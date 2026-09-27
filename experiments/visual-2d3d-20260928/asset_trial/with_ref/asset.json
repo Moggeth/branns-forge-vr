@@ -1,0 +1,132 @@
+{
+  "id": "orchard_brook_footbridge",
+  "units": "metres",
+  "axes_gltf": {
+    "up": "+Y",
+    "long_axis": "Z (symmetric)",
+    "origin": "centre of walking deck, deck top at Y=0"
+  },
+  "deck": {
+    "length_m": 5.0,
+    "clear_walk_width_m": 3.4,
+    "walk_top_y": 0.0,
+    "walkway_x_range": [
+      -1.7,
+      1.7
+    ],
+    "walkway_z_range": [
+      -2.5,
+      2.5
+    ],
+    "stone_landing_abs_z_range": [
+      2.5,
+      2.95
+    ]
+  },
+  "parapet": {
+    "inner_face_abs_x": 1.7,
+    "outer_abs_x": 2.1,
+    "coping_top_y": 0.9,
+    "post_top_y": 1.23,
+    "post_outer_abs_x": 2.31
+  },
+  "span": {
+    "clear_span_between_abutments_m": 4.6,
+    "stream_width_supported_m": [
+      3.0,
+      4.6
+    ],
+    "arch_springing_y": -1.15,
+    "arch_crown_soffit_y": -0.62,
+    "timber_soffit_y": -0.4,
+    "footing_y": -1.6,
+    "headroom_above_footing_at_centre_m": 1.2
+  },
+  "overall_bounds_gltf": {
+    "x": [
+      -2.31,
+      2.31
+    ],
+    "y": [
+      -1.62,
+      1.28
+    ],
+    "z": [
+      -2.941,
+      2.941
+    ]
+  },
+  "collision": {
+    "nodes": [
+      "col_walkway-colonly",
+      "col_parapet_L-colonly",
+      "col_parapet_R-colonly"
+    ],
+    "boxes_gltf_min_max": {
+      "walkway": {
+        "min": [
+          -1.7,
+          -0.2,
+          -2.95
+        ],
+        "max": [
+          1.7,
+          0.0,
+          2.95
+        ]
+      },
+      "parapet_L": {
+        "min": [
+          -2.31,
+          -0.2,
+          -2.55
+        ],
+        "max": [
+          -1.7,
+          1.23,
+          2.55
+        ]
+      },
+      "parapet_R": {
+        "min": [
+          1.7,
+          -0.2,
+          -2.55
+        ],
+        "max": [
+          2.31,
+          1.23,
+          2.55
+        ]
+      }
+    },
+    "note": "Walkway box top at Y=0 is the walk surface; parapet boxes start exactly at |x|=1.7 so they never intrude into the walkway."
+  },
+  "stats": {
+    "visual_meshes": 7,
+    "visual_triangles": 9832,
+    "per_mesh_triangles": {
+      "bridge_stone": 4268,
+      "bridge_stone_warm": 2596,
+      "bridge_moss": 600,
+      "bridge_wood": 484,
+      "bridge_wood_alt": 264,
+      "bridge_wood_dark": 396,
+      "bridge_iron": 1224
+    },
+    "bounds_blender_min": [
+      -2.31,
+      -2.941,
+      -1.62
+    ],
+    "bounds_blender_max": [
+      2.31,
+      2.941,
+      1.28
+    ],
+    "walkway_intrusions": [],
+    "build_seconds": 0.086,
+    "export_seconds": 0.104,
+    "render_seconds": 1.53
+  }
+}

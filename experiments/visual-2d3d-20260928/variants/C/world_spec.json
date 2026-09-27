@@ -1,0 +1,5359 @@
+{
+ "version": 1,
+ "variant": "C",
+ "method": "2d_reference_guided_opus_3d",
+ "seed": 20260928,
+ "bounds_m": [
+  80,
+  80
+ ],
+ "spawn_xz": [
+  -30,
+  29
+ ],
+ "goal_xz": [
+  24,
+  -27
+ ],
+ "path_xz": [
+  [
+   -30,
+   29
+  ],
+  [
+   -26.5,
+   25.6
+  ],
+  [
+   -21.5,
+   22.3
+  ],
+  [
+   -16.5,
+   19.0
+  ],
+  [
+   -13.8,
+   14.5
+  ],
+  [
+   -10.6,
+   10.4
+  ],
+  [
+   -6.6,
+   8.2
+  ],
+  [
+   -4.4,
+   7.0
+  ],
+  [
+   -2.776,
+   3.74
+  ],
+  [
+   2.976,
+   -4.44
+  ],
+  [
+   4.6,
+   -7.2
+  ],
+  [
+   7.6,
+   -10.8
+  ],
+  [
+   11.2,
+   -14.4
+  ],
+  [
+   15.6,
+   -17.4
+  ],
+  [
+   19.6,
+   -19.6
+  ],
+  [
+   21.9,
+   -22.6
+  ],
+  [
+   24,
+   -27
+  ]
+ ],
+ "stream": {
+  "points_xz": [
+   [
+    -41,
+    -5.2
+   ],
+   [
+    -32,
+    -3.3
+   ],
+   [
+    -24,
+    -1.2
+   ],
+   [
+    -16.4,
+    -2.4
+   ],
+   [
+    -9.4,
+    -3.4
+   ],
+   [
+    -4.3,
+    -2.4
+   ],
+   [
+    0.0,
+    -0.3
+   ],
+   [
+    5.9,
+    1.15
+   ],
+   [
+    11,
+    1.5
+   ],
+   [
+    16.1,
+    0.2
+   ],
+   [
+    20.6,
+    -0.45
+   ],
+   [
+    28.9,
+    0.8
+   ],
+   [
+    41,
+    2.75
+   ]
+  ],
+  "width_m": 4.5,
+  "c_water_y": -0.9
+ },
+ "crossing": {
+  "center_xz": [
+   0.1,
+   -0.35
+  ],
+  "width_m": 3.4,
+  "length_m": 10.0,
+  "yaw_rad": 2.5288,
+  "c_outer_width_m": 4.4,
+  "c_type": "stone-parapet timber-deck arch (procedural)",
+  "c_ends_xz": [
+   [
+    -2.776,
+    3.74
+   ],
+   [
+    2.976,
+    -4.44
+   ]
+  ]
+ },
+ "terrain": {
+  "base_y": 0.0,
+  "gaussian_coefficient": 1.0,
+  "stream_carve": {
+   "kind": "none"
+  },
+  "hills": [
+   {
+    "center_xz": [
+     -15.0,
+     -17.0
+    ],
+    "radius_m": 8.5,
+    "amplitude_m": 1.4
+   },
+   {
+    "center_xz": [
+     -1.0,
+     -21.8
+    ],
+    "radius_m": 4.5,
+    "amplitude_m": 0.6
+   },
+   {
+    "center_xz": [
+     15.0,
+     15.5
+    ],
+    "radius_m": 8.5,
+    "amplitude_m": 1.3
+   },
+   {
+    "center_xz": [
+     28.3,
+     13.6
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": 0.5
+   },
+   {
+    "center_xz": [
+     -40.0,
+     -40.0
+    ],
+    "radius_m": 16.0,
+    "amplitude_m": 4.0
+   },
+   {
+    "center_xz": [
+     -44.0,
+     16.0
+    ],
+    "radius_m": 9.0,
+    "amplitude_m": 2.5
+   },
+   {
+    "center_xz": [
+     8.0,
+     -44.0
+    ],
+    "radius_m": 12.0,
+    "amplitude_m": 3.0
+   },
+   {
+    "center_xz": [
+     46.0,
+     22.0
+    ],
+    "radius_m": 12.0,
+    "amplitude_m": 3.2
+   },
+   {
+    "center_xz": [
+     40.0,
+     42.0
+    ],
+    "radius_m": 16.0,
+    "amplitude_m": 4.0
+   },
+   {
+    "center_xz": [
+     -6.0,
+     44.0
+    ],
+    "radius_m": 11.0,
+    "amplitude_m": 2.6
+   },
+   {
+    "center_xz": [
+     43.0,
+     -17.0
+    ],
+    "radius_m": 8.0,
+    "amplitude_m": 2.0
+   },
+   {
+    "center_xz": [
+     -22.0,
+     14.0
+    ],
+    "radius_m": 9.0,
+    "amplitude_m": 0.8
+   },
+   {
+    "center_xz": [
+     10.0,
+     -20.0
+    ],
+    "radius_m": 8.0,
+    "amplitude_m": 0.7
+   },
+   {
+    "center_xz": [
+     -12.0,
+     26.0
+    ],
+    "radius_m": 8.0,
+    "amplitude_m": 0.9
+   },
+   {
+    "center_xz": [
+     26.0,
+     -29.0
+    ],
+    "radius_m": 9.0,
+    "amplitude_m": 1.2
+   },
+   {
+    "center_xz": [
+     -41,
+     -5.2
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -38.06,
+     -4.58
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -35.13,
+     -3.96
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -32.2,
+     -3.29
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -29.29,
+     -2.58
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -26.37,
+     -1.89
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -23.39,
+     -1.58
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -20.4,
+     -1.77
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -17.44,
+     -2.23
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -14.47,
+     -2.67
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -11.5,
+     -3.07
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -8.5,
+     -3.12
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -5.55,
+     -2.6
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     -2.72,
+     -1.62
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     0.04,
+     -0.44
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     2.91,
+     0.42
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     5.85,
+     1.02
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     8.83,
+     1.35
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     11.82,
+     1.2
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     14.75,
+     0.56
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     17.69,
+     -0.02
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     20.68,
+     -0.23
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     23.67,
+     0.02
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     26.64,
+     0.46
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     29.6,
+     0.92
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     32.56,
+     1.39
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     35.53,
+     1.87
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     38.49,
+     2.35
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   },
+   {
+    "center_xz": [
+     41,
+     2.75
+    ],
+    "radius_m": 3.5,
+    "amplitude_m": -0.63
+   }
+  ],
+  "c_falloff": "amplitude_m * exp(-(d/radius_m)^2), summed; negative hills carve the brook trench"
+ },
+ "regions": [
+  {
+   "name": "meadow",
+   "surface": "grass",
+   "polygon_xz": [
+    [
+     -40,
+     -40
+    ],
+    [
+     40,
+     -40
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     -40,
+     40
+    ]
+   ],
+   "tree_density": 0.02
+  },
+  {
+   "name": "woods_northwest",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     -20.0,
+     -30.0
+    ],
+    [
+     -21.47,
+     -24.5
+    ],
+    [
+     -25.5,
+     -20.47
+    ],
+    [
+     -31.0,
+     -19.0
+    ],
+    [
+     -36.5,
+     -20.47
+    ],
+    [
+     -40.53,
+     -24.5
+    ],
+    [
+     -42.0,
+     -30.0
+    ],
+    [
+     -40.53,
+     -35.5
+    ],
+    [
+     -36.5,
+     -39.53
+    ],
+    [
+     -31.0,
+     -41.0
+    ],
+    [
+     -25.5,
+     -39.53
+    ],
+    [
+     -21.47,
+     -35.5
+    ]
+   ],
+   "tree_density": 0.85
+  },
+  {
+   "name": "woods_northwest_b",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     -13.0,
+     -35.0
+    ],
+    [
+     -13.94,
+     -31.5
+    ],
+    [
+     -16.5,
+     -28.94
+    ],
+    [
+     -20.0,
+     -28.0
+    ],
+    [
+     -23.5,
+     -28.94
+    ],
+    [
+     -26.06,
+     -31.5
+    ],
+    [
+     -27.0,
+     -35.0
+    ],
+    [
+     -26.06,
+     -38.5
+    ],
+    [
+     -23.5,
+     -41.06
+    ],
+    [
+     -20.0,
+     -42.0
+    ],
+    [
+     -16.5,
+     -41.06
+    ],
+    [
+     -13.94,
+     -38.5
+    ]
+   ],
+   "tree_density": 0.8
+  },
+  {
+   "name": "woods_north",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     19.0,
+     -33.0
+    ],
+    [
+     18.06,
+     -29.5
+    ],
+    [
+     15.5,
+     -26.94
+    ],
+    [
+     12.0,
+     -26.0
+    ],
+    [
+     8.5,
+     -26.94
+    ],
+    [
+     5.94,
+     -29.5
+    ],
+    [
+     5.0,
+     -33.0
+    ],
+    [
+     5.94,
+     -36.5
+    ],
+    [
+     8.5,
+     -39.06
+    ],
+    [
+     12.0,
+     -40.0
+    ],
+    [
+     15.5,
+     -39.06
+    ],
+    [
+     18.06,
+     -36.5
+    ]
+   ],
+   "tree_density": 0.75
+  },
+  {
+   "name": "woods_east",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     41.0,
+     -8.0
+    ],
+    [
+     40.2,
+     -5.0
+    ],
+    [
+     38.0,
+     -2.8
+    ],
+    [
+     35.0,
+     -2.0
+    ],
+    [
+     32.0,
+     -2.8
+    ],
+    [
+     29.8,
+     -5.0
+    ],
+    [
+     29.0,
+     -8.0
+    ],
+    [
+     29.8,
+     -11.0
+    ],
+    [
+     32.0,
+     -13.2
+    ],
+    [
+     35.0,
+     -14.0
+    ],
+    [
+     38.0,
+     -13.2
+    ],
+    [
+     40.2,
+     -11.0
+    ]
+   ],
+   "tree_density": 0.7
+  },
+  {
+   "name": "woods_east_b",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     40.0,
+     5.0
+    ],
+    [
+     39.33,
+     7.5
+    ],
+    [
+     37.5,
+     9.33
+    ],
+    [
+     35.0,
+     10.0
+    ],
+    [
+     32.5,
+     9.33
+    ],
+    [
+     30.67,
+     7.5
+    ],
+    [
+     30.0,
+     5.0
+    ],
+    [
+     30.67,
+     2.5
+    ],
+    [
+     32.5,
+     0.67
+    ],
+    [
+     35.0,
+     0.0
+    ],
+    [
+     37.5,
+     0.67
+    ],
+    [
+     39.33,
+     2.5
+    ]
+   ],
+   "tree_density": 0.6
+  },
+  {
+   "name": "woods_southeast",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     40.0,
+     30.0
+    ],
+    [
+     38.39,
+     36.0
+    ],
+    [
+     34.0,
+     40.39
+    ],
+    [
+     28.0,
+     42.0
+    ],
+    [
+     22.0,
+     40.39
+    ],
+    [
+     17.61,
+     36.0
+    ],
+    [
+     16.0,
+     30.0
+    ],
+    [
+     17.61,
+     24.0
+    ],
+    [
+     22.0,
+     19.61
+    ],
+    [
+     28.0,
+     18.0
+    ],
+    [
+     34.0,
+     19.61
+    ],
+    [
+     38.39,
+     24.0
+    ]
+   ],
+   "tree_density": 0.9
+  },
+  {
+   "name": "woods_southeast_b",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     20.0,
+     34.0
+    ],
+    [
+     19.2,
+     37.0
+    ],
+    [
+     17.0,
+     39.2
+    ],
+    [
+     14.0,
+     40.0
+    ],
+    [
+     11.0,
+     39.2
+    ],
+    [
+     8.8,
+     37.0
+    ],
+    [
+     8.0,
+     34.0
+    ],
+    [
+     8.8,
+     31.0
+    ],
+    [
+     11.0,
+     28.8
+    ],
+    [
+     14.0,
+     28.0
+    ],
+    [
+     17.0,
+     28.8
+    ],
+    [
+     19.2,
+     31.0
+    ]
+   ],
+   "tree_density": 0.8
+  },
+  {
+   "name": "woods_southwest",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     -27.0,
+     12.0
+    ],
+    [
+     -27.94,
+     15.5
+    ],
+    [
+     -30.5,
+     18.06
+    ],
+    [
+     -34.0,
+     19.0
+    ],
+    [
+     -37.5,
+     18.06
+    ],
+    [
+     -40.06,
+     15.5
+    ],
+    [
+     -41.0,
+     12.0
+    ],
+    [
+     -40.06,
+     8.5
+    ],
+    [
+     -37.5,
+     5.94
+    ],
+    [
+     -34.0,
+     5.0
+    ],
+    [
+     -30.5,
+     5.94
+    ],
+    [
+     -27.94,
+     8.5
+    ]
+   ],
+   "tree_density": 0.8
+  },
+  {
+   "name": "woods_south",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     -8.0,
+     35.0
+    ],
+    [
+     -9.07,
+     39.0
+    ],
+    [
+     -12.0,
+     41.93
+    ],
+    [
+     -16.0,
+     43.0
+    ],
+    [
+     -20.0,
+     41.93
+    ],
+    [
+     -22.93,
+     39.0
+    ],
+    [
+     -24.0,
+     35.0
+    ],
+    [
+     -22.93,
+     31.0
+    ],
+    [
+     -20.0,
+     28.07
+    ],
+    [
+     -16.0,
+     27.0
+    ],
+    [
+     -12.0,
+     28.07
+    ],
+    [
+     -9.07,
+     31.0
+    ]
+   ],
+   "tree_density": 0.85
+  },
+  {
+   "name": "woods_west",
+   "surface": "grass_woodland",
+   "polygon_xz": [
+    [
+     -31.0,
+     -12.0
+    ],
+    [
+     -31.67,
+     -9.5
+    ],
+    [
+     -33.5,
+     -7.67
+    ],
+    [
+     -36.0,
+     -7.0
+    ],
+    [
+     -38.5,
+     -7.67
+    ],
+    [
+     -40.33,
+     -9.5
+    ],
+    [
+     -41.0,
+     -12.0
+    ],
+    [
+     -40.33,
+     -14.5
+    ],
+    [
+     -38.5,
+     -16.33
+    ],
+    [
+     -36.0,
+     -17.0
+    ],
+    [
+     -33.5,
+     -16.33
+    ],
+    [
+     -31.67,
+     -14.5
+    ]
+   ],
+   "tree_density": 0.6
+  },
+  {
+   "name": "clearing_northwest",
+   "surface": "dirt",
+   "polygon_xz": [
+    [
+     -8.0,
+     -17.0
+    ],
+    [
+     -9.34,
+     -13.71
+    ],
+    [
+     -12.84,
+     -11.67
+    ],
+    [
+     -17.16,
+     -11.67
+    ],
+    [
+     -20.66,
+     -13.71
+    ],
+    [
+     -22.0,
+     -17.0
+    ],
+    [
+     -20.66,
+     -20.29
+    ],
+    [
+     -17.16,
+     -22.33
+    ],
+    [
+     -12.84,
+     -22.33
+    ],
+    [
+     -9.34,
+     -20.29
+    ]
+   ],
+   "tree_density": 0.0
+  },
+  {
+   "name": "clearing_north_small",
+   "surface": "dirt",
+   "polygon_xz": [
+    [
+     2.2,
+     -21.8
+    ],
+    [
+     1.26,
+     -20.22
+    ],
+    [
+     -1.0,
+     -19.56
+    ],
+    [
+     -3.26,
+     -20.22
+    ],
+    [
+     -4.2,
+     -21.8
+    ],
+    [
+     -3.26,
+     -23.38
+    ],
+    [
+     -1.0,
+     -24.04
+    ],
+    [
+     1.26,
+     -23.38
+    ]
+   ],
+   "tree_density": 0.0
+  },
+  {
+   "name": "clearing_southeast",
+   "surface": "dirt",
+   "polygon_xz": [
+    [
+     22.0,
+     15.5
+    ],
+    [
+     20.66,
+     18.59
+    ],
+    [
+     17.16,
+     20.49
+    ],
+    [
+     12.84,
+     20.49
+    ],
+    [
+     9.34,
+     18.59
+    ],
+    [
+     8.0,
+     15.5
+    ],
+    [
+     9.34,
+     12.41
+    ],
+    [
+     12.84,
+     10.51
+    ],
+    [
+     17.16,
+     10.51
+    ],
+    [
+     20.66,
+     12.41
+    ]
+   ],
+   "tree_density": 0.0
+  },
+  {
+   "name": "brook",
+   "surface": "water",
+   "polygon_xz": [
+    [
+     -41.46,
+     -3.0
+    ],
+    [
+     -37.55,
+     -2.17
+    ],
+    [
+     -33.67,
+     -1.35
+    ],
+    [
+     -29.85,
+     -0.41
+    ],
+    [
+     -25.71,
+     0.66
+    ],
+    [
+     -21.32,
+     0.65
+    ],
+    [
+     -17.21,
+     0.01
+    ],
+    [
+     -13.27,
+     -0.57
+    ],
+    [
+     -9.67,
+     -1.12
+    ],
+    [
+     -6.3,
+     -0.51
+    ],
+    [
+     -2.79,
+     0.83
+    ],
+    [
+     1.07,
+     2.28
+    ],
+    [
+     5.25,
+     3.3
+    ],
+    [
+     9.66,
+     3.65
+    ],
+    [
+     13.91,
+     3.07
+    ],
+    [
+     17.76,
+     2.23
+    ],
+    [
+     21.3,
+     1.92
+    ],
+    [
+     25.0,
+     2.49
+    ],
+    [
+     28.94,
+     3.09
+    ],
+    [
+     32.88,
+     3.72
+    ],
+    [
+     36.83,
+     4.36
+    ],
+    [
+     40.64,
+     4.97
+    ],
+    [
+     41.36,
+     0.53
+    ],
+    [
+     37.54,
+     -0.09
+    ],
+    [
+     33.59,
+     -0.72
+    ],
+    [
+     29.63,
+     -1.36
+    ],
+    [
+     25.67,
+     -1.96
+    ],
+    [
+     21.45,
+     -2.58
+    ],
+    [
+     17.08,
+     -2.22
+    ],
+    [
+     13.12,
+     -1.36
+    ],
+    [
+     9.54,
+     -0.85
+    ],
+    [
+     5.98,
+     -1.14
+    ],
+    [
+     2.4,
+     -2.02
+    ],
+    [
+     -1.2,
+     -3.38
+    ],
+    [
+     -5.11,
+     -4.85
+    ],
+    [
+     -9.6,
+     -5.62
+    ],
+    [
+     -13.92,
+     -5.03
+    ],
+    [
+     -17.89,
+     -4.44
+    ],
+    [
+     -21.68,
+     -3.84
+    ],
+    [
+     -25.14,
+     -3.8
+    ],
+    [
+     -28.73,
+     -4.77
+    ],
+    [
+     -32.67,
+     -5.74
+    ],
+    [
+     -36.62,
+     -6.58
+    ],
+    [
+     -40.54,
+     -7.4
+    ]
+   ],
+   "tree_density": 0.0
+  },
+  {
+   "name": "lane",
+   "surface": "dirt_path",
+   "polygon_xz": [
+    [
+     -28.75,
+     30.29
+    ],
+    [
+     -26.64,
+     28.24
+    ],
+    [
+     -24.49,
+     26.42
+    ],
+    [
+     -22.07,
+     24.83
+    ],
+    [
+     -19.57,
+     23.18
+    ],
+    [
+     -16.94,
+     21.44
+    ],
+    [
+     -14.51,
+     19.15
+    ],
+    [
+     -12.86,
+     16.44
+    ],
+    [
+     -11.19,
+     14.08
+    ],
+    [
+     -9.59,
+     11.99
+    ],
+    [
+     -7.34,
+     10.66
+    ],
+    [
+     -4.51,
+     9.08
+    ],
+    [
+     -2.22,
+     6.6
+    ],
+    [
+     -0.69,
+     3.9
+    ],
+    [
+     0.98,
+     1.52
+    ],
+    [
+     2.71,
+     -0.93
+    ],
+    [
+     4.48,
+     -3.45
+    ],
+    [
+     5.96,
+     -5.98
+    ],
+    [
+     7.75,
+     -8.16
+    ],
+    [
+     9.68,
+     -10.33
+    ],
+    [
+     11.68,
+     -12.34
+    ],
+    [
+     13.91,
+     -14.07
+    ],
+    [
+     16.28,
+     -15.69
+    ],
+    [
+     18.93,
+     -17.19
+    ],
+    [
+     21.56,
+     -19.22
+    ],
+    [
+     23.59,
+     -21.97
+    ],
+    [
+     24.96,
+     -24.83
+    ],
+    [
+     25.62,
+     -26.22
+    ],
+    [
+     22.38,
+     -27.78
+    ],
+    [
+     21.71,
+     -26.38
+    ],
+    [
+     20.5,
+     -23.82
+    ],
+    [
+     18.98,
+     -21.73
+    ],
+    [
+     16.95,
+     -20.19
+    ],
+    [
+     14.38,
+     -18.74
+    ],
+    [
+     11.79,
+     -16.98
+    ],
+    [
+     9.3,
+     -15.04
+    ],
+    [
+     7.06,
+     -12.81
+    ],
+    [
+     5.01,
+     -10.5
+    ],
+    [
+     3.01,
+     -8.03
+    ],
+    [
+     1.45,
+     -5.4
+    ],
+    [
+     -0.24,
+     -3.0
+    ],
+    [
+     -1.96,
+     -0.55
+    ],
+    [
+     -3.74,
+     1.98
+    ],
+    [
+     -5.14,
+     4.5
+    ],
+    [
+     -6.72,
+     6.24
+    ],
+    [
+     -9.14,
+     7.54
+    ],
+    [
+     -11.99,
+     9.3
+    ],
+    [
+     -14.08,
+     11.93
+    ],
+    [
+     -15.88,
+     14.47
+    ],
+    [
+     -17.32,
+     16.89
+    ],
+    [
+     -19.17,
+     18.61
+    ],
+    [
+     -21.55,
+     20.18
+    ],
+    [
+     -24.05,
+     21.83
+    ],
+    [
+     -26.64,
+     23.54
+    ],
+    [
+     -29.06,
+     25.58
+    ],
+    [
+     -31.25,
+     27.71
+    ]
+   ],
+   "tree_density": 0.0
+  },
+  {
+   "name": "beacon_ruin",
+   "surface": "stone",
+   "polygon_xz": [
+    [
+     31.5,
+     -27.0
+    ],
+    [
+     30.76,
+     -23.75
+    ],
+    [
+     28.68,
+     -21.14
+    ],
+    [
+     25.67,
+     -19.69
+    ],
+    [
+     22.33,
+     -19.69
+    ],
+    [
+     19.32,
+     -21.14
+    ],
+    [
+     17.24,
+     -23.75
+    ],
+    [
+     16.5,
+     -27.0
+    ],
+    [
+     17.24,
+     -30.25
+    ],
+    [
+     19.32,
+     -32.86
+    ],
+    [
+     22.33,
+     -34.31
+    ],
+    [
+     25.67,
+     -34.31
+    ],
+    [
+     28.68,
+     -32.86
+    ],
+    [
+     30.76,
+     -30.25
+    ]
+   ],
+   "tree_density": 0.0
+  }
+ ],
+ "objects": [
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -3.0,
+    0.246,
+    -14.5
+   ],
+   "yaw_rad": 3.4525,
+   "scale": 0.948,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    17.7,
+    0.115,
+    -11.9
+   ],
+   "yaw_rad": 1.3448,
+   "scale": 0.883,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -25.3,
+    0.131,
+    -8.7
+   ],
+   "yaw_rad": 6.0528,
+   "scale": 1.17,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -17.4,
+    0.554,
+    10.7
+   ],
+   "yaw_rad": 6.2025,
+   "scale": 0.967,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    5.3,
+    0.191,
+    23.5
+   ],
+   "yaw_rad": 2.9072,
+   "scale": 0.941,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -0.4,
+    0.558,
+    30.8
+   ],
+   "yaw_rad": 2.5277,
+   "scale": 1.052,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -6.2,
+    0.887,
+    29.3
+   ],
+   "yaw_rad": 5.1859,
+   "scale": 1.174,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -13.5,
+    1.037,
+    26.0
+   ],
+   "yaw_rad": 5.7487,
+   "scale": 1.173,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    19.7,
+    0.191,
+    -15.3
+   ],
+   "yaw_rad": 0.1571,
+   "scale": 1.018,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -16.4,
+    0.442,
+    -30.5
+   ],
+   "yaw_rad": 5.901,
+   "scale": 1.187,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    1.1,
+    1.255,
+    -35.1
+   ],
+   "yaw_rad": 3.9177,
+   "scale": 1.15,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    6.0,
+    0.359,
+    12.0
+   ],
+   "yaw_rad": 1.3816,
+   "scale": 1.135,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -8.0,
+    0.16,
+    -8.5
+   ],
+   "yaw_rad": 1.0507,
+   "scale": 1.105,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    24.5,
+    -0.092,
+    -5.5
+   ],
+   "yaw_rad": 2.6721,
+   "scale": 1.121,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -28.0,
+    0.057,
+    3.5
+   ],
+   "yaw_rad": 5.5331,
+   "scale": 1.175,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -36.57,
+    3.812,
+    -39.272
+   ],
+   "yaw_rad": 3.7136,
+   "scale": 1.132,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -23.083,
+    0.837,
+    -27.592
+   ],
+   "yaw_rad": 5.5699,
+   "scale": 1.062,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -23.406,
+    1.257,
+    -35.273
+   ],
+   "yaw_rad": 2.6519,
+   "scale": 0.856,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -31.556,
+    2.536,
+    -33.26
+   ],
+   "yaw_rad": 1.0626,
+   "scale": 0.895,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -28.152,
+    2.166,
+    -35.908
+   ],
+   "yaw_rad": 6.03,
+   "scale": 0.887,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -22.142,
+    0.77,
+    -24.301
+   ],
+   "yaw_rad": 5.1256,
+   "scale": 1.174,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -36.653,
+    2.851,
+    -31.312
+   ],
+   "yaw_rad": 4.1098,
+   "scale": 1.053,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -26.485,
+    0.775,
+    -23.062
+   ],
+   "yaw_rad": 1.0021,
+   "scale": 0.968,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -33.558,
+    3.215,
+    -36.197
+   ],
+   "yaw_rad": 1.662,
+   "scale": 1.13,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -28.645,
+    0.619,
+    -20.251
+   ],
+   "yaw_rad": 1.2652,
+   "scale": 1.002,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -26.358,
+    1.494,
+    -31.751
+   ],
+   "yaw_rad": 0.7505,
+   "scale": 1.173,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -32.915,
+    1.877,
+    -28.002
+   ],
+   "yaw_rad": 5.4717,
+   "scale": 1.192,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -36.497,
+    1.568,
+    -24.911
+   ],
+   "yaw_rad": 1.7248,
+   "scale": 1.081,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -34.432,
+    0.757,
+    -20.065
+   ],
+   "yaw_rad": 0.9507,
+   "scale": 1.069,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -38.921,
+    3.546,
+    -34.55
+   ],
+   "yaw_rad": 5.7446,
+   "scale": 1.17,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -31.612,
+    3.032,
+    -39.212
+   ],
+   "yaw_rad": 5.7682,
+   "scale": 0.957,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -32.019,
+    1.028,
+    -23.033
+   ],
+   "yaw_rad": 4.7776,
+   "scale": 0.876,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -22.045,
+    0.897,
+    -31.51
+   ],
+   "yaw_rad": 5.4949,
+   "scale": 1.043,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -29.495,
+    1.82,
+    -30.404
+   ],
+   "yaw_rad": 5.9509,
+   "scale": 0.868,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -38.918,
+    2.347,
+    -28.366
+   ],
+   "yaw_rad": 3.1465,
+   "scale": 1.125,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -26.473,
+    1.153,
+    -27.947
+   ],
+   "yaw_rad": 1.2835,
+   "scale": 0.935,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -29.218,
+    1.154,
+    -25.542
+   ],
+   "yaw_rad": 1.9179,
+   "scale": 0.854,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -24.99,
+    1.643,
+    -38.311
+   ],
+   "yaw_rad": 0.6842,
+   "scale": 0.98,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -38.659,
+    1.15,
+    -22.181
+   ],
+   "yaw_rad": 6.2748,
+   "scale": 1.169,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -20.998,
+    0.966,
+    -37.728
+   ],
+   "yaw_rad": 2.3639,
+   "scale": 1.122,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -17.129,
+    0.537,
+    -37.439
+   ],
+   "yaw_rad": 1.0517,
+   "scale": 0.94,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -13.294,
+    0.314,
+    -35.155
+   ],
+   "yaw_rad": 5.5522,
+   "scale": 1.071,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -19.342,
+    0.684,
+    -33.971
+   ],
+   "yaw_rad": 1.7488,
+   "scale": 1.183,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -19.564,
+    0.642,
+    -28.2
+   ],
+   "yaw_rad": 5.0351,
+   "scale": 0.94,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    16.753,
+    1.509,
+    -37.755
+   ],
+   "yaw_rad": 3.5023,
+   "scale": 1.01,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    11.282,
+    0.9,
+    -29.552
+   ],
+   "yaw_rad": 1.6781,
+   "scale": 1.185,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    5.966,
+    1.237,
+    -32.607
+   ],
+   "yaw_rad": 5.6183,
+   "scale": 0.966,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    14.174,
+    1.459,
+    -34.961
+   ],
+   "yaw_rad": 2.237,
+   "scale": 1.156,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    7.114,
+    0.769,
+    -28.339
+   ],
+   "yaw_rad": 4.5116,
+   "scale": 1.07,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    10.855,
+    2.185,
+    -37.699
+   ],
+   "yaw_rad": 0.9372,
+   "scale": 1.164,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    12.145,
+    0.754,
+    -26.18
+   ],
+   "yaw_rad": 0.7739,
+   "scale": 1.102,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    10.89,
+    1.444,
+    -33.683
+   ],
+   "yaw_rad": 5.5905,
+   "scale": 1.104,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    6.548,
+    1.993,
+    -36.391
+   ],
+   "yaw_rad": 2.635,
+   "scale": 0.991,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    35.543,
+    -0.019,
+    -3.904
+   ],
+   "yaw_rad": 2.098,
+   "scale": 1.198,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    34.402,
+    0.197,
+    -8.286
+   ],
+   "yaw_rad": 4.5339,
+   "scale": 1.176,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    35.306,
+    0.538,
+    -11.879
+   ],
+   "yaw_rad": 2.1974,
+   "scale": 1.134,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    29.137,
+    0.012,
+    -6.799
+   ],
+   "yaw_rad": 6.0406,
+   "scale": 0.938,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    30.211,
+    0.111,
+    -11.153
+   ],
+   "yaw_rad": 2.998,
+   "scale": 1.097,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    38.47,
+    0.601,
+    -9.457
+   ],
+   "yaw_rad": 1.9389,
+   "scale": 0.887,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    32.292,
+    -0.007,
+    -5.059
+   ],
+   "yaw_rad": 2.167,
+   "scale": 0.936,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    33.352,
+    0.391,
+    9.152
+   ],
+   "yaw_rad": 1.4622,
+   "scale": 0.985,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    35.798,
+    -0.043,
+    6.079
+   ],
+   "yaw_rad": 3.2339,
+   "scale": 1.155,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    37.932,
+    0.651,
+    8.999
+   ],
+   "yaw_rad": 3.2502,
+   "scale": 0.871,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    32.164,
+    -0.11,
+    5.767
+   ],
+   "yaw_rad": 4.5866,
+   "scale": 0.963,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    19.249,
+    0.596,
+    24.15
+   ],
+   "yaw_rad": 5.8043,
+   "scale": 1.062,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    27.53,
+    1.691,
+    32.688
+   ],
+   "yaw_rad": 1.7239,
+   "scale": 0.993,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    20.181,
+    0.548,
+    29.39
+   ],
+   "yaw_rad": 4.8822,
+   "scale": 0.916,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    38.899,
+    3.878,
+    33.066
+   ],
+   "yaw_rad": 5.6663,
+   "scale": 1.053,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    24.259,
+    0.657,
+    21.553
+   ],
+   "yaw_rad": 2.6842,
+   "scale": 1.023,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    36.909,
+    3.858,
+    36.744
+   ],
+   "yaw_rad": 5.4487,
+   "scale": 0.993,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    23.383,
+    0.731,
+    27.266
+   ],
+   "yaw_rad": 4.5002,
+   "scale": 1.193,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    25.174,
+    1.51,
+    35.928
+   ],
+   "yaw_rad": 1.4415,
+   "scale": 1.077,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    34.265,
+    1.944,
+    21.759
+   ],
+   "yaw_rad": 5.9085,
+   "scale": 0.957,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    18.314,
+    0.528,
+    34.289
+   ],
+   "yaw_rad": 2.0242,
+   "scale": 1.022,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    29.327,
+    1.677,
+    29.16
+   ],
+   "yaw_rad": 5.4478,
+   "scale": 1.069,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    32.432,
+    3.152,
+    37.949
+   ],
+   "yaw_rad": 0.3712,
+   "scale": 1.118,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    35.45,
+    2.951,
+    28.92
+   ],
+   "yaw_rad": 4.4275,
+   "scale": 1.006,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    21.608,
+    0.919,
+    35.36
+   ],
+   "yaw_rad": 1.3159,
+   "scale": 1.147,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    28.75,
+    1.033,
+    22.874
+   ],
+   "yaw_rad": 5.9807,
+   "scale": 0.925,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    21.836,
+    1.073,
+    38.878
+   ],
+   "yaw_rad": 1.7349,
+   "scale": 0.914,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    31.984,
+    2.674,
+    33.506
+   ],
+   "yaw_rad": 0.6665,
+   "scale": 0.907,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    26.237,
+    0.666,
+    18.476
+   ],
+   "yaw_rad": 0.1316,
+   "scale": 0.912,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    33.292,
+    2.167,
+    25.973
+   ],
+   "yaw_rad": 3.2351,
+   "scale": 1.198,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    23.625,
+    0.959,
+    31.176
+   ],
+   "yaw_rad": 1.6137,
+   "scale": 1.046,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    28.043,
+    2.195,
+    37.771
+   ],
+   "yaw_rad": 3.986,
+   "scale": 0.902,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    37.325,
+    3.114,
+    25.821
+   ],
+   "yaw_rad": 0.6925,
+   "scale": 1.017,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    16.326,
+    0.338,
+    30.836
+   ],
+   "yaw_rad": 3.93,
+   "scale": 1.15,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    30.194,
+    0.952,
+    18.891
+   ],
+   "yaw_rad": 3.1438,
+   "scale": 0.927,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    26.645,
+    0.96,
+    25.563
+   ],
+   "yaw_rad": 5.5407,
+   "scale": 1.016,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    39.195,
+    3.729,
+    29.333
+   ],
+   "yaw_rad": 3.5216,
+   "scale": 0.929,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    16.668,
+    0.405,
+    27.096
+   ],
+   "yaw_rad": 1.1831,
+   "scale": 1.085,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    13.744,
+    0.275,
+    34.433
+   ],
+   "yaw_rad": 0.2533,
+   "scale": 1.072,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    8.47,
+    0.279,
+    34.18
+   ],
+   "yaw_rad": 0.6255,
+   "scale": 1.171,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    10.088,
+    0.353,
+    38.406
+   ],
+   "yaw_rad": 1.5653,
+   "scale": 0.88,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    10.883,
+    0.195,
+    29.141
+   ],
+   "yaw_rad": 0.4073,
+   "scale": 1.102,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    14.856,
+    0.382,
+    38.715
+   ],
+   "yaw_rad": 2.2272,
+   "scale": 1.111,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -30.506,
+    0.494,
+    11.148
+   ],
+   "yaw_rad": 2.4596,
+   "scale": 1.129,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -33.037,
+    0.199,
+    5.19
+   ],
+   "yaw_rad": 0.9427,
+   "scale": 1.039,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -35.975,
+    1.167,
+    14.435
+   ],
+   "yaw_rad": 1.6699,
+   "scale": 1.155,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -28.444,
+    0.377,
+    8.22
+   ],
+   "yaw_rad": 5.3744,
+   "scale": 1.137,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -29.274,
+    0.583,
+    14.935
+   ],
+   "yaw_rad": 1.3316,
+   "scale": 1.084,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -32.596,
+    0.668,
+    17.247
+   ],
+   "yaw_rad": 3.8325,
+   "scale": 1.017,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -38.941,
+    0.879,
+    8.218
+   ],
+   "yaw_rad": 2.5985,
+   "scale": 1.146,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -35.261,
+    0.653,
+    9.54
+   ],
+   "yaw_rad": 5.7937,
+   "scale": 1.165,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -36.486,
+    1.242,
+    17.874
+   ],
+   "yaw_rad": 2.7189,
+   "scale": 1.183,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -39.028,
+    1.64,
+    12.758
+   ],
+   "yaw_rad": 0.5153,
+   "scale": 0.968,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -36.702,
+    0.369,
+    5.647
+   ],
+   "yaw_rad": 1.4542,
+   "scale": 0.857,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -10.994,
+    1.718,
+    38.437
+   ],
+   "yaw_rad": 2.53,
+   "scale": 0.922,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -23.167,
+    0.172,
+    37.006
+   ],
+   "yaw_rad": 0.4736,
+   "scale": 1.059,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    -12.324,
+    1.078,
+    30.396
+   ],
+   "yaw_rad": 4.3739,
+   "scale": 1.172,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -18.394,
+    0.616,
+    38.637
+   ],
+   "yaw_rad": 2.1374,
+   "scale": 0.895,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -12.115,
+    1.182,
+    34.248
+   ],
+   "yaw_rad": 1.0224,
+   "scale": 1.194,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -14.893,
+    1.118,
+    38.442
+   ],
+   "yaw_rad": 3.3299,
+   "scale": 0.962,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    -16.208,
+    0.764,
+    30.306
+   ],
+   "yaw_rad": 0.5556,
+   "scale": 1.032,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -22.858,
+    0.174,
+    31.691
+   ],
+   "yaw_rad": 5.2993,
+   "scale": 0.865,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    -19.443,
+    0.41,
+    31.74
+   ],
+   "yaw_rad": 3.3478,
+   "scale": 1.082,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_autumn",
+   "position_xyz": [
+    -8.7,
+    1.531,
+    35.479
+   ],
+   "yaw_rad": 2.7788,
+   "scale": 0.919,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -18.05,
+    0.546,
+    34.943
+   ],
+   "yaw_rad": 5.2318,
+   "scale": 0.9,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -17.966,
+    0.654,
+    27.371
+   ],
+   "yaw_rad": 3.5719,
+   "scale": 1.16,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature_b",
+   "position_xyz": [
+    -9.008,
+    1.154,
+    31.51
+   ],
+   "yaw_rad": 1.8143,
+   "scale": 0.924,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -38.428,
+    0.343,
+    -14.968
+   ],
+   "yaw_rad": 4.0951,
+   "scale": 1.003,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -38.785,
+    0.138,
+    -11.524
+   ],
+   "yaw_rad": 2.2623,
+   "scale": 0.909,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_young",
+   "position_xyz": [
+    -33.68,
+    0.096,
+    -10.626
+   ],
+   "yaw_rad": 2.6957,
+   "scale": 1.056,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "apple_tree_mature",
+   "position_xyz": [
+    -33.643,
+    0.381,
+    -16.137
+   ],
+   "yaw_rad": 2.5587,
+   "scale": 0.942,
+   "interactive": false,
+   "role": "tree"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -19.77,
+    0.662,
+    -31.012
+   ],
+   "yaw_rad": 7.7641,
+   "scale": 0.915,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -18.944,
+    0.67,
+    -26.566
+   ],
+   "yaw_rad": 1.8483,
+   "scale": 0.975,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -20.253,
+    0.681,
+    -27.697
+   ],
+   "yaw_rad": 1.7819,
+   "scale": 1.268,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -19.726,
+    0.732,
+    -25.52
+   ],
+   "yaw_rad": 1.9491,
+   "scale": 0.998,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -20.546,
+    0.856,
+    -35.469
+   ],
+   "yaw_rad": 7.372,
+   "scale": 0.925,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -23.001,
+    0.84,
+    -27.844
+   ],
+   "yaw_rad": 3.5387,
+   "scale": 0.98,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -25.777,
+    1.28,
+    -30.286
+   ],
+   "yaw_rad": 4.028,
+   "scale": 0.971,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -15.107,
+    0.427,
+    -29.012
+   ],
+   "yaw_rad": 2.4565,
+   "scale": 0.922,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -21.875,
+    0.773,
+    -28.222
+   ],
+   "yaw_rad": 3.4114,
+   "scale": 0.922,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    5.807,
+    1.574,
+    -34.484
+   ],
+   "yaw_rad": 4.9475,
+   "scale": 1.127,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    7.979,
+    2.35,
+    -38.004
+   ],
+   "yaw_rad": 5.6063,
+   "scale": 1.224,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    30.29,
+    -0.005,
+    -5.795
+   ],
+   "yaw_rad": 4.2745,
+   "scale": 1.201,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    30.803,
+    -0.048,
+    -4.896
+   ],
+   "yaw_rad": 4.0756,
+   "scale": 1.161,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    29.762,
+    0.022,
+    -6.923
+   ],
+   "yaw_rad": 4.5096,
+   "scale": 1.168,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    38.171,
+    0.656,
+    8.94
+   ],
+   "yaw_rad": 2.4639,
+   "scale": 1.296,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    30.819,
+    0.208,
+    7.987
+   ],
+   "yaw_rad": 4.0921,
+   "scale": 1.208,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    36.888,
+    3.797,
+    35.852
+   ],
+   "yaw_rad": 2.1531,
+   "scale": 1.263,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    14.783,
+    0.315,
+    28.05
+   ],
+   "yaw_rad": 4.8588,
+   "scale": 1.218,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    34.439,
+    1.629,
+    18.875
+   ],
+   "yaw_rad": 6.8079,
+   "scale": 0.943,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    29.382,
+    0.88,
+    19.194
+   ],
+   "yaw_rad": 6.4104,
+   "scale": 0.968,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    16.411,
+    0.388,
+    34.097
+   ],
+   "yaw_rad": 4.3725,
+   "scale": 1.235,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    17.544,
+    0.472,
+    26.08
+   ],
+   "yaw_rad": 5.0711,
+   "scale": 1.019,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    38.904,
+    3.645,
+    28.666
+   ],
+   "yaw_rad": 7.7323,
+   "scale": 1.101,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    17.064,
+    0.688,
+    23.104
+   ],
+   "yaw_rad": 5.275,
+   "scale": 1.11,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    16.642,
+    0.422,
+    35.079
+   ],
+   "yaw_rad": 4.2919,
+   "scale": 1.093,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    19.441,
+    0.561,
+    32.103
+   ],
+   "yaw_rad": 7.5185,
+   "scale": 0.991,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    14.677,
+    0.319,
+    27.822
+   ],
+   "yaw_rad": 6.3923,
+   "scale": 1.185,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    20.048,
+    0.624,
+    32.386
+   ],
+   "yaw_rad": 7.5932,
+   "scale": 1.218,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    8.615,
+    0.327,
+    35.669
+   ],
+   "yaw_rad": 4.4118,
+   "scale": 0.954,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    16.37,
+    0.37,
+    27.869
+   ],
+   "yaw_rad": 6.652,
+   "scale": 1.205,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -34.919,
+    0.242,
+    5.044
+   ],
+   "yaw_rad": 6.1518,
+   "scale": 1.069,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -27.952,
+    0.618,
+    14.157
+   ],
+   "yaw_rad": 1.9134,
+   "scale": 0.963,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -28.192,
+    0.551,
+    17.338
+   ],
+   "yaw_rad": 2.3141,
+   "scale": 1.262,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -31.554,
+    0.174,
+    5.051
+   ],
+   "yaw_rad": 6.6217,
+   "scale": 1.176,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -35.674,
+    0.243,
+    4.672
+   ],
+   "yaw_rad": 6.0586,
+   "scale": 1.219,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -12.223,
+    1.085,
+    26.708
+   ],
+   "yaw_rad": 6.7105,
+   "scale": 1.297,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -23.489,
+    0.162,
+    30.15
+   ],
+   "yaw_rad": 5.2871,
+   "scale": 1.05,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -8.222,
+    1.192,
+    32.27
+   ],
+   "yaw_rad": 7.5164,
+   "scale": 1.096,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -7.885,
+    1.285,
+    33.336
+   ],
+   "yaw_rad": 7.6518,
+   "scale": 0.965,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -24.294,
+    0.136,
+    38.609
+   ],
+   "yaw_rad": 4.302,
+   "scale": 0.904,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -6.971,
+    1.634,
+    35.913
+   ],
+   "yaw_rad": 1.6716,
+   "scale": 1.239,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -32.42,
+    0.318,
+    -15.349
+   ],
+   "yaw_rad": 7.1018,
+   "scale": 1.212,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -30.97,
+    0.221,
+    -13.494
+   ],
+   "yaw_rad": 7.5652,
+   "scale": 1.22,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -30.794,
+    0.209,
+    -13.176
+   ],
+   "yaw_rad": 7.6317,
+   "scale": 0.923,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "hedge_dense",
+   "position_xyz": [
+    -30.435,
+    0.187,
+    -12.57
+   ],
+   "yaw_rad": 7.7518,
+   "scale": 1.11,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -28.979,
+    0.244,
+    23.216
+   ],
+   "yaw_rad": 0.2482,
+   "scale": 1.189,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -21.944,
+    0.268,
+    28.967
+   ],
+   "yaw_rad": 3.7987,
+   "scale": 1.039,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -20.873,
+    0.396,
+    26.981
+   ],
+   "yaw_rad": 2.2646,
+   "scale": 0.915,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -19.693,
+    0.766,
+    17.349
+   ],
+   "yaw_rad": 1.2284,
+   "scale": 1.341,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -13.796,
+    0.247,
+    8.491
+   ],
+   "yaw_rad": 3.145,
+   "scale": 1.194,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -12.25,
+    0.1,
+    5.538
+   ],
+   "yaw_rad": 6.105,
+   "scale": 1.155,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -7.545,
+    -0.025,
+    3.764
+   ],
+   "yaw_rad": 1.8376,
+   "scale": 1.475,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -0.762,
+    0.014,
+    7.708
+   ],
+   "yaw_rad": 6.224,
+   "scale": 1.179,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    -6.218,
+    -0.166,
+    2.532
+   ],
+   "yaw_rad": 1.0778,
+   "scale": 1.157,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    1.33,
+    -0.245,
+    4.492
+   ],
+   "yaw_rad": 0.6016,
+   "scale": 1.152,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    0.517,
+    0.043,
+    -9.074
+   ],
+   "yaw_rad": 0.261,
+   "scale": 1.077,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    11.14,
+    0.761,
+    -19.786
+   ],
+   "yaw_rad": 0.0254,
+   "scale": 0.906,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    17.495,
+    0.203,
+    -14.074
+   ],
+   "yaw_rad": 0.2823,
+   "scale": 1.328,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "shrub_flowering",
+   "position_xyz": [
+    15.61,
+    0.636,
+    -21.661
+   ],
+   "yaw_rad": 5.2597,
+   "scale": 1.144,
+   "interactive": false,
+   "role": "undergrowth"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -37.934,
+    -0.832,
+    -7.138
+   ],
+   "yaw_rad": 3.6234,
+   "scale": 1.126,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -36.426,
+    -0.918,
+    -1.758
+   ],
+   "yaw_rad": 2.43,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -31.615,
+    -0.645,
+    0.225
+   ],
+   "yaw_rad": 0.1318,
+   "scale": 1.344,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -23.203,
+    -0.819,
+    0.817
+   ],
+   "yaw_rad": 2.2502,
+   "scale": 1.063,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -17.615,
+    -0.774,
+    0.549
+   ],
+   "yaw_rad": 2.1627,
+   "scale": 1.183,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -15.048,
+    -0.777,
+    0.238
+   ],
+   "yaw_rad": 5.4974,
+   "scale": 1.559,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -13.215,
+    -0.77,
+    -5.201
+   ],
+   "yaw_rad": 1.793,
+   "scale": 1.164,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -12.526,
+    -0.89,
+    -0.377
+   ],
+   "yaw_rad": 1.7037,
+   "scale": 1.315,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    -10.413,
+    -0.569,
+    -6.027
+   ],
+   "yaw_rad": 6.0922,
+   "scale": 1.129,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -1.469,
+    -0.725,
+    -4.418
+   ],
+   "yaw_rad": 5.5808,
+   "scale": 1.514,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    1.343,
+    -0.717,
+    3.174
+   ],
+   "yaw_rad": 3.7968,
+   "scale": 1.245,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    5.14,
+    -1.008,
+    -1.477
+   ],
+   "yaw_rad": 5.6548,
+   "scale": 1.559,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    9.869,
+    -0.503,
+    4.547
+   ],
+   "yaw_rad": 0.9852,
+   "scale": 1.771,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    11.894,
+    -0.788,
+    -1.889
+   ],
+   "yaw_rad": 1.5649,
+   "scale": 1.261,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    15.502,
+    -0.801,
+    2.933
+   ],
+   "yaw_rad": 2.0575,
+   "scale": 1.322,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    23.006,
+    -0.697,
+    -3.231
+   ],
+   "yaw_rad": 2.1513,
+   "scale": 1.657,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    22.396,
+    -0.846,
+    2.552
+   ],
+   "yaw_rad": 6.016,
+   "scale": 1.553,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    24.879,
+    -0.888,
+    2.731
+   ],
+   "yaw_rad": 5.527,
+   "scale": 1.497,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    28.212,
+    -0.907,
+    -1.864
+   ],
+   "yaw_rad": 3.8396,
+   "scale": 1.217,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    30.822,
+    -0.829,
+    -1.678
+   ],
+   "yaw_rad": 5.3001,
+   "scale": 1.351,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    30.025,
+    -0.918,
+    3.363
+   ],
+   "yaw_rad": 4.7279,
+   "scale": 1.434,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy_small",
+   "position_xyz": [
+    32.443,
+    -0.569,
+    4.672
+   ],
+   "yaw_rad": 0.2294,
+   "scale": 1.595,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -9,
+    0.802,
+    -20
+   ],
+   "yaw_rad": 3.3911,
+   "scale": 1.8,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -20,
+    0.74,
+    -12
+   ],
+   "yaw_rad": 3.4152,
+   "scale": 1.5,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    7,
+    0.501,
+    18
+   ],
+   "yaw_rad": 3.4984,
+   "scale": 1.6,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    22,
+    0.727,
+    20
+   ],
+   "yaw_rad": 4.4725,
+   "scale": 1.9,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -24,
+    0.342,
+    6
+   ],
+   "yaw_rad": 2.5735,
+   "scale": 1.4,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    12,
+    0.753,
+    -26
+   ],
+   "yaw_rad": 1.2052,
+   "scale": 1.5,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -32,
+    0.378,
+    22
+   ],
+   "yaw_rad": 2.2118,
+   "scale": 1.3,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    30,
+    0.264,
+    -16
+   ],
+   "yaw_rad": 1.5691,
+   "scale": 1.6,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    4,
+    0.146,
+    9.5
+   ],
+   "yaw_rad": 4.0905,
+   "scale": 1.2,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "rock_mossy",
+   "position_xyz": [
+    -8,
+    0.147,
+    14
+   ],
+   "yaw_rad": 6.1041,
+   "scale": 1.3,
+   "interactive": false,
+   "role": "boulder"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    -19.5,
+    0.76,
+    13.0
+   ],
+   "yaw_rad": 0.9542,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    -17.014,
+    0.487,
+    9.867
+   ],
+   "yaw_rad": 0.8536,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    -14.527,
+    0.211,
+    6.733
+   ],
+   "yaw_rad": 0.9246,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    -10.841,
+    0.01,
+    3.6
+   ],
+   "yaw_rad": 1.5265,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "rubble"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    -9.0,
+    -0.065,
+    2.8
+   ],
+   "yaw_rad": 0.3217,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    7.0,
+    -0.215,
+    -3.6
+   ],
+   "yaw_rad": 0.2246,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    10.92,
+    -0.092,
+    -4.395
+   ],
+   "yaw_rad": 0.1484,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    16.041,
+    -0.098,
+    -5.189
+   ],
+   "yaw_rad": 4.9232,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "rubble"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    12.0,
+    0.069,
+    -8.0
+   ],
+   "yaw_rad": -0.8221,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    14.486,
+    -0.102,
+    -4.867
+   ],
+   "yaw_rad": -0.8271,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    -24.0,
+    0.137,
+    30.5
+   ],
+   "yaw_rad": 1.4745,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "fallen_wall"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    17.589,
+    0.721,
+    -24.732
+   ],
+   "yaw_rad": 1.9109,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    17.258,
+    0.849,
+    -27.889
+   ],
+   "yaw_rad": 1.4397,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_corner_broken",
+   "position_xyz": [
+    18.397,
+    1.027,
+    -30.853
+   ],
+   "yaw_rad": 0.9684,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    20.757,
+    1.128,
+    -32.977
+   ],
+   "yaw_rad": 0.4972,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_corner_broken",
+   "position_xyz": [
+    26.929,
+    1.072,
+    -33.137
+   ],
+   "yaw_rad": -0.4453,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_straight",
+   "position_xyz": [
+    28.931,
+    0.688,
+    -22.318
+   ],
+   "yaw_rad": -2.3303,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "wall_end_broken",
+   "position_xyz": [
+    26.268,
+    0.539,
+    -20.589
+   ],
+   "yaw_rad": -2.8015,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "ruin_wall"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    15.8,
+    0.726,
+    -25.5
+   ],
+   "yaw_rad": 2.9931,
+   "scale": 1.094,
+   "interactive": false,
+   "role": "ruin_rubble"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    28.5,
+    0.438,
+    -19.5
+   ],
+   "yaw_rad": 0.6276,
+   "scale": 1.001,
+   "interactive": false,
+   "role": "ruin_rubble"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    32.6,
+    0.749,
+    -29.0
+   ],
+   "yaw_rad": 6.1602,
+   "scale": 1.051,
+   "interactive": false,
+   "role": "ruin_rubble"
+  },
+  {
+   "asset_id": "rubble_split",
+   "position_xyz": [
+    21.5,
+    1.06,
+    -35.8
+   ],
+   "yaw_rad": 3.3255,
+   "scale": 1.146,
+   "interactive": false,
+   "role": "ruin_rubble"
+  },
+  {
+   "asset_id": "mountain_cliff_chunk",
+   "position_xyz": [
+    -34.0,
+    2.488,
+    -34.5
+   ],
+   "yaw_rad": 0.6,
+   "scale": 0.1,
+   "interactive": false,
+   "role": "outcrop"
+  },
+  {
+   "asset_id": "mountain_cliff_chunk",
+   "position_xyz": [
+    34.5,
+    2.73,
+    35.0
+   ],
+   "yaw_rad": 3.6,
+   "scale": 0.1,
+   "interactive": false,
+   "role": "outcrop"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -29.125,
+    0.105,
+    28.15
+   ],
+   "yaw_rad": 2.3417,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -27.375,
+    0.161,
+    26.45
+   ],
+   "yaw_rad": 2.3417,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -25.25,
+    0.272,
+    24.775
+   ],
+   "yaw_rad": 2.1542,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -22.75,
+    0.456,
+    23.125
+   ],
+   "yaw_rad": 2.1542,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -20.25,
+    0.651,
+    21.475
+   ],
+   "yaw_rad": 2.1542,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -17.75,
+    0.754,
+    19.825
+   ],
+   "yaw_rad": 2.1542,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -15.825,
+    0.705,
+    17.875
+   ],
+   "yaw_rad": 2.6012,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -14.475,
+    0.569,
+    15.625
+   ],
+   "yaw_rad": 2.6012,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -13.0,
+    0.401,
+    13.475
+   ],
+   "yaw_rad": 2.4789,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -11.4,
+    0.247,
+    11.425
+   ],
+   "yaw_rad": 2.4789,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -9.6,
+    0.141,
+    9.85
+   ],
+   "yaw_rad": 2.0736,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -7.6,
+    0.081,
+    8.75
+   ],
+   "yaw_rad": 2.0736,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    -5.5,
+    0.05,
+    7.6
+   ],
+   "yaw_rad": 2.0701,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    5.35,
+    0.084,
+    -8.1
+   ],
+   "yaw_rad": 2.4469,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    6.85,
+    0.154,
+    -9.9
+   ],
+   "yaw_rad": 2.4469,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    8.5,
+    0.264,
+    -11.7
+   ],
+   "yaw_rad": 2.3562,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    10.3,
+    0.399,
+    -13.5
+   ],
+   "yaw_rad": 2.3562,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    12.3,
+    0.496,
+    -15.15
+   ],
+   "yaw_rad": 2.1692,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    14.5,
+    0.506,
+    -16.65
+   ],
+   "yaw_rad": 2.1692,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    16.6,
+    0.467,
+    -17.95
+   ],
+   "yaw_rad": 2.0736,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    18.6,
+    0.446,
+    -19.05
+   ],
+   "yaw_rad": 2.0736,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    20.175,
+    0.505,
+    -20.35
+   ],
+   "yaw_rad": 2.4875,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  },
+  {
+   "asset_id": "path_straight",
+   "position_xyz": [
+    21.325,
+    0.637,
+    -21.85
+   ],
+   "yaw_rad": 2.4875,
+   "scale": 1.0,
+   "interactive": false,
+   "role": "surface"
+  }
+ ],
+ "exclusions": [
+  {
+   "kind": "polygon",
+   "name": "route_corridor",
+   "polygon_xz": [
+    [
+     -28.33,
+     30.72
+    ],
+    [
+     -26.24,
+     28.69
+    ],
+    [
+     -24.13,
+     26.9
+    ],
+    [
+     -21.74,
+     25.33
+    ],
+    [
+     -19.24,
+     23.68
+    ],
+    [
+     -16.57,
+     21.91
+    ],
+    [
+     -14.04,
+     19.53
+    ],
+    [
+     -12.36,
+     16.76
+    ],
+    [
+     -10.71,
+     14.44
+    ],
+    [
+     -9.2,
+     12.44
+    ],
+    [
+     -7.04,
+     11.18
+    ],
+    [
+     -4.14,
+     9.56
+    ],
+    [
+     -1.73,
+     6.95
+    ],
+    [
+     -0.18,
+     4.22
+    ],
+    [
+     1.47,
+     1.87
+    ],
+    [
+     3.2,
+     -0.59
+    ],
+    [
+     4.98,
+     -3.12
+    ],
+    [
+     6.46,
+     -5.64
+    ],
+    [
+     8.2,
+     -7.78
+    ],
+    [
+     10.11,
+     -9.92
+    ],
+    [
+     12.08,
+     -11.89
+    ],
+    [
+     14.26,
+     -13.59
+    ],
+    [
+     16.6,
+     -15.18
+    ],
+    [
+     19.26,
+     -16.68
+    ],
+    [
+     21.99,
+     -18.8
+    ],
+    [
+     24.1,
+     -21.66
+    ],
+    [
+     25.5,
+     -24.57
+    ],
+    [
+     26.17,
+     -25.97
+    ],
+    [
+     21.83,
+     -28.03
+    ],
+    [
+     21.17,
+     -26.64
+    ],
+    [
+     19.98,
+     -24.13
+    ],
+    [
+     18.55,
+     -22.15
+    ],
+    [
+     16.62,
+     -20.69
+    ],
+    [
+     14.06,
+     -19.25
+    ],
+    [
+     11.44,
+     -17.47
+    ],
+    [
+     8.9,
+     -15.49
+    ],
+    [
+     6.62,
+     -13.22
+    ],
+    [
+     4.55,
+     -10.89
+    ],
+    [
+     2.52,
+     -8.38
+    ],
+    [
+     0.95,
+     -5.72
+    ],
+    [
+     -0.73,
+     -3.35
+    ],
+    [
+     -2.45,
+     -0.89
+    ],
+    [
+     -4.24,
+     1.66
+    ],
+    [
+     -5.63,
+     4.15
+    ],
+    [
+     -7.09,
+     5.77
+    ],
+    [
+     -9.44,
+     7.02
+    ],
+    [
+     -12.39,
+     8.85
+    ],
+    [
+     -14.56,
+     11.58
+    ],
+    [
+     -16.38,
+     14.14
+    ],
+    [
+     -17.78,
+     16.52
+    ],
+    [
+     -19.54,
+     18.14
+    ],
+    [
+     -21.88,
+     19.67
+    ],
+    [
+     -24.38,
+     21.33
+    ],
+    [
+     -27.0,
+     23.06
+    ],
+    [
+     -29.46,
+     25.13
+    ],
+    [
+     -31.67,
+     27.28
+    ]
+   ]
+  },
+  {
+   "kind": "polygon",
+   "name": "brook",
+   "polygon_xz": [
+    [
+     -41.6,
+     -2.36
+    ],
+    [
+     -37.69,
+     -1.54
+    ],
+    [
+     -33.82,
+     -0.72
+    ],
+    [
+     -30.01,
+     0.22
+    ],
+    [
+     -25.79,
+     1.3
+    ],
+    [
+     -21.26,
+     1.3
+    ],
+    [
+     -17.11,
+     0.65
+    ],
+    [
+     -13.18,
+     0.07
+    ],
+    [
+     -9.68,
+     -0.47
+    ],
+    [
+     -6.47,
+     0.12
+    ],
+    [
+     -3.01,
+     1.44
+    ],
+    [
+     0.87,
+     2.9
+    ],
+    [
+     5.15,
+     3.94
+    ],
+    [
+     9.68,
+     4.3
+    ],
+    [
+     14.02,
+     3.71
+    ],
+    [
+     17.85,
+     2.88
+    ],
+    [
+     21.28,
+     2.57
+    ],
+    [
+     24.9,
+     3.13
+    ],
+    [
+     28.84,
+     3.73
+    ],
+    [
+     32.77,
+     4.36
+    ],
+    [
+     36.72,
+     5.0
+    ],
+    [
+     40.54,
+     5.61
+    ],
+    [
+     41.46,
+     -0.11
+    ],
+    [
+     37.65,
+     -0.73
+    ],
+    [
+     33.7,
+     -1.36
+    ],
+    [
+     29.74,
+     -2.0
+    ],
+    [
+     25.77,
+     -2.6
+    ],
+    [
+     21.47,
+     -3.23
+    ],
+    [
+     16.98,
+     -2.86
+    ],
+    [
+     13.01,
+     -2.0
+    ],
+    [
+     9.52,
+     -1.5
+    ],
+    [
+     6.08,
+     -1.78
+    ],
+    [
+     2.59,
+     -2.65
+    ],
+    [
+     -0.97,
+     -3.99
+    ],
+    [
+     -4.94,
+     -5.47
+    ],
+    [
+     -9.59,
+     -6.27
+    ],
+    [
+     -14.01,
+     -5.67
+    ],
+    [
+     -17.99,
+     -5.09
+    ],
+    [
+     -21.74,
+     -4.48
+    ],
+    [
+     -25.05,
+     -4.45
+    ],
+    [
+     -28.57,
+     -5.4
+    ],
+    [
+     -32.53,
+     -6.37
+    ],
+    [
+     -36.49,
+     -7.21
+    ],
+    [
+     -40.4,
+     -8.04
+    ]
+   ],
+   "except_roles": [
+    "boulder"
+   ]
+  },
+  {
+   "kind": "circle",
+   "name": "beacon_dais",
+   "center_xz": [
+    24,
+    -27
+   ],
+   "radius_m": 4.0
+  },
+  {
+   "kind": "circle",
+   "name": "spawn",
+   "center_xz": [
+    -30,
+    29
+   ],
+   "radius_m": 3.5
+  }
+ ],
+ "c_procedural": {
+  "beacon": {
+   "center_xz": [
+    24,
+    -27
+   ],
+   "dais_radius_m": 3.4,
+   "dais_top_y": 1.722,
+   "orb_height_m": 2.4,
+   "orb_color": "#d060bb",
+   "monoliths": [
+    {
+     "angle_deg": 175,
+     "height_m": 4.6
+    },
+    {
+     "angle_deg": 225,
+     "height_m": 3.2
+    },
+    {
+     "angle_deg": 272,
+     "height_m": 5.4
+    },
+    {
+     "angle_deg": 50,
+     "height_m": 3.6
+    }
+   ]
+  },
+  "bridge": "see crossing",
+  "terrain_mesh": "0.5 m grid of terrain.hills",
+  "water": "ribbon along stream.points_xz (Chaikin x3)"
+ },
+ "provenance": {
+  "source_image": "input/generated-map-source.png",
+  "reference_board": "input/environment-board.png",
+  "source_plan": "coordinates read visually from the map by Opus (no extracted JSON consulted)",
+  "tools": [
+   "Blender 4.5.13"
+  ],
+  "model": "claude-opus-5-5",
+  "measured_time_s": {
+   "build": 2.27,
+   "export": 0.38,
+   "renders": {},
+   "total": 2.65
+  }
+ },
+ "c_asset_counts": {
+  "apple_tree_young": 39,
+  "apple_tree_mature": 45,
+  "apple_tree_mature_b": 33,
+  "apple_tree_mature_autumn": 7,
+  "hedge_dense": 45,
+  "rock_mossy_small": 18,
+  "shrub_flowering": 11,
+  "rock_mossy": 17,
+  "wall_straight": 8,
+  "wall_end_broken": 6,
+  "rubble_split": 6,
+  "wall_corner_broken": 2,
+  "mountain_cliff_chunk": 2,
+  "path_straight": 23
+ }
+}

@@ -1,0 +1,155 @@
+{
+ "checks": {
+  "required_fields": {
+   "ok": true,
+   "value": []
+  },
+  "hill_fields": {
+   "ok": true,
+   "value": 44
+  },
+  "region_fields": {
+   "ok": true,
+   "value": 17
+  },
+  "objects_allowed_ids": {
+   "ok": true,
+   "value": []
+  },
+  "path_tiles_marked_surface": {
+   "ok": true,
+   "value": 0
+  },
+  "spawn_goal": {
+   "ok": true,
+   "value": [
+    [
+     -30,
+     29
+    ],
+    [
+     24,
+     -27
+    ]
+   ]
+  },
+  "single_stream_crossing": {
+   "ok": true,
+   "value": 1
+  },
+  "crossing_within_8m": {
+   "ok": true,
+   "value": 0.36
+  },
+  "bridge_width": {
+   "ok": true,
+   "value": 3.4
+  },
+  "stream_width": {
+   "ok": true,
+   "value": 4.5
+  },
+  "bridge_yaw_long_axis": {
+   "ok": true,
+   "value": [
+    2.529,
+    2.5288
+   ]
+  },
+  "bridge_on_path": {
+   "ok": true,
+   "value": [
+    [
+     -2.776,
+     3.74
+    ],
+    [
+     2.976,
+     -4.44
+    ]
+   ]
+  },
+  "route_grade": {
+   "ok": true,
+   "value": [
+    0.15,
+    [
+     3.0,
+     -4.4
+    ]
+   ]
+  },
+  "route_clearance_2.4m": {
+   "ok": true,
+   "value": []
+  },
+  "canopy_overhang": {
+   "ok": true,
+   "value": []
+  },
+  "objects_in_bounds": {
+   "ok": true,
+   "value": []
+  },
+  "glb_footprint_80m_plus_canopy": {
+   "ok": true,
+   "value": [
+    [
+     -42.8,
+     -42.58,
+     -1.3
+    ],
+    [
+     42.01,
+     41.97,
+     8.88
+    ]
+   ]
+  },
+  "glb_prop_count_matches_spec": {
+   "ok": true,
+   "value": [
+    262,
+    262
+   ]
+  },
+  "glb_has_Terrain": {
+   "ok": true,
+   "value": true
+  },
+  "glb_has_Brook_Water": {
+   "ok": true,
+   "value": true
+  },
+  "glb_has_BeaconOrb": {
+   "ok": true,
+   "value": true
+  },
+  "glb_positions_match_spec": {
+   "ok": true,
+   "value": 0.0
+  }
+ },
+ "notes": [],
+ "reimport": {
+  "seconds": 0.48,
+  "objects": 930,
+  "mesh_objects": 668,
+  "unique_meshes": 126,
+  "triangles": 957198,
+  "materials": 40,
+  "bounds_blender_min": [
+   -42.8,
+   -42.58,
+   -1.3
+  ],
+  "bounds_blender_max": [
+   42.01,
+   41.97,
+   8.88
+  ],
+  "glb_bytes": 6537076
+ },
+ "all_ok": true,
+ "seconds": 0.54
+}

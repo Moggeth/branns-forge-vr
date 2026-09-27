@@ -1,0 +1,33 @@
+{
+  "meshes": {
+    "bridge_iron": 1224,
+    "bridge_moss": 600,
+    "bridge_stone": 4268,
+    "bridge_stone_warm": 2596,
+    "bridge_wood": 484,
+    "bridge_wood_alt": 264,
+    "bridge_wood_dark": 396,
+    "col_parapet_L-colonly": 12,
+    "col_parapet_R-colonly": 12,
+    "col_walkway-colonly": 12
+  },
+  "total_triangles": 9832,
+  "mesh_count": 10,
+  "visual_mesh_count": 7,
+  "visual_size_m": [
+    4.62,
+    5.882,
+    2.9
+  ],
+  "visual_min_blender": [
+    -2.31,
+    -2.941,
+    -1.62
+  ],
+  "visual_max_blender": [
+    2.31,
+    2.941,
+    1.28
+  ],
+  "walkway_intrusions": []
+}

@@ -1,0 +1,39 @@
+{
+  "meshes": {
+    "Abutments": 3696,
+    "COL_AbutN-colonly": 12,
+    "COL_AbutS-colonly": 12,
+    "COL_Deck-colonly": 12,
+    "COL_PillarLN-colonly": 12,
+    "COL_PillarLS-colonly": 12,
+    "COL_PillarRN-colonly": 12,
+    "COL_PillarRS-colonly": 12,
+    "COL_RailL-colonly": 12,
+    "COL_RailR-colonly": 12,
+    "Deck": 880,
+    "Frame": 704,
+    "Ironwork": 264,
+    "Moss": 968,
+    "Pillars": 1232,
+    "Railings": 1408
+  },
+  "render_tris": 9152,
+  "collider_count": 9,
+  "size_xyz_blender": [
+    4.643,
+    5.244,
+    2.749
+  ],
+  "min": [
+    -2.321,
+    -2.622,
+    -1.599
+  ],
+  "max": [
+    2.322,
+    2.622,
+    1.15
+  ],
+  "deck_top_z": -0.0003,
+  "mesh_count": 16
+}

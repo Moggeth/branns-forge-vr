@@ -1,0 +1,183 @@
+{
+  "asset": "orchard_brook_footbridge",
+  "units": "metres",
+  "up_axis": "+Y (glTF)",
+  "long_axis": "+Z (glTF)",
+  "origin": "centre of walking deck top surface",
+  "deck": {
+    "length_m": 5.0,
+    "top_y": 0.0,
+    "plank_thickness_m": 0.08,
+    "clear_walkway_width_m": 3.4,
+    "walkway_x_range": [
+      -1.7,
+      1.7
+    ],
+    "min_parapet_inner_x_m": 1.72,
+    "min_clearance_margin_m": 0.02,
+    "headroom": "unobstructed (no overhead members)"
+  },
+  "span": {
+    "abutment_inner_faces_z": [
+      -2.0,
+      2.0
+    ],
+    "clear_span_m": 4.0,
+    "stream_bed_y": -1.45,
+    "clear_height_under_stringers_m": 1.01,
+    "suits_stream_width_m": [
+      3.0,
+      4.0
+    ]
+  },
+  "parapet_height_above_deck_m": 1.0,
+  "pillar_cap_top_m": 1.15,
+  "bounds_gltf": {
+    "min": [
+      -2.321,
+      -1.599,
+      -2.622
+    ],
+    "max": [
+      2.322,
+      1.15,
+      2.622
+    ]
+  },
+  "collision": {
+    "COL_Deck-colonly": {
+      "center_gltf": [
+        0.0,
+        -0.06,
+        -0.0
+      ],
+      "size_gltf": [
+        3.72,
+        0.12,
+        5.0
+      ]
+    },
+    "COL_RailL-colonly": {
+      "center_gltf": [
+        -1.84,
+        0.5,
+        -0.0
+      ],
+      "size_gltf": [
+        0.14,
+        1.0,
+        5.06
+      ]
+    },
+    "COL_RailR-colonly": {
+      "center_gltf": [
+        1.84,
+        0.5,
+        -0.0
+      ],
+      "size_gltf": [
+        0.14,
+        1.0,
+        5.06
+      ]
+    },
+    "COL_AbutN-colonly": {
+      "center_gltf": [
+        0.0,
+        -0.945,
+        -2.31
+      ],
+      "size_gltf": [
+        4.5,
+        1.01,
+        0.6200000000000001
+      ]
+    },
+    "COL_AbutS-colonly": {
+      "center_gltf": [
+        0.0,
+        -0.945,
+        2.31
+      ],
+      "size_gltf": [
+        4.5,
+        1.01,
+        0.6200000000000001
+      ]
+    },
+    "COL_PillarLS-colonly": {
+      "center_gltf": [
+        -1.98,
+        0.355,
+        2.32
+      ],
+      "size_gltf": [
+        0.52,
+        1.5899999999999999,
+        0.52
+      ]
+    },
+    "COL_PillarLN-colonly": {
+      "center_gltf": [
+        -1.98,
+        0.355,
+        -2.32
+      ],
+      "size_gltf": [
+        0.52,
+        1.5899999999999999,
+        0.52
+      ]
+    },
+    "COL_PillarRS-colonly": {
+      "center_gltf": [
+        1.98,
+        0.355,
+        2.32
+      ],
+      "size_gltf": [
+        0.52,
+        1.5899999999999999,
+        0.52
+      ]
+    },
+    "COL_PillarRN-colonly": {
+      "center_gltf": [
+        1.98,
+        0.355,
+        -2.32
+      ],
+      "size_gltf": [
+        0.52,
+        1.5899999999999999,
+        0.52
+      ]
+    }
+  },
+  "collision_note": "Nodes ending -colonly import in Godot as StaticBody3D shapes only; walkable surface is COL_Deck (top y=0). Approaches meet the deck at y=0 at z=+-2.5.",
+  "render_meshes": [
+    "Deck",
+    "Frame",
+    "Abutments",
+    "Pillars",
+    "Moss",
+    "Railings",
+    "Ironwork"
+  ],
+  "render_triangles": 9152,
+  "materials": [
+    "Timber_Warm",
+    "Timber_Honey",
+    "Timber_Weathered",
+    "Timber_Dark",
+    "Stone_Grey",
+    "Stone_Cool",
+    "Moss",
+    "Iron_Black"
+  ],
+  "timing_s": {
+    "build": 0.13,
+    "save_export": 0.11,
+    "render_5_views": 1.63
+  }
+}
