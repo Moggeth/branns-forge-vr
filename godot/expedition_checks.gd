@@ -32,7 +32,12 @@ func run(game):
 	for id in ["forge_yard","pinewood_ruins","gloamfen","cloudbreak_keep"]:
 		if orchard_bounds.intersects(zones[id].bounds): failures.append("orchard overlaps "+id)
 	var orchard_meta:Dictionary=zones.orchard_highlands.root.get_meta("orchard_expansion",{})
-	if int(orchard_meta.get("plots",0))<6 or int(orchard_meta.get("grove_trees",0))<150: failures.append("orchard layout missing")
+	if int(orchard_meta.get("plots",0))<6 or int(orchard_meta.get("grove_trees",0))<350: failures.append("orchard layout missing")
+	var orchard_library:Array=zones.orchard_highlands.root.get_meta("orchard_art_library",[])
+	if orchard_library.size()!=23: failures.append("orchard art library incomplete")
+	for asset_id in orchard_library:
+		if not ResourceLoader.exists("res://assets/orchard/"+str(asset_id)+".glb"):
+			failures.append("missing orchard art "+str(asset_id))
 	for id in game.adventure.ZONES:
 		var horizon: Node3D = zones.get(id,{}).get("horizon")
 		if horizon==null or not is_instance_valid(horizon):
