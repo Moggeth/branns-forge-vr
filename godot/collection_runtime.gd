@@ -48,13 +48,16 @@ func ensure_home(id:String,title:String)->Dictionary:
 	if homes.has(id): return homes[id]
 	if not order.has(id): order.append(id); save_order()
 	var index=order.find(id)
-	if index>=20:
+	if index>=20 and not id.begins_with("forge_lantern_"):
 		# Overflow gets real walkable ground instead of stacking exhibits. The hall
 		# proposal replaces these temporary outdoor extensions with proper bays.
 		WorldZones.floor_patch(root,slot_position(index),Vector2(2.0,3.0),"a79b80")
 	var stand=Node3D.new(); root.add_child(stand); stand.position=slot_position(index)
+	# Keep the two independent Asset Lab specimens adjacent for an honest in-game comparison.
+	if id=="forge_lantern_sol": stand.position=Vector3(12.0,0,6.0)
+	elif id=="forge_lantern_opus": stand.position=Vector3(12.0,0,8.0)
 	# Face the collection from the workshop; signs share the same approach side.
-	stand.rotation.y=PI
+	stand.rotation.y=-PI/2 if id.begins_with("forge_lantern_") else PI
 	if id=="starter_hammer": stand.position=Vector3(-1.8,0,-1.7); stand.rotation.y=0
 	var wood=WorkshopScene.material("76553b")
 	var slate=WorkshopScene.material("334c48")
@@ -135,6 +138,10 @@ func register(item:Node3D):
 	item.set_meta("collection_id",id)
 	if item not in game.held.values() and not game.grips.is_stowed(item): return_item(id)
 
+func display_position(home:Dictionary)->Vector3:
+	var item=home.item
+	return home.stand.global_position+Vector3.UP*float(item.get_meta("display_height",0.98))
+
 func return_item(id:String)->bool:
 	if not homes.has(id): return false
 	var home=homes[id]; var item=home.item
@@ -144,8 +151,8 @@ func return_item(id:String)->bool:
 	if not item.get_meta("delivery_ready",true): return false
 	game.tool_physics.detach(item)
 	item.reparent(root)
-	item.global_position=home.stand.global_position+Vector3.UP*0.98
-	item.rotation=Vector3.ZERO; item.visible=true
+	item.global_position=display_position(home)
+	item.rotation=Vector3(0,float(item.get_meta("display_yaw",0.0)),0); item.visible=true
 	game._set_collisions(item,true)
 	game.previous_tips.clear()
 	home.status.text="Grip to take"
@@ -188,7 +195,7 @@ func tick():
 		if not is_instance_valid(item): continue
 		if item in game.held.values(): home.status.text="In your hands"
 		elif game.grips.is_stowed(item): home.status.text="On your belt"
-		elif item.global_position.distance_to(home.stand.global_position+Vector3.UP*0.98)<0.15: home.status.text="Already worn · grip for controls" if home.id=="bomb_glove" else "Grip to take"
+		elif item.global_position.distance_to(display_position(home))<0.15: home.status.text="Already worn · grip for controls" if home.id=="bomb_glove" else "Grip to take"
 		else: home.status.text="Away · return it here"
 
 func checks(failures:Array):

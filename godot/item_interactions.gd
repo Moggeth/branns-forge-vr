@@ -7,6 +7,8 @@ const CONTROLS={
 "quarry_pick":"Swing: mine · Trigger: charge a seam-breaking strike (8s)\nStrike ore within 8s to fracture nearby seams",
 "grappling_hook":"Aim + trigger: attach · Hold: reel · Release: pause\nLet go of the handle: detach",
 "spore_lantern":"Carry: light · Trigger: slowing spore garden (6s)",
+"forge_lantern_sol":"Grip: carry · other hand: grip and pull the brass shutter tab · Trigger: toggle light",
+"forge_lantern_opus":"Grip: carry · other hand: grip and pull the brass shutter tab · Trigger: toggle light",
 "crystal_resonator":"Swing: strike · Trigger: resonance fan / open seals (3s)",
 "ember_gauntlet":"Swing: strike · Trigger: firebolt + brief ward (3s)",
 "bomb_glove":"Grip, then hold trigger: form bomb · Release grip: throw",

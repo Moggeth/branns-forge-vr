@@ -98,6 +98,7 @@ var echo_bells
 var lantern_gallery
 var ember_gallery
 var atelier
+var forge_lanterns=[]
 var discoveries
 var fairy_trails
 var ember_creek
@@ -313,6 +314,17 @@ func _ready():
 	hearth_torch=load("res://hearth_torch.gd").new(); add_child(hearth_torch); hearth_torch.setup(self)
 	ember_creek=load("res://ember_creek.gd").new(); add_child(ember_creek); ember_creek.setup(self)
 	atelier=preload("res://atelier_runtime.gd").new(); add_child(atelier); atelier.setup(self)
+	for variant in [
+		{"id":"forge_lantern_sol","name":"Forge Lantern · Sol","asset":"res://assets/forge_lantern/sol.glb"},
+		{"id":"forge_lantern_opus","name":"Forge Lantern · Opus","asset":"res://assets/forge_lantern/opus.glb"}]:
+		if not ResourceLoader.exists(variant.asset): continue
+		var lantern=preload("res://forge_lantern.gd").new()
+		add_child(lantern)
+		lantern.setup(self,variant.id,variant.name,variant.asset)
+		forge_lanterns.append(lantern)
+	if forge_lanterns.size()==2:
+		var comparison_label=WorkshopScene.label(collection.root,"LANTERN STUDY · TWO ARTISTS\nSame controls · grip to compare · shutter opens by hand",Vector3(12.0,2.3,7.0),18)
+		comparison_label.rotation.y=-PI/2
 	discoveries=preload("res://discoveries.gd").new(); add_child(discoveries); discoveries.setup(self,self)
 	hearth_torch.create_stand(ember_gallery.court,Vector3(-3.4,1.05,5))
 	if OS.get_cmdline_user_args().has("--fairy-coop"): _start_fairy()
@@ -715,6 +727,23 @@ func _capture():
 		point.y=0.15
 		bomb_art.explosion(point,3.2)
 		await get_tree().create_timer(0.18).timeout
+	if OS.get_cmdline_user_args().has("--capture-lantern-pair"):
+		adventure.travel("forge_yard")
+		camera.global_position=Vector3(9.6,1.72,7.0)
+		camera.look_at(Vector3(12.0,1.05,7.0))
+		camera.fov=64
+		for lantern in forge_lanterns:
+			lantern.target_angle=lantern.MAX_OPEN
+			lantern.tick(0.4)
+		if OS.get_cmdline_user_args().has("--capture-lantern-dark"):
+			for child in get_children():
+				if child is DirectionalLight3D: child.light_energy=0.03
+			var world=get_world_3d().environment
+			if world!=null:
+				world.ambient_light_energy=0.07
+				world.background_mode=Environment.BG_COLOR
+				world.background_color=Color("151f2d")
+		await get_tree().create_timer(0.15).timeout
 	await RenderingServer.frame_post_draw
 	var image = get_viewport().get_texture().get_image()
 	print("CAPTURE ", image.save_png(capture_path))
@@ -815,6 +844,7 @@ func _process(delta):
 	if fairy_trails!=null: fairy_trails.tick(delta)
 	if ember_creek!=null: ember_creek.tick(delta)
 	if atelier!=null: atelier.tick(delta)
+	for lantern in forge_lanterns: lantern.tick(delta)
 	if not smoke:
 		if vr: _xr_input()
 		elif director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus(): _desktop_input(delta)
@@ -1064,6 +1094,7 @@ func _desktop_hint()->String:
 		return "Siegebird %s · unlimited bolts · LMB fire · R reload · F1 controls"%state_text
 	var item=held.get(str(desktop_hand.get_instance_id()))
 	if wyrmspout!=null and wyrmspout.is_wyrmspout(item): return "Wyrmspout · hold LMB for fire · release to cool · RMB vent · F1 controls"
+	if is_instance_valid(item) and str(item.get_meta("id","")).begins_with("forge_lantern_"): return "Lantern · LMB toggle shutter · E drop · F1 controls"
 	if is_instance_valid(item) and melee.handles(item):
 		var action=str(item_actions.CONTROLS.get(str(item.get_meta("id","")),"Swing: strike · Trigger: special"))
 		action=action.replace("Swing:","LMB").replace("Trigger:","RMB").replace("trigger:","RMB")
@@ -1102,7 +1133,7 @@ func _xr_input():
 		var grabbed=false
 		if grip and not was_gripped and not qol.opened:
 			grabbed = _grip(hand, false)
-		if bomb_input.tick(key,grip,was_gripped,trigger,last_inputs.get(key+"t",false),grabbed,held.has(key) or ((playful_tools!=null and playful_tools.claims_trigger(hand)) or (magnetic_wand!=null and magnetic_wand.claims_trigger(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand)))) or firecraft.busy(hand) or siegebird.busy(hand) or (living!=null and living.claims_trigger(hand)) or workshop.busy(hand) or enchantments.busy(hand),qol.opened or (fairy!=null and fairy.perched_on(hand)),elapsed):
+		if bomb_input.tick(key,grip,was_gripped,trigger,last_inputs.get(key+"t",false),grabbed,held.has(key) or _lantern_shutter_busy(hand) or ((playful_tools!=null and playful_tools.claims_trigger(hand)) or (magnetic_wand!=null and magnetic_wand.claims_trigger(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand)))) or firecraft.busy(hand) or siegebird.busy(hand) or (living!=null and living.claims_trigger(hand)) or workshop.busy(hand) or enchantments.busy(hand),qol.opened or (fairy!=null and fairy.perched_on(hand)),elapsed):
 			adventure.begin_bomb(hand)
 		if not grip and was_gripped:
 			print("GRIP_RELEASE hand=",hand.tracker," amount=",snappedf(hand.get_float("grip"),0.01)," threshold=",tuning.value("input.grip_release"))
@@ -1242,6 +1273,8 @@ func _grip(hand: Node3D, desktop: bool):
 	if held.has(key):
 		if desktop: adventure.release(hand,true)
 		return true
+	for lantern in forge_lanterns:
+		if lantern.try_grab_shutter(hand,desktop): return true
 	if apples!=null and apples.try_grab(hand,desktop): return true
 	if hearth_torch!=null and hearth_torch.try_grab(hand,desktop): return true
 	if ember_gallery!=null and ember_gallery.try_grab(hand,desktop): return true
@@ -1294,6 +1327,11 @@ func _grip(hand: Node3D, desktop: bool):
 			qol.presentation_label.queue_free()
 	return true
 
+func _lantern_shutter_busy(hand: Node3D) -> bool:
+	for lantern in forge_lanterns:
+		if lantern.busy(hand): return true
+	return false
+
 func _start_fairy():
 	if fairy!=null:
 		if fairy.active: fairy.window.grab_focus()
@@ -1308,6 +1346,8 @@ func _set_collisions(node: Node, enabled: bool):
 func _trigger(hand: Node3D, desktop: bool):
 	var source = camera if desktop else aim_source(hand)
 	if qol.menu_trigger(source): return
+	for lantern in forge_lanterns:
+		if lantern.trigger(hand): return
 	if echo_bells!=null and echo_bells.busy(hand): return
 	if cargo_playground!=null and cargo_playground.busy(hand): return
 	# Desktop has one hand: visible activity controls must remain usable with a toy.

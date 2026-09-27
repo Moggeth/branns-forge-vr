@@ -336,6 +336,8 @@ func begin_bomb(hand):
 
 func release(hand,desktop=false):
 	if game.guardians!=null: game.guardians.cancel_grip(hand)
+	for lantern in game.forge_lanterns:
+		if lantern.release(hand): return
 	if game.apples!=null and game.apples.release(hand): return
 	if game.hearth_torch!=null and game.hearth_torch.release(hand): return
 	if game.ember_gallery!=null and game.ember_gallery.release(hand): return

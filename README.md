@@ -33,6 +33,11 @@ Latest fairy expansion: `outputs/fairy-night-build/Play Flight Practice.cmd` or 
 Khronos validation → disposable Godot import path for new models. Run
 `scripts/Setup-AssetLab.ps1 -SmokeTest` once, then build the small Forge Yard
 lantern with `python scripts/asset_lab.py build assets/asset-lab/pilot/asset.json`.
+The [lantern comparison](assets/asset-lab/lantern-comparison/README.md) puts
+independent GPT-6 Sol and Claude Opus 5.5 versions on adjacent Forge Yard
+collection stands. Both have the same grip, physical shutter, trigger toggle,
+lighting and drop/return behavior. This is a playable asset-pipeline trial,
+with editable sources and a 53-assertion in-game regression.
 Inspect an existing complex weapon with
 `python scripts/asset_lab.py inspect assets/asset-lab/siegebird.json godot/assets/siegebird/siegebird.glb`.
 Outputs and logs go to `outputs/asset-lab/`; builds never replace live assets.

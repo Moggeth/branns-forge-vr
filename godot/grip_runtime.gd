@@ -69,6 +69,8 @@ func _holster_pose(item: Node3D, side: int) -> Transform3D:
 		return Transform3D(Basis(Vector3.UP, side * 0.35), Vector3(0, -0.18, 0))
 	if id in ["spore_lantern", "crystal_resonator"]:
 		return Transform3D(Basis(Vector3.FORWARD, side * 0.2), Vector3(0, -0.14, 0))
+	if id.begins_with("forge_lantern_"):
+		return Transform3D(Basis(Vector3.UP, side * 0.12), Vector3(0, -0.15, -0.055))
 	if id in ["ember_gauntlet", "bomb_glove"]:
 		return Transform3D(Basis(Vector3.RIGHT, -0.65), Vector3(0, -0.12, 0))
 	if id == WYRM_V1 or id == WYRM_V2:
