@@ -1,0 +1,1176 @@
+{
+ "schema": "brann.crystal_hollow.layout/1",
+ "zone": "crystal_hollow",
+ "zone_center_world": [
+  52,
+  0,
+  52
+ ],
+ "coordinates": "positions relative to zone centre; metres; +Y up; rotation_y_deg is Godot rotation.y (degrees) with piece front = local +Z",
+ "pieces": {
+  "cave_wall_strata": {
+   "file": "glb/cave_wall_strata.glb",
+   "triangles": 1152,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata"
+   ],
+   "bounds_min": [
+    -3.9,
+    -0.6,
+    -2.8
+   ],
+   "bounds_max": [
+    3.9,
+    11.93,
+    3.638
+   ]
+  },
+  "cave_wall_vein": {
+   "file": "glb/cave_wall_vein.glb",
+   "triangles": 1368,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata"
+   ],
+   "bounds_min": [
+    -3.9,
+    -0.6,
+    -2.8
+   ],
+   "bounds_max": [
+    3.9,
+    11.93,
+    3.862
+   ]
+  },
+  "cave_wall_mine": {
+   "file": "glb/cave_wall_mine.glb",
+   "triangles": 1326,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_Iron",
+    "CH_RockStrata",
+    "CH_Timber"
+   ],
+   "bounds_min": [
+    -3.9,
+    -0.6,
+    -2.8
+   ],
+   "bounds_max": [
+    3.9,
+    11.93,
+    3.856
+   ]
+  },
+  "cave_ceiling_cluster": {
+   "file": "glb/cave_ceiling_cluster.glb",
+   "triangles": 506,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata"
+   ],
+   "bounds_min": [
+    -4.8,
+    -2.598,
+    -4.8
+   ],
+   "bounds_max": [
+    4.8,
+    0.185,
+    4.8
+   ]
+  },
+  "chasm_arch": {
+   "file": "glb/chasm_arch.glb",
+   "triangles": 846,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_Iron",
+    "CH_RockStrata",
+    "CH_RockWorked"
+   ],
+   "bounds_min": [
+    -8.655,
+    -5.19,
+    -0.888
+   ],
+   "bounds_max": [
+    8.439,
+    8.918,
+    1.243
+   ]
+  },
+  "prism_vault": {
+   "file": "glb/prism_vault.glb",
+   "triangles": 1513,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata",
+    "CH_RockWorked",
+    "CH_RuneCore"
+   ],
+   "bounds_min": [
+    -3.836,
+    -0.254,
+    -6.165
+   ],
+   "bounds_max": [
+    3.97,
+    8.939,
+    1.18
+   ]
+  },
+  "lodestone_waymarker": {
+   "file": "glb/lodestone_waymarker.glb",
+   "triangles": 242,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_Iron",
+    "CH_RockStrata",
+    "CH_RockWorked",
+    "CH_RuneCore"
+   ],
+   "bounds_min": [
+    -0.463,
+    0.027,
+    -0.387
+   ],
+   "bounds_max": [
+    0.456,
+    2.255,
+    0.483
+   ]
+  },
+  "miners_lens_post": {
+   "file": "glb/miners_lens_post.glb",
+   "triangles": 436,
+   "materials": [
+    "CH_CrystalOrchid",
+    "CH_Iron",
+    "CH_RockStrata",
+    "CH_Timber"
+   ],
+   "bounds_min": [
+    -0.694,
+    -0.01,
+    -0.335
+   ],
+   "bounds_max": [
+    0.482,
+    2.8,
+    0.957
+   ]
+  },
+  "crystal_spire_cyan": {
+   "file": "glb/crystal_spire_cyan.glb",
+   "triangles": 220,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata"
+   ],
+   "bounds_min": [
+    -0.761,
+    -0.149,
+    -0.754
+   ],
+   "bounds_max": [
+    1.551,
+    2.8,
+    1.711
+   ]
+  },
+  "crystal_spire_orchid": {
+   "file": "glb/crystal_spire_orchid.glb",
+   "triangles": 220,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_CrystalOrchid",
+    "CH_RockStrata"
+   ],
+   "bounds_min": [
+    -0.761,
+    -0.149,
+    -0.754
+   ],
+   "bounds_max": [
+    1.551,
+    2.8,
+    1.711
+   ]
+  },
+  "trail_stud_cyan": {
+   "file": "glb/trail_stud_cyan.glb",
+   "triangles": 70,
+   "materials": [
+    "CH_CrystalCyan",
+    "CH_RockWorked"
+   ],
+   "bounds_min": [
+    -0.17,
+    -0.008,
+    -0.147
+   ],
+   "bounds_max": [
+    0.17,
+    0.265,
+    0.147
+   ]
+  },
+  "trail_stud_orchid": {
+   "file": "glb/trail_stud_orchid.glb",
+   "triangles": 70,
+   "materials": [
+    "CH_CrystalOrchid",
+    "CH_RockWorked"
+   ],
+   "bounds_min": [
+    -0.17,
+    -0.008,
+    -0.147
+   ],
+   "bounds_max": [
+    0.17,
+    0.265,
+    0.147
+   ]
+  },
+  "glow_pool_cyan": {
+   "file": "glb/glow_pool_cyan.glb",
+   "triangles": 20,
+   "materials": [
+    "CH_GlowCyan"
+   ],
+   "bounds_min": [
+    -1.0,
+    0.015,
+    -1.0
+   ],
+   "bounds_max": [
+    1.0,
+    0.015,
+    1.0
+   ]
+  },
+  "glow_pool_orchid": {
+   "file": "glb/glow_pool_orchid.glb",
+   "triangles": 20,
+   "materials": [
+    "CH_GlowOrchid"
+   ],
+   "bounds_min": [
+    -1.0,
+    0.015,
+    -1.0
+   ],
+   "bounds_max": [
+    1.0,
+    0.015,
+    1.0
+   ]
+  }
+ },
+ "placements": [
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    14.509,
+    0.0,
+    1.627
+   ],
+   "rotation_y_deg": -96.4,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_vein",
+   "position": [
+    12.366,
+    0.0,
+    7.762
+   ],
+   "rotation_y_deg": -122.11,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    7.774,
+    0.0,
+    12.358
+   ],
+   "rotation_y_deg": -147.83,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_mine",
+   "position": [
+    1.642,
+    0.0,
+    14.507
+   ],
+   "rotation_y_deg": -173.54,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    -4.815,
+    0.0,
+    13.783
+   ],
+   "rotation_y_deg": 160.74,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_vein",
+   "position": [
+    -10.319,
+    0.0,
+    10.329
+   ],
+   "rotation_y_deg": 135.03,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    -13.778,
+    0.0,
+    4.829
+   ],
+   "rotation_y_deg": 109.31,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_mine",
+   "position": [
+    -14.509,
+    0.0,
+    -1.627
+   ],
+   "rotation_y_deg": 83.6,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_vein",
+   "position": [
+    -12.366,
+    0.0,
+    -7.762
+   ],
+   "rotation_y_deg": 57.89,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    -7.774,
+    0.0,
+    -12.358
+   ],
+   "rotation_y_deg": 32.17,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_vein",
+   "position": [
+    -1.642,
+    0.0,
+    -14.507
+   ],
+   "rotation_y_deg": 6.46,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_strata",
+   "position": [
+    4.815,
+    0.0,
+    -13.783
+   ],
+   "rotation_y_deg": -19.26,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_mine",
+   "position": [
+    10.319,
+    0.0,
+    -10.329
+   ],
+   "rotation_y_deg": -44.97,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_wall_vein",
+   "position": [
+    13.778,
+    0.0,
+    -4.829
+   ],
+   "rotation_y_deg": -70.69,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    0.0,
+    10.35,
+    0.5
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    7.101,
+    10.2,
+    4.1
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    0.0,
+    10.2,
+    8.2
+   ],
+   "rotation_y_deg": 67.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    -7.101,
+    10.2,
+    4.1
+   ],
+   "rotation_y_deg": 134.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    -7.101,
+    10.2,
+    -4.1
+   ],
+   "rotation_y_deg": 201.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    -0.0,
+    10.2,
+    -8.2
+   ],
+   "rotation_y_deg": 268.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "cave_ceiling_cluster",
+   "position": [
+    7.101,
+    10.2,
+    -4.1
+   ],
+   "rotation_y_deg": 335.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "chasm_arch",
+   "position": [
+    0.0,
+    0.0,
+    -3.6
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "prism_vault",
+   "position": [
+    0.0,
+    0.0,
+    -10.5
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "crystal_spire_cyan",
+   "position": [
+    11.977,
+    0.0,
+    3.209
+   ],
+   "rotation_y_deg": 45.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_cyan",
+   "position": [
+    11.977,
+    0.0,
+    3.209
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "crystal_spire_orchid",
+   "position": [
+    -7.112,
+    0.0,
+    10.157
+   ],
+   "rotation_y_deg": 15.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_orchid",
+   "position": [
+    -7.112,
+    0.0,
+    10.157
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "crystal_spire_cyan",
+   "position": [
+    -11.977,
+    0.0,
+    3.209
+   ],
+   "rotation_y_deg": 135.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_cyan",
+   "position": [
+    -11.977,
+    0.0,
+    3.209
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "crystal_spire_orchid",
+   "position": [
+    -11.652,
+    0.0,
+    -4.241
+   ],
+   "rotation_y_deg": 240.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_orchid",
+   "position": [
+    -11.652,
+    0.0,
+    -4.241
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "crystal_spire_cyan",
+   "position": [
+    -4.241,
+    0.0,
+    -11.652
+   ],
+   "rotation_y_deg": 30.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_cyan",
+   "position": [
+    -4.241,
+    0.0,
+    -11.652
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "crystal_spire_orchid",
+   "position": [
+    9.499,
+    0.0,
+    -7.971
+   ],
+   "rotation_y_deg": 240.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "glow_pool_orchid",
+   "position": [
+    9.499,
+    0.0,
+    -7.971
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.6
+  },
+  {
+   "piece": "lodestone_waymarker",
+   "position": [
+    -3.45,
+    0.0,
+    3.25
+   ],
+   "rotation_y_deg": 111.37,
+   "scale": 1.0,
+   "guides": "control_A"
+  },
+  {
+   "piece": "miners_lens_post",
+   "position": [
+    4.2,
+    0.0,
+    -6.6
+   ],
+   "rotation_y_deg": -101.89,
+   "scale": 1.0,
+   "guides": "control_B"
+  },
+  {
+   "piece": "glow_pool_cyan",
+   "position": [
+    -2.9,
+    0.0,
+    3.0
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.6
+  },
+  {
+   "piece": "glow_pool_orchid",
+   "position": [
+    2.9,
+    0.0,
+    -6.9
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.6
+  },
+  {
+   "piece": "glow_pool_orchid",
+   "position": [
+    0.0,
+    0.0,
+    -10.5
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 2.2
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    1.9,
+    0.0,
+    7.6
+   ],
+   "rotation_y_deg": 59.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    1.9,
+    0.0,
+    6.1
+   ],
+   "rotation_y_deg": 13.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    -1.9,
+    0.0,
+    5.0
+   ],
+   "rotation_y_deg": 331.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    -3.3,
+    0.0,
+    4.4
+   ],
+   "rotation_y_deg": 177.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_orchid",
+   "position": [
+    1.75,
+    0.0,
+    -6.35
+   ],
+   "rotation_y_deg": 333.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_orchid",
+   "position": [
+    3.2,
+    0.0,
+    -7.9
+   ],
+   "rotation_y_deg": 65.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_orchid",
+   "position": [
+    1.8,
+    0.0,
+    -8.6
+   ],
+   "rotation_y_deg": 269.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    -1.5,
+    0.0,
+    -9.0
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  },
+  {
+   "piece": "trail_stud_cyan",
+   "position": [
+    1.5,
+    0.0,
+    -9.0
+   ],
+   "rotation_y_deg": 0.0,
+   "scale": 1.0
+  }
+ ],
+ "collision_proxies": [
+  {
+   "shape": "box",
+   "for_piece": "prism_vault",
+   "position": [
+    -1.55,
+    1.52,
+    -11.35
+   ],
+   "size": [
+    0.82,
+    3.05,
+    0.82
+   ],
+   "note": "left pillar"
+  },
+  {
+   "shape": "box",
+   "for_piece": "prism_vault",
+   "position": [
+    1.55,
+    1.52,
+    -11.35
+   ],
+   "size": [
+    0.82,
+    3.05,
+    0.82
+   ],
+   "note": "right pillar"
+  },
+  {
+   "shape": "box",
+   "for_piece": "prism_vault",
+   "position": [
+    0.0,
+    1.6,
+    -12.85
+   ],
+   "size": [
+    3.6,
+    3.2,
+    0.6
+   ],
+   "note": "apse back wall; leaves reward at (0,0,-10.5) open"
+  },
+  {
+   "shape": "box",
+   "for_piece": "prism_vault",
+   "position": [
+    -2.85,
+    1.6,
+    -12.7
+   ],
+   "size": [
+    1.7,
+    3.2,
+    1.9
+   ],
+   "note": "left shell rock"
+  },
+  {
+   "shape": "box",
+   "for_piece": "prism_vault",
+   "position": [
+    2.85,
+    1.6,
+    -12.7
+   ],
+   "size": [
+    1.7,
+    3.2,
+    1.9
+   ],
+   "note": "right shell rock"
+  },
+  {
+   "shape": "box",
+   "for_piece": "chasm_arch",
+   "position": [
+    -6.6,
+    -1.8,
+    -3.6
+   ],
+   "size": [
+    1.4,
+    6.8,
+    1.4
+   ],
+   "note": "left pier (from chasm floor)"
+  },
+  {
+   "shape": "box",
+   "for_piece": "chasm_arch",
+   "position": [
+    6.6,
+    -1.8,
+    -3.6
+   ],
+   "size": [
+    1.4,
+    6.8,
+    1.4
+   ],
+   "note": "right pier"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "lodestone_waymarker",
+   "position": [
+    -3.45,
+    0.8,
+    3.25
+   ],
+   "radius": 0.4,
+   "height": 1.6,
+   "note": "waymarker body"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "miners_lens_post",
+   "position": [
+    4.2,
+    0.9,
+    -6.6
+   ],
+   "radius": 0.35,
+   "height": 1.8,
+   "note": "post + footing; the arm/lantern above 1.8 m needs no collision"
+  },
+  {
+   "shape": "ring_of_boxes",
+   "for_piece": "cave_wall_*",
+   "note": "keep the existing 16 box walls at radius 14.5 as collision (make their meshes invisible) OR one box per wall placement: local centre (0,5.9,-1.2), size (7.4,11.8,2.6), rotated with the placement"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    11.977,
+    1.0,
+    3.209
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    -7.112,
+    1.0,
+    10.157
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    -11.977,
+    1.0,
+    3.209
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    -11.652,
+    1.0,
+    -4.241
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    -4.241,
+    1.0,
+    -11.652
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  },
+  {
+   "shape": "cylinder",
+   "for_piece": "crystal_spire_*",
+   "position": [
+    9.499,
+    1.0,
+    -7.971
+   ],
+   "radius": 0.9,
+   "height": 2.0,
+   "note": "spire base"
+  }
+ ],
+ "preserved_anchors": {
+  "entry": [
+   0,
+   0,
+   8
+  ],
+  "far_platform": [
+   0,
+   0,
+   -10.5
+  ],
+  "bridge_z": [
+   -1,
+   -6
+  ],
+  "control_A": [
+   -2.3,
+   0,
+   2.8
+  ],
+  "control_B": [
+   2.3,
+   0,
+   -7
+  ],
+  "reward_vault": [
+   0,
+   0,
+   -10.5
+  ],
+  "return_portal": [
+   7.5,
+   0,
+   9.5
+  ],
+  "enemies": [
+   [
+    -5,
+    0,
+    -7.5
+   ],
+   [
+    3,
+    0,
+    -8
+   ]
+  ],
+  "ore_z": -10,
+  "ore_x": [
+   -7,
+   -2.5,
+   2,
+   6.5
+  ]
+ },
+ "keepout_zones": [
+  {
+   "name": "bridge_and_corridor",
+   "kind": "box",
+   "params": [
+    -1.35,
+    1.35,
+    -6.4,
+    -0.8
+   ],
+   "checked_up_to_y": 2.4
+  },
+  {
+   "name": "main_corridor_entry_to_far",
+   "kind": "box",
+   "params": [
+    -1.3,
+    1.3,
+    -10.0,
+    8.5
+   ],
+   "checked_up_to_y": 2.4
+  },
+  {
+   "name": "control_A",
+   "kind": "circle",
+   "params": [
+    -2.3,
+    2.8,
+    0.75
+   ],
+   "checked_up_to_y": 2.2
+  },
+  {
+   "name": "control_B",
+   "kind": "circle",
+   "params": [
+    2.3,
+    -7.0,
+    0.75
+   ],
+   "checked_up_to_y": 2.2
+  },
+  {
+   "name": "reward_vault",
+   "kind": "box",
+   "params": [
+    -1.2,
+    1.2,
+    -11.2,
+    -9.2
+   ],
+   "checked_up_to_y": 3.0
+  },
+  {
+   "name": "return_portal",
+   "kind": "circle",
+   "params": [
+    7.5,
+    9.5,
+    1.6
+   ],
+   "checked_up_to_y": 3.0
+  },
+  {
+   "name": "enemy_golem",
+   "kind": "circle",
+   "params": [
+    3.0,
+    -8.0,
+    0.9
+   ],
+   "checked_up_to_y": 2.2
+  },
+  {
+   "name": "enemy_prismwatch",
+   "kind": "circle",
+   "params": [
+    -5.0,
+    -7.5,
+    0.9
+   ],
+   "checked_up_to_y": 2.2
+  },
+  {
+   "name": "ore_0",
+   "kind": "circle",
+   "params": [
+    -7.0,
+    -10.0,
+    0.6
+   ],
+   "checked_up_to_y": 1.5
+  },
+  {
+   "name": "ore_1",
+   "kind": "circle",
+   "params": [
+    -2.5,
+    -10.0,
+    0.6
+   ],
+   "checked_up_to_y": 1.5
+  },
+  {
+   "name": "ore_2",
+   "kind": "circle",
+   "params": [
+    2.0,
+    -10.0,
+    0.6
+   ],
+   "checked_up_to_y": 1.5
+  },
+  {
+   "name": "ore_3",
+   "kind": "circle",
+   "params": [
+    6.5,
+    -10.0,
+    0.6
+   ],
+   "checked_up_to_y": 1.5
+  }
+ ],
+ "clearance_issues": [],
+ "placed_triangles": 26439,
+ "placed_material_slots": [
+  "CH_CrystalCyan",
+  "CH_CrystalOrchid",
+  "CH_GlowCyan",
+  "CH_GlowOrchid",
+  "CH_Iron",
+  "CH_RockStrata",
+  "CH_RockWorked",
+  "CH_RuneCore",
+  "CH_Timber"
+ ]
+}

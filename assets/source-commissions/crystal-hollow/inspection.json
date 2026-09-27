@@ -1,0 +1,450 @@
+{
+ "cave_wall_strata": {
+  "bytes": 324084,
+  "meshes": 1,
+  "triangles": 1152,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata"
+  ],
+  "dims_m": [
+   7.8,
+   12.53,
+   6.438
+  ],
+  "bounds_min": [
+   -3.9,
+   -0.6,
+   -2.8
+  ],
+  "bounds_max": [
+   3.9,
+   11.93,
+   3.638
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 1152
+ },
+ "cave_wall_vein": {
+  "bytes": 341512,
+  "meshes": 1,
+  "triangles": 1368,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata"
+  ],
+  "dims_m": [
+   7.8,
+   12.53,
+   6.662
+  ],
+  "bounds_min": [
+   -3.9,
+   -0.6,
+   -2.8
+  ],
+  "bounds_max": [
+   3.9,
+   11.93,
+   3.862
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 1368
+ },
+ "cave_wall_mine": {
+  "bytes": 338976,
+  "meshes": 1,
+  "triangles": 1326,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_Iron",
+   "CH_RockStrata",
+   "CH_Timber"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_rock_strata",
+   "ch_timber"
+  ],
+  "dims_m": [
+   7.8,
+   12.53,
+   6.656
+  ],
+  "bounds_min": [
+   -3.9,
+   -0.6,
+   -2.8
+  ],
+  "bounds_max": [
+   3.9,
+   11.93,
+   3.856
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 1326
+ },
+ "cave_ceiling_cluster": {
+  "bytes": 280200,
+  "meshes": 1,
+  "triangles": 506,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata"
+  ],
+  "dims_m": [
+   9.6,
+   2.783,
+   9.6
+  ],
+  "bounds_min": [
+   -4.8,
+   -2.598,
+   -4.8
+  ],
+  "bounds_max": [
+   4.8,
+   0.185,
+   4.8
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 506
+ },
+ "chasm_arch": {
+  "bytes": 530888,
+  "meshes": 1,
+  "triangles": 846,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_Iron",
+   "CH_RockStrata",
+   "CH_RockWorked"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata",
+   "ch_rock_worked"
+  ],
+  "dims_m": [
+   17.094,
+   14.108,
+   2.131
+  ],
+  "bounds_min": [
+   -8.655,
+   -5.19,
+   -0.888
+  ],
+  "bounds_max": [
+   8.439,
+   8.918,
+   1.243
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 846
+ },
+ "prism_vault": {
+  "bytes": 585940,
+  "meshes": 1,
+  "triangles": 1513,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata",
+   "CH_RockWorked",
+   "CH_RuneCore"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata",
+   "ch_rock_worked"
+  ],
+  "dims_m": [
+   7.806,
+   9.194,
+   7.345
+  ],
+  "bounds_min": [
+   -3.836,
+   -0.254,
+   -6.165
+  ],
+  "bounds_max": [
+   3.97,
+   8.939,
+   1.18
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 1513
+ },
+ "lodestone_waymarker": {
+  "bytes": 489152,
+  "meshes": 1,
+  "triangles": 242,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_Iron",
+   "CH_RockStrata",
+   "CH_RockWorked",
+   "CH_RuneCore"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata",
+   "ch_rock_worked"
+  ],
+  "dims_m": [
+   0.919,
+   2.228,
+   0.869
+  ],
+  "bounds_min": [
+   -0.463,
+   0.027,
+   -0.387
+  ],
+  "bounds_max": [
+   0.456,
+   2.255,
+   0.483
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 242
+ },
+ "miners_lens_post": {
+  "bytes": 278424,
+  "meshes": 1,
+  "triangles": 436,
+  "materials": [
+   "CH_CrystalOrchid",
+   "CH_Iron",
+   "CH_RockStrata",
+   "CH_Timber"
+  ],
+  "images": [
+   "ch_crystal_orchid",
+   "ch_rock_strata",
+   "ch_timber"
+  ],
+  "dims_m": [
+   1.176,
+   2.81,
+   1.292
+  ],
+  "bounds_min": [
+   -0.694,
+   -0.01,
+   -0.335
+  ],
+  "bounds_max": [
+   0.482,
+   2.8,
+   0.957
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 436
+ },
+ "crystal_spire_cyan": {
+  "bytes": 260892,
+  "meshes": 1,
+  "triangles": 220,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata"
+  ],
+  "dims_m": [
+   2.312,
+   2.949,
+   2.464
+  ],
+  "bounds_min": [
+   -0.761,
+   -0.149,
+   -0.754
+  ],
+  "bounds_max": [
+   1.551,
+   2.8,
+   1.711
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 220
+ },
+ "crystal_spire_orchid": {
+  "bytes": 260896,
+  "meshes": 1,
+  "triangles": 220,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_CrystalOrchid",
+   "CH_RockStrata"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_crystal_orchid",
+   "ch_rock_strata"
+  ],
+  "dims_m": [
+   2.312,
+   2.949,
+   2.464
+  ],
+  "bounds_min": [
+   -0.761,
+   -0.149,
+   -0.754
+  ],
+  "bounds_max": [
+   1.551,
+   2.8,
+   1.711
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 220
+ },
+ "trail_stud_cyan": {
+  "bytes": 277276,
+  "meshes": 1,
+  "triangles": 70,
+  "materials": [
+   "CH_CrystalCyan",
+   "CH_RockWorked"
+  ],
+  "images": [
+   "ch_crystal_cyan",
+   "ch_rock_worked"
+  ],
+  "dims_m": [
+   0.34,
+   0.273,
+   0.294
+  ],
+  "bounds_min": [
+   -0.17,
+   -0.008,
+   -0.147
+  ],
+  "bounds_max": [
+   0.17,
+   0.265,
+   0.147
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 70
+ },
+ "trail_stud_orchid": {
+  "bytes": 277544,
+  "meshes": 1,
+  "triangles": 70,
+  "materials": [
+   "CH_CrystalOrchid",
+   "CH_RockWorked"
+  ],
+  "images": [
+   "ch_crystal_orchid",
+   "ch_rock_worked"
+  ],
+  "dims_m": [
+   0.34,
+   0.273,
+   0.294
+  ],
+  "bounds_min": [
+   -0.17,
+   -0.008,
+   -0.147
+  ],
+  "bounds_max": [
+   0.17,
+   0.265,
+   0.147
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 70
+ },
+ "glow_pool_cyan": {
+  "bytes": 9960,
+  "meshes": 1,
+  "triangles": 20,
+  "materials": [
+   "CH_GlowCyan"
+  ],
+  "images": [
+   "ch_glow_cyan"
+  ],
+  "dims_m": [
+   2.0,
+   0.0,
+   2.0
+  ],
+  "bounds_min": [
+   -1.0,
+   0.015,
+   -1.0
+  ],
+  "bounds_max": [
+   1.0,
+   0.015,
+   1.0
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 20
+ },
+ "glow_pool_orchid": {
+  "bytes": 9968,
+  "meshes": 1,
+  "triangles": 20,
+  "materials": [
+   "CH_GlowOrchid"
+  ],
+  "images": [
+   "ch_glow_orchid"
+  ],
+  "dims_m": [
+   2.0,
+   0.0,
+   2.0
+  ],
+  "bounds_min": [
+   -1.0,
+   0.015,
+   -1.0
+  ],
+  "bounds_max": [
+   1.0,
+   0.015,
+   1.0
+  ],
+  "glb_magic": "glTF",
+  "builder_triangles": 20
+ }
+}

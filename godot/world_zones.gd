@@ -709,21 +709,11 @@ static func crystal_hollow(root: Node3D, data: Dictionary) -> void:
 	floor_patch(p,Vector3(0,0,6.5),Vector2(30,17),"777688")
 	floor_patch(p,Vector3(0,0,-10.5),Vector2(30,9),"737285")
 	box(p,Vector3(0,-5,-4),Vector3(30,0.25,5),"356d9d",0.4)
-	for i in range(16):
-		var a: float = float(i)*TAU/16
-		var wall := box(p,Vector3(cos(a)*14.5,5.8,sin(a)*14.5),Vector3(6.4,12,3.0),"394358")
-		wall.rotation.y = PI/2.0-a
 	box(p,Vector3(0,11,0),Vector3(31,2.0,31),"313c53")
 	for i in range(6):
 		var a: float = float(i)*TAU/6
 		glow_light(p,Vector3(cos(a)*8,2.0,sin(a)*8),"68c9ea" if i%2 else "d184d2",1.8,10)
-	for i in range(15):
-		var a: float = float(i)*TAU/15
-		rock(p,Vector3(cos(a)*14,4,sin(a)*14),Vector3(5,9+(i%3),5),"4f566e")
-		rock(p,Vector3(cos(a)*10,8.2,sin(a)*10),Vector3(6,3.2,5),"535b72")
-	for i in range(9):
-		var a: float = float(i)*TAU/9
-		crystal_cluster(p,Vector3(cos(a)*10,0,sin(a)*10),1.5+(i%3)*0.65,"58cee6" if i%2 else "e49bdc")
+	CrystalHollowArt.add(p)
 	# Physically supported plank bridge above a genuine gap.
 	for i in range(9):
 		box(p,Vector3(0,0.045,-1.3-i*0.57),Vector3(2.2,0.13,0.53),"a18266")
@@ -737,7 +727,7 @@ static func crystal_hollow(root: Node3D, data: Dictionary) -> void:
 	enemy(root,data,id,c+Vector3(-5,0,-7.5),"skeleton","prismwatch")
 	anchor(root,data,id,c+Vector3(4,3,-8),c+Vector3(4,0,-8))
 	crate(p,Vector3(-6,0,5),0.8)
-	label(p,"EVERY STONE HOLDS A LITTLE SKY",Vector3(0,3,-11),26,"b7e5ed")
+	label(p,"EVERY STONE HOLDS A LITTLE SKY",Vector3(0,6.2,-10.9),26,"b7e5ed")
 
 static func island(p: Node3D, pos: Vector3, size: Vector2) -> void:
 	floor_patch(p,pos,size,"92aa69")
