@@ -18,7 +18,9 @@ session reported Opus 5.5 and no API key source.
 
 Actual Godot comparison frames: [day](in-game-day.png) and
 [darkened](in-game-night.png). The Sol and Opus folders also contain larger
-closed/open artist renders for inspecting the geometry.
+closed/open artist renders for inspecting the geometry. Paired review angles:
+[Sol front](sol/front.png) / [Opus front](opus/straight_front.png), and
+[Sol three-quarter](sol/three_quarter.png) / [Opus three-quarter](opus/front.png).
 
 Both accepted models have editable Blender sources and builders in their
 respective folders here. The original GLBs are embedded, including their
