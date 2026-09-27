@@ -403,7 +403,7 @@ static func build(root: Node3D) -> Dictionary:
 		["crystal_hollow","Crystal Hollow",Vector3(52,0,52),3,"68667c"],
 		["sky_garden","Sky Garden",Vector3(-52,0,-52),3,"8ea668"],
 		["ember_foundry","Ember Foundry",Vector3(52,0,-52),4,"68606a"],
-		["orchard_highlands","Orchard Highlands",Vector3(-155,0,25),2,"91a568"],
+		["orchard_highlands","Orchard Highlands",Vector3(-360,0,0),2,"91a568"],
 		["gloamfen","Gloamfen",Vector3(-155,0,115),2,"657d78"],
 		["starfall_ridge","Starfall Ridge",Vector3(155,0,110),3,"6d7793"],
 		["cloudbreak_keep","Cloudbreak Keep",Vector3(-155,0,-155),3,"a5b8ad"]]
@@ -415,7 +415,10 @@ static func build(root: Node3D) -> Dictionary:
 		var center: Vector3 = spec[2]
 		# Orchard Highlands is the broad playtest slice: a long walk, a wide
 		# meadow and a perimeter grove in one continuous physical zone.
-		var extent: float = 48.0 if spec[0]=="orchard_highlands" else (28.0 if spec[0] in ["gloamfen","starfall_ridge","cloudbreak_keep"] else (22.0 if spec[0] == "sky_garden" else 15.0))
+		# 320 x 320 m of walkable orchard: 11.1 times the former 96 x 96 m.
+		# Its center is farther west so the floor and collision do not overlap
+		# Gloamfen, Cloudbreak Keep or the home zones.
+		var extent: float = 160.0 if spec[0]=="orchard_highlands" else (28.0 if spec[0] in ["gloamfen","starfall_ridge","cloudbreak_keep"] else (22.0 if spec[0] == "sky_garden" else 15.0))
 		data.zones[spec[0]] = {"name":spec[1],"center":center,"spawn":center+Vector3(0,0,8),"bounds":Rect2(Vector2(center.x-extent,center.z-extent),Vector2.ONE*extent*2.0),"tier":spec[3],"root":p}
 		data.zones[spec[0]]["environment"] = {"ambient_color":"c5d7df","ambient_energy":0.38,"sun_color":"ffe6bd","sun_energy":1.05,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"adc5d8","fog_density":0.001}
 		if spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep"]: floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
