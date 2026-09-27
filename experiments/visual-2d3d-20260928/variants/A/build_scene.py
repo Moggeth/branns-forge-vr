@@ -216,7 +216,7 @@ for x, z, yaw in resample(STREAM, 5.0):
 
 # 7. backdrop cliffs (ravine walls, kept in corners well away from the route)
 add("mountain_cliff_chunk", -35.0, -37.5, 0.35, 0.26, dy=-2.0)
-add("mountain_cliff_chunk", 37.5, 32.0, 3.6, 0.22, dy=-2.0)
+add("mountain_cliff_chunk", 34.0, 37.0, 3.6, 0.22, dy=-2.0)
 
 # -------------------------------------------------------------- verification
 def route_samples(step=0.5):
@@ -265,13 +265,21 @@ def buffer_poly(pts, w):
 BRIDGE_W, BRIDGE_WALK = 4.4, 3.4
 BRIDGE_LEN = math.hypot(BRIDGE_B[0] - BRIDGE_A[0], BRIDGE_B[1] - BRIDGE_A[1]) + 1.6
 BRIDGE_YAW = math.atan2(BRIDGE_B[0] - BRIDGE_A[0], BRIDGE_B[1] - BRIDGE_A[1])
+bridge_axis = ((BRIDGE_B[0] - BRIDGE_A[0]) / 12.0, (BRIDGE_B[1] - BRIDGE_A[1]) / 12.0)
+bridge_bounds = buffer_poly([
+    [BRIDGE_A[0] - bridge_axis[0] * 0.8, BRIDGE_A[1] - bridge_axis[1] * 0.8],
+    [BRIDGE_B[0] + bridge_axis[0] * 0.8, BRIDGE_B[1] + bridge_axis[1] * 0.8],
+], BRIDGE_W / 2 + 0.4)
 spec = {
     "version": 1, "variant": "A", "method": "Opus written-brief direct 3D baseline (no 2D reference)", "seed": SEED,
     "bounds_m": [80, 80], "spawn_xz": list(SPAWN), "goal_xz": list(GOAL),
     "path_xz": [list(p) for p in ROUTE],
     "stream": {"points_xz": [list(p) for p in STREAM], "width_m": CHECKS["stream_water_width_m"]},
     "crossing": {"center_xz": [0.0, 0.0], "width_m": BRIDGE_W, "length_m": round(BRIDGE_LEN, 2), "yaw_rad": round(BRIDGE_YAW, 4)},
-    "terrain": {"base_y": BASE_Y,
+    "terrain": {"base_y": BASE_Y, "gaussian_coefficient": 1.0,
+                "stream_carve": {"kind": "valley_channel", "valley_depth_m": VALLEY_DEPTH,
+                                  "valley_radius_m": VALLEY_R, "channel_depth_m": CH_DEPTH,
+                                  "channel_smoothstep_m": [CH_IN, CH_OUT], "water_below_ground_m": WATER_BELOW},
                 "hills": [{"center_xz": list(c), "radius_m": r, "amplitude_m": a} for c, r, a in HILLS]},
     "regions": [
         {"name": "spawn_meadow", "surface": "grass", "polygon_xz": [[-40, 20], [-22, 20], [-22, 40], [-40, 40]], "tree_density": 0.15},
@@ -287,7 +295,7 @@ spec = {
     "exclusions": [
         {"kind": "polygon", "name": "route_clearance", "polygon_xz": buffer_poly(ROUTE, 1.2)},
         {"kind": "polygon", "name": "stream_water", "polygon_xz": buffer_poly(STREAM, CHECKS["stream_water_width_m"] / 2)},
-        {"kind": "circle", "name": "bridge", "center_xz": [0, 0], "radius_m": BRIDGE_LEN / 2},
+        {"kind": "polygon", "name": "bridge", "polygon_xz": bridge_bounds},
         {"kind": "circle", "name": "beacon", "center_xz": list(BEACON), "radius_m": 3.2},
         {"kind": "circle", "name": "goal_plaza", "center_xz": list(GOAL), "radius_m": 3.0},
         {"kind": "circle", "name": "spawn", "center_xz": list(SPAWN), "radius_m": 3.0},

@@ -1,5 +1,9 @@
 # Variant A: Opus direct 3D baseline from the written brief (Orchard Brook)
 
+## Integration correction (Codex, 2026-09-28)
+
+The first shared evaluator run flagged five declared exclusion conflicts. The bridge exclusion had been a 6.8 m radius circle even though the physical crossing is a narrow diagonal deck: four legitimate bank-side trees/rocks fell inside that overbroad circle while remaining clear of the deck. The saved plan now uses an oriented bridge polygon with 0.4 m side margin and 0.8 m end margin. A scaled backdrop cliff whose centre was actually in the water strip moved from `(37.5,32)` to `(34,37)`. These targeted changes leave the route and 193 other asset placements intact. The regenerated Blender GLB reimport passes, and the shared structured evaluator changes from five failures to zero. The terrain contract now explicitly records the Gaussian coefficient and ravine carve for faithful engine reconstruction.
+
 No 2D planning or reference imagery was made or looked at. The inputs were `input/benchmark.json`, `input/CONTRACT.md`, the written task and the 23 orchard GLBs, which were only measured for their bounds and triangle counts.
 
 ## Rebuild
