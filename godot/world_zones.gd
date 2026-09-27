@@ -491,36 +491,36 @@ static func build(root: Node3D) -> Dictionary:
 	return data
 
 static func forge(p: Node3D) -> void:
-	# Open timber shelter and terracotta roof frame Brann's existing anvil/board.
+	# The authored shell keeps Brann, the boards and all upgrade anchors where
+	# they are.  Only broad architectural members receive simple collision.
 	ForgeMaterials.dress(box(p,Vector3(0,-0.01,-3.8),Vector3(17,0.08,7.8),"bca47e"),"stone","c5b8a1")
-	for x in [-8.4,8.4]:
-		for z in [-7.4,-0.4]: ForgeMaterials.dress(box(p,Vector3(x,2.2,z),Vector3(0.3,4.4,0.3),"815233"),"timber","9c7659")
-	ForgeMaterials.dress(box(p,Vector3(0,4.2,-0.4),Vector3(17.4,0.28,0.32),"8b5837"),"timber","9c7659")
-	ForgeMaterials.dress(box(p,Vector3(0,4.2,-7.4),Vector3(17.4,0.28,0.32),"8b5837"),"timber","9c7659")
-	for x in range(-8,9,2):
-		line(p,Vector3(x,4.1,-7.6),Vector3(x,5.5,-4),0.18,"91603a")
-		line(p,Vector3(x,5.5,-4),Vector3(x,4.1,-0.1),0.18,"91603a")
-	for side in [-1,1]:
-		var roof := box(p,Vector3(0,4.95,-4+side*2.05),Vector3(18.2,0.17,4.5),"b4653b")
-		roof.rotation.x = side*0.34
-		for x in range(-9,10):
-			line(p,Vector3(x,5.64,-4),Vector3(x,4.16,-4+side*4.3),0.055,"d7854b")
+	for asset in ["res://assets/forge-yard/forge_shelter.glb","res://assets/forge-yard/forge_detail_kit.glb"]:
+		var scene: PackedScene = load(asset)
+		if scene == null:
+			push_error("FORGE_ARCHITECTURE missing="+asset)
+			continue
+		var architecture := scene.instantiate()
+		architecture.name = "Authored_"+asset.get_file().get_basename()
+		p.add_child(architecture)
+	for x in [-8.3,-4.6,4.6,8.3]:
+		for z in [-7.35,-0.45]: body(p,Vector3(x,2.0,z),Vector3(0.45,4.0,0.45),"solid")
+	for x in [-8.3,8.3]: body(p,Vector3(x,2.0,-3.9),Vector3(0.45,4.0,0.45),"solid")
+	for x in [-5.5,5.5]: body(p,Vector3(x,1.5,-7.58),Vector3(5.0,3.0,0.35),"solid")
+	body(p,Vector3(0,3.42,-7.58),Vector3(3.0,0.62,0.35),"solid")
+	for x in [-1.3,1.3]: body(p,Vector3(x,1.3,2.7),Vector3(0.34,2.6,0.36),"solid")
 	# A real rear doorway lets the final foundry connect to the original forge.
-	for side in [-1,1]: ForgeMaterials.dress(box(p,Vector3(side*5.0,1.9,-7.6),Vector3(7,3.8,0.3),"c5b58f"),"stone","c8baa2")
-	ForgeMaterials.dress(box(p,Vector3(0,3.35,-7.6),Vector3(3,0.9,0.3),"c5b58f"),"stone","c8baa2")
 	var gate=Node3D.new(); p.add_child(gate); gate.name="FoundryGate"; gate.add_to_group("foundry_gate")
 	ForgeMaterials.dress(box(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.16),"73553c"),"timber","8c6e55")
 	for y in [0.6,2.2]: box(gate,Vector3(0,y,-7.48),Vector3(2.95,0.13,0.10),"b49b67")
 	body(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.2),"solid")
 	label(gate,"THE HEARTH BEYOND\nAwakens with the Everburning Forge",Vector3(0,3.16,-7.35),17)
-	for x in [-8,-4,4,8]: box(p,Vector3(x,1.9,-7.37),Vector3(0.16,3.8,0.18),"94653e")
-	ForgeMaterials.dress(box(p,Vector3(-3.1,4.5,-4.9),Vector3(1.05,4.2,0.9),"96958b"),"stone","a5a298")
-	ForgeMaterials.dress(box(p,Vector3(-3.1,6.65,-4.9),Vector3(1.27,0.28,1.12),"797e77"),"stone","a5a298")
 	var smoke=preload("res://forge_atmosphere.gd").new()
 	p.add_child(smoke)
 	smoke.name="ForgeSmoke"
-	smoke.position=Vector3(-3.1,6.8,-4.9)
-	for x in [-7.5,7.5]: lantern(p,Vector3(x,3.4,-0.4))
+	smoke.position=Vector3(-3.1,7.99,-4.9)
+	# The authored lantern meshes provide the silhouettes; two cheap lights give
+	# the front posts a warm pool without doubling the geometry.
+	for x in [-8.3,8.3]: glow_light(p,Vector3(x,3.0,-0.45),"ffd08b",0.4,3.2)
 	glow_light(p,Vector3(-3.1,1.6,-3.9),"ff9a43",1.8,7.0)
 	# Low garden walls, apple trees, winding flagstone approaches.
 	for side in [-1,1]:

@@ -1,0 +1,1060 @@
+{
+  "coordinate_system": "Godot: metres, +Y up, front +Z, ground y=0. All positions are world positions in the forge_yard zone root.",
+  "forge_shelter": {
+    "file": "forge_shelter.glb",
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "rotation_deg": [
+      0,
+      0,
+      0
+    ],
+    "groups": {
+      "Shell_Posts": {
+        "triangles": 1320,
+        "materials": [
+          "Stone_Warm",
+          "Timber_Oak"
+        ],
+        "bounds": {
+          "min": [
+            -8.875,
+            0.0,
+            -7.679
+          ],
+          "max": [
+            8.875,
+            4.02,
+            -0.124
+          ]
+        }
+      },
+      "Shell_Plates_Ties": {
+        "triangles": 396,
+        "materials": [
+          "Timber_Oak"
+        ],
+        "bounds": {
+          "min": [
+            -8.65,
+            4.02,
+            -7.85
+          ],
+          "max": [
+            8.65,
+            4.72,
+            0.05
+          ]
+        }
+      },
+      "Shell_Braces_Joinery": {
+        "triangles": 1376,
+        "materials": [
+          "Timber_Oak",
+          "Timber_Pine"
+        ],
+        "bounds": {
+          "min": [
+            -8.45,
+            3.103,
+            -7.43
+          ],
+          "max": [
+            8.45,
+            4.235,
+            -0.24
+          ]
+        }
+      },
+      "Shell_Trusses": {
+        "triangles": 1320,
+        "materials": [
+          "Timber_Oak"
+        ],
+        "bounds": {
+          "min": [
+            -8.42,
+            4.073,
+            -7.897
+          ],
+          "max": [
+            8.42,
+            6.514,
+            0.097
+          ]
+        }
+      },
+      "Shell_Rafters_Purlins": {
+        "triangles": 1672,
+        "materials": [
+          "Timber_Oak",
+          "Timber_Pine"
+        ],
+        "bounds": {
+          "min": [
+            -8.752,
+            4.328,
+            -7.727
+          ],
+          "max": [
+            8.752,
+            6.582,
+            -0.073
+          ]
+        }
+      },
+      "Shell_Roof_Tiles": {
+        "triangles": 4600,
+        "materials": [
+          "Timber_Pine",
+          "Roof_Terracotta"
+        ],
+        "bounds": {
+          "min": [
+            -8.75,
+            4.37,
+            -7.759
+          ],
+          "max": [
+            8.75,
+            6.841,
+            -0.041
+          ]
+        }
+      },
+      "Shell_Ridge_Finials": {
+        "triangles": 960,
+        "materials": [
+          "Roof_Terracotta",
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            -8.781,
+            6.602,
+            -4.322
+          ],
+          "max": [
+            8.782,
+            7.932,
+            -3.478
+          ]
+        }
+      },
+      "Shell_FrontGable": {
+        "triangles": 1900,
+        "materials": [
+          "Timber_Oak",
+          "Timber_Pine",
+          "Roof_Terracotta",
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            -3.308,
+            4.383,
+            -3.32
+          ],
+          "max": [
+            3.308,
+            7.35,
+            0.35
+          ]
+        }
+      },
+      "Shell_RearWall_Stone": {
+        "triangles": 3444,
+        "materials": [
+          "Stone_Warm"
+        ],
+        "bounds": {
+          "min": [
+            -8.485,
+            0.01,
+            -7.87
+          ],
+          "max": [
+            8.513,
+            4.02,
+            -7.29
+          ]
+        }
+      },
+      "Shell_RearWall_Frame": {
+        "triangles": 984,
+        "materials": [
+          "Plaster_Lime",
+          "Timber_Oak"
+        ],
+        "bounds": {
+          "min": [
+            -8.45,
+            1.12,
+            -7.72
+          ],
+          "max": [
+            8.45,
+            4.1,
+            -7.35
+          ]
+        }
+      },
+      "Shell_GableEnds": {
+        "triangles": 720,
+        "materials": [
+          "Plaster_Lime",
+          "Timber_Oak",
+          "Timber_Pine",
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            -8.805,
+            4.264,
+            -8.025
+          ],
+          "max": [
+            8.805,
+            7.076,
+            0.225
+          ]
+        }
+      },
+      "Shell_Chimney": {
+        "triangles": 608,
+        "materials": [
+          "Stone_Warm",
+          "Roof_Terracotta"
+        ],
+        "bounds": {
+          "min": [
+            -3.793,
+            3.25,
+            -5.468
+          ],
+          "max": [
+            -2.407,
+            8.55,
+            -4.332
+          ]
+        }
+      },
+      "Shell_Ironwork": {
+        "triangles": 924,
+        "materials": [
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            -8.539,
+            0.48,
+            -7.42
+          ],
+          "max": [
+            8.539,
+            5.635,
+            -0.202
+          ]
+        }
+      }
+    },
+    "chimney_smoke_socket": [
+      -3.0999999046325684,
+      7.99,
+      -4.900000095367432
+    ],
+    "collision_boxes": [
+      {
+        "name": "Post_-8.3_-0.45",
+        "center": [
+          -8.3,
+          1.95,
+          -0.45
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_-8.3_-7.35",
+        "center": [
+          -8.3,
+          1.95,
+          -7.35
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_-4.6_-0.45",
+        "center": [
+          -4.6,
+          1.95,
+          -0.45
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_-4.6_-7.35",
+        "center": [
+          -4.6,
+          1.95,
+          -7.35
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_+4.6_-0.45",
+        "center": [
+          4.6,
+          1.95,
+          -0.45
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_+4.6_-7.35",
+        "center": [
+          4.6,
+          1.95,
+          -7.35
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_+8.3_-0.45",
+        "center": [
+          8.3,
+          1.95,
+          -0.45
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_+8.3_-7.35",
+        "center": [
+          8.3,
+          1.95,
+          -7.35
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_-8.3_mid",
+        "center": [
+          -8.3,
+          1.95,
+          -3.9
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "Post_+8.3_mid",
+        "center": [
+          8.3,
+          1.95,
+          -3.9
+        ],
+        "size": [
+          0.45,
+          3.9,
+          0.45
+        ]
+      },
+      {
+        "name": "RearWall_W",
+        "center": [
+          -5.0,
+          2.1,
+          -7.55
+        ],
+        "size": [
+          7.0,
+          4.2,
+          0.6
+        ]
+      },
+      {
+        "name": "RearWall_E",
+        "center": [
+          5.0,
+          2.1,
+          -7.55
+        ],
+        "size": [
+          7.0,
+          4.2,
+          0.6
+        ]
+      },
+      {
+        "name": "RearWall_OverGate",
+        "center": [
+          0,
+          3.575,
+          -7.55
+        ],
+        "size": [
+          3.0,
+          1.25,
+          0.6
+        ],
+        "note": "above the gate aperture only; FoundryGate keeps its own runtime body"
+      }
+    ]
+  },
+  "forge_detail_kit": {
+    "file": "forge_detail_kit.glb",
+    "note": "modules are pre-placed in this file; kit_modules/*.glb are the same meshes with origin at 'position'",
+    "modules": {
+      "Kit_ForgeCrest": {
+        "file": "kit_modules/Kit_ForgeCrest.glb",
+        "position": [
+          0.0,
+          5.05,
+          0.1
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 852,
+        "materials": [
+          "Timber_Oak",
+          "Brass_Trim",
+          "Cloth_Banner",
+          "Iron_Wrought",
+          "Timber_Pine",
+          "Lantern_Glow"
+        ],
+        "bounds": {
+          "min": [
+            -1.042,
+            4.38,
+            0.03
+          ],
+          "max": [
+            1.042,
+            6.015,
+            0.275
+          ]
+        },
+        "attach": "front gable collar, hangs in front of truss",
+        "clearance_bottom_y": 4.38,
+        "collision_boxes": []
+      },
+      "Kit_Banner_West": {
+        "file": "kit_modules/Kit_Banner_West.glb",
+        "position": [
+          -6.45,
+          4.0,
+          -0.21
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 204,
+        "materials": [
+          "Brass_Trim",
+          "Cloth_Banner",
+          "Lantern_Glow"
+        ],
+        "bounds": {
+          "min": [
+            -7.073,
+            2.81,
+            -0.26
+          ],
+          "max": [
+            -5.827,
+            4.05,
+            -0.16
+          ]
+        },
+        "attach": "hangs from front wall plate between posts",
+        "clearance_bottom_y": 2.85,
+        "collision_boxes": []
+      },
+      "Kit_Banner_East": {
+        "file": "kit_modules/Kit_Banner_East.glb",
+        "position": [
+          6.45,
+          4.0,
+          -0.21
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 204,
+        "materials": [
+          "Brass_Trim",
+          "Cloth_Banner",
+          "Lantern_Glow"
+        ],
+        "bounds": {
+          "min": [
+            5.827,
+            2.81,
+            -0.26
+          ],
+          "max": [
+            7.073,
+            4.05,
+            -0.16
+          ]
+        },
+        "attach": "hangs from front wall plate between posts",
+        "clearance_bottom_y": 2.85,
+        "collision_boxes": []
+      },
+      "Kit_Lantern_W8_3": {
+        "file": "kit_modules/Kit_Lantern_W8_3.glb",
+        "position": [
+          -8.3,
+          3.1,
+          -0.27
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 300,
+        "materials": [
+          "Iron_Wrought",
+          "Lantern_Glow",
+          "Brass_Trim"
+        ],
+        "bounds": {
+          "min": [
+            -8.431,
+            2.45,
+            -0.27
+          ],
+          "max": [
+            -8.169,
+            3.27,
+            0.42
+          ]
+        },
+        "attach": "front face of post, lantern bottom ~2.55 m",
+        "light_socket": [
+          -8.3,
+          2.73,
+          0.28
+        ],
+        "clearance_bottom_y": 2.55,
+        "collision_boxes": []
+      },
+      "Kit_Lantern_W4_6": {
+        "file": "kit_modules/Kit_Lantern_W4_6.glb",
+        "position": [
+          -4.6,
+          3.1,
+          -0.27
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 300,
+        "materials": [
+          "Iron_Wrought",
+          "Lantern_Glow",
+          "Brass_Trim"
+        ],
+        "bounds": {
+          "min": [
+            -4.731,
+            2.45,
+            -0.27
+          ],
+          "max": [
+            -4.469,
+            3.27,
+            0.42
+          ]
+        },
+        "attach": "front face of post, lantern bottom ~2.55 m",
+        "light_socket": [
+          -4.6,
+          2.73,
+          0.28
+        ],
+        "clearance_bottom_y": 2.55,
+        "collision_boxes": []
+      },
+      "Kit_Lantern_E4_6": {
+        "file": "kit_modules/Kit_Lantern_E4_6.glb",
+        "position": [
+          4.6,
+          3.1,
+          -0.27
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 300,
+        "materials": [
+          "Iron_Wrought",
+          "Lantern_Glow",
+          "Brass_Trim"
+        ],
+        "bounds": {
+          "min": [
+            4.469,
+            2.45,
+            -0.27
+          ],
+          "max": [
+            4.731,
+            3.27,
+            0.42
+          ]
+        },
+        "attach": "front face of post, lantern bottom ~2.55 m",
+        "light_socket": [
+          4.6,
+          2.73,
+          0.28
+        ],
+        "clearance_bottom_y": 2.55,
+        "collision_boxes": []
+      },
+      "Kit_Lantern_E8_3": {
+        "file": "kit_modules/Kit_Lantern_E8_3.glb",
+        "position": [
+          8.3,
+          3.1,
+          -0.27
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 300,
+        "materials": [
+          "Iron_Wrought",
+          "Lantern_Glow",
+          "Brass_Trim"
+        ],
+        "bounds": {
+          "min": [
+            8.169,
+            2.45,
+            -0.27
+          ],
+          "max": [
+            8.431,
+            3.27,
+            0.42
+          ]
+        },
+        "attach": "front face of post, lantern bottom ~2.55 m",
+        "light_socket": [
+          8.3,
+          2.73,
+          0.28
+        ],
+        "clearance_bottom_y": 2.55,
+        "collision_boxes": []
+      },
+      "Kit_ToolRack_West": {
+        "file": "kit_modules/Kit_ToolRack_West.glb",
+        "position": [
+          -6.4,
+          0.0,
+          -7.34
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 836,
+        "materials": [
+          "Timber_Oak",
+          "Timber_Pine",
+          "Iron_Wrought",
+          "Roof_Terracotta"
+        ],
+        "bounds": {
+          "min": [
+            -7.35,
+            0.737,
+            -7.34
+          ],
+          "max": [
+            -5.45,
+            2.12,
+            -6.96
+          ]
+        },
+        "attach": "yard face of rear wall, behind the interaction table",
+        "depth_m": 0.4,
+        "collision_boxes": [
+          {
+            "name": "ToolRack_W",
+            "center": [
+              -6.4,
+              1.5,
+              -7.14
+            ],
+            "size": [
+              1.9,
+              1.3,
+              0.4
+            ],
+            "note": "optional; rear wall box already covers most"
+          }
+        ]
+      },
+      "Kit_ToolRack_East": {
+        "file": "kit_modules/Kit_ToolRack_East.glb",
+        "position": [
+          6.4,
+          0.0,
+          -7.34
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 836,
+        "materials": [
+          "Timber_Oak",
+          "Timber_Pine",
+          "Iron_Wrought",
+          "Roof_Terracotta"
+        ],
+        "bounds": {
+          "min": [
+            5.45,
+            0.737,
+            -7.34
+          ],
+          "max": [
+            7.35,
+            2.12,
+            -6.96
+          ]
+        },
+        "attach": "yard face of rear wall, behind the interaction table",
+        "depth_m": 0.4,
+        "collision_boxes": [
+          {
+            "name": "ToolRack_E",
+            "center": [
+              6.4,
+              1.5,
+              -7.14
+            ],
+            "size": [
+              1.9,
+              1.3,
+              0.4
+            ],
+            "note": "optional; rear wall box already covers most"
+          }
+        ]
+      },
+      "Kit_EntryArch": {
+        "file": "kit_modules/Kit_EntryArch.glb",
+        "position": [
+          0.0,
+          0.0,
+          2.7
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 716,
+        "materials": [
+          "Stone_Warm",
+          "Timber_Oak",
+          "Iron_Wrought",
+          "Timber_Pine",
+          "Roof_Terracotta",
+          "Lantern_Glow"
+        ],
+        "bounds": {
+          "min": [
+            -1.7,
+            0.0,
+            2.438
+          ],
+          "max": [
+            1.7,
+            3.829,
+            2.962
+          ]
+        },
+        "attach": "stands over the flagstone path; 2.36 m clear between post faces, 2.95 m under hoop",
+        "clearance_bottom_y": 2.88,
+        "collision_boxes": [
+          {
+            "name": "EntryPost_W",
+            "center": [
+              -1.3,
+              1.6,
+              2.7
+            ],
+            "size": [
+              0.5,
+              3.2,
+              0.5
+            ]
+          },
+          {
+            "name": "EntryPost_E",
+            "center": [
+              1.3,
+              1.6,
+              2.7
+            ],
+            "size": [
+              0.5,
+              3.2,
+              0.5
+            ]
+          }
+        ]
+      },
+      "Kit_ExpansionFrame_West": {
+        "file": "kit_modules/Kit_ExpansionFrame_West.glb",
+        "position": [
+          -9.6,
+          0.0,
+          -3.9
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 752,
+        "materials": [
+          "Stone_Warm",
+          "Timber_Pine",
+          "Cloth_Banner",
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            -11.014,
+            0.0,
+            -6.7
+          ],
+          "max": [
+            -8.436,
+            4.075,
+            -1.1
+          ]
+        },
+        "attach": "outside the open side bay; posts at x=+/-10.7 (trees at x=+/-11,z=-9 and x=+/-12,z=3 stay clear)",
+        "collision_boxes": [
+          {
+            "name": "WingPost_W_rear",
+            "center": [
+              -10.7,
+              1.6,
+              -6.4
+            ],
+            "size": [
+              0.4,
+              3.2,
+              0.4
+            ]
+          },
+          {
+            "name": "WingPost_W_front",
+            "center": [
+              -10.7,
+              1.6,
+              -1.4
+            ],
+            "size": [
+              0.4,
+              3.2,
+              0.4
+            ]
+          },
+          {
+            "name": "PlankStack_W",
+            "center": [
+              -9.7,
+              0.35,
+              -3.9
+            ],
+            "size": [
+              0.6,
+              0.7,
+              3.3
+            ]
+          }
+        ]
+      },
+      "Kit_ExpansionFrame_East": {
+        "file": "kit_modules/Kit_ExpansionFrame_East.glb",
+        "position": [
+          9.6,
+          0.0,
+          -3.9
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "triangles": 752,
+        "materials": [
+          "Stone_Warm",
+          "Timber_Pine",
+          "Cloth_Banner",
+          "Iron_Wrought"
+        ],
+        "bounds": {
+          "min": [
+            8.436,
+            0.0,
+            -6.7
+          ],
+          "max": [
+            11.014,
+            4.075,
+            -1.1
+          ]
+        },
+        "attach": "outside the open side bay; posts at x=+/-10.7 (trees at x=+/-11,z=-9 and x=+/-12,z=3 stay clear)",
+        "collision_boxes": [
+          {
+            "name": "WingPost_E_rear",
+            "center": [
+              10.7,
+              1.6,
+              -6.4
+            ],
+            "size": [
+              0.4,
+              3.2,
+              0.4
+            ]
+          },
+          {
+            "name": "WingPost_E_front",
+            "center": [
+              10.7,
+              1.6,
+              -1.4
+            ],
+            "size": [
+              0.4,
+              3.2,
+              0.4
+            ]
+          },
+          {
+            "name": "PlankStack_E",
+            "center": [
+              9.7,
+              0.35,
+              -3.9
+            ],
+            "size": [
+              0.6,
+              0.7,
+              3.3
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "anchors_respected": {
+    "brann": [
+      0,
+      0,
+      -4
+    ],
+    "tables": [
+      [
+        -5.4,
+        0,
+        -4.7
+      ],
+      [
+        5.4,
+        0,
+        -4.7
+      ]
+    ],
+    "foundry_gate": [
+      0,
+      1.4,
+      -7.6
+    ],
+    "gate_clear_aperture_m": [
+      3.0,
+      2.95
+    ],
+    "roof_eave_x": 8.75,
+    "roof_z": [
+      -7.75,
+      0.2
+    ],
+    "min_head_clearance_inside_m": 3.15,
+    "approach_view_from": [
+      0,
+      1.6,
+      8
+    ]
+  }
+}
