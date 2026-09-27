@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 27
+  productName: Brann's Forge VR
+  companyName: Brann Copperpot
+  defaultScreenWidth: 1280
+  defaultScreenHeight: 720
+  runInBackground: 1
+  useHDRDisplay: 0
+  usePlayerLog: 1
+  activeInputHandler: 2
+  fullscreenMode: 3
+  resizableWindow: 1
+  visibleInBackground: 1
+  useMacAppStoreValidation: 0
+  webGLInitialMemorySize: 32
+  bundleVersion: 0.1.0
+  AndroidBundleVersionCode: 1
+  scriptingBackend:
+    Standalone: 1
+  apiCompatibilityLevelPerPlatform: {}
+  useDefaultGraphicsAPIs: 1
+  m_SupportedAspectRatios: 00000000000000000000000000000000

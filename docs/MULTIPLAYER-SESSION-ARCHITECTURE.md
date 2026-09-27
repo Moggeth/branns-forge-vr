@@ -1,0 +1,74 @@
+# Multiplayer session architecture (proposal)
+
+Status: design only, 26 September 2026. The playable game remains single-machine. No shareable code, remote fairy, remote Director, cloud session endpoint, or public listener is implemented by this document.
+
+## Existing boundaries
+
+- `godot/fairy_coop.gd` creates a second native `Window` and camera in the **same** `World3D` as the Hero. Its keyboard, mouse and gamepad events mutate the local fairy directly. This is local co-op, with local pickup, combat, ping, reveal, perch and travel interactions; it is not a network client.
+- `godot/director_runtime.gd` runs the Pinewood Waystones match in Godot. It polls the bridge about every 150 ms, applies numbered Director commands, and returns a snapshot plus acknowledgment. A separate tactical camera can upload a 1024×576 JPEG at most five times per second while a viewer is present. The host therefore owns physical combat, health, timer, waystones and result.
+- `service/director.js` holds exactly one Director match in process memory. `session/start` replaces it. The UUID `sessionId` guards against *stale* requests but is visible to the browser and is not an authorization secret. The command queue and JPEG frame disappear on service restart. The current service binds `127.0.0.1:8787`; its middleware rejects non-loopback Host/Origin and forwarded requests. The `/director` page and endpoints assume that local boundary. **Never expose or proxy this service as the multiplayer API.** Its other `/api/vr` and forge routes can change local progression or initiate paid work.
+- The Director UI reads `/api/director/state`, posts `/api/director/command`, and fetches `/api/director/frame?after=...`. These are useful gameplay semantics to adapt, but their authentication, state lifetime and single-match model do not carry over.
+
+## Chosen shape and authority
+
+One Hero game process is the authoritative simulation and save owner. At most one Fairy controller and one Director controller occupy separate role slots; Fairy can instead stay local in the existing second window. Joining the Director role does not replace the Fairy. An absent Director means normal solo or Fairy play; no AI or untrusted client becomes an authority by default. A room has one immutable `sessionId` and one random public **invite code** per share operation. The code only locates a room and requests a role; it is not the final command credential.
+
+```text
+Hero Godot -> existing local bridge (127.0.0.1, saves/forge/voice stay here)
+     |
+     +-- outbound authenticated TLS/WebSocket connection --> session relay
+                                                          |-- Fairy client
+                                                          +-- Director client
+Vercel: invitation UI, join/auth API, room registry, short-lived grants
+External durable store: rooms, role leases, epochs, relay routing, rate counters
+```
+
+The relay is only a message router and authorization gate. It never calculates damage, creates items, grants achievements, chooses match outcomes, or writes the Hero save. The Hero validates a role's actions and publishes authoritative outcomes. The Vercel app can serve web clients, room creation/join APIs, and possibly the relay on Vercel Functions; this is a deployment choice to verify with a spike before connecting the game. Keep the relay interface portable to a dedicated long-lived service if network jitter, reconnect churn, cost or platform beta behavior proves unsuitable.
+
+An outbound Hero connection avoids router port forwarding and works behind many home NATs. The relay necessarily sees session traffic and can become an outage point. A direct peer connection might lower latency, but needs NAT traversal, signaling and often TURN relay anyway; it would reveal peer addressing and complicate role authorization. Do not make direct peer connectivity the first release. Never place the local bridge or its secrets on a public address. The Hero process may continue offline when the relay fails, with remote input frozen and a visible connection state.
+
+## Room and role lifecycle
+
+1. Hero explicitly selects **Share session**. The local game creates a fresh ephemeral host key, sends only the public key and permitted roles to the cloud create API over TLS, and receives an opaque `sessionId`, short display code, room epoch and a host challenge. The host signs the challenge and proves possession on its outbound relay connection. Host private key remains on the Hero machine and is discarded when sharing ends. A host code rotation does not reset the gameplay world.
+2. Guest enters a code in the share site, chooses Fairy or Director, and signs in using the chosen identity provider. For an early private playtest, an allowlist or single-use owner-approved invite is sufficient. Joining is a server-side atomic claim of a vacant role lease, not a query parameter saying `role=fairy`. Local Fairy ownership and remote Fairy ownership are mutually exclusive: host must explicitly hand off or close the local window before accepting a remote Fairy.
+3. The API returns a short-lived, signed, room-and-role-scoped connection grant after authorization. The relay verifies signature, expiry, audience, `sessionId`, role, participant ID, room epoch, and a single-use nonce before upgrade or first message. Browser Origin checks and rate limits are additional controls. The invite code must never be accepted as a bearer command token. Keep grants in memory; do not put them in URL query strings or persistent local storage. Redact codes/grants from logs.
+4. On join, the Hero sends a full versioned snapshot and current sequence. A guest becomes active only after it acknowledges that baseline. If a guest leaves, its role lease enters a short reconnect grace period (proposed 60 seconds) and its pending inputs are discarded. A reconnecting same participant presents a fresh grant, last acknowledged state sequence and role generation. Another device can take the slot only after explicit host release or grace expiry, which increments the role generation. A stale socket or delayed command from the old generation is then rejected.
+5. The Hero leaving pauses remote actions immediately. The room goes unavailable after a heartbeat lease timeout (proposed 10 seconds), with a visible reason. Reconnection of the same signed host before room expiry (proposed 10 minutes) increments the room epoch, invalidates old grants and sends a new full snapshot. After expiry, create a new room and code; never silently transfer simulation authority to a guest. End sharing revokes the room and role grants, closes connections, and clears transient remote-only state.
+
+Display codes should be cryptographically random, case-insensitive, unambiguous characters, at least 50 bits of entropy, and time limited. For example, ten Crockford Base32 characters give 50 bits before any checksum; render as `XXXXX-XXXXX`. Store only a keyed hash of the normalized code, with its room ID and expiry. Reject malformed codes before lookup, use uniform error messages for missing/expired/full rooms, cap attempts per account and network, and allow host rotation/revocation. A code leak grants only the chance to request a role, with sign-in/allowlist or host approval still required.
+
+## Wire contract to implement first
+
+Use a shared schema version, bounded JSON messages and explicit direction. Every message contains `v`, `sessionId`, `roomEpoch`, `roleGeneration`, `type`, `seq`, and `sentAtMs`; the relay supplies the authenticated `participantId` and role from its verified grant, never from a client field. Reject unknown versions, oversized payloads, nonfinite numbers, unexpected fields, out-of-order sequence and role-incompatible types. Message IDs are unique per role generation; cache a bounded acknowledgment window to make retries idempotent. Server and client time are diagnostics only, never match authority.
+
+| Direction | Types | Meaning / validation |
+| --- | --- | --- |
+| Hero → guests | `baseline`, `state`, `event`, `presence`, `ack`, `reject` | Monotonic authoritative `stateSeq`; bounded entity IDs and zone IDs; no private save, speech transcript, forge prompt, token, file path or host IP. A baseline carries enough state for late join. |
+| Fairy → Hero | `fairy_input`, `fairy_action` | Direction/aim and button edges with bounded values, no transforms or damage amounts supplied as fact. Hero runs existing fairy movement/interaction rules. Explicit action IDs cover ping, shoot, reveal, perch, pickup/drop and item use; Hero checks distance, line of sight, inventory and cooldown. |
+| Director → Hero | `director_command`, `director_camera` | Start/rematch/card and valid lane or bounded camera pose. Bridge or shared rules still check phase, budget, cooldown, enemy cap and match state. Director cannot submit snapshots or frame bytes. |
+| All peers | `ping`, `pong`, `resume` | Liveness and resynchronization; no gameplay authority. |
+
+The existing Director `sessionId` and command serial should be adapted behind an authenticated room adapter; they are not the room grant. Future implementation should choose one command acceptance owner: preferably the Hero for final phase/gameplay validation, while relay may perform cheap schema/rate checks. If the bridge remains a command queue, only the authenticated Hero-side adapter may call its local endpoints. The current `session/start` must not run for each guest or each reconnect, because it resets the match.
+
+State sync starts with a full snapshot, followed by sequence-numbered deltas/events. Proposed initial rates to measure, not promises: Fairy input 20 Hz unreliable or latest-wins, Hero position/state 10–20 Hz, slow world state 2–5 Hz, Director tabletop 5–10 Hz, tactical JPEG at most the existing 5 Hz only when watched. Camera frames are a separate best-effort channel with sequence, size cap and backpressure; drop stale frames instead of queuing them. Compress/quantize state only after profiling. Smooth remote fairy rendering with interpolation; never extrapolate item ownership, hits or score. The host can locally predict the fairy's own camera if moved to a remote Godot client, but must reconcile to Hero snapshots. A browser-first Fairy controller may use a lower-fidelity rendered view or a compressed host camera feed; the existing native `Window` cannot simply be embedded on the web.
+
+On gap, reconnect or room epoch change, request a fresh baseline and discard old deltas. On Director command retry, retain its client message ID until the Hero acknowledges acceptance or rejection; accepted commands apply once. The current Director bridge already has serial acknowledgments, but remote delivery needs a separate per-role input sequence and epoch to avoid double play after reconnect. Pause remote interaction when round-trip latency or host heartbeat exceeds a measured threshold; show degraded status rather than letting queued button presses fire later.
+
+## Privacy and security separation
+
+Only publish a small allowlisted gameplay projection. No raw `/api/vr/state`, forge inventory/job details, generated files, voice payloads, OpenAI key, local paths, real name, IP, or whole Godot scene tree. Use TLS/WSS, encrypted storage for any durable connection metadata, short retention for room records, and no recording of camera frames by default. The Director's tactical view can reveal the Hero's in-game movements, so the Hero explicitly enables it and can revoke it. Guest aliases and account IDs stay out of public room lookup. Label chat/voice as a separate later feature with its own consent and moderation; this design does not add it.
+
+Enforce role permissions at API, relay and Hero layers. The cloud rejects an unclaimed or expired role; the Hero rejects commands from a stale epoch/generation and rechecks game rules. Limit payload bytes and message rate per role, code guesses and room creations; treat the relay as potentially compromised for gameplay integrity and the client as untrusted for both integrity and privacy. Host keys, grants and store credentials rotate independently. A legitimate Director must never inherit `/api/vr` or forge permissions from the local bridge.
+
+## Vercel fit and deployment decision
+
+As of this document, Vercel [WebSockets on Functions](https://vercel.com/docs/functions/websockets) are in beta, require Fluid compute, and are pinned to one Function instance only for that connection's life. Connections close at the Function maximum duration; reconnects may land on another instance or deployment. The official guidance is to keep rooms, presence and pub/sub coordination in an external store. The [Function limits](https://vercel.com/docs/functions/limitations) cap duration and request/response payloads (4.5 MB for an HTTP Function body). The [Marketplace Redis integration](https://vercel.com/docs/redis) is one candidate for room leases and cross-instance routing. These are current platform facts, not proof that its latency or cost is acceptable for this VR game.
+
+Proposed staged path:
+
+1. Implement pure schemas and host-side input adapter locally; preserve loopback bridge behavior. Add tests for unauthorized roles, malformed/oversized frames, stale epochs/generations, duplicate commands and reconnect baselines.
+2. Add a local relay emulator and two separate clients; demonstrate join, leave, reconnection, role handoff and host failure without Vercel. Measure end-to-end input-to-authoritative-event p50/p95/p99 and bandwidth while the headset is rendering.
+3. Deploy only a private Vercel invitation/API prototype with external durable room store and a narrow outbound host connection. Verify account/visibility, TLS, origin/grant handling, data retention and abuse controls. No local bridge routes or keys are deployed. Test the WebSocket beta across forced Function recycle and deployment. The [official WebSocket lifecycle guidance](https://vercel.com/docs/functions/websockets#handle-disconnections-and-reconnects) explicitly requires reconnect and state reload.
+4. If the measured relay meets VR interaction targets, enable private remote Fairy playtests. The Director can then use the same room/role model; its tactical frame path needs bandwidth and device review. If Vercel WebSocket behavior is inadequate, keep its invitation UI/API and move only the relay to an appropriate dedicated service without changing the wire contract.
+
+Release gates: no unauthorized cross-role action; no duplicate item/command effect after reconnect; no stale command after handoff; remote Fairy cannot corrupt Hero save; source and exported desktop plus real headset smoke pass; mobile guest join and Director screen inspected; explicit user approval before any public deployment or exposure. Multiplayer should be described as playable only after these gates are exercised end to end.

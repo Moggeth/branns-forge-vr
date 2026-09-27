@@ -1,0 +1,166 @@
+{
+  "variant": "prismwatch",
+  "title": "Prismwatch",
+  "zone": "Crystal Hollow",
+  "files": {
+    "blend": "assets/prismwatch/prismwatch.blend",
+    "character_glb": "assets/prismwatch/prismwatch_guardian.glb",
+    "shield_glb": "assets/prismwatch/prismwatch_shield.glb",
+    "builder": "builder/build_guardian.py",
+    "renders": [
+      "assets/prismwatch/renders/prismwatch_front.png",
+      "assets/prismwatch/renders/prismwatch_side.png",
+      "assets/prismwatch/renders/prismwatch_back.png",
+      "assets/prismwatch/renders/prismwatch_hero.png",
+      "assets/prismwatch/renders/prismwatch_shield_rear.png"
+    ]
+  },
+  "axes": "Godot: +Y up, +Z forward, +X right; toes at y=0",
+  "height_m": 1.639,
+  "groups": {
+    "Head": {
+      "origin": [
+        0.0,
+        1.3943,
+        -0.0388
+      ],
+      "triangles": 2000,
+      "materials": [
+        "Bone_Ivory",
+        "Bone_Socket",
+        "Prismwatch_Studs",
+        "Prism_Crystal"
+      ]
+    },
+    "Torso": {
+      "origin": [
+        0.0,
+        0.8996,
+        -0.0291
+      ],
+      "triangles": 3164,
+      "materials": [
+        "Bone_Ivory",
+        "Prismwatch_Leather",
+        "Prismwatch_Cloth",
+        "Prismwatch_Studs"
+      ]
+    },
+    "LeftArm": {
+      "origin": [
+        -0.2117,
+        1.3264,
+        -0.0
+      ],
+      "triangles": 1536,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "RightArm": {
+      "origin": [
+        0.2117,
+        1.3264,
+        -0.0
+      ],
+      "triangles": 1416,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "LeftLeg": {
+      "origin": [
+        -0.1223,
+        0.7735,
+        -0.0
+      ],
+      "triangles": 2220,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "RightLeg": {
+      "origin": [
+        0.1223,
+        0.7735,
+        -0.0
+      ],
+      "triangles": 2220,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "Shield": {
+      "origin": [
+        -0.4582,
+        0.8317,
+        0.1651
+      ],
+      "triangles": 1388,
+      "materials": [
+        "Prismwatch_ShieldCore",
+        "Prismwatch_ShieldFace",
+        "Prismwatch_ShieldRim",
+        "Prismwatch_Studs",
+        "Prism_Crystal",
+        "Prism_Glimmer",
+        "Iron_Bracket",
+        "Grip_Leather"
+      ]
+    }
+  },
+  "triangles_total": 13944,
+  "materials_total": 12,
+  "shield_prop": {
+    "mesh": "PrismwatchShield",
+    "origin": "central hand grip",
+    "triangles": 1388,
+    "forward_normal": [
+      0,
+      0,
+      1
+    ],
+    "central_grip": [
+      0,
+      0,
+      0
+    ],
+    "central_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "rim_grip": [
+      0.2668,
+      0.0,
+      -0.0048
+    ],
+    "rim_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "item_tip": [
+      0.0,
+      0.5626,
+      0.0897
+    ],
+    "broad_phase_box": {
+      "center": [
+        0.0,
+        0.0,
+        0.0863
+      ],
+      "size": [
+        0.776,
+        1.2316,
+        0.225
+      ]
+    },
+    "character_grip_position": [
+      -0.4582,
+      0.8317,
+      0.1651
+    ]
+  }
+}

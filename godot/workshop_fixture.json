@@ -1,0 +1,638 @@
+{
+  "workshop": {
+    "revision": 0,
+    "donations": {
+      "tier": 2,
+      "option": 0,
+      "counts": {}
+    },
+    "tokens": [],
+    "modules": [],
+    "sockets": {},
+    "catalog": [
+      {
+        "kind": "quickwind",
+        "name": "Quickwind",
+        "tier": 2,
+        "costs": {
+          "iron": 2,
+          "rat_tail": 1
+        },
+        "compatible": [
+          "20dc22c5-7bcc-43df-b07f-e81eab521b0f"
+        ],
+        "description": "Halves Siegebird crank turns."
+      },
+      {
+        "kind": "truesight",
+        "name": "Truesight",
+        "tier": 3,
+        "costs": {
+          "crystal": 2,
+          "haunted_bone": 1
+        },
+        "compatible": [
+          "20dc22c5-7bcc-43df-b07f-e81eab521b0f"
+        ],
+        "description": "Reveals skeleton head weak points through the Siegebird optic and boosts headshot damage."
+      },
+      {
+        "kind": "verdant",
+        "name": "Verdant",
+        "tier": 3,
+        "costs": {
+          "apple": 2,
+          "spore": 1
+        },
+        "compatible": "all",
+        "description": "Heals on alternate action once every ten seconds."
+      },
+      {
+        "kind": "hearth",
+        "name": "Hearth",
+        "tier": 4,
+        "costs": {
+          "ember_core": 1,
+          "sky_bloom": 2
+        },
+        "compatible": "all",
+        "description": "Grants a three-second ward on alternate action, once every eight seconds."
+      }
+    ],
+    "materials": [
+      {
+        "id": "rat_tail",
+        "name": "Rat tail",
+        "use": "Tier 2 donation or Quickwind mechanism."
+      },
+      {
+        "id": "lumber",
+        "name": "Lumber",
+        "use": "Alternative Tier 2 workshop donation."
+      },
+      {
+        "id": "stone",
+        "name": "Stone",
+        "use": "Alternative Tier 2 workshop donation."
+      },
+      {
+        "id": "iron",
+        "name": "Iron",
+        "use": "Tier 3 donation or Quickwind mechanism."
+      },
+      {
+        "id": "apple",
+        "name": "Apple",
+        "use": "Verdant restorative module."
+      },
+      {
+        "id": "spore",
+        "name": "Spore",
+        "use": "Verdant restorative module."
+      },
+      {
+        "id": "crystal",
+        "name": "Crystal",
+        "use": "Truesight optic module."
+      },
+      {
+        "id": "haunted_bone",
+        "name": "Haunted bone",
+        "use": "Tier 3 donation or Truesight optic module."
+      },
+      {
+        "id": "sky_bloom",
+        "name": "Sky bloom",
+        "use": "Hearth ward module."
+      },
+      {
+        "id": "ember_core",
+        "name": "Ember core",
+        "use": "Tier 4 donation or Hearth ward module."
+      }
+    ]
+  },
+  "tails": 5,
+  "favours": 0,
+  "tier": 1,
+  "resources": {
+    "rat_tail": 5,
+    "lumber": 5,
+    "stone": 5,
+    "iron": 5,
+    "apple": 5,
+    "spore": 5,
+    "crystal": 5,
+    "haunted_bone": 5,
+    "sky_bloom": 5,
+    "ember_core": 5
+  },
+  "unlocks": [],
+  "tools": [
+    {
+      "id": "apprentice_hammer",
+      "name": "Copperpot’s Promise",
+      "description": "Swing to strike. Trigger releases Forge Pulse: a nearby damaging shockwave with a brief slow, every 3 seconds.",
+      "tier": 1,
+      "capabilities": [
+        "strike"
+      ],
+      "color": "#e6a153",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "woodland_axe",
+      "name": "Orchard’s Edge",
+      "description": "An applewood axe: three aligned physical cuts fell timber. Trigger activates Orchard Shelter: heal 15 and slow nearby enemies for 4 seconds, 8 second cooldown.",
+      "tier": 1,
+      "capabilities": [
+        "chop",
+        "strike"
+      ],
+      "color": "#94c87e",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "quarry_pick",
+      "name": "Stonewhisper",
+      "description": "Swing to mine. Trigger launches a stone dart; one second cooldown.",
+      "tier": 1,
+      "capabilities": [
+        "mine",
+        "strike"
+      ],
+      "color": "#80c8eb",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "bomb_glove",
+      "name": "Pocket Thunder",
+      "description": "Squeeze for a heartbeat; release a warm little thunderstorm.",
+      "tier": 1,
+      "capabilities": [
+        "bomb"
+      ],
+      "color": "#f8b64b",
+      "formationSeconds": 0.6,
+      "cooldown": 2,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true
+    }
+  ],
+  "defaultCombatTool": "bomb_glove",
+  "deliveries": [],
+  "lastDelivery": null,
+  "recipes": [
+    {
+      "id": "apprentice_hammer",
+      "name": "Copperpot’s Promise",
+      "description": "Swing to strike. Trigger releases Forge Pulse: a nearby damaging shockwave with a brief slow, every 3 seconds.",
+      "tier": 1,
+      "capabilities": [
+        "strike"
+      ],
+      "color": "#e6a153",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": true,
+      "owned": true,
+      "cost": {}
+    },
+    {
+      "id": "woodland_axe",
+      "name": "Orchard’s Edge",
+      "description": "An applewood axe: three aligned physical cuts fell timber. Trigger activates Orchard Shelter: heal 15 and slow nearby enemies for 4 seconds, 8 second cooldown.",
+      "tier": 1,
+      "capabilities": [
+        "chop",
+        "strike"
+      ],
+      "color": "#94c87e",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": true,
+      "owned": true,
+      "cost": {}
+    },
+    {
+      "id": "quarry_pick",
+      "name": "Stonewhisper",
+      "description": "Swing to mine. Trigger launches a stone dart; one second cooldown.",
+      "tier": 1,
+      "capabilities": [
+        "mine",
+        "strike"
+      ],
+      "color": "#80c8eb",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": true,
+      "owned": true,
+      "cost": {}
+    },
+    {
+      "id": "bomb_glove",
+      "name": "Pocket Thunder",
+      "description": "Squeeze for a heartbeat; release a warm little thunderstorm.",
+      "tier": 1,
+      "capabilities": [
+        "bomb"
+      ],
+      "color": "#f8b64b",
+      "formationSeconds": 0.6,
+      "cooldown": 2,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": true,
+      "owned": true,
+      "cost": {}
+    },
+    {
+      "id": "grappling_hook",
+      "name": "Swallow Line",
+      "description": "A winged grappling reel. Aim and press trigger to attach; hold to reel, release to pause, release grip to detach.",
+      "tier": 2,
+      "capabilities": [
+        "grapple"
+      ],
+      "color": "#e8d59a",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": false,
+      "owned": false,
+      "cost": {}
+    },
+    {
+      "id": "spore_lantern",
+      "name": "Mooncap Lantern",
+      "description": "Carry for soft fungal light. Trigger plants a slowing spore garden for six seconds.",
+      "tier": 2,
+      "capabilities": [
+        "ignite",
+        "spark",
+        "slow",
+        "blast"
+      ],
+      "color": "#c5a4fb",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": false,
+      "owned": false,
+      "cost": {}
+    },
+    {
+      "id": "crystal_resonator",
+      "name": "Hollow’s Song",
+      "description": "A purple crystal hammer that shatters brittle barriers with trigger-activated resonance.",
+      "tier": 3,
+      "capabilities": [
+        "resonate",
+        "blast",
+        "enchant"
+      ],
+      "color": "#73ebf4",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": false,
+      "owned": false,
+      "cost": {}
+    },
+    {
+      "id": "ember_gauntlet",
+      "name": "The Last Hearth",
+      "description": "Swing to strike. Trigger launches a firebolt and grants a two-second protective ward; three second cooldown.",
+      "tier": 4,
+      "capabilities": [
+        "ignite",
+        "blast"
+      ],
+      "color": "#ff9745",
+      "cooldown": 3,
+      "formationSeconds": 0,
+      "haptics": {
+        "formation": {
+          "amplitude": 0.18,
+          "duration": 0.6,
+          "frequency": 75
+        },
+        "ready": {
+          "amplitude": 0.65,
+          "duration": 0.08,
+          "frequency": 150
+        },
+        "release": {
+          "amplitude": 0.28,
+          "duration": 0.06,
+          "frequency": 100
+        },
+        "impact": {
+          "amplitude": 0.7,
+          "duration": 0.12,
+          "frequency": 80
+        }
+      },
+      "builtin": true,
+      "available": false,
+      "owned": false,
+      "cost": {}
+    }
+  ],
+  "upgrades": [
+    {
+      "tier": 2,
+      "milestone": "stocked_workshop",
+      "name": "A stocked workshop",
+      "costs": [
+        {
+          "rat_tail": 3
+        },
+        {
+          "lumber": 3,
+          "stone": 3
+        }
+      ],
+      "available": true,
+      "completed": false
+    },
+    {
+      "tier": 3,
+      "milestone": "enchanted_anvil",
+      "name": "The enchanted anvil",
+      "costs": [
+        {
+          "iron": 3,
+          "haunted_bone": 3
+        }
+      ],
+      "available": false,
+      "completed": false
+    },
+    {
+      "tier": 4,
+      "milestone": "everburning_forge",
+      "name": "The everburning forge",
+      "costs": [
+        {
+          "ember_core": 1
+        }
+      ],
+      "available": false,
+      "completed": false
+    }
+  ],
+  "drop": null,
+  "health": 100,
+  "maxHealth": 100
+}

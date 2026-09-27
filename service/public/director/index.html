@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1411">
+  <title>The Director · Brann's Forge</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/director/style.css">
+</head>
+<body>
+<div id="game" class="game" data-phase="offline" data-connected="false">
+
+  <!-- ░░ Battlefield: live Godot feed. Host orbit-drag attaches to #stage. ░░ -->
+  <div id="stage" class="stage" data-orbit-surface aria-hidden="true">
+    <img id="live-frame" alt="" draggable="false" decoding="async">
+    <div class="stage-fallback" id="stage-fallback">
+      <div class="fallback-rune"></div>
+      <p>Seeking the forest's eye…</p>
+    </div>
+    <div class="fx-gloom"></div>
+    <div class="fx-vignette"></div>
+    <div class="fx-grain"></div>
+  </div>
+
+  <!-- ░░ World-space lane markers (positioned by ui.js) ░░ -->
+  <div id="lane-layer" class="lane-layer" role="group" aria-label="Approaches">
+    <button type="button" class="lane-marker" data-lane="west" aria-label="West path">
+      <span class="lm-beam"></span><span class="lm-ring"></span><span class="lm-core"></span>
+      <span class="lm-label"><span class="lm-name">West</span><span class="lm-sub">Old path</span></span>
+    </button>
+    <button type="button" class="lane-marker" data-lane="north" aria-label="North ruins">
+      <span class="lm-beam"></span><span class="lm-ring"></span><span class="lm-core"></span>
+      <span class="lm-label"><span class="lm-name">North</span><span class="lm-sub">Ruins</span></span>
+    </button>
+    <button type="button" class="lane-marker" data-lane="east" aria-label="East grove">
+      <span class="lm-beam"></span><span class="lm-ring"></span><span class="lm-core"></span>
+      <span class="lm-label"><span class="lm-name">East</span><span class="lm-sub">Grove</span></span>
+    </button>
+  </div>
+
+  <!-- ░░ Top HUD ░░ -->
+  <header class="hud-top">
+    <section class="panel hero-panel" aria-label="The adventurer">
+      <div class="hp-head">
+        <span class="eyebrow">Adventurer</span>
+        <span class="hp-value"><b id="health">100</b><small>/ <span id="health-max">100</span></small></span>
+      </div>
+      <div class="hp-bar" role="meter" aria-label="Adventurer health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" id="hp-meter">
+        <i class="hp-lag" id="hp-lag"></i><i class="hp-fill" id="hp-fill"></i>
+      </div>
+      <div class="stones-row">
+        <span class="eyebrow">Waystones</span>
+        <ol class="stones" id="stones" aria-label="Waystones awakened">
+          <li class="stone"><i></i></li><li class="stone"><i></i></li><li class="stone"><i></i></li>
+        </ol>
+        <b class="stones-count" id="stones-count">0/3</b>
+      </div>
+    </section>
+
+    <section class="plaque" aria-label="Round status">
+      <div class="plaque-round" id="round">Round 1</div>
+      <div class="plaque-time" id="time" role="timer" aria-live="off">2:30</div>
+      <div class="plaque-phase" id="phase">Awaiting the forest</div>
+    </section>
+
+    <section class="panel sys-panel" aria-label="Battlefield">
+      <div class="sys-row">
+        <span class="conn" id="connection"><i></i><span id="connection-text">Seeking Godot</span></span>
+      </div>
+      <div class="sys-row sys-stats">
+        <span title="Your creatures on the field"><span class="eyebrow">Minions</span> <b id="enemies">0</b></span>
+        <span id="gloom-stat" title="Dusk veil"><span class="eyebrow">Veil</span> <b id="gloom">—</b></span>
+      </div>
+      <button type="button" class="fs-btn" id="fullscreen" aria-label="Toggle fullscreen (F11)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        <span>Fullscreen <kbd>F11</kbd></span>
+      </button>
+    </section>
+  </header>
+
+  <!-- ░░ Feedback feed ░░ -->
+  <ol class="toasts" id="toasts" aria-live="polite" aria-relevant="additions"></ol>
+
+  <!-- ░░ Bottom HUD: lanes · hand · sparks ░░ -->
+  <footer class="hud-bottom">
+    <nav class="panel lane-strip" aria-label="Choose approach">
+      <div class="eyebrow">Approach</div>
+      <div class="lane-buttons">
+        <kbd class="lk" aria-hidden="true">Q</kbd>
+        <button type="button" class="lane-btn" data-lane="west" aria-pressed="false">West</button>
+        <button type="button" class="lane-btn" data-lane="north" aria-pressed="false">North</button>
+        <button type="button" class="lane-btn" data-lane="east" aria-pressed="false">East</button>
+        <kbd class="lk" aria-hidden="true">E</kbd>
+      </div>
+      <p class="hint" id="hint">Hover a glowing approach, then press 1–4.</p>
+    </nav>
+
+    <div class="hand">
+      <div class="sparks" aria-label="Sparks">
+        <div class="sparks-head">
+          <span class="sparks-icon" aria-hidden="true"></span>
+          <b id="sparks">0.0</b><small>/ <span id="sparks-max">10</span> sparks</small>
+          <span class="regen" id="regen">+0.0/s</span>
+        </div>
+        <div class="sparks-bar" id="sparks-bar" role="meter" aria-label="Sparks" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
+          <i class="sparks-fill" id="sparks-fill"></i>
+          <i class="sparks-preview" id="sparks-preview"></i>
+          <span class="sparks-ticks" id="sparks-ticks"></span>
+        </div>
+      </div>
+
+      <div class="cards" role="toolbar" aria-label="Calls — hotkeys 1 to 4">
+        <button type="button" class="card" data-card="skeletons" aria-keyshortcuts="1">
+          <kbd class="card-key">1</kbd>
+          <span class="card-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 6c-8 0-13 5.5-13 12.5 0 4.5 2.2 7.6 5 9.4V33h16v-5.1c2.8-1.8 5-4.9 5-9.4C37 11.5 32 6 24 6z"/><circle cx="18.5" cy="19.5" r="3.4" class="cut"/><circle cx="29.5" cy="19.5" r="3.4" class="cut"/><path d="M22 26h4l-2-3z" class="cut"/><path d="M18 36h12v6H18z"/><path d="M21 36v6M24 36v6M27 36v6" class="cut-line"/></svg></span>
+          <span class="card-name">Bone patrol</span>
+          <span class="card-sub" data-sub>Skeletons</span>
+          <span class="card-cost"><b data-cost>3</b><i aria-hidden="true">✦</i></span>
+          <span class="card-reason" data-reason></span>
+          <span class="card-cd" aria-hidden="true"><i data-cdfill></i></span>
+          <span class="card-cdnum" data-cdnum aria-hidden="true"></span>
+        </button>
+        <button type="button" class="card" data-card="wisps" aria-keyshortcuts="2">
+          <kbd class="card-key">2</kbd>
+          <span class="card-art" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="24" cy="22" r="7"/><circle cx="24" cy="22" r="12" class="halo"/><path d="M24 4v6M24 34v10M6 22h6M36 22h6M11 9l4 4M37 9l-4 4M13 33l3-3M35 33l-3-3" class="ray"/></svg></span>
+          <span class="card-name">Wandering lights</span>
+          <span class="card-sub" data-sub>Wisps</span>
+          <span class="card-cost"><b data-cost>2</b><i aria-hidden="true">✦</i></span>
+          <span class="card-reason" data-reason></span>
+          <span class="card-cd" aria-hidden="true"><i data-cdfill></i></span>
+          <span class="card-cdnum" data-cdnum aria-hidden="true"></span>
+        </button>
+        <button type="button" class="card" data-card="golem" aria-keyshortcuts="3">
+          <kbd class="card-key">3</kbd>
+          <span class="card-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M16 8h16l6 10-4 6 4 8-6 10H16l-6-10 4-8-4-6z"/><path d="M19 20h3v3h-3zM26 20h3v3h-3z" class="glow"/><path d="M18 30h12" class="cut-line"/></svg></span>
+          <span class="card-name">Stone sentinel</span>
+          <span class="card-sub" data-sub>Golem</span>
+          <span class="card-cost"><b data-cost>5</b><i aria-hidden="true">✦</i></span>
+          <span class="card-reason" data-reason></span>
+          <span class="card-cd" aria-hidden="true"><i data-cdfill></i></span>
+          <span class="card-cdnum" data-cdnum aria-hidden="true"></span>
+        </button>
+        <button type="button" class="card" data-card="gloom" aria-keyshortcuts="4">
+          <kbd class="card-key">4</kbd>
+          <span class="card-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M31 7a17 17 0 1 0 10 27A14 14 0 0 1 31 7z"/><path d="M6 36c6-3 12 3 18 0s12-3 18 0M9 42c5-2 10 2 15 0s10-2 15 0" class="cut-line"/></svg></span>
+          <span class="card-name">Dusk veil</span>
+          <span class="card-sub" data-sub>Gloom</span>
+          <span class="card-cost"><b data-cost>4</b><i aria-hidden="true">✦</i></span>
+          <span class="card-reason" data-reason></span>
+          <span class="card-cd" aria-hidden="true"><i data-cdfill></i></span>
+          <span class="card-cdnum" data-cdnum aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel keys-panel" aria-label="Controls">
+      <div class="eyebrow">Controls</div>
+      <dl>
+        <div><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Call at approach</dd></div>
+        <div><dt><kbd>Q</kbd> <kbd>E</kbd></dt><dd>Cycle approach</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Cancel call</dd></div>
+        <div><dt><kbd>Drag</kbd></dt><dd>Orbit view</dd></div>
+      </dl>
+    </div>
+  </footer>
+
+  <!-- ░░ Phase overlay: offline / waiting / results ░░ -->
+  <section class="phase-overlay" id="phase-overlay" aria-live="polite">
+    <div class="po-card">
+      <div class="po-eyebrow" id="po-eyebrow">Brann's Forge · The Director</div>
+      <h1 class="po-title" id="po-title">The forest sleeps</h1>
+      <p class="po-body" id="po-body">Start Director Mode in Godot. The table will wake when the world does.</p>
+      <div class="po-stats" id="po-stats" hidden></div>
+      <button type="button" class="po-btn" id="start" disabled>Begin round</button>
+      <p class="po-foot">Best played fullscreen — press <kbd>F11</kbd> or use the ⛶ button.</p>
+    </div>
+  </section>
+
+  <div class="cast-flash" id="cast-flash" aria-hidden="true"></div>
+</div>
+<script src="/director/ui.js" defer></script>
+<script src="/director/camera.js" defer></script>
+</body>
+</html>

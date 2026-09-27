@@ -1,0 +1,572 @@
+{
+  "crossbow.gravity": {
+    "type": "number",
+    "default": 4,
+    "min": 0,
+    "max": 9.8,
+    "step": 0.2,
+    "label": "Bolt drop",
+    "help": "Downward acceleration in metres per second squared.",
+    "group": "crossbow"
+  },
+  "crossbow.bolt_lifetime": {
+    "type": "number",
+    "default": 120,
+    "min": 15,
+    "max": 300,
+    "step": 15,
+    "label": "Embedded bolt lifetime",
+    "help": "Seconds embedded bolts remain.",
+    "group": "crossbow"
+  },
+  "crossbow.bolt_cap": {
+    "type": "number",
+    "default": 20,
+    "min": 5,
+    "max": 40,
+    "step": 1,
+    "label": "Embedded bolt limit",
+    "help": "Oldest embedded bolt is removed above this limit.",
+    "group": "crossbow"
+  },
+  "grapple.reel_speed": {
+    "type": "number",
+    "default": 2.8,
+    "min": 0.5,
+    "max": 5,
+    "step": 0.1,
+    "label": "Reel speed",
+    "help": "Continuous pull speed; release trigger to pause.",
+    "group": "grapple"
+  },
+  "crossbow.trigger_break": {
+    "type": "number",
+    "default": 0.72,
+    "min": 0.3,
+    "max": 0.95,
+    "step": 0.01,
+    "label": "Trigger break",
+    "help": "Analog pressure needed to release the sear. Release below 0.15 to reset.",
+    "group": "crossbow"
+  },
+  "crossbow.drag": {
+    "type": "number",
+    "default": 0.12,
+    "min": 0,
+    "max": 0.5,
+    "step": 0.01,
+    "label": "Bolt air resistance",
+    "help": "Gradual velocity loss per second.",
+    "group": "crossbow"
+  },
+  "crossbow.bolt_speed": {
+    "type": "number",
+    "default": 44,
+    "min": 8,
+    "max": 65,
+    "step": 1,
+    "label": "Bolt speed",
+    "help": "Base bolt velocity; a Brann per-item live profile overrides this.",
+    "group": "crossbow"
+  },
+  "crossbow.crank_reach": {
+    "type": "number",
+    "default": 0.13,
+    "min": 0.06,
+    "max": 0.22,
+    "step": 0.01,
+    "label": "Crank grip reach",
+    "help": "Hand distance from the winding knob needed to grab it.",
+    "group": "crossbow"
+  },
+  "crossbow.load_reach": {
+    "type": "number",
+    "default": 0.19,
+    "min": 0.08,
+    "max": 0.3,
+    "step": 0.01,
+    "label": "Bolt seating reach",
+    "help": "Forgiving rail catch distance; the bolt must also point along the rail.",
+    "group": "crossbow"
+  },
+  "crossbow.damage": {
+    "type": "number",
+    "default": 95,
+    "min": 10,
+    "max": 140,
+    "step": 5,
+    "label": "Bolt damage",
+    "help": "Base impact damage; a Brann per-item live profile overrides this.",
+    "group": "crossbow"
+  },
+  "enemy.stride": {
+    "type": "number",
+    "default": 1,
+    "min": 0.5,
+    "max": 2,
+    "step": 0.05,
+    "label": "Stride length",
+    "help": "Animation stride multiplier; gait follows actual travel.",
+    "group": "enemy"
+  },
+  "enemy.bob": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 2,
+    "step": 0.05,
+    "label": "Body weight shift",
+    "help": "Cosmetic body bob multiplier.",
+    "group": "enemy"
+  },
+  "enemy.turn_speed": {
+    "type": "number",
+    "default": 5,
+    "min": 1,
+    "max": 12,
+    "step": 0.5,
+    "label": "Enemy turn speed",
+    "help": "Facing response per second.",
+    "group": "enemy"
+  },
+  "enemy.windup": {
+    "type": "number",
+    "default": 1.2,
+    "min": 0.4,
+    "max": 3,
+    "step": 0.1,
+    "label": "Attack wind-up",
+    "help": "Seconds before the visible strike; applies on next attack.",
+    "group": "enemy"
+  },
+  "enemy.recovery": {
+    "type": "number",
+    "default": 2.5,
+    "min": 0.5,
+    "max": 5,
+    "step": 0.1,
+    "label": "Attack recovery",
+    "help": "Recovery seconds after a strike; applies on next attack.",
+    "group": "enemy"
+  },
+  "enemy.recoil": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 2,
+    "step": 0.1,
+    "label": "Hit reaction",
+    "help": "Cosmetic recoil strength, not gameplay stagger.",
+    "group": "enemy"
+  },
+  "enemy.death_scatter": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 2,
+    "step": 0.1,
+    "label": "Death scatter",
+    "help": "Impulse multiplier for physical character pieces.",
+    "group": "enemy"
+  },
+  "grip.secondary_reach": {
+    "type": "number",
+    "default": 0.18,
+    "min": 0.08,
+    "max": 0.3,
+    "step": 0.01,
+    "label": "Second hand reach",
+    "help": "Distance from the handle for a support grip or regrip.",
+    "group": "grip"
+  },
+  "holster.reach": {
+    "type": "number",
+    "default": 0.2,
+    "min": 0.1,
+    "max": 0.35,
+    "step": 0.01,
+    "label": "Holster reach",
+    "help": "Distance from a hip slot to store or retrieve tools.",
+    "group": "holster"
+  },
+  "holster.height": {
+    "type": "number",
+    "default": 0.65,
+    "min": 0.4,
+    "max": 0.9,
+    "step": 0.05,
+    "label": "Hip offset",
+    "help": "Distance below the headset to the estimated belt.",
+    "group": "holster"
+  },
+  "input.grip_press": {
+    "type": "number",
+    "default": 0.6,
+    "min": 0.15,
+    "max": 0.95,
+    "step": 0.05,
+    "label": "Grip to grab",
+    "help": "Squeeze value needed to begin grabbing. Release is clamped below this value.",
+    "group": "input"
+  },
+  "input.grip_release": {
+    "type": "number",
+    "default": 0.5,
+    "min": 0.05,
+    "max": 0.9,
+    "step": 0.05,
+    "label": "Release earlier",
+    "help": "Higher values release earlier as your fingers open. Effective maximum is grab threshold minus0.05.",
+    "group": "input"
+  },
+  "hands.pitch_degrees": {
+    "type": "number",
+    "default": -90,
+    "min": -180,
+    "max": 180,
+    "step": 5,
+    "label": "Hand pitch",
+    "help": "Visual hand and held-tool pitch correction.",
+    "group": "hands"
+  },
+  "hands.yaw_degrees": {
+    "type": "number",
+    "default": 0,
+    "min": -180,
+    "max": 180,
+    "step": 5,
+    "label": "Hand yaw",
+    "help": "Visual hand and held-tool yaw correction.",
+    "group": "hands"
+  },
+  "hands.roll_degrees": {
+    "type": "number",
+    "default": 0,
+    "min": -180,
+    "max": 180,
+    "step": 5,
+    "label": "Hand roll",
+    "help": "Visual hand and held-tool roll correction.",
+    "group": "hands"
+  },
+  "player.eye_height": {
+    "type": "number",
+    "default": 1.7,
+    "min": 1.1,
+    "max": 2.1,
+    "step": 0.05,
+    "label": "Target eye height",
+    "help": "Eye height used when you press Calibrate height.",
+    "group": "player"
+  },
+  "bomb.formation_seconds": {
+    "type": "number",
+    "default": 0.45,
+    "min": 0.1,
+    "max": 2,
+    "step": 0.05,
+    "label": "Formation time",
+    "help": "Seconds to form a ready bomb.",
+    "group": "bomb"
+  },
+  "bomb.radius": {
+    "type": "number",
+    "default": 0.095,
+    "min": 0.05,
+    "max": 0.2,
+    "step": 0.005,
+    "label": "Bomb radius",
+    "help": "Visual and collision radius in metres.",
+    "group": "bomb"
+  },
+  "throw.gain": {
+    "type": "number",
+    "default": 1.45,
+    "min": 0.5,
+    "max": 3,
+    "step": 0.05,
+    "label": "Throw gain",
+    "help": "Multiplier applied to sampled hand velocity.",
+    "group": "throw"
+  },
+  "throw.window_seconds": {
+    "type": "number",
+    "default": 0.12,
+    "min": 0.04,
+    "max": 0.3,
+    "step": 0.01,
+    "label": "Sampling window",
+    "help": "Strongest recent hand motion retained for a forgiving release.",
+    "group": "throw"
+  },
+  "throw.assist_lift": {
+    "type": "number",
+    "default": 0.65,
+    "min": 0,
+    "max": 2,
+    "step": 0.05,
+    "label": "Release lift",
+    "help": "Upward assistance in metres per second.",
+    "group": "throw"
+  },
+  "throw.min_speed": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 3,
+    "step": 0.1,
+    "label": "Throw threshold",
+    "help": "Below this hand speed, release drops instead of launching.",
+    "group": "throw"
+  },
+  "throw.max_speed": {
+    "type": "number",
+    "default": 18,
+    "min": 5,
+    "max": 30,
+    "step": 0.5,
+    "label": "Speed limit",
+    "help": "Maximum launch velocity in metres per second.",
+    "group": "throw"
+  },
+  "bomb.fuse_seconds": {
+    "type": "number",
+    "default": 3,
+    "min": 0.5,
+    "max": 8,
+    "step": 0.1,
+    "label": "Fuse duration",
+    "help": "Maximum live lifetime after release.",
+    "group": "bomb"
+  },
+  "bomb.impact_delay": {
+    "type": "number",
+    "default": 0.85,
+    "min": 0,
+    "max": 3,
+    "step": 0.05,
+    "label": "Impact delay",
+    "help": "Seconds between first impact and detonation.",
+    "group": "bomb"
+  },
+  "bomb.bounce": {
+    "type": "number",
+    "default": 0.25,
+    "min": 0,
+    "max": 0.9,
+    "step": 0.05,
+    "label": "Bounce",
+    "help": "Collision restitution.",
+    "group": "bomb"
+  },
+  "bomb.gravity": {
+    "type": "number",
+    "default": 1,
+    "min": 0.1,
+    "max": 2,
+    "step": 0.05,
+    "label": "Gravity scale",
+    "help": "Gravity multiplier for thrown bombs.",
+    "group": "bomb"
+  },
+  "bomb.blast_radius": {
+    "type": "number",
+    "default": 3.2,
+    "min": 1,
+    "max": 6,
+    "step": 0.1,
+    "label": "Blast radius",
+    "help": "Explosion influence radius in metres.",
+    "group": "bomb"
+  },
+  "bomb.damage": {
+    "type": "number",
+    "default": 45,
+    "min": 5,
+    "max": 120,
+    "step": 5,
+    "label": "Bomb damage",
+    "help": "Damage to enemies within the blast radius.",
+    "group": "bomb"
+  },
+  "bomb.self_damage_ratio": {
+    "type": "number",
+    "default": 0.65,
+    "min": 0,
+    "max": 1,
+    "step": 0.05,
+    "label": "Self damage",
+    "help": "Player damage fraction relative to enemy damage.",
+    "group": "bomb"
+  },
+  "vfx.intensity": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 2,
+    "step": 0.05,
+    "label": "Effect intensity",
+    "help": "Overall explosion brightness and scale emphasis.",
+    "group": "vfx"
+  },
+  "vfx.duration": {
+    "type": "number",
+    "default": 0.75,
+    "min": 0.2,
+    "max": 2,
+    "step": 0.05,
+    "label": "Effect duration",
+    "help": "Explosion effect duration in seconds.",
+    "group": "vfx"
+  },
+  "vfx.spark_count": {
+    "type": "integer",
+    "default": 24,
+    "min": 0,
+    "max": 64,
+    "step": 1,
+    "label": "Spark count",
+    "help": "Number of explosion sparks.",
+    "group": "vfx"
+  },
+  "audio.volume": {
+    "type": "number",
+    "default": 0.65,
+    "min": 0,
+    "max": 1,
+    "step": 0.05,
+    "label": "Effects volume",
+    "help": "Bomb sound effect volume.",
+    "group": "audio"
+  },
+  "haptics.strength": {
+    "type": "number",
+    "default": 1,
+    "min": 0,
+    "max": 1.5,
+    "step": 0.05,
+    "label": "Haptic strength",
+    "help": "Global multiplier; final device amplitude stays bounded.",
+    "group": "haptics"
+  },
+  "locomotion.speed": {
+    "type": "number",
+    "default": 2.7,
+    "min": 0.5,
+    "max": 6,
+    "step": 0.1,
+    "label": "Movement speed",
+    "help": "Left-stick VR and desktop movement speed in metres per second.",
+    "group": "locomotion"
+  },
+  "combat.enemy_speed": {
+    "type": "number",
+    "default": 1,
+    "min": 0.25,
+    "max": 2,
+    "step": 0.05,
+    "label": "Enemy speed",
+    "help": "Enemy movement multiplier.",
+    "group": "combat"
+  },
+  "playful.ring_toss_gain": {
+    "type": "number",
+    "default": 1,
+    "min": 0.5,
+    "max": 1.5,
+    "step": 0.05,
+    "label": "Ring toss strength",
+    "help": "Sunskipper launch multiplier; applies on next toss, capped at 21 metres per second.",
+    "group": "playful"
+  },
+  "playful.ring_gravity": {
+    "type": "number",
+    "default": 1.1,
+    "min": 0,
+    "max": 3,
+    "step": 0.1,
+    "label": "Ring drop",
+    "help": "Sunskipper downward acceleration in metres per second squared; changes during flight.",
+    "group": "playful"
+  },
+  "playful.ring_recall_speed": {
+    "type": "number",
+    "default": 18,
+    "min": 4,
+    "max": 18,
+    "step": 0.5,
+    "label": "Ring recall speed",
+    "help": "Sunskipper return speed in metres per second; changes during recall.",
+    "group": "playful"
+  },
+  "playful.magnet_range": {
+    "type": "number",
+    "default": 4.5,
+    "min": 1.5,
+    "max": 4.5,
+    "step": 0.1,
+    "label": "Wand reach",
+    "help": "Maximum cargo acquisition distance in metres; lowering it also releases distant held cargo.",
+    "group": "playful"
+  },
+  "playful.magnet_pull": {
+    "type": "number",
+    "default": 22,
+    "min": 10,
+    "max": 22,
+    "step": 1,
+    "label": "Wand pull acceleration",
+    "help": "Maximum cargo acceleration in metres per second squared; lower values make distant pulling gentler.",
+    "group": "playful"
+  },
+  "playful.magnet_fling": {
+    "type": "number",
+    "default": 4.2,
+    "min": 1,
+    "max": 5.8,
+    "step": 0.2,
+    "label": "Wand toss speed",
+    "help": "Forward cargo fling speed in metres per second; final combined velocity stays below 6.",
+    "group": "playful"
+  },
+  "playful.ring_curve": {
+    "type": "number",
+    "default": 4.2,
+    "min": 0,
+    "max": 9,
+    "step": 0.2,
+    "label": "Ring banking curve",
+    "help": "Sideways turn strength at full bank; flat throws stay straight.",
+    "group": "playful"
+  },
+  "playful.ring_drag": {
+    "type": "number",
+    "default": 0.025,
+    "min": 0,
+    "max": 0.2,
+    "step": 0.005,
+    "label": "Ring air drag",
+    "help": "Gentle speed loss while gliding.",
+    "group": "playful"
+  },
+  "playful.ring_recall_accel": {
+    "type": "number",
+    "default": 28,
+    "min": 6,
+    "max": 60,
+    "step": 1,
+    "label": "Ring recall pull",
+    "help": "Acceleration pulling momentum back towards the hand; no instant reversal.",
+    "group": "playful"
+  },
+  "playful.ring_bounce": {
+    "type": "number",
+    "default": 0.84,
+    "min": 0.4,
+    "max": 1,
+    "step": 0.02,
+    "label": "Ring bounce energy",
+    "help": "Speed retained after mirror-angle scenery ricochets.",
+    "group": "playful"
+  }
+}

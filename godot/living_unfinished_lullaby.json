@@ -1,0 +1,872 @@
+{
+  "schema": 1,
+  "id": "living-unfinished-lullaby",
+  "version": 1,
+  "name": "The Unfinished Lullaby",
+  "kind": "region",
+  "scope": {
+    "kind": "region",
+    "targetId": "living-unfinished-lullaby"
+  },
+  "provenance": {
+    "prompt": "A small garden of three sleeping buds, awakened by light, warmth and a song. Let any supported invention supply the outcome; lend three simple starter objects. Complete each different wonder once to raise a turning copper chorus.",
+    "interpretation": "A data-only sensory puzzle using light, heat and sound sensors, movable starter sources, one-shot objectives and bounded declarative rules. Nearby supported Living stimuli can come from other packages. No microphone or arbitrary object sensing.",
+    "origin": "demo",
+    "parentIds": []
+  },
+  "dependencies": [],
+  "region": {
+    "origin": [
+      120,
+      0,
+      -90
+    ],
+    "spawn": [
+      120,
+      0,
+      -84
+    ],
+    "size": [
+      20,
+      6,
+      18
+    ]
+  },
+  "entities": [
+    {
+      "id": "garden-floor",
+      "name": "The Unfinished Lullaby",
+      "shape": "box",
+      "position": [
+        0,
+        -0.2,
+        0
+      ],
+      "size": [
+        20,
+        0.4,
+        18
+      ],
+      "color": "#788d7a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "west-rail",
+      "name": "Garden edge",
+      "shape": "box",
+      "position": [
+        -9.7,
+        0.45,
+        0
+      ],
+      "size": [
+        0.25,
+        0.9,
+        18
+      ],
+      "color": "#697970",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "east-rail",
+      "name": "Garden edge",
+      "shape": "box",
+      "position": [
+        9.7,
+        0.45,
+        0
+      ],
+      "size": [
+        0.25,
+        0.9,
+        18
+      ],
+      "color": "#697970",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "north-rail",
+      "name": "Garden edge",
+      "shape": "box",
+      "position": [
+        0,
+        0.45,
+        -8.7
+      ],
+      "size": [
+        19.4,
+        0.9,
+        0.25
+      ],
+      "color": "#697970",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "south-rail",
+      "name": "Garden edge",
+      "shape": "box",
+      "position": [
+        0,
+        0.45,
+        8.7
+      ],
+      "size": [
+        19.4,
+        0.9,
+        0.25
+      ],
+      "color": "#697970",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "welcome",
+      "name": "Three sleeping buds. Bring LIGHT, WARMTH and a SONG. Any invention may help.",
+      "shape": "box",
+      "position": [
+        0,
+        1.15,
+        4.4
+      ],
+      "size": [
+        2.3,
+        0.6,
+        0.18
+      ],
+      "color": "#506d68",
+      "material": "stone",
+      "static": true,
+      "components": [
+        {
+          "type": "trigger",
+          "version": 1,
+          "config": {
+            "event": "triggered"
+          }
+        }
+      ]
+    },
+    {
+      "id": "return-gate",
+      "name": "BACK TO BRANN",
+      "shape": "box",
+      "position": [
+        7.3,
+        1.2,
+        6
+      ],
+      "size": [
+        1.4,
+        2.4,
+        0.12
+      ],
+      "color": "#8ac8b1",
+      "material": "stone",
+      "static": true,
+      "components": [
+        {
+          "type": "portal",
+          "version": 1,
+          "config": {
+            "destination": [
+              9,
+              0,
+              2
+            ],
+            "radius": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "starter-table",
+      "name": "Borrow a glow pebble, a warm pebble or the handbell.",
+      "shape": "box",
+      "position": [
+        0,
+        0.65,
+        2.6
+      ],
+      "size": [
+        5.6,
+        0.3,
+        1.3
+      ],
+      "color": "#8c7559",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "glow-pebble",
+      "name": "Glow Pebble - carry light to a sleeping bud",
+      "shape": "sphere",
+      "position": [
+        -1.8,
+        1.04,
+        2.6
+      ],
+      "size": [
+        0.34,
+        0.34,
+        0.34
+      ],
+      "color": "#d4f7a5",
+      "material": "crystal",
+      "static": false,
+      "components": [
+        {
+          "type": "grabbable",
+          "version": 1,
+          "config": {
+            "mass": 0.3
+          }
+        },
+        {
+          "type": "emitter",
+          "version": 1,
+          "config": {
+            "kind": "light",
+            "strength": 4,
+            "interval": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "warm-pebble",
+      "name": "Warm Pebble - carry gentle warmth close to a bud",
+      "shape": "sphere",
+      "position": [
+        0,
+        1.04,
+        2.6
+      ],
+      "size": [
+        0.34,
+        0.34,
+        0.34
+      ],
+      "color": "#ffb378",
+      "material": "stone",
+      "static": false,
+      "components": [
+        {
+          "type": "grabbable",
+          "version": 1,
+          "config": {
+            "mass": 0.4
+          }
+        },
+        {
+          "type": "emitter",
+          "version": 1,
+          "config": {
+            "kind": "heat",
+            "strength": 12,
+            "interval": 0.6
+          }
+        },
+        {
+          "type": "material",
+          "version": 1,
+          "config": {
+            "ignition": 1000,
+            "hardness": 50
+          }
+        }
+      ]
+    },
+    {
+      "id": "handbell",
+      "name": "Handbell - grip, bring near a bud, then trigger to ring",
+      "shape": "cylinder",
+      "position": [
+        1.8,
+        1.02,
+        2.6
+      ],
+      "size": [
+        0.32,
+        0.42,
+        0.32
+      ],
+      "color": "#e6c981",
+      "material": "iron",
+      "static": false,
+      "components": [
+        {
+          "type": "grabbable",
+          "version": 1,
+          "config": {
+            "mass": 0.3
+          }
+        },
+        {
+          "type": "trigger",
+          "version": 1,
+          "config": {
+            "event": "triggered"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chorus",
+      "name": "The Unfinished Lullaby - three different wonders awaken the chorus",
+      "shape": "sphere",
+      "position": [
+        0,
+        1.1,
+        -5.7
+      ],
+      "size": [
+        0.72,
+        0.72,
+        0.72
+      ],
+      "color": "#8a9e9a",
+      "material": "crystal",
+      "static": true,
+      "components": [
+        {
+          "type": "objective",
+          "version": 1,
+          "config": {
+            "event": "signal:three_wonders",
+            "target": "chorus",
+            "count": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "crown",
+      "name": "A chorus of small inventions",
+      "shape": "box",
+      "position": [
+        0,
+        2.1,
+        -5.7
+      ],
+      "size": [
+          1.8,
+          0.25,
+          0.6
+      ],
+      "color": "#b6945a",
+      "material": "iron",
+      "static": true,
+      "components": [
+        {
+          "type": "receiver",
+          "version": 1,
+          "config": {
+            "kind": "motor",
+            "power": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "crown-light",
+      "name": "Light earned by three different wonders",
+      "shape": "sphere",
+      "position": [
+        0,
+        2.42,
+        -5.7
+      ],
+      "size": [
+        0.4,
+        0.4,
+        0.4
+      ],
+      "color": "#8b9ca3",
+      "material": "crystal",
+      "static": true,
+      "components": [
+        {
+          "type": "receiver",
+          "version": 1,
+          "config": {
+            "kind": "light",
+            "power": 0,
+            "color": "#ffeab0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sun-pedestal",
+      "name": "A nest for a sleeping bud",
+      "shape": "cylinder",
+      "position": [
+        -5,
+        0.38,
+        -2
+      ],
+      "size": [
+        1.25,
+        0.76,
+        1.25
+      ],
+      "color": "#879480",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "sun-bud",
+      "name": "LIGHT wanted - bring any source close enough",
+      "shape": "sphere",
+      "position": [
+        -5,
+        1.25,
+        -2
+      ],
+      "size": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "color": "#b9d598",
+      "material": "crystal",
+      "static": true,
+      "components": [
+        {
+          "type": "sensor",
+          "version": 1,
+          "config": {
+            "kind": "light",
+            "radius": 1.8,
+            "threshold": 1
+          }
+        },
+        {
+          "type": "objective",
+          "version": 1,
+          "config": {
+            "event": "sensed",
+            "target": "sun-bud",
+            "count": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "sun-petal-left",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        -5.52,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "sun-petal-right",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        -4.48,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "hearth-pedestal",
+      "name": "A nest for a sleeping bud",
+      "shape": "cylinder",
+      "position": [
+        0,
+        0.38,
+        -2
+      ],
+      "size": [
+        1.25,
+        0.76,
+        1.25
+      ],
+      "color": "#879480",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "hearth-bud",
+      "name": "WARMTH wanted - bring any source close enough",
+      "shape": "sphere",
+      "position": [
+        0,
+        1.25,
+        -2
+      ],
+      "size": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "color": "#dea97c",
+      "material": "crystal",
+      "static": true,
+      "components": [
+        {
+          "type": "sensor",
+          "version": 1,
+          "config": {
+            "kind": "heat",
+            "radius": 1.8,
+            "threshold": 1
+          }
+        },
+        {
+          "type": "objective",
+          "version": 1,
+          "config": {
+            "event": "sensed",
+            "target": "hearth-bud",
+            "count": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "hearth-petal-left",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        -0.52,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "hearth-petal-right",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        0.52,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "song-pedestal",
+      "name": "A nest for a sleeping bud",
+      "shape": "cylinder",
+      "position": [
+        5,
+        0.38,
+        -2
+      ],
+      "size": [
+        1.25,
+        0.76,
+        1.25
+      ],
+      "color": "#879480",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "song-bud",
+      "name": "SOUND wanted - bring any source close enough",
+      "shape": "sphere",
+      "position": [
+        5,
+        1.25,
+        -2
+      ],
+      "size": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "color": "#a69fd2",
+      "material": "crystal",
+      "static": true,
+      "components": [
+        {
+          "type": "sensor",
+          "version": 1,
+          "config": {
+            "kind": "sound",
+            "radius": 1.8,
+            "threshold": 1
+          }
+        },
+        {
+          "type": "objective",
+          "version": 1,
+          "config": {
+            "event": "sensed",
+            "target": "song-bud",
+            "count": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "song-petal-left",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        4.48,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    },
+    {
+      "id": "song-petal-right",
+      "name": "A copper leaf",
+      "shape": "box",
+      "position": [
+        5.52,
+        1.04,
+        -2
+      ],
+      "size": [
+        0.42,
+        0.16,
+        0.72
+      ],
+      "color": "#9c926a",
+      "material": "stone",
+      "static": true,
+      "components": []
+    }
+  ],
+  "links": [],
+  "rules": [
+    {
+      "event": "triggered",
+      "target": "handbell",
+      "actions": [
+        {
+          "op": "emit",
+          "target": "handbell",
+          "signal": "sound",
+          "value": 6
+        }
+      ]
+    },
+    {
+      "event": "objective_complete",
+      "target": "sun-bud",
+      "actions": [
+        {
+          "op": "objective",
+          "target": "chorus",
+          "value": 1
+        },
+        {
+          "op": "move",
+          "target": "sun-petal-left",
+          "vector": [
+            -0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "move",
+          "target": "sun-petal-right",
+          "vector": [
+            0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "set_color",
+          "target": "sun-petal-left",
+          "color": "#b9d598"
+        },
+        {
+          "op": "set_color",
+          "target": "sun-petal-right",
+          "color": "#b9d598"
+        }
+      ]
+    },
+    {
+      "event": "objective_complete",
+      "target": "hearth-bud",
+      "actions": [
+        {
+          "op": "objective",
+          "target": "chorus",
+          "value": 1
+        },
+        {
+          "op": "move",
+          "target": "hearth-petal-left",
+          "vector": [
+            -0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "move",
+          "target": "hearth-petal-right",
+          "vector": [
+            0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "set_color",
+          "target": "hearth-petal-left",
+          "color": "#dea97c"
+        },
+        {
+          "op": "set_color",
+          "target": "hearth-petal-right",
+          "color": "#dea97c"
+        }
+      ]
+    },
+    {
+      "event": "objective_complete",
+      "target": "song-bud",
+      "actions": [
+        {
+          "op": "objective",
+          "target": "chorus",
+          "value": 1
+        },
+        {
+          "op": "move",
+          "target": "song-petal-left",
+          "vector": [
+            -0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "move",
+          "target": "song-petal-right",
+          "vector": [
+            0.2,
+            0.35,
+            0
+          ]
+        },
+        {
+          "op": "set_color",
+          "target": "song-petal-left",
+          "color": "#a69fd2"
+        },
+        {
+          "op": "set_color",
+          "target": "song-petal-right",
+          "color": "#a69fd2"
+        }
+      ]
+    },
+    {
+      "event": "objective_complete",
+      "target": "chorus",
+      "actions": [
+        {
+          "op": "power",
+          "target": "crown",
+          "value": 1.4
+        },
+        {
+          "op": "power",
+          "target": "crown-light",
+          "value": 2
+        },
+        {
+          "op": "move",
+          "target": "crown",
+          "vector": [
+            0,
+            0.5,
+            0
+          ]
+        },
+        {
+          "op": "move",
+          "target": "crown-light",
+          "vector": [
+            0,
+            0.5,
+            0
+          ]
+        },
+        {
+          "op": "set_color",
+          "target": "crown",
+          "color": "#f4ca78"
+        },
+        {
+          "op": "emit",
+          "target": "chorus",
+          "signal": "sound",
+          "value": 4
+        }
+      ]
+    }
+  ]
+}

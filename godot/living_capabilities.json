@@ -1,0 +1,459 @@
+{
+  "components": {
+    "embodiment": {
+      "version": 1,
+      "config": {
+        "handColor": {
+          "type": "color"
+        },
+        "handScale": {
+          "type": "number",
+          "min": 0.75,
+          "max": 1.25
+        },
+        "fingerCurl": {
+          "type": "number",
+          "min": 0.5,
+          "max": 1.4
+        },
+        "moveSpeed": {
+          "type": "number",
+          "min": 0.5,
+          "max": 4
+        }
+      }
+    },
+    "grabbable": {
+      "version": 1,
+      "config": {
+        "mass": {
+          "type": "number",
+          "min": 0.05,
+          "max": 20
+        }
+      }
+    },
+    "material": {
+      "version": 1,
+      "config": {
+        "ignition": {
+          "type": "number",
+          "min": 0,
+          "max": 1000
+        },
+        "conductivity": {
+          "type": "number",
+          "min": 0,
+          "max": 1
+        },
+        "absorption": {
+          "type": "number",
+          "min": 0,
+          "max": 1
+        },
+        "hardness": {
+          "type": "number",
+          "min": 0.1,
+          "max": 100
+        }
+      }
+    },
+    "returning_projectile": {
+      "version": 1,
+      "config": {
+        "speed": {
+          "type": "number",
+          "min": 1,
+          "max": 16
+        },
+        "gravity": {
+          "type": "number",
+          "min": 0,
+          "max": 9.8
+        },
+        "returnSpeed": {
+          "type": "number",
+          "min": 2,
+          "max": 20
+        },
+        "returnAfter": {
+          "type": "number",
+          "min": 0.2,
+          "max": 8
+        },
+        "collision": {
+          "type": "enum",
+          "values": [
+            "return",
+            "bounce",
+            "stop"
+          ]
+        },
+        "restitution": {
+          "type": "number",
+          "min": 0,
+          "max": 0.8
+        },
+        "hitEvent": {
+          "type": "string"
+        },
+        "appearance": {
+          "type": "enum",
+          "values": [
+            "plain",
+            "ember_ring",
+            "wood_ring"
+          ]
+        }
+      }
+    },
+    "emitter": {
+      "version": 1,
+      "config": {
+        "signal": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "number",
+          "min": 0.1,
+          "max": 60
+        },
+        "strength": {
+          "type": "number",
+          "min": 0,
+          "max": 100
+        },
+        "kind": {
+          "type": "enum",
+          "values": [
+            "light",
+            "sound",
+            "heat",
+            "energy"
+          ]
+        }
+      }
+    },
+    "sensor": {
+      "version": 1,
+      "config": {
+        "kind": {
+          "type": "enum",
+          "values": [
+            "light",
+            "sound",
+            "heat",
+            "motion",
+            "signal"
+          ]
+        },
+        "radius": {
+          "type": "number",
+          "min": 0.1,
+          "max": 30
+        },
+        "threshold": {
+          "type": "number",
+          "min": 0,
+          "max": 100
+        },
+        "signal": {
+          "type": "string"
+        }
+      }
+    },
+    "reservoir": {
+      "version": 1,
+      "config": {
+        "capacity": {
+          "type": "number",
+          "min": 0.1,
+          "max": 100
+        },
+        "amount": {
+          "type": "number",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    "receiver": {
+      "version": 1,
+      "config": {
+        "kind": {
+          "type": "enum",
+          "values": [
+            "light",
+            "door",
+            "motor"
+          ]
+        },
+        "color": {
+          "type": "color"
+        },
+        "power": {
+          "type": "number",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    "creature": {
+      "version": 1,
+      "config": {
+        "mode": {
+          "type": "enum",
+          "values": [
+            "investigate",
+            "flee",
+            "follow"
+          ]
+        },
+        "speed": {
+          "type": "number",
+          "min": 0,
+          "max": 4
+        },
+        "radius": {
+          "type": "number",
+          "min": 0.1,
+          "max": 30
+        }
+      }
+    },
+    "field": {
+      "version": 1,
+      "config": {
+        "kind": {
+          "type": "enum",
+          "values": [
+            "gravity",
+            "visibility"
+          ]
+        },
+        "radius": {
+          "type": "number",
+          "min": 0.1,
+          "max": 20
+        },
+        "strength": {
+          "type": "number",
+          "min": 0,
+          "max": 2
+        }
+      }
+    },
+    "climbable": {
+      "version": 1,
+      "config": {}
+    },
+    "grapple": {
+      "version": 1,
+      "config": {
+        "range": {
+          "type": "number",
+          "min": 1,
+          "max": 50
+        },
+        "reelSpeed": {
+          "type": "number",
+          "min": 0.1,
+          "max": 3
+        }
+      }
+    },
+    "portal": {
+      "version": 1,
+      "config": {
+        "destination": {
+          "type": "vector"
+        },
+        "radius": {
+          "type": "number",
+          "min": 0.2,
+          "max": 3
+        }
+      }
+    },
+    "weakpoint": {
+      "version": 1,
+      "config": {
+        "multiplier": {
+          "type": "number",
+          "min": 1,
+          "max": 5
+        }
+      }
+    },
+    "objective": {
+      "version": 1,
+      "config": {
+        "event": {
+          "type": "string"
+        },
+        "count": {
+          "type": "number",
+          "min": 1,
+          "max": 100
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    },
+    "maker": {
+      "version": 1,
+      "config": {
+        "mode": {
+          "type": "enum",
+          "values": [
+            "record",
+            "join",
+            "paint"
+          ]
+        }
+      }
+    },
+    "transformer": {
+      "version": 1,
+      "config": {
+        "operation": {
+          "type": "enum",
+          "values": [
+            "cut",
+            "repair",
+            "join",
+            "grow"
+          ]
+        },
+        "amount": {
+          "type": "number",
+          "min": 0.1,
+          "max": 2
+        }
+      }
+    },
+    "trigger": {
+      "version": 1,
+      "config": {
+        "event": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "actions": {
+    "emit": [
+      "signal",
+      "value"
+    ],
+    "heat": [
+      "value"
+    ],
+    "wet": [
+      "value"
+    ],
+    "power": [
+      "value"
+    ],
+    "move": [
+      "vector"
+    ],
+    "scale": [
+      "vector"
+    ],
+    "damage": [
+      "value"
+    ],
+    "repair": [
+      "value"
+    ],
+    "grow": [
+      "value"
+    ],
+    "cut": [
+      "value"
+    ],
+    "toggle": [],
+    "set_color": [
+      "color"
+    ],
+    "objective": [
+      "value"
+    ]
+  },
+  "events": [
+    "activated",
+    "attached",
+    "triggered",
+    "grabbed",
+    "released",
+    "ignited",
+    "extinguished",
+    "cut",
+    "repaired",
+    "grown",
+    "joined",
+    "sensed",
+    "powered",
+    "filled",
+    "objective_complete",
+    "arrived",
+    "recorded",
+    "painted",
+    "projectile_thrown",
+    "projectile_hit",
+    "projectile_recalled",
+    "projectile_caught",
+    "projectile_home"
+  ],
+  "links": {
+    "types": [
+      "signal",
+      "energy",
+      "tether",
+      "hinge",
+      "fluid"
+    ],
+    "config": {
+      "conductance": {
+        "type": "number",
+        "min": 0,
+        "max": 1
+      },
+      "length": {
+        "type": "number",
+        "min": 0.1,
+        "max": 20
+      },
+      "rate": {
+        "type": "number",
+        "min": 0.01,
+        "max": 10
+      },
+      "axis": {
+        "type": "vector"
+      },
+      "speed": {
+        "type": "number",
+        "min": 0,
+        "max": 2
+      }
+    }
+  },
+  "budgets": {
+    "packages": 16,
+    "versions": 512,
+    "entities": 64,
+    "totalEntities": 192,
+    "dynamicBodies": 32,
+    "dynamicPerPackage": 16,
+    "links": 96,
+    "rules": 64,
+    "actions": 128,
+    "events": 512,
+    "transcripts": 256,
+    "receipts": 256,
+    "bytes": 131072
+  }
+}

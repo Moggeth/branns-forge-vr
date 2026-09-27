@@ -1,0 +1,166 @@
+{
+  "variant": "mossward",
+  "title": "Mossward",
+  "zone": "Pinewood Ruins",
+  "files": {
+    "blend": "assets/mossward/mossward.blend",
+    "character_glb": "assets/mossward/mossward_guardian.glb",
+    "shield_glb": "assets/mossward/mossward_shield.glb",
+    "builder": "builder/build_guardian.py",
+    "renders": [
+      "assets/mossward/renders/mossward_front.png",
+      "assets/mossward/renders/mossward_side.png",
+      "assets/mossward/renders/mossward_back.png",
+      "assets/mossward/renders/mossward_hero.png",
+      "assets/mossward/renders/mossward_shield_rear.png"
+    ]
+  },
+  "axes": "Godot: +Y up, +Z forward, +X right; toes at y=0",
+  "height_m": 1.624,
+  "groups": {
+    "Head": {
+      "origin": [
+        0.0,
+        1.3805,
+        -0.0384
+      ],
+      "triangles": 1784,
+      "materials": [
+        "Bone_Ivory",
+        "Bone_Socket"
+      ]
+    },
+    "Torso": {
+      "origin": [
+        0.0,
+        0.8909,
+        -0.0288
+      ],
+      "triangles": 3132,
+      "materials": [
+        "Bone_Ivory",
+        "Mossward_Leather",
+        "Mossward_Cloth",
+        "Mossward_Leaf"
+      ]
+    },
+    "LeftArm": {
+      "origin": [
+        -0.216,
+        1.3133,
+        -0.0
+      ],
+      "triangles": 1536,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "RightArm": {
+      "origin": [
+        0.216,
+        1.3133,
+        -0.0
+      ],
+      "triangles": 1416,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "LeftLeg": {
+      "origin": [
+        -0.1248,
+        0.7661,
+        -0.0
+      ],
+      "triangles": 2220,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "RightLeg": {
+      "origin": [
+        0.1248,
+        0.7661,
+        -0.0
+      ],
+      "triangles": 2220,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "Shield": {
+      "origin": [
+        -0.4404,
+        0.8045,
+        0.1555
+      ],
+      "triangles": 3744,
+      "materials": [
+        "Mossward_ShieldCore",
+        "Mossward_ShieldFace",
+        "Mossward_ShieldRim",
+        "Mossward_Studs",
+        "Mossward_Seam",
+        "Mossward_Emblem",
+        "Mossward_LeafVein",
+        "Mossward_SeamBack",
+        "Iron_Bracket",
+        "Grip_Leather"
+      ]
+    }
+  },
+  "triangles_total": 16052,
+  "materials_total": 15,
+  "shield_prop": {
+    "mesh": "MosswardShield",
+    "origin": "central hand grip",
+    "triangles": 3744,
+    "forward_normal": [
+      0,
+      0,
+      1
+    ],
+    "central_grip": [
+      0,
+      0,
+      0
+    ],
+    "central_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "rim_grip": [
+      0.2448,
+      0.0,
+      -0.0048
+    ],
+    "rim_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "item_tip": [
+      0.0,
+      0.4992,
+      0.0864
+    ],
+    "broad_phase_box": {
+      "center": [
+        0.0,
+        -0.0192,
+        0.0655
+      ],
+      "size": [
+        0.6547,
+        1.0368,
+        0.1828
+      ]
+    },
+    "character_grip_position": [
+      -0.4404,
+      0.8045,
+      0.1555
+    ]
+  }
+}

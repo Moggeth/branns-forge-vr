@@ -1,0 +1,16 @@
+{
+  "name": "branns-forge-audio-host",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Managed hidden audio renderer for Brann's native VR game",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "setup": "node node_modules/electron/install.js",
+    "check": "node check.cjs",
+    "test": "node --test policy-test.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.3.0"
+  }
+}

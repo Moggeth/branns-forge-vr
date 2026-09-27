@@ -1,0 +1,47 @@
+THE EMBER GALLERY - BRANN'S FORGE
+
+Open Play Desktop.cmd, or Play VR.cmd with SteamVR/OpenXR ready.
+Use a launcher, not the EXE directly. No API key or voice service needed.
+
+Desktop: WASD walks, hold right mouse to look, E picks up/drops/throws,
+left click is the held tool's trigger (or activates a pointed-at button).
+VR: grip to pick up, release to put down/throw, trigger operates the tool.
+
+Take HEARTHLIGHT from its pedestal beside the left bench. Trigger kindles
+or snuffs it. It casts real light/shadows. Lower its flame to oil to ignite.
+Take the copper OIL can or blue WATER can from the bench. Trigger opens or
+closes the valve; in VR tilt the can to pour. On desktop it pours ahead.
+Both have finite contents. REFILL CANS gives free refills without clearing spills.
+UNLIT BOTTLE and LIT BOTTLE give real throwable glass bottles to an empty hand.
+Lit wicks burn for ten seconds: throw before they go out. Bottles shatter on impact.
+
+Try a river of fire in the shallow channels; use water to quench it; carry
+Hearthlight through the doorway on the right to reveal the hidden copper carving.
+Three copper seals remember these discoveries. No timer or combat required.
+Fire can hurt you. Keep the centre stone walkway clear; water quenches fire.
+BRIGHTER / MOODY adjusts this room's ambient light. Other zones stay unchanged.
+The torch can travel with you. Return to forge or use Tab/palm > Travel for toys.
+
+Oil/contact fire supports up to 40 bottles worth of unburned fuel across 8 regions.
+Unlit spills can ignite later. Water leaves fuel wet; it can burn after drying.
+Spills stay anchored and pause while you visit another region in this session.
+Spilled fuel/loose item positions reset on relaunch. Seals and supported demo
+achievements/settings persist separately in Godot user data:
+Brann's Forge VR/EmberGalleryDemo. Normal game and BellworksDemo saves are untouched.
+Use only one Ember Gallery window at a time. Tab > Demo shows save status/reset.
+Older demo ZIPs remain separate snapshots.
+
+Surface fluid uses one sampled height per horizontal cell, not full volumetric
+fluid. It flows over sampled surfaces; it does not support stacked liquid layers
+in the same column. Held tools and terrain remain physically interactive.
+
+Close the game window to stop. For failures inspect logs/game.log. Restart using
+the launcher. Headset comfort has not yet been human-tested; desktop GPU timings
+are not VR framerate promises. Runtime licences are in GODOT-LICENSES.txt.
+
+LAMPLIGHTER UPDATE
+Three copper lamps start empty. Pick up the oil can (E / grip), aim the spout at a lamp bowl, and click / trigger to open its valve. In VR, tilt to pour. Close the valve before moving away. Touch a torch or lit match to the wick. Each lamp holds four units and burns for roughly four minutes when full. Pour water to snuff it; damp wicks need eight seconds to dry.
+
+The pale blue MOONWATER can fills the labelled inlet on the right of the gallery. Watch the liquid travel through copper channels, then follow its glow through the doorway to the Moonmoth alcove. Water washes moonwater out of the channels. Refill all three cans at the main board.
+
+Lamps and channel contents persist during this session, pause while away, and reset on exit; existing saved achievements are preserved. This is a small stylised reservoir-and-channel system, not an unrestricted volumetric fluid simulation. Lamps and the channel endpoint cast light without additional shadow maps. Desktop screenshots/performance checks passed; headset ergonomics and stereo frame time still need playtesting.

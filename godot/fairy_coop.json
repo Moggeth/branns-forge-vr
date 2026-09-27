@@ -1,0 +1,22 @@
+{
+  "speed": 5.0,
+  "boost": 2.2,
+  "acceleration": 28.0,
+  "drag": 0.5,
+  "look_sensitivity": 0.0026,
+  "controller_look": 2.4,
+  "deadzone": 0.16,
+  "perch_radius": 0.3,
+  "dislodge_speed": 1.8,
+  "throw_gain": 3.4,
+  "throw_coast_seconds": 1.6,
+  "range": 65.0,
+  "dart_damage": 4.0,
+  "critical_damage": 12.0,
+  "render_scale": 1.0,
+  "view_distance": 100.0,
+  "deceleration": 34.0,
+  "match_reach": 0.55,
+  "match_scrape": 0.045,
+  "camera_follow": 40.0
+}

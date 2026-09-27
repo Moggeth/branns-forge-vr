@@ -1,0 +1,80 @@
+LITTLE WING — LOCAL FAIRY CO-OP
+
+Extract the entire ZIP into one folder.
+Play VR + Fairy.cmd: one person in VR, one in the separate Little Wing window.
+Play Flight Practice.cmd: no headset; explore as the fairy while the host stays put.
+This is an offline snapshot. It resets progress on exit and never uses paid voice.
+For the full source game and saved progress, use Start Fairy Co-op.cmd in the project.
+
+Click the Little Wing window to focus it. F1 / controller Start shows the controls.
+WASD / left stick fly. Space/Ctrl / RB/LB rise and fall.
+Mouse looks automatically / right stick to look. Shift / L3 boosts. Alt / R3 brakes.
+Click / RT fires tiny darts. Right click / LT sends a dust marker.
+1-4 / D-pad chooses look, danger, attack or pickup.
+Back mouse / E / X carries or drops. Forward mouse / F / A perches. Middle / R / Y reveals.
+V / B switches first/third person. C / Back switches hover/acro.
+Q/Z rolls in acro; Steam Input rear paddles can emulate these keys.
+Escape releases the mouse. Home returns to the host.
+
+HOST: right VR B calls the fairy home. Toolbelt > Comfort has the same action.
+Offer a still hand; the fairy chooses to perch. A brisk hand movement launches it.
+Grip an object offered by the fairy to take it. Ghosts still require fire.
+The fairy can carry a burning match gently to spilled oil; fast flight blows it out.
+
+SOLO PRACTICE: F3 offers a visible practice hand nearby. F to perch, F4 to toss.
+You can inspect the effects, flight, weight, and basic interaction without a headset.
+Close the fairy window to return to ordinary desktop host controls; F8 reopens it.
+
+STEAM CONTROLLER: add LittleWing.exe as a non-Steam game. Use a Gamepad layout.
+Launch options: --xr-mode on -- --playful-demo --fairy-coop
+Use --xr-mode off instead for solo practice. Controller hardware remains unverified.
+
+The fairy stays in the host's current area. Marks persist during this session,
+up to 24 for eight seconds; Delete clears all marks. Zone travel leaves cargo where it was.
+Death scatters the fairy, drops cargo, then respawns it in the host's pocket.
+
+Close both windows to quit. Closing only the fairy window leaves the host running.
+Diagnostic logs: logs/game.log beside this executable. If something feels wrong,
+close and relaunch. No SteamVR restart is necessary to reset the fairy.
+VR performance, motion comfort and physical controller ergonomics need playtesting.
+
+Blue-light update: solo practice starts at the Forge Yard common-goods bench with loose matches, the real matchbox and bottles. Back mouse/E picks up or drops. Click/RT opens a held box; set it down and pick a match from its open drawer. Carry a fresh match within 40 cm of the box and click/RT for an assisted physical striker stroke. Fly gently with Alt/brake to preserve the flame. Escape frees the cursor; the next click resumes looking without firing. V shows the new blue winged-light body.
+
+MATCH-BAT UPDATE
+Nearby reachable pickups show a small Back/E hint. Left click/RT belongs to the held item: open/close a matchbox, swing a match, or swat with another object. No darts while carrying. Right-click still casts a guiding dust mark.
+Bring a fresh match within about half a metre of the matchbox and click. The fairy winds up, meets the side panel, scrapes along it and recovers. A blocked path or a box moved out of reach cancels the strike. Ignition requires actual collider contact and enough scrape distance; sparks and the warm flare follow ignition. Dropping cancels the animation. Matches retain their ten-second life and blowout rules.
+Hover now accelerates at 28 m/s� and stops at 34 m/s�, with the same 5 m/s top speed. Camera follow is tighter; perch smoothing remains gentle. These and match reach/scrape distance remain editable in godot/fairy_coop.json, hot-reloaded by the source game.
+
+DISPLAY & PRECISE LOOK: starts maximized. F11 toggles fullscreen; F10 maximize/windowed; F6/F7 left/right half-screen on the current monitor. Escape releases the pointer. [ / ] changes sensitivity for this session. Captured aiming uses unscaled screen deltas, no added mouse acceleration or smoothing, and immediate first-person camera rotation. Gentle perch positional smoothing remains.
+
+CRISP TEXT: this build renders the fairy view at native resolution and uses scalable world-sign lettering. Torch instructions sit on their own plaque.
+
+MATCHBOX & FUEL UPDATE: Back mouse/E near an open box takes one match. Hold Shift while picking up to lift the whole box (controller: hold L3 + X). Closed boxes pick up normally. Dropped boxes have a low-bounce body and an open-drawer collider.
+Spilled fuel burns for approximately eight seconds. Unlit fuel lasts roughly 50% longer than the original demo (measured single bottle: 26.4 -> 39.8 seconds on flat ground). Lamps and torches retain their longer lifetimes. Match and wick timers remain ten seconds. Tuning: spill_burn_seconds and spill_unlit_lifetime_scale in firecraft.json.
+SOLO HAND: F3 brings the visible practice hand nearby. F perches; F4 flings you forward. Steer or brake to regain control; Home recalls you. Pings expire after eight seconds; Delete clears all pings. A lit match swing can ignite nearby wicks and fuel along its actual path, blocked by solid walls.
+
+OPTIONAL GUIDED PRACTICE
+At the Forge Yard, F2 starts Flight & Flame. Follow the blue in-world board: perch, fling, brake, take a match, strike it, share its flame with a bottle wick, cast a dust marker, then clear it. F2 pauses; Shift+F2 starts again. Retry drops what you carry and stops your flight; it does not reset the world or award progression. V chooses first/third person; [ / ] adjusts mouse sensitivity. Camera choice, sensitivity and help visibility save separately in fairy_preferences.cfg under Godot's Brann's Forge VR user-data folder. Hover remains the safe starting flight mode; C toggles acro during play.
+
+AFTER DARK: LITTLE WING & FRIEND
+Three new compact night walks: use the AFTER DARK signs at the forge, or J in the fairy window. Fairy darts can activate these signs, so solo practice can travel too. Every space has BACK TO BRANN, NEXT NIGHT WALK and BRIGHTER / MOODY signs.
+- Glowroot Grotto: fly near sleepy mushrooms to unfurl their glowing caps. Moths gather around your light.
+- Starlace Archive: fly within 2.4m of each of three seals and pulse (Middle mouse / R / Y). A physical gate lifts after all three awaken.
+- Moonwater Causeway: nearby stones remember your light for twelve seconds, marking the route for your friend. There is safe footing under the water.
+New buddy rituals: fly close to your friend's shoulder and press H (controller: hold D-pad down + A) to perch; press again to leave. A two-second rest on a hand or shoulder leaves a blue light with your friend for twenty seconds after departure. Pulse while settled together to restore 4 fairy health and 6 friend health, once per ten seconds. No revival and no forced camera roll. Solo F3 practice hand also lends light and supports the duet.
+Magic includes expanding star rings, shoulder sparks, blooming caps, moth lights and rippling moonwater. Effects use bounded pools; existing reduced-motion feedback setting slows the rings. These discoveries and gate state last for the current session; existing progression saves are unchanged.
+
+CONTROLLER-ONLY PRACTICE
+Hold Start and press: Y guide/pause, X retry, A offer practice hand, B fling from hand, LB clear dust, RB recall home. Release Start afterward. Start alone still toggles help on release. Movement is braked while the menu chord is held; chord buttons do not fire or switch camera. All labels use Xbox-style button names (Steam Input can map equivalent controls).
+The guide now explains the whole closed-box sequence: X picks up the box, RT opens it, X sets it down, and X near the open drawer takes one match. The full eight-step path is verified with actual in-game actions; physical controller ergonomics still need playtesting.
+
+EMBER CREEK
+K visits Ember Creek; there is also a sign below the AFTER DARK destinations. One short loop: POUR OIL, take a lit match, touch the shallow spill, WATER SLUICE while burning, BELLOWS to dry it, then touch flame again. The gate rises; carry a live match to the carving beyond. Extra pours/matches are free; matches retain the normal ten-second flame. If a spill burns out early, pour and light again. Existing Molotov burn and evaporation times are unchanged.
+Fairy: aim at a nearby sign (within4m), left click/RT activates it even while carrying a match. Darts also operate signs at a distance. The match dispenser serves the active fairy, or an available player hand; with no tracked hand it leaves a match beside the signs. Reset clears only this challenge and returns anyone beyond its gate to the entrance without deleting carried items. BACK TO BRANN returns to the forge. BRIGHTER/MOODY changes local lighting. Progress is session-only and uses the existing shared fluid region budget (eight regions).
+
+DISCOVERIES: M opens the excursion chooser (controller: hold Start + D-pad up).
+D-pad up/down chooses a place; left/right chooses an action; A activates; B closes.
+Glowroot wakes in your light; Starlace seals respond to nearby reveal; Moonwater stones remember your glow.
+H / D-pad down + A perches on your friend's shoulder. Rest together for borrowed light; R / Y offers a shared pulse.
+Ember Creek: oil, match, water, bellows, relight, then carry fire beyond the gate.
+Reset activity asks for confirmation and resets only Ember Creek; inventory and other areas remain.

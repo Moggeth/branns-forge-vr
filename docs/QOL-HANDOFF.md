@@ -1,0 +1,17 @@
+# Invention handoff and comparison
+
+Completed items expose requestedFunction, extraFunction and useInstructions (each bounded to 400 characters). Existing items retain their description as the function and explicitly say no extra effect is documented. Brann's backend reads the same actual summaries through inspect_forge; the generation contract requires honest separate descriptions.
+
+GET /api/vr/state returns these fields on each ready item, plus readyAt, previousItemId, lineageId, version and announcement. A handoffs array gives the same readiness summary for native presentation. Readiness is only published after the worker verifies and exports the item. Native clients should key announcements by item id; polling a ready item is not a fresh completion event.
+
+POST /api/vr/commission accepts optional baseItemId. A valid completed base creates a new independent commission, preserves the previous requested behavior and capability scope in the brief, and passes previous specification/context to the worker. It never overwrites the old model, ability or registry record. Earlier versions remain ready/equippable even if the refinement fails. Both the voice commission tool and direct companion can select a base. This is a fresh generated implementation, not a patch applied to prior source.
+
+The companion lists completed versions, their functions, extras and controls. Refine this version selects the base and focuses the brief. This does not start generation until Forge with Astra is pressed. Old versions stay visible beside newer ones for comparison. No automatic paid voice call is added for readiness.
+
+Verification: 19 offline tests pass, including old-item defaults, text bounds, refinement capability preservation, request idempotency, failed-refinement safety and persistence reload. Command elapsed 0.326 seconds; Node test runner 0.179 seconds. Existing 17-test regression before new tests passed in 0.411 seconds. No paid API calls, worker launches or normal service restart were used. Companion JavaScript syntax checked separately; actual browser/VR handoff remains part of coordinator verification.
+
+Search lesson: PowerShell does not expand globs supplied as literal rg path arguments. Use rg with a concrete directory and -g '*.js' -g '!node_modules/**', or explicit files. Avoid searching bundled dependencies; initial broad search produced irrelevant output. Inspection attempts measured 0.096, 0.136 (bad glob), 0.322 (overbroad), 0.110 and 0.099 seconds.
+
+Native refine links use /voice?refine=<completed-id>. The companion preselects a matching loaded item once, focuses the brief and displays typing/talking instructions. It does not submit a commission. The integration harness now runs --qol-smoke after the original and adventure tests; its run is coordinated with the native implementation. Follow-up inspection took 0.220070s; edit and syntax checks 0.203620s.
+
+Final verification caught a test-environment regression: adding URL query handling requires URLSearchParams and location in the VM browser mock (ReferenceError at script initialization). The browser implementation was valid; the test fixture lacked these globals. Extended the mock and added a behavioral test for delayed completed-item availability, one-time preselection, preserving a later user selection, focus once, and zero POST requests. All 20 tests now pass (0.313666s command; 0.170388s runner). Always rerun the service suite after companion follow-ups, not just node --check.

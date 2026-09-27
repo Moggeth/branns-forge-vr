@@ -1,0 +1,14 @@
+{
+  "match_seconds": 10,
+  "wick_seconds": 10,
+  "blowout_speed": 1.8,
+  "blowout_dwell": 0.15,
+  "light_dwell": 0.3,
+  "gentle_speed": 0.55,
+  "fire_seconds": 8,
+  "fire_radius": 2.7,
+  "fear_radius": 6,
+  "ghost_speed": 0.65,
+  "spill_burn_seconds": 8,
+  "spill_unlit_lifetime_scale": 1.5
+}

@@ -1,0 +1,11 @@
+# Held-item pose contract
+
+The calibrated hand socket (`main.gd:hand_socket`) is the only aiming frame. Its local **−Z** follows the visible index finger. An authored item's forward axis must be documented with the model and transformed onto that socket axis before applying any roll or palm offset. Do not infer forward from a glTF empty's rotation: Blender markers can import with a valid position and a misleading basis.
+
+`grip_runtime.gd` resolves a one-handed pose in this order: an explicit per-instance `grip_preferences` transform; the saved pose for item ID, creation version and left/right/desktop side; the tested item default; then the ordinary generic tool grip. Wyrmspout v1 was authored along model +Y, so it rotates −90° about local X. Wyrmspout v2 was authored along model −Z and gets a side-specific 90° roll around that firing axis. Neither changes desktop aiming. Both versions and both hands are checked by `godot/grip_pose_checks.gd`.
+
+To correct a held item in VR, hold A while gripping, reposition the item/hand, then release A. The resulting transform is applied to that instance and saved to Godot's `user://grip-poses-v1.json`. The key includes the creation version so a newly modelled revision can have a new default without changing older pieces. The file is local preference state, separate from the player's world save. For a bad calibration, remove the matching key from this JSON while the game is closed, or ask Codex to do so; the default is restored on the next launch. Automated diagnostics never read or write that file.
+
+When commissioning a new item, record its local forward, handle axis and intended dorsal/up axis with its GLB. Verify right and left hand orientation against the calibrated socket and capture an in-game held screenshot. Then add a focused assertion to `grip_pose_checks.gd` or a new item fixture. This avoids hiding future orientation defects in generic hand rotations or changing the art to compensate for a grip error.
+
+Run the read-only check with `tools/godot/Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --path godot --script res://grip_pose_checks.gd -- --grip-pose-check`. It reports `GRIP_POSE_RESULT` and does not contact the service.

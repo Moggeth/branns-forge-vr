@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "firstLevelXp": 100,
+  "levelStepXp": 50,
+  "maxActive": 3,
+  "enemyXp": { "rat": 5, "skeleton": 12, "golem": 25, "ghost": 18, "minotaur": 35, "ember_warden": 80 },
+  "resourceXp": { "rat_tail": 0, "lumber": 3, "stone": 3, "iron": 4, "apple": 1, "spore": 3, "crystal": 5, "haunted_bone": 4, "sky_bloom": 5, "ember_core": 12 },
+  "titles": [{"level":1,"name":"Forgehand"},{"level":3,"name":"Trailhand"},{"level":5,"name":"Adventurer"},{"level":8,"name":"Wayfinder"},{"level":12,"name":"Forgekeeper"}],
+  "quests": [
+    {"id":"rat_patrol","name":"A quieter yard","description":"Defeat 3 rats, then report to Brann.","kind":"enemy","target":"rat","goal":3,"xpReward":35},
+    {"id":"skeleton_patrol","name":"Bones to pick","description":"Defeat 3 skeletons, then report to Brann.","kind":"enemy","target":"skeleton","goal":3,"xpReward":55},
+    {"id":"lumber_run","name":"Timber for tomorrow","description":"Gather 3 fresh lumber, then report to Brann. Keep your materials.","kind":"resource","target":"lumber","goal":3,"xpReward":30},
+    {"id":"stone_run","name":"A solid foundation","description":"Gather 3 fresh stone, then report to Brann. Keep your materials.","kind":"resource","target":"stone","goal":3,"xpReward":30}
+  ]
+}

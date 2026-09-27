@@ -1,0 +1,3640 @@
+[
+  {
+    "schema": 1,
+    "id": "living-climb-arena",
+    "version": 1,
+    "name": "The Open-Hand Test Garden",
+    "kind": "region",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-climb-arena"
+    },
+    "provenance": {
+      "prompt": "A reversible 64 metre garden with climbable stepped towers, grappling anchors, broad landings and a return gate. Grip the bronze reel, trigger a tower to attach, then hold trigger to reel. Grip jade walls with empty hands to climb.",
+      "interpretation": "A reversible 64 metre garden with climbable stepped towers, grappling anchors, broad landings and a return gate. Grip the bronze reel, trigger a tower to attach, then hold trigger to reel. Grip jade walls with empty hands to climb.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [],
+    "entities": [
+      {
+        "id": "garden-floor",
+        "name": "The test garden",
+        "shape": "box",
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "size": [
+          64,
+          0.4,
+          64
+        ],
+        "color": "#8c9d7b",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "boundary-0",
+        "name": "Garden boundary",
+        "shape": "box",
+        "position": [
+          0,
+          0.5,
+          -32
+        ],
+        "size": [
+          64,
+          1,
+          0.4
+        ],
+        "color": "#899584",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "boundary-1",
+        "name": "Garden boundary",
+        "shape": "box",
+        "position": [
+          0,
+          0.5,
+          32
+        ],
+        "size": [
+          64,
+          1,
+          0.4
+        ],
+        "color": "#899584",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "boundary-2",
+        "name": "Garden boundary",
+        "shape": "box",
+        "position": [
+          -32,
+          0.5,
+          0
+        ],
+        "size": [
+          0.4,
+          1,
+          64
+        ],
+        "color": "#899584",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "boundary-3",
+        "name": "Garden boundary",
+        "shape": "box",
+        "position": [
+          32,
+          0.5,
+          0
+        ],
+        "size": [
+          0.4,
+          1,
+          64
+        ],
+        "color": "#899584",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "return-gate",
+        "name": "RETURN TO BRANN · point and trigger",
+        "shape": "box",
+        "position": [
+          -3,
+          1.2,
+          -2
+        ],
+        "size": [
+          1.8,
+          2.4,
+          0.25
+        ],
+        "color": "#62c5b5",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "portal",
+            "version": 1,
+            "config": {
+              "destination": [
+                -9,
+                0,
+                2
+              ],
+              "radius": 1.3
+            }
+          }
+        ]
+      },
+      {
+        "id": "grapple-table",
+        "name": "Climbing equipment",
+        "shape": "box",
+        "position": [
+          3,
+          0.5,
+          -2
+        ],
+        "size": [
+          2,
+          1,
+          1
+        ],
+        "color": "#735b3e",
+        "material": "wood",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "garden-reel",
+        "name": "BRONZE REEL · grip, aim, trigger; hold to reel",
+        "shape": "box",
+        "position": [
+          3,
+          1.3,
+          -2
+        ],
+        "size": [
+          0.3,
+          0.24,
+          0.45
+        ],
+        "color": "#c19146",
+        "material": "iron",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.5
+            }
+          },
+          {
+            "type": "grapple",
+            "version": 1,
+            "config": {
+              "range": 40,
+              "reelSpeed": 2.4
+            }
+          }
+        ]
+      },
+      {
+        "id": "return-pillar-0",
+        "name": "Return gate pillar",
+        "shape": "box",
+        "position": [
+          -4.02,
+          1.3,
+          -2
+        ],
+        "size": [
+          0.25,
+          2.6,
+          0.4
+        ],
+        "color": "#7c8a7e",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "return-pillar-2",
+        "name": "Return gate pillar",
+        "shape": "box",
+        "position": [
+          -1.98,
+          1.3,
+          -2
+        ],
+        "size": [
+          0.25,
+          2.6,
+          0.4
+        ],
+        "color": "#7c8a7e",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "return-lintel",
+        "name": "Return gate lintel",
+        "shape": "box",
+        "position": [
+          -3,
+          2.68,
+          -2
+        ],
+        "size": [
+          2.35,
+          0.25,
+          0.4
+        ],
+        "color": "#c1ae7a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "tower-0",
+        "name": "Climb or grapple · landing 1",
+        "shape": "box",
+        "position": [
+          10,
+          1.0,
+          10
+        ],
+        "size": [
+          3.4,
+          2,
+          5
+        ],
+        "color": "#8c9991",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "anchor-0",
+        "name": "Grapple anchor 1",
+        "shape": "cylinder",
+        "position": [
+          10,
+          2.6,
+          10
+        ],
+        "size": [
+          0.45,
+          1.2,
+          0.45
+        ],
+        "color": "#d6b567",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "tower-1",
+        "name": "Climb or grapple · landing 2",
+        "shape": "box",
+        "position": [
+          14,
+          2.0,
+          10
+        ],
+        "size": [
+          3.4,
+          4,
+          5
+        ],
+        "color": "#8c9991",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "anchor-1",
+        "name": "Grapple anchor 2",
+        "shape": "cylinder",
+        "position": [
+          14,
+          4.6,
+          10
+        ],
+        "size": [
+          0.45,
+          1.2,
+          0.45
+        ],
+        "color": "#d6b567",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "tower-2",
+        "name": "Climb or grapple · landing 3",
+        "shape": "box",
+        "position": [
+          18,
+          3.0,
+          10
+        ],
+        "size": [
+          3.4,
+          6,
+          5
+        ],
+        "color": "#8c9991",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "anchor-2",
+        "name": "Grapple anchor 3",
+        "shape": "cylinder",
+        "position": [
+          18,
+          6.6,
+          10
+        ],
+        "size": [
+          0.45,
+          1.2,
+          0.45
+        ],
+        "color": "#d6b567",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "tower-3",
+        "name": "Climb or grapple · landing 4",
+        "shape": "box",
+        "position": [
+          22,
+          4.0,
+          10
+        ],
+        "size": [
+          3.4,
+          8,
+          5
+        ],
+        "color": "#8c9991",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "anchor-3",
+        "name": "Grapple anchor 4",
+        "shape": "cylinder",
+        "position": [
+          22,
+          8.6,
+          10
+        ],
+        "size": [
+          0.45,
+          1.2,
+          0.45
+        ],
+        "color": "#d6b567",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "climbable",
+            "version": 1,
+            "config": {}
+          }
+        ]
+      },
+      {
+        "id": "step-0",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          4.0,
+          0.08,
+          10
+        ],
+        "size": [
+          1.1,
+          0.16,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-1",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          4.33,
+          0.16,
+          10
+        ],
+        "size": [
+          1.1,
+          0.32,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-2",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          4.66,
+          0.24,
+          10
+        ],
+        "size": [
+          1.1,
+          0.48,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-3",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          4.99,
+          0.32,
+          10
+        ],
+        "size": [
+          1.1,
+          0.64,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-4",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          5.32,
+          0.4,
+          10
+        ],
+        "size": [
+          1.1,
+          0.8,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-5",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          5.65,
+          0.48,
+          10
+        ],
+        "size": [
+          1.1,
+          0.96,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-6",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          5.98,
+          0.56,
+          10
+        ],
+        "size": [
+          1.1,
+          1.12,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-7",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          6.3100000000000005,
+          0.64,
+          10
+        ],
+        "size": [
+          1.1,
+          1.28,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-8",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          6.640000000000001,
+          0.72,
+          10
+        ],
+        "size": [
+          1.1,
+          1.44,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-9",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          6.970000000000001,
+          0.8,
+          10
+        ],
+        "size": [
+          1.1,
+          1.6,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-10",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          7.300000000000001,
+          0.88,
+          10
+        ],
+        "size": [
+          1.1,
+          1.76,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "step-11",
+        "name": "Broad practice step",
+        "shape": "box",
+        "position": [
+          7.630000000000001,
+          0.96,
+          10
+        ],
+        "size": [
+          1.1,
+          1.92,
+          5
+        ],
+        "color": "#a4ae99",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "summit-beacon",
+        "name": "THE LONG REACH · trigger at the summit",
+        "shape": "box",
+        "position": [
+          22,
+          8.6,
+          11
+        ],
+        "size": [
+          0.35,
+          0.8,
+          0.35
+        ],
+        "color": "#81d9c7",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "arrived"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summit-objective",
+        "name": "Reach the summit · trigger the beacon",
+        "shape": "box",
+        "position": [
+          1,
+          1,
+          -2
+        ],
+        "size": [
+          0.25,
+          1,
+          0.25
+        ],
+        "color": "#c3ae78",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "arrived",
+              "count": 1,
+              "target": "summit-beacon"
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "arrived",
+        "target": "summit-beacon",
+        "actions": [
+          {
+            "op": "set_color",
+            "target": "summit-beacon",
+            "color": "#ffd06d"
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-material-garden",
+    "version": 1,
+    "name": "Fire, Water and New Growth",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-material-garden"
+    },
+    "provenance": {
+      "prompt": "Warm the wood with the ember stone, cool it using the water cistern, cut it with the pruner and repair or grow it with a wand. These transformations affect garden objects only.",
+      "interpretation": "Warm the wood with the ember stone, cool it using the water cistern, cut it with the pruner and repair or grow it with a wand. These transformations affect garden objects only.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "timber",
+        "name": "Practice timber · burns, cuts, repairs and grows",
+        "shape": "box",
+        "position": [
+          -16,
+          1,
+          8
+        ],
+        "size": [
+          0.9,
+          2,
+          0.9
+        ],
+        "color": "#987449",
+        "material": "wood",
+        "static": true,
+        "components": [
+          {
+            "type": "material",
+            "version": 1,
+            "config": {
+              "ignition": 35,
+              "conductivity": 0.1,
+              "absorption": 0.8,
+              "hardness": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "ember-stone",
+        "name": "TRIGGER · warm the timber",
+        "shape": "box",
+        "position": [
+          -19,
+          1,
+          7
+        ],
+        "size": [
+          0.5,
+          0.6,
+          0.5
+        ],
+        "color": "#dc6b35",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      },
+      {
+        "id": "water-cistern",
+        "name": "TRIGGER · send water to the timber",
+        "shape": "cylinder",
+        "position": [
+          -19,
+          1,
+          10
+        ],
+        "size": [
+          0.8,
+          1,
+          0.8
+        ],
+        "color": "#5aafb2",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "reservoir",
+            "version": 1,
+            "config": {
+              "capacity": 10,
+              "amount": 10
+            }
+          },
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pruning-tool",
+        "name": "PRUNER · grip; point and trigger to cut",
+        "shape": "box",
+        "position": [
+          -16,
+          1,
+          5
+        ],
+        "size": [
+          0.15,
+          0.65,
+          0.1
+        ],
+        "color": "#c6b17f",
+        "material": "iron",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "transformer",
+            "version": 1,
+            "config": {
+              "operation": "cut",
+              "amount": 0.35
+            }
+          }
+        ]
+      },
+      {
+        "id": "repair-wand",
+        "name": "MENDER · grip; point and trigger to repair",
+        "shape": "box",
+        "position": [
+          -15,
+          1,
+          5
+        ],
+        "size": [
+          0.12,
+          0.6,
+          0.12
+        ],
+        "color": "#70d8b4",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.2
+            }
+          },
+          {
+            "type": "transformer",
+            "version": 1,
+            "config": {
+              "operation": "repair",
+              "amount": 0.35
+            }
+          }
+        ]
+      },
+      {
+        "id": "growth-wand",
+        "name": "GREEN FINGER · grip; point and trigger to grow",
+        "shape": "box",
+        "position": [
+          -14,
+          1,
+          5
+        ],
+        "size": [
+          0.12,
+          0.6,
+          0.12
+        ],
+        "color": "#99c957",
+        "material": "wood",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.2
+            }
+          },
+          {
+            "type": "transformer",
+            "version": 1,
+            "config": {
+              "operation": "grow",
+              "amount": 0.2
+            }
+          }
+        ]
+      },
+      {
+        "id": "material-table",
+        "name": "Tools for the living wood",
+        "shape": "box",
+        "position": [
+          -15,
+          0.45,
+          5
+        ],
+        "size": [
+          4,
+          0.9,
+          1
+        ],
+        "color": "#685439",
+        "material": "wood",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "growth-leaf",
+        "name": "A sprout with a useful future",
+        "shape": "box",
+        "position": [
+          -13,
+          0.35,
+          8
+        ],
+        "size": [
+          0.5,
+          0.7,
+          0.5
+        ],
+        "color": "#7cab56",
+        "material": "wood",
+        "static": true,
+        "components": [
+          {
+            "type": "material",
+            "version": 1,
+            "config": {
+              "ignition": 45,
+              "absorption": 0.7,
+              "hardness": 1
+            }
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": "irrigation",
+        "from": "water-cistern",
+        "to": "growth-leaf",
+        "type": "fluid",
+        "config": {
+          "rate": 0.3
+        }
+      }
+    ],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "ember-stone",
+        "actions": [
+          {
+            "op": "heat",
+            "target": "timber",
+            "value": 80
+          }
+        ]
+      },
+      {
+        "event": "triggered",
+        "target": "water-cistern",
+        "actions": [
+          {
+            "op": "wet",
+            "target": "timber",
+            "value": 40
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-flow-engine",
+    "version": 1,
+    "name": "The Copper Heart Engine",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-flow-engine"
+    },
+    "provenance": {
+      "prompt": "Trigger the copper heart to power a lamp and lift a gate through visible connections. A reservoir feeds a receiving bowl. Trigger the motor to turn its wheel.",
+      "interpretation": "Trigger the copper heart to power a lamp and lift a gate through visible connections. A reservoir feeds a receiving bowl. Trigger the motor to turn its wheel.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "heart",
+        "name": "TRIGGER · power the copper heart",
+        "shape": "box",
+        "position": [
+          -15,
+          1,
+          -12
+        ],
+        "size": [
+          0.6,
+          0.8,
+          0.6
+        ],
+        "color": "#c9854a",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          },
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "color": "#ffa344",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "lamp",
+        "name": "Connected lamp",
+        "shape": "box",
+        "position": [
+          -12,
+          1.3,
+          -12
+        ],
+        "size": [
+          0.35,
+          0.6,
+          0.35
+        ],
+        "color": "#8da693",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "color": "#e0b763",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate",
+        "name": "Power opens this gate",
+        "shape": "box",
+        "position": [
+          -9,
+          1,
+          -12
+        ],
+        "size": [
+          1.4,
+          2,
+          0.2
+        ],
+        "color": "#697c75",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "door",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "motor",
+        "name": "TRIGGER · start the wheel",
+        "shape": "cylinder",
+        "position": [
+          -15,
+          1,
+          -16
+        ],
+        "size": [
+          0.8,
+          0.8,
+          0.3
+        ],
+        "color": "#bfa675",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          },
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "motor",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "cistern",
+        "name": "Water source",
+        "shape": "cylinder",
+        "position": [
+          -12,
+          1.3,
+          -16
+        ],
+        "size": [
+          0.8,
+          1,
+          0.8
+        ],
+        "color": "#66b4b3",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "reservoir",
+            "version": 1,
+            "config": {
+              "capacity": 10,
+              "amount": 10
+            }
+          }
+        ]
+      },
+      {
+        "id": "bowl",
+        "name": "Receiving bowl · fills from the source",
+        "shape": "cylinder",
+        "position": [
+          -9,
+          0.6,
+          -16
+        ],
+        "size": [
+          1,
+          0.6,
+          1
+        ],
+        "color": "#ad8555",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "reservoir",
+            "version": 1,
+            "config": {
+              "capacity": 10,
+              "amount": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "engine-objective",
+        "name": "Power the connected lamp",
+        "shape": "box",
+        "position": [
+          -17,
+          1,
+          -12
+        ],
+        "size": [
+          0.3,
+          0.8,
+          0.3
+        ],
+        "color": "#d7c58e",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "powered",
+              "target": "lamp",
+              "count": 1
+            }
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": "heart-lamp",
+        "from": "heart",
+        "to": "lamp",
+        "type": "energy",
+        "config": {
+          "conductance": 0.8
+        }
+      },
+      {
+        "id": "lamp-gate",
+        "from": "lamp",
+        "to": "gate",
+        "type": "energy",
+        "config": {
+          "conductance": 0.8
+        }
+      },
+      {
+        "id": "water-pipe",
+        "from": "cistern",
+        "to": "bowl",
+        "type": "fluid",
+        "config": {
+          "rate": 0.8
+        }
+      }
+    ],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "heart",
+        "actions": [
+          {
+            "op": "power",
+            "target": "heart",
+            "value": 10
+          }
+        ]
+      },
+      {
+        "event": "triggered",
+        "target": "motor",
+        "actions": [
+          {
+            "op": "power",
+            "target": "motor",
+            "value": 8
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-signal-companions",
+    "version": 1,
+    "name": "The Lantern and the Listener",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-signal-companions"
+    },
+    "provenance": {
+      "prompt": "Trigger the bell and watch the brass listener investigate. A motion-sensing lantern notices visitors. The jade companion follows you; the violet companion keeps its distance.",
+      "interpretation": "Trigger the bell and watch the brass listener investigate. A motion-sensing lantern notices visitors. The jade companion follows you; the violet companion keeps its distance.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "bell",
+        "name": "TRIGGER · ring for the listener",
+        "shape": "cylinder",
+        "position": [
+          13,
+          1,
+          -14
+        ],
+        "size": [
+          0.5,
+          0.7,
+          0.5
+        ],
+        "color": "#d3ac55",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          },
+          {
+            "type": "emitter",
+            "version": 1,
+            "config": {
+              "kind": "sound",
+              "signal": "sound",
+              "interval": 60,
+              "strength": 30
+            }
+          }
+        ]
+      },
+      {
+        "id": "listener",
+        "name": "The brass listener · investigates nearby sounds",
+        "shape": "sphere",
+        "position": [
+          17,
+          0.4,
+          -14
+        ],
+        "size": [
+          0.65,
+          0.8,
+          0.65
+        ],
+        "color": "#cbaa65",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "creature",
+            "version": 1,
+            "config": {
+              "mode": "investigate",
+              "speed": 0.8,
+              "radius": 12
+            }
+          },
+          {
+            "type": "sensor",
+            "version": 1,
+            "config": {
+              "kind": "sound",
+              "radius": 12,
+              "threshold": 0.05,
+              "signal": "heard"
+            }
+          }
+        ]
+      },
+      {
+        "id": "follower",
+        "name": "The jade follower · likes your company",
+        "shape": "sphere",
+        "position": [
+          20,
+          0.4,
+          -14
+        ],
+        "size": [
+          0.65,
+          0.8,
+          0.65
+        ],
+        "color": "#7ebf99",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "creature",
+            "version": 1,
+            "config": {
+              "mode": "follow",
+              "speed": 0.7,
+              "radius": 12
+            }
+          }
+        ]
+      },
+      {
+        "id": "shy-one",
+        "name": "The shy violet companion · give it space",
+        "shape": "sphere",
+        "position": [
+          24,
+          0.4,
+          -14
+        ],
+        "size": [
+          0.65,
+          0.8,
+          0.65
+        ],
+        "color": "#ae91be",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "creature",
+            "version": 1,
+            "config": {
+              "mode": "flee",
+              "speed": 0.65,
+              "radius": 5
+            }
+          }
+        ]
+      },
+      {
+        "id": "sensor",
+        "name": "Motion-sensing lantern",
+        "shape": "box",
+        "position": [
+          17,
+          1,
+          -19
+        ],
+        "size": [
+          0.4,
+          1,
+          0.4
+        ],
+        "color": "#d3b48a",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "sensor",
+            "version": 1,
+            "config": {
+              "kind": "motion",
+              "radius": 5,
+              "threshold": 0.1,
+              "signal": "visitor"
+            }
+          },
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "color": "#ffd47a",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "listener-objective",
+        "name": "Ring the bell three times",
+        "shape": "box",
+        "position": [
+          13,
+          1,
+          -16
+        ],
+        "size": [
+          0.3,
+          0.8,
+          0.3
+        ],
+        "color": "#9d9276",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "triggered",
+              "target": "bell",
+              "count": 3
+            }
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "id": "bell-lantern",
+        "from": "bell",
+        "to": "sensor",
+        "type": "signal",
+        "config": {
+          "conductance": 1
+        }
+      }
+    ],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "bell",
+        "actions": [
+          {
+            "op": "emit",
+            "target": "bell",
+            "signal": "sound",
+            "value": 10
+          }
+        ]
+      },
+      {
+        "event": "sensed",
+        "target": "sensor",
+        "actions": [
+          {
+            "op": "power",
+            "target": "sensor",
+            "value": 8
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-local-fields",
+    "version": 1,
+    "name": "A Pocket of Moonlight",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-local-fields"
+    },
+    "provenance": {
+      "prompt": "A low-gravity field changes loose objects inside its radius. Lift and drop the little moons. The veil dims only this experiment's objects, never the player's whole view.",
+      "interpretation": "A low-gravity field changes loose objects inside its radius. Lift and drop the little moons. The veil dims only this experiment's objects, never the player's whole view.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "moon-well",
+        "name": "Low-gravity well · drop the moons nearby",
+        "shape": "cylinder",
+        "position": [
+          0,
+          0.15,
+          18
+        ],
+        "size": [
+          1.3,
+          0.3,
+          1.3
+        ],
+        "color": "#a696d2",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "field",
+            "version": 1,
+            "config": {
+              "kind": "gravity",
+              "radius": 6,
+              "strength": 0.2
+            }
+          }
+        ]
+      },
+      {
+        "id": "veil",
+        "name": "TRIGGER · toggle the local veil",
+        "shape": "box",
+        "position": [
+          -4,
+          1,
+          18
+        ],
+        "size": [
+          0.3,
+          1,
+          0.3
+        ],
+        "color": "#b9b0dd",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          },
+          {
+            "type": "field",
+            "version": 1,
+            "config": {
+              "kind": "visibility",
+              "radius": 5,
+              "strength": 0.35
+            }
+          }
+        ]
+      },
+      {
+        "id": "moon-0",
+        "name": "A little moon · grip and release",
+        "shape": "sphere",
+        "position": [
+          -1,
+          2,
+          18
+        ],
+        "size": [
+          0.4,
+          0.4,
+          0.4
+        ],
+        "color": "#d2cfe7",
+        "material": "stone",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          }
+        ]
+      },
+      {
+        "id": "moon-1",
+        "name": "A little moon · grip and release",
+        "shape": "sphere",
+        "position": [
+          0,
+          2,
+          18
+        ],
+        "size": [
+          0.4,
+          0.4,
+          0.4
+        ],
+        "color": "#d2cfe7",
+        "material": "stone",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          }
+        ]
+      },
+      {
+        "id": "moon-2",
+        "name": "A little moon · grip and release",
+        "shape": "sphere",
+        "position": [
+          1,
+          2,
+          18
+        ],
+        "size": [
+          0.4,
+          0.4,
+          0.4
+        ],
+        "color": "#d2cfe7",
+        "material": "stone",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "veil",
+        "actions": [
+          {
+            "op": "toggle",
+            "target": "veil"
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-maker-tools",
+    "version": 1,
+    "name": "Tools That Make Tools",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-maker-tools"
+    },
+    "provenance": {
+      "prompt": "Grip the amber recorder: trigger once, move through a gesture, then trigger again to replay it. The joiner links two selected objects. The paintbrush makes the selected practice wall climbable.",
+      "interpretation": "Grip the amber recorder: trigger once, move through a gesture, then trigger again to replay it. The joiner links two selected objects. The paintbrush makes the selected practice wall climbable.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "maker-table",
+        "name": "Tools that make tools",
+        "shape": "box",
+        "position": [
+          0,
+          0.45,
+          -18
+        ],
+        "size": [
+          5,
+          0.9,
+          1.2
+        ],
+        "color": "#70563d",
+        "material": "wood",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "recorder",
+        "name": "GESTURE SEED · grip; trigger, move, trigger to replay",
+        "shape": "box",
+        "position": [
+          -1.5,
+          1.2,
+          -18
+        ],
+        "size": [
+          0.22,
+          0.3,
+          0.22
+        ],
+        "color": "#e3b45c",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.2
+            }
+          },
+          {
+            "type": "maker",
+            "version": 1,
+            "config": {
+              "mode": "record"
+            }
+          }
+        ]
+      },
+      {
+        "id": "joiner",
+        "name": "JOINER · grip; trigger two separate targets",
+        "shape": "box",
+        "position": [
+          0,
+          1.2,
+          -18
+        ],
+        "size": [
+          0.15,
+          0.5,
+          0.15
+        ],
+        "color": "#d39665",
+        "material": "iron",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "maker",
+            "version": 1,
+            "config": {
+              "mode": "join"
+            }
+          }
+        ]
+      },
+      {
+        "id": "paintbrush",
+        "name": "CLIMB BRUSH · grip; point and trigger",
+        "shape": "box",
+        "position": [
+          1.5,
+          1.2,
+          -18
+        ],
+        "size": [
+          0.15,
+          0.5,
+          0.15
+        ],
+        "color": "#75c4b2",
+        "material": "wood",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.2
+            }
+          },
+          {
+            "type": "maker",
+            "version": 1,
+            "config": {
+              "mode": "paint"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-block-a",
+        "name": "First joining block",
+        "shape": "box",
+        "position": [
+          -2,
+          0.5,
+          -22
+        ],
+        "size": [
+          0.7,
+          0.7,
+          0.7
+        ],
+        "color": "#a98054",
+        "material": "wood",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.5
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-block-b",
+        "name": "Second joining block",
+        "shape": "box",
+        "position": [
+          0,
+          0.5,
+          -22
+        ],
+        "size": [
+          0.7,
+          0.7,
+          0.7
+        ],
+        "color": "#cca877",
+        "material": "wood",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.5
+            }
+          }
+        ]
+      },
+      {
+        "id": "paint-wall",
+        "name": "Paint this wall to climb it",
+        "shape": "box",
+        "position": [
+          3,
+          1.5,
+          -22
+        ],
+        "size": [
+          3,
+          3,
+          0.5
+        ],
+        "color": "#8c9c91",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "maker-objective",
+        "name": "Give the wall a new purpose",
+        "shape": "box",
+        "position": [
+          3,
+          1,
+          -19
+        ],
+        "size": [
+          0.3,
+          0.8,
+          0.3
+        ],
+        "color": "#b8ab7b",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "painted",
+              "target": "paint-wall",
+              "count": 1
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-weakspot-yard",
+    "version": 1,
+    "name": "The Glass-Eye Practice Yard",
+    "kind": "device",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-weakspot-yard"
+    },
+    "provenance": {
+      "prompt": "A golden weak spot rewards precision. Grip the practice lance and trigger while pointing at the head or body. The head multiplies damage; the green switch repairs the target.",
+      "interpretation": "A golden weak spot rewards precision. Grip the practice lance and trigger while pointing at the head or body. The head multiplies damage; the green switch repairs the target.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "target-body",
+        "name": "Practice construct · ordinary damage",
+        "shape": "box",
+        "position": [
+          -19,
+          1,
+          21
+        ],
+        "size": [
+          0.8,
+          1.6,
+          0.5
+        ],
+        "color": "#71857e",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "material",
+            "version": 1,
+            "config": {
+              "hardness": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "target-head",
+        "name": "Golden eye · precision weak spot",
+        "shape": "sphere",
+        "position": [
+          -19,
+          2.1,
+          21
+        ],
+        "size": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "color": "#eec775",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "weakpoint",
+            "version": 1,
+            "config": {
+              "multiplier": 3
+            }
+          },
+          {
+            "type": "material",
+            "version": 1,
+            "config": {
+              "hardness": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "practice-lance",
+        "name": "GLASS EYE · grip, aim, trigger",
+        "shape": "box",
+        "position": [
+          -16,
+          1,
+          20
+        ],
+        "size": [
+          0.12,
+          0.6,
+          0.12
+        ],
+        "color": "#bfcfe0",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "transformer",
+            "version": 1,
+            "config": {
+              "operation": "cut",
+              "amount": 0.2
+            }
+          }
+        ]
+      },
+      {
+        "id": "repair-target",
+        "name": "TRIGGER · repair the target",
+        "shape": "box",
+        "position": [
+          -16,
+          1,
+          22
+        ],
+        "size": [
+          0.3,
+          0.5,
+          0.3
+        ],
+        "color": "#7abb9a",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "repair-target",
+        "actions": [
+          {
+            "op": "repair",
+            "target": "target-body",
+            "value": 100
+          },
+          {
+            "op": "repair",
+            "target": "target-head",
+            "value": 100
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-moon-gloves",
+    "version": 1,
+    "name": "Moonweaver Gloves",
+    "kind": "device",
+    "scope": {
+      "kind": "world",
+      "targetId": "player"
+    },
+    "provenance": {
+      "prompt": "Try a reversible turquoise hand appearance, slightly larger visual gloves and softer finger curl. This changes presentation and movement settings through a supported profile; tracked controller input stays intact.",
+      "interpretation": "Try a reversible turquoise hand appearance, slightly larger visual gloves and softer finger curl. This changes presentation and movement settings through a supported profile; tracked controller input stays intact.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "glove-totem",
+        "name": "Moonweaver glove profile · remove through the archive",
+        "shape": "box",
+        "position": [
+          4,
+          1,
+          0
+        ],
+        "size": [
+          0.4,
+          0.6,
+          0.4
+        ],
+        "color": "#78c8cb",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "embodiment",
+            "version": 1,
+            "config": {
+              "handColor": "#78c8cb",
+              "handScale": 1.05,
+              "fingerCurl": 0.9,
+              "moveSpeed": 2.0
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-lantern-seed",
+    "version": 1,
+    "name": "Lantern Seed · First Spark",
+    "kind": "item",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-lantern-seed"
+    },
+    "provenance": {
+      "prompt": "A small grabbable crystal lamp. Trigger it to kindle a glow. This first version remains in history when its next version becomes a companion.",
+      "interpretation": "A small grabbable crystal lamp. Trigger it to kindle a glow. This first version remains in history when its next version becomes a companion.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "seed",
+        "name": "LANTERN SEED · grip; trigger to light",
+        "shape": "box",
+        "position": [
+          1,
+          1.1,
+          4
+        ],
+        "size": [
+          0.3,
+          0.45,
+          0.3
+        ],
+        "color": "#a5c7b0",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "color": "#ffce83",
+              "power": 0
+            }
+          },
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "seed",
+        "actions": [
+          {
+            "op": "power",
+            "target": "seed",
+            "value": 8
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-lantern-seed",
+    "version": 2,
+    "name": "Lantern Seed · Little Companion",
+    "kind": "item",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-lantern-seed"
+    },
+    "provenance": {
+      "prompt": "Keep the first lantern's crystal identity and give its next version a friendly following behaviour. Trigger still lights it. The archive preserves the earlier version, and held copies defer replacement.",
+      "interpretation": "Keep the first lantern's crystal identity and give its next version a friendly following behaviour. Trigger still lights it. The archive preserves the earlier version, and held copies defer replacement.",
+      "origin": "demo",
+      "parentIds": [
+        "living-lantern-seed@1"
+      ]
+    },
+    "dependencies": [
+      {
+        "id": "living-climb-arena",
+        "version": 1
+      }
+    ],
+    "entities": [
+      {
+        "id": "seed",
+        "name": "LITTLE COMPANION · grip or let it follow",
+        "shape": "box",
+        "position": [
+          1,
+          1.1,
+          4
+        ],
+        "size": [
+          0.4,
+          0.55,
+          0.4
+        ],
+        "color": "#a5c7b0",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "color": "#ffce83",
+              "power": 0
+            }
+          },
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          },
+          {
+            "type": "creature",
+            "version": 1,
+            "config": {
+              "mode": "follow",
+              "speed": 0.7,
+              "radius": 10
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "seed",
+        "actions": [
+          {
+            "op": "power",
+            "target": "seed",
+            "value": 8
+          }
+        ]
+      }
+    ],
+    "region": {
+      "origin": [
+        120,
+        0,
+        0
+      ],
+      "spawn": [
+        120,
+        0,
+        0
+      ],
+      "size": [
+        64,
+        18,
+        64
+      ]
+    }
+  },
+  {
+    "schema": 1,
+    "id": "living-unfinished-lullaby",
+    "version": 1,
+    "name": "The Unfinished Lullaby",
+    "kind": "region",
+    "scope": {
+      "kind": "region",
+      "targetId": "living-unfinished-lullaby"
+    },
+    "provenance": {
+      "prompt": "A small garden of three sleeping buds, awakened by light, warmth and a song. Let any supported invention supply the outcome; lend three simple starter objects. Complete each different wonder once to raise a turning copper chorus.",
+      "interpretation": "A data-only sensory puzzle using light, heat and sound sensors, movable starter sources, one-shot objectives and bounded declarative rules. Nearby supported Living stimuli can come from other packages. No microphone or arbitrary object sensing.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [],
+    "region": {
+      "origin": [
+        120,
+        0,
+        -90
+      ],
+      "spawn": [
+        120,
+        0,
+        -84
+      ],
+      "size": [
+        20,
+        6,
+        18
+      ]
+    },
+    "entities": [
+      {
+        "id": "garden-floor",
+        "name": "The Unfinished Lullaby",
+        "shape": "box",
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "size": [
+          20,
+          0.4,
+          18
+        ],
+        "color": "#788d7a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "west-rail",
+        "name": "Garden edge",
+        "shape": "box",
+        "position": [
+          -9.7,
+          0.45,
+          0
+        ],
+        "size": [
+          0.25,
+          0.9,
+          18
+        ],
+        "color": "#697970",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "east-rail",
+        "name": "Garden edge",
+        "shape": "box",
+        "position": [
+          9.7,
+          0.45,
+          0
+        ],
+        "size": [
+          0.25,
+          0.9,
+          18
+        ],
+        "color": "#697970",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "north-rail",
+        "name": "Garden edge",
+        "shape": "box",
+        "position": [
+          0,
+          0.45,
+          -8.7
+        ],
+        "size": [
+          19.4,
+          0.9,
+          0.25
+        ],
+        "color": "#697970",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "south-rail",
+        "name": "Garden edge",
+        "shape": "box",
+        "position": [
+          0,
+          0.45,
+          8.7
+        ],
+        "size": [
+          19.4,
+          0.9,
+          0.25
+        ],
+        "color": "#697970",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "welcome",
+        "name": "Three sleeping buds. Bring LIGHT, WARMTH and a SONG. Any invention may help.",
+        "shape": "box",
+        "position": [
+          0,
+          1.15,
+          4.4
+        ],
+        "size": [
+          2.3,
+          0.6,
+          0.18
+        ],
+        "color": "#506d68",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      },
+      {
+        "id": "return-gate",
+        "name": "BACK TO BRANN",
+        "shape": "box",
+        "position": [
+          7.3,
+          1.2,
+          6
+        ],
+        "size": [
+          1.4,
+          2.4,
+          0.12
+        ],
+        "color": "#8ac8b1",
+        "material": "stone",
+        "static": true,
+        "components": [
+          {
+            "type": "portal",
+            "version": 1,
+            "config": {
+              "destination": [
+                9,
+                0,
+                2
+              ],
+              "radius": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "starter-table",
+        "name": "Borrow a glow pebble, a warm pebble or the handbell.",
+        "shape": "box",
+        "position": [
+          0,
+          0.65,
+          2.6
+        ],
+        "size": [
+          5.6,
+          0.3,
+          1.3
+        ],
+        "color": "#8c7559",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "glow-pebble",
+        "name": "Glow Pebble - carry light to a sleeping bud",
+        "shape": "sphere",
+        "position": [
+          -1.8,
+          1.04,
+          2.6
+        ],
+        "size": [
+          0.34,
+          0.34,
+          0.34
+        ],
+        "color": "#d4f7a5",
+        "material": "crystal",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "emitter",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "strength": 4,
+              "interval": 0.6
+            }
+          }
+        ]
+      },
+      {
+        "id": "warm-pebble",
+        "name": "Warm Pebble - carry gentle warmth close to a bud",
+        "shape": "sphere",
+        "position": [
+          0,
+          1.04,
+          2.6
+        ],
+        "size": [
+          0.34,
+          0.34,
+          0.34
+        ],
+        "color": "#ffb378",
+        "material": "stone",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.4
+            }
+          },
+          {
+            "type": "emitter",
+            "version": 1,
+            "config": {
+              "kind": "heat",
+              "strength": 12,
+              "interval": 0.6
+            }
+          },
+          {
+            "type": "material",
+            "version": 1,
+            "config": {
+              "ignition": 1000,
+              "hardness": 50
+            }
+          }
+        ]
+      },
+      {
+        "id": "handbell",
+        "name": "Handbell - grip, bring near a bud, then trigger to ring",
+        "shape": "cylinder",
+        "position": [
+          1.8,
+          1.02,
+          2.6
+        ],
+        "size": [
+          0.32,
+          0.42,
+          0.32
+        ],
+        "color": "#e6c981",
+        "material": "iron",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.3
+            }
+          },
+          {
+            "type": "trigger",
+            "version": 1,
+            "config": {
+              "event": "triggered"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chorus",
+        "name": "The Unfinished Lullaby - three different wonders awaken the chorus",
+        "shape": "sphere",
+        "position": [
+          0,
+          1.1,
+          -5.7
+        ],
+        "size": [
+          0.72,
+          0.72,
+          0.72
+        ],
+        "color": "#8a9e9a",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "signal:three_wonders",
+              "target": "chorus",
+              "count": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "crown",
+        "name": "A chorus of small inventions",
+        "shape": "box",
+        "position": [
+          0,
+          2.1,
+          -5.7
+        ],
+        "size": [
+          1.8,
+          0.25,
+          0.6
+        ],
+        "color": "#b6945a",
+        "material": "iron",
+        "static": true,
+        "components": [
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "motor",
+              "power": 0
+            }
+          }
+        ]
+      },
+      {
+        "id": "crown-light",
+        "name": "Light earned by three different wonders",
+        "shape": "sphere",
+        "position": [
+          0,
+          2.42,
+          -5.7
+        ],
+        "size": [
+          0.4,
+          0.4,
+          0.4
+        ],
+        "color": "#8b9ca3",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "power": 0,
+              "color": "#ffeab0"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sun-pedestal",
+        "name": "A nest for a sleeping bud",
+        "shape": "cylinder",
+        "position": [
+          -5,
+          0.38,
+          -2
+        ],
+        "size": [
+          1.25,
+          0.76,
+          1.25
+        ],
+        "color": "#879480",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "sun-bud",
+        "name": "LIGHT wanted - bring any source close enough",
+        "shape": "sphere",
+        "position": [
+          -5,
+          1.25,
+          -2
+        ],
+        "size": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "color": "#b9d598",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "sensor",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "radius": 1.8,
+              "threshold": 1
+            }
+          },
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "sensed",
+              "target": "sun-bud",
+              "count": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "sun-petal-left",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          -5.52,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "sun-petal-right",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          -4.48,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "hearth-pedestal",
+        "name": "A nest for a sleeping bud",
+        "shape": "cylinder",
+        "position": [
+          0,
+          0.38,
+          -2
+        ],
+        "size": [
+          1.25,
+          0.76,
+          1.25
+        ],
+        "color": "#879480",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "hearth-bud",
+        "name": "WARMTH wanted - bring any source close enough",
+        "shape": "sphere",
+        "position": [
+          0,
+          1.25,
+          -2
+        ],
+        "size": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "color": "#dea97c",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "sensor",
+            "version": 1,
+            "config": {
+              "kind": "heat",
+              "radius": 1.8,
+              "threshold": 1
+            }
+          },
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "sensed",
+              "target": "hearth-bud",
+              "count": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "hearth-petal-left",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          -0.52,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "hearth-petal-right",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          0.52,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "song-pedestal",
+        "name": "A nest for a sleeping bud",
+        "shape": "cylinder",
+        "position": [
+          5,
+          0.38,
+          -2
+        ],
+        "size": [
+          1.25,
+          0.76,
+          1.25
+        ],
+        "color": "#879480",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "song-bud",
+        "name": "SOUND wanted - bring any source close enough",
+        "shape": "sphere",
+        "position": [
+          5,
+          1.25,
+          -2
+        ],
+        "size": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "color": "#a69fd2",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "sensor",
+            "version": 1,
+            "config": {
+              "kind": "sound",
+              "radius": 1.8,
+              "threshold": 1
+            }
+          },
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "sensed",
+              "target": "song-bud",
+              "count": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "song-petal-left",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          4.48,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "song-petal-right",
+        "name": "A copper leaf",
+        "shape": "box",
+        "position": [
+          5.52,
+          1.04,
+          -2
+        ],
+        "size": [
+          0.42,
+          0.16,
+          0.72
+        ],
+        "color": "#9c926a",
+        "material": "stone",
+        "static": true,
+        "components": []
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "triggered",
+        "target": "handbell",
+        "actions": [
+          {
+            "op": "emit",
+            "target": "handbell",
+            "signal": "sound",
+            "value": 6
+          }
+        ]
+      },
+      {
+        "event": "objective_complete",
+        "target": "sun-bud",
+        "actions": [
+          {
+            "op": "objective",
+            "target": "chorus",
+            "value": 1
+          },
+          {
+            "op": "move",
+            "target": "sun-petal-left",
+            "vector": [
+              -0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "move",
+            "target": "sun-petal-right",
+            "vector": [
+              0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "set_color",
+            "target": "sun-petal-left",
+            "color": "#b9d598"
+          },
+          {
+            "op": "set_color",
+            "target": "sun-petal-right",
+            "color": "#b9d598"
+          }
+        ]
+      },
+      {
+        "event": "objective_complete",
+        "target": "hearth-bud",
+        "actions": [
+          {
+            "op": "objective",
+            "target": "chorus",
+            "value": 1
+          },
+          {
+            "op": "move",
+            "target": "hearth-petal-left",
+            "vector": [
+              -0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "move",
+            "target": "hearth-petal-right",
+            "vector": [
+              0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "set_color",
+            "target": "hearth-petal-left",
+            "color": "#dea97c"
+          },
+          {
+            "op": "set_color",
+            "target": "hearth-petal-right",
+            "color": "#dea97c"
+          }
+        ]
+      },
+      {
+        "event": "objective_complete",
+        "target": "song-bud",
+        "actions": [
+          {
+            "op": "objective",
+            "target": "chorus",
+            "value": 1
+          },
+          {
+            "op": "move",
+            "target": "song-petal-left",
+            "vector": [
+              -0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "move",
+            "target": "song-petal-right",
+            "vector": [
+              0.2,
+              0.35,
+              0
+            ]
+          },
+          {
+            "op": "set_color",
+            "target": "song-petal-left",
+            "color": "#a69fd2"
+          },
+          {
+            "op": "set_color",
+            "target": "song-petal-right",
+            "color": "#a69fd2"
+          }
+        ]
+      },
+      {
+        "event": "objective_complete",
+        "target": "chorus",
+        "actions": [
+          {
+            "op": "power",
+            "target": "crown",
+            "value": 1.4
+          },
+          {
+            "op": "power",
+            "target": "crown-light",
+            "value": 2
+          },
+          {
+            "op": "move",
+            "target": "crown",
+            "vector": [
+              0,
+              0.5,
+              0
+            ]
+          },
+          {
+            "op": "move",
+            "target": "crown-light",
+            "vector": [
+              0,
+              0.5,
+              0
+            ]
+          },
+          {
+            "op": "set_color",
+            "target": "crown",
+            "color": "#f4ca78"
+          },
+          {
+            "op": "emit",
+            "target": "chorus",
+            "signal": "sound",
+            "value": 4
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "schema": 1,
+    "id": "demo-ember-return",
+    "version": 1,
+    "name": "Cinderloop · a ring that remembers",
+    "kind": "item",
+    "scope": {
+      "kind": "design",
+      "targetId": "demo-ember-return"
+    },
+    "provenance": {
+      "prompt": "Make me a palm-sized wooden ring with glowing ember inlays that I can throw and recall with an empty-hand trigger. Let its impacts light its own little practice lantern.",
+      "interpretation": "One package-owned grabbable ring with bounded returning_projectile motion; projectile_hit illuminates only this package's lantern.",
+      "origin": "demo",
+      "parentIds": []
+    },
+    "dependencies": [],
+    "entities": [
+      {
+        "id": "stand",
+        "name": "Cinderloop stand",
+        "shape": "cylinder",
+        "position": [
+          -3,
+          0.5,
+          7
+        ],
+        "size": [
+          0.65,
+          1,
+          0.65
+        ],
+        "color": "#6b5543",
+        "material": "stone",
+        "static": true,
+        "components": []
+      },
+      {
+        "id": "ring",
+        "name": "Cinderloop",
+        "shape": "cylinder",
+        "position": [
+          -3,
+          1.12,
+          7
+        ],
+        "size": [
+          0.32,
+          0.08,
+          0.32
+        ],
+        "color": "#ed9c52",
+        "material": "wood",
+        "static": false,
+        "components": [
+          {
+            "type": "grabbable",
+            "version": 1,
+            "config": {
+              "mass": 0.18
+            }
+          },
+          {
+            "type": "returning_projectile",
+            "version": 1,
+            "config": {
+              "speed": 8,
+              "gravity": 0.8,
+              "returnSpeed": 12,
+              "returnAfter": 3,
+              "collision": "return",
+              "restitution": 0.5,
+              "hitEvent": "signal:ring_chime",
+              "appearance": "ember_ring"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lantern",
+        "name": "Cinderloop's impact lantern",
+        "shape": "sphere",
+        "position": [
+          -3,
+          1.75,
+          4.5
+        ],
+        "size": [
+          0.38,
+          0.38,
+          0.38
+        ],
+        "color": "#b97e55",
+        "material": "crystal",
+        "static": true,
+        "components": [
+          {
+            "type": "receiver",
+            "version": 1,
+            "config": {
+              "kind": "light",
+              "power": 0
+            }
+          },
+          {
+            "type": "objective",
+            "version": 1,
+            "config": {
+              "event": "projectile_hit",
+              "target": "ring",
+              "count": 3
+            }
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "rules": [
+      {
+        "event": "projectile_hit",
+        "target": "ring",
+        "actions": [
+          {
+            "op": "power",
+            "target": "lantern",
+            "value": 2
+          },
+          {
+            "op": "set_color",
+            "target": "lantern",
+            "color": "#ffca72"
+          }
+        ]
+      },
+      {
+        "event": "projectile_caught",
+        "target": "ring",
+        "actions": [
+          {
+            "op": "emit",
+            "target": "lantern",
+            "signal": "sound",
+            "value": 1
+          }
+        ]
+      }
+    ]
+  }
+]

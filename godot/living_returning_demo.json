@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "demo-ember-return",
+  "version": 1,
+  "name": "Cinderloop · a ring that remembers",
+  "kind": "item",
+  "scope": {"kind": "design", "targetId": "demo-ember-return"},
+  "provenance": {
+    "prompt": "Make me a palm-sized wooden ring with glowing ember inlays that I can throw and recall with an empty-hand trigger. Let its impacts light its own little practice lantern.",
+    "interpretation": "One package-owned grabbable ring with bounded returning_projectile motion; projectile_hit illuminates only this package's lantern.",
+    "origin": "demo",
+    "parentIds": []
+  },
+  "dependencies": [],
+  "entities": [
+    {"id":"stand","name":"Cinderloop stand","shape":"cylinder","position":[-3,0.5,7],"size":[0.65,1,0.65],"color":"#6b5543","material":"stone","static":true,"components":[]},
+    {"id":"ring","name":"Cinderloop","shape":"cylinder","position":[-3,1.12,7],"size":[0.32,0.08,0.32],"color":"#ed9c52","material":"wood","static":false,"components":[
+      {"type":"grabbable","version":1,"config":{"mass":0.18}},
+      {"type":"returning_projectile","version":1,"config":{"speed":8,"gravity":0.8,"returnSpeed":12,"returnAfter":3,"collision":"return","restitution":0.5,"hitEvent":"signal:ring_chime","appearance":"ember_ring"}}
+    ]},
+    {"id":"lantern","name":"Cinderloop's impact lantern","shape":"sphere","position":[-3,1.75,4.5],"size":[0.38,0.38,0.38],"color":"#b97e55","material":"crystal","static":true,"components":[{"type":"receiver","version":1,"config":{"kind":"light","power":0}},{"type":"objective","version":1,"config":{"event":"projectile_hit","target":"ring","count":3}}]}
+  ],
+  "links": [],
+  "rules": [
+    {"event":"projectile_hit","target":"ring","actions":[{"op":"power","target":"lantern","value":2},{"op":"set_color","target":"lantern","color":"#ffca72"}]},
+    {"event":"projectile_caught","target":"ring","actions":[{"op":"emit","target":"lantern","signal":"sound","value":1}]}
+  ]
+}

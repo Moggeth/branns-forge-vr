@@ -1,0 +1,167 @@
+{
+  "variant": "cinderkeep",
+  "title": "Cinderkeep",
+  "zone": "Ember Foundry",
+  "files": {
+    "blend": "assets/cinderkeep/cinderkeep.blend",
+    "character_glb": "assets/cinderkeep/cinderkeep_guardian.glb",
+    "shield_glb": "assets/cinderkeep/cinderkeep_shield.glb",
+    "builder": "builder/build_guardian.py",
+    "renders": [
+      "assets/cinderkeep/renders/cinderkeep_front.png",
+      "assets/cinderkeep/renders/cinderkeep_side.png",
+      "assets/cinderkeep/renders/cinderkeep_back.png",
+      "assets/cinderkeep/renders/cinderkeep_hero.png",
+      "assets/cinderkeep/renders/cinderkeep_shield_rear.png"
+    ]
+  },
+  "axes": "Godot: +Y up, +Z forward, +X right; toes at y=0",
+  "height_m": 1.574,
+  "groups": {
+    "Head": {
+      "origin": [
+        0.0,
+        1.3266,
+        -0.0368
+      ],
+      "triangles": 1784,
+      "materials": [
+        "Bone_Ivory",
+        "Bone_Socket"
+      ]
+    },
+    "Torso": {
+      "origin": [
+        0.0,
+        0.8574,
+        -0.0276
+      ],
+      "triangles": 3144,
+      "materials": [
+        "Bone_Ivory",
+        "Cinderkeep_Leather",
+        "Cinderkeep_Cloth",
+        "Cinderkeep_Studs"
+      ]
+    },
+    "LeftArm": {
+      "origin": [
+        -0.236,
+        1.2622,
+        -0.0
+      ],
+      "triangles": 1536,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "RightArm": {
+      "origin": [
+        0.236,
+        1.2622,
+        -0.0
+      ],
+      "triangles": 1416,
+      "materials": [
+        "Bone_Ivory"
+      ]
+    },
+    "LeftLeg": {
+      "origin": [
+        -0.1363,
+        0.7378,
+        -0.0
+      ],
+      "triangles": 2388,
+      "materials": [
+        "Bone_Ivory",
+        "Cinderkeep_Studs"
+      ]
+    },
+    "RightLeg": {
+      "origin": [
+        0.1363,
+        0.7378,
+        -0.0
+      ],
+      "triangles": 2388,
+      "materials": [
+        "Bone_Ivory",
+        "Cinderkeep_Studs"
+      ]
+    },
+    "Shield": {
+      "origin": [
+        -0.4476,
+        0.793,
+        0.1623
+      ],
+      "triangles": 4044,
+      "materials": [
+        "Cinderkeep_ShieldCore",
+        "Cinderkeep_ShieldFace",
+        "Cinderkeep_ShieldRim",
+        "Cinderkeep_Studs",
+        "Cinderkeep_Emblem",
+        "Cinder_VentGlow",
+        "Cinder_HeatPlate",
+        "Iron_Bracket",
+        "Grip_Leather"
+      ]
+    }
+  },
+  "triangles_total": 16700,
+  "materials_total": 13,
+  "shield_prop": {
+    "mesh": "CinderkeepShield",
+    "origin": "central hand grip",
+    "triangles": 4044,
+    "forward_normal": [
+      0,
+      0,
+      1
+    ],
+    "central_grip": [
+      0,
+      0,
+      0
+    ],
+    "central_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "rim_grip": [
+      0.2438,
+      0.0,
+      -0.0046
+    ],
+    "rim_grip_axis": [
+      0,
+      1,
+      0
+    ],
+    "item_tip": [
+      0.0,
+      0.4784,
+      0.0874
+    ],
+    "broad_phase_box": {
+      "center": [
+        -0.0177,
+        0.0,
+        0.0635
+      ],
+      "size": [
+        0.7438,
+        0.9568,
+        0.1766
+      ]
+    },
+    "character_grip_position": [
+      -0.4476,
+      0.793,
+      0.1623
+    ]
+  }
+}
