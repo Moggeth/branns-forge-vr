@@ -42,8 +42,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	var center:Vector3=zone.center
 	var rng:=RandomNumberGenerator.new()
 	rng.seed=SEED
-	for i in range(TRAIL.size()-1):
-		w.path(p,TRAIL[i],TRAIL[i+1],"bdab80" if i%2 else "c9b98e")
+	Art.trail(p,TRAIL,w)
 	for plot_index in range(PLOTS.size()):
 		var plot:Dictionary=PLOTS[plot_index]
 		var place:=Node3D.new()

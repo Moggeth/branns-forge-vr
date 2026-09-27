@@ -1,5 +1,6 @@
 extends RefCounted
 const TreeAdapter = preload("res://tree_adapter.gd")
+const OrchardArt = preload("res://orchard_art.gd")
 ## The outer ring is kept separate from the original eight authored zones.
 ## Every reward uses the existing harvesting/loot contract, and each return
 ## portal points to its parent region. Geometry is batched by WorldZones.
@@ -26,7 +27,7 @@ static func orchard(root:Node3D,data:Dictionary,w:Script)->void:
 		var a=TAU*float(i)/10.0
 		w.tree(p,Vector3(cos(a)*22,0,sin(a)*21),6.0+float(i%3)*0.8,true)
 	for i in range(7): w.flowers(p,Vector3(-15+i*5,0,8-i%3*5),22,2.0,"fff0cf")
-	w.path(p,Vector3(0,0,21),Vector3(0,0,-20),"ddc394")
+	OrchardArt.trail(p,[Vector3(0,0,21),Vector3(0,0,-20)],w)
 	for i in range(5):
 		# Keep the path clear until the actual fallen-gate chopping challenge.
 		var v=Vector3(-18+i*9+(4 if i==2 else 0),0,-4.5-(i%2)*9)
@@ -48,10 +49,7 @@ static func orchard(root:Node3D,data:Dictionary,w:Script)->void:
 static func _windfall_meadow(root:Node3D,data:Dictionary,w:Script,p:Node3D,c:Vector3)->void:
 	# A deliberately open, much larger combat/throwing loop beyond the original
 	# orchard. Repeated assets are batched by WorldZones at the end of build.
-	w.path(p,Vector3(0,0,-20),Vector3(0,0,-38),"c9ba8e")
-	w.path(p,Vector3(0,0,-37),Vector3(32,0,-31),"c9ba8e")
-	w.path(p,Vector3(32,0,-31),Vector3(33,0,14),"c9ba8e")
-	w.path(p,Vector3(33,0,14),Vector3(15,0,22),"c9ba8e")
+	OrchardArt.trail(p,[Vector3(0,0,-20),Vector3(0,0,-38),Vector3(32,0,-31),Vector3(33,0,14),Vector3(15,0,22)],w)
 	for i in range(38):
 		var angle=float(i)*2.399963
 		var radial=29.0+float(i%6)*2.4

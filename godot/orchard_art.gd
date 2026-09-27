@@ -3,8 +3,11 @@ extends RefCounted
 ## and chunked so the same registry can dress later generated landscapes.
 const TreeKit = preload("res://tree_kit.gd")
 const PATH := "res://assets/orchard/"
-const ASSETS := ["apple_tree_mature","apple_tree_young","hedge_dense","shrub_flowering",
-	"rock_mossy","rubble_split","wall_straight","wall_broken","path_dirt","mountain_cliff"]
+const ASSETS := ["apple_tree_mature","apple_tree_mature_b","apple_tree_mature_autumn",
+	"apple_tree_young","apple_tree_young_autumn","apple_stump","hedge_dense",
+	"shrub_flowering","rock_mossy","rock_mossy_small","rubble_split",
+	"wall_straight","wall_corner_broken","wall_end_broken","path_straight",
+	"path_curve30","mountain_cliff_chunk","mountain_peak_snow"]
 const CHUNK := 40.0
 static var _cache:Dictionary={}
 
@@ -66,16 +69,35 @@ static func _pose(at:Vector3,scale:float,yaw:float)->Dictionary:
 	return {"at":at,"scale":scale,"yaw":yaw}
 
 static func grove(root:Node3D,placements:Array)->void:
-	var authored:Dictionary={"apple_tree_mature":[],"apple_tree_young":[]}
+	var authored:Dictionary={"apple_tree_mature":[],"apple_tree_mature_b":[],"apple_tree_mature_autumn":[],"apple_tree_young":[]}
 	var fallback:Array=[]
 	for tree in placements:
-		var id:String="apple_tree_young" if int(tree.seed)%5==0 else "apple_tree_mature"
+		var id:String="apple_tree_young" if int(tree.seed)%7==0 else ("apple_tree_mature_autumn" if int(tree.seed)%13==0 else ("apple_tree_mature_b" if int(tree.seed)%3==0 else "apple_tree_mature"))
 		if tree.species=="apple" and available(id):
 			authored[id].append(_pose(tree.position,tree.scale,float(tree.seed%628)/100.0))
 		else: fallback.append(tree)
 	for id in authored: _emit(root,id,authored[id])
 	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false}))
-	print("ORCHARD_ART authored_trees=",authored.apple_tree_mature.size()+authored.apple_tree_young.size()," fallback_trees=",fallback.size())
+	var authored_count:=0
+	for id in authored: authored_count+=authored[id].size()
+	print("ORCHARD_ART authored_trees=",authored_count," fallback_trees=",fallback.size())
+
+static func trail(root:Node3D,points:Array,w:Script)->void:
+	if not available("path_straight"):
+		for i in range(points.size()-1): w.path(root,points[i],points[i+1],"bdab80" if i%2 else "c9b98e")
+		return
+	var poses:Array=[]
+	for i in range(points.size()-1):
+		var a:Vector3=points[i]
+		var b:Vector3=points[i+1]
+		var segment:Vector3=b-a
+		var distance:float=segment.length()
+		var direction:Vector3=segment/distance
+		var yaw:float=atan2(direction.x,direction.z)
+		for j in range(ceili(distance/3.8)):
+			var t:float=(float(j)+0.5)/float(ceili(distance/3.8))
+			poses.append(_pose(a.lerp(b,t)+Vector3.UP*0.025,1.0,yaw))
+	_emit(root,"path_straight",poses)
 
 static func _near_path(point:Vector3,trail:Array)->bool:
 	for i in range(trail.size()-1):
@@ -121,13 +143,17 @@ static func place_features(root:Node3D,trail:Array,plots:Array,seed:int)->void:
 		if plot.kind in ["stone","ruin"]:
 			for j in range(4):
 				var at:Vector3=plot.at+Vector3(-13+j*8,0,12)
-				var id:String="wall_broken" if j==3 else "wall_straight"
+				var id:String="wall_end_broken" if j==3 else "wall_straight"
 				if available(id):
 					placements[id].append(_pose(at,1.0,0.0))
-					_collider(root,at,5.0,2.0,0.75,0.0)
-	for i in range(16):
-		var a:float=TAU*float(i)/16.0
-		var at:=Vector3(cos(a)*153,0,sin(a)*153)
-		if available("mountain_cliff"): placements.mountain_cliff.append(_pose(at,1.1,a+PI*0.5))
+					_collider(root,at,3.9,1.35,0.65,0.0)
+	for i in range(8):
+		var a:float=TAU*float(i)/8.0
+		var at:=Vector3(cos(a)*226,0,sin(a)*226)
+		if available("mountain_cliff_chunk"): placements.mountain_cliff_chunk.append(_pose(at,1.0,a+PI*0.5))
+	for i in range(3):
+		var a:float=TAU*float(i)/3.0+0.4
+		var at:=Vector3(cos(a)*395,0,sin(a)*395)
+		if available("mountain_peak_snow"): placements.mountain_peak_snow.append(_pose(at,1.0,a+PI*0.5))
 	for id in ASSETS: _emit(root,id,placements[id])
 	root.set_meta("orchard_art_library",ASSETS)
