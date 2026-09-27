@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const workshop = require('./workshop-ledger');
 const quests=require('./quests');
 const playful=require('./playful-context');
+const challengeContext=require('./challenge-context');
 const supplies=require('./supplies'); const profiles=require('./interaction-profiles');
 const {RESOURCES,TOOLS,UPGRADES,policy}=require('./progression');
 const VOICES = ['vesper','ripple','stone','meridian','cinder','marin','willow','quartz'];
@@ -22,12 +23,12 @@ class World {
     this.player.deliveries??=[];
     if(!Array.isArray(this.player.deliveries)||this.player.deliveries.some(d=>!d||typeof d.id!=='string'||!TOOLS.some(t=>t.id===d.toolId)||!['pending','delivered'].includes(d.status)))throw Error('Invalid saved delivery queue.');
     workshop.init(this); supplies.ensure(this); quests.ensure(this);
-    this.context = {position:{x:0,y:0,z:0},zone:'forge_yard',health:100,maxHealth:100,visiting:false,targets:[],equipped:'',controllers:[],interaction:null}; this.seen = 0;
+    this.context = {position:{x:0,y:0,z:0},zone:'forge_yard',health:100,maxHealth:100,visiting:false,targets:[],equipped:'',controllers:[],interaction:null,worldChallenges:[]}; this.seen = 0;
     this.voice = {enabled:true,voice:'vesper',revision:0}; this.cooldowns = new Map();
   }
   save() {this.player.resources.rat_tail=this.player.tails;fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.player,null,2));fs.renameSync(this.file+'.tmp',this.file);}
   visiting() {return this.context.visiting && Date.now()-this.seen < 5000;}
-  updateContext(value) {this.context={position:point(value.position),zone:typeof value.zone==='string'?identifier(value.zone):this.context.zone,health:Number.isFinite(value.health)?Math.max(0,Math.min(100,value.health)):(this.context.health??100),maxHealth:100,visiting:value.visiting===true,targets:targets(value.targets),equipped:typeof value.equipped==='string'?value.equipped.slice(0,80):'',controllers:controllers(value.controllers),interactionProfilesApplied:Object.fromEntries(Object.entries(value.interactionProfilesApplied||{}).slice(0,100).filter(([id,revision])=>/^[a-zA-Z0-9_.:-]{1,100}$/.test(id)&&Number.isSafeInteger(revision)&&revision>=0)),interaction:interaction(value.interaction),playful:playful.normalize(value.playful),presence:{distance:Number.isFinite(value.presence?.distance)?Math.max(0,Math.min(1000,value.presence.distance)):0,phase:["near","leaving","away"].includes(value.presence?.phase)?value.presence.phase:"away"}};this.seen=Date.now();return {ok:true};}
+  updateContext(value) {this.context={position:point(value.position),zone:typeof value.zone==='string'?identifier(value.zone):this.context.zone,health:Number.isFinite(value.health)?Math.max(0,Math.min(100,value.health)):(this.context.health??100),maxHealth:100,visiting:value.visiting===true,targets:targets(value.targets),equipped:typeof value.equipped==='string'?value.equipped.slice(0,80):'',controllers:controllers(value.controllers),interactionProfilesApplied:Object.fromEntries(Object.entries(value.interactionProfilesApplied||{}).slice(0,100).filter(([id,revision])=>/^[a-zA-Z0-9_.:-]{1,100}$/.test(id)&&Number.isSafeInteger(revision)&&revision>=0)),interaction:interaction(value.interaction),playful:playful.normalize(value.playful),worldChallenges:challengeContext.normalize(value.worldChallenges),presence:{distance:Number.isFinite(value.presence?.distance)?Math.max(0,Math.min(1000,value.presence.distance)):0,phase:["near","leaving","away"].includes(value.presence?.phase)?value.presence.phase:"away"}};this.seen=Date.now();return {ok:true};}
   kill(id) {id=identifier(id);if(!this.player.killed.includes(id)){if(this.player.killed.length>=20000)throw Error('Hunt ledger is full; archive player state before a new hunt.');this.player.killed.push(id);this.save();}return {ok:true};}
   tail(id) {id=identifier(id);if(!this.player.killed.includes(id))throw Error('This tail has not dropped from your hunt.');if(!this.player.collected.includes(id)){this.player.collected.push(id);this.player.tails++;this.save();this.log('TAIL collected',id);}return {tails:this.player.tails};}
   handin() {if(!this.visiting())throw Error('Bring your tails to Brann.');if(this.player.tails<5)throw Error('Five collected tails are required.');this.player.tails-=5;this.player.favours++;this.save();this.log('BOUNTY hand-in');return {tails:this.player.tails,favours:this.player.favours};}

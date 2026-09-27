@@ -1497,7 +1497,7 @@ func _send_context():
 	if not held.is_empty(): id = held.values()[0].get_meta("id", "starter_hammer")
 	var controllers = []
 	for hand in hands: controllers.append({"hand":"left" if str(hand.tracker).begins_with("left") else "right","profile":"OpenXR","haptics":true,"tracked":hand.get_is_active()})
-	await _request("/api/vr/context", {"position":_vec(camera.global_position),"visiting":visiting,"equipped":id,"targets":_targets(),"zone":adventure.zone,"controllers":controllers,"interactionProfilesApplied":siegebird.extras.applied_versions,"interaction":adventure.last_interaction,"health":adventure.hp,"playful":_playful_context(),"presence":{"distance":presence.distance if presence!=null else 0.0,"phase":presence.phase if presence!=null else "away"}})
+	await _request("/api/vr/context", {"position":_vec(camera.global_position),"visiting":visiting,"equipped":id,"targets":_targets(),"zone":adventure.zone,"controllers":controllers,"interactionProfilesApplied":siegebird.extras.applied_versions,"interaction":adventure.last_interaction,"health":adventure.hp,"playful":_playful_context(),"worldChallenges":[adventure.hollow.context()] if adventure.hollow != null else [],"presence":{"distance":presence.distance if presence!=null else 0.0,"phase":presence.phase if presence!=null else "away"}})
 	context_busy = false
 
 func _poll():

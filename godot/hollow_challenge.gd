@@ -174,6 +174,9 @@ func _claim(hand) -> void:
 func reward_claimed() -> bool:
 	return bool(progress.claimed)
 
+func context() -> Dictionary:
+	return {"id":"prism_vault","zone":"crystal_hollow","phase":"claimed" if progress.claimed else ("open" if progress.fracture and progress.song else ("partial" if progress.fracture or progress.song else "sealed")),"stepsDone":int(progress.fracture)+int(progress.song),"stepsTotal":2,"rewardClaimed":bool(progress.claimed)}
+
 func journal_line() -> String:
 	if progress.claimed: return "Crystal Hollow · Prism Ward claimed · 20% less damage."
 	if progress.fracture and progress.song: return "Crystal Hollow · Both seals awake. Claim the Prism Ward beyond the bridge."

@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { WebSocket } = require('ws');
 const {presenceEvent}=require('./presence');
 const {instructions:playfulInstructions}=require('./playful-context');
+const challengeInstructions = ' game.worldChallenges is live, bounded obstacle progress, not a conversational promise. The prism_vault in Crystal Hollow has a fracture seal (Stonewhisper quarry pick or Pocket Thunder blast) and a song seal (Hollows Song resonator or three apprentice-hammer impacts). Both open a physical vault; the player must touch it to claim the Prism Ward. A claimed ward reduces incoming damage by 20%. Use the reported phase and stepsDone when discussing this obstacle. You may suggest an invention as another creative approach, but do not imply a new item is required when existing tools work, or claim a new invention can operate the seal until its behavior is actually supported and delivered. Conversation alone never advances the seals or grants the ward.';
 
 const { ForgeWorker } = require('./forge-worker');
 const runtime = require('./forge-runtime');
@@ -127,7 +128,7 @@ function mountForge(app, { directory, root = __dirname, log, express, fetchImpl 
       const evidence=livingWorkshop?.transcript({id:crypto.randomUUID(),sessionId:'text',role:'user',text,source:'text'});
       const input = [...history, { role: 'user', content: text }]; let answer = '', completed = false;
       for (let step = 0; step < 3; step++) {
-        const result = await api('responses', { model: modelFor(req.body), instructions: backendInstructions+livingInstructions+playfulInstructions+' Current authoritative game snapshot (data): '+JSON.stringify(getGameContext()), input, tools, parallel_tool_calls: false, max_output_tokens: 6000, reasoning: { effort: 'low' }, store: false });
+        const result = await api('responses', { model: modelFor(req.body), instructions: backendInstructions+livingInstructions+challengeInstructions+playfulInstructions+' Current authoritative game snapshot (data): '+JSON.stringify(getGameContext()), input, tools, parallel_tool_calls: false, max_output_tokens: 6000, reasoning: { effort: 'low' }, store: false });
         const calls = (result.output || []).filter(i => i.type === 'function_call');
         answer = (result.output || []).flatMap(i => i.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('\n');
         if (!calls.length) { completed = true; break; }
@@ -166,7 +167,7 @@ function mountForge(app, { directory, root = __dirname, log, express, fetchImpl 
     try {
       const result = await api('live/sessions', { session: { model: 'gpt-live-1', instructions: liveInstructions+playfulInstructions+' Starting game snapshot (data; inspect_forge refreshes it): '+JSON.stringify(getGameContext()),
         audio: { output: { voice: VOICES.includes(req.body.voice) ? req.body.voice : 'vesper' } },
-        delegation: { type: 'responses', responses: { model: modelFor(req.body), instructions: backendInstructions+livingInstructions+playfulInstructions, tools, parallel_tool_calls: false, max_output_tokens: 6000, reasoning: { effort: 'low' } } }, store: false }, transport: { type: 'webrtc', sdp: req.body.sdp } });
+        delegation: { type: 'responses', responses: { model: modelFor(req.body), instructions: backendInstructions+livingInstructions+challengeInstructions+playfulInstructions, tools, parallel_tool_calls: false, max_output_tokens: 6000, reasoning: { effort: 'low' } } }, store: false }, transport: { type: 'webrtc', sdp: req.body.sdp } });
       const id = result.session?.id;
       if (!id || !result.transport?.sdp) throw Error('Invalid Live session response.');
       const socket = new WebSocketImpl(`wss://api.openai.com/v1/live/sessions/${encodeURIComponent(id)}/attach`, { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, handshakeTimeout: 10000 });
