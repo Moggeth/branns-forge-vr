@@ -1,0 +1,9 @@
+{
+  "name": "branns-forge-asset-lab",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Isolated official glTF validator dependency for authored game assets",
+  "dependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

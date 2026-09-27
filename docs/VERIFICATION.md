@@ -1,5 +1,26 @@
 # Verification and recovery evidence — 2026-09-12
 
+## Asset Lab fast path and failure lesson (2026-09-27)
+
+Run `python scripts/asset_lab.py build assets/asset-lab/pilot/asset.json` for a
+full Blender/Khronos/Godot gate, then `python scripts/test_asset_lab.py` for four
+focused regressions. `python scripts/asset_lab.py inspect
+assets/asset-lab/siegebird.json godot/assets/siegebird/siegebird.glb` exercises
+the same generic gate on a real production weapon. These use a disposable
+Godot project under ignored `outputs/asset-lab/` and never start the game or
+service. `scripts/Setup-AssetLab.ps1 -SmokeTest` restores the locked validator
+and runs the pilot; Blender is downloaded only if missing and checksum-checked.
+
+First import check placed its scene under `SceneTree` inside `_initialize()` and
+immediately asked child meshes for `global_transform`. Godot had not yet
+entered the tree, emitted `!is_inside_tree()` errors, and returned identity
+transforms, inflating the measured prop bounds to 1.789 × 2.000 × 1.701 m.
+The check now defers its scan one iteration and treats logged `ERROR:` lines as
+failures even if an engine process exits zero. Repeat the fast path above; the
+same model imported at 0.146 × 0.347 × 0.188 m. Initial failed gate: 4.561 s;
+repaired gate: 3.525 s; final Khronos-equipped gate: 3.692 s; focused tests:
+3.754 s; production Siegebird inspect: 2.994 s; setup smoke check: 5.043 s.
+
 ## Vive Pro 2 startup diagnosis (2026-09-26)
 
 If the launcher says SteamVR is not ready, do not start Brann VR until

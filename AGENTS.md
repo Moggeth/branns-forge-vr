@@ -5,6 +5,8 @@ Preserve C:/Users/mog/OneDrive/Documents/BomberWLAN unchanged. Source provenance
 
 Read README.md and docs/VERIFICATION.md before recurring costly work. Fast verification is service/test.cjs then service/integration.cjs. The integration test uses port 8788 and work/integration-* with generated offline test fixtures; never copy historical runtime jobs or spend on live API/generation merely to test UI. Normal service is loopback 8787. Source game uses separate ports and is not modified or restarted.
 
+For **new 3D assets**, read docs/ASSET-LAB-RD.md. Fast repeatable path: `python scripts/asset_lab.py build assets/asset-lab/pilot/asset.json` or `inspect <spec> <glb>`, followed by the asset's own gameplay check and visual review before installing it in `godot/`. Run `scripts/Setup-AssetLab.ps1 -SmokeTest` on a fresh machine. This authors with Blender 4.5.13 and imports in disposable Godot; the player-generated forge worker still has its separate Blender 2.93-compatible contract. Do not accidentally rewrite that worker contract while improving authored assets.
+
 Secrets: reuse authorized OPENAI_API_KEY in memory or source .env.local if present. Never print or commit keys; worker child environments exclude API keys. Paid voice begins only on game workshop visit or Talk. Do not launch a paid voice test without a task need.
 
 Use logs/work-timing.csv for measured work and docs/VERIFICATION.md for failed-strategy evidence and recovery. The desktop **Brann's Forge** shortcut opens `Brann's Forge Launcher.cmd`; older batch shortcuts live in `launcher/legacy/`. The launcher's Stop button calls stop.ps1, which checks process identity and start time before stopping this project's processes. Never stop all node/Godot/SteamVR processes.

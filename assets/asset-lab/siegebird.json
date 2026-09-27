@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "asset_id": "siegebird",
+  "kind": "weapon",
+  "source_builder": "assets/siegebird-opus/build_siegebird_opus.py",
+  "source_scene": "assets/siegebird-opus/Siegebird-Opus.blend",
+  "installed_asset": "godot/assets/siegebird/siegebird.glb",
+  "coordinate_system": {
+    "unit": "metre",
+    "up": "+Y",
+    "forward": "gameplay-specific: see docs/SIEGEBIRD-OPUS.md"
+  },
+  "required_nodes": ["Bolt", "Crank", "CrankKnob", "Pinion", "Reduction", "Drum", "Sled", "Clutch", "Latch", "Trigger", "OpticRear", "BoltSeat", "GripAnchor", "LiveCord"],
+  "limits": {
+    "max_bytes": 8388608,
+    "max_triangles": 80000,
+    "max_meshes": 50,
+    "max_materials": 20,
+    "max_images": 20
+  }
+}

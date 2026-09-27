@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "asset_id": "forge_lantern_pilot",
+  "kind": "prop",
+  "builder": "assets/asset-lab/pilot/build_lantern.py",
+  "coordinate_system": {
+    "unit": "metre",
+    "up": "+Y",
+    "forward": "-Z",
+    "origin": "ground-contact centre"
+  },
+  "required_nodes": ["Grip", "Flame", "Foot", "HoneyGlass", "FlameCore", "GripWrap"],
+  "limits": {
+    "max_bytes": 1048576,
+    "max_triangles": 3000,
+    "max_meshes": 40,
+    "max_materials": 8,
+    "max_images": 2
+  },
+  "max_dimensions_m": [0.25, 0.45, 0.25],
+  "review_files": ["source.blend", "front.png", "side.png", "three_quarter.png"]
+}

@@ -29,6 +29,16 @@ Latest fairy expansion: `outputs/fairy-night-build/Play Flight Practice.cmd` or 
 
 # Brann's Forge VR
 
+**Asset authoring:** `scripts/asset_lab.py` now offers a repeatable Blender → GLB →
+Khronos validation → disposable Godot import path for new models. Run
+`scripts/Setup-AssetLab.ps1 -SmokeTest` once, then build the small Forge Yard
+lantern with `python scripts/asset_lab.py build assets/asset-lab/pilot/asset.json`.
+Inspect an existing complex weapon with
+`python scripts/asset_lab.py inspect assets/asset-lab/siegebird.json godot/assets/siegebird/siegebird.glb`.
+Outputs and logs go to `outputs/asset-lab/`; builds never replace live assets.
+The [Asset Lab R&D and handoff](docs/ASSET-LAB-RD.md) covers tool choices, model
+requirements, asset contracts, limits and the next integration steps.
+
 Three existing creations now use generated concept art as **selective, in-game
 surface detail**: Mossward's painted shield, Siegebird's feather enamel, and
 Hollow's Song's crystal inclusions. Their silhouettes and interactions remain
