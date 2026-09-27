@@ -56,6 +56,13 @@ static func label(parent: Node3D, text_value: String, pos: Vector3, size_value: 
 	parent.add_child(node)
 	return node
 
+static func station_sign(parent: Node3D, title: String, subtitle: String, pos: Vector3, accent: Material) -> void:
+	# Keep the three workshop tasks recognizable from the arrival area.
+	box(parent, pos, Vector3(2.6, 0.53, 0.10), material("263a37"))
+	box(parent, pos + Vector3(0, -0.27, 0.035), Vector3(2.6, 0.045, 0.11), accent)
+	label(parent, title, pos + Vector3(0, 0.07, 0.065), 35)
+	label(parent, subtitle, pos + Vector3(0, -0.14, 0.065), 18, Color("d6e1d4"))
+
 static func collision(parent: Node3D, pos: Vector3, size: Vector3) -> StaticBody3D:
 	var body: StaticBody3D = StaticBody3D.new()
 	body.position = pos
@@ -207,7 +214,7 @@ static func build(root: Node3D) -> Dictionary:
 	resting_arm.position=Vector3(0.44,1.12,0)
 	preload("res://workshop_details.gd").arm(resting_arm,shirt,skin)
 	collision(brann,Vector3(0,0.9,0),Vector3(0.95,1.8,0.65))
-	label(brann,"BRANN COPPERPOT",Vector3(0,2.2,0),30)
+	label(brann,"BRANN · TALK",Vector3(0,2.2,0),31)
 	var question: Label3D = label(brann,"?",Vector3(0,2.65,0),110,Color("ffdc45"))
 	question.visible = false
 	var rack: Node3D = Node3D.new()
@@ -218,7 +225,7 @@ static func build(root: Node3D) -> Dictionary:
 	collision(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9))
 	for side in [-1,1]:
 		box(rack,Vector3(side*0.55,-0.52,0),Vector3(0.1,0.92,0.66),wood)
-	label(rack,"RETRIEVAL BENCH",Vector3(0,0.72,-0.3),23)
+	label(rack,"PICK UP TOOLS",Vector3(0,0.72,-0.3),25)
 	var hammer: Node3D = make_hammer(wood,iron,brass)
 	hammer.position = Vector3(2,1.06,-2.95)
 	hammer.set_meta("kind","weapon")
@@ -226,7 +233,7 @@ static func build(root: Node3D) -> Dictionary:
 	hammer.name = "StarterHammer"
 	root.add_child(hammer)
 	collision(hammer,Vector3(0,0.29,0),Vector3(0.42,0.68,0.24))
-	label(root,"GRAB A HAMMER",Vector3(2,0.65,-2.35),24)
+	label(root,"GRIP THE HAMMER",Vector3(2,0.65,-2.35),22)
 	var board: Node3D = Node3D.new()
 	board.position = Vector3(5.4,1.9,-5.55)
 	root.add_child(board)
@@ -253,7 +260,7 @@ static func build(root: Node3D) -> Dictionary:
 	# Physical commissioning controls are accessible by a controller ray in VR.
 	box(root,Vector3(-6.9,1.9,-4.55),Vector3(3.4,2.7,0.18),wood)
 	box(root,Vector3(-6.9,1.9,-4.44),Vector3(3.2,2.5,0.04),material("29473e"))
-	label(root,"THE POSSIBILITIES",Vector3(-6.9,3.0,-4.39),28)
+	label(root,"TOOLS · POINT + TRIGGER",Vector3(-6.9,3.0,-4.39),27)
 	var tool_ids := ["apprentice_hammer","woodland_axe","quarry_pick","bomb_glove","grappling_hook","spore_lantern","crystal_resonator","ember_gauntlet"]
 	var tool_names := ["COPPERPOT'S PROMISE","ORCHARD'S EDGE","STONEWHISPER","POCKET THUNDER","SWALLOWLINE","MOONCAP LANTERN","HOLLOW'S SONG","THE LAST HEARTH"]
 	for i in range(tool_ids.size()):
@@ -264,8 +271,8 @@ static func build(root: Node3D) -> Dictionary:
 		button.set_meta("hint_position",Vector3(-6.9,0.25,-4.02))
 		root.add_child(button)
 		box(button,Vector3.ZERO,Vector3(1.54,0.38,0.16),teal)
-		label(button,tool_names[i],Vector3(0,0.055,0.10),17)
-		button.set_meta("availability_label",label(button,"",Vector3(0,-0.095,0.105),13,Color("ddbb74")))
+		label(button,tool_names[i],Vector3(0,0.055,0.10),19)
+		button.set_meta("availability_label",label(button,"",Vector3(0,-0.095,0.105),15,Color("ddbb74")))
 		collision(button,Vector3.ZERO,Vector3(1.56,0.40,0.19))
 		buttons.append(button)
 	var upgrade := Node3D.new()
@@ -278,6 +285,9 @@ static func build(root: Node3D) -> Dictionary:
 	label(upgrade,"KINDLE THE NEXT FORGE TIER",Vector3(0,0,0.11),22)
 	collision(upgrade,Vector3.ZERO,Vector3(3.2,0.32,0.21))
 	buttons.append(upgrade)
+	station_sign(root,"CHOOSE TOOLS","Point and trigger",Vector3(-6.9,3.65,-4.48),teal)
+	station_sign(root,"TALK TO BRANN","Forge and invent",Vector3(0,3.45,-4.48),brass)
+	station_sign(root,"GROW THE FORGE","Offer materials",Vector3(5.4,3.65,-4.48),ember)
 	var rats: Array[Node3D] = []
 	for i in range(7):
 		var rat: Node3D = make_rat(i)

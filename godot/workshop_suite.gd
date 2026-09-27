@@ -64,7 +64,8 @@ func setup(owner_game):
 func _button(parent,action,pos,size,caption):
 	var n=Node3D.new(); parent.add_child(n); n.position=pos; n.set_meta("kind","button"); n.set_meta("action",action)
 	WorkshopScene.box(n,Vector3.ZERO,size,WorkshopScene.material("39655c",0.35)); WorkshopScene.collision(n,Vector3.ZERO,size)
-	var text=ART.text(n,caption,Vector3(0,0,size.z/2+0.008),14); text.pixel_size=0.0028
+	var text=ART.text(n,caption,Vector3(0,0,size.z/2+0.008),17 if size.x>0.5 else 14)
+	text.pixel_size=0.0035 if size.x>0.5 else 0.0028
 	return n
 
 func _build_table():
@@ -74,24 +75,24 @@ func _build_table():
 		for z in [-0.6,0.6]: WorkshopScene.box(table,Vector3(x,-0.46,z),Vector3(0.15,0.9,0.15),WorkshopScene.material("523c2c"))
 	WorkshopScene.collision(table,Vector3(0,-0.44,0),Vector3(4.8,1.04,1.7))
 	WorkshopScene.box(table,Vector3(0,1.0,-0.78),Vector3(4.6,0.43,0.08),WorkshopScene.material("344d49"))
-	labels.title=ART.text(table,"THE LIVING WORKSHOP",Vector3(0,1.1,-0.72),40)
-	labels.status=ART.text(table,"Pouch → buckets → pull the lever",Vector3(0,0.93,-0.72),23)
+	labels.title=ART.text(table,"GROW THE FORGE",Vector3(0,1.1,-0.72),42)
+	labels.status=ART.text(table,"1 POUCH   2 BUCKETS   3 LEVER",Vector3(0,0.93,-0.72),25)
 	for i in range(4):
 		var x=-1.65+i*1.1
 		var mini=ART.mini(i+1); table.add_child(mini); mini.position=Vector3(x,0.13,-0.46); mini.scale=Vector3.ONE*0.78
 		var caption=ART.text(table,ART.TITLES[i],Vector3(x,0.74,-0.45),19); caption.pixel_size=0.0028; caption.rotation.x=0
-		var state_label=ART.text(table,"",Vector3(x,0.665,-0.45),14); state_label.pixel_size=0.0028; state_label.rotation.x=0; stage_labels.append(state_label)
+		var state_label=ART.text(table,"",Vector3(x,0.665,-0.45),18); state_label.pixel_size=0.0032; state_label.rotation.x=0; stage_labels.append(state_label)
 		stage_lights.append(WorkshopScene.ball(table,Vector3(x,0.12,0.16),Vector3.ONE*0.045,WorkshopScene.material("6c7667")))
 	for i in range(2):
 		var bucket=ART.bucket(table,Vector3(-0.55+i*1.1,0.09,0.47)); buckets.append(bucket); bucket_home.append(bucket.position)
-		var caption=ART.text(table,"",Vector3(-0.55+i*1.1,-0.09,0.88),16); caption.pixel_size=0.0028; labels["bucket"+str(i)]=caption
-	labels.cost=ART.text(table,"",Vector3(-1.7,0.40,0.50),15); labels.cost.pixel_size=0.0028; labels.cost.width=450
-	option_button=_button(table,"workshop:option",Vector3(-1.65,0.19,0.66),Vector3(1.0,0.18,0.16),"CHANGE OFFERING")
+		var caption=ART.text(table,"",Vector3(-0.55+i*1.1,-0.09,0.88),19); caption.pixel_size=0.0035; labels["bucket"+str(i)]=caption
+	labels.cost=ART.text(table,"",Vector3(-1.7,0.43,0.50),19); labels.cost.pixel_size=0.0035; labels.cost.width=450
+	option_button=_button(table,"workshop:option",Vector3(-1.65,0.19,0.66),Vector3(1.0,0.18,0.16),"SWAP COST")
 	lever=Node3D.new(); table.add_child(lever); lever.position=Vector3(2.02,0.13,0.36)
 	WorkshopScene.cylinder(lever,Vector3(0,0.25,0),0.026,0.5,WorkshopScene.material("c7a25d",0.65))
 	knob=Node3D.new(); lever.add_child(knob); knob.position=Vector3(0,0.5,0)
 	WorkshopScene.box(knob,Vector3.ZERO,Vector3(0.22,0.075,0.075),WorkshopScene.material("d1ad6a",0.5))
-	ART.text(table,"GRIP + PULL",Vector3(2.0,-0.06,0.88),15).pixel_size=0.0028
+	ART.text(table,"3 · GRIP + PULL",Vector3(2.0,-0.06,0.88),19).pixel_size=0.0035
 
 func _build_pouch():
 	pouch=Node3D.new(); game.grips.belt.add_child(pouch); pouch.name="MaterialPouch"; pouch.position=pouch_home
@@ -104,7 +105,7 @@ func _build_pouch():
 	WorkshopScene.box(pouch,Vector3(0,0.04,-0.092),Vector3(0.23,0.09,0.018),WorkshopScene.material("ac8854"))
 	var clasp=_button(pouch,"workshop:pouch",Vector3(0,0.10,-0.08),Vector3(0.12,0.10,0.05),"LIFT"); clasp.rotation.x=-PI/3
 	pouch_contents=Node3D.new(); pouch.add_child(pouch_contents); pouch_contents.position=Vector3(0,0.25,-0.02)
-	pouch_label=ART.text(pouch_contents,"",Vector3(0,0.26,0),14); pouch_label.pixel_size=0.0015; pouch_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; pouch_label.width=390
+	pouch_label=ART.text(pouch_contents,"",Vector3(0,0.26,0),18); pouch_label.pixel_size=0.0023; pouch_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; pouch_label.width=390
 	for side in [-1,1]:
 		var button=_button(pouch_contents,"workshop:scroll:"+str(side),Vector3(side*0.21,0.03,0),Vector3(0.10,0.10,0.07),"‹" if side<0 else "›"); button.rotation.x=-PI/3
 	_ui_layers(pouch)
@@ -119,7 +120,7 @@ func _update_pouch():
 	if is_instance_valid(pouch_preview): pouch_preview.free()
 	pouch_preview=ART.material_piece(RESOURCES[pouch_index]); pouch_contents.add_child(pouch_preview); pouch_preview.position=Vector3(0,0.035,0)
 	var resource=RESOURCES[pouch_index]; var count=int(game.state.get("resources",{}).get(resource,0))
-	pouch_label.text=resource.replace("_"," ").capitalize()+" × "+str(count)+"\nGrip one · ‹ / › browse"
+	pouch_label.text=resource.replace("_"," ").capitalize()+" × "+str(count)+"\n"+("GRIP ONE" if count>0 else "NONE HELD")+" · ‹ / › BROWSE"
 	pouch_preview.scale=Vector3.ONE*(1.0 if count>0 else 0.65)
 
 func costs()->Dictionary:
@@ -138,7 +139,7 @@ func ingest(snapshot:Dictionary):
 func _labels():
 	var tier=int(game.state.get("tier",1)); var cost=costs(); var counts=game.state.get("workshop",{}).get("donations",{}).get("counts",{})
 	for i in range(4):
-		stage_labels[i].text="BUILT" if i+1<tier else ("YOUR WORKSHOP" if i+1==tier else ("NEXT" if i==tier else "LATER"))
+		stage_labels[i].text="BUILT" if i+1<tier else ("CURRENT" if i+1==tier else ("NEXT" if i==tier else "LATER"))
 		stage_lights[i].material_override.albedo_color=Color("e6b769" if i+1==tier else ("90bca1" if i+1<tier else "687566"))
 	for i in range(2):
 		buckets[i].visible=i<cost.size()
@@ -147,8 +148,8 @@ func _labels():
 			var resource=cost.keys()[i]; labels["bucket"+str(i)].text=resource.replace("_"," ").capitalize()+"  %d / %d"%[int(counts.get(resource,0)),int(cost[resource])]
 	option_button.visible=tier==1
 	game._set_collisions(option_button,option_button.visible)
-	labels.cost.text="TIER %d → %d\n%s"%[tier,tier+1,"Tail offering" if int(game.state.get("workshop",{}).get("donations",{}).get("option",0))==0 else "Timber + stone"] if tier==1 else ("NEXT: "+ART.TITLES[tier] if tier<4 else "ALL FOUR\nSTAGES BUILT")
-	if not construction: labels.status.text="The forge is yours to imagine with" if tier==4 else ("Offering ready · grip and pull the lever" if ready() else "Pouch → matching buckets → pull the lever")
+	labels.cost.text="TIER %d → %d\n%s"%[tier,tier+1,"Tails" if int(game.state.get("workshop",{}).get("donations",{}).get("option",0))==0 else "Wood + stone"] if tier==1 else ("NEXT: "+ART.TITLES[tier] if tier<4 else "ALL STAGES\nBUILT")
+	if not construction: labels.status.text="ALL STAGES BUILT" if tier==4 else ("READY · PULL LEVER" if ready() else "1 POUCH   2 BUCKETS   3 LEVER")
 
 func ready()->bool:
 	var cost=costs(); var counts=game.state.get("workshop",{}).get("donations",{}).get("counts",{})
