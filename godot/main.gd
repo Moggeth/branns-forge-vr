@@ -756,7 +756,7 @@ func _capture():
 	await RenderingServer.frame_post_draw
 	var image = get_viewport().get_texture().get_image()
 	print("CAPTURE ", image.save_png(capture_path))
-	print("RENDER_STATS zone=",capture_zone," fps=",Engine.get_frames_per_second()," objects=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," draw_calls=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	print("RENDER_STATS zone=",adventure.zone," fps=",Engine.get_frames_per_second()," objects=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," draw_calls=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	get_tree().quit()
 
 func _capture_workshop():

@@ -57,6 +57,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 			var is_pine:bool=plot.kind=="pine" and j%2==0
 			var has_apple:bool=not is_pine and j<2
 			var tree:Node3D=w.tree(place,local,4.7+float(j%3)*0.38,is_pine,has_apple,1 if has_apple else 0)
+			if not is_pine: Art.upgrade_tree_visual(tree)
 			if has_apple: TreeAdapter.hanging_apple(w,root,data,"orchard_highlands",tree)
 		if plot.kind in ["stone","ruin"]:
 			w.arch(place,Vector3(0,0,-1.0),2.1,"a6a99a",true)
@@ -76,7 +77,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	var trunks:=StaticBody3D.new()
 	trunks.name="OrchardGroveTrunks"
 	p.add_child(trunks)
-	for i in range(250):
+	for i in range(480):
 		var point:=Vector3(rng.randf_range(-146,146),0,rng.randf_range(-146,146))
 		if not _clear(point): continue
 		var pine:bool=i%9==0
@@ -89,7 +90,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		collision.shape=shape
 		collision.position=point+Vector3.UP*shape.height*0.5
 		trunks.add_child(collision)
-	Art.grove(p,placements)
+	Art.grove(p,placements,TRAIL)
 	Art.place_features(p,TRAIL,PLOTS,SEED)
 	w.anchor(root,data,"orchard_highlands",center+Vector3(-112,3.8,-40),center+Vector3(-108,0,-38))
 	w.anchor(root,data,"orchard_highlands",center+Vector3(73,4.2,93),center+Vector3(69,0,88))

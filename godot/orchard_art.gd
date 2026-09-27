@@ -2,12 +2,15 @@ extends RefCounted
 ## Authored orchard kit adapter. GLBs are independent pieces; placement is seeded
 ## and chunked so the same registry can dress later generated landscapes.
 const TreeKit = preload("res://tree_kit.gd")
+const Finish = preload("res://orchard_finish.gd")
 const PATH := "res://assets/orchard/"
 const ASSETS := ["apple_tree_mature","apple_tree_mature_b","apple_tree_mature_autumn",
-	"apple_tree_young","apple_tree_young_autumn","apple_stump","hedge_dense",
-	"shrub_flowering","rock_mossy","rock_mossy_small","rubble_split",
-	"wall_straight","wall_corner_broken","wall_end_broken","path_straight",
-	"path_curve30","mountain_cliff_chunk","mountain_peak_snow"]
+	"apple_tree_mature_lod1","apple_tree_mature_b_lod1","apple_tree_young",
+	"apple_tree_young_autumn","apple_tree_young_lod1","apple_stump",
+	"hedge_dense","hedge_dense_lod1","shrub_flowering","rock_mossy",
+	"rock_mossy_small","rubble_split","wall_straight","wall_corner_broken",
+	"wall_end_broken","path_straight","path_curve30","path_curve30_left",
+	"mountain_cliff_chunk","mountain_peak_snow"]
 const CHUNK := 40.0
 static var _cache:Dictionary={}
 
@@ -19,6 +22,9 @@ static func _collect(node:Node,pose:Transform3D,parts:Array)->void:
 		if not child is Node3D: continue
 		var local:Transform3D=pose*child.transform
 		if child is MeshInstance3D and child.mesh!=null:
+			# Godot 4.7 imports the first vertex-colour surface white unless its
+			# albedo-from-vertex flag is restored. Fix the shared mesh once.
+			Finish.apply_mesh(child.mesh)
 			parts.append({"mesh":child.mesh,"pose":local,"material":child.material_override,"name":child.name})
 		_collect(child,local,parts)
 
@@ -62,21 +68,79 @@ static func _emit(root:Node3D,id:String,poses:Array)->void:
 			holder.position=origin
 			holder.multimesh=multi
 			holder.material_override=part.material
-			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if id in ["hedge_dense","shrub_flowering","path_dirt"] else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if id in ["hedge_dense","shrub_flowering","path_straight"] or id.begins_with("mountain") else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			holder.visibility_range_end=90.0 if id.begins_with("apple_tree") else (100.0 if id.begins_with("wall") else (75.0 if id in ["rock_mossy","rubble_split","path_straight"] else (60.0 if id in ["hedge_dense","shrub_flowering"] else 0.0)))
+			holder.visibility_range_end_margin=10.0 if holder.visibility_range_end>0.0 else 0.0
 			root.add_child(holder)
 
 static func _pose(at:Vector3,scale:float,yaw:float)->Dictionary:
 	return {"at":at,"scale":scale,"yaw":yaw}
 
-static func grove(root:Node3D,placements:Array)->void:
-	var authored:Dictionary={"apple_tree_mature":[],"apple_tree_mature_b":[],"apple_tree_mature_autumn":[],"apple_tree_young":[]}
+static func upgrade_tree_visual(tree:Node3D)->void:
+	# Keep TreeKit's trunk collider, apple reach points and fruit physics.
+	# Replace only its rendered crown with the commissioned mesh.
+	if not available("apple_tree_mature"): return
+	var id:String="apple_tree_mature_b" if int(tree.get_meta("tree_seed",0))%2==0 else "apple_tree_mature"
+	var scene:PackedScene=load(PATH+id+".glb")
+	if scene==null: return
+	var art:Node3D=scene.instantiate()
+	Finish.apply_tree(art)
+	art.name="AuthoredOrchardTree"
+	art.scale=Vector3.ONE*(float(tree.get_meta("tree_height",4.8))/4.68)
+	for node in art.find_children("*","MeshInstance3D",true,false):
+		# ShootableApples supplies the visible fruit on an interactive tree.
+		if "Fruit" in node.name: node.visible=false
+		else:
+			node.visibility_range_end=85.0
+			node.visibility_range_end_margin=2.0
+	for child_name in ["Crown","Far","LeafCards"]:
+		var child:Node3D=tree.get_node_or_null(child_name)
+		if child!=null: child.visible=false
+	var far:MeshInstance3D=tree.get_node_or_null("Far")
+	if far!=null:
+		far.visible=true
+		far.visibility_range_begin=85.0
+		far.visibility_range_begin_margin=2.0
+	tree.add_child(art)
+
+static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
+	var authored:Dictionary={}
+	for id in ASSETS:
+		if id.begins_with("apple_tree"): authored[id]=[]
 	var fallback:Array=[]
+	var distant:Array=[]
 	for tree in placements:
-		var id:String="apple_tree_young" if int(tree.seed)%7==0 else ("apple_tree_mature_autumn" if int(tree.seed)%13==0 else ("apple_tree_mature_b" if int(tree.seed)%3==0 else "apple_tree_mature"))
+		var young:bool=int(tree.seed)%7==0
+		var autumn:bool=int(tree.seed)%13==0
+		var variant_b:bool=int(tree.seed)%3==0
+		var far:bool=not trail.is_empty() and not _near_path(tree.position,trail,20.0)
+		var id:String="apple_tree_mature"
+		if young: id="apple_tree_young_lod1" if far else "apple_tree_young"
+		elif autumn and not far: id="apple_tree_mature_autumn"
+		elif variant_b: id="apple_tree_mature_b_lod1" if far else "apple_tree_mature_b"
+		elif far: id="apple_tree_mature_lod1"
 		if tree.species=="apple" and available(id):
 			authored[id].append(_pose(tree.position,tree.scale,float(tree.seed%628)/100.0))
+			distant.append(tree)
 		else: fallback.append(tree)
 	for id in authored: _emit(root,id,authored[id])
+	var far_chunks:Dictionary={}
+	for tree in distant:
+		var key:=Vector2i(floori(tree.position.x/80.0),floori(tree.position.z/80.0))
+		if not far_chunks.has(key): far_chunks[key]=[]
+		var origin:=Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)
+		var local_tree:Dictionary=tree.duplicate()
+		local_tree.position=tree.position-origin
+		far_chunks[key].append(local_tree)
+	for key in far_chunks:
+		var far_grove:Node3D=TreeKit.make_grove(far_chunks[key],{"lod":"far","variants":3,"shadows":false})
+		far_grove.name="OrchardDistantSilhouettes_%s_%s"%[key.x,key.y]
+		far_grove.position=Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)
+		for child in far_grove.get_children():
+			if child is GeometryInstance3D:
+				child.visibility_range_begin=90.0
+				child.visibility_range_begin_margin=4.0
+		root.add_child(far_grove)
 	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false}))
 	var authored_count:=0
 	for id in authored: authored_count+=authored[id].size()
@@ -99,12 +163,12 @@ static func trail(root:Node3D,points:Array,w:Script)->void:
 			poses.append(_pose(a.lerp(b,t)+Vector3.UP*0.025,1.0,yaw))
 	_emit(root,"path_straight",poses)
 
-static func _near_path(point:Vector3,trail:Array)->bool:
+static func _near_path(point:Vector3,trail:Array,clearance:float=5.4)->bool:
 	for i in range(trail.size()-1):
 		var a:Vector3=trail[i]
 		var segment:Vector3=trail[i+1]-a
 		var t:float=clampf((point-a).dot(segment)/segment.length_squared(),0,1)
-		if point.distance_to(a+segment*t)<5.4: return true
+		if point.distance_to(a+segment*t)<clearance: return true
 	return false
 
 static func _collider(root:Node3D,at:Vector3,width:float,height:float,depth:float,yaw:float)->void:
@@ -139,6 +203,7 @@ static func place_features(root:Node3D,trail:Array,plots:Array,seed:int)->void:
 		var yaw:float=rng.randf_range(0,TAU)
 		placements[id].append(_pose(at,scale,yaw))
 		if id=="rock_mossy": _collider(root,at,1.0*scale,0.6*scale,0.9*scale,yaw)
+		if id=="hedge_dense": _collider(root,at,3.0*scale,1.25*scale,1.05*scale,yaw)
 	for plot in plots:
 		if plot.kind in ["stone","ruin"]:
 			for j in range(4):

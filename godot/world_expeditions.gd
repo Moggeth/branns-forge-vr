@@ -22,6 +22,7 @@ static func orchard(root:Node3D,data:Dictionary,w:Script)->void:
 		var row=floori(float(i)/2.0)
 		var v=Vector3(side*(6.0+float(row%3)*2.5),0,17.0-float(row)*2.8)
 		var orchard_tree: Node3D = w.tree(p,v,4.6+float(i%4)*0.4,false,true,1 if i<5 else 0)
+		OrchardArt.upgrade_tree_visual(orchard_tree)
 		if i<5: TreeAdapter.hanging_apple(w,root,data,id,orchard_tree)
 	for i in range(10):
 		var a=TAU*float(i)/10.0

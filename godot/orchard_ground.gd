@@ -22,10 +22,10 @@ void fragment() {
     float broad = cell_noise(ground_at * 0.075);
     float small = cell_noise(ground_at * 0.43);
     float scuff = cell_noise(ground_at * 1.9);
-    vec3 meadow = mix(vec3(0.33, 0.43, 0.22), vec3(0.53, 0.58, 0.30), broad);
-    vec3 dry = vec3(0.56, 0.48, 0.31);
+    vec3 meadow = mix(vec3(0.18, 0.28, 0.12), vec3(0.32, 0.41, 0.18), broad);
+    vec3 dry = vec3(0.41, 0.32, 0.18);
     float earth = smoothstep(0.60, 0.78, broad + (small - 0.5) * 0.25);
-    ALBEDO = mix(meadow, dry, earth * 0.45) * (0.94 + small * 0.10 + scuff * 0.04);
+    ALBEDO = mix(meadow, dry, earth * 0.32) * (0.94 + small * 0.10 + scuff * 0.04);
     ROUGHNESS = 0.96;
 }
 """

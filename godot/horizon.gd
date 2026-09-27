@@ -17,7 +17,7 @@ const EYE_HEIGHT := 1.8
 # Environment table mirrors world_zones.gd so haze matches the fogged sky.
 const ZONES := {
 	"orchard_highlands": {
-		"haze": "e6cba6", "haze_density": 0.0008, "mist_top": 0.0, "mist_depth": 34.0, "mist_max": 0.75,
+		"haze": "bbd6ca", "haze_density": 0.0008, "mist_top": 0.0, "mist_depth": 34.0, "mist_max": 0.65,
 		"light": "fff0d4", "shade": "a59cc0", "inner_radius": 26.0,
 		"ground_style": "grass", "ground_inner": "93a861", "ground_outer": "a8aa6a", "ground_y": -0.3, "ground_amp": 1.2,
 		"layers": [

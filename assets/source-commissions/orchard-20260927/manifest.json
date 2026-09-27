@@ -1,0 +1,945 @@
+{
+ "library": "Brann's Forge VR orchard environment library",
+ "version": 1,
+ "units": "metres",
+ "up": "+Y",
+ "forward_note": "authored so 'front' faces +Z",
+ "generator": "output/builder/build_orchard_library.py",
+ "blender": "4.5.13 LTS",
+ "godot_target": "4.7.2 Mobile / OpenXR",
+ "colour": "all albedo in COLOR_0 (sRGB authored); materials are white; see HANDOFF.md 'Import' for the required albedo-from-vertex-colour step",
+ "godot_import_script": "godot/orchard_post_import.gd",
+ "godot_runtime_helper": "godot/orchard_finish.gd",
+ "contact_sheet": "renders/contact_sheet.png",
+ "review_renders": [
+  "renders/review_scale_lineup.png",
+  "renders/review_tiling_joins.png"
+ ],
+ "assets": [
+  {
+   "id": "orchard_apple_tree_mature",
+   "category": "tree",
+   "glb": "glb/orchard_apple_tree_mature.glb",
+   "nodes": [
+    "orchard_apple_tree_mature_Canopy",
+    "orchard_apple_tree_mature_Fruit",
+    "orchard_apple_tree_mature_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_fruit",
+    "orchard_bark"
+   ],
+   "triangles": 6739,
+   "bounds_min_m": [
+    -2.723,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max_m": [
+    1.999,
+    4.589,
+    2.074
+   ],
+   "size_m": [
+    4.722,
+    4.676,
+    4.235
+   ],
+   "origin": "ground-contact centre",
+   "collision": "capsule trunk r0.22 h1.6 + optional convex limbs; canopy no collision",
+   "lod": "LOD1 GLB provided (_lod1); swap at 35 m, cull or impostor past 140 m",
+   "glb_bytes": 200920,
+   "reimport_triangles": 6739,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_mature_front.png",
+    "threequarter": "renders/orchard_apple_tree_mature_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_mature_autumn",
+   "category": "tree",
+   "glb": "glb/orchard_apple_tree_mature_autumn.glb",
+   "nodes": [
+    "orchard_apple_tree_mature_autumn_Canopy",
+    "orchard_apple_tree_mature_autumn_Fruit",
+    "orchard_apple_tree_mature_autumn_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf_autumn",
+    "orchard_fruit",
+    "orchard_bark"
+   ],
+   "triangles": 6739,
+   "bounds_min_m": [
+    -2.723,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max_m": [
+    1.999,
+    4.589,
+    2.074
+   ],
+   "size_m": [
+    4.722,
+    4.676,
+    4.235
+   ],
+   "origin": "ground-contact centre",
+   "collision": "as mature",
+   "lod": "as mature",
+   "glb_bytes": 200976,
+   "reimport_triangles": 6739,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_mature_autumn_front.png",
+    "threequarter": "renders/orchard_apple_tree_mature_autumn_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_mature_b",
+   "category": "tree",
+   "glb": "glb/orchard_apple_tree_mature_b.glb",
+   "nodes": [
+    "orchard_apple_tree_mature_b_Canopy",
+    "orchard_apple_tree_mature_b_Fruit",
+    "orchard_apple_tree_mature_b_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_fruit",
+    "orchard_bark"
+   ],
+   "triangles": 6883,
+   "bounds_min_m": [
+    -2.348,
+    -0.087,
+    -2.325
+   ],
+   "bounds_max_m": [
+    2.824,
+    4.558,
+    2.527
+   ],
+   "size_m": [
+    5.172,
+    4.646,
+    4.852
+   ],
+   "origin": "ground-contact centre",
+   "collision": "as mature",
+   "lod": "LOD1 GLB provided (_lod1)",
+   "glb_bytes": 206404,
+   "reimport_triangles": 6883,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_mature_b_front.png",
+    "threequarter": "renders/orchard_apple_tree_mature_b_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_young",
+   "category": "tree",
+   "glb": "glb/orchard_apple_tree_young.glb",
+   "nodes": [
+    "orchard_apple_tree_young_Canopy",
+    "orchard_apple_tree_young_Fruit",
+    "orchard_apple_tree_young_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_fruit",
+    "orchard_bark"
+   ],
+   "triangles": 3303,
+   "bounds_min_m": [
+    -1.32,
+    -0.055,
+    -1.442
+   ],
+   "bounds_max_m": [
+    1.45,
+    2.827,
+    1.248
+   ],
+   "size_m": [
+    2.77,
+    2.881,
+    2.69
+   ],
+   "origin": "ground-contact centre",
+   "collision": "capsule trunk r0.1 h1.0",
+   "lod": "LOD1 GLB provided (_lod1); swap at 25 m",
+   "glb_bytes": 96796,
+   "reimport_triangles": 3303,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_young_front.png",
+    "threequarter": "renders/orchard_apple_tree_young_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_young_autumn",
+   "category": "tree",
+   "glb": "glb/orchard_apple_tree_young_autumn.glb",
+   "nodes": [
+    "orchard_apple_tree_young_autumn_Canopy",
+    "orchard_apple_tree_young_autumn_Fruit",
+    "orchard_apple_tree_young_autumn_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf_autumn",
+    "orchard_fruit",
+    "orchard_bark"
+   ],
+   "triangles": 3303,
+   "bounds_min_m": [
+    -1.32,
+    -0.055,
+    -1.442
+   ],
+   "bounds_max_m": [
+    1.45,
+    2.827,
+    1.248
+   ],
+   "size_m": [
+    2.77,
+    2.881,
+    2.69
+   ],
+   "origin": "ground-contact centre",
+   "collision": "as young",
+   "lod": "as young",
+   "glb_bytes": 96852,
+   "reimport_triangles": 3303,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_young_autumn_front.png",
+    "threequarter": "renders/orchard_apple_tree_young_autumn_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_mature_lod1",
+   "category": "tree_lod",
+   "glb": "glb/orchard_apple_tree_mature_lod1.glb",
+   "nodes": [
+    "orchard_apple_tree_mature_lod1_Canopy",
+    "orchard_apple_tree_mature_lod1_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_bark"
+   ],
+   "triangles": 1475,
+   "bounds_min_m": [
+    -2.662,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max_m": [
+    1.999,
+    4.589,
+    2.017
+   ],
+   "size_m": [
+    4.661,
+    4.676,
+    4.178
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (LOD)",
+   "lod": "is LOD1 of orchard_apple_tree_mature (+_autumn via material swap)",
+   "glb_bytes": 43396,
+   "reimport_triangles": 1475,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_tree_mature_lod1_front.png",
+    "threequarter": "renders/orchard_apple_tree_mature_lod1_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_apple_tree_mature_b_lod1",
+   "category": "tree_lod",
+   "glb": "glb/orchard_apple_tree_mature_b_lod1.glb",
+   "nodes": [
+    "orchard_apple_tree_mature_b_lod1_Canopy",
+    "orchard_apple_tree_mature_b_lod1_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_bark"
+   ],
+   "triangles": 1475,
+   "bounds_min_m": [
+    -2.348,
+    -0.087,
+    -2.273
+   ],
+   "bounds_max_m": [
+    2.796,
+    4.558,
+    2.527
+   ],
+   "size_m": [
+    5.144,
+    4.646,
+    4.8
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (LOD)",
+   "lod": "is LOD1 of orchard_apple_tree_mature_b",
+   "glb_bytes": 43400,
+   "reimport_triangles": 1475,
+   "vertex_colours": true,
+   "renders": {}
+  },
+  {
+   "id": "orchard_apple_tree_young_lod1",
+   "category": "tree_lod",
+   "glb": "glb/orchard_apple_tree_young_lod1.glb",
+   "nodes": [
+    "orchard_apple_tree_young_lod1_Canopy",
+    "orchard_apple_tree_young_lod1_Trunk"
+   ],
+   "material_slots": [
+    "orchard_leaf",
+    "orchard_bark"
+   ],
+   "triangles": 767,
+   "bounds_min_m": [
+    -1.261,
+    -0.054,
+    -1.442
+   ],
+   "bounds_max_m": [
+    1.409,
+    2.81,
+    1.224
+   ],
+   "size_m": [
+    2.67,
+    2.864,
+    2.665
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (LOD)",
+   "lod": "is LOD1 of orchard_apple_tree_young",
+   "glb_bytes": 23192,
+   "reimport_triangles": 767,
+   "vertex_colours": true,
+   "renders": {}
+  },
+  {
+   "id": "orchard_apple_stump",
+   "category": "tree",
+   "glb": "glb/orchard_apple_stump.glb",
+   "nodes": [
+    "orchard_apple_stump_Wood"
+   ],
+   "material_slots": [
+    "orchard_bark",
+    "orchard_heartwood"
+   ],
+   "triangles": 188,
+   "bounds_min_m": [
+    -0.681,
+    -0.074,
+    -0.553
+   ],
+   "bounds_max_m": [
+    0.676,
+    0.469,
+    0.676
+   ],
+   "size_m": [
+    1.357,
+    0.543,
+    1.229
+   ],
+   "origin": "ground-contact centre",
+   "collision": "cylinder r0.26 h0.45",
+   "lod": "none needed",
+   "glb_bytes": 10200,
+   "reimport_triangles": 188,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_apple_stump_front.png",
+    "threequarter": "renders/orchard_apple_stump_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_hedge_dense",
+   "category": "shrub",
+   "glb": "glb/orchard_hedge_dense.glb",
+   "nodes": [
+    "orchard_hedge_dense_Foliage",
+    "orchard_hedge_dense_Stems"
+   ],
+   "material_slots": [
+    "orchard_hedge",
+    "orchard_bark"
+   ],
+   "triangles": 2300,
+   "bounds_min_m": [
+    -1.737,
+    -0.065,
+    -0.614
+   ],
+   "bounds_max_m": [
+    1.659,
+    1.455,
+    0.671
+   ],
+   "size_m": [
+    3.396,
+    1.519,
+    1.285
+   ],
+   "origin": "ground-contact centre",
+   "collision": "box 3.0 x 1.35 x 1.1 (centre y 0.67)",
+   "lod": "LOD1 GLB provided (_lod1); swap at 30 m",
+   "glb_bytes": 59096,
+   "reimport_triangles": 2300,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_hedge_dense_front.png",
+    "threequarter": "renders/orchard_hedge_dense_threequarter.png"
+   },
+   "joins": {
+    "module_m": 3.0,
+    "ends": "rounded foliage ends inside x=+-1.7; place runs at 2.9-3.0 m spacing (slight overlap hides the join)"
+   }
+  },
+  {
+   "id": "orchard_hedge_dense_lod1",
+   "category": "shrub_lod",
+   "glb": "glb/orchard_hedge_dense_lod1.glb",
+   "nodes": [
+    "orchard_hedge_dense_lod1_Foliage",
+    "orchard_hedge_dense_lod1_Stems"
+   ],
+   "material_slots": [
+    "orchard_hedge",
+    "orchard_bark"
+   ],
+   "triangles": 620,
+   "bounds_min_m": [
+    -1.673,
+    -0.065,
+    -0.584
+   ],
+   "bounds_max_m": [
+    1.652,
+    1.438,
+    0.657
+   ],
+   "size_m": [
+    3.325,
+    1.503,
+    1.24
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (LOD)",
+   "lod": "is LOD1 of orchard_hedge_dense",
+   "glb_bytes": 18792,
+   "reimport_triangles": 620,
+   "vertex_colours": true,
+   "renders": {}
+  },
+  {
+   "id": "orchard_shrub_flowering",
+   "category": "shrub",
+   "glb": "glb/orchard_shrub_flowering.glb",
+   "nodes": [
+    "orchard_shrub_flowering_Blossom",
+    "orchard_shrub_flowering_Foliage"
+   ],
+   "material_slots": [
+    "orchard_blossom",
+    "orchard_leaf"
+   ],
+   "triangles": 2400,
+   "bounds_min_m": [
+    -0.651,
+    -0.118,
+    -0.75
+   ],
+   "bounds_max_m": [
+    0.729,
+    0.503,
+    0.652
+   ],
+   "size_m": [
+    1.38,
+    0.621,
+    1.402
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (walk-through) or small cylinder r0.5",
+   "lod": "Godot auto-LOD; cull beyond 60 m",
+   "glb_bytes": 132184,
+   "reimport_triangles": 2400,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_shrub_flowering_front.png",
+    "threequarter": "renders/orchard_shrub_flowering_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_rock_mossy",
+   "category": "rock",
+   "glb": "glb/orchard_rock_mossy.glb",
+   "nodes": [
+    "orchard_rock_mossy_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 320,
+   "bounds_min_m": [
+    -0.507,
+    -0.03,
+    -0.509
+   ],
+   "bounds_max_m": [
+    0.714,
+    0.902,
+    0.514
+   ],
+   "size_m": [
+    1.222,
+    0.932,
+    1.023
+   ],
+   "origin": "ground-contact centre",
+   "collision": "convex hull or box 1.4 x 1.05 x 1.2",
+   "lod": "none; Godot auto-LOD",
+   "glb_bytes": 33104,
+   "reimport_triangles": 320,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_rock_mossy_front.png",
+    "threequarter": "renders/orchard_rock_mossy_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_rock_mossy_small",
+   "category": "rock",
+   "glb": "glb/orchard_rock_mossy_small.glb",
+   "nodes": [
+    "orchard_rock_mossy_small_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 320,
+   "bounds_min_m": [
+    -0.383,
+    -0.03,
+    -0.349
+   ],
+   "bounds_max_m": [
+    0.391,
+    0.447,
+    0.352
+   ],
+   "size_m": [
+    0.774,
+    0.477,
+    0.701
+   ],
+   "origin": "ground-contact centre",
+   "collision": "box or none",
+   "lod": "none",
+   "glb_bytes": 32940,
+   "reimport_triangles": 320,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_rock_mossy_small_front.png",
+    "threequarter": "renders/orchard_rock_mossy_small_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_rubble_split",
+   "category": "rock",
+   "glb": "glb/orchard_rubble_split.glb",
+   "nodes": [
+    "orchard_rubble_split_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 408,
+   "bounds_min_m": [
+    -1.036,
+    -0.076,
+    -0.851
+   ],
+   "bounds_max_m": [
+    1.004,
+    0.681,
+    0.903
+   ],
+   "size_m": [
+    2.04,
+    0.757,
+    1.754
+   ],
+   "origin": "ground-contact centre",
+   "collision": "one convex per split half; shards none",
+   "lod": "none; cull beyond 80 m",
+   "glb_bytes": 45596,
+   "reimport_triangles": 408,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_rubble_split_front.png",
+    "threequarter": "renders/orchard_rubble_split_threequarter.png"
+   }
+  },
+  {
+   "id": "orchard_wall_straight",
+   "category": "wall",
+   "glb": "glb/orchard_wall_straight.glb",
+   "nodes": [
+    "orchard_wall_straight_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 2770,
+   "bounds_min_m": [
+    -2.0,
+    -0.006,
+    -0.331
+   ],
+   "bounds_max_m": [
+    2.0,
+    1.283,
+    0.34
+   ],
+   "size_m": [
+    4.0,
+    1.288,
+    0.671
+   ],
+   "origin": "ground-contact centre",
+   "collision": "box 4.0 x 1.3 x 0.62 (centre y 0.65)",
+   "lod": "Godot auto-LOD; ~2.9k tris",
+   "glb_bytes": 312428,
+   "reimport_triangles": 2770,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_wall_straight_front.png",
+    "threequarter": "renders/orchard_wall_straight_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "flat faces at local x=-2 and x=+2, centreline z=0, height 1.05 + coping"
+   }
+  },
+  {
+   "id": "orchard_wall_corner_broken",
+   "category": "wall",
+   "glb": "glb/orchard_wall_corner_broken.glb",
+   "nodes": [
+    "orchard_wall_corner_broken_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 2570,
+   "bounds_min_m": [
+    -1.043,
+    -0.08,
+    -0.341
+   ],
+   "bounds_max_m": [
+    2.002,
+    1.38,
+    2.0
+   ],
+   "size_m": [
+    3.044,
+    1.46,
+    2.341
+   ],
+   "origin": "ground-contact centre",
+   "collision": "two boxes along arms (see HANDOFF)",
+   "lod": "Godot auto-LOD",
+   "glb_bytes": 289084,
+   "reimport_triangles": 2570,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_wall_corner_broken_front.png",
+    "threequarter": "renders/orchard_wall_corner_broken_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "arm ends at local (+2,0,0) facing +X and (0,0,+2) facing +Z; corner block at origin. A straight piece continues at (4,0,0) yaw 0 or (0,0,4) yaw 90deg"
+   }
+  },
+  {
+   "id": "orchard_wall_end_broken",
+   "category": "wall",
+   "glb": "glb/orchard_wall_end_broken.glb",
+   "nodes": [
+    "orchard_wall_end_broken_Stone"
+   ],
+   "material_slots": [
+    "orchard_stone",
+    "orchard_moss"
+   ],
+   "triangles": 1832,
+   "bounds_min_m": [
+    -2.0,
+    -0.071,
+    -1.164
+   ],
+   "bounds_max_m": [
+    2.606,
+    1.279,
+    1.17
+   ],
+   "size_m": [
+    4.606,
+    1.35,
+    2.335
+   ],
+   "origin": "ground-contact centre",
+   "collision": "box x[-2,1.4] full height + ramped box for rubble",
+   "lod": "Godot auto-LOD",
+   "glb_bytes": 207048,
+   "reimport_triangles": 1832,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_wall_end_broken_front.png",
+    "threequarter": "renders/orchard_wall_end_broken_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "full-height flat face at local x=-2; collapses toward +X into rubble (terminator)"
+   }
+  },
+  {
+   "id": "orchard_path_straight",
+   "category": "ground",
+   "glb": "glb/orchard_path_straight.glb",
+   "nodes": [
+    "orchard_path_straight_Ground"
+   ],
+   "material_slots": [
+    "orchard_soil"
+   ],
+   "triangles": 578,
+   "bounds_min_m": [
+    -0.899,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max_m": [
+    0.899,
+    0.029,
+    2.0
+   ],
+   "size_m": [
+    1.798,
+    0.039,
+    4.0
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none (flat ground carries physics)",
+   "lod": "none; cast_shadow off",
+   "glb_bytes": 46908,
+   "reimport_triangles": 578,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_path_straight_front.png",
+    "threequarter": "renders/orchard_path_straight_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "local z=-2 and z=+2, identical periodic edge outline so any number tile"
+   }
+  },
+  {
+   "id": "orchard_path_curve30",
+   "category": "ground",
+   "glb": "glb/orchard_path_curve30.glb",
+   "nodes": [
+    "orchard_path_curve30_Ground"
+   ],
+   "material_slots": [
+    "orchard_soil"
+   ],
+   "triangles": 578,
+   "bounds_min_m": [
+    -0.887,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max_m": [
+    1.755,
+    0.029,
+    2.242
+   ],
+   "size_m": [
+    2.642,
+    0.039,
+    4.242
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none",
+   "lod": "none; cast_shadow off",
+   "glb_bytes": 47424,
+   "reimport_triangles": 578,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_path_curve30_front.png",
+    "threequarter": "renders/orchard_path_curve30_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "enters at z=-2 heading +Z; exits at local (1.023, 0, 1.820) heading yaw +30deg (+Z rotated toward +X). Use orchard_path_curve30_left for the other hand (do not mirror)",
+    "exit_transform": {
+     "position": [
+      1.0235,
+      0.0,
+      1.8197
+     ],
+     "yaw_deg": 30.0
+    }
+   }
+  },
+  {
+   "id": "orchard_path_curve30_left",
+   "category": "ground",
+   "glb": "glb/orchard_path_curve30_left.glb",
+   "nodes": [
+    "orchard_path_curve30_left_Ground"
+   ],
+   "material_slots": [
+    "orchard_soil"
+   ],
+   "triangles": 578,
+   "bounds_min_m": [
+    -1.755,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max_m": [
+    0.887,
+    0.029,
+    2.242
+   ],
+   "size_m": [
+    2.642,
+    0.039,
+    4.242
+   ],
+   "origin": "ground-contact centre",
+   "collision": "none",
+   "lod": "none; cast_shadow off",
+   "glb_bytes": 47436,
+   "reimport_triangles": 578,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/orchard_path_curve30_left_front.png",
+    "threequarter": "renders/orchard_path_curve30_left_threequarter.png"
+   },
+   "joins": {
+    "module_m": 4.0,
+    "ends": "enters at z=-2 heading +Z; exits at local (-1.023, 0, 1.820) heading yaw -30deg",
+    "exit_transform": {
+     "position": [
+      -1.0235,
+      0.0,
+      1.8197
+     ],
+     "yaw_deg": -30.0
+    }
+   }
+  },
+  {
+   "id": "mountain_cliff_chunk",
+   "category": "backdrop",
+   "glb": "glb/mountain_cliff_chunk.glb",
+   "nodes": [
+    "mountain_cliff_chunk_Rock"
+   ],
+   "material_slots": [
+    "orchard_strata"
+   ],
+   "triangles": 832,
+   "bounds_min_m": [
+    -43.587,
+    -4.0,
+    -24.815
+   ],
+   "bounds_max_m": [
+    42.409,
+    51.982,
+    27.294
+   ],
+   "size_m": [
+    85.996,
+    55.982,
+    52.109
+   ],
+   "origin": "footprint centre at ground level; base skirt extends to y=-4 for uneven terrain",
+   "collision": "none (out of bounds) or coarse box",
+   "lod": "single LOD, reads at 100-300 m",
+   "glb_bytes": 94156,
+   "reimport_triangles": 832,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/mountain_cliff_chunk_front.png",
+    "threequarter": "renders/mountain_cliff_chunk_threequarter.png"
+   }
+  },
+  {
+   "id": "mountain_peak_snow",
+   "category": "backdrop",
+   "glb": "glb/mountain_peak_snow.glb",
+   "nodes": [
+    "mountain_peak_snow_Rock"
+   ],
+   "material_slots": [
+    "orchard_strata"
+   ],
+   "triangles": 1040,
+   "bounds_min_m": [
+    -58.637,
+    -4.0,
+    -46.953
+   ],
+   "bounds_max_m": [
+    63.757,
+    105.0,
+    46.646
+   ],
+   "size_m": [
+    122.394,
+    109.0,
+    93.6
+   ],
+   "origin": "footprint centre at ground level; base skirt extends to y=-4 for uneven terrain",
+   "collision": "none",
+   "lod": "single LOD, reads at 150-600 m",
+   "glb_bytes": 117920,
+   "reimport_triangles": 1040,
+   "vertex_colours": true,
+   "renders": {
+    "front": "renders/mountain_peak_snow_front.png",
+    "threequarter": "renders/mountain_peak_snow_threequarter.png"
+   }
+  }
+ ]
+}

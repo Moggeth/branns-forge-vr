@@ -1,0 +1,488 @@
+{
+ "assets": [
+  {
+   "id": "mountain_cliff_chunk",
+   "bytes": 94156,
+   "meshes": 1,
+   "triangles": 832,
+   "materials": [
+    "orchard_strata"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -43.587,
+    -4.0,
+    -24.815
+   ],
+   "bounds_max": [
+    42.409,
+    51.982,
+    27.294
+   ]
+  },
+  {
+   "id": "mountain_peak_snow",
+   "bytes": 117920,
+   "meshes": 1,
+   "triangles": 1040,
+   "materials": [
+    "orchard_strata"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -58.637,
+    -4.0,
+    -46.953
+   ],
+   "bounds_max": [
+    63.757,
+    105.0,
+    46.646
+   ]
+  },
+  {
+   "id": "orchard_apple_stump",
+   "bytes": 10200,
+   "meshes": 1,
+   "triangles": 188,
+   "materials": [
+    "orchard_bark",
+    "orchard_heartwood"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.681,
+    -0.074,
+    -0.553
+   ],
+   "bounds_max": [
+    0.676,
+    0.469,
+    0.676
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_mature",
+   "bytes": 200920,
+   "meshes": 3,
+   "triangles": 6739,
+   "materials": [
+    "orchard_bark",
+    "orchard_fruit",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.723,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max": [
+    1.999,
+    4.589,
+    2.074
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_mature_autumn",
+   "bytes": 200976,
+   "meshes": 3,
+   "triangles": 6739,
+   "materials": [
+    "orchard_bark",
+    "orchard_fruit",
+    "orchard_leaf_autumn"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.723,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max": [
+    1.999,
+    4.589,
+    2.074
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_mature_b",
+   "bytes": 206404,
+   "meshes": 3,
+   "triangles": 6883,
+   "materials": [
+    "orchard_bark",
+    "orchard_fruit",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.348,
+    -0.087,
+    -2.325
+   ],
+   "bounds_max": [
+    2.824,
+    4.558,
+    2.527
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_mature_b_lod1",
+   "bytes": 43400,
+   "meshes": 2,
+   "triangles": 1475,
+   "materials": [
+    "orchard_bark",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.348,
+    -0.087,
+    -2.273
+   ],
+   "bounds_max": [
+    2.796,
+    4.558,
+    2.527
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_mature_lod1",
+   "bytes": 43396,
+   "meshes": 2,
+   "triangles": 1475,
+   "materials": [
+    "orchard_bark",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.662,
+    -0.087,
+    -2.161
+   ],
+   "bounds_max": [
+    1.999,
+    4.589,
+    2.017
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_young",
+   "bytes": 96796,
+   "meshes": 3,
+   "triangles": 3303,
+   "materials": [
+    "orchard_bark",
+    "orchard_fruit",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.32,
+    -0.055,
+    -1.442
+   ],
+   "bounds_max": [
+    1.45,
+    2.827,
+    1.248
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_young_autumn",
+   "bytes": 96852,
+   "meshes": 3,
+   "triangles": 3303,
+   "materials": [
+    "orchard_bark",
+    "orchard_fruit",
+    "orchard_leaf_autumn"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.32,
+    -0.055,
+    -1.442
+   ],
+   "bounds_max": [
+    1.45,
+    2.827,
+    1.248
+   ]
+  },
+  {
+   "id": "orchard_apple_tree_young_lod1",
+   "bytes": 23192,
+   "meshes": 2,
+   "triangles": 767,
+   "materials": [
+    "orchard_bark",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.261,
+    -0.054,
+    -1.442
+   ],
+   "bounds_max": [
+    1.409,
+    2.81,
+    1.224
+   ]
+  },
+  {
+   "id": "orchard_hedge_dense",
+   "bytes": 59096,
+   "meshes": 2,
+   "triangles": 2300,
+   "materials": [
+    "orchard_bark",
+    "orchard_hedge"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.737,
+    -0.065,
+    -0.614
+   ],
+   "bounds_max": [
+    1.659,
+    1.455,
+    0.671
+   ]
+  },
+  {
+   "id": "orchard_hedge_dense_lod1",
+   "bytes": 18792,
+   "meshes": 2,
+   "triangles": 620,
+   "materials": [
+    "orchard_bark",
+    "orchard_hedge"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.673,
+    -0.065,
+    -0.584
+   ],
+   "bounds_max": [
+    1.652,
+    1.438,
+    0.657
+   ]
+  },
+  {
+   "id": "orchard_path_curve30",
+   "bytes": 47424,
+   "meshes": 1,
+   "triangles": 578,
+   "materials": [
+    "orchard_soil"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.887,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max": [
+    1.755,
+    0.029,
+    2.242
+   ]
+  },
+  {
+   "id": "orchard_path_curve30_left",
+   "bytes": 47436,
+   "meshes": 1,
+   "triangles": 578,
+   "materials": [
+    "orchard_soil"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.755,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max": [
+    0.887,
+    0.029,
+    2.242
+   ]
+  },
+  {
+   "id": "orchard_path_straight",
+   "bytes": 46908,
+   "meshes": 1,
+   "triangles": 578,
+   "materials": [
+    "orchard_soil"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.899,
+    -0.01,
+    -2.0
+   ],
+   "bounds_max": [
+    0.899,
+    0.029,
+    2.0
+   ]
+  },
+  {
+   "id": "orchard_rock_mossy",
+   "bytes": 33104,
+   "meshes": 1,
+   "triangles": 320,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.507,
+    -0.03,
+    -0.509
+   ],
+   "bounds_max": [
+    0.714,
+    0.902,
+    0.514
+   ]
+  },
+  {
+   "id": "orchard_rock_mossy_small",
+   "bytes": 32940,
+   "meshes": 1,
+   "triangles": 320,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.383,
+    -0.03,
+    -0.349
+   ],
+   "bounds_max": [
+    0.391,
+    0.447,
+    0.352
+   ]
+  },
+  {
+   "id": "orchard_rubble_split",
+   "bytes": 45596,
+   "meshes": 1,
+   "triangles": 408,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.036,
+    -0.076,
+    -0.851
+   ],
+   "bounds_max": [
+    1.004,
+    0.681,
+    0.903
+   ]
+  },
+  {
+   "id": "orchard_shrub_flowering",
+   "bytes": 132184,
+   "meshes": 2,
+   "triangles": 2400,
+   "materials": [
+    "orchard_blossom",
+    "orchard_leaf"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -0.651,
+    -0.118,
+    -0.75
+   ],
+   "bounds_max": [
+    0.729,
+    0.503,
+    0.652
+   ]
+  },
+  {
+   "id": "orchard_wall_corner_broken",
+   "bytes": 289084,
+   "meshes": 1,
+   "triangles": 2570,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -1.043,
+    -0.08,
+    -0.341
+   ],
+   "bounds_max": [
+    2.002,
+    1.38,
+    2.0
+   ]
+  },
+  {
+   "id": "orchard_wall_end_broken",
+   "bytes": 207048,
+   "meshes": 1,
+   "triangles": 1832,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.0,
+    -0.071,
+    -1.164
+   ],
+   "bounds_max": [
+    2.606,
+    1.279,
+    1.17
+   ]
+  },
+  {
+   "id": "orchard_wall_straight",
+   "bytes": 312428,
+   "meshes": 1,
+   "triangles": 2770,
+   "materials": [
+    "orchard_moss",
+    "orchard_stone"
+   ],
+   "vertex_colours": true,
+   "bounds_min": [
+    -2.0,
+    -0.006,
+    -0.331
+   ],
+   "bounds_max": [
+    2.0,
+    1.283,
+    0.34
+   ]
+  }
+ ],
+ "problems": []
+}
