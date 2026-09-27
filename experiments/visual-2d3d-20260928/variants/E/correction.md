@@ -1,0 +1,7 @@
+# Hybrid correction: image plan to specialist scene
+
+The first image-extracted B build passed route and bridge validation, but its player-height approach exposed a broad, under-populated lawn. I kept B's saved stream, bridge, path, hills and 113 image-derived placements, then added 78 clearance-checked props from the reference-led C plan. I replaced the generic crossing and goal marker with the Opus-built stone-and-timber bridge and C beacon. The source hashes and per-role additions are saved in `world_spec.json`; `build_hybrid.py` reconstructs the result without another model call.
+
+The corrected E build passes structured evaluation with no hard failures. Godot raycasts hit its walkable deck and landmark fallback collider, and the saved five-view captures show the crossing and goal are more distinct. The correction did **not** make the initial approach lush: its clearing and long straight sightline remain dominated by B's extracted geometry. This is a useful limit of local prop additions. Re-compose the path and terrain in the structured plan, or use A's stronger layout, before claiming an overall visual win.
+
+Compare the matched [B approach](../../evidence/B/approach.png), [E approach](../../evidence/E/approach.png), [B crossing](../../evidence/B/crossing.png), and [E crossing](../../evidence/E/crossing.png). These are desktop Godot captures with the same five benchmark cameras. The specialist bridge and beacon use simplified safety colliders in this harness; their detailed collision and headset performance are not established.
