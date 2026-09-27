@@ -1,0 +1,12 @@
+step,outcome,elapsed_seconds,measurement
+initial contract and brief reads,completed,0.300,tool wall time
+README verification and asset discovery,completed,0.800,tool wall time
+first default spec generation,57 objects,0.111,tool wall time
+first default spec evaluation,passed,0.133,tool wall time
+three additional spec generations,63/69/55 objects,0.700,parallel tool wall time
+four-spec evaluation,all passed,0.144,tool wall time
+focused tests and edit comparison,5 tests passed and local edit passed,0.600,parallel tool wall time
+bytecode cleanup attempt,blocked by command policy; caches ignored instead,0.000,tool wall time
+compile and output inspection,passed,0.700,parallel tool wall time
+regenerate four specs after exclusion validation,passed,0.900,parallel tool wall time
+final four-spec evaluation and tests,all passed,0.700,parallel tool wall time

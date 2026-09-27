@@ -1,0 +1,2167 @@
+{
+  "version": 1,
+  "variant": "B",
+  "method": "image-led palette extraction",
+  "seed": 0,
+  "bounds_m": [
+    80,
+    80
+  ],
+  "spawn_xz": [
+    -31.7262,
+    31.156
+  ],
+  "goal_xz": [
+    29.2812,
+    -29.7235
+  ],
+  "path_xz": [
+    [
+      -31.5625,
+      31.5625
+    ],
+    [
+      -31.5625,
+      30.9375
+    ],
+    [
+      -30.3125,
+      29.6875
+    ],
+    [
+      -29.6875,
+      29.6875
+    ],
+    [
+      -24.0625,
+      24.0625
+    ],
+    [
+      -23.4375,
+      24.0625
+    ],
+    [
+      -22.8125,
+      23.4375
+    ],
+    [
+      -22.1875,
+      23.4375
+    ],
+    [
+      -15.9375,
+      17.1875
+    ],
+    [
+      -15.3125,
+      16.5625
+    ],
+    [
+      -15.3125,
+      15.9375
+    ],
+    [
+      -9.0625,
+      9.6875
+    ],
+    [
+      -2.8125,
+      3.4375
+    ],
+    [
+      -2.1875,
+      2.8125
+    ],
+    [
+      -2.1875,
+      2.1875
+    ],
+    [
+      0.3125,
+      -0.3125
+    ],
+    [
+      0.3125,
+      -2.1875
+    ],
+    [
+      6.5625,
+      -8.4375
+    ],
+    [
+      12.8125,
+      -14.6875
+    ],
+    [
+      14.6875,
+      -16.5625
+    ],
+    [
+      15.3125,
+      -16.5625
+    ],
+    [
+      16.5625,
+      -17.8125
+    ],
+    [
+      17.1875,
+      -17.8125
+    ],
+    [
+      17.8125,
+      -18.4375
+    ],
+    [
+      18.4375,
+      -18.4375
+    ],
+    [
+      19.0625,
+      -19.0625
+    ],
+    [
+      20.3125,
+      -19.0625
+    ],
+    [
+      20.9375,
+      -19.6875
+    ],
+    [
+      21.5625,
+      -19.6875
+    ],
+    [
+      27.8125,
+      -25.9375
+    ],
+    [
+      29.6875,
+      -27.8125
+    ],
+    [
+      29.6875,
+      -29.6875
+    ]
+  ],
+  "stream": {
+    "points_xz": [
+      [
+        -38.5156,
+        -5.2344
+      ],
+      [
+        -35.7031,
+        -4.9219
+      ],
+      [
+        -32.5781,
+        -3.9844
+      ],
+      [
+        -29.6094,
+        -2.4219
+      ],
+      [
+        -26.6406,
+        -1.0156
+      ],
+      [
+        -23.5156,
+        -0.3906
+      ],
+      [
+        -20.3906,
+        -0.5469
+      ],
+      [
+        -17.1094,
+        -1.3281
+      ],
+      [
+        -13.9844,
+        -2.7344
+      ],
+      [
+        -10.7031,
+        -3.3594
+      ],
+      [
+        -7.5781,
+        -3.3594
+      ],
+      [
+        -4.4531,
+        -2.5781
+      ],
+      [
+        -1.9531,
+        -1.6406
+      ],
+      [
+        2.2656,
+        0.7031
+      ],
+      [
+        4.6094,
+        1.3281
+      ],
+      [
+        7.5781,
+        1.7969
+      ],
+      [
+        10.8594,
+        1.4844
+      ],
+      [
+        13.9844,
+        0.7031
+      ],
+      [
+        17.2656,
+        -0.0781
+      ],
+      [
+        20.3906,
+        -0.2344
+      ],
+      [
+        23.5156,
+        -0.0781
+      ],
+      [
+        26.6406,
+        0.625
+      ],
+      [
+        29.6094,
+        1.6406
+      ],
+      [
+        32.7344,
+        2.5781
+      ],
+      [
+        35.8594,
+        3.0469
+      ]
+    ],
+    "width_m": 3.0
+  },
+  "crossing": {
+    "center_xz": [
+      0.2165,
+      -0.4507
+    ],
+    "width_m": 3.5,
+    "length_m": 5.0,
+    "yaw_rad": -0.42483
+  },
+  "terrain": {
+    "base_height_m": 0,
+    "hills": [
+      {
+        "center_xz": [
+          -14.6122,
+          -16.9555
+        ],
+        "radius_m": 10.79,
+        "amplitude_m": 1.541
+      },
+      {
+        "center_xz": [
+          15.5525,
+          15.8407
+        ],
+        "radius_m": 10.478,
+        "amplitude_m": 1.506
+      },
+      {
+        "center_xz": [
+          -0.7914,
+          -21.7654
+        ],
+        "radius_m": 4.474,
+        "amplitude_m": 0.844
+      },
+      {
+        "center_xz": [
+          28.3182,
+          13.3479
+        ],
+        "radius_m": 3.274,
+        "amplitude_m": 0.711
+      }
+    ]
+  },
+  "regions": [
+    {
+      "name": "earth_hill_1",
+      "polygon_xz": [
+        [
+          -6.1719,
+          -13.2031
+        ],
+        [
+          -6.7969,
+          -11.4844
+        ],
+        [
+          -10.5469,
+          -9.7656
+        ],
+        [
+          -23.2031,
+          -15.5469
+        ],
+        [
+          -24.1406,
+          -16.9531
+        ],
+        [
+          -21.6406,
+          -22.1094
+        ],
+        [
+          -16.6406,
+          -23.8281
+        ],
+        [
+          -9.2969,
+          -21.1719
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_2",
+      "polygon_xz": [
+        [
+          23.9844,
+          16.6406
+        ],
+        [
+          23.0469,
+          19.9219
+        ],
+        [
+          19.2969,
+          21.7969
+        ],
+        [
+          6.7969,
+          18.8281
+        ],
+        [
+          5.8594,
+          17.2656
+        ],
+        [
+          6.7969,
+          14.7656
+        ],
+        [
+          16.3281,
+          8.9844
+        ],
+        [
+          20.8594,
+          10.5469
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_5",
+      "polygon_xz": [
+        [
+          3.0469,
+          -20.8594
+        ],
+        [
+          2.7344,
+          -19.1406
+        ],
+        [
+          1.9531,
+          -18.6719
+        ],
+        [
+          -4.7656,
+          -21.3281
+        ],
+        [
+          -5.0781,
+          -22.1094
+        ],
+        [
+          -4.4531,
+          -23.3594
+        ],
+        [
+          -2.4219,
+          -24.4531
+        ],
+        [
+          1.0156,
+          -23.3594
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_6",
+      "polygon_xz": [
+        [
+          30.5469,
+          14.6094
+        ],
+        [
+          30.5469,
+          14.6094
+        ],
+        [
+          29.2969,
+          15.7031
+        ],
+        [
+          27.1094,
+          15.2344
+        ],
+        [
+          26.0156,
+          12.5781
+        ],
+        [
+          26.4844,
+          11.4844
+        ],
+        [
+          27.1094,
+          11.1719
+        ],
+        [
+          30.2344,
+          12.4219
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_1",
+      "polygon_xz": [
+        [
+          34.1406,
+          -31.6406
+        ],
+        [
+          34.1406,
+          -29.4531
+        ],
+        [
+          33.9844,
+          -29.2969
+        ],
+        [
+          28.2031,
+          -34.1406
+        ],
+        [
+          28.0469,
+          -35.2344
+        ],
+        [
+          28.2031,
+          -36.7969
+        ],
+        [
+          28.2031,
+          -36.7969
+        ],
+        [
+          34.1406,
+          -33.8281
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_2",
+      "polygon_xz": [
+        [
+          36.0156,
+          -30.0781
+        ],
+        [
+          35.2344,
+          -27.1094
+        ],
+        [
+          33.5156,
+          -25.3906
+        ],
+        [
+          32.7344,
+          -25.5469
+        ],
+        [
+          32.4219,
+          -26.0156
+        ],
+        [
+          34.9219,
+          -31.1719
+        ],
+        [
+          34.9219,
+          -31.1719
+        ],
+        [
+          36.0156,
+          -31.0156
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_3",
+      "polygon_xz": [
+        [
+          25.2344,
+          -33.8281
+        ],
+        [
+          25.2344,
+          -31.0156
+        ],
+        [
+          25.0781,
+          -30.8594
+        ],
+        [
+          24.1406,
+          -30.8594
+        ],
+        [
+          23.8281,
+          -31.3281
+        ],
+        [
+          24.1406,
+          -34.9219
+        ],
+        [
+          24.1406,
+          -34.9219
+        ],
+        [
+          25.2344,
+          -34.7656
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_4",
+      "polygon_xz": [
+        [
+          25.2344,
+          -28.8281
+        ],
+        [
+          25.2344,
+          -28.6719
+        ],
+        [
+          24.7656,
+          -28.2031
+        ],
+        [
+          24.1406,
+          -28.2031
+        ],
+        [
+          23.6719,
+          -28.8281
+        ],
+        [
+          23.8281,
+          -29.6094
+        ],
+        [
+          24.2969,
+          -29.9219
+        ],
+        [
+          25.0781,
+          -29.4531
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_5",
+      "polygon_xz": [
+        [
+          32.2656,
+          -24.2969
+        ],
+        [
+          32.2656,
+          -24.1406
+        ],
+        [
+          31.7969,
+          -23.8281
+        ],
+        [
+          31.3281,
+          -23.8281
+        ],
+        [
+          31.0156,
+          -24.2969
+        ],
+        [
+          31.4844,
+          -25.0781
+        ],
+        [
+          31.4844,
+          -25.0781
+        ],
+        [
+          32.2656,
+          -24.7656
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_6",
+      "polygon_xz": [
+        [
+          27.2656,
+          -33.8281
+        ],
+        [
+          27.2656,
+          -33.6719
+        ],
+        [
+          27.1094,
+          -33.5156
+        ],
+        [
+          26.6406,
+          -33.5156
+        ],
+        [
+          26.4844,
+          -33.6719
+        ],
+        [
+          26.6406,
+          -34.4531
+        ],
+        [
+          26.6406,
+          -34.4531
+        ],
+        [
+          27.2656,
+          -34.1406
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_7",
+      "polygon_xz": [
+        [
+          33.6719,
+          -23.6719
+        ],
+        [
+          33.6719,
+          -23.6719
+        ],
+        [
+          33.3594,
+          -23.3594
+        ],
+        [
+          32.8906,
+          -23.3594
+        ],
+        [
+          32.7344,
+          -23.5156
+        ],
+        [
+          32.8906,
+          -23.9844
+        ],
+        [
+          33.2031,
+          -24.1406
+        ],
+        [
+          33.6719,
+          -23.9844
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_8",
+      "polygon_xz": [
+        [
+          25.2344,
+          -27.4219
+        ],
+        [
+          25.2344,
+          -27.1094
+        ],
+        [
+          25.0781,
+          -26.9531
+        ],
+        [
+          24.7656,
+          -26.9531
+        ],
+        [
+          24.6094,
+          -27.1094
+        ],
+        [
+          24.9219,
+          -27.7344
+        ],
+        [
+          24.9219,
+          -27.7344
+        ],
+        [
+          25.2344,
+          -27.5781
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    }
+  ],
+  "objects": [
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        31.5556,
+        0,
+        -33.8865
+      ],
+      "yaw_rad": 0.8014,
+      "scale": 2.5,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        34.5658,
+        0,
+        -28.1405
+      ],
+      "yaw_rad": 2.0803,
+      "scale": 2.145,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        24.5201,
+        0,
+        -32.8956
+      ],
+      "yaw_rad": 1.5662,
+      "scale": 1.356,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        24.4129,
+        0,
+        -29.0134
+      ],
+      "yaw_rad": 1.1448,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        31.6575,
+        0,
+        -24.4411
+      ],
+      "yaw_rad": -0.6996,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        26.8576,
+        0,
+        -33.9627
+      ],
+      "yaw_rad": 1.2736,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        33.2079,
+        0,
+        -23.7382
+      ],
+      "yaw_rad": -0.4746,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        24.9414,
+        0,
+        -27.3177
+      ],
+      "yaw_rad": 1.913,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -31.717,
+        0,
+        -29.7283
+      ],
+      "yaw_rad": 0.0,
+      "scale": 1.8,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.4178,
+        0,
+        -36.5395
+      ],
+      "yaw_rad": 2.4,
+      "scale": 1.193,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -14.2642,
+        0,
+        35.6983
+      ],
+      "yaw_rad": 4.7999,
+      "scale": 1.157,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -28.6286,
+        0,
+        17.0738
+      ],
+      "yaw_rad": 0.9167,
+      "scale": 1.139,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        23.0501,
+        0,
+        30.9451
+      ],
+      "yaw_rad": 3.3167,
+      "scale": 1.125,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        29.0863,
+        0,
+        27.7382
+      ],
+      "yaw_rad": 5.7166,
+      "scale": 1.106,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.6247,
+        0,
+        13.4321
+      ],
+      "yaw_rad": 1.8334,
+      "scale": 1.093,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        15.9903,
+        0,
+        36.6364
+      ],
+      "yaw_rad": 4.2334,
+      "scale": 1.091,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        36.4219,
+        0,
+        36.2392
+      ],
+      "yaw_rad": 0.3501,
+      "scale": 1.05,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -13.5418,
+        0,
+        -34.3385
+      ],
+      "yaw_rad": 2.7501,
+      "scale": 1.047,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -8.1225,
+        0,
+        34.1819
+      ],
+      "yaw_rad": 5.1501,
+      "scale": 1.047,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.8051,
+        0,
+        23.6089
+      ],
+      "yaw_rad": 1.2669,
+      "scale": 1.044,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.8294,
+        0,
+        24.07
+      ],
+      "yaw_rad": 3.6668,
+      "scale": 1.02,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.0181,
+        0,
+        37.1002
+      ],
+      "yaw_rad": 6.0668,
+      "scale": 0.944,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        7.6064,
+        0,
+        -37.121
+      ],
+      "yaw_rad": 2.1836,
+      "scale": 0.915,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        17.5632,
+        0,
+        30.8736
+      ],
+      "yaw_rad": 4.5835,
+      "scale": 0.912,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -30.2076,
+        0,
+        -37.2481
+      ],
+      "yaw_rad": 0.7003,
+      "scale": 0.906,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        12.1082,
+        0,
+        -34.9209
+      ],
+      "yaw_rad": 3.1003,
+      "scale": 0.904,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        37.0111,
+        0,
+        30.406
+      ],
+      "yaw_rad": 5.5002,
+      "scale": 0.9,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.1411,
+        0,
+        22.3378
+      ],
+      "yaw_rad": 1.617,
+      "scale": 0.885,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -20.5608,
+        0,
+        35.4898
+      ],
+      "yaw_rad": 4.017,
+      "scale": 0.885,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        37.3584,
+        0,
+        -37.3792
+      ],
+      "yaw_rad": 0.1337,
+      "scale": 0.874,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        35.9426,
+        0,
+        -17.239
+      ],
+      "yaw_rad": 2.5337,
+      "scale": 0.871,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        16.3289,
+        0,
+        -37.387
+      ],
+      "yaw_rad": 4.9337,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.9383,
+        0,
+        -12.6266
+      ],
+      "yaw_rad": 1.0504,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.2267,
+        0,
+        34.3356
+      ],
+      "yaw_rad": 3.4504,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -32.647,
+        0,
+        -18.4285
+      ],
+      "yaw_rad": 5.8504,
+      "scale": 0.869,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        12.5027,
+        0,
+        32.5022
+      ],
+      "yaw_rad": 1.9671,
+      "scale": 0.862,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -29.1741,
+        0,
+        37.1067
+      ],
+      "yaw_rad": 4.3671,
+      "scale": 0.856,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -34.7152,
+        0,
+        8.3362
+      ],
+      "yaw_rad": 0.4839,
+      "scale": 0.848,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        36.875,
+        0,
+        13.0469
+      ],
+      "yaw_rad": 2.8839,
+      "scale": 0.843,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -21.7991,
+        0,
+        -32.0517
+      ],
+      "yaw_rad": 5.2838,
+      "scale": 0.829,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        24.8584,
+        0,
+        36.1523
+      ],
+      "yaw_rad": 1.4006,
+      "scale": 0.822,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -32.5384,
+        0,
+        -23.4211
+      ],
+      "yaw_rad": 3.8006,
+      "scale": 0.819,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        17.626,
+        0,
+        -11.9076
+      ],
+      "yaw_rad": 6.2005,
+      "scale": 0.819,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        33.6672,
+        0,
+        18.1124
+      ],
+      "yaw_rad": 2.3173,
+      "scale": 0.813,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        32.8786,
+        0,
+        32.7102
+      ],
+      "yaw_rad": 4.7173,
+      "scale": 0.813,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -18.5123,
+        0,
+        -35.1708
+      ],
+      "yaw_rad": 0.834,
+      "scale": 0.805,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -30.5418,
+        0,
+        11.674
+      ],
+      "yaw_rad": 3.234,
+      "scale": 0.803,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -17.6728,
+        0,
+        31.8187
+      ],
+      "yaw_rad": 5.634,
+      "scale": 0.8,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.8366,
+        0,
+        8.7763
+      ],
+      "yaw_rad": 1.7507,
+      "scale": 0.799,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -26.1258,
+        0,
+        -27.89
+      ],
+      "yaw_rad": 4.1507,
+      "scale": 0.792,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        27.9736,
+        0,
+        32.7541
+      ],
+      "yaw_rad": 0.2675,
+      "scale": 0.788,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        9.9752,
+        0,
+        36.5085
+      ],
+      "yaw_rad": 2.6674,
+      "scale": 0.787,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.9704,
+        0,
+        35.5466
+      ],
+      "yaw_rad": 5.0674,
+      "scale": 0.78,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.8116,
+        0,
+        -10.0164
+      ],
+      "yaw_rad": 1.1842,
+      "scale": 0.755,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.7281,
+        0,
+        -8.0827
+      ],
+      "yaw_rad": 3.5841,
+      "scale": 0.751,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.0252,
+        0,
+        18.2947
+      ],
+      "yaw_rad": 5.9841,
+      "scale": 0.75,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        11.667,
+        0,
+        -30.2963
+      ],
+      "yaw_rad": 2.1009,
+      "scale": 0.739,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -22.7419,
+        0,
+        -36.3969
+      ],
+      "yaw_rad": 4.5009,
+      "scale": 0.736,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        37.7118,
+        0,
+        -5.1831
+      ],
+      "yaw_rad": 0.6176,
+      "scale": 0.736,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.1201,
+        0,
+        -8.5304
+      ],
+      "yaw_rad": 3.0176,
+      "scale": 0.726,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        8.0412,
+        0,
+        -32.6502
+      ],
+      "yaw_rad": 5.4176,
+      "scale": 0.669,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        14.5604,
+        0,
+        27.7191
+      ],
+      "yaw_rad": 1.5343,
+      "scale": 0.666,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        37.9376,
+        0,
+        -21.1508
+      ],
+      "yaw_rad": 3.9343,
+      "scale": 0.659,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.0612,
+        0,
+        -18.5156
+      ],
+      "yaw_rad": 0.0511,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        37.0855,
+        0,
+        20.0714
+      ],
+      "yaw_rad": 2.451,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -36.1335,
+        0,
+        -21.9133
+      ],
+      "yaw_rad": 4.851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -6.0272,
+        0,
+        29.4725
+      ],
+      "yaw_rad": 0.9678,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -13.3142,
+        0,
+        25.6541
+      ],
+      "yaw_rad": 3.3677,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -2.868,
+        0,
+        -14.3361
+      ],
+      "yaw_rad": 5.7677,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -37.1326,
+        0,
+        5.0875
+      ],
+      "yaw_rad": 1.8845,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -16.4399,
+        0,
+        -29.1301
+      ],
+      "yaw_rad": 4.2844,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        5.3739,
+        0,
+        23.7025
+      ],
+      "yaw_rad": 0.4012,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.0178,
+        0,
+        -9.7914
+      ],
+      "yaw_rad": 2.8012,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -22.3468,
+        0,
+        30.8689
+      ],
+      "yaw_rad": 5.2011,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -8.8939,
+        0,
+        -36.4695
+      ],
+      "yaw_rad": 1.3179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        1.0734,
+        0,
+        -35.0999
+      ],
+      "yaw_rad": 3.7179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -5.0781,
+        0,
+        37.8906
+      ],
+      "yaw_rad": 6.1179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        20.93,
+        0,
+        37.4196
+      ],
+      "yaw_rad": 2.2346,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -17.2929,
+        0,
+        10.7635
+      ],
+      "yaw_rad": 4.6346,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.137,
+        0,
+        -12.7707
+      ],
+      "yaw_rad": 0.7514,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -32.459,
+        0,
+        -33.8063
+      ],
+      "yaw_rad": 3.1513,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -29.138,
+        0,
+        -25.4761
+      ],
+      "yaw_rad": 5.5513,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -9.9863,
+        0,
+        -31.8431
+      ],
+      "yaw_rad": 1.6681,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        24.8908,
+        0,
+        25.81
+      ],
+      "yaw_rad": 4.068,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        8.5582,
+        0,
+        31.32
+      ],
+      "yaw_rad": 0.1848,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -31.9277,
+        0,
+        21.9352
+      ],
+      "yaw_rad": 2.5848,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -0.2781,
+        0,
+        30.951
+      ],
+      "yaw_rad": 4.9847,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        19.7175,
+        0,
+        -15.1918
+      ],
+      "yaw_rad": 1.1015,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        31.4808,
+        0,
+        -5.3171
+      ],
+      "yaw_rad": 3.5015,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -33.7156,
+        0,
+        2.4556
+      ],
+      "yaw_rad": 5.9014,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        18.5754,
+        0,
+        25.5145
+      ],
+      "yaw_rad": 2.0182,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -16.5658,
+        0,
+        -38.4153
+      ],
+      "yaw_rad": 4.4182,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -23.9095,
+        0,
+        38.1472
+      ],
+      "yaw_rad": 0.535,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        15.1053,
+        0,
+        -32.329
+      ],
+      "yaw_rad": 2.9349,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -37.9945,
+        0,
+        28.2982
+      ],
+      "yaw_rad": 5.3349,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        33.5084,
+        0,
+        28.5849
+      ],
+      "yaw_rad": 1.4517,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        20.0875,
+        0,
+        34.4267
+      ],
+      "yaw_rad": 3.8516,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.2415,
+        0,
+        19.571
+      ],
+      "yaw_rad": 6.2516,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.1749,
+        0,
+        -31.1542
+      ],
+      "yaw_rad": 2.3684,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.2821,
+        0,
+        26.2967
+      ],
+      "yaw_rad": 4.7683,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.2697,
+        0,
+        9.2802
+      ],
+      "yaw_rad": 0.8851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.2637,
+        0,
+        -33.3546
+      ],
+      "yaw_rad": 3.2851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        32.7934,
+        0,
+        -38.5042
+      ],
+      "yaw_rad": 5.685,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -25.9514,
+        0,
+        -37.7411
+      ],
+      "yaw_rad": 1.8018,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -35.4533,
+        0,
+        -31.6406
+      ],
+      "yaw_rad": 4.2018,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -34.3598,
+        0,
+        37.8071
+      ],
+      "yaw_rad": 0.3186,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -32.4585,
+        0,
+        14.9901
+      ],
+      "yaw_rad": 2.7185,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -10.2583,
+        0,
+        37.804
+      ],
+      "yaw_rad": 5.1185,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.1969,
+        0,
+        16.8625
+      ],
+      "yaw_rad": 1.2353,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        17.744,
+        0,
+        -34.1085
+      ],
+      "yaw_rad": 3.6352,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.4,
+        0,
+        -14.6779
+      ],
+      "yaw_rad": 6.0352,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.3594,
+        0,
+        9.7451
+      ],
+      "yaw_rad": 2.152,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        26.7353,
+        0,
+        23.5405
+      ],
+      "yaw_rad": 4.5519,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    }
+  ],
+  "exclusions": [
+    {
+      "type": "circle",
+      "center_xz": [
+        0.2165,
+        -0.4507
+      ],
+      "radius_m": 3.5,
+      "reason": "bridge clearance"
+    }
+  ],
+  "provenance": {
+    "source_image": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\experiments\\visual-2d3d-20260928\\planning\\input\\generated-map-source.png",
+    "source_plan": "source_map.png",
+    "tools": [
+      "Pillow",
+      "NumPy",
+      "planning/plan.py"
+    ],
+    "model": "openai-imagegen",
+    "measured_time_s": 0.287,
+    "source_dimensions_px": [
+      1254,
+      1254
+    ],
+    "registered_dimensions_px": [
+      512,
+      512
+    ],
+    "registration": "full-frame Lanczos resize to 512x512; no crop or transform",
+    "anchor_fallbacks": []
+  },
+  "planning": {
+    "mask_prefix": "mask_",
+    "coordinate_mapping": "x=-40+80*(u+0.5)/512; z=-40+80*(v+0.5)/512",
+    "uncertain_pixel_fraction": 0.0,
+    "warnings": [],
+    "height_encoding": "greyscale 0=0m, 255=3m; derived from source hill patches",
+    "density_encoding": "blurred tree canopy occupancy, 0..255; source-aligned"
+  }
+}

@@ -1,0 +1,17 @@
+step,outcome,elapsed_seconds,source
+guidance_contract_asset_discovery,identified Godot and Orchard colour repair,1.3,measured tool wall times
+sample_schema_check,passed,0.278,exec_command wall time
+sample_headless_build,passed without render,0.448,exec_command wall time
+first_sample_desktop_render,exposed culled terrain and white GLBs,2.013,exec_command wall time
+corrected_sample_desktop_render,passed five views,2.089,exec_command wall time
+D_spec_first_check,rejected deck yaw convention,0.255,exec_command wall time
+D_spec_corrected_check,passed,0.267,exec_command wall time
+D_desktop_render,passed five views,2.251,exec_command wall time
+invalid_bridge_check,correctly rejected width 1.5 m,0.285,exec_command wall time
+D_collision_render,passed bridge and spawn raycasts,2.241,exec_command wall time
+D_batched_foliage_render,passed but overhead range culled some distant trees,2.574,exec_command wall time
+D_batched_range_corrected_render,passed five views and raycasts,2.618,exec_command wall time
+sample_batched_range_corrected_render,passed five views and raycasts,2.181,exec_command wall time
+A_initial_validation,rejected path surface decals as obstructions,0.361,exec_command wall time
+A_surface_classification_render,passed five views and raycasts,2.253,exec_command wall time
+A_rock_obstruction_regression,correctly rejected rock on path,0.397,exec_command wall time

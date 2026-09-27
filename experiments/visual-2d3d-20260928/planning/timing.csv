@@ -1,0 +1,18 @@
+step,outcome,elapsed_s,evidence
+brief_contract_and_environment_inspection,completed,2.2,batched tool wall times 0.9+0.9+0.4
+initial_unit_tests,failed_coordinate_rounding_and_route_segment,0.692,unittest command measured wall time
+corrected_unit_tests,passed,0.633,unittest command measured wall time
+first_real_image_extraction,passed,0.533,extract command measured wall time
+real_image_palette_inspection,completed,2.066,three measured inspection commands 0.729+0.7+0.637
+enriched_unit_tests,passed,0.681,unittest command measured wall time
+enriched_real_image_extraction,passed,0.661,extract command measured wall time
+final_spec_validation,passed,0.245,validate command measured wall time
+planning_interval_including_coding_and_visual_review,completed,340.041,wall clock 00:16:14.041 to 00:21:54.082 Australia/Sydney
+final_unit_tests,passed,0.720,unittest command measured wall time
+artifact_move_to_trackable_directory,completed,0.081,Move-Item command measured wall time
+final_artifact_validation,passed,0.147,validate command measured wall time
+godot_bridge_failure_inspection,identified_yaw_convention_mismatch,0.8,batched read commands measured wall time
+corrected_image_extraction,passed,0.691,extract command measured wall time
+godot_b_smoke,passed,2.061,Run-World command measured wall time; metrics elapsed_s 0.558
+alignment_regression_test_initial,failed_inconsistent_synthetic_fixture,0.710,unittest command measured wall time
+alignment_regression_test_corrected,passed,0.691,unittest command measured wall time

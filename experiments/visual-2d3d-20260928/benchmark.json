@@ -1,0 +1,33 @@
+{
+  "id": "orchard_brook_benchmark",
+  "theme": "A sheltered apple-woodland ravine belonging to Brann's Forge, with an old stone crossing and a ruined orchard beacon.",
+  "world": {"width_m": 80, "depth_m": 80, "x_min": -40, "x_max": 40, "z_min": -40, "z_max": 40, "up": "+Y", "north": "-Z"},
+  "raster": {"width_px": 512, "height_px": 512, "pixel_centres": true, "mapping": "x=-40+80*(u+0.5)/512; z=-40+80*(v+0.5)/512"},
+  "fixed_gameplay": {
+    "spawn_xz": [-30, 29],
+    "goal_xz": [24, -27],
+    "crossing_neighbourhood_xz": [0, 0],
+    "route_min_clearance_m": 2.4,
+    "stream_min_width_m": 3.0,
+    "bridge_min_walkable_width_m": 3.0,
+    "terrain_max_route_grade": 0.24,
+    "require_single_connected_route": true,
+    "require_non_ford_stream_crossing": true
+  },
+  "common_asset_library": "godot/assets/orchard",
+  "allowed_asset_ids": ["apple_tree_mature", "apple_tree_mature_b", "apple_tree_young", "apple_tree_mature_autumn", "hedge_dense", "shrub_flowering", "rock_mossy", "rock_mossy_small", "rubble_split", "wall_straight", "wall_corner_broken", "wall_end_broken", "path_straight", "path_curve30", "path_curve30_left", "mountain_cliff_chunk"],
+  "evaluation_cameras": [
+    {"id": "overhead", "position": [0, 85, 0], "target": [0, 0, 0], "fov_deg": 60, "north_up": true},
+    {"id": "approach", "position": [-28, 3.2, 27], "target": [-2, 1.6, 0], "fov_deg": 72},
+    {"id": "crossing", "position": [-6, 2.1, 8], "target": [8, 1.5, -10], "fov_deg": 72},
+    {"id": "landmark", "position": [18, 3.2, -17], "target": [24, 2.5, -27], "fov_deg": 72},
+    {"id": "reverse", "position": [31, 3.0, -31], "target": [-5, 1.5, 8], "fov_deg": 72}
+  ],
+  "variants": {
+    "A": "Opus written-brief direct 3D baseline",
+    "B": "generated top-down image extracted to structure",
+    "C": "generated 2D references supplied to Opus",
+    "D": "seeded procedural-only baseline",
+    "E": "hybrid structured/image/Opus correction"
+  }
+}

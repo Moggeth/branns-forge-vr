@@ -1,0 +1,19 @@
+{
+  "edit": "expand ruin clearing",
+  "old_radius_m": 6.0,
+  "new_radius_m": 9.0,
+  "removed_object_ids": [
+    "tree_2_-4",
+    "tree_4_-3"
+  ],
+  "added_object_ids": [],
+  "changed_object_ids": [],
+  "unrelated_object_changes": [],
+  "unchanged_object_count": 55,
+  "route_unchanged": true,
+  "before_pass": true,
+  "after_pass": true,
+  "before_sha256": "e5d18cc6141743776dfa08fa2594a8f34a7f555b4e6f88f2e42ce68062edfaf8",
+  "after_sha256": "9857fe92326a2daf6e251e29cf10ab22e9c285b7d77318f3612af01689f34d61",
+  "targeted_edit_pass": true
+}

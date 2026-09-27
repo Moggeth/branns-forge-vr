@@ -1,0 +1,5 @@
+source,variant,seed,pass,failure_count,warning_count,object_count,path_length_m,stream_crossing_count,bridge_crossing_error_m,max_route_grade,min_object_route_clearance_m,placement_failure_count,object_radii_declared,semantic_sha256,engine_collision_verified,visual_quality_verified,vr_performance_verified
+experiments\visual-2d3d-20260928\variants\D\world_spec.json,D,20260928,True,0,0,57,80.36,1,0.0,0.0201,3.969,0,True,e5d18cc6141743776dfa08fa2594a8f34a7f555b4e6f88f2e42ce68062edfaf8,False,False,False
+experiments\visual-2d3d-20260928\variants\D\seed-20260929.json,D,20260929,True,0,0,63,80.362,1,0.0,0.0201,2.504,0,True,7eb8c3dc7d3db8fccdb203117f8214347418546d2ba7e25e9bbbd1b6c868704b,False,False,False
+experiments\visual-2d3d-20260928\variants\D\seed-20260930.json,D,20260930,True,0,0,69,80.36,1,0.0,0.0201,2.079,0,True,d3311cf182943ebe7a697c4c48ae42f4bf81b26a15bd0d7a73bc5c2ad9b6c24e,False,False,False
+experiments\visual-2d3d-20260928\variants\D\clearing-edit.json,D,20260928,True,0,0,55,80.36,1,0.0,0.0201,3.969,0,True,9857fe92326a2daf6e251e29cf10ab22e9c285b7d77318f3612af01689f34d61,False,False,False

@@ -1,0 +1,90 @@
+[
+  {
+    "source": "experiments\\visual-2d3d-20260928\\variants\\D\\world_spec.json",
+    "variant": "D",
+    "seed": 20260928,
+    "pass": true,
+    "failures": [],
+    "warnings": [],
+    "metrics": {
+      "object_count": 57,
+      "path_length_m": 80.36,
+      "stream_crossing_count": 1,
+      "bridge_crossing_error_m": 0.0,
+      "max_route_grade": 0.0201,
+      "min_object_route_clearance_m": 3.969,
+      "placement_failure_count": 0,
+      "object_radii_declared": true,
+      "semantic_sha256": "e5d18cc6141743776dfa08fa2594a8f34a7f555b4e6f88f2e42ce68062edfaf8",
+      "engine_collision_verified": false,
+      "visual_quality_verified": false,
+      "vr_performance_verified": false
+    }
+  },
+  {
+    "source": "experiments\\visual-2d3d-20260928\\variants\\D\\seed-20260929.json",
+    "variant": "D",
+    "seed": 20260929,
+    "pass": true,
+    "failures": [],
+    "warnings": [],
+    "metrics": {
+      "object_count": 63,
+      "path_length_m": 80.362,
+      "stream_crossing_count": 1,
+      "bridge_crossing_error_m": 0.0,
+      "max_route_grade": 0.0201,
+      "min_object_route_clearance_m": 2.504,
+      "placement_failure_count": 0,
+      "object_radii_declared": true,
+      "semantic_sha256": "7eb8c3dc7d3db8fccdb203117f8214347418546d2ba7e25e9bbbd1b6c868704b",
+      "engine_collision_verified": false,
+      "visual_quality_verified": false,
+      "vr_performance_verified": false
+    }
+  },
+  {
+    "source": "experiments\\visual-2d3d-20260928\\variants\\D\\seed-20260930.json",
+    "variant": "D",
+    "seed": 20260930,
+    "pass": true,
+    "failures": [],
+    "warnings": [],
+    "metrics": {
+      "object_count": 69,
+      "path_length_m": 80.36,
+      "stream_crossing_count": 1,
+      "bridge_crossing_error_m": 0.0,
+      "max_route_grade": 0.0201,
+      "min_object_route_clearance_m": 2.079,
+      "placement_failure_count": 0,
+      "object_radii_declared": true,
+      "semantic_sha256": "d3311cf182943ebe7a697c4c48ae42f4bf81b26a15bd0d7a73bc5c2ad9b6c24e",
+      "engine_collision_verified": false,
+      "visual_quality_verified": false,
+      "vr_performance_verified": false
+    }
+  },
+  {
+    "source": "experiments\\visual-2d3d-20260928\\variants\\D\\clearing-edit.json",
+    "variant": "D",
+    "seed": 20260928,
+    "pass": true,
+    "failures": [],
+    "warnings": [],
+    "metrics": {
+      "object_count": 55,
+      "path_length_m": 80.36,
+      "stream_crossing_count": 1,
+      "bridge_crossing_error_m": 0.0,
+      "max_route_grade": 0.0201,
+      "min_object_route_clearance_m": 3.969,
+      "placement_failure_count": 0,
+      "object_radii_declared": true,
+      "semantic_sha256": "9857fe92326a2daf6e251e29cf10ab22e9c285b7d77318f3612af01689f34d61",
+      "engine_collision_verified": false,
+      "visual_quality_verified": false,
+      "vr_performance_verified": false
+    }
+  }
+]
