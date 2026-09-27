@@ -1,8 +1,8 @@
 # VR recording with OBS
 
 Hold **right B for one second** to start or stop. Release before holding again.
-A short tap does nothing; left B still opens the toolbelt. You can also turn your
-left palm toward you and choose **Quick > Start video / Stop video**. A red REC
+A short tap does not record (it may recall the fairy or vent Wyrmspout); left B opens the toolbelt. You can also press
+left B and choose **Quick > Start video / Stop video**. A red REC
 timer and haptic confirmation acknowledge recording; stopping shows the saved name.
 The indicator reflects OBS status, not a guessed local toggle. If OBS disconnects,
 the game displays status unknown rather than falsely claiming recording stopped.
@@ -53,6 +53,10 @@ If OBS is unavailable, gameplay continues normally. Restart OBS for authenticati
 or connection failures; inspect its latest log in `%APPDATA%/obs-studio/logs/` and
 `logs/game-*.log` lines beginning RECORDING. No unconfirmed operation is auto-retried.
 You can inspect recorder state with `node scripts/obs_rpc.cjs GetRecordStatus`.
+
+2026-09-27 recovery: OBS was running but its log stopped at `Crash or unclean shutdown detected`, with no WebSocket listener. The recovery modal was hidden by background startup. OBS 32 removed `--disable-shutdown-check`; trying that obsolete flag did not help. The dedicated launcher now preserves a stale `%APPDATA%/obs-studio/.sentinel` directory under `logs/obs-sentinel-*` only when no OBS process is running, then starts normally. Recovery is recorded in `logs/obs-startup.log`; existing running OBS sessions are never stopped by this script. If OBS is already stuck at the prompt, close that specific instance before rerunning the launcher. Do not delete profiles, scenes or crash reports.
+
+Verification after recovery: native controller latch and live OBS start/timer/stop checks passed (`RECORDING_CHECK []`, 5.380 s). The saved test MP4 was decoded and visually inspected: actual game view, H.264 1280x800, 2.833 seconds. The running VR game received OBS's recording event without restart. Physical pressing of the controller still requires the player; tests exercised the same hold latch and native recording path.
 
 ## Verification
 
