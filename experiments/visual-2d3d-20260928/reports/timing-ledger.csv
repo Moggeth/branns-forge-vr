@@ -18,3 +18,9 @@ B_Godot_smoke,passed,2.061,planning/timing.csv process wall time
 160m_final_Godot_build_and_capture,passed_route_and_five_views,4.155,exec_command process wall time
 160m_in_engine_scene_build,passed,2.099,evidence/scale/metrics.json
 160m_in_engine_five_view_render,passed,0.185,evidence/scale/metrics.json
+final_planner_tests_4,passed,0.893,unittest reported duration
+final_evaluator_tests_9,passed,0.069,unittest reported duration
+final_gallery_tests_2,passed,0.009,unittest reported duration
+final_gallery_rebuild_25_captures,passed,0.004,gallery/build.py internal duration
+final_E_walkable_smoke,passed,0.750,exec_command wall time
+final_A_to_E_Godot_spec_checks,passed,1.436,exec_command wall time
