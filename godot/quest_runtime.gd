@@ -94,13 +94,14 @@ func rows()->Array:
 	return [["Previous job","quest:previous"],["Next job","quest:next"],[label,"quest:primary"],["Abandon job","quest:abandon"]]
 
 func journal()->String:
-	if data.is_empty(): return "FIELD JOURNAL\nConnect to the forge to load jobs and experience."
+	var hollow_line = "\n\n" + game.adventure.hollow.journal_line() if game != null and game.adventure != null and game.adventure.hollow != null else ""
+	if data.is_empty(): return "FIELD JOURNAL\nConnect to the forge to load jobs and experience." + hollow_line
 	var quest=selected()
-	if quest.is_empty(): return level_line()+"\nNo jobs available."
+	if quest.is_empty(): return level_line()+"\nNo jobs available." + hollow_line
 	var location={"skeleton":"Pinewood Ruins","rat":"Enchanted Kitchen","lumber":"Pinewood Ruins","stone":"Sandstone Quarry"}.get(str(quest.get("target","")),"Explore the world")
 	var status=str(quest.get("status","available"))
 	var hint="Accept near Brann before setting out." if status=="available" else ("Return to Brann to collect your reward." if status=="ready" else "Progress stays saved between visits.")
-	return "%s · %s\n\n%s  [%d/%d]\n%s\n%d / %d · %s · Reward %d XP\n%s"%[level_line(),data.get("title","Adventurer"),quest.get("name","Job"),index+1,data.quests.size(),location+" · "+("Defeat " if quest.get("kind")=="enemy" else "Gather ")+str(quest.get("target","")).replace("_"," "),quest.get("progress",0),quest.get("goal",3),status.capitalize(),quest.get("xpReward",0),hint]
+	return "%s · %s\n\n%s  [%d/%d]\n%s\n%d / %d · %s · Reward %d XP\n%s%s"%[level_line(),data.get("title","Adventurer"),quest.get("name","Job"),index+1,data.quests.size(),location+" · "+("Defeat " if quest.get("kind")=="enemy" else "Gather ")+str(quest.get("target","")).replace("_"," "),quest.get("progress",0),quest.get("goal",3),status.capitalize(),quest.get("xpReward",0),hint,hollow_line]
 
 func act(action:String):
 	if action=="previous": index-=1; game.qol._build(); return

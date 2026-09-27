@@ -23,6 +23,7 @@ var special_at = 0.0
 var test_mode = false
 var zone_groups = {}
 var last_interaction = {"phase":"activate","hand":"right","squeeze":0.0,"formationSeconds":0.6}
+var hollow: Node
 
 func setup(owner_game):
 	game = owner_game
@@ -71,10 +72,14 @@ func setup(owner_game):
 		for zone_id in game.scene.get("zones",{}):
 			if game.scene.zones[zone_id].root==child: child_zone=zone_id
 		if zone_groups.has(child_zone): child.reparent(zone_groups[child_zone])
+	hollow = preload("res://hollow_challenge.gd").new()
+	add_child(hollow)
+	hollow.setup(game, zone_groups.get("crystal_hollow"))
 	_apply_zone_environment("forge_yard")
 	game._notice("Pocket Thunder is ready. Grip picks up. For a bomb, grip an empty hand THEN press and hold trigger; release grip to throw. Explore the travel board.",12)
 
 func tick(delta):
+	if hollow != null: hollow.tick(delta, zone)
 	var resource_text = ""
 	for key in game.state.get("resources",local_resources):
 		var count = int(game.state.get("resources",local_resources)[key])
@@ -140,6 +145,14 @@ func _requirements() -> String:
 var destination_index = 1
 func keyboard(event):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			var hollow_hit = game._ray(game.camera,4)
+			var hollow_target = game._owner(hollow_hit.get("collider"))
+			if hollow_target != null and str(hollow_target.get_meta("kind","")).begins_with("hollow_"):
+				var held_tool = game.held.get(str(game.desktop_hand.get_instance_id()))
+				if hollow_target.get_meta("kind","") == "hollow_vault" or is_instance_valid(held_tool):
+					interact(hollow_target,str(held_tool.get_meta("id",selected)) if is_instance_valid(held_tool) else "hand",game.desktop_hand)
+					return true
 		if selected == "bomb_glove" and not (game.echo_bells!=null and game.echo_bells.busy(game.desktop_hand)) and not game.held.has(str(game.desktop_hand.get_instance_id())) and not game.living.claims_trigger(game.desktop_hand) and not ((game.playful_tools!=null and game.playful_tools.claims_trigger(game.desktop_hand)) or (game.magnetic_wand!=null and game.magnetic_wand.claims_trigger(game.desktop_hand))):
 			if event.pressed:
 				var hit = game._ray(game.camera,8)
@@ -424,6 +437,7 @@ func _detonate_later(body,hand,seconds):
 	body.queue_free()
 
 func explode(position:Vector3,radius:float,damage:float,hand=null,self_ratio=-1.0,damage_type="blast"):
+	if hollow != null: hollow.blast(position,radius,hand)
 	if game.apples!=null: game.apples.blast(position,radius)
 	if game.get("fairy")!=null and game.fairy.active and game.fairy.avatar.global_position.distance_to(position)<radius:
 		game.fairy.hurt(damage*.5,"Caught in an explosion")
@@ -453,6 +467,7 @@ func trigger(hand,source) -> bool:
 	if target != null and target.get_meta("kind","")=="cache":
 		recover()
 		return true
+	if target != null and target.get_meta("kind","")=="hollow_vault": return interact(target,"hand",hand)
 	if not game.held.has(key) and id!="bomb_glove":
 		if target!=null and target.get_meta("kind","")=="resource" and target.get_meta("requires","") in ["","hand","none"]:
 			interact(target,"hand",hand)
@@ -485,6 +500,7 @@ func trigger(hand,source) -> bool:
 
 func interact(target,id,hand=null) -> bool:
 	var kind = str(target.get_meta("kind",""))
+	if kind.begins_with("hollow_") and hollow != null: return hollow.interact(target,id,hand)
 	if kind=="anchor":
 		if id!="grappling_hook" and id!="ember_gauntlet":
 			game._notice("Swallow Line can reach this anchor. Bring Brann a Tier 2 offering.")
@@ -721,6 +737,7 @@ func _boss_wave(enemy,mark:Vector3):
 func take_damage(amount:float,source:String):
 	if dying or game.elapsed<game.shield_until or game.elapsed<game.hurts_until: return
 	if game.guardians!=null: amount=game.guardians.player_guard(amount,source)
+	if hollow != null and hollow.reward_claimed(): amount *= 0.8
 	game.hurts_until=game.elapsed+1.0
 	hp=maxf(0,hp-amount)
 	for hand in game.hands: haptic(hand,"impact")
@@ -818,6 +835,7 @@ func travel(id:String):
 	game.visiting=id=="forge_yard"
 	game.shield_until=game.elapsed+3
 	game._notice(data.get("name",id.replace("_"," "))+" · Explore, gather and invent. F / G selects another destination.",6)
+	if hollow != null: hollow.on_travel(id)
 
 func _apply_zone_environment(id:String):
 	for zone_id in zone_groups: zone_groups[zone_id].visible=zone_id==id
