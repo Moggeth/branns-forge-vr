@@ -9,11 +9,11 @@ The portable script now reads the repository's shared benchmark and orchard GLBs
 blender -b --factory-startup -P experiments/visual-2d3d-20260928/variants/C/build_scene.py -- --render
 blender -b --factory-startup -P experiments/visual-2d3d-20260928/variants/C/validate.py
 ```
-Blender 4.5.13, EEVEE, seed 20260928, fully deterministic. No model/API call. The builder
-reads only `input/benchmark.json` and `input/orchard/*.glb`; all plan coordinates are written in
-the builder (read by eye from the two images).
+Blender 4.5.13, EEVEE, seed 20260928, fully deterministic. No model/API call. The portable builder
+reads the shared `benchmark.json` and existing `godot/assets/orchard/*.glb` library; all plan coordinates are written in
+the builder after visual interpretation of the two generated references.
 
-## Deliverables (output/)
+## Deliverables (this directory)
 `build_scene.py`, `validate.py`, `scene.blend`, `scene.glb` (6.5 MB), `world_spec.json` (v1 +
 `c_*` namespaced extras), `validation.json` (all 21 checks OK), `renders/` (overhead,
 approach, crossing, landmark, reverse + `unfamiliar_reverse_low`).

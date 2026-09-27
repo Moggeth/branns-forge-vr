@@ -1,0 +1,8063 @@
+{
+  "version": 1,
+  "variant": "E-scale",
+  "method": "hybrid E extended to 160m with deterministic outer orchard rules",
+  "seed": 2026092801,
+  "bounds_m": [
+    160,
+    160
+  ],
+  "spawn_xz": [
+    -65,
+    65
+  ],
+  "goal_xz": [
+    65,
+    -65
+  ],
+  "path_xz": [
+    [
+      -65,
+      65
+    ],
+    [
+      -55,
+      55
+    ],
+    [
+      -43,
+      43
+    ],
+    [
+      -30,
+      29
+    ],
+    [
+      -31.5625,
+      30.9375
+    ],
+    [
+      -30.3125,
+      29.6875
+    ],
+    [
+      -29.6875,
+      29.6875
+    ],
+    [
+      -24.0625,
+      24.0625
+    ],
+    [
+      -23.4375,
+      24.0625
+    ],
+    [
+      -22.8125,
+      23.4375
+    ],
+    [
+      -22.1875,
+      23.4375
+    ],
+    [
+      -15.9375,
+      17.1875
+    ],
+    [
+      -15.3125,
+      16.5625
+    ],
+    [
+      -15.3125,
+      15.9375
+    ],
+    [
+      -9.0625,
+      9.6875
+    ],
+    [
+      -2.8125,
+      3.4375
+    ],
+    [
+      -2.1875,
+      2.8125
+    ],
+    [
+      -2.1875,
+      2.1875
+    ],
+    [
+      0.3125,
+      -0.3125
+    ],
+    [
+      0.3125,
+      -2.1875
+    ],
+    [
+      6.5625,
+      -8.4375
+    ],
+    [
+      12.8125,
+      -14.6875
+    ],
+    [
+      14.6875,
+      -16.5625
+    ],
+    [
+      15.3125,
+      -16.5625
+    ],
+    [
+      16.5625,
+      -17.8125
+    ],
+    [
+      17.1875,
+      -17.8125
+    ],
+    [
+      17.8125,
+      -18.4375
+    ],
+    [
+      18.4375,
+      -18.4375
+    ],
+    [
+      19.0625,
+      -19.0625
+    ],
+    [
+      20.3125,
+      -19.0625
+    ],
+    [
+      20.9375,
+      -19.6875
+    ],
+    [
+      21.5625,
+      -19.6875
+    ],
+    [
+      27.8125,
+      -25.9375
+    ],
+    [
+      29.6875,
+      -27.8125
+    ],
+    [
+      24,
+      -27
+    ],
+    [
+      36,
+      -38
+    ],
+    [
+      50,
+      -51
+    ],
+    [
+      65,
+      -65
+    ]
+  ],
+  "stream": {
+    "points_xz": [
+      [
+        -82,
+        -11
+      ],
+      [
+        -70,
+        -7
+      ],
+      [
+        -56,
+        -3
+      ],
+      [
+        -44,
+        -5
+      ],
+      [
+        -38.5156,
+        -5.2344
+      ],
+      [
+        -35.7031,
+        -4.9219
+      ],
+      [
+        -32.5781,
+        -3.9844
+      ],
+      [
+        -29.6094,
+        -2.4219
+      ],
+      [
+        -26.6406,
+        -1.0156
+      ],
+      [
+        -23.5156,
+        -0.3906
+      ],
+      [
+        -20.3906,
+        -0.5469
+      ],
+      [
+        -17.1094,
+        -1.3281
+      ],
+      [
+        -13.9844,
+        -2.7344
+      ],
+      [
+        -10.7031,
+        -3.3594
+      ],
+      [
+        -7.5781,
+        -3.3594
+      ],
+      [
+        -4.4531,
+        -2.5781
+      ],
+      [
+        -1.9531,
+        -1.6406
+      ],
+      [
+        2.2656,
+        0.7031
+      ],
+      [
+        4.6094,
+        1.3281
+      ],
+      [
+        7.5781,
+        1.7969
+      ],
+      [
+        10.8594,
+        1.4844
+      ],
+      [
+        13.9844,
+        0.7031
+      ],
+      [
+        17.2656,
+        -0.0781
+      ],
+      [
+        20.3906,
+        -0.2344
+      ],
+      [
+        23.5156,
+        -0.0781
+      ],
+      [
+        26.6406,
+        0.625
+      ],
+      [
+        29.6094,
+        1.6406
+      ],
+      [
+        32.7344,
+        2.5781
+      ],
+      [
+        35.8594,
+        3.0469
+      ],
+      [
+        45,
+        5
+      ],
+      [
+        58,
+        4
+      ],
+      [
+        70,
+        6
+      ],
+      [
+        82,
+        12
+      ]
+    ],
+    "width_m": 3.0
+  },
+  "crossing": {
+    "center_xz": [
+      0.2165,
+      -0.4507
+    ],
+    "width_m": 3.5,
+    "length_m": 5.0,
+    "yaw_rad": -0.42483,
+    "asset_glb": "res://assets/experimental_2d3d/bridge.glb"
+  },
+  "terrain": {
+    "base_height_m": 0,
+    "hills": [
+      {
+        "center_xz": [
+          -14.6122,
+          -16.9555
+        ],
+        "radius_m": 10.79,
+        "amplitude_m": 1.541
+      },
+      {
+        "center_xz": [
+          15.5525,
+          15.8407
+        ],
+        "radius_m": 10.478,
+        "amplitude_m": 1.506
+      },
+      {
+        "center_xz": [
+          -0.7914,
+          -21.7654
+        ],
+        "radius_m": 4.474,
+        "amplitude_m": 0.844
+      },
+      {
+        "center_xz": [
+          28.3182,
+          13.3479
+        ],
+        "radius_m": 3.274,
+        "amplitude_m": 0.711
+      },
+      {
+        "center_xz": [
+          -61,
+          -58
+        ],
+        "radius_m": 18,
+        "amplitude_m": 0.8
+      },
+      {
+        "center_xz": [
+          -52,
+          41
+        ],
+        "radius_m": 18,
+        "amplitude_m": 0.7
+      },
+      {
+        "center_xz": [
+          57,
+          55
+        ],
+        "radius_m": 18,
+        "amplitude_m": 0.9
+      },
+      {
+        "center_xz": [
+          62,
+          -60
+        ],
+        "radius_m": 18,
+        "amplitude_m": 0.6
+      },
+      {
+        "center_xz": [
+          48,
+          -45
+        ],
+        "radius_m": 18,
+        "amplitude_m": 0.5
+      }
+    ],
+    "gaussian_coefficient": 0.5
+  },
+  "regions": [
+    {
+      "name": "earth_hill_1",
+      "polygon_xz": [
+        [
+          -6.1719,
+          -13.2031
+        ],
+        [
+          -6.7969,
+          -11.4844
+        ],
+        [
+          -10.5469,
+          -9.7656
+        ],
+        [
+          -23.2031,
+          -15.5469
+        ],
+        [
+          -24.1406,
+          -16.9531
+        ],
+        [
+          -21.6406,
+          -22.1094
+        ],
+        [
+          -16.6406,
+          -23.8281
+        ],
+        [
+          -9.2969,
+          -21.1719
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_2",
+      "polygon_xz": [
+        [
+          23.9844,
+          16.6406
+        ],
+        [
+          23.0469,
+          19.9219
+        ],
+        [
+          19.2969,
+          21.7969
+        ],
+        [
+          6.7969,
+          18.8281
+        ],
+        [
+          5.8594,
+          17.2656
+        ],
+        [
+          6.7969,
+          14.7656
+        ],
+        [
+          16.3281,
+          8.9844
+        ],
+        [
+          20.8594,
+          10.5469
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_5",
+      "polygon_xz": [
+        [
+          3.0469,
+          -20.8594
+        ],
+        [
+          2.7344,
+          -19.1406
+        ],
+        [
+          1.9531,
+          -18.6719
+        ],
+        [
+          -4.7656,
+          -21.3281
+        ],
+        [
+          -5.0781,
+          -22.1094
+        ],
+        [
+          -4.4531,
+          -23.3594
+        ],
+        [
+          -2.4219,
+          -24.4531
+        ],
+        [
+          1.0156,
+          -23.3594
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "earth_hill_6",
+      "polygon_xz": [
+        [
+          30.5469,
+          14.6094
+        ],
+        [
+          30.5469,
+          14.6094
+        ],
+        [
+          29.2969,
+          15.7031
+        ],
+        [
+          27.1094,
+          15.2344
+        ],
+        [
+          26.0156,
+          12.5781
+        ],
+        [
+          26.4844,
+          11.4844
+        ],
+        [
+          27.1094,
+          11.1719
+        ],
+        [
+          30.2344,
+          12.4219
+        ]
+      ],
+      "surface": "earth",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_1",
+      "polygon_xz": [
+        [
+          34.1406,
+          -31.6406
+        ],
+        [
+          34.1406,
+          -29.4531
+        ],
+        [
+          33.9844,
+          -29.2969
+        ],
+        [
+          28.2031,
+          -34.1406
+        ],
+        [
+          28.0469,
+          -35.2344
+        ],
+        [
+          28.2031,
+          -36.7969
+        ],
+        [
+          28.2031,
+          -36.7969
+        ],
+        [
+          34.1406,
+          -33.8281
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_2",
+      "polygon_xz": [
+        [
+          36.0156,
+          -30.0781
+        ],
+        [
+          35.2344,
+          -27.1094
+        ],
+        [
+          33.5156,
+          -25.3906
+        ],
+        [
+          32.7344,
+          -25.5469
+        ],
+        [
+          32.4219,
+          -26.0156
+        ],
+        [
+          34.9219,
+          -31.1719
+        ],
+        [
+          34.9219,
+          -31.1719
+        ],
+        [
+          36.0156,
+          -31.0156
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_3",
+      "polygon_xz": [
+        [
+          25.2344,
+          -33.8281
+        ],
+        [
+          25.2344,
+          -31.0156
+        ],
+        [
+          25.0781,
+          -30.8594
+        ],
+        [
+          24.1406,
+          -30.8594
+        ],
+        [
+          23.8281,
+          -31.3281
+        ],
+        [
+          24.1406,
+          -34.9219
+        ],
+        [
+          24.1406,
+          -34.9219
+        ],
+        [
+          25.2344,
+          -34.7656
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_4",
+      "polygon_xz": [
+        [
+          25.2344,
+          -28.8281
+        ],
+        [
+          25.2344,
+          -28.6719
+        ],
+        [
+          24.7656,
+          -28.2031
+        ],
+        [
+          24.1406,
+          -28.2031
+        ],
+        [
+          23.6719,
+          -28.8281
+        ],
+        [
+          23.8281,
+          -29.6094
+        ],
+        [
+          24.2969,
+          -29.9219
+        ],
+        [
+          25.0781,
+          -29.4531
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_5",
+      "polygon_xz": [
+        [
+          32.2656,
+          -24.2969
+        ],
+        [
+          32.2656,
+          -24.1406
+        ],
+        [
+          31.7969,
+          -23.8281
+        ],
+        [
+          31.3281,
+          -23.8281
+        ],
+        [
+          31.0156,
+          -24.2969
+        ],
+        [
+          31.4844,
+          -25.0781
+        ],
+        [
+          31.4844,
+          -25.0781
+        ],
+        [
+          32.2656,
+          -24.7656
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_6",
+      "polygon_xz": [
+        [
+          27.2656,
+          -33.8281
+        ],
+        [
+          27.2656,
+          -33.6719
+        ],
+        [
+          27.1094,
+          -33.5156
+        ],
+        [
+          26.6406,
+          -33.5156
+        ],
+        [
+          26.4844,
+          -33.6719
+        ],
+        [
+          26.6406,
+          -34.4531
+        ],
+        [
+          26.6406,
+          -34.4531
+        ],
+        [
+          27.2656,
+          -34.1406
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_7",
+      "polygon_xz": [
+        [
+          33.6719,
+          -23.6719
+        ],
+        [
+          33.6719,
+          -23.6719
+        ],
+        [
+          33.3594,
+          -23.3594
+        ],
+        [
+          32.8906,
+          -23.3594
+        ],
+        [
+          32.7344,
+          -23.5156
+        ],
+        [
+          32.8906,
+          -23.9844
+        ],
+        [
+          33.2031,
+          -24.1406
+        ],
+        [
+          33.6719,
+          -23.9844
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "stone_8",
+      "polygon_xz": [
+        [
+          25.2344,
+          -27.4219
+        ],
+        [
+          25.2344,
+          -27.1094
+        ],
+        [
+          25.0781,
+          -26.9531
+        ],
+        [
+          24.7656,
+          -26.9531
+        ],
+        [
+          24.6094,
+          -27.1094
+        ],
+        [
+          24.9219,
+          -27.7344
+        ],
+        [
+          24.9219,
+          -27.7344
+        ],
+        [
+          25.2344,
+          -27.5781
+        ]
+      ],
+      "surface": "stone",
+      "tree_density": 0
+    },
+    {
+      "name": "outer_west_orchard",
+      "surface": "grass",
+      "polygon_xz": [
+        [
+          -80,
+          -80
+        ],
+        [
+          -40,
+          -80
+        ],
+        [
+          -40,
+          80
+        ],
+        [
+          -80,
+          80
+        ]
+      ],
+      "tree_density": 0.0
+    },
+    {
+      "name": "outer_east_orchard",
+      "surface": "grass",
+      "polygon_xz": [
+        [
+          40,
+          -80
+        ],
+        [
+          80,
+          -80
+        ],
+        [
+          80,
+          80
+        ],
+        [
+          40,
+          80
+        ]
+      ],
+      "tree_density": 0.0
+    },
+    {
+      "name": "outer_north_orchard",
+      "surface": "grass",
+      "polygon_xz": [
+        [
+          -40,
+          -80
+        ],
+        [
+          40,
+          -80
+        ],
+        [
+          40,
+          -40
+        ],
+        [
+          -40,
+          -40
+        ]
+      ],
+      "tree_density": 0.0
+    },
+    {
+      "name": "outer_south_orchard",
+      "surface": "grass",
+      "polygon_xz": [
+        [
+          -40,
+          40
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          40,
+          80
+        ],
+        [
+          -40,
+          80
+        ]
+      ],
+      "tree_density": 0.0
+    }
+  ],
+  "objects": [
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        34.5658,
+        0.0001,
+        -28.1405
+      ],
+      "yaw_rad": 2.0803,
+      "scale": 2.145,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        24.5201,
+        0.0007,
+        -32.8956
+      ],
+      "yaw_rad": 1.5662,
+      "scale": 1.356,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        31.6575,
+        0.0004,
+        -24.4411
+      ],
+      "yaw_rad": -0.6996,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        26.8576,
+        0.0003,
+        -33.9627
+      ],
+      "yaw_rad": 1.2736,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        33.2079,
+        0.0004,
+        -23.7382
+      ],
+      "yaw_rad": -0.4746,
+      "scale": 0.6,
+      "interactive": false,
+      "source": "stone mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -31.717,
+        0.2177,
+        -29.7283
+      ],
+      "yaw_rad": 0.0,
+      "scale": 1.8,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.4178,
+        0.0385,
+        -36.5395
+      ],
+      "yaw_rad": 2.4,
+      "scale": 1.193,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -14.2642,
+        0.0044,
+        35.6983
+      ],
+      "yaw_rad": 4.7999,
+      "scale": 1.157,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -28.6286,
+        0.0048,
+        17.0738
+      ],
+      "yaw_rad": 0.9167,
+      "scale": 1.139,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        23.0501,
+        0.4125,
+        30.9451
+      ],
+      "yaw_rad": 3.3167,
+      "scale": 1.125,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        29.0863,
+        0.3433,
+        27.7382
+      ],
+      "yaw_rad": 5.7166,
+      "scale": 1.106,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.6247,
+        0.0037,
+        13.4321
+      ],
+      "yaw_rad": 1.8334,
+      "scale": 1.093,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        15.9903,
+        0.2099,
+        36.6364
+      ],
+      "yaw_rad": 4.2334,
+      "scale": 1.091,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        36.4219,
+        0.0311,
+        36.2392
+      ],
+      "yaw_rad": 0.3501,
+      "scale": 1.05,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -13.5418,
+        0.4192,
+        -34.3385
+      ],
+      "yaw_rad": 2.7501,
+      "scale": 1.047,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -8.1225,
+        0.0254,
+        34.1819
+      ],
+      "yaw_rad": 5.1501,
+      "scale": 1.047,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.8051,
+        0.0002,
+        23.6089
+      ],
+      "yaw_rad": 1.2669,
+      "scale": 1.044,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.8294,
+        0.2041,
+        24.07
+      ],
+      "yaw_rad": 3.6668,
+      "scale": 1.02,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.0181,
+        0.0741,
+        37.1002
+      ],
+      "yaw_rad": 6.0668,
+      "scale": 0.944,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        7.6064,
+        0.0327,
+        -37.121
+      ],
+      "yaw_rad": 2.1836,
+      "scale": 0.915,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        17.5632,
+        0.5283,
+        30.8736
+      ],
+      "yaw_rad": 4.5835,
+      "scale": 0.912,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -30.2076,
+        0.0925,
+        -37.2481
+      ],
+      "yaw_rad": 0.7003,
+      "scale": 0.906,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        12.1082,
+        0.0181,
+        -34.9209
+      ],
+      "yaw_rad": 3.1003,
+      "scale": 0.904,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        37.0111,
+        0.0704,
+        30.406
+      ],
+      "yaw_rad": 5.5002,
+      "scale": 0.9,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.1411,
+        0.4854,
+        22.3378
+      ],
+      "yaw_rad": 1.617,
+      "scale": 0.885,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -20.5608,
+        0.0007,
+        35.4898
+      ],
+      "yaw_rad": 4.017,
+      "scale": 0.885,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        35.9426,
+        0.0016,
+        -17.239
+      ],
+      "yaw_rad": 2.5337,
+      "scale": 0.871,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        16.3289,
+        0.0042,
+        -37.387
+      ],
+      "yaw_rad": 4.9337,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.9383,
+        0.0068,
+        -12.6266
+      ],
+      "yaw_rad": 1.0504,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.2267,
+        0.0002,
+        34.3356
+      ],
+      "yaw_rad": 3.4504,
+      "scale": 0.87,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -32.647,
+        0.3777,
+        -18.4285
+      ],
+      "yaw_rad": 5.8504,
+      "scale": 0.869,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        12.5027,
+        0.4077,
+        32.5022
+      ],
+      "yaw_rad": 1.9671,
+      "scale": 0.862,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -29.1741,
+        0.0,
+        37.1067
+      ],
+      "yaw_rad": 4.3671,
+      "scale": 0.856,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -34.7152,
+        0.0174,
+        8.3362
+      ],
+      "yaw_rad": 0.4839,
+      "scale": 0.848,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        36.875,
+        0.2066,
+        13.0469
+      ],
+      "yaw_rad": 2.8839,
+      "scale": 0.843,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -21.7991,
+        0.4639,
+        -32.0517
+      ],
+      "yaw_rad": 5.2838,
+      "scale": 0.829,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        24.8584,
+        0.1551,
+        36.1523
+      ],
+      "yaw_rad": 1.4006,
+      "scale": 0.822,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -32.5384,
+        0.3239,
+        -23.4211
+      ],
+      "yaw_rad": 3.8006,
+      "scale": 0.819,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        17.626,
+        0.0602,
+        -11.9076
+      ],
+      "yaw_rad": 6.2005,
+      "scale": 0.819,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        33.6672,
+        0.395,
+        18.1124
+      ],
+      "yaw_rad": 2.3173,
+      "scale": 0.813,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        32.8786,
+        0.105,
+        32.7102
+      ],
+      "yaw_rad": 4.7173,
+      "scale": 0.813,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -18.5123,
+        0.3472,
+        -35.1708
+      ],
+      "yaw_rad": 0.834,
+      "scale": 0.805,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -30.5418,
+        0.0154,
+        11.674
+      ],
+      "yaw_rad": 3.234,
+      "scale": 0.803,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -17.6728,
+        0.0031,
+        31.8187
+      ],
+      "yaw_rad": 5.634,
+      "scale": 0.8,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.8366,
+        0.2576,
+        8.7763
+      ],
+      "yaw_rad": 1.7507,
+      "scale": 0.799,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -26.1258,
+        0.5219,
+        -27.89
+      ],
+      "yaw_rad": 4.1507,
+      "scale": 0.792,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        27.9736,
+        0.2027,
+        32.7541
+      ],
+      "yaw_rad": 0.2675,
+      "scale": 0.788,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        9.9752,
+        0.1868,
+        36.5085
+      ],
+      "yaw_rad": 2.6674,
+      "scale": 0.787,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.8116,
+        0.1819,
+        -10.0164
+      ],
+      "yaw_rad": 1.1842,
+      "scale": 0.755,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.7281,
+        0.0209,
+        -8.0827
+      ],
+      "yaw_rad": 3.5841,
+      "scale": 0.751,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.0252,
+        0.0013,
+        18.2947
+      ],
+      "yaw_rad": 5.9841,
+      "scale": 0.75,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        11.667,
+        0.0399,
+        -30.2963
+      ],
+      "yaw_rad": 2.1009,
+      "scale": 0.739,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -22.7419,
+        0.2289,
+        -36.3969
+      ],
+      "yaw_rad": 4.5009,
+      "scale": 0.736,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        37.7118,
+        0.0215,
+        -5.1831
+      ],
+      "yaw_rad": 0.6176,
+      "scale": 0.736,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.1201,
+        0.7071,
+        -8.5304
+      ],
+      "yaw_rad": 3.0176,
+      "scale": 0.726,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        8.0412,
+        0.0653,
+        -32.6502
+      ],
+      "yaw_rad": 5.4176,
+      "scale": 0.669,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        14.5604,
+        0.7885,
+        27.7191
+      ],
+      "yaw_rad": 1.5343,
+      "scale": 0.666,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        37.9376,
+        0.0003,
+        -21.1508
+      ],
+      "yaw_rad": 3.9343,
+      "scale": 0.659,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.0612,
+        0.1438,
+        -18.5156
+      ],
+      "yaw_rad": 0.0511,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        37.0855,
+        0.1704,
+        20.0714
+      ],
+      "yaw_rad": 2.451,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -36.1335,
+        0.1897,
+        -21.9133
+      ],
+      "yaw_rad": 4.851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -6.0272,
+        0.0776,
+        29.4725
+      ],
+      "yaw_rad": 0.9678,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -13.3142,
+        0.0225,
+        25.6541
+      ],
+      "yaw_rad": 3.3677,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -2.868,
+        1.0234,
+        -14.3361
+      ],
+      "yaw_rad": 5.7677,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -37.1326,
+        0.0217,
+        5.0875
+      ],
+      "yaw_rad": 1.8845,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -16.4399,
+        0.8042,
+        -29.1301
+      ],
+      "yaw_rad": 4.2844,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        5.3739,
+        0.7093,
+        23.7025
+      ],
+      "yaw_rad": 0.4012,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.0178,
+        0.0076,
+        -9.7914
+      ],
+      "yaw_rad": 2.8012,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -22.3468,
+        0.0008,
+        30.8689
+      ],
+      "yaw_rad": 5.2011,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -8.8939,
+        0.2617,
+        -36.4695
+      ],
+      "yaw_rad": 1.3179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        1.0734,
+        0.1394,
+        -35.0999
+      ],
+      "yaw_rad": 3.7179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -5.0781,
+        0.0237,
+        37.8906
+      ],
+      "yaw_rad": 6.1179,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        20.93,
+        0.1584,
+        37.4196
+      ],
+      "yaw_rad": 2.2346,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -17.2929,
+        0.065,
+        10.7635
+      ],
+      "yaw_rad": 4.6346,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.137,
+        0.1327,
+        -12.7707
+      ],
+      "yaw_rad": 0.7514,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -32.459,
+        0.1159,
+        -33.8063
+      ],
+      "yaw_rad": 3.1513,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -29.138,
+        0.4559,
+        -25.4761
+      ],
+      "yaw_rad": 5.5513,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -9.9863,
+        0.5507,
+        -31.8431
+      ],
+      "yaw_rad": 1.6681,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        24.8908,
+        0.6441,
+        25.81
+      ],
+      "yaw_rad": 4.068,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        8.5582,
+        0.4047,
+        31.32
+      ],
+      "yaw_rad": 0.1848,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -31.9277,
+        0.0007,
+        21.9352
+      ],
+      "yaw_rad": 2.5848,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -0.2781,
+        0.1701,
+        30.951
+      ],
+      "yaw_rad": 4.9847,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        19.7175,
+        0.027,
+        -15.1918
+      ],
+      "yaw_rad": 1.1015,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        31.4808,
+        0.0618,
+        -5.3171
+      ],
+      "yaw_rad": 3.5015,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -33.7156,
+        0.0637,
+        2.4556
+      ],
+      "yaw_rad": 5.9014,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        18.5754,
+        0.9433,
+        25.5145
+      ],
+      "yaw_rad": 2.0182,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -16.5658,
+        0.2098,
+        -38.4153
+      ],
+      "yaw_rad": 4.4182,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -23.9095,
+        0.0001,
+        38.1472
+      ],
+      "yaw_rad": 0.535,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        15.1053,
+        0.0127,
+        -32.329
+      ],
+      "yaw_rad": 2.9349,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -37.9945,
+        0.0,
+        28.2982
+      ],
+      "yaw_rad": 5.3349,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        33.5084,
+        0.1655,
+        28.5849
+      ],
+      "yaw_rad": 1.4517,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        20.0875,
+        0.2844,
+        34.4267
+      ],
+      "yaw_rad": 3.8516,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.2415,
+        0.0005,
+        19.571
+      ],
+      "yaw_rad": 6.2516,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.1749,
+        0.0597,
+        -31.1542
+      ],
+      "yaw_rad": 2.3684,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.2821,
+        0.087,
+        26.2967
+      ],
+      "yaw_rad": 4.7683,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -38.2697,
+        0.0072,
+        9.2802
+      ],
+      "yaw_rad": 0.8851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.2637,
+        0.0,
+        -33.3546
+      ],
+      "yaw_rad": 3.2851,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        32.7934,
+        0.0,
+        -38.5042
+      ],
+      "yaw_rad": 5.685,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -25.9514,
+        0.1387,
+        -37.7411
+      ],
+      "yaw_rad": 1.8018,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -35.4533,
+        0.0945,
+        -31.6406
+      ],
+      "yaw_rad": 4.2018,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -34.3598,
+        0.0,
+        37.8071
+      ],
+      "yaw_rad": 0.3186,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -32.4585,
+        0.0049,
+        14.9901
+      ],
+      "yaw_rad": 2.7185,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -10.2583,
+        0.0081,
+        37.804
+      ],
+      "yaw_rad": 5.1185,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.1969,
+        0.1493,
+        16.8625
+      ],
+      "yaw_rad": 1.2353,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        17.744,
+        0.0049,
+        -34.1085
+      ],
+      "yaw_rad": 3.6352,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.4,
+        0.002,
+        -14.6779
+      ],
+      "yaw_rad": 6.0352,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        38.3594,
+        0.1225,
+        9.7451
+      ],
+      "yaw_rad": 2.152,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        26.7353,
+        0.6554,
+        23.5405
+      ],
+      "yaw_rad": 4.5519,
+      "scale": 0.65,
+      "interactive": false,
+      "source": "tree canopy mask"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        6.0,
+        0.9361,
+        12.0
+      ],
+      "yaw_rad": 1.3816,
+      "scale": 1.135,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -8.0,
+        0.9505,
+        -8.5
+      ],
+      "yaw_rad": 1.0507,
+      "scale": 1.105,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        24.5,
+        0.1327,
+        -5.5
+      ],
+      "yaw_rad": 2.6721,
+      "scale": 1.121,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -28.0,
+        0.1185,
+        3.5
+      ],
+      "yaw_rad": 5.5331,
+      "scale": 1.175,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -23.083,
+        0.6966,
+        -27.592
+      ],
+      "yaw_rad": 5.5699,
+      "scale": 1.062,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -28.152,
+        0.1499,
+        -35.908
+      ],
+      "yaw_rad": 6.03,
+      "scale": 0.887,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -22.142,
+        0.9581,
+        -24.301
+      ],
+      "yaw_rad": 5.1256,
+      "scale": 1.174,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -26.485,
+        0.7167,
+        -23.062
+      ],
+      "yaw_rad": 1.0021,
+      "scale": 0.968,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -33.558,
+        0.0673,
+        -36.197
+      ],
+      "yaw_rad": 1.662,
+      "scale": 1.13,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -28.645,
+        0.6313,
+        -20.251
+      ],
+      "yaw_rad": 1.2652,
+      "scale": 1.002,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -26.358,
+        0.3328,
+        -31.751
+      ],
+      "yaw_rad": 0.7505,
+      "scale": 1.173,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -36.497,
+        0.1501,
+        -24.911
+      ],
+      "yaw_rad": 1.7248,
+      "scale": 1.081,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -34.432,
+        0.2736,
+        -20.065
+      ],
+      "yaw_rad": 0.9507,
+      "scale": 1.069,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -20.998,
+        0.2027,
+        -37.728
+      ],
+      "yaw_rad": 2.3639,
+      "scale": 1.122,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -19.564,
+        0.8059,
+        -28.2
+      ],
+      "yaw_rad": 5.0351,
+      "scale": 0.94,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        5.966,
+        0.1017,
+        -32.607
+      ],
+      "yaw_rad": 5.6183,
+      "scale": 0.966,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        7.114,
+        0.1767,
+        -28.339
+      ],
+      "yaw_rad": 4.5116,
+      "scale": 1.07,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        10.855,
+        0.015,
+        -37.699
+      ],
+      "yaw_rad": 0.9372,
+      "scale": 1.164,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        12.145,
+        0.0578,
+        -26.18
+      ],
+      "yaw_rad": 0.7739,
+      "scale": 1.102,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        35.543,
+        0.0414,
+        -3.904
+      ],
+      "yaw_rad": 2.098,
+      "scale": 1.198,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        29.137,
+        0.0632,
+        -6.799
+      ],
+      "yaw_rad": 6.0406,
+      "scale": 0.938,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.211,
+        0.0207,
+        -11.153
+      ],
+      "yaw_rad": 2.998,
+      "scale": 1.097,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        35.798,
+        0.1553,
+        6.079
+      ],
+      "yaw_rad": 3.2339,
+      "scale": 1.155,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        32.164,
+        0.2944,
+        5.767
+      ],
+      "yaw_rad": 4.5866,
+      "scale": 0.963,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        19.249,
+        1.0334,
+        24.15
+      ],
+      "yaw_rad": 5.8043,
+      "scale": 1.062,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        20.181,
+        0.592,
+        29.39
+      ],
+      "yaw_rad": 4.8822,
+      "scale": 0.916,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        24.259,
+        0.9334,
+        21.553
+      ],
+      "yaw_rad": 2.6842,
+      "scale": 1.023,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        23.383,
+        0.6286,
+        27.266
+      ],
+      "yaw_rad": 4.5002,
+      "scale": 1.193,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        34.265,
+        0.2656,
+        21.759
+      ],
+      "yaw_rad": 5.9085,
+      "scale": 0.957,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        18.314,
+        0.3087,
+        34.289
+      ],
+      "yaw_rad": 2.0242,
+      "scale": 1.022,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        32.432,
+        0.0444,
+        37.949
+      ],
+      "yaw_rad": 0.3712,
+      "scale": 1.118,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        21.608,
+        0.2248,
+        35.36
+      ],
+      "yaw_rad": 1.3159,
+      "scale": 1.147,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        26.237,
+        1.0379,
+        18.476
+      ],
+      "yaw_rad": 0.1316,
+      "scale": 0.912,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        33.292,
+        0.2252,
+        25.973
+      ],
+      "yaw_rad": 3.2351,
+      "scale": 1.198,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.194,
+        0.6877,
+        18.891
+      ],
+      "yaw_rad": 3.1438,
+      "scale": 0.927,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        26.645,
+        0.5597,
+        25.563
+      ],
+      "yaw_rad": 5.5407,
+      "scale": 1.016,
+      "interactive": false,
+      "role": "tree",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -19.77,
+        0.5884,
+        -31.012
+      ],
+      "yaw_rad": 7.7641,
+      "scale": 0.915,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -19.726,
+        1.0052,
+        -25.52
+      ],
+      "yaw_rad": 1.9491,
+      "scale": 0.998,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        30.819,
+        0.5324,
+        7.987
+      ],
+      "yaw_rad": 4.0921,
+      "scale": 1.208,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        17.064,
+        1.1721,
+        23.104
+      ],
+      "yaw_rad": 5.275,
+      "scale": 1.11,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -34.919,
+        0.0328,
+        5.044
+      ],
+      "yaw_rad": 6.1518,
+      "scale": 1.069,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -27.952,
+        0.0115,
+        14.157
+      ],
+      "yaw_rad": 1.9134,
+      "scale": 0.963,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -31.554,
+        0.0562,
+        5.051
+      ],
+      "yaw_rad": 6.6217,
+      "scale": 1.176,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -32.42,
+        0.3904,
+        -15.349
+      ],
+      "yaw_rad": 7.1018,
+      "scale": 1.212,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "hedge_dense",
+      "position_xyz": [
+        -30.794,
+        0.4707,
+        -13.176
+      ],
+      "yaw_rad": 7.6317,
+      "scale": 0.923,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        -28.979,
+        0.0008,
+        23.216
+      ],
+      "yaw_rad": 0.2482,
+      "scale": 1.189,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -21.944,
+        0.0013,
+        28.967
+      ],
+      "yaw_rad": 3.7987,
+      "scale": 1.039,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -20.873,
+        0.0024,
+        26.981
+      ],
+      "yaw_rad": 2.2646,
+      "scale": 0.915,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -13.796,
+        0.1185,
+        8.491
+      ],
+      "yaw_rad": 3.145,
+      "scale": 1.194,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -12.25,
+        0.1988,
+        5.538
+      ],
+      "yaw_rad": 6.105,
+      "scale": 1.155,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        -0.762,
+        0.3812,
+        7.708
+      ],
+      "yaw_rad": 6.224,
+      "scale": 1.179,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        1.33,
+        0.4052,
+        4.492
+      ],
+      "yaw_rad": 0.6016,
+      "scale": 1.152,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        0.517,
+        0.4879,
+        -9.074
+      ],
+      "yaw_rad": 0.261,
+      "scale": 1.077,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        11.14,
+        0.1124,
+        -19.786
+      ],
+      "yaw_rad": 0.0254,
+      "scale": 0.906,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        17.495,
+        0.043,
+        -14.074
+      ],
+      "yaw_rad": 0.2823,
+      "scale": 1.328,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        15.61,
+        0.0312,
+        -21.661
+      ],
+      "yaw_rad": 5.2597,
+      "scale": 1.144,
+      "interactive": false,
+      "role": "undergrowth",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        -36.426,
+        0.074,
+        -1.758
+      ],
+      "yaw_rad": 2.43,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        -31.615,
+        0.1254,
+        0.225
+      ],
+      "yaw_rad": 0.1318,
+      "scale": 1.344,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        -10.413,
+        0.8635,
+        -6.027
+      ],
+      "yaw_rad": 6.0922,
+      "scale": 1.129,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        5.14,
+        0.3377,
+        -1.477
+      ],
+      "yaw_rad": 5.6548,
+      "scale": 1.559,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        11.894,
+        0.367,
+        -1.889
+      ],
+      "yaw_rad": 1.5649,
+      "scale": 1.261,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy_small",
+      "position_xyz": [
+        28.212,
+        0.1744,
+        -1.864
+      ],
+      "yaw_rad": 3.8396,
+      "scale": 1.217,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        30.822,
+        0.1288,
+        -1.678
+      ],
+      "yaw_rad": 5.3001,
+      "scale": 1.351,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -9,
+        1.4388,
+        -20
+      ],
+      "yaw_rad": 3.3911,
+      "scale": 1.8,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -20,
+        1.2244,
+        -12
+      ],
+      "yaw_rad": 3.4152,
+      "scale": 1.5,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        7,
+        1.0577,
+        18
+      ],
+      "yaw_rad": 3.4984,
+      "scale": 1.6,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -24,
+        0.1106,
+        6
+      ],
+      "yaw_rad": 2.5735,
+      "scale": 1.4,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        30,
+        0.006,
+        -16
+      ],
+      "yaw_rad": 1.5691,
+      "scale": 1.6,
+      "interactive": false,
+      "role": "boulder",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        -19.5,
+        0.0349,
+        13.0
+      ],
+      "yaw_rad": 0.9542,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "fallen_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        -10.841,
+        0.268,
+        3.6
+      ],
+      "yaw_rad": 1.5265,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "rubble",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_end_broken",
+      "position_xyz": [
+        10.92,
+        0.2592,
+        -4.395
+      ],
+      "yaw_rad": 0.1484,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "fallen_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        16.041,
+        0.2158,
+        -5.189
+      ],
+      "yaw_rad": 4.9232,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "rubble",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        12.0,
+        0.1591,
+        -8.0
+      ],
+      "yaw_rad": -0.8221,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "fallen_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_straight",
+      "position_xyz": [
+        17.589,
+        0.0148,
+        -24.732
+      ],
+      "yaw_rad": 1.9109,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "ruin_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_end_broken",
+      "position_xyz": [
+        17.258,
+        0.0121,
+        -27.889
+      ],
+      "yaw_rad": 1.4397,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "ruin_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "wall_corner_broken",
+      "position_xyz": [
+        18.397,
+        0.0063,
+        -30.853
+      ],
+      "yaw_rad": 0.9684,
+      "scale": 1.0,
+      "interactive": false,
+      "role": "ruin_wall",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        28.5,
+        0.0029,
+        -19.5
+      ],
+      "yaw_rad": 0.6276,
+      "scale": 1.001,
+      "interactive": false,
+      "role": "ruin_rubble",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        21.5,
+        0.0012,
+        -35.8
+      ],
+      "yaw_rad": 3.3255,
+      "scale": 1.146,
+      "interactive": false,
+      "role": "ruin_rubble",
+      "provenance_variant": "C"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -74.57,
+        0.373,
+        -75.596
+      ],
+      "yaw_rad": 5.0997,
+      "scale": 1.066,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -74.818,
+        0.528,
+        -66.843
+      ],
+      "yaw_rad": 3.1846,
+      "scale": 0.897,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -75.783,
+        0.558,
+        -61.88
+      ],
+      "yaw_rad": 3.8237,
+      "scale": 1.193,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -75.225,
+        0.555,
+        -52.092
+      ],
+      "yaw_rad": 1.7652,
+      "scale": 1.2,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -74.763,
+        0.491,
+        -46.753
+      ],
+      "yaw_rad": 1.4289,
+      "scale": 1.015,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -75.914,
+        0.371,
+        -41.388
+      ],
+      "yaw_rad": 2.4706,
+      "scale": 0.907,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -76.507,
+        0.171,
+        -30.431
+      ],
+      "yaw_rad": 0.987,
+      "scale": 0.866,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -74.423,
+        0.128,
+        -26.271
+      ],
+      "yaw_rad": 0.9016,
+      "scale": 1.183,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -76.633,
+        0.075,
+        -22.042
+      ],
+      "yaw_rad": 4.4397,
+      "scale": 1.178,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -76.461,
+        0.042,
+        -16.883
+      ],
+      "yaw_rad": 4.6301,
+      "scale": 1.247,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -74.719,
+        0.112,
+        15.065
+      ],
+      "yaw_rad": 3.3701,
+      "scale": 0.988,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -75.606,
+        0.152,
+        20.249
+      ],
+      "yaw_rad": 6.2599,
+      "scale": 1.153,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -74.449,
+        0.201,
+        23.588
+      ],
+      "yaw_rad": 5.4576,
+      "scale": 1.032,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -74.506,
+        0.26,
+        29.324
+      ],
+      "yaw_rad": 5.0138,
+      "scale": 0.956,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -74.655,
+        0.315,
+        38.743
+      ],
+      "yaw_rad": 2.9308,
+      "scale": 1.191,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -74.545,
+        0.314,
+        44.368
+      ],
+      "yaw_rad": 5.3963,
+      "scale": 1.136,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -74.923,
+        0.278,
+        49.483
+      ],
+      "yaw_rad": 4.0486,
+      "scale": 1.087,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -75.974,
+        0.221,
+        54.11
+      ],
+      "yaw_rad": 4.0034,
+      "scale": 0.857,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -75.846,
+        0.188,
+        57.858
+      ],
+      "yaw_rad": 1.2815,
+      "scale": 1.092,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -76.264,
+        0.14,
+        62.311
+      ],
+      "yaw_rad": 2.2608,
+      "scale": 0.999,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -75.475,
+        0.097,
+        67.953
+      ],
+      "yaw_rad": 3.0886,
+      "scale": 1.232,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -75.755,
+        0.059,
+        73.278
+      ],
+      "yaw_rad": 3.122,
+      "scale": 1.175,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -71.734,
+        0.496,
+        -71.965
+      ],
+      "yaw_rad": 2.3893,
+      "scale": 0.865,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -71.589,
+        0.605,
+        -66.302
+      ],
+      "yaw_rad": 3.1742,
+      "scale": 1.066,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -70.633,
+        0.692,
+        -56.802
+      ],
+      "yaw_rad": 1.976,
+      "scale": 1.175,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -70.808,
+        0.658,
+        -52.473
+      ],
+      "yaw_rad": 1.3949,
+      "scale": 0.927,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -71.652,
+        0.516,
+        -44.952
+      ],
+      "yaw_rad": 2.7836,
+      "scale": 0.877,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -71.259,
+        0.338,
+        -36.732
+      ],
+      "yaw_rad": 0.6069,
+      "scale": 1.133,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -70.399,
+        0.239,
+        -31.615
+      ],
+      "yaw_rad": 4.3317,
+      "scale": 0.962,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -69.307,
+        0.161,
+        -26.86
+      ],
+      "yaw_rad": 5.7396,
+      "scale": 1.191,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -71.375,
+        0.07,
+        -19.499
+      ],
+      "yaw_rad": 2.551,
+      "scale": 1.162,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -70.418,
+        0.043,
+        -14.977
+      ],
+      "yaw_rad": 0.2201,
+      "scale": 1.139,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -69.508,
+        0.033,
+        -1.224
+      ],
+      "yaw_rad": 0.2076,
+      "scale": 1.083,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -70.806,
+        0.049,
+        3.659
+      ],
+      "yaw_rad": 1.8413,
+      "scale": 1.086,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -71.708,
+        0.077,
+        8.581
+      ],
+      "yaw_rad": 2.0179,
+      "scale": 1.134,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -70.985,
+        0.185,
+        18.57
+      ],
+      "yaw_rad": 0.8144,
+      "scale": 1.1,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -72.555,
+        0.339,
+        34.096
+      ],
+      "yaw_rad": 1.2102,
+      "scale": 1.086,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -70.988,
+        0.401,
+        40.7
+      ],
+      "yaw_rad": 3.9344,
+      "scale": 1.104,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -70.15,
+        0.383,
+        48.847
+      ],
+      "yaw_rad": 3.9714,
+      "scale": 0.974,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -70.701,
+        0.31,
+        54.313
+      ],
+      "yaw_rad": 1.9268,
+      "scale": 1.104,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -72.063,
+        0.154,
+        65.066
+      ],
+      "yaw_rad": 0.0143,
+      "scale": 1.044,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -72.153,
+        0.067,
+        74.451
+      ],
+      "yaw_rad": 1.2782,
+      "scale": 0.85,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -67.086,
+        0.462,
+        -75.861
+      ],
+      "yaw_rad": 6.174,
+      "scale": 0.958,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -67.54,
+        0.552,
+        -72.046
+      ],
+      "yaw_rad": 2.0177,
+      "scale": 1.094,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -65.255,
+        0.722,
+        -64.934
+      ],
+      "yaw_rad": 1.6058,
+      "scale": 0.992,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -65.594,
+        0.772,
+        -59.507
+      ],
+      "yaw_rad": 5.1036,
+      "scale": 0.88,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -67.633,
+        0.681,
+        -50.215
+      ],
+      "yaw_rad": 0.3633,
+      "scale": 0.857,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -65.151,
+        0.268,
+        -31.68
+      ],
+      "yaw_rad": 6.0519,
+      "scale": 1.151,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -64.921,
+        0.034,
+        -10.875
+      ],
+      "yaw_rad": 4.7621,
+      "scale": 1.079,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -66.055,
+        0.18,
+        14.893
+      ],
+      "yaw_rad": 0.8781,
+      "scale": 0.932,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -66.085,
+        0.247,
+        19.185
+      ],
+      "yaw_rad": 2.4995,
+      "scale": 1.097,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -66.903,
+        0.329,
+        24.634
+      ],
+      "yaw_rad": 1.3284,
+      "scale": 1.239,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -64.438,
+        0.432,
+        28.404
+      ],
+      "yaw_rad": 3.9281,
+      "scale": 1.195,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -65.431,
+        0.525,
+        43.554
+      ],
+      "yaw_rad": 3.3129,
+      "scale": 1.06,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -66.679,
+        0.459,
+        48.624
+      ],
+      "yaw_rad": 0.0611,
+      "scale": 0.996,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -65.891,
+        0.384,
+        54.983
+      ],
+      "yaw_rad": 5.8155,
+      "scale": 1.007,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -66.927,
+        0.306,
+        58.694
+      ],
+      "yaw_rad": 2.4431,
+      "scale": 1.095,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.832,
+        0.465,
+        -76.703
+      ],
+      "yaw_rad": 2.5812,
+      "scale": 0.851,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.396,
+        0.784,
+        -61.236
+      ],
+      "yaw_rad": 1.832,
+      "scale": 1.145,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.648,
+        0.725,
+        -50.151
+      ],
+      "yaw_rad": 1.8962,
+      "scale": 0.954,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -60.993,
+        0.624,
+        -45.298
+      ],
+      "yaw_rad": 2.1451,
+      "scale": 1.136,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -61.943,
+        0.51,
+        -40.929
+      ],
+      "yaw_rad": 0.1343,
+      "scale": 0.984,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -59.644,
+        0.401,
+        -36.871
+      ],
+      "yaw_rad": 1.1042,
+      "scale": 0.878,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -61.552,
+        0.264,
+        -31.169
+      ],
+      "yaw_rad": 0.0186,
+      "scale": 1.172,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.874,
+        0.065,
+        -17.211
+      ],
+      "yaw_rad": 2.2201,
+      "scale": 1.078,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -60.244,
+        0.038,
+        -11.813
+      ],
+      "yaw_rad": 5.6257,
+      "scale": 1.008,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -61.54,
+        0.074,
+        3.731
+      ],
+      "yaw_rad": 5.1358,
+      "scale": 0.922,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -61.293,
+        0.13,
+        9.231
+      ],
+      "yaw_rad": 4.5982,
+      "scale": 0.943,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -60.878,
+        0.182,
+        12.83
+      ],
+      "yaw_rad": 0.3919,
+      "scale": 1.129,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -59.799,
+        0.291,
+        18.465
+      ],
+      "yaw_rad": 0.4225,
+      "scale": 1.181,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.656,
+        0.528,
+        29.838
+      ],
+      "yaw_rad": 1.3106,
+      "scale": 1.089,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -59.317,
+        0.644,
+        40.656
+      ],
+      "yaw_rad": 2.0081,
+      "scale": 1.071,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -59.872,
+        0.594,
+        47.651
+      ],
+      "yaw_rad": 3.953,
+      "scale": 1.011,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -60.138,
+        0.171,
+        70.091
+      ],
+      "yaw_rad": 2.5342,
+      "scale": 1.149,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -56.086,
+        0.465,
+        -76.088
+      ],
+      "yaw_rad": 5.6623,
+      "scale": 1.149,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -56.024,
+        0.572,
+        -71.873
+      ],
+      "yaw_rad": 2.6915,
+      "scale": 1.242,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -57.284,
+        0.678,
+        -67.665
+      ],
+      "yaw_rad": 1.5949,
+      "scale": 1.245,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -55.112,
+        0.751,
+        -60.567
+      ],
+      "yaw_rad": 2.8296,
+      "scale": 1.151,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -54.871,
+        0.687,
+        -50.195
+      ],
+      "yaw_rad": 5.9737,
+      "scale": 1.098,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -56.028,
+        0.234,
+        -30.162
+      ],
+      "yaw_rad": 3.0547,
+      "scale": 0.914,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -56.473,
+        0.159,
+        -25.896
+      ],
+      "yaw_rad": 2.4624,
+      "scale": 1.142,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -56.502,
+        0.04,
+        -12.403
+      ],
+      "yaw_rad": 3.0396,
+      "scale": 0.951,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -57.186,
+        0.162,
+        10.631
+      ],
+      "yaw_rad": 1.7719,
+      "scale": 1.191,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -55.173,
+        0.22,
+        13.765
+      ],
+      "yaw_rad": 5.96,
+      "scale": 0.884,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -56.599,
+        0.298,
+        17.934
+      ],
+      "yaw_rad": 4.4763,
+      "scale": 0.893,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -55.941,
+        0.671,
+        44.455
+      ],
+      "yaw_rad": 5.9461,
+      "scale": 0.998,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -54.719,
+        0.637,
+        48.298
+      ],
+      "yaw_rad": 2.4762,
+      "scale": 1.041,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -54.67,
+        0.305,
+        64.064
+      ],
+      "yaw_rad": 5.6823,
+      "scale": 1.241,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -54.917,
+        0.119,
+        74.747
+      ],
+      "yaw_rad": 0.9218,
+      "scale": 0.855,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -50.858,
+        0.424,
+        -75.548
+      ],
+      "yaw_rad": 5.54,
+      "scale": 1.177,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -50.009,
+        0.592,
+        -66.649
+      ],
+      "yaw_rad": 2.1276,
+      "scale": 0.904,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -51.402,
+        0.692,
+        -56.506
+      ],
+      "yaw_rad": 2.1962,
+      "scale": 1.134,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -51.399,
+        0.647,
+        -51.292
+      ],
+      "yaw_rad": 4.1168,
+      "scale": 1.161,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -51.009,
+        0.563,
+        -46.672
+      ],
+      "yaw_rad": 3.6564,
+      "scale": 0.913,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -51.452,
+        0.436,
+        -40.597
+      ],
+      "yaw_rad": 4.3065,
+      "scale": 1.156,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -50.265,
+        0.347,
+        -37.289
+      ],
+      "yaw_rad": 2.6913,
+      "scale": 0.9,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -49.721,
+        0.209,
+        -30.537
+      ],
+      "yaw_rad": 4.9845,
+      "scale": 0.927,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -51.324,
+        0.096,
+        -21.633
+      ],
+      "yaw_rad": 0.3627,
+      "scale": 0.853,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -52.46,
+        0.054,
+        -15.922
+      ],
+      "yaw_rad": 3.1729,
+      "scale": 1.182,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -51.045,
+        0.039,
+        -11.644
+      ],
+      "yaw_rad": 5.3909,
+      "scale": 1.157,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -49.644,
+        0.09,
+        4.375
+      ],
+      "yaw_rad": 4.8474,
+      "scale": 1.064,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -50.956,
+        0.131,
+        7.987
+      ],
+      "yaw_rad": 2.0542,
+      "scale": 1.066,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -49.555,
+        0.2,
+        12.575
+      ],
+      "yaw_rad": 2.4719,
+      "scale": 1.077,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -49.63,
+        0.584,
+        30.432
+      ],
+      "yaw_rad": 1.897,
+      "scale": 1.228,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -51.373,
+        0.698,
+        39.684
+      ],
+      "yaw_rad": 0.5848,
+      "scale": 1.201,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -51.622,
+        0.682,
+        45.092
+      ],
+      "yaw_rad": 5.4261,
+      "scale": 1.227,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -49.524,
+        0.446,
+        57.908
+      ],
+      "yaw_rad": 4.14,
+      "scale": 0.903,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -49.883,
+        0.22,
+        68.299
+      ],
+      "yaw_rad": 2.3201,
+      "scale": 1.05,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -45.872,
+        0.329,
+        -76.64
+      ],
+      "yaw_rad": 1.3891,
+      "scale": 1.009,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -46.676,
+        0.445,
+        -71.204
+      ],
+      "yaw_rad": 4.1732,
+      "scale": 1.046,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -47.555,
+        0.273,
+        -35.108
+      ],
+      "yaw_rad": 2.9473,
+      "scale": 1.203,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -44.856,
+        0.189,
+        -31.153
+      ],
+      "yaw_rad": 0.0778,
+      "scale": 0.918,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -44.415,
+        0.186,
+        12.622
+      ],
+      "yaw_rad": 4.6086,
+      "scale": 0.938,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -46.702,
+        0.321,
+        19.155
+      ],
+      "yaw_rad": 1.4944,
+      "scale": 1.114,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -45.948,
+        0.395,
+        22.714
+      ],
+      "yaw_rad": 5.5985,
+      "scale": 0.858,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -45.044,
+        0.578,
+        32.327
+      ],
+      "yaw_rad": 0.5245,
+      "scale": 0.898,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -46.716,
+        0.67,
+        40.182
+      ],
+      "yaw_rad": 1.8334,
+      "scale": 0.898,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -44.81,
+        0.5,
+        53.901
+      ],
+      "yaw_rad": 5.7102,
+      "scale": 1.211,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -46.676,
+        0.38,
+        60.158
+      ],
+      "yaw_rad": 2.8112,
+      "scale": 1.052,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -46.408,
+        0.298,
+        63.827
+      ],
+      "yaw_rad": 0.5712,
+      "scale": 0.967,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -45.475,
+        0.173,
+        70.399
+      ],
+      "yaw_rad": 5.1894,
+      "scale": 1.232,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -41.007,
+        0.277,
+        -74.927
+      ],
+      "yaw_rad": 0.3147,
+      "scale": 0.934,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -40.939,
+        0.35,
+        -69.549
+      ],
+      "yaw_rad": 0.8132,
+      "scale": 1.148,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -42.328,
+        0.465,
+        -59.561
+      ],
+      "yaw_rad": 2.6835,
+      "scale": 1.15,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -39.41,
+        0.325,
+        -46.95
+      ],
+      "yaw_rad": 1.8215,
+      "scale": 1.245,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -42.606,
+        0.075,
+        -12.427
+      ],
+      "yaw_rad": 1.5318,
+      "scale": 1.039,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -41.238,
+        0.084,
+        4.226
+      ],
+      "yaw_rad": 2.2526,
+      "scale": 1.037,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -40.537,
+        0.204,
+        15.121
+      ],
+      "yaw_rad": 2.6085,
+      "scale": 1.161,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -40.419,
+        0.392,
+        25.436
+      ],
+      "yaw_rad": 4.4022,
+      "scale": 0.871,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -40.024,
+        0.491,
+        50.304
+      ],
+      "yaw_rad": 5.5741,
+      "scale": 1.197,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -40.28,
+        0.419,
+        54.997
+      ],
+      "yaw_rad": 4.8135,
+      "scale": 1.124,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -40.232,
+        0.18,
+        68.205
+      ],
+      "yaw_rad": 6.0696,
+      "scale": 0.953,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -42.59,
+        0.126,
+        72.942
+      ],
+      "yaw_rad": 1.4905,
+      "scale": 0.989,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.994,
+        0.176,
+        -76.822
+      ],
+      "yaw_rad": 3.4665,
+      "scale": 0.973,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -36.706,
+        0.302,
+        -64.466
+      ],
+      "yaw_rad": 2.3513,
+      "scale": 1.202,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -37.675,
+        0.344,
+        -59.538
+      ],
+      "yaw_rad": 1.6092,
+      "scale": 0.998,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -34.831,
+        0.277,
+        -55.953
+      ],
+      "yaw_rad": 0.0984,
+      "scale": 1.105,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -36.467,
+        0.298,
+        -51.631
+      ],
+      "yaw_rad": 0.1307,
+      "scale": 1.127,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -35.105,
+        0.24,
+        -46.784
+      ],
+      "yaw_rad": 0.1693,
+      "scale": 1.129,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -35.626,
+        0.287,
+        58.584
+      ],
+      "yaw_rad": 5.7776,
+      "scale": 1.018,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -36.946,
+        0.227,
+        63.422
+      ],
+      "yaw_rad": 4.4961,
+      "scale": 1.246,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -36.953,
+        0.13,
+        70.369
+      ],
+      "yaw_rad": 5.8909,
+      "scale": 1.0,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -35.835,
+        0.092,
+        73.479
+      ],
+      "yaw_rad": 0.3317,
+      "scale": 0.902,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -29.543,
+        0.105,
+        -76.148
+      ],
+      "yaw_rad": 3.2601,
+      "scale": 0.973,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -29.374,
+        0.161,
+        -64.321
+      ],
+      "yaw_rad": 0.2704,
+      "scale": 1.183,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -30.218,
+        0.33,
+        44.597
+      ],
+      "yaw_rad": 6.1706,
+      "scale": 1.066,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -30.628,
+        0.308,
+        49.623
+      ],
+      "yaw_rad": 4.2167,
+      "scale": 0.862,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -29.589,
+        0.234,
+        55.393
+      ],
+      "yaw_rad": 0.2519,
+      "scale": 1.244,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -30.959,
+        0.156,
+        64.03
+      ],
+      "yaw_rad": 3.0325,
+      "scale": 0.98,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -31.791,
+        0.07,
+        73.923
+      ],
+      "yaw_rad": 2.8354,
+      "scale": 1.018,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.117,
+        0.07,
+        -75.13
+      ],
+      "yaw_rad": 0.514,
+      "scale": 1.068,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -26.257,
+        0.102,
+        -69.327
+      ],
+      "yaw_rad": 3.6794,
+      "scale": 1.07,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -24.783,
+        0.098,
+        -64.963
+      ],
+      "yaw_rad": 3.051,
+      "scale": 1.047,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -24.842,
+        0.106,
+        -51.378
+      ],
+      "yaw_rad": 1.3447,
+      "scale": 1.208,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -24.6,
+        0.116,
+        -44.661
+      ],
+      "yaw_rad": 0.1335,
+      "scale": 1.096,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -26.379,
+        0.252,
+        43.529
+      ],
+      "yaw_rad": 0.9429,
+      "scale": 1.163,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -26.95,
+        0.239,
+        49.228
+      ],
+      "yaw_rad": 4.2043,
+      "scale": 0.861,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -25.045,
+        0.14,
+        58.77
+      ],
+      "yaw_rad": 5.4052,
+      "scale": 1.035,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -24.417,
+        0.045,
+        72.807
+      ],
+      "yaw_rad": 1.2341,
+      "scale": 1.203,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -22.288,
+        0.062,
+        -70.455
+      ],
+      "yaw_rad": 2.6971,
+      "scale": 1.101,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -19.605,
+        0.057,
+        -61.288
+      ],
+      "yaw_rad": 3.6898,
+      "scale": 0.968,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -20.375,
+        0.148,
+        -41.199
+      ],
+      "yaw_rad": 4.6243,
+      "scale": 0.958,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -19.7,
+        0.14,
+        42.353
+      ],
+      "yaw_rad": 0.3818,
+      "scale": 1.227,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -21.998,
+        0.16,
+        48.595
+      ],
+      "yaw_rad": 1.1395,
+      "scale": 1.237,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -21.405,
+        0.134,
+        52.707
+      ],
+      "yaw_rad": 3.6333,
+      "scale": 0.985,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -15.565,
+        0.027,
+        -69.943
+      ],
+      "yaw_rad": 3.1738,
+      "scale": 1.181,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -17.191,
+        0.072,
+        -46.193
+      ],
+      "yaw_rad": 3.0425,
+      "scale": 0.958,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -15.191,
+        0.063,
+        55.553
+      ],
+      "yaw_rad": 1.1194,
+      "scale": 1.112,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -17.337,
+        0.068,
+        58.743
+      ],
+      "yaw_rad": 4.2189,
+      "scale": 1.035,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -14.575,
+        0.036,
+        64.105
+      ],
+      "yaw_rad": 4.5091,
+      "scale": 0.896,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -15.429,
+        0.015,
+        75.179
+      ],
+      "yaw_rad": 1.372,
+      "scale": 1.238,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -11.093,
+        0.011,
+        -75.674
+      ],
+      "yaw_rad": 3.0306,
+      "scale": 1.109,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -11.477,
+        0.014,
+        -72.17
+      ],
+      "yaw_rad": 6.1729,
+      "scale": 1.194,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -11.972,
+        0.018,
+        -66.825
+      ],
+      "yaw_rad": 1.8363,
+      "scale": 1.199,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -12.044,
+        0.03,
+        -51.249
+      ],
+      "yaw_rad": 4.3059,
+      "scale": 1.159,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -10.742,
+        0.053,
+        43.525
+      ],
+      "yaw_rad": 1.0793,
+      "scale": 1.116,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -11.235,
+        0.048,
+        50.145
+      ],
+      "yaw_rad": 4.3073,
+      "scale": 1.156,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -12.363,
+        0.012,
+        73.583
+      ],
+      "yaw_rad": 4.1649,
+      "scale": 1.206,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -7.332,
+        0.007,
+        -74.816
+      ],
+      "yaw_rad": 5.5536,
+      "scale": 1.065,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -7.652,
+        0.01,
+        -69.969
+      ],
+      "yaw_rad": 2.8056,
+      "scale": 1.099,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -6.871,
+        0.034,
+        44.918
+      ],
+      "yaw_rad": 4.7657,
+      "scale": 1.128,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -5.16,
+        0.022,
+        53.169
+      ],
+      "yaw_rad": 5.4222,
+      "scale": 1.089,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -5.42,
+        0.016,
+        59.825
+      ],
+      "yaw_rad": 6.1254,
+      "scale": 1.077,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        -4.518,
+        0.011,
+        65.301
+      ],
+      "yaw_rad": 3.608,
+      "scale": 0.956,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -7.145,
+        0.009,
+        70.318
+      ],
+      "yaw_rad": 4.8168,
+      "scale": 0.975,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -4.573,
+        0.005,
+        74.111
+      ],
+      "yaw_rad": 1.2927,
+      "scale": 1.18,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -0.458,
+        0.009,
+        -70.067
+      ],
+      "yaw_rad": 2.6179,
+      "scale": 1.208,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -1.543,
+        0.01,
+        -66.689
+      ],
+      "yaw_rad": 2.7349,
+      "scale": 0.882,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        -2.593,
+        0.015,
+        -55.326
+      ],
+      "yaw_rad": 3.7598,
+      "scale": 1.113,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -0.046,
+        0.024,
+        -49.502
+      ],
+      "yaw_rad": 5.7848,
+      "scale": 0.991,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -0.773,
+        0.031,
+        43.105
+      ],
+      "yaw_rad": 2.6974,
+      "scale": 1.024,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        -1.405,
+        0.018,
+        50.169
+      ],
+      "yaw_rad": 1.9014,
+      "scale": 1.109,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        0.638,
+        0.015,
+        54.255
+      ],
+      "yaw_rad": 0.888,
+      "scale": 1.163,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        -0.13,
+        0.012,
+        60.407
+      ],
+      "yaw_rad": 1.9476,
+      "scale": 1.113,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        -1.522,
+        0.01,
+        63.752
+      ],
+      "yaw_rad": 3.2875,
+      "scale": 1.006,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        -2.454,
+        0.007,
+        70.386
+      ],
+      "yaw_rad": 1.9125,
+      "scale": 0.89,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        2.768,
+        0.009,
+        -74.35
+      ],
+      "yaw_rad": 0.4321,
+      "scale": 1.102,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        5.296,
+        0.015,
+        -71.232
+      ],
+      "yaw_rad": 3.8498,
+      "scale": 1.058,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        4.535,
+        0.018,
+        -66.3
+      ],
+      "yaw_rad": 4.1799,
+      "scale": 0.88,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        4.162,
+        0.023,
+        -59.731
+      ],
+      "yaw_rad": 3.5594,
+      "scale": 1.158,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        3.696,
+        0.025,
+        -55.777
+      ],
+      "yaw_rad": 0.3356,
+      "scale": 1.159,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        5.303,
+        0.035,
+        -50.641
+      ],
+      "yaw_rad": 3.8875,
+      "scale": 1.216,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        4.592,
+        0.037,
+        -47.08
+      ],
+      "yaw_rad": 4.575,
+      "scale": 1.014,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        3.267,
+        0.029,
+        45.39
+      ],
+      "yaw_rad": 3.4221,
+      "scale": 1.119,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        3.979,
+        0.013,
+        63.724
+      ],
+      "yaw_rad": 0.081,
+      "scale": 1.008,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        3.771,
+        0.008,
+        72.404
+      ],
+      "yaw_rad": 0.893,
+      "scale": 1.031,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        10.258,
+        0.026,
+        -72.045
+      ],
+      "yaw_rad": 1.7501,
+      "scale": 0.961,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        8.219,
+        0.028,
+        -66.719
+      ],
+      "yaw_rad": 3.2617,
+      "scale": 0.946,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        7.742,
+        0.033,
+        -62.205
+      ],
+      "yaw_rad": 0.8033,
+      "scale": 1.101,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        8.901,
+        0.049,
+        -54.657
+      ],
+      "yaw_rad": 3.9059,
+      "scale": 1.052,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        9.467,
+        0.06,
+        -46.502
+      ],
+      "yaw_rad": 1.8572,
+      "scale": 0.963,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        8.121,
+        0.06,
+        43.184
+      ],
+      "yaw_rad": 4.037,
+      "scale": 1.037,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        10.097,
+        0.038,
+        49.241
+      ],
+      "yaw_rad": 6.0322,
+      "scale": 1.035,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        9.443,
+        0.03,
+        54.959
+      ],
+      "yaw_rad": 4.0538,
+      "scale": 0.935,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        8.073,
+        0.022,
+        62.404
+      ],
+      "yaw_rad": 3.385,
+      "scale": 1.211,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        7.444,
+        0.017,
+        68.056
+      ],
+      "yaw_rad": 3.5962,
+      "scale": 0.921,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        8.331,
+        0.015,
+        73.03
+      ],
+      "yaw_rad": 5.0399,
+      "scale": 1.051,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        14.872,
+        0.049,
+        -70.73
+      ],
+      "yaw_rad": 1.4664,
+      "scale": 1.017,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        13.336,
+        0.058,
+        -64.831
+      ],
+      "yaw_rad": 1.6396,
+      "scale": 1.211,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        15.549,
+        0.086,
+        -61.577
+      ],
+      "yaw_rad": 4.7786,
+      "scale": 1.218,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        14.206,
+        0.086,
+        -57.076
+      ],
+      "yaw_rad": 1.5751,
+      "scale": 1.128,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        13.92,
+        0.095,
+        -41.114
+      ],
+      "yaw_rad": 5.8339,
+      "scale": 0.978,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        14.208,
+        0.062,
+        48.75
+      ],
+      "yaw_rad": 1.7124,
+      "scale": 1.129,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        13.464,
+        0.052,
+        52.513
+      ],
+      "yaw_rad": 0.525,
+      "scale": 1.169,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        14.429,
+        0.054,
+        58.969
+      ],
+      "yaw_rad": 5.5184,
+      "scale": 1.04,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        13.231,
+        0.043,
+        62.921
+      ],
+      "yaw_rad": 4.2081,
+      "scale": 1.056,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        12.332,
+        0.032,
+        67.942
+      ],
+      "yaw_rad": 0.2528,
+      "scale": 0.961,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        13.231,
+        0.024,
+        75.663
+      ],
+      "yaw_rad": 1.7637,
+      "scale": 1.031,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        18.307,
+        0.122,
+        -59.938
+      ],
+      "yaw_rad": 0.7467,
+      "scale": 1.25,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        19.939,
+        0.163,
+        -55.622
+      ],
+      "yaw_rad": 1.8048,
+      "scale": 1.181,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        17.523,
+        0.14,
+        -44.576
+      ],
+      "yaw_rad": 1.744,
+      "scale": 1.013,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        20.513,
+        0.18,
+        -42.183
+      ],
+      "yaw_rad": 4.5003,
+      "scale": 1.018,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        19.204,
+        0.112,
+        45.594
+      ],
+      "yaw_rad": 2.4296,
+      "scale": 1.074,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        17.729,
+        0.088,
+        49.664
+      ],
+      "yaw_rad": 2.2192,
+      "scale": 1.009,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        18.411,
+        0.089,
+        58.941
+      ],
+      "yaw_rad": 4.1289,
+      "scale": 1.129,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        20.464,
+        0.098,
+        64.973
+      ],
+      "yaw_rad": 4.1573,
+      "scale": 0.946,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        19.067,
+        0.053,
+        74.828
+      ],
+      "yaw_rad": 4.6207,
+      "scale": 0.85,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        24.93,
+        0.093,
+        -76.767
+      ],
+      "yaw_rad": 0.4135,
+      "scale": 0.978,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        23.431,
+        0.185,
+        -62.192
+      ],
+      "yaw_rad": 2.9369,
+      "scale": 0.954,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        24.359,
+        0.171,
+        45.632
+      ],
+      "yaw_rad": 1.8955,
+      "scale": 1.011,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        25.53,
+        0.196,
+        52.999
+      ],
+      "yaw_rad": 1.781,
+      "scale": 1.071,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        25.664,
+        0.196,
+        57.859
+      ],
+      "yaw_rad": 3.9352,
+      "scale": 1.136,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        23.945,
+        0.141,
+        65.328
+      ],
+      "yaw_rad": 4.7698,
+      "scale": 1.214,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        22.585,
+        0.103,
+        69.952
+      ],
+      "yaw_rad": 1.955,
+      "scale": 1.173,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        27.594,
+        0.184,
+        -69.891
+      ],
+      "yaw_rad": 2.4825,
+      "scale": 1.235,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        28.179,
+        0.241,
+        -65.486
+      ],
+      "yaw_rad": 4.2829,
+      "scale": 1.039,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        29.848,
+        0.278,
+        49.381
+      ],
+      "yaw_rad": 0.1226,
+      "scale": 0.854,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        29.351,
+        0.271,
+        58.679
+      ],
+      "yaw_rad": 6.2793,
+      "scale": 1.068,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        29.928,
+        0.263,
+        62.977
+      ],
+      "yaw_rad": 2.7128,
+      "scale": 0.899,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        30.087,
+        0.231,
+        67.473
+      ],
+      "yaw_rad": 2.7059,
+      "scale": 0.945,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        32.525,
+        0.24,
+        -71.819
+      ],
+      "yaw_rad": 5.4071,
+      "scale": 0.912,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        33.323,
+        0.339,
+        -66.172
+      ],
+      "yaw_rad": 2.4326,
+      "scale": 1.156,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        34.495,
+        0.436,
+        -61.353
+      ],
+      "yaw_rad": 5.768,
+      "scale": 0.993,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        35.557,
+        0.529,
+        -55.595
+      ],
+      "yaw_rad": 1.4354,
+      "scale": 0.96,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        33.978,
+        0.502,
+        -52.494
+      ],
+      "yaw_rad": 2.7654,
+      "scale": 0.955,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        34.517,
+        0.512,
+        -45.431
+      ],
+      "yaw_rad": 2.086,
+      "scale": 1.01,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        33.424,
+        0.316,
+        42.781
+      ],
+      "yaw_rad": 4.4612,
+      "scale": 0.998,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        32.325,
+        0.352,
+        54.408
+      ],
+      "yaw_rad": 4.0632,
+      "scale": 1.156,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        40.043,
+        0.289,
+        -76.319
+      ],
+      "yaw_rad": 4.6445,
+      "scale": 1.02,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        39.895,
+        0.492,
+        -66.191
+      ],
+      "yaw_rad": 5.5852,
+      "scale": 0.976,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        38.287,
+        0.551,
+        -60.451
+      ],
+      "yaw_rad": 1.5753,
+      "scale": 1.232,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        39.874,
+        0.676,
+        -50.167
+      ],
+      "yaw_rad": 2.9916,
+      "scale": 0.971,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        39.653,
+        0.489,
+        45.147
+      ],
+      "yaw_rad": 1.4448,
+      "scale": 1.136,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        37.432,
+        0.482,
+        50.288
+      ],
+      "yaw_rad": 3.1707,
+      "scale": 1.213,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        39.652,
+        0.551,
+        59.163
+      ],
+      "yaw_rad": 0.32,
+      "scale": 1.116,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        40.422,
+        0.535,
+        62.853
+      ],
+      "yaw_rad": 0.0131,
+      "scale": 0.895,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        39.652,
+        0.434,
+        68.095
+      ],
+      "yaw_rad": 6.097,
+      "scale": 1.102,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        39.428,
+        0.293,
+        75.48
+      ],
+      "yaw_rad": 6.2668,
+      "scale": 1.004,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.762,
+        0.384,
+        -74.63
+      ],
+      "yaw_rad": 0.6238,
+      "scale": 1.193,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.463,
+        0.685,
+        -60.661
+      ],
+      "yaw_rad": 0.6768,
+      "scale": 1.193,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        44.818,
+        0.774,
+        -56.587
+      ],
+      "yaw_rad": 1.1917,
+      "scale": 0.904,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.911,
+        0.434,
+        -29.966
+      ],
+      "yaw_rad": 1.1034,
+      "scale": 0.888,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.541,
+        0.325,
+        -25.446
+      ],
+      "yaw_rad": 2.6164,
+      "scale": 0.904,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        45.339,
+        0.256,
+        -21.748
+      ],
+      "yaw_rad": 5.9526,
+      "scale": 1.094,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        45.427,
+        0.088,
+        -10.338
+      ],
+      "yaw_rad": 5.0231,
+      "scale": 1.083,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.924,
+        0.042,
+        -0.001
+      ],
+      "yaw_rad": 0.2397,
+      "scale": 0.998,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        42.571,
+        0.081,
+        10.201
+      ],
+      "yaw_rad": 0.9949,
+      "scale": 1.014,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        44.506,
+        0.116,
+        17.634
+      ],
+      "yaw_rad": 2.5975,
+      "scale": 1.048,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        45.002,
+        0.265,
+        28.898
+      ],
+      "yaw_rad": 1.8692,
+      "scale": 1.127,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        42.838,
+        0.48,
+        40.483
+      ],
+      "yaw_rad": 2.7729,
+      "scale": 1.029,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        43.359,
+        0.568,
+        44.329
+      ],
+      "yaw_rad": 5.4709,
+      "scale": 0.985,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        42.703,
+        0.647,
+        57.997
+      ],
+      "yaw_rad": 2.5192,
+      "scale": 0.885,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        43.111,
+        0.522,
+        67.677
+      ],
+      "yaw_rad": 2.9366,
+      "scale": 1.206,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        43.535,
+        0.357,
+        75.428
+      ],
+      "yaw_rad": 3.999,
+      "scale": 1.24,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        49.534,
+        0.44,
+        -75.682
+      ],
+      "yaw_rad": 1.8021,
+      "scale": 1.231,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        48.151,
+        0.782,
+        -61.014
+      ],
+      "yaw_rad": 0.0301,
+      "scale": 1.141,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        49.465,
+        0.86,
+        -57.343
+      ],
+      "yaw_rad": 3.1776,
+      "scale": 0.977,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        48.983,
+        0.741,
+        -40.509
+      ],
+      "yaw_rad": 4.4875,
+      "scale": 1.014,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        48.276,
+        0.608,
+        -35.316
+      ],
+      "yaw_rad": 1.3049,
+      "scale": 1.024,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        49.01,
+        0.482,
+        -30.504
+      ],
+      "yaw_rad": 3.7653,
+      "scale": 1.179,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        47.304,
+        0.372,
+        -26.541
+      ],
+      "yaw_rad": 2.6653,
+      "scale": 1.126,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        48.24,
+        0.184,
+        -17.527
+      ],
+      "yaw_rad": 5.3217,
+      "scale": 0.889,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        48.823,
+        0.081,
+        -9.408
+      ],
+      "yaw_rad": 1.7685,
+      "scale": 0.955,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        49.814,
+        0.123,
+        19.211
+      ],
+      "yaw_rad": 5.4092,
+      "scale": 1.069,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        50.075,
+        0.173,
+        22.716
+      ],
+      "yaw_rad": 2.3131,
+      "scale": 1.093,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        49.648,
+        0.44,
+        34.721
+      ],
+      "yaw_rad": 5.478,
+      "scale": 0.873,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        50.502,
+        0.843,
+        54.562
+      ],
+      "yaw_rad": 0.9787,
+      "scale": 1.022,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        50.504,
+        0.807,
+        60.351
+      ],
+      "yaw_rad": 2.4063,
+      "scale": 0.969,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        47.459,
+        0.604,
+        67.924
+      ],
+      "yaw_rad": 3.2132,
+      "scale": 1.144,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        50.528,
+        0.454,
+        75.035
+      ],
+      "yaw_rad": 1.4242,
+      "scale": 0.877,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        54.928,
+        0.482,
+        -75.911
+      ],
+      "yaw_rad": 3.8582,
+      "scale": 1.053,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        55.298,
+        0.851,
+        -62.008
+      ],
+      "yaw_rad": 2.4228,
+      "scale": 0.856,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        52.756,
+        0.737,
+        -39.532
+      ],
+      "yaw_rad": 3.2632,
+      "scale": 1.075,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        53.757,
+        0.519,
+        -31.705
+      ],
+      "yaw_rad": 2.9629,
+      "scale": 1.201,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        53.844,
+        0.363,
+        -26.026
+      ],
+      "yaw_rad": 3.7963,
+      "scale": 0.873,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        53.541,
+        0.24,
+        -20.649
+      ],
+      "yaw_rad": 0.2924,
+      "scale": 1.095,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        53.863,
+        0.174,
+        -17.041
+      ],
+      "yaw_rad": 3.3147,
+      "scale": 1.031,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        52.433,
+        0.098,
+        -11.208
+      ],
+      "yaw_rad": 5.761,
+      "scale": 0.986,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        55.09,
+        0.061,
+        -7.169
+      ],
+      "yaw_rad": 4.4244,
+      "scale": 1.21,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        55.108,
+        0.045,
+        9.983
+      ],
+      "yaw_rad": 3.3382,
+      "scale": 0.883,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        54.881,
+        0.121,
+        18.877
+      ],
+      "yaw_rad": 3.6771,
+      "scale": 0.966,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        54.642,
+        0.182,
+        22.818
+      ],
+      "yaw_rad": 5.3162,
+      "scale": 1.143,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        53.972,
+        0.282,
+        27.714
+      ],
+      "yaw_rad": 4.83,
+      "scale": 1.115,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        55.575,
+        0.431,
+        33.185
+      ],
+      "yaw_rad": 0.6286,
+      "scale": 1.17,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        52.817,
+        0.618,
+        39.944
+      ],
+      "yaw_rad": 2.9191,
+      "scale": 1.198,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        53.688,
+        0.843,
+        49.404
+      ],
+      "yaw_rad": 0.0515,
+      "scale": 1.089,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        54.125,
+        0.888,
+        55.412
+      ],
+      "yaw_rad": 1.4183,
+      "scale": 1.005,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        59.149,
+        0.523,
+        -74.952
+      ],
+      "yaw_rad": 6.1009,
+      "scale": 0.873,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        59.594,
+        0.915,
+        -51.848
+      ],
+      "yaw_rad": 2.5962,
+      "scale": 1.135,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        59.024,
+        0.748,
+        -41.198
+      ],
+      "yaw_rad": 1.1126,
+      "scale": 0.977,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        58.343,
+        0.338,
+        -25.87
+      ],
+      "yaw_rad": 4.0665,
+      "scale": 0.974,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        57.422,
+        0.263,
+        -22.358
+      ],
+      "yaw_rad": 2.1303,
+      "scale": 0.985,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        59.275,
+        0.151,
+        -16.559
+      ],
+      "yaw_rad": 3.3726,
+      "scale": 0.909,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        58.246,
+        0.081,
+        -10.385
+      ],
+      "yaw_rad": 5.4099,
+      "scale": 0.85,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        58.831,
+        0.031,
+        -0.789
+      ],
+      "yaw_rad": 5.5431,
+      "scale": 1.141,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        58.332,
+        0.04,
+        9.037
+      ],
+      "yaw_rad": 2.7693,
+      "scale": 1.235,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        58.981,
+        0.066,
+        13.616
+      ],
+      "yaw_rad": 1.2035,
+      "scale": 0.902,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        59.295,
+        0.105,
+        17.649
+      ],
+      "yaw_rad": 5.3474,
+      "scale": 1.012,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        60.015,
+        0.189,
+        23.337
+      ],
+      "yaw_rad": 0.4186,
+      "scale": 0.989,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        57.593,
+        0.785,
+        45.591
+      ],
+      "yaw_rad": 1.2374,
+      "scale": 0.945,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        59.413,
+        0.768,
+        64.829
+      ],
+      "yaw_rad": 4.2263,
+      "scale": 1.08,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        57.583,
+        0.661,
+        69.135
+      ],
+      "yaw_rad": 3.4171,
+      "scale": 1.089,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        57.398,
+        0.51,
+        74.196
+      ],
+      "yaw_rad": 2.307,
+      "scale": 0.902,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        62.362,
+        0.865,
+        -50.055
+      ],
+      "yaw_rad": 0.2894,
+      "scale": 1.207,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        62.557,
+        0.729,
+        -42.406
+      ],
+      "yaw_rad": 4.0781,
+      "scale": 0.867,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        64.68,
+        0.499,
+        -34.776
+      ],
+      "yaw_rad": 3.16,
+      "scale": 0.966,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        64.391,
+        0.369,
+        -29.468
+      ],
+      "yaw_rad": 4.0161,
+      "scale": 0.996,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        63.433,
+        0.201,
+        -21.078
+      ],
+      "yaw_rad": 0.6719,
+      "scale": 1.099,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        65.642,
+        0.062,
+        -10.217
+      ],
+      "yaw_rad": 5.2915,
+      "scale": 1.087,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        64.39,
+        0.046,
+        -7.108
+      ],
+      "yaw_rad": 3.5999,
+      "scale": 1.227,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        65.392,
+        0.025,
+        -1.194
+      ],
+      "yaw_rad": 1.8766,
+      "scale": 1.073,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        64.723,
+        0.042,
+        10.537
+      ],
+      "yaw_rad": 2.9939,
+      "scale": 0.993,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        65.47,
+        0.099,
+        18.089
+      ],
+      "yaw_rad": 1.8872,
+      "scale": 1.121,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        65.393,
+        0.204,
+        25.115
+      ],
+      "yaw_rad": 3.6291,
+      "scale": 1.058,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        63.935,
+        0.413,
+        33.637
+      ],
+      "yaw_rad": 4.5786,
+      "scale": 1.226,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        64.553,
+        0.562,
+        39.232
+      ],
+      "yaw_rad": 3.0696,
+      "scale": 0.894,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        62.53,
+        0.727,
+        44.603
+      ],
+      "yaw_rad": 3.9449,
+      "scale": 0.948,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        64.629,
+        0.788,
+        49.71
+      ],
+      "yaw_rad": 5.1305,
+      "scale": 0.866,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        62.921,
+        0.851,
+        53.802
+      ],
+      "yaw_rad": 4.2351,
+      "scale": 0.882,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        62.425,
+        0.845,
+        58.359
+      ],
+      "yaw_rad": 2.9567,
+      "scale": 0.992,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        64.197,
+        0.698,
+        65.621
+      ],
+      "yaw_rad": 5.7593,
+      "scale": 1.072,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        68.044,
+        0.559,
+        -39.731
+      ],
+      "yaw_rad": 3.2226,
+      "scale": 1.179,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        70.089,
+        0.432,
+        -36.057
+      ],
+      "yaw_rad": 3.191,
+      "scale": 0.877,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        69.413,
+        0.332,
+        -30.96
+      ],
+      "yaw_rad": 4.492,
+      "scale": 1.075,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        67.548,
+        0.187,
+        -22.186
+      ],
+      "yaw_rad": 5.1748,
+      "scale": 1.147,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        70.588,
+        0.094,
+        -16.51
+      ],
+      "yaw_rad": 0.6932,
+      "scale": 0.969,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        69.474,
+        0.048,
+        -9.698
+      ],
+      "yaw_rad": 4.4314,
+      "scale": 1.224,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        69.522,
+        0.032,
+        -5.921
+      ],
+      "yaw_rad": 4.9999,
+      "scale": 1.004,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        70.647,
+        0.018,
+        -0.102
+      ],
+      "yaw_rad": 4.0135,
+      "scale": 0.877,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        68.857,
+        0.037,
+        10.678
+      ],
+      "yaw_rad": 4.6433,
+      "scale": 1.155,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        67.366,
+        0.242,
+        27.744
+      ],
+      "yaw_rad": 5.1457,
+      "scale": 1.063,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        70.458,
+        0.352,
+        34.316
+      ],
+      "yaw_rad": 2.1338,
+      "scale": 0.879,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        69.21,
+        0.506,
+        40.013
+      ],
+      "yaw_rad": 5.8214,
+      "scale": 1.165,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        69.319,
+        0.67,
+        48.718
+      ],
+      "yaw_rad": 5.719,
+      "scale": 0.857,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        68.679,
+        0.729,
+        54.462
+      ],
+      "yaw_rad": 2.0117,
+      "scale": 0.959,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        69.288,
+        0.611,
+        64.989
+      ],
+      "yaw_rad": 4.391,
+      "scale": 1.13,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        70.263,
+        0.492,
+        69.66
+      ],
+      "yaw_rad": 5.1262,
+      "scale": 0.917,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        70.33,
+        0.407,
+        73.362
+      ],
+      "yaw_rad": 0.2013,
+      "scale": 0.971,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        73.714,
+        0.487,
+        -69.904
+      ],
+      "yaw_rad": 2.1909,
+      "scale": 0.997,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        73.363,
+        0.619,
+        -60.559
+      ],
+      "yaw_rad": 4.9536,
+      "scale": 1.14,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        72.352,
+        0.661,
+        -57.327
+      ],
+      "yaw_rad": 3.9551,
+      "scale": 0.987,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        72.518,
+        0.628,
+        -50.451
+      ],
+      "yaw_rad": 1.4396,
+      "scale": 0.926,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        74.63,
+        0.513,
+        -45.976
+      ],
+      "yaw_rad": 1.2976,
+      "scale": 1.098,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_autumn",
+      "position_xyz": [
+        75.462,
+        0.408,
+        -40.746
+      ],
+      "yaw_rad": 5.1014,
+      "scale": 1.079,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "shrub_flowering",
+      "position_xyz": [
+        74.674,
+        0.319,
+        -34.878
+      ],
+      "yaw_rad": 3.4874,
+      "scale": 1.112,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        74.431,
+        0.023,
+        -5.957
+      ],
+      "yaw_rad": 0.761,
+      "scale": 1.016,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        72.594,
+        0.047,
+        13.922
+      ],
+      "yaw_rad": 2.6697,
+      "scale": 1.18,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        75.398,
+        0.119,
+        23.839
+      ],
+      "yaw_rad": 0.4522,
+      "scale": 1.007,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        72.404,
+        0.196,
+        27.617
+      ],
+      "yaw_rad": 1.9943,
+      "scale": 1.132,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "rock_mossy",
+      "position_xyz": [
+        75.21,
+        0.291,
+        35.002
+      ],
+      "yaw_rad": 3.0788,
+      "scale": 1.107,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        75.472,
+        0.358,
+        38.968
+      ],
+      "yaw_rad": 5.7153,
+      "scale": 1.089,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature_b",
+      "position_xyz": [
+        74.772,
+        0.465,
+        44.442
+      ],
+      "yaw_rad": 1.6745,
+      "scale": 0.942,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        73.131,
+        0.564,
+        48.454
+      ],
+      "yaw_rad": 6.0966,
+      "scale": 0.909,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        72.474,
+        0.615,
+        57.61
+      ],
+      "yaw_rad": 1.0719,
+      "scale": 1.036,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_mature",
+      "position_xyz": [
+        74.699,
+        0.483,
+        64.493
+      ],
+      "yaw_rad": 0.4809,
+      "scale": 0.888,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    },
+    {
+      "asset_id": "apple_tree_young",
+      "position_xyz": [
+        75.206,
+        0.307,
+        74.133
+      ],
+      "yaw_rad": 3.2967,
+      "scale": 1.161,
+      "interactive": false,
+      "provenance_variant": "scale_rules"
+    }
+  ],
+  "exclusions": [
+    {
+      "type": "circle",
+      "center_xz": [
+        0.2165,
+        -0.4507
+      ],
+      "radius_m": 3.5,
+      "reason": "bridge clearance"
+    },
+    {
+      "kind": "circle",
+      "name": "scale_spawn",
+      "center_xz": [
+        -65,
+        65
+      ],
+      "radius_m": 4.0
+    },
+    {
+      "kind": "circle",
+      "name": "scale_goal",
+      "center_xz": [
+        65,
+        -65
+      ],
+      "radius_m": 4.0
+    }
+  ],
+  "provenance": {
+    "source_image": "planning/input/generated-map-source.png",
+    "source_plan": "variants/E/world_spec.json + deterministic outer orchard rules",
+    "specialist_reference": "variants/C/world_spec.json",
+    "specialist_assets": [
+      "res://assets/experimental_2d3d/bridge.glb",
+      "res://assets/experimental_2d3d/beacon.glb"
+    ],
+    "tools": [
+      "Python deterministic merge",
+      "Godot common builder",
+      "Blender asset extraction"
+    ],
+    "model": "OpenAI image generation + claude-opus-5-5"
+  },
+  "planning": {
+    "mask_prefix": "mask_",
+    "coordinate_mapping": "x=-40+80*(u+0.5)/512; z=-40+80*(v+0.5)/512",
+    "uncertain_pixel_fraction": 0.0,
+    "warnings": [],
+    "anchor_snap": {
+      "spawn_extracted_xz": [
+        -31.7262,
+        31.156
+      ],
+      "goal_extracted_xz": [
+        29.2812,
+        -29.7235
+      ],
+      "spawn_delta_m": 2.7619,
+      "goal_delta_m": 5.9421
+    },
+    "height_encoding": "greyscale 0=0m, 255=3m; derived from source hill patches",
+    "density_encoding": "blurred tree canopy occupancy, 0..255; source-aligned",
+    "grounding_delta_m": {
+      "object_count": 113,
+      "min": 0.0,
+      "max": 1.0234,
+      "mean": 0.1658
+    }
+  },
+  "landmark": {
+    "asset_glb": "res://assets/experimental_2d3d/beacon.glb",
+    "position_xz": [
+      65,
+      -65
+    ],
+    "kind": "orchard_beacon"
+  },
+  "hybrid": {
+    "parent_plan": "planning\\artifacts\\B\\world_spec.json",
+    "specialist_layout": "variants\\C\\world_spec.json",
+    "parent_sha256": "5f39a105f248a18aafffc4c9dee2afa1ba762be9b8c86408ad37e4a27cd53abd",
+    "specialist_sha256": "285ad47b3f0816eae55527cfb6b450796be91f4c92a74ca464bd5384ba6c67e0",
+    "addition_quotas": {
+      "tree": 36,
+      "undergrowth": 22,
+      "boulder": 12,
+      "fallen_wall": 4,
+      "ruin_wall": 3,
+      "ruin_rubble": 3,
+      "rubble": 2
+    },
+    "correction": "frame empty route with compatible undergrowth and C-inspired props",
+    "original_image_derived_objects": 113,
+    "added_specialist_objects": {
+      "tree": 36,
+      "undergrowth": 20,
+      "boulder": 12,
+      "fallen_wall": 3,
+      "rubble": 2,
+      "ruin_wall": 3,
+      "ruin_rubble": 2
+    }
+  },
+  "scale_probe": {
+    "parent": "variants/E/world_spec.json",
+    "bounds_m": [
+      160,
+      160
+    ],
+    "parent_object_count": 191,
+    "route_cleared_count": 5,
+    "route_cleared": [
+      {
+        "asset_id": "wall_straight",
+        "position_xz": [
+          31.5556,
+          -33.8865
+        ]
+      },
+      {
+        "asset_id": "rubble_split",
+        "position_xz": [
+          24.4129,
+          -29.0134
+        ]
+      },
+      {
+        "asset_id": "rubble_split",
+        "position_xz": [
+          24.9414,
+          -27.3177
+        ]
+      },
+      {
+        "asset_id": "apple_tree_mature",
+        "position_xz": [
+          37.3584,
+          -37.3792
+        ]
+      },
+      {
+        "asset_id": "apple_tree_mature",
+        "position_xz": [
+          -36.9704,
+          35.5466
+        ]
+      }
+    ],
+    "new_object_count": 386,
+    "new_assets": {
+      "apple_tree_young": 88,
+      "apple_tree_mature": 82,
+      "rock_mossy": 70,
+      "apple_tree_mature_b": 80,
+      "shrub_flowering": 51,
+      "apple_tree_mature_autumn": 15
+    },
+    "purpose": "layout/repetition/route/performance scaling"
+  }
+}

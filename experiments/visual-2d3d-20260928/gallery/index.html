@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Orchard Brook · 2D ↔ 3D evidence</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101615; --panel:#1a2421; --panel2:#202e29; --line:#3b5148; --text:#f1eee3; --muted:#b6c0b7; --gold:#e4b86d; --mint:#95d9b2; --rose:#e49d93; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(ellipse at 75% -10%,#243d34 0%,transparent 42%),var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    a { color:var(--mint); text-underline-offset:3px; }
+    button { font:inherit; }
+    button:focus-visible,a:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
+    header,.wrap { max-width:1540px; margin:auto; padding:0 28px; }
+    header { padding-top:42px; padding-bottom:25px; }
+    .eyebrow { color:var(--gold); text-transform:uppercase; letter-spacing:.16em; font-size:11px; font-weight:800; }
+    h1 { font-family:Georgia,serif; font-size:clamp(35px,5vw,64px); line-height:1.03; letter-spacing:-.03em; margin:12px 0; font-weight:500; }
+    h2 { font-family:Georgia,serif; font-size:clamp(25px,3vw,36px); font-weight:500; margin:0 0 12px; }
+    h3 { font-size:16px; margin:0 0 10px; }
+    p { margin:0 0 12px; }
+    .intro { max-width:760px; color:var(--muted); font-size:17px; }
+    .meta { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
+    .chip { border:1px solid var(--line); border-radius:100px; padding:5px 11px; color:var(--muted); font-size:12px; }
+    main section { margin:0 0 48px; }
+    .section-head { display:flex; justify-content:space-between; gap:20px; align-items:end; margin-bottom:17px; }
+    .subtle { color:var(--muted); }
+    .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:15px 18px; background:var(--panel); border:1px solid var(--line); border-radius:14px 14px 0 0; }
+    .toolbar label { color:var(--muted); font-weight:700; font-size:13px; }
+    .camera-buttons { display:flex; flex-wrap:wrap; gap:6px; }
+    .camera-buttons button,.blind-btn { background:#2a3a33; border:1px solid var(--line); border-radius:8px; color:var(--text); padding:7px 12px; cursor:pointer; }
+    .camera-buttons button[aria-pressed="true"],.blind-btn[aria-pressed="true"] { color:#15231c; background:var(--gold); border-color:var(--gold); font-weight:700; }
+    .blind-btn { margin-left:auto; }
+    .camera-note { background:#18221e; border:1px solid var(--line); border-top:0; padding:9px 18px; color:var(--muted); font-size:13px; }
+    .grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-top:12px; }
+    .card,.info-card { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:13px; overflow:hidden; }
+    .card-title { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 13px; min-height:66px; }
+    .letter { display:inline-flex; flex:none; justify-content:center; align-items:center; width:30px; height:30px; border-radius:7px; background:#385242; color:var(--mint); font-weight:800; }
+    .card-title strong { font-size:13px; line-height:1.25; }
+    .card-title small { color:var(--muted); font-size:11px; }
+    .frame { aspect-ratio:1/1; background:#121b17; position:relative; display:flex; align-items:center; justify-content:center; text-align:center; }
+    .frame img { width:100%; height:100%; object-fit:contain; display:block; }
+    .missing { padding:16px; color:var(--muted); font-size:13px; }
+    .missing b { display:block; color:var(--gold); font-size:20px; font-family:Georgia,serif; font-weight:500; margin-bottom:5px; }
+    .card-footer { padding:9px 13px 12px; min-height:42px; font-size:12px; color:var(--muted); }
+    .card-footer a { white-space:nowrap; }
+    .source-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+    .info-card { padding:15px; }
+    .info-card h3 { display:flex; align-items:center; gap:9px; }
+    .source-thumb { display:block; width:100%; aspect-ratio:4/3; object-fit:contain; background:#101916; border-radius:8px; margin:9px 0; }
+    .links { margin:8px 0 0; padding:0; list-style:none; font-size:13px; }
+    .links li { margin:6px 0; }
+    .none { color:var(--muted); font-style:italic; font-size:13px; }
+    .table-scroll { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:13px; }
+    table { border-collapse:collapse; width:100%; min-width:830px; font-size:13px; }
+    th,td { padding:11px 13px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--gold); font-size:12px; letter-spacing:.03em; white-space:nowrap; }
+    tr:last-child td { border-bottom:0; }
+    td:first-child { white-space:nowrap; font-weight:700; }
+    .pass { color:var(--mint); } .fail { color:var(--rose); } .na { color:var(--muted); }
+    .foot-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .foot-grid .info-card { padding:20px; }
+    .key { font-weight:700; color:var(--gold); }
+    footer { border-top:1px solid var(--line); color:var(--muted); padding:22px 0 45px; font-size:12px; }
+    @media(max-width:1100px) { .grid,.source-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:700px) { header,.wrap { padding-left:16px; padding-right:16px; } header { padding-top:28px; } .grid,.source-grid,.foot-grid { grid-template-columns:1fr; } .frame { aspect-ratio:4/3; } .section-head { display:block; } .blind-btn { margin-left:0; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Brann's Forge VR · local experiment</div>
+  <h1>Orchard Brook<br>evidence gallery</h1>
+  <p class="intro">Five construction routes, one benchmark scene and five fixed cameras. Render availability and measurements come from saved experiment files; empty cells are deliberately left empty.</p>
+  <div class="meta"><span class="chip">80 × 80 m world</span><span class="chip">Fixed camera definitions</span><span class="chip">Local evidence · no VR score inferred</span></div>
+</header>
+<main class="wrap">
+  <section aria-labelledby="comparison-title">
+    <div class="section-head"><div><div class="eyebrow">01 / matched views</div><h2 id="comparison-title">Camera comparison</h2></div><p class="subtle">Switch cameras to compare the same viewpoint across A–E.</p></div>
+    <div class="toolbar"><label>Camera</label><div class="camera-buttons" id="camera-buttons"></div><button class="blind-btn" id="blind" type="button" aria-pressed="false">Hide pipeline labels</button></div>
+    <div class="camera-note" id="camera-note"></div>
+    <div class="grid" id="comparison"></div>
+  </section>
+  <section aria-labelledby="sources-title">
+    <div class="section-head"><div><div class="eyebrow">02 / provenance</div><h2 id="sources-title">Source plans and specifications</h2></div><p class="subtle">Open the saved input or specification behind each route.</p></div>
+    <div class="source-grid" id="sources"></div>
+  </section>
+  <section aria-labelledby="metrics-title">
+    <div class="section-head"><div><div class="eyebrow">03 / recorded checks</div><h2 id="metrics-title">Measured and validated evidence</h2></div><p class="subtle">A blank result means no compatible measurement has been recorded.</p></div>
+    <div class="table-scroll"><table><thead><tr><th>Variant</th><th>Spec validation</th><th>Objects</th><th>Path length</th><th>Crossings</th><th>Max route grade</th><th>Min object clearance</th><th>VR performance</th></tr></thead><tbody id="metrics"></tbody></table></div>
+  </section>
+  <section aria-labelledby="notes-title">
+    <div class="section-head"><div><div class="eyebrow">04 / interpretation</div><h2 id="notes-title">Evidence notes</h2></div></div>
+    <div class="foot-grid"><div class="info-card"><h3>Targeted correction</h3><div id="edit-note"></div><h3>Variant A GLB check</h3><div id="glb-note"></div></div><div class="info-card"><h3>Reading this comparison</h3><p>Renders establish visual evidence at fixed viewpoints. Specification checks cover the saved plan only; they do not establish Godot collision, playable traversal, stereo comfort or headset performance.</p><p>Variant A's Blender renders and future Godot renders should be compared with their renderer and settings disclosed before treating visual differences as a pipeline outcome.</p><ul class="links" id="context-links"></ul></div></div>
+  </section>
+  <footer>Generated locally from saved experiment files. Run <code>python build.py</code> again after new renders, source files or metrics arrive.</footer>
+</main>
+<script>
+const data = {"title": "Orchard Brook · 2D ↔ 3D evidence", "benchmark": {"id": "orchard_brook_benchmark", "world": {"width_m": 80, "depth_m": 80, "x_min": -40, "x_max": 40, "z_min": -40, "z_max": 40, "up": "+Y", "north": "-Z"}, "cameras": [{"id": "overhead", "position": [0, 85, 0], "target": [0, 0, 0], "fov_deg": 60, "north_up": true}, {"id": "approach", "position": [-28, 3.2, 27], "target": [-2, 1.6, 0], "fov_deg": 72}, {"id": "crossing", "position": [-6, 2.1, 8], "target": [8, 1.5, -10], "fov_deg": 72}, {"id": "landmark", "position": [18, 3.2, -17], "target": [24, 2.5, -27], "fov_deg": 72}, {"id": "reverse", "position": [31, 3.0, -31], "target": [-5, 1.5, 8], "fov_deg": 72}]}, "variants": [{"id": "A", "label": "Direct 3D / written brief", "renders": {"overhead": "../evidence/A/overhead.png", "approach": "../evidence/A/approach.png", "crossing": "../evidence/A/crossing.png", "landmark": "../evidence/A/landmark.png", "reverse": "../evidence/A/reverse.png"}, "sources": [{"label": "World specification", "href": "../variants/A/world_spec.json", "kind": ".json"}, {"label": "Specialist handoff", "href": "../variants/A/HANDOFF.md", "kind": ".md"}, {"label": "GLB validation", "href": "../variants/A/validation.json", "kind": ".json"}], "spec": "../variants/A/world_spec.json", "metrics": {"source": "experiments\\visual-2d3d-20260928\\variants\\A\\world_spec.json", "variant": "A", "seed": 20260928, "pass": true, "failures": [], "warnings": ["object radii absent; full clearance/collision checks unavailable", "2 terrain feature centres embedded in ground; mesh contact unknown"], "metrics": {"object_count": 194, "path_length_m": 78.739, "stream_crossing_count": 1, "bridge_crossing_error_m": 0.0, "max_route_grade": 0.1275, "min_object_route_clearance_m": null, "placement_failure_count": 0, "grounding_failure_count": 0, "ground_contact_unknown_count": 2, "water_region_intrusion_count": 0, "water_buffer_conflict_count": 0, "exclusion_role_exemption_count": 0, "water_edge_contact_unverified_count": 0, "terrain_height_evaluated": true, "terrain_gaussian_coefficient": 1.0, "terrain_model": "declared ravine carve and hills", "path_surface_count": 16, "inferred_path_surface_count": 16, "inferred_terrain_feature_count": 2, "object_radii_declared": false, "semantic_sha256": "f6397402975b4e32791c1d6f31acf81292772ae43f92a24de5602242a0de891e", "engine_collision_verified": false, "visual_quality_verified": false, "vr_performance_verified": false}}}, {"id": "B", "label": "Generated map → structured scene", "renders": {"overhead": "../evidence/B/overhead.png", "approach": "../evidence/B/approach.png", "crossing": "../evidence/B/crossing.png", "landmark": "../evidence/B/landmark.png", "reverse": "../evidence/B/reverse.png"}, "sources": [{"label": "Generated source map", "href": "../planning/artifacts/B/source_map.png", "kind": ".png"}, {"label": "Extracted plan preview", "href": "../planning/artifacts/B/plan_preview.png", "kind": ".png"}, {"label": "World specification", "href": "../planning/artifacts/B/world_spec.json", "kind": ".json"}, {"label": "Extraction report", "href": "../planning/artifacts/B/extraction_report.json", "kind": ".json"}], "spec": "../planning/artifacts/B/world_spec.json", "metrics": {"source": "experiments\\visual-2d3d-20260928\\planning\\artifacts\\B\\world_spec.json", "variant": "B", "seed": 0, "pass": true, "failures": [], "warnings": ["object radii absent; full clearance/collision checks unavailable"], "metrics": {"object_count": 113, "path_length_m": 95.65, "stream_crossing_count": 1, "bridge_crossing_error_m": 0.118, "max_route_grade": 0.0194, "min_object_route_clearance_m": null, "placement_failure_count": 0, "grounding_failure_count": 0, "ground_contact_unknown_count": 0, "water_region_intrusion_count": 0, "water_buffer_conflict_count": 0, "exclusion_role_exemption_count": 0, "water_edge_contact_unverified_count": 0, "terrain_height_evaluated": true, "terrain_gaussian_coefficient": 0.5, "terrain_model": "Gaussian hills", "path_surface_count": 0, "inferred_path_surface_count": 0, "inferred_terrain_feature_count": 0, "object_radii_declared": false, "semantic_sha256": "a176d107087e580be3b57fed95854b51de14108013313b7e0b00785a28b74892", "engine_collision_verified": false, "visual_quality_verified": false, "vr_performance_verified": false}}}, {"id": "C", "label": "2D references → specialist 3D", "renders": {"overhead": "../evidence/C/overhead.png", "approach": "../evidence/C/approach.png", "crossing": "../evidence/C/crossing.png", "landmark": "../evidence/C/landmark.png", "reverse": "../evidence/C/reverse.png"}, "sources": [{"label": "Environment reference board", "href": "../references/environment-board.png", "kind": ".png"}, {"label": "Bridge model sheet", "href": "../references/bridge-model-sheet.png", "kind": ".png"}, {"label": "Reference check", "href": "../references/REFERENCE-CHECK.md", "kind": ".md"}, {"label": "World specification", "href": "../variants/C/world_spec.json", "kind": ".json"}], "spec": "../variants/C/world_spec.json", "metrics": {"source": "experiments\\visual-2d3d-20260928\\variants\\C\\world_spec.json", "variant": "C", "seed": 20260928, "pass": true, "failures": [], "warnings": ["object radii absent; full clearance/collision checks unavailable", "2 terrain feature centres embedded in ground; mesh contact unknown", "15 declared role exemptions near water; mesh-water contact unverified"], "metrics": {"object_count": 262, "path_length_m": 79.549, "stream_crossing_count": 1, "bridge_crossing_error_m": 0.078, "max_route_grade": 0.1587, "min_object_route_clearance_m": null, "placement_failure_count": 0, "grounding_failure_count": 0, "ground_contact_unknown_count": 2, "water_region_intrusion_count": 0, "water_buffer_conflict_count": 0, "exclusion_role_exemption_count": 15, "water_edge_contact_unverified_count": 15, "terrain_height_evaluated": true, "terrain_gaussian_coefficient": 1.0, "terrain_model": "Gaussian hills", "path_surface_count": 23, "inferred_path_surface_count": 0, "inferred_terrain_feature_count": 0, "object_radii_declared": false, "semantic_sha256": "7272c9e5e3302ad5a061f0361e723bc6271bf04e8bf4c03e695ffeb5eea1727b", "engine_collision_verified": false, "visual_quality_verified": false, "vr_performance_verified": false}}}, {"id": "D", "label": "Seeded procedural baseline", "renders": {"overhead": "../evidence/D/overhead.png", "approach": "../evidence/D/approach.png", "crossing": "../evidence/D/crossing.png", "landmark": "../evidence/D/landmark.png", "reverse": "../evidence/D/reverse.png"}, "sources": [{"label": "World specification", "href": "../variants/D/world_spec.json", "kind": ".json"}, {"label": "Generator", "href": "../variants/D/generate.py", "kind": ".py"}, {"label": "Clearing edit", "href": "../variants/D/clearing-edit.json", "kind": ".json"}, {"label": "Edit metrics", "href": "../evaluation/edit-metrics.json", "kind": ".json"}], "spec": "../variants/D/world_spec.json", "metrics": {"source": "experiments\\visual-2d3d-20260928\\variants\\D\\world_spec.json", "variant": "D", "seed": 20260928, "pass": true, "failures": [], "warnings": [], "metrics": {"object_count": 57, "path_length_m": 80.36, "stream_crossing_count": 1, "bridge_crossing_error_m": 0.0, "max_route_grade": 0.0201, "min_object_route_clearance_m": 3.969, "placement_failure_count": 0, "grounding_failure_count": 0, "ground_contact_unknown_count": 0, "water_region_intrusion_count": 0, "water_buffer_conflict_count": 0, "exclusion_role_exemption_count": 0, "water_edge_contact_unverified_count": 0, "terrain_height_evaluated": true, "terrain_gaussian_coefficient": 0.5, "terrain_model": "Gaussian hills", "path_surface_count": 0, "inferred_path_surface_count": 0, "inferred_terrain_feature_count": 0, "object_radii_declared": true, "semantic_sha256": "e5d18cc6141743776dfa08fa2594a8f34a7f555b4e6f88f2e42ce68062edfaf8", "engine_collision_verified": false, "visual_quality_verified": false, "vr_performance_verified": false}}}, {"id": "E", "label": "Hybrid construction and correction", "renders": {"overhead": "../evidence/E/overhead.png", "approach": "../evidence/E/approach.png", "crossing": "../evidence/E/crossing.png", "landmark": "../evidence/E/landmark.png", "reverse": "../evidence/E/reverse.png"}, "sources": [{"label": "World specification", "href": "../variants/E/world_spec.json", "kind": ".json"}, {"label": "Correction notes", "href": "../variants/E/correction.md", "kind": ".md"}], "spec": "../variants/E/world_spec.json", "metrics": {"source": "experiments\\visual-2d3d-20260928\\variants\\E\\world_spec.json", "variant": "E", "seed": 20260928, "pass": true, "failures": [], "warnings": ["object radii absent; full clearance/collision checks unavailable"], "metrics": {"object_count": 191, "path_length_m": 95.65, "stream_crossing_count": 1, "bridge_crossing_error_m": 0.118, "max_route_grade": 0.0194, "min_object_route_clearance_m": null, "placement_failure_count": 0, "grounding_failure_count": 0, "ground_contact_unknown_count": 0, "water_region_intrusion_count": 0, "water_buffer_conflict_count": 0, "exclusion_role_exemption_count": 0, "water_edge_contact_unverified_count": 0, "terrain_height_evaluated": true, "terrain_gaussian_coefficient": 0.5, "terrain_model": "Gaussian hills", "path_surface_count": 0, "inferred_path_surface_count": 0, "inferred_terrain_feature_count": 0, "object_radii_declared": false, "semantic_sha256": "c7f4e194d7cc3c39d9e4dd720a2b940d84f35a2b0e97534af6c8bc42e3e839b8", "engine_collision_verified": false, "visual_quality_verified": false, "vr_performance_verified": false}}}], "edit_metrics": {"edit": "expand ruin clearing", "old_radius_m": 6.0, "new_radius_m": 9.0, "removed_object_ids": ["tree_2_-4", "tree_4_-3"], "added_object_ids": [], "changed_object_ids": [], "unrelated_object_changes": [], "unchanged_object_count": 55, "route_unchanged": true, "before_pass": true, "after_pass": true, "before_sha256": "e5d18cc6141743776dfa08fa2594a8f34a7f555b4e6f88f2e42ce68062edfaf8", "after_sha256": "9857fe92326a2daf6e251e29cf10ab22e9c285b7d77318f3612af01689f34d61", "targeted_edit_pass": true}, "a_glb_validation": {"glb_bytes": 6296032, "mesh_objects": 203, "unique_meshes": 23, "triangles": 733241, "procedural_present": true, "spec_objects": 194, "library_instances_in_glb": 194, "ok": true}, "links": [{"label": "Benchmark", "href": "../benchmark.json"}, {"label": "Shared contract", "href": "../CONTRACT.md"}, {"label": "Planning method", "href": "../planning/README.md"}, {"label": "Evaluation method", "href": "../evaluation/README.md"}, {"label": "Results and recommendations", "href": "../reports/RESULTS.md"}, {"label": "Reference-assisted bridge", "href": "../asset_trial/with_ref/review_three_quarter.png"}, {"label": "No-reference bridge", "href": "../asset_trial/no_ref/review_three_quarter.png"}, {"label": "2.5D probes", "href": "../probes/README.md"}, {"label": "160 m scaling capture", "href": "../evidence/scale/overhead.png"}]};
+const cameras = data.benchmark.cameras;
+let selected = cameras[0].id;
+let blind = false;
+const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const missing = '<span class="na">Unavailable</span>';
+function render() {
+  document.getElementById('camera-buttons').innerHTML = cameras.map(c => `<button type="button" data-camera="${esc(c.id)}" aria-pressed="${c.id===selected}">${esc(c.id[0].toUpperCase()+c.id.slice(1))}</button>`).join('');
+  const camera = cameras.find(c => c.id===selected);
+  document.getElementById('camera-note').textContent = `${camera.id}: camera ${camera.position.join(', ')} → target ${camera.target.join(', ')} · ${camera.fov_deg}° field of view${camera.north_up ? ' · north up' : ''}`;
+  document.getElementById('comparison').innerHTML = data.variants.map(v => {
+    const image = v.renders[selected];
+    const count = Object.values(v.renders).filter(Boolean).length;
+    return `<article class="card"><div class="card-title"><span class="letter">${esc(v.id)}</span><strong>${blind ? 'Pipeline concealed' : esc(v.label)}</strong><small>${count}/5 views</small></div><div class="frame">${image ? `<img loading="lazy" src="${esc(image)}" alt="Variant ${esc(v.id)}, ${esc(selected)} camera render">` : `<div class="missing"><b>No render yet</b>${esc(selected)} camera has no saved image for variant ${esc(v.id)}.</div>`}</div><div class="card-footer">${image ? `<a href="${esc(image)}" target="_blank" rel="noopener">Open full image ↗</a>` : 'Awaiting a matching camera capture'}</div></article>`;
+  }).join('');
+  document.querySelectorAll('[data-camera]').forEach(button => button.addEventListener('click', () => { selected=button.dataset.camera; render(); }));
+}
+function sourceCards() {
+  document.getElementById('sources').innerHTML = data.variants.map(v => {
+    const available = v.sources.filter(s => s.href);
+    const preview = available.find(s => ['.png','.webp','.jpg','.jpeg'].includes(s.kind));
+    return `<article class="info-card"><h3><span class="letter">${esc(v.id)}</span>${esc(v.label)}</h3>${preview ? `<a href="${esc(preview.href)}" target="_blank" rel="noopener"><img class="source-thumb" loading="lazy" src="${esc(preview.href)}" alt="${esc(preview.label)}"></a>` : '<div class="source-thumb missing">No source image saved</div>'}<ul class="links">${available.map(s => `<li><a href="${esc(s.href)}" target="_blank" rel="noopener">${esc(s.label)} ↗</a></li>`).join('') || '<li class="none">No source files available yet.</li>'}</ul></article>`;
+  }).join('');
+}
+function metricTable() {
+  document.getElementById('metrics').innerHTML = data.variants.map(v => {
+    const result = v.metrics, m = result?.metrics || {};
+    const fmt = (x, unit='') => x == null ? missing : `${esc(x)}${unit}`;
+    const status = !result ? missing : result.pass === true ? '<span class="pass">Pass</span>' : result.pass === false ? `<span class="fail">Fail (${esc((result.failures||[]).length)} checks)</span>` : missing;
+    const vr = m.vr_performance_verified === true ? '<span class="pass">Verified</span>' : '<span class="na">Unverified</span>';
+    return `<tr><td>${esc(v.id)} <span class="subtle">${esc(v.label)}</span></td><td>${status}</td><td>${fmt(m.object_count)}</td><td>${fmt(m.path_length_m,' m')}</td><td>${fmt(m.stream_crossing_count)}</td><td>${fmt(m.max_route_grade)}</td><td>${fmt(m.min_object_route_clearance_m,' m')}</td><td>${vr}</td></tr>`;
+  }).join('');
+}
+function notes() {
+  const e = data.edit_metrics;
+  document.getElementById('edit-note').innerHTML = e ? `<p><span class="key">${esc(e.edit || 'Edit')}</span>: radius ${esc(e.old_radius_m)} → ${esc(e.new_radius_m)} m. ${esc((e.removed_object_ids||[]).length)} objects removed; ${esc((e.unrelated_object_changes||[]).length)} unrelated object changes.</p><p>Saved specification checks: ${e.before_pass ? 'pass' : 'fail'} before, ${e.after_pass ? 'pass' : 'fail'} after. ${e.route_unchanged ? 'Route unchanged.' : 'Route changed.'} This is a structural edit test; a matched before/after render is still needed for visual confirmation.</p>` : '<p class="none">No correction metrics saved yet.</p>';
+  const a = data.a_glb_validation;
+  document.getElementById('glb-note').innerHTML = a ? `<p>Imported GLB check: <span class="${a.ok ? 'pass' : 'fail'}">${a.ok ? 'pass' : 'fail'}</span>; ${esc(a.library_instances_in_glb)} library instances, ${esc(a.triangles.toLocaleString())} triangles. This is a Blender import check, not an engine or headset performance result.</p>` : '<p class="none">No imported GLB check saved yet.</p>';
+  document.getElementById('context-links').innerHTML = data.links.filter(l=>l.href).map(l=>`<li><a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a></li>`).join('');
+}
+document.getElementById('blind').addEventListener('click', function() { blind=!blind; this.setAttribute('aria-pressed',String(blind)); this.textContent=blind ? 'Reveal pipeline labels' : 'Hide pipeline labels'; render(); });
+render(); sourceCards(); metricTable(); notes();
+</script>
+</body>
+</html>

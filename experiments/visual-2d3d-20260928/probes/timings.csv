@@ -1,0 +1,9 @@
+step,outcome,elapsed_seconds,source
+brief_contract_repo_discovery,completed,0.9,exec wall clock
+source_image_visual_inspection,completed,0.1,view_image wall clock
+first_texture_extraction,GrabCut selected 0.19 percent foreground,1.06,exec wall clock
+first_blender_run,failed missing factory scene world,2.65,exec wall clock
+corrected_first_blender_run,seven renders saved,2.99,exec wall clock
+revised_texture_extraction,beige classifier 64.8 percent nonzero alpha,0.34,exec wall clock
+revised_blender_run,seven renders saved,1.66,exec wall clock
+final_camera_blender_run,side camera moved to expose card,1.65,exec wall clock

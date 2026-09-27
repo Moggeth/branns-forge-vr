@@ -1,0 +1,43 @@
+{
+  "benchmark_path": "benchmark.json",
+  "build_s": 0.459,
+  "captures": [
+    "evidence/E/overhead.png",
+    "evidence/E/approach.png",
+    "evidence/E/crossing.png",
+    "evidence/E/landmark.png",
+    "evidence/E/reverse.png"
+  ],
+  "elapsed_s": 0.672,
+  "errors": [],
+  "method": "hybrid image-extracted layout + constrained C props + Opus bridge/beacon",
+  "metrics": {
+    "asset_instances": 191,
+    "bridge_collision_fallback": true,
+    "bridge_collision_ok": true,
+    "bridge_length_m": 5.0,
+    "bridge_route_alignment": 0.911108791828156,
+    "bridge_visual_asset": "res://assets/experimental_2d3d/bridge.glb",
+    "bridge_width_m": 3.5,
+    "gaussian_coefficient": 0.5,
+    "landmark_collision_fallback": true,
+    "landmark_collision_ok": true,
+    "landmark_visual_asset": "res://assets/experimental_2d3d/beacon.glb",
+    "max_route_grade": 0.0193764779828925,
+    "node_count": 1298,
+    "path_bridge_offset_m": 0.096000000834465,
+    "path_triangles": 192,
+    "procedural_foliage": 0,
+    "route_length_m": 95.6499104499817,
+    "spawn_ground_collision_ok": true,
+    "stream_carve_profile": "legacy",
+    "stream_triangles": 188,
+    "terrain_triangles": 12800
+  },
+  "render_s": 0.151,
+  "render_status": "complete",
+  "scene_path": "godot/experiments/visual_2d3d/e_smoke/world.tscn (rebuildable)",
+  "spec_path": "variants/E/world_spec.json",
+  "valid": true,
+  "variant": "E"
+}

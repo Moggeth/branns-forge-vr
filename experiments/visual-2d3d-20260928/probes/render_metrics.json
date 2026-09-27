@@ -1,0 +1,82 @@
+{
+  "wall_seconds": 1.021,
+  "renders": [
+    {
+      "probe": "2.5D",
+      "view": "front",
+      "file": "foliage_front.png",
+      "render_seconds": 0.534,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "2.5D",
+      "view": "side_75deg",
+      "file": "foliage_side_75deg.png",
+      "render_seconds": 0.06,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "2.5D",
+      "view": "stereo_left",
+      "file": "foliage_stereo_left.png",
+      "render_seconds": 0.062,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "2.5D",
+      "view": "stereo_right",
+      "file": "foliage_stereo_right.png",
+      "render_seconds": 0.061,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "view_driven",
+      "view": "matched",
+      "file": "view_matched.png",
+      "render_seconds": 0.077,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "view_driven",
+      "view": "unfamiliar_70deg",
+      "file": "view_unfamiliar_70deg.png",
+      "render_seconds": 0.061,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    },
+    {
+      "probe": "view_driven",
+      "view": "close_left",
+      "file": "view_close_left.png",
+      "render_seconds": 0.067,
+      "resolution": [
+        800,
+        600
+      ],
+      "engine": "Blender 2.93 Eevee"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+step,outcome,elapsed_seconds,measurement_source
+generated_map_image,source_saved,40.2,imagegen tool wall time
+generated_environment_board,source_saved,48.7,imagegen tool wall time
+generated_bridge_model_sheet,source_saved,55.6,imagegen tool wall time
+opus_direct_A_commission,editable_scene_and_handoff,399.929,Claude process wall clock
+opus_reference_C_commission,editable_scene_and_handoff,505.115,Claude process wall clock
+opus_bridge_no_reference,editable_asset_and_five_views,176.910,Claude process wall clock
+opus_bridge_with_reference,editable_asset_and_five_views,270.580,Claude process wall clock
+B_planning_interval,initial_extraction_and_visual_review,340.041,planning/timing.csv interval includes coding
+B_final_extraction,passed,0.661,planning/timing.csv command wall time
+B_Godot_smoke,passed,2.061,planning/timing.csv process wall time
+2_5D_first_texture_extraction,failed_GrabCut_mask,1.06,probes/timings.csv command wall time
+2_5D_final_blender_run,seven_views_saved,1.65,probes/timings.csv command wall time
+160m_initial_spec_generation,failed_missing_base_y,0.117,exec_command wall time
+160m_corrected_spec_generation,577_objects_initial,0.117,exec_command wall time
+160m_first_Godot_check,failed_five_route_blockers,0.348,Godot builder measured check
+160m_route_cleared_spec_generation,572_objects_final,0.118,exec_command wall time
+160m_final_Godot_build_and_capture,passed_route_and_five_views,4.155,exec_command process wall time
+160m_in_engine_scene_build,passed,2.099,evidence/scale/metrics.json
+160m_in_engine_five_view_render,passed,0.185,evidence/scale/metrics.json

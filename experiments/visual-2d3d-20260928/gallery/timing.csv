@@ -1,0 +1,15 @@
+step,outcome,elapsed_seconds,measurement
+brief_and_file_discovery,read brief and experiment file paths,0.500,exec wall time
+benchmark_contract_metrics_read,read four source documents,0.800,exec wall time
+gallery_build_initial,A 5 renders and B-E 0,0.125,command wall time
+playwright_cli_prerequisite,CLI available,1.482,command wall time
+playwright_file_url_attempt,blocked by Playwright file protocol policy,2.022,command wall time
+local_http_server_start,server available on loopback,10.011,exec yield wall time
+playwright_http_open,page loaded with favicon 404,1.133,command wall time
+playwright_desktop_screenshot,layout inspected at 1440px,1.283,command wall time
+playwright_crossing_click,A crossing render selected,2.345,command wall time
+gallery_rebuild_after_fix,built with favicon and GLB note,0.133,command wall time
+playwright_reload,no console error reported on reload,1.028,command wall time
+playwright_mobile_screenshot,layout inspected at 390px,1.028,command wall time
+playwright_console_check,zero errors and warnings,0.927,command wall time
+implementation_and_browser_interval,from build.py creation to clock reading,276.600,file timestamp and clock difference

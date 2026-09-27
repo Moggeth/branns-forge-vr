@@ -1,0 +1,22 @@
+{
+  "source": "references/environment-board.png",
+  "source_size_px": [
+    1254,
+    1254
+  ],
+  "tree_crop_xyxy": [
+    697,
+    696,
+    939,
+    969
+  ],
+  "panel_crop_xyxy": [
+    707,
+    0,
+    1254,
+    681
+  ],
+  "tree_alpha_nonzero_fraction": 0.647958102503557,
+  "method": "RGB beige-background classifier; generated source pixels unchanged except alpha",
+  "measured_seconds": 0.122
+}

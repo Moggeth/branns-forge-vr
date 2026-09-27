@@ -1,0 +1,116 @@
+{
+	"benchmark_path": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\experiments\\visual-2d3d-20260928\\benchmark.json",
+	"build_s": 2.099,
+	"camera_mode": "anchor_following_scaled_overhead",
+	"camera_poses": {
+		"approach": {
+			"position": [
+				-63.0,
+				3.20000004768372,
+				63.0
+			],
+			"target": [
+				-1.78349995613098,
+				1.60000002384186,
+				-0.450700014829636
+			]
+		},
+		"crossing": {
+			"position": [
+				-5.78350019454956,
+				2.09999990463257,
+				7.54930019378662
+			],
+			"target": [
+				8.2165002822876,
+				1.5,
+				-10.4506998062134
+			]
+		},
+		"landmark": {
+			"position": [
+				59.0,
+				3.20000004768372,
+				-55.0
+			],
+			"target": [
+				65.0,
+				2.5,
+				-65.0
+			]
+		},
+		"overhead": {
+			"position": [
+				0.0,
+				170.0,
+				0.0
+			],
+			"target": [
+				0.0,
+				0.0,
+				0.0
+			]
+		},
+		"reverse": {
+			"position": [
+				72.0,
+				3.0,
+				-69.0
+			],
+			"target": [
+				-4.78350019454956,
+				1.5,
+				7.54930019378662
+			]
+		}
+	},
+	"captures": [
+		"C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/overhead.png",
+		"C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/approach.png",
+		"C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/crossing.png",
+		"C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/landmark.png",
+		"C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/reverse.png"
+	],
+	"elapsed_s": 2.464,
+	"errors": [],
+	"method": "hybrid E extended to 160m with deterministic outer orchard rules",
+	"metrics": {
+		"asset_instances": 572,
+		"bounds_depth_m": 160.0,
+		"bounds_width_m": 160.0,
+		"bridge_collision_fallback": true,
+		"bridge_collision_ok": true,
+		"bridge_length_m": 5.0,
+		"bridge_route_alignment": 0.911108791828156,
+		"bridge_visual_asset": "res://assets/experimental_2d3d/bridge.glb",
+		"bridge_width_m": 3.5,
+		"gaussian_coefficient": 0.5,
+		"landmark_collision_fallback": true,
+		"landmark_collision_ok": true,
+		"landmark_visual_asset": "res://assets/experimental_2d3d/beacon.glb",
+		"max_route_grade": 0.0264686824604811,
+		"node_count": 3780,
+		"path_bridge_offset_m": 0.096000000834465,
+		"path_triangles": 412,
+		"procedural_foliage": 0,
+		"route_length_m": 201.769657611847,
+		"route_physics": {
+			"blocking_hits": 0,
+			"bridge_deck_hits": 3,
+			"max_sampled_step_m": 0.384877383708954,
+			"missing_hits": 0,
+			"pass": true,
+			"samples": 120
+		},
+		"spawn_ground_collision_ok": true,
+		"stream_carve_profile": "legacy",
+		"stream_triangles": 384,
+		"terrain_triangles": 51200
+	},
+	"render_s": 0.185,
+	"render_status": "complete",
+	"scene_path": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\scale_real_output/world.tscn",
+	"spec_path": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\experiments\\visual-2d3d-20260928\\variants\\scale\\world_spec.json",
+	"valid": true,
+	"variant": "E-scale"
+}

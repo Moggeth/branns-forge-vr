@@ -1,0 +1,38 @@
+{
+  "benchmark_path": "benchmark.json",
+  "build_s": 0.38,
+  "captures": [
+    "evidence/B/overhead.png",
+    "evidence/B/approach.png",
+    "evidence/B/crossing.png",
+    "evidence/B/landmark.png",
+    "evidence/B/reverse.png"
+  ],
+  "elapsed_s": 0.561,
+  "errors": [],
+  "method": "image-led palette extraction",
+  "metrics": {
+    "asset_instances": 113,
+    "bridge_collision_ok": true,
+    "bridge_length_m": 5.0,
+    "bridge_route_alignment": 0.911108791828156,
+    "bridge_width_m": 3.5,
+    "gaussian_coefficient": 0.5,
+    "max_route_grade": 0.0193764779828925,
+    "node_count": 805,
+    "path_bridge_offset_m": 0.096000000834465,
+    "path_triangles": 192,
+    "procedural_foliage": 0,
+    "route_length_m": 95.6499104499817,
+    "spawn_ground_collision_ok": true,
+    "stream_carve_profile": "legacy",
+    "stream_triangles": 188,
+    "terrain_triangles": 12800
+  },
+  "render_s": 0.124,
+  "render_status": "complete",
+  "scene_path": "godot/experiments/visual_2d3d/b_smoke/world.tscn (rebuildable)",
+  "spec_path": "planning/artifacts/B/world_spec.json",
+  "valid": true,
+  "variant": "B"
+}

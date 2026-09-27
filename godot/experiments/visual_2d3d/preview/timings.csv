@@ -1,0 +1,12 @@
+step,outcome,elapsed_s,evidence
+discovery,located contract runner builder and scenes,2.8,measured tool wall time
+initial_saved_E_smoke,passed but engine log file conflict,0.475,measured launcher wall time
+fixed_log_saved_E_smoke,passed,0.463,measured launcher wall time
+fixed_log_fresh_D_smoke,passed,0.842,measured launcher wall time
+fresh_E_smoke,passed,0.459,measured launcher wall time
+fresh_B_smoke,passed,0.601,measured launcher wall time
+fresh_A_smoke,passed,0.753,measured launcher wall time
+fresh_C_smoke,passed,1.021,measured launcher wall time
+strong_smoke_parse_failure,invalid inferred types; two processes stopped after 30 s,30.2,measured tool wall time
+corrected_saved_E_collision_movement,passed; moved 1.106 m,0.739,measured launcher wall time
+corrected_fresh_D_collision_movement,passed; moved 1.095 m,1.113,measured launcher wall time
