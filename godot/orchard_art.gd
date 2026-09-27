@@ -1,0 +1,133 @@
+extends RefCounted
+## Authored orchard kit adapter. GLBs are independent pieces; placement is seeded
+## and chunked so the same registry can dress later generated landscapes.
+const TreeKit = preload("res://tree_kit.gd")
+const PATH := "res://assets/orchard/"
+const ASSETS := ["apple_tree_mature","apple_tree_young","hedge_dense","shrub_flowering",
+	"rock_mossy","rubble_split","wall_straight","wall_broken","path_dirt","mountain_cliff"]
+const CHUNK := 40.0
+static var _cache:Dictionary={}
+
+static func available(id:String)->bool:
+	return ASSETS.has(id) and ResourceLoader.exists(PATH+id+".glb")
+
+static func _collect(node:Node,pose:Transform3D,parts:Array)->void:
+	for child in node.get_children():
+		if not child is Node3D: continue
+		var local:Transform3D=pose*child.transform
+		if child is MeshInstance3D and child.mesh!=null:
+			parts.append({"mesh":child.mesh,"pose":local,"material":child.material_override,"name":child.name})
+		_collect(child,local,parts)
+
+static func _parts(id:String)->Array:
+	if _cache.has(id): return _cache[id]
+	if not available(id): return []
+	var scene:PackedScene=load(PATH+id+".glb")
+	if scene==null: return []
+	var instance:Node3D=scene.instantiate()
+	var parts:Array=[]
+	_collect(instance,Transform3D.IDENTITY,parts)
+	instance.free()
+	_cache[id]=parts
+	return parts
+
+static func _emit(root:Node3D,id:String,poses:Array)->void:
+	var parts:Array=_parts(id)
+	if parts.is_empty() or poses.is_empty(): return
+	var chunks:Dictionary={}
+	for placement in poses:
+		var at:Vector3=placement.at
+		var key:=Vector2i(floori(at.x/CHUNK),floori(at.z/CHUNK))
+		if not chunks.has(key): chunks[key]=[]
+		chunks[key].append(placement)
+	for key in chunks:
+		var origin:=Vector3((float(key.x)+0.5)*CHUNK,0,(float(key.y)+0.5)*CHUNK)
+		var list:Array=chunks[key]
+		for part_index in range(parts.size()):
+			var part:Dictionary=parts[part_index]
+			var mesh:Mesh=part.mesh
+			var multi:=MultiMesh.new()
+			multi.transform_format=MultiMesh.TRANSFORM_3D
+			multi.mesh=mesh
+			multi.instance_count=list.size()
+			for index in range(list.size()):
+				var placement:Dictionary=list[index]
+				var pose:=Transform3D(Basis(Vector3.UP,placement.yaw).scaled(Vector3.ONE*placement.scale),placement.at-origin)
+				multi.set_instance_transform(index,pose*part.pose)
+			var holder:=MultiMeshInstance3D.new()
+			holder.name="Orchard_%s_%s_%s_%d"%[id,key.x,key.y,part_index]
+			holder.position=origin
+			holder.multimesh=multi
+			holder.material_override=part.material
+			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if id in ["hedge_dense","shrub_flowering","path_dirt"] else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			root.add_child(holder)
+
+static func _pose(at:Vector3,scale:float,yaw:float)->Dictionary:
+	return {"at":at,"scale":scale,"yaw":yaw}
+
+static func grove(root:Node3D,placements:Array)->void:
+	var authored:Dictionary={"apple_tree_mature":[],"apple_tree_young":[]}
+	var fallback:Array=[]
+	for tree in placements:
+		var id:String="apple_tree_young" if int(tree.seed)%5==0 else "apple_tree_mature"
+		if tree.species=="apple" and available(id):
+			authored[id].append(_pose(tree.position,tree.scale,float(tree.seed%628)/100.0))
+		else: fallback.append(tree)
+	for id in authored: _emit(root,id,authored[id])
+	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false}))
+	print("ORCHARD_ART authored_trees=",authored.apple_tree_mature.size()+authored.apple_tree_young.size()," fallback_trees=",fallback.size())
+
+static func _near_path(point:Vector3,trail:Array)->bool:
+	for i in range(trail.size()-1):
+		var a:Vector3=trail[i]
+		var segment:Vector3=trail[i+1]-a
+		var t:float=clampf((point-a).dot(segment)/segment.length_squared(),0,1)
+		if point.distance_to(a+segment*t)<5.4: return true
+	return false
+
+static func _collider(root:Node3D,at:Vector3,width:float,height:float,depth:float,yaw:float)->void:
+	var body:=StaticBody3D.new()
+	body.name="OrchardArtSolid"
+	body.set_meta("kind","solid")
+	body.position=at+Vector3.UP*height*0.5
+	body.rotation.y=yaw
+	root.add_child(body)
+	var shape:=BoxShape3D.new()
+	shape.size=Vector3(width,height,depth)
+	var collision:=CollisionShape3D.new()
+	collision.shape=shape
+	body.add_child(collision)
+
+static func place_features(root:Node3D,trail:Array,plots:Array,seed:int)->void:
+	var rng:=RandomNumberGenerator.new()
+	rng.seed=seed+73
+	var placements:Dictionary={}
+	for id in ASSETS: placements[id]=[]
+	for i in range(570):
+		var at:=Vector3(rng.randf_range(-148,148),0,rng.randf_range(-148,148))
+		if at.length()<44 or _near_path(at,trail): continue
+		var plot_clear:=true
+		for plot in plots:
+			if at.distance_to(plot.at)<11.0: plot_clear=false; break
+		if not plot_clear: continue
+		var choice:int=i%10
+		var id:String="hedge_dense" if choice<4 else ("shrub_flowering" if choice<7 else ("rock_mossy" if choice<9 else "rubble_split"))
+		if not available(id): continue
+		var scale:float=rng.randf_range(0.75,1.30)
+		var yaw:float=rng.randf_range(0,TAU)
+		placements[id].append(_pose(at,scale,yaw))
+		if id=="rock_mossy": _collider(root,at,1.0*scale,0.6*scale,0.9*scale,yaw)
+	for plot in plots:
+		if plot.kind in ["stone","ruin"]:
+			for j in range(4):
+				var at:Vector3=plot.at+Vector3(-13+j*8,0,12)
+				var id:String="wall_broken" if j==3 else "wall_straight"
+				if available(id):
+					placements[id].append(_pose(at,1.0,0.0))
+					_collider(root,at,5.0,2.0,0.75,0.0)
+	for i in range(16):
+		var a:float=TAU*float(i)/16.0
+		var at:=Vector3(cos(a)*153,0,sin(a)*153)
+		if available("mountain_cliff"): placements.mountain_cliff.append(_pose(at,1.1,a+PI*0.5))
+	for id in ASSETS: _emit(root,id,placements[id])
+	root.set_meta("orchard_art_library",ASSETS)

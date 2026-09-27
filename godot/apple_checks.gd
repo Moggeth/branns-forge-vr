@@ -21,12 +21,18 @@ func run():
 	game.smoke = true
 	game.adventure.travel("orchard_highlands")
 	var orchard: Array = game.apples.entries.filter(func(e): return e.zone == "orchard_highlands" and e.source != null)
-	check(orchard.size() == 5, "five reachable orchard fruit remain")
+	print("ORCHARD_PHYSICAL_APPLES count=",orchard.size())
+	check(orchard.size() >= 16, "expanded orchard fruit remain reachable")
 	var entry: Dictionary = orchard[0]
 	var p: Vector3 = entry.collider.global_position
 	var ray = PhysicsRayQueryParameters3D.create(p + Vector3(0, 0, 0.5), p - Vector3(0, 0, 0.5), 1)
 	var hit = game.get_world_3d().direct_space_state.intersect_ray(ray)
-	check(not hit.is_empty() and game._owner(hit.get("collider")) == entry.collider, "a bolt ray can hit one apple")
+	# A neighbouring fruit can legitimately be closer along this ray in a
+	# denser grove. Validate the struck collider is an apple, not an exact index.
+	var ray_hits_apple := false
+	for candidate in game.apples.entries:
+		if candidate.collider == hit.get("collider"): ray_hits_apple = true; break
+	check(not hit.is_empty() and ray_hits_apple, "a bolt ray can hit an apple")
 	game.apples.impact(entry.collider, 1.1, p, Vector3.RIGHT)
 	check(entry.state == "attached" and absf(entry.wobble_speed) > 0.1, "a light hit jiggles without detaching")
 	game.apples.tick(0.06)

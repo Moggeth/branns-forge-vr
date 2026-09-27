@@ -27,6 +27,12 @@ func run(game):
 		var spawn:Vector3=zones[id].spawn
 		var ray=PhysicsRayQueryParameters3D.create(spawn+Vector3.UP*2.0,spawn+Vector3.DOWN*4.0,1)
 		if game.get_world_3d().direct_space_state.intersect_ray(ray).is_empty(): failures.append("unsupported spawn "+id)
+	var orchard_bounds:Rect2=zones.orchard_highlands.bounds
+	if orchard_bounds.get_area()<96.0*96.0*10.0: failures.append("orchard expansion below 10x")
+	for id in ["forge_yard","pinewood_ruins","gloamfen","cloudbreak_keep"]:
+		if orchard_bounds.intersects(zones[id].bounds): failures.append("orchard overlaps "+id)
+	var orchard_meta:Dictionary=zones.orchard_highlands.root.get_meta("orchard_expansion",{})
+	if int(orchard_meta.get("plots",0))<6 or int(orchard_meta.get("grove_trees",0))<150: failures.append("orchard layout missing")
 	for id in game.adventure.ZONES:
 		var horizon: Node3D = zones.get(id,{}).get("horizon")
 		if horizon==null or not is_instance_valid(horizon):
@@ -47,7 +53,8 @@ func run(game):
 			timber_count+=1
 			if not node.has_meta("trunk") or not node.has_meta("trunk_mesh"): failures.append("timber lost chop contract")
 			elif node.get_meta("trunk").get_parent()!=node: failures.append("timber trunk not direct child")
-	if orchard_apples!=5: failures.append("orchard apple count")
+	print("ORCHARD_APPLES count=",orchard_apples)
+	if orchard_apples<16: failures.append("orchard apple count")
 	if timber_count<8: failures.append("timber count")
 	var rewards={"orchard_highlands":"lumber","gloamfen":"spore","starfall_ridge":"crystal","cloudbreak_keep":"sky_bloom"}
 	for id in rewards:

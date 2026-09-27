@@ -43,6 +43,7 @@ static func orchard(root:Node3D,data:Dictionary,w:Script)->void:
 	w.label(p,"THE LONG ORCHARD  ·  TIMBER BEYOND THE FALLEN GATE",Vector3(0,3.3,-15),23,"fff1d5")
 	w.lantern(p,Vector3(0,1.4,13))
 	_windfall_meadow(root,data,w,p,c)
+	load("res://orchard_expansion.gd").populate(root,data,w)
 
 static func _windfall_meadow(root:Node3D,data:Dictionary,w:Script,p:Node3D,c:Vector3)->void:
 	# A deliberately open, much larger combat/throwing loop beyond the original
