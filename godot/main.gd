@@ -441,6 +441,15 @@ func _capture():
 		camera.global_position=meadow_center+Vector3(16,3.2,-21)
 		camera.look_at(meadow_center+Vector3(18,1.0,-33))
 		camera.fov=72
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--capture-orchard-plot="):
+			var index:int=clampi(int(argument.trim_prefix("--capture-orchard-plot=")),0,5)
+			var plot:Dictionary=preload("res://orchard_expansion.gd").PLOTS[index]
+			adventure.travel("orchard_highlands")
+			var at:Vector3=scene.zones.orchard_highlands.center+plot.at
+			camera.global_position=at+Vector3(18,6,19)
+			camera.look_at(at+Vector3(0,2,0))
+			camera.fov=72
 	if not capture_guardian.is_empty():
 		for actor in scene.enemies:
 			if str(actor.get_meta("guardian_variant", "")) != capture_guardian: continue

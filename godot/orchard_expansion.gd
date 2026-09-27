@@ -95,4 +95,5 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	w.anchor(root,data,"orchard_highlands",center+Vector3(-112,3.8,-40),center+Vector3(-108,0,-38))
 	w.anchor(root,data,"orchard_highlands",center+Vector3(73,4.2,93),center+Vector3(69,0,88))
 	p.set_meta("orchard_expansion",{"seed":SEED,"extent_m":EXTENT,"area_m2":102400,"plots":PLOTS.size(),"grove_trees":placements.size()})
+	p.set_meta("orchard_trail",TRAIL)
 	print("ORCHARD_EXPANSION area_m2=102400 plots=",PLOTS.size()," grove_trees=",placements.size())
