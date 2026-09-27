@@ -26,7 +26,9 @@ func setup(g,s):
 
 func _build_rack():
 	belt_label=WorkshopScene.label(system.supply,"∞ bolts",Vector3(0,0.30,0),16); belt_label.pixel_size=0.0014
-	rack=Node3D.new(); game.adventure.zone_groups.forge_yard.add_child(rack); rack.position=Vector3(-3.4,0,3.4)
+	# Supply racks belong at the workshop's west porch, with a walking gap to
+	# the outdoor collection homes instead of sharing their sign plane.
+	rack=Node3D.new(); game.adventure.zone_groups.forge_yard.add_child(rack); rack.position=Vector3(-3.4,0,1.35)
 	WorldZones.box(rack,Vector3(0,0.85,0),Vector3(1.5,0.1,0.65),"775738")
 	WorldZones.body(rack,Vector3(0,0.85,0),Vector3(1.5,0.1,0.65))
 	for x in [-0.6,0.6]: WorldZones.box(rack,Vector3(x,0.4,0),Vector3(0.1,0.8,0.48),"44352b")

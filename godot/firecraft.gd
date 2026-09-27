@@ -23,7 +23,9 @@ func setup(g):
 	if not game.diagnostic_offline or OS.get_cmdline_user_args().has("--playful-demo") or OS.get_cmdline_user_args().has("--experimental-fuel-combat") or OS.get_cmdline_user_args().has("--fuel-combat-check"):
 		fluid=preload("res://fuel_combat.gd").new(); add_child(fluid); fluid.setup(game)
 	_make_sounds()
-	stand=Node3D.new(); game.adventure.zone_groups.forge_yard.add_child(stand); stand.position=Vector3(4.8,0,3.5)
+	# Keep the common-goods bench in the east porch, behind the collection walk.
+	# Its old z=3.5 position crowded the first row of invention displays.
+	stand=Node3D.new(); game.adventure.zone_groups.forge_yard.add_child(stand); stand.position=Vector3(4.8,0,1.35)
 	WorldZones.box(stand,Vector3(0,0.86,0),Vector3(1.7,0.12,0.7),"795232")
 	WorldZones.body(stand,Vector3(0,0.86,0),Vector3(1.7,0.12,0.7))
 	for x in [-0.7,0.7]: WorldZones.box(stand,Vector3(x,0.4,0),Vector3(0.13,0.8,0.5),"45352b")

@@ -1,6 +1,6 @@
 extends Node
 ## One tactile Hearthlight, shared by its stands. Real light, no inventory duplication.
-const HOME=Vector3(5.8,1.05,3.5)
+const HOME=Vector3(6.2,1.05,1.35)
 const LIGHT_RANGE=8.0
 var game
 var torch:Node3D
