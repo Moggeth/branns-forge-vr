@@ -6,7 +6,7 @@ const GRASS=["gk_grass_meadow_tuft","gk_grass_meadow_tuft_small","gk_grass_clove
 const ROCKS=["gk_rock_mossy_boulder","gk_rock_sandstone_ledge","gk_rock_split_shards"]
 const ROCK_SIZES=[Vector3(1.34,0.63,1.08),Vector3(1.69,0.51,1.20),Vector3(0.95,0.95,0.63)]
 const ZONE_DENSITY={"forge_yard":[110,7],"pinewood_ruins":[85,8],"orchard_highlands":[7200,120],"mushroom_glade":[80,7],"sandstone_quarry":[30,10]}
-const ORCHARD_CHUNK := 40.0
+const ORCHARD_CHUNK := 64.0
 
 static func _mesh(asset:String)->Mesh:
 	var scene=load(PATH+asset+".glb")
@@ -113,5 +113,8 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 			holder.multimesh=multi
 			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if name in GRASS else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			holder.material_override=finish
+			if id=="orchard_highlands" and name in GRASS:
+				holder.visibility_range_end=75.0
+				holder.visibility_range_end_margin=8.0
 			root.add_child(holder)
 	print("GROUND_KIT zone=",id," grass=",grass_count," rocks=",rock_count," chunked=",id=="orchard_highlands")

@@ -66,6 +66,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		if plot.kind=="orchard":
 			w.crate(place,Vector3(1.4,0,2.5),0.9)
 			w.flowers(place,Vector3(-3.0,0,3.0),24,3.2,"f5e9bb")
+		w.batch_decorations(place)
 		var timber=w.resource(root,data,"orchard_highlands",center+plot.at+Vector3(11,0,3),"lumber","axe",2)
 		w.tree(timber,Vector3.ZERO,5.2,plot.kind=="pine",false)
 		if plot_index in [2,3,4]:

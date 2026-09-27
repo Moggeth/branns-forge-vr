@@ -450,6 +450,14 @@ func _capture():
 			camera.global_position=at+Vector3(18,6,19)
 			camera.look_at(at+Vector3(0,2,0))
 			camera.fov=72
+	if OS.get_cmdline_user_args().has("--capture-hide-orchard-art") or OS.get_cmdline_user_args().has("--capture-hide-ground-kit") or OS.get_cmdline_user_args().has("--capture-only-orchard-kit"):
+		var hide_art:bool=OS.get_cmdline_user_args().has("--capture-hide-orchard-art")
+		var only_kit:bool=OS.get_cmdline_user_args().has("--capture-only-orchard-kit")
+		var orchard_root:Node3D=scene.zones.orchard_highlands.root
+		for visual in orchard_root.find_children("*","GeometryInstance3D",true,false):
+			if hide_art and visual.name.begins_with("Orchard_"): visual.visible=false
+			if OS.get_cmdline_user_args().has("--capture-hide-ground-kit") and visual.name.begins_with("gk_"): visual.visible=false
+			if only_kit and not (visual.name.begins_with("Orchard_") or visual.name.begins_with("gk_")): visual.visible=false
 	if not capture_guardian.is_empty():
 		for actor in scene.enemies:
 			if str(actor.get_meta("guardian_variant", "")) != capture_guardian: continue
@@ -757,6 +765,19 @@ func _capture():
 	var image = get_viewport().get_texture().get_image()
 	print("CAPTURE ", image.save_png(capture_path))
 	print("RENDER_STATS zone=",adventure.zone," fps=",Engine.get_frames_per_second()," objects=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," draw_calls=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	if adventure.zone=="orchard_highlands" and OS.get_cmdline_user_args().has("--capture-orchard-breakdown"):
+		var orchard_root:Node3D=scene.zones.orchard_highlands.root
+		var buckets:Dictionary={}
+		for visual in orchard_root.find_children("*","GeometryInstance3D",true,false):
+			if not visual.is_visible_in_tree(): continue
+			if not camera.is_position_in_frustum(visual.global_position): continue
+			var direct:Node=visual
+			while direct.get_parent()!=orchard_root and direct.get_parent()!=null: direct=direct.get_parent()
+			var key:String=direct.name
+			if key.begins_with("Orchard_"): key="Orchard art"
+			if key.begins_with("gk_"): key="Ground kit"
+			buckets[key]=int(buckets.get(key,0))+1
+		print("ORCHARD_RENDER_BREAKDOWN ",JSON.stringify(buckets))
 	get_tree().quit()
 
 func _capture_workshop():

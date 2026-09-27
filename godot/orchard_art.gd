@@ -11,7 +11,7 @@ const ASSETS := ["apple_tree_mature","apple_tree_mature_b","apple_tree_mature_au
 	"rock_mossy_small","rubble_split","wall_straight","wall_corner_broken",
 	"wall_end_broken","path_straight","path_curve30","path_curve30_left",
 	"mountain_cliff_chunk","mountain_peak_snow"]
-const CHUNK := 40.0
+const CHUNK := 64.0
 static var _cache:Dictionary={}
 
 static func available(id:String)->bool:
