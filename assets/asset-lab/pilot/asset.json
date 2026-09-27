@@ -9,14 +9,14 @@
     "forward": "-Z",
     "origin": "ground-contact centre"
   },
-  "required_nodes": ["Grip", "Flame", "Foot", "HoneyGlass", "FlameCore", "GripWrap"],
+  "required_nodes": ["Grip", "Flame", "Foot", "HoneyGlass", "FlameCore", "GripWrap", "ShutterHinge", "ShutterThumb"],
   "limits": {
     "max_bytes": 1048576,
-    "max_triangles": 3000,
-    "max_meshes": 40,
+    "max_triangles": 4000,
+    "max_meshes": 50,
     "max_materials": 8,
     "max_images": 2
   },
   "max_dimensions_m": [0.25, 0.45, 0.25],
-  "review_files": ["source.blend", "front.png", "side.png", "three_quarter.png"]
+  "review_files": ["source.blend", "front.png", "side.png", "three_quarter.png", "brass.png", "leather.png"]
 }

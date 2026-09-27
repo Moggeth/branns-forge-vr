@@ -39,24 +39,51 @@ def color(hex_color):
     return [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb] + [1.0]
 
 
-def material(name, hex_color, metallic=0.0, roughness=0.6, emission=None):
+def painted_texture(name, hex_color, kind):
+    """Small deterministic, embedded color map; no external art dependency."""
+    size = 96
+    base = [int(hex_color[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    image = bpy.data.images.new(name, width=size, height=size, alpha=True)
+    pixels = []
+    for y in range(size):
+        for x in range(size):
+            speckle = (math.sin(x * 127.1 + y * 311.7) * 43758.5453) % 1.0
+            weave = math.sin((x + y * 0.27) * (0.53 if kind == "leather" else 0.18))
+            strength = 0.88 + 0.13 * speckle + 0.055 * weave
+            if kind == "brass" and speckle > 0.988:
+                pixels.extend((base[0] * 0.46, base[1] * 0.75, base[2] * 0.58, 1.0))
+            else:
+                pixels.extend((*[min(1.0, channel * strength) for channel in base], 1.0))
+    image.pixels.foreach_set(pixels)
+    image.filepath_raw = str(OUT / f"{name}.png")
+    image.file_format = "PNG"
+    image.save()
+    image.pack()
+    return image
+
+
+def material(name, hex_color, metallic=0.0, roughness=0.6, emission=None, texture=None):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     p = mat.node_tree.nodes.get("Principled BSDF")
     p.inputs["Base Color"].default_value = color(hex_color)
     p.inputs["Metallic"].default_value = metallic
     p.inputs["Roughness"].default_value = roughness
+    if texture:
+        node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+        node.image = painted_texture(texture, hex_color, texture)
+        mat.node_tree.links.new(node.outputs["Color"], p.inputs["Base Color"])
     if emission:
         p.inputs["Emission Color"].default_value = color(emission)
         p.inputs["Emission Strength"].default_value = 2.3
     return mat
 
 
-BRASS = material("Warm hammered brass", "ad7441", 0.8, 0.32)
+BRASS = material("Warm hammered brass", "ad7441", 0.8, 0.32, texture="brass")
 DARK = material("Soot-dark iron", "282628", 0.7, 0.48)
 GLASS = material("Honey glass", "a85424", 0.12, 0.32, "de7625")
 EMBER = material("Lantern ember", "ffe398", 0.0, 0.42, "ffab38")
-LEATHER = material("Worn leather grip", "59351f", 0.0, 0.9)
+LEATHER = material("Worn leather grip", "59351f", 0.0, 0.9, texture="leather")
 EXPORT = []
 
 
@@ -88,6 +115,13 @@ def bar(name, start, end, radius, mat, vertices=8):
 def ico(name, location, scale, mat, subdivisions=1):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdivisions, radius=1,
                                           location=location)
+    obj = keep(bpy.context.object, name, mat)
+    obj.scale = scale
+    return obj
+
+
+def box(name, location, scale, mat):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=location)
     obj = keep(bpy.context.object, name, mat)
     obj.scale = scale
     return obj
@@ -139,6 +173,23 @@ def marker(name, location):
 # Flame=(0,.145,0); both are stable assembly markers.
 marker("Grip", (0, -0.101, 0.132))
 marker("Flame", (0, 0, 0.145))
+
+# A real, separately addressable shutter assembly. Godot rotates the hinge
+# about the converted +Y axis; the thumb stud is the tracked grab point.
+hinge = marker("ShutterHinge", (-0.061, 0.052, 0.146))
+shutter = []
+for index, z in enumerate((0.111, 0.151, 0.191), 1):
+    shutter.append(box(f"ShutterSlat_{index:02d}", (0.0, 0.054, z),
+                       (0.113, 0.010, 0.027), BRASS))
+for x in (-0.056, 0.053):
+    shutter.append(bar(f"ShutterRail_{'L' if x < 0 else 'R'}",
+                       (x, 0.047, 0.088), (x, 0.047, 0.214), 0.006, DARK))
+shutter.append(ico("ShutterThumb", (0.055, 0.070, 0.148),
+                   (0.013, 0.012, 0.013), BRASS, 1))
+bpy.context.view_layer.update()
+for part in shutter:
+    part.parent = hinge
+    part.matrix_parent_inverse = hinge.matrix_world.inverted()
 
 for obj in EXPORT:
     obj.select_set(True)
