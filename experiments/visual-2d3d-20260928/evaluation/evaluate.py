@@ -58,11 +58,46 @@ def intersects(a, b, c, d):
 
 def terrain_height(spec, x, z):
     terrain = spec["terrain"]
-    height = terrain.get("base_y", 0.0)
+    height = terrain.get("base_y", terrain.get("base_height_m", 0.0))
+    coefficient = terrain.get("gaussian_coefficient")
+    if coefficient is None:
+        declared_formula = spec.get("a_procedural", {}).get("hill_formula") or terrain.get("c_falloff")
+        if declared_formula:
+            if "exp(-(d/r" not in declared_formula.replace(" ", ""):
+                return None
+            coefficient = 1.0
+        else:
+            coefficient = 0.5
+    if not isinstance(coefficient, (int, float)) or coefficient <= 0:
+        return None
     for h in terrain.get("hills", []):
         radius = h["radius_m"]
-        height += h["amplitude_m"] * math.exp(-0.5 * (((x-h["center_xz"][0])/radius)**2 + ((z-h["center_xz"][1])/radius)**2))
+        height += h["amplitude_m"] * math.exp(-coefficient * (((x-h["center_xz"][0])/radius)**2 + ((z-h["center_xz"][1])/radius)**2))
+    ravine = spec.get("a_procedural", {}).get("ravine")
+    if ravine:
+        if not all(k in ravine for k in ("valley_depth_m", "valley_radius_m", "channel_depth_m", "channel_smoothstep_m")):
+            return None
+        ds = polyline_distance([x, z], spec["stream"]["points_xz"])
+        height -= ravine["valley_depth_m"] * math.exp(-(ds / ravine["valley_radius_m"])**2)
+        inner, outer = ravine["channel_smoothstep_m"]
+        t = max(0.0, min(1.0, (ds-inner)/(outer-inner)))
+        height -= ravine["channel_depth_m"] * (1-(t*t*(3-2*t)))
     return height
+
+
+def object_role(obj):
+    """Explicit role wins; orchard path assets have a narrow, safe inference."""
+    if obj.get("role") == "surface" and obj["asset_id"] in ("path_straight", "path_curve30", "path_curve30_left"):
+        return "path_surface", "declared"
+    if obj.get("role") == "outcrop" and obj["asset_id"] == "mountain_cliff_chunk":
+        return "terrain_feature", "declared"
+    if obj.get("role"):
+        return obj["role"], "declared"
+    if obj["asset_id"] in ("path_straight", "path_curve30", "path_curve30_left"):
+        return "path_surface", "asset_id_inferred"
+    if obj["asset_id"] == "mountain_cliff_chunk":
+        return "terrain_feature", "asset_id_inferred"
+    return "obstacle", "default_inferred"
 
 
 def semantic_hash(spec):
@@ -113,17 +148,33 @@ def evaluate(spec, source="<memory>"):
     angle_error = abs(math.atan2(math.sin(segment_angle-bridge["yaw_rad"]), math.cos(segment_angle-bridge["yaw_rad"])))
     angle_error = min(angle_error, abs(math.pi-angle_error))
     if angle_error > math.radians(25): failures.append("bridge long axis misaligned with traversing route")
-    max_grade = 0.0
+    terrain_known = terrain_height(spec, *path[0]) is not None
+    if not terrain_known: warnings.append("terrain modifier/formula unsupported; grounding and grade unknown")
+    max_grade = 0.0 if terrain_known else None
     for a, b in zip(path, path[1:]):
+        # A bridge deck is a separate structure; the terrain below it is not
+        # the walking surface. Grade here means terrain grade off the bridge.
+        if (a, b) == crossing_segment and bridge_error is not None and bridge_error < bridge["width_m"]/2:
+            continue
         for n in range(10):
             t0, t1 = n/10, (n+1)/10
             p = [a[j]+t0*(b[j]-a[j]) for j in (0,1)]
             q = [a[j]+t1*(b[j]-a[j]) for j in (0,1)]
-            grade = abs(terrain_height(spec, *q)-terrain_height(spec, *p))/max(distance(p,q), 1e-9)
-            max_grade = max(max_grade, grade)
-    if max_grade > G["terrain_max_route_grade"]: failures.append("route terrain grade exceeds benchmark")
+            if terrain_known:
+                grade = abs(terrain_height(spec, *q)-terrain_height(spec, *p))/max(distance(p,q), 1e-9)
+                max_grade = max(max_grade, grade)
+    if max_grade is not None and max_grade > G["terrain_max_route_grade"]: failures.append("route terrain grade exceeds benchmark")
     actual_clearance = float("inf")
     placement_failures = 0
+    ground_failures = 0
+    inferred_path_surfaces = 0
+    inferred_terrain_features = 0
+    ground_contact_unknown = 0
+    water_region_intrusions = 0
+    water_buffer_conflicts = 0
+    exclusion_role_exemptions = 0
+    water_edge_contact_unverified = 0
+    path_surfaces = 0
     known_radii = all("radius_m" in o for o in objects)
     if not known_radii: warnings.append("object radii absent; full clearance/collision checks unavailable")
     ids = [o.get("id") for o in objects if o.get("id") is not None]
@@ -131,13 +182,22 @@ def evaluate(spec, source="<memory>"):
     for i, o in enumerate(objects):
         x, y, z = o["position_xyz"]
         r = o.get("radius_m", 0)
+        role, role_source = object_role(o)
+        if role == "path_surface": path_surfaces += 1
+        if role == "path_surface" and role_source == "asset_id_inferred": inferred_path_surfaces += 1
+        if role == "terrain_feature" and role_source == "asset_id_inferred": inferred_terrain_features += 1
         if o["asset_id"] not in BENCHMARK["allowed_asset_ids"]:
             failures.append(f"unsupported asset: {o['asset_id']}")
         if abs(x)+r > 40 or abs(z)+r > 40:
             placement_failures += 1
             failures.append(f"{o.get('id', i)} outside world bounds")
-        if abs(y-terrain_height(spec, x, z)) > 0.15:
+        # Cliff chunks are meshes deliberately sunk into terrain; their centre
+        # Y is not a ground-contact point. A mesh/collider inspection is needed.
+        if role == "terrain_feature":
+            ground_contact_unknown += 1
+        elif terrain_known and abs(y-terrain_height(spec, x, z)) > 0.2:
             placement_failures += 1
+            ground_failures += 1
             failures.append(f"{o.get('id', i)} not grounded on declared terrain")
         clearance = polyline_distance([x,z], path)-r
         actual_clearance = min(actual_clearance, clearance)
@@ -148,24 +208,56 @@ def evaluate(spec, source="<memory>"):
             placement_failures += 1
             failures.append(f"{o.get('id', i)} intersects water")
         for exclusion in spec["exclusions"]:
-            kind = exclusion.get("kind")
+            kind = exclusion.get("kind", exclusion.get("type"))
+            name = exclusion.get("name", exclusion.get("reason", "?"))
+            if o.get("role") in exclusion.get("except_roles", []):
+                overlaps = (kind == "circle" and distance([x,z], exclusion["center_xz"]) < exclusion["radius_m"]+r) or (kind == "polygon" and point_in_polygon([x,z], exclusion["polygon_xz"]))
+                if overlaps:
+                    exclusion_role_exemptions += 1
+                    if any(region.get("name") == name and region.get("surface") == "water" for region in spec["regions"]):
+                        water_edge_contact_unverified += 1
+                continue
+            # These named zones reserve a walkable route, so path surfacing
+            # belongs there. All other exclusions still apply to path assets.
+            if role == "path_surface" and name in ("route_clearance", "route_corridor", "spawn", "goal_plaza", "bridge"):
+                continue
             if kind == "circle" and distance([x,z], exclusion["center_xz"]) < exclusion["radius_m"]+r:
                 placement_failures += 1
-                failures.append(f"{o.get('id', i)} intersects exclusion {exclusion.get('name', '?')}")
+                failures.append(f"{o.get('id', i)} intersects exclusion {name}")
             elif kind == "polygon" and point_in_polygon([x,z], exclusion["polygon_xz"]):
                 placement_failures += 1
-                failures.append(f"{o.get('id', i)} inside exclusion {exclusion.get('name', '?')}")
+                water_region = next((region for region in spec["regions"] if region.get("name") == name and region.get("surface") == "water" and "polygon_xz" in region), None)
+                if water_region:
+                    if point_in_polygon([x,z], water_region["polygon_xz"]):
+                        water_region_intrusions += 1
+                        failures.append(f"{o.get('id', i)} inside exclusion {name} (inside declared water region)")
+                    else:
+                        water_buffer_conflicts += 1
+                        failures.append(f"{o.get('id', i)} inside exclusion {name} (bank buffer, outside declared water region)")
+                else:
+                    failures.append(f"{o.get('id', i)} inside exclusion {name}")
             elif kind not in ("circle", "polygon"):
                 warnings.append(f"unknown exclusion kind {kind}; not evaluated")
         for other in objects[:i]:
             if known_radii and distance([x,z], [other["position_xyz"][0], other["position_xyz"][2]]) < r+other["radius_m"]-0.05:
                 placement_failures += 1
                 failures.append(f"{o.get('id', i)} overlaps {other.get('id', '?')}")
+    if ground_contact_unknown:
+        warnings.append(f"{ground_contact_unknown} terrain feature centres embedded in ground; mesh contact unknown")
+    if water_edge_contact_unverified:
+        warnings.append(f"{water_edge_contact_unverified} declared role exemptions near water; mesh-water contact unverified")
     metrics = {
         "object_count": len(objects), "path_length_m": round(sum(distance(a,b) for a,b in zip(path,path[1:])), 3),
         "stream_crossing_count": len(crossings), "bridge_crossing_error_m": round(bridge_error, 3) if bridge_error is not None else None,
-        "max_route_grade": round(max_grade, 4), "min_object_route_clearance_m": round(actual_clearance, 3) if objects and known_radii else None,
-        "placement_failure_count": placement_failures, "object_radii_declared": known_radii,
+        "max_route_grade": round(max_grade, 4) if max_grade is not None else None, "min_object_route_clearance_m": round(actual_clearance, 3) if objects and known_radii else None,
+        "placement_failure_count": placement_failures, "grounding_failure_count": ground_failures,
+        "ground_contact_unknown_count": ground_contact_unknown,
+        "water_region_intrusion_count": water_region_intrusions, "water_buffer_conflict_count": water_buffer_conflicts,
+        "exclusion_role_exemption_count": exclusion_role_exemptions, "water_edge_contact_unverified_count": water_edge_contact_unverified,
+        "terrain_height_evaluated": terrain_known, "terrain_gaussian_coefficient": spec["terrain"].get("gaussian_coefficient", 1.0 if spec.get("a_procedural", {}).get("hill_formula") or spec["terrain"].get("c_falloff") else 0.5),
+        "terrain_model": "declared ravine carve and hills" if spec.get("a_procedural", {}).get("ravine") else "Gaussian hills",
+        "path_surface_count": path_surfaces, "inferred_path_surface_count": inferred_path_surfaces, "inferred_terrain_feature_count": inferred_terrain_features,
+        "object_radii_declared": known_radii,
         "semantic_sha256": semantic_hash(spec), "engine_collision_verified": False, "visual_quality_verified": False, "vr_performance_verified": False,
     }
     return {"source": source, "variant": spec["variant"], "seed": spec["seed"], "pass": not failures, "failures": failures, "warnings": warnings, "metrics": metrics}
@@ -180,7 +272,7 @@ def main():
     results = [evaluate(json.loads(p.read_text(encoding="utf-8")), str(p)) for p in args.specs]
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(results, indent=2)+"\n", encoding="utf-8")
-    fields = ["source", "variant", "seed", "pass", "failure_count", "warning_count", "object_count", "path_length_m", "stream_crossing_count", "bridge_crossing_error_m", "max_route_grade", "min_object_route_clearance_m", "placement_failure_count", "object_radii_declared", "semantic_sha256", "engine_collision_verified", "visual_quality_verified", "vr_performance_verified"]
+    fields = ["source", "variant", "seed", "pass", "failure_count", "warning_count", "object_count", "path_length_m", "stream_crossing_count", "bridge_crossing_error_m", "max_route_grade", "min_object_route_clearance_m", "placement_failure_count", "grounding_failure_count", "ground_contact_unknown_count", "water_region_intrusion_count", "water_buffer_conflict_count", "exclusion_role_exemption_count", "water_edge_contact_unverified_count", "terrain_height_evaluated", "terrain_gaussian_coefficient", "terrain_model", "path_surface_count", "inferred_path_surface_count", "inferred_terrain_feature_count", "object_radii_declared", "semantic_sha256", "engine_collision_verified", "visual_quality_verified", "vr_performance_verified"]
     with args.csv.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()

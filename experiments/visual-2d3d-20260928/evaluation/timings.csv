@@ -10,3 +10,9 @@ bytecode cleanup attempt,blocked by command policy; caches ignored instead,0.000
 compile and output inspection,passed,0.700,parallel tool wall time
 regenerate four specs after exclusion validation,passed,0.900,parallel tool wall time
 final four-spec evaluation and tests,all passed,0.700,parallel tool wall time
+A/B terrain and object-role diagnosis,identified declared ravine and path surfaces plus B ground mismatches,2.500,observed batched tool wall times
+first A/B/D revised evaluation,A 16 failures B 43 D 0,0.122,tool wall time
+final A/B/D evaluation and eight tests,A 5 failures B 0 D 0; tests pass,0.400,parallel tool wall time
+C role/brook diagnostic reads,identified 15 bank boulders outside mapped water and two embedded outcrops,1.900,observed batched tool wall times
+first A/B/C/D rerun with concurrent spec corrections,all four passed; one stale A assertion failed,0.400,parallel tool wall time
+final A/B/C/D evaluation and nine tests,all passed,0.400,parallel tool wall time

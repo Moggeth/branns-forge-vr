@@ -1,2 +1,7 @@
 *_smoke/
 sample_output/
+e_fixture/
+scale_*_output/
+scale_real_output/
+*.import
+*.translation

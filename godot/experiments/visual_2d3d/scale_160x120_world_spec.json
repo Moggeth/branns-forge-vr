@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "variant": "scale_160x120",
+  "method": "synthetic bounds scaling fixture",
+  "seed": 92815,
+  "bounds_m": [
+    160.0,
+    120.0
+  ],
+  "spawn_xz": [
+    -60.0,
+    43.5
+  ],
+  "goal_xz": [
+    48.0,
+    -40.5
+  ],
+  "path_xz": [
+    [
+      -60.0,
+      43.5
+    ],
+    [
+      -46.0,
+      34.5
+    ],
+    [
+      -34.0,
+      30.0
+    ],
+    [
+      -30.0,
+      18.0
+    ],
+    [
+      -18.0,
+      13.5
+    ],
+    [
+      -10.0,
+      6.0
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      12.0,
+      -6.0
+    ],
+    [
+      20.0,
+      -18.0
+    ],
+    [
+      32.0,
+      -24.0
+    ],
+    [
+      40.0,
+      -33.0
+    ],
+    [
+      48.0,
+      -40.5
+    ]
+  ],
+  "stream": {
+    "points_xz": [
+      [
+        -8.0,
+        -60.0
+      ],
+      [
+        -4.0,
+        -42.0
+      ],
+      [
+        -8.0,
+        -24.0
+      ],
+      [
+        -2.0,
+        -12.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        4.0,
+        16.5
+      ],
+      [
+        -2.0,
+        33.0
+      ],
+      [
+        6.0,
+        60.0
+      ]
+    ],
+    "width_m": 4.0
+  },
+  "crossing": {
+    "center_xz": [
+      0.0,
+      0.0
+    ],
+    "width_m": 3.6,
+    "length_m": 8.0,
+    "yaw_rad": -0.7853981634
+  },
+  "terrain": {
+    "base_y": 0.0,
+    "hills": [
+      {
+        "center_xz": [
+          -42.0,
+          -27.0
+        ],
+        "radius_m": 27.7128,
+        "amplitude_m": 2.0
+      },
+      {
+        "center_xz": [
+          40.0,
+          27.0
+        ],
+        "radius_m": 32.909,
+        "amplitude_m": 1.7
+      }
+    ]
+  },
+  "regions": [
+    {
+      "name": "western orchard",
+      "polygon_xz": [
+        [
+          -78.0,
+          -58.5
+        ],
+        [
+          -14.0,
+          -58.5
+        ],
+        [
+          -14.0,
+          58.5
+        ],
+        [
+          -78.0,
+          58.5
+        ]
+      ],
+      "surface": "grass",
+      "tree_density": 0.18
+    },
+    {
+      "name": "eastern orchard",
+      "polygon_xz": [
+        [
+          16.0,
+          -58.5
+        ],
+        [
+          78.0,
+          -58.5
+        ],
+        [
+          78.0,
+          58.5
+        ],
+        [
+          16.0,
+          58.5
+        ]
+      ],
+      "surface": "grass",
+      "tree_density": 0.17
+    }
+  ],
+  "objects": [
+    {
+      "asset_id": "wall_corner_broken",
+      "position_xyz": [
+        50.0,
+        0,
+        -42.0
+      ],
+      "yaw_rad": 0.3,
+      "scale": 1.0,
+      "interactive": false
+    },
+    {
+      "asset_id": "rubble_split",
+      "position_xyz": [
+        54.0,
+        0,
+        -39.0
+      ],
+      "yaw_rad": 0.8,
+      "scale": 1.0,
+      "interactive": false
+    }
+  ],
+  "exclusions": [
+    {
+      "center_xz": [
+        48.0,
+        -40.5
+      ],
+      "radius_m": 10.3923
+    }
+  ],
+  "provenance": {
+    "source_plan": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\godot\\experiments\\visual_2d3d\\sample_world_spec.json",
+    "tools": [
+      "make_scale_fixture.py"
+    ],
+    "model": null,
+    "measured_time_s": null,
+    "source_image": null
+  }
+}

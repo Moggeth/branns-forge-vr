@@ -8,17 +8,17 @@
     80
   ],
   "spawn_xz": [
-    -31.7262,
-    31.156
+    -30,
+    29
   ],
   "goal_xz": [
-    29.2812,
-    -29.7235
+    24,
+    -27
   ],
   "path_xz": [
     [
-      -31.5625,
-      31.5625
+      -30,
+      29
     ],
     [
       -31.5625,
@@ -141,8 +141,8 @@
       -27.8125
     ],
     [
-      29.6875,
-      -29.6875
+      24,
+      -27
     ]
   ],
   "stream": {
@@ -771,7 +771,7 @@
       "asset_id": "wall_straight",
       "position_xyz": [
         31.5556,
-        0,
+        0.0001,
         -33.8865
       ],
       "yaw_rad": 0.8014,
@@ -783,7 +783,7 @@
       "asset_id": "wall_straight",
       "position_xyz": [
         34.5658,
-        0,
+        0.0001,
         -28.1405
       ],
       "yaw_rad": 2.0803,
@@ -795,7 +795,7 @@
       "asset_id": "wall_straight",
       "position_xyz": [
         24.5201,
-        0,
+        0.0007,
         -32.8956
       ],
       "yaw_rad": 1.5662,
@@ -807,7 +807,7 @@
       "asset_id": "rubble_split",
       "position_xyz": [
         24.4129,
-        0,
+        0.0013,
         -29.0134
       ],
       "yaw_rad": 1.1448,
@@ -819,7 +819,7 @@
       "asset_id": "rubble_split",
       "position_xyz": [
         31.6575,
-        0,
+        0.0004,
         -24.4411
       ],
       "yaw_rad": -0.6996,
@@ -831,7 +831,7 @@
       "asset_id": "rubble_split",
       "position_xyz": [
         26.8576,
-        0,
+        0.0003,
         -33.9627
       ],
       "yaw_rad": 1.2736,
@@ -843,7 +843,7 @@
       "asset_id": "rubble_split",
       "position_xyz": [
         33.2079,
-        0,
+        0.0004,
         -23.7382
       ],
       "yaw_rad": -0.4746,
@@ -855,7 +855,7 @@
       "asset_id": "rubble_split",
       "position_xyz": [
         24.9414,
-        0,
+        0.0014,
         -27.3177
       ],
       "yaw_rad": 1.913,
@@ -867,7 +867,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -31.717,
-        0,
+        0.2177,
         -29.7283
       ],
       "yaw_rad": 0.0,
@@ -879,7 +879,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -36.4178,
-        0,
+        0.0385,
         -36.5395
       ],
       "yaw_rad": 2.4,
@@ -891,7 +891,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -14.2642,
-        0,
+        0.0044,
         35.6983
       ],
       "yaw_rad": 4.7999,
@@ -903,7 +903,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -28.6286,
-        0,
+        0.0048,
         17.0738
       ],
       "yaw_rad": 0.9167,
@@ -915,7 +915,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         23.0501,
-        0,
+        0.4125,
         30.9451
       ],
       "yaw_rad": 3.3167,
@@ -927,7 +927,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         29.0863,
-        0,
+        0.3433,
         27.7382
       ],
       "yaw_rad": 5.7166,
@@ -939,7 +939,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -36.6247,
-        0,
+        0.0037,
         13.4321
       ],
       "yaw_rad": 1.8334,
@@ -951,7 +951,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         15.9903,
-        0,
+        0.2099,
         36.6364
       ],
       "yaw_rad": 4.2334,
@@ -963,7 +963,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         36.4219,
-        0,
+        0.0311,
         36.2392
       ],
       "yaw_rad": 0.3501,
@@ -975,7 +975,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -13.5418,
-        0,
+        0.4192,
         -34.3385
       ],
       "yaw_rad": 2.7501,
@@ -987,7 +987,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -8.1225,
-        0,
+        0.0254,
         34.1819
       ],
       "yaw_rad": 5.1501,
@@ -999,7 +999,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -36.8051,
-        0,
+        0.0002,
         23.6089
       ],
       "yaw_rad": 1.2669,
@@ -1011,7 +1011,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         34.8294,
-        0,
+        0.2041,
         24.07
       ],
       "yaw_rad": 3.6668,
@@ -1023,7 +1023,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         30.0181,
-        0,
+        0.0741,
         37.1002
       ],
       "yaw_rad": 6.0668,
@@ -1035,7 +1035,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         7.6064,
-        0,
+        0.0327,
         -37.121
       ],
       "yaw_rad": 2.1836,
@@ -1047,7 +1047,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         17.5632,
-        0,
+        0.5283,
         30.8736
       ],
       "yaw_rad": 4.5835,
@@ -1059,7 +1059,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -30.2076,
-        0,
+        0.0925,
         -37.2481
       ],
       "yaw_rad": 0.7003,
@@ -1071,7 +1071,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         12.1082,
-        0,
+        0.0181,
         -34.9209
       ],
       "yaw_rad": 3.1003,
@@ -1083,7 +1083,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         37.0111,
-        0,
+        0.0704,
         30.406
       ],
       "yaw_rad": 5.5002,
@@ -1095,7 +1095,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         30.1411,
-        0,
+        0.4854,
         22.3378
       ],
       "yaw_rad": 1.617,
@@ -1107,7 +1107,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -20.5608,
-        0,
+        0.0007,
         35.4898
       ],
       "yaw_rad": 4.017,
@@ -1119,7 +1119,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         37.3584,
-        0,
+        0.0,
         -37.3792
       ],
       "yaw_rad": 0.1337,
@@ -1131,7 +1131,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         35.9426,
-        0,
+        0.0016,
         -17.239
       ],
       "yaw_rad": 2.5337,
@@ -1143,7 +1143,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         16.3289,
-        0,
+        0.0042,
         -37.387
       ],
       "yaw_rad": 4.9337,
@@ -1155,7 +1155,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         34.9383,
-        0,
+        0.0068,
         -12.6266
       ],
       "yaw_rad": 1.0504,
@@ -1167,7 +1167,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -25.2267,
-        0,
+        0.0002,
         34.3356
       ],
       "yaw_rad": 3.4504,
@@ -1179,7 +1179,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -32.647,
-        0,
+        0.3777,
         -18.4285
       ],
       "yaw_rad": 5.8504,
@@ -1191,7 +1191,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         12.5027,
-        0,
+        0.4077,
         32.5022
       ],
       "yaw_rad": 1.9671,
@@ -1203,7 +1203,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -29.1741,
-        0,
+        0.0,
         37.1067
       ],
       "yaw_rad": 4.3671,
@@ -1215,7 +1215,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -34.7152,
-        0,
+        0.0174,
         8.3362
       ],
       "yaw_rad": 0.4839,
@@ -1227,7 +1227,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         36.875,
-        0,
+        0.2066,
         13.0469
       ],
       "yaw_rad": 2.8839,
@@ -1239,7 +1239,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -21.7991,
-        0,
+        0.4639,
         -32.0517
       ],
       "yaw_rad": 5.2838,
@@ -1251,7 +1251,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         24.8584,
-        0,
+        0.1551,
         36.1523
       ],
       "yaw_rad": 1.4006,
@@ -1263,7 +1263,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -32.5384,
-        0,
+        0.3239,
         -23.4211
       ],
       "yaw_rad": 3.8006,
@@ -1275,7 +1275,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         17.626,
-        0,
+        0.0602,
         -11.9076
       ],
       "yaw_rad": 6.2005,
@@ -1287,7 +1287,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         33.6672,
-        0,
+        0.395,
         18.1124
       ],
       "yaw_rad": 2.3173,
@@ -1299,7 +1299,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         32.8786,
-        0,
+        0.105,
         32.7102
       ],
       "yaw_rad": 4.7173,
@@ -1311,7 +1311,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -18.5123,
-        0,
+        0.3472,
         -35.1708
       ],
       "yaw_rad": 0.834,
@@ -1323,7 +1323,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -30.5418,
-        0,
+        0.0154,
         11.674
       ],
       "yaw_rad": 3.234,
@@ -1335,7 +1335,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -17.6728,
-        0,
+        0.0031,
         31.8187
       ],
       "yaw_rad": 5.634,
@@ -1347,7 +1347,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         34.8366,
-        0,
+        0.2576,
         8.7763
       ],
       "yaw_rad": 1.7507,
@@ -1359,7 +1359,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -26.1258,
-        0,
+        0.5219,
         -27.89
       ],
       "yaw_rad": 4.1507,
@@ -1371,7 +1371,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         27.9736,
-        0,
+        0.2027,
         32.7541
       ],
       "yaw_rad": 0.2675,
@@ -1383,7 +1383,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         9.9752,
-        0,
+        0.1868,
         36.5085
       ],
       "yaw_rad": 2.6674,
@@ -1395,7 +1395,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -36.9704,
-        0,
+        0.0,
         35.5466
       ],
       "yaw_rad": 5.0674,
@@ -1407,7 +1407,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -35.8116,
-        0,
+        0.1819,
         -10.0164
       ],
       "yaw_rad": 1.1842,
@@ -1419,7 +1419,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         34.7281,
-        0,
+        0.0209,
         -8.0827
       ],
       "yaw_rad": 3.5841,
@@ -1431,7 +1431,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -35.0252,
-        0,
+        0.0013,
         18.2947
       ],
       "yaw_rad": 5.9841,
@@ -1443,7 +1443,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         11.667,
-        0,
+        0.0399,
         -30.2963
       ],
       "yaw_rad": 2.1009,
@@ -1455,7 +1455,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -22.7419,
-        0,
+        0.2289,
         -36.3969
       ],
       "yaw_rad": 4.5009,
@@ -1467,7 +1467,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         37.7118,
-        0,
+        0.0215,
         -5.1831
       ],
       "yaw_rad": 0.6176,
@@ -1479,7 +1479,7 @@
       "asset_id": "apple_tree_mature",
       "position_xyz": [
         -25.1201,
-        0,
+        0.7071,
         -8.5304
       ],
       "yaw_rad": 3.0176,
@@ -1491,7 +1491,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         8.0412,
-        0,
+        0.0653,
         -32.6502
       ],
       "yaw_rad": 5.4176,
@@ -1503,7 +1503,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         14.5604,
-        0,
+        0.7885,
         27.7191
       ],
       "yaw_rad": 1.5343,
@@ -1515,7 +1515,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         37.9376,
-        0,
+        0.0003,
         -21.1508
       ],
       "yaw_rad": 3.9343,
@@ -1527,7 +1527,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -38.0612,
-        0,
+        0.1438,
         -18.5156
       ],
       "yaw_rad": 0.0511,
@@ -1539,7 +1539,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         37.0855,
-        0,
+        0.1704,
         20.0714
       ],
       "yaw_rad": 2.451,
@@ -1551,7 +1551,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -36.1335,
-        0,
+        0.1897,
         -21.9133
       ],
       "yaw_rad": 4.851,
@@ -1563,7 +1563,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -6.0272,
-        0,
+        0.0776,
         29.4725
       ],
       "yaw_rad": 0.9678,
@@ -1575,7 +1575,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -13.3142,
-        0,
+        0.0225,
         25.6541
       ],
       "yaw_rad": 3.3677,
@@ -1587,7 +1587,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -2.868,
-        0,
+        1.0234,
         -14.3361
       ],
       "yaw_rad": 5.7677,
@@ -1599,7 +1599,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -37.1326,
-        0,
+        0.0217,
         5.0875
       ],
       "yaw_rad": 1.8845,
@@ -1611,7 +1611,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -16.4399,
-        0,
+        0.8042,
         -29.1301
       ],
       "yaw_rad": 4.2844,
@@ -1623,7 +1623,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         5.3739,
-        0,
+        0.7093,
         23.7025
       ],
       "yaw_rad": 0.4012,
@@ -1635,7 +1635,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.0178,
-        0,
+        0.0076,
         -9.7914
       ],
       "yaw_rad": 2.8012,
@@ -1647,7 +1647,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -22.3468,
-        0,
+        0.0008,
         30.8689
       ],
       "yaw_rad": 5.2011,
@@ -1659,7 +1659,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -8.8939,
-        0,
+        0.2617,
         -36.4695
       ],
       "yaw_rad": 1.3179,
@@ -1671,7 +1671,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         1.0734,
-        0,
+        0.1394,
         -35.0999
       ],
       "yaw_rad": 3.7179,
@@ -1683,7 +1683,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -5.0781,
-        0,
+        0.0237,
         37.8906
       ],
       "yaw_rad": 6.1179,
@@ -1695,7 +1695,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         20.93,
-        0,
+        0.1584,
         37.4196
       ],
       "yaw_rad": 2.2346,
@@ -1707,7 +1707,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -17.2929,
-        0,
+        0.065,
         10.7635
       ],
       "yaw_rad": 4.6346,
@@ -1719,7 +1719,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -38.137,
-        0,
+        0.1327,
         -12.7707
       ],
       "yaw_rad": 0.7514,
@@ -1731,7 +1731,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -32.459,
-        0,
+        0.1159,
         -33.8063
       ],
       "yaw_rad": 3.1513,
@@ -1743,7 +1743,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -29.138,
-        0,
+        0.4559,
         -25.4761
       ],
       "yaw_rad": 5.5513,
@@ -1755,7 +1755,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -9.9863,
-        0,
+        0.5507,
         -31.8431
       ],
       "yaw_rad": 1.6681,
@@ -1767,7 +1767,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         24.8908,
-        0,
+        0.6441,
         25.81
       ],
       "yaw_rad": 4.068,
@@ -1779,7 +1779,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         8.5582,
-        0,
+        0.4047,
         31.32
       ],
       "yaw_rad": 0.1848,
@@ -1791,7 +1791,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -31.9277,
-        0,
+        0.0007,
         21.9352
       ],
       "yaw_rad": 2.5848,
@@ -1803,7 +1803,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -0.2781,
-        0,
+        0.1701,
         30.951
       ],
       "yaw_rad": 4.9847,
@@ -1815,7 +1815,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         19.7175,
-        0,
+        0.027,
         -15.1918
       ],
       "yaw_rad": 1.1015,
@@ -1827,7 +1827,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         31.4808,
-        0,
+        0.0618,
         -5.3171
       ],
       "yaw_rad": 3.5015,
@@ -1839,7 +1839,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -33.7156,
-        0,
+        0.0637,
         2.4556
       ],
       "yaw_rad": 5.9014,
@@ -1851,7 +1851,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         18.5754,
-        0,
+        0.9433,
         25.5145
       ],
       "yaw_rad": 2.0182,
@@ -1863,7 +1863,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -16.5658,
-        0,
+        0.2098,
         -38.4153
       ],
       "yaw_rad": 4.4182,
@@ -1875,7 +1875,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -23.9095,
-        0,
+        0.0001,
         38.1472
       ],
       "yaw_rad": 0.535,
@@ -1887,7 +1887,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         15.1053,
-        0,
+        0.0127,
         -32.329
       ],
       "yaw_rad": 2.9349,
@@ -1899,7 +1899,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -37.9945,
-        0,
+        0.0,
         28.2982
       ],
       "yaw_rad": 5.3349,
@@ -1911,7 +1911,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         33.5084,
-        0,
+        0.1655,
         28.5849
       ],
       "yaw_rad": 1.4517,
@@ -1923,7 +1923,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         20.0875,
-        0,
+        0.2844,
         34.4267
       ],
       "yaw_rad": 3.8516,
@@ -1935,7 +1935,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -38.2415,
-        0,
+        0.0005,
         19.571
       ],
       "yaw_rad": 6.2516,
@@ -1947,7 +1947,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -38.1749,
-        0,
+        0.0597,
         -31.1542
       ],
       "yaw_rad": 2.3684,
@@ -1959,7 +1959,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.2821,
-        0,
+        0.087,
         26.2967
       ],
       "yaw_rad": 4.7683,
@@ -1971,7 +1971,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -38.2697,
-        0,
+        0.0072,
         9.2802
       ],
       "yaw_rad": 0.8851,
@@ -1983,7 +1983,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.2637,
-        0,
+        0.0,
         -33.3546
       ],
       "yaw_rad": 3.2851,
@@ -1995,7 +1995,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         32.7934,
-        0,
+        0.0,
         -38.5042
       ],
       "yaw_rad": 5.685,
@@ -2007,7 +2007,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -25.9514,
-        0,
+        0.1387,
         -37.7411
       ],
       "yaw_rad": 1.8018,
@@ -2019,7 +2019,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -35.4533,
-        0,
+        0.0945,
         -31.6406
       ],
       "yaw_rad": 4.2018,
@@ -2031,7 +2031,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -34.3598,
-        0,
+        0.0,
         37.8071
       ],
       "yaw_rad": 0.3186,
@@ -2043,7 +2043,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -32.4585,
-        0,
+        0.0049,
         14.9901
       ],
       "yaw_rad": 2.7185,
@@ -2055,7 +2055,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         -10.2583,
-        0,
+        0.0081,
         37.804
       ],
       "yaw_rad": 5.1185,
@@ -2067,7 +2067,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.1969,
-        0,
+        0.1493,
         16.8625
       ],
       "yaw_rad": 1.2353,
@@ -2079,7 +2079,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         17.744,
-        0,
+        0.0049,
         -34.1085
       ],
       "yaw_rad": 3.6352,
@@ -2091,7 +2091,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.4,
-        0,
+        0.002,
         -14.6779
       ],
       "yaw_rad": 6.0352,
@@ -2103,7 +2103,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         38.3594,
-        0,
+        0.1225,
         9.7451
       ],
       "yaw_rad": 2.152,
@@ -2115,7 +2115,7 @@
       "asset_id": "apple_tree_young",
       "position_xyz": [
         26.7353,
-        0,
+        0.6554,
         23.5405
       ],
       "yaw_rad": 4.5519,
@@ -2161,7 +2161,25 @@
     "coordinate_mapping": "x=-40+80*(u+0.5)/512; z=-40+80*(v+0.5)/512",
     "uncertain_pixel_fraction": 0.0,
     "warnings": [],
+    "anchor_snap": {
+      "spawn_extracted_xz": [
+        -31.7262,
+        31.156
+      ],
+      "goal_extracted_xz": [
+        29.2812,
+        -29.7235
+      ],
+      "spawn_delta_m": 2.7619,
+      "goal_delta_m": 5.9421
+    },
     "height_encoding": "greyscale 0=0m, 255=3m; derived from source hill patches",
-    "density_encoding": "blurred tree canopy occupancy, 0..255; source-aligned"
+    "density_encoding": "blurred tree canopy occupancy, 0..255; source-aligned",
+    "grounding_delta_m": {
+      "object_count": 113,
+      "min": 0.0,
+      "max": 1.0234,
+      "mean": 0.1658
+    }
   }
 }

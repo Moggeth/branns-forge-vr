@@ -15,3 +15,28 @@ sample_batched_range_corrected_render,passed five views and raycasts,2.181,exec_
 A_initial_validation,rejected path surface decals as obstructions,0.361,exec_command wall time
 A_surface_classification_render,passed five views and raycasts,2.253,exec_command wall time
 A_rock_obstruction_regression,correctly rejected rock on path,0.397,exec_command wall time
+C_before_profile_check,rejected route grade due mismatched hill and carve formulas,0.359,exec_command wall time
+profile_copy_creation,created flagged A/C specs inside owned directories,0.117,exec_command wall time
+A_profile_schema_check,passed,0.222,exec_command wall time
+B_profile_schema_check,passed,0.330,exec_command wall time
+C_profile_schema_check,passed,0.361,exec_command wall time
+D_profile_schema_check,passed,0.336,exec_command wall time
+A_profile_desktop_render,passed five views and raycasts,2.455,exec_command wall time
+B_profile_desktop_render,passed five views and raycasts,2.114,exec_command wall time
+C_profile_desktop_render,passed five views and raycasts,2.610,exec_command wall time
+D_profile_desktop_render,passed five views and raycasts,2.309,exec_command wall time
+PowerShell_metrics_report_first_attempt,parser rejected direct foreach pipeline; assign rows before piping,0.147,exec_command wall time
+PowerShell_metrics_report_corrected,printed four variant metrics,0.146,exec_command wall time
+A_profile_metrics_render,passed after adding profile labels,2.317,exec_command wall time
+B_profile_metrics_render,passed after adding profile labels,2.128,exec_command wall time
+C_profile_metrics_render,passed after adding profile labels,2.581,exec_command wall time
+D_profile_metrics_render,passed after adding profile labels,2.410,exec_command wall time
+E_optional_asset_initial_fixture,asset instances and fallback raycasts passed but bridge visual too small,2.119,exec_command wall time
+E_optional_asset_scaled_fixture,visual spans stream and all raycasts pass,1.978,exec_command wall time
+D_procedural_bridge_regression,passed five views and raycasts after optional asset support,2.334,exec_command wall time
+E_invalid_asset_path_check,rejected traversal and wrong extension,0.380,exec_command wall time
+scale_160_fixture_and_check,generated fixture and passed schema/route validation,0.422,exec_command wall time
+scale_160_first_render,passed five views and bridge/spawn collision,2.610,exec_command wall time
+scale_80_regression_render,passed fixed five views and bridge/spawn collision,1.974,exec_command wall time
+scale_160_route_physics_render,passed 86 route samples and five views,2.604,exec_command wall time
+scale_160x120_rectangular_render,passed route samples and five views,2.495,exec_command wall time

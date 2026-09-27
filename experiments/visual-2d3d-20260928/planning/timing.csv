@@ -16,3 +16,9 @@ corrected_image_extraction,passed,0.691,extract command measured wall time
 godot_b_smoke,passed,2.061,Run-World command measured wall time; metrics elapsed_s 0.558
 alignment_regression_test_initial,failed_inconsistent_synthetic_fixture,0.710,unittest command measured wall time
 alignment_regression_test_corrected,passed,0.691,unittest command measured wall time
+shared_evaluator_failure_inspection,identified_anchor_and_grounding_contract_mismatch,0.9,batched read command measured wall time
+bank_distance_check,confirmed_all_objects_outside_carved_banks,0.232,source object distance command measured wall time
+benchmark_grounding_reextract,passed,0.678,extract command measured wall time
+shared_evaluator_B,passed_zero_failures,0.121,read-only evaluation command measured wall time
+refreshed_B_godot_smoke,passed,2.165,Run-World command measured wall time
+final_four_planning_tests,passed,1.127,unittest command measured wall time

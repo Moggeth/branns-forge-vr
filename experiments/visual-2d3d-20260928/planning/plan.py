@@ -98,13 +98,20 @@ def source_details(label: np.ndarray, spec: dict, out: Path) -> None:
     height = np.zeros((SIZE, SIZE), dtype=np.float32)
     for hill in hills:
         u, v = world_to_pixel(*hill["center_xz"])
-        sigma = hill["radius_m"] * px_per_m / 2
+        sigma = hill["radius_m"] * px_per_m
         height += hill["amplitude_m"] * np.exp(-((xx-u)**2+(yy-v)**2)/(2*sigma*sigma))
     Image.fromarray(np.uint8(np.clip(height/3 * 255, 0, 255)), "L").save(out / "mask_height.png")
     density = Image.fromarray(np.uint8((label == NAMES.index("trees"))*255), "L").filter(ImageFilter.GaussianBlur(18))
     density.save(out / "mask_density.png")
     spec["planning"]["height_encoding"] = "greyscale 0=0m, 255=3m; derived from source hill patches"
     spec["planning"]["density_encoding"] = "blurred tree canopy occupancy, 0..255; source-aligned"
+    for obj in spec["objects"]:
+        xyz = obj["position_xyz"]
+        xyz[1] = round(terrain_height(spec, (xyz[0], xyz[2])), 4)
+    heights = [o["position_xyz"][1] for o in spec["objects"]]
+    spec["planning"]["grounding_delta_m"] = {"object_count": len(heights),
+        "min": min(heights, default=0), "max": max(heights, default=0),
+        "mean": round(sum(heights)/len(heights),4) if heights else 0}
 
 
 def classify(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -273,6 +280,12 @@ def extract(image_path: Path, out: Path, model: str = "unknown") -> dict:
     bridge = anchor(label, "crossing", (0, 0), warnings)
     stream, width = trace_stream(label == NAMES.index("water"), warnings)
     path = route(label, spawn, goal, bridge, warnings)
+    extracted_spawn = pixel_to_world(*spawn)
+    extracted_goal = pixel_to_world(*goal)
+    fixed_spawn = BENCHMARK["fixed_gameplay"]["spawn_xz"]
+    fixed_goal = BENCHMARK["fixed_gameplay"]["goal_xz"]
+    path[0] = fixed_spawn[:]
+    path[-1] = fixed_goal[:]
     center = pixel_to_world(*bridge)
     # Approximate stream tangent at nearest centreline point, then orient bridge perpendicular.
     n = min(range(len(stream)), key=lambda i: math.dist(center, stream[i]))
@@ -282,7 +295,7 @@ def extract(image_path: Path, out: Path, model: str = "unknown") -> dict:
     yaw = math.atan2(-(p1[1]-p0[1]), p1[0]-p0[0])
     spec = {
         "version": 1, "variant": "B", "method": "image-led palette extraction", "seed": 0,
-        "bounds_m": [80, 80], "spawn_xz": pixel_to_world(*spawn), "goal_xz": pixel_to_world(*goal),
+        "bounds_m": [80, 80], "spawn_xz": fixed_spawn[:], "goal_xz": fixed_goal[:],
         "path_xz": path, "stream": {"points_xz": stream, "width_m": width},
         "crossing": {"center_xz": center, "width_m": 3.5, "length_m": round(width + 2.0, 3), "yaw_rad": round(yaw, 5)},
         "terrain": {"base_height_m": 0, "hills": []},
@@ -295,7 +308,10 @@ def extract(image_path: Path, out: Path, model: str = "unknown") -> dict:
                        "registration": "full-frame Lanczos resize to 512x512; no crop or transform",
                        "anchor_fallbacks": [w.split()[0] for w in warnings if "marker absent" in w]},
         "planning": {"mask_prefix": "mask_", "coordinate_mapping": BENCHMARK["raster"]["mapping"],
-                     "uncertain_pixel_fraction": round(uncertain, 4), "warnings": warnings},
+                     "uncertain_pixel_fraction": round(uncertain, 4), "warnings": warnings,
+                     "anchor_snap": {"spawn_extracted_xz": extracted_spawn, "goal_extracted_xz": extracted_goal,
+                                     "spawn_delta_m": round(math.dist(extracted_spawn,fixed_spawn),4),
+                                     "goal_delta_m": round(math.dist(extracted_goal,fixed_goal),4)}},
     }
     source_details(label, spec, out)
     (out / "world_spec.json").write_text(json.dumps(spec, indent=2), encoding="utf-8")
@@ -348,7 +364,7 @@ def terrain_height(spec: dict, point: tuple[float, float]) -> float:
     for hill in spec["terrain"].get("hills", []):
         radius = hill["radius_m"]
         d = math.dist(point, hill["center_xz"])
-        value += hill["amplitude_m"] * math.exp(-2 * (d/radius)**2)
+        value += hill["amplitude_m"] * math.exp(-.5 * (d/radius)**2)
     return value
 
 

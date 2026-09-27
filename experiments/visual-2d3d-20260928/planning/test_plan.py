@@ -5,10 +5,22 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from plan import PALETTE, extract, pixel_to_world, validate, world_to_pixel
+from plan import PALETTE, extract, pixel_to_world, terrain_height, validate, world_to_pixel
 
 
 class PlannerTests(unittest.TestCase):
+    def test_generated_source_benchmark_and_grounding(self):
+        source = Path(__file__).parent / "input" / "generated-map-source.png"
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = extract(source, Path(tmp))
+            self.assertEqual([], validate(spec))
+            self.assertGreater(spec["planning"]["anchor_snap"]["goal_delta_m"], 5)
+            self.assertEqual(113, len(spec["objects"]))
+            self.assertGreater(spec["planning"]["grounding_delta_m"]["max"], .5)
+            for obj in spec["objects"]:
+                x,y,z = obj["position_xyz"]
+                self.assertAlmostEqual(y,terrain_height(spec,(x,z)),places=3)
+
     def test_coordinate_registration(self):
         for point in ((0, 0), (511, 511), (255.5, 255.5), (27, 390)):
             for actual, expected in zip(world_to_pixel(*pixel_to_world(*point)), point):
@@ -35,6 +47,13 @@ class PlannerTests(unittest.TestCase):
             im.save(source)
             spec=extract(source,tmp/"out","synthetic-test")
             self.assertEqual([],validate(spec))
+            self.assertEqual([-30,29],spec["spawn_xz"])
+            self.assertEqual([24,-27],spec["goal_xz"])
+            self.assertEqual(spec["spawn_xz"],spec["path_xz"][0])
+            self.assertEqual(spec["goal_xz"],spec["path_xz"][-1])
+            for obj in spec["objects"]:
+                x,y,z=obj["position_xyz"]
+                self.assertAlmostEqual(y,terrain_height(spec,(x,z)),places=3)
             self.assertTrue((tmp/"out"/"mask_water.png").exists())
             self.assertTrue((tmp/"out"/"plan_preview.png").exists())
             for mask in ("mask_height.png", "mask_density.png"):

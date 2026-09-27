@@ -20,19 +20,61 @@ func _init(input: Dictionary):
 func v2(value) -> Vector2:
 	return Vector2(float(value[0]), float(value[1]))
 
-func terrain_height(p: Vector2) -> float:
+func valid_optional_glb(path: String) -> bool:
+	return path.begins_with("res://assets/") and path.ends_with(".glb") and not path.contains("..") and not path.contains("\\") and ResourceLoader.exists(path)
+
+func stream_carve_kind() -> String:
+	var carve = spec.get("terrain", {}).get("stream_carve", "legacy")
+	if typeof(carve) == TYPE_DICTIONARY: return str(carve.get("kind", "legacy"))
+	return str(carve)
+
+func stream_carve_parameters() -> Dictionary:
+	var carve = spec.get("terrain", {}).get("stream_carve", {})
+	return carve if typeof(carve) == TYPE_DICTIONARY else {}
+
+func hill_height(p: Vector2) -> float:
 	var t: Dictionary = spec.get("terrain", {})
 	var height := float(t.get("base_y", t.get("base_height_m", t.get("base_height", 0.0))))
+	var coefficient := float(t.get("gaussian_coefficient", 0.5))
 	for hill in t.get("hills", []):
 		var center: Vector2 = v2(hill.get("center_xz", [0, 0]))
 		var radius := maxf(float(hill.get("radius_m", 1.0)), 0.1)
 		var distance_sq := p.distance_squared_to(center)
-		height += float(hill.get("amplitude_m", 0.0)) * exp(-0.5 * distance_sq / (radius * radius))
+		height += float(hill.get("amplitude_m", 0.0)) * exp(-coefficient * distance_sq / (radius * radius))
+	return height
+
+func smoothstep(a: float, b: float, value: float) -> float:
+	var t := clampf((value - a) / maxf(b - a, 0.001), 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+func terrain_height(p: Vector2) -> float:
+	var height := hill_height(p)
+	var kind := stream_carve_kind()
+	if kind == "none": return height
 	var distance := distance_to_polyline(p, spec["stream"]["points_xz"])
+	if kind == "valley_channel":
+		var carve := stream_carve_parameters()
+		var valley_radius := maxf(float(carve.get("valley_radius_m", 12.0)), 0.1)
+		height -= float(carve.get("valley_depth_m", 1.0)) * exp(-distance * distance / (valley_radius * valley_radius))
+		var limits: Array = carve.get("channel_smoothstep_m", [1.2, 4.5])
+		height -= float(carve.get("channel_depth_m", 1.9)) * (1.0 - smoothstep(float(limits[0]), float(limits[1]), distance))
+		return height
 	var stream_half := float(spec["stream"]["width_m"]) * 0.5
 	var bank := clampf((distance - stream_half) / 2.0, 0.0, 1.0)
 	height -= 1.8 * (1.0 - bank * bank * (3.0 - 2.0 * bank))
 	return height
+
+func water_height(p: Vector2) -> float:
+	var kind := stream_carve_kind()
+	if kind == "none":
+		return float(spec.stream.get("c_water_y", terrain_height(p) + 0.2))
+	if kind == "valley_channel":
+		var carve := stream_carve_parameters()
+		var distance := distance_to_polyline(p, spec.stream.points_xz)
+		var valley_radius := maxf(float(carve.get("valley_radius_m", 12.0)), 0.1)
+		var valley_ground := hill_height(p) - float(carve.get("valley_depth_m", 1.0)) * exp(-distance * distance / (valley_radius * valley_radius))
+		return valley_ground - float(carve.get("water_below_ground_m", 1.35))
+	return terrain_height(p) + 1.2
 
 func distance_to_polyline(p: Vector2, points: Array) -> float:
 	var nearest := INF
@@ -51,8 +93,22 @@ func validate() -> bool:
 		if not spec.has(key): errors.append("Missing field: " + key)
 	if not errors.is_empty(): return false
 	if int(spec.version) != 1: errors.append("Expected world_spec version 1")
-	if spec.bounds_m.size() != 2 or absf(float(spec.bounds_m[0]) - 80.0) > 0.01 or absf(float(spec.bounds_m[1]) - 80.0) > 0.01:
-		errors.append("Benchmark bounds must be 80 by 80 metres")
+	for descriptor in [spec.crossing, spec.get("landmark", {})]:
+		var path := str(descriptor.get("asset_glb", ""))
+		if not path.is_empty() and not valid_optional_glb(path): errors.append("Optional GLB must be an imported res://assets/*.glb: " + path)
+	if float(spec.terrain.get("gaussian_coefficient", 0.5)) <= 0.0: errors.append("Gaussian coefficient must be positive")
+	if not ["legacy", "none", "valley_channel"].has(stream_carve_kind()): errors.append("Unknown stream carve profile")
+	metrics["gaussian_coefficient"] = float(spec.terrain.get("gaussian_coefficient", 0.5))
+	metrics["stream_carve_profile"] = stream_carve_kind()
+	if spec.bounds_m.size() != 2:
+		errors.append("bounds_m must contain width and depth")
+	else:
+		var width := float(spec.bounds_m[0])
+		var depth := float(spec.bounds_m[1])
+		if width < 20.0 or depth < 20.0 or width > 256.0 or depth > 256.0:
+			errors.append("World bounds must be between 20 and 256 metres per side")
+		metrics["bounds_width_m"] = width
+		metrics["bounds_depth_m"] = depth
 	if spec.path_xz.size() < 3: errors.append("Path requires at least three vertices")
 	if spec.stream.get("points_xz", []).size() < 2: errors.append("Stream requires at least two vertices")
 	if not errors.is_empty(): return false
@@ -142,15 +198,20 @@ func append_quad(out: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3, d:
 
 func build_terrain(root: Node3D):
 	var vertices := PackedVector3Array()
-	var cells := 80
-	for iz in cells:
-		for ix in cells:
-			var x := -40.0 + ix
-			var z := -40.0 + iz
+	var width := float(spec.bounds_m[0])
+	var depth := float(spec.bounds_m[1])
+	var cells_x := int(ceil(width))
+	var cells_z := int(ceil(depth))
+	var step_x := width / cells_x
+	var step_z := depth / cells_z
+	for iz in cells_z:
+		for ix in cells_x:
+			var x := -width * 0.5 + ix * step_x
+			var z := -depth * 0.5 + iz * step_z
 			var a := Vector3(x, terrain_height(Vector2(x, z)), z)
-			var b := Vector3(x + 1, terrain_height(Vector2(x + 1, z)), z)
-			var c := Vector3(x + 1, terrain_height(Vector2(x + 1, z + 1)), z + 1)
-			var d := Vector3(x, terrain_height(Vector2(x, z + 1)), z + 1)
+			var b := Vector3(x + step_x, terrain_height(Vector2(x + step_x, z)), z)
+			var c := Vector3(x + step_x, terrain_height(Vector2(x + step_x, z + step_z)), z + step_z)
+			var d := Vector3(x, terrain_height(Vector2(x, z + step_z)), z + step_z)
 			append_quad(vertices, a, d, c, b)
 	var ground := mesh_from_triangles(vertices, material(Color("719757")))
 	ground.name = "Terrain"
@@ -184,8 +245,8 @@ func build_strip(root: Node3D, name: String, points: Array, width: float, color:
 		var dq := (after - p).normalized()
 		var sp := Vector2(-dp.y, dp.x) * width * 0.5
 		var sq := Vector2(-dq.y, dq.x) * width * 0.5
-		var h1 := terrain_height(p) + (1.2 if is_stream else 0.06)
-		var h2 := terrain_height(q) + (1.2 if is_stream else 0.06)
+		var h1 := water_height(p) if is_stream else terrain_height(p) + 0.06
+		var h2 := water_height(q) if is_stream else terrain_height(q) + 0.06
 		append_quad(vertices, Vector3(p.x - sp.x, h1, p.y - sp.y), Vector3(p.x + sp.x, h1, p.y + sp.y), Vector3(q.x + sq.x, h2, q.y + sq.y), Vector3(q.x - sq.x, h2, q.y - sq.y))
 	var node := mesh_from_triangles(vertices, material(color, 0.65 if is_stream else 1.0))
 	node.name = name
@@ -212,6 +273,32 @@ func add_box(root: Node3D, name: String, position: Vector3, size: Vector3, mat: 
 		shape.shape = box
 		body.add_child(shape)
 
+func add_collision_box(root: Node3D, name: String, position: Vector3, size: Vector3):
+	var body := StaticBody3D.new()
+	body.name = name
+	body.collision_layer = 1 | (1 << 19)
+	body.position = position
+	root.add_child(body)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+
+func instantiate_optional_glb(parent: Node3D, path: String, name: String) -> Node3D:
+	var packed := load(path) as PackedScene
+	if packed == null:
+		errors.append("Cannot load optional GLB: " + path)
+		return null
+	var visual := packed.instantiate() as Node3D
+	if visual == null:
+		errors.append("Optional GLB root is not Node3D: " + path)
+		return null
+	visual.name = name
+	parent.add_child(visual)
+	if path.begins_with(ASSETS): FINISH.apply_tree(visual)
+	return visual
+
 func build_bridge(root: Node3D):
 	var crossing: Dictionary = spec.crossing
 	var c := v2(crossing.center_xz)
@@ -225,10 +312,55 @@ func build_bridge(root: Node3D):
 	var width := float(crossing.width_m)
 	var stone := material(Color("8e8980"))
 	var dark := material(Color("656865"))
-	add_box(bridge, "WalkableDeck", Vector3(0, 0, 0), Vector3(width, 0.36, length), stone)
+	var specialist_path := str(crossing.get("asset_glb", ""))
+	if specialist_path.is_empty():
+		add_box(bridge, "WalkableDeck", Vector3(0, 0, 0), Vector3(width, 0.36, length), stone)
+	else:
+		var visual := instantiate_optional_glb(bridge, specialist_path, "SpecialistBridgeVisual")
+		if visual != null:
+			visual.position.y = float(crossing.get("asset_y_offset_m", 0.0))
+			visual.rotation.y = float(crossing.get("asset_yaw_offset_rad", 0.0))
+			visual.scale = Vector3.ONE * float(crossing.get("asset_scale", 1.0))
+		add_collision_box(bridge, "WalkableDeckCollision", Vector3.ZERO, Vector3(width, 0.36, length))
+		metrics["bridge_visual_asset"] = specialist_path
+		metrics["bridge_collision_fallback"] = true
+		return
 	for side in [-1.0, 1.0]:
 		add_box(bridge, "Parapet", Vector3(side * (width * 0.5 + 0.16), 0.55, 0), Vector3(0.32, 0.85, length), dark)
 		for end in [-1.0, 1.0]: add_box(bridge, "Pier", Vector3(side * (width * 0.5 - 0.2), -0.85, end * (length * 0.5 - 0.45)), Vector3(0.65, 1.6, 0.9), stone)
+	metrics["bridge_visual_asset"] = "procedural"
+	metrics["bridge_collision_fallback"] = false
+
+func build_landmark(root: Node3D):
+	var landmark: Dictionary = spec.get("landmark", {})
+	var path := str(landmark.get("asset_glb", ""))
+	if path.is_empty(): return
+	var goal := v2(spec.goal_xz)
+	var position := Vector3(goal.x, terrain_height(goal), goal.y)
+	var coordinates: Array = landmark.get("position_xyz", [])
+	if coordinates.size() == 3: position = Vector3(float(coordinates[0]), float(coordinates[1]), float(coordinates[2]))
+	var pivot := Node3D.new()
+	pivot.name = "Landmark"
+	pivot.position = position
+	pivot.rotation.y = float(landmark.get("yaw_rad", 0.0))
+	root.add_child(pivot)
+	var visual := instantiate_optional_glb(pivot, path, "SpecialistLandmarkVisual")
+	if visual != null:
+		visual.scale = Vector3.ONE * float(landmark.get("scale", 1.0))
+		visual.position.y = float(landmark.get("asset_y_offset_m", 0.0))
+	var collider := StaticBody3D.new()
+	collider.name = "LandmarkFallbackCollision"
+	collider.collision_layer = 1 | (1 << 18)
+	pivot.add_child(collider)
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = maxf(float(landmark.get("collision_radius_m", 0.6)), 0.2)
+	cylinder.height = maxf(float(landmark.get("collision_height_m", 2.0)), 0.2)
+	shape.position.y = cylinder.height * 0.5
+	shape.shape = cylinder
+	collider.add_child(shape)
+	metrics["landmark_visual_asset"] = path
+	metrics["landmark_collision_fallback"] = true
 
 func point_in_polygon(p: Vector2, polygon: Array) -> bool:
 	var inside := false
@@ -286,13 +418,16 @@ func build_objects(root: Node3D):
 		add_asset(root, str(obj.asset_id), Vector3(float(c[0]), float(c[1]), float(c[2])), float(obj.get("yaw_rad", 0)), float(obj.get("scale", 1)))
 	var placed := 0
 	var batches := {}
+	var half_width := float(spec.bounds_m[0]) * 0.5
+	var half_depth := float(spec.bounds_m[1]) * 0.5
+	var area_ratio := float(spec.bounds_m[0]) * float(spec.bounds_m[1]) / 6400.0
 	for region in spec.regions:
 		var density := clampf(float(region.get("tree_density", 0)), 0.0, 1.0)
 		var polygon: Array = region.get("polygon_xz", [])
 		if polygon.size() < 3 or density <= 0: continue
-		var samples := mini(240, int(640 * density))
+		var samples := mini(int(240 * area_ratio), int(640 * density * area_ratio))
 		for _i in samples:
-			var p := Vector2(rng.randf_range(-38, 38), rng.randf_range(-38, 38))
+			var p := Vector2(rng.randf_range(-half_width + 2.0, half_width - 2.0), rng.randf_range(-half_depth + 2.0, half_depth - 2.0))
 			if not point_in_polygon(p, polygon) or excluded(p): continue
 			var ids := ["apple_tree_mature", "apple_tree_mature_b", "apple_tree_young", "shrub_flowering", "rock_mossy_small"]
 			var id: String = ids[rng.randi_range(0, ids.size() - 1)]
@@ -320,6 +455,7 @@ func build() -> Node3D:
 	build_strip(root, "Path", spec.path_xz, PATH_HALF_WIDTH * 2.0, Color("af8156"))
 	build_bridge(root)
 	build_objects(root)
+	build_landmark(root)
 	var sun := DirectionalLight3D.new()
 	sun.name = "CommonSun"
 	sun.rotation_degrees = Vector3(-48, -28, 0)
