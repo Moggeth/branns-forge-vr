@@ -139,7 +139,9 @@ static func skeleton_shield(p: Node3D) -> void:
 static func floor_patch(p: Node3D, v: Vector3, size: Vector2, color: String) -> void:
 	var mesh=box(p,v+Vector3(0,-0.23,0),Vector3(size.x,0.46,size.y),color)
 	if p.name=="forge_yard": ForgeMaterials.dress(mesh,"grass","c8d2ad")
-	if p.name=="orchard_highlands": mesh.material_override=OrchardGround.material()
+	if p.name=="orchard_highlands":
+		mesh.material_override=OrchardGround.material()
+		mesh.set_meta("atmospheric_ground",true)
 	body(p,v+Vector3(0,-0.23,0),Vector3(size.x,0.46,size.y),"floor")
 
 static func entity(root: Node3D, zone: String, kind: String, pos: Vector3, group: String) -> Node3D:

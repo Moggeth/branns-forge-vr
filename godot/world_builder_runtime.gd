@@ -47,6 +47,7 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	data = fresh_state()
 	_index_timber()
 	if not test_mode: _load()
+	preload("res://orchard_ground.gd").sync_paths(data.paths)
 	_build_brook()
 	_build_camp()
 	_rebuild_saved()
@@ -185,6 +186,7 @@ func carve_path(a: Vector3, b: Vector3) -> String:
 	if problem != "": return problem
 	data.aether = float(data.aether) - ceili(a.distance_to(b) / 7.0)
 	data.paths.append({"a": _pack(a), "b": _pack(b)})
+	preload("res://orchard_ground.gd").add_path(a,b)
 	_render_path(a, b)
 	_clear_grove_collision(a, b)
 	_changed("A route now crosses the orchard. Walk it in VR or first person.")
