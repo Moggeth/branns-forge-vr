@@ -941,14 +941,14 @@ The desktop Weather Lab now holds **40 full potions' worth of remaining fuel** (
 
 Contact heat ignites neighbouring spilled fuel even when neither puddle is flowing. Pouring unlit fuel onto burning fuel feeds the fire. Rain-soaked fuel resists ignition, gaps and large height discontinuities block contact ignition, and a narrow ledge retains the full bottle volume. A connected trail burns until its fuel is consumed; unburned fuel still evaporates slowly.
 
-Both liquid and flame MultiMeshes have room for all 4096 simulation cells, replacing the previous 384/128 display limits. Their transforms update with the 10 Hz simulation; flame animation stays on the GPU. Splashes, sound voices and lights remain separately bounded. Limits live at the top of `godot/weather_lab.gd`; `godot/fuel_checks.gd` is part of the normal Weather Lab check. This updates the playground fuel system; the playable game's legacy four-pool combat fire system is unchanged.
+Both liquid and flame MultiMeshes have room for all 4096 simulation cells, replacing the previous 384/128 display limits. Their transforms update with the 10 Hz simulation; flame animation stays on the GPU. Splashes, sound voices and lights remain separately bounded. Limits live at the top of `godot/weather_lab.gd`; `godot/fuel_checks.gd` is part of the normal Weather Lab check. Ordinary playable sessions now also use the shared surface-fuel system; some offline diagnostic modes still use the legacy four-pool path.
 
 To capture a real 40-spill scene, add `--fuel-stress` alongside `--weather-lab --weather-check --capture-demos=<directory>` when running `visual_demo.gd`. The result is `weather-stress.png`. These foundations support larger experiments, but recursive grenade/potion spawning is not implemented.
 
 Weather surface refreshes preserve zone coverage while scanning. Disabling weather or travelling during a scan discards stale results; rebuilding the palm menu during a scan is safe.
 
-## Opt-in spreading fuel combat
-The native game now has an experimental fuel-combat mode. Close the game, then tick **Experimental spreading-fire combat** in the launcher (and choose VR or desktop). The ordinary setting keeps legacy combat. Unlit vials leave fuel, lit vials ignite trails, and fire damages ghosts and the player. Puddles persist between zone visits during the session. See docs/FUEL_COMBAT.md for controls, prototype bounds, rollback, diagnostics and headset checks. Run scripts/check-fuel-combat.ps1 for focused verification.
+## Spreading fuel combat
+Ordinary VR and desktop sessions use the shared surface-fuel simulation. Unlit vials leave fuel, lit vials ignite trails, and fire damages ghosts and the player. Puddles persist between zone visits during the session. The launcher still shows an experimental spreading-fire option, but the flag is no longer necessary for normal play. See docs/FUEL_COMBAT.md for prototype bounds and diagnostics, and [the fire unification audit](docs/FIRE-UNIFICATION-AUDIT.md) for remaining interaction gaps. Run scripts/check-fuel-combat.ps1 for focused verification.
 
 
 ## Bellworks and playful experiments
@@ -964,10 +964,7 @@ See [play controls, saves, verification and standalone packaging](docs/PLAYFUL-S
 Actual desktop captures are in `outputs/bellworks/`. The optional standalone build
 is in `outputs/bellworks-build`, with Play Desktop / Play VR launchers.
 
-For the forty-bottle full-game fuel experiment, tick **Experimental spreading-fire combat**
-in the launcher after closing the current game. The ordinary
-launcher setting preserves legacy fire combat. The desktop weather lab already uses the
-larger capacity and contact ignition. See [bounds and controls](docs/FUEL_COMBAT.md).
+The forty-bottle fuel capacity is part of the ordinary game path. The desktop weather lab uses the same capacity and contact-ignition foundation. See [bounds and controls](docs/FUEL_COMBAT.md).
 
 
 ### Persistent standalone demo
