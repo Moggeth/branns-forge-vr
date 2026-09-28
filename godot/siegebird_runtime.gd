@@ -360,9 +360,14 @@ func trigger(hand)->bool:
 		bolt.set_meta("ammo_token",w.get("ammo_token","")); bolt.set_meta("spent_shot",true)
 		bolt.global_basis=item.global_basis
 		bolt.global_position=w.seat.global_position
+		var hot=game.heat_contacts!=null and game.heat_contacts.hot_at(bolt.to_global(bolt.get_meta("tip",Vector3.UP*.35)),game.adventure.zone,.43)
+		if hot:
+			var ember=WorldZones.rock(bolt,bolt.get_meta("tip",Vector3.UP*.35),Vector3.ONE*.048,"ffbb68")
+			ember.material_override=WorldZones.mat("ffad55",1.35)
+			game._effect(bolt.global_position,Color("ffad55"),.12,.12)
 		var module_kind=game.enchantments.kind_for(item) if game.enchantments!=null else ""
 		# Module state is captured at fire time so changing hands/optics cannot alter a shot.
-		projectiles.append({"node":bolt,"velocity":item.global_basis.y.normalized()*extras.setting(w,"bolt_speed",44.0),"hand":hand,"until":game.elapsed+12,"zone":game.adventure.zone,"module":module_kind,"truesight_at_fire":game.enchantments.truesight_optics(w),"grapple":w.get("grapple_mode",false),"weapon":w,"damage":extras.setting(w,"damage",95.0)})
+		projectiles.append({"node":bolt,"velocity":item.global_basis.y.normalized()*extras.setting(w,"bolt_speed",44.0),"hand":hand,"until":game.elapsed+12,"zone":game.adventure.zone,"module":module_kind,"truesight_at_fire":game.enchantments.truesight_optics(w),"grapple":w.get("grapple_mode",false),"weapon":w,"damage":extras.setting(w,"damage",95.0),"hot":hot})
 		w.loaded=false; w.release=float(config.release_seconds); w.owner=hand
 		game.adventure.haptic(hand,"impact")
 		sound("fire",bolt.global_position)
@@ -467,6 +472,10 @@ func tick(delta):
 		var decay=exp(-drag*delta)
 		var terminal=Vector3.DOWN*game.tuning.value("crossbow.gravity")/drag
 		var end=start+(shot.velocity-terminal)*(1.0-decay)/drag+terminal*delta
+		if shot.get("hot",false) and game.heat_contacts!=null:
+			var steps=mini(10,maxi(1,ceili(start.distance_to(end)/.6)))
+			for segment in range(steps):
+				game.heat_contacts.sweep(start.lerp(end,float(segment)/steps),start.lerp(end,float(segment+1)/steps),.18,95,shot.zone,"hot_bolt",shot.node,delta/steps)
 		shot.velocity=shot.velocity*decay+terminal*(1.0-decay)
 		var hit=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(start,end,1))
 		var forward=shot.velocity.normalized()
@@ -474,6 +483,8 @@ func tick(delta):
 		var tip=shot.node.get_meta("tip",Vector3.UP*0.35)
 		shot.node.global_position=(end if hit.is_empty() else hit.position+forward*0.045)-shot.node.global_basis*tip
 		if not hit.is_empty():
+			if shot.get("hot",false) and game.heat_contacts!=null:
+				game.heat_contacts.touch(hit.position+hit.normal*.035,.45,240,shot.zone,"hot_bolt_impact",shot.node,.1)
 			var target=game._owner(hit.collider)
 			var embed_surface:Node3D=hit.collider
 			if target!=null:
@@ -489,7 +500,7 @@ func tick(delta):
 					"enemy":
 						var local_hit=target.to_local(hit.position)
 						var headshot=str(target.get_meta("enemy_type",""))=="skeleton" and hit.position.distance_to(game.enchantments._head_position(target))<0.32
-						game.adventure.hurt_enemy(target,float(shot.get("damage",95))*(2.0 if headshot else 1.0),shot.hand,Vector3.ZERO,"projectile")
+						game.adventure.hurt_enemy(target,float(shot.get("damage",95))*(2.0 if headshot else 1.0),shot.hand,Vector3.ZERO,"fire" if shot.get("hot",false) else "projectile")
 					"rat": game._kill_rat(target)
 					"dummy": game._dummy_hit(target)
 			extras.impact(shot,hit,target)

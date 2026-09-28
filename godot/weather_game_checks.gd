@@ -25,6 +25,9 @@ func run(game):
 	game.weather.action("enabled")
 	await settle(game)
 	check(is_equal_approx(game.weather.engine.snow[0],saved_snow),"Snow restored after interrupted scan")
+	var warm_point=game.weather.engine.point(0)+Vector3.UP*.08
+	game.heat_contacts.touch(warm_point,.48,400,"forge_yard","test_fire",null,.1)
+	check(game.weather.engine.snow[0]<saved_snow and game.weather.engine.wet[0]>0,"Local flame melts snow into wet ground")
 	game.qol.page="weather"; game.qol._build()
 	check(game.weather.rows().size()==9,"Palm controls available")
 	game.weather.refresh()

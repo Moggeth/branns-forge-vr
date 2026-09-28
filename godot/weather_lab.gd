@@ -5,8 +5,10 @@ const CELL=0.375
 const MAX_POTION_EQUIVALENTS=40
 const FUEL_PER_POTION=8.0
 const MAX_FLYING_POTIONS=40
+const MAX_VISIBLE_FLAMES=640
 var spill_burn_seconds=8.0
 var unlit_evaporation_rate=.002/(1.5*1.5)
+var stress_profile={"samples":0,"solver_ms":0.0,"texture_ms":0.0,"visual_ms":0.0}
 var burn_age=PackedFloat32Array()
 var spill_notice=""
 var spill_notice_until=0.0
@@ -199,8 +201,9 @@ varying vec4 joins;
 varying vec2 tile_uv;
 void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; joins=INSTANCE_CUSTOM; tile_uv=UV;}
 void fragment(){
- float wave=sin(world.x*8.0+world.z*5.0-TIME*1.35)*.5+sin(world.z*11.0-world.x*3.0+TIME*.8)*.5;
- float curl=sin(world.x*22.0+world.z*17.0+TIME*.45)*sin(world.z*19.0-world.x*13.0-TIME*.35);
+ float phase=world.x*8.0+world.z*5.0-TIME*1.1;
+ float wave=sin(phase);
+ float curl=sin(phase*2.13+world.z*3.0);
  // The border retreats unevenly into each exposed tile. Joined sides remain
  // seamless, while corner cuts keep a connected spill from reading as a grid.
  float margin=.19+.075*curl+.045*wave;
@@ -215,9 +218,9 @@ void fragment(){
  edge=min(edge,mix(smoothstep(margin,margin+.23,2.0-tile_uv.x-tile_uv.y),1.0,max(joins.g,joins.a)));
  ALPHA=edge; ALPHA_SCISSOR_THRESHOLD=.48;
  vec3 n=normalize(NORMAL);
- NORMAL=normalize(n+mat3(VIEW_MATRIX)*vec3(cos(world.x*8.0+world.z*5.0-TIME*1.35),0.0,sin(world.z*11.0-world.x*3.0+TIME*.8))*.045);
+ NORMAL=normalize(n+mat3(VIEW_MATRIX)*vec3(wave,0.0,curl)*.045);
  float grazing=pow(1.0-max(dot(normalize(NORMAL),normalize(VIEW)),0.0),2.5);
- vec3 pearl=mix(vec3(.13,.36,.32),vec3(.40,.23,.35),.5+.5*sin(world.x*2.2+world.z*1.7+TIME*.27));
+ vec3 pearl=mix(vec3(.13,.36,.32),vec3(.40,.23,.35),.5+.5*curl);
  float rim=1.0-edge;
  ALBEDO=mix(vec3(.073,.060,.048),pearl,.10+.35*grazing+.08*rim)+wave*.008;
  EMISSION=pearl*(.008+.035*grazing);
@@ -360,6 +363,7 @@ func touch_near(pos:Vector3,radius:float,water:bool)->int:
 	return count
 
 func simulation(dt):
+	var profile_start=Time.get_ticks_usec() if OS.get_cmdline_user_args().has("--fuel-stress") else 0
 	var daytime=maxf(0,sin((hour-6)/24.0*TAU))
 	# Heat spreads by contact, independent of flow direction or pressure difference.
 	var ignition=burning.duplicate()
@@ -397,8 +401,15 @@ func simulation(dt):
 		else:
 			burn_age[i]=0
 			var lost=minf(fuel[i],dt*unlit_evaporation_rate); fuel[i]-=lost; evaporated+=lost
+	if profile_start>0: stress_profile.solver_ms+=float(Time.get_ticks_usec()-profile_start)/1000
+	var texture_start=Time.get_ticks_usec() if profile_start>0 else 0
 	update_field(); field_texture.update(field_image)
+	if profile_start>0: stress_profile.texture_ms+=float(Time.get_ticks_usec()-texture_start)/1000
+	var visual_start=Time.get_ticks_usec() if profile_start>0 else 0
 	update_fluid_visuals()
+	if profile_start>0:
+		stress_profile.visual_ms+=float(Time.get_ticks_usec()-visual_start)/1000
+		stress_profile.samples+=1
 
 func update_field():
 	for i in range(N*N): field_image.set_pixel(i%N,int(i/N),Color(heights[i],snow[i],wet[i],float(burning[i])))
@@ -608,6 +619,10 @@ func set_overlay_active(active:bool,force=false):
 func update_fluid_visuals():
 	var seen=0; var lit=0
 	var regions={}
+	var active_flames=0
+	for i in range(N*N):
+		if burning[i]>0 and fuel[i]>=.01: active_flames+=1
+	var flame_stride=maxi(1,ceili(float(active_flames)/MAX_VISIBLE_FLAMES))
 	for i in range(N*N):
 		if fuel[i]<.01: continue
 		if seen<N*N:
@@ -621,9 +636,13 @@ func update_fluid_visuals():
 			liquid.multimesh.set_instance_transform(seen,Transform3D(Basis.IDENTITY,point(i)+Vector3.UP*.024))
 			liquid.multimesh.set_instance_custom_data(seen,joins)
 			seen+=1
-		if burning[i]>0 and lit<N*N:
-			var scale=Vector3(.8,.4+minf(fuel[i],1),.8)
-			flames.multimesh.set_instance_transform(lit,Transform3D(Basis.IDENTITY.scaled(scale),point(i)+Vector3.UP*.65*scale.y*.5)); lit+=1
+		if burning[i]>0:
+			# All cells still burn and illuminate. Only the dense visual flame mesh
+			# thins out; a checker-shifted pattern avoids rows at 2x/4x density.
+			if (i*73+int(i/N)*31)%flame_stride==0 and lit<MAX_VISIBLE_FLAMES:
+				var width=1.0 if flame_stride>1 else .8
+				var scale=Vector3(width,.4+minf(fuel[i],1),width)
+				flames.multimesh.set_instance_transform(lit,Transform3D(Basis.IDENTITY.scaled(scale),point(i)+Vector3.UP*.65*scale.y*.5)); lit+=1
 			var key=Vector2i(int((i%N)/8),int(int(i/N)/8))
 			if not regions.has(key): regions[key]={"weight":0.0,"center":Vector3.ZERO}
 			var strength=minf(fuel[i],1.0)

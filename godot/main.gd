@@ -343,6 +343,7 @@ func _ready():
 	if (not diagnostic_offline and not smoke) or OS.get_cmdline_user_args().has("--weather-game-check"):
 		weather=preload("res://weather_runtime.gd").new(); add_child(weather); weather.setup(self)
 	heat_contacts=preload("res://heat_contacts.gd").new(); add_child(heat_contacts); heat_contacts.setup(self)
+	if ember_gallery!=null: ember_gallery.register_heat_targets()
 	if lab_mode:
 		animation_lab=preload("res://animation_lab.gd").new()
 		add_child(animation_lab)
@@ -468,6 +469,11 @@ func _capture():
 			await get_tree().create_timer(0.15).timeout
 			break
 	if OS.get_cmdline_user_args().has("--capture-fire"): firecraft.showcase()
+	if OS.get_cmdline_user_args().has("--capture-heat-gallery"):
+		adventure.travel("ember_gallery")
+		var gallery_center:Vector3=scene.zones.ember_gallery.center
+		camera.global_position=gallery_center+Vector3(4.0,1.72,3.8)
+		camera.look_at(gallery_center+Vector3(4.0,.60,.5))
 	if OS.get_cmdline_user_args().has("--capture-ghosts"):
 		firecraft.show_ghosts()
 		await get_tree().create_timer(0.35).timeout

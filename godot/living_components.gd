@@ -548,6 +548,14 @@ func _tick_entity(e,delta:float):
 				var distance=e.node.global_position.distance_to(other.node.global_position)
 				if distance<2: other.state.heat=minf(1000,float(other.state.heat)+float(c.emitter.get("strength",10))*delta/(1+distance*distance))
 		if e.has("light") and c.emitter.get("kind","light")=="light": e.light.light_energy=minf(3,float(c.emitter.get("strength",1)))
+	# Authored heat emitters and burning materials also join the native fire
+	# network. Package-owned signals still work as before; this is the bridge to
+	# bottles, matches, Wyrmspout, weather and other world objects.
+	var world_heat=(s.burning if c.has("material") else false) or (c.has("emitter") and s.enabled and str(c.emitter.get("kind",""))=="heat")
+	if world_heat and game.heat_contacts!=null and e.owner.active and e.node.is_visible_in_tree() and clock-float(s.get("last_heat_contact",-99))>=.12:
+		s.last_heat_contact=clock
+		var intensity=100.0 if s.burning else maxf(10,float(c.emitter.get("strength",10)))
+		game.heat_contacts.touch(e.node.global_position,clampf(e.size.length()*.35,.32,1.2),intensity,game.adventure.zone,"living_heat",e.node,.12)
 	if c.has("receiver"):
 		var power=clampf(float(s.power),0,100) if s.enabled else 0.0; var kind=str(c.receiver.get("kind","light"))
 		if kind=="light" and e.has("light"): e.light.light_color=Color(str(c.receiver.get("color","8eceef"))); e.light.light_energy=minf(4,power); e.material.emission_enabled=power>.01; e.material.emission=e.light.light_color; e.material.emission_energy_multiplier=minf(2,power)

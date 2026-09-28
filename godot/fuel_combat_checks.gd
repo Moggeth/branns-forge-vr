@@ -32,7 +32,10 @@ func run(game):
 	check(f.flames.multimesh.visible_instance_count==0,"Unlit bottle cannot ignite itself")
 	game.heat_contacts.touch(pos+Vector3.UP*.06,.3,155,"forge_yard","match",contact_match,.1)
 	check(combat.nearest_fire(f,pos,.4)!=Vector3.INF,"Real lit match ignites visible unlit fuel")
-	f.burning.fill(0); f.update_fluid_visuals(); game.firecraft._remove(contact_match)
+	f.burning.fill(0); f.update_fluid_visuals()
+	game.heat_contacts.touch(pos+Vector3.UP*.06,.3,155,"crystal_hollow","match",contact_match,.1)
+	check(combat.nearest_fire(f,pos,.4)==Vector3.INF,"Heat tagged for another zone cannot ignite this spill")
+	game.firecraft._remove(contact_match)
 	bottle(game,pos,true)
 	check(f.flames.multimesh.visible_instance_count>0,"Lit bottle ignites existing spill")
 	for i in range(38): bottle(game,pos,false)
@@ -86,5 +89,25 @@ func run(game):
 	for i in range(32): combat.scan(cave)
 	check(cave.field.total_fuel()>7.99,"Cave spill lands beneath ceiling, not on roof")
 	check(f.total_fuel()>0,"Creating cave field retains forge fuel")
+	# The gallery's three authored materials exercise the same heat and water
+	# contacts used by live flame tools. A damp target should steam before it burns.
+	game.adventure.travel("ember_gallery")
+	var samples=game.heat_contacts.fixtures
+	check(samples.size()==3,"Gallery presents three distinct combustible samples")
+	if samples.size()==3:
+		var dry=samples[0]; var damp=samples[1]; var cloth=samples[2]
+		game.heat_contacts.touch(dry.node.global_position+Vector3.UP*.25,.4,600,"ember_gallery","test_flame",null,.1)
+		game.heat_contacts.tick(.11)
+		check(dry.burning,"Dry timber catches from shared heat contact")
+		check(not damp.burning,"Adjacent damp timber does not instantly ignite")
+		game.heat_contacts.touch(damp.node.global_position+Vector3.UP*.25,.28,250,"ember_gallery","test_flame",null,.1)
+		game.heat_contacts.tick(.11)
+		check(damp.steam.visible and not damp.burning,"Damp timber steams before ignition")
+		game.heat_contacts.water(dry.node.global_position,.3,"ember_gallery")
+		game.heat_contacts.tick(.11)
+		check(not dry.burning and dry.wet>20,"Water quenches and wets burning timber")
+		game.heat_contacts.touch(cloth.node.global_position+Vector3.UP*.25,.26,300,"ember_gallery","test_flame",null,.1)
+		game.heat_contacts.tick(.11)
+		check(cloth.burning,"Oilcloth catches from the same heat contact")
 	print("FUEL_COMBAT_CHECK_RESULT ",JSON.stringify(failures))
 	get_tree().quit(0 if failures.is_empty() else 1)

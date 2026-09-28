@@ -293,6 +293,9 @@ func capture_all():
 
 func capture_weather():
 	await create_timer(1).timeout
+	var stress_count=40
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--fuel-stress-count="): stress_count=clampi(int(arg.trim_prefix("--fuel-stress-count=")),1,40)
 	for preset in (["stress"] if OS.get_cmdline_user_args().has("--fuel-stress") else ["night","rain","snow","fire"]):
 		weather_lab.hour=0 if preset=="night" else 16
 		target=Vector3(0,7,-4) if preset=="night" else Vector3(0,1.1,-3)
@@ -300,11 +303,16 @@ func capture_weather():
 		weather_lab.set_weather(preset if preset in ["rain","snow"] else "clear")
 		if preset=="stress":
 			weather_lab.wet.fill(0); weather_lab.snow.fill(0)
-			for i in range(40):
+			for i in range(stress_count):
 				var point=weather_lab.point(weather_lab.cell_index(Vector3(-9+(i%8)*2.5,0,-6+floorf(i/8.0)*3)))
 				weather_lab.spill(point+Vector3.UP*.025,true)
 			for i in range(12): weather_lab.simulation(.1)
 			target=Vector3(0,1,1); distance=22; pitch=.8
+			for sample in range(5):
+				await create_timer(1).timeout
+				var profile=weather_lab.stress_profile
+				var frames=maxi(1,int(profile.samples))
+				print("WEATHER_STRESS_FPS bottles=",stress_count," sample=",sample," fps=",Engine.get_frames_per_second()," displayed_flames=",weather_lab.flames.multimesh.visible_instance_count," solver_ms=",snappedf(float(profile.solver_ms)/frames,.01)," texture_ms=",snappedf(float(profile.texture_ms)/frames,.01)," visual_ms=",snappedf(float(profile.visual_ms)/frames,.01))
 		if preset=="snow":
 			for i in range(160): weather_lab.simulation(.1)
 		if preset=="fire":
@@ -315,7 +323,8 @@ func capture_weather():
 			for i in range(20): weather_lab.simulation(.1)
 		await create_timer(1.5).timeout
 		await RenderingServer.frame_post_draw
-		print("WEATHER_CAPTURE ",preset," result=",root.get_texture().get_image().save_png(output+"/weather-"+preset+".png"))
+		var image_name="weather-stress-%d.png"%stress_count if preset=="stress" and stress_count!=40 else "weather-"+preset+".png"
+		print("WEATHER_CAPTURE ",preset," result=",root.get_texture().get_image().save_png(output+"/"+image_name))
 	print("WEATHER_CAPTURE_COMPLETE")
 	ready_demo=false
 	quit()

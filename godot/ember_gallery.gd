@@ -81,6 +81,33 @@ func setup(g):
 	_vessel("glimmer",Vector3(-6.3,1.03,5))
 	court.visible=game.adventure.zone==ZONE; _refresh()
 	print("EMBER_GALLERY_READY fluid=",fluid!=null," persistence=",persistence_enabled)
+
+func register_heat_targets():
+	# A small, reusable material bench beside the copper basin. These are real
+	# colliders and heat recipients, rather than scripted success buttons.
+	if game.heat_contacts==null: return
+	var samples=[
+		{"name":"Dry timber","x":3.25,"color":"96734f","ignition":45.0,"wet":0.0,"kind":"timber"},
+		{"name":"Damp timber","x":4.0,"color":"617574","ignition":60.0,"wet":65.0,"kind":"damp_timber"},
+		{"name":"Oilcloth","x":4.75,"color":"88695d","ignition":23.0,"wet":0.0,"kind":"cloth"}]
+	for sample in samples:
+		var n=Node3D.new(); court.add_child(n); n.name=str(sample.name).replace(" ",""); n.position=Vector3(sample.x,.29,0)
+		var mesh=ART.box(n,Vector3.ZERO,Vector3(.48,.13,1.0),sample.color)
+		mesh.material_override=ART.mat(sample.color)
+		if sample.kind=="cloth":
+			for stripe in range(5):
+				ART.box(n,Vector3(-.18+stripe*.09,.075,0),Vector3(.025,.016,.96),"c9a675" if stripe%2==0 else "593d3c")
+			for end in [-.5,.5]:
+				for thread in range(5): ART.box(n,Vector3(-.18+thread*.09,.01,end+signf(end)*.065),Vector3(.018,.012,.14),"b98f69")
+		else:
+			for grain in range(3): ART.box(n,Vector3(-.14+grain*.14,.073,0),Vector3(.018,.008,.88),"b69a70" if sample.kind=="timber" else "72918b")
+			for end in [-.5,.5]: ART.box(n,Vector3(0,.005,end),Vector3(.42,.085,.012),"d2aa78" if sample.kind=="timber" else "839f9a")
+		var body=ART.body(n,Vector3.ZERO,Vector3(.48,.13,1.0),"wood")
+		body.set_meta("surface_material","cloth" if sample.kind=="cloth" else "wood")
+		game.heat_contacts.register_fixture(n,mesh,body,ZONE,sample.kind,sample.ignition,sample.wet)
+		ART.label(court,sample.name.to_upper(),Vector3(sample.x,.54,1.20),22,"f9daa0").pixel_size=.0032
+	var lamp=OmniLight3D.new(); court.add_child(lamp); lamp.position=Vector3(4.0,2.3,1.4); lamp.light_color=Color("ffd4a0"); lamp.light_energy=.46; lamp.omni_range=4.0; lamp.shadow_enabled=false
+	ART.label(court,"TRY A COMBINATION\nDry wood catches. Wet wood steams.\nOilcloth loves a spark. Water quenches.",Vector3(4.0,1.73,2.25),24,"f3d5a1").pixel_size=.0035
 func _button(at,action,title,width):
 	var n=Node3D.new(); (board if action in ["bottle","lit_bottle","refill"] else court).add_child(n); n.position=at; n.set_meta("kind","button"); n.set_meta("action","ember:"+action)
 	ART.box(n,Vector3.ZERO,Vector3(width,.34,.13),"48645f"); SCENE.collision(n,Vector3.ZERO,Vector3(width,.34,.13))
@@ -160,7 +187,7 @@ func pour_at(n,point:Vector3,amount:float)->float:
 		n.set_meta("remaining",maxf(0,float(n.get_meta("remaining"))-used)); _vessel_label(n); return used
 	if n.get_meta("fluid")=="oil": used=fluid.pour(point,game.adventure.zone,amount,false)
 	else:
-		var affected=fluid.extinguish_near(point,.65); wet_cells+=affected; used=amount
+		var affected=game.heat_contacts.water(point,.65,game.adventure.zone) if game.heat_contacts!=null else fluid.extinguish_near(point,.65); wet_cells+=affected; used=amount
 		if affected>=1: n.set_meta("hiss_until",clock+.25)
 		if wet_cells>=3: _earn("water")
 	n.set_meta("remaining",maxf(0,float(n.get_meta("remaining"))-used)); _vessel_label(n); return used
