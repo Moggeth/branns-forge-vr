@@ -65,6 +65,12 @@ static func _emit(root:Node3D,id:String,poses:Array)->void:
 				multi.set_instance_transform(index,pose*part.pose)
 			var holder:=MultiMeshInstance3D.new()
 			holder.name="Orchard_%s_%s_%s_%d"%[id,key.x,key.y,part_index]
+			if id.begins_with("apple_tree"):
+				# Keep the per-instance placement address so a future carved route can
+				# remove an individual canopy without rebuilding the whole grove.
+				var addresses:Array=[]
+				for placement in list: addresses.append(placement.at)
+				holder.set_meta("builder_positions",addresses)
 			holder.position=origin
 			holder.multimesh=multi
 			holder.material_override=part.material
@@ -133,7 +139,7 @@ static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
 		local_tree.position=tree.position-origin
 		far_chunks[key].append(local_tree)
 	for key in far_chunks:
-		var far_grove:Node3D=TreeKit.make_grove(far_chunks[key],{"lod":"far","variants":3,"shadows":false})
+		var far_grove:Node3D=TreeKit.make_grove(far_chunks[key],{"lod":"far","variants":3,"shadows":false,"builder_addresses":true,"builder_origin":Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)})
 		far_grove.name="OrchardDistantSilhouettes_%s_%s"%[key.x,key.y]
 		far_grove.position=Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)
 		for child in far_grove.get_children():
@@ -141,7 +147,7 @@ static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
 				child.visibility_range_begin=90.0
 				child.visibility_range_begin_margin=4.0
 		root.add_child(far_grove)
-	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false}))
+	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false,"builder_addresses":true}))
 	var authored_count:=0
 	for id in authored: authored_count+=authored[id].size()
 	print("ORCHARD_ART authored_trees=",authored_count," fallback_trees=",fallback.size())

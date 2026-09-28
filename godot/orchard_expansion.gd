@@ -77,6 +77,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	var placements:Array=[]
 	var trunks:=StaticBody3D.new()
 	trunks.name="OrchardGroveTrunks"
+	trunks.set_meta("kind", "builder_forest")
 	p.add_child(trunks)
 	for i in range(480):
 		var point:=Vector3(rng.randf_range(-146,146),0,rng.randf_range(-146,146))
@@ -90,6 +91,7 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		shape.height=2.5*scale
 		collision.shape=shape
 		collision.position=point+Vector3.UP*shape.height*0.5
+		collision.set_meta("builder_timber", true)
 		trunks.add_child(collision)
 	Art.grove(p,placements,TRAIL)
 	Art.place_features(p,TRAIL,PLOTS,SEED)

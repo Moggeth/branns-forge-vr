@@ -132,7 +132,7 @@ foreach ($name in @('Tabs','Role','RoleHelp','VR','Desktop','DirectorOptions','D
   Set-Variable -Name $name -Scope Script -Value $script:window.FindName($name)
 }
 
-@('Adventure - one Hero','Director - Hero + game master','Fairy - Hero + companion') | ForEach-Object { [void]$script:Role.Items.Add($_) }
+@('Adventure - one Hero','Director - Hero + game master','Fairy - Hero + companion','World Builder - develop the orchard') | ForEach-Object { [void]$script:Role.Items.Add($_) }
 @('Native window - recommended','Browser view - older fallback') | ForEach-Object { [void]$script:DirectorView.Items.Add($_) }
 $script:Role.SelectedIndex = 0
 $script:DirectorView.SelectedIndex = 0
@@ -154,6 +154,7 @@ function Get-GameArguments {
     else { $arguments += '-DirectorMode' }
   }
   if ($script:Role.SelectedIndex -eq 2 -or $script:Fairy.IsChecked) { $arguments += '-FairyCoop' }
+  if ($script:Role.SelectedIndex -eq 3) { $arguments += '-WorldBuilder' }
   if ($script:Fuel.IsChecked) { $arguments += '-ExperimentalFuelCombat' }
   return $arguments
 }
@@ -164,13 +165,15 @@ function Update-GameSummary {
   $script:RoleHelp.Text = @(
     'Explore, craft, and fight in the main adventure.',
     'A second person directs encounters from the same live world.',
-    'The Hero plays normally while Little Wing flies alongside them.'
+    'The Hero plays normally while Little Wing flies alongside them.',
+    'Shape the same Orchard Highlands with helpers, paths, trees, and a bridge. Return to walk your work in VR.'
   )[$role]
   $display = if ($script:Desktop.IsChecked) { 'desktop' } else { 'VR' }
   $description = if ($role -eq 1) {
     if ($script:DirectorView.SelectedIndex -eq 0) { "The Hero plays in $display; the Director gets a fast native tactical window. Best for the projector." }
     else { "The Hero plays in $display; the Director gets the older browser view. This view is much slower." }
   } elseif ($role -eq 2) { "The Hero plays in $display and Little Wing joins locally." }
+  elseif ($role -eq 3) { "The Hero plays in $display while a second native window surveys and develops the Orchard Highlands." }
   else { "The ordinary $display adventure." }
   if ($script:Fairy.IsChecked -and $role -ne 2) { $description += ' Little Wing can join too.' }
   if ($script:Fuel.IsChecked) { $description += ' Experimental fuel combat is enabled.' }
@@ -195,7 +198,7 @@ function Get-ManagedStatus {
     $game = Get-Process -Id $state.game.pid -ErrorAction SilentlyContinue
     if (!$game) { return 'Previous game is closed. Ready to launch.' }
     if ($game.StartTime.ToUniversalTime().Ticks -ne ([datetime]$state.game.started).ToUniversalTime().Ticks -or $game.Path -ne $state.game.path) { return 'An old process record does not match; it will be left alone.' }
-    $mode = if ($state.game.directorLocal) { 'native Director' } elseif ($state.game.directorMode) { 'browser Director' } elseif ($state.game.fairyCoop) { 'Fairy companion' } else { 'adventure' }
+    $mode = if ($state.game.worldBuilder) { 'live Orchard World Builder' } elseif ($state.game.directorLocal) { 'native Director' } elseif ($state.game.directorMode) { 'browser Director' } elseif ($state.game.fairyCoop) { 'Fairy companion' } else { 'adventure' }
     $display = if ($state.game.desktopMode) { 'desktop' } else { 'VR' }
     return "Running: $display $mode (PID $($game.Id)). Close it before switching modes."
   } catch { return 'Could not read the managed session record. Check logs/runtime.json.' }

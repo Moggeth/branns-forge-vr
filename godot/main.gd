@@ -106,6 +106,8 @@ var hearth_torch
 var fairy
 var director
 var director_local_view
+var world_builder
+var world_builder_view
 var festival_relay
 var festival_relay_art
 var bankshot
@@ -173,7 +175,7 @@ func _ready():
 			smoke = true
 	diagnostic_offline = OS.get_cmdline_user_args().has("--playful-check") or OS.get_cmdline_user_args().has("--playful-demo") or OS.get_cmdline_user_args().has("--playful-showcase") or OS.get_cmdline_user_args().has("--fuel-combat-check") or OS.get_cmdline_user_args().has("--weather-game-check") or OS.get_cmdline_user_args().has("--quest-check") or OS.get_cmdline_user_args().has("--fire-check") or not capture_path.is_empty() or runtime_check or OS.get_cmdline_user_args().has("--living-showcase") or OS.get_cmdline_user_args().has("--living-check-network") or OS.get_cmdline_user_args().has("--living-check") or OS.get_cmdline_user_args().has("--siegebird-check") or capture_workshop_tier>0 or capture_tinker or OS.get_cmdline_user_args().has("--workshop-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--guardian-check") or OS.get_cmdline_user_args().has("--desktop-hero-check") or OS.get_cmdline_user_args().has("--expedition-check") or OS.get_cmdline_user_args().has("--director-check") or OS.get_cmdline_user_args().has("--director-network-check")
-	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check")
 	for argument in OS.get_cmdline_user_args():
@@ -225,6 +227,9 @@ func _ready():
 	adventure = preload("res://adventure_runtime.gd").new()
 	add_child(adventure)
 	adventure.setup(self)
+	world_builder = preload("res://world_builder_runtime.gd").new()
+	add_child(world_builder)
+	world_builder.setup(self, diagnostic_offline or smoke)
 	apples=preload("res://apple_runtime.gd").new()
 	add_child(apples)
 	apples.setup(self)
@@ -329,6 +334,10 @@ func _ready():
 	discoveries=preload("res://discoveries.gd").new(); add_child(discoveries); discoveries.setup(self,self)
 	hearth_torch.create_stand(ember_gallery.court,Vector3(-3.4,1.05,5))
 	if OS.get_cmdline_user_args().has("--fairy-coop"): _start_fairy()
+	if OS.get_cmdline_user_args().has("--world-builder") or OS.get_cmdline_user_args().has("--world-builder-check"):
+		adventure.travel("orchard_highlands")
+		if not OS.get_cmdline_user_args().has("--world-builder-check"):
+			_open_world_builder_view()
 	if OS.get_cmdline_user_args().has("--director-mode") or OS.get_cmdline_user_args().has("--director-check"):
 		var director_native=OS.get_cmdline_user_args().has("--director-window") and not diagnostic_offline
 		director=preload("res://director_runtime.gd").new(); add_child(director); director.setup(self,OS.get_cmdline_user_args().has("--director-check"),director_native)
@@ -885,7 +894,7 @@ func _process(delta):
 	for lantern in forge_lanterns: lantern.tick(delta)
 	if not smoke:
 		if vr: _xr_input()
-		elif director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus(): _desktop_input(delta)
+		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus()): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
 	if elapsed > next_poll and not busy and not diagnostic_offline:
 		next_poll = elapsed + 2.0
@@ -923,6 +932,8 @@ func _process(delta):
 	if heat_contacts!=null: heat_contacts.tick(delta)
 	if director!=null: director.tick(delta)
 	if is_instance_valid(director_local_view): director_local_view.tick(delta)
+	if world_builder!=null: world_builder.tick(delta)
+	if is_instance_valid(world_builder_view): world_builder_view.tick(delta)
 	if workshop!=null: workshop.tick(delta)
 	if enchantments!=null: enchantments.tick(delta)
 	grips.tick(delta)
@@ -1010,7 +1021,20 @@ func _notice(message: String, seconds = 7.0):
 	status_until = elapsed + seconds
 	if scene.has("status_label"): scene.status_label.text = message
 
+func _open_world_builder_view() -> void:
+	if is_instance_valid(world_builder_view):
+		world_builder_view.grab_focus()
+		return
+	if world_builder == null: return
+	world_builder_view = preload("res://world_builder_view.gd").new()
+	world_builder_view.visible = false
+	add_child(world_builder_view)
+	world_builder_view.setup(self, world_builder)
+	print("WORLD_BUILDER_VIEW opened for the same live simulation; vr=", vr)
+
 func _unhandled_input(event):
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F9:
+		_open_world_builder_view(); return
 	if not vr and event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode==KEY_F11:
 			_desktop_fullscreen(); return
@@ -1302,6 +1326,7 @@ func _notification(what):
 	if what==NOTIFICATION_WM_CLOSE_REQUEST:
 		if demo_session!=null: demo_session.save_now()
 		if living!=null: living._save()
+		if world_builder!=null: world_builder.save()
 
 func _grip(hand: Node3D, desktop: bool):
 	if fairy!=null: fairy.offer_to(hand)

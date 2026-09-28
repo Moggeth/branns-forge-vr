@@ -1,0 +1,46 @@
+{
+  "builder": "build_orchard_kit.py",
+  "blender": "4.5.13 LTS",
+  "assets": {
+    "worker": {
+      "chop_strike_blade_world": [
+        -0.186,
+        -0.912,
+        0.495
+      ],
+      "clips": {
+        "Worker_Idle": {
+          "frames": [
+            1,
+            49
+          ],
+          "fps": 24,
+          "loop": true
+        },
+        "Worker_Walk": {
+          "frames": [
+            1,
+            25
+          ],
+          "fps": 24,
+          "loop": true
+        },
+        "Worker_Chop": {
+          "frames": [
+            1,
+            37
+          ],
+          "fps": 24,
+          "loop": false
+        }
+      }
+    },
+    "stockpile": {
+      "chop_stand_yaw_deg": 180,
+      "blade_strike_height_m": 0.495
+    }
+  },
+  "chop_strike_upperarm_R_deg": 54,
+  "build_seconds": 2.82,
+  "render_engine": "BLENDER_EEVEE_NEXT"
+}

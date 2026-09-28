@@ -442,6 +442,11 @@ static func make_grove(placements: Array, opts: Dictionary = {}) -> Node3D:
 		var mmi = MultiMeshInstance3D.new()
 		mmi.name = "Grove_" + key.replace(":", "_")
 		mmi.multimesh = mm
+		if bool(opts.get("builder_addresses", false)):
+			var addresses: Array = []
+			var builder_origin: Vector3 = opts.get("builder_origin", Vector3.ZERO)
+			for placement in list: addresses.append(placement.position + builder_origin)
+			mmi.set_meta("builder_positions", addresses)
 		mmi.material_override = tree_material()
 		mmi.cast_shadow = cast
 		root.add_child(mmi)

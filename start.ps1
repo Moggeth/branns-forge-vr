@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Desktop,[switch]$ServiceOnly,[switch]$ExperimentalFuelCombat,[switch]$FairyCoop,[switch]$DirectorMode,[switch]$DirectorLocal)
+param([switch]$Desktop,[switch]$ServiceOnly,[switch]$ExperimentalFuelCombat,[switch]$FairyCoop,[switch]$DirectorMode,[switch]$DirectorLocal,[switch]$WorldBuilder)
 $ErrorActionPreference='Stop'
 $projectRoot=$PSScriptRoot
 $timer=[Diagnostics.Stopwatch]::StartNew()
@@ -16,7 +16,7 @@ if(Test-Path $runtimeFile){$saved=Get-Content $runtimeFile -Raw | ConvertFrom-Js
 if($runtime.game){
   $recordedGame=Get-Process -Id $runtime.game.pid -ErrorAction SilentlyContinue
   if($recordedGame -and $recordedGame.StartTime.ToUniversalTime().Ticks -eq ([datetime]$runtime.game.started).ToUniversalTime().Ticks -and $recordedGame.Path -eq $runtime.game.path){
-    if([bool]$runtime.game.directorMode -ne [bool]($DirectorMode -or $DirectorLocal) -or [bool]$runtime.game.directorLocal -ne [bool]$DirectorLocal -or [bool]$runtime.game.desktopMode -ne [bool]$Desktop -or [bool]$runtime.game.experimentalFuelCombat -ne [bool]$ExperimentalFuelCombat -or [bool]$runtime.game.fairyCoop -ne [bool]$FairyCoop){
+    if([bool]$runtime.game.directorMode -ne [bool]($DirectorMode -or $DirectorLocal) -or [bool]$runtime.game.directorLocal -ne [bool]$DirectorLocal -or [bool]$runtime.game.worldBuilder -ne [bool]$WorldBuilder -or [bool]$runtime.game.desktopMode -ne [bool]$Desktop -or [bool]$runtime.game.experimentalFuelCombat -ne [bool]$ExperimentalFuelCombat -or [bool]$runtime.game.fairyCoop -ne [bool]$FairyCoop){
       throw 'A different game mode is already running. Close its game window, then use the launcher again. The current session was left untouched.'
     }
   }
@@ -82,9 +82,10 @@ if(!$ServiceOnly){
     if($FairyCoop){$gameFlags+='--fairy-coop'}
     if($DirectorMode -or $DirectorLocal){$gameFlags+='--director-mode'}
     if($DirectorLocal){$gameFlags+='--director-window'}
+    if($WorldBuilder){$gameFlags+='--world-builder'}
     if($gameFlags.Count){$args+=@('--')+$gameFlags}
     $game=Start-Process -FilePath $engine -ArgumentList $args -WorkingDirectory "$projectRoot\godot" -PassThru
-    $runtime.game=@{pid=$game.Id;started=$game.StartTime.ToUniversalTime().ToString('o');path=$engine;desktopMode=[bool]$Desktop;experimentalFuelCombat=[bool]$ExperimentalFuelCombat;fairyCoop=[bool]$FairyCoop;directorMode=[bool]($DirectorMode -or $DirectorLocal);directorLocal=[bool]$DirectorLocal}
+    $runtime.game=@{pid=$game.Id;started=$game.StartTime.ToUniversalTime().ToString('o');path=$engine;desktopMode=[bool]$Desktop;experimentalFuelCombat=[bool]$ExperimentalFuelCombat;fairyCoop=[bool]$FairyCoop;directorMode=[bool]($DirectorMode -or $DirectorLocal);directorLocal=[bool]$DirectorLocal;worldBuilder=[bool]$WorldBuilder}
   }elseif([bool]$ExperimentalFuelCombat -ne [bool]$runtime.game.experimentalFuelCombat){
     Write-Warning 'The game is already running with a different fuel mode. Close the game, then run this launcher again to change modes.'
   }

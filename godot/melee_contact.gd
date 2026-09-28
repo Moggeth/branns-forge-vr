@@ -103,6 +103,8 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		var motion=(point-tracks.get(item.get_instance_id(),{}).get("previous",point)).normalized()*speed
 		if motion.length()<0.01: motion=-normal*speed
 		return game.pumpkins.impact(target,item,point,normal,motion)
+	if kind=="builder_forest" and game.world_builder!=null and str(item.get_meta("id", ""))=="woodland_axe":
+		return game.world_builder.chop_scenic(point,_is_blade(item,normal))
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
 		return chop(target,point,normal,hand) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":
