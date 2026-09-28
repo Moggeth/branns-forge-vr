@@ -204,7 +204,8 @@ func tick(delta:float):
 	ignition_clock+=delta
 	if ignition_clock>=.1:
 		ignition_clock=0
-		if game.firecraft!=null and game.firecraft.fluid!=null and game.firecraft.fluid.has_method("ignite_near"): game.firecraft.fluid.ignite_near(tip_position(),.35)
+		if game.get("heat_contacts")!=null: game.heat_contacts.touch(tip_position(),.35,260,game.adventure.zone,"torch",torch,.1)
+		elif game.firecraft!=null and game.firecraft.fluid!=null and game.firecraft.fluid.has_method("ignite_near"): game.firecraft.fluid.ignite_near(tip_position(),.35)
 	if game.firecraft!=null:
 		var contacts={}
 		for prop in game.firecraft.props:

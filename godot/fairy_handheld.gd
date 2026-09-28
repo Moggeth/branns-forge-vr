@@ -126,6 +126,11 @@ func heat_sweep(a:Vector3,b:Vector3)->int:
 	if not is_instance_valid(item) or item!=fairy.carry or not fairy.active or fairy.health<=0: return 0
 	if not item.is_visible_in_tree() or str(item.get_meta("zone",fairy.game.adventure.zone))!=fairy.game.adventure.zone: return 0
 	if not item.has_meta("state") or not fairy.game.firecraft._burning(item): return 0
+	if fairy.game.get("heat_contacts")!=null:
+		var result=fairy.game.heat_contacts.sweep(a,b,.20,155,fairy.game.adventure.zone,"fairy_match",item,.1)
+		heat_cells_checked=fairy.game.heat_contacts.last_cells_checked
+		if result>0 and fairy.get("practice")!=null: fairy.practice.record("ignite")
+		return result
 	# No teleport ignition, and never sweep out of or through solid geometry.
 	if not a.is_finite() or not b.is_finite() or a.distance_to(b)>.75: return 0
 	var hit=_obstruction(a,b)

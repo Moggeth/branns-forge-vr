@@ -20,11 +20,19 @@ func run(game):
 	check(is_equal_approx(combat.remaining_fuel(),8.0),"Pending impact reserves capacity during scan")
 	check(game.firecraft.pools.is_empty(),"Opt-in impact bypasses legacy fire pools")
 	var entry=combat.fields.forge_yard
+	var contact_match=game.firecraft._prop("match",pos)
+	game.firecraft._light(contact_match)
+	game.heat_contacts.touch(pos+Vector3.UP*.06,.3,155,"forge_yard","match",contact_match,.1)
+	check(entry.pending[0].lit,"Real lit match heats fuel while the surface scan is pending")
+	entry.pending[0].lit=false
 	for i in range(32): combat.scan(entry)
 	var f=entry.field
 	check(entry.ready,"Bounded surface scan completes")
 	check(is_equal_approx(f.total_fuel(),8.0),"Actual unlit bottle creates eight units of persistent fuel")
 	check(f.flames.multimesh.visible_instance_count==0,"Unlit bottle cannot ignite itself")
+	game.heat_contacts.touch(pos+Vector3.UP*.06,.3,155,"forge_yard","match",contact_match,.1)
+	check(combat.nearest_fire(f,pos,.4)!=Vector3.INF,"Real lit match ignites visible unlit fuel")
+	f.burning.fill(0); f.update_fluid_visuals(); game.firecraft._remove(contact_match)
 	bottle(game,pos,true)
 	check(f.flames.multimesh.visible_instance_count>0,"Lit bottle ignites existing spill")
 	for i in range(38): bottle(game,pos,false)

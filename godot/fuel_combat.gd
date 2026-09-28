@@ -1,5 +1,5 @@
 extends Node
-## Opt-in surface fuel. One fixed 24m patch per visited zone, retained for this session.
+## Shared surface fuel. One fixed 24m patch per visited zone, retained for this session.
 const Field=preload("res://weather_lab.gd")
 const MAX_FIELDS=8
 const SCAN_CELLS_PER_TICK=128
@@ -12,7 +12,7 @@ var rejected=0
 
 func setup(g):
 	game=g
-	print("FUEL_COMBAT opt_in=true budget_potions=40 zone_fields=8 persistence=session inactive_zones=paused")
+	print("FUEL_COMBAT shared=true budget_potions=40 zone_fields=8 persistence=session inactive_zones=paused")
 
 func remaining_fuel()->float:
 	var total=0.0
@@ -177,7 +177,7 @@ func _touch_near(pos:Vector3,radius:float,water:bool)->int:
 	var entry=fields[game.adventure.zone]
 	# Pending fuel participates too, so a match/water touch during surface scanning
 	# cannot be forgotten by the time the puddle becomes visible.
-	for request in entry.pending:
+	for request in entry.get("pending",[]):
 		if request.pos.distance_squared_to(pos)<=radius*radius: request.lit=not water
 	if not entry.ready:
 		# Coalesce repeated torch/water contacts while the short scan completes.

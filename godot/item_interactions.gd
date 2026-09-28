@@ -193,8 +193,11 @@ func tick(delta):
 		var query=PhysicsRayQueryParameters3D.create(a,b,1)
 		query.collide_with_areas=shot.kind=="fire"
 		var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+		if shot.kind=="fire" and game.heat_contacts!=null and a.distance_to(b)<=.75:
+			game.heat_contacts.sweep(a,hit.position if not hit.is_empty() else b,.22,310,game.adventure.zone,"firebolt",shot.node,delta)
 		shot.node.global_position=b
 		if not hit.is_empty():
+			if shot.kind=="fire" and game.heat_contacts!=null: game.heat_contacts.touch(hit.position,.45,360,game.adventure.zone,"firebolt_impact",shot.node,.1)
 			var target=game._owner(hit.collider)
 			if target!=null:
 				if target.get_meta("kind","")=="enemy": game.adventure.hurt_enemy(target,shot.damage,shot.hand,Vector3.ZERO,"fire" if shot.kind=="fire" else "physical")

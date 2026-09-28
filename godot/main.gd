@@ -114,6 +114,7 @@ var demo_session
 var demo_help
 var zone_details
 var firecraft
+var heat_contacts
 var wyrmspout
 var sunfall
 var item_actions
@@ -341,6 +342,7 @@ func _ready():
 			if child is Label3D: child.hide()
 	if (not diagnostic_offline and not smoke) or OS.get_cmdline_user_args().has("--weather-game-check"):
 		weather=preload("res://weather_runtime.gd").new(); add_child(weather); weather.setup(self)
+	heat_contacts=preload("res://heat_contacts.gd").new(); add_child(heat_contacts); heat_contacts.setup(self)
 	if lab_mode:
 		animation_lab=preload("res://animation_lab.gd").new()
 		add_child(animation_lab)
@@ -912,6 +914,7 @@ func _process(delta):
 	if festival_relay_art!=null: festival_relay_art.tick(delta)
 	if demo_session!=null: demo_session.tick(delta)
 	if weather!=null: weather.tick(delta)
+	if heat_contacts!=null: heat_contacts.tick(delta)
 	if director!=null: director.tick(delta)
 	if is_instance_valid(director_local_view): director_local_view.tick(delta)
 	if workshop!=null: workshop.tick(delta)
@@ -1672,7 +1675,9 @@ func _apply_action(action: Dictionary):
 			var tool = {"chop":"woodland_axe","mine":"quarry_pick","ignite":"ember_gauntlet","grapple":"grappling_hook","resonate":"crystal_resonator"}[action.type]
 			for target in scene.get("resources",[]) + scene.get("barriers",[]) + scene.get("anchors",[]):
 				if is_instance_valid(target) and target.global_position.distance_to(position)<2: adventure.interact(target,tool)
-			if action.type=="ignite": adventure.explode(position,2,35,null,-1.0,"fire")
+			if action.type=="ignite":
+				adventure.explode(position,2,35,null,-1.0,"fire")
+				if heat_contacts!=null: heat_contacts.touch(position,1.8,350,adventure.zone,"scripted_ignite",null,.1)
 		"blast": _flame(position, seconds)
 		"slow", "pull":
 			for rat in scene.rats + scene.get("enemies",[]):

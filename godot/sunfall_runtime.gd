@@ -39,6 +39,7 @@ func impact(item:Node3D,target:Node3D,point:Vector3,normal:Vector3,speed:float,h
 	if game.elapsed<float(last_hit.get(key,-10.0))+IMPACT_COOLDOWN: return true
 	last_hit[key]=game.elapsed
 	_bonk(point,speed)
+	if game.heat_contacts!=null: game.heat_contacts.touch(point,.55,270,game.adventure.zone,"sunfall",item,.1)
 	game.adventure.haptic(hand,"impact")
 	game._effect(point,Color("ff8f3b"),0.35,0.42)
 	var direction=(velocity+Vector3.UP*2.0).normalized()
@@ -78,6 +79,7 @@ func _make_bonk(variation:int)->AudioStreamWAV:
 	return sound
 
 func _shockwave(point:Vector3):
+	if game.heat_contacts!=null: game.heat_contacts.touch(point,1.8,300,game.adventure.zone,"sunfall_wave",null,.1)
 	var root=Node3D.new(); game.adventure.zone_groups.get(game.adventure.zone,game).add_child(root)
 	root.global_position=point+Vector3.UP*0.02
 	var spikes:Array=[]

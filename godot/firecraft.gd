@@ -16,6 +16,8 @@ var reload_at=0.0
 var sounds={}
 var voices=[]
 var fluid
+var heat_clock=0.0
+var heat_previous={}
 var cfg={"spill_burn_seconds":8.0,"spill_unlit_lifetime_scale":1.5,"match_seconds":10.0,"wick_seconds":10.0,"blowout_speed":1.8,"blowout_dwell":0.15,"light_dwell":0.3,"gentle_speed":0.55,"fire_seconds":8.0,"fire_radius":2.7,"fear_radius":6.0,"ghost_speed":0.65}
 
 func setup(g):
@@ -164,6 +166,7 @@ func _impact(n):
 
 func _remove(n):
 	props.erase(n)
+	heat_previous.erase(n.get_instance_id())
 	for key in game.held.keys():
 		if game.held[key]==n: game.held.erase(key)
 	if n.has_meta("body"): n.get_meta("body").queue_free()
@@ -215,6 +218,9 @@ func tick(delta):
 	if game.elapsed>refill_at: refill_at=game.elapsed+3; _refill()
 	if not slider.is_empty(): target_open=clampf(float(slider.open)+(box.to_local(slider.hand.global_position).z-float(slider.start))/0.16,0,1)
 	opening=move_toward(opening,target_open,delta*4); tray.position.z=opening*0.16
+	heat_clock+=delta
+	var transfer_heat=heat_clock>=.1
+	if transfer_heat: heat_clock=0.0
 	var flames=[]
 	for n in props.duplicate():
 		if not is_instance_valid(n): props.erase(n); continue
@@ -240,6 +246,11 @@ func tick(delta):
 				if gust>cfg.blowout_dwell: _extinguish(n); continue
 			if n.has_meta("timer_label"): n.get_meta("timer_label").text=str(ceili(float(n.get_meta("until"))-game.elapsed))+"s"
 			flames.append(_tip(n))
+			if transfer_heat and game.heat_contacts!=null and not (game.fairy!=null and game.fairy.carry==n):
+				var tip=_tip(n); var prior:Vector3=heat_previous.get(n.get_instance_id(),tip)
+				if prior.distance_to(tip)>.75: prior=tip
+				game.heat_contacts.sweep(prior,tip,.24 if kind=="match" else .29,155 if kind=="match" else 235,str(n.get_meta("zone")),"match" if kind=="match" else "vial",n,.1)
+				heat_previous[n.get_instance_id()]=tip
 			if n.has_meta("flame"): n.get_meta("flame").scale=Vector3.ONE*(0.86+0.14*sin(game.elapsed*18))
 		if kind=="vial" and state=="fresh":
 			var gentle=props.any(func(m):return is_instance_valid(m) and m.get_meta("fire_kind")=="match" and _burning(m) and m.is_visible_in_tree() and _can_light(_tip(m).distance_to(_tip(n)),Vector3(m.get_meta("velocity",Vector3.ZERO)).length()))

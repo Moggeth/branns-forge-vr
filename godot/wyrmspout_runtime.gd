@@ -272,6 +272,9 @@ func _step_stream(record:Dictionary,delta:float):
 		var query=PhysicsRayQueryParameters3D.create(start,finish,1)
 		query.collide_with_areas=true
 		var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+		if game.heat_contacts!=null and game.elapsed>=float(record.get("next_heat",0)) and finish.distance_to(start)<=.75:
+			record.next_heat=game.elapsed+.045
+			game.heat_contacts.sweep(start,hit.position if not hit.is_empty() else finish,.24,350,game.adventure.zone,"wyrm_stream",null,advance)
 		if not hit.is_empty():
 			var struck=game._owner(hit.collider)
 			if struck!=null and str(struck.get_meta("kind","")) in ["enemy","rat"]:
@@ -365,6 +368,7 @@ void fragment(){
 
 func _ignite_surface(hit: Dictionary):
 	var position: Vector3 = hit.position
+	if game.heat_contacts!=null: game.heat_contacts.touch(position,.44,380,game.adventure.zone,"wyrm_impact",null,.1)
 	var target=game._owner(hit.collider)
 	var kind=str(target.get_meta("kind","")) if target!=null else ""
 	# Ground impacts join the very same spreading liquid-fire simulation as a
@@ -423,6 +427,7 @@ func _update_patches(delta: float):
 		for patch in patches:
 			if not is_instance_valid(patch.node) or patch.zone != game.adventure.zone or not patch.node.is_visible_in_tree(): continue
 			var source: Vector3 = patch.node.global_position
+			if game.heat_contacts!=null: game.heat_contacts.touch(source,.45,170,game.adventure.zone,"wyrm_patch",patch.node,.4)
 			for enemy in game.scene.rats + game.scene.get("enemies", []):
 				if not is_instance_valid(enemy) or not enemy.is_visible_in_tree() or not enemy.get_meta("alive", true): continue
 				if enemy.global_position.distance_to(source) > 0.85: continue
