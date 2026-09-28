@@ -107,6 +107,7 @@ var fairy
 var director
 var director_local_view
 var world_builder
+var orchard_atmosphere
 var world_builder_view
 var festival_relay
 var festival_relay_art
@@ -178,6 +179,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--atmosphere-test")
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="): diagnostic_offline=true
 	scene = SCENE.build(self)
@@ -230,6 +232,9 @@ func _ready():
 	world_builder = preload("res://world_builder_runtime.gd").new()
 	add_child(world_builder)
 	world_builder.setup(self, diagnostic_offline or smoke)
+	orchard_atmosphere=preload("res://orchard_atmosphere.gd").new()
+	add_child(orchard_atmosphere)
+	orchard_atmosphere.setup(self)
 	apples=preload("res://apple_runtime.gd").new()
 	add_child(apples)
 	apples.setup(self)

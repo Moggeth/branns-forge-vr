@@ -1,7 +1,9 @@
 extends Node
 ## Outdoor weather adapter; shares the desktop lab's tested surface and sound model.
 const SAVE="user://weather_state.json"
-const OUTDOORS=["forge_yard","sandstone_quarry","pinewood_ruins","mushroom_glade","sky_garden"]
+const OUTDOORS=["forge_yard","sandstone_quarry","pinewood_ruins","mushroom_glade","sky_garden","orchard_highlands"]
+const OrchardGround=preload("res://orchard_ground.gd")
+const OrchardFoliage=preload("res://orchard_foliage.gd")
 var game
 var stage
 var camera
@@ -24,6 +26,8 @@ func setup(g):
 	sun=g.get_node("AdventureSun")
 	diagnostic=game.diagnostic_offline or game.smoke
 	engine=preload("res://weather_lab.gd").new(); game.add_child(engine); engine.setup(self,true)
+	var q:int=game.orchard_atmosphere.quality
+	engine.rain_budget=([220,360,480][q] if game.vr else [300,480,640][q])
 	engine.cycle=true; engine.cycle_seconds=1200; engine.automatic=true; engine.automatic_at=210
 	if not diagnostic and FileAccess.file_exists(SAVE):
 		var data=JSON.parse_string(FileAccess.get_file_as_string(SAVE))
@@ -35,7 +39,7 @@ func setup(g):
 	engine.visible=false
 	engine.set_overlay_active(false,true)
 	refresh.call_deferred()
-	print("WEATHER_GAME_READY cycle_seconds=1200 outdoors=5 async_surface_scan=true")
+	print("WEATHER_GAME_READY cycle_seconds=1200 outdoors=6 async_surface_scan=true")
 
 func remember_zone():
 	# A cooperative scan temporarily clears these arrays; never persist that scratch state.
@@ -46,6 +50,7 @@ func refresh():
 	remember_zone(); rebuilding=true; coverage_ready=false
 	zone=game.adventure.zone
 	var scan_zone=zone
+	engine.surface_root=game.scene.zones.orchard_highlands.root if zone=="orchard_highlands" else null
 	engine.visible=false
 	engine.overlay.set_shader_parameter("weather_visible",0.0)
 	if zone not in OUTDOORS or not enabled:
@@ -54,7 +59,9 @@ func refresh():
 		rebuilding=false; return
 	var center=Vector2(roundf(camera.global_position.x/8)*8,roundf(camera.global_position.z/8)*8)
 	engine.set_origin(center-Vector2(12,12))
-	engine.heights.fill(.04); engine.snow.fill(0); engine.wet.fill(0); engine.update_field(); engine.field_texture.update(engine.field_image)
+	engine.heights.fill(.04); engine.snow.fill(0); engine.wet.fill(0)
+	engine.kinds.fill("earth" if zone=="orchard_highlands" else "stone")
+	engine.update_field(); engine.field_texture.update(engine.field_image)
 	var start=Time.get_ticks_msec()
 	await engine.capture_surfaces(true)
 	if not enabled or game.adventure.zone!=scan_zone:
@@ -65,8 +72,14 @@ func refresh():
 	var state=zone_states.get(zone,{})
 	engine.snow.fill(clampf(float(state.get("snow",0)),0,1)); engine.wet.fill(clampf(float(state.get("wet",0)),0,1))
 	coverage_ready=true
-	for node in game.find_children("*","GeometryInstance3D",true,false):
-		if (node is MeshInstance3D or node is MultiMeshInstance3D) and not node.is_in_group("distant_horizon") and node.material_overlay==null and not engine.is_ancestor_of(node) and not engine.overlay_targets.has(node): engine.overlay_targets.append(node)
+	for old in engine.overlay_targets:
+		if is_instance_valid(old) and old.material_overlay==engine.overlay: old.material_overlay=null
+	engine.overlay_targets.clear()
+	var possible:Node=game.scene.zones.orchard_highlands.root if zone=="orchard_highlands" else game
+	for node in possible.find_children("*","GeometryInstance3D",true,false):
+		if not (node is MeshInstance3D or node is MultiMeshInstance3D) or node.is_in_group("distant_horizon") or node.get_meta("atmospheric_ground",false) or node.name.begins_with("gk_grass") or node.name.begins_with("Woodland_") or engine.is_ancestor_of(node): continue
+		if node.global_position.distance_to(camera.global_position)>70: continue
+		engine.overlay_targets.append(node)
 	engine.update_field(); engine.field_texture.update(engine.field_image)
 	engine.set_overlay_active(engine.snow[0]+engine.wet[0]>.03,true)
 	engine.overlay.set_shader_parameter("weather_visible",1.0)
@@ -89,6 +102,10 @@ func tick(delta):
 	if game.elapsed>next_refresh and (Vector2(camera.global_position.x,camera.global_position.z).distance_to(middle)>7 or game.workshop.revision!=scanned_revision):
 		refresh.call_deferred(); return
 	engine.tick(delta)
+	OrchardFoliage.weather(engine.wind,engine.wind_strength,engine.wet[0])
+	if zone=="orchard_highlands":
+		OrchardGround.weather(engine.wet[0],engine.snow[0])
+		game.orchard_atmosphere.tick(engine.hour,engine.weather,engine.wind)
 	game.adventure.sync_horizon()
 	# Rain meeting existing outdoor fire has a quiet hiss, without changing combat damage.
 	if engine.weather=="rain" and game.firecraft!=null and int(game.elapsed*2)!=int((game.elapsed-delta)*2):

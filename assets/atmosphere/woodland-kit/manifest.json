@@ -1,0 +1,405 @@
+{
+  "kit": "branns_forge_woodland_kit",
+  "version": 1,
+  "units": "metres",
+  "up": "glTF/Godot +Y (Blender +Z)",
+  "front": "glTF/Godot +Z = Vector3.MODEL_FRONT (Blender -Y)",
+  "origin": "ground contact centre; min Y = 0",
+  "materials": {
+    "kit_palette_1s": "opaque, backface culled",
+    "kit_palette_2s": "opaque, double-sided"
+  },
+  "palette": {
+    "albedo": "textures/kit_palette_albedo.png",
+    "orm": "textures/kit_palette_orm.png",
+    "size": 256,
+    "swatches": [
+      {
+        "name": "fern",
+        "dark": "#2F5A27",
+        "light": "#8DBB52",
+        "roughness": 0.7
+      },
+      {
+        "name": "grass",
+        "dark": "#3B6528",
+        "light": "#AAC962",
+        "roughness": 0.75
+      },
+      {
+        "name": "bracken",
+        "dark": "#4A7630",
+        "light": "#B8C35A",
+        "roughness": 0.7
+      },
+      {
+        "name": "stem",
+        "dark": "#4A4520",
+        "light": "#86803E",
+        "roughness": 0.8
+      },
+      {
+        "name": "petal_cream",
+        "dark": "#D9CCA2",
+        "light": "#FFF7E0",
+        "roughness": 0.55
+      },
+      {
+        "name": "petal_lilac",
+        "dark": "#5E4B98",
+        "light": "#B9A6E4",
+        "roughness": 0.55
+      },
+      {
+        "name": "flower_eye",
+        "dark": "#B7862A",
+        "light": "#F2CC55",
+        "roughness": 0.6
+      },
+      {
+        "name": "bark",
+        "dark": "#3A271A",
+        "light": "#7C5436",
+        "roughness": 0.9
+      },
+      {
+        "name": "wood_end",
+        "dark": "#9E7245",
+        "light": "#DDB67E",
+        "roughness": 0.85
+      },
+      {
+        "name": "rock_dry",
+        "dark": "#6C6A5C",
+        "light": "#ABA893",
+        "roughness": 0.92
+      },
+      {
+        "name": "rock_wet",
+        "dark": "#353C37",
+        "light": "#5A625A",
+        "roughness": 0.3
+      },
+      {
+        "name": "moss",
+        "dark": "#2F5522",
+        "light": "#6E9A3C",
+        "roughness": 0.8
+      },
+      {
+        "name": "leaf_ochre",
+        "dark": "#94601F",
+        "light": "#DCA846",
+        "roughness": 0.62
+      },
+      {
+        "name": "leaf_rust",
+        "dark": "#72321D",
+        "light": "#C26433",
+        "roughness": 0.62
+      },
+      {
+        "name": "leaf_olive",
+        "dark": "#5E6028",
+        "light": "#A8A652",
+        "roughness": 0.68
+      },
+      {
+        "name": "fungus",
+        "dark": "#A88C62",
+        "light": "#EEDAB0",
+        "roughness": 0.55
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "fern_sword",
+      "family": "fern",
+      "file": "glb/fern_sword.glb",
+      "seed": 101,
+      "triangles": 1180,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "radial rosette; no front",
+      "bounds_godot_m": {
+        "min": [
+          -0.6394,
+          0.0,
+          -0.6074
+        ],
+        "max": [
+          0.5953,
+          0.5481,
+          0.7256
+        ]
+      },
+      "size_m": [
+        1.235,
+        0.548,
+        1.333
+      ],
+      "bytes": 126600,
+      "sha256": "6ba82d42e252e042eb267c512b55ba3d04cfc814754530aeee592ad5d6cb14cb"
+    },
+    {
+      "id": "fern_lady",
+      "family": "fern",
+      "file": "glb/fern_lady.glb",
+      "seed": 202,
+      "triangles": 1288,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "radial vase; no front",
+      "bounds_godot_m": {
+        "min": [
+          -0.4062,
+          0.0,
+          -0.3292
+        ],
+        "max": [
+          0.3746,
+          0.5663,
+          0.2949
+        ]
+      },
+      "size_m": [
+        0.781,
+        0.566,
+        0.624
+      ],
+      "bytes": 137620,
+      "sha256": "c282d69344cd0274d622d32d96fa366f2774e7675af3e613b6f53326c86f5f99"
+    },
+    {
+      "id": "fern_bracken",
+      "family": "fern",
+      "file": "glb/fern_bracken.glb",
+      "seed": 303,
+      "triangles": 696,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "tiered umbrella; primary blade leans +X/-Y",
+      "bounds_godot_m": {
+        "min": [
+          -0.6482,
+          0.0,
+          -0.4246
+        ],
+        "max": [
+          0.6582,
+          0.5224,
+          0.6671
+        ]
+      },
+      "size_m": [
+        1.306,
+        0.522,
+        1.092
+      ],
+      "bytes": 77236,
+      "sha256": "ca7da680ced2f75a63b77da8ff2023518e217733696b608db4b2571629521f1f"
+    },
+    {
+      "id": "grass_tuft",
+      "family": "grass_flower",
+      "file": "glb/grass_tuft.glb",
+      "seed": 404,
+      "triangles": 234,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "radial; no front",
+      "bounds_godot_m": {
+        "min": [
+          -0.307,
+          0.0,
+          -0.2168
+        ],
+        "max": [
+          0.1302,
+          0.4488,
+          0.2813
+        ]
+      },
+      "size_m": [
+        0.437,
+        0.449,
+        0.498
+      ],
+      "bytes": 30100,
+      "sha256": "82594e8e146e08092ed254281ca81c7a320ee3779ee929f8d94a83935d887d4c"
+    },
+    {
+      "id": "flower_clump",
+      "family": "grass_flower",
+      "file": "glb/flower_clump.glb",
+      "seed": 505,
+      "triangles": 545,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "radial; no front",
+      "bounds_godot_m": {
+        "min": [
+          -0.1663,
+          0.0,
+          -0.1523
+        ],
+        "max": [
+          0.1557,
+          0.3091,
+          0.1531
+        ]
+      },
+      "size_m": [
+        0.322,
+        0.309,
+        0.305
+      ],
+      "bytes": 61840,
+      "sha256": "a914dd180e5b01fe8877f5f628df3d568107b8ca77618ec0bcf7c404eb06d73c"
+    },
+    {
+      "id": "branch_fallen_mossy",
+      "family": "wood",
+      "file": "glb/branch_fallen_mossy.glb",
+      "seed": 606,
+      "triangles": 477,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_1s"
+      ],
+      "double_sided": false,
+      "orientation": "long axis along X (Godot X); moss faces +Z-up",
+      "bounds_godot_m": {
+        "min": [
+          -0.8937,
+          0.0,
+          -0.3836
+        ],
+        "max": [
+          0.8937,
+          0.3699,
+          0.3836
+        ]
+      },
+      "size_m": [
+        1.787,
+        0.37,
+        0.767
+      ],
+      "bytes": 54892,
+      "sha256": "c5734da430d417f9c04ef3fb6ee18c843780358a7363f149869b17266d505568"
+    },
+    {
+      "id": "rock_mossy_boulder",
+      "family": "rock",
+      "file": "glb/rock_mossy_boulder.glb",
+      "seed": 707,
+      "triangles": 140,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_1s"
+      ],
+      "double_sided": false,
+      "orientation": "moss on top; damp streak on Blender +Y (Godot -Z) side",
+      "bounds_godot_m": {
+        "min": [
+          -0.5936,
+          0.0,
+          -0.4967
+        ],
+        "max": [
+          0.5936,
+          0.6448,
+          0.4967
+        ]
+      },
+      "size_m": [
+        1.187,
+        0.645,
+        0.993
+      ],
+      "bytes": 20504,
+      "sha256": "4aa5d6a3d26e2f512e9c3a9e80ac05064d098b15805349e8e071980f2bbb96cb"
+    },
+    {
+      "id": "rock_mossy_slab",
+      "family": "rock",
+      "file": "glb/rock_mossy_slab.glb",
+      "seed": 808,
+      "triangles": 152,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_1s"
+      ],
+      "double_sided": false,
+      "orientation": "stepped strata; top tier offset toward +X/-Y (Godot +X/+Z)",
+      "bounds_godot_m": {
+        "min": [
+          -0.7576,
+          0.0,
+          -0.5161
+        ],
+        "max": [
+          0.7576,
+          0.43,
+          0.5161
+        ]
+      },
+      "size_m": [
+        1.515,
+        0.43,
+        1.032
+      ],
+      "bytes": 21724,
+      "sha256": "4b3c0910c3bd41f826cd31f1a060fd7340d2b33b10af56c54dbf277723abbe07"
+    },
+    {
+      "id": "litter_leaf_cluster",
+      "family": "litter",
+      "file": "glb/litter_leaf_cluster.glb",
+      "seed": 909,
+      "triangles": 620,
+      "material_count": 1,
+      "materials": [
+        "kit_palette_2s"
+      ],
+      "double_sided": true,
+      "orientation": "radial ground decal-mesh; no front",
+      "bounds_godot_m": {
+        "min": [
+          -0.3909,
+          0.0,
+          -0.3693
+        ],
+        "max": [
+          0.3909,
+          0.0411,
+          0.3693
+        ]
+      },
+      "size_m": [
+        0.782,
+        0.041,
+        0.739
+      ],
+      "bytes": 69500,
+      "sha256": "a29989a2dee57f23a54d76a056a2b8c8294cdef1e120315a1bafa7a8364f212a"
+    }
+  ]
+}

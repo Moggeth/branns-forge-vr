@@ -3,6 +3,7 @@ extends RefCounted
 ## and chunked so the same registry can dress later generated landscapes.
 const TreeKit = preload("res://tree_kit.gd")
 const Finish = preload("res://orchard_finish.gd")
+const Foliage = preload("res://orchard_foliage.gd")
 const PATH := "res://assets/orchard/"
 const ASSETS := ["apple_tree_mature","apple_tree_mature_b","apple_tree_mature_autumn",
 	"apple_tree_mature_lod1","apple_tree_mature_b_lod1","apple_tree_young",
@@ -73,7 +74,8 @@ static func _emit(root:Node3D,id:String,poses:Array)->void:
 				holder.set_meta("builder_positions",addresses)
 			holder.position=origin
 			holder.multimesh=multi
-			holder.material_override=part.material
+			var leafy:bool=str(part.name).contains("Canopy") or str(part.name).contains("Foliage")
+			holder.material_override=Foliage.material("tree" if id.begins_with("apple_tree") else "shrub") if leafy else part.material
 			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if id in ["hedge_dense","shrub_flowering","path_straight"] or id.begins_with("mountain") else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			holder.visibility_range_end=90.0 if id.begins_with("apple_tree") else (100.0 if id.begins_with("wall") else (75.0 if id in ["rock_mossy","rubble_split","path_straight"] else (60.0 if id in ["hedge_dense","shrub_flowering"] else 0.0)))
 			holder.visibility_range_end_margin=10.0 if holder.visibility_range_end>0.0 else 0.0
@@ -97,6 +99,7 @@ static func upgrade_tree_visual(tree:Node3D)->void:
 		# ShootableApples supplies the visible fruit on an interactive tree.
 		if "Fruit" in node.name: node.visible=false
 		else:
+			if "Canopy" in node.name: node.material_override=Foliage.material("tree")
 			node.visibility_range_end=85.0
 			node.visibility_range_end_margin=2.0
 	for child_name in ["Crown","Far","LeafCards"]:

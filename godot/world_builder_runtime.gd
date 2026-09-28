@@ -385,12 +385,7 @@ func _build_brook() -> void:
 	root.add_child(brook)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var water_material := StandardMaterial3D.new()
-	water_material.albedo_color = Color.WHITE
-	water_material.roughness = 0.24
-	water_material.metallic = 0.04
-	water_material.vertex_color_use_as_albedo = true
-	water_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var water_material: ShaderMaterial = preload("res://orchard_atmosphere.gd").water_material()
 	for i in range(80):
 		var x0 := -28.0 + float(i) * 1.5
 		var x1 := x0 + 1.5
@@ -407,15 +402,14 @@ func _build_brook() -> void:
 			surface.set_color(tint)
 			surface.set_normal(Vector3.UP)
 			surface.add_vertex(point)
-		if i % 2 == 0:
-			for side in [-1.0, 1.0]:
-				W.rock(brook, Vector3(x0, 0.07, CROSSING.z + drift0 + side * (half_width0 + 0.42)), Vector3(0.75, 0.15, 0.42), "9ca68d")
+	# The authored shoreline kit replaces the old metronomic row of primitives.
 	var stream := MeshInstance3D.new()
 	stream.name = "WindfallWater"
 	stream.mesh = surface.commit()
 	stream.mesh.surface_set_material(0, water_material)
 	stream.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	brook.add_child(stream)
+	preload("res://orchard_dressing.gd").brook_bank(brook, CROSSING.z)
 	W.label(brook, "THE BROOK CROSSING\n3 lumber · build from the map", CROSSING + Vector3(0, 2.25, -3.2), 20, "fff0c8")
 	# The water is shallow and physically walkable; the bridge is a useful dry route.
 
@@ -495,6 +489,7 @@ func _clear_grove_collision(a: Vector3, b: Vector3) -> void:
 	# The authored canopy is instanced; clearing one placement removes its visible
 	# instances and its exact trunk proxy without rebuilding the 320 m orchard.
 	var orchard_root: Node3D = game.scene.zones[ZONE].root
+	preload("res://orchard_dressing.gd").clear_path(orchard_root, a, b)
 	var trunk_group: Node3D = orchard_root.get_node_or_null("OrchardGroveTrunks")
 	if trunk_group == null: return
 	var span := b - a

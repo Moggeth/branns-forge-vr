@@ -26,6 +26,10 @@ var cycle_seconds=240.0
 var weather="clear"
 var automatic=false
 var automatic_at=25.0
+var wind=Vector2(0.95,0.30)
+var wind_strength=0.65
+var rain_budget=480
+var surface_root:Node
 var elapsed=0.0
 var accumulator=0.0
 var sound_at=0.0
@@ -107,12 +111,15 @@ func point(i:int)->Vector3:
 
 func capture_surfaces(cooperative=false):
 	var budget_start=Time.get_ticks_msec()
-	for node in demo.stage.find_children("*","GeometryInstance3D",true,false):
+	var scan:Node=surface_root if is_instance_valid(surface_root) else demo.stage
+	for node in scan.find_children("*","GeometryInstance3D",true,false):
 		if cooperative and Time.get_ticks_msec()-budget_start>2:
 			await get_tree().process_frame
 			budget_start=Time.get_ticks_msec()
 		# Menus and zone geometry can be replaced while a cooperative scan yields.
 		if not is_instance_valid(node) or not node.is_inside_tree() or not node.is_visible_in_tree(): continue
+		if native_mode and (node.get_meta("atmospheric_ground",false) or node.name.begins_with("gk_grass") or node.name.begins_with("Woodland_") or node.name.begins_with("Orchard_apple_tree") or node.name.begins_with("OrchardDistant")): continue
+		if native_mode and node is VisualInstance3D and node.global_position.distance_to(demo.camera.global_position)>80: continue
 		if node is MeshInstance3D and node.mesh!=null:
 			var m=node.material_override
 			if m==null and node.mesh.get_surface_count()>0: m=node.mesh.surface_get_material(0)
@@ -164,6 +171,7 @@ void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;normal_world=normalize(M
 void fragment(){if(weather_visible<.5)discard;vec2 uv=(world.xz-grid_origin)/24.;if(any(lessThan(uv,vec2(0.)))||any(greaterThan(uv,vec2(1.))))discard;vec4 s=texture(state_map,uv);float exposed=1.-smoothstep(.12,.32,abs(world.y-s.r));float up=smoothstep(.35,.85,normal_world.y);float snow=s.g*up*exposed;float wet=s.b*exposed;ALBEDO=mix(vec3(.09,.16,.19),vec3(.89,.94,1.),snow);ROUGHNESS=mix(.16,.84,snow);ALPHA=clamp(snow+wet*.18,0.,.96);if(ALPHA<.025)discard;}
 """
 	overlay=ShaderMaterial.new(); overlay.shader=shader; overlay.set_shader_parameter("state_map",field_texture)
+	if native_mode: return
 	for node in demo.stage.find_children("*","GeometryInstance3D",true,false):
 		if node is MeshInstance3D or node is MultiMeshInstance3D:
 			if node.material_overlay==null: node.material_overlay=overlay; overlay_targets.append(node)
@@ -179,7 +187,7 @@ func material(color:String,emission=0.0)->StandardMaterial3D:
 	return m
 
 func make_particles():
-	var streak=BoxMesh.new(); streak.size=Vector3(.012,.22,.012); streak.material=material("a9c5d7",.15); rain=instances(streak,480)
+	var streak=BoxMesh.new(); streak.size=Vector3(.012,.22,.012); streak.material=material("a9c5d7",.15); rain=instances(streak,640 if native_mode else 480)
 	var flake=SphereMesh.new(); flake.radius=.027; flake.height=.04; flake.radial_segments=5; flake.rings=2; flake.material=material("edf5fa",.2); flakes=instances(flake,640)
 	var star=SphereMesh.new(); star.radius=.035; star.height=.07; star.radial_segments=5; star.rings=2; star.material=material("d6e3ff",1); stars=instances(star,500)
 	for i in range(500):
@@ -271,7 +279,7 @@ void fragment(){
 	fire_light=fire_lights[0] # Kept for existing field diagnostics.
 
 func make_audio():
-	for kind in ["metal","wood","stone","hiss","rain"]:
+	for kind in ["metal","wood","stone","earth","hiss","rain"]:
 		var bank=[]
 		for variant in range(7 if kind!="rain" else 1):
 			var duration=rng.randf_range(.13,.27) if kind!="rain" else 2.0
@@ -282,6 +290,7 @@ func make_audio():
 				if kind=="metal": sample_value=(muffled*.5+sin(t*TAU*tone)*.009*exp(-t*70))*exp(-t*22)
 				elif kind=="wood": sample_value=muffled*.6*exp(-t*24)
 				elif kind=="stone": sample_value=smooth*.12*exp(-t*38)
+				elif kind=="earth": sample_value=muffled*.13*exp(-t*34)
 				elif kind=="hiss": sample_value=smooth*.22*exp(-t*10)
 				if kind!="rain": sample_value*=minf(1,t*180)*minf(1,(duration-t)*80)
 				bytes.encode_s16(i*2,int(clampf(sample_value,-1,1)*25000))
@@ -416,6 +425,8 @@ func update_field():
 
 func tick(delta):
 	elapsed+=delta
+	wind=Vector2(0.83+sin(elapsed*.23)*.24,0.23+cos(elapsed*.17)*.32).normalized()
+	wind_strength=(1.25 if weather=="rain" else (0.82 if weather=="snow" else 0.55))*(0.86+sin(elapsed*.31)*.14)
 	if demo!=null: light_observer=demo.camera.global_position
 	tick_fire_lights(delta)
 	set_overlay_active(snow[0]+wet[0]>.03)
@@ -436,15 +447,23 @@ func tick(delta):
 	demo.sun.rotation_degrees=Vector3(-maxf(12,daylight*55),-35+(hour-12)*5,0)
 	demo.env.ambient_light_color=Color("7191bc").lerp(Color("b6c9d2"),daylight); demo.env.ambient_light_energy=lerpf(.18,.4,daylight)
 	demo.env.fog_light_color=sky.sky_horizon_color; demo.env.fog_density=.004 if weather=="clear" else .014
-	stars.position=demo.camera.position; stars.visible=daylight<.15 and weather=="clear"
+	if native_mode and demo.zone=="orchard_highlands":
+		preload("res://atmosphere_pipeline.gd").apply(demo.env,demo.sun,sky,hour,weather,demo.game.orchard_atmosphere.quality)
+	stars.global_position=demo.camera.global_position; stars.visible=daylight<.15 and weather=="clear"
 	ambience.volume_db=-80 if weather!="rain" or muted else -25
 	var particles=rain if weather=="rain" else flakes
 	if weather!="clear":
-		for i in range(particles.multimesh.instance_count):
-			var x=ORIGIN.x+12+sin(i*83.71)*11.7; var z=ORIGIN.y+12+cos(i*37.51)*11.7
+		var count=mini(rain_budget,particles.multimesh.instance_count) if weather=="rain" else particles.multimesh.instance_count
+		particles.multimesh.visible_instance_count=count
+		for i in range(count):
+			var x=demo.camera.global_position.x+sin(i*83.71)*11.7
+			var z=demo.camera.global_position.z+cos(i*37.51)*11.7
 			var id=cell_index(Vector3(x,0,z)); var ground=heights[id] if id>=0 else .04
 			var height=ground+.06+fposmod(i*.319-elapsed*(9 if weather=="rain" else .75),maxf(2,12-ground))
 			if weather=="snow": x+=sin(elapsed*.7+i)*.08
+			else:
+				x+=wind.x*height*.045*wind_strength
+				z+=wind.y*height*.045*wind_strength
 			particles.multimesh.set_instance_transform(i,Transform3D(Basis.IDENTITY,Vector3(x,height,z)))
 	if weather=="rain" and elapsed>sound_at:
 		sound_at=elapsed+rng.randf_range(.09,.38)

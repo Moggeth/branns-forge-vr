@@ -34,17 +34,17 @@ def save_rgb(name: str, values: np.ndarray) -> None:
 
 def terrain_maps() -> None:
     broad, middle, fine, grain = periodic(5), periodic(19), periodic(67), periodic(166)
-    organic = (broad - .5) * .24 + (middle - .5) * .16 + (fine - .5) * .075 + (grain - .5) * .025
+    organic = (broad - .5) * .16 + (middle - .5) * .11 + (fine - .5) * .048 + (grain - .5) * .018
     grass = np.empty((SIZE, SIZE, 3), dtype=np.float32)
     soil = np.empty_like(grass)
-    grass[:] = (.30, .39, .18)
+    grass[:] = (.34, .42, .20)
     soil[:] = (.43, .33, .21)
     grass += organic[..., None] * np.array((.82, .92, .45), dtype=np.float32)
     soil += organic[..., None] * np.array((.85, .66, .38), dtype=np.float32)
     # Tiny warm leaf/seed flecks carry material identity at eye height. Their
     # density is low enough that the tile never becomes a recognisable stamp.
     fleck = (fine > .79) & (grain > .54)
-    grass[fleck] = grass[fleck] * .66 + np.array((.76, .60, .25), dtype=np.float32) * .34
+    grass[fleck] = grass[fleck] * .78 + np.array((.76, .60, .25), dtype=np.float32) * .22
     pebble = (fine < .20) & (grain > .70)
     soil[pebble] = soil[pebble] * .70 + np.array((.62, .57, .44), dtype=np.float32) * .30
     save_rgb("grass_albedo.png", grass)

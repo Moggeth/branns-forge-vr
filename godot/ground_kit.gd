@@ -1,6 +1,7 @@
 class_name GroundKit
 ## Deterministic, batched dressing. A stable seed makes iteration and bug reports
 ## reproducible; future map generation can vary that seed without changing art.
+const Foliage = preload("res://orchard_foliage.gd")
 const PATH="res://assets/ground-kit/"
 const GRASS=["gk_grass_meadow_tuft","gk_grass_meadow_tuft_small","gk_grass_clover_patch","gk_grass_seedhead_clump"]
 const ROCKS=["gk_rock_mossy_boulder","gk_rock_sandstone_ledge","gk_rock_split_shards"]
@@ -90,14 +91,16 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 			chunks[key].append(pose)
 		# The GLB's pale showroom finish washes out against playable daylight.
 		# Tint its authored vertex shading as a zone material, keeping the kit batched.
-		var finish=StandardMaterial3D.new()
-		finish.vertex_color_use_as_albedo=true
-		finish.roughness=0.95
+		var finish:Material
 		if name in GRASS:
-			finish.albedo_color=Color("769b54") if name==GRASS[0] else (Color("9bb963") if name==GRASS[1] else (Color("719655") if name==GRASS[2] else Color("a7b46c")))
-			finish.cull_mode=BaseMaterial3D.CULL_DISABLED
+			var tint:Color=Color("769b54") if name==GRASS[0] else (Color("9bb963") if name==GRASS[1] else (Color("719655") if name==GRASS[2] else Color("a7b46c")))
+			finish=Foliage.material("grass",tint)
 		else:
-			finish.albedo_color=Color("a18c72") if id=="sandstone_quarry" else Color("929184")
+			var rock_finish:=StandardMaterial3D.new()
+			rock_finish.vertex_color_use_as_albedo=true
+			rock_finish.roughness=0.95
+			finish=rock_finish
+			rock_finish.albedo_color=Color("a18c72") if id=="sandstone_quarry" else Color("929184")
 		for key in chunks:
 			var origin:=Vector3((float(key.x)+0.5)*ORCHARD_CHUNK,0,(float(key.y)+0.5)*ORCHARD_CHUNK) if id=="orchard_highlands" else Vector3.ZERO
 			var list:Array=chunks[key]
@@ -111,6 +114,13 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 			holder.name=name+"_%s_%s"%[key.x,key.y]
 			holder.position=origin
 			holder.multimesh=multi
+			if id=="orchard_highlands" and name in GRASS:
+				var addresses:=PackedVector3Array()
+				for pose in list: addresses.append(pose.origin)
+				holder.set_meta("dressing_positions",addresses)
+				var hidden:=PackedByteArray()
+				hidden.resize(list.size())
+				holder.set_meta("dressing_hidden",hidden)
 			holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if name in GRASS else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			holder.material_override=finish
 			if id=="orchard_highlands" and name in GRASS:

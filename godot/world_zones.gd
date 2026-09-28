@@ -4,6 +4,7 @@ const TreeAdapter = preload("res://tree_adapter.gd")
 const LandmarkKit = preload("res://landmark_kit.gd")
 const ForgeMaterials = preload("res://forge_materials.gd")
 const OrchardGround = preload("res://orchard_ground.gd")
+const OrchardDressing = preload("res://orchard_dressing.gd")
 
 # Art is built in engine: shared low-poly meshes are batched per zone. Interactive
 # objects remain individual root children so harvesting, combat and saving stay simple.
@@ -481,6 +482,7 @@ static func build(root: Node3D) -> Dictionary:
 		if id=="forge_yard": zone_sign.rotation.y=PI
 		batch_decorations(z.root)
 		GroundKit.populate(z.root,id,float(z.bounds.size.x)*0.5)
+		if id == "orchard_highlands": OrchardDressing.populate(z.root)
 		# These masses are one or two batched surfaces inside their own container.
 		# The container prevents decoration batching from adding convex canopy-like
 		# collision around them; only the kit's deliberate simple proxies are solid.

@@ -42,7 +42,7 @@ void fragment() {
     float exposed = clamp(m.r * 0.86 + m.a * 0.36 + leaf * 0.40 +
                           smoothstep(0.70, 0.87, regional + (meander - 0.5) * 0.20) * 0.24, 0.0, 1.0);
     vec3 colour = mix(grass, soil, exposed);
-    colour *= mix(0.79, 1.13, regional) * mix(0.94, 1.05, breakup);
+    colour *= mix(0.88, 1.10, regional) * mix(0.97, 1.03, breakup);
     colour = mix(colour, vec3(0.34, 0.31, 0.18), leaf * 0.22);
     float damp = clamp(max(m.b * 0.55, rain_wetness) + m.g * rain_wetness * 0.18, 0.0, 1.0);
     colour *= 1.0 - damp * 0.22;
@@ -85,6 +85,13 @@ static func add_path(a: Vector3, b: Vector3) -> void:
 	if _mask_image == null: material()
 	_paint_segment(Vector2(a.x, a.z), Vector2(b.x, b.z))
 	_mask_texture.update(_mask_image)
+
+static func sample(at: Vector2) -> Color:
+	# Same authored/mutable mask drives both the ground and ecological placement.
+	if _mask_image == null: material()
+	var x := clampi(floori((at.x + EXTENT) / (EXTENT * 2.0) * RESOLUTION), 0, RESOLUTION - 1)
+	var z := clampi(floori((at.y + EXTENT) / (EXTENT * 2.0) * RESOLUTION), 0, RESOLUTION - 1)
+	return _mask_image.get_pixel(x, z)
 
 static func _paint_segment(a: Vector2, b: Vector2) -> void:
 	var low := a.min(b) - Vector2.ONE * 5.0
