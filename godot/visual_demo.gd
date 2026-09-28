@@ -308,8 +308,10 @@ func capture_weather():
 		if preset=="snow":
 			for i in range(160): weather_lab.simulation(.1)
 		if preset=="fire":
-			weather_lab.snow.fill(0); weather_lab.wet.fill(0); weather_lab.spill()
-			target=Vector3(-1,1,3); distance=7; yaw=.35; pitch=.65
+			weather_lab.snow.fill(0); weather_lab.wet.fill(0)
+			var fire_target=weather_lab.point(weather_lab.cell_index(Vector3(1.5,0,6)))+Vector3.UP*.025
+			weather_lab.spill(fire_target)
+			target=fire_target+Vector3.UP*.6; distance=6; yaw=.35; pitch=.65
 			for i in range(20): weather_lab.simulation(.1)
 		await create_timer(1.5).timeout
 		await RenderingServer.frame_post_draw

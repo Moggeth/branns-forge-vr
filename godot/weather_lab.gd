@@ -166,8 +166,8 @@ void fragment(){if(weather_visible<.5)discard;vec2 uv=(world.xz-grid_origin)/24.
 		if node is MeshInstance3D or node is MultiMeshInstance3D:
 			if node.material_overlay==null: node.material_overlay=overlay; overlay_targets.append(node)
 
-func instances(mesh:Mesh,count:int)->MultiMeshInstance3D:
-	var m=MultiMesh.new(); m.transform_format=MultiMesh.TRANSFORM_3D; m.mesh=mesh; m.instance_count=count
+func instances(mesh:Mesh,count:int,custom=false)->MultiMeshInstance3D:
+	var m=MultiMesh.new(); m.transform_format=MultiMesh.TRANSFORM_3D; m.use_custom_data=custom; m.mesh=mesh; m.instance_count=count
 	for i in range(count): m.set_instance_transform(i,Transform3D(Basis.IDENTITY.scaled(Vector3.ZERO),Vector3.ZERO))
 	var node=MultiMeshInstance3D.new(); node.multimesh=m; node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; add_child(node); return node
 
@@ -188,22 +188,43 @@ func make_particles():
 	var drop=SphereMesh.new(); drop.radius=.025; drop.height=.05; drop.radial_segments=5; drop.rings=2; drop.material=material("dbac65",.4); splash=instances(drop,96)
 
 func make_fluid_particles():
-	var puddle=CylinderMesh.new(); puddle.top_radius=.25; puddle.bottom_radius=.25; puddle.height=.012; puddle.radial_segments=9
+	# One square tile per occupied cell. Neighbour flags remove inner borders so
+	# an oil trail reads as one connected surface, with a broken outer meniscus.
+	var puddle=PlaneMesh.new(); puddle.size=Vector2(CELL+.012,CELL+.012)
 	var oil_shader=Shader.new()
 	oil_shader.code="""shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
 varying vec3 world;
-void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;}
+varying vec4 joins;
+varying vec2 tile_uv;
+void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; joins=INSTANCE_CUSTOM; tile_uv=UV;}
 void fragment(){
- float wave=sin(world.x*9.0+world.z*5.0-TIME*1.6)*.5+sin(world.z*12.0-world.x*4.0+TIME*1.1)*.5;
- ALBEDO=vec3(.19,.072,.024)*(1.0+wave*.065);
- METALLIC=.18; ROUGHNESS=.16+wave*.035; SPECULAR=.7;
- // Fine ripples alter highlights, never move the collision/simulation surface.
+ float wave=sin(world.x*8.0+world.z*5.0-TIME*1.35)*.5+sin(world.z*11.0-world.x*3.0+TIME*.8)*.5;
+ float curl=sin(world.x*22.0+world.z*17.0+TIME*.45)*sin(world.z*19.0-world.x*13.0-TIME*.35);
+ // The border retreats unevenly into each exposed tile. Joined sides remain
+ // seamless, while corner cuts keep a connected spill from reading as a grid.
+ float margin=.19+.075*curl+.045*wave;
+ float edge=1.0;
+ edge=min(edge,mix(smoothstep(0.0,margin,tile_uv.x),1.0,joins.r));
+ edge=min(edge,mix(smoothstep(0.0,margin,1.0-tile_uv.x),1.0,joins.g));
+ edge=min(edge,mix(smoothstep(0.0,margin,tile_uv.y),1.0,joins.b));
+ edge=min(edge,mix(smoothstep(0.0,margin,1.0-tile_uv.y),1.0,joins.a));
+ edge=min(edge,mix(smoothstep(margin,margin+.23,tile_uv.x+tile_uv.y),1.0,max(joins.r,joins.b)));
+ edge=min(edge,mix(smoothstep(margin,margin+.23,1.0-tile_uv.x+tile_uv.y),1.0,max(joins.g,joins.b)));
+ edge=min(edge,mix(smoothstep(margin,margin+.23,tile_uv.x+1.0-tile_uv.y),1.0,max(joins.r,joins.a)));
+ edge=min(edge,mix(smoothstep(margin,margin+.23,2.0-tile_uv.x-tile_uv.y),1.0,max(joins.g,joins.a)));
+ ALPHA=edge; ALPHA_SCISSOR_THRESHOLD=.48;
  vec3 n=normalize(NORMAL);
- NORMAL=normalize(n+mat3(VIEW_MATRIX)*vec3(cos(world.x*9.0+world.z*5.0-TIME*1.6),0.0,sin(world.z*12.0-world.x*4.0+TIME*1.1))*.035);
+ NORMAL=normalize(n+mat3(VIEW_MATRIX)*vec3(cos(world.x*8.0+world.z*5.0-TIME*1.35),0.0,sin(world.z*11.0-world.x*3.0+TIME*.8))*.045);
+ float grazing=pow(1.0-max(dot(normalize(NORMAL),normalize(VIEW)),0.0),2.5);
+ vec3 pearl=mix(vec3(.13,.36,.32),vec3(.40,.23,.35),.5+.5*sin(world.x*2.2+world.z*1.7+TIME*.27));
+ float rim=1.0-edge;
+ ALBEDO=mix(vec3(.073,.060,.048),pearl,.10+.35*grazing+.08*rim)+wave*.008;
+ EMISSION=pearl*(.008+.035*grazing);
+ METALLIC=.15; ROUGHNESS=.12+wave*.024; SPECULAR=.82;
 }"""
 	var oil_material=ShaderMaterial.new(); oil_material.shader=oil_shader; puddle.material=oil_material
-	liquid=instances(puddle,N*N)
+	liquid=instances(puddle,N*N,true)
 	var flame_shape=SurfaceTool.new(); flame_shape.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var radii=[.08,.18,.12,.075,0.0]
 	for ring in range(4):
@@ -494,13 +515,18 @@ func checks()->Array:
 	if snow[roof]>=before: failures.append("sun melt")
 	spill(Vector3(0,.05,-4),true)
 	if poured>0: failures.append("spill must not jump onto overhead roof")
-	spill(Vector3(0,.05,3),true)
+	# The showroom layout moved a roof across the old (0,3) test point.
+	# Choose an actual sampled floor surface, as the thrown-potion check does.
+	var spread_target=point(cell_index(Vector3(1.5,0,6)))+Vector3.UP*.025
+	spill(spread_target,true)
 	for i in range(30): simulation(.1)
 	if absf(total_fuel()+burned+evaporated-poured)>.01: failures.append("fuel conservation")
 	var patches=0
 	for volume in fuel:
 		if volume>.01: patches+=1
-	if patches<=5: failures.append("liquid spread")
+	if patches<=5:
+		print("WEATHER_SPREAD_DIAGNOSTIC patches=",patches," fuel=",total_fuel()," burned=",burned," evaporated=",evaporated," origin_height=",heights[cell_index(Vector3(0,0,3))])
+		failures.append("liquid spread")
 	set_weather("rain")
 	for i in range(80): simulation(.1)
 	var lit=0
@@ -585,8 +611,16 @@ func update_fluid_visuals():
 	for i in range(N*N):
 		if fuel[i]<.01: continue
 		if seen<N*N:
-			var size=minf(1.0,sqrt(fuel[i]*5))
-			liquid.multimesh.set_instance_transform(seen,Transform3D(Basis.IDENTITY.scaled(Vector3(size,1,size)),point(i)+Vector3.UP*.024)); seen+=1
+			var left=i-1; var right=i+1; var back=i-N; var front=i+N
+			var x=i%N
+			var joins=Color(
+				1.0 if x>0 and fuel[left]>.01 and absf(heights[left]-heights[i])<.2 else 0.0,
+				1.0 if x<N-1 and fuel[right]>.01 and absf(heights[right]-heights[i])<.2 else 0.0,
+				1.0 if back>=0 and fuel[back]>.01 and absf(heights[back]-heights[i])<.2 else 0.0,
+				1.0 if front<N*N and fuel[front]>.01 and absf(heights[front]-heights[i])<.2 else 0.0)
+			liquid.multimesh.set_instance_transform(seen,Transform3D(Basis.IDENTITY,point(i)+Vector3.UP*.024))
+			liquid.multimesh.set_instance_custom_data(seen,joins)
+			seen+=1
 		if burning[i]>0 and lit<N*N:
 			var scale=Vector3(.8,.4+minf(fuel[i],1),.8)
 			flames.multimesh.set_instance_transform(lit,Transform3D(Basis.IDENTITY.scaled(scale),point(i)+Vector3.UP*.65*scale.y*.5)); lit+=1
