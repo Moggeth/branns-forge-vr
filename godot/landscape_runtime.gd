@@ -10,9 +10,12 @@ const Reprojection = preload("res://landscape_reprojection.gd")
 const SpellDressing = preload("res://landscape_spell_dressing.gd")
 const WorldDocument = preload("res://landscape_world_document.gd")
 const Compiler = preload("res://landscape_compiler.gd")
+const VisualEvents = preload("res://landscape_visual_events.gd")
 const SAVE := "user://landscape_v1.json"
 const CHUNK_CELLS := 32
 const MAX_OPERATIONS := 256
+
+signal visual_event(payload: Dictionary)
 
 var game: Node3D
 var zone_root: Node3D
@@ -27,6 +30,7 @@ var dressing: Node3D
 var reprojection
 var save_enabled := true
 var transition: Dictionary = {}
+var active_visual_event: Dictionary = {}
 var last_rebuild_ms := 0.0
 var last_operation_ms := 0.0
 var last_settle_ms := 0.0
@@ -128,6 +132,9 @@ func apply_magic(raw: Dictionary) -> String:
 	transition = {"before": before, "target": target, "indices": changed, "dirty": dirty,
 		"bounds": box, "elapsed": 0.0, "duration": 1.35 if str(raw.type) == "sunder" else 1.1,
 		"rebuild_elapsed": 0.0, "type": str(raw.type)}
+	var operation_id: String = str((document.operations as Array).back().get("id", ""))
+	active_visual_event = VisualEvents.started(raw, operation_id, seed, transition, model, zone_root, _visual_quality_budget())
+	if not active_visual_event.is_empty(): visual_event.emit(active_visual_event.duplicate(false))
 	last_operation_ms = float(Time.get_ticks_usec() - start) / 1000.0
 	print("LANDSCAPE_OP type=", raw.type, " cells=", changed.size(), " chunks=", dirty.size(), " target_ms=", snappedf(last_operation_ms, 0.01))
 	return ""
@@ -136,6 +143,7 @@ func undo_last() -> bool:
 	if operations.is_empty(): return false
 	if not transition.is_empty(): _finish_transition()
 	var op: Dictionary = operations.back()
+	var removed_id: String = str((document.operations as Array).back().get("id", ""))
 	var result: Dictionary = WorldDocument.remove_last(document)
 	if not bool(result.get("ok", false)): return false
 	document = result.document
@@ -154,6 +162,10 @@ func undo_last() -> bool:
 		if absf(before[i] - target[i]) > 0.001: changed.append(i)
 	transition = {"before": before, "target": target, "indices": changed, "dirty": dirty,
 		"bounds": box, "elapsed": 0.0, "duration": 0.8, "rebuild_elapsed": 0.0, "type": "undo"}
+	active_visual_event = VisualEvents.started(op, removed_id, seed, transition, model, zone_root, _visual_quality_budget())
+	if not active_visual_event.is_empty():
+		active_visual_event["direction"] = "reverse"
+		visual_event.emit(active_visual_event.duplicate(false))
 	return true
 
 func _process(delta: float) -> void:
@@ -172,6 +184,7 @@ func _process(delta: float) -> void:
 	for i in transition.indices:
 		heights[i] = lerpf(before[i], target[i], eased)
 	model["height"] = heights
+	if not active_visual_event.is_empty(): visual_event.emit(VisualEvents.advance(active_visual_event, "animating", t))
 	_lift_player(old_player_ground)
 	_settle_player(delta)
 	if float(transition.rebuild_elapsed) >= 0.085 or t >= 1.0:
@@ -199,7 +212,16 @@ func _finish_transition() -> void:
 	if dressing != null: dressing.refresh_region(model, box)
 	last_settle_ms = float(Time.get_ticks_usec() - started) / 1000.0
 	print("LANDSCAPE_SETTLED type=", transition.type, " dirty_chunks=", transition.dirty.size(), " geometry_ms=", snappedf(last_settle_ms, 0.01), " hydro_pending=", not pending_hydrology.is_empty())
+	if not active_visual_event.is_empty(): visual_event.emit(VisualEvents.advance(active_visual_event, "settled", 1.0))
+	active_visual_event.clear()
 	transition.clear()
+
+
+func _visual_quality_budget() -> Dictionary:
+	# Fixed bounded event data for the visual presenter; the artist owns its
+	# quality-tier implementation, while terrain/collision never depend on it.
+	return {"max_terrain_samples": 384, "max_live_debris": 36, "max_dust_particles": 160,
+		"max_temporary_lights": 2, "max_effect_seconds": 4.0}
 
 
 func _start_hydrology(bounds: Rect2) -> void:

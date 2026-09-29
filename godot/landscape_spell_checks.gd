@@ -24,6 +24,8 @@ func _run() -> void:
 		print("LANDSCAPE_SPELL_RESULT failures=[missing shared world]")
 		quit(1)
 		return
+	var visual_events: Array[Dictionary] = []
+	land.visual_event.connect(func(payload: Dictionary) -> void: visual_events.append(payload))
 	var wall_mid := Vector2(-45.0, 39.0)
 	var prior: float = land.height_at(wall_mid)
 	builder.data.aether = 20.0
@@ -77,6 +79,12 @@ func _run() -> void:
 		if error != "" or int(builder.data.star_iron) != prior_iron - 2: failures.append("iron-paid wall: " + error)
 		land._finish_transition()
 	if not builder._valid(builder.data): failures.append("settlement save invalid")
+	var starts := 0
+	var settles := 0
+	for event in visual_events:
+		if str(event.get("phase", "")) == "started" and str(event.get("operation_id", "")).begins_with("op-"): starts += 1
+		if str(event.get("phase", "")) == "settled": settles += 1
+	if starts < 4 or settles < 4: failures.append("visual event stream missing stable start/settle lifecycle (%d starts, %d settled)" % [starts, settles])
 	var serialized_settlement: Variant = JSON.parse_string(JSON.stringify(builder.data))
 	if not builder._valid(serialized_settlement): failures.append("settlement JSON round trip invalid")
 	if not land.document.is_empty() and not preload("res://landscape_world_document.gd").validate(land.document).ok: failures.append("world command document invalid")
