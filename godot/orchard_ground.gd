@@ -3,66 +3,105 @@ extends RefCounted
 const MASK_PATH := "res://assets/atmosphere/orchard_masks.png"
 const EXTENT := 160.0
 const RESOLUTION := 512
+const EXPOSURE_RESOLUTION := 320
+const EXPOSURE_FEATHER_M := 1.0
 static var _material: ShaderMaterial
 static var _mask_image: Image
 static var _mask_texture: ImageTexture
+static var _exposure_image: Image
+static var _exposure_texture: ImageTexture
 
 static func material() -> ShaderMaterial:
 	if _material != null: return _material
 	var source: Texture2D = load(MASK_PATH)
 	_mask_image = source.get_image().duplicate()
 	_mask_texture = ImageTexture.create_from_image(_mask_image)
-	var shader := Shader.new()
-	shader.code = """
-shader_type spatial;
-render_mode cull_back, diffuse_lambert, specular_schlick_ggx;
-uniform sampler2D grass_tex : source_color, repeat_enable, filter_linear_mipmap;
-uniform sampler2D soil_tex : source_color, repeat_enable, filter_linear_mipmap;
-uniform sampler2D micro_normal : hint_normal, repeat_enable, filter_linear_mipmap;
-uniform sampler2D macro_mask : repeat_disable, filter_linear;
-uniform float rain_wetness = 0.0;
-uniform float snow_cover = 0.0;
-varying vec2 at;
-float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise2(vec2 p) {
-    vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
-               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
-}
-void vertex() { at = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz - vec2(-360.0, 0.0); }
-void fragment() {
-    vec2 uv = clamp((at + vec2(160.0)) / 320.0, vec2(0.0), vec2(1.0));
-    vec4 m = texture(macro_mask, uv);
-    float regional = noise2(at * 0.021);
-    float meander = noise2(at * 0.11);
-    float breakup = noise2(at * 0.39);
-    vec3 grass = texture(grass_tex, at * 0.28).rgb;
-    vec3 soil = texture(soil_tex, at * 0.31).rgb;
-    float leaf = m.g * (0.38 + 0.24 * meander);
-    float exposed = clamp(m.r * 0.86 + m.a * 0.36 + leaf * 0.40 +
-                          smoothstep(0.70, 0.87, regional + (meander - 0.5) * 0.20) * 0.24, 0.0, 1.0);
-    vec3 colour = mix(grass, soil, exposed);
-    colour *= mix(0.88, 1.10, regional) * mix(0.97, 1.03, breakup);
-    colour = mix(colour, vec3(0.34, 0.31, 0.18), leaf * 0.22);
-    float damp = clamp(max(m.b * 0.55, rain_wetness) + m.g * rain_wetness * 0.18, 0.0, 1.0);
-    colour *= 1.0 - damp * 0.22;
-    float puddle = smoothstep(0.68, 0.90, m.b * 0.58 + rain_wetness * 0.58 + meander * 0.14);
-    colour = mix(colour, vec3(0.89, 0.93, 0.94), snow_cover * (0.79 + 0.16 * regional));
-    ALBEDO = colour;
-    ROUGHNESS = mix(0.93 - exposed * 0.06, 0.48, max(damp * 0.78, puddle * 0.72));
-    ROUGHNESS = mix(ROUGHNESS, 0.82, snow_cover);
-    SPECULAR = mix(0.35, 0.69, damp);
-    NORMAL_MAP = texture(micro_normal, at * 0.28).rgb;
-    NORMAL_MAP_DEPTH = mix(0.24, 0.07, snow_cover);
-}
-"""
 	_material = ShaderMaterial.new()
-	_material.shader = shader
+	_material.shader = load("res://assets/orchard_kit/orchard_ground_visual.gdshader")
 	_material.set_shader_parameter("grass_tex", load("res://assets/atmosphere/grass_albedo.png"))
 	_material.set_shader_parameter("soil_tex", load("res://assets/atmosphere/soil_albedo.png"))
 	_material.set_shader_parameter("micro_normal", load("res://assets/atmosphere/micro_normal.png"))
 	_material.set_shader_parameter("macro_mask", _mask_texture)
+	_exposure_image = Image.create(EXPOSURE_RESOLUTION, EXPOSURE_RESOLUTION, false, Image.FORMAT_RGBA8)
+	_exposure_image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	_exposure_texture = ImageTexture.create_from_image(_exposure_image)
+	_material.set_shader_parameter("exposure_tex", _exposure_texture)
 	return _material
+
+
+static func apply_exposure_delta(before_model: Dictionary, after_model: Dictionary, bounds: Rect2, operation_type: String = "") -> int:
+	## Models share size/step/origin and carry their own row-major height arrays.
+	## Call once when an operation's target height is known, not every animation frame.
+	if not bounds.has_area(): return 0
+	var size: int = int(before_model.get("size", 0))
+	var step: float = float(before_model.get("step", 0.0))
+	var origin: Vector2 = before_model.get("origin", Vector2.ZERO)
+	var before: PackedFloat32Array = before_model.get("height", PackedFloat32Array())
+	var after: PackedFloat32Array = after_model.get("height", PackedFloat32Array())
+	if size < 2 or step <= 0.0 or before.size() != size * size or after.size() != size * size:
+		push_warning("Orchard exposure skipped: incompatible height fields")
+		return 0
+	if int(after_model.get("size", 0)) != size or not is_equal_approx(float(after_model.get("step", 0.0)), step) or after_model.get("origin", Vector2.ZERO) != origin:
+		push_warning("Orchard exposure skipped: heightfield mappings differ")
+		return 0
+	if _exposure_image == null: material()
+	var low := bounds.position - Vector2.ONE * EXPOSURE_FEATHER_M
+	var high := bounds.end + Vector2.ONE * EXPOSURE_FEATHER_M
+	if high.x < -EXTENT or high.y < -EXTENT or low.x > EXTENT or low.y > EXTENT: return 0
+	var x0 := clampi(floori((low.x + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	var x1 := clampi(ceili((high.x + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	var z0 := clampi(floori((low.y + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	var z1 := clampi(ceili((high.y + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	var painted := 0
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var point := Vector2(float(x) + 0.5, float(z) + 0.5) * (EXTENT * 2.0 / EXPOSURE_RESOLUTION) - Vector2.ONE * EXTENT
+			var change := _height_sample(after, size, step, origin, point) - _height_sample(before, size, step, origin, point)
+			# The four offset samples feather a real change about one metre beyond its edge.
+			var nearby := absf(change)
+			for offset in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+				var neighbour: Vector2 = point + offset * EXPOSURE_FEATHER_M
+				if bounds.has_point(neighbour):
+					nearby = maxf(nearby, absf(_height_sample(after, size, step, origin, neighbour) - _height_sample(before, size, step, origin, neighbour)) * 0.45)
+			if nearby <= 0.01: continue
+			var fresh := smoothstep(0.01, 0.16, nearby)
+			var cut := clampf(-change / 4.0, 0.0, 1.0)
+			var heap := clampf(change / 2.0, 0.0, 1.0)
+			var prior := _exposure_image.get_pixel(x, z)
+			# The latest real height change determines cut versus heap locally;
+			# older exposure survives around it. Undo can be rebuilt by replay.
+			var changed_here := absf(change) > 0.01
+			var result := Color(maxf(prior.r, fresh), cut if changed_here else prior.g, heap if changed_here else prior.b, 0.0)
+			if result != prior:
+				_exposure_image.set_pixel(x, z, result)
+				painted += 1
+	if painted > 0: _exposure_texture.update(_exposure_image)
+	return painted
+
+
+static func reset_exposure() -> void:
+	if _exposure_image == null: material()
+	_exposure_image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	_exposure_texture.update(_exposure_image)
+
+
+static func exposure_sample(at: Vector2) -> Color:
+	if _exposure_image == null: material()
+	var x := clampi(floori((at.x + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	var z := clampi(floori((at.y + EXTENT) / (EXTENT * 2.0) * EXPOSURE_RESOLUTION), 0, EXPOSURE_RESOLUTION - 1)
+	return _exposure_image.get_pixel(x, z)
+
+
+static func _height_sample(values: PackedFloat32Array, size: int, step: float, origin: Vector2, at: Vector2) -> float:
+	var gx := clampf((at.x - origin.x) / step, 0.0, float(size - 1))
+	var gz := clampf((at.y - origin.y) / step, 0.0, float(size - 1))
+	var x0 := floori(gx)
+	var z0 := floori(gz)
+	var x1 := mini(x0 + 1, size - 1)
+	var z1 := mini(z0 + 1, size - 1)
+	var a := lerpf(values[z0 * size + x0], values[z0 * size + x1], gx - float(x0))
+	var b := lerpf(values[z1 * size + x0], values[z1 * size + x1], gx - float(x0))
+	return lerpf(a, b, gz - float(z0))
 
 static func weather(wet: float, snow: float) -> void:
 	if _material == null: return

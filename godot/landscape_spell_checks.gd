@@ -34,6 +34,7 @@ func _run() -> void:
 	else:
 		land._finish_transition()
 		if land.height_at(wall_mid) < prior + 3.0: failures.append("wall not real terrain")
+		if preload("res://orchard_ground.gd").exposure_sample(wall_mid).b < 0.5: failures.append("raised earth did not expose heaped soil")
 		if str(land.operations[-1].get("feature", "")) != "earthen_wall": failures.append("wall provenance lost")
 	builder.data.aether = 20.0
 	error = builder.cast_tree_ring(Vector3(62, 0, -58))
@@ -57,6 +58,7 @@ func _run() -> void:
 		if land.operation_count() < 2 or str(land.operations[-1].type) != "crater": failures.append("meteor has no terrain crater")
 		land._finish_transition()
 		if land.height_at(impact_at) > impact_before - 2.0: failures.append("crater depth missing")
+		if preload("res://orchard_ground.gd").exposure_sample(impact_at).g < 0.4: failures.append("crater did not expose cut ground")
 		for i in 2:
 			if not builder.mine_meteor(meteor.collider, meteor.gems[0].global_position, "quarry_pick", 3.0): failures.append("pick missed gem")
 		if int(builder.data.star_gems) != 2: failures.append("mined gem ledger")

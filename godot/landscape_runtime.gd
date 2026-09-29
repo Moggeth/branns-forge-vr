@@ -11,6 +11,8 @@ const SpellDressing = preload("res://landscape_spell_dressing.gd")
 const WorldDocument = preload("res://landscape_world_document.gd")
 const Compiler = preload("res://landscape_compiler.gd")
 const VisualEvents = preload("res://landscape_visual_events.gd")
+const OrchardVisualKit = preload("res://orchard_visual_kit.gd")
+const Ground = preload("res://orchard_ground.gd")
 const SAVE := "user://landscape_v1.json"
 const CHUNK_CELLS := 32
 const MAX_OPERATIONS := 256
@@ -70,6 +72,7 @@ func setup(owner_game: Node3D, orchard_root: Node3D, offline := false) -> void:
 		model["height"] = Ops.apply(model, operations)
 		# Startup may spend the full watershed solve once, before gameplay frames.
 		Hydro.refresh_after_terrain_change(model, Rect2(Vector2(-160, -160), Vector2(320, 320)))
+	_rebuild_exposure_from_operations()
 	Fields.derive(model)
 	Ecology.build_fields(model)
 	for cz in range((int(model.size) - 1) / CHUNK_CELLS):
@@ -81,6 +84,7 @@ func setup(owner_game: Node3D, orchard_root: Node3D, offline := false) -> void:
 	dressing = SpellDressing.new()
 	add_child(dressing)
 	dressing.setup(model, operations)
+	OrchardVisualKit.populate(self, model)
 	reprojection = Reprojection.new()
 	reprojection.setup(zone_root.get_parent() as Node3D, model)
 	initial_ms = float(Time.get_ticks_usec() - start) / 1000.0
@@ -131,7 +135,7 @@ func apply_magic(raw: Dictionary) -> String:
 	if dressing != null: dressing.add_operation(raw, target_model, 1.35 if str(raw.type) == "sunder" else 1.1)
 	transition = {"before": before, "target": target, "indices": changed, "dirty": dirty,
 		"bounds": box, "elapsed": 0.0, "duration": 1.35 if str(raw.type) == "sunder" else 1.1,
-		"rebuild_elapsed": 0.0, "type": str(raw.type)}
+		"rebuild_elapsed": 0.0, "type": str(raw.type), "exposure_applied": false}
 	var operation_id: String = str((document.operations as Array).back().get("id", ""))
 	active_visual_event = VisualEvents.started(raw, operation_id, seed, transition, model, zone_root, _visual_quality_budget())
 	if not active_visual_event.is_empty(): visual_event.emit(active_visual_event.duplicate(false))
@@ -161,7 +165,8 @@ func undo_last() -> bool:
 	for i in range(before.size()):
 		if absf(before[i] - target[i]) > 0.001: changed.append(i)
 	transition = {"before": before, "target": target, "indices": changed, "dirty": dirty,
-		"bounds": box, "elapsed": 0.0, "duration": 0.8, "rebuild_elapsed": 0.0, "type": "undo"}
+		"bounds": box, "elapsed": 0.0, "duration": 0.8, "rebuild_elapsed": 0.0,
+		"type": "undo", "exposure_applied": false}
 	active_visual_event = VisualEvents.started(op, removed_id, seed, transition, model, zone_root, _visual_quality_budget())
 	if not active_visual_event.is_empty():
 		active_visual_event["direction"] = "reverse"
@@ -184,6 +189,7 @@ func _process(delta: float) -> void:
 	for i in transition.indices:
 		heights[i] = lerpf(before[i], target[i], eased)
 	model["height"] = heights
+	if t >= 0.25: _paint_transition_exposure()
 	if not active_visual_event.is_empty(): visual_event.emit(VisualEvents.advance(active_visual_event, "animating", t))
 	_lift_player(old_player_ground)
 	_settle_player(delta)
@@ -197,6 +203,7 @@ func _process(delta: float) -> void:
 
 func _finish_transition() -> void:
 	if transition.is_empty(): return
+	_paint_transition_exposure()
 	var started := Time.get_ticks_usec()
 	model["height"] = transition.target
 	var box: Rect2 = transition.bounds
@@ -215,6 +222,32 @@ func _finish_transition() -> void:
 	if not active_visual_event.is_empty(): visual_event.emit(VisualEvents.advance(active_visual_event, "settled", 1.0))
 	active_visual_event.clear()
 	transition.clear()
+
+
+func _paint_transition_exposure() -> void:
+	if transition.is_empty() or bool(transition.get("exposure_applied", false)): return
+	transition["exposure_applied"] = true
+	if str(transition.type) == "undo":
+		_rebuild_exposure_from_operations()
+		return
+	var before_model: Dictionary = model.duplicate(false)
+	before_model["height"] = transition.before
+	var target_model: Dictionary = model.duplicate(false)
+	target_model["height"] = transition.target
+	Ground.apply_exposure_delta(before_model, target_model, transition.bounds, str(transition.type))
+
+
+func _rebuild_exposure_from_operations() -> void:
+	Ground.reset_exposure()
+	if operations.is_empty(): return
+	var stage: Dictionary = model.duplicate(false)
+	stage["height"] = (model.natural_height as PackedFloat32Array).duplicate()
+	for op in operations:
+		var next_height: PackedFloat32Array = Ops.apply(stage, [op])
+		var target_stage: Dictionary = stage.duplicate(false)
+		target_stage["height"] = next_height
+		Ground.apply_exposure_delta(stage, target_stage, Ops.bounds(op), str(op.get("type", "")))
+		stage = target_stage
 
 
 func _visual_quality_budget() -> Dictionary:
@@ -278,6 +311,7 @@ func _apply_hydrology(computed: Dictionary, revision: int, bounds: Rect2) -> voi
 	var dirty: Rect2 = stats.get("water_dirty", bounds)
 	var stamp := Time.get_ticks_usec()
 	last_compile_stages = Compiler.settle_after_hydrology(model, dirty, water)
+	OrchardVisualKit.populate(self, model)
 	last_hydrology_ms = float(Time.get_ticks_usec() - stamp) / 1000.0
 	print("LANDSCAPE_HYDRO revision=", revision, " solve_ms=", snappedf(float(stats.get("elapsed_ms", 0.0)), 0.01), " main_ms=", snappedf(last_hydrology_ms, 0.01), " stages=", last_compile_stages, " changed_water=", stats.get("changed_water_cells", 0))
 
