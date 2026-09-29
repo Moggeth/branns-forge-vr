@@ -1,6 +1,7 @@
 extends Node
 ## A restrained, original five-cue score with intentional space for world audio.
-## setup(game), then tick(delta) from the game loop. There are only two 2D voices.
+## setup(game), then tick(delta) from the game loop. Each cue has one reusable
+## voice so a rapid A-B-A change can fade back into A without cutting it off.
 
 const CUES = {
 	"exploration": preload("res://audio/music/exploration.wav"),
@@ -9,12 +10,13 @@ const CUES = {
 	"mysterious": preload("res://audio/music/mysterious.wav"),
 	"rts": preload("res://audio/music/rts.wav"),
 }
+const CUE_ORDER = ["exploration", "combat", "settlement", "mysterious", "rts"]
 const MYSTERY_ZONES = ["mushroom_glade", "crystal_hollow", "gloamfen", "starfall_ridge"]
 const SETTLEMENT_ZONES = ["forge_yard", "enchanted_kitchen", "sky_garden"]
 
 var game: Node
 var voices: Array[AudioStreamPlayer] = []
-var levels = [0.0, 0.0]
+var levels = [0.0, 0.0, 0.0, 0.0, 0.0]
 var active_voice = -1
 var active_state = ""
 var desired_state = "exploration"
@@ -29,9 +31,9 @@ func setup(owner_game: Node) -> void:
 	game = owner_game
 	if get_parent() == null: owner_game.add_child(self)
 	rng.seed = 11973
-	for index in range(2):
+	for index in range(CUE_ORDER.size()):
 		var voice = AudioStreamPlayer.new()
-		voice.name = "MusicVoice%d" % index
+		voice.name = "MusicVoice_%s" % CUE_ORDER[index]
 		voice.volume_db = -80.0
 		add_child(voice)
 		voices.append(voice)
@@ -100,14 +102,18 @@ func _nearby_danger() -> bool:
 
 func _start(state: String) -> void:
 	if not CUES.has(state): return
-	var index = 0 if active_voice != 0 else 1
-	if voices[index].playing: voices[index].stop()
-	voices[index].stream = CUES[state]
-	if voices[index].stream is AudioStreamWAV:
-		voices[index].stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	voices[index].volume_db = -80.0
-	levels[index] = 0.0
-	if enabled: voices[index].play()
+	var index = CUE_ORDER.find(state)
+	if index < 0: return
+	# A fading cue keeps its playback position and current gain if we return to
+	# it before the fade has completed. The five existing cues never evict one
+	# another, even under rapid combat / RTS / exploration transitions.
+	if not voices[index].playing:
+		voices[index].stream = CUES[state]
+		if voices[index].stream is AudioStreamWAV:
+			voices[index].stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		if levels[index] < 0.0005: levels[index] = 0.0
+		voices[index].volume_db = linear_to_db(maxf(0.0001, levels[index]))
+		if enabled: voices[index].play()
 	active_voice = index
 	active_state = state
 	phrase_timer = rng.randf_range(26.0, 42.0) if state != "combat" and state != "rts" else 999999.0
@@ -116,7 +122,7 @@ func _start(state: String) -> void:
 
 func stop() -> void:
 	for voice in voices: voice.stop()
-	levels = [0.0, 0.0]
+	levels = [0.0, 0.0, 0.0, 0.0, 0.0]
 	active_voice = -1
 	active_state = ""
 	quiet_timer = 5.0
