@@ -10,6 +10,8 @@ func run(game: Node3D) -> void:
 	if land == null or builder == null:
 		_finish(game, ["missing live systems"])
 		return
+	var forest_events: Array[Dictionary] = []
+	builder.forest_visual_event.connect(func(payload: Dictionary) -> void: forest_events.append(payload))
 	await game.get_tree().physics_frame
 	_check(land.chunks.size() == 25, "expected 25 terrain chunks", failures)
 	_check(land.model.has("flow_accumulation") and land.model.has("vegetation_suitability"), "missing shared world fields", failures)
@@ -47,6 +49,10 @@ func run(game: Node3D) -> void:
 	if error.is_empty():
 		var saved: Array = builder.data.forest_spells[-1].placements
 		_check(not saved.is_empty(), "forest placements were not saved", failures)
+		_check(not forest_events.is_empty() and str(forest_events[0].get("phase", "")) == "started", "forest visual start missing", failures)
+		if not forest_events.is_empty():
+			_check(str(forest_events[0].get("operation_type", "")) == "grow_forest", "forest visual kind changed", failures)
+			_check((forest_events[0].get("tree_positions", []) as Array).size() == saved.size(), "forest visual roots differ from saved trees", failures)
 		if not saved.is_empty():
 			var tree_at := Vector2(float(saved[0][0]), float(saved[0][1]))
 			var tree_y: float = game.landscape.height_at(tree_at)
@@ -64,6 +70,7 @@ func run(game: Node3D) -> void:
 	_check(changed, "undo rejected", failures)
 	await game.get_tree().create_timer(0.98).timeout
 	_check(absf(land.height_at(raise_at) - raise_before) < 0.05, "undo did not replay prior terrain", failures)
+	_check(forest_events.any(func(event: Dictionary) -> bool: return str(event.get("phase", "")) == "settled"), "forest visual did not settle", failures)
 	print("LANDSCAPE_LIVE_METRICS initial_ms=", snappedf(land.initial_ms,0.01), " target_ms=", snappedf(land.last_operation_ms,0.01), " rebuild_ms=", snappedf(land.last_rebuild_ms,0.01), " demo_seconds=", snappedf(float(Time.get_ticks_usec()-started)/1000000.0,0.01), " chunks=", land.chunks.size())
 	_finish(game, failures)
 

@@ -22,6 +22,8 @@ const Navigation = preload("res://landscape_navigation.gd")
 const Water = preload("res://landscape_water.gd")
 const Meteor = preload("res://landscape_meteor.gd")
 
+signal forest_visual_event(payload: Dictionary)
+
 var game: Node3D
 var root: Node3D
 var center := Vector3.ZERO
@@ -29,6 +31,7 @@ var data: Dictionary = {}
 var worker_nodes: Array[Node3D] = []
 var jobs: Array[Dictionary] = []
 var growing_trees: Array[Dictionary] = []
+var active_forest_visuals: Array[Dictionary] = []
 var rendered_markers := 0
 var summoned_nodes: Dictionary = {}
 var warning_nodes: Dictionary = {}
@@ -157,8 +160,18 @@ func tick(delta: float) -> void:
 		if not is_instance_valid(growth.node): growing_trees.remove_at(i); continue
 		growth.elapsed = float(growth.elapsed) + delta
 		var progress := clampf(float(growth.elapsed) / 2.4, 0, 1)
-		growth.node.scale = Vector3.ONE * lerpf(0.08, 1.0, smoothstep(0.0, 1.0, progress))
+		if growth.has("start"):
+			var local_progress := clampf((progress - float(growth.start)) / 0.4, 0.0, 1.0)
+			growth.node.scale = Vector3.ONE * lerpf(0.05, 1.0, smoothstep(0.0, 1.0, local_progress))
+		else:
+			growth.node.scale = Vector3.ONE * lerpf(0.08, 1.0, smoothstep(0.0, 1.0, progress))
 		if progress >= 1.0: growing_trees.remove_at(i)
+	for i in range(active_forest_visuals.size() - 1, -1, -1):
+		var visual: Dictionary = active_forest_visuals[i]
+		visual.elapsed = minf(float(visual.elapsed) + delta, 2.4)
+		var phase := "settled" if float(visual.elapsed) >= 2.4 else "animating"
+		forest_visual_event.emit(_forest_visual_phase(visual.payload, phase, float(visual.elapsed) / 2.4))
+		if phase == "settled": active_forest_visuals.remove_at(i)
 	if data.aether < 20.0:
 		data.aether = minf(20.0, float(data.aether) + delta * 0.055)
 		if game.elapsed >= autosave_at:
@@ -386,7 +399,11 @@ func cast_forest(a: Vector3, b: Vector3) -> String:
 	var trees: Array[Dictionary] = Ecology.grow(game.landscape.model, region, spell_seed)
 	if trees.is_empty(): return "Trees cannot take root on that slope or in water."
 	data.forest_spells.append({"region":region, "seed":spell_seed, "placements":_pack_forest(trees)})
-	_render_forest(trees, true)
+	var roots: Array[Vector3] = _render_forest(trees, true, a, b)
+	if not roots.is_empty():
+		var payload: Dictionary = _forest_visual_payload(a, b, roots, spell_seed, data.forest_spells.size())
+		forest_visual_event.emit(payload.duplicate(false))
+		active_forest_visuals.append({"payload": payload, "elapsed": 0.0})
 	data.aether = float(data.aether) - 3.0
 	_changed("A living forest has taken root where you drew it.")
 	return ""
@@ -407,7 +424,8 @@ func _unpack_forest(placements: Array) -> Array[Dictionary]:
 		trees.append({"position": Vector3(at.x, game.landscape.height_at(at), at.y), "species": ["oak", "birch", "pine"][int(value[2])], "scale":float(value[3]), "rotation":float(value[4])})
 	return trees
 
-func _render_forest(trees: Array[Dictionary], animate: bool) -> void:
+func _render_forest(trees: Array[Dictionary], animate: bool, from: Vector3 = Vector3.ZERO, to: Vector3 = Vector3.ZERO) -> Array[Vector3]:
+	var roots: Array[Vector3] = []
 	var index := 0
 	for record in trees:
 		if index >= 30: break
@@ -415,17 +433,41 @@ func _render_forest(trees: Array[Dictionary], animate: bool) -> void:
 		var at: Vector3 = record.position
 		var key := _key(at)
 		if resource_by_key.has(key): continue
+		roots.append(center + at)
 		var timber: Node3D = W.resource(game.adventure.zone_groups[ZONE], game.scene, ZONE, center + at, "lumber", "axe", 2)
 		W.tree(timber, Vector3.ZERO, 4.4 * float(record.scale), str(record.species) == "pine", str(record.species) == "birch")
 		timber.rotation.y = float(record.rotation)
 		timber.set_meta("landscape_growth", true)
 		if animate:
 			timber.scale = Vector3.ONE * 0.05
-			growing_trees.append({"node": timber, "elapsed": 0.0})
+			var growth: Dictionary = {"node": timber, "elapsed": 0.0}
+			if from != to:
+				var segment := Vector2(to.x - from.x, to.z - from.z)
+				var along := clampf(Vector2(at.x - from.x, at.z - from.z).dot(segment) / segment.length_squared(), 0.0, 1.0)
+				growth.start = along * 0.4
+			growing_trees.append(growth)
 		resource_by_key[key] = timber
 		if key in data.harvested:
 			timber.visible = false
 			game._set_collisions(timber, false)
+	return roots
+
+func _forest_visual_payload(a: Vector3, b: Vector3, roots: Array[Vector3], spell_seed: int, spell_index: int) -> Dictionary:
+	var world_path: Array[Vector3] = [center + Vector3(a.x, game.landscape.height_at(Vector2(a.x, a.z)), a.z),
+		center + Vector3(b.x, game.landscape.height_at(Vector2(b.x, b.z)), b.z)]
+	return {"schema": 1, "operation_id": "forest-%d" % spell_index, "operation_type": "grow_forest",
+		"phase": "started", "progress": 0.0, "eased_progress": 0.0, "direction": "forward",
+		"visual_seed": spell_seed, "world_path": world_path, "tree_positions": roots,
+		"terrain_samples": [], "duration_seconds": 2.4,
+		"quality_budget": {"max_live_debris": 36, "max_dust_particles": 160,
+			"max_temporary_lights": 2, "max_effect_seconds": 4.0}}
+
+func _forest_visual_phase(started: Dictionary, phase: String, progress: float) -> Dictionary:
+	var payload: Dictionary = started.duplicate(false)
+	payload.phase = phase
+	payload.progress = clampf(progress, 0.0, 1.0)
+	payload.eased_progress = payload.progress * payload.progress * (3.0 - 2.0 * payload.progress)
+	return payload
 
 func mark_harvest(local: Vector3) -> String:
 	if not _inside(local): return "Outside the orchard boundary."
