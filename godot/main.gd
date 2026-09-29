@@ -36,6 +36,7 @@ var desktop_swing_started = -1.0
 var desktop_swing_item: Node3D
 var desktop_swing_reach = 1.4
 var desktop_swing_contact = false
+const DESKTOP_MELEE_REACH := 2.4
 var desktop_bob_phase = 0.0
 var desktop_bob_strength = 0.0
 var desktop_last_position = Vector3.ZERO
@@ -1166,7 +1167,7 @@ func _desktop_primary() -> void:
 	if is_instance_valid(item) and melee.handles(item) and not item.get_meta("guardian_shield",false) and str(item.get_meta("id",""))!="grappling_hook":
 		# Desktop has no physical swing. Use one deliberate ray strike while the
 		# tracked VR path continues to use contact speed and blade constraints.
-		var hit=_ray(camera,3.2)
+		var hit=_ray(camera,DESKTOP_MELEE_REACH)
 		var target=_owner(hit.get("collider")) if hit.has("collider") else null
 		if target!=null and (target.has_meta("action") or target.get_meta("kind","")=="brann"):
 			_trigger(desktop_hand,true)
@@ -1176,7 +1177,7 @@ func _desktop_primary() -> void:
 		desktop_swing_started=elapsed
 		desktop_swing_item=item
 		desktop_swing_contact=false
-		desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,2.4) if target!=null else 1.4
+		desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,DESKTOP_MELEE_REACH) if target!=null else 1.4
 		return
 	_trigger(desktop_hand,true)
 
@@ -1235,10 +1236,10 @@ func _desktop_weapon_motion(delta:float):
 		else:
 			if progress>=0.5 and not desktop_swing_contact:
 				desktop_swing_contact=true
-				var hit=_ray(camera,3.2)
+				var hit=_ray(camera,DESKTOP_MELEE_REACH)
 				var strike_target=_owner(hit.get("collider")) if hit.has("collider") else null
 				if strike_target!=null:
-					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,2.4)
+					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,DESKTOP_MELEE_REACH)
 					melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
 				else: _effect(camera.global_position-camera.global_basis.z*0.8,Color("e9c184"),0.07,0.10)
 			if progress>=1.0:

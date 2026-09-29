@@ -105,6 +105,45 @@ static func run(game) -> void:
 	game.elapsed+=0.5
 	game._desktop_weapon_motion(0.5)
 	if not game.desktop_swing_contact or game.desktop_swing_started>=0: failures.append("slow frame skipped melee contact")
+	# The ray must not damage a target farther away than the visible contact tip.
+	game.grips._attach(game.desktop_hand, hammer)
+	var melee_origin: Vector3 = game.rig.global_position
+	game.rig.global_position += Vector3.UP * 20.0
+	var dummy := StaticBody3D.new()
+	dummy.name = "DesktopMeleeRangeFixture"
+	dummy.collision_layer = 1
+	dummy.collision_mask = 0
+	dummy.set_meta("kind", "dummy")
+	game.add_child(dummy)
+	var dummy_shape := CollisionShape3D.new()
+	var dummy_box := BoxShape3D.new()
+	dummy_box.size = Vector3.ONE * 0.2
+	dummy_shape.shape = dummy_box
+	dummy.add_child(dummy_shape)
+	var aim_forward: Vector3 = -game.camera.global_basis.z
+	dummy.global_position = game.camera.global_position + aim_forward * (game.DESKTOP_MELEE_REACH + 0.35)
+	await game.get_tree().physics_frame
+	game.desktop_swing_started = -1.0
+	game.desktop_swing_ready = 0.0
+	game._desktop_primary()
+	game.elapsed = game.desktop_swing_started + 0.20
+	game._desktop_weapon_motion(0.016)
+	if int(dummy.get_meta("hits", 0)) != 0: failures.append("melee hit a dummy beyond the visible tip")
+	dummy.global_position = game.camera.global_position + aim_forward * (game.DESKTOP_MELEE_REACH - 0.2)
+	await game.get_tree().physics_frame
+	game.desktop_swing_started = -1.0
+	game.desktop_swing_ready = 0.0
+	game._desktop_primary()
+	game.elapsed = game.desktop_swing_started + 0.20
+	game._desktop_weapon_motion(0.016)
+	if int(dummy.get_meta("hits", 0)) != 1: failures.append("melee missed a dummy within the visible tip")
+	game._desktop_melee_pose(hammer, 0.5, Vector3(0.35, -0.35, -0.55), 0.0)
+	var contact_tip: Vector3 = game.camera.to_local(hammer.to_global(hammer.get_meta("tip", Vector3.UP * 0.65)))
+	if contact_tip.distance_to(Vector3(0, 0, -game.desktop_swing_reach)) > 0.03:
+		failures.append("melee contact tip did not reach the damaged dummy")
+	game.desktop_swing_started = -1.0
+	game.rig.global_position = melee_origin
+	dummy.queue_free()
 	if game._desktop_siegebird_item()==null and game._desktop_equip_siegebird(): failures.append("9 equipped an unowned crossbow")
 	var crossbow=preload("res://siegebird_checks.gd").load_sample(game)
 	if crossbow==null: failures.append("Siegebird asset missing from desktop test")
