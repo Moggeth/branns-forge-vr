@@ -1369,3 +1369,15 @@ Failure lessons and fast paths:
 - The first atmosphere scene checks were runnable without the diagnostic flag, leaving a route by which test actions could write to player saves. They now **refuse** to start without `-- --atmosphere-test`, which makes `main.gd` use the existing offline save path. No player world-builder save file was found after the correction. Never drop that flag for captures or stress runs.
 - First-frame capture counters include shader compilation and camera setup (one camp frame printed 1 FPS); use a warmed, multi-second stress sample for desktop performance. Even warmed desktop single-view results do not prove VR performance.
 - The original brook bank used roughly eighty separate primitive stone nodes. Replacing those with sparse, batched authored rocks brought this stress scene to 229–230 median draw calls in a normal desktop view; record an actual headset baseline before claiming a stereo frame-time gain.
+
+### Overnight gameplay and visual-commission checks (2026-09-29)
+
+The current playable checkout is this repository. `C:/Users/mog/OneDrive/Documents/ChatGPT/Brann's Forge VR/work/night-expansion` is an older, untracked copy and must not be used to inspect current gameplay. The first ghost-control audit mistakenly inspected that copy before switching to this repository.
+
+The starter Copperpot's Promise uses **right-click** for Forge Pulse on desktop (`1` equips it); VR uses a grip and trigger. Left-click is the melee swing. `--guardian-check` passed with `GUARDIAN_RESULT []` in 5.485 seconds after the control wording was corrected. The Ghosts hint names this fire action because ghosts remain immune to physical damage.
+
+The RTS presentation check passed with `WORLD_BUILDER_PRESENTATION failures:[]` in 11.137 seconds after adding the short Hero-to-survey camera arrival. The graphical 3840×2160 capture was inspected. Opening the native fullscreen window still logged one approximately 142–150 ms frame hitch; the camera animation does not solve that separate startup cost. A previous version of the presentation harness failed on the first run (10.114 seconds) before its timing assertion was corrected; subsequent runs passed.
+
+Lumberjack review captured 22 assigned-tree frames in 11.79 seconds and 28 isolated-camp frames in 11.27 seconds. The worker advanced 1.68 m in eight 0.1-second updates, switched Walk to Chop at arrival, and settled the blend by frames 9–10 with no obvious foot skating. `WORLD_BUILDER_RESULT {"failures":[]}` passed in 5.52 seconds. The first two graphical captures (13.29 and 12.74 seconds) were occluded because `--world-builder-preview` alone leaves the orchard hidden. Use **both** `--world-builder --world-builder-preview` for a useful gameplay capture.
+
+Sonnet 5.5 commissioning uses `scripts/Run-Sonnet-Commission.ps1` only after the subscription is available. The 22:22 Sydney Stonewhisper attempt reported a subscription rate limit resetting at midnight, and delivered no art. Do not switch to metered API billing or another identity/model to bypass that limit.
