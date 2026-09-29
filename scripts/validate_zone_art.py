@@ -59,6 +59,59 @@ def read_glb(path: Path) -> tuple[dict, bytes]:
     return doc, chunks[1][1] if len(chunks) == 2 else b""
 
 
+def winding_sample(primitive: dict, accessors: list, views: list, binary: bytes) -> tuple[int, int]:
+    """Count sampled triangles whose winding opposes their exported normals."""
+    attrs = primitive["attributes"]
+    position_id, normal_id = attrs.get("POSITION"), attrs.get("NORMAL")
+    if primitive.get("mode", 4) != 4 or not isinstance(position_id, int) or not isinstance(normal_id, int):
+        return 0, 0
+    if not 0 <= position_id < len(accessors) or not 0 <= normal_id < len(accessors):
+        return 0, 0
+    positions, normals = accessors[position_id], accessors[normal_id]
+    if (positions.get("componentType") != 5126 or positions.get("type") != "VEC3"
+            or normals.get("componentType") != 5126 or normals.get("type") != "VEC3"):
+        return 0, 0
+    indexed = "indices" in primitive
+    indices = accessors[primitive["indices"]] if indexed else positions
+    index_formats = {5121: "B", 5123: "H", 5125: "I"}
+    if indexed and (indices.get("componentType") not in index_formats or indices.get("type") != "SCALAR"):
+        return 0, 0
+
+    def read(acc: dict, item: int, width: int, fmt: str) -> tuple:
+        view = views[acc["bufferView"]]
+        stride = view.get("byteStride", struct.calcsize("<" + fmt * width))
+        offset = view.get("byteOffset", 0) + acc.get("byteOffset", 0) + item * stride
+        return struct.unpack_from("<" + fmt * width, binary, offset)
+
+    def vertex(index: int, acc: dict) -> tuple[float, float, float]:
+        return read(acc, index, 3, "f")
+
+    count = indices.get("count", 0) // 3
+    if count == 0:
+        return 0, 0
+    tested = 0
+    opposed = 0
+    for triangle in range(0, count, max(1, count // 80)):
+        if indexed:
+            fmt = index_formats[indices["componentType"]]
+            a, b, c = (read(indices, triangle * 3 + corner, 1, fmt)[0] for corner in range(3))
+        else:
+            a, b, c = triangle * 3, triangle * 3 + 1, triangle * 3 + 2
+        if max(a, b, c) >= min(positions["count"], normals["count"]):
+            continue
+        p0, p1, p2 = (vertex(i, positions) for i in (a, b, c))
+        n0, n1, n2 = (vertex(i, normals) for i in (a, b, c))
+        ux, uy, uz = (p1[j] - p0[j] for j in range(3))
+        vx, vy, vz = (p2[j] - p0[j] for j in range(3))
+        cross = (uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx)
+        dot = sum(cross[j] * (n0[j] + n1[j] + n2[j]) for j in range(3))
+        if abs(dot) < 1e-8:
+            continue
+        tested += 1
+        opposed += dot < 0
+    return opposed, tested
+
+
 def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
     doc, binary = read_glb(path)
     label = path.name
@@ -119,6 +172,10 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
                 triangles += max(0, count - 2)
             else:
                 warnings.append(f"{label}: primitive mode {mode} is excluded from triangle count")
+            if mode == 4:
+                opposed, tested = winding_sample(primitive, accessors, views, binary)
+                if tested >= 8 and opposed / tested > 0.90:
+                    errors.append(f"{label}: {opposed}/{tested} sampled triangles have winding opposite to normals")
             primitives += 1
     if primitives == 0:
         errors.append(f"{label}: no mesh primitives")
@@ -264,7 +321,7 @@ def validate(path: Path) -> dict:
                 continue
             try:
                 summary = glb_summary(glb_path, errors, warnings)
-            except (OSError, ValueError, TypeError, KeyError) as exc:
+            except (OSError, ValueError, TypeError, KeyError, IndexError, struct.error) as exc:
                 errors.append(f"asset {asset}: malformed GLB {filename}: {exc}")
                 continue
             result["triangles_unique"] += summary["triangles"]
