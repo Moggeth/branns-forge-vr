@@ -10,6 +10,12 @@ The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs
 
 Each capture now also records a draw-call count and rendered-object count before PNG readback. Use them to spot large before/after regressions when integrating a zone kit. They are whole-process samples while the live world and a review viewport exist; they are neither isolated GPU timings nor a headset stereo benchmark. Capture pacing makes FPS and process-time samples misleading, so those are deliberately omitted. Run a separate in-game VR performance check before claiming a kit is headset-safe.
 
+For the next authored kits, run the route/resource acceptance check before and after integration. It samples a player-sized capsule along the Quarry, Foundry, Kitchen and Glade approaches, gathering sites and fight spaces, rejects authored collision that blocks them, and checks existing resource/barrier counts. After importing the first pair, use `-- --zone=sandstone_quarry,ember_foundry --require-authored`; the default checks all four without demanding unfinished kits:
+
+```powershell
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://zone_art_route_checks.gd --quit-after 2400
+```
+
 ## Commission order from the captured images
 
 | Priority | Zones | Evidence and Sonnet art brief |
