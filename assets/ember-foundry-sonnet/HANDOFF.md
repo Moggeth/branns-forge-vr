@@ -15,6 +15,6 @@ Collision intent (conservative, none baked): gate = two box colliders per pylon 
 
 Checks: texture nonblack fraction 1.0 for all four (stats.json); normals recalculated outward (bmesh.recalc_face_normals) and flat-shaded; each mesh has one UV layer (box projection, 0.5 tile/m). Not run: Godot import, in-headset review.
 
-Previews: preview_ground.png (1.7 m eye at z=+14), preview_overhead.png (north is up in Godot -Z), preview_rts.png. first_render.png is the initial single-module test.
+Previews: curated copies are in `previews/` (ground at a 1.7 m eye and elevated RTS). The builder regenerates root-level `preview_*.png` as ignored working files. `first_render.png` in the isolated commission was the initial single-module test.
 
 Remaining/known: textures are low-res procedural (256 px, blocky pixels up close); gate glow is a flat panel; the before_foundry_* references and style_reference.jpg were not consulted; rails/slag may clip rim by a few cm. Tile texture repeat is per-piece box UV, not seamless across tiles.

@@ -11,7 +11,7 @@ def make_tex(name, kind, size=256):
     rng = np.random.default_rng(zlib.crc32(name.encode()) % 9999)
     n = rng.random((size, size))
     for k in (4, 8, 16, 32):
-        c = rng.random((k, k)); 
+        c = rng.random((k, k))
         up = np.kron(c, np.ones((size//k, size//k)))
         n = n*0.6 + up*0.4
     n = (n - n.min())/(n.max()-n.min())
