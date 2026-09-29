@@ -71,6 +71,13 @@ func _initialize() -> void:
 		if grown != Ecology.grow(model, region, 491): failures.append("grow region not deterministic: " + region.type)
 		for item in grown:
 			if not Ecology._in_region(region, Vector2(item.position.x, item.position.z)): failures.append("grown tree outside region")
+	var deliberate: Array[Dictionary] = Ecology.grow_ring(model, Vector2(60, 45), 19.0, 491)
+	if deliberate.size() < 12: failures.append("intentional tree ring has too many gaps")
+	if deliberate != Ecology.grow_ring(model, Vector2(60, 45), 19.0, 491): failures.append("intentional tree ring is not seeded")
+	for item in deliberate:
+		var at := Vector2(item.position.x, item.position.z)
+		if absf(at.distance_to(Vector2(60, 45)) - 19.0) > 2.1: failures.append("tree outside the ring band")
+		if Fields.sample(model, "water", at) > 0.05: failures.append("ring tree placed in water")
 	print("LANDSCAPE_ECOLOGY_CHECK fields_ms=%.3f instances_ms=%.3f counts=%d/%d/%d failures=%d" % [field_ms, generate_ms, generated.trees.size(), generated.rocks.size(), generated.shrubs.size(), failures.size()])
 	for failure in failures: push_error(failure)
 	quit(0 if failures.is_empty() else 1)

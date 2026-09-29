@@ -1,10 +1,12 @@
 extends Window
 ## The second perspective is an input surface over the Hero's actual World3D.
-const ACTIONS = ["harvest", "path", "bridge", "grove", "patrol", "sunder", "raise", "forest"]
-const TITLES = ["MARK TIMBER", "CARVE PATH", "BUILD BRIDGE", "GROW GROVE", "MUSTER BONES", "SUNDER EARTH", "RAISE EARTH", "GROW FOREST"]
-const HINTS = ["Choose an orchard tree. A helper fells it and carries the timber home.", "Choose route endpoints 3–36 m apart. The path costs aether.", "Build the Windfall Brook crossing for 3 lumber.", "Grow three harvestable trees for 3 aether.", "Warn the Hero, then raise three skeletons for 4 aether.", "Drag a line, or choose two endpoints, to carve a lasting ravine. Costs 5 aether.", "Choose a point to raise a traversable hill. Costs 4 aether.", "Drag a line, or choose two endpoints, to grow a living forest. Costs 3 aether."]
+const ACTIONS = ["harvest", "path", "bridge", "grove", "patrol", "sunder", "raise", "forest", "wall", "ring", "meteor", "fault"]
+const TITLES = ["MARK TIMBER", "CARVE PATH", "BUILD BRIDGE", "GROW GROVE", "MUSTER BONES", "SUNDER EARTH", "RAISE EARTH", "GROW FOREST", "EARTHEN WALL", "TREE RING", "STARFALL", "CRYSTAL FAULT"]
+const HINTS = ["Choose an orchard tree. A helper fells it and carries the timber home.", "Choose route endpoints 3–36 m apart. The path costs aether.", "Build the Windfall Brook crossing for 3 lumber.", "Grow three harvestable trees for 3 aether.", "Warn the Hero, then raise three skeletons for 4 aether.", "Drag a line, or choose two endpoints, to carve a lasting ravine. Costs 5 aether.", "Choose a point to raise a traversable hill. Costs 4 aether.", "Drag a line, or choose two endpoints, to grow a living forest. Costs 3 aether.", "Draw a defensive ridge. Costs 4 aether, or 2 mined star iron.", "Choose a point to grow a harvestable ring of trees. Costs 4 aether.", "Choose an impact site. A falling meteor hurts nearby actors, carves a crater, and leaves mineable gems. Costs 8 aether.", "Draw a crystal-lined ridge using 2 mined star gems and 2 aether."]
+const HOTKEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "0", "Q", "E", "R"]
+const COSTS = ["helper + timber", "aether / distance", "3 lumber", "3 aether", "4 aether", "5 aether", "4 aether", "3 aether", "4 aether / 2 iron", "4 aether", "8 aether", "2 gems + 2 aether"]
 const TOP_HEIGHT = 64
-const BOTTOM_HEIGHT = 166
+const BOTTOM_HEIGHT = 224
 
 var game: Node3D
 var builder: Node
@@ -158,13 +160,13 @@ func _build_ui() -> void:
 		var button := Button.new()
 		button.position = Vector2(20 + (i % 5) * 200, 51 + (i / 5) * 54)
 		button.size = Vector2(190, 48)
-		button.text = "%d  %s\n%s" % [i + 1, TITLES[i], ["helper + timber", "aether / distance", "3 lumber", "3 aether", "4 aether", "5 aether", "4 aether", "3 aether"][i]]
+		button.text = "%s  %s\n%s" % [HOTKEYS[i], TITLES[i], COSTS[i]]
 		button.tooltip_text = HINTS[i]
 		button.pressed.connect(select_action.bind(ACTIONS[i]))
 		bottom_panel.add_child(button)
 		buttons.append(button)
 	hire_button = Button.new()
-	hire_button.position = Vector2(20 + 3 * 200, 105)
+	hire_button.position = Vector2(20 + 2 * 200, 159)
 	hire_button.size = Vector2(190, 48)
 	hire_button.text = "9  HIRE HELPER\n2 lumber"
 	hire_button.tooltip_text = "Hire another lumberjack. Up to five can work independently."
@@ -235,13 +237,13 @@ func _layout_ui() -> void:
 		buttons[i].position.x = 20 + (i % 5) * (action_width + 8)
 		buttons[i].position.y = 51 + (i / 5) * 54
 		buttons[i].size.x = action_width
-	hire_button.position.x = 20 + 3 * (action_width + 8)
-	hire_button.position.y = 105
+	hire_button.position.x = 20 + 2 * (action_width + 8)
+	hire_button.position.y = 159
 	hire_button.size.x = action_width
 
 func _refresh_ui() -> void:
 	if status_label == null: return
-	status_label.text = "Orchard seed %d  ·  %d earth edits  ·  %d lumber  ·  %.1f / 20 aether  ·  %d helpers" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.wood), float(builder.data.aether), int(builder.data.workers)]
+	status_label.text = "Seed %d  ·  %d earth edits  ·  %d lumber  ·  %.1f/20 aether  ·  %d star-gems  ·  %d star iron  ·  %d helpers" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.wood), float(builder.data.aether), int(builder.data.star_gems), int(builder.data.star_iron), int(builder.data.workers)]
 	var action_index := ACTIONS.find(selected)
 	hint_label.text = HINTS[action_index] + "    WASD pan · right-drag orbit · wheel zoom · F11 fullscreen · Esc close"
 	var route_hint := ""
@@ -251,7 +253,7 @@ func _refresh_ui() -> void:
 		route_hint = ("Route %.1f m · %d aether" % [length, ceili(length / 7.0)]) if problem == "" else problem
 	feedback_label.text = route_hint if route_hint != "" else ("Choose the second end of the route." if first_point != Vector3.INF else (message if clock < message_until else builder.progress_message if game.elapsed < builder.progress_until else "Edits appear live for the Hero and persist between visits."))
 	for i in range(buttons.size()):
-		var unaffordable := (i == 2 and int(builder.data.wood) < 3) or (i in [3, 7] and float(builder.data.aether) < 3.0) or (i in [4, 6] and float(builder.data.aether) < 4.0) or (i == 5 and float(builder.data.aether) < 5.0)
+		var unaffordable := (i == 2 and int(builder.data.wood) < 3) or (i in [3, 7] and float(builder.data.aether) < 3.0) or (i in [4, 6, 9] and float(builder.data.aether) < 4.0) or (i == 5 and float(builder.data.aether) < 5.0) or (i == 8 and int(builder.data.star_iron) < 2 and float(builder.data.aether) < 4.0) or (i == 10 and float(builder.data.aether) < 8.0) or (i == 11 and (int(builder.data.star_gems) < 2 or float(builder.data.aether) < 2.0))
 		buttons[i].modulate = Color("ffe1a1") if selected == ACTIONS[i] else (Color("df907c") if unaffordable else Color.WHITE)
 	hire_button.disabled = int(builder.data.wood) < 2 or int(builder.data.workers) >= 5
 	follow_button.text = "F  Following Hero" if follow_hero else "F  Find Hero"
@@ -329,7 +331,7 @@ func _update_preview() -> void:
 		marker.material_override = preview_valid if valid else preview_invalid
 		route_preview.material_override = marker.material_override
 	var line_start: Vector3 = spell_drag_start if spell_drag_start != Vector3.INF else first_point
-	route_preview.visible = selected in ["path", "sunder", "forest"] and line_start != Vector3.INF and hovered != Vector3.INF
+	route_preview.visible = selected in ["path", "sunder", "forest", "wall", "fault"] and line_start != Vector3.INF and hovered != Vector3.INF
 	if route_preview.visible:
 		var a: Vector3 = builder.center + line_start
 		var b: Vector3 = builder.center + hovered
@@ -364,14 +366,20 @@ func _act(local: Vector3) -> void:
 		"bridge": result = builder.place_bridge(local)
 		"grove": result = builder.plant_grove(local)
 		"patrol": result = builder.summon_patrol(local)
-		"sunder", "forest":
+		"sunder", "forest", "wall", "fault":
 			if first_point == Vector3.INF:
 				first_point = local
 				_say("Start set. Choose the other end, or drag a line.")
 				return
-			result = builder.cast_sunder(first_point, local) if selected == "sunder" else builder.cast_forest(first_point, local)
+			match selected:
+				"sunder": result = builder.cast_sunder(first_point, local)
+				"forest": result = builder.cast_forest(first_point, local)
+				"wall": result = builder.cast_wall(first_point, local)
+				"fault": result = builder.cast_prism_fault(first_point, local)
 			if result == "": first_point = Vector3.INF
 		"raise": result = builder.cast_raise(local)
+		"ring": result = builder.cast_tree_ring(local)
+		"meteor": result = builder.cast_meteor(local)
 	_say(result if result != "" else builder.progress_message)
 
 func _input(event: InputEvent) -> void:
@@ -379,6 +387,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode >= KEY_1 and event.keycode <= KEY_8: select_action(ACTIONS[event.keycode - KEY_1])
 		elif event.keycode == KEY_9: _hire()
+		elif event.keycode == KEY_0: select_action("wall")
+		elif event.keycode == KEY_Q: select_action("ring")
+		elif event.keycode == KEY_E: select_action("meteor")
+		elif event.keycode == KEY_R: select_action("fault")
 		elif event.keycode == KEY_F: _toggle_follow()
 		elif event.keycode == KEY_ESCAPE:
 			if first_point != Vector3.INF: first_point = Vector3.INF; _say("Route preview cancelled.")
@@ -393,14 +405,19 @@ func _input(event: InputEvent) -> void:
 			set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			var location := _world_at(event.position)
-			if event.pressed and selected in ["sunder", "forest"] and location != Vector3.INF:
+			if event.pressed and selected in ["sunder", "forest", "wall", "fault"] and location != Vector3.INF:
 				spell_drag_start = location
 				set_input_as_handled()
 			elif not event.pressed and spell_drag_start != Vector3.INF:
 				var start := spell_drag_start
 				spell_drag_start = Vector3.INF
 				if location != Vector3.INF and Vector2(start.x, start.z).distance_to(Vector2(location.x, location.z)) >= 6.0:
-					var result: String = builder.cast_sunder(start, location) if selected == "sunder" else builder.cast_forest(start, location)
+					var result: String = ""
+					match selected:
+						"sunder": result = builder.cast_sunder(start, location)
+						"forest": result = builder.cast_forest(start, location)
+						"wall": result = builder.cast_wall(start, location)
+						"fault": result = builder.cast_prism_fault(start, location)
 					first_point = Vector3.INF
 					_say(result if result != "" else builder.progress_message)
 				elif location != Vector3.INF: _act(location)

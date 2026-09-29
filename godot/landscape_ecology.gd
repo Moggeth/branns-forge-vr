@@ -120,6 +120,38 @@ static func grow(model: Dictionary, region: Dictionary, seed: int) -> Array[Dict
 	return result
 
 
+static func grow_ring(model: Dictionary, center: Vector2, radius: float, seed: int) -> Array[Dictionary]:
+	## A ring is a deliberate spell rather than a random forest mask. Angular
+	## slots keep its silhouette legible while small seeded shifts and shared
+	## water/slope/path fields keep the trees grounded in this landscape.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var trees: Array[Dictionary] = []
+	var world := _world_bounds(model)
+	for slot in 18:
+		for attempt in 4:
+			var angle := TAU * float(slot) / 18.0 + rng.randf_range(-0.10, 0.10)
+			var distance := radius + rng.randf_range(-2.0, 2.0)
+			var point := center + Vector2(cos(angle), sin(angle)) * distance
+			if not world.has_point(point): continue
+			if Fields.sample(model, "water", point) > 0.05: continue
+			if Fields.sample(model, "slope", point) > 0.58: continue
+			if model.has("path_distance") and Fields.sample(model, "path_distance", point) < 3.5: continue
+			if model.has("exclusion") and Fields.sample(model, "exclusion", point) > 0.65: continue
+			var crowded := false
+			for other in trees:
+				var at: Vector3 = other.position
+				if point.distance_squared_to(Vector2(at.x, at.z)) < 4.2 * 4.2: crowded = true; break
+			if crowded: continue
+			var species_roll := rng.randf()
+			trees.append({"id":"ring:%d:%d" % [seed,slot], "kind":"tree",
+				"species":"oak" if species_roll < 0.55 else "birch" if species_roll < 0.82 else "pine",
+				"position":Vector3(point.x, Fields.sample(model, "height", point), point.y),
+				"rotation":rng.randf_range(0.0, TAU), "scale":rng.randf_range(0.86, 1.18)})
+			break
+	return trees
+
+
 static func _field_at(model: Dictionary, field: String, i: int, fallback: float) -> float:
 	var values: PackedFloat32Array = model.get(field, PackedFloat32Array())
 	return values[i] if i < values.size() else fallback

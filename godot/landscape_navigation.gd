@@ -6,6 +6,41 @@ const Water = preload("res://landscape_water.gd")
 const NEIGHBORS := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1)]
 
 
+static func pursuit(model: Dictionary, state: Dictionary, from_local: Vector2, target_local: Vector2,
+		operation_count: int, dirty: Rect2, transitioning: bool, now: float) -> Dictionary:
+	## One A* at acquisition, after an edit, or when the target has moved enough.
+	## A failed route is also cached briefly so a blocked enemy cannot rerun A* each frame.
+	var path: Array[Vector2] = []
+	if state.has("path"): path.assign(state.path)
+	var target: Vector2 = state.get("target", Vector2(INF, INF))
+	var index: int = int(state.get("index", 0))
+	var old_count: int = int(state.get("op_count", -1))
+	var next_at: float = float(state.get("next_at", 0.0))
+	var edited: bool = old_count != operation_count or bool(state.get("transitioning", false)) != transitioning
+	if not edited and dirty.has_area() and not path.is_empty():
+		edited = route_needs_replan(model, path, dirty, old_count, operation_count)
+	if not edited and not path.is_empty() and index < path.size() and from_local.distance_to(path[index]) > 6.0 and now >= next_at:
+		edited = true
+	var retarget: bool = target.distance_to(target_local) > 1.8 and now >= next_at
+	var retry: bool = path.is_empty() and now >= next_at
+	if transitioning and (edited or path.is_empty()):
+		return {"state": state, "direction": Vector2.ZERO, "remaining": INF, "available": false}
+	if edited or retarget or retry:
+		path = route(model, from_local, target_local)
+		index = 1
+		state = {"path": path, "target": target_local, "index": index,
+			"op_count": operation_count, "transitioning": transitioning, "next_at": now + 0.7}
+	if path.is_empty(): return {"state": state, "direction": Vector2.ZERO, "remaining": INF, "available": false}
+	while index < path.size() - 1 and from_local.distance_to(path[index]) < 0.7: index += 1
+	state.index = index
+	var waypoint: Vector2 = path[mini(index, path.size() - 1)]
+	var delta: Vector2 = waypoint - from_local
+	var remaining: float = delta.length()
+	for i in range(index, path.size() - 1): remaining += path[i].distance_to(path[i + 1])
+	return {"state": state, "direction": delta.normalized() if remaining > 0.001 else Vector2.ZERO,
+		"remaining": remaining, "available": true}
+
+
 static func route(model: Dictionary, from_local: Vector2, to_local: Vector2, options: Dictionary = {}) -> Array[Vector2]:
 	var result: Array[Vector2] = []
 	if not _valid(model): return result

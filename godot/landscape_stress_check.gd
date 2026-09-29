@@ -12,6 +12,9 @@ func _initialize() -> void:
 func _check() -> void:
 	var game: Node3D = load("res://main.tscn").instantiate()
 	root.add_child(game)
+	await process_frame
+	game.adventure.travel("orchard_highlands")
+	game._open_world_builder_view()
 	var builder: Node = game.world_builder
 	if builder == null or game.world_builder_view == null:
 		push_error("Landscape stress needs the live dual-view scene")

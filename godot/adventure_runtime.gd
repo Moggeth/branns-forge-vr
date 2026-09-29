@@ -1,6 +1,7 @@
 extends Node
 ## Native adventure simulation. Generated scripts remain in the service sandbox.
 const Horizon = preload("res://horizon.gd")
+const Navigation = preload("res://landscape_navigation.gd")
 const TOOL_NAMES = {"apprentice_hammer":"Copperpot’s Promise", "woodland_axe":"Orchard’s Edge", "quarry_pick":"Stonewhisper", "bomb_glove":"Pocket Thunder", "grappling_hook":"Swallow Line", "spore_lantern":"Mooncap Lantern", "crystal_resonator":"Hollow’s Song", "ember_gauntlet":"The Last Hearth"}
 const ORDER = ["apprentice_hammer", "woodland_axe", "quarry_pick", "bomb_glove", "grappling_hook", "spore_lantern", "crystal_resonator", "ember_gauntlet"]
 const ZONES = ["forge_yard","sandstone_quarry","enchanted_kitchen","pinewood_ruins","mushroom_glade","crystal_hollow","sky_garden","ember_foundry","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep"]
@@ -580,10 +581,17 @@ func _enemies(delta):
 		diff.y=0
 		var distance = diff.length()
 		var home:Vector3 = enemy.get_meta("home",enemy.global_position)
+		var orchard_ground: bool = zone=="orchard_highlands" and str(enemy.get_meta("zone",""))=="orchard_highlands" and str(enemy.get_meta("enemy_type","skeleton")) not in ["wisp","ghost"] and game.landscape!=null
 		if distance>10 or zone=="forge_yard":
 			enemy.set_meta("combat_phase","idle")
 			enemy.set_meta("attack_damage_done",true)
-			enemy.global_position = enemy.global_position.move_toward(home,delta*0.45)
+			if orchard_ground:
+				var home_route: Dictionary = _orchard_pursuit(enemy,home)
+				if bool(home_route.available):
+					enemy.global_position += home_route.direction*minf(delta*0.45,enemy.global_position.distance_to(home))
+					_orchard_ground_enemy(enemy)
+			else:
+				enemy.global_position = enemy.global_position.move_toward(home,delta*0.45)
 			continue
 		var type = str(enemy.get_meta("enemy_type","skeleton"))
 		var speed = (0.48 if type in ["boss","golem"] else 0.72)*game.tuning.value("combat.enemy_speed")
@@ -596,15 +604,44 @@ func _enemies(delta):
 		if knock.length()>0.02:
 			enemy.global_position+=Vector3(knock.x,0,knock.z)*delta
 			enemy.set_meta("knock_velocity",knock.move_toward(Vector3.ZERO,delta*7.0))
-		if distance>1.8 and str(enemy.get_meta("combat_phase","idle")) not in ["windup","strike"]: enemy.global_position += diff.normalized()*speed*delta
+		var heading: Vector3 = diff.normalized()
+		var attack_distance: float = distance
+		if orchard_ground:
+			var chase: Dictionary = _orchard_pursuit(enemy,destination)
+			heading = chase.direction if bool(chase.available) else Vector3.ZERO
+			if not bool(chase.available) or float(chase.remaining)>distance+3.0: attack_distance = INF
+		if distance>1.8 and str(enemy.get_meta("combat_phase","idle")) not in ["windup","strike"]:
+			enemy.global_position += heading*speed*delta
+			if orchard_ground: _orchard_ground_enemy(enemy)
 		# Procedural enemy faces are authored toward local +Z, unlike Godot cameras.
-		if diff.length_squared()>0.001:
+		if heading.length_squared()>0.001:
 			var turn=game.tuning.value("enemy.turn_speed")
-			enemy.rotation.y=lerp_angle(enemy.rotation.y,atan2(diff.x,diff.z),clampf(delta*turn,0,1)) if delta>0 else atan2(diff.x,diff.z)
+			enemy.rotation.y=lerp_angle(enemy.rotation.y,atan2(heading.x,heading.z),clampf(delta*turn,0,1)) if delta>0 else atan2(heading.x,heading.z)
 		if type=="boss" and distance<10 and game.elapsed>float(enemy.get_meta("wave_at",0)):
 			enemy.set_meta("wave_at",game.elapsed+9)
 			_boss_wave(enemy,game.rig.global_position)
-		_step_attack(enemy,distance,type)
+		_step_attack(enemy,attack_distance,type)
+
+func _orchard_pursuit(enemy: Node3D, destination: Vector3) -> Dictionary:
+	var zone_root: Node3D = game.scene.zones.orchard_highlands.root
+	var from_local: Vector3 = zone_root.to_local(enemy.global_position)
+	var to_local: Vector3 = zone_root.to_local(destination)
+	var terrain = game.landscape
+	var transition: Dictionary = terrain.transition
+	var dirty: Rect2 = transition.get("bounds", Rect2())
+	var result: Dictionary = Navigation.pursuit(terrain.model, enemy.get_meta("orchard_nav", {}),
+		Vector2(from_local.x,from_local.z),Vector2(to_local.x,to_local.z),
+		terrain.operation_count(),dirty,not transition.is_empty(),game.elapsed)
+	enemy.set_meta("orchard_nav",result.state)
+	var dir: Vector2 = result.direction
+	return {"direction": zone_root.global_basis * Vector3(dir.x,0,dir.y),
+		"remaining": result.remaining,"available": result.available}
+
+func _orchard_ground_enemy(enemy: Node3D) -> void:
+	var zone_root: Node3D = game.scene.zones.orchard_highlands.root
+	var local: Vector3 = zone_root.to_local(enemy.global_position)
+	local.y = game.landscape.height_at(Vector2(local.x,local.z))
+	enemy.global_position = zone_root.to_global(local)
 
 func _step_attack(enemy,distance,type):
 	if not enemy.get_meta("alive",true): return

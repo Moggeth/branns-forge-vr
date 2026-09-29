@@ -28,11 +28,13 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 	var river_width := PackedFloat32Array()
 	var river_depth := PackedFloat32Array()
 	var water := PackedFloat32Array()
+	var pool := PackedFloat32Array()
 	var water_level := PackedFloat32Array()
 	river_distance.resize(count)
 	river_width.resize(count)
 	river_depth.resize(count)
 	water.resize(count)
+	pool.resize(count)
 	water_level.resize(count)
 	river_distance.fill(1000000.0)
 	water_level.fill(-1000000.0)
@@ -155,10 +157,12 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 	var moisture: PackedFloat32Array = model.get("moisture", PackedFloat32Array())
 	if moisture.size() != count:
 		moisture.resize(count)
+	model["hydrology_base_moisture"] = moisture.duplicate()
 	for index in count:
 		var influence: float = exp(-river_distance[index] / 16.0)
 		moisture[index] = clampf(maxf(moisture[index], 0.18 + 0.78 * influence), 0.0, 1.0)
 	model["height"] = height
+	model["hydrology_last_height"] = height.duplicate()
 	model["flow_direction"] = downstream
 	model["flow_accumulation"] = accumulation
 	model["flow_surface"] = flow_surface
@@ -166,10 +170,160 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 	model["river_width"] = river_width
 	model["river_depth"] = river_depth
 	model["water"] = water
+	model["hydrology_pool"] = pool
 	model["water_level"] = water_level
+	model["hydrology_channel_level"] = water_level.duplicate()
 	model["moisture"] = moisture
 	model["river_polyline"] = polyline
 	return model
+
+
+static func refresh_after_terrain_change(model: Dictionary, dirty: Rect2) -> Dictionary:
+	## Called once after a terrain transition settles. The watershed can extend
+	## beyond dirty, so solve its small 161-square graph globally, but only alter
+	## water and moisture in the changed region. Never carve a second time.
+	var size: int = int(model.get("size", 0))
+	var step: float = float(model.get("step", 2.0))
+	var count: int = size * size
+	var height: PackedFloat32Array = model.get("height", PackedFloat32Array())
+	if size < 3 or step <= 0.0 or height.size() != count:
+		push_error("Hydrology refresh needs a valid height grid")
+		return {"water_dirty": dirty, "changed_water_cells": 0, "blocked_channel_cells": 0}
+	var start: int = Time.get_ticks_usec()
+	var origin: Vector2 = model.get("origin", Vector2(-160, -160))
+	var zone: Rect2 = dirty.grow(step * 2.0)
+	var x0: int = clampi(floori((zone.position.x - origin.x) / step), 0, size - 1)
+	var z0: int = clampi(floori((zone.position.y - origin.y) / step), 0, size - 1)
+	var x1: int = clampi(ceili((zone.end.x - origin.x) / step), 0, size - 1)
+	var z1: int = clampi(ceili((zone.end.y - origin.y) / step), 0, size - 1)
+	var previous_height: PackedFloat32Array = model.get("hydrology_last_height", PackedFloat32Array())
+	var prior_water: PackedFloat32Array = model.get("water", PackedFloat32Array())
+	var prior_flow: PackedFloat32Array = model.get("flow_accumulation", PackedFloat32Array())
+	var prior_distance: PackedFloat32Array = model.get("river_distance", PackedFloat32Array())
+	var prior_width: PackedFloat32Array = model.get("river_width", PackedFloat32Array())
+	var simple_dry_raise: bool = previous_height.size() == count and prior_water.size() == count and prior_flow.size() == count and prior_distance.size() == count and prior_width.size() == count
+	var changed_height: bool = false
+	if simple_dry_raise:
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				var index: int = z * size + x
+				if absf(height[index] - previous_height[index]) > 0.001: changed_height = true
+				if height[index] < previous_height[index] - 0.001 or prior_water[index] > 0.01 or prior_flow[index] >= 32.0 or prior_distance[index] < prior_width[index] * 0.5 + step:
+					simple_dry_raise = false
+					break
+			if not simple_dry_raise: break
+	if not changed_height and previous_height.size() == count:
+		# No height operator (for example a forest spell) needs no water work.
+		var any_change: bool = false
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				if absf(height[z * size + x] - previous_height[z * size + x]) > 0.001:
+					any_change = true
+					break
+			if any_change: break
+		if not any_change:
+			return {"water_dirty": dirty, "changed_water_cells": 0, "blocked_channel_cells": 0,
+				"skipped_drainage": true, "elapsed_ms": float(Time.get_ticks_usec() - start) / 1000.0}
+	if simple_dry_raise:
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				var index: int = z * size + x
+				previous_height[index] = height[index]
+		model["hydrology_last_height"] = previous_height
+		return {"water_dirty": dirty, "changed_water_cells": 0, "blocked_channel_cells": 0,
+			"skipped_drainage": true, "elapsed_ms": float(Time.get_ticks_usec() - start) / 1000.0}
+	var downstream := PackedInt32Array()
+	var accumulation := PackedFloat32Array()
+	var surface := PackedFloat32Array()
+	downstream.resize(count)
+	accumulation.resize(count)
+	surface.resize(count)
+	downstream.fill(-1)
+	accumulation.fill(1.0)
+	var order: Array[int] = _drainage(height, size, downstream, surface)
+	for at in range(order.size() - 1, -1, -1):
+		var index: int = order[at]
+		if downstream[index] >= 0:
+			accumulation[downstream[index]] += accumulation[index]
+	model["flow_direction"] = downstream
+	model["flow_accumulation"] = accumulation
+	model["flow_surface"] = surface
+	var water: PackedFloat32Array = model.get("water", PackedFloat32Array())
+	var pool: PackedFloat32Array = model.get("hydrology_pool", PackedFloat32Array())
+	var levels: PackedFloat32Array = model.get("water_level", PackedFloat32Array())
+	var channel_levels: PackedFloat32Array = model.get("hydrology_channel_level", levels)
+	var distances: PackedFloat32Array = model.get("river_distance", PackedFloat32Array())
+	var widths: PackedFloat32Array = model.get("river_width", PackedFloat32Array())
+	var moisture: PackedFloat32Array = model.get("moisture", PackedFloat32Array())
+	var base_moisture: PackedFloat32Array = model.get("hydrology_base_moisture", PackedFloat32Array())
+	if water.size() != count or levels.size() != count or channel_levels.size() != count or distances.size() != count or widths.size() != count:
+		return {"water_dirty": dirty, "changed_water_cells": 0, "blocked_channel_cells": 0}
+	if pool.size() != count:
+		pool.resize(count)
+	# A depression is not a magical spring. Only existing river water (or an
+	# explicit future water source) can fill a fresh cut; an isolated impact
+	# crater stays dry instead of instantly becoming a checkerboard pond.
+	var source_water := water.duplicate()
+	var source_pool := pool.duplicate()
+	var changed: int = 0
+	var blocked: int = 0
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var index: int = z * size + x
+			var previous: float = water[index]
+			var half_width: float = widths[index] * 0.5
+			var in_channel: bool = distances[index] < half_width and channel_levels[index] > -100.0
+			var channel_depth: float = maxf(0.0, channel_levels[index] - height[index]) if in_channel else 0.0
+			# A spell may dam the old bed. The water must not render through
+			# raised rock; the old downstream river is preserved, and a nearby
+			# enclosed cut can hold a shallow, bounded pool at its spill level.
+			if in_channel and channel_depth <= 0.01: blocked += 1
+			var pool_depth: float = 0.0
+			if surface[index] > height[index] + 0.15 and _near_water_source(source_water, source_pool, size, x, z):
+				pool_depth = minf(1.5, surface[index] - height[index])
+			water[index] = maxf(channel_depth, pool_depth)
+			pool[index] = pool_depth
+			levels[index] = height[index] + pool_depth if pool_depth > channel_depth else channel_levels[index]
+			if moisture.size() == count and base_moisture.size() == count:
+				var creek_influence: float = exp(-distances[index] / 16.0) if channel_depth > 0.01 else 0.0
+				moisture[index] = clampf(maxf(base_moisture[index], maxf(0.18 + 0.78 * creek_influence, 0.5 if pool_depth > 0.1 else 0.0)), 0.0, 1.0)
+			if absf(previous - water[index]) > 0.001: changed += 1
+	model["water"] = water
+	model["hydrology_last_height"] = height.duplicate()
+	model["hydrology_pool"] = pool
+	model["water_level"] = levels
+	if moisture.size() == count: model["moisture"] = moisture
+	return {"water_dirty": zone, "changed_water_cells": changed,
+		"blocked_channel_cells": blocked,
+		"elapsed_ms": float(Time.get_ticks_usec() - start) / 1000.0}
+
+
+static func _near_water_source(water: PackedFloat32Array, pool: PackedFloat32Array, size: int, x: int, z: int) -> bool:
+	for dz in range(-2, 3):
+		for dx in range(-2, 3):
+			var nx := x + dx
+			var nz := z + dz
+			if nx < 0 or nx >= size or nz < 0 or nz >= size: continue
+			var index := nz * size + nx
+			if water[index] > 0.02 and pool[index] <= 0.02: return true
+	return false
+
+
+static func isolated_refresh_snapshot(model: Dictionary) -> Dictionary:
+	## Copy only primitive metadata and packed fields used by refresh. The result
+	## has no SceneTree nodes or resources and can be passed to a worker Thread.
+	## The caller merges the result only after checking its terrain revision.
+	var snapshot: Dictionary = {}
+	for key in ["size", "step", "origin", "height", "water", "water_level",
+		"river_distance", "river_width", "moisture", "hydrology_base_moisture",
+		"hydrology_pool", "hydrology_channel_level", "hydrology_last_height",
+		"flow_accumulation"]:
+		var value: Variant = model.get(key)
+		if value is PackedFloat32Array:
+			snapshot[key] = (value as PackedFloat32Array).duplicate()
+		else:
+			snapshot[key] = value
+	return snapshot
 
 
 static func default_controls(model: Dictionary) -> Array[Vector2]:

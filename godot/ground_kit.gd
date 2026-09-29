@@ -2,6 +2,7 @@ class_name GroundKit
 ## Deterministic, batched dressing. A stable seed makes iteration and bug reports
 ## reproducible; future map generation can vary that seed without changing art.
 const Foliage = preload("res://orchard_foliage.gd")
+const Fields = preload("res://landscape_fields.gd")
 const PATH="res://assets/ground-kit/"
 const GRASS=["gk_grass_meadow_tuft","gk_grass_meadow_tuft_small","gk_grass_clover_patch","gk_grass_seedhead_clump"]
 const ROCKS=["gk_rock_mossy_boulder","gk_rock_sandstone_ledge","gk_rock_split_shards"]
@@ -37,11 +38,24 @@ static func _allowed(id:String,p:Vector3,trail:Array=[])->bool:
 	if id=="mushroom_glade" and absf(p.x)<2.5 and p.z>-10 and p.z<11: return false
 	return true
 
+static func field_chance(model:Dictionary, at:Vector2, kind:String)->float:
+	# Orchard decoration samples the same post-hydrology fields as live terrain.
+	# Existing dressing positions stay fixed; reprojection handles later edits.
+	if model.is_empty(): return 1.0
+	if Fields.sample(model,"water",at)>0.05: return 0.0
+	var slope:=Fields.sample(model,"slope",at)
+	if kind!="rock" and slope>0.62: return 0.0
+	var suitability:=Fields.sample(model,"rock_suitability" if kind=="rock" else "shrub_suitability" if kind=="shrub" else "vegetation_suitability",at)
+	if suitability<0.035: return 0.0
+	var grade_weight:=1.0 if kind=="rock" else 1.0-smoothstep(0.26,0.62,slope)
+	return clampf((0.18+suitability*2.4)*grade_weight,0.0,1.0)
+
 static func populate(root:Node3D,id:String,extent:float)->void:
 	if not ZONE_DENSITY.has(id): return
 	var counts:Array=ZONE_DENSITY[id]
 	var rng=RandomNumberGenerator.new()
-	rng.seed=298190+id.hash()
+	var model:Dictionary=root.get_meta("landscape_model",{}) if id=="orchard_highlands" else {}
+	rng.seed=(int(model.seed) if not model.is_empty() else 298190)+id.hash()
 	var trail:Array=root.get_meta("orchard_trail",[])
 	var transforms:Dictionary={}
 	for name in GRASS+ROCKS: transforms[name]=[]
@@ -51,6 +65,7 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 		for local_index in range(4):
 			var at=center+Vector3(rng.randf_range(-1.0,1.0),0,rng.randf_range(-1.0,1.0))
 			if not _allowed(id,at,trail): continue
+			if not model.is_empty() and rng.randf()>field_chance(model,Vector2(at.x,at.z),"grass"): continue
 			var choice=rng.randf()
 			var name=GRASS[0] if choice<0.46 else (GRASS[1] if choice<0.74 else (GRASS[2] if choice<0.91 else GRASS[3]))
 			var size=rng.randf_range(0.78,1.16)
@@ -61,6 +76,7 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 		for retry in range(25):
 			var at=Vector3(rng.randf_range(-extent+2,extent-2),0,rng.randf_range(-extent+2,extent-2))
 			if not _allowed(id,at,trail): continue
+			if not model.is_empty() and rng.randf()>field_chance(model,Vector2(at.x,at.z),"rock"): continue
 			var kind=i%ROCKS.size()
 			if id=="sandstone_quarry": kind=1 if i%3!=0 else 2
 			var size=rng.randf_range(0.72,1.32)

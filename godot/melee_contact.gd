@@ -94,6 +94,8 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		return game.sunfall.impact(item,target,point,normal,speed,hand,motion)
 	game.adventure.haptic(hand,"impact")
 	var kind=target.get_meta("kind","")
+	if kind=="meteor_ore" and game.world_builder!=null:
+		return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed)
 	if str(kind).begins_with("hollow_"):
 		return game.adventure.interact(target,str(item.get_meta("id","apprentice_hammer")),hand)
 	if kind=="apple" and game.apples!=null:

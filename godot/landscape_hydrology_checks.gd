@@ -58,6 +58,133 @@ func _initialize() -> void:
 		if candidate != previous_controls: varied += 1
 		previous_controls = candidate
 	if varied < 19: failures.append("seed variation repeats creek controls")
+	# A settled raise must re-solve drainage without recarving the player's
+	# mound, drying the covered channel, or changing distant existing water.
+	var edited: Dictionary = Hydro.run(_fixture(43), controls)
+	var original_height: PackedFloat32Array = edited.height.duplicate()
+	var original_water: PackedFloat32Array = edited.water.duplicate()
+	var ridge_point: Vector3 = edited.river_polyline[70]
+	var ridge_cell: int = _index(Vector2(ridge_point.x, ridge_point.z))
+	var ridge_x: int = ridge_cell % SIZE
+	var ridge_z: int = ridge_cell / SIZE
+	var raised: PackedFloat32Array = edited.height
+	for dz in range(-2, 3):
+		for dx in range(-2, 3):
+			raised[(ridge_z + dz) * SIZE + ridge_x + dx] += 5.0
+	edited["height"] = raised
+	var ridge_box := Rect2(Vector2(ridge_point.x, ridge_point.z) - Vector2(5, 5), Vector2(10, 10))
+	var refresh_started: int = Time.get_ticks_usec()
+	var result: Dictionary = Hydro.refresh_after_terrain_change(edited, ridge_box)
+	var refresh_ms: float = float(Time.get_ticks_usec() - refresh_started) / 1000.0
+	if int(result.blocked_channel_cells) < 1: failures.append("raise did not block channel")
+	if edited.water[ridge_cell] > 0.01: failures.append("water remained inside raised ridge")
+	if edited.height[ridge_cell] < original_height[ridge_cell] + 4.9: failures.append("refresh recarved raised terrain")
+	var far_cell: int = _index(Vector2(120, 120))
+	if edited.water[far_cell] != original_water[far_cell]: failures.append("raise changed distant water")
+	for index in SIZE * SIZE:
+		var below: int = edited.flow_direction[index]
+		if below >= 0 and edited.flow_surface[below] >= edited.flow_surface[index]:
+			failures.append("edited drainage flows uphill"); break
+	var repeated: Dictionary = Hydro.run(_fixture(43), controls)
+	var repeated_height: PackedFloat32Array = repeated.height
+	for dz in range(-2, 3):
+		for dx in range(-2, 3):
+			repeated_height[(ridge_z + dz) * SIZE + ridge_x + dx] += 5.0
+	repeated["height"] = repeated_height
+	Hydro.refresh_after_terrain_change(repeated, ridge_box)
+	if edited.flow_direction != repeated.flow_direction or edited.water != repeated.water:
+		failures.append("terrain refresh was not deterministic")
+	edited["height"] = original_height.duplicate()
+	Hydro.refresh_after_terrain_change(edited, ridge_box)
+	if absf(edited.water[ridge_cell] - original_water[ridge_cell]) > 0.01:
+		failures.append("undo did not restore creek water")
+	# A newly cut dry hollow remains dry. An otherwise identical hollow with an
+	# existing water source can collect a bounded pool at its spill height.
+	var hollow: Dictionary = Hydro.run(_fixture(43), controls)
+	var hollow_cell: int = -1
+	for z in range(115, 145):
+		for x in range(115, 145):
+			var dry := true
+			for dz in range(-2, 3):
+				for dx in range(-2, 3):
+					if hollow.water[(z + dz) * SIZE + x + dx] > 0.02: dry = false
+			if dry: hollow_cell = z * SIZE + x; break
+		if hollow_cell >= 0: break
+	if hollow_cell < 0:
+		failures.append("could not locate a dry cut site")
+		hollow_cell = 135 * SIZE + 135
+	var hollow_center := ORIGIN + Vector2(hollow_cell % SIZE, hollow_cell / SIZE) * STEP
+	var hollow_box := Rect2(hollow_center - Vector2(2, 2), Vector2(4, 4))
+	var cut: PackedFloat32Array = hollow.height
+	cut[hollow_cell] -= 4.0
+	hollow["height"] = cut
+	Hydro.refresh_after_terrain_change(hollow, hollow_box)
+	if hollow.water[hollow_cell] > 0.01: failures.append("dry closed cut filled without a water source")
+	hollow = Hydro.run(_fixture(43), controls)
+	cut = hollow.height
+	cut[hollow_cell] -= 4.0
+	hollow["height"] = cut
+	var supplied: PackedFloat32Array = hollow.water
+	supplied[hollow_cell] = 0.5
+	hollow["water"] = supplied
+	Hydro.refresh_after_terrain_change(hollow, hollow_box)
+	if hollow.water[hollow_cell] < 0.1: failures.append("closed cut did not collect water")
+	var live_model: Dictionary = Hydro.run(_fixture(43), controls)
+	supplied = live_model.water
+	supplied[hollow_cell] = 0.5
+	live_model["water"] = supplied
+	var live_height: float = live_model.height[hollow_cell]
+	var live_water: float = live_model.water[hollow_cell]
+	var live_flow: float = live_model.flow_accumulation[hollow_cell]
+	var isolated: Dictionary = Hydro.isolated_refresh_snapshot(live_model)
+	var isolated_height: PackedFloat32Array = isolated.height
+	isolated_height[hollow_cell] -= 4.0
+	isolated["height"] = isolated_height
+	Hydro.refresh_after_terrain_change(isolated, hollow_box)
+	if isolated.water[hollow_cell] < 0.1: failures.append("isolated refresh failed to collect water")
+	if live_model.height[hollow_cell] != live_height or live_model.water[hollow_cell] != live_water or live_model.flow_accumulation[hollow_cell] != live_flow:
+		failures.append("isolated refresh modified live model")
+	var threaded: Dictionary = Hydro.isolated_refresh_snapshot(live_model)
+	var threaded_height: PackedFloat32Array = threaded.height
+	threaded_height[hollow_cell] -= 4.0
+	threaded["height"] = threaded_height
+	var worker := Thread.new()
+	var thread_error: Error = worker.start(Callable(self, "_refresh_on_worker").bind(threaded, hollow_box))
+	if thread_error != OK:
+		failures.append("hydrology worker failed to start")
+	else:
+		var worker_result: Dictionary = worker.wait_to_finish()
+		if threaded.water[hollow_cell] < 0.1 or int(worker_result.get("changed_water_cells", 0)) < 1:
+			failures.append("worker did not compute isolated hydrology")
+		if live_model.height[hollow_cell] != live_height or live_model.water[hollow_cell] != live_water:
+			failures.append("hydrology worker modified live model")
+	var dry_hill: Dictionary = Hydro.run(_fixture(43), controls)
+	var dry_refresh_ms: float = -1.0
+	var dry_x: int = -1
+	var dry_z: int = -1
+	for z in range(12, SIZE - 12):
+		for x in range(12, SIZE - 12):
+			var dry_enough: bool = true
+			for dz in range(-3, 4):
+				for dx in range(-3, 4):
+					var at: int = (z + dz) * SIZE + x + dx
+					if dry_hill.water[at] > 0.01 or dry_hill.flow_accumulation[at] >= 10.0 or dry_hill.river_distance[at] < 12.0:
+						dry_enough = false
+						break
+				if not dry_enough: break
+			if dry_enough: dry_x = x; dry_z = z; break
+		if dry_x >= 0: break
+	if dry_x < 0:
+		failures.append("could not find dry hill test site")
+	else:
+		var hill_height: PackedFloat32Array = dry_hill.height
+		hill_height[dry_z * SIZE + dry_x] += 2.0
+		dry_hill["height"] = hill_height
+		var dry_point: Vector2 = ORIGIN + Vector2(dry_x, dry_z) * STEP
+		var fast: Dictionary = Hydro.refresh_after_terrain_change(dry_hill, Rect2(dry_point - Vector2(2, 2), Vector2(4, 4)))
+		dry_refresh_ms = float(fast.elapsed_ms)
+		if not bool(fast.get("skipped_drainage", false)): failures.append("ordinary dry hill did not use fast hydrology path")
+		if float(fast.elapsed_ms) > 5.0: failures.append("dry hill hydrology was unexpectedly slow")
 	if "--stress" in OS.get_cmdline_user_args():
 		var stress_started: int = Time.get_ticks_msec()
 		var wet_camp_count: int = 0
@@ -90,7 +217,7 @@ func _initialize() -> void:
 		if route_shapes.size() < 8: failures.append("stress seeds made repetitive creek routes")
 		if worst_bank_slope > 1.0: failures.append("bank slope exceeds traversable stress limit: " + str(worst_bank_slope))
 		print("HYDROLOGY_STRESS seeds=20 ms=", Time.get_ticks_msec() - stress_started, " route_shapes=", route_shapes.size(), " wet_camps=", wet_camp_count, " missed_crossings=", missed_crossing_count, " max_slope=", snappedf(worst_slope, 0.001), " max_bank_slope=", snappedf(worst_bank_slope, 0.001), " seed2014_old_hotspot=", snappedf(old_hotspot_slope, 0.001), " worst_seed=", worst_seed, " worst_point=", worst_point)
-	print("HYDROLOGY_BENCHMARK cells=", SIZE * SIZE, " first_ms=", first_ms, " repeat_ms=", repeat_ms, " wet=", wet_cells, " tributary=", tributary_cells, " max_flow=", max_accumulation)
+	print("HYDROLOGY_BENCHMARK cells=", SIZE * SIZE, " first_ms=", first_ms, " repeat_ms=", repeat_ms, " refresh_ms=", snappedf(refresh_ms, 0.01), " dry_raise_ms=", snappedf(dry_refresh_ms, 0.01), " wet=", wet_cells, " tributary=", tributary_cells, " max_flow=", max_accumulation)
 	if failures.is_empty():
 		print("HYDROLOGY_CHECKS_PASS")
 		quit(0)
@@ -115,3 +242,7 @@ func _fixture(seed_value: int) -> Dictionary:
 
 func _index(point: Vector2) -> int:
 	return clampi(roundi((point.y - ORIGIN.y) / STEP), 0, SIZE - 1) * SIZE + clampi(roundi((point.x - ORIGIN.x) / STEP), 0, SIZE - 1)
+
+
+func _refresh_on_worker(snapshot: Dictionary, box: Rect2) -> Dictionary:
+	return Hydro.refresh_after_terrain_change(snapshot, box)

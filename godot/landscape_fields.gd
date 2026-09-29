@@ -86,20 +86,32 @@ static func create(seed: int, recipe: String = "gentle_orchard", size: int = 161
 
 
 static func derive(model: Dictionary) -> void:
-	## Recompute after the authoritative height array changes. Edge derivatives use one-sided samples.
+	derive_region(model, Rect2())
+
+
+static func derive_region(model: Dictionary, bounds: Rect2) -> void:
+	## A height edit invalidates slope/curvature at its neighbours too. Empty bounds
+	## rebuild the complete world; a nonempty rectangle leaves distant cells intact.
 	var size: int = model.size
 	var step: float = model.step
 	var height: PackedFloat32Array = model.height
-	var slope := PackedFloat32Array()
-	var curvature := PackedFloat32Array()
-	var traversability := PackedFloat32Array()
-	slope.resize(size * size)
-	curvature.resize(size * size)
-	traversability.resize(size * size)
-	for z in range(size):
+	var slope: PackedFloat32Array = model.get("slope", PackedFloat32Array())
+	var curvature: PackedFloat32Array = model.get("curvature", PackedFloat32Array())
+	var traversability: PackedFloat32Array = model.get("traversability", PackedFloat32Array())
+	var full := not bounds.has_area() or slope.size() != size * size or curvature.size() != size * size or traversability.size() != size * size
+	if full:
+		slope.resize(size * size)
+		curvature.resize(size * size)
+		traversability.resize(size * size)
+	var origin: Vector2 = model.origin
+	var x0 := 0 if full else clampi(floori((bounds.position.x - origin.x) / step) - 1, 0, size - 1)
+	var z0 := 0 if full else clampi(floori((bounds.position.y - origin.y) / step) - 1, 0, size - 1)
+	var x1 := size - 1 if full else clampi(ceili((bounds.end.x - origin.x) / step) + 1, 0, size - 1)
+	var z1 := size - 1 if full else clampi(ceili((bounds.end.y - origin.y) / step) + 1, 0, size - 1)
+	for z in range(z0, z1 + 1):
 		var zm := maxi(z - 1, 0)
 		var zp := mini(z + 1, size - 1)
-		for x in range(size):
+		for x in range(x0, x1 + 1):
 			var xm := maxi(x - 1, 0)
 			var xp := mini(x + 1, size - 1)
 			var i := z * size + x

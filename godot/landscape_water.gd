@@ -17,18 +17,37 @@ void fragment() {
 	EMISSION = vec3(0.018, 0.055, 0.060) + vec3(foam * 0.13);
 }
 """
+const POOL_SHADER := """
+shader_type spatial;
+render_mode cull_disabled, shadows_disabled;
+varying vec2 world_xz;
+void vertex() { world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz; }
+void fragment() {
+	float ripple = sin(world_xz.x * 0.36 + TIME * 1.1) * sin(world_xz.y * 0.28 - TIME * 0.9);
+	float fine = sin(world_xz.x * 0.73 - world_xz.y * 0.42 + TIME * 1.7);
+	ALBEDO = mix(vec3(0.035, 0.16, 0.18), vec3(0.10, 0.27, 0.29), 0.52 + ripple * 0.22 + fine * 0.08);
+	ROUGHNESS = 0.24;
+	METALLIC = 0.06;
+	EMISSION = vec3(0.015, 0.04, 0.045);
+}
+"""
 
 var _chunks: Array[MeshInstance3D] = []
 var _bounds: Array[Rect2] = []
 var _model: Dictionary = {}
 var _material: ShaderMaterial
+var _pool_material: ShaderMaterial
 var _route_snapshot: Array[Vector3] = []
+var _pool_surface: MeshInstance3D
 
 
 func setup(model: Dictionary) -> void:
 	for chunk in _chunks: chunk.free()
 	_chunks.clear()
 	_bounds.clear()
+	if _pool_surface != null:
+		_pool_surface.free()
+		_pool_surface = null
 	_model = model
 	_route_snapshot = (model.get("river_polyline", []) as Array[Vector3]).duplicate()
 	if _material == null:
@@ -47,6 +66,7 @@ func setup(model: Dictionary) -> void:
 		_chunks.append(surface)
 		_bounds.append(Rect2())
 		_rebuild(chunk_index)
+	_rebuild_pools()
 
 
 func refresh_region(model: Dictionary, dirty: Rect2) -> int:
@@ -57,12 +77,62 @@ func refresh_region(model: Dictionary, dirty: Rect2) -> int:
 		setup(model)
 		return _chunks.size()
 	_model = model
+	_rebuild_pools()
 	var rebuilt: int = 0
 	for i in _chunks.size():
 		if _bounds[i].intersects(dirty):
 			_rebuild(i)
 			rebuilt += 1
 	return rebuilt
+
+
+func _rebuild_pools() -> void:
+	var pool: PackedFloat32Array = _model.get("hydrology_pool", PackedFloat32Array())
+	var levels: PackedFloat32Array = _model.get("water_level", PackedFloat32Array())
+	var size: int = int(_model.get("size", 0))
+	if pool.size() != size * size or levels.size() != pool.size(): return
+	var step: float = float(_model.get("step", 2.0))
+	var origin: Vector2 = _model.get("origin", Vector2.ZERO)
+	var vertices := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for index in pool.size():
+		if pool[index] <= 0.1: continue
+		var x: int = index % size
+		var z: int = index / size
+		var center: Vector2 = origin + Vector2(x, z) * step
+		var y: float = levels[index] + SURFACE_LIFT
+		var radius: float = step * 0.53
+		var base: int = vertices.size()
+		vertices.append(Vector3(center.x - radius, y, center.y - radius))
+		vertices.append(Vector3(center.x + radius, y, center.y - radius))
+		vertices.append(Vector3(center.x - radius, y, center.y + radius))
+		vertices.append(Vector3(center.x + radius, y, center.y + radius))
+		uvs.append_array(PackedVector2Array([Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]))
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base + 1, base + 3, base + 2]))
+	if indices.is_empty():
+		if _pool_surface != null:
+			_pool_surface.free()
+			_pool_surface = null
+		return
+	if _pool_surface == null:
+		_pool_surface = MeshInstance3D.new()
+		_pool_surface.name = "LandscapePools"
+		if _pool_material == null:
+			_pool_material = ShaderMaterial.new()
+			_pool_material.shader = Shader.new()
+			_pool_material.shader.code = POOL_SHADER
+		_pool_surface.material_override = _pool_material
+		_pool_surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_pool_surface)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_pool_surface.mesh = mesh
 
 
 func chunk_count() -> int:
@@ -76,6 +146,7 @@ func _rebuild(chunk_index: int) -> void:
 	var vertices := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
+	var wet := PackedByteArray()
 	var bounds_min := Vector2(INF, INF)
 	var bounds_max := Vector2(-INF, -INF)
 	var travelled: float = 0.0
@@ -85,6 +156,11 @@ func _rebuild(chunk_index: int) -> void:
 		travelled += Vector2(following.x - previous.x, following.z - previous.z).length()
 	for i in range(first, last + 1):
 		var p: Vector3 = route[i]
+		var center := Vector2(p.x, p.z)
+		# The authored route can be blocked by raised earth. Leave a physical
+		# gap instead of drawing a ribbon through the new ridge. Its remaining
+		# segments retain the original strictly descending water heights.
+		wet.append(1 if _field("water", center) > 0.02 and _field("height", center) < p.y - 0.01 else 0)
 		var prev: Vector3 = route[maxi(0, i - 1)]
 		if i > first: travelled += Vector2(p.x - prev.x, p.z - prev.z).length()
 		var next: Vector3 = route[mini(route.size() - 1, i + 1)]
@@ -93,7 +169,6 @@ func _rebuild(chunk_index: int) -> void:
 		var normal := tangent.orthogonal()
 		var width: float = clampf(_field("river_width", Vector2(p.x, p.z)), 3.0, 14.0)
 		var edge: Vector2 = normal * width * 0.49
-		var center := Vector2(p.x, p.z)
 		var left := center - edge
 		var right := center + edge
 		vertices.append(Vector3(left.x, p.y + SURFACE_LIFT, left.y))
@@ -102,7 +177,7 @@ func _rebuild(chunk_index: int) -> void:
 		uvs.append(Vector2(1.0, travelled * 0.1))
 		bounds_min = bounds_min.min(left).min(right)
 		bounds_max = bounds_max.max(left).max(right)
-		if i > first:
+		if i > first and wet[i - first] != 0 and wet[i - first - 1] != 0:
 			var base: int = (i - first) * 2
 			indices.append_array(PackedInt32Array([base - 2, base - 1, base, base - 1, base + 1, base]))
 	var arrays: Array = []
@@ -111,7 +186,8 @@ func _rebuild(chunk_index: int) -> void:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	if indices.size() > 0:
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_chunks[chunk_index].mesh = mesh
 	_bounds[chunk_index] = Rect2(bounds_min, bounds_max - bounds_min).grow(2.0)
 

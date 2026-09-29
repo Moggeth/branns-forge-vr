@@ -61,7 +61,8 @@ static func populate(root: Node3D) -> void:
 		if arg == "--atmosphere-quality=low": scale = 0.47
 		elif arg == "--atmosphere-quality=high": scale = 1.35
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 290929
+	var model: Dictionary = root.get_meta("landscape_model", {})
+	rng.seed = int(model.seed) if not model.is_empty() else 290929
 	var trail: Array = root.get_meta("orchard_trail", [])
 	var total := 0
 	for id in COUNTS:
@@ -76,6 +77,8 @@ static func populate(root: Node3D) -> void:
 			if not GroundKitScript._allowed("orchard_highlands", point, trail): continue
 			if point.distance_to(Vector3(15, 0, -27)) < 10.5: continue
 			if point.distance_to(Vector3(25, 0, -48)) < 6.0: continue
+			var field_kind := "rock" if _kind(id) == "rock" else "shrub" if _kind(id) == "fern" else "grass"
+			if not model.is_empty() and rng.randf() > GroundKitScript.field_chance(model, Vector2(point.x, point.z), field_kind): continue
 			var mask := Ground.sample(Vector2(point.x, point.z))
 			if mask.r > 0.48 or mask.b > 0.87: continue
 			var patch := clampf(0.5 + 0.25 * sin(point.x * 0.077 + cos(point.z * 0.089)) +

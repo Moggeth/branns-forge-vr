@@ -8,6 +8,8 @@ const Ecology = preload("res://landscape_ecology.gd")
 const Water = preload("res://landscape_water.gd")
 const Reprojection = preload("res://landscape_reprojection.gd")
 const SpellDressing = preload("res://landscape_spell_dressing.gd")
+const WorldDocument = preload("res://landscape_world_document.gd")
+const Compiler = preload("res://landscape_compiler.gd")
 const SAVE := "user://landscape_v1.json"
 const CHUNK_CELLS := 32
 const MAX_OPERATIONS := 256
@@ -18,6 +20,7 @@ var model: Dictionary = {}
 var seed := 290929
 var recipe := "gentle_orchard"
 var operations: Array = []
+var document: Dictionary = {}
 var chunks: Dictionary = {}
 var water: Node3D
 var dressing: Node3D
@@ -26,6 +29,12 @@ var save_enabled := true
 var transition: Dictionary = {}
 var last_rebuild_ms := 0.0
 var last_operation_ms := 0.0
+var last_settle_ms := 0.0
+var last_hydrology_ms := 0.0
+var last_compile_stages: Dictionary = {}
+var world_revision := 0
+var pending_hydrology: Dictionary = {}
+var deferred_hydrology_bounds := Rect2()
 var initial_ms := 0.0
 var _falling_with_earth := false
 var _fall_speed := 0.0
@@ -51,8 +60,12 @@ func setup(owner_game: Node3D, orchard_root: Node3D, offline := false) -> void:
 		Hydro.run(model, controls)
 		Fields.derive(model)
 	model["natural_height"] = (model.height as PackedFloat32Array).duplicate()
+	document = WorldDocument.create(seed, recipe)
 	if save_enabled: _load_operations()
-	if not operations.is_empty(): model["height"] = Ops.apply(model, operations)
+	if not operations.is_empty():
+		model["height"] = Ops.apply(model, operations)
+		# Startup may spend the full watershed solve once, before gameplay frames.
+		Hydro.refresh_after_terrain_change(model, Rect2(Vector2(-160, -160), Vector2(320, 320)))
 	Fields.derive(model)
 	Ecology.build_fields(model)
 	for cz in range((int(model.size) - 1) / CHUNK_CELLS):
@@ -103,7 +116,11 @@ func apply_magic(raw: Dictionary) -> String:
 			var i: int = z * int(model.size) + x
 			if absf(target[i] - before[i]) > 0.001: changed.append(i)
 	if changed.is_empty(): return "The land was already shaped that way."
-	operations.append(raw.duplicate(true))
+	var written: Dictionary = WorldDocument.append(document, raw)
+	if not bool(written.get("ok", false)): return "The world cannot record that spell: " + str(written.get("error", "unknown error"))
+	document = written.document
+	operations = WorldDocument.replay_operations(document)
+	world_revision += 1
 	_save_operations()
 	var target_model: Dictionary = model.duplicate(false)
 	target_model["height"] = target
@@ -118,7 +135,12 @@ func apply_magic(raw: Dictionary) -> String:
 func undo_last() -> bool:
 	if operations.is_empty(): return false
 	if not transition.is_empty(): _finish_transition()
-	var op: Dictionary = operations.pop_back()
+	var op: Dictionary = operations.back()
+	var result: Dictionary = WorldDocument.remove_last(document)
+	if not bool(result.get("ok", false)): return false
+	document = result.document
+	operations = WorldDocument.replay_operations(document)
+	world_revision += 1
 	_save_operations()
 	if dressing != null: dressing.remove_last()
 	var box := Ops.bounds(op)
@@ -135,6 +157,7 @@ func undo_last() -> bool:
 	return true
 
 func _process(delta: float) -> void:
+	_poll_hydrology()
 	if transition.is_empty():
 		_settle_player(delta)
 		return
@@ -161,16 +184,80 @@ func _process(delta: float) -> void:
 
 func _finish_transition() -> void:
 	if transition.is_empty(): return
+	var started := Time.get_ticks_usec()
 	model["height"] = transition.target
 	var box: Rect2 = transition.bounds
-	for key in transition.dirty: _rebuild_chunk(key)
-	Fields.derive(model)
-	Ecology.build_fields(model, box)
-	if water != null: water.refresh_region(model, box)
+	if float(transition.elapsed) < float(transition.duration):
+		for key in transition.dirty: _rebuild_chunk(key)
+	Fields.derive_region(model, box)
+	# Height/collision move first. The drainage graph is calculated from an
+	# isolated snapshot, then merged only if no newer spell superseded it.
+	var hydro_box: Rect2 = box if not deferred_hydrology_bounds.has_area() else box.merge(deferred_hydrology_bounds)
+	deferred_hydrology_bounds = Rect2()
+	_start_hydrology(hydro_box)
 	if reprojection != null: reprojection.refresh_region(zone_root.get_parent() as Node3D, model, box)
 	if dressing != null: dressing.refresh_region(model, box)
-	print("LANDSCAPE_SETTLED type=", transition.type, " dirty_chunks=", transition.dirty.size(), " last_rebuild_ms=", snappedf(last_rebuild_ms, 0.01))
+	last_settle_ms = float(Time.get_ticks_usec() - started) / 1000.0
+	print("LANDSCAPE_SETTLED type=", transition.type, " dirty_chunks=", transition.dirty.size(), " geometry_ms=", snappedf(last_settle_ms, 0.01), " hydro_pending=", not pending_hydrology.is_empty())
 	transition.clear()
+
+
+func _start_hydrology(bounds: Rect2) -> void:
+	# One worker at a time. A newer edit may invalidate its result; in that case
+	# the next frame schedules a fresh snapshot against the latest heightfield.
+	if not pending_hydrology.is_empty():
+		var pending_box: Rect2 = pending_hydrology.reschedule_bounds
+		pending_hydrology.reschedule_bounds = bounds if not pending_box.has_area() else pending_box.merge(bounds)
+		return
+	var snapshot: Dictionary = Hydro.isolated_refresh_snapshot(model)
+	var thread := Thread.new()
+	var error: Error = thread.start(Callable(self, "_hydrology_worker").bind(snapshot, bounds))
+	if error != OK:
+		push_warning("Hydrology thread unavailable; completing watershed on main thread")
+		var computed: Dictionary = _hydrology_worker(snapshot, bounds)
+		_apply_hydrology(computed, world_revision, bounds)
+		return
+	pending_hydrology = {"thread":thread, "revision":world_revision, "bounds":bounds, "reschedule_bounds":Rect2(), "start":Time.get_ticks_usec()}
+
+
+static func _hydrology_worker(snapshot: Dictionary, bounds: Rect2) -> Dictionary:
+	var stats: Dictionary = Hydro.refresh_after_terrain_change(snapshot, bounds)
+	return {"snapshot":snapshot, "stats":stats}
+
+
+func _poll_hydrology() -> void:
+	if pending_hydrology.is_empty(): return
+	var thread: Thread = pending_hydrology.thread
+	if thread.is_alive(): return
+	var record: Dictionary = pending_hydrology
+	pending_hydrology = {}
+	var computed: Dictionary = thread.wait_to_finish()
+	if int(record.revision) == world_revision:
+		_apply_hydrology(computed, int(record.revision), record.bounds)
+	else:
+		var reschedule: Rect2 = record.reschedule_bounds
+		var stale_bounds: Rect2 = record.bounds if not reschedule.has_area() else record.bounds.merge(reschedule)
+		if transition.is_empty(): _start_hydrology(stale_bounds)
+		else: deferred_hydrology_bounds = stale_bounds if not deferred_hydrology_bounds.has_area() else deferred_hydrology_bounds.merge(stale_bounds)
+
+
+func _exit_tree() -> void:
+	if not pending_hydrology.is_empty():
+		var thread: Thread = pending_hydrology.thread
+		thread.wait_to_finish()
+
+
+func _apply_hydrology(computed: Dictionary, revision: int, bounds: Rect2) -> void:
+	if revision != world_revision: return
+	var source: Dictionary = computed.get("snapshot", {})
+	for field in ["flow_direction", "flow_accumulation", "flow_surface", "water", "water_level", "hydrology_pool", "moisture", "hydrology_last_height"]:
+		if source.has(field): model[field] = source[field]
+	var stats: Dictionary = computed.get("stats", {})
+	var dirty: Rect2 = stats.get("water_dirty", bounds)
+	var stamp := Time.get_ticks_usec()
+	last_compile_stages = Compiler.settle_after_hydrology(model, dirty, water)
+	last_hydrology_ms = float(Time.get_ticks_usec() - stamp) / 1000.0
+	print("LANDSCAPE_HYDRO revision=", revision, " solve_ms=", snappedf(float(stats.get("elapsed_ms", 0.0)), 0.01), " main_ms=", snappedf(last_hydrology_ms, 0.01), " stages=", last_compile_stages, " changed_water=", stats.get("changed_water_cells", 0))
 
 func _player_ground() -> float:
 	if game == null or game.rig == null: return NAN
@@ -285,24 +372,17 @@ func _rebuild_chunk(key: Vector2i) -> void:
 	else: (record.collider as CollisionShape3D).shape = shape
 
 func _load_operations() -> void:
-	if not FileAccess.file_exists(SAVE): return
-	var file := FileAccess.open(SAVE, FileAccess.READ)
-	if file == null or file.get_length() > 262144: return
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if not parsed is Dictionary or int(parsed.get("schema", 0)) != 1: return
-	if int(parsed.get("seed", seed)) != seed or str(parsed.get("recipe", recipe)) != recipe: return
-	var candidate: Variant = parsed.get("operations", [])
-	if not candidate is Array or candidate.size() > MAX_OPERATIONS: return
-	for op in candidate:
-		if not op is Dictionary or not Ops.validate(op): return
-	operations = candidate
+	var loaded: Dictionary = WorldDocument.load_document(SAVE, seed, recipe)
+	if not bool(loaded.get("ok", false)):
+		save_enabled = false
+		push_warning("LANDSCAPE save protected: " + str(loaded.get("error", "unknown error")))
+		return
+	document = loaded.document
+	operations = WorldDocument.replay_operations(document)
+	if bool(loaded.get("migrated", false)): _save_operations()
 
 func _save_operations() -> void:
 	if not save_enabled: return
-	var temp := SAVE + ".tmp"
-	var file := FileAccess.open(temp, FileAccess.WRITE)
-	if file == null: push_warning("LANDSCAPE save failed to open"); return
-	file.store_string(JSON.stringify({"schema": 1, "seed": seed, "recipe": recipe, "operations": operations}))
-	file.close()
-	if DirAccess.rename_absolute(ProjectSettings.globalize_path(temp), ProjectSettings.globalize_path(SAVE)) != OK:
-		push_warning("LANDSCAPE save replace failed")
+	var result: Dictionary = WorldDocument.save(SAVE, document)
+	if not bool(result.get("ok", false)):
+		push_warning("LANDSCAPE save failed: " + str(result.get("error", "unknown error")))

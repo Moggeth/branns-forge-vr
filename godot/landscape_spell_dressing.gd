@@ -7,6 +7,7 @@ const ASSETS := {
 	"rupture": "res://assets/landscape/geo_earth_rupture_roots.glb",
 	"split": "res://assets/landscape/geo_boulder_split_b.glb",
 	"moss": "res://assets/landscape/geo_boulder_mossy_a.glb",
+	"spire": "res://assets/landscape/geo_spell_spire.glb",
 }
 const MAX_DRESSED_OPERATIONS := 64
 
@@ -33,6 +34,15 @@ func add_operation(op: Dictionary, target_model: Dictionary, duration: float) ->
 		var item := MeshInstance3D.new()
 		item.name = str(p.kind).capitalize()
 		item.mesh = mesh
+		if str(p.kind) == "spire":
+			var crystal := StandardMaterial3D.new()
+			crystal.albedo_color = Color("62cbd2")
+			crystal.metallic = 0.18
+			crystal.roughness = 0.22
+			crystal.emission_enabled = true
+			crystal.emission = Color("55d8f3")
+			crystal.emission_energy_multiplier = 2.1
+			item.material_override = crystal
 		item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		item.position = Vector3(point.x, ground, point.y)
 		item.rotation.y = float(p.angle)
@@ -66,6 +76,17 @@ func refresh_region(model: Dictionary, bounds: Rect2) -> void:
 static func _placements(op: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	match str(op.get("type", "")):
+		"ridge":
+			var points: Array = op.get("points", [])
+			if points.size() < 2: return result
+			var a := Vector2(float(points[0][0]), float(points[0][1]))
+			var b := Vector2(float(points[-1][0]), float(points[-1][1]))
+			var across := (b - a).normalized().orthogonal()
+			var crystal_fault := str(op.get("feature", "")) == "crystal_fault"
+			for i in 4:
+				var at: Vector2 = a.lerp(b, float(i + 1) / 5.0) + across * (1.3 if i % 2 == 0 else -1.3)
+				result.append({"kind":"spire" if crystal_fault else "split", "position":at,
+					"angle":atan2(across.x,across.y) + i * 0.62, "scale":0.6 if crystal_fault else 0.43})
 		"sunder":
 			var points: Array = op.points
 			if points.size() < 2: return result

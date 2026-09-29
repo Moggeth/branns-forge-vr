@@ -16,9 +16,11 @@ const MAX_GROVES = 24
 const MAX_BRIDGES = 4
 const MAX_THREATS = 8
 const MAX_FOREST_SPELLS = 64
+const MAX_METEORS = 10
 const Ecology = preload("res://landscape_ecology.gd")
 const Navigation = preload("res://landscape_navigation.gd")
 const Water = preload("res://landscape_water.gd")
+const Meteor = preload("res://landscape_meteor.gd")
 
 var game: Node3D
 var root: Node3D
@@ -33,6 +35,7 @@ var warning_nodes: Dictionary = {}
 var resource_by_key: Dictionary = {}
 var scenic_by_key: Dictionary = {}
 var scenic_cuts: Dictionary = {}
+var meteor_nodes: Dictionary = {}
 var test_mode := false
 var save_path := SAVE
 var save_blocked := false
@@ -59,7 +62,7 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "harvested": [], "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "marked": [], "carried": [], "threats": []}
 
 func _valid(value: Variant) -> bool:
 	if not value is Dictionary or int(value.get("schema", 0)) != 1: return false
@@ -74,6 +77,13 @@ func _valid(value: Variant) -> bool:
 	if value.get("carried", []) is not Array or value.get("carried", []).size() > 5: return false
 	if value.get("threats", []) is not Array or value.get("threats", []).size() > MAX_THREATS: return false
 	if value.get("forest_spells", []) is not Array or value.get("forest_spells", []).size() > MAX_FOREST_SPELLS: return false
+	if value.get("meteors", []) is not Array or value.get("meteors", []).size() > MAX_METEORS: return false
+	if int(value.get("star_gems", 0)) < 0 or int(value.get("star_gems", 0)) > 200: return false
+	if int(value.get("star_iron", 0)) < 0 or int(value.get("star_iron", 0)) > 200: return false
+	for rock in value.get("meteors", []):
+		if not rock is Dictionary or not _point_valid(rock.get("center", [])) or not Meteor._valid_record(rock): return false
+		if not rock.get("id", "") is String or str(rock.id).length() > 32: return false
+		if str(rock.get("phase", "")) not in ["falling", "landed"]: return false
 	for grove in value.get("forest_spells", []):
 		if not grove is Dictionary or not grove.get("region") is Dictionary or not grove.get("seed") is float and not grove.get("seed") is int: return false
 		# Old saves only have a region/seed. New saves pin each tree's identity
@@ -120,6 +130,9 @@ func _load() -> void:
 		if not data.has("carried"): data.carried = []
 		if not data.has("threats"): data.threats = []
 		if not data.has("forest_spells"): data.forest_spells = []
+		if not data.has("meteors"): data.meteors = []
+		if not data.has("star_gems"): data.star_gems = 0
+		if not data.has("star_iron"): data.star_iron = 0
 	else:
 		push_warning("WORLD_BUILDER invalid save; preserving file and starting an empty settlement")
 		save_blocked = true
@@ -229,6 +242,137 @@ func cast_raise(point: Vector3) -> String:
 	if result != "": return result
 	data.aether = float(data.aether) - 4.0
 	_changed("A hill rises beneath the same sky the Hero can see.")
+	return ""
+
+
+func cast_wall(a: Vector3, b: Vector3) -> String:
+	if not _inside(a) or not _inside(b): return "Draw the wall within the Orchard."
+	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+	if distance < 8.0 or distance > 85.0: return "Draw a wall between 8 and 85 metres."
+	var use_iron := int(data.star_iron) >= 2
+	if not use_iron and float(data.aether) < 4.0: return "Need 4 aether or 2 mined star iron for an earthen wall."
+	var op := {"type":"ridge", "points":[_pack(a),_pack(b)], "width":13.0, "height":4.0,
+		"feature":"earthen_wall"}
+	var result: String = game.landscape.apply_magic(op)
+	if result != "": return result
+	if use_iron: data.star_iron = int(data.star_iron) - 2
+	else: data.aether = float(data.aether) - 4.0
+	_changed("An earthen wall rises. Its slope and collision are real.")
+	return ""
+
+
+func cast_tree_ring(point: Vector3) -> String:
+	if not _inside(point) or absf(point.x) > 119.0 or absf(point.z) > 119.0: return "Choose a ring with room inside the Orchard."
+	if float(data.aether) < 4.0: return "Need 4 aether to grow a tree ring."
+	if data.forest_spells.size() >= MAX_FOREST_SPELLS: return "The grove ledger is full."
+	var region := {"type":"ring", "center":_pack(point), "radius":19.0, "width":10.0}
+	var spell_seed: int = int(game.landscape.seed) + int(data.revision) * 101 + 8357
+	var trees: Array[Dictionary] = Ecology.grow_ring(game.landscape.model, Vector2(point.x, point.z), 19.0, spell_seed)
+	if trees.size() < 10: return "That ring needs gentler, drier ground with more space."
+	if trees.size() > 30: trees.resize(30)
+	data.forest_spells.append({"region":region,"seed":spell_seed,"placements":_pack_forest(trees),"feature":"tree_ring"})
+	_render_forest(trees, true)
+	data.aether = float(data.aether) - 4.0
+	_changed("A ring of harvestable trees is growing around the chosen ground.")
+	return ""
+
+
+func cast_meteor(point: Vector3) -> String:
+	if not _inside(point) or absf(point.x) > 132.0 or absf(point.z) > 132.0: return "Call Starfall farther inside the Orchard."
+	if float(data.aether) < 8.0: return "Need 8 aether to call Starfall."
+	if data.meteors.size() >= MAX_METEORS: return "The Orchard already holds its maximum of ten meteorites."
+	if game.landscape.operation_count() >= game.landscape.MAX_OPERATIONS: return "The landscape cannot record another impact."
+	var at := Vector2(point.x,point.z)
+	var record: Dictionary = Meteor.make_record(at, int(game.landscape.seed) + int(data.revision) * 503 + 2903, game.landscape.height_at(at))
+	record["id"] = "meteor-%06d" % (int(data.revision) + 1)
+	record["phase"] = "falling"
+	data.meteors.append(record)
+	_render_meteor(record, true)
+	data.aether = float(data.aether) - 8.0
+	_changed("STARFALL! Leave the glowing impact site; then mine its gems with Stonewhisper.")
+	return ""
+
+
+func _render_meteor(record: Dictionary, animate: bool) -> void:
+	var id := str(record.id)
+	if meteor_nodes.has(id) and is_instance_valid(meteor_nodes[id]): return
+	var meteor := Meteor.new()
+	root.add_child(meteor)
+	meteor.setup(record, animate)
+	meteor.impact_ready.connect(_meteor_impact.bind(id))
+	meteor.inventory_changed.connect(_meteor_inventory.bind(id))
+	meteor_nodes[id] = meteor
+
+
+func _meteor_impact(event: Dictionary, id: String) -> void:
+	if not meteor_nodes.has(id): return
+	var meteor = meteor_nodes[id]
+	var record: Dictionary = meteor.to_record()
+	var result: String = game.landscape.apply_magic(Meteor.crater_operation(record))
+	if result != "":
+		push_warning("STARFALL terrain edit failed: " + result)
+		return
+	# The rock sinks with its crater; the same final height is stored for reload.
+	record.ground_y = float(record.ground_y) - 1.4
+	meteor.record.ground_y = record.ground_y
+	var sink := create_tween()
+	sink.tween_property(meteor, "position:y", float(record.ground_y), 1.1)
+	for i in data.meteors.size():
+		if str(data.meteors[i].get("id", "")) == id:
+			record.phase = "landed"
+			data.meteors[i] = record
+			break
+	var impact: Vector3 = center + event.center
+	game._effect(impact + Vector3.UP, Color("ffb363"), 0.45, 4.0)
+	var hero_local: Vector3 = game.rig.global_position - center
+	var hero_damage: float = Meteor.damage_at(event, hero_local)
+	if game.adventure.zone == ZONE and hero_damage > 0.0: game.adventure.take_damage(hero_damage, "Starfall")
+	for enemy in game.scene.enemies:
+		if not is_instance_valid(enemy) or not bool(enemy.get_meta("alive", false)): continue
+		if str(enemy.get_meta("zone", "")) != ZONE: continue
+		var damage: float = Meteor.damage_at(event, enemy.global_position - center)
+		if damage > 0.0: game.adventure.hurt_enemy(enemy, damage, null, (enemy.global_position - impact).normalized() * 4.0)
+	_changed("Starfall struck. Mine its core with a pick for star-gems and iron.")
+
+
+func _meteor_inventory(record: Dictionary, id: String) -> void:
+	for i in data.meteors.size():
+		if str(data.meteors[i].get("id", "")) == id:
+			record.phase = "landed"
+			data.meteors[i] = record
+			break
+
+
+func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float) -> bool:
+	var meteor: Node = target.get_parent()
+	if meteor == null or not meteor_nodes.values().has(meteor): return false
+	var reward: Dictionary = meteor.strike(point, tool_id, maxf(0.0, speed) * 0.45)
+	if not bool(reward.get("ok", false)):
+		if str(reward.get("reason", "")) == "pick_required": game._notice("A mining pick can break the star-metal.", 2)
+		return false
+	if str(reward.kind) == "meteor_gem":
+		data.star_gems = mini(200, int(data.star_gems) + 1)
+		_changed("A star-gem came free. Two gems can focus a Crystal Fault spell.")
+	else:
+		data.star_iron = mini(200, int(data.star_iron) + 1)
+		_changed("Star iron recovered. Two pieces can raise an earthen wall.")
+	game._effect(point, Color("86f6f4") if str(reward.kind) == "meteor_gem" else Color("f6b276"), 0.25, 0.45)
+	return true
+
+
+func cast_prism_fault(a: Vector3, b: Vector3) -> String:
+	if not _inside(a) or not _inside(b): return "Draw the crystal fault within the Orchard."
+	var distance := Vector2(a.x,a.z).distance_to(Vector2(b.x,b.z))
+	if distance < 7.0 or distance > 65.0: return "Draw a crystal fault between 7 and 65 metres."
+	if int(data.star_gems) < 2: return "Mine two star gems from a meteorite first."
+	if float(data.aether) < 2.0: return "Need 2 aether to awaken those gems."
+	var op := {"type":"ridge", "points":[_pack(a),_pack(b)], "width":8.0, "height":4.6,
+		"feature":"crystal_fault", "seed":int(game.landscape.seed) + int(data.revision) * 37}
+	var result: String = game.landscape.apply_magic(op)
+	if result != "": return result
+	data.star_gems = int(data.star_gems) - 2
+	data.aether = float(data.aether) - 2.0
+	_changed("Your mined gems raised a lasting, luminous crystal fault.")
 	return ""
 
 func cast_forest(a: Vector3, b: Vector3) -> String:
@@ -464,6 +608,7 @@ func _rebuild_saved() -> void:
 	for value in data.groves: _render_grove(_unpack(value))
 	for entry in data.forest_spells:
 		_render_forest(_unpack_forest(entry.placements) if entry.has("placements") else Ecology.grow(game.landscape.model, entry.region, int(entry.seed)), false)
+	for record in data.meteors: _render_meteor(record, str(record.phase) == "falling")
 	for segment in data.paths:
 		var a := _unpack(segment.a)
 		var b := _unpack(segment.b)
