@@ -1,6 +1,19 @@
 extends RefCounted
 ## Small authored assemblies: bevels, joints, wraps, functional parts and restraint.
 static func build(node:Node3D,id:String):
+	if id=="spore_lantern" and ResourceLoader.exists("res://weapons/mooncap_lantern.glb"):
+		var lantern_scene=load("res://weapons/mooncap_lantern.glb") as PackedScene
+		if lantern_scene!=null:
+			var lantern=lantern_scene.instantiate() as Node3D
+			if lantern!=null:
+				node.add_child(lantern)
+				node.set_meta("mooncap_authored",true)
+				var anchor=lantern.find_child("LightAnchor",true,false) as Node3D
+				if anchor!=null:
+					WorkshopScene.light(anchor,Vector3.ZERO,Color("bca5ef"),0.55,4.0)
+				else:
+					WorkshopScene.light(node,Vector3(0,0.55,0),Color("bca5ef"),0.55,4.0)
+				return
 	if id=="quarry_pick" and ResourceLoader.exists("res://weapons/stonewhisper.glb"):
 		var scene=load("res://weapons/stonewhisper.glb") as PackedScene
 		if scene!=null:
