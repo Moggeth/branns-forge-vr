@@ -33,6 +33,7 @@ func _initialize() -> void:
 		if n > 0:
 			Hydrology.run(variant, [])
 			Fields.derive(variant)
+			Ecology.build_fields(variant)
 		var report := _metrics(variant)
 		metrics.append(report)
 		if not report.river_descends: failures.append("river ascends on seed %d" % seed)

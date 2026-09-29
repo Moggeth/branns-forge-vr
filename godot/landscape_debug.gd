@@ -64,6 +64,16 @@ static func make_image(model: Dictionary, layer: String = "overview", scale: int
 					color = Color(0.20, 0.17, 0.13).lerp(Color(0.16, 0.76, 0.25), clampf(value, 0.0, 1.0))
 				"overview":
 					color = _terrain(elevation, grade, wetness)
+					# Show the ecology and the relief in the contact sheet, rather
+					# than twenty nearly identical green maps with blue lines.
+					var woodland: float = smoothstep(0.38, 0.82, _at(suitability, i, 0.0))
+					color = color.lerp(Color(0.13, 0.31, 0.18), woodland * 0.34)
+					var west: float = height[z * size + maxi(x - 1, 0)]
+					var east: float = height[z * size + mini(x + 1, size - 1)]
+					var north: float = height[maxi(z - 1, 0) * size + x]
+					var south: float = height[mini(z + 1, size - 1) * size + x]
+					var lit: float = clampf(0.87 + (west - east) * 0.09 + (north - south) * 0.10, 0.52, 1.17)
+					color *= lit
 					if water_depth > 0.01: color = Color(0.10, 0.46, 0.75)
 			image.set_pixel(x, z, color)
 	if layer == "vegetation": _draw_instances(image, model)

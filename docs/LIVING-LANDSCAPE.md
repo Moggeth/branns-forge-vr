@@ -32,7 +32,7 @@ When adding an operator, validate it in `landscape_operations.gd`, give it exact
 
 ## Measured evidence and limits
 
-On the local RTX 3080 Ti desktop, terrain setup after the indexed-mesh optimization was about 204–208 ms; the final isolated live check reported 204.46 ms. A 100 m Sunder target calculation was 1.33 ms, command dispatch 1.46 ms, and its last combined dirty-chunk/dressing rebuild 8.56 ms. The graphical stress sample reported 24 skeletons, 25 chunks, a 30 fps/65% second view, 16.08 ms 95th-percentile wall frames during the edit and one 35.22 ms maximum frame. Its baseline fps counter was stale immediately after startup, so the measured frame times are more useful than its reported minimum FPS. The 20-seed field run took 7.66 s, found all six landmark routes on every seed, 98% minimum walkable cells and 0.835 maximum grade. These are **desktop proxies**; headset stereo comfort and GPU timing still need a Vive Pro 2 playtest. A separate `world_builder_stress_check.gd` desktop run with 24 skeletons and the second view completed at median 120 fps.
+On the local RTX 3080 Ti desktop, terrain setup after the indexed-mesh optimization was about 204–208 ms; the final isolated live check reported 204.46 ms. A 100 m Sunder target calculation was 1.33 ms, command dispatch 1.46 ms, and its last combined dirty-chunk/dressing rebuild 8.56 ms. The graphical stress sample reported 24 skeletons, 25 chunks, a 30 fps/65% second view, 16.08 ms 95th-percentile wall frames during the edit and one 35.22 ms maximum frame. Its baseline fps counter was stale immediately after startup, so the measured frame times are more useful than its reported minimum FPS. The final 20-seed field run took 8.91 s, found all six landmark routes on every seed, 98% minimum walkable cells and 0.835 maximum grade. Its overview now shades relief and ecological density to expose variation that the first flat-green contact sheet hid. These are **desktop proxies**; headset stereo comfort and GPU timing still need a Vive Pro 2 playtest. A separate `world_builder_stress_check.gd` desktop run with 24 skeletons and the second view completed at median 120 fps.
 
 Measured work-step record (seconds, local wall clock unless marked internal):
 
@@ -40,13 +40,14 @@ Measured work-step record (seconds, local wall clock unless marked internal):
 |---|---|---:|
 | Opus 5.5 geology commission | Seven Blender/GLB assets and previews delivered | 186.23 |
 | Final nine headless module checks | All pass, including 20 seeds | 13.53 |
-| Final 20-seed generation/gallery inside that check | All landmarks reachable; no field failures | 7.66 internal |
+| Final 20-seed generation/gallery after overview refinement | All landmarks reachable; no field failures | 8.91 internal |
+| Final improved debug-gallery process | Pass | 9.93 |
 | Final same-world terrain/collider/grove check | Pass | 9.76 |
 | Full World Builder scripted regression | Pass | 4.55 |
 | Graphical 24-skeleton/dual-view Sunder stress | Pass | 10.75 |
 | Incorrect bare `--world-builder-check` launch | No checker ran; discarded and documented correct command | 73.32 |
 
-The first slice deliberately does not add caves/overhangs, multiplayer replication, dynamic watershed rerouting after spells, river diversion, settlement-grade flattening, GPU compute or clipmaps. The water ribbon is rebuilt locally, but the authored river centreline and drainage graph are not yet re-solved when a new ridge blocks them. Lumberjacks use the topology-aware route adapter; other enemy AI remains on its existing movement system. Some earlier hand-placed features are reprojected rather than regenerated from the new ecology fields. These are the next integration boundaries, not hidden claims of completeness.
+The first slice deliberately does not add caves/overhangs, multiplayer replication, dynamic watershed rerouting after spells, river diversion, erosion simulation, settlement-grade flattening, GPU compute or clipmaps. The water ribbon is rebuilt locally, but the authored river centreline and drainage graph are not yet re-solved when a new ridge blocks them. Lumberjacks use the topology-aware route adapter; other enemy AI remains on its existing movement system. Some earlier hand-placed features are reprojected rather than regenerated from the new ecology fields. These are the next integration boundaries, not hidden claims of completeness.
 
 ## Learned fast paths
 
