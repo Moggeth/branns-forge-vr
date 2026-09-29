@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import math
@@ -180,6 +181,8 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
     if primitives == 0:
         errors.append(f"{label}: no mesh primitives")
     base_images = set()
+    image_sizes: dict[str, int] = {}
+    image_bytes_total = 0
     for i, material in enumerate(arrays["materials"]):
         if not isinstance(material, dict):
             errors.append(f"{label}: invalid material {i}")
@@ -219,6 +222,8 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
         if len(image_bytes) != view["byteLength"]:
             errors.append(f"{label}: truncated embedded image {i}")
             continue
+        image_sizes[hashlib.sha256(image_bytes).hexdigest()] = len(image_bytes)
+        image_bytes_total += len(image_bytes)
         if i in base_images and Image is not None:
             try:
                 with Image.open(io.BytesIO(image_bytes)) as opened:
@@ -230,7 +235,8 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
     if base_images and Image is None:
         errors.append("Pillow is required to inspect base-color pixels; install Pillow and retry")
     return {"triangles": triangles, "primitives": primitives, "materials": len(arrays["materials"]),
-            "embedded_images": len(arrays["images"]), "base_color_images": len(base_images)}
+            "embedded_images": len(arrays["images"]), "base_color_images": len(base_images),
+            "embedded_image_bytes": image_bytes_total, "image_sizes": image_sizes}
 
 
 def validate(path: Path) -> dict:
@@ -239,7 +245,8 @@ def validate(path: Path) -> dict:
     warnings: list[str] = []
     result = {"manifest": str(path), "ok": False, "assets": 0, "placements": 0,
               "triangles_unique": 0, "triangles_instanced": 0, "primitives": 0,
-              "materials": 0, "embedded_images": 0, "errors": errors, "warnings": warnings}
+              "materials": 0, "embedded_images": 0, "embedded_image_bytes": 0,
+              "unique_image_bytes": 0, "errors": errors, "warnings": warnings}
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(doc, dict):
@@ -261,6 +268,7 @@ def validate(path: Path) -> dict:
         result["assets"] = len(assets)
         result["placements"] = len(placements)
         counts: dict[str, int] = {}
+        unique_images: dict[str, int] = {}
         for i, entry in enumerate(placements):
             if not isinstance(entry, dict):
                 errors.append(f"placement {i}: must be an object")
@@ -328,6 +336,9 @@ def validate(path: Path) -> dict:
             result["triangles_instanced"] += summary["triangles"] * counts.get(asset, 0)
             for key in ("primitives", "materials", "embedded_images"):
                 result[key] += summary[key]
+            result["embedded_image_bytes"] += summary["embedded_image_bytes"]
+            unique_images.update(summary["image_sizes"])
+        result["unique_image_bytes"] = sum(unique_images.values())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         errors.append(f"manifest unreadable: {exc}")
     result["ok"] = not errors
