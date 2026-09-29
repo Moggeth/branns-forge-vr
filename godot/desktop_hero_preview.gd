@@ -16,7 +16,13 @@ static func run(game,tool:String):
 		var item=preload("res://siegebird_checks.gd").load_sample(game)
 		if item==null: game.get_tree().quit(2); return
 		game.grips._attach(game.desktop_hand,item)
+	elif game.adventure.TOOL_NAMES.has(tool):
+		var item=game.adventure._tool_model(tool)
+		game.add_child(item)
+		game.grips._attach(game.desktop_hand,item)
 	else: game.get_tree().quit(2); return
+	if OS.get_cmdline_user_args().has("--preview-alternate"):
+		game.item_actions.trigger(game.desktop_hand,game.desktop_hand)
 	if OS.get_cmdline_user_args().has("--preview-help"): game.desktop_help_panel.visible=true
 	if OS.get_cmdline_user_args().has("--preview-fullscreen-check"):
 		var previous=game.get_window().mode

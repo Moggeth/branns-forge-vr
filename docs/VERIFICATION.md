@@ -1432,6 +1432,17 @@ intermittent OneDrive `EPERM` while atomically replacing the fixture's
 fixture location is now the OS temp directory, with `BRANN_TEST_ROOT` retained
 as an override. No player service save or historical fixture was used.
 
+Stonewhisper integration lesson (2026-09-30): the first authored-pick check
+used `get_meta(key, null)` for an optional material. Godot threw when that
+metadata did not exist on a fallback item; guard with `has_meta(key)` before
+reading it. Running `--adventure-smoke` alone was also a misleading strategy
+because a live tier-four save defeated its fresh-progression assumptions.
+Run `node service/integration.cjs` with its disposable fixture instead; the
+full suite passed in 54.679 seconds after the authored-pick changes. The
+focused `stonewhisper_checks.gd` passed in 5.65 seconds. Godot extracted three
+textures while importing the self-contained GLB, so keep those PNGs and their
+`.import` metadata beside the installed weapon when committing it.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

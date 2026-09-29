@@ -14,11 +14,10 @@ static func run(game,failures:Array):
 		if id=="woodland_axe" and (game.adventure.hp!=50 or not item.get_meta("axe_power_armed",false)): failures.append("axe trigger must arm a physical cleave without healing")
 		if id=="quarry_pick" and float(item.get_meta("stonewhisper_charged_until",0))<=game.elapsed: failures.append("pick resonance did not charge")
 		if id=="quarry_pick":
-			var outward=0
-			for part in item.get_children():
-				if part is MeshInstance3D and part.mesh is CylinderMesh and absf(part.position.x)>.20 and absf(part.position.y-.59)<.02:
-					if part.global_basis.y.x*signf(part.position.x)>0: outward+=1
-			if outward!=2: failures.append("pick spikes do not point outward")
+			var left=item.find_child("PickTipLeft",true,false) as Node3D
+			var right=item.find_child("PickTipRight",true,false) as Node3D
+			if left==null or right==null or left.global_basis.y.x>-.9 or right.global_basis.y.x<.9:
+				failures.append("authored pick points do not face outward")
 			var sample_ore=Node3D.new(); game.add_child(sample_ore); sample_ore.set_meta("requires","pick")
 			actions.resonant_mine(item,sample_ore,hand.global_position,hand)
 			if int(sample_ore.get_meta("resonant_bonus",0))!=1 or float(item.get_meta("stonewhisper_charged_until",-1))!=0: failures.append("pick charge did not enrich physical ore strike")

@@ -17,6 +17,7 @@ var game
 var cooldowns={}
 var projectiles=[]
 var gardens=[]
+var charged_picks=[]
 var grapple={}
 var falling=false
 var tether:MeshInstance3D
@@ -59,11 +60,28 @@ func trigger(hand,source)->bool:
 		"starter_hammer","apprentice_hammer":
 			pulse(origin,2.7,18,hand,Color("ff9b48"))
 		"quarry_pick":
+			_clear_pick_charge(item)
 			item.set_meta("stonewhisper_charged_until",game.elapsed+8.0)
-			if item.has_meta("stonewhisper_glow") and is_instance_valid(item.get_meta("stonewhisper_glow")): item.get_meta("stonewhisper_glow").queue_free()
-			var glow=WorkshopScene.ball(item,Vector3(0,0.61,0.085),Vector3.ONE*0.09,WorkshopScene.material("97bed3",0.2,0.35,1.2))
-			item.set_meta("stonewhisper_glow",glow)
-			game._effect(item.to_global(Vector3(0,0.61,0)),Color("97bed3"),0.55,0.36)
+			if not item in charged_picks: charged_picks.append(item)
+			var marker=item.find_child("ChargeGlow",true,false) as Node3D
+			var at=item.to_local(marker.global_position) if marker!=null else Vector3(0,0.61,0.085)
+			var crystal=item.get_meta("stonewhisper_crystal_material") if item.has_meta("stonewhisper_crystal_material") else null
+			if crystal is StandardMaterial3D:
+				crystal.emission_energy_multiplier=3.0
+				# One short-range, shadowless light makes the charged head read in a
+				# dark mine without paying for a light on every idle pick.
+				var charge_light=OmniLight3D.new()
+				charge_light.name="ResonanceChargeLight"
+				charge_light.light_color=Color("85d9ff")
+				charge_light.light_energy=0.8
+				charge_light.omni_range=1.35
+				charge_light.shadow_enabled=false
+				item.add_child(charge_light)
+				charge_light.position=at
+				item.set_meta("stonewhisper_charge_light",charge_light)
+			else:
+				item.set_meta("stonewhisper_glow",WorkshopScene.ball(item,at,Vector3.ONE*0.09,WorkshopScene.material("97bed3",0.2,0.35,1.2)))
+			game._effect(item.to_global(at),Color("97bed3"),0.55,0.36)
 			game._notice("Stonewhisper is listening. Strike ore within eight seconds for a richer seam break.",6)
 		"crystal_resonator":
 			for angle in [-0.12,0.0,0.12]: launch(origin,(-source.global_basis.z).rotated(Vector3.UP,angle),Color("b984ed"),20,hand,"crystal")
@@ -84,12 +102,26 @@ func trigger(hand,source)->bool:
 	game.adventure.haptic(hand,"release")
 	return true
 
+func _clear_pick_charge(item:Node3D)->void:
+	item.set_meta("stonewhisper_charged_until",0.0)
+	var crystal=item.get_meta("stonewhisper_crystal_material") if item.has_meta("stonewhisper_crystal_material") else null
+	if crystal is StandardMaterial3D:
+		crystal.emission_energy_multiplier=float(item.get_meta("stonewhisper_crystal_rest",0.9))
+	if item.has_meta("stonewhisper_glow"):
+		var glow=item.get_meta("stonewhisper_glow")
+		if is_instance_valid(glow): glow.queue_free()
+		item.remove_meta("stonewhisper_glow")
+	if item.has_meta("stonewhisper_charge_light"):
+		var charge_light=item.get_meta("stonewhisper_charge_light")
+		if is_instance_valid(charge_light): charge_light.queue_free()
+		item.remove_meta("stonewhisper_charge_light")
+	charged_picks.erase(item)
+
 func resonant_mine(item,target,point:Vector3,hand)->void:
 	if game.elapsed>float(item.get_meta("stonewhisper_charged_until",0)): return
 	if not target.is_visible_in_tree() or target.get_meta("collecting",false): return
 	if not str(target.get_meta("requires", "")) in ["pick","mine"]: return
-	item.set_meta("stonewhisper_charged_until",0.0)
-	if item.has_meta("stonewhisper_glow") and is_instance_valid(item.get_meta("stonewhisper_glow")): item.get_meta("stonewhisper_glow").queue_free()
+	_clear_pick_charge(item)
 	target.set_meta("resonant_bonus",1)
 	game._effect(point,Color("97bed3"),0.65,1.4)
 	var fractured=0
@@ -142,12 +174,15 @@ func detach():
 
 func tick(delta):
 	controls.visible=false
+	for index in range(charged_picks.size()-1,-1,-1):
+		var charged=charged_picks[index]
+		if not is_instance_valid(charged):
+			charged_picks.remove_at(index)
+		elif game.elapsed>float(charged.get_meta("stonewhisper_charged_until",0)):
+			_clear_pick_charge(charged)
 	for key in game.held:
 		var item=game.held[key]
 		var id=str(item.get_meta("id",""))
-		if id=="quarry_pick" and item.has_meta("stonewhisper_glow") and game.elapsed>float(item.get_meta("stonewhisper_charged_until",0)):
-			if is_instance_valid(item.get_meta("stonewhisper_glow")): item.get_meta("stonewhisper_glow").queue_free()
-			item.remove_meta("stonewhisper_glow")
 		if item.has_meta("spool") and item.get_meta("reeling",false): item.get_meta("spool").rotate_x(delta*4)
 		if (CONTROLS.has(id) or item.has_meta("use_instructions")) and not game.qol.opened and game.elapsed<float(item.get_meta("controls_until",0)):
 			# Desktop controls live in the readable corner HUD. A head-locked 3D

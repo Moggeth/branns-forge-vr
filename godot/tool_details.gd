@@ -1,6 +1,22 @@
 extends RefCounted
 ## Small authored assemblies: bevels, joints, wraps, functional parts and restraint.
 static func build(node:Node3D,id:String):
+	if id=="quarry_pick" and ResourceLoader.exists("res://weapons/stonewhisper.glb"):
+		var scene=load("res://weapons/stonewhisper.glb") as PackedScene
+		if scene!=null:
+			var authored=scene.instantiate() as Node3D
+			if authored!=null:
+				node.add_child(authored)
+				node.set_meta("stonewhisper_authored",true)
+				var crystal=authored.find_child("ResonanceCrystal",true,false) as MeshInstance3D
+				if crystal!=null:
+					var finish=crystal.get_active_material(0)
+					if finish is StandardMaterial3D:
+						var unique_finish=finish.duplicate() as StandardMaterial3D
+						crystal.material_override=unique_finish
+						node.set_meta("stonewhisper_crystal_material",unique_finish)
+						node.set_meta("stonewhisper_crystal_rest",unique_finish.emission_energy_multiplier)
+				return
 	var wood=WorkshopScene.material("795334")
 	var brass=WorkshopScene.material("bc955b",0.65,0.4)
 	var steel=WorkshopScene.material("728b94",0.75,0.35)

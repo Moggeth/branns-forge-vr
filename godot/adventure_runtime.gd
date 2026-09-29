@@ -294,7 +294,8 @@ func _tool_model(id: String) -> Node3D:
 		return node
 	if id in ["quarry_pick","grappling_hook","spore_lantern","ember_gauntlet"]:
 		preload("res://tool_details.gd").build(node,id)
-		game._collider(node,Vector3(0.48,0.85,0.32),Vector3(0,0.4,0))
+		# Stonewhisper's complete crescent head is physical, including both tips.
+		game._collider(node,Vector3(0.70,0.82,0.18) if id=="quarry_pick" else Vector3(0.48,0.85,0.32),Vector3(0,0.34,0) if id=="quarry_pick" else Vector3(0,0.4,0))
 		return node
 	var wood = Color("754622")
 	var metal = Color("b3ced4")
