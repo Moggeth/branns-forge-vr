@@ -1505,7 +1505,7 @@ func _trigger(hand: Node3D, desktop: bool):
 		_effect(hand.global_position - source.global_basis.z * 0.6, Color("ffc774"), 0.2, 0.25)
 	else:
 		cooldown = elapsed + 0.3
-		var response = await _request("/api/vr/ability", {"id":id,"position":_vec(camera.global_position),"forward":_vec(-source.global_basis.z),"targets":_targets()})
+		var response = await _request("/api/vr/ability", {"id":id,"position":_vec(camera.global_position),"forward":_vec(-source.global_basis.z),"targets":_targets(camera.global_position)})
 		if response.has("error"):
 			_notice(response.error)
 			return
@@ -1576,8 +1576,11 @@ func _button(action: String):
 			_notice("Tell Brann your invention idea. Finished tools arrive on their named collection stands.", 12)
 			_button("retry")
 
-func _targets() -> Array:
-	var list = []
+func _targets(origin: Vector3) -> Array:
+	# service/world.js accepts at most 100 targets. Keep all scene nodes available
+	# locally, and send the nearest useful subset for context and abilities.
+	var candidates = []
+	var order = 0
 	for target in scene.rats + scene.dummies + scene.get("enemies",[]) + scene.get("resources",[]) + scene.get("barriers",[]) + scene.get("anchors",[]):
 		if not is_instance_valid(target): continue
 		var entry = _vec(target.global_position)
@@ -1587,7 +1590,19 @@ func _targets() -> Array:
 		entry.resource = target.get_meta("resource", "")
 		entry.requires = target.get_meta("requires", "")
 		entry.alive = target.get_meta("alive", true)
-		list.append(entry)
+		var distance_sq = target.global_position.distance_squared_to(origin)
+		var threat = entry.alive and entry.type in ["rat", "dummy", "enemy", "skeleton", "boss", "guardian", "golem", "wisp"]
+		var nearby = distance_sq <= 144.0
+		var priority = 0 if threat and nearby else (1 if nearby else (2 if threat else 3))
+		candidates.append({"entry":entry,"distance_sq":distance_sq,"priority":priority,"order":order})
+		order += 1
+	candidates.sort_custom(func(a, b):
+		if a.priority != b.priority: return a.priority < b.priority
+		if a.distance_sq != b.distance_sq: return a.distance_sq < b.distance_sq
+		return a.order < b.order
+	)
+	var list = []
+	for candidate in candidates.slice(0, 100): list.append(candidate.entry)
 	return list
 
 func _send_context():
@@ -1597,7 +1612,7 @@ func _send_context():
 	if not held.is_empty(): id = held.values()[0].get_meta("id", "starter_hammer")
 	var controllers = []
 	for hand in hands: controllers.append({"hand":"left" if str(hand.tracker).begins_with("left") else "right","profile":"OpenXR","haptics":true,"tracked":hand.get_is_active()})
-	await _request("/api/vr/context", {"position":_vec(camera.global_position),"visiting":visiting,"equipped":id,"targets":_targets(),"zone":adventure.zone,"controllers":controllers,"interactionProfilesApplied":siegebird.extras.applied_versions,"interaction":adventure.last_interaction,"health":adventure.hp,"playful":_playful_context(),"worldChallenges":[adventure.hollow.context()] if adventure.hollow != null else [],"presence":{"distance":presence.distance if presence!=null else 0.0,"phase":presence.phase if presence!=null else "away"}})
+	await _request("/api/vr/context", {"position":_vec(camera.global_position),"visiting":visiting,"equipped":id,"targets":_targets(camera.global_position),"zone":adventure.zone,"controllers":controllers,"interactionProfilesApplied":siegebird.extras.applied_versions,"interaction":adventure.last_interaction,"health":adventure.hp,"playful":_playful_context(),"worldChallenges":[adventure.hollow.context()] if adventure.hollow != null else [],"presence":{"distance":presence.distance if presence!=null else 0.0,"phase":presence.phase if presence!=null else "away"}})
 	context_busy = false
 
 func _poll():
@@ -1954,7 +1969,7 @@ func _smoke_test():
 		rat.set_meta("alive", true)
 		rat.visible = true
 		rat.position = Vector3(0, 0.2, 0)
-		var result = await _request("/api/vr/ability", {"id":imported.keys()[0],"position":_vec(Vector3.ZERO),"forward":_vec(Vector3.FORWARD),"targets":_targets()})
+		var result = await _request("/api/vr/ability", {"id":imported.keys()[0],"position":_vec(Vector3.ZERO),"forward":_vec(Vector3.FORWARD),"targets":_targets(Vector3.ZERO)})
 		for action in result.get("actions", []): _apply_action(action)
 		print("SMOKE generated_damage=", not rat.get_meta("alive", true))
 		successful = successful and not held.is_empty() and not rat.get_meta("alive", true)
@@ -2083,7 +2098,7 @@ func _adventure_smoke_test():
 		var rat=scene.rats[0]
 		rat.global_position=center+Vector3(1,0.2,0)
 		rat.set_meta("alive",true)
-		var result=await _request("/api/vr/ability",{"id":imported.keys()[0],"position":_vec(center),"forward":_vec(Vector3.FORWARD),"targets":_targets()})
+		var result=await _request("/api/vr/ability",{"id":imported.keys()[0],"position":_vec(center),"forward":_vec(Vector3.FORWARD),"targets":_targets(center)})
 		for action in result.get("actions",[]): _apply_action(action)
 		if rat.get_meta("alive",true): failures.append("generated remote zone damage")
 	print("ADVENTURE_SMOKE ",JSON.stringify({"failures":failures,"tier":state.get("tier",1),"zones":scene.get("zones",{}).size(),"resources":state.get("resources",{})}))
