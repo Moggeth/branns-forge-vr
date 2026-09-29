@@ -14,6 +14,7 @@ func _check() -> void:
 	if builder == null or game.adventure.zone != "orchard_highlands": failures.append("builder world/arrival missing")
 	else:
 		var view: Window = load("res://world_builder_view.gd").new()
+		view.visible = false
 		game.add_child(view)
 		view.setup(game, builder)
 		if view.tactical_viewport.world_3d != game.get_world_3d(): failures.append("survey is not the Hero's live World3D")

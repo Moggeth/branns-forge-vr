@@ -7,6 +7,8 @@ const HOTKEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "0", "Q", "E", "R"]
 const COSTS = ["helper + timber", "aether / distance", "3 lumber", "3 aether", "4 aether", "5 aether", "4 aether", "3 aether", "4 aether / 2 iron", "4 aether", "8 aether", "2 gems + 2 aether"]
 const TOP_HEIGHT = 64
 const BOTTOM_HEIGHT = 224
+const WINDOWED_SIZE = Vector2i(1280, 800)
+const WINDOWED_MIN_SIZE = Vector2i(960, 620)
 
 var game: Node3D
 var builder: Node
@@ -50,15 +52,26 @@ var protected_vr := false
 var follow_hero := false
 var preview_valid: StandardMaterial3D
 var preview_invalid: StandardMaterial3D
+var companion_mode := false
+var previous_embed_subwindows := true
+var ui_scale := 1.0
+
+func _enter_tree() -> void:
+	previous_embed_subwindows = get_tree().root.gui_embed_subwindows
+	get_tree().root.gui_embed_subwindows = false
+
+func _exit_tree() -> void:
+	get_tree().root.gui_embed_subwindows = previous_embed_subwindows
 
 func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	game = owner_game
 	builder = owner_builder
 	title = "Brann's Forge — Orchard Survey"
-	size = Vector2i(1280, 800)
-	min_size = Vector2i(960, 620)
+	companion_mode = bool(game.vr)
+	size = WINDOWED_SIZE
+	min_size = WINDOWED_MIN_SIZE
 	initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_MOUSE_FOCUS
-	unresizable = true
+	unresizable = false
 	focus_point = builder.center + Vector3(19, 0, -39)
 	tactical_viewport = SubViewport.new()
 	tactical_viewport.name = "BuilderSharedWorld"
@@ -80,8 +93,11 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	_layout_ui()
 	close_requested.connect(close)
 	visible = true
+	if not companion_mode and DisplayServer.get_name() != "headless":
+		game.desktop_look.release_capture()
+		mode = Window.MODE_FULLSCREEN
 	grab_focus()
-	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale)
+	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale, " mode=", mode, " companion=", companion_mode)
 
 func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(builder): return
@@ -130,6 +146,8 @@ func close() -> void:
 	if is_instance_valid(marker): marker.queue_free()
 	if is_instance_valid(route_preview): route_preview.queue_free()
 	visible = false
+	if not companion_mode:
+		game.get_window().grab_focus()
 	queue_free()
 
 func _position_camera() -> void:
@@ -147,7 +165,7 @@ func _build_ui() -> void:
 	world_picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(world_picture)
 	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay)
 	top_panel = _panel(Vector2.ZERO, Vector2(1280, TOP_HEIGHT))
@@ -221,23 +239,29 @@ func _label(parent: Control, words: String, pos: Vector2, extent: Vector2, font_
 
 func _layout_ui() -> void:
 	if top_panel == null: return
-	var width := float(size.x)
-	tactical_viewport.size = Vector2i(maxi(1, roundi(width * render_scale)), maxi(1, roundi(float(size.y) * render_scale)))
+	ui_scale = clampf(minf(float(size.x) / 1440.0, float(size.y) / 900.0), 1.0, 2.0)
+	overlay.scale = Vector2.ONE * ui_scale
+	overlay.size = Vector2(size) / ui_scale
+	var width := overlay.size.x
+	var height := overlay.size.y
+	tactical_viewport.size = Vector2i(maxi(1, roundi(float(size.x) * render_scale)), maxi(1, roundi(float(size.y) * render_scale)))
 	top_panel.size.x = width
-	bottom_panel.position.y = float(size.y) - BOTTOM_HEIGHT
+	bottom_panel.position.y = height - BOTTOM_HEIGHT
 	bottom_panel.size.x = width
 	quality_button.position.x = width - 360
 	fps_button.position.x = width - 185
 	follow_button.position.x = width - 538
+	title_label.size.x = maxf(200.0, width - 570.0)
 	status_label.size.x = width - 50
 	hint_label.size.x = width - 40
 	feedback_label.size.x = width - 40
-	var action_width := maxf(132, (width - 40 - 4 * 8) / 5.0)
+	var action_width := clampf((width - 40 - 4 * 8) / 5.0, 132.0, 230.0)
+	var actions_left := maxf(20.0, (width - (action_width * 5.0 + 8.0 * 4.0)) * 0.5)
 	for i in range(buttons.size()):
-		buttons[i].position.x = 20 + (i % 5) * (action_width + 8)
+		buttons[i].position.x = actions_left + (i % 5) * (action_width + 8)
 		buttons[i].position.y = 51 + (i / 5) * 54
 		buttons[i].size.x = action_width
-	hire_button.position.x = 20 + 2 * (action_width + 8)
+	hire_button.position.x = actions_left + 2 * (action_width + 8)
 	hire_button.position.y = 159
 	hire_button.size.x = action_width
 
@@ -245,7 +269,7 @@ func _refresh_ui() -> void:
 	if status_label == null: return
 	status_label.text = "Seed %d  ·  %d earth edits  ·  %d lumber  ·  %.1f/20 aether  ·  %d star-gems  ·  %d star iron  ·  %d helpers" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.wood), float(builder.data.aether), int(builder.data.star_gems), int(builder.data.star_iron), int(builder.data.workers)]
 	var action_index := ACTIONS.find(selected)
-	hint_label.text = HINTS[action_index] + "    WASD pan · right-drag orbit · wheel zoom · F11 fullscreen · Esc close"
+	hint_label.text = HINTS[action_index] + "    WASD pan · right-drag orbit · wheel zoom · F11 window/fullscreen · F9 or Esc return"
 	var route_hint := ""
 	if selected == "path" and first_point != Vector3.INF and hovered != Vector3.INF:
 		var length := first_point.distance_to(hovered)
@@ -341,7 +365,7 @@ func _update_preview() -> void:
 		route_preview.rotation.y = atan2(span.x, span.z)
 
 func _world_at(screen: Vector2) -> Vector3:
-	if screen.y < TOP_HEIGHT or screen.y > float(size.y) - BOTTOM_HEIGHT: return Vector3.INF
+	if screen.y < TOP_HEIGHT * ui_scale or screen.y > float(size.y) - BOTTOM_HEIGHT * ui_scale: return Vector3.INF
 	var scaled := screen * Vector2(tactical_viewport.size) / Vector2(size)
 	var origin := camera.project_ray_origin(scaled)
 	var direction := camera.project_ray_normal(scaled)
@@ -396,7 +420,11 @@ func _input(event: InputEvent) -> void:
 			if first_point != Vector3.INF: first_point = Vector3.INF; _say("Route preview cancelled.")
 			else: close()
 		elif event.keycode == KEY_F9: close()
-		elif event.keycode == KEY_F11: mode = Window.MODE_WINDOWED if mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		elif event.keycode == KEY_F11:
+			if mode == Window.MODE_FULLSCREEN or mode == Window.MODE_EXCLUSIVE_FULLSCREEN:
+				mode = Window.MODE_WINDOWED
+				size = WINDOWED_SIZE
+			else: mode = Window.MODE_FULLSCREEN
 		set_input_as_handled()
 	elif event is InputEventMouseButton:
 		if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
