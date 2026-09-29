@@ -9,6 +9,8 @@ const TOP_HEIGHT = 64
 const BOTTOM_HEIGHT = 224
 const WINDOWED_SIZE = Vector2i(1280, 800)
 const WINDOWED_MIN_SIZE = Vector2i(960, 620)
+const ARRIVAL_SECONDS = 0.36
+const ARRIVAL_MAX_DISTANCE = 180.0
 
 var game: Node3D
 var builder: Node
@@ -55,6 +57,10 @@ var preview_invalid: StandardMaterial3D
 var companion_mode := false
 var previous_embed_subwindows := true
 var ui_scale := 1.0
+var arrival_elapsed := ARRIVAL_SECONDS
+var arrival_from := Transform3D.IDENTITY
+var arrival_to := Transform3D.IDENTITY
+var arrival_from_fov := 56.0
 
 func _enter_tree() -> void:
 	previous_embed_subwindows = get_tree().root.gui_embed_subwindows
@@ -96,12 +102,14 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	if not companion_mode and DisplayServer.get_name() != "headless":
 		game.desktop_look.release_capture()
 		mode = Window.MODE_FULLSCREEN
+		_start_arrival()
 	grab_focus()
 	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale, " mode=", mode, " companion=", companion_mode)
 
 func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(builder): return
 	clock += delta
+	_advance_arrival(delta)
 	if mode == Window.MODE_MINIMIZED:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
@@ -152,9 +160,29 @@ func close() -> void:
 
 func _position_camera() -> void:
 	if camera == null: return
+	arrival_elapsed = ARRIVAL_SECONDS
+	camera.fov = 56.0
 	var horizontal := cos(pitch) * zoom
 	camera.global_position = focus_point + Vector3(sin(yaw) * horizontal, sin(pitch) * zoom, cos(yaw) * horizontal)
 	camera.look_at(focus_point, Vector3.UP)
+
+func _start_arrival() -> void:
+	if not is_instance_valid(game.camera): return
+	arrival_to = camera.global_transform
+	arrival_from = game.camera.global_transform
+	if arrival_from.origin.distance_to(arrival_to.origin) > ARRIVAL_MAX_DISTANCE: return
+	arrival_from_fov = game.camera.fov
+	arrival_elapsed = 0.0
+	camera.global_transform = arrival_from
+	camera.fov = arrival_from_fov
+
+func _advance_arrival(delta: float) -> void:
+	if arrival_elapsed >= ARRIVAL_SECONDS: return
+	arrival_elapsed = minf(arrival_elapsed + delta, ARRIVAL_SECONDS)
+	var fraction := arrival_elapsed / ARRIVAL_SECONDS
+	var eased := 1.0 - pow(1.0 - fraction, 3.0)
+	camera.global_transform = arrival_from.interpolate_with(arrival_to, eased)
+	camera.fov = lerpf(arrival_from_fov, 56.0, eased)
 
 func _build_ui() -> void:
 	world_picture = TextureRect.new()

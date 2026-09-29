@@ -8,12 +8,24 @@ func _check() -> void:
 	var failures: Array[String] = []
 	var game: Node3D = load("res://main.tscn").instantiate()
 	root.add_child(game)
+	game.camera.global_position = game.world_builder.center + Vector3(16, 2, -20)
+	game.camera.look_at(game.world_builder.center + Vector3(19, 0, -39))
 	var original_embed := root.gui_embed_subwindows
+	var original_game_mode := game.get_window().mode
 	var view: Window = load("res://world_builder_view.gd").new()
 	view.visible = false
 	game.add_child(view)
+	game.world_builder_view = view
 	view.setup(game, game.world_builder)
+	if view.arrival_elapsed != 0.0 or view.camera.global_position.distance_to(game.camera.global_position) > 0.05:
+		failures.append("desktop survey did not begin at the Hero camera")
+	if view.tactical_viewport.world_3d != game.get_world_3d():
+		failures.append("desktop survey lost the live Hero world")
 	await create_timer(0.7).timeout
+	if view.arrival_elapsed < view.ARRIVAL_SECONDS or view.camera.global_position.distance_to(view.arrival_to.origin) > 0.05:
+		failures.append("survey camera did not settle promptly over the orchard")
+	if game.get_window().mode != original_game_mode:
+		failures.append("opening the survey changed the Hero window mode")
 	var desktop_size := view.size
 	var desktop_mode := view.mode
 	if desktop_mode != Window.MODE_FULLSCREEN: failures.append("desktop survey did not open fullscreen")
@@ -42,6 +54,16 @@ func _check() -> void:
 	await process_frame
 	if is_instance_valid(view): failures.append("F9 did not return to the Hero")
 	if root.gui_embed_subwindows != original_embed: failures.append("subwindow preference was not restored")
+	var quick_return: Window = load("res://world_builder_view.gd").new()
+	quick_return.visible = false
+	game.add_child(quick_return)
+	game.world_builder_view = quick_return
+	quick_return.setup(game, game.world_builder)
+	await process_frame
+	quick_return._input(f9)
+	await process_frame
+	if is_instance_valid(quick_return): failures.append("F9 did not interrupt the camera arrival immediately")
+	if game.get_window().mode != original_game_mode: failures.append("return changed the Hero window mode")
 	game.vr = true
 	var companion: Window = load("res://world_builder_view.gd").new()
 	companion.visible = false
