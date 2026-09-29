@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "asset_id": "stonewhisper",
+  "kind": "weapon",
+  "coordinate_system": {
+    "unit": "metre",
+    "up": "+Y",
+    "head_axis": "+X/-X",
+    "origin": "base of handle"
+  },
+  "required_nodes": ["Grip", "PickTipLeft", "PickTipRight", "ChargeGlow", "HitCentre"],
+  "limits": {
+    "max_bytes": 8388608,
+    "max_triangles": 20000,
+    "max_meshes": 40,
+    "max_materials": 6,
+    "max_images": 6
+  },
+  "max_dimensions_m": [0.8, 0.95, 0.4]
+}
