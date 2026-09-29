@@ -19,6 +19,15 @@ $routeZones = @('sandstone_quarry', 'ember_foundry', 'enchanted_kitchen', 'mushr
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $outcome = 'failed'
 
+function Assert-GodotLog([string]$Path, [string]$Marker) {
+  if (Select-String -LiteralPath $Path -Pattern '^(SCRIPT ERROR:|ERROR:)' -Quiet) {
+    throw "Godot reported an error; inspect $Path"
+  }
+  if ($Marker -and !(Select-String -LiteralPath $Path -Pattern "^$([regex]::Escape($Marker)) " -Quiet)) {
+    throw "Godot did not emit $Marker; inspect $Path"
+  }
+}
+
 try {
   if (!(Test-Path -LiteralPath $godot)) { throw "Godot executable missing: $godot" }
   $manifests = @()
@@ -34,6 +43,7 @@ try {
 
   & $godot --headless --editor --xr-mode off --audio-driver Dummy --path $project --import --quit *> $importLog
   if ($LASTEXITCODE -ne 0) { throw "Godot asset import failed; inspect $importLog" }
+  Assert-GodotLog $importLog ''
   Write-Output "ZONE_ART_IMPORT_OK $importLog"
 
   $selectedRoutes = @($Zones | Where-Object { $_ -in $routeZones })
@@ -41,12 +51,14 @@ try {
     $selection = '--zone=' + ($selectedRoutes -join ',')
     & $godot --headless --xr-mode off --audio-driver Dummy --path $project --script res://zone_art_route_checks.gd --quit-after 2400 -- $selection --require-authored *> $routeLog
     if ($LASTEXITCODE -ne 0) { throw "Art blocked a gameplay route; inspect $routeLog" }
+    Assert-GodotLog $routeLog 'ZONE_ART_ROUTE_RESULT'
     Write-Output "ZONE_ART_ROUTES_OK $routeLog"
   }
 
   if ($Render) {
     & $godot --xr-mode off --audio-driver Dummy --path $project --script res://environment_art_review.gd --quit-after 2400 -- --world-builder-preview *> $renderLog
     if ($LASTEXITCODE -ne 0) { throw "Godot environment capture failed; inspect $renderLog" }
+    Assert-GodotLog $renderLog 'ENVIRONMENT_ART_REVIEW'
     & python (Join-Path $repo 'scripts/make_environment_contact_sheet.py')
     if ($LASTEXITCODE -ne 0) { throw 'Contact sheet generation failed' }
     Write-Output "ZONE_ART_RENDER_OK $renderLog"
