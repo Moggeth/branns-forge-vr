@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "asset_id": "pocket_thunder",
+  "kind": "weapon",
+  "coordinate_system": {
+    "unit": "metre",
+    "up": "+Y",
+    "origin": "centre of bomb"
+  },
+  "required_nodes": ["Heart", "Shell", "Crown", "TrailOrigin"],
+  "limits": {
+    "max_bytes": 5242880,
+    "max_triangles": 10000,
+    "max_meshes": 48,
+    "max_materials": 8,
+    "max_images": 6
+  },
+  "max_dimensions_m": [0.3, 0.3, 0.3]
+}
