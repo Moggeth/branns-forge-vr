@@ -1554,3 +1554,23 @@ passed in 63.714 s. Both art revisions used actual game review; the refined
 version replaced the technically valid but fern-like first silhouette.
 Source, controls, measured budgets, captures and headset limits are in
 `docs/EMBERWING-20260930.md`.
+
+Emberwing standard-view review (2026-09-30): twelve 1800px views render with
+Blender EEVEE in 4.735 s. The first view-layer material override left the
+wireframe textured; assign explicit materials to the imported meshes instead.
+A Wireframe modifier with even-offset enabled made acute feather triangles
+produce long spikes. Disable even-offset and visually check the wire view.
+The assembled review GLB passed the existing bow contract in 2.231 s; the
+original game GLB's hash remained unchanged. Full source/rebuild, camera
+conventions, selected sharing links and ZIP contents are in
+`assets/emberwing-sonnet/REVIEW.md`.
+
+New Cloudflare tunnel verification initially failed twice with Windows
+`getaddrinfo` errors although the tunnel logged a registered connection. A
+later ordinary and explicit DNS query returned A records; checking the same
+running endpoint then verified four GLBs, both download sizes/types and the
+overview checksum in 1.965 s. Stop/restart at most once; after that, inspect
+DNS and verify the existing endpoint rather than repeatedly creating tunnels.
+The selected static review files require `.png` and `.zip` MIME entries in the
+showroom server. Its root boundary, real-path guard and extension allowlist
+remain in force; never copy a whole project into the public folder.
