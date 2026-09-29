@@ -1,0 +1,186 @@
+{
+ "assets": {
+  "table": {
+   "triangles": 1832,
+   "draw_calls_per_instance": 10,
+   "materials": [
+    "K_oak",
+    "K_darkwood",
+    "K_iron",
+    "K_cloth",
+    "K_carrot",
+    "K_bread",
+    "K_ceramic",
+    "K_tomato",
+    "K_cream",
+    "K_fire"
+   ],
+   "glb_bytes": 567600,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "counter_a": {
+   "triangles": 1584,
+   "draw_calls_per_instance": 9,
+   "materials": [
+    "K_darkwood",
+    "K_oak",
+    "K_iron",
+    "K_copper",
+    "K_cream",
+    "K_cabbage",
+    "K_stone",
+    "K_bottle",
+    "K_ceramic"
+   ],
+   "glb_bytes": 504948,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "counter_b": {
+   "triangles": 1444,
+   "draw_calls_per_instance": 13,
+   "materials": [
+    "K_darkwood",
+    "K_oak",
+    "K_iron",
+    "K_stone",
+    "K_bottle",
+    "K_copper",
+    "K_magic",
+    "K_tile",
+    "K_herb",
+    "K_carrot",
+    "K_cloth",
+    "K_bread",
+    "K_fire"
+   ],
+   "glb_bytes": 724940,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "shelf": {
+   "triangles": 1956,
+   "draw_calls_per_instance": 12,
+   "materials": [
+    "K_darkwood",
+    "K_oak",
+    "K_iron",
+    "K_ceramic",
+    "K_bottle",
+    "K_cream",
+    "K_tile",
+    "K_cabbage",
+    "K_cloth",
+    "K_magic",
+    "K_herb",
+    "K_tomato"
+   ],
+   "glb_bytes": 659204,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "hearth": {
+   "triangles": 1992,
+   "draw_calls_per_instance": 11,
+   "materials": [
+    "K_stone",
+    "K_darkwood",
+    "K_cream",
+    "K_fire",
+    "K_ceramic",
+    "K_copper",
+    "K_iron",
+    "K_magic",
+    "K_carrot",
+    "K_herb",
+    "K_tomato"
+   ],
+   "glb_bytes": 596396,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "roof_truss": {
+   "triangles": 396,
+   "draw_calls_per_instance": 4,
+   "materials": [
+    "K_darkwood",
+    "K_floorplank",
+    "K_iron",
+    "K_fire"
+   ],
+   "glb_bytes": 214276,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "gable_wall": {
+   "triangles": 248,
+   "draw_calls_per_instance": 3,
+   "materials": [
+    "K_plaster",
+    "K_darkwood",
+    "K_magic"
+   ],
+   "glb_bytes": 161948,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "wall_panel": {
+   "triangles": 516,
+   "draw_calls_per_instance": 6,
+   "materials": [
+    "K_plaster",
+    "K_darkwood",
+    "K_oak",
+    "K_magic",
+    "K_cloth",
+    "K_iron"
+   ],
+   "glb_bytes": 354664,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "floor_rug": {
+   "triangles": 608,
+   "draw_calls_per_instance": 5,
+   "materials": [
+    "K_tile",
+    "K_rug",
+    "K_cream",
+    "K_darkwood",
+    "K_tomato"
+   ],
+   "glb_bytes": 237896,
+   "min_texture_mean": 0.13,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  },
+  "teacup": {
+   "triangles": 488,
+   "draw_calls_per_instance": 5,
+   "materials": [
+    "K_ceramic",
+    "K_cream",
+    "K_bread",
+    "K_iron",
+    "K_magic"
+   ],
+   "glb_bytes": 199756,
+   "min_texture_mean": 0.253,
+   "signed_volume_positive": true,
+   "bad_uv_meshes": 0
+  }
+ },
+ "unique_triangles": 11064,
+ "placed_instances": 45,
+ "approx_draw_calls_no_batching": 346,
+ "triangles_placed_total": 44296
+}

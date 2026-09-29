@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "assets": {
+    "room": "kitchen_room.glb"
+  },
+  "placements": [
+    {
+      "asset": "room",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "yaw_degrees": 0,
+      "scale": 1
+    }
+  ]
+}

@@ -562,6 +562,22 @@ static func quarry(root: Node3D, data: Dictionary) -> void:
 	path(p,Vector3(0,0,9),Vector3(4,0,-8),"e8ba86")
 
 static func kitchen(p: Node3D) -> void:
+	if FileAccess.file_exists("res://assets/zone_art/enchanted_kitchen/placement.json"):
+		# Keep the existing room and table collision while the authored kit owns
+		# the visible floor, shell, furniture and magic. The shared zone floor is
+		# already solid and extends beyond this open-front kitchen.
+		body(p,Vector3(0,2.65,-12),Vector3(24,5.3,0.35))
+		for side in [-1,1]:
+			body(p,Vector3(side*12,2.65,0),Vector3(0.35,5.3,24))
+			for i in range(5):
+				body(p,Vector3(side*10.6,0.65,-8+i*3.1),Vector3(2.2,1.3,3))
+		body(p,Vector3(0,0.7,-2),Vector3(4.3,1.4,2.8))
+		for x in [-5.5,5.5]: glow_light(p,Vector3(x,3.2,-7.5),"ffd394",1.3,9)
+		glow_light(p,Vector3(0,1.8,-8.8),"ffa856",2.6,11)
+		glow_light(p,Vector3(0,3.0,-1),"ffe0a4",1.3,10)
+		label(p,"THE ENCHANTED KITCHEN",Vector3(0,4.6,-9.5),42)
+		label(p,"A little mischief. A very good supper.",Vector3(0,3.95,-9.4),25)
+		return
 	# Warm, oversized farmhouse interior: open front makes navigation legible.
 	for x in range(-7,8):
 		for z in range(-7,8): box(p,Vector3(x*1.6,0.018,z*1.6),Vector3(1.56,0.06,1.56),"d5c4a1" if (x+z)%3 else "c6b38f")

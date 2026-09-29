@@ -72,7 +72,9 @@ func _run() -> void:
 		var expected: Dictionary = ZONES[id]
 		var zone: Dictionary = data.zones[id]
 		var art: Dictionary = zone.get("authored_art", {})
-		if require_authored and int(art.get("assets", 0)) < 5:
+		# A whole room can be compiled into one GLB while retaining many
+		# independently textured mesh batches. Accept either representation.
+		if require_authored and int(art.get("assets", 0)) < 5 and int(art.get("holders", 0)) < 10:
 			failures.append(id + ": authored kit missing or too small")
 		var counts: Dictionary = {}
 		for item in data.resources:
