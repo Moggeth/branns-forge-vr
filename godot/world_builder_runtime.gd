@@ -6,6 +6,7 @@ const ZONE = "orchard_highlands"
 const SAVE = "user://world_builder_v1.json"
 const BRIDGE = "res://assets/worldbuilder/orchard_bridge.glb"
 const WORKER = "res://assets/worldbuilder/worker.glb"
+const WORKER_WALK_SPEED = 2.1
 const STOCKPILE = "res://assets/worldbuilder/stockpile.glb"
 const WAYMARKER = "res://assets/worldbuilder/waymarker.glb"
 const CAMP = Vector3(15, 0, -27)
@@ -814,6 +815,9 @@ func _ensure_workers() -> void:
 				var players := model.find_children("*", "AnimationPlayer", true, false)
 				if not players.is_empty():
 					worker.set_meta("animator", players[0])
+					for clip in ["Worker_Idle", "Worker_Walk", "Worker_Chop"]:
+						var animation: Animation = players[0].get_animation(clip)
+						if animation != null: animation.loop_mode = Animation.LOOP_LINEAR
 					_set_worker_animation(worker, "Worker_Idle")
 		else:
 			W.cyl(worker, Vector3(0, 0.54, 0), 0.22, 1.05, "6d85a1", "taper")
@@ -845,16 +849,27 @@ func _set_worker_animation(worker: Node3D, clip: String) -> void:
 		for name in player.get_animation_list():
 			if str(name).ends_with(clip): actual = str(name); break
 	if not player.has_animation(actual) or str(worker.get_meta("clip", "")) == actual: return
+	if clip != "Worker_Walk": player.speed_scale = 1.0
 	player.play(actual, 0.16)
 	worker.set_meta("clip", actual)
+
+func _animate_worker_travel(worker: Node3D, distance: float, delta: float) -> void:
+	if distance <= 0.001 or delta <= 0.0:
+		_set_worker_animation(worker, "Worker_Idle")
+		return
+	_set_worker_animation(worker, "Worker_Walk")
+	var player: AnimationPlayer = worker.get_meta("animator", null)
+	if player != null and is_instance_valid(player):
+		# The authored walk cycle is one second long at the normal 2.1 m/s pace.
+		# Match its cadence to the displacement actually achieved this frame.
+		player.speed_scale = clampf(distance / delta / WORKER_WALK_SPEED, 0.25, 1.5)
 
 func _for_each_worker(delta: float) -> void:
 	for worker in worker_nodes:
 		if not is_instance_valid(worker): continue
 		if int(worker.get_meta("carry_amount", 0)) > 0:
-			_set_worker_animation(worker, "Worker_Walk")
 			var destination := CAMP + Vector3(0.0, 0, 1.4)
-			if not _worker_travel(worker, destination, delta, 2.1, 0.55): continue
+			if not _worker_travel(worker, destination, delta, WORKER_WALK_SPEED, 0.55): continue
 			var delivered: int = int(worker.get_meta("carry_amount", 0))
 			var delivered_key: String = str(worker.get_meta("carry_key", ""))
 			worker.set_meta("carry_amount", 0)
@@ -875,7 +890,6 @@ func _for_each_worker(delta: float) -> void:
 					worker.set_meta("job", key)
 					break
 		if key == "":
-			_set_worker_animation(worker, "Worker_Idle")
 			_worker_travel(worker, CAMP + Vector3(0, 0, 1.4), delta, 1.4, 0.55)
 			continue
 		if not resource_by_key.has(key) and not scenic_by_key.has(key): worker.set_meta("job", ""); continue
@@ -884,8 +898,7 @@ func _for_each_worker(delta: float) -> void:
 		if target != null and not is_instance_valid(target): worker.set_meta("job", ""); continue
 		var target_position: Vector3 = target.global_position - center if target != null else scenic_by_key[key].position
 		var place: Vector3 = target_position + Vector3(1.0, 0, 0)
-		if not _worker_travel(worker, place, delta, 2.1, 1.2):
-			_set_worker_animation(worker, "Worker_Walk")
+		if not _worker_travel(worker, place, delta, WORKER_WALK_SPEED, 1.2):
 			continue
 		_set_worker_animation(worker, "Worker_Chop")
 		var chop := float(worker.get_meta("chop", 0.0)) + delta
@@ -914,6 +927,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 	var goal := Vector2(destination.x, destination.z)
 	if here.distance_to(goal) <= stop_radius:
 		worker.position.y = _worker_surface_height(worker, here)
+		_animate_worker_travel(worker, 0.0, delta)
 		return true
 	var model: Dictionary = game.landscape.model
 	var op_count: int = game.landscape.operation_count()
@@ -936,6 +950,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 		worker.set_meta("nav_bridge", Water.crossing(model) if bridge_available else {})
 	if path.is_empty():
 		worker.position.y = _worker_surface_height(worker, here)
+		_animate_worker_travel(worker, 0.0, delta)
 		return false
 	var index: int = int(worker.get_meta("nav_index", 0))
 	while index < path.size() - 1 and here.distance_to(path[index]) < 0.4:
@@ -943,13 +958,16 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 	worker.set_meta("nav_index", index)
 	var waypoint: Vector2 = path[index]
 	var heading: Vector2 = waypoint - here
-	if heading.length() < 0.01: return here.distance_to(goal) <= stop_radius
+	if heading.length() < 0.01:
+		_animate_worker_travel(worker, 0.0, delta)
+		return here.distance_to(goal) <= stop_radius
 	var step: float = minf(delta * speed, heading.length())
 	var next: Vector2 = here + heading.normalized() * step
 	worker.position.x = next.x
 	worker.position.z = next.y
 	worker.position.y = _worker_surface_height(worker, next)
 	worker.rotation.y = atan2(heading.x, heading.y)
+	_animate_worker_travel(worker, here.distance_to(next), delta)
 	return next.distance_to(goal) <= stop_radius
 
 func _worker_surface_height(worker: Node3D, point: Vector2) -> float:

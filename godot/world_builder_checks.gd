@@ -23,6 +23,20 @@ func _check() -> void:
 			var animator: AnimationPlayer = builder.worker_nodes[0].get_meta("animator", null)
 			if animator == null or not animator.has_animation("Worker_Idle") or not animator.has_animation("Worker_Walk") or not animator.has_animation("Worker_Chop"):
 				failures.append("Opus helper clips not imported: " + str(animator.get_animation_list() if animator != null else []))
+			else:
+				var helper: Node3D = builder.worker_nodes[0]
+				for clip in ["Worker_Idle", "Worker_Walk", "Worker_Chop"]:
+					if animator.get_animation(clip).loop_mode != Animation.LOOP_LINEAR: failures.append(clip + " does not loop")
+				var initial_position: Vector3 = helper.position
+				builder._for_each_worker(0.1)
+				var moved: float = Vector2(initial_position.x, initial_position.z).distance_to(Vector2(helper.position.x, helper.position.z))
+				if moved <= 0.001: failures.append("idle helper did not start walking home")
+				elif str(helper.get_meta("clip", "")) != "Worker_Walk" or absf(animator.speed_scale - moved / 0.1 / builder.WORKER_WALK_SPEED) > 0.02:
+					failures.append("walk cadence does not match ground movement")
+				builder._worker_travel(helper, helper.position, 0.1, 1.4, 0.55)
+				if str(helper.get_meta("clip", "")) != "Worker_Idle" or absf(animator.speed_scale - 1.0) > 0.01: failures.append("stopped helper did not return to normal idle")
+				builder._set_worker_animation(helper, "Worker_Chop")
+				if str(helper.get_meta("clip", "")) != "Worker_Chop": failures.append("worker did not enter work animation")
 		if builder.root.find_children("*", "MeshInstance3D", true, false).is_empty(): failures.append("authored work site absent")
 		if not builder._valid(builder.data): failures.append("fresh state invalid")
 		var before_aether: float = builder.data.aether
