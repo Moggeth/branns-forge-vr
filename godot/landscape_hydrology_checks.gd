@@ -2,6 +2,7 @@ extends SceneTree
 
 const Hydro = preload("res://landscape_hydrology.gd")
 const Fields = preload("res://landscape_fields.gd")
+const Ops = preload("res://landscape_operations.gd")
 const SIZE: int = 161
 const STEP: float = 2.0
 const ORIGIN := Vector2(-160, -160)
@@ -147,6 +148,21 @@ func _initialize() -> void:
 	hollow["water"] = supplied
 	Hydro.refresh_after_terrain_change(hollow, hollow_box)
 	if hollow.water[hollow_cell] < 0.1: failures.append("closed cut did not collect water")
+	# The visual-review Sunder crosses only a 25 cm procedural tributary.
+	# That trickle must not become an unlimited source for a metre-deep pool.
+	var sunder: Dictionary = Hydro.run(Fields.create(290929), [])
+	var sunder_op := {"type": "sunder", "points": [[-69.0, -5.0], [-24.0, -5.0]],
+		"width": 8.0, "depth": 4.2, "height": 1.2, "shoulder": 4.0, "seed": 290929}
+	var trickle_cell: int = _index(Vector2(-31, -4))
+	if sunder.water[trickle_cell] <= 0.1 or sunder.water[trickle_cell] >= Hydro.POOL_SOURCE_DEPTH:
+		failures.append("Sunder fixture lost its shallow tributary")
+	sunder["height"] = Ops.apply(sunder, [sunder_op])
+	Hydro.refresh_after_terrain_change(sunder, Ops.bounds(sunder_op))
+	for z in range(-10, 1, 2):
+		for x in range(-50, -19, 2):
+			if sunder.hydrology_pool[_index(Vector2(x, z))] > 0.1:
+				failures.append("shallow tributary instantly filled dry Sunder trench")
+				break
 	var live_model: Dictionary = Hydro.run(_fixture(43), controls)
 	supplied = live_model.water
 	supplied[hollow_cell] = 0.5

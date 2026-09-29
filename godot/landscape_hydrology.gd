@@ -7,6 +7,7 @@ const GRAVEL_MARGIN: float = 1.5
 const BANK_GRADE: float = 0.64 # tan(33 degrees): walkable, exposed bank face.
 const MAIN_REACH: float = 34.0
 const TRIBUTARY_THRESHOLD: float = 145.0
+const POOL_SOURCE_DEPTH: float = 0.4 # A trickle cannot instantly fill a spell-cut basin.
 
 
 static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary:
@@ -338,7 +339,7 @@ static func _near_water_source(water: PackedFloat32Array, pool: PackedFloat32Arr
 			var nz := z + dz
 			if nx < 0 or nx >= size or nz < 0 or nz >= size: continue
 			var index := nz * size + nx
-			if water[index] > 0.02 and pool[index] <= 0.02: return true
+			if water[index] >= POOL_SOURCE_DEPTH and pool[index] <= 0.02: return true
 	return false
 
 
