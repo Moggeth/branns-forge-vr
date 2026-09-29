@@ -102,6 +102,50 @@ func passable(local: Vector2) -> bool:
 func operation_count() -> int:
 	return operations.size()
 
+
+func get_visual_history_events() -> Array[Dictionary]:
+	# The presenter connects after setup, so expose a snapshot on demand rather
+	# than emitting restore events while the saved world is being loaded.
+	var events: Array[Dictionary] = []
+	if zone_root == null or operations.is_empty() or operations.size() > MAX_OPERATIONS:
+		return events
+	var saved: Array = document.get("operations", [])
+	if saved.size() != operations.size(): return events
+	var size: int = int(model.get("size", 0))
+	var step: float = float(model.get("step", 0.0))
+	var natural: PackedFloat32Array = model.get("natural_height", PackedFloat32Array())
+	if size < 2 or step <= 0.0 or natural.size() != size * size: return events
+	var origin: Vector2 = model.get("origin", Vector2.ZERO)
+	var stage: Dictionary = model.duplicate(false)
+	stage["height"] = natural.duplicate()
+	for index in range(operations.size()):
+		var op: Dictionary = operations[index]
+		var record: Dictionary = saved[index]
+		var before: PackedFloat32Array = stage.height
+		var target: PackedFloat32Array = Ops.apply(stage, [op])
+		var box: Rect2 = Ops.bounds(op)
+		var x0 := clampi(floori((box.position.x - origin.x) / step), 0, size - 1)
+		var z0 := clampi(floori((box.position.y - origin.y) / step), 0, size - 1)
+		var x1 := clampi(ceili((box.end.x - origin.x) / step), 0, size - 1)
+		var z1 := clampi(ceili((box.end.y - origin.y) / step), 0, size - 1)
+		var changed := PackedInt32Array()
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				var cell: int = z * size + x
+				if absf(target[cell] - before[cell]) > 0.001: changed.append(cell)
+		if not changed.is_empty():
+			var staged_transition := {"before": before, "target": target, "indices": changed,
+				"bounds": box, "duration": 1.35 if str(op.type) == "sunder" else 1.1}
+			var event: Dictionary = VisualEvents.started(op, str(record.get("id", "")), seed,
+				staged_transition, model, zone_root, _visual_quality_budget())
+			if not event.is_empty():
+				event["phase"] = "restore"
+				event["progress"] = 1.0
+				event["eased_progress"] = 1.0
+				events.append(event)
+		stage["height"] = target
+	return events
+
 func apply_magic(raw: Dictionary) -> String:
 	if not Ops.validate(raw): return "The earth could not understand that shape."
 	if operations.size() >= MAX_OPERATIONS: return "This landscape has reached its recorded spell limit."
