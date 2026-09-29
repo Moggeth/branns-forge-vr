@@ -4,9 +4,7 @@ extends Node3D
 const Art = preload("res://landscape_asset_library.gd")
 const Fields = preload("res://landscape_fields.gd")
 const ASSETS := {
-	"rupture": "res://assets/landscape/geo_earth_rupture_roots.glb",
 	"split": "res://assets/landscape/geo_boulder_split_b.glb",
-	"moss": "res://assets/landscape/geo_boulder_mossy_a.glb",
 	"spire": "res://assets/landscape/geo_spell_spire.glb",
 }
 const MAX_DRESSED_OPERATIONS := 64
@@ -24,6 +22,8 @@ func add_operation(op: Dictionary, target_model: Dictionary, duration: float) ->
 	var group := Node3D.new()
 	group.name = "LandscapeSpell_%03d" % _records.size()
 	add_child(group)
+	# Keep one record per operation for undo, including spells whose artwork is
+	# supplied by OrchardSpellVfx instead of persistent dressing meshes.
 	var placements := _placements(op)
 	var anchors: Array[Dictionary] = []
 	for p in placements:
@@ -87,21 +87,4 @@ static func _placements(op: Dictionary) -> Array[Dictionary]:
 				var at: Vector2 = a.lerp(b, float(i + 1) / 5.0) + across * (1.3 if i % 2 == 0 else -1.3)
 				result.append({"kind":"spire" if crystal_fault else "split", "position":at,
 					"angle":atan2(across.x,across.y) + i * 0.62, "scale":0.6 if crystal_fault else 0.43})
-		"sunder":
-			var points: Array = op.points
-			if points.size() < 2: return result
-			var a := Vector2(float(points[0][0]), float(points[0][1]))
-			var b := Vector2(float(points[-1][0]), float(points[-1][1]))
-			var across := (b - a).normalized().orthogonal()
-			for i in 3:
-				var at: Vector2 = a.lerp(b, float(i + 1) / 4.0) + across * (5.5 if i % 2 == 0 else -5.5)
-				result.append({"kind":"rupture" if i == 1 else "split", "position":at,
-					"angle":atan2(across.x,across.y) + i * 0.7, "scale":0.67 if i == 1 else 0.58})
-		"raise":
-			var center := Vector2(float(op.center[0]), float(op.center[1]))
-			var radius: float = float(op.get("radius", 12.0))
-			for i in 3:
-				var angle: float = i * TAU / 3.0 + float(op.get("seed",0)) * 0.31
-				result.append({"kind":"moss", "position":center + Vector2(cos(angle),sin(angle)) * radius * 0.67,
-					"angle":angle,"scale":0.52})
 	return result
