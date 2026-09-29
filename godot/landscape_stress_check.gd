@@ -1,11 +1,21 @@
 extends SceneTree
 ## Graphical, save-isolated desktop proxy for a 100 m spell while the Hero and
 ## strategic cameras view one World3D. Headset stereo timing remains separate.
+const ABLATIONS := ["none", "orchard-kit", "horizon", "spell-vfx"]
+var visual_ablation := "none"
 
 func _initialize() -> void:
-	if not OS.get_cmdline_user_args().has("--world-builder-preview"):
+	var args := OS.get_cmdline_user_args()
+	if not args.has("--world-builder-preview"):
 		push_error("Landscape stress requires --world-builder-preview to isolate saves")
 		quit(1)
+		return
+	for arg in args:
+		if arg.begins_with("--visual-ablation="):
+			visual_ablation = arg.trim_prefix("--visual-ablation=")
+	if not ABLATIONS.has(visual_ablation):
+		push_error("Unknown visual ablation: %s (choose %s)" % [visual_ablation, ", ".join(ABLATIONS)])
+		quit(2)
 		return
 	call_deferred("_check")
 
@@ -18,6 +28,9 @@ func _check() -> void:
 	var builder: Node = game.world_builder
 	if builder == null or game.world_builder_view == null:
 		push_error("Landscape stress needs the live dual-view scene")
+		quit(1)
+		return
+	if not _apply_visual_ablation(game):
 		quit(1)
 		return
 	game.adventure.hp = 9999.0
@@ -37,6 +50,7 @@ func _check() -> void:
 	var deform: Dictionary = await _sample(190)
 	await physics_frame
 	var state: Dictionary = {"adapter":RenderingServer.get_video_adapter_name(),
+		"visual_ablation":visual_ablation,
 		"skeletons":24,"terrain_chunks":game.landscape.chunks.size(),
 		"affected_operations":game.landscape.operation_count(),
 		"command_ms":snappedf(command_ms,0.01),"target_ms":snappedf(game.landscape.last_operation_ms,0.01),
@@ -49,6 +63,33 @@ func _check() -> void:
 	state["tactical_capture"] = output if capture == OK else "failed"
 	print("LANDSCAPE_STRESS ", JSON.stringify(state))
 	quit(0 if game.landscape.operation_count() == 1 and game.landscape.transition.is_empty() else 1)
+
+func _apply_visual_ablation(game: Node3D) -> bool:
+	match visual_ablation:
+		"orchard-kit":
+			var kit: Node3D = game.landscape.get_node_or_null("OrchardVisualKit")
+			if kit == null:
+				push_error("Landscape stress cannot find OrchardVisualKit")
+				return false
+			kit.visible = false
+			# Hydrology can rebuild the kit during Sunder. Hide replacements as they enter.
+			game.landscape.child_entered_tree.connect(_hide_rebuilt_orchard_kit)
+		"horizon":
+			var horizon: Node3D = game.scene.zones["orchard_highlands"].get("horizon")
+			if horizon == null:
+				push_error("Landscape stress cannot find OrchardHorizon")
+				return false
+			horizon.visible = false
+		"spell-vfx":
+			if game.orchard_spell_vfx == null:
+				push_error("Landscape stress cannot find OrchardSpellVfx")
+				return false
+			game.orchard_spell_vfx.enabled = false
+	return true
+
+func _hide_rebuilt_orchard_kit(node: Node) -> void:
+	if node.name == "OrchardVisualKit" and node is Node3D:
+		(node as Node3D).visible = false
 
 func _sample(frames: int) -> Dictionary:
 	var wall: Array[float] = []
