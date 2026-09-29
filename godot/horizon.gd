@@ -235,7 +235,9 @@ static func build(zone_id: String, parent: Node3D, profile: Dictionary = {}) -> 
 	b.mist_max = float(P.mist_max)
 	b.eye = Vector3(0.0, float(P.get("eye_height", EYE_HEIGHT)), 0.0)
 	var layers: Array = P.layers
-	_ground(b, P, layers[0])
+	# The Orchard's fixed-height apron used to cross above its deformable river
+	# and spell cuts. Other zones alias its profile and still need their apron.
+	if zone_id != "orchard_highlands": _ground(b, P, layers[0])
 	var counts := {}
 	for L in layers:
 		var before := b.triangle_count()
