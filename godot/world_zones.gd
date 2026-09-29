@@ -140,9 +140,9 @@ static func skeleton_shield(p: Node3D) -> void:
 
 static func floor_patch(p: Node3D, v: Vector3, size: Vector2, color: String) -> void:
 	var mesh=box(p,v+Vector3(0,-0.23,0),Vector3(size.x,0.46,size.y),color)
-	if p.name=="starfall_ridge" and FileAccess.file_exists("res://assets/zone_art/starfall_ridge/placement.json"):
-		# Keep the original floor collision, but let the authored strata skin
-		# supply the visible ground instead of z-fighting with a flat box.
+	if (p.name=="starfall_ridge" or p.name=="pinewood_ruins") and FileAccess.file_exists("res://assets/zone_art/%s/placement.json" % p.name):
+		# Keep the original floor collision while authored terrain supplies
+		# the visible ground. Two overlapping opaque surfaces create a seam.
 		mesh.visible=false
 	if p.name=="forge_yard": ForgeMaterials.dress(mesh,"grass","c8d2ad")
 	if p.name=="orchard_highlands":
@@ -655,13 +655,15 @@ static func pinewood(root: Node3D, data: Dictionary) -> void:
 	var id := "pinewood_ruins"
 	var p: Node3D = data.zones[id].root
 	var c: Vector3 = data.zones[id].center
-	for i in range(14):
-		var a: float = float(i)*TAU/14
-		var tree_position := Vector3(cos(a)*12.5,0,sin(a)*12.5)
-		# The two northern waystones need a walkable approach through the grove.
-		if tree_position.z > 7.5 and absf(tree_position.x) > 5.0 and absf(tree_position.x) < 11.0:
-			tree_position.z += 4.5
-		tree(p,tree_position,5.5+(i%3),i%3!=0,i%3==0)
+	var authored := FileAccess.file_exists("res://assets/zone_art/pinewood_ruins/placement.json")
+	if not authored:
+		for i in range(14):
+			var a: float = float(i)*TAU/14
+			var tree_position := Vector3(cos(a)*12.5,0,sin(a)*12.5)
+			# The two northern waystones need a walkable approach through the grove.
+			if tree_position.z > 7.5 and absf(tree_position.x) > 5.0 and absf(tree_position.x) < 11.0:
+				tree_position.z += 4.5
+			tree(p,tree_position,5.5+(i%3),i%3!=0,i%3==0)
 	for v in [Vector3(-6,0,4),Vector3(5,0,2),Vector3(-7,0,-4)]:
 		var n := resource(root,data,id,c+v,"lumber","axe")
 		tree(n,Vector3.ZERO,4.7,false,true,1)
@@ -669,15 +671,16 @@ static func pinewood(root: Node3D, data: Dictionary) -> void:
 		var fruit_pos: Vector3 = c+v+(reach_points[0] if not reach_points.is_empty() else Vector3(0.75,1.8,0.55))
 		var apple := resource(root,data,id,fruit_pos,"apple","",1)
 		apple.set_meta("host_tree",n)
-	arch(p,Vector3(0,0,-6),1.8,"949b91",true)
-	for side in [-1,1]:
-		for i in range(4):
-			box(p,Vector3(side*(3.2+i*1.6),0.5+(i%2)*0.3,-6),Vector3(1.5,1+(i%2)*0.6,1),"949b91")
-		for i in range(3): rock(p,Vector3(side*(3.5+i),0.5,1+i*2),Vector3(1.2,1.0,1.3),"a0a698")
-	for i in range(6):
-		box(p,Vector3(-2+i*0.8,0.10,-7.7),Vector3(0.76,0.2,2.1),"a7ac9c")
-	for i in range(7): flowers(p,Vector3(sin(i*2.1)*8,0,cos(i*2.1)*8),30,2.2)
-	path(p,Vector3(0,0,10),Vector3(0,0,-6))
+	if not authored:
+		arch(p,Vector3(0,0,-6),1.8,"949b91",true)
+		for side in [-1,1]:
+			for i in range(4):
+				box(p,Vector3(side*(3.2+i*1.6),0.5+(i%2)*0.3,-6),Vector3(1.5,1+(i%2)*0.6,1),"949b91")
+			for i in range(3): rock(p,Vector3(side*(3.5+i),0.5,1+i*2),Vector3(1.2,1.0,1.3),"a0a698")
+		for i in range(6):
+			box(p,Vector3(-2+i*0.8,0.10,-7.7),Vector3(0.76,0.2,2.1),"a7ac9c")
+		for i in range(7): flowers(p,Vector3(sin(i*2.1)*8,0,cos(i*2.1)*8),30,2.2)
+		path(p,Vector3(0,0,10),Vector3(0,0,-6))
 	enemy(root,data,id,c+Vector3(0,0,-8.7),"skeleton","mossward")
 	enemy(root,data,id,c+Vector3(5,0,-8.5),"skeleton","mossward")
 	barrier(root,data,id,c+Vector3(-5,0,-9),"chop")

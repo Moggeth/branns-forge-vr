@@ -1,0 +1,51 @@
+{
+ "assets": {
+  "arch": {
+   "triangles": 648,
+   "glb_bytes": 601796
+  },
+  "ruin_wall": {
+   "triangles": 312,
+   "glb_bytes": 578648
+  },
+  "rubble_pile": {
+   "triangles": 408,
+   "glb_bytes": 471264
+  },
+  "timber_roots": {
+   "triangles": 288,
+   "glb_bytes": 575296
+  },
+  "conifer_pine": {
+   "triangles": 240,
+   "glb_bytes": 376792
+  },
+  "conifer_spruce": {
+   "triangles": 260,
+   "glb_bytes": 378864
+  },
+  "conifer_fir": {
+   "triangles": 200,
+   "glb_bytes": 372740
+  },
+  "ground_patch": {
+   "triangles": 1152,
+   "glb_bytes": 3454564
+  },
+  "undergrowth_clump": {
+   "triangles": 248,
+   "glb_bytes": 502320
+  }
+ },
+ "placements": 97,
+ "unique_triangles": 3756,
+ "instanced_triangles": 26156,
+ "material_families": [
+  "stone",
+  "bark",
+  "needles",
+  "ground",
+  "flora",
+  "moss"
+ ]
+}

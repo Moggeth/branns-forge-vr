@@ -50,6 +50,8 @@ The [Enchanted Kitchen rebuild](KITCHEN-ART-20260930.md) now replaces its unifor
 
 The [Mushroom Glade rebuild](GLADE-ART-20260930.md) has an irregular pond/bank, mossy backdrop, varied physical mushrooms and rooted detail. Its actual-game ground/RTS capture and protected route checks passed; the final installed manifest has 59 placements, five preserved spore pickups and 25 conservative collision shapes.
 
+The [Pinewood Ruins rebuild](PINEWOOD-ART-20260930.md) replaces the decorative gate, conifers, rubble and ground surface while preserving the three harvestable trees, the Mossward fight and chop barrier. Both actual-game views were inspected; hiding the old flat floor visual removed the new terrain's color seam while retaining collision. Ground-eye draws moved from 322 to 336, and RTS draws from 414 to 420; protected routes passed with 38 conservative collision shapes.
+
 ## Capture failure and recovery
 
 The first default run completed 24 files in 8.53 script seconds, but most were nearly solid haze. Hiding the horizon did not restore Pinewood; the game's own `--capture-zone=pinewood_ruins` reproduced the haze. A fresh Godot `Environment` probe showed that assigning `fog_mode=0` resets `fog_density` from `0.001` to `1.0`. `adventure_runtime.gd` restored `fog_mode` after setting the zone density. Commit `497b2c1` moved the density assignment after the grade defaults. The final default run after that fix completed 24 files in 8.97 script seconds (10.63 wall seconds), with no capture failures or fog audit notes. Orchard deliberately applies its separate 0.0028 atmosphere grade over its 0.0008 zone palette.

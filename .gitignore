@@ -32,6 +32,8 @@ godot/assets/zone_art/enchanted_kitchen/*.png
 godot/assets/zone_art/enchanted_kitchen/*.import
 godot/assets/zone_art/mushroom_glade/*.png
 godot/assets/zone_art/mushroom_glade/*.import
+godot/assets/zone_art/pinewood_ruins/*.png
+godot/assets/zone_art/pinewood_ruins/*.import
 assets/ember-foundry-sonnet/preview_*.png
 
 recordings/

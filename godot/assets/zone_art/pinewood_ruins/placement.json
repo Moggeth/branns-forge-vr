@@ -1,0 +1,1114 @@
+{
+  "schema": 1,
+  "assets": {
+    "arch": "arch.glb",
+    "ruin_wall": "ruin_wall.glb",
+    "rubble_pile": "rubble_pile.glb",
+    "timber_roots": "timber_roots.glb",
+    "conifer_pine": "conifer_pine.glb",
+    "conifer_spruce": "conifer_spruce.glb",
+    "conifer_fir": "conifer_fir.glb",
+    "ground_patch": "ground_patch.glb",
+    "undergrowth_clump": "undergrowth_clump.glb"
+  },
+  "placements": [
+    {
+      "asset": "ground_patch",
+      "position": [
+        0,
+        0.0,
+        0
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0
+    },
+    {
+      "asset": "arch",
+      "position": [
+        0,
+        0.0,
+        -6
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "ruin_wall",
+      "position": [
+        3.7,
+        0.0,
+        -6.1
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "ruin_wall",
+      "position": [
+        -3.7,
+        0.0,
+        -6.4
+      ],
+      "yaw_degrees": 180,
+      "scale": 0.9,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        4.4,
+        0.0,
+        -4.4
+      ],
+      "yaw_degrees": 42.88,
+      "scale": 1.0
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        -6.6,
+        0.0,
+        -7.0
+      ],
+      "yaw_degrees": 180.91,
+      "scale": 0.85
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        6.8,
+        0.0,
+        -5.2
+      ],
+      "yaw_degrees": 184.26,
+      "scale": 0.8
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        -4.5,
+        0.0,
+        -3.0
+      ],
+      "yaw_degrees": 309.6,
+      "scale": 0.6
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        2.8,
+        0.0,
+        -11.2
+      ],
+      "yaw_degrees": 36.95,
+      "scale": 0.8
+    },
+    {
+      "asset": "rubble_pile",
+      "position": [
+        -2.8,
+        0.0,
+        -11.8
+      ],
+      "yaw_degrees": 80.38,
+      "scale": 0.7
+    },
+    {
+      "asset": "timber_roots",
+      "position": [
+        -3.8,
+        0.0,
+        8.0
+      ],
+      "yaw_degrees": 70,
+      "scale": 1.0
+    },
+    {
+      "asset": "timber_roots",
+      "position": [
+        7.0,
+        0.0,
+        7.0
+      ],
+      "yaw_degrees": -20,
+      "scale": 0.9
+    },
+    {
+      "asset": "timber_roots",
+      "position": [
+        -10.0,
+        0.0,
+        -1.5
+      ],
+      "yaw_degrees": 100,
+      "scale": 0.85
+    },
+    {
+      "asset": "timber_roots",
+      "position": [
+        9.0,
+        0.0,
+        -3.5
+      ],
+      "yaw_degrees": 30,
+      "scale": 0.75
+    },
+    {
+      "asset": "timber_roots",
+      "position": [
+        3.6,
+        0.0,
+        10.8
+      ],
+      "yaw_degrees": 200,
+      "scale": 0.7
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -13.338,
+        0.0,
+        13.524
+      ],
+      "yaw_degrees": 334.61,
+      "scale": 1.294,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        -9.647,
+        0.0,
+        13.512
+      ],
+      "yaw_degrees": 196.43,
+      "scale": 1.102,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -6.331,
+        0.0,
+        13.799
+      ],
+      "yaw_degrees": 241.11,
+      "scale": 0.988,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        6.819,
+        0.0,
+        13.859
+      ],
+      "yaw_degrees": 287.93,
+      "scale": 1.076,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        10.596,
+        0.0,
+        13.683
+      ],
+      "yaw_degrees": 172.4,
+      "scale": 1.248,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        13.236,
+        0.0,
+        13.127
+      ],
+      "yaw_degrees": 155.9,
+      "scale": 0.982,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -12.732,
+        0.0,
+        -12.892
+      ],
+      "yaw_degrees": 96.85,
+      "scale": 0.865,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        -9.612,
+        0.0,
+        -12.8
+      ],
+      "yaw_degrees": 236.03,
+      "scale": 1.119,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -6.678,
+        0.0,
+        -14.001
+      ],
+      "yaw_degrees": 164.96,
+      "scale": 1.085,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -3.555,
+        0.0,
+        -13.375
+      ],
+      "yaw_degrees": 176.23,
+      "scale": 1.265,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        4.102,
+        0.0,
+        -13.185
+      ],
+      "yaw_degrees": 93.64,
+      "scale": 1.069,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        7.024,
+        0.0,
+        -14.068
+      ],
+      "yaw_degrees": 184.06,
+      "scale": 1.222,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        10.637,
+        0.0,
+        -13.627
+      ],
+      "yaw_degrees": 290.87,
+      "scale": 1.101,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        13.576,
+        0.0,
+        -13.582
+      ],
+      "yaw_degrees": 326.62,
+      "scale": 1.224,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -13.673,
+        0.0,
+        -10.102
+      ],
+      "yaw_degrees": 114.0,
+      "scale": 1.263,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -14.095,
+        0.0,
+        -6.69
+      ],
+      "yaw_degrees": 35.41,
+      "scale": 1.16,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        -13.525,
+        0.0,
+        -3.14
+      ],
+      "yaw_degrees": 282.63,
+      "scale": 1.082,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -13.758,
+        0.0,
+        0.767
+      ],
+      "yaw_degrees": 163.05,
+      "scale": 1.284,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -13.967,
+        0.0,
+        3.372
+      ],
+      "yaw_degrees": 348.22,
+      "scale": 1.229,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        -13.366,
+        0.0,
+        6.867
+      ],
+      "yaw_degrees": 172.49,
+      "scale": 0.879,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -13.734,
+        0.0,
+        9.541
+      ],
+      "yaw_degrees": 95.93,
+      "scale": 1.074,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        13.502,
+        0.0,
+        -10.694
+      ],
+      "yaw_degrees": 34.8,
+      "scale": 1.186,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        13.344,
+        0.0,
+        -6.373
+      ],
+      "yaw_degrees": 148.07,
+      "scale": 1.052,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        14.098,
+        0.0,
+        -3.936
+      ],
+      "yaw_degrees": 5.05,
+      "scale": 0.85,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        13.86,
+        0.0,
+        0.052
+      ],
+      "yaw_degrees": 209.03,
+      "scale": 1.269,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        13.734,
+        0.0,
+        3.066
+      ],
+      "yaw_degrees": 29.9,
+      "scale": 1.207,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        14.097,
+        0.0,
+        7.103
+      ],
+      "yaw_degrees": 89.22,
+      "scale": 1.129,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        13.711,
+        0.0,
+        10.251
+      ],
+      "yaw_degrees": 270.67,
+      "scale": 1.28,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        8.2,
+        0.0,
+        9.2
+      ],
+      "yaw_degrees": 240.65,
+      "scale": 1.136,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        -9.5,
+        0.0,
+        8.2
+      ],
+      "yaw_degrees": 55.71,
+      "scale": 0.991,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        9.6,
+        0.0,
+        -9.5
+      ],
+      "yaw_degrees": 209.9,
+      "scale": 1.196,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_spruce",
+      "position": [
+        -9.2,
+        0.0,
+        -10.0
+      ],
+      "yaw_degrees": 341.98,
+      "scale": 1.071,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_fir",
+      "position": [
+        10.4,
+        0.0,
+        0.5
+      ],
+      "yaw_degrees": 259.37,
+      "scale": 0.911,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "conifer_pine",
+      "position": [
+        -11,
+        0.0,
+        3.5
+      ],
+      "yaw_degrees": 80.25,
+      "scale": 1.115,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.373,
+        0.0,
+        9.776
+      ],
+      "yaw_degrees": 181.7,
+      "scale": 0.851
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        4.551,
+        0.0,
+        11.311
+      ],
+      "yaw_degrees": 282.04,
+      "scale": 1.349
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -5.238,
+        0.0,
+        -2.287
+      ],
+      "yaw_degrees": 290.88,
+      "scale": 1.112
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -8.189,
+        0.0,
+        -12.633
+      ],
+      "yaw_degrees": 38.21,
+      "scale": 1.333
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -12.113,
+        0.0,
+        -3.978
+      ],
+      "yaw_degrees": 127.23,
+      "scale": 1.262
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -12.804,
+        0.0,
+        0.27
+      ],
+      "yaw_degrees": 117.99,
+      "scale": 0.982
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.117,
+        0.0,
+        1.862
+      ],
+      "yaw_degrees": 289.78,
+      "scale": 0.892
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -4.417,
+        0.0,
+        2.554
+      ],
+      "yaw_degrees": 244.26,
+      "scale": 0.842
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        11.379,
+        0.0,
+        -11.824
+      ],
+      "yaw_degrees": 196.12,
+      "scale": 1.303
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -8.41,
+        0.0,
+        5.485
+      ],
+      "yaw_degrees": 316.01,
+      "scale": 0.877
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -9.169,
+        0.0,
+        8.954
+      ],
+      "yaw_degrees": 140.39,
+      "scale": 1.055
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -2.32,
+        0.0,
+        -10.955
+      ],
+      "yaw_degrees": 109.77,
+      "scale": 1.006
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -6.387,
+        0.0,
+        -0.062
+      ],
+      "yaw_degrees": 280.89,
+      "scale": 1.049
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        8.008,
+        0.0,
+        7.715
+      ],
+      "yaw_degrees": 293.81,
+      "scale": 1.309
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -7.254,
+        0.0,
+        11.796
+      ],
+      "yaw_degrees": 316.3,
+      "scale": 1.187
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        9.436,
+        0.0,
+        4.43
+      ],
+      "yaw_degrees": 346.03,
+      "scale": 1.011
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -9.268,
+        0.0,
+        1.612
+      ],
+      "yaw_degrees": 206.04,
+      "scale": 1.123
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -10.538,
+        0.0,
+        5.616
+      ],
+      "yaw_degrees": 200.09,
+      "scale": 1.141
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -6.261,
+        0.0,
+        1.449
+      ],
+      "yaw_degrees": 36.52,
+      "scale": 0.958
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.282,
+        0.0,
+        -8.547
+      ],
+      "yaw_degrees": 246.44,
+      "scale": 1.255
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        3.512,
+        0.0,
+        0.172
+      ],
+      "yaw_degrees": 99.64,
+      "scale": 1.302
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -6.457,
+        0.0,
+        -11.365
+      ],
+      "yaw_degrees": 148.19,
+      "scale": 1.339
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        7.473,
+        0.0,
+        -2.222
+      ],
+      "yaw_degrees": 5.55,
+      "scale": 0.858
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -12.88,
+        0.0,
+        -9.801
+      ],
+      "yaw_degrees": 246.9,
+      "scale": 1.146
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        11.775,
+        0.0,
+        -3.892
+      ],
+      "yaw_degrees": 280.71,
+      "scale": 1.164
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        11.468,
+        0.0,
+        -4.782
+      ],
+      "yaw_degrees": 77.63,
+      "scale": 1.078
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.936,
+        0.0,
+        9.838
+      ],
+      "yaw_degrees": 247.13,
+      "scale": 1.317
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        4.898,
+        0.0,
+        11.017
+      ],
+      "yaw_degrees": 140.06,
+      "scale": 1.368
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -3.879,
+        0.0,
+        6.12
+      ],
+      "yaw_degrees": 157.23,
+      "scale": 0.814
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        5.273,
+        0.0,
+        -5.472
+      ],
+      "yaw_degrees": 344.98,
+      "scale": 1.28
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -10.197,
+        0.0,
+        6.965
+      ],
+      "yaw_degrees": 114.8,
+      "scale": 1.342
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -10.46,
+        0.0,
+        3.093
+      ],
+      "yaw_degrees": 42.58,
+      "scale": 0.875
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -3.941,
+        0.0,
+        3.845
+      ],
+      "yaw_degrees": 236.09,
+      "scale": 0.817
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -10.119,
+        0.0,
+        1.116
+      ],
+      "yaw_degrees": 238.16,
+      "scale": 1.361
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        4.961,
+        0.0,
+        -2.682
+      ],
+      "yaw_degrees": 91.79,
+      "scale": 0.889
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -12.869,
+        0.0,
+        -5.802
+      ],
+      "yaw_degrees": 172.38,
+      "scale": 0.958
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -5.002,
+        0.0,
+        11.55
+      ],
+      "yaw_degrees": 213.71,
+      "scale": 1.304
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.455,
+        0.0,
+        0.365
+      ],
+      "yaw_degrees": 95.48,
+      "scale": 1.18
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        6.872,
+        0.0,
+        -4.745
+      ],
+      "yaw_degrees": 236.83,
+      "scale": 0.807
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.909,
+        0.0,
+        -0.766
+      ],
+      "yaw_degrees": 349.27,
+      "scale": 1.207
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        9.777,
+        0.0,
+        11.108
+      ],
+      "yaw_degrees": 326.18,
+      "scale": 1.039
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        12.857,
+        0.0,
+        11.726
+      ],
+      "yaw_degrees": 83.7,
+      "scale": 1.297
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -3.804,
+        0.0,
+        3.562
+      ],
+      "yaw_degrees": 197.57,
+      "scale": 1.084
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        7.793,
+        0.0,
+        2.095
+      ],
+      "yaw_degrees": 67.64,
+      "scale": 1.177
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -9.348,
+        0.0,
+        10.239
+      ],
+      "yaw_degrees": 342.16,
+      "scale": 1.288
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        9.047,
+        0.0,
+        5.261
+      ],
+      "yaw_degrees": 286.33,
+      "scale": 1.183
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        -11.226,
+        0.0,
+        -3.307
+      ],
+      "yaw_degrees": 263.16,
+      "scale": 0.883
+    },
+    {
+      "asset": "undergrowth_clump",
+      "position": [
+        6.467,
+        0.0,
+        12.969
+      ],
+      "yaw_degrees": 6.61,
+      "scale": 0.93
+    }
+  ],
+  "asset_meta": {
+    "arch": {
+      "collision": [
+        {
+          "shape": "box",
+          "size": [
+            1.6,
+            5.6,
+            1.35
+          ],
+          "offset": [
+            -3.0,
+            2.8,
+            0
+          ]
+        },
+        {
+          "shape": "box",
+          "size": [
+            1.6,
+            3.1,
+            1.35
+          ],
+          "offset": [
+            3.0,
+            1.55,
+            0
+          ]
+        }
+      ]
+    },
+    "ruin_wall": {
+      "collision": [
+        {
+          "shape": "box",
+          "size": [
+            5.5,
+            1.4,
+            0.95
+          ],
+          "offset": [
+            2.75,
+            0.7,
+            0
+          ]
+        }
+      ]
+    },
+    "conifer_pine": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.3,
+          "height": 1.7,
+          "offset": [
+            0,
+            0.85,
+            0
+          ]
+        }
+      ]
+    },
+    "conifer_spruce": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.3,
+          "height": 1.7,
+          "offset": [
+            0,
+            0.85,
+            0
+          ]
+        }
+      ]
+    },
+    "conifer_fir": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.3,
+          "height": 1.7,
+          "offset": [
+            0,
+            0.85,
+            0
+          ]
+        }
+      ]
+    }
+  }
+}
