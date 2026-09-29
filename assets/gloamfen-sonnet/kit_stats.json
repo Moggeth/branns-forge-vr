@@ -1,0 +1,957 @@
+{
+ "stats": {
+  "heart_arch_tree": {
+   "tris": 3488,
+   "dims": {
+    "min": [
+     -10.09,
+     -0.9,
+     -7.15
+    ],
+    "max": [
+     9.6,
+     13.47,
+     6.64
+    ],
+    "size": [
+     19.7,
+     14.37,
+     13.79
+    ]
+   },
+   "glb_bytes": 465368,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_foliage",
+    "gf_glow"
+   ],
+   "category": "major"
+  },
+  "ruin_gate": {
+   "tris": 715,
+   "dims": {
+    "min": [
+     -6.88,
+     -0.07,
+     -1.57
+    ],
+    "max": [
+     6.84,
+     6.47,
+     1.65
+    ],
+    "size": [
+     13.72,
+     6.54,
+     3.22
+    ]
+   },
+   "glb_bytes": 131240,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "major"
+  },
+  "fen_tree_a": {
+   "tris": 1101,
+   "dims": {
+    "min": [
+     -1.57,
+     -0.22,
+     -2.8
+    ],
+    "max": [
+     4.7,
+     7.77,
+     3.37
+    ],
+    "size": [
+     6.27,
+     7.99,
+     6.17
+    ]
+   },
+   "glb_bytes": 169216,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_foliage",
+    "gf_glow"
+   ],
+   "category": "major"
+  },
+  "fen_tree_b": {
+   "tris": 1061,
+   "dims": {
+    "min": [
+     -1.26,
+     -0.25,
+     -2.48
+    ],
+    "max": [
+     5.73,
+     8.76,
+     3.16
+    ],
+    "size": [
+     6.99,
+     9.01,
+     5.64
+    ]
+   },
+   "glb_bytes": 164696,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_foliage",
+    "gf_glow"
+   ],
+   "category": "major"
+  },
+  "fen_tree_dead": {
+   "tris": 486,
+   "dims": {
+    "min": [
+     -2.02,
+     -0.44,
+     -1.14
+    ],
+    "max": [
+     1.79,
+     4.4,
+     1.94
+    ],
+    "size": [
+     3.81,
+     4.84,
+     3.08
+    ]
+   },
+   "glb_bytes": 82116,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_glow"
+   ],
+   "category": "major"
+  },
+  "mossy_island_a": {
+   "tris": 230,
+   "dims": {
+    "min": [
+     -2.85,
+     -0.25,
+     -2.26
+    ],
+    "max": [
+     2.43,
+     1.02,
+     2.13
+    ],
+    "size": [
+     5.27,
+     1.27,
+     4.39
+    ]
+   },
+   "glb_bytes": 56840,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "terrain"
+  },
+  "mossy_island_b": {
+   "tris": 198,
+   "dims": {
+    "min": [
+     -1.73,
+     -0.25,
+     -1.61
+    ],
+    "max": [
+     1.85,
+     1.03,
+     1.38
+    ],
+    "size": [
+     3.58,
+     1.28,
+     2.99
+    ]
+   },
+   "glb_bytes": 52728,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "terrain"
+  },
+  "mud_bank_a": {
+   "tris": 936,
+   "dims": {
+    "min": [
+     -3.58,
+     -0.34,
+     -2.04
+    ],
+    "max": [
+     3.62,
+     0.88,
+     1.83
+    ],
+    "size": [
+     7.2,
+     1.22,
+     3.87
+    ]
+   },
+   "glb_bytes": 149344,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "terrain"
+  },
+  "mud_bank_b": {
+   "tris": 696,
+   "dims": {
+    "min": [
+     -2.58,
+     -0.36,
+     -1.7
+    ],
+    "max": [
+     2.68,
+     0.88,
+     2.36
+    ],
+    "size": [
+     5.26,
+     1.24,
+     4.06
+    ]
+   },
+   "glb_bytes": 119100,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "terrain"
+  },
+  "mud_bank_c": {
+   "tris": 516,
+   "dims": {
+    "min": [
+     -1.88,
+     -0.28,
+     -1.86
+    ],
+    "max": [
+     1.84,
+     0.88,
+     1.92
+    ],
+    "size": [
+     3.72,
+     1.16,
+     3.78
+    ]
+   },
+   "glb_bytes": 94832,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone"
+   ],
+   "category": "terrain"
+  },
+  "water_pool": {
+   "tris": 120,
+   "dims": {
+    "min": [
+     -1.42,
+     0.03,
+     -1.55
+    ],
+    "max": [
+     1.14,
+     0.05,
+     1.48
+    ],
+    "size": [
+     2.56,
+     0.02,
+     3.03
+    ]
+   },
+   "glb_bytes": 15536,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud"
+   ],
+   "category": "terrain"
+  },
+  "boardwalk_slab": {
+   "tris": 432,
+   "dims": {
+    "min": [
+     -2.38,
+     -0.6,
+     -1.58
+    ],
+    "max": [
+     2.43,
+     1.01,
+     1.58
+    ],
+    "size": [
+     4.82,
+     1.61,
+     3.16
+    ]
+   },
+   "glb_bytes": 94940,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "modular"
+  },
+  "boardwalk_link": {
+   "tris": 84,
+   "dims": {
+    "min": [
+     -2.14,
+     0.03,
+     -1.02
+    ],
+    "max": [
+     2.15,
+     0.3,
+     1.02
+    ],
+    "size": [
+     4.29,
+     0.27,
+     2.04
+    ]
+   },
+   "glb_bytes": 40388,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone"
+   ],
+   "category": "modular"
+  },
+  "lantern_post": {
+   "tris": 234,
+   "dims": {
+    "min": [
+     -0.54,
+     0.0,
+     -0.54
+    ],
+    "max": [
+     0.84,
+     2.59,
+     0.53
+    ],
+    "size": [
+     1.38,
+     2.59,
+     1.07
+    ]
+   },
+   "glb_bytes": 71108,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "modular"
+  },
+  "root_curtain": {
+   "tris": 221,
+   "dims": {
+    "min": [
+     -1.08,
+     -2.94,
+     -0.1
+    ],
+    "max": [
+     1.0,
+     0.24,
+     0.1
+    ],
+    "size": [
+     2.08,
+     3.18,
+     0.2
+    ]
+   },
+   "glb_bytes": 40248,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_glow"
+   ],
+   "category": "modular"
+  },
+  "pale_stone_a": {
+   "tris": 56,
+   "dims": {
+    "min": [
+     -1.07,
+     0.0,
+     -0.99
+    ],
+    "max": [
+     0.96,
+     0.19,
+     0.97
+    ],
+    "size": [
+     2.03,
+     0.19,
+     1.96
+    ]
+   },
+   "glb_bytes": 34912,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone"
+   ],
+   "category": "modular"
+  },
+  "pale_stone_b": {
+   "tris": 44,
+   "dims": {
+    "min": [
+     -1.13,
+     0.0,
+     -0.76
+    ],
+    "max": [
+     1.04,
+     0.14,
+     0.7
+    ],
+    "size": [
+     2.17,
+     0.14,
+     1.46
+    ]
+   },
+   "glb_bytes": 23624,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "modular"
+  },
+  "ruin_pillar_a": {
+   "tris": 192,
+   "dims": {
+    "min": [
+     -0.82,
+     -0.06,
+     -0.88
+    ],
+    "max": [
+     1.43,
+     3.02,
+     0.83
+    ],
+    "size": [
+     2.25,
+     3.08,
+     1.71
+    ]
+   },
+   "glb_bytes": 64192,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "ruin"
+  },
+  "ruin_pillar_b": {
+   "tris": 164,
+   "dims": {
+    "min": [
+     -0.84,
+     -0.05,
+     -0.88
+    ],
+    "max": [
+     1.45,
+     2.09,
+     0.82
+    ],
+    "size": [
+     2.29,
+     2.14,
+     1.7
+    ]
+   },
+   "glb_bytes": 61468,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "ruin"
+  },
+  "ruin_block_pile": {
+   "tris": 120,
+   "dims": {
+    "min": [
+     -1.41,
+     -0.08,
+     -1.1
+    ],
+    "max": [
+     1.66,
+     1.21,
+     1.23
+    ],
+    "size": [
+     3.06,
+     1.28,
+     2.34
+    ]
+   },
+   "glb_bytes": 46512,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "ruin"
+  },
+  "standing_stone_a": {
+   "tris": 100,
+   "dims": {
+    "min": [
+     -0.88,
+     -0.27,
+     -0.58
+    ],
+    "max": [
+     0.89,
+     2.6,
+     0.66
+    ],
+    "size": [
+     1.77,
+     2.86,
+     1.24
+    ]
+   },
+   "glb_bytes": 42064,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "ruin"
+  },
+  "standing_stone_b": {
+   "tris": 100,
+   "dims": {
+    "min": [
+     -0.85,
+     -0.26,
+     -0.72
+    ],
+    "max": [
+     0.7,
+     1.87,
+     0.7
+    ],
+    "size": [
+     1.55,
+     2.12,
+     1.42
+    ]
+   },
+   "glb_bytes": 42064,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_stone",
+    "gf_glow"
+   ],
+   "category": "ruin"
+  },
+  "fallen_log": {
+   "tris": 212,
+   "dims": {
+    "min": [
+     -1.95,
+     -0.03,
+     -0.7
+    ],
+    "max": [
+     1.94,
+     1.4,
+     0.51
+    ],
+    "size": [
+     3.89,
+     1.43,
+     1.21
+    ]
+   },
+   "glb_bytes": 50224,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_moss_mud",
+    "gf_glow"
+   ],
+   "category": "flora"
+  },
+  "reed_clump_a": {
+   "tris": 165,
+   "dims": {
+    "min": [
+     -0.56,
+     -0.05,
+     -0.48
+    ],
+    "max": [
+     0.37,
+     1.39,
+     0.54
+    ],
+    "size": [
+     0.93,
+     1.44,
+     1.02
+    ]
+   },
+   "glb_bytes": 33736,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_foliage"
+   ],
+   "category": "flora"
+  },
+  "reed_clump_b": {
+   "tris": 135,
+   "dims": {
+    "min": [
+     -0.48,
+     -0.05,
+     -0.33
+    ],
+    "max": [
+     0.19,
+     1.03,
+     0.46
+    ],
+    "size": [
+     0.66,
+     1.08,
+     0.78
+    ]
+   },
+   "glb_bytes": 30196,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_foliage"
+   ],
+   "category": "flora"
+  },
+  "reed_clump_c": {
+   "tris": 228,
+   "dims": {
+    "min": [
+     -0.75,
+     -0.05,
+     -0.7
+    ],
+    "max": [
+     0.57,
+     2.1,
+     0.86
+    ],
+    "size": [
+     1.32,
+     2.15,
+     1.55
+    ]
+   },
+   "glb_bytes": 50768,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_bark",
+    "gf_foliage"
+   ],
+   "category": "flora"
+  },
+  "fungi_cluster_a": {
+   "tris": 656,
+   "dims": {
+    "min": [
+     -0.57,
+     -0.17,
+     -0.6
+    ],
+    "max": [
+     0.71,
+     0.95,
+     0.61
+    ],
+    "size": [
+     1.28,
+     1.13,
+     1.2
+    ]
+   },
+   "glb_bytes": 93804,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_glow"
+   ],
+   "category": "flora"
+  },
+  "fungi_cluster_b": {
+   "tris": 550,
+   "dims": {
+    "min": [
+     -0.58,
+     -0.15,
+     -0.54
+    ],
+    "max": [
+     0.51,
+     0.8,
+     0.6
+    ],
+    "size": [
+     1.09,
+     0.95,
+     1.14
+    ]
+   },
+   "glb_bytes": 80852,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_glow"
+   ],
+   "category": "flora"
+  },
+  "glow_mushroom_tall": {
+   "tris": 218,
+   "dims": {
+    "min": [
+     -0.79,
+     -0.19,
+     -0.92
+    ],
+    "max": [
+     0.81,
+     2.18,
+     0.76
+    ],
+    "size": [
+     1.61,
+     2.37,
+     1.69
+    ]
+   },
+   "glb_bytes": 39968,
+   "attrs": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "materials": [
+    "gf_moss_mud",
+    "gf_glow"
+   ],
+   "category": "flora"
+  }
+ },
+ "total_tris": 13458,
+ "instances": 210,
+ "issues": []
+}

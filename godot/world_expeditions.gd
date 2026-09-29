@@ -88,6 +88,17 @@ static func fen(root:Node3D,data:Dictionary,w:Script)->void:
 	var id="gloamfen"
 	var p:Node3D=data.zones[id].root
 	var c:Vector3=data.zones[id].center
+	if FileAccess.file_exists("res://assets/zone_art/gloamfen/placement.json"):
+		# The authored kit supplies the visible banks, trees, lamps and boards.
+		# Preserve slim walkable board collision and the original resource/NPC rules.
+		for i in range(9):
+			var z:float=19.0-float(i)*4.3
+			w.body(p,Vector3(0,0.25,z),Vector3(4.3,0.16,2.8),"floor")
+			if i<8: w.body(p,Vector3(0,0.25,z-2.15),Vector3(4.1,0.16,1.6),"floor")
+		_fen_interactables(root,data,w,p,c,id)
+		w.label(p,"GLOAMFEN  ·  FOLLOW THE PALE STONES",Vector3(0,3.1,2),24,"d9f3d7")
+		for side in [-1,1]: w.glow_light(p,Vector3(side*8,2,-12),"76c5bc",0.5,5)
+		return
 	# Pale stepping stones and cap light make the fairy useful in the dim bog.
 	for i in range(3): w.cyl(p,Vector3(-12+i*12,0.035,-8+i%2*10),4.5+i,0.04,"587f7b","disc",0.12)
 	for i in range(32):
@@ -118,14 +129,7 @@ static func fen(root:Node3D,data:Dictionary,w:Script)->void:
 		w.cyl(p,v+Vector3(0,1.1,0),0.14,2.2,"536653","taper")
 		w.rock(p,v+Vector3(0,2.25,0),Vector3(1.55,0.36,1.35),"a797c7")
 		w.glow_light(p,v+Vector3(0,2.18,0),"83d9c8",0.35,3.8)
-	for i in range(5):
-		var v=Vector3(-16+i*8,0,-11+(i%2)*7)
-		var patch=w.resource(root,data,id,c+v,"spore","",3)
-		for j in range(4):
-			w.cyl(patch,Vector3((j-1.5)*0.27,0.23,0),0.045,0.46,"bad2b8")
-			w.rock(patch,Vector3((j-1.5)*0.27,0.52,0),Vector3(0.38,0.18,0.38),"a78fc4")
-		w.body(patch,Vector3(0,0.36,0),Vector3(1.2,0.75,0.8))
-	for i in range(3): w.enemy(root,data,id,c+Vector3(-10+i*10,0,-8-i%2*7),"wisp")
+	_fen_interactables(root,data,w,p,c,id)
 	w.arch(p,Vector3(0,0,-20),2.3,"647c80",true)
 	for side in [-1,1]:
 		w.box(p,Vector3(side*3.3,0.8,-18.7),Vector3(0.85,1.6,0.85),"829999")
@@ -134,6 +138,18 @@ static func fen(root:Node3D,data:Dictionary,w:Script)->void:
 		w.rock(p,Vector3(side*7,1.5,-19),Vector3(5,3,3),"52696e")
 		w.glow_light(p,Vector3(side*8,2,-12),"76c5bc",0.5,5)
 	w.label(p,"GLOAMFEN  ·  FOLLOW THE PALE STONES",Vector3(0,3.1,2),24,"d9f3d7")
+
+static func _fen_interactables(root:Node3D,data:Dictionary,w:Script,p:Node3D,c:Vector3,id:String)->void:
+	for i in range(5):
+		var v=Vector3(-16+i*8,0,-11+(i%2)*7)
+		if i==2 and FileAccess.file_exists("res://assets/zone_art/gloamfen/placement.json"):
+			v.x=4.5 # The authored boardwalk keeps the central walking line open.
+		var patch=w.resource(root,data,id,c+v,"spore","",3)
+		for j in range(4):
+			w.cyl(patch,Vector3((j-1.5)*0.27,0.23,0),0.045,0.46,"bad2b8")
+			w.rock(patch,Vector3((j-1.5)*0.27,0.52,0),Vector3(0.38,0.18,0.38),"a78fc4")
+		w.body(patch,Vector3(0,0.36,0),Vector3(1.2,0.75,0.8))
+	for i in range(3): w.enemy(root,data,id,c+Vector3(-10+i*10,0,-8-i%2*7),"wisp")
 
 static func ridge(root:Node3D,data:Dictionary,w:Script)->void:
 	var id="starfall_ridge"

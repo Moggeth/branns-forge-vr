@@ -1511,6 +1511,12 @@ Godot renamed duplicate node names; iterating direct children by type is the
 reliable approach for this check. The actual Gloamfen kit still needs a
 full scene collision and walkability review after import.
 
+The first live zone kit, Gloamfen, was imported and reviewed as recorded in
+`docs/GLOAMFEN-ART-20260930.md`. The authored environment passes its focused
+standing-capsule sweep, all 22 portal approach checks and the full service
+integration suite; its actual game ground and RTS captures are retained with
+the source kit. Desktop 120 FPS is a capped mono measurement, not a VR pass.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

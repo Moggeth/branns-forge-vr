@@ -402,7 +402,7 @@ static func build(root: Node3D) -> Dictionary:
 	data.zones.ember_foundry.environment = {"ambient_color":"a77678","ambient_energy":0.38,"sun_color":"ffad6b","sun_energy":0.70,"sky_top":"704869","sky_horizon":"d58a67","fog_color":"8e5e70","fog_density":0.006}
 	data.zones.enchanted_kitchen.environment = {"ambient_color":"ddd2b9","ambient_energy":0.32,"sun_color":"ffe2ad","sun_energy":0.95,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"c5ba9e","fog_density":0.001}
 	data.zones.orchard_highlands.environment = {"ambient_color":"b9caca","ambient_energy":0.38,"sun_color":"fff1c6","sun_energy":0.95,"sky_top":"5192d7","sky_horizon":"b9d9e7","fog_color":"bbd6ca","fog_density":0.0008}
-	data.zones.gloamfen.environment = {"ambient_color":"73908c","ambient_energy":0.23,"sun_color":"93cbb8","sun_energy":0.28,"sky_top":"1b3349","sky_horizon":"4e7a77","fog_color":"426962","fog_density":0.014}
+	data.zones.gloamfen.environment = {"ambient_color":"73908c","ambient_energy":0.18,"sun_color":"abc4c0","sun_energy":0.58,"sky_top":"1b3349","sky_horizon":"4e7a77","fog_color":"496f6a","fog_density":0.012}
 	data.zones.starfall_ridge.environment = {"ambient_color":"929bc8","ambient_energy":0.32,"sun_color":"d3e8f8","sun_energy":0.55,"sky_top":"263e72","sky_horizon":"718dc2","fog_color":"8492b7","fog_density":0.006}
 	data.zones.cloudbreak_keep.environment = {"ambient_color":"d6e7e4","ambient_energy":0.48,"sun_color":"ffffff","sun_energy":1.05,"sky_top":"4c94d6","sky_horizon":"d1e8ee","fog_color":"bbd7e4","fog_density":0.003}
 	var views := {
