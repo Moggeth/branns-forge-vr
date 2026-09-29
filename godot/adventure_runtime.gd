@@ -90,7 +90,7 @@ func setup(owner_game):
 	add_child(hollow)
 	hollow.setup(game, zone_groups.get("crystal_hollow"))
 	_apply_zone_environment("forge_yard")
-	game._notice("Pocket Thunder is ready. Grip picks up. For a bomb, grip an empty hand THEN press and hold trigger; release grip to throw. Explore the travel board.",12)
+	game._notice("Fire is ready from the start: desktop 1 then right-click, or grip Copperpot's Promise in VR and press trigger for Forge Pulse. Only fire hurts ghosts. Pocket Thunder: grip empty hand, hold trigger, release grip to throw.",12)
 
 func tick(delta):
 	if hollow != null: hollow.tick(delta, zone)
@@ -101,10 +101,14 @@ func tick(delta):
 	var text = "%s · Health %d/100%s" % [zone.replace("_"," ").capitalize(),ceili(hp)," · "+resource_text if not resource_text.is_empty() else ""]
 	if game.quests!=null and not game.quests.data.is_empty(): text+=" · Level "+str(game.quests.data.get("level",1))
 	text += "\n" + _requirements()
+	if zone in ["pinewood_ruins", "crystal_hollow"]:
+		text += "\nGhosts: only fire hurts them. Copperpot's Promise: desktop 1 then right-click; VR grip hammer then trigger."
 	panel.text = text
 	overlay.text = "%s · Health %d/100" % [zone.replace("_"," ").capitalize(),ceili(hp)]
 	if game.quests!=null and not game.quests.data.is_empty(): overlay.text+=" · Level "+str(game.quests.data.get("level",1))
 	overlay.text += "\n" + _requirements()
+	if zone in ["pinewood_ruins", "crystal_hollow"]:
+		overlay.text += "\nGhosts: only fire hurts them. Copperpot's Promise: press 1, then right-click for Forge Pulse."
 	for hand in game.hands + [game.desktop_hand]:
 		var key = str(hand.get_instance_id())
 		var last = motion.get(key,{"position":hand.global_position,"rotation":hand.global_rotation})
