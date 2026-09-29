@@ -1,0 +1,6 @@
+{
+  "schema_version": 1, "asset_id": "emberwing_wings", "kind": "prop",
+  "required_nodes": ["WingLeft", "WingRight"],
+  "limits": {"max_bytes": 500000, "max_triangles": 2800, "max_meshes": 3, "max_materials": 3, "max_images": 3},
+  "max_dimensions_m": [0.65, 0.20, 0.45]
+}

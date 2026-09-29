@@ -38,6 +38,8 @@ static func tick(hand:Node3D,holding:bool,delta:float):
 			var angle=float(values[segment]) if segment<values.size() else fallback
 			# Held tools need a stable wrapped silhouette, but lifted fingers can still articulate.
 			if holding: angle=clampf(angle,0.35,1.15) if not values.is_empty() else 0.95
+			if hand.get_meta("archery_arrow",false):
+				angle=clampf(angle,0.15,1.2) if not values.is_empty() else (0.9 if finger in [0,4] else (0.55 if finger==1 else 0.22))
 			if finger==0 and hand.get_meta("siege_trigger",-1.0)>=0:
 				angle=lerpf(0.35,1.08,float(hand.get_meta("siege_trigger")))
 			angle=clampf(angle*float(hand.get_meta("living_curl",1.0)),0,MAX_BEND)

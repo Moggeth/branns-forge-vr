@@ -170,6 +170,7 @@ func _build():
 			if game.quests!=null: rows=game.quests.rows()
 		"tools":
 			for id in game.adventure.ORDER: rows.append([game.adventure.TOOL_NAMES[id],"tool:"+id])
+			if game.archery!=null and is_instance_valid(game.archery.bow): rows.append(["Emberwing bow","archery:equip"])
 		"travel":
 			var places=_travel_rows()
 			travel_page=clampi(travel_page,0,maxi(0,ceili(places.size()/12.0)-1))

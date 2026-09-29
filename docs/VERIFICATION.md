@@ -1524,3 +1524,33 @@ rename failure), 54.516 s (all pass). The verbose run named two active
 `AudioStreamPlaybackWAV` references and `forge-impact-7.wav`; this evidence
 distinguished audio teardown from a gameplay resource error. Existing
 OneDrive fixtures were left untouched.
+
+### Emberwing and new-model CLI recovery (2026-09-30)
+
+Claude Code 2.1.282 rejected the explicit `claude-sonnet-5-5` model immediately
+with `[claude-code:unrecognized_model]`. Updating the CLI with
+`npm install -g @anthropic-ai/claude-code@latest` installed 2.1.285 in 10.714 s;
+the retry then verified the exact Sonnet model in session metadata. For a newly
+released requested model, check the CLI version/update path before proposing a
+different model. Continue to verify cleaned subscription auth in the child
+environment; never route this recovery through API credentials or extra usage.
+
+The first bow collision regression indexed an empty embedded-arrow array,
+leaving the diagnostic running; it was stopped after 53.969 s. Guard dependent
+assertions so a failed contact check can report and exit. Follow-up attempts
+(6.542 and 6.526 s) still failed because the test wall overlapped real scenery,
+and moving the camera also moved its child desktop hand. Printing actual launch,
+camera, bow and ray-hit positions showed a nearby rock intercepting the ray.
+Move physics fixtures to isolated coordinates, explicitly reset child local
+transforms, and await two physics frames after adding a collider. The corrected
+fixture passed in 6.624 s. This diagnosis also exposed a real FPS aiming bug:
+a surface between the eye and displayed bow could reverse the arrow towards the
+player. Aim now falls back to camera forward in that case, and the release
+sweeps from the rest to the initial tip for obstruction.
+
+Final bow verification passed 28 assertions in 6.898 s, the source rebuilt
+byte-identically in 0.876 s, and the full disposable service/game integration
+passed in 63.714 s. Both art revisions used actual game review; the refined
+version replaced the technically valid but fern-like first silhouette.
+Source, controls, measured budgets, captures and headset limits are in
+`docs/EMBERWING-20260930.md`.

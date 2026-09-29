@@ -1,0 +1,6 @@
+{
+  "schema_version": 1, "asset_id": "emberwing_arrow", "kind": "prop",
+  "required_nodes": ["ArrowNock", "ArrowTip"],
+  "limits": {"max_bytes": 300000, "max_triangles": 1800, "max_meshes": 5, "max_materials": 4, "max_images": 4},
+  "max_dimensions_m": [0.10, 0.10, 0.82]
+}

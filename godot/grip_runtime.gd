@@ -61,6 +61,8 @@ func _holster_pose(item: Node3D, side: int) -> Transform3D:
 		return Transform3D(Basis(Vector3.FORWARD, side * 0.22) * Basis(Vector3.RIGHT, -PI * 0.5), Vector3(side * 0.04, -0.13, -0.07))
 	if item.get_meta("crossbow", false):
 		return Transform3D(Basis(Vector3.UP, side * PI * 0.5) * Basis(Vector3.RIGHT, -0.25), Vector3(side * 0.025, -0.12, -0.07))
+	if item.get_meta("phoenix_bow",false):
+		return Transform3D(Basis(Vector3.FORWARD,side*0.18),Vector3(0,0.12,0.08))
 	if "axe" in id or "pick" in id:
 		return Transform3D(Basis(Vector3.UP, side * 0.20), Vector3(0, -0.24, 0))
 	if "hammer" in id or "mace" in id:
@@ -186,7 +188,7 @@ func try_grab(hand)->bool:
 			return true
 	# A second hand may grab only the actual handle, never via distance pickup.
 	for item in game.held.values():
-		if not is_instance_valid(item) or _managed(item) or _entries(item).size()>=2: continue
+		if not is_instance_valid(item) or _managed(item) or item.get_meta("no_secondary_grip",false) or _entries(item).size()>=2: continue
 		var point=_point(item,hand)
 		if hand.global_position.distance_to(item.to_global(point))>game.tuning.value("grip.secondary_reach"): continue
 		var entries=_entries(item)
@@ -309,7 +311,7 @@ func tick(delta):
 		var visual=hand.get_meta("hand_visual") if hand.has_meta("hand_visual") else null
 		if is_instance_valid(visual): visual.position=visual.position.lerp(Vector3.ZERO,clampf(delta*18,0,1))
 		if game.held.has(key) and not grips.has(key) and not _managed(game.held[key]): bind(hand,game.held[key])
-		preload("res://hand_animation.gd").tick(hand,game.held.has(key) or (game.siegebird!=null and game.siegebird.busy(hand)),delta)
+		preload("res://hand_animation.gd").tick(hand,game.held.has(key) or (game.siegebird!=null and game.siegebird.busy(hand)) or (game.archery!=null and game.archery.busy(hand)),delta)
 	var solved=[]
 	for item in game.held.values():
 		if item in solved or not is_instance_valid(item): continue

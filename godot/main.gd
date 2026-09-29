@@ -90,6 +90,7 @@ var visit_entered=false
 var voice_client_message=""
 var grips
 var siegebird
+var archery
 var collection
 var living
 var weather
@@ -187,7 +188,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--guardian-check") or OS.get_cmdline_user_args().has("--desktop-hero-check") or OS.get_cmdline_user_args().has("--expedition-check") or OS.get_cmdline_user_args().has("--director-check") or OS.get_cmdline_user_args().has("--director-network-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
-	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check") or OS.get_cmdline_user_args().has("--phoenix-bow-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--atmosphere-test")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--landscape-check")
 	for argument in OS.get_cmdline_user_args():
@@ -323,6 +324,7 @@ func _ready():
 	collection=preload("res://collection_runtime.gd").new()
 	add_child(collection)
 	collection.setup(self)
+	archery=preload("res://phoenix_bow.gd").new(); add_child(archery); archery.setup(self)
 	item_actions=preload("res://item_interactions.gd").new()
 	add_child(item_actions)
 	item_actions.setup(self)
@@ -435,6 +437,7 @@ func _ready():
 		add_child(landscape_check)
 		landscape_check.run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--desktop-hero-check"): preload("res://desktop_hero_integration_checks.gd").run.call_deferred(self)
+	if OS.get_cmdline_user_args().has("--phoenix-bow-check"): preload("res://phoenix_bow_checks.gd").run.call_deferred(self)
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="):
 			preload("res://desktop_hero_preview.gd").run.call_deferred(self,argument.trim_prefix("--desktop-hero-preview="))
@@ -914,6 +917,7 @@ func _hud():
 	help.add_theme_color_override("font_color",Color("e6ebdd"))
 	help.text="MOVE  WASD walk · Mouse look · Esc cursor\nGEAR  E take/drop · Left click primary · Right click alternate\nCROSSBOW  9 equip owned Siegebird · R cock + seat bolt · Hold R to reel tether\nTOOLS  1–8 equip · F destination · G travel\nWORLD  T teleport · U workshop · V talk to Brann\nVIEW  F11 fullscreen · Q turn left · F1 close help"
 	desktop_help_panel.visible=false
+	help.text += "\nBOW  0 Emberwing · hold LMB draw, release fire · hold RMB + turn to bend"
 	var cross = Label.new()
 	layer.add_child(cross)
 	cross.text = "+"
@@ -1001,6 +1005,7 @@ func _process(delta):
 	if enchantments!=null: enchantments.tick(delta)
 	grips.tick(delta)
 	siegebird.tick(delta)
+	if archery!=null: archery.tick(delta)
 	collection.tick()
 	item_actions.tick(delta)
 	qol.tick(delta)
@@ -1040,7 +1045,7 @@ func _process(delta):
 	for key in held.keys():
 		var weapon = held[key]
 		if not is_instance_valid(weapon): continue
-		if melee.handles(weapon) or weapon.get_meta("crossbow",false) or weapon.has_meta("fire_kind"): continue
+		if melee.handles(weapon) or weapon.get_meta("crossbow",false) or weapon.get_meta("phoenix_bow",false) or weapon.has_meta("fire_kind"): continue
 		if weapon in struck: continue
 		struck.append(weapon)
 		if grips.adjusting.has(key):
@@ -1121,6 +1126,7 @@ func _unhandled_input(event):
 		match event.physical_keycode:
 			KEY_E: _grip(desktop_hand, true)
 			KEY_9: _desktop_equip_siegebird()
+			KEY_0: archery.equip(desktop_hand)
 			KEY_X:
 				if magnetic_wand!=null: magnetic_wand.secondary(desktop_hand)
 			KEY_Q: _snap(deg_to_rad(qol.settings.snap_degrees))
@@ -1161,6 +1167,7 @@ func _desktop_equip_siegebird()->bool:
 
 func _desktop_primary() -> void:
 	var item=held.get(str(desktop_hand.get_instance_id()))
+	if archery!=null and item==archery.bow and is_instance_valid(item): archery.desktop_press(); return
 	if is_instance_valid(item) and item.get_meta("guardian_shield",false):
 		guardians.desktop_bash(desktop_hand,camera)
 		return
@@ -1184,6 +1191,7 @@ func _desktop_primary() -> void:
 func _desktop_alternate() -> bool:
 	var item=held.get(str(desktop_hand.get_instance_id()))
 	if not is_instance_valid(item): return false
+	if item==archery.bow: return true
 	if wyrmspout!=null and wyrmspout.vent(item): return true
 	var crossbow=siegebird.desktop_weapon(desktop_hand)
 	if crossbow!=null and crossbow.reel_installed:
@@ -1294,6 +1302,7 @@ func _desktop_hint()->String:
 		var state_text="reloading" if crossbow.get("desktop_reloading",false) else ("ready" if crossbow.loaded else ("cocked · empty" if crossbow.draw>=0.999 else "empty"))
 		return "Siegebird %s · unlimited bolts · LMB fire · R reload · F1 controls"%state_text
 	var item=held.get(str(desktop_hand.get_instance_id()))
+	if archery!=null and item==archery.bow and is_instance_valid(item): return "Emberwing · hold LMB draw, release fire · hold RMB + turn for phoenix arc · 0 equip · F1 controls"
 	if wyrmspout!=null and wyrmspout.is_wyrmspout(item): return "Wyrmspout · hold LMB for fire · release to cool · RMB vent · F1 controls"
 	if is_instance_valid(item) and str(item.get_meta("id","")).begins_with("forge_lantern_"): return "Lantern · LMB toggle shutter · E drop · F1 controls"
 	if is_instance_valid(item) and melee.handles(item):
@@ -1334,12 +1343,13 @@ func _xr_input():
 		var grabbed=false
 		if grip and not was_gripped and not qol.opened:
 			grabbed = _grip(hand, false)
-		if bomb_input.tick(key,grip,was_gripped,trigger,last_inputs.get(key+"t",false),grabbed,held.has(key) or _lantern_shutter_busy(hand) or ((playful_tools!=null and playful_tools.claims_trigger(hand)) or (magnetic_wand!=null and magnetic_wand.claims_trigger(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand)))) or firecraft.busy(hand) or siegebird.busy(hand) or (living!=null and living.claims_trigger(hand)) or workshop.busy(hand) or enchantments.busy(hand),qol.opened or (fairy!=null and fairy.perched_on(hand)),elapsed):
+		var archery_input=archery!=null and archery.sample_trigger(hand,trigger)
+		if bomb_input.tick(key,grip,was_gripped,trigger,last_inputs.get(key+"t",false),grabbed,held.has(key) or archery_input or _lantern_shutter_busy(hand) or ((playful_tools!=null and playful_tools.claims_trigger(hand)) or (magnetic_wand!=null and magnetic_wand.claims_trigger(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand)))) or firecraft.busy(hand) or siegebird.busy(hand) or (living!=null and living.claims_trigger(hand)) or workshop.busy(hand) or enchantments.busy(hand),qol.opened or (fairy!=null and fairy.perched_on(hand)),elapsed):
 			adventure.begin_bomb(hand)
 		if not grip and was_gripped:
 			print("GRIP_RELEASE hand=",hand.tracker," amount=",snappedf(hand.get_float("grip"),0.01)," threshold=",tuning.value("input.grip_release"))
 			adventure.release(hand)
-		if trigger and not last_inputs.get(key + "t", false) and _trigger_allowed(hand,grip): _trigger(hand, false)
+		if trigger and not archery_input and not last_inputs.get(key + "t", false) and _trigger_allowed(hand,grip): _trigger(hand, false)
 		last_inputs[key + "g"] = grip
 		last_inputs[key + "t"] = trigger
 		var pointer=aim_source(hand)
@@ -1491,6 +1501,7 @@ func _notification(what):
 		if world_builder!=null: world_builder.save()
 
 func _grip(hand: Node3D, desktop: bool):
+	if archery!=null and archery.busy(hand): return true
 	if fairy!=null: fairy.offer_to(hand)
 	if fairy!=null and fairy.perched_on(hand): return true
 	var key = str(hand.get_instance_id())
@@ -1572,6 +1583,7 @@ func _set_collisions(node: Node, enabled: bool):
 func _trigger(hand: Node3D, desktop: bool):
 	var source = camera if desktop else aim_source(hand)
 	if qol.menu_trigger(source): return
+	if archery!=null and archery.controls_hand(hand): return
 	for lantern in forge_lanterns:
 		if lantern.trigger(hand): return
 	if echo_bells!=null and echo_bells.busy(hand): return
@@ -1654,6 +1666,8 @@ func _desktop_activity_button(source:Node3D,hand:Node3D)->bool:
 	return true
 
 func _button(action: String):
+	if action=="archery:equip" and archery!=null:
+		archery.equip(qol.other_hand() if vr else desktop_hand); return
 	if action.begins_with("creek:") and ember_creek!=null:
 		ember_creek.act(action.trim_prefix("creek:")); return
 	if action.begins_with("fairytrail:") and fairy_trails!=null:
