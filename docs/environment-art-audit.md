@@ -10,6 +10,19 @@ The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs
 
 Each capture now also records a draw-call count and rendered-object count before PNG readback. Use them to spot large before/after regressions when integrating a zone kit. They are whole-process samples while the live world and a review viewport exist; they are neither isolated GPU timings nor a headset stereo benchmark. Capture pacing makes FPS and process-time samples misleading, so those are deliberately omitted. Run a separate in-game VR performance check before claiming a kit is headset-safe.
 
+The 2026-09-30 ground-eye baseline for the next six art candidates, sampled under that exact capture setup:
+
+| Zone | Draw calls | Rendered objects |
+| --- | ---: | ---: |
+| Sandstone Quarry | 395 | 591 |
+| Ember Foundry | 351 | 544 |
+| Enchanted Kitchen | 950 | 1,147 |
+| Mushroom Glade | 226 | 420 |
+| Pinewood Ruins | 322 | 595 |
+| Crystal Hollow | 561 | 834 |
+
+These totals include the running world and the review viewport. Compare like-for-like captures only. The Kitchen is already relatively expensive despite its simple appearance, so extra shelves/props should be batched rather than added as independent nodes.
+
 For the next authored kits, run the route/resource acceptance check before and after integration. It samples a player-sized capsule along the Quarry, Foundry, Kitchen, Glade, Pinewood and Crystal approaches, gathering sites and fight spaces, rejects authored collision that blocks them, and checks existing resource/barrier counts. After importing the first pair, use `-- --zone=sandstone_quarry,ember_foundry --require-authored`; the default checks all six without demanding unfinished kits:
 
 ```powershell
