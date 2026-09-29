@@ -37,6 +37,24 @@ func _initialize() -> void:
 	var crossing: int = _index(Vector2(25, -48))
 	if first.river_distance[crossing] > 3.0: failures.append("creek missed bridge crossing")
 	if first.height[crossing] >= first.base_height[crossing] - 0.5: failures.append("creek was not carved at bridge")
+	# On flat terrain, the authored visual profile is measurable independent of
+	# the procedural hills: inset water, a wet bed, gravel, then a walkable bank.
+	var flat_height := PackedFloat32Array()
+	flat_height.resize(SIZE * SIZE)
+	var flat_moisture := PackedFloat32Array()
+	flat_moisture.resize(SIZE * SIZE)
+	var flat: Dictionary = Hydro.run({"size": SIZE, "step": STEP, "origin": ORIGIN, "seed": 1,
+		"height": flat_height, "moisture": flat_moisture},
+		[Vector2(-160, -48), Vector2(160, -48)])
+	var center: int = _index(Vector2(-140, -48))
+	var gravel: int = _index(Vector2(-140, -44))
+	var bank: int = _index(Vector2(-140, -42))
+	var rim: int = _index(Vector2(-140, -40))
+	if flat.water_level[center] > -1.5 or flat.water_level[center] < -2.5: failures.append("water surface lacks two-metre inset")
+	if flat.water[center] < 0.6 or flat.height[center] >= flat.water_level[center]: failures.append("main bed is not submerged")
+	if absf(flat.height[gravel] - flat.water_level[gravel]) > 0.35: failures.append("gravel margin is absent")
+	if flat.height[bank] <= flat.height[gravel] + 0.4 or flat.height[rim] <= flat.height[bank] + 0.4: failures.append("graded bank is absent")
+	if flat.height[rim] - flat.height[bank] > STEP * 0.8: failures.append("bank grade exceeds 40 degrees")
 	var camp: int = _index(Vector2(15, -27))
 	if first.water[camp] > 0.0: failures.append("camp is underwater")
 	var line: Array[Vector3] = first.river_polyline

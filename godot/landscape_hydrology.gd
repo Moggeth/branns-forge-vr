@@ -2,7 +2,9 @@ extends RefCounted
 ## Deterministic, grid-based water compiler. Grid index is z * size + x.
 ## Coordinates and river_polyline are local to the landscape origin.
 
-const MAIN_BANK: float = 25.0
+const WATER_INSET: float = 2.0
+const GRAVEL_MARGIN: float = 1.5
+const BANK_GRADE: float = 0.64 # tan(33 degrees): walkable, exposed bank face.
 const MAIN_REACH: float = 34.0
 const TRIBUTARY_THRESHOLD: float = 145.0
 
@@ -27,22 +29,25 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 	var river_distance := PackedFloat32Array()
 	var river_width := PackedFloat32Array()
 	var river_depth := PackedFloat32Array()
+	var carve_ceiling := PackedFloat32Array()
 	var water := PackedFloat32Array()
 	var pool := PackedFloat32Array()
 	var water_level := PackedFloat32Array()
 	river_distance.resize(count)
 	river_width.resize(count)
 	river_depth.resize(count)
+	carve_ceiling.resize(count)
 	water.resize(count)
 	pool.resize(count)
 	water_level.resize(count)
 	river_distance.fill(1000000.0)
+	carve_ceiling.fill(1000000.0)
 	water_level.fill(-1000000.0)
 	var levels := PackedFloat32Array()
 	levels.resize(route.size())
-	var previous_level: float = _sample_height(height, size, step, origin, route[0]) - 0.7
+	var previous_level: float = _sample_height(height, size, step, origin, route[0]) - WATER_INSET
 	for i in route.size():
-		var current: float = _sample_height(height, size, step, origin, route[i]) - 0.7
+		var current: float = _sample_height(height, size, step, origin, route[i]) - WATER_INSET
 		if i > 0:
 			# A directed river always descends, even when its controls cross a rise.
 			current = minf(current, previous_level - route[i].distance_to(route[i - 1]) * 0.0015)
@@ -67,25 +72,24 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 				var t: float = clampf((p - a).dot(tangent) / length_sq, 0.0, 1.0)
 				var distance: float = p.distance_to(a + tangent * t)
 				var index: int = z * size + x
-				if distance >= river_distance[index]: continue
-				river_distance[index] = distance
 				var width: float = 6.2 + 1.8 * sin(float(i) * 0.055 + 0.3)
 				var depth: float = 1.2 + 0.3 * sin(float(i) * 0.11)
+				var level: float = lerpf(levels[i], levels[i + 1], t)
+				var landing: float = 1.0 - smoothstep(7.0, 14.0, absf(p.x - 25.0))
+				var grade: float = lerpf(BANK_GRADE, 0.42, landing)
+				carve_ceiling[index] = minf(carve_ceiling[index], _channel_ceiling(distance, width, depth, level, grade))
+				if distance >= river_distance[index]: continue
+				river_distance[index] = distance
 				river_width[index] = width
 				river_depth[index] = depth
-				water_level[index] = lerpf(levels[i], levels[i + 1], t)
+				water_level[index] = level
 	for index in count:
 		var distance: float = river_distance[index]
 		if distance >= MAIN_REACH: continue
 		var half_width: float = river_width[index] * 0.5
-		var bank_t: float = clampf((distance - half_width) / MAIN_BANK, 0.0, 1.0)
-		var ease: float = bank_t * bank_t * (3.0 - 2.0 * bank_t)
-		var carve_weight: float = 1.0 - ease
-		var bed: float = water_level[index] - river_depth[index]
-		# Fade the *amount removed* into the existing ground. The former profile
-		# ended below that ground and made a near-vertical lip at its outer edge.
-		if distance < half_width + MAIN_BANK:
-			height[index] -= maxf(0.0, height[index] - bed) * carve_weight
+		# Take the lower profile where bends approach one another. Choosing only
+		# the nearest segment can create a sharp seam between different levels.
+		height[index] = minf(height[index], carve_ceiling[index])
 		if distance < half_width and height[index] < water_level[index]:
 			water[index] = water_level[index] - height[index]
 	var downstream := PackedInt32Array()
@@ -125,6 +129,22 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 				river_width[near_index] = maxf(river_width[near_index], radius * 2.0)
 				river_distance[near_index] = minf(river_distance[near_index], d)
 				if d <= radius: water[near_index] = maxf(water[near_index], cut * 0.7)
+	# Resolve the few junctions where a narrow tributary meets the deeper main
+	# cut. Lower the high side until neighbouring terrain remains walkable.
+	for pass_index in 4:
+		for z in range(1, size - 1):
+			for x in range(1, size - 1):
+				var index: int = z * size + x
+				if river_distance[index] >= MAIN_REACH: continue
+				for dz in range(-1, 2):
+					for dx in range(-1, 2):
+						if dx == 0 and dz == 0: continue
+						var neighbor: int = (z + dz) * size + x + dx
+						var allowed: float = height[neighbor] + step * 0.65 * Vector2(dx, dz).length()
+						height[index] = minf(height[index], allowed)
+	for index in count:
+		if river_distance[index] < river_width[index] * 0.5 and water_level[index] > -100.0:
+			water[index] = maxf(water[index], water_level[index] - height[index])
 	# Named work sites are composable dry clearing masks. Drainage still informs
 	# moisture nearby, but a random tributary cannot bisect an authored plot.
 	var natural_ground: PackedFloat32Array = model.get("base_height", PackedFloat32Array())
@@ -176,6 +196,19 @@ static func run(model: Dictionary, river_controls: Array[Vector2]) -> Dictionary
 	model["moisture"] = moisture
 	model["river_polyline"] = polyline
 	return model
+
+
+static func _channel_ceiling(distance: float, width: float, depth: float, level: float, grade: float) -> float:
+	var half_width: float = width * 0.5
+	if distance <= half_width:
+		# Keep the visible ribbon wet to its edge, with a shallow submerged toe.
+		var toe: float = smoothstep(maxf(0.0, half_width - 2.5), half_width, distance)
+		return lerpf(level - depth, level - 0.12, toe)
+	if distance <= half_width + GRAVEL_MARGIN:
+		# A narrow shelf above the water is the physical gravel margin.
+		return lerpf(level - 0.12, level + 0.10, (distance - half_width) / GRAVEL_MARGIN)
+	# Join the uncut terrain at a 33-degree grade, without an outer lip.
+	return level + 0.10 + grade * (distance - half_width - GRAVEL_MARGIN)
 
 
 static func refresh_after_terrain_change(model: Dictionary, dirty: Rect2) -> Dictionary:
