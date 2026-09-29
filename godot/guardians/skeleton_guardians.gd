@@ -145,6 +145,8 @@ func filter_damage(enemy, damage: float, hand = null, damage_type := "physical")
 	if record.is_empty(): return damage
 	var exposed: bool = game.elapsed < float(enemy.get_meta("exposed_until", -100.0))
 	if exposed: damage *= 1.5  # Prism Chime weak spot
+	# A bolt that actually reached the skull passed above the raised shield.
+	if damage_type == "headshot": return damage
 	if record.state != "carried" or exposed: return damage
 	var source: Vector3 = hand.global_position if hand is Node3D else game.camera.global_position
 	if not _is_frontal(record, source): return damage

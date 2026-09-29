@@ -174,13 +174,13 @@ func _apply_personality(entry: Dictionary, walking: bool, gait: float, phase: St
 	var step_bounce := pow(absf(sin(cycle)), 1.4) * walk_mix
 	var uneven := sin(cycle + (0.35 if variant == "mossward" else -0.2)) * walk_mix
 	var hit_age := float(game.elapsed) - float(entry.hit_at)
-	var hit := maxf(0.0, 1.0 - hit_age / 0.42) * float(entry.hit_strength)
+	# A damped sideways jolt reads as loose bone without moving the gameplay root.
+	var hit := maxf(0.0, 1.0 - hit_age / 0.55) * (0.82 + 0.18 * cos(hit_age * 25.0)) * float(entry.hit_strength)
 	var push: Vector3 = entry.hit_direction * hit
-	# The attack remains legible and the shield stays on the animated left arm.
-	# These restrained secondary rotations make the rigid-bone walk feel fragile.
-	_bone_add(entry, "Torso", Vector3(-0.05 * step_bounce - push.z * 0.19, 0.05 * uneven, -0.075 * wobble - push.x * 0.22) * attack_mix)
-	_bone_add(entry, "Head", Vector3(0.025 * step_bounce + push.z * 0.15, -0.06 * uneven, 0.07 * wobble + push.x * 0.18) * attack_mix)
-	_bone_add(entry, "RightArm", Vector3(0.11 * sin(cycle + 0.7) * walk_mix, 0.0, 0.07 * uneven + push.x * 0.13) * attack_mix)
+	# Keep the hit visible during an attack; only the walking secondary motion is subdued.
+	_bone_add(entry, "Torso", Vector3(-0.05 * step_bounce, 0.05 * uneven, -0.075 * wobble) * attack_mix + Vector3(-push.z * 0.31, 0.0, -push.x * 0.34))
+	_bone_add(entry, "Head", Vector3(0.025 * step_bounce, -0.06 * uneven, 0.07 * wobble) * attack_mix + Vector3(push.z * 0.24, 0.0, push.x * 0.27))
+	_bone_add(entry, "RightArm", Vector3(0.11 * sin(cycle + 0.7) * walk_mix, 0.0, 0.07 * uneven) * attack_mix + Vector3(0.0, 0.0, push.x * 0.19))
 	_bone_add(entry, "LeftArm", Vector3(0.04 * sin(cycle + 2.0) * walk_mix, 0.0, -0.025 * uneven) * attack_mix)
 	if variant != "mossward":
 		_bone_add(entry, "LeftLeg", Vector3(0.08 * maxf(0.0, sin(cycle)) * walk_mix, 0.0, -0.035 * wobble) * attack_mix)
@@ -193,9 +193,9 @@ func _apply_personality(entry: Dictionary, walking: bool, gait: float, phase: St
 	_bone_add(entry, "RightKnee", Vector3(right_flex, 0.0, 0.0))
 	if int(entry.bones.get("LeftKnee", -1)) < 0: _bone_add(entry, "LeftShin", Vector3(left_flex, 0.0, 0.0))
 	if int(entry.bones.get("RightKnee", -1)) < 0: _bone_add(entry, "RightShin", Vector3(right_flex, 0.0, 0.0))
-	entry.visual.position.y = 0.025 * step_bounce - 0.018 * hit
-	entry.visual.position.x = -push.x * 0.045
-	entry.visual.position.z = -push.z * 0.045
+	entry.visual.position.y = 0.025 * step_bounce - 0.035 * hit
+	entry.visual.position.x = -push.x * 0.11
+	entry.visual.position.z = -push.z * 0.11
 
 func _bone_add(entry: Dictionary, name: String, rotation: Vector3) -> void:
 	var index: int = int(entry.bones.get(name, -1))

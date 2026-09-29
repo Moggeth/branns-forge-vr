@@ -27,6 +27,7 @@ static func run(game):
 		hand.global_position=actor.global_position+actor.global_basis.z*2+Vector3.UP
 		var blocked=game.guardians.filter_damage(actor,20,hand)
 		if blocked>=15 or blocked<=0: failures.append("frontal guard ineffective")
+		if not is_equal_approx(game.guardians.filter_damage(actor,190,hand,"headshot"),190): failures.append("skull hit failed to clear raised shield")
 		hand.global_position=actor.global_position-actor.global_basis.z*2+Vector3.UP
 		if not is_equal_approx(game.guardians.filter_damage(actor,20,hand),20): failures.append("blocked attack from behind")
 		hand.global_position=record.shield.global_position
@@ -105,6 +106,8 @@ static func run(game):
 			ghost.set_meta("hp",20.0)
 			game.adventure.hurt_enemy(ghost,100.0,game.desktop_hand,Vector3.ZERO,"physical")
 			if not is_equal_approx(float(ghost.get_meta("hp")),20.0): failures.append("physical strike harmed ghost")
+			game.item_actions.pulse(ghost.global_position,2.7,18.0,game.desktop_hand,Color("ff9b48"))
+			if not is_equal_approx(float(ghost.get_meta("hp")),2.0): failures.append("starter Forge Pulse did not burn ghost")
 		game.guardians.trigger(game.desktop_hand,game.camera)
 		if float(item.get_meta("alt_ready",0))<=game.elapsed: failures.append(variant+" alternate action missing")
 		if variant == "cinderkeep":

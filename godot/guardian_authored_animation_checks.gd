@@ -52,6 +52,9 @@ func _run() -> void:
 		if not str(entry.active_clip).to_lower().ends_with("attack"): failures.append("attack clip not selected: " + variant)
 		var clip: Animation = entry.player.get_animation(entry.active_clip)
 		if absf(entry.player.current_animation_position - clip.length * 0.5) > 0.02: failures.append("combat progress not mapped: " + variant)
+		adapter.react_to_hit(actor, Vector3.RIGHT, 1.0)
+		adapter.tick(0.016)
+		if entry.visual.position.x > -0.08: failures.append("living guardian hit jolt too subtle: " + variant)
 		if not actor.global_transform.is_equal_approx(gameplay_pose): failures.append("animation moved gameplay root: " + variant)
 		fixture.guardians.guardians[actor.get_instance_id()].state = "loose"
 		adapter.tick(0.016)

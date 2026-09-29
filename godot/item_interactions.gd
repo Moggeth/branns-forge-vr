@@ -1,8 +1,8 @@
 extends Node
 ## Distinct native actions; deliberately independent of the model builders.
 const CONTROLS={
-"starter_hammer":"Swing: strike · Trigger: Forge Pulse (3s)",
-"apprentice_hammer":"Swing: strike · Trigger: Forge Pulse (3s)",
+"starter_hammer":"Swing: strike · Trigger: fiery Forge Pulse (3s) · fire defeats ghosts",
+"apprentice_hammer":"Swing: strike · Trigger: fiery Forge Pulse (3s) · fire defeats ghosts",
 "woodland_axe":"Swing: chop · Hold trigger while swinging: powered cleave",
 "quarry_pick":"Swing: mine · Trigger: charge a seam-breaking strike (8s)\nStrike ore within 8s to fracture nearby seams",
 "grappling_hook":"Aim + trigger: attach · Hold: reel · Release: pause\nLet go of the handle: detach",
@@ -57,7 +57,7 @@ func trigger(hand,source)->bool:
 	var origin:Vector3=source.global_position-source.global_basis.z*0.3
 	match id:
 		"starter_hammer","apprentice_hammer":
-			pulse(origin,2.7,18,hand,Color("eab56c"))
+			pulse(origin,2.7,18,hand,Color("ff9b48"))
 		"quarry_pick":
 			item.set_meta("stonewhisper_charged_until",game.elapsed+8.0)
 			if item.has_meta("stonewhisper_glow") and is_instance_valid(item.get_meta("stonewhisper_glow")): item.get_meta("stonewhisper_glow").queue_free()
@@ -115,7 +115,7 @@ func pulse(point:Vector3,radius:float,damage:float,hand,color:Color):
 	for enemy in game.scene.get("enemies",[]):
 		if enemy.is_visible_in_tree() and enemy.global_position.distance_to(point)<radius:
 			enemy.set_meta("slow_until",game.elapsed+2)
-			game.adventure.hurt_enemy(enemy,damage,hand)
+			game.adventure.hurt_enemy(enemy,damage,hand,Vector3.ZERO,"fire")
 	for dummy in game.scene.dummies:
 		if dummy.global_position.distance_to(point)<radius: game._dummy_hit(dummy)
 	for rat in game.scene.rats:

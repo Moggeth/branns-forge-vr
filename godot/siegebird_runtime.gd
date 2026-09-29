@@ -500,7 +500,7 @@ func tick(delta):
 					"enemy":
 						var local_hit=target.to_local(hit.position)
 						var headshot=str(target.get_meta("enemy_type",""))=="skeleton" and hit.position.distance_to(game.enchantments._head_position(target))<0.32
-						game.adventure.hurt_enemy(target,float(shot.get("damage",95))*(2.0 if headshot else 1.0),shot.hand,Vector3.ZERO,"fire" if shot.get("hot",false) else "projectile")
+						game.adventure.hurt_enemy(target,float(shot.get("damage",95))*(2.0 if headshot else 1.0),shot.hand,shot.velocity.normalized(),"headshot" if headshot else ("fire" if shot.get("hot",false) else "projectile"),hit.position)
 					"rat": game._kill_rat(target)
 					"dummy": game._dummy_hit(target)
 			extras.impact(shot,hit,target)
