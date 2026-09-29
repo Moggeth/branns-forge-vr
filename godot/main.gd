@@ -2315,11 +2315,15 @@ func _qol_smoke_test():
 		if pickup.get_meta("kind","")=="weapon" and not pickup in held.values():
 			if pickup.has_meta("collection_id"):
 				var home=collection.homes[pickup.get_meta("collection_id")]
-				if pickup.global_position.distance_to(home.stand.global_position+Vector3.UP*0.98)>0.1: failures.append("collection recall")
+				if pickup.global_position.distance_to(collection.display_position(home))>0.1: failures.append("collection recall")
 			elif pickup.global_position.distance_to(scene.rack.global_position)>6: failures.append("tool recall")
 	if imported.is_empty(): failures.append("generated item missing")
 	else:
 		var id=imported.keys()[0]
+		var handoff_deadline=elapsed+8.0
+		while not imported[id].get_meta("delivery_ready",true) and elapsed<handoff_deadline:
+			await get_tree().process_frame
+		if not imported[id].get_meta("delivery_ready",true): failures.append("invention delivery did not finish")
 		qol.present(id)
 		if imported[id].global_position.distance_to(camera.global_position)>1.2: failures.append("within reach handoff")
 		qol.equip(id)

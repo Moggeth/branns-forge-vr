@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawn}=require('node:child_process');
 const project=path.resolve(__dirname,'..');const godot=path.join(project,'tools/godot/Godot_v4.7.2-stable_win64_console.exe');
-const root=fs.mkdtempSync(path.join(process.env.BRANN_TEST_ROOT||path.join(project,'work'),'integration-'));const id='00000000-0000-4000-8000-000000000001';const asset=path.join(root,'data/forge-assets',id);fs.mkdirSync(asset,{recursive:true});
+const root=fs.mkdtempSync(path.join(process.env.BRANN_TEST_ROOT||os.tmpdir(),'integration-'));const id='00000000-0000-4000-8000-000000000001';const asset=path.join(root,'data/forge-assets',id);fs.mkdirSync(asset,{recursive:true});
 const started=performance.now();let service;
 function run(args){return new Promise((resolve,reject)=>{const p=spawn(godot,process.env.BRANN_VERBOSE_TEST==='1'?['--verbose',...args]:args,{windowsHide:true});let out='';p.stdout.on('data',d=>{out+=d;process.stdout.write(d);});p.stderr.on('data',d=>{out+=d;process.stderr.write(d);});p.on('error',reject);p.on('exit',code=>code===0&&!/SCRIPT ERROR|ERROR:/.test(out)?resolve(out):reject(Error('Godot verification failed, exit '+code)));});}
 (async()=>{try{

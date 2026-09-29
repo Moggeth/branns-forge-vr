@@ -258,7 +258,7 @@ godot/ is the playable implementation. Do not retry Unity without fixing licensi
 
 Diagnostics are read-only and record engine/runtime/process/service readiness in
 logs/diagnostics-latest.json. Verification runs service tests, Godot parsing and
-isolated connected native tests on port 8788 with temporary work/integration-* state.
+isolated connected native tests on port 8788 with temporary OS-temp integration-* state.
 Optional captures render all eight zones with service mutations disabled. Normal
 play uses loopback port 8787. See docs/VERIFICATION.md for results and known failures.
 

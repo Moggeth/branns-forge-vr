@@ -12,10 +12,25 @@ static func summary(state:Dictionary)->String:
 	for upgrade in upgrades:
 		if int(upgrade.tier)==tier+1: next=upgrade
 	if not next.is_empty():
-		lines.append("NEXT  ·  "+str(next.name))
+		lines.append("NEXT · "+str(next.name))
+		var resources:Dictionary=state.get("resources",{})
+		var choices:PackedStringArray=[]
+		for cost in next.get("costs",[]):
+			var ingredients:PackedStringArray=[]
+			for resource in cost:
+				var owned=int(state.get("tails",0)) if resource=="rat_tail" else int(resources.get(resource,0))
+				ingredients.append("%s %d/%d"%[str(resource).replace("_"," "),owned,int(cost[resource])])
+			choices.append(" + ".join(ingredients))
+		if not choices.is_empty(): lines.append(" OR ".join(choices))
+		var places:PackedStringArray=[]
+		for cost in next.get("costs",[]):
+			for resource in cost:
+				var place=str(PLACES.get(resource,""))
+				if not place.is_empty() and not places.has(place): places.append(place)
+		if not places.is_empty(): lines.append("Find at "+", ".join(places))
 		lines.append("Pouch → buckets → lever")
 	else:
-		lines.append("All tiers built" if tier>=4 else "Talk to Brann for the next step")
+		lines.append("All forge tiers unlocked" if tier>=4 else "Talk to Brann for the next step")
 	return "\n".join(lines)
 
 static func update_cards(buttons:Array,state:Dictionary):

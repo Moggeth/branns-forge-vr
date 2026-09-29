@@ -118,7 +118,7 @@ func _array_to_pose(values)->Transform3D:
 	return pose
 
 func _load_poses():
-	if game.diagnostic_offline or not FileAccess.file_exists(GRIP_POSE_PATH): return
+	if game.diagnostic_offline or game.smoke or not FileAccess.file_exists(GRIP_POSE_PATH): return
 	var data=JSON.parse_string(FileAccess.get_file_as_string(GRIP_POSE_PATH))
 	if data is Dictionary:
 		for key in data:
@@ -127,7 +127,7 @@ func _load_poses():
 	print("GRIP_POSES loaded=",saved_poses.size()," path=",GRIP_POSE_PATH)
 
 func _save_pose(item:Node3D,hand:Node3D,pose:Transform3D):
-	if game.diagnostic_offline: return
+	if game.diagnostic_offline or game.smoke: return
 	var key=_pose_key(item,hand)
 	saved_poses[key]=pose
 	var data={}

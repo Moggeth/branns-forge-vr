@@ -1404,3 +1404,38 @@ number. The first test edit failed at parse time because GDScript could not
 infer the RID type through the dynamic `world_builder_view` property; declaring
 both viewport variables as `RID` fixed it. The probe closes its window before
 exit to avoid a spurious subwindow-embedding shutdown warning.
+
+### Integration smoke repair (2026-09-30)
+
+`node service/integration.cjs` now passes with `QOL_SMOKE failures:[]`,
+`SIEGE_LEDGER_RESULT []`, and `INTEGRATION PASS seconds=54.516` using a
+disposable service fixture on port 8788. The first focused run failed in the
+QOL section. Its two collection assertions assumed every item sits 0.98 m
+above its stand, while both lantern specimens intentionally use 0.88 m. The
+smoke check now asks the collection for each item's display position. Five
+invention/distance assertions ran before the delivery's `delivery_ready` flag
+became true; the test now waits up to eight seconds for the real handoff.
+The progression panel itself had lost the service's live costs and gathering
+places despite the README's UI contract; those lines were restored from the
+authoritative upgrade ledger. This was a display regression, not just a stale
+assertion.
+
+The final Siegebird test still expected paid, finite bolts after the service
+switched to unlimited quiver supply. Its checks now assert unchanged stock
+across draw, recover, auto-load and reload while retaining chamber, fire and
+desktop input checks. A full run then reached `SIEGE_LEDGER_RESULT []` but
+Godot emitted a shutdown error for active `forge-impact-7.wav` playback. The
+test now stops audio players and releases the forge WAV references before
+quitting; do not suppress the runner's `ERROR:` gate. Another run hit an
+intermittent OneDrive `EPERM` while atomically replacing the fixture's
+`player.json`, causing a dependent pouch-conservation failure. The default
+fixture location is now the OS temp directory, with `BRANN_TEST_ROOT` retained
+as an override. No player service save or historical fixture was used.
+
+Measured integration attempts, including fixture creation and all four Godot
+stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
+audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive
+rename failure), 54.516 s (all pass). The verbose run named two active
+`AudioStreamPlaybackWAV` references and `forge-impact-7.wav`; this evidence
+distinguished audio teardown from a gameplay resource error. Existing
+OneDrive fixtures were left untouched.
