@@ -137,6 +137,9 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		var result={}
 		if target.get_meta("enemy_type","")=="skeleton" and game.skeleton_structure!=null and not shielded:
 			result=game.skeleton_structure.hit(target,point,direction,impact_force,"blade" if blade else "blunt")
+			# Audible contact on every connected bone strike, not only when a
+			# whole limb breaks free. PhysicalRemains pools and throttles the clack.
+			game.remains._clack(point)
 			remaining_energy-=5.5 if blade else 3.0
 			if powered and blade:
 				var cut_regions=[result.get("region","")]

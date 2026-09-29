@@ -278,6 +278,7 @@ func _clack(point):
 	game.add_child(player)
 	player.global_position=point
 	player.stream=clack
+	player.pitch_scale=randf_range(0.90,1.12)
 	player.max_distance=12
 	player.volume_db=linear_to_db(game.tuning.value("audio.volume"))-14
 	player.finished.connect(player.queue_free)
