@@ -1381,3 +1381,15 @@ The RTS presentation check passed with `WORLD_BUILDER_PRESENTATION failures:[]` 
 Lumberjack review captured 22 assigned-tree frames in 11.79 seconds and 28 isolated-camp frames in 11.27 seconds. The worker advanced 1.68 m in eight 0.1-second updates, switched Walk to Chop at arrival, and settled the blend by frames 9–10 with no obvious foot skating. `WORLD_BUILDER_RESULT {"failures":[]}` passed in 5.52 seconds. The first two graphical captures (13.29 and 12.74 seconds) were occluded because `--world-builder-preview` alone leaves the orchard hidden. Use **both** `--world-builder --world-builder-preview` for a useful gameplay capture.
 
 Sonnet 5.5 commissioning uses `scripts/Run-Sonnet-Commission.ps1` only after the subscription is available. The 22:22 Sydney Stonewhisper attempt reported a subscription rate limit resetting at midnight, and delivered no art. Do not switch to metered API billing or another identity/model to bypass that limit.
+
+# Overnight visual-art baseline (2026-09-29)
+
+Before installing the queued Sonnet art, the native desktop RTS stress rehearsal
+(`--script res://world_builder_stress_check.gd -- --world-builder --world-builder-preview`)
+spawned 24 live skeletons in the shared Orchard and reported 120 FPS minimum,
+median and mean across sixteen quarter-second samples, with the tactical view
+at 65% scale and 30 FPS. The run took 14.07 seconds. A 141.7 ms first-view
+frame hitch was logged separately. These are capped desktop readings on the
+RTX 3080 Ti, not stereo VR measurements. Re-run the same scene after art
+integration and compare draw calls, frame times and first-open hitch; do not
+assume the 120 FPS cap means additional geometry is free.
