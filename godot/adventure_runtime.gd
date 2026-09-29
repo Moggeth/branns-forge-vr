@@ -1,6 +1,7 @@
 extends Node
 ## Native adventure simulation. Generated scripts remain in the service sandbox.
 const Horizon = preload("res://horizon.gd")
+const OrchardHorizon = preload("res://orchard_vfx/orchard_horizon.gd")
 const Navigation = preload("res://landscape_navigation.gd")
 const TOOL_NAMES = {"apprentice_hammer":"Copperpot’s Promise", "woodland_axe":"Orchard’s Edge", "quarry_pick":"Stonewhisper", "bomb_glove":"Pocket Thunder", "grappling_hook":"Swallow Line", "spore_lantern":"Mooncap Lantern", "crystal_resonator":"Hollow’s Song", "ember_gauntlet":"The Last Hearth"}
 const ORDER = ["apprentice_hammer", "woodland_axe", "quarry_pick", "bomb_glove", "grappling_hook", "spore_lantern", "crystal_resonator", "ember_gauntlet"]
@@ -25,16 +26,28 @@ var test_mode = false
 var zone_groups = {}
 var last_interaction = {"phase":"activate","hand":"right","squeeze":0.0,"formationSeconds":0.6}
 var hollow: Node
+var environment_grade_defaults: Dictionary = {}
 
 func setup(owner_game):
 	game = owner_game
+	var world: WorldEnvironment = game.get_node_or_null("AdventureEnvironment") as WorldEnvironment
+	if world != null:
+		for property in ["tonemap_exposure", "tonemap_white", "ambient_light_source", "ambient_light_sky_contribution", "fog_mode", "fog_light_energy", "fog_sun_scatter", "fog_aerial_perspective", "fog_sky_affect", "fog_height", "fog_height_density", "adjustment_enabled", "adjustment_contrast", "adjustment_saturation"]:
+			environment_grade_defaults[property] = world.environment.get(property)
 	# Every core destination has one static, collision-free landscape mesh. Its zone
 	# root is already culled on travel, so distant neighbouring rings never overlap.
 	for horizon_zone in ZONES:
 		if not game.scene.zones.has(horizon_zone): continue
 		var horizon_root: Node3D = game.scene.zones[horizon_zone].root
-		var horizon: Node3D = Horizon.build(horizon_zone,horizon_root)
-		horizon.get_node("HorizonMesh").add_to_group("distant_horizon")
+		var horizon: Node3D
+		if horizon_zone == "orchard_highlands":
+			horizon = OrchardHorizon.new()
+			horizon.name = "OrchardHorizon"
+			horizon_root.add_child(horizon)
+			for band in horizon.get_children(): band.add_to_group("distant_horizon")
+		else:
+			horizon = Horizon.build(horizon_zone,horizon_root)
+			horizon.get_node("HorizonMesh").add_to_group("distant_horizon")
 		game.scene.zones[horizon_zone]["horizon"] = horizon
 	panel = Label3D.new()
 	game.camera.add_child(panel)
@@ -876,6 +889,7 @@ func travel(id:String):
 
 func _apply_zone_environment(id:String):
 	for zone_id in zone_groups: zone_groups[zone_id].visible=zone_id==id
+	if game.orchard_spell_vfx != null: game.orchard_spell_vfx.visible = id == "orchard_highlands"
 	var settings=game.scene.get("zones",{}).get(id,{}).get("environment",{})
 	if settings.is_empty(): return
 	for child in game.get_children():
@@ -893,9 +907,18 @@ func _apply_zone_environment(id:String):
 		if child is DirectionalLight3D:
 			child.light_color=Color(settings.get("sun_color","ffe6bd"))
 			child.light_energy=float(settings.get("sun_energy",1.05))
+	var world: WorldEnvironment = game.get_node_or_null("AdventureEnvironment") as WorldEnvironment
+	if world != null:
+		if id == "orchard_highlands":
+			OrchardHorizon.apply_orchard_grade(world.environment, game.get_node_or_null("AdventureSun") as DirectionalLight3D)
+			world.environment.fog_height += game.scene.zones.orchard_highlands.root.global_position.y
+		else:
+			for property in environment_grade_defaults:
+				world.environment.set(property, environment_grade_defaults[property])
 	sync_horizon()
 
 func sync_horizon():
+	if zone == "orchard_highlands": return
 	var destination: Dictionary = game.scene.get("zones",{}).get(zone,{})
 	var horizon: Node3D = destination.get("horizon")
 	if horizon==null or not is_instance_valid(horizon): return

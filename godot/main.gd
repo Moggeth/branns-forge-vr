@@ -108,6 +108,7 @@ var director
 var director_local_view
 var world_builder
 var landscape
+var orchard_spell_vfx: Node3D
 var orchard_atmosphere
 var world_builder_view
 var festival_relay
@@ -233,9 +234,19 @@ func _ready():
 	adventure.setup(self)
 	landscape = preload("res://landscape_runtime.gd").new()
 	landscape.setup(self, scene.zones.orchard_highlands.root, diagnostic_offline or smoke)
+	orchard_spell_vfx = preload("res://orchard_vfx/orchard_spell_vfx.gd").new()
+	orchard_spell_vfx.name = "OrchardSpellVfx"
+	orchard_spell_vfx.quality_tier = "vr" if vr else "rts"
+	orchard_spell_vfx.grow_saplings_persist = false
+	orchard_spell_vfx.visible = false
+	add_child(orchard_spell_vfx)
+	landscape.visual_event.connect(orchard_spell_vfx.accept_event)
+	for event in landscape.get_visual_history_events():
+		orchard_spell_vfx.restore_event(event)
 	world_builder = preload("res://world_builder_runtime.gd").new()
 	add_child(world_builder)
 	world_builder.setup(self, diagnostic_offline or smoke)
+	world_builder.forest_visual_event.connect(orchard_spell_vfx.accept_event)
 	orchard_atmosphere=preload("res://orchard_atmosphere.gd").new()
 	add_child(orchard_atmosphere)
 	orchard_atmosphere.setup(self)
