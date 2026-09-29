@@ -43,9 +43,30 @@ func run(game):
 		if horizon==null or not is_instance_valid(horizon):
 			failures.append("missing horizon "+id)
 			continue
-		var horizon_stats: Dictionary = horizon.get_meta("stats",{})
-		if int(horizon_stats.get("triangles",0))<100 or int(horizon_stats.get("triangles",0))>10000: failures.append("horizon budget "+id)
-		if not horizon.get_node("HorizonMesh").is_in_group("distant_horizon"): failures.append("horizon weather group "+id)
+		if id=="orchard_highlands":
+			var orchard_horizon_tris:=0
+			if horizon.get_child_count()!=3: failures.append("orchard horizon band count")
+			for band_index in 3:
+				var band:=horizon.get_node_or_null("HorizonBand%d"%band_index) as MeshInstance3D
+				if band==null or band.mesh==null or band.mesh.get_surface_count()!=1:
+					failures.append("missing orchard horizon band "+str(band_index))
+					continue
+				if not band.is_in_group("distant_horizon"): failures.append("horizon weather group "+id+" band "+str(band_index))
+				if band.mesh.surface_get_primitive_type(0)!=Mesh.PRIMITIVE_TRIANGLES: failures.append("orchard horizon primitive "+str(band_index))
+				var arrays:=band.mesh.surface_get_arrays(0)
+				var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+				var triangles: int=vertices.size()/3
+				if arrays[Mesh.ARRAY_INDEX]!=null:
+					var indices:PackedInt32Array=arrays[Mesh.ARRAY_INDEX]
+					triangles=indices.size()/3
+				if triangles<100: failures.append("orchard horizon band budget "+str(band_index))
+				orchard_horizon_tris+=triangles
+			if orchard_horizon_tris>10000: failures.append("horizon budget "+id)
+		else:
+			var horizon_stats: Dictionary = horizon.get_meta("stats",{})
+			if int(horizon_stats.get("triangles",0))<100 or int(horizon_stats.get("triangles",0))>10000: failures.append("horizon budget "+id)
+			var horizon_mesh:=horizon.get_node_or_null("HorizonMesh")
+			if horizon_mesh==null or not horizon_mesh.is_in_group("distant_horizon"): failures.append("horizon weather group "+id)
 	var orchard_apples=0
 	var timber_count=0
 	for node in game.scene.get("resources",[]):
