@@ -1393,3 +1393,14 @@ frame hitch was logged separately. These are capped desktop readings on the
 RTX 3080 Ti, not stereo VR measurements. Re-run the same scene after art
 integration and compare draw calls, frame times and first-open hitch; do not
 assume the 120 FPS cap means additional geometry is free.
+
+The stress probe now records both viewports' median draw calls, the main
+viewport's measured GPU time, and process CPU p95 so later asset additions can
+be compared against the same scenario. A repeat reported 401 main and 521
+tactical median draw calls, 1.69 ms main-view GPU p95 and 10.54 ms process CPU
+p95. Godot did not return tactical-view GPU timings with the 30 FPS
+`UPDATE_ONCE` viewport, so that field remains null rather than inventing a
+number. The first test edit failed at parse time because GDScript could not
+infer the RID type through the dynamic `world_builder_view` property; declaring
+both viewport variables as `RID` fixed it. The probe closes its window before
+exit to avoid a spurious subwindow-embedding shutdown warning.
