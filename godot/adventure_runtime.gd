@@ -806,8 +806,16 @@ func die():
 		await game._poll()
 		_sync_cache()
 		game._notice("Brann pulled you home. Your tools are safe; recover your materials at "+death_zone.replace("_"," ")+".",12)
+	_finish_death_recovery()
+
+func _finish_death_recovery() -> void:
 	hp=100
 	travel("forge_yard")
+	if not game.vr:
+		# Arrive on the open approach rather than in the crowded workshop.
+		game.rig.global_position=game._safe_respawn_position(game.scene.zones.forge_yard.spawn+Vector3(0,0,4))
+		game.desktop_last_position=game.rig.global_position
+		print("DESKTOP_RESPAWN zone=forge_yard feet=",game.rig.global_position)
 	game.shield_until=game.elapsed+8
 	dying=false
 

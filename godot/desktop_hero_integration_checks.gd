@@ -4,6 +4,45 @@ extends RefCounted
 static func run(game) -> void:
 	var failures: Array[String] = []
 	if game.vr or game.desktop_look == null: failures.append("desktop look was not installed")
+	# Travel is the same path used by death recovery. A valid respawn must let
+	# desktop movement leave the forge instead of trapping the capsule in props.
+	game.adventure.travel("orchard_highlands")
+	game.adventure.travel("forge_yard")
+	await game.get_tree().physics_frame
+	var respawn_origin: Vector3 = game.rig.position
+	for direction in [Vector3.FORWARD, Vector3.BACK, Vector3.LEFT, Vector3.RIGHT]:
+		game.rig.position = respawn_origin
+		game._move_to(respawn_origin + direction * 0.35)
+		if game.rig.position.distance_to(respawn_origin) < 0.2:
+			failures.append("desktop player cannot walk after forge respawn: %s" % str(direction))
+	game.rig.position = respawn_origin
+	var blocker := StaticBody3D.new()
+	blocker.name = "RespawnObstructionFixture"
+	blocker.collision_layer = 1
+	blocker.collision_mask = 0
+	blocker.set_meta("kind", "solid")
+	game.add_child(blocker)
+	blocker.global_position = game.scene.zones.forge_yard.spawn + Vector3(0, 0.8, 4)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.5, 1.6, 1.5)
+	shape.shape = box
+	blocker.add_child(shape)
+	await game.get_tree().physics_frame
+	game.adventure.dying = true
+	game.adventure.hp = 0
+	game.adventure._finish_death_recovery()
+	var recovered: Vector3 = game.rig.global_position
+	if recovered.distance_to(blocker.global_position - Vector3.UP * 0.8) < 0.9:
+		failures.append("death recovery placed Hero inside an occupied forge spawn")
+	if game.adventure.dying or game.adventure.hp != 100 or game.adventure.zone != "forge_yard":
+		failures.append("death recovery did not reset health and location")
+	game._move_to(recovered + Vector3(0, 0, 0.35))
+	if game.rig.global_position.distance_to(recovered) < 0.2:
+		failures.append("desktop player cannot walk after obstructed death recovery")
+	blocker.queue_free()
+	game.desktop_last_position = game.rig.global_position
+	game.desktop_bob_strength = 0.0
 	var key := str(game.desktop_hand.get_instance_id())
 	var old_held: Dictionary = game.held.duplicate()
 	var hammer: Node3D = game.scene.hammer

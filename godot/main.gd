@@ -1320,14 +1320,38 @@ func _move_to(destination: Vector3):
 	if floor_owner==null or floor_owner.get_meta("kind","") not in ["floor","solid"]: return
 	if floor_owner.get_meta("kind","")=="solid" and float(floor_hit.position.y)-rig.global_position.y>0.35: return
 	bounded.y = float(floor_hit.position.y)+0.02
+	if _player_capsule_clear(bounded): rig.position = bounded
+
+func _player_capsule_clear(feet: Vector3) -> bool:
 	var query = PhysicsShapeQueryParameters3D.new()
 	var capsule = CapsuleShape3D.new()
 	capsule.radius = 0.2
 	capsule.height = 1.5
 	query.shape = capsule
 	query.collision_mask = 1
-	query.transform = Transform3D(Basis.IDENTITY, bounded + Vector3.UP * 0.95)
-	if get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty(): rig.position = bounded
+	query.transform = Transform3D(Basis.IDENTITY, feet + Vector3.UP * 0.95)
+	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
+
+func _safe_respawn_position(preferred: Vector3) -> Vector3:
+	# The forge evolves and loose or generated objects may occupy an old spawn.
+	# Find real floor support and a clear movement capsule before placing the Hero.
+	var offsets = [Vector3.ZERO]
+	var directions = [Vector3.BACK, Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD,
+		Vector3(1,0,1).normalized(), Vector3(-1,0,1).normalized(),
+		Vector3(1,0,-1).normalized(), Vector3(-1,0,-1).normalized()]
+	for radius in [2.0, 4.0, 6.0, 8.0]:
+		for direction in directions: offsets.append(direction * radius)
+	for offset in offsets:
+		var candidate: Vector3 = preferred + offset
+		var floor_query = PhysicsRayQueryParameters3D.create(candidate + Vector3.UP * 3.0, candidate + Vector3.DOWN * 4.0, 1)
+		var floor_hit = get_world_3d().direct_space_state.intersect_ray(floor_query)
+		if floor_hit.is_empty() or floor_hit.normal.y < 0.8: continue
+		var floor_owner = _owner(floor_hit.collider)
+		if floor_owner == null or floor_owner.get_meta("kind", "") != "floor": continue
+		var feet = Vector3(candidate.x, float(floor_hit.position.y) + 0.02, candidate.z)
+		if _player_capsule_clear(feet): return feet
+	push_warning("No clear forge respawn near " + str(preferred))
+	return preferred
 
 func _teleport(source: Node3D):
 	var hit = _ray(source, 12.0)
