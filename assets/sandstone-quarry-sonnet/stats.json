@@ -1,0 +1,46 @@
+{
+ "unique_triangles": 5428,
+ "per_asset_triangles": {
+  "spoil_boulder": 444,
+  "strata_wall": 864,
+  "cliff_mass": 476,
+  "cut_slab_stack": 352,
+  "scaffold_crane": 1384,
+  "quarry_gateway": 1132,
+  "mine_portal": 556,
+  "lantern_post": 220
+ },
+ "material_families": [
+  "CutStone",
+  "Iron",
+  "Lantern",
+  "Rope",
+  "Sandstone",
+  "Timber"
+ ],
+ "placements": 56,
+ "placement_counts": {
+  "strata_wall": 18,
+  "mine_portal": 1,
+  "quarry_gateway": 1,
+  "spoil_boulder": 9,
+  "cliff_mass": 9,
+  "scaffold_crane": 3,
+  "cut_slab_stack": 6,
+  "lantern_post": 9
+ },
+ "placed_triangles": 33764,
+ "dropped_for_gameplay_clearance": [
+  {
+   "asset": "lantern_post",
+   "position": [
+    4.9,
+    0,
+    -1
+   ],
+   "why": [
+    "resource (4, -1)"
+   ]
+  }
+ ]
+}

@@ -23,6 +23,9 @@ native/Builds/
 tools/
 godot/.godot/
 godot/*.tmp
+# Quarry GLBs embed their textures; Godot regenerates these import sidecars.
+godot/assets/zone_art/sandstone_quarry/*.png
+godot/assets/zone_art/sandstone_quarry/*.import
 
 recordings/
 

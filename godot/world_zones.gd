@@ -476,7 +476,7 @@ static func build(root: Node3D) -> Dictionary:
 		# These masses are one or two batched surfaces inside their own container.
 		# The container prevents decoration batching from adding convex canopy-like
 		# collision around them; only the kit's deliberate simple proxies are solid.
-		if id in ["sandstone_quarry","crystal_hollow","ember_foundry","cloudbreak_keep"] and not (id == "cloudbreak_keep" and z.has("authored_art")):
+		if id in ["sandstone_quarry","crystal_hollow","ember_foundry","cloudbreak_keep"] and not z.has("authored_art"):
 			var landmark_kit = LandmarkKit.new(id)
 			if id=="cloudbreak_keep":
 				# Shape existing islands without introducing new bridges or grapple routes.
@@ -538,15 +538,18 @@ static func quarry(root: Node3D, data: Dictionary) -> void:
 	var id := "sandstone_quarry"
 	var p: Node3D = data.zones[id].root
 	var c: Vector3 = data.zones[id].center
-	for i in range(11):
-		var x: float = -15+i*3.0
-		var h: float = 5.5+float(i%4)*1.2
-		box(p,Vector3(x,h*0.5,-12.5),Vector3(3.6,h,4.5),["cd8b59","d99d63","b97655"][i%3])
-		box(p,Vector3(x+0.4,h+0.9,-13.4),Vector3(3.0,1.8,3.0),"dea570")
-	for side in [-1,1]:
-		for i in range(5):
-			rock(p,Vector3(side*14,2+i%3,-6+i*4),Vector3(5,6+i%3,4.5),"cf915d")
-	for i in range(20): rock(p,Vector3(sin(i*2.4)*11,0.18,cos(i*3.1)*10),Vector3(0.5,0.4,0.6),"ca9266")
+	# The Sonnet kit replaces only the old decorative perimeter. Gameplay ore,
+	# barrier, golem and the shared floor remain at their established positions.
+	if not FileAccess.file_exists("res://assets/zone_art/sandstone_quarry/placement.json"):
+		for i in range(11):
+			var x: float = -15+i*3.0
+			var h: float = 5.5+float(i%4)*1.2
+			box(p,Vector3(x,h*0.5,-12.5),Vector3(3.6,h,4.5),["cd8b59","d99d63","b97655"][i%3])
+			box(p,Vector3(x+0.4,h+0.9,-13.4),Vector3(3.0,1.8,3.0),"dea570")
+		for side in [-1,1]:
+			for i in range(5):
+				rock(p,Vector3(side*14,2+i%3,-6+i*4),Vector3(5,6+i%3,4.5),"cf915d")
+		for i in range(20): rock(p,Vector3(sin(i*2.4)*11,0.18,cos(i*3.1)*10),Vector3(0.5,0.4,0.6),"ca9266")
 	for i in range(3): ore(root,data,id,c+Vector3(-6+i*5,0,-1+(i%2)*5),"iron","e4b54e")
 	for i in range(3): ore(root,data,id,c+Vector3(-8+i*6,0,-7),"stone","a5b6bb")
 	arch(p,Vector3(5,0,-10),1.8,"b68159")

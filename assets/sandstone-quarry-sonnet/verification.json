@@ -1,0 +1,96 @@
+{
+ "cliff_mass.glb": {
+  "meshes": 2,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Sandstone_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "cut_slab_stack.glb": {
+  "meshes": 4,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Iron_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "lantern_post.glb": {
+  "meshes": 4,
+  "embedded_images_nonblack_fraction": {
+   "Iron_tex": 1.0,
+   "Lantern_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "mine_portal.glb": {
+  "meshes": 4,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Iron_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "quarry_gateway.glb": {
+  "meshes": 5,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Iron_tex": 1.0,
+   "Lantern_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "scaffold_crane.glb": {
+  "meshes": 5,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Iron_tex": 1.0,
+   "Rope_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "spoil_boulder.glb": {
+  "meshes": 2,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Sandstone_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ },
+ "strata_wall.glb": {
+  "meshes": 4,
+  "embedded_images_nonblack_fraction": {
+   "CutStone_tex": 1.0,
+   "Iron_tex": 1.0,
+   "Sandstone_tex": 1.0,
+   "Timber_tex": 1.0
+  },
+  "meshes_with_inward_normals": 0,
+  "inward_names": [],
+  "uv_layers_ok": true
+ }
+}
