@@ -16,6 +16,8 @@ For the next authored kits, run the route/resource acceptance check before and a
 & .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://zone_art_route_checks.gd --quit-after 2400
 ```
 
+`scripts/Verify-ZoneArt.ps1 -Zones sandstone_quarry,ember_foundry -Render` runs the structural/texture validator, Godot editor import, the relevant route acceptance check and all 24 actual-game captures/contact sheet in that order. Without `-Render` it skips the screenshots. Logs and timing go under ignored `logs/`; the script stops on any failed gate. The dry run on existing Starfall art passed in 4.207 s; the render-inclusive run passed in 17.756 s. This does not replace close visual inspection or HMD performance testing.
+
 ## Commission order from the captured images
 
 | Priority | Zones | Evidence and Sonnet art brief |
