@@ -1492,6 +1492,16 @@ not VR stereo GPU cost. The original duplicate hub signage overlapped the
 new frames and was removed. At startup the kit stays at far LOD until a
 camera exists, avoiding 22 unnecessary near-gate lights during load.
 
+Authored zone-art hook (2026-09-30): `WorldZones.build()` now reads optional
+`res://assets/zone_art/<zone-id>/placement.json` after legacy decoration
+batching. Missing manifests remain a no-op; successful loads are recorded on
+the zone dictionary and malformed manifests emit an error. This keeps a
+single integration path for the Gloamfen, skyland and later visual kits.
+The existing fixture importer check passed in 0.206 s, and the full
+disposable-fixture integration passed in 55.387 s with no zone manifests
+installed. An authored-zone capture is still required after the first kit
+arrives.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

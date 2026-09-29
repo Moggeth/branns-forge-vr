@@ -5,6 +5,7 @@ const LandmarkKit = preload("res://landmark_kit.gd")
 const ForgeMaterials = preload("res://forge_materials.gd")
 const OrchardGround = preload("res://orchard_ground.gd")
 const OrchardDressing = preload("res://orchard_dressing.gd")
+const AuthoredZoneKit = preload("res://authored_zone_kit.gd")
 
 # Art is built in engine: shared low-poly meshes are batched per zone. Interactive
 # objects remain individual root children so harvesting, combat and saving stay simple.
@@ -450,6 +451,15 @@ static func build(root: Node3D) -> Dictionary:
 		if id != "forge_yard":
 			label(z.root,z.name.to_upper(),Vector3(0,3.8,12.8),38)
 		batch_decorations(z.root)
+		# Zone art is placed after legacy dressing has been batched. A manifest can
+		# improve any region without teaching this world builder new mesh types.
+		var zone_art_path := "res://assets/zone_art/%s/placement.json" % id
+		if FileAccess.file_exists(zone_art_path):
+			var art_result: Dictionary = AuthoredZoneKit.load_into(z.root, zone_art_path)
+			if art_result.has("error"):
+				push_error("Zone art %s: %s" % [id, art_result.error])
+			else:
+				z["authored_art"] = art_result
 		GroundKit.populate(z.root,id,float(z.bounds.size.x)*0.5)
 		if id == "orchard_highlands": OrchardDressing.populate(z.root)
 		# These masses are one or two batched surfaces inside their own container.
