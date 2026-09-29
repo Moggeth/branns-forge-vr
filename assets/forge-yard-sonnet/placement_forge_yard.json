@@ -1,0 +1,610 @@
+{
+  "schema": 1,
+  "zone": "forge_yard",
+  "coordinate_system": "godot, y-up meters; rotation_y_deg is Basis(Vector3.UP, deg2rad(v)); asset local +Z is its 'front' facing the hub",
+  "assets": [
+    {
+      "id": "ridge_a",
+      "file": "ridge_a.glb",
+      "triangles": 1728,
+      "size_m": [
+        22.0,
+        8.27,
+        14.0
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "aabb",
+      "instance": true
+    },
+    {
+      "id": "ridge_b",
+      "file": "ridge_b.glb",
+      "triangles": 1728,
+      "size_m": [
+        22.0,
+        12.46,
+        14.0
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "aabb",
+      "instance": true
+    },
+    {
+      "id": "ridge_far",
+      "file": "ridge_far.glb",
+      "triangles": 1728,
+      "size_m": [
+        26.0,
+        10.75,
+        12.0
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "none (decor, unreachable)",
+      "instance": true
+    },
+    {
+      "id": "garden_bed_a",
+      "file": "garden_bed_a.glb",
+      "triangles": 1604,
+      "size_m": [
+        4.5,
+        1.36,
+        1.78
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "box 4.0x0.5x1.4 (wall only)",
+      "instance": true
+    },
+    {
+      "id": "garden_planter_b",
+      "file": "garden_planter_b.glb",
+      "triangles": 1148,
+      "size_m": [
+        2.73,
+        2.56,
+        2.77
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "cylinder r1.4 h0.5 (tree canopy no collision)",
+      "instance": true
+    },
+    {
+      "id": "path_edge_stones",
+      "file": "path_edge_stones.glb",
+      "triangles": 1472,
+      "size_m": [
+        3.05,
+        0.77,
+        0.99
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "none (or 3.0x0.2x0.5 box)",
+      "instance": true
+    },
+    {
+      "id": "cordwood_ore_rack",
+      "file": "cordwood_ore_rack.glb",
+      "triangles": 1620,
+      "size_m": [
+        2.7,
+        1.77,
+        1.21
+      ],
+      "origin": "ground-level center",
+      "suggested_collision": "box 2.6x1.5x0.8",
+      "instance": true
+    }
+  ],
+  "placements": [
+    {
+      "id": "ridge_a_00",
+      "asset": "ridge_a",
+      "position": [
+        -7.203,
+        -0.2,
+        -22.169
+      ],
+      "rotation_y_deg": 10.3,
+      "scale": [
+        1.098,
+        0.895,
+        1.098
+      ]
+    },
+    {
+      "id": "ridge_b_00",
+      "asset": "ridge_b",
+      "position": [
+        -19.287,
+        -0.2,
+        -14.013
+      ],
+      "rotation_y_deg": 54.13,
+      "scale": [
+        1.009,
+        0.96,
+        1.009
+      ]
+    },
+    {
+      "id": "ridge_a_01",
+      "asset": "ridge_a",
+      "position": [
+        -22.594,
+        -0.2,
+        0.0
+      ],
+      "rotation_y_deg": 82.63,
+      "scale": [
+        1.01,
+        0.98,
+        1.01
+      ]
+    },
+    {
+      "id": "ridge_b_01",
+      "asset": "ridge_b",
+      "position": [
+        -19.061,
+        -0.2,
+        13.849
+      ],
+      "rotation_y_deg": 121.02,
+      "scale": [
+        1.019,
+        0.649,
+        1.019
+      ]
+    },
+    {
+      "id": "ridge_a_02",
+      "asset": "ridge_a",
+      "position": [
+        -7.438,
+        -0.2,
+        22.891
+      ],
+      "rotation_y_deg": 160.14,
+      "scale": [
+        1.087,
+        0.664,
+        1.087
+      ]
+    },
+    {
+      "id": "ridge_b_02",
+      "asset": "ridge_b",
+      "position": [
+        7.707,
+        -0.2,
+        23.72
+      ],
+      "rotation_y_deg": 194.21,
+      "scale": [
+        1.129,
+        0.556,
+        1.129
+      ]
+    },
+    {
+      "id": "ridge_a_03",
+      "asset": "ridge_a",
+      "position": [
+        18.495,
+        -0.2,
+        13.437
+      ],
+      "rotation_y_deg": 239.69,
+      "scale": [
+        1.046,
+        0.564,
+        1.046
+      ]
+    },
+    {
+      "id": "ridge_b_03",
+      "asset": "ridge_b",
+      "position": [
+        22.952,
+        -0.2,
+        0.0
+      ],
+      "rotation_y_deg": 267.7,
+      "scale": [
+        1.096,
+        1.024,
+        1.096
+      ]
+    },
+    {
+      "id": "ridge_a_04",
+      "asset": "ridge_a",
+      "position": [
+        19.311,
+        -0.2,
+        -14.03
+      ],
+      "rotation_y_deg": 300.71,
+      "scale": [
+        1.009,
+        0.869,
+        1.009
+      ]
+    },
+    {
+      "id": "ridge_b_04",
+      "asset": "ridge_b",
+      "position": [
+        7.479,
+        -0.2,
+        -23.017
+      ],
+      "rotation_y_deg": 343.54,
+      "scale": [
+        1.047,
+        0.978,
+        1.047
+      ]
+    },
+    {
+      "id": "ridge_far_00",
+      "asset": "ridge_far",
+      "position": [
+        -19.0,
+        -0.5,
+        -32.909
+      ],
+      "rotation_y_deg": 29.44,
+      "scale": [
+        1.35,
+        1.425,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_01",
+      "asset": "ridge_far",
+      "position": [
+        -37.423,
+        -0.5,
+        -6.599
+      ],
+      "rotation_y_deg": 83.53,
+      "scale": [
+        1.35,
+        1.525,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_02",
+      "asset": "ridge_far",
+      "position": [
+        -29.11,
+        -0.5,
+        24.426
+      ],
+      "rotation_y_deg": 126.93,
+      "scale": [
+        1.35,
+        1.494,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_03",
+      "asset": "ridge_far",
+      "position": [
+        0.0,
+        -0.5,
+        38.0
+      ],
+      "rotation_y_deg": 180.3,
+      "scale": [
+        1.35,
+        1.569,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_04",
+      "asset": "ridge_far",
+      "position": [
+        29.11,
+        -0.5,
+        24.426
+      ],
+      "rotation_y_deg": 232.75,
+      "scale": [
+        1.35,
+        1.422,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_05",
+      "asset": "ridge_far",
+      "position": [
+        37.423,
+        -0.5,
+        -6.599
+      ],
+      "rotation_y_deg": 285.76,
+      "scale": [
+        1.35,
+        1.38,
+        1.35
+      ]
+    },
+    {
+      "id": "ridge_far_06",
+      "asset": "ridge_far",
+      "position": [
+        19.0,
+        -0.5,
+        -32.909
+      ],
+      "rotation_y_deg": 329.02,
+      "scale": [
+        1.35,
+        1.539,
+        1.35
+      ]
+    },
+    {
+      "id": "garden_bed_a_00",
+      "asset": "garden_bed_a",
+      "position": [
+        -12.4,
+        0,
+        3.2
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_planter_b_00",
+      "asset": "garden_planter_b",
+      "position": [
+        -12.9,
+        0,
+        -3.5
+      ],
+      "rotation_y_deg": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_planter_b_01",
+      "asset": "garden_planter_b",
+      "position": [
+        -14.2,
+        0,
+        7.2
+      ],
+      "rotation_y_deg": -40,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_bed_a_01",
+      "asset": "garden_bed_a",
+      "position": [
+        -5.8,
+        0,
+        -10.6
+      ],
+      "rotation_y_deg": 0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "cordwood_ore_rack_00",
+      "asset": "cordwood_ore_rack",
+      "position": [
+        -9.75,
+        0,
+        -4.2
+      ],
+      "rotation_y_deg": -90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_00",
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0,
+        1.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_01",
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0,
+        4.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_02",
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0,
+        7.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_bed_a_02",
+      "asset": "garden_bed_a",
+      "position": [
+        12.4,
+        0,
+        3.2
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_planter_b_02",
+      "asset": "garden_planter_b",
+      "position": [
+        12.9,
+        0,
+        -3.5
+      ],
+      "rotation_y_deg": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_planter_b_03",
+      "asset": "garden_planter_b",
+      "position": [
+        14.2,
+        0,
+        7.2
+      ],
+      "rotation_y_deg": 40,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_bed_a_03",
+      "asset": "garden_bed_a",
+      "position": [
+        5.8,
+        0,
+        -10.6
+      ],
+      "rotation_y_deg": 0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "cordwood_ore_rack_01",
+      "asset": "cordwood_ore_rack",
+      "position": [
+        9.75,
+        0,
+        -2.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_03",
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0,
+        1.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_04",
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0,
+        4.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_edge_stones_05",
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0,
+        7.6
+      ],
+      "rotation_y_deg": 90,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "garden_planter_b_04",
+      "asset": "garden_planter_b",
+      "position": [
+        0,
+        0,
+        -11.6
+      ],
+      "rotation_y_deg": 15,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ]
+}

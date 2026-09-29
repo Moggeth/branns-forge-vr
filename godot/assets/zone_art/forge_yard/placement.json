@@ -1,0 +1,577 @@
+{
+  "schema": 1,
+  "zone": "forge_yard",
+  "visibility_metres": 210,
+  "vertex_color_multiply": true,
+  "assets": {
+    "ridge_a": "ridge_a.glb",
+    "ridge_b": "ridge_b.glb",
+    "ridge_far": "ridge_far.glb",
+    "garden_bed_a": "garden_bed_a.glb",
+    "garden_planter_b": "garden_planter_b.glb",
+    "path_edge_stones": "path_edge_stones.glb",
+    "cordwood_ore_rack": "cordwood_ore_rack.glb"
+  },
+  "asset_meta": {
+    "garden_bed_a": {
+      "collision": [
+        {
+          "shape": "box",
+          "size": [
+            4.0,
+            0.5,
+            1.4
+          ],
+          "offset": [
+            0,
+            0.25,
+            0
+          ]
+        }
+      ]
+    },
+    "garden_planter_b": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 1.2,
+          "height": 0.5,
+          "offset": [
+            0,
+            0.25,
+            0
+          ]
+        }
+      ]
+    },
+    "cordwood_ore_rack": {
+      "collision": [
+        {
+          "shape": "box",
+          "size": [
+            2.6,
+            1.5,
+            0.8
+          ],
+          "offset": [
+            0,
+            0.75,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "placements": [
+    {
+      "asset": "ridge_a",
+      "position": [
+        -7.203,
+        -0.2,
+        -22.169
+      ],
+      "yaw_degrees": 10.3,
+      "scale": [
+        1.098,
+        0.895,
+        1.098
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_b",
+      "position": [
+        -19.287,
+        -0.2,
+        -14.013
+      ],
+      "yaw_degrees": 54.13,
+      "scale": [
+        1.009,
+        0.96,
+        1.009
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_a",
+      "position": [
+        -22.594,
+        -0.2,
+        0.0
+      ],
+      "yaw_degrees": 82.63,
+      "scale": [
+        1.01,
+        0.98,
+        1.01
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_b",
+      "position": [
+        -19.061,
+        -0.2,
+        13.849
+      ],
+      "yaw_degrees": 121.02,
+      "scale": [
+        1.019,
+        0.649,
+        1.019
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_a",
+      "position": [
+        -7.438,
+        -0.2,
+        22.891
+      ],
+      "yaw_degrees": 160.14,
+      "scale": [
+        1.087,
+        0.664,
+        1.087
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_b",
+      "position": [
+        7.707,
+        -0.2,
+        23.72
+      ],
+      "yaw_degrees": 194.21,
+      "scale": [
+        1.129,
+        0.556,
+        1.129
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_a",
+      "position": [
+        18.495,
+        -0.2,
+        13.437
+      ],
+      "yaw_degrees": 239.69,
+      "scale": [
+        1.046,
+        0.564,
+        1.046
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_b",
+      "position": [
+        22.952,
+        -0.2,
+        0.0
+      ],
+      "yaw_degrees": 267.7,
+      "scale": [
+        1.096,
+        1.024,
+        1.096
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_a",
+      "position": [
+        19.311,
+        -0.2,
+        -14.03
+      ],
+      "yaw_degrees": 300.71,
+      "scale": [
+        1.009,
+        0.869,
+        1.009
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_b",
+      "position": [
+        7.479,
+        -0.2,
+        -23.017
+      ],
+      "yaw_degrees": 343.54,
+      "scale": [
+        1.047,
+        0.978,
+        1.047
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        -19.0,
+        -0.5,
+        -32.909
+      ],
+      "yaw_degrees": 29.44,
+      "scale": [
+        1.35,
+        1.425,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        -37.423,
+        -0.5,
+        -6.599
+      ],
+      "yaw_degrees": 83.53,
+      "scale": [
+        1.35,
+        1.525,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        -29.11,
+        -0.5,
+        24.426
+      ],
+      "yaw_degrees": 126.93,
+      "scale": [
+        1.35,
+        1.494,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        0.0,
+        -0.5,
+        38.0
+      ],
+      "yaw_degrees": 180.3,
+      "scale": [
+        1.35,
+        1.569,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        29.11,
+        -0.5,
+        24.426
+      ],
+      "yaw_degrees": 232.75,
+      "scale": [
+        1.35,
+        1.422,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        37.423,
+        -0.5,
+        -6.599
+      ],
+      "yaw_degrees": 285.76,
+      "scale": [
+        1.35,
+        1.38,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "ridge_far",
+      "position": [
+        19.0,
+        -0.5,
+        -32.909
+      ],
+      "yaw_degrees": 329.02,
+      "scale": [
+        1.35,
+        1.539,
+        1.35
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "garden_bed_a",
+      "position": [
+        -12.4,
+        0.0,
+        3.2
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_planter_b",
+      "position": [
+        -12.9,
+        0.0,
+        -3.5
+      ],
+      "yaw_degrees": 0.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_planter_b",
+      "position": [
+        -14.2,
+        0.0,
+        7.2
+      ],
+      "yaw_degrees": -40.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_bed_a",
+      "position": [
+        -5.8,
+        0.0,
+        -10.6
+      ],
+      "yaw_degrees": 0.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "cordwood_ore_rack",
+      "position": [
+        -9.75,
+        0.0,
+        -4.2
+      ],
+      "yaw_degrees": -90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0.0,
+        1.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0.0,
+        4.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        -3.05,
+        0.0,
+        7.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "garden_bed_a",
+      "position": [
+        12.4,
+        0.0,
+        3.2
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_planter_b",
+      "position": [
+        12.9,
+        0.0,
+        -3.5
+      ],
+      "yaw_degrees": 0.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_planter_b",
+      "position": [
+        14.2,
+        0.0,
+        7.2
+      ],
+      "yaw_degrees": 40.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "garden_bed_a",
+      "position": [
+        5.8,
+        0.0,
+        -10.6
+      ],
+      "yaw_degrees": 0.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "cordwood_ore_rack",
+      "position": [
+        9.75,
+        0.0,
+        -2.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0.0,
+        1.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0.0,
+        4.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "path_edge_stones",
+      "position": [
+        3.05,
+        0.0,
+        7.6
+      ],
+      "yaw_degrees": 90.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "none"
+    },
+    {
+      "asset": "garden_planter_b",
+      "position": [
+        0.0,
+        0.0,
+        -11.6
+      ],
+      "yaw_degrees": 15.0,
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "asset_default"
+    }
+  ]
+}

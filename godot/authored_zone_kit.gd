@@ -23,14 +23,16 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		if not assets.has(asset_id): return {"error":"unknown asset: " + asset_id}
 		var position: Variant = entry.get("position", [])
 		if not position is Array or position.size() != 3: return {"error":"position needs three metres: " + asset_id}
-		var scale: float = float(entry.get("scale", 1.0))
-		if scale <= 0.0 or scale > 8.0: return {"error":"invalid scale: " + asset_id}
+		var scale := _scale_vector(entry.get("scale", 1.0))
+		if scale == Vector3.ZERO: return {"error":"invalid scale: " + asset_id}
 		var at := Vector3(float(position[0]), float(position[1]), float(position[2]))
 		var yaw := deg_to_rad(float(entry.get("yaw_degrees", 0.0)))
 		var key := Vector2i(floori(at.x / CHUNK_METRES), floori(at.z / CHUNK_METRES))
 		var group_key := asset_id + ":" + str(key.x) + ":" + str(key.y)
 		if not grouped.has(group_key): grouped[group_key] = {"asset":asset_id,"chunk":key,"poses":[]}
-		grouped[group_key].poses.append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale), at))
+		# Apply nonuniform scale in asset-local axes before yaw. Basis.scaled()
+		# alone scales world axes and distorts angled ridge instances.
+		grouped[group_key].poses.append(Transform3D(Basis(Vector3.UP, yaw) * Basis.IDENTITY.scaled(scale), at))
 	var cache: Dictionary = {}
 	for asset_id in assets:
 		var filename: String = str(assets[asset_id])
@@ -46,6 +48,23 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		_collect(visual, Transform3D.IDENTITY, parts)
 		visual.free()
 		if parts.is_empty(): return {"error":"GLB has no meshes: " + scene_path}
+		if bool(document.get("vertex_color_multiply", false)):
+			for part_index in range(parts.size()):
+				var part: Dictionary = parts[part_index]
+				if not part.mesh is ArrayMesh: return {"error":"vertex-colour GLB needs ArrayMesh: " + scene_path}
+				var copy := (part.mesh as ArrayMesh).duplicate(true) as ArrayMesh
+				for surface_index in range(copy.get_surface_count()):
+					var source := copy.surface_get_material(surface_index) as StandardMaterial3D
+					if source == null: return {"error":"vertex-colour material missing: " + scene_path}
+					var finish := source.duplicate() as StandardMaterial3D
+					finish.vertex_color_use_as_albedo = true
+					copy.surface_set_material(surface_index, finish)
+				part.mesh = copy
+				if part.material is StandardMaterial3D:
+					var override_finish := (part.material as StandardMaterial3D).duplicate() as StandardMaterial3D
+					override_finish.vertex_color_use_as_albedo = true
+					part.material = override_finish
+				parts[part_index] = part
 		cache[asset_id] = parts
 	var holders := 0
 	for group_key in grouped:
@@ -93,7 +112,7 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		var at_values: Array = entry.position
 		var at := Vector3(float(at_values[0]), float(at_values[1]), float(at_values[2]))
 		var yaw := deg_to_rad(float(entry.get("yaw_degrees", 0.0)))
-		var scale: float = float(entry.get("scale", 1.0))
+		var scale := _scale_vector(entry.get("scale", 1.0))
 		var solid := StaticBody3D.new()
 		solid.name = "ZoneArtSolid_%s" % asset_id
 		solid.set_meta("kind", "solid")
@@ -111,8 +130,8 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 					shape = box_shape
 				"cylinder":
 					var cylinder := CylinderShape3D.new()
-					cylinder.radius = float(spec.get("radius", 0.0)) * scale
-					cylinder.height = float(spec.get("height", 0.0)) * scale
+					cylinder.radius = float(spec.get("radius", 0.0)) * maxf(scale.x, scale.z)
+					cylinder.height = float(spec.get("height", 0.0)) * scale.y
 					shape = cylinder
 				_:
 					continue
@@ -138,3 +157,13 @@ static func _collect(node: Node3D, pose: Transform3D, parts: Array) -> void:
 		if child is MeshInstance3D and child.mesh != null:
 			parts.append({"mesh":child.mesh,"pose":local,"material":child.material_override})
 		_collect(child, local, parts)
+
+static func _scale_vector(value: Variant) -> Vector3:
+	var result := Vector3.ZERO
+	if value is Array and value.size() == 3:
+		result = Vector3(float(value[0]), float(value[1]), float(value[2]))
+	elif value is float or value is int:
+		result = Vector3.ONE * float(value)
+	if not result.is_finite() or result.x <= 0.0 or result.y <= 0.0 or result.z <= 0.0 or result.x > 8.0 or result.y > 8.0 or result.z > 8.0:
+		return Vector3.ZERO
+	return result

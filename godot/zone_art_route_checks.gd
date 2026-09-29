@@ -5,6 +5,12 @@ extends SceneTree
 const World = preload("res://world_zones.gd")
 
 const ZONES := {
+	"forge_yard": {
+		"resources": {},
+		"barriers": 0,
+		"clear": [[0, 0], [0, 3], [0, 6], [0, 9], [-3.5, 9], [3.5, 9],
+			[-7, -4], [7, -4], [-10.5, 10], [10.5, 10]],
+	},
 	"sandstone_quarry": {
 		"resources": {"iron": 3, "stone": 3, "crystal": 1},
 		"barriers": 1,

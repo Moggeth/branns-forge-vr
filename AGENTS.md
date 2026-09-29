@@ -11,6 +11,8 @@ For 3D modelling, visual asset creation, environment art, materials, rigging, an
 
 Environment commission lesson (2026-09-30): a broad Orchard vocabulary prompt spent 280.5 s without a first export. A narrow four-prop brief with an explicit "build and render one textured GLB first" milestone delivered the complete kit in 208.947 s. Commission the smallest runnable art slice first, inspect it, then expand. See `docs/ORCHARD-BANK-ART-20260930.md`.
 
+Blender-to-Godot colour lesson (2026-09-30): Forge Yard GLBs looked textured in Blender but nearly white in Godot because Blender exported white `COLOR_0` and authored vertex tint in `COLOR_1`. The deterministic Forge builder promotes the authored colour set; the zone manifest opts into material vertex-colour multiplication; `scripts/validate_zone_art.py` rejects white-only `COLOR_0` for that mode. Inspect actual Godot ground/RTS captures before accepting a source render. See `docs/FORGE-YARD-ART-20260930.md`.
+
 Secrets: reuse authorized OPENAI_API_KEY in memory or source .env.local if present. Never print or commit keys; worker child environments exclude API keys. Paid voice begins only on game workshop visit or Talk. Do not launch a paid voice test without a task need.
 
 Use logs/work-timing.csv for measured work and docs/VERIFICATION.md for failed-strategy evidence and recovery. The desktop **Brann's Forge** shortcut opens `Brann's Forge Launcher.cmd`; older batch shortcuts live in `launcher/legacy/`. The launcher's Stop button calls stop.ps1, which checks process identity and start time before stopping this project's processes. Never stop all node/Godot/SteamVR processes.

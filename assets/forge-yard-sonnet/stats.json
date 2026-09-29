@@ -1,0 +1,109 @@
+{
+  "builder": "build_forge_grounds.py",
+  "blender": "4.5.13 LTS",
+  "assets": {
+    "ridge_a": {
+      "triangles": 1728,
+      "vertices": 931,
+      "size_godot_m": [
+        22.0,
+        8.27,
+        14.0
+      ],
+      "glb_bytes": 101548
+    },
+    "ridge_b": {
+      "triangles": 1728,
+      "vertices": 931,
+      "size_godot_m": [
+        22.0,
+        12.46,
+        14.0
+      ],
+      "glb_bytes": 101548
+    },
+    "ridge_far": {
+      "triangles": 1728,
+      "vertices": 931,
+      "size_godot_m": [
+        26.0,
+        10.75,
+        12.0
+      ],
+      "glb_bytes": 101552
+    },
+    "garden_bed_a": {
+      "triangles": 1604,
+      "vertices": 1052,
+      "size_godot_m": [
+        4.5,
+        1.36,
+        1.78
+      ],
+      "glb_bytes": 317256
+    },
+    "garden_planter_b": {
+      "triangles": 1148,
+      "vertices": 704,
+      "size_godot_m": [
+        2.73,
+        2.56,
+        2.77
+      ],
+      "glb_bytes": 338324
+    },
+    "path_edge_stones": {
+      "triangles": 1472,
+      "vertices": 840,
+      "size_godot_m": [
+        3.05,
+        0.77,
+        0.99
+      ],
+      "glb_bytes": 222996
+    },
+    "cordwood_ore_rack": {
+      "triangles": 1620,
+      "vertices": 952,
+      "size_godot_m": [
+        2.7,
+        1.77,
+        1.21
+      ],
+      "glb_bytes": 260460
+    }
+  },
+  "material_families": [
+    "mat_stone",
+    "mat_wood",
+    "mat_leaf",
+    "mat_soil",
+    "mat_ridge"
+  ],
+  "unique_triangles_total": 11028,
+  "placement_count": 34,
+  "placement_triangles_total": 53604,
+  "textures": {
+    "tex_leaf": [
+      256,
+      256
+    ],
+    "tex_ridge": [
+      256,
+      256
+    ],
+    "tex_soil": [
+      256,
+      256
+    ],
+    "tex_stone": [
+      256,
+      256
+    ],
+    "tex_wood": [
+      256,
+      256
+    ]
+  },
+  "build_seconds": 1.6
+}

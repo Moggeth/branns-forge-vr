@@ -880,6 +880,7 @@ static func glow_light(p: Node3D, pos: Vector3, color: String, energy: float, ra
 	p.add_child(light)
 
 static func backdrop(p: Node3D, id: String) -> void:
+	if id == "forge_yard" and FileAccess.file_exists("res://assets/zone_art/forge_yard/placement.json"): return
 	if id == "sky_garden" and FileAccess.file_exists("res://assets/zone_art/sky_garden/placement.json"): return
 	if id in ["crystal_hollow","enchanted_kitchen","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep"]: return
 	if id == "sky_garden":

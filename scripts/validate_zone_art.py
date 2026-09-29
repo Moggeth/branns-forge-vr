@@ -147,6 +147,7 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
             errors.append(f"{label}: invalid accessor bufferView {i}")
     triangles = 0
     primitives = 0
+    nonwhite_vertex_color = False
     for mesh in arrays["meshes"]:
         if not isinstance(mesh, dict) or not isinstance(mesh.get("primitives"), list):
             errors.append(f"{label}: invalid mesh")
@@ -156,6 +157,26 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
                 errors.append(f"{label}: invalid mesh primitive")
                 continue
             pos = primitive["attributes"].get("POSITION")
+            color_id = primitive["attributes"].get("COLOR_0")
+            if isinstance(color_id, int) and 0 <= color_id < len(accessors):
+                color = accessors[color_id]
+                view_id = color.get("bufferView")
+                components = {5121: ("B", 1, 255.0), 5123: ("H", 2, 65535.0), 5126: ("f", 4, 1.0)}
+                if (color.get("type") in ("VEC3", "VEC4") and color.get("componentType") in components
+                        and isinstance(view_id, int) and 0 <= view_id < len(views)):
+                    fmt, width, maximum = components[color["componentType"]]
+                    view = views[view_id]
+                    channels = 3 if color["type"] == "VEC3" else 4
+                    stride = view.get("byteStride", channels * width)
+                    origin = view.get("byteOffset", 0) + color.get("byteOffset", 0)
+                    for vertex in range(0, color.get("count", 0), max(1, color.get("count", 0) // 32)):
+                        offset = origin + vertex * stride
+                        if offset + channels * width > len(binary):
+                            break
+                        sample = struct.unpack_from("<" + fmt * channels, binary, offset)
+                        if any(channel < maximum * 0.98 for channel in sample[:3]):
+                            nonwhite_vertex_color = True
+                            break
             index = primitive.get("indices", pos)
             material = primitive.get("material")
             if (not isinstance(pos, int) or not 0 <= pos < len(accessors)
@@ -236,7 +257,8 @@ def glb_summary(path: Path, errors: list[str], warnings: list[str]) -> dict:
         errors.append("Pillow is required to inspect base-color pixels; install Pillow and retry")
     return {"triangles": triangles, "primitives": primitives, "materials": len(arrays["materials"]),
             "embedded_images": len(arrays["images"]), "base_color_images": len(base_images),
-            "embedded_image_bytes": image_bytes_total, "image_sizes": image_sizes}
+            "embedded_image_bytes": image_bytes_total, "image_sizes": image_sizes,
+            "nonwhite_vertex_color": nonwhite_vertex_color}
 
 
 def validate(path: Path) -> dict:
@@ -281,8 +303,9 @@ def validate(path: Path) -> dict:
             if not vec3(entry.get("position")):
                 errors.append(f"placement {i}: position must contain three finite numbers")
             scale = entry.get("scale", 1)
-            if not number(scale, positive=True) or scale > 8:
-                errors.append(f"placement {i}: scale must be in (0, 8]")
+            if not ((number(scale, positive=True) and scale <= 8)
+                    or (vec3(scale, positive=True) and all(component <= 8 for component in scale))):
+                errors.append(f"placement {i}: scale must be a number or vec3 in (0, 8]")
             if not number(entry.get("yaw_degrees", 0)):
                 errors.append(f"placement {i}: yaw_degrees must be finite")
             if entry.get("collision", "none") not in ("none", "asset_default"):
@@ -332,6 +355,8 @@ def validate(path: Path) -> dict:
             except (OSError, ValueError, TypeError, KeyError, IndexError, struct.error) as exc:
                 errors.append(f"asset {asset}: malformed GLB {filename}: {exc}")
                 continue
+            if doc.get("vertex_color_multiply") and not summary["nonwhite_vertex_color"]:
+                errors.append(f"asset {asset}: vertex-color mode needs nonwhite COLOR_0")
             result["triangles_unique"] += summary["triangles"]
             result["triangles_instanced"] += summary["triangles"] * counts.get(asset, 0)
             for key in ("primitives", "materials", "embedded_images"):
