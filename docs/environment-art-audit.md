@@ -6,7 +6,7 @@ This is a visual commissioning baseline for all 12 playable zones, captured from
 & .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --xr-mode off --audio-driver Dummy --path godot --script res://environment_art_review.gd --quit-after 2400 -- --world-builder-preview
 ```
 
-The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs, two per zone, plus `result.json`. `ground-eye` uses each zone's established capture pose; `elevated-rts` surveys the zone, with cameras below the kitchen and hollow roofs. The manifest records camera poses, expected and captured fog density, scene geometry node counts, sampled image luminance and coarse color-bin counts, elapsed time, and failures. These metrics can flag a blank or unexpectedly flat capture; they are not aesthetic scores. The contact sheet is generated locally for review and is not committed.
+The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs, two per zone, plus `result.json`. `ground-eye` uses each zone's established capture pose; `elevated-rts` surveys the zone, with cameras below the kitchen and hollow roofs. The manifest records camera poses, expected and captured fog density, scene geometry node counts, sampled image luminance and coarse color-bin counts, elapsed time, and failures. These metrics can flag a blank or unexpectedly flat capture; they are not aesthetic scores. Run `python scripts/make_environment_contact_sheet.py` to rebuild the ignored `contact-sheet.jpg` from the manifest and PNGs (Pillow is needed for this review utility). It took 0.563 s for this baseline; the result is a visual review aid, not an aesthetic score.
 
 ## Commission order from the captured images
 
