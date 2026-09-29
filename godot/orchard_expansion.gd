@@ -4,6 +4,10 @@ extends RefCounted
 const TreeKit = preload("res://tree_kit.gd")
 const TreeAdapter = preload("res://tree_adapter.gd")
 const Art = preload("res://orchard_art.gd")
+const Fields = preload("res://landscape_fields.gd")
+const Hydro = preload("res://landscape_hydrology.gd")
+const Ecology = preload("res://landscape_ecology.gd")
+const GeologicalArt = preload("res://landscape_asset_library.gd")
 const EXTENT := 160.0
 const SEED := 277091
 const TRAIL := [
@@ -42,6 +46,26 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	var center:Vector3=zone.center
 	var rng:=RandomNumberGenerator.new()
 	rng.seed=SEED
+	# Compile the shared world genome before placing the natural grove. The
+	# runtime consumes this exact model; vegetation does not roll its own noise.
+	var terrain_seed := 290929
+	var terrain_recipe := "gentle_orchard"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--landscape-seed="): terrain_seed = int(arg.trim_prefix("--landscape-seed="))
+		if arg.begins_with("--landscape-recipe=") and Fields.RECIPES.has(arg.trim_prefix("--landscape-recipe=")): terrain_recipe = arg.trim_prefix("--landscape-recipe=")
+	var terrain: Dictionary = Fields.create(terrain_seed, terrain_recipe)
+	var river_controls: Array[Vector2] = []
+	Hydro.run(terrain, river_controls)
+	Fields.derive(terrain)
+	var path_distance := PackedFloat32Array()
+	path_distance.resize(int(terrain.size) * int(terrain.size))
+	for z in range(int(terrain.size)):
+		for x in range(int(terrain.size)):
+			var at: Vector2 = terrain.origin + Vector2(x, z) * float(terrain.step)
+			path_distance[z * int(terrain.size) + x] = _distance_to_path(Vector3(at.x, 0, at.y))
+	terrain["path_distance"] = path_distance
+	Ecology.build_fields(terrain)
+	p.set_meta("landscape_model", terrain)
 	Art.trail(p,TRAIL,w)
 	for plot_index in range(PLOTS.size()):
 		var plot:Dictionary=PLOTS[plot_index]
@@ -79,12 +103,14 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 	trunks.name="OrchardGroveTrunks"
 	trunks.set_meta("kind", "builder_forest")
 	p.add_child(trunks)
-	for i in range(480):
-		var point:=Vector3(rng.randf_range(-146,146),0,rng.randf_range(-146,146))
+	var ecology: Dictionary = Ecology.generate(terrain)
+	for candidate in ecology.trees:
+		var point: Vector3 = candidate.position
+		point.y = 0.0 # Reprojection places every legacy and new tree on the heightfield.
 		if not _clear(point): continue
-		var pine:bool=i%9==0
-		var scale:float=rng.randf_range(0.88,1.19)
-		placements.append({"species":"pine" if pine else "apple","position":point,"seed":rng.randi()%100000,"scale":scale})
+		var pine: bool = str(candidate.species) == "pine"
+		var scale: float = float(candidate.scale)
+		placements.append({"species":"pine" if pine else "apple","position":point,"seed":abs(str(candidate.id).hash())%100000,"scale":scale})
 		var collision:=CollisionShape3D.new()
 		var shape:=CylinderShape3D.new()
 		shape.radius=0.31*scale
@@ -94,9 +120,24 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		collision.set_meta("builder_timber", true)
 		trunks.add_child(collision)
 	Art.grove(p,placements,TRAIL)
+	var natural_rocks: Array = []
+	var natural_shrubs: Array = []
+	for candidate in ecology.rocks:
+		if abs(str(candidate.id).hash()) % 2 != 0: continue
+		var point: Vector3 = candidate.position
+		point.y = 0.0
+		if _clear(point): natural_rocks.append(Art._pose(point, float(candidate.scale), float(candidate.rotation)))
+	for candidate in ecology.shrubs:
+		if abs(str(candidate.id).hash()) % 4 != 0: continue
+		var point: Vector3 = candidate.position
+		point.y = 0.0
+		if _clear(point): natural_shrubs.append(Art._pose(point, float(candidate.scale), float(candidate.rotation)))
+	Art._emit(p, "rock_mossy_small", natural_rocks)
+	Art._emit(p, "shrub_flowering", natural_shrubs)
+	GeologicalArt.populate(p, terrain, ecology)
 	Art.place_features(p,TRAIL,PLOTS,SEED)
 	w.anchor(root,data,"orchard_highlands",center+Vector3(-112,3.8,-40),center+Vector3(-108,0,-38))
 	w.anchor(root,data,"orchard_highlands",center+Vector3(73,4.2,93),center+Vector3(69,0,88))
-	p.set_meta("orchard_expansion",{"seed":SEED,"extent_m":EXTENT,"area_m2":102400,"plots":PLOTS.size(),"grove_trees":placements.size()})
+	p.set_meta("orchard_expansion",{"seed":terrain_seed,"extent_m":EXTENT,"area_m2":102400,"plots":PLOTS.size(),"grove_trees":placements.size(),"field_rocks":natural_rocks.size(),"field_shrubs":natural_shrubs.size()})
 	p.set_meta("orchard_trail",TRAIL)
 	print("ORCHARD_EXPANSION area_m2=102400 plots=",PLOTS.size()," grove_trees=",placements.size())

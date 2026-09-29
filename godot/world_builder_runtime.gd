@@ -15,6 +15,10 @@ const MAX_WAYMARKERS = 24
 const MAX_GROVES = 24
 const MAX_BRIDGES = 4
 const MAX_THREATS = 8
+const MAX_FOREST_SPELLS = 64
+const Ecology = preload("res://landscape_ecology.gd")
+const Navigation = preload("res://landscape_navigation.gd")
+const Water = preload("res://landscape_water.gd")
 
 var game: Node3D
 var root: Node3D
@@ -55,7 +59,7 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "harvested": [], "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "harvested": [], "marked": [], "carried": [], "threats": []}
 
 func _valid(value: Variant) -> bool:
 	if not value is Dictionary or int(value.get("schema", 0)) != 1: return false
@@ -69,6 +73,18 @@ func _valid(value: Variant) -> bool:
 	if value.get("marked") is not Array or value.marked.size() > 512: return false
 	if value.get("carried", []) is not Array or value.get("carried", []).size() > 5: return false
 	if value.get("threats", []) is not Array or value.get("threats", []).size() > MAX_THREATS: return false
+	if value.get("forest_spells", []) is not Array or value.get("forest_spells", []).size() > MAX_FOREST_SPELLS: return false
+	for grove in value.get("forest_spells", []):
+		if not grove is Dictionary or not grove.get("region") is Dictionary or not grove.get("seed") is float and not grove.get("seed") is int: return false
+		# Old saves only have a region/seed. New saves pin each tree's identity
+		# so later land-shaping cannot silently relocate an existing grove.
+		if grove.has("placements"):
+			if not grove.placements is Array or grove.placements.size() > 30: return false
+			for placement in grove.placements:
+				if not placement is Array or placement.size() != 5 or not _point_valid([placement[0], placement[1]]): return false
+				if not placement[2] is float and not placement[2] is int or int(placement[2]) not in [0, 1, 2]: return false
+				if not placement[3] is float and not placement[3] is int or not is_finite(float(placement[3])) or float(placement[3]) < 0.4 or float(placement[3]) > 2.0: return false
+				if not placement[4] is float and not placement[4] is int or not is_finite(float(placement[4])) or absf(float(placement[4])) > TAU + 0.01: return false
 	for field in ["harvested", "marked"]:
 		for key in value[field]:
 			if not key is String or key.length() > 24: return false
@@ -103,6 +119,7 @@ func _load() -> void:
 		data = candidate
 		if not data.has("carried"): data.carried = []
 		if not data.has("threats"): data.threats = []
+		if not data.has("forest_spells"): data.forest_spells = []
 	else:
 		push_warning("WORLD_BUILDER invalid save; preserving file and starting an empty settlement")
 		save_blocked = true
@@ -191,6 +208,80 @@ func carve_path(a: Vector3, b: Vector3) -> String:
 	_clear_grove_collision(a, b)
 	_changed("A route now crosses the orchard. Walk it in VR or first person.")
 	return ""
+
+func cast_sunder(a: Vector3, b: Vector3) -> String:
+	if not _inside(a) or not _inside(b): return "Draw within the Orchard boundary."
+	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+	if distance < 8.0 or distance > 110.0: return "Draw a scar between 8 and 110 metres long."
+	if float(data.aether) < 5.0: return "Need 5 aether to sunder the land."
+	var op := {"type":"sunder", "points":[_pack(a), _pack(b)], "width":8.0, "depth":4.2, "height":1.2, "shoulder":4.0, "seed":int(data.revision) + game.landscape.seed}
+	var result: String = game.landscape.apply_magic(op)
+	if result != "": return result
+	data.aether = float(data.aether) - 5.0
+	_changed("The earth is opening. The scar remains in the world.")
+	return ""
+
+func cast_raise(point: Vector3) -> String:
+	if not _inside(point): return "Choose ground within the Orchard."
+	if float(data.aether) < 4.0: return "Need 4 aether to raise earth."
+	var op := {"type":"raise", "center":_pack(point), "radius":15.0, "height":3.6}
+	var result: String = game.landscape.apply_magic(op)
+	if result != "": return result
+	data.aether = float(data.aether) - 4.0
+	_changed("A hill rises beneath the same sky the Hero can see.")
+	return ""
+
+func cast_forest(a: Vector3, b: Vector3) -> String:
+	if not _inside(a) or not _inside(b): return "Draw within the Orchard boundary."
+	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
+	if distance < 6.0 or distance > 100.0: return "Draw a grove between 6 and 100 metres long."
+	if float(data.aether) < 3.0: return "Need 3 aether to grow a forest."
+	if data.forest_spells.size() >= MAX_FOREST_SPELLS: return "The grove ledger is full."
+	var region := {"type":"line", "points":[_pack(a), _pack(b)], "width":11.0}
+	var spell_seed: int = int(game.landscape.seed) + int(data.revision) * 101 + 7501
+	var trees: Array[Dictionary] = Ecology.grow(game.landscape.model, region, spell_seed)
+	if trees.is_empty(): return "Trees cannot take root on that slope or in water."
+	data.forest_spells.append({"region":region, "seed":spell_seed, "placements":_pack_forest(trees)})
+	_render_forest(trees, true)
+	data.aether = float(data.aether) - 3.0
+	_changed("A living forest has taken root where you drew it.")
+	return ""
+
+func _pack_forest(trees: Array[Dictionary]) -> Array:
+	var placements: Array = []
+	for record in trees:
+		if placements.size() >= 30: break
+		var at: Vector3 = record.position
+		var species: int = ["oak", "birch", "pine"].find(str(record.species))
+		placements.append([snappedf(at.x, 0.01), snappedf(at.z, 0.01), species, snappedf(float(record.scale), 0.001), snappedf(float(record.rotation), 0.001)])
+	return placements
+
+func _unpack_forest(placements: Array) -> Array[Dictionary]:
+	var trees: Array[Dictionary] = []
+	for value in placements:
+		var at := Vector2(float(value[0]), float(value[1]))
+		trees.append({"position": Vector3(at.x, game.landscape.height_at(at), at.y), "species": ["oak", "birch", "pine"][int(value[2])], "scale":float(value[3]), "rotation":float(value[4])})
+	return trees
+
+func _render_forest(trees: Array[Dictionary], animate: bool) -> void:
+	var index := 0
+	for record in trees:
+		if index >= 30: break
+		index += 1
+		var at: Vector3 = record.position
+		var key := _key(at)
+		if resource_by_key.has(key): continue
+		var timber: Node3D = W.resource(game.adventure.zone_groups[ZONE], game.scene, ZONE, center + at, "lumber", "axe", 2)
+		W.tree(timber, Vector3.ZERO, 4.4 * float(record.scale), str(record.species) == "pine", str(record.species) == "birch")
+		timber.rotation.y = float(record.rotation)
+		timber.set_meta("landscape_growth", true)
+		if animate:
+			timber.scale = Vector3.ONE * 0.05
+			growing_trees.append({"node": timber, "elapsed": 0.0})
+		resource_by_key[key] = timber
+		if key in data.harvested:
+			timber.visible = false
+			game._set_collisions(timber, false)
 
 func mark_harvest(local: Vector3) -> String:
 	if not _inside(local): return "Outside the orchard boundary."
@@ -371,6 +462,8 @@ func _rebuild_saved() -> void:
 			_hide_scenic(point)
 			W.cyl(root, point + Vector3(0, 0.14, 0), 0.37, 0.28, "9a754e")
 	for value in data.groves: _render_grove(_unpack(value))
+	for entry in data.forest_spells:
+		_render_forest(_unpack_forest(entry.placements) if entry.has("placements") else Ecology.grow(game.landscape.model, entry.region, int(entry.seed)), false)
 	for segment in data.paths:
 		var a := _unpack(segment.a)
 		var b := _unpack(segment.b)
@@ -380,43 +473,15 @@ func _rebuild_saved() -> void:
 	_jobs_from_marked()
 
 func _build_brook() -> void:
-	var brook := Node3D.new()
-	brook.name = "WindfallBrook"
-	root.add_child(brook)
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var water_material: ShaderMaterial = preload("res://orchard_atmosphere.gd").water_material()
-	for i in range(80):
-		var x0 := -28.0 + float(i) * 1.5
-		var x1 := x0 + 1.5
-		var drift0 := sin(x0 * 0.078) * 1.1 + sin(x0 * 0.18) * 0.25
-		var drift1 := sin(x1 * 0.078) * 1.1 + sin(x1 * 0.18) * 0.25
-		var half_width0 := 2.2 + sin(x0 * 0.13) * 0.16
-		var half_width1 := 2.2 + sin(x1 * 0.13) * 0.16
-		var a := Vector3(x0, 0.075, CROSSING.z + drift0 - half_width0)
-		var b := Vector3(x0, 0.075, CROSSING.z + drift0 + half_width0)
-		var c := Vector3(x1, 0.075, CROSSING.z + drift1 - half_width1)
-		var d := Vector3(x1, 0.075, CROSSING.z + drift1 + half_width1)
-		var tint := Color("a8dcc9") if i % 9 == 0 else Color("65baa9")
-		for point in [a, b, c, b, d, c]:
-			surface.set_color(tint)
-			surface.set_normal(Vector3.UP)
-			surface.add_vertex(point)
-	# The authored shoreline kit replaces the old metronomic row of primitives.
-	var stream := MeshInstance3D.new()
-	stream.name = "WindfallWater"
-	stream.mesh = surface.commit()
-	stream.mesh.surface_set_material(0, water_material)
-	stream.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	brook.add_child(stream)
-	preload("res://orchard_dressing.gd").brook_bank(brook, CROSSING.z)
-	W.label(brook, "THE BROOK CROSSING\n3 lumber · build from the map", CROSSING + Vector3(0, 2.25, -3.2), 20, "fff0c8")
-	# The water is shallow and physically walkable; the bridge is a useful dry route.
+	# The shared hydrology field carves the bed and owns the flowing water ribbon.
+	# This sign remains an authored gameplay cue at the stable crossing control.
+	var y: float = game.landscape.height_at(Vector2(CROSSING.x, CROSSING.z))
+	W.label(root, "THE BROOK CROSSING\n3 lumber · build from the map", CROSSING + Vector3(0, y + 2.25, -3.2), 20, "fff0c8")
 
 func _build_camp() -> void:
 	var camp := Node3D.new()
 	camp.name = "LumberjackCamp"
-	camp.position = CAMP
+	camp.position = CAMP + Vector3.UP * game.landscape.height_at(Vector2(CAMP.x, CAMP.z))
 	root.add_child(camp)
 	if ResourceLoader.exists(STOCKPILE):
 		var site: PackedScene = load(STOCKPILE)
@@ -439,12 +504,16 @@ func _render_path(a: Vector3, b: Vector3) -> void:
 	for i in range(count):
 		var t0 := float(i) / count
 		var t1 := float(i + 1) / count
-		var point0 := a.lerp(b, t0) + Vector3.UP * 0.095 + across * (0.10 * sin(float(i) * 2.3))
-		var point1 := a.lerp(b, t1) + Vector3.UP * 0.095 + across * (0.10 * sin(float(i + 1) * 2.3))
+		var point0 := a.lerp(b, t0) + across * (0.10 * sin(float(i) * 2.3))
+		var point1 := a.lerp(b, t1) + across * (0.10 * sin(float(i + 1) * 2.3))
+		point0.y = game.landscape.height_at(Vector2(point0.x, point0.z)) + 0.095
+		point1.y = game.landscape.height_at(Vector2(point1.x, point1.z)) + 0.095
 		var width0 := 1.42 + 0.10 * sin(float(i) * 1.7)
 		var width1 := 1.42 + 0.10 * sin(float(i + 1) * 1.7)
 		var tint := Color("c9ad7d") if i % 4 else Color("ddc18e")
-		for point in [point0 - across * width0, point0 + across * width0, point1 - across * width1, point0 + across * width0, point1 + across * width1, point1 - across * width1]:
+		for raw_point in [point0 - across * width0, point0 + across * width0, point1 - across * width1, point0 + across * width0, point1 + across * width1, point1 - across * width1]:
+			var point: Vector3 = raw_point
+			point.y = game.landscape.height_at(Vector2(point.x, point.z)) + 0.095
 			surface.set_color(tint)
 			surface.set_normal(Vector3.UP)
 			surface.add_vertex(point)
@@ -466,6 +535,7 @@ func _render_path(a: Vector3, b: Vector3) -> void:
 		var post := Node3D.new()
 		post.name = "RouteWaymarker"
 		post.position = a + across * 2.1
+		post.position.y = game.landscape.height_at(Vector2(post.position.x, post.position.z))
 		post.rotation.y = atan2(direction.z, direction.x)
 		post.add_child(marker.instantiate())
 		root.add_child(post)
@@ -511,12 +581,14 @@ func _clear_grove_collision(a: Vector3, b: Vector3) -> void:
 func _render_grove(local: Vector3, animate := false) -> void:
 	var grove := Node3D.new()
 	grove.name = "GrownGrove_%02d" % data.groves.size()
-	grove.position = local
+	grove.position = local + Vector3.UP * game.landscape.height_at(Vector2(local.x, local.z))
 	root.add_child(grove)
 	for i in range(3):
 		var a := float(i) * TAU / 3.0 + 0.2
 		var pos := Vector3(cos(a) * 2.5, 0, sin(a) * 2.5)
-		var timber: Node3D = W.resource(game.adventure.zone_groups[ZONE], game.scene, ZONE, center + local + pos, "lumber", "axe", 2)
+		var place := local + pos
+		place.y = game.landscape.height_at(Vector2(place.x, place.z))
+		var timber: Node3D = W.resource(game.adventure.zone_groups[ZONE], game.scene, ZONE, center + place, "lumber", "axe", 2)
 		W.tree(timber, Vector3.ZERO, 4.5, i == 2, i != 2)
 		if animate:
 			timber.scale = Vector3.ONE * 0.08
@@ -530,7 +602,9 @@ func _render_grove(local: Vector3, animate := false) -> void:
 func _render_bridge(local: Vector3) -> void:
 	var crossing := Node3D.new()
 	crossing.name = "BuiltOrchardBridge"
-	crossing.position = local + Vector3(0, 0.17, 0)
+	var bridge_plan: Dictionary = preload("res://landscape_water.gd").crossing(game.landscape.model, Vector2(local.x, local.z))
+	crossing.position = bridge_plan.position
+	crossing.rotation.y = atan2(bridge_plan.across.x, bridge_plan.across.y)
 	root.add_child(crossing)
 	if ResourceLoader.exists(BRIDGE):
 		var scene: PackedScene = load(BRIDGE)
@@ -561,10 +635,19 @@ func _ensure_workers() -> void:
 		var worker := Node3D.new()
 		worker.name = "Lumberjack_%02d" % index
 		worker.position = CAMP + Vector3(-1.5 + float(index) * 0.75, 0, 1.4)
+		worker.position.y = game.landscape.height_at(Vector2(worker.position.x, worker.position.z))
 		root.add_child(worker)
 		worker.set_meta("job", "")
 		worker.set_meta("chop", 0.0)
 		worker.set_meta("carry_amount", 0)
+		var empty_route: Array[Vector2] = []
+		worker.set_meta("nav_path", empty_route)
+		worker.set_meta("nav_target", Vector2(INF, INF))
+		worker.set_meta("nav_index", 0)
+		worker.set_meta("nav_op_count", -1)
+		worker.set_meta("nav_transitioning", false)
+		worker.set_meta("nav_initialized", false)
+		worker.set_meta("nav_bridge_available", false)
 		if ResourceLoader.exists(WORKER):
 			var scene: PackedScene = load(WORKER)
 			if scene != null:
@@ -586,6 +669,7 @@ func _ensure_workers() -> void:
 			worker.set_meta("carry_amount", int(pending.amount))
 			if resource_by_key.has(key): worker.position = resource_by_key[key].global_position - center
 			elif scenic_by_key.has(key): worker.position = scenic_by_key[key].position
+			worker.position.y = _worker_surface_height(worker, Vector2(worker.position.x, worker.position.z))
 			_add_carried_log(worker)
 			break
 
@@ -612,12 +696,7 @@ func _for_each_worker(delta: float) -> void:
 		if int(worker.get_meta("carry_amount", 0)) > 0:
 			_set_worker_animation(worker, "Worker_Walk")
 			var destination := CAMP + Vector3(0.0, 0, 1.4)
-			var home_direction: Vector3 = destination - worker.position
-			home_direction.y = 0
-			if home_direction.length() > 0.55:
-				worker.position += home_direction.normalized() * minf(delta * 2.1, home_direction.length())
-				worker.rotation.y = atan2(home_direction.x, home_direction.z)
-				continue
+			if not _worker_travel(worker, destination, delta, 2.1, 0.55): continue
 			var delivered: int = int(worker.get_meta("carry_amount", 0))
 			var delivered_key: String = str(worker.get_meta("carry_key", ""))
 			worker.set_meta("carry_amount", 0)
@@ -639,7 +718,7 @@ func _for_each_worker(delta: float) -> void:
 					break
 		if key == "":
 			_set_worker_animation(worker, "Worker_Idle")
-			worker.position = worker.position.move_toward(CAMP + Vector3(0, 0, 1.4), delta * 1.4)
+			_worker_travel(worker, CAMP + Vector3(0, 0, 1.4), delta, 1.4, 0.55)
 			continue
 		if not resource_by_key.has(key) and not scenic_by_key.has(key): worker.set_meta("job", ""); continue
 		if key in data.harvested: worker.set_meta("job", ""); continue
@@ -647,12 +726,8 @@ func _for_each_worker(delta: float) -> void:
 		if target != null and not is_instance_valid(target): worker.set_meta("job", ""); continue
 		var target_position: Vector3 = target.global_position - center if target != null else scenic_by_key[key].position
 		var place: Vector3 = target_position + Vector3(1.0, 0, 0)
-		var direction: Vector3 = place - worker.position
-		direction.y = 0
-		if direction.length() > 1.2:
+		if not _worker_travel(worker, place, delta, 2.1, 1.2):
 			_set_worker_animation(worker, "Worker_Walk")
-			worker.position += direction.normalized() * minf(delta * 2.1, direction.length() - 1.1)
-			worker.rotation.y = atan2(direction.x, direction.z)
 			continue
 		_set_worker_animation(worker, "Worker_Chop")
 		var chop := float(worker.get_meta("chop", 0.0)) + delta
@@ -675,3 +750,56 @@ func _for_each_worker(delta: float) -> void:
 		for i in range(jobs.size() - 1, -1, -1):
 			if str(jobs[i].key) == key: jobs.remove_at(i)
 		_changed("The tree is felled. Your helper is carrying its timber home.")
+
+func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: float, stop_radius: float) -> bool:
+	var here := Vector2(worker.position.x, worker.position.z)
+	var goal := Vector2(destination.x, destination.z)
+	if here.distance_to(goal) <= stop_radius:
+		worker.position.y = _worker_surface_height(worker, here)
+		return true
+	var model: Dictionary = game.landscape.model
+	var op_count: int = game.landscape.operation_count()
+	var transitioning: bool = not game.landscape.transition.is_empty()
+	var path: Array[Vector2] = worker.get_meta("nav_path")
+	var old_goal: Vector2 = worker.get_meta("nav_target")
+	var bridge_available: bool = not data.bridges.is_empty()
+	var path_index: int = int(worker.get_meta("nav_index", 0))
+	var off_route: bool = not path.is_empty() and path_index < path.size() and here.distance_to(path[path_index]) > 10.0
+	if not bool(worker.get_meta("nav_initialized", false)) or old_goal.distance_to(goal) > 0.5 or int(worker.get_meta("nav_op_count", -1)) != op_count or bool(worker.get_meta("nav_transitioning", false)) != transitioning or bool(worker.get_meta("nav_bridge_available", false)) != bridge_available or off_route:
+		var options := {"allow_bridge": bridge_available}
+		path = Navigation.route(model, here, goal, options)
+		worker.set_meta("nav_path", path)
+		worker.set_meta("nav_target", goal)
+		worker.set_meta("nav_index", 0)
+		worker.set_meta("nav_op_count", op_count)
+		worker.set_meta("nav_transitioning", transitioning)
+		worker.set_meta("nav_bridge_available", bridge_available)
+		worker.set_meta("nav_initialized", true)
+		worker.set_meta("nav_bridge", Water.crossing(model) if bridge_available else {})
+	if path.is_empty():
+		worker.position.y = _worker_surface_height(worker, here)
+		return false
+	var index: int = int(worker.get_meta("nav_index", 0))
+	while index < path.size() - 1 and here.distance_to(path[index]) < 0.4:
+		index += 1
+	worker.set_meta("nav_index", index)
+	var waypoint: Vector2 = path[index]
+	var heading: Vector2 = waypoint - here
+	if heading.length() < 0.01: return here.distance_to(goal) <= stop_radius
+	var step: float = minf(delta * speed, heading.length())
+	var next: Vector2 = here + heading.normalized() * step
+	worker.position.x = next.x
+	worker.position.z = next.y
+	worker.position.y = _worker_surface_height(worker, next)
+	worker.rotation.y = atan2(heading.x, heading.y)
+	return next.distance_to(goal) <= stop_radius
+
+func _worker_surface_height(worker: Node3D, point: Vector2) -> float:
+	var ground: float = game.landscape.height_at(point)
+	var bridge: Dictionary = worker.get_meta("nav_bridge", {})
+	if bridge.is_empty() or game.landscape.water_at(point) <= 0.45: return ground
+	var center_2d := Vector2(bridge.position.x, bridge.position.z)
+	var relative: Vector2 = point - center_2d
+	if absf(relative.dot(bridge.along)) <= 2.5 and absf(relative.dot(bridge.across)) <= float(bridge.span) * 0.5:
+		return maxf(ground, bridge.position.y)
+	return ground

@@ -57,8 +57,8 @@ func _check() -> void:
 						if kind not in ["floor", "solid"]: failures.append("bridge collider lacks floor/solid gameplay tag")
 					if not has_walkway: failures.append("bridge deck is not navigable")
 					await physics_frame
-					var deck_point: Vector3 = builder.center + builder.CROSSING
-					var deck_ray := PhysicsRayQueryParameters3D.create(deck_point + Vector3.UP * 3.0, deck_point + Vector3.DOWN * 1.0, 1)
+					var deck_point: Vector3 = bridge.global_position
+					var deck_ray := PhysicsRayQueryParameters3D.create(deck_point + Vector3.UP * 2.0, deck_point + Vector3.DOWN * 2.0, 1)
 					var deck_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(deck_ray)
 					if deck_hit.is_empty() or str(deck_hit.collider.get_meta("kind", "")) != "floor": failures.append("Hero's downward ray misses the bridge deck")
 		var grove_error: String = builder.plant_grove(Vector3(55, 0, -63))
@@ -69,19 +69,25 @@ func _check() -> void:
 			if not builder.growing_trees.is_empty(): failures.append("grove growth did not settle")
 		if builder.scenic_by_key.size() < 300: failures.append("the authored forest is not addressable as harvestable trees")
 		else:
-			var scenic_key: String = str(builder.scenic_by_key.keys()[0])
-			var scenic_point: Vector3 = builder.scenic_by_key[scenic_key].position
-			var scenic_error: String = builder.mark_harvest(scenic_point)
-			if scenic_error != "" or scenic_key not in builder.data.marked: failures.append("lumberjack cannot be assigned to the authored forest: " + scenic_error)
+			var scenic_key := ""
+			for key in builder.scenic_by_key:
+				if builder._inside(builder.scenic_by_key[key].position):
+					scenic_key = str(key)
+					break
+			if scenic_key.is_empty(): failures.append("no reachable authored timber inside the orchard")
 			else:
-				builder.worker_nodes[0].position = scenic_point + Vector3(1, 0, 0)
-				for i in range(40): builder._for_each_worker(0.1)
-				await physics_frame
-				if scenic_key not in builder.data.harvested or not builder.scenic_by_key[scenic_key].collision.disabled:
-					failures.append("authored tree did not fall in the live scene")
+				var scenic_point: Vector3 = builder.scenic_by_key[scenic_key].position
+				var scenic_error: String = builder.mark_harvest(scenic_point)
+				if scenic_error != "" or scenic_key not in builder.data.marked: failures.append("lumberjack cannot be assigned to the authored forest: " + scenic_error)
+				else:
+					builder.worker_nodes[0].position = scenic_point + Vector3(1, 0, 0)
+					for i in range(40): builder._for_each_worker(0.1)
+					await physics_frame
+					if scenic_key not in builder.data.harvested or not builder.scenic_by_key[scenic_key].collision.disabled:
+						failures.append("authored tree did not fall in the live scene")
 			var hero_tree_key := ""
 			for key in builder.scenic_by_key:
-				if key not in builder.data.harvested and not builder.scenic_by_key[key].collision.disabled:
+				if key not in builder.data.harvested and not builder.scenic_by_key[key].collision.disabled and builder._inside(builder.scenic_by_key[key].position):
 					hero_tree_key = key
 					break
 			if hero_tree_key == "": failures.append("no forest tree available for Hero axe")

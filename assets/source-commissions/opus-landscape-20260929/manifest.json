@@ -1,0 +1,186 @@
+{
+  "generator": "build_geology.py",
+  "units": "metres",
+  "up": "+Y (glTF)",
+  "assets": [
+    {
+      "name": "geo_boulder_mossy_a",
+      "glb": "out/glb/geo_boulder_mossy_a.glb",
+      "triangles": 320,
+      "vertices": 162,
+      "materials": [
+        "geo_rock"
+      ],
+      "material_count": 1,
+      "bounds": {
+        "min": [
+          -1.155,
+          -0.25,
+          -0.98
+        ],
+        "max": [
+          1.054,
+          1.483,
+          1.016
+        ]
+      },
+      "bytes": 37292
+    },
+    {
+      "name": "geo_boulder_split_b",
+      "glb": "out/glb/geo_boulder_split_b.glb",
+      "triangles": 640,
+      "vertices": 324,
+      "materials": [
+        "geo_rock"
+      ],
+      "material_count": 1,
+      "bounds": {
+        "min": [
+          -1.285,
+          -0.25,
+          -1.1
+        ],
+        "max": [
+          1.511,
+          1.83,
+          0.915
+        ]
+      },
+      "bytes": 71900
+    },
+    {
+      "name": "geo_slab_streamside_c",
+      "glb": "out/glb/geo_slab_streamside_c.glb",
+      "triangles": 320,
+      "vertices": 162,
+      "materials": [
+        "geo_rock"
+      ],
+      "material_count": 1,
+      "bounds": {
+        "min": [
+          -1.277,
+          -0.2,
+          -1.103
+        ],
+        "max": [
+          1.273,
+          0.582,
+          1.101
+        ]
+      },
+      "bytes": 37668
+    },
+    {
+      "name": "geo_outcrop_bank_straight",
+      "glb": "out/glb/geo_outcrop_bank_straight.glb",
+      "triangles": 496,
+      "vertices": 442,
+      "materials": [
+        "geo_rock"
+      ],
+      "material_count": 1,
+      "bounds": {
+        "min": [
+          -2.0,
+          -0.3,
+          -0.8
+        ],
+        "max": [
+          2.0,
+          1.876,
+          1.297
+        ]
+      },
+      "bytes": 37188
+    },
+    {
+      "name": "geo_outcrop_ridge_tall",
+      "glb": "out/glb/geo_outcrop_ridge_tall.glb",
+      "triangles": 496,
+      "vertices": 442,
+      "materials": [
+        "geo_rock"
+      ],
+      "material_count": 1,
+      "bounds": {
+        "min": [
+          -1.5,
+          -0.3,
+          -0.8
+        ],
+        "max": [
+          1.5,
+          3.151,
+          1.356
+        ]
+      },
+      "bytes": 37188
+    },
+    {
+      "name": "geo_earth_rupture_roots",
+      "glb": "out/glb/geo_earth_rupture_roots.glb",
+      "triangles": 1576,
+      "vertices": 840,
+      "materials": [
+        "geo_rock",
+        "geo_root_wood"
+      ],
+      "material_count": 2,
+      "bounds": {
+        "min": [
+          -2.107,
+          -0.436,
+          -2.738
+        ],
+        "max": [
+          2.324,
+          1.92,
+          2.487
+        ]
+      },
+      "bytes": 156536
+    },
+    {
+      "name": "geo_spell_spire",
+      "glb": "out/glb/geo_spell_spire.glb",
+      "triangles": 546,
+      "vertices": 301,
+      "materials": [
+        "geo_rock",
+        "geo_rune_glow"
+      ],
+      "material_count": 2,
+      "bounds": {
+        "min": [
+          -1.028,
+          -0.6,
+          -0.867
+        ],
+        "max": [
+          1.012,
+          3.805,
+          0.965
+        ]
+      },
+      "bytes": 40220
+    }
+  ],
+  "previews": [
+    "out/previews/geo_boulder_mossy_a_close.png",
+    "out/previews/geo_boulder_mossy_a_threequarter.png",
+    "out/previews/geo_boulder_split_b_close.png",
+    "out/previews/geo_boulder_split_b_threequarter.png",
+    "out/previews/geo_slab_streamside_c_close.png",
+    "out/previews/geo_slab_streamside_c_threequarter.png",
+    "out/previews/geo_outcrop_bank_straight_close.png",
+    "out/previews/geo_outcrop_bank_straight_threequarter.png",
+    "out/previews/geo_outcrop_ridge_tall_close.png",
+    "out/previews/geo_outcrop_ridge_tall_threequarter.png",
+    "out/previews/geo_earth_rupture_roots_close.png",
+    "out/previews/geo_earth_rupture_roots_threequarter.png",
+    "out/previews/geo_spell_spire_close.png",
+    "out/previews/geo_spell_spire_threequarter.png"
+  ]
+}

@@ -107,6 +107,7 @@ var fairy
 var director
 var director_local_view
 var world_builder
+var landscape
 var orchard_atmosphere
 var world_builder_view
 var festival_relay
@@ -180,6 +181,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--atmosphere-test")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--landscape-check")
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="): diagnostic_offline=true
 	scene = SCENE.build(self)
@@ -229,6 +231,8 @@ func _ready():
 	adventure = preload("res://adventure_runtime.gd").new()
 	add_child(adventure)
 	adventure.setup(self)
+	landscape = preload("res://landscape_runtime.gd").new()
+	landscape.setup(self, scene.zones.orchard_highlands.root, diagnostic_offline or smoke)
 	world_builder = preload("res://world_builder_runtime.gd").new()
 	add_child(world_builder)
 	world_builder.setup(self, diagnostic_offline or smoke)
@@ -406,6 +410,10 @@ func _ready():
 	if OS.get_cmdline_user_args().has("--guardian-check"): preload("res://guardian_checks.gd").run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--skeleton-combat-check"): preload("res://skeleton_combat_checks.gd").run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--hand-art-check"): preload("res://hand_art_checks.gd").run.call_deferred(self)
+	if OS.get_cmdline_user_args().has("--landscape-check"):
+		var landscape_check = preload("res://landscape_live_checks.gd").new()
+		add_child(landscape_check)
+		landscape_check.run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--desktop-hero-check"): preload("res://desktop_hero_integration_checks.gd").run.call_deferred(self)
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="):
@@ -458,6 +466,18 @@ func _capture():
 		camera.global_position=meadow_center+Vector3(16,3.2,-21)
 		camera.look_at(meadow_center+Vector3(18,1.0,-33))
 		camera.fov=72
+	if OS.get_cmdline_user_args().has("--capture-landscape-overview"):
+		adventure.travel("orchard_highlands")
+		var landscape_center: Vector3 = scene.zones.orchard_highlands.center
+		camera.global_position = landscape_center + Vector3(0, 150, 190)
+		camera.look_at(landscape_center + Vector3(0, 0, 0))
+		camera.fov = 73
+	if OS.get_cmdline_user_args().has("--capture-landscape-stream"):
+		adventure.travel("orchard_highlands")
+		var brook_center: Vector3 = scene.zones.orchard_highlands.center
+		camera.global_position = brook_center + Vector3(38, 8, -27)
+		camera.look_at(brook_center + Vector3(25, -1, -48))
+		camera.fov = 70
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--capture-orchard-plot="):
 			var index:int=clampi(int(argument.trim_prefix("--capture-orchard-plot=")),0,5)
@@ -1282,7 +1302,7 @@ func _cancel_inactive_playful_hand(hand):
 
 func _move_to(destination: Vector3):
 	var bounded = destination
-	var floor_query = PhysicsRayQueryParameters3D.create(destination+Vector3.UP*1.2,destination+Vector3.DOWN*2.0,1)
+	var floor_query = PhysicsRayQueryParameters3D.create(destination+Vector3.UP*3.0,destination+Vector3.DOWN*4.0,1)
 	var floor_hit = get_world_3d().direct_space_state.intersect_ray(floor_query)
 	if floor_hit.is_empty() or floor_hit.normal.y<0.8: return
 	var floor_owner = _owner(floor_hit.collider)

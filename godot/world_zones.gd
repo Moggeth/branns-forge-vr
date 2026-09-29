@@ -426,7 +426,8 @@ static func build(root: Node3D) -> Dictionary:
 		var extent: float = 160.0 if spec[0]=="orchard_highlands" else (28.0 if spec[0] in ["gloamfen","starfall_ridge","cloudbreak_keep"] else (22.0 if spec[0] == "sky_garden" else 15.0))
 		data.zones[spec[0]] = {"name":spec[1],"center":center,"spawn":center+Vector3(0,0,8),"bounds":Rect2(Vector2(center.x-extent,center.z-extent),Vector2.ONE*extent*2.0),"tier":spec[3],"root":p}
 		data.zones[spec[0]]["environment"] = {"ambient_color":"c5d7df","ambient_energy":0.38,"sun_color":"ffe6bd","sun_energy":1.05,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"adc5d8","fog_density":0.001}
-		if spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep"]: floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
+		# Orchard ground/collision is compiled from the shared heightfield at runtime.
+		if spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep","orchard_highlands"]: floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
 	data.zones.forge_yard.spawn = Vector3(0,0,0)
 	data.zones.crystal_hollow.environment = {"ambient_color":"738bbf","ambient_energy":0.32,"sun_color":"b3cdf7","sun_energy":0.05,"sky_top":"202a46","sky_horizon":"303d59","fog_color":"35486a","fog_density":0.012}
 	data.zones.ember_foundry.environment = {"ambient_color":"a77678","ambient_energy":0.38,"sun_color":"ffad6b","sun_energy":0.70,"sky_top":"704869","sky_horizon":"d58a67","fog_color":"8e5e70","fog_density":0.006}
