@@ -14,6 +14,8 @@ The landscape command log is `user://landscape_v1.json` (Godot user data), and t
 
 `landscape_runtime.gd` owns the live model, 25 visual/collision chunks, operation stack, save, dirty-region transitions and conservative player-ground adjustment. A typical 100 m Sunder touches 3 chunks. `landscape_reprojection.gd` moves existing Orchard objects to the edited surface in the affected region, `landscape_water.gd` builds short water ribbons at the carved channel, and `landscape_navigation.gd` routes lumberjacks around slopes/water using the existing bridge. `landscape_spell_dressing.gd` scatters bounded commissioned stones/rupture forms on new scars and mounds. `landscape_debug.gd` exports twelve registered 2D views. Geological meshes are decorative vocabulary; height, drainage, placement and gameplay meaning come from the world model. The seven GLBs and Blender source are in `godot/assets/landscape/` and `assets/source-commissions/opus-landscape-20260929/`; `landscape_asset_library.gd` integrates them as batches and explicitly enables imported vertex colours.
 
+The geology commission used the cleaned Claude CLI child environment with verified personal subscription identity `fauxgrady@gmail.com`, `authMethod: claude.ai`, and session metadata `claude-opus-5-5`; no Anthropic API billing credential was used. The 186.23 s commission delivered editable Blender source and seven GLBs. Godot imported all seven, `landscape_asset_checks.gd` measured 4,394 triangles across the set, and the integrated scene/collider tests passed. The art direction and rebuild details are in the commission handoff alongside its source.
+
 ## Inspect, test and recover
 
 From the repository root, use `tools/godot/Godot_v4.7.2-stable_win64_console.exe`:
