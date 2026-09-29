@@ -1,6 +1,20 @@
 extends RefCounted
 ## Small authored assemblies: bevels, joints, wraps, functional parts and restraint.
 static func build(node:Node3D,id:String):
+	if id=="grappling_hook" and ResourceLoader.exists("res://weapons/swallow_line.glb"):
+		var hook_scene=load("res://weapons/swallow_line.glb") as PackedScene
+		if hook_scene!=null:
+			var hook=hook_scene.instantiate() as Node3D
+			if hook!=null:
+				var spool=hook.find_child("SpoolPivot",true,false) as Node3D
+				var tip=hook.find_child("HookTip",true,false) as Node3D
+				if spool!=null and tip!=null:
+					node.add_child(hook)
+					node.set_meta("swallow_line_authored",true)
+					node.set_meta("spool",spool)
+					node.set_meta("tether_origin",tip)
+					return
+				hook.free()
 	if id=="spore_lantern" and ResourceLoader.exists("res://weapons/mooncap_lantern.glb"):
 		var lantern_scene=load("res://weapons/mooncap_lantern.glb") as PackedScene
 		if lantern_scene!=null:

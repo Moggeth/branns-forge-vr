@@ -213,7 +213,9 @@ func tick(delta):
 				var difference:Vector3=grapple.goal-Vector3(offset.x,0,offset.z)-game.rig.global_position
 				move_rig(difference.limit_length(delta*game.tuning.value("grapple.reel_speed")))
 				if difference.length()<0.15 and grapple.landing: detach(); falling=false; game._notice("Swallow Line · landing reached."); return
-			var a=grapple.item.to_global(Vector3(0,0.48,0)); var b=grapple.point
+			var tether_origin=grapple.item.get_meta("tether_origin",null)
+			var a:Vector3=tether_origin.global_position if is_instance_valid(tether_origin) else grapple.item.to_global(Vector3(0,0.48,0))
+			var b=grapple.point
 			var mesh=SurfaceTool.new(); mesh.begin(Mesh.PRIMITIVE_TRIANGLES)
 			for axis in [Vector3.UP,Vector3.RIGHT]:
 				var width=axis*0.008
