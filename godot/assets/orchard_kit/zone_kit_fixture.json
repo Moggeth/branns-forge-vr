@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "assets": {"rock": "boulder_small.glb"},
+  "placements": [
+    {"asset": "rock", "position": [1, 0, 2], "yaw_degrees": 30, "scale": 1.0},
+    {"asset": "rock", "position": [2, 0, 3], "yaw_degrees": 80, "scale": 0.8}
+  ]
+}
