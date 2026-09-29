@@ -1,0 +1,299 @@
+{
+ "orchard": {
+  "family": "orchard",
+  "near_tris": 3175,
+  "far_tris": 191,
+  "dims_xyz": [
+   2.73,
+   1.17,
+   3.15
+  ],
+  "min": [
+   -1.39,
+   -0.65,
+   -0.03
+  ],
+  "max": [
+   1.35,
+   0.52,
+   3.13
+  ],
+  "materials": [
+   "PK_Accent_Orchard",
+   "PK_Glow_Orchard",
+   "PK_Organic_Orchard",
+   "PK_Stone_Orchard",
+   "PK_Surface_Orchard",
+   "PK_Trim_Orchard"
+  ],
+  "mesh_nodes": [
+   "Arch",
+   "Base",
+   "Far_Body",
+   "Motif_Apples",
+   "Motif_Canopy",
+   "Motif_KeystoneGem",
+   "Motif_Roots",
+   "Motif_Vines",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.22
+ },
+ "quarry": {
+  "family": "quarry",
+  "near_tris": 2578,
+  "far_tris": 54,
+  "dims_xyz": [
+   2.67,
+   1.04,
+   3.02
+  ],
+  "min": [
+   -1.37,
+   -0.64,
+   -0.04
+  ],
+  "max": [
+   1.3,
+   0.41,
+   2.98
+  ],
+  "materials": [
+   "PK_Accent_Quarry",
+   "PK_Glow_Quarry",
+   "PK_Metal_Quarry",
+   "PK_Organic_Quarry",
+   "PK_Stone_Quarry",
+   "PK_Surface_Quarry",
+   "PK_Trim_Quarry"
+  ],
+  "mesh_nodes": [
+   "Base",
+   "Far_Body",
+   "Lintel",
+   "Motif_GoldNuggets",
+   "Motif_GoldVein",
+   "Motif_Pick",
+   "Motif_Scaffold",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.22
+ },
+ "crystal": {
+  "family": "crystal",
+  "near_tris": 2121,
+  "far_tris": 175,
+  "dims_xyz": [
+   2.7,
+   1.39,
+   3.22
+  ],
+  "min": [
+   -1.33,
+   -0.78,
+   -0.15
+  ],
+  "max": [
+   1.37,
+   0.61,
+   3.07
+  ],
+  "materials": [
+   "PK_Accent_Crystal",
+   "PK_Organic_Crystal",
+   "PK_Surface_Crystal"
+  ],
+  "mesh_nodes": [
+   "Arch_Crystals",
+   "Base",
+   "Far_Body",
+   "Motif_Apex",
+   "Motif_FloatShard_1",
+   "Motif_FloatShard_2",
+   "Motif_FloatShard_3",
+   "Motif_GroundClusters",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.283
+ },
+ "foundry": {
+  "family": "foundry",
+  "near_tris": 2414,
+  "far_tris": 122,
+  "dims_xyz": [
+   2.57,
+   1.11,
+   3.03
+  ],
+  "min": [
+   -1.28,
+   -0.7,
+   -0.01
+  ],
+  "max": [
+   1.28,
+   0.41,
+   3.02
+  ],
+  "materials": [
+   "PK_Accent_Foundry",
+   "PK_Glow_Foundry",
+   "PK_Metal_Foundry",
+   "PK_Stone_Foundry",
+   "PK_Surface_Foundry",
+   "PK_Trim_Foundry"
+  ],
+  "mesh_nodes": [
+   "Base",
+   "Far_Body",
+   "Lintel",
+   "Motif_Braziers",
+   "Motif_Chains",
+   "Motif_Gear",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.215
+ },
+ "mushroom": {
+  "family": "orchard",
+  "near_tris": 3299,
+  "far_tris": 191,
+  "dims_xyz": [
+   2.73,
+   1.17,
+   3.02
+  ],
+  "min": [
+   -1.39,
+   -0.64,
+   -0.03
+  ],
+  "max": [
+   1.35,
+   0.53,
+   3.0
+  ],
+  "materials": [
+   "PK_Accent_Mushroom",
+   "PK_Glow_Mushroom",
+   "PK_Organic_Mushroom",
+   "PK_Stone_Mushroom",
+   "PK_Surface_Mushroom",
+   "PK_Trim_Mushroom"
+  ],
+  "mesh_nodes": [
+   "Arch",
+   "Base",
+   "Far_Body",
+   "Motif_KeystoneGem",
+   "Motif_MushroomCaps",
+   "Motif_Roots",
+   "Motif_Vines",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.22
+ },
+ "sky": {
+  "family": "quarry",
+  "near_tris": 2698,
+  "far_tris": 54,
+  "dims_xyz": [
+   2.7,
+   1.12,
+   3.09
+  ],
+  "min": [
+   -1.35,
+   -0.71,
+   -0.06
+  ],
+  "max": [
+   1.35,
+   0.41,
+   3.04
+  ],
+  "materials": [
+   "PK_Accent_Sky",
+   "PK_Glow_Sky",
+   "PK_Metal_Sky",
+   "PK_Organic_Sky",
+   "PK_Stone_Sky",
+   "PK_Surface_Sky",
+   "PK_Trim_Sky"
+  ],
+  "mesh_nodes": [
+   "Base",
+   "Far_Body",
+   "Lintel",
+   "Motif_CloudWings",
+   "Motif_GoldNuggets",
+   "Motif_GoldVein",
+   "Motif_Pick",
+   "Motif_Scaffold",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.22
+ },
+ "kitchen": {
+  "family": "quarry",
+  "near_tris": 2614,
+  "far_tris": 54,
+  "dims_xyz": [
+   2.65,
+   1.06,
+   3.09
+  ],
+  "min": [
+   -1.31,
+   -0.66,
+   -0.05
+  ],
+  "max": [
+   1.34,
+   0.4,
+   3.05
+  ],
+  "materials": [
+   "PK_Accent_Kitchen",
+   "PK_Glow_Kitchen",
+   "PK_Metal_Kitchen",
+   "PK_Organic_Kitchen",
+   "PK_Stone_Kitchen",
+   "PK_Surface_Kitchen",
+   "PK_Trim_Kitchen"
+  ],
+  "mesh_nodes": [
+   "Base",
+   "Far_Body",
+   "Lintel",
+   "Motif_CopperPots",
+   "Motif_GoldNuggets",
+   "Motif_GoldVein",
+   "Motif_Pick",
+   "Motif_Scaffold",
+   "Pillar_L",
+   "Pillar_R",
+   "Surface_Far",
+   "Surface_Near"
+  ],
+  "aperture_centre_z": 1.22
+ }
+}

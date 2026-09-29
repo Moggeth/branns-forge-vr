@@ -1475,6 +1475,23 @@ in 54.964 s. A first check edit failed GDScript inference for a `var :=`
 assigned from an untyped portal list; explicitly annotate `Vector3` values
 before rerunning. Art-specific aperture and performance review remains next.
 
+Portal art integration (2026-09-30): Sonnet 5.5 delivered seven authored arch
+variants with one runtime kit, portal surface shaders, motes and entry/exit
+effects. Source, rebuild instructions and three actual-game captures are in
+`assets/portal-kit-sonnet/`; installed visuals are in `godot/portal_kit/`.
+The first 22-gate visual check rejected correct hollow arches because it used
+each whole mesh's AABB as if it were solid. The corrected check tests mesh
+triangles around the walking aperture and retains real capsule sweeps and
+ray tests. The final `PORTAL_VISUAL_RESULT` had zero failures across 22 gates
+in 2.587 s; the seven variant transition checks passed in 2.601 s. Editor
+import passed in 3.765 s and the full disposable-fixture integration passed
+in 55.201 s. Actual Forge Yard ground, overhead and close desktop captures
+completed in 11.078, 11.175 and 11.153 s, all near the 120 FPS cap, with
+160, 441 and 61 draw calls. They verify composition and text clearance,
+not VR stereo GPU cost. The original duplicate hub signage overlapped the
+new frames and was removed. At startup the kit stays at far LOD until a
+camera exists, avoiding 22 unnecessary near-gate lights during load.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

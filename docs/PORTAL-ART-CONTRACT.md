@@ -48,10 +48,21 @@ tools/godot/Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --aud
 To check an authored `PackedScene` whose root is `Node3D`, add
 `-- --visual-scene=res://path/to/portal_kit.tscn`. The check instantiates it
 under each Forge Yard gate and rejects collision, opaque aperture intrusion,
-and a nonidentity root transform. This structural test does not prove headset
-legibility, correct destination imagery, ray reachability after the collider
-migration, or physical comfort. Review rendered gate captures and test actual
-travel plus walk-through in the playable scene before accepting an integration.
+and a nonidentity root transform. The check also tests interaction rays and
+standing-capsule clearance. It does not prove headset legibility, correct
+destination imagery, physical comfort or an actual human travel interaction.
+Review rendered gate captures and test travel in the playable scene before
+accepting an integration.
+
+The installed `PortalKit` is a script factory. Check all seven hub variants
+with `-- --visual-script=res://portal_kit/portal_kit.gd`. The visual check uses
+component triangle bounds and an XY separating-axis check to distinguish a
+true aperture obstruction from an arch mesh whose overall bounding box spans
+its empty middle. It also calls entrance/exit effects. Use the game capture
+flags `--capture-portals`, `--capture-portals-overhead` and
+`--capture-portal-close` for three review angles; pass an absolute
+`--capture=<PNG path>`. This is still a desktop rendering check, not headset
+comfort or measured stereo GPU cost.
 
 Verification lesson: the first facing assertion used local `-Z` and failed for
 all 22 gates. The existing `look_at(..., true)` call deliberately uses local

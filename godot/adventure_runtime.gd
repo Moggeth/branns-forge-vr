@@ -888,6 +888,10 @@ func travel(id:String):
 	motion.clear()
 	if game.tuning!=null: game.tuning.history.clear()
 	if not game.scene.get("zones",{}).has(id): return
+	var previous_zone: String = zone
+	if previous_zone != id:
+		var leaving_visual := _portal_visual(previous_zone, id)
+		if leaving_visual != null: leaving_visual.play_entrance()
 	zone=id
 	_apply_zone_environment(id)
 	var data=game.scene.zones[id]
@@ -898,7 +902,16 @@ func travel(id:String):
 	game.visiting=id=="forge_yard"
 	game.shield_until=game.elapsed+3
 	game._notice(data.get("name",id.replace("_"," "))+" · Explore, gather and invent. F / G selects another destination.",6)
+	if previous_zone != id:
+		var arriving_visual := _portal_visual(id, previous_zone)
+		if arriving_visual != null: arriving_visual.play_exit()
 	if hollow != null: hollow.on_travel(id)
+
+func _portal_visual(source: String, destination: String) -> Node3D:
+	for gateway in game.scene.get("portals", []):
+		if gateway.get_meta("zone", "") == source and gateway.get_meta("target_zone", "") == destination:
+			return gateway.get_node_or_null("PortalVisuals")
+	return null
 
 func _apply_zone_environment(id:String):
 	for zone_id in zone_groups: zone_groups[zone_id].visible=zone_id==id

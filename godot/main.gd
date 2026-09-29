@@ -618,6 +618,14 @@ func _capture():
 		camera.global_position=Vector3(0,2.0,4.7)
 		camera.fov=100
 		camera.look_at(Vector3(0,1.15,10.8))
+	if OS.get_cmdline_user_args().has("--capture-portals-overhead"):
+		camera.global_position=Vector3(0,10.5,2.0)
+		camera.fov=85
+		camera.look_at(Vector3(0,1.1,10.8))
+	if OS.get_cmdline_user_args().has("--capture-portal-close"):
+		camera.global_position=Vector3(3.5,1.7,6.2)
+		camera.fov=68
+		camera.look_at(Vector3(3.5,1.35,10.8))
 	if OS.get_cmdline_user_args().has("--capture-forge-working"):
 		state.jobs=[{"status":"building","estimatedProgress":0.6,"remainingLowSeconds":120,"remainingHighSeconds":300,"sampleCount":1}]
 		workshop_delivery._process(0.01)

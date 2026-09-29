@@ -224,61 +224,16 @@ static func lantern(p: Node3D, pos: Vector3) -> void:
 		box(p,pos+Vector3(0,side*0.23,0),Vector3(0.33,0.045,0.33),"554534")
 	cyl(p,pos+Vector3(0,0.33,0),0.2,0.17,"554534","cone")
 
-static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, target: String, color: String = "77dbc6") -> void:
+static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, target: String) -> void:
 	var n := entity(root,zone,"portal",pos,"adventure_portal")
-	var themes={"forge_yard":["8d7765","e5ad61"],"sandstone_quarry":["c79565","efbf64"],"enchanted_kitchen":["b79d7a","e7a25f"],"pinewood_ruins":["7c8b75","a7c76b"],"mushroom_glade":["757c8a","bc8deb"],"crystal_hollow":["636d87","7edcea"],"sky_garden":["d1d3bc","b3e4e8"],"ember_foundry":["48434b","ff9747"],"orchard_highlands":["778568","e3c27a"],"gloamfen":["46566a","8cdaae"],"starfall_ridge":["586486","a4dff3"],"cloudbreak_keep":["b8c6c9","bceef1"]}
-	var theme=themes.get(target,themes.forge_yard)
-	var stone_color:String=theme[0]
-	color=theme[1]
 	var facing=Vector3(0,pos.y,-4) if zone=="forge_yard" else Vector3(data.zones[zone].center.x,pos.y,data.zones[zone].center.z)
 	n.look_at(facing,Vector3.UP,true)
 	n.set_meta("target_zone",target)
 	n.set_meta("action","travel:"+target)
-	cyl(n,Vector3(0,0.12,0),0.8,0.24,stone_color,"disc")
-	cyl(n,Vector3(0,0.25,0),0.57,0.035,color,"disc",0.35)
-	for side in [-1,1]:
-		box(n,Vector3(side*0.64,1.05,0),Vector3(0.24,1.65,0.33),stone_color)
-		cyl(n,Vector3(side*0.64,1.96,0),0.16,0.32,color,"taper",0.8)
-	for side in [-1,1]:
-		for y in [0.45,1.05,1.65]:
-			box(n,Vector3(side*0.64,y,0),Vector3(0.32,0.09,0.41),stone_color)
-		if target=="crystal_hollow":
-			for j in range(3):
-				var shard=cyl(n,Vector3(side*(0.65+j*0.09),0.35+j*0.10,0.13),0.11,0.5+j*0.13,color,"cone",0.5)
-				shard.rotation.z=-side*0.25
-		elif target=="mushroom_glade":
-			cyl(n,Vector3(side*0.64,1.9,0),0.38,0.23,"9965b8","cone")
-			for j in range(3): rock(n,Vector3(side*0.64+(j-1)*0.11,1.99,0.09),Vector3.ONE*0.06,"ead3ed")
-		elif target=="pinewood_ruins":
-			for j in range(5): rock(n,Vector3(side*0.66,0.55+j*0.25,0.23),Vector3(0.13,0.22,0.06),"71915b")
-		elif target=="sandstone_quarry":
-			rock(n,Vector3(side*0.67,0.23,0.22),Vector3(0.4,0.32,0.3),"b78250")
-			rock(n,Vector3(side*0.68,0.31,0.39),Vector3.ONE*0.15,"e4b54f")
-		elif target=="enchanted_kitchen":
-			box(n,Vector3(side*0.64,1.30,0.25),Vector3(0.45,0.06,0.35),"95663d")
-			cyl(n,Vector3(side*0.64,1.42,0.25),0.12,0.18,"b97b47","taper")
-		elif target=="ember_foundry":
-			box(n,Vector3(side*0.64,1.02,0.18),Vector3(0.06,0.65,0.025),color,0.8)
-			box(n,Vector3(side*0.64,1.30,0.18),Vector3(0.19,0.05,0.026),color,0.8)
-		elif target=="sky_garden":
-			for j in range(3):
-				var wing=box(n,Vector3(side*(0.7+j*0.13),1.8-j*0.09,0),Vector3(0.26,0.12,0.18),stone_color)
-				wing.rotation.z=side*0.4
-		else:
-			box(n,Vector3(side*0.64,1.3,0.2),Vector3(0.18,0.12,0.08),"c28e51")
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.54
-	torus.outer_radius = 0.61
-	torus.rings = 20
-	torus.ring_segments = 6
-	var ring := MeshInstance3D.new()
-	ring.mesh = torus
-	ring.material_override = mat(color,0.8)
-	ring.position.y = 1.03
-	ring.rotation.x = PI/2.0
-	n.add_child(ring)
-	label(n,str(data.zones[target].name),Vector3(0,2.43,0),26)
-	label(n,"TRAVEL",Vector3(0,0.52,0.38),20,color)
+	var visuals := preload("res://portal_kit/portal_kit.gd").create(target) as Node3D
+	visuals.name = "PortalVisuals"
+	n.add_child(visuals)
+	label(n,str(data.zones[target].name).to_upper(),Vector3(0,3.4,0.0),20)
 	# A ray-targetable area keeps the travel action usable while the player can
 	# physically step into the gateway. The old central StaticBody blocked it.
 	var interaction := Area3D.new()
@@ -481,7 +436,7 @@ static func build(root: Node3D) -> Dictionary:
 		var target: String = destinations[i]
 		portal(root,data,"forge_yard",Vector3(-10.5+i*3.5,0,10.8),target)
 		var c: Vector3 = data.zones[target].center
-		portal(root,data,target,c+Vector3(7.5,0,9.5),"forge_yard","f1c878")
+		portal(root,data,target,c+Vector3(7.5,0,9.5),"forge_yard")
 	# An outer ring makes exploration feel like a journey. Its return gates lead
 	# back to the parent region, so the hub keeps its intimate seven-way garden.
 	var branches={"pinewood_ruins":"orchard_highlands","mushroom_glade":"gloamfen","crystal_hollow":"starfall_ridge","sky_garden":"cloudbreak_keep"}
@@ -492,8 +447,8 @@ static func build(root: Node3D) -> Dictionary:
 	for id in data.zones:
 		backdrop(data.zones[id].root,id)
 		var z: Dictionary = data.zones[id]
-		var zone_sign=label(z.root,z.name.to_upper(),Vector3(0,3.8,12.8),38)
-		if id=="forge_yard": zone_sign.rotation.y=PI
+		if id != "forge_yard":
+			label(z.root,z.name.to_upper(),Vector3(0,3.8,12.8),38)
 		batch_decorations(z.root)
 		GroundKit.populate(z.root,id,float(z.bounds.size.x)*0.5)
 		if id == "orchard_highlands": OrchardDressing.populate(z.root)
@@ -555,7 +510,8 @@ static func forge(p: Node3D) -> void:
 	for v in [Vector3(-6,0,1.3),Vector3(6.7,0,2.0)]: crate(p,v,0.95)
 	for x in [-5,0,5]:
 		box(p,Vector3(x,0.015,6.9),Vector3(2.5,0.02,0.6),"b9a679")
-	label(p,"WAYSTONES  ·  FOLLOW YOUR CURIOSITY",Vector3(0,3.15,10.0),27,"fff0c8").rotation.y=PI
+	# The seven authored gates carry their own destination names; a second
+	# floating waystone caption here overlapped them from the garden path.
 
 static func quarry(root: Node3D, data: Dictionary) -> void:
 	var id := "sandstone_quarry"
