@@ -1443,6 +1443,25 @@ focused `stonewhisper_checks.gd` passed in 5.65 seconds. Godot extracted three
 textures while importing the self-contained GLB, so keep those PNGs and their
 `.import` metadata beside the installed weapon when committing it.
 
+Pocket Thunder visual integration (2026-09-30): the first Sonnet pass passed
+isolated Blender/Godot checks but looked checkerboard-like in the actual Forge
+Yard. A second isolated Sonnet commission used the actual game ready/burst
+frames to replace the shell with thirteen irregular plates and to reduce the
+dominant pressure dome. Review *game* captures, not only studio renders.
+The v2 replacement initially failed the old bomb visual check because it
+pooled four bursts and kept smoke alive longer than the check's one-second
+assumption. The integration raised the fixed pool to eight, held the light
+pool at two, and tested bounded recycling. A later full integration smoke
+still expected effects gone after 0.5 s on a 0.2 s blast; its authored
+debris/smoke tail lasts about 0.69 s. Waiting 0.9 s verifies cleanup without
+shortening the art. First full run failed on that one assertion; rerun passed
+in 53.020 s. Eight simultaneous headless burst updates cost 0.35 ms p95 and
+0.507 ms max over 60 samples on this PC; this is CPU-side only and is not a
+stereo-VR GPU measurement. Avoid parsing the active Claude JSONL commission
+with `Get-Content | ConvertFrom-Json` during generation: one such attempted
+tail read stalled and was interrupted after ~15 s. Inspect file presence/
+size or wait for the runner's verified terminal result instead.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

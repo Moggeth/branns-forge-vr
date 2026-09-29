@@ -2405,7 +2405,8 @@ func _bomb_tuning_checks(failures:Array):
 	response=await _request("/api/vr/tuning",{"values":original,"expectedRevision":tuning.revision})
 	await _poll()
 	bomb_art.explosion(Vector3(0,1,-4),3.2,1,0.2,0)
-	await get_tree().create_timer(0.5).timeout
+	# The authored blast keeps a brief debris/smoke tail after the shockwave.
+	await get_tree().create_timer(0.9).timeout
 	if not bomb_art.bursts.is_empty(): failures.append("explosion effects not cleaned up")
 	await _controller_checks(failures)
 

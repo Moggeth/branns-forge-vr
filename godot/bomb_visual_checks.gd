@@ -30,6 +30,14 @@ func _run() -> void:
 			failures.append("formation did not accept complete state")
 		if bomb.get_child_count() < 6:
 			failures.append("bomb silhouette has too few articulated parts")
+	var installed_scene = art.bomb_scene
+	art.bomb_scene = null
+	var fallback := art.create_bomb(game, 0.095)
+	art.update_forming(fallback, 0.4)
+	art.tick(0.01)
+	if fallback.find_child("Heart", true, false) == null:
+		failures.append("missing imported art left the bomb invisible")
+	art.bomb_scene = installed_scene
 	var projectile := Node3D.new()
 	game.add_child(projectile)
 	projectile.add_to_group("magic_bomb")
@@ -46,9 +54,20 @@ func _run() -> void:
 	if art.bursts.size() != 5: failures.append("simultaneous explosions were dropped")
 	var live_lights := 0
 	for burst in art.bursts:
-		if burst.get("burst_light") != null: live_lights += 1
-	if live_lights > 4: failures.append("explosion light budget exceeded")
-	art.tick(1.0)
+		if burst.get("light") != null: live_lights += 1
+	if live_lights > 2: failures.append("explosion light budget exceeded")
+	art.tick(3.0)
 	if not art.bursts.is_empty(): failures.append("explosions were not released after their lifetime")
+	for i in range(12): art.explosion(Vector3(float(i), 0, 0), 3.0, 1.0, 0.4, 16)
+	if art.bursts.size() != art.MAX_BURSTS: failures.append("simultaneous explosion rig budget was not enforced")
+	var tick_samples: Array[float] = []
+	for frame in range(60):
+		var started := Time.get_ticks_usec()
+		art.tick(1.0 / 60.0)
+		tick_samples.append(float(Time.get_ticks_usec() - started) / 1000.0)
+	tick_samples.sort()
+	print("BOMB_VISUAL_CPU ", JSON.stringify({"bursts": art.MAX_BURSTS, "tick_p95_ms": tick_samples[56], "tick_max_ms": tick_samples.back()}))
+	art.tick(3.0)
+	if not art.bursts.is_empty(): failures.append("recycled explosions were not released")
 	print("BOMB_VISUAL_RESULT ", JSON.stringify(failures))
 	quit(0 if failures.is_empty() else 1)
