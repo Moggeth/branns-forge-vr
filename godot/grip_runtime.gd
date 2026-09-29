@@ -219,9 +219,10 @@ func _attach(hand,item):
 			item.position=Vector3(0,-0.045,-0.035)-item.basis*Vector3(0,grip_y,0)
 		else:
 			item.position=Vector3(-0.03,-0.16,-0.28) if str(item.get_meta("id",""))=="woodland_axe" else Vector3.ZERO
-			# The axe blade is authored in XY. Present its edge toward the target
-			# instead of a broadside plate across the player's view.
 			item.rotation=Vector3(-0.4,-PI/2,0.45) if str(item.get_meta("id",""))=="woodland_axe" else Vector3(-0.3,0,0)
+			# Keep the haft pose, but turn the authored +X edge away from the
+			# player around the haft's own +Y axis.
+			if str(item.get_meta("id",""))=="woodland_axe": item.basis=item.basis*Basis(Vector3.UP,PI)
 	game.held[_key(hand)]=item
 	bind(hand,item)
 	item.set_meta("controls_until",game.elapsed+8.0)

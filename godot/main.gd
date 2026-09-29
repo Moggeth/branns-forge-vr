@@ -33,6 +33,9 @@ var desktop_pitch = 0.0
 var desktop_look
 var desktop_swing_ready = 0.0
 var desktop_swing_started = -1.0
+var desktop_swing_item: Node3D
+var desktop_swing_reach = 1.4
+var desktop_swing_contact = false
 var desktop_bob_phase = 0.0
 var desktop_bob_strength = 0.0
 var desktop_last_position = Vector3.ZERO
@@ -65,6 +68,7 @@ var qol_smoke = false
 var capture_qol = false
 var capture_feedback = false
 var tuning
+var music
 var bomb_art
 var capture_bomb_stage=""
 var capture_tuning=false
@@ -259,6 +263,8 @@ func _ready():
 	tuning=preload("res://tuning_runtime.gd").new()
 	add_child(tuning)
 	tuning.setup(self)
+	music=preload("res://adaptive_music.gd").new()
+	music.setup(self)
 	bomb_art=preload("res://bomb_visuals.gd").new()
 	add_child(bomb_art)
 	bomb_art.setup(self)
@@ -886,7 +892,7 @@ func _hud():
 	desktop_help_panel.add_child(help)
 	help.add_theme_font_size_override("font_size",15)
 	help.add_theme_color_override("font_color",Color("e6ebdd"))
-	help.text="MOVE  WASD walk · Mouse look · Esc cursor\nGEAR  E take/drop · Left click primary · Right click alternate\nCROSSBOW  R cock + seat bolt · Hold R to reel tether\nTOOLS  1–8 equip · F destination · G travel\nWORLD  T teleport · U workshop · V talk to Brann\nVIEW  F11 fullscreen · Q turn left · F1 close help"
+	help.text="MOVE  WASD walk · Mouse look · Esc cursor\nGEAR  E take/drop · Left click primary · Right click alternate\nCROSSBOW  9 equip owned Siegebird · R cock + seat bolt · Hold R to reel tether\nTOOLS  1–8 equip · F destination · G travel\nWORLD  T teleport · U workshop · V talk to Brann\nVIEW  F11 fullscreen · Q turn left · F1 close help"
 	desktop_help_panel.visible=false
 	var cross = Label.new()
 	layer.add_child(cross)
@@ -947,6 +953,7 @@ func _process(delta):
 		visit_entered=visiting
 	_speech_tick(delta)
 	adventure.tick(delta)
+	if music!=null and not diagnostic_offline and not smoke: music.tick(delta)
 	if apples!=null: apples.tick(delta)
 	if pumpkins!=null: pumpkins.tick(delta)
 	if living!=null: living.tick(delta)
@@ -1093,6 +1100,7 @@ func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E: _grip(desktop_hand, true)
+			KEY_9: _desktop_equip_siegebird()
 			KEY_X:
 				if magnetic_wand!=null: magnetic_wand.secondary(desktop_hand)
 			KEY_Q: _snap(deg_to_rad(qol.settings.snap_degrees))
@@ -1103,6 +1111,33 @@ func _unhandled_input(event):
 			KEY_T: _teleport(camera)
 			KEY_H: _button("upgrade")
 			KEY_V: _button("retry")
+
+func _desktop_siegebird_item()->Node3D:
+	for weapon in siegebird.weapons:
+		if is_instance_valid(weapon.item) and str(weapon.item.get_meta("id",""))==siegebird.ITEM_ID:
+			return weapon.item
+	return null
+
+func _desktop_equip_siegebird()->bool:
+	var item=_desktop_siegebird_item()
+	if item==null:
+		_notice("Siegebird is not available yet. Build it at the forge first.",4)
+		return false
+	var key=str(desktop_hand.get_instance_id())
+	if held.get(key)==item: return true
+	if held.has(key):
+		# A hotkey swap is a handoff, not a throw. Leave the previous tool at
+		# rest so it remains recoverable in the world.
+		tuning.history.erase(key)
+		adventure.motion.erase(key)
+		adventure.release(desktop_hand,false)
+	if held.has(key):
+		_notice("Put down the held item before equipping Siegebird.",3)
+		return false
+	# Reuse the live crafted instance, including its loaded bolt and reel state.
+	grips._attach(desktop_hand,item)
+	_notice("Siegebird equipped · LMB fire · R reload",3)
+	return true
 
 func _desktop_primary() -> void:
 	var item=held.get(str(desktop_hand.get_instance_id()))
@@ -1120,8 +1155,9 @@ func _desktop_primary() -> void:
 		if elapsed<desktop_swing_ready: return
 		desktop_swing_ready=elapsed+0.42
 		desktop_swing_started=elapsed
-		if target!=null: melee.strike(target,hit.position,hit.normal,2.4,desktop_hand,item)
-		else: _effect(camera.global_position-camera.global_basis.z*0.8,Color("e9c184"),0.07,0.10)
+		desktop_swing_item=item
+		desktop_swing_contact=false
+		desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,2.4) if target!=null else 1.4
 		return
 	_trigger(desktop_hand,true)
 
@@ -1167,16 +1203,62 @@ func _desktop_weapon_motion(delta:float):
 	desktop_bob_strength=move_toward(desktop_bob_strength,target,delta*3.5)
 	if desktop_bob_strength>0.001: desktop_bob_phase+=delta*10.0
 	var bob=desktop_bob_strength
-	var swing=0.0
+	var rest=Vector3(0.35+sin(desktop_bob_phase)*0.008*bob,-0.35+absf(cos(desktop_bob_phase))*0.012*bob,-0.55)
+	var rest_roll=0.018*sin(desktop_bob_phase)*bob
+	desktop_hand.position=rest
+	desktop_hand.rotation=Vector3(0,0,rest_roll)
+	var item=held.get(str(desktop_hand.get_instance_id()))
 	if desktop_swing_started>=0:
-		var progress=(elapsed-desktop_swing_started)/0.38
-		if progress>=1: desktop_swing_started=-1
-		else: swing=sin(progress*PI)
-	desktop_hand.position=Vector3(0.35+sin(desktop_bob_phase)*0.008*bob,-0.35+absf(cos(desktop_bob_phase))*0.012*bob,-0.55+0.11*swing)
-	desktop_hand.rotation=Vector3(-0.28*swing,0.12*swing,0.018*sin(desktop_bob_phase)*bob-0.58*swing)
+		var progress=clampf((elapsed-desktop_swing_started)/0.38,0.0,1.0)
+		if not is_instance_valid(desktop_swing_item) or item!=desktop_swing_item:
+			desktop_swing_started=-1.0
+			desktop_swing_item=null
+		else:
+			if progress>=0.5 and not desktop_swing_contact:
+				desktop_swing_contact=true
+				var hit=_ray(camera,3.2)
+				var strike_target=_owner(hit.get("collider")) if hit.has("collider") else null
+				if strike_target!=null:
+					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,2.4)
+					melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
+				else: _effect(camera.global_position-camera.global_basis.z*0.8,Color("e9c184"),0.07,0.10)
+			if progress>=1.0:
+				desktop_swing_started=-1.0
+				desktop_swing_item=null
+			else: _desktop_melee_pose(item,progress,rest,rest_roll)
 	var crossbow=siegebird.desktop_weapon(desktop_hand)
 	if crossbow!=null and siegebird.extras.tethered(crossbow) and Input.is_physical_key_pressed(KEY_R):
 		siegebird.extras.reel(crossbow,delta*TAU*1.4,delta)
+
+func _desktop_melee_pose(item:Node3D,progress:float,rest:Vector3,rest_roll:float)->void:
+	# Drive the actual contact tip across the camera ray. This also works for
+	# tools whose authored tips and grip offsets differ from the axe's.
+	var tip:Vector3=item.get_meta("tip",Vector3.UP*0.65)
+	var rest_tip=rest+Basis(Vector3.FORWARD,rest_roll)*(item.transform*tip)
+	var reach=desktop_swing_reach
+	var windup=Vector3(0.38,0.3,-reach+0.12)
+	var contact=Vector3(0,0,-reach)
+	var follow=Vector3(-0.42,-0.32,-reach+0.12)
+	var desired:Vector3
+	var roll:float
+	if progress<0.2:
+		var blend=smoothstep(0.0,0.2,progress)
+		desired=rest_tip.lerp(windup,blend)
+		roll=lerpf(rest_roll,0.32,blend)
+	elif progress<0.5:
+		var blend=smoothstep(0.2,0.5,progress)
+		desired=windup.lerp(contact,blend)
+		roll=lerpf(0.32,-0.08,blend)
+	elif progress<0.8:
+		var blend=smoothstep(0.5,0.8,progress)
+		desired=contact.lerp(follow,blend)
+		roll=lerpf(-0.08,-0.48,blend)
+	else:
+		var blend=smoothstep(0.8,1.0,progress)
+		desired=follow.lerp(rest_tip,blend)
+		roll=lerpf(-0.48,rest_roll,blend)
+	desktop_hand.rotation=Vector3(-0.18*sin(progress*PI),0.12*sin(progress*PI),roll)
+	desktop_hand.position=desired-desktop_hand.basis*(item.transform*tip)
 
 func _desktop_fullscreen():
 	var window=get_window()
@@ -1197,8 +1279,8 @@ func _desktop_hint()->String:
 	if is_instance_valid(item) and melee.handles(item):
 		var action=str(item_actions.CONTROLS.get(str(item.get_meta("id","")),"Swing: strike · Trigger: special"))
 		action=action.replace("Swing:","LMB").replace("Trigger:","RMB").replace("trigger:","RMB")
-		return action + " · E drop · F1 controls"
-	return "WASD move · Click to look · LMB use · E take · F1 controls · F11 fullscreen"
+		return action + " · E drop · 9 Siegebird · F1 controls"
+	return "WASD move · Click to look · LMB use · E take · 9 Siegebird · F1 controls"
 
 func _xr_input():
 	for hand in hands:

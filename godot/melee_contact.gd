@@ -24,6 +24,11 @@ func tick(delta):
 		if not handles(item): continue
 		var hand=game.grips.grips.get(key,{}).get("hand",game.desktop_hand)
 		var id=item.get_instance_id()
+		# The desktop attack resolves once at the animated camera-ray contact.
+		# Sweeping the moving display model would apply a second VR-style hit.
+		if not game.vr and hand==game.desktop_hand and item.get_parent()==game.desktop_hand:
+			tracks.erase(id)
+			continue
 		var tip=item.get_meta("tip",Vector3.UP*0.65)
 		if not tracks.has(id): tracks[id]={"previous":item.to_global(tip),"correction":Vector3.ZERO,"block":{},"item":item}
 		var track=tracks[id]

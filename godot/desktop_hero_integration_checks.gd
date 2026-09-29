@@ -74,7 +74,20 @@ static func run(game) -> void:
 	var axe=game.adventure._tool_model("woodland_axe")
 	game.add_child(axe)
 	game.grips._attach(game.desktop_hand,axe)
-	if absf(axe.rotation.y+PI/2)>0.001: failures.append("desktop axe still presents broadside")
+	var blade=(axe.global_basis*Vector3.RIGHT).normalized()
+	if blade.dot(-game.camera.global_basis.z)<0.5: failures.append("desktop axe blade faces the player")
+	for tool_id in ["woodland_axe","apprentice_hammer","quarry_pick"]:
+		var tool=axe if tool_id=="woodland_axe" else game.adventure._tool_model(tool_id)
+		if tool!=axe:
+			game.add_child(tool)
+			game.grips._attach(game.desktop_hand,tool)
+		game.desktop_swing_reach=1.4
+		for phase in [0.2,0.5,0.8]:
+			game._desktop_melee_pose(tool,phase,Vector3(0.35,-0.35,-0.55),0.0)
+			var tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+			var expected=Vector3(0.38,0.3,-1.28) if phase==0.2 else (Vector3(0,0,-1.4) if phase==0.5 else Vector3(-0.42,-0.32,-1.28))
+			if tip.distance_to(expected)>0.02: failures.append("%s swing tip misses camera aim at phase %.1f"%[tool_id,phase])
+		if tool!=axe: tool.queue_free()
 	var previous_strength:float=game.desktop_bob_strength
 	game.rig.global_position+=Vector3(0.1,0,0)
 	game._desktop_weapon_motion(0.016)
@@ -83,10 +96,27 @@ static func run(game) -> void:
 	game.desktop_swing_ready=0
 	game._desktop_primary()
 	if game.desktop_swing_started<0 or game.desktop_swing_ready<=game.elapsed: failures.append("melee click did not begin visible swing")
+	if game.desktop_swing_contact: failures.append("melee strike resolved before visible contact")
+	game.elapsed=game.desktop_swing_started+0.20
+	game._desktop_weapon_motion(0.016)
+	if not game.desktop_swing_contact: failures.append("melee strike did not resolve at visible contact")
+	game.desktop_swing_started=game.elapsed
+	game.desktop_swing_contact=false
+	game.elapsed+=0.5
+	game._desktop_weapon_motion(0.5)
+	if not game.desktop_swing_contact or game.desktop_swing_started>=0: failures.append("slow frame skipped melee contact")
+	if game._desktop_siegebird_item()==null and game._desktop_equip_siegebird(): failures.append("9 equipped an unowned crossbow")
 	var crossbow=preload("res://siegebird_checks.gd").load_sample(game)
 	if crossbow==null: failures.append("Siegebird asset missing from desktop test")
 	else:
-		game.grips._attach(game.desktop_hand,crossbow)
+		var weapon_count=game.siegebird.weapons.size()
+		var nine:=InputEventKey.new()
+		nine.physical_keycode=KEY_9
+		nine.pressed=true
+		game._unhandled_input(nine)
+		if game.held.get(key)!=crossbow: failures.append("9 did not equip the owned Siegebird")
+		if not game._desktop_equip_siegebird() or game.siegebird.weapons.size()!=weapon_count: failures.append("9 duplicated the Siegebird")
+		if not game.desktop_help_panel.get_child(0).text.contains("9 equip owned Siegebird"): failures.append("F1 help omits Siegebird shortcut")
 		game.siegebird.tick(0.016)
 		var w=game.siegebird.desktop_weapon(game.desktop_hand)
 		var before:int=game.siegebird.projectiles.size()
