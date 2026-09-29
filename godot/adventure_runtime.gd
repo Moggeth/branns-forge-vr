@@ -900,6 +900,12 @@ func _apply_zone_environment(id:String):
 	if game.orchard_spell_vfx != null: game.orchard_spell_vfx.visible = id == "orchard_highlands"
 	var settings=game.scene.get("zones",{}).get(id,{}).get("environment",{})
 	if settings.is_empty(): return
+	var world: WorldEnvironment = game.get_node_or_null("AdventureEnvironment") as WorldEnvironment
+	if world != null and id != "orchard_highlands":
+		# In Godot 4.7, assigning fog_mode also resets fog_density to 1.0.
+		# Restore the Orchard grade first so the destination's density wins.
+		for property in environment_grade_defaults:
+			world.environment.set(property, environment_grade_defaults[property])
 	for child in game.get_children():
 		if child is WorldEnvironment:
 			var env=child.environment
@@ -915,14 +921,9 @@ func _apply_zone_environment(id:String):
 		if child is DirectionalLight3D:
 			child.light_color=Color(settings.get("sun_color","ffe6bd"))
 			child.light_energy=float(settings.get("sun_energy",1.05))
-	var world: WorldEnvironment = game.get_node_or_null("AdventureEnvironment") as WorldEnvironment
-	if world != null:
-		if id == "orchard_highlands":
-			OrchardHorizon.apply_orchard_grade(world.environment, game.get_node_or_null("AdventureSun") as DirectionalLight3D)
-			world.environment.fog_height += game.scene.zones.orchard_highlands.root.global_position.y
-		else:
-			for property in environment_grade_defaults:
-				world.environment.set(property, environment_grade_defaults[property])
+	if world != null and id == "orchard_highlands":
+		OrchardHorizon.apply_orchard_grade(world.environment, game.get_node_or_null("AdventureSun") as DirectionalLight3D)
+		world.environment.fog_height += game.scene.zones.orchard_highlands.root.global_position.y
 	sync_horizon()
 
 func sync_horizon():

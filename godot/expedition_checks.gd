@@ -27,6 +27,16 @@ func run(game):
 		var spawn:Vector3=zones[id].spawn
 		var ray=PhysicsRayQueryParameters3D.create(spawn+Vector3.UP*2.0,spawn+Vector3.DOWN*4.0,1)
 		if game.get_world_3d().direct_space_state.intersect_ray(ray).is_empty(): failures.append("unsupported spawn "+id)
+	# Restoring the Orchard fog mode must happen before applying a destination's
+	# density: Godot resets fog_density to 1.0 when fog_mode is assigned.
+	var env: Environment = game.get_node("AdventureEnvironment").environment
+	for id in ["orchard_highlands", "pinewood_ruins", "sandstone_quarry"]:
+		game.adventure.travel(id)
+		if id == "orchard_highlands":
+			if not env.fog_enabled or env.fog_density <= 0.0: failures.append("orchard atmosphere disabled")
+		else:
+			var wanted: float = float(zones[id].environment.fog_density)
+			if not is_equal_approx(env.fog_density, wanted): failures.append("zone fog density "+id)
 	var orchard_bounds:Rect2=zones.orchard_highlands.bounds
 	if orchard_bounds.get_area()<96.0*96.0*10.0: failures.append("orchard expansion below 10x")
 	for id in ["forge_yard","pinewood_ruins","gloamfen","cloudbreak_keep"]:

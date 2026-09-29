@@ -1,5 +1,25 @@
 # Verification and recovery evidence — 2026-09-12
 
+## Playable zone fog regression — 2026-09-29
+
+Pinewood and Quarry rendered as nearly solid sky-coloured fog in the graphical
+environment review. The zone palette requested `fog_density=0.001`, but the
+live environment reported `1.0`. A minimal Godot 4.7.2 repro showed that
+assigning `Environment.fog_mode` resets `fog_density` to `1.0`. Zone travel had
+applied the destination density before restoring Orchard grade defaults,
+including `fog_mode`. Restore grade defaults first, then apply the destination
+palette. The Orchard keeps its own static grade after its zone palette.
+
+Fast regression check: run the bundled engine with `--headless --xr-mode off
+--audio-driver Dummy --path godot --quit-after 1200 -- --expedition-check` and
+require `EXPEDITION_RESULT []`; it now checks Orchard followed by Pinewood and
+Quarry fog densities. For visual acceptance, use the graphical, save-isolated
+`environment_art_review.gd -- --world-builder-preview` capture. Before the fix,
+Pinewood and Quarry each had only 2 quantized colour bins at ground eye; after
+the fix they had 52 and 32, with visible gameplay landmarks. Orchard remained
+visible at 37 bins. The 24-view graphical capture reported no failures. A
+headless scene check alone cannot establish the visible result.
+
 ## Asset Lab fast path and failure lesson (2026-09-27)
 
 Run `python scripts/asset_lab.py build assets/asset-lab/pilot/asset.json` for a
