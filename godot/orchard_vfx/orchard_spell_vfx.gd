@@ -180,48 +180,72 @@ func _build_sunder(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path:
 	# 1. Stratified walls: panels stand on the new floor at the foot of each bank, top at the
 	#    original surface, so the heightfield's cut reads as layered earth. They extend downward
 	#    with the sinking terrain (scale Y follows real local cut depth).
-	var s_wall := rng.randf_range(0.2, 1.2)
-	while s_wall < length - 0.3:
-		for side in [-1.0, 1.0]:
-			if rng.randf() < 0.2: continue                      # gaps: slumped sections
-			var at: Dictionary = pl.at(s_wall + rng.randf_range(-0.4, 0.4))
-			var out: Vector3 = at.right * side
-			var foot := _wall_foot(g, at.pos, out, w)
-			if foot.is_empty(): continue
-			var depth: float = foot.depth
-			var bpos: Vector3 = foot.pos
-			var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.25, 0.25)))
-			var lean := Basis(Vector3.BACK, deg_to_rad(rng.randf_range(8.0, 20.0)))   # top leans back into the bank
-			var mesh: String = "wall_a" if rng.randf() < 0.6 else "wall_b"
-			var sy: float = clampf(depth / 1.8, 0.25, 1.6)
-			var sxz := rng.randf_range(0.85, 1.2)
-			var t0: float = front.call(s_wall)
-			var top_before: float = bpos.y + depth
-			_piece(fx, mesh, Transform3D((basis * lean).scaled_local(Vector3(sxz, 0.04, sxz)), Vector3(bpos.x, top_before, bpos.z)),
-				Transform3D((basis * lean).scaled_local(Vector3(sxz, sy, sxz)), Vector3(bpos.x, top_before + 0.04, bpos.z)),
-				t0 + 0.02, minf(t0 + 0.34, 1.0), CURVE_SMOOTH, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0) * Color(1, 1, 1, 0.9), true)
-		s_wall += rng.randf_range(1.5, 2.4)
-	# 2. Fracture lips: irregular torn sod plates, clustered and gapped (never evenly spaced),
-	#    varied size/yaw/tilt, some half-buried crusts and clods between them.
+	# rev-4 (real capture 03: evenly repeated stripe panels): walls come in RUNS of 1-4 overlapping
+	# panels per side, each run with its own scale family, separated by 2-7 m slumped gaps where the
+	# shader's chipped strata show alone. Panels vary 0.55-1.45 in width, some slump 0.2-0.6 m below
+	# the lip, and yaw/lean vary so no two neighbours share a face plane.
 	for side in [-1.0, 1.0]:
-		var s := rng.randf_range(0.0, 0.8)
+		var s_wall := rng.randf_range(0.0, 2.5)
+		while s_wall < length - 0.3:
+			var run: int = 1 + int(pow(rng.randf(), 1.4) * 3.99)
+			var fam := rng.randf_range(0.55, 1.35)
+			for k in run:
+				if s_wall >= length - 0.3: break
+				var at: Dictionary = pl.at(s_wall)
+				var out: Vector3 = at.right * side
+				var foot := _wall_foot(g, at.pos, out, w)
+				var sxz := fam * rng.randf_range(0.8, 1.12)
+				s_wall += sxz * rng.randf_range(0.9, 1.5)
+				if foot.is_empty(): continue
+				var depth: float = foot.depth
+				var bpos: Vector3 = foot.pos
+				var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.45, 0.45)))
+				var lean := Basis(Vector3.BACK, deg_to_rad(rng.randf_range(4.0, 26.0)))   # top leans back into the bank
+				var mesh: String = "wall_a" if rng.randf() < 0.55 else "wall_b"
+				var slump := rng.randf_range(0.2, 0.6) if rng.randf() < 0.35 else 0.0
+				var sy: float = clampf((depth - slump) / 1.8, 0.2, 1.6) * rng.randf_range(0.85, 1.1)
+				var t0: float = front.call(s_wall)
+				var top_before: float = bpos.y + depth - slump
+				_piece(fx, mesh, Transform3D((basis * lean).scaled_local(Vector3(sxz, 0.04, sxz)), Vector3(bpos.x, top_before, bpos.z)),
+					Transform3D((basis * lean).scaled_local(Vector3(sxz, sy, sxz * rng.randf_range(0.8, 1.2))), Vector3(bpos.x, top_before + 0.04, bpos.z)),
+					t0 + 0.02, minf(t0 + 0.34, 1.0), CURVE_SMOOTH, 0.0, Vector3.ZERO, _earth_tint(rng, rng.randf_range(0.82, 1.05)) * Color(1, 1, 1, 0.9), true)
+				# local rock fall below a slumped panel: 2-4 stones heaped at its foot
+				if slump > 0.0:
+					for j in 2 + rng.randi() % 3:
+						var sp: Vector3 = bpos - out * rng.randf_range(0.2, 0.9) + at.tangent * rng.randf_range(-0.6, 0.6)
+						sp.y = g.target(sp) + 0.05
+						var cm: String = ["chunk_a", "chunk_b", "chunk_c", "clod_b"][rng.randi() % 4]
+						var sb := Basis.from_euler(Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4))).scaled(Vector3.ONE * rng.randf_range(0.6, 1.2))
+						_piece(fx, cm, Transform3D(sb, Vector3(bpos.x, top_before, bpos.z)), Transform3D(sb, sp), t0 + 0.12, minf(t0 + 0.32, 1.0),
+							CURVE_FALL, 0.15, Vector3(rng.randf_range(-6, 6), 0, rng.randf_range(-6, 6)), _rock_tint(rng, cm), true)
+			s_wall += rng.randf_range(2.0, 7.0)                 # slumped gap
+	# 2. Fracture lips: torn sod plates in CLUMPS of 1-3 (one dominant plate, smaller shards around
+	#    it), then 2.5-8 m of bare torn edge. Scale family per clump, stronger yaw, and some plates
+	#    darker/earth-side up so the green tops never form a repeating rib.
+	for side in [-1.0, 1.0]:
+		var s := rng.randf_range(0.0, 3.0)
 		while s < length:
-			var at: Dictionary = pl.at(s)
-			var out: Vector3 = at.right * side
-			var hinge: Vector3 = at.pos + out * w * rng.randf_range(0.78, 1.02) + at.tangent * rng.randf_range(-0.3, 0.3)
-			var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.55, 0.55)))
-			var big := rng.randf() < 0.4
-			var mesh: String = LIPS[rng.randi() % 3] if big else "crust_a"
-			var tilt := -deg_to_rad(rng.randf_range(8.0, 28.0) if big else rng.randf_range(3.0, 12.0)) + _slope_pitch(g, hinge, basis.x)
-			var sc := Vector3(rng.randf_range(0.7, 1.25), rng.randf_range(0.8, 1.2), rng.randf_range(0.6, 1.3))
-			var t0: float = front.call(s)
-			var hb: float = g.before(hinge)
-			var ht: float = maxf(g.target(hinge), hb - 0.15)
-			_piece(fx, mesh, Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, hb - 0.1, hinge.z)),
-				Transform3D((basis * Basis(Vector3.BACK, tilt) * Basis(Vector3.RIGHT, rng.randf_range(-0.15, 0.15))).scaled_local(sc),
-				Vector3(hinge.x, ht + rng.randf_range(0.0, 0.12), hinge.z)),
-				t0, t0 + rng.randf_range(0.18, 0.3), CURVE_BACK, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0), true)
-			s += rng.randf_range(1.2, 3.6) * (1.0 / maxf(q, 0.5))   # clustered + gapped, never a rail
+			var clump: int = 1 + int(pow(rng.randf(), 1.6) * 2.99)
+			var fam := rng.randf_range(0.55, 1.3)
+			for k in clump:
+				var at: Dictionary = pl.at(minf(s + k * rng.randf_range(0.5, 1.1), length))
+				var out: Vector3 = at.right * side
+				var hinge: Vector3 = at.pos + out * w * rng.randf_range(0.8, 1.05) + at.tangent * rng.randf_range(-0.4, 0.4)
+				var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.9, 0.9)))
+				var big := k == 0 and rng.randf() < 0.55
+				var mesh: String = LIPS[rng.randi() % 3] if big else "crust_a"
+				var tilt := -deg_to_rad(rng.randf_range(10.0, 34.0) if big else rng.randf_range(3.0, 16.0)) + _slope_pitch(g, hinge, basis.x)
+				var size := fam * (1.0 if k == 0 else rng.randf_range(0.45, 0.75))
+				var sc := Vector3(rng.randf_range(0.75, 1.2), rng.randf_range(0.8, 1.2), rng.randf_range(0.6, 1.3)) * size
+				var t0: float = front.call(s)
+				var hb: float = g.before(hinge)
+				var ht: float = maxf(g.target(hinge), hb - 0.15)
+				var tint := _earth_tint(rng, rng.randf_range(0.7, 1.0))
+				_piece(fx, mesh, Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, hb - 0.1, hinge.z)),
+					Transform3D((basis * Basis(Vector3.BACK, tilt) * Basis(Vector3.RIGHT, rng.randf_range(-0.3, 0.3))).scaled_local(sc),
+					Vector3(hinge.x, ht + rng.randf_range(-0.05, 0.12), hinge.z)),
+					t0, t0 + rng.randf_range(0.18, 0.3), CURVE_BACK, 0.0, Vector3.ZERO, tint, true)
+			s += rng.randf_range(2.5, 8.0) * (1.0 / maxf(q, 0.5))   # clumps + long bare gaps, never a rail
 	# 3. Loosened rock and clods: spall off the wall at the moving front, drop to the floor.
 	for i in fx.max_debris:
 		var s: float = rng.randf() * length
@@ -250,8 +274,9 @@ func _build_sunder(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path:
 		pos.y = g.before(pos) - 0.05
 		var vel: Vector3 = Vector3.UP * rng.randf_range(0.5, 1.3) + at.right * side * rng.randf_range(0.2, 0.7) + at.tangent * rng.randf_range(0.3, 1.1)
 		var ea := rng.randf_range(0.85, 1.1)
-		_dust(fx, pos, vel, _birth(fx, front.call(s) + rng.randf_range(0.0, 0.05)), rng.randf_range(0.6, 1.15),
-			rng.randf_range(0.18, 0.35) * w, rng.randf_range(0.5, 0.95) * w, Color(0.52 * ea, 0.42 * ea, 0.31 * ea, rng.randf_range(0.28, 0.5)))
+		# rev-4: shorter life + smaller end size so dust is a travelling knot at the front, not a strip
+		_dust(fx, pos, vel, _birth(fx, front.call(s) + rng.randf_range(0.0, 0.03)), rng.randf_range(0.45, 0.8),
+			rng.randf_range(0.15, 0.3) * w, rng.randf_range(0.35, 0.65) * w, Color(0.52 * ea, 0.42 * ea, 0.31 * ea, rng.randf_range(0.28, 0.5)))
 	# 5. Embers race along the fissure just ahead of the dust.
 	for i in int(24 * q):
 		var s: float = rng.randf() * length

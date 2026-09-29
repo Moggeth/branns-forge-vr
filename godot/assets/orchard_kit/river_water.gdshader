@@ -1,4 +1,4 @@
-// Brann's Forge VR - river surface, live-revision 2026-09-29 (replaces WATER_SHADER in landscape_water.gd).
+// Brann's Forge VR - river surface, rev-4 2026-09-29 (deeper water, warmer shallows, less sky/foam whitening) (replaces WATER_SHADER in landscape_water.gd).
 // Contract unchanged: UV.x = 0..1 across channel (left->right bank), UV.y = travelled_metres * 0.1,
 // NORMAL = up, TANGENT = across. Every previous uniform name is kept (extra ones are optional).
 // Opaque, no screen/depth reads (Mobile/VR).
@@ -17,19 +17,19 @@
 shader_type spatial;
 render_mode cull_disabled, shadows_disabled, specular_schlick_ggx;
 
-uniform vec3 deep_col    : source_color = vec3(0.05, 0.14, 0.12);   // in-scatter colour of deep water
-uniform vec3 mid_col     : source_color = vec3(0.12, 0.25, 0.20);
-uniform vec3 shallow_col : source_color = vec3(0.50, 0.44, 0.33);   // lit gravel bed
+uniform vec3 deep_col    : source_color = vec3(0.030, 0.100, 0.095);   // rev-4: deeper, readable   // in-scatter colour of deep water
+uniform vec3 mid_col     : source_color = vec3(0.075, 0.19, 0.155);
+uniform vec3 shallow_col : source_color = vec3(0.56, 0.45, 0.30);   // warmer ochre gravel   // lit gravel bed
 uniform vec3 bed_dark    : source_color = vec3(0.20, 0.18, 0.13);   // gaps between stones
-uniform vec3 foam_col    : source_color = vec3(0.82, 0.86, 0.83);
+uniform vec3 foam_col    : source_color = vec3(0.74, 0.79, 0.76);
 uniform vec3 sky_col     : source_color = vec3(0.55, 0.70, 0.86);
 uniform vec3 bank_reflect_col : source_color = vec3(0.16, 0.22, 0.12); // reflected banks/vegetation
 uniform vec3 wet_stone_col : source_color = vec3(0.26, 0.24, 0.20);
 uniform float flow_speed = 0.35;
 uniform float rain_wetness = 0.0;
-uniform float fresnel_max = 0.28;
+uniform float fresnel_max = 0.22;
 uniform float channel_width_m = 7.0;
-uniform float absorb_depth_m = 1.8;    // metres of water at the thalweg (visual only)
+uniform float absorb_depth_m = 2.2;    // metres of water at the thalweg (visual only)
 
 varying vec3 wpos;
 
@@ -106,15 +106,15 @@ void fragment() {
 	float ndv = clamp(dot(normalize(NORMAL + (TANGENT * n_ts.x + BINORMAL * n_ts.y) * 0.6), VIEW), 0.0, 1.0);
 	float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 	float edge_reflect = smoothstep(0.35, 0.95, abs(off));
-	vec3 refl = mix(sky_col * 0.8, bank_reflect_col, edge_reflect * 0.85);
+	vec3 refl = mix(sky_col * 0.62, bank_reflect_col, edge_reflect * 0.9);   // rev-4: less pale sky sheen
 	colour = mix(colour, refl, fres * fresnel_max * 1.4);
 
 	// --- foam: waterline lace + riffle patches over shallow stones (isotropic, broken)
-	float lace = smoothstep(0.8, 0.97, abs(off) + (noise2(q * 1.6 + flow * TIME * 0.5) - 0.5) * 0.25);
+	float lace = smoothstep(0.86, 0.98, abs(off) + (noise2(q * 1.6 + flow * TIME * 0.5) - 0.5) * 0.25);
 	float riffle_zone = smoothstep(0.6, 0.85, noise2(vec2(mpos.x * 0.35, mpos.y * 0.09))) * (1.0 - depth);
 	float bubbles = smoothstep(0.62, 0.9, noise2(q * 2.2 + flow * ph0 * 3.0) * w0 + noise2(q * 2.2 + flow * ph1 * 3.0 + 4.0) * (1.0 - w0));
 	float foam = clamp(lace * 0.55 + riffle_zone * bubbles * 0.9, 0.0, 1.0);
-	colour = mix(colour, foam_col, foam * 0.45);
+	colour = mix(colour, foam_col, foam * 0.32);
 
 	// --- shoreline: last stretch becomes wet gravel/stones breaking the ribbon edge
 	float shore = smoothstep(0.9, 1.02, abs(off) + (0.35 - st2.x) * 0.3 + (noise2(wpos.xz * 0.7) - 0.5) * 0.2);

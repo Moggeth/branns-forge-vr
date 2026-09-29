@@ -16,19 +16,27 @@ static func apply_after(env: Environment, sun: DirectionalLight3D, hour: float, 
 	var cloud := 0.76 if weather == "rain" else (0.42 if weather == "snow" else 0.0)
 	# 1. Sky-derived ambient: blue from above, ground bounce from below -> hills keep volume.
 	#    Pipeline's ambient energy is kept, slightly reduced in clear daylight to let the sun model form.
+	var clear_day := day * (1.0 - cloud)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_sky_contribution = lerpf(0.35, 0.65, day)
-	env.ambient_light_energy *= lerpf(1.0, 0.85, day * (1.0 - cloud))
-	# 2. Depth: stronger aerial perspective (distance takes the sky colour), modest distance density,
-	#    valley height fog stays thin so near geometry is never hidden.
-	env.fog_aerial_perspective = lerpf(0.32, 0.55, day)
-	env.fog_density *= lerpf(1.0, 0.8, day * (1.0 - cloud))
+	env.ambient_light_sky_contribution = lerpf(0.35, 0.6, day)
+	# rev-4: real captures still washed out -> less flat fill in clear daylight, more key (relative only)
+	env.ambient_light_energy *= lerpf(1.0, 0.74, clear_day)
+	# 2. Depth. rev-4 diagnosis from capture 00: the pipeline's height fog (fog_height 0.05, density 0.02)
+	#    sits ABOVE the river valley floor (y < 0), so the brook, its banks and the near meadow were
+	#    veiled milky-grey at 5-20 m. In clear daylight the height-fog floor drops 4 m and thins; rain,
+	#    snow, dawn and night keep the pipeline's valley mist. Distance haze stays (aerial perspective).
+	env.fog_height = lerpf(env.fog_height, -4.0, clear_day)
+	env.fog_height_density *= lerpf(1.0, 0.45, clear_day)
+	env.fog_aerial_perspective = lerpf(0.32, 0.6, day)
+	env.fog_density *= lerpf(1.0, 0.7, clear_day)
 	env.fog_sky_affect = 0.3
-	# 3. Mild grade (static, comfortable): a touch of contrast so value separates the planes.
+	# 3. Mild grade (static, comfortable): contrast + saturation so value separates the planes.
 	env.adjustment_enabled = true
-	env.adjustment_contrast = lerpf(1.02, 1.1, day)
-	env.adjustment_saturation = lerpf(0.95, 1.05, day * (1.0 - cloud * 0.5))
+	env.adjustment_contrast = lerpf(1.03, 1.14, day)
+	env.adjustment_brightness = lerpf(1.0, 0.97, clear_day)
+	env.adjustment_saturation = lerpf(0.95, 1.1, day * (1.0 - cloud * 0.5))
 	if sun == null: return
+	sun.light_energy *= lerpf(1.0, 1.08, clear_day)
 	# 4. Cap noon elevation at ~44 deg (pipeline uses up to 54) for longer shadows and slope modelling;
 	#    morning/evening angles are untouched so the day cycle is unchanged.
 	sun.rotation_degrees.x = maxf(sun.rotation_degrees.x, -44.0)

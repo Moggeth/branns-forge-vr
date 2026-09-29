@@ -541,8 +541,33 @@ static func _add_blob(sk: Dictionary, rng: RandomNumberGenerator, center: Vector
 	sk.blobs.append(b)
 	return b
 
+## rev-4 (Opus art-family pass): seeded growth FORMS break the cloned-orchard look (captures 08/09).
+## Drawn from a separate RNG stream, so the main sequence (trunk, low fruit limb, fruit, reach points)
+## is unchanged for every existing seed. Forms only touch upper limbs and crown masses.
+##   [spread_k, elev_k, crown_y, top_k, side_bias, extra_filler]
+const APPLE_FORMS := {
+	"classic":   [1.0, 1.0, 1.0, 1.0, 0.0, 0],
+	"spreading": [1.28, 1.22, 0.78, 0.82, 0.0, 1],   # wide, flat-topped, old orchard tree
+	"upright":   [0.86, 0.72, 1.16, 1.14, 0.0, 0],   # narrow, tall crown, young vigorous tree
+	"lopsided":  [1.12, 1.08, 0.92, 0.95, 0.38, 1],  # wind/light-bent, one heavy side
+	"billowy":   [1.05, 0.95, 1.05, 1.24, 0.0, 2],   # big domed crown with extra clusters
+}
+const APPLE_FORM_WEIGHTS := {"classic": 0.24, "spreading": 0.22, "upright": 0.18, "lopsided": 0.2, "billowy": 0.16}
+
+static func apple_form(seed: int) -> String:
+	var frng := _rng("apple_form", seed, 91)
+	var roll := frng.randf()
+	for name in APPLE_FORM_WEIGHTS:
+		roll -= float(APPLE_FORM_WEIGHTS[name])
+		if roll <= 0.0: return name
+	return "classic"
+
 static func _skel_apple(sk: Dictionary, rng: RandomNumberGenerator, opts: Dictionary) -> void:
 	var h: float = sk.height
+	var form_name: String = opts.get("form", apple_form(int(sk.seed)))
+	var F: Array = APPLE_FORMS.get(form_name, APPLE_FORMS.classic)
+	var frng := _rng("apple_form", int(sk.seed), 92)
+	sk["form"] = form_name
 	var r0 = h * rng.randf_range(0.056, 0.066)
 	_trunk(sk, rng, h * rng.randf_range(0.30, 0.33), r0, 0.07)
 	_roots(sk, rng, 5, r0 * 1.5, 0.42, r0 * 0.42)
@@ -560,6 +585,10 @@ static func _skel_apple(sk: Dictionary, rng: RandomNumberGenerator, opts: Dictio
 		var low: bool = i == 0
 		var elev = rng.randf_range(1.2, 1.35) if low else rng.randf_range(0.8, 1.1)
 		var length = h * (rng.randf_range(0.3, 0.34) if low else rng.randf_range(0.26, 0.32))
+		if not low:   # rev-4 form: upper limbs only (low fruit limb and its reach points untouched)
+			var side: float = 1.0 + float(F[4]) * cos(az - az0 - 0.6)
+			length *= float(F[0]) * side * frng.randf_range(0.9, 1.12)
+			elev = minf(elev * float(F[1]), 1.45)
 		var o: Vector3 = collar + Vector3.DOWN * rng.randf_range(0.0, 0.12)
 		var d1 = _dir(az, elev)
 		var d2 = _dir(az + rng.randf_range(-0.25, 0.25), elev * (0.85 if low else 0.72))
@@ -567,7 +596,9 @@ static func _skel_apple(sk: Dictionary, rng: RandomNumberGenerator, opts: Dictio
 		var tip = mid + d2 * length * 0.5
 		sk.tubes.append({"points": [o, mid, tip], "radii": [r0 * 0.44, r0 * 0.32, r0 * 0.18], "wind": 0.0, "kind": "limb"})
 		var br = h * (rng.randf_range(0.17, 0.19) if low else rng.randf_range(0.2, 0.23))
-		var b = _add_blob(sk, rng, tip + Vector3.UP * br * 0.05, Vector3(br, br * 0.84, br) * Vector3(rng.randf_range(0.95, 1.1), 1, rng.randf_range(0.95, 1.1)), i % 4, 0.68)
+		var cy: float = 1.0 if low else float(F[2]) * frng.randf_range(0.9, 1.1)
+		var cw: float = 1.0 if low else frng.randf_range(0.85, 1.2)
+		var b = _add_blob(sk, rng, tip + Vector3.UP * br * 0.05, Vector3(br * cw, br * 0.84 * cy, br * cw) * Vector3(rng.randf_range(0.95, 1.1), 1, rng.randf_range(0.95, 1.1)), i % 4, 0.68)
 		lowest.append(b)
 		# Two small lumps on the sunlit outer shoulder break the silhouette into clusters.
 		for k in 2:
@@ -584,11 +615,19 @@ static func _skel_apple(sk: Dictionary, rng: RandomNumberGenerator, opts: Dictio
 		_add_blob(sk, rng, stip + Vector3.UP * sr * 0.25, Vector3(sr, sr * 0.84, sr), (i + 2) % 4, 0.68)
 	# Crown top and filler clusters close the canopy into one rounded mass.
 	var tr = h * rng.randf_range(0.22, 0.25)
-	_add_blob(sk, rng, collar + Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2)) + Vector3.UP * (h - collar.y - tr * 0.84), Vector3(tr, tr * 0.84, tr), 2, 0.68)
+	var tk: float = float(F[3]) * frng.randf_range(0.92, 1.08)
+	var top_off := Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2)) + Vector3(cos(az0 - 0.6), 0, sin(az0 - 0.6)) * h * 0.08 * float(F[4])
+	_add_blob(sk, rng, collar + top_off + Vector3.UP * (h - collar.y - tr * 0.84 * float(F[2])), Vector3(tr * tk, tr * 0.84 * tk * float(F[2]), tr * tk), 2, 0.68)
 	for j in 2:
 		var fr = h * rng.randf_range(0.17, 0.19)
 		var faz = az0 + TAU * (float(j) + 0.5) / 2.0 + rng.randf_range(-0.4, 0.4)
-		_add_blob(sk, rng, collar + Vector3(0, h * rng.randf_range(0.26, 0.32), 0) + Vector3(cos(faz), 0, sin(faz)) * h * 0.14, Vector3(fr, fr * 0.84, fr), (j + 1) % 4, 0.68)
+		_add_blob(sk, rng, collar + Vector3(0, h * rng.randf_range(0.26, 0.32), 0) + Vector3(cos(faz), 0, sin(faz)) * h * 0.14 * float(F[0]), Vector3(fr, fr * 0.84 * float(F[2]), fr), (j + 1) % 4, 0.68)
+	# rev-4 form: extra outer clusters (separate RNG) give billowy/spreading crowns a broken, clumped edge
+	for j in int(F[5]):
+		var ea: float = az0 + frng.randf_range(0.0, TAU)
+		var er := h * frng.randf_range(0.12, 0.16)
+		var ep := collar + Vector3(cos(ea), 0, sin(ea)) * h * frng.randf_range(0.22, 0.3) * float(F[0]) + Vector3.UP * h * frng.randf_range(0.2, 0.34)
+		_add_blob(sk, frng, ep, Vector3(er, er * 0.8 * float(F[2]), er), (j + 3) % 4, 0.7)
 	if not sk.fruit_enabled: return
 	# Apples sit on the lower/outer surface of clusters, embedded so they read as hanging in leaves.
 	var apples = []

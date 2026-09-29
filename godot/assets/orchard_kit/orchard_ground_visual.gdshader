@@ -1,4 +1,7 @@
-// Brann's Forge VR - Orchard ground, live-revision 2026-09-29.
+// Brann's Forge VR - Orchard ground, rev-4 art-family pass 2026-09-29 (claude-opus-5-5).
+// rev-4 summary: lifted turf ignores the authored "disturbed" mask alpha + slope soil (the real cause of
+// the brown Raise disc), Raise tear = narrow intermittent foot rim + few rim cracks, Sunder strata warped
+// and chipped into blocks, worn-mask areas read as dry trampled grass with scuffs, not paint.
 // Drop-in: keeps EVERY uniform name/binding (grass_tex, soil_tex, micro_normal, macro_mask, exposure_tex,
 // rain_wetness, snow_cover, palette uniforms, mask_origin_x). exposure_tex contract is unchanged
 // (orchard_ground.gd apply_exposure_delta: r = fresh 0..1, g = cut depth / 4 m, b = heap / 2 m, 320 m @ 1 m/texel).
@@ -86,6 +89,11 @@ void vertex() {
 	at = w.xz - vec2(mask_origin_x, 0.0);
 	world_y = w.y;
 	world_n = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	// rev-4b: heightfield meshes carry no TANGENT array, so NORMAL_MAP lit each facet with an
+	// undefined frame -> hard triangular light/dark tints. Build a stable +X-aligned frame here.
+	vec3 t = vec3(1.0, 0.0, 0.0) - NORMAL * NORMAL.x;
+	TANGENT = normalize(length(t) > 0.01 ? t : vec3(0.0, 0.0, 1.0));
+	BINORMAL = normalize(cross(NORMAL, TANGENT)) * -1.0;
 }
 
 void fragment() {
@@ -98,7 +106,10 @@ void fragment() {
 	float regional = fbm(wp * 0.018);
 	float meander = fbm(wp * 0.07 + 3.0);
 	float fine = fbm(at * 0.55);
-	float dist_fade = 1.0 - smoothstep(0.02, 0.12, length(fwidth(at)));   // 1 near the viewer
+	// rev-4b: view distance, NOT fwidth(at). Screen derivatives of world xz differ per terrain triangle
+	// (each facet has its own plane), so the old fade jumped at triangle edges -> the hard yellow/olive
+	// triangular tints seen in real tactical captures 00/03/06 and in preview iter1.
+	float dist_fade = 1.0 - smoothstep(12.0, 40.0, length(VERTEX));   // 1 near the viewer
 
 	vec3 nw = normalize(world_n);
 	float slope = 1.0 - clamp(nw.y, 0.0, 1.0);
@@ -125,23 +136,69 @@ void fragment() {
 	vec3 s = mix(soil_col, soil_dark, slope_soft * 0.6 + fine * 0.2);
 	s *= mix(1.0, luma(st) * 2.2, texture_strength);
 
+	// rev-4: exposure is read BEFORE the base soil mix. Real-game capture 05/06 fault: the authored
+	// orchard_masks.png carries broad soft alpha "disturbed" blobs (14 % of the map, up to 0.93) and
+	// m.a*0.5 + slope_soft*0.45 turned any Raise flank that landed on a blob into one flat brown disc.
+	// (The isolated preview used a synthetic mask with a = 0, so it looked green there.)
+	// Lifted turf (heap > ~10 cm) now suppresses mask/slope soil completely; the rim shader below draws
+	// the only bare earth on a heap.
+	vec2 euv = uv + (vec2(noise2(at * 0.9), noise2(at * 0.9 + 7.1)) - 0.5) * (1.4 / 320.0);  // hide texels
+	vec4 ex = texture(exposure_tex, euv);
+	float lifted = smoothstep(0.03, 0.12, ex.b) * step(0.004, ex.r);
+
 	float edge_n = (fine - 0.5) * 0.35 + (noise2(at * 1.7) - 0.5) * 0.15;
 	float leaf = m.g * (0.35 + 0.3 * meander);
-	float soil_amt = clamp(m.r * 0.9 + m.a * 0.5 + leaf * 0.35 + slope_soft * 0.45 + edge_n, 0.0, 1.0);
-	soil_amt = smoothstep(0.25, 0.75, soil_amt);
+	// disturbed mask = worn, drier grass with only a few broken bare scuffs in its core, never a paint disc
+	float scuff = smoothstep(0.62, 0.82, noise2(at * 0.42 + 3.3) * 0.7 + noise2(at * 1.9) * 0.3);
+	float worn = m.a * (1.0 - lifted);
+	g = mix(g, mix(meadow_dry, grass_warm, 0.5) * 0.9, smoothstep(0.1, 0.8, worn) * 0.35);
+	float steep = smoothstep(0.30, 0.55, slope + edge_n * 0.3) * (1.0 - lifted);   // only real banks go bare
+	// rev-4c: RAISED PATH. Real rev4b captures 04 vs 06: the brown band is the authored path (m.r),
+	// present before the Raise; the heap lifted it and m.r*0.9 kept painting an unbroken road over the
+	// hill. Inside lifted ground the tread now fractures into tilted compacted slabs with open joints,
+	// fewer and smaller with height (heap B + noise), and the lost tread becomes turf that rolled over it
+	// plus a few fresh-earth/stone rubble pockets. Outside the heap the path is untouched.
+	// rev-4d (real rev4c capture 06): the Voronoi slab version read as a uniform 2 m flagstone net
+	// (hard step() survival = equal cell silhouettes; the grass joint gap outlined EVERY cell). Replaced
+	// with NO cells: surviving tread = soft, irregular patches of anisotropic warped noise stretched ALONG
+	// the local contour (fault direction from the flank normal: tension tears run across the downhill
+	// direction), eroded crumb edges, grass creeping in, a few open (never closed) tension cracks.
+	float path = m.r;
+	float path_lift = 0.0, path_keep = 1.0, path_crack = 0.0, path_rubble = 0.0, path_tone = 0.5;
+	if (lifted > 0.0 && path > 0.03) {
+		// rev-4e (real rev4d capture: slope-aligned noise drew parallel contour stripes). SIMPLE, isotropic:
+		// the old tread fades smoothly under the lifted turf with a height-graded lift; only a few BROAD
+		// (~6-8 m) soft remnants and faint soil spots survive. World-space only, no cells, no slope axes,
+		// no cracks. The narrow foot tear still comes from the rev-4 heap rim in the exposure block.
+		path_lift = smoothstep(0.1, 0.8, ex.b * 2.0 + (noise2(at * 0.21 + 2.0) - 0.5) * 0.3) * lifted;
+		float remnant = smoothstep(0.52, 0.78, noise2(at * 0.15 + warp * 0.03 + 3.1) * 0.8 + noise2(at * 0.5 + 7.0) * 0.2);
+		path_keep = mix(1.0, remnant * 0.75, path_lift);
+		float lost = path * path_lift * (1.0 - remnant);
+		path_rubble = lost * smoothstep(0.7, 0.88, noise2(at * 0.33 + 5.0)) * 0.45;   // sparse soft soil spots
+	}
+	float soil_amt = clamp(path * path_keep * 0.9 + worn * scuff * 0.7 + leaf * 0.35 + steep * 0.6 + edge_n, 0.0, 1.0);
+	soil_amt = smoothstep(0.3, 0.75, soil_amt);
 	vec3 colour = mix(g, s, soil_amt);
+	if (path_lift > 0.0) {
+		// tread: broad tilt tone; turf over lost tread slightly drier and trampled; rubble = fresh earth
+		// + pale stone chips; cracks thin and dark but at reduced strength (0.5)
+		colour *= mix(1.0, mix(0.86, 1.07, path_tone), path * path_keep * path_lift);
+		colour = mix(colour, colour * vec3(1.03, 1.0, 0.88), path * (1.0 - path_keep) * path_lift * 0.45);
+		vec3 fresh_earth = mix(soil_dark, clay_col * 0.85, smoothstep(0.4, 0.8, noise2(at * 2.3))) * mix(1.0, luma(st) * 2.2, 0.8);
+		fresh_earth = mix(fresh_earth, rock_fresh * mix(0.8, 1.05, fine), smoothstep(0.7, 0.85, noise2(at * 3.7 + 1.0)) * 0.5);
+		colour = mix(colour, soil_dark * 0.8, clamp(path_crack, 0.0, 1.0) * 0.5);
+		colour = mix(colour, fresh_earth, clamp(path_rubble, 0.0, 1.0) * 0.85);
+	}
 	colour = mix(colour, vec3(0.36, 0.30, 0.17) * (0.8 + 0.5 * fine), leaf * 0.25);
 
 	float wy = world_y + (meander - 0.5) * 1.6 + at.x * 0.06;
 	float band = sin(wy * strata_scale) + 0.45 * sin(wy * 5.1 + fine * 2.0);
 	vec3 rock = mix(mix(rock_mid, rock_warm, 0.5 + 0.3 * band), rock_band, smoothstep(0.6, 0.95, sin(wy * 1.3)) * 0.6);
 	rock *= mix(1.0, luma(st) * 2.0, 0.6);
-	float rockiness = smoothstep(0.45, 0.70, slope + edge_n * 0.5);
+	float rockiness = smoothstep(0.50, 0.75, slope + edge_n * 0.5) * (1.0 - lifted * 0.85);
 	colour = mix(colour, rock, rockiness);
 
 	// --- EXPOSURE -------------------------------------------------------------------------------
-	vec2 euv = uv + (vec2(noise2(at * 0.9), noise2(at * 0.9 + 7.1)) - 0.5) * (1.4 / 320.0);  // hide texels
-	vec4 ex = texture(exposure_tex, euv);
 	float fresh = 0.0;
 	float wall_amt = 0.0;
 	if (ex.r > 0.004) {
@@ -157,17 +214,22 @@ void fragment() {
 		float n1 = noise2(at * 2.3), n2 = noise2(at * 0.8 + 4.0);
 
 		// 1) disturbed turf everywhere the ground moved: flattened, browner grass, scattered clods
-		float moved = ex.r * (1.0 - smoothstep(0.3, 1.0, ex.b) * 0.7);                // heaved turf stays greener
+		float moved = ex.r * (1.0 - lifted) * (1.0 - smoothstep(0.02, 0.2, ex.g) * 0.3); // heaved turf stays green (rev-4)
 		vec2 cl = cells(at * 2.6);
-		float clods = smoothstep(0.12, 0.02, cl.x) * step(0.6, cl.y) * moved;
-		vec3 trampled = mix(colour, mix(colour, soil_col, 0.3) * 0.85, moved * 0.5);
+		// rev-4b: FILLED sparse clods (cell interior), not F2-F1 edge lines (those drew a crack net)
+		float clods = smoothstep(0.1, 0.22, cl.x) * step(0.86, cl.y) * moved;
+		vec3 trampled = mix(colour, mix(colour, soil_col, 0.3) * 0.88, moved * 0.3);
 		trampled = mix(trampled, mix(soil_dark, soil_col, cl.y) * mix(1.0, luma(st) * 2.2, 0.8), clods * 0.8);
 		colour = trampled;
 
 		// 2) SUNDER cut: bare ground only where really deep or on walls; strata by depth below original
 		float bare_cut = smoothstep(0.22, 0.5, cut_m + (n1 - 0.5) * 0.3) + smoothstep(0.25, 0.6, cut_grad);
 		bare_cut = clamp(bare_cut, 0.0, 1.0) * ex.r;
-		float dz = cut_m + (fine - 0.5) * 0.25 + (n2 - 0.5) * 0.15;   // depth below original surface
+		// rev-4: strata are warped at three scales along the wall (layers pinch, thicken and dip) and
+		// broken into chipped blocks so the cut no longer reads as one regular stripe panel.
+		vec2 blk = cells(at * vec2(0.55, 0.9) + vec2(world_y * 0.4, 0.0));
+		float pinch = (noise2(at * 0.21 + 1.7) - 0.5) * 0.9 + (noise2(at * 0.07) - 0.5) * 0.8;
+		float dz = cut_m * mix(0.75, 1.3, noise2(at * 0.33)) + pinch + (fine - 0.5) * 0.25 + (blk.y - 0.5) * 0.35;
 		vec3 strata = mix(vec3(0.20, 0.16, 0.10), soil_dark, smoothstep(0.02, 0.12, dz));       // root mat
 		strata = mix(strata, soil_col * 1.05, smoothstep(0.42, 0.52, dz));                         // subsoil
 		strata = mix(strata, gravel_col * mix(0.7, 1.05, n1), smoothstep(0.95, 1.05, dz));         // gravel lens
@@ -175,28 +237,39 @@ void fragment() {
 		strata = mix(strata, mix(rock_fresh, rock_band * 0.8, 0.5 + 0.4 * sin(wy * strata_scale * 1.3 + fine * 3.0)),
 			smoothstep(2.1, 2.3, dz));                                                               // bedrock
 		strata *= mix(1.0, luma(st) * 2.2, 0.85);
+		strata *= mix(0.78, 1.08, blk.y) * mix(0.7, 1.0, smoothstep(0.0, 0.06, blk.x));   // chipped joints + block value
 		wall_amt = smoothstep(0.35, 0.9, cut_grad) * ex.r;
 		// floor: loose fallen topsoil/rubble on flat low ground (keeps floor darker, not one colour)
 		float floor_amt = (1.0 - wall_amt) * smoothstep(0.4, 0.8, cut_m);
 		vec3 loose = mix(soil_dark * 0.95, soil_col * 0.8, cl.y * 0.6) * mix(1.0, luma(st) * 2.2, 0.9);
-		loose = mix(loose, gravel_col * mix(0.55, 1.0, n1), smoothstep(0.1, 0.03, cl.x) * step(0.7, cl.y) * 0.8);
+		loose = mix(loose, gravel_col * mix(0.55, 1.0, n1), smoothstep(0.08, 0.2, cl.x) * step(0.7, cl.y) * 0.8);   // filled gravel pieces
 		vec3 cut_col = mix(strata, loose, floor_amt * 0.7);
 		colour = mix(colour, cut_col, bare_cut);
 
 		// 3) RAISE heap: turf rides up intact; stretch tears a narrow seam + tension cracks
 		// rev-2: the seam is ONE narrow contour on the lower shoulder (0.55-0.95 m of heave, wobbling),
 		// only where the heave is steep; the rest of the flank keeps its turf with sparse cracks.
+		// rev-4 (real capture 05/06: full dark ring + dense crack mesh). The tear is now the FOOT RIM only,
+		// 0.08-0.45 m of heave (~0.5-1 m wide on a real flank), intermittent along its length via a
+		// stretched noise so it reads as torn sod lips with intact grass bridges, never a closed ring.
 		float stretch = heap_grad + (n1 - 0.5) * 0.12;
-		float contour = heap_m + (n2 - 0.5) * 0.35 + (fine - 0.5) * 0.2;
-		float seam = smoothstep(0.5, 0.62, contour) * smoothstep(1.02, 0.86, contour) * smoothstep(0.18, 0.32, stretch);
-		vec2 crack = cells(at * vec2(0.8, 1.2) + warp * 0.2);
-		float near_seam = smoothstep(0.2, 0.6, contour) * smoothstep(1.7, 1.1, contour);
-		float cracks = smoothstep(0.045, 0.01, crack.x) * near_seam * smoothstep(0.12, 0.3, stretch) * ex.r * step(0.35, crack.y);
+		float contour = heap_m + (n2 - 0.5) * 0.14 + (fine - 0.5) * 0.10;
+		float along = noise2(at * 0.55 + warp * 0.12) * 0.75 + noise2(at * 2.2) * 0.25;   // breaks the rim into runs
+		float seam = smoothstep(0.07, 0.14, contour) * smoothstep(0.48, 0.30, contour) * smoothstep(0.16, 0.30, stretch)
+			* smoothstep(0.36, 0.52, along);
+		// lifted sod edge: thin bright-ish turf lip right above the tear (catches light, reads as a torn edge)
+		float lip = smoothstep(0.42, 0.50, contour) * smoothstep(0.66, 0.52, contour) * smoothstep(0.40, 0.55, along) * smoothstep(0.16, 0.3, stretch);
+		// only a few short tension cracks hugging the rim, on a coarse lattice (no crack net over the mound)
+		vec2 crack = cells(at * vec2(0.9, 1.3) + warp * 0.2);
+		float near_seam = smoothstep(0.1, 0.4, contour) * smoothstep(1.1, 0.6, contour);
+		float cracks = smoothstep(0.03, 0.008, crack.x) * near_seam * smoothstep(0.2, 0.35, stretch) * ex.r * step(0.78, crack.y)
+			* smoothstep(0.45, 0.6, along);
 		float crest = smoothstep(0.85, 0.98, ex.b) * smoothstep(0.1, 0.02, heap_grad);
-		float outcrop = crest * smoothstep(0.8, 0.9, noise2(at * 0.9 + 9.0));
+		float outcrop = crest * smoothstep(0.84, 0.92, noise2(at * 0.9 + 9.0));
 		vec3 torn = mix(soil_dark, clay_col * 0.8, smoothstep(0.55, 0.8, n1)) * mix(1.0, luma(st) * 2.2, 0.85);
 		torn = mix(torn, rock_fresh * mix(0.85, 1.1, n2), smoothstep(0.72, 0.85, noise2(at * 3.3)) * 0.3);  // sparse rock chips in the seam (rev-3)
-		colour = mix(colour, soil_dark * 0.85 * mix(1.0, luma(st) * 2.2, 0.8), cracks * 0.85);
+		colour = mix(colour, colour * vec3(1.08, 1.1, 0.92), lip * ex.r * 0.6);
+		colour = mix(colour, soil_dark * 0.85 * mix(1.0, luma(st) * 2.2, 0.8), cracks * 0.7);
 		colour = mix(colour, torn, clamp(seam * ex.r, 0.0, 1.0));
 		colour = mix(colour, mix(rock_fresh, rock_mid, n2) * mix(1.0, luma(st) * 2.0, 0.6), outcrop);
 		fresh = clamp(bare_cut + seam * ex.r + cracks * 0.5 + outcrop, 0.0, 1.0);

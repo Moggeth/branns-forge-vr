@@ -51,6 +51,7 @@ static func plan(model: Dictionary) -> Dictionary:
 				var width: float = Fields.sample(model, "river_width", p)
 				var edge: Vector2 = p + left * side * (width * 0.5 + 0.3 + jitter * 2.2)
 				if _inside(model, edge) and Fields.sample(model, "water", edge) < 0.08:
+					if _unit(seed, floori(next_reed / 9.0), int(side) + 41) < 0.45: continue
 					_add(result, "reed_clump", edge, Fields.sample(model, "height", edge) - 0.04,
 						_unit(seed, floori(next_reed * 4.0), int(side) + 13) * TAU, 0.72 + jitter * 0.42)
 			next_reed += 1.25

@@ -1,0 +1,189 @@
+{
+  "generator": "build_visual_kit.py",
+  "blender": "4.5.13 LTS",
+  "seed": 7331,
+  "units": "metres; Godot +Y up; origin grounded at y=0 with buried skirt",
+  "materials": {
+    "OrchardRock_VC": "opaque, vertex-colour albedo (COLOR_0), rough 0.88",
+    "OrchardFoliage_VC": "opaque, vertex-colour albedo, rough 0.8, cull_disabled recommended for reeds/tufts"
+  },
+  "textures": "none embedded: all colour is flat-shaded vertex colour (zero texture bandwidth); detail comes from godot/ shaders in output/godot/",
+  "assets": [
+    {
+      "name": "cliff_strata_wide",
+      "file": "glb/cliff_strata_wide.glb",
+      "family": "cliff",
+      "triangles": 7128,
+      "dimensions_m": {
+        "x": 8.61,
+        "y_up": 8.56,
+        "z": 6.13,
+        "min_y_up": -0.6
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=40 per Orchard",
+      "lod": "LOD0 full, LOD1 via Godot auto-LOD at 45 m",
+      "visibility_range_end_m": 220
+    },
+    {
+      "name": "cliff_strata_tall",
+      "file": "glb/cliff_strata_tall.glb",
+      "family": "cliff",
+      "triangles": 9900,
+      "dimensions_m": {
+        "x": 5.61,
+        "y_up": 10.24,
+        "z": 5.68,
+        "min_y_up": -0.6
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=24",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 240
+    },
+    {
+      "name": "cliff_strata_low",
+      "file": "glb/cliff_strata_low.glb",
+      "family": "cliff",
+      "triangles": 3564,
+      "dimensions_m": {
+        "x": 6.85,
+        "y_up": 4.73,
+        "z": 3.52,
+        "min_y_up": -0.6
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=60 (bank ledges)",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 160
+    },
+    {
+      "name": "boulder_large",
+      "file": "glb/boulder_large.glb",
+      "family": "boulder",
+      "triangles": 48,
+      "dimensions_m": {
+        "x": 3.38,
+        "y_up": 1.97,
+        "z": 3.48,
+        "min_y_up": -0.77
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=80 MultiMesh",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 140
+    },
+    {
+      "name": "boulder_medium",
+      "file": "glb/boulder_medium.glb",
+      "family": "boulder",
+      "triangles": 50,
+      "dimensions_m": {
+        "x": 1.95,
+        "y_up": 0.8,
+        "z": 1.74,
+        "min_y_up": -0.35
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=200 MultiMesh",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 90
+    },
+    {
+      "name": "boulder_small",
+      "file": "glb/boulder_small.glb",
+      "family": "boulder",
+      "triangles": 50,
+      "dimensions_m": {
+        "x": 0.84,
+        "y_up": 0.36,
+        "z": 0.83,
+        "min_y_up": -0.15
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "<=500 MultiMesh",
+      "lod": "none",
+      "visibility_range_end_m": 50
+    },
+    {
+      "name": "bank_stone_lip_8m",
+      "file": "glb/bank_stone_lip_8m.glb",
+      "family": "riverbank",
+      "triangles": 208,
+      "dimensions_m": {
+        "x": 8.0,
+        "y_up": 0.87,
+        "z": 3.38,
+        "min_y_up": -0.79
+      },
+      "material": "OrchardRock_VC",
+      "instance_budget": "one per ~8 m of bank, both sides (~80)",
+      "lod": "none",
+      "visibility_range_end_m": 90
+    },
+    {
+      "name": "reed_clump",
+      "file": "glb/reed_clump.glb",
+      "family": "vegetation",
+      "triangles": 78,
+      "dimensions_m": {
+        "x": 2.8,
+        "y_up": 1.42,
+        "z": 2.69,
+        "min_y_up": -0.05
+      },
+      "material": "OrchardFoliage_VC",
+      "instance_budget": "<=600 MultiMesh near water",
+      "lod": "none",
+      "visibility_range_end_m": 45
+    },
+    {
+      "name": "grass_tuft",
+      "file": "glb/grass_tuft.glb",
+      "family": "vegetation",
+      "triangles": 36,
+      "dimensions_m": {
+        "x": 0.37,
+        "y_up": 0.62,
+        "z": 0.34,
+        "min_y_up": -0.02
+      },
+      "material": "OrchardFoliage_VC",
+      "instance_budget": "<=3000 MultiMesh, per-chunk",
+      "lod": "none",
+      "visibility_range_end_m": 30
+    },
+    {
+      "name": "tree_orchard_round",
+      "file": "glb/tree_orchard_round.glb",
+      "family": "vegetation",
+      "triangles": 540,
+      "dimensions_m": {
+        "x": 5.54,
+        "y_up": 7.3,
+        "z": 5.45,
+        "min_y_up": -0.3
+      },
+      "material": "OrchardFoliage_VC",
+      "instance_budget": "<=350 MultiMesh",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 260
+    },
+    {
+      "name": "tree_orchard_tall",
+      "file": "glb/tree_orchard_tall.glb",
+      "family": "vegetation",
+      "triangles": 540,
+      "dimensions_m": {
+        "x": 6.11,
+        "y_up": 8.81,
+        "z": 5.22,
+        "min_y_up": -0.3
+      },
+      "material": "OrchardFoliage_VC",
+      "instance_budget": "<=200 MultiMesh",
+      "lod": "auto-LOD",
+      "visibility_range_end_m": 260
+    }
+  ]
+}
