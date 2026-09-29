@@ -611,8 +611,10 @@ func _capture():
 			if preview is Dictionary: state=preview
 			_update_text()
 	if OS.get_cmdline_user_args().has("--capture-portals"):
-		camera.global_position=Vector3(0,3.0,1.0)
-		camera.fov=85
+		# Review the waystones from the clear central garden approach; the old
+		# camera sat underneath the workshop roof and hid most of the frames.
+		camera.global_position=Vector3(0,2.0,4.7)
+		camera.fov=100
 		camera.look_at(Vector3(0,1.15,10.8))
 	if OS.get_cmdline_user_args().has("--capture-forge-working"):
 		state.jobs=[{"status":"building","estimatedProgress":0.6,"remainingLowSeconds":120,"remainingHighSeconds":300,"sampleCount":1}]
