@@ -156,21 +156,10 @@ static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
 	print("ORCHARD_ART authored_trees=",authored_count," fallback_trees=",fallback.size())
 
 static func trail(root:Node3D,points:Array,w:Script)->void:
-	if not available("path_straight"):
-		for i in range(points.size()-1): w.path(root,points[i],points[i+1],"bdab80" if i%2 else "c9b98e")
-		return
-	var poses:Array=[]
-	for i in range(points.size()-1):
-		var a:Vector3=points[i]
-		var b:Vector3=points[i+1]
-		var segment:Vector3=b-a
-		var distance:float=segment.length()
-		var direction:Vector3=segment/distance
-		var yaw:float=atan2(direction.x,direction.z)
-		for j in range(ceili(distance/3.8)):
-			var t:float=(float(j)+0.5)/float(ceili(distance/3.8))
-			poses.append(_pose(a.lerp(b,t)+Vector3.UP*0.025,1.0,yaw))
-	_emit(root,"path_straight",poses)
+	# The authored trail is already painted into orchard_masks.png and remains
+	# defined by OrchardExpansion.TRAIL for ecology, clearance and navigation.
+	# Flat GLB slabs float or clip when the shared heightfield changes.
+	return
 
 static func _near_path(point:Vector3,trail:Array,clearance:float=5.4)->bool:
 	for i in range(trail.size()-1):

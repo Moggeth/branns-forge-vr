@@ -685,37 +685,8 @@ func _build_camp() -> void:
 func _render_path(a: Vector3, b: Vector3) -> void:
 	var direction := (b - a).normalized()
 	var across := Vector3(-direction.z, 0, direction.x)
-	var count := maxi(2, ceili(a.distance_to(b) / 1.25))
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in range(count):
-		var t0 := float(i) / count
-		var t1 := float(i + 1) / count
-		var point0 := a.lerp(b, t0) + across * (0.10 * sin(float(i) * 2.3))
-		var point1 := a.lerp(b, t1) + across * (0.10 * sin(float(i + 1) * 2.3))
-		point0.y = game.landscape.height_at(Vector2(point0.x, point0.z)) + 0.095
-		point1.y = game.landscape.height_at(Vector2(point1.x, point1.z)) + 0.095
-		var width0 := 1.42 + 0.10 * sin(float(i) * 1.7)
-		var width1 := 1.42 + 0.10 * sin(float(i + 1) * 1.7)
-		var tint := Color("c9ad7d") if i % 4 else Color("ddc18e")
-		for raw_point in [point0 - across * width0, point0 + across * width0, point1 - across * width1, point0 + across * width0, point1 + across * width1, point1 - across * width1]:
-			var point: Vector3 = raw_point
-			point.y = game.landscape.height_at(Vector2(point.x, point.z)) + 0.095
-			surface.set_color(tint)
-			surface.set_normal(Vector3.UP)
-			surface.add_vertex(point)
-	var mesh := MeshInstance3D.new()
-	mesh.name = "CarvedPath_%02d" % data.paths.size()
-	mesh.mesh = surface.commit()
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("aa906a")
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 1.0
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mesh.mesh.surface_set_material(0, material)
-	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(mesh)
+	# orchard_ground.add_path/sync_paths paints this route on the live terrain.
+	# Keep the entrance marker; a one-time mesh strip cannot follow later spells.
 	# A sign at the route entrance makes a carved route legible on foot.
 	if rendered_markers < MAX_WAYMARKERS and ResourceLoader.exists(WAYMARKER):
 		var marker: PackedScene = load(WAYMARKER)

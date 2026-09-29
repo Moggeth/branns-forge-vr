@@ -29,3 +29,6 @@ static func apply(env: Environment, sun: DirectionalLight3D, sky: ProceduralSkyM
 	env.fog_aerial_perspective = 0.32
 	env.fog_sky_affect = 0.22
 	env.fog_sun_scatter = (0.28 + low_sun * 0.15) * (1.0 - cloud * 0.45)
+	# This pipeline is applied only to the Orchard in native play. Derive the
+	# additional depth grade immediately from its current day/weather values.
+	preload("res://orchard_vfx/orchard_atmosphere_grade.gd").apply_after(env, sun, hour, weather)
