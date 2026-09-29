@@ -8,6 +8,8 @@ This is a visual commissioning baseline for all 12 playable zones, captured from
 
 The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs, two per zone, plus `result.json`. `ground-eye` uses each zone's established capture pose; `elevated-rts` surveys the zone, with cameras below the kitchen and hollow roofs. The manifest records camera poses, expected and captured fog density, scene geometry node counts, sampled image luminance and coarse color-bin counts, elapsed time, and failures. These metrics can flag a blank or unexpectedly flat capture; they are not aesthetic scores. Run `python scripts/make_environment_contact_sheet.py` to rebuild the ignored `contact-sheet.jpg` from the manifest and PNGs (Pillow is needed for this review utility). It took 0.563 s for this baseline; the result is a visual review aid, not an aesthetic score.
 
+Each capture now also records a draw-call count and rendered-object count before PNG readback. Use them to spot large before/after regressions when integrating a zone kit. They are whole-process samples while the live world and a review viewport exist; they are neither isolated GPU timings nor a headset stereo benchmark. Capture pacing makes FPS and process-time samples misleading, so those are deliberately omitted. Run a separate in-game VR performance check before claiming a kit is headset-safe.
+
 ## Commission order from the captured images
 
 | Priority | Zones | Evidence and Sonnet art brief |

@@ -105,6 +105,12 @@ func _capture(id: String, view_name: String, position: Vector3, target: Vector3,
 	for frame in 5:
 		await process_frame
 	await RenderingServer.frame_post_draw
+	# Sample before PNG readback. Capture pacing makes FPS and process-time
+	# counters meaningless here, but draw calls and object counts remain useful.
+	var render_metrics := {
+		"draw_calls": roundi(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		"objects": roundi(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
+	}
 	var image := viewport.get_texture().get_image()
 	var path := output.path_join(id + "-" + view_name + ".png")
 	var result := image.save_png(path)
@@ -113,6 +119,7 @@ func _capture(id: String, view_name: String, position: Vector3, target: Vector3,
 	var capture := {"zone": id, "view": view_name, "path": path,
 		"camera_position": _vector(position), "camera_target": _vector(target),
 		"width": image.get_width(), "height": image.get_height(), "save_error": result,
+		"render_metrics": render_metrics,
 		"image_metrics": _image_metrics(image)}
 	captures.append(capture)
 	record.views.append(capture)
