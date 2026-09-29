@@ -12,10 +12,12 @@ func _run() -> void:
 	root.add_child(scene)
 	var data: Dictionary = World.build(scene)
 	var expectations := {
-		"sky_garden": {"assets": 35, "placements": 200, "floors": 3, "anchors": 3,
+		"sky_garden": {"assets": 35, "placements": 200, "colliders": 35, "floors": 3, "anchors": 3,
+			"solid_probe": Vector3(-10, 4.0, -11), "solid_name": "ZoneArtSolid_windmill_tower",
 			"islands": [Vector3(0,0,6),Vector3(-10,1.8,-11),Vector3(10,3.2,-10)],
 			"arrival": [Vector3(0,1.15,8),Vector3(0,1.15,12),Vector3(-1,1.15,4)]},
-		"cloudbreak_keep": {"assets": 30, "placements": 250, "floors": 4, "anchors": 4,
+		"cloudbreak_keep": {"assets": 30, "placements": 250, "colliders": 50, "floors": 4, "anchors": 4,
+			"solid_probe": Vector3(-12.1, 2.0, 20.5), "solid_name": "ZoneArtSolid_keep_tower",
 			"islands": [Vector3(0,0,10),Vector3(-16,2.2,-8),Vector3(15,4.2,-15),Vector3(-3,6,-25)],
 			"arrival": [Vector3(0,1.15,10),Vector3(0,1.15,15),Vector3(0,1.15,6)]}
 	}
@@ -26,6 +28,8 @@ func _run() -> void:
 		var art: Dictionary = zone.get("authored_art", {})
 		if int(art.get("assets", 0)) < int(need.assets) or int(art.get("placements", 0)) < int(need.placements):
 			failures.append(zone_id + ": authored environment is missing or incomplete")
+		if int(art.get("colliders", 0)) < int(need.colliders):
+			failures.append(zone_id + ": authored trees or architecture lost their physical proxies")
 		var floors := 0
 		for child in zone.root.get_children():
 			if child is StaticBody3D and child.get_meta("kind", "") == "floor": floors += 1
@@ -53,6 +57,11 @@ func _run() -> void:
 	for zone_id in expectations:
 		var zone: Dictionary = data.zones[zone_id]
 		var need: Dictionary = expectations[zone_id]
+		var probe: Vector3 = zone.center + need.solid_probe
+		var solid_ray := PhysicsRayQueryParameters3D.create(probe + Vector3(-3, 0, 0), probe + Vector3(3, 0, 0), 1)
+		var solid_hit := space.intersect_ray(solid_ray)
+		if solid_hit.is_empty() or solid_hit.collider.name != need.solid_name:
+			failures.append(zone_id + ": solid visual is missing physical collision at " + str(probe))
 		for local: Vector3 in need.islands:
 			var above: Vector3 = zone.center + local + Vector3.UP * 1.5
 			var below: Vector3 = zone.center + local + Vector3.DOWN * 0.7

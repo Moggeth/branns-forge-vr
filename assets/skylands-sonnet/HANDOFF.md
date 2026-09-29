@@ -3,6 +3,8 @@
 70 self-contained GLBs (12 materials, textures embedded, COLOR_0 vertex tint), two placement manifests, an editable `.blend`, 8 previews.
 Nothing here touches gameplay; all art is **visual only**.
 
+Integration supplement: `skl_collision.py` adds inexpensive, selective physical proxies to the placement manifests for tree trunks, towers, walls, posts and shelters. `build_skylands.py` reapplies them when the art is regenerated. This is Codex's game-integration layer; the source GLBs remain visual meshes.
+
 ## Rebuild
 ```
 blender.exe -b --factory-startup --python build_skylands.py            # everything, ~5 s

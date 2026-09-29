@@ -1344,7 +1344,8 @@
     15.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "keep_wall_span",
@@ -1354,7 +1355,8 @@
     18.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "keep_tower",
@@ -1364,7 +1366,8 @@
     20.5
    ],
    "yaw_degrees": 146.69,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "pillar_lantern_cloud",
@@ -1374,7 +1377,8 @@
     9
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_a",
@@ -1384,7 +1388,8 @@
     4.0
    ],
    "yaw_degrees": 288.86,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_b",
@@ -1404,7 +1409,8 @@
     15.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "keep_wall_span",
@@ -1414,7 +1420,8 @@
     18.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "keep_tower",
@@ -1424,7 +1431,8 @@
     20.5
    ],
    "yaw_degrees": 171.26,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "pillar_lantern_cloud",
@@ -1434,7 +1442,8 @@
     9
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_a",
@@ -1444,7 +1453,8 @@
     4.0
    ],
    "yaw_degrees": 303.72,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_b",
@@ -1464,7 +1474,8 @@
     17.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_b",
@@ -1474,7 +1485,8 @@
     17.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_b",
@@ -1484,7 +1496,8 @@
     14.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_a",
@@ -1494,7 +1507,8 @@
     14.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_a",
@@ -1504,7 +1518,8 @@
     10.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_b",
@@ -1514,7 +1529,8 @@
     10.5
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_b",
@@ -1524,7 +1540,8 @@
     7.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_a",
@@ -1534,7 +1551,8 @@
     7.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "path_slab_cloud_a",
@@ -1704,7 +1722,8 @@
     4
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_c",
@@ -1714,7 +1733,8 @@
     12.6
    ],
    "yaw_degrees": 298.55,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_a",
@@ -1724,7 +1744,8 @@
     12.0
    ],
    "yaw_degrees": 322.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_b",
@@ -1734,7 +1755,8 @@
     8.0
    ],
    "yaw_degrees": 20.47,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_b",
@@ -1744,7 +1766,8 @@
     8.2
    ],
    "yaw_degrees": 31.77,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_b",
@@ -1754,7 +1777,8 @@
     20.8
    ],
    "yaw_degrees": 108.61,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "turf_patch_cloud_a",
@@ -1904,7 +1928,8 @@
     1.4
    ],
    "yaw_degrees": 336.56,
-   "scale": 0.998
+   "scale": 0.998,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -1914,7 +1939,8 @@
     1.0
    ],
    "yaw_degrees": 116.55,
-   "scale": 1.101
+   "scale": 1.101,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -1924,7 +1950,8 @@
     20.9
    ],
    "yaw_degrees": 272.23,
-   "scale": 0.993
+   "scale": 0.993,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -1934,7 +1961,8 @@
     17.0
    ],
    "yaw_degrees": 127.03,
-   "scale": 0.971
+   "scale": 0.971,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -1944,7 +1972,8 @@
     -1.2
    ],
    "yaw_degrees": 223.51,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -1954,7 +1983,8 @@
     -1.2
    ],
    "yaw_degrees": 337.66,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -1964,7 +1994,8 @@
     -1.4
    ],
    "yaw_degrees": 353.32,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -1974,7 +2005,8 @@
     -1.4
    ],
    "yaw_degrees": 35.83,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "grapple_post_cloud",
@@ -1984,7 +2016,8 @@
     -7
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "watch_shelter",
@@ -1994,7 +2027,8 @@
     -11.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_a",
@@ -2004,7 +2038,8 @@
     -4.0
    ],
    "yaw_degrees": 20,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_b",
@@ -2014,7 +2049,8 @@
     -13.0
    ],
    "yaw_degrees": 200,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -2024,7 +2060,8 @@
     -3.2
    ],
    "yaw_degrees": 40,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_a",
@@ -2034,7 +2071,8 @@
     -7.0
    ],
    "yaw_degrees": 10,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "meadow_patch_cloud_a",
@@ -2064,7 +2102,8 @@
     -4.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "wind_banner_pole_b",
@@ -2074,7 +2113,8 @@
     -13.2
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "path_slab_cloud_a",
@@ -2134,7 +2174,8 @@
     -13
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "watch_shelter",
@@ -2144,7 +2185,8 @@
     -18.4
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_c",
@@ -2154,7 +2196,8 @@
     -10.6
    ],
    "yaw_degrees": 30,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_b",
@@ -2164,7 +2207,8 @@
     -19.6
    ],
    "yaw_degrees": 90,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -2174,7 +2218,8 @@
     -10.2
    ],
    "yaw_degrees": 0,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_b",
@@ -2214,7 +2259,8 @@
     -20.4
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -2224,7 +2270,8 @@
     -11.4
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "path_slab_cloud_a",
@@ -2284,7 +2331,8 @@
     -24
    ],
    "yaw_degrees": 0.0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "shelter_hall",
@@ -2294,7 +2342,8 @@
     -28.6
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_a",
@@ -2304,7 +2353,8 @@
     -21.0
    ],
    "yaw_degrees": 200,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "tree_cloud_c",
@@ -2314,7 +2364,8 @@
     -21.4
    ],
    "yaw_degrees": 80,
-   "scale": 0.9
+   "scale": 0.9,
+   "collision": "asset_default"
   },
   {
    "asset": "cairn_stack",
@@ -2324,7 +2375,8 @@
     -29.8
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "crystal_cluster_a",
@@ -2334,7 +2386,8 @@
     -29.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "meadow_patch_cloud_a",
@@ -2364,7 +2417,8 @@
     -26.6
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "waymark_cloud",
@@ -2374,7 +2428,8 @@
     -22.4
    ],
    "yaw_degrees": 0,
-   "scale": 1.0
+   "scale": 1.0,
+   "collision": "asset_default"
   },
   {
    "asset": "path_slab_cloud_a",
@@ -2656,5 +2711,238 @@
    "yaw_degrees": 195.17,
    "scale": 1.599
   }
- ]
+ ],
+ "asset_meta": {
+  "tree_cloud_a": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.25,
+     "height": 2.8,
+     "offset": [
+      0,
+      1.4,
+      0
+     ]
+    }
+   ]
+  },
+  "tree_cloud_b": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.18,
+     "height": 1.7,
+     "offset": [
+      0,
+      0.85,
+      0
+     ]
+    }
+   ]
+  },
+  "tree_cloud_c": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.3,
+     "height": 3.55,
+     "offset": [
+      0,
+      1.775,
+      0
+     ]
+    }
+   ]
+  },
+  "pillar_lantern_cloud": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.31,
+     "height": 1.55,
+     "offset": [
+      0,
+      0.775,
+      0
+     ]
+    }
+   ]
+  },
+  "grapple_post_cloud": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.35,
+     "height": 5.2,
+     "offset": [
+      0,
+      2.6,
+      0
+     ]
+    }
+   ]
+  },
+  "waymark_cloud": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.34,
+     "height": 1.0,
+     "offset": [
+      0,
+      0.5,
+      0
+     ]
+    }
+   ]
+  },
+  "wind_banner_pole_a": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.15,
+     "height": 4.2,
+     "offset": [
+      0,
+      2.1,
+      0
+     ]
+    }
+   ]
+  },
+  "wind_banner_pole_b": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.15,
+     "height": 3.0,
+     "offset": [
+      0,
+      1.5,
+      0
+     ]
+    }
+   ]
+  },
+  "cairn_stack": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.48,
+     "height": 1.55,
+     "offset": [
+      0,
+      0.775,
+      0
+     ]
+    }
+   ]
+  },
+  "crystal_cluster_a": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.38,
+     "height": 1.15,
+     "offset": [
+      0,
+      0.575,
+      0
+     ]
+    }
+   ]
+  },
+  "keep_wall_span": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      0.57,
+      1.55,
+      2.95
+     ],
+     "offset": [
+      0,
+      0.775,
+      0
+     ]
+    }
+   ]
+  },
+  "keep_tower": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 1.82,
+     "height": 5.35,
+     "offset": [
+      0,
+      2.675,
+      0
+     ]
+    }
+   ]
+  },
+  "watch_shelter": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      4.25,
+      1.25,
+      0.28
+     ],
+     "offset": [
+      0,
+      1.025,
+      -1.6
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.28,
+      1.25,
+      3.3
+     ],
+     "offset": [
+      -2.15,
+      1.025,
+      0
+     ]
+    }
+   ]
+  },
+  "shelter_hall": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      7.25,
+      1.25,
+      0.28
+     ],
+     "offset": [
+      0,
+      1.025,
+      -1.6
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.28,
+      1.25,
+      3.3
+     ],
+     "offset": [
+      -3.65,
+      1.025,
+      0
+     ]
+    }
+   ]
+  }
+ }
 }

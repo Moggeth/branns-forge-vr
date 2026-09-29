@@ -7,6 +7,7 @@ import bpy
 from mathutils import Vector, Matrix
 import skl_core as C
 import skl_assets as A
+import skl_collision as K
 
 HERE = C.HERE
 ARGV = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -455,6 +456,7 @@ def main():
         missing = [u for u in used if u not in objs]
         if missing and not ONLY: raise RuntimeError(f"missing assets {missing}")
         manifest = {"schema": 1, "assets": {u: f"{u}.glb" for u in used}, "placements": Z.items}
+        manifest = K.apply_collision_intent(manifest)
         with open(os.path.join(HERE, f"placement_{zname}.json"), 'w') as f:
             json.dump(manifest, f, indent=1)
         tri = sum(stats['assets'][it['asset']]['triangles'] for it in Z.items if it['asset'] in stats['assets'])
