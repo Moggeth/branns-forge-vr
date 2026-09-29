@@ -1,0 +1,120 @@
+{
+ "assets": {
+  "cluster_small": {
+   "triangles": 230,
+   "bounds_godot_min": [
+    -0.85,
+    -0.15,
+    -0.93
+   ],
+   "bounds_godot_max": [
+    0.78,
+    1.73,
+    0.81
+   ]
+  },
+  "cluster_large": {
+   "triangles": 580,
+   "bounds_godot_min": [
+    -2.12,
+    -0.26,
+    -1.55
+   ],
+   "bounds_godot_max": [
+    2.12,
+    3.09,
+    1.81
+   ]
+  },
+  "boulders": {
+   "triangles": 406,
+   "bounds_godot_min": [
+    -1.71,
+    -0.32,
+    -1.52
+   ],
+   "bounds_godot_max": [
+    2.0,
+    1.31,
+    1.35
+   ]
+  },
+  "cliff_strata": {
+   "triangles": 842,
+   "bounds_godot_min": [
+    -2.3,
+    -0.16,
+    -2.31
+   ],
+   "bounds_godot_max": [
+    2.53,
+    4.53,
+    0.98
+   ]
+  },
+  "chasm_edge": {
+   "triangles": 780,
+   "bounds_godot_min": [
+    -1.61,
+    -3.18,
+    -1.23
+   ],
+   "bounds_godot_max": [
+    1.61,
+    0.21,
+    1.24
+   ]
+  },
+  "landmark_spire": {
+   "triangles": 2834,
+   "bounds_godot_min": [
+    -2.95,
+    -0.12,
+    -2.62
+   ],
+   "bounds_godot_max": [
+    3.02,
+    7.99,
+    2.81
+   ]
+  },
+  "ore_wall": {
+   "triangles": 976,
+   "bounds_godot_min": [
+    -1.95,
+    -0.15,
+    -1.67
+   ],
+   "bounds_godot_max": [
+    2.04,
+    3.44,
+    1.08
+   ]
+  },
+  "stalactites": {
+   "triangles": 296,
+   "bounds_godot_min": [
+    -1.79,
+    -2.03,
+    -1.41
+   ],
+   "bounds_godot_max": [
+    1.81,
+    0.62,
+    1.0
+   ]
+  }
+ },
+ "unique_triangles": 6944,
+ "instanced_triangles": 42798,
+ "placements": 68,
+ "materials": [
+  "HollowRock",
+  "HollowOre",
+  "CrystalCyan",
+  "CrystalCyanGlow",
+  "CrystalViolet",
+  "CrystalVioletGlow"
+ ],
+ "texture_size": 256
+}

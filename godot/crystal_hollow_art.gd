@@ -31,7 +31,7 @@ static func _cylinder_collider(parent: Node3D, at: Vector3, radius: float, heigh
 	shape.shape = cylinder
 	body.add_child(shape)
 
-static func add(parent: Node3D) -> Dictionary:
+static func add(parent: Node3D, replace_clusters: bool = false) -> Dictionary:
 	var manifest = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT_PATH))
 	if not manifest is Dictionary or manifest.get("schema","") != "brann.crystal_hollow.layout/1":
 		push_error("CRYSTAL_ART invalid layout manifest")
@@ -41,6 +41,8 @@ static func add(parent: Node3D) -> Dictionary:
 	var walls: Array = []
 	for placement in manifest.get("placements",[]):
 		var piece := str(placement.get("piece",""))
+		if replace_clusters and (piece.begins_with("crystal_spire_") or piece.begins_with("glow_pool_")):
+			continue
 		if not scenes.has(piece): scenes[piece] = load(ASSET_ROOT+piece+".glb")
 		var scene: PackedScene = scenes[piece]
 		if scene == null:
@@ -55,6 +57,9 @@ static func add(parent: Node3D) -> Dictionary:
 		if piece.begins_with("cave_wall_"): walls.append(placement)
 	var colliders := 0
 	for proxy in manifest.get("collision_proxies",[]):
+		var for_piece := str(proxy.get("for_piece", ""))
+		if replace_clusters and (for_piece.begins_with("crystal_spire_") or for_piece.begins_with("glow_pool_")):
+			continue
 		var shape_kind := str(proxy.get("shape",""))
 		if shape_kind == "ring_of_boxes":
 			# The wall proxy is authored in each module's local space.

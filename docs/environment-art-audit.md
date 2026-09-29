@@ -52,6 +52,8 @@ The [Mushroom Glade rebuild](GLADE-ART-20260930.md) has an irregular pond/bank, 
 
 The [Pinewood Ruins rebuild](PINEWOOD-ART-20260930.md) replaces the decorative gate, conifers, rubble and ground surface while preserving the three harvestable trees, the Mossward fight and chop barrier. Both actual-game views were inspected; hiding the old flat floor visual removed the new terrain's color seam while retaining collision. Ground-eye draws moved from 322 to 336, and RTS draws from 414 to 420; protected routes passed with 38 conservative collision shapes.
 
+The [Crystal Hollow kit](CRYSTAL-ART-20260930.md) adds Sonnet-authored strata, rooted crystals and chasm rims inside the established vaulted cave. The interactive Prism Vault remains unobstructed; the new kit's own focal spire is archived but not placed there. Twelve protected route samples and the seals/reward check passed. Ground-eye draws moved from 561 to 595 and RTS draws from 604 to 637, with 35 selective new solid proxies.
+
 ## Capture failure and recovery
 
 The first default run completed 24 files in 8.53 script seconds, but most were nearly solid haze. Hiding the horizon did not restore Pinewood; the game's own `--capture-zone=pinewood_ruins` reproduced the haze. A fresh Godot `Environment` probe showed that assigning `fog_mode=0` resets `fog_density` from `0.001` to `1.0`. `adventure_runtime.gd` restored `fog_mode` after setting the zone density. Commit `497b2c1` moved the density assignment after the grade defaults. The final default run after that fix completed 24 files in 8.97 script seconds (10.63 wall seconds), with no capture failures or fog audit notes. Orchard deliberately applies its separate 0.0028 atmosphere grade over its 0.0008 zone palette.

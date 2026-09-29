@@ -754,7 +754,9 @@ static func crystal_hollow(root: Node3D, data: Dictionary) -> void:
 	for i in range(6):
 		var a: float = float(i)*TAU/6
 		glow_light(p,Vector3(cos(a)*8,2.0,sin(a)*8),"68c9ea" if i%2 else "d184d2",1.8,10)
-	CrystalHollowArt.add(p)
+	# Keep the enclosing cave, arch and challenge landmark; the Sonnet kit
+	# replaces the older loose spires and pools when available.
+	CrystalHollowArt.add(p,FileAccess.file_exists("res://assets/zone_art/crystal_hollow/placement.json"))
 	# Physically supported plank bridge above a genuine gap.
 	for i in range(9):
 		box(p,Vector3(0,0.045,-1.3-i*0.57),Vector3(2.2,0.13,0.53),"a18266")
