@@ -80,6 +80,22 @@ func _check() -> void:
 	var pool_mesh: MeshInstance3D = water.get_node_or_null("LandscapePools")
 	if model.hydrology_pool[hollow_cell] < 0.1 or pool_mesh == null or pool_mesh.mesh == null:
 		failures.append("enclosed cut has no visible pool")
+	for child in water.get_children():
+		if not child is MeshInstance3D or child.mesh == null: continue
+		for surface_index in child.mesh.get_surface_count():
+			var arrays: Array = child.mesh.surface_get_arrays(surface_index)
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+			var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]
+			if normals.size() != vertices.size() or tangents.size() != vertices.size() * 4:
+				failures.append("water normal-map basis missing on " + child.name)
+				continue
+			for vertex_index in vertices.size():
+				var at: int = vertex_index * 4
+				var tangent := Vector3(tangents[at], tangents[at + 1], tangents[at + 2])
+				if normals[vertex_index].distance_to(Vector3.UP) > 0.001 or absf(tangent.length() - 1.0) > 0.001 or absf(tangent.dot(normals[vertex_index])) > 0.001 or tangents[at + 3] != -1.0:
+					failures.append("invalid water normal-map basis on " + child.name)
+					break
 	var shortened: Dictionary = model.duplicate()
 	var shorter: Array[Vector3] = model.river_polyline.duplicate()
 	shorter.resize(shorter.size() / 2)

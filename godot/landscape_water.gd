@@ -4,33 +4,8 @@ extends Node3D
 
 const CHUNK_SAMPLES: int = 16
 const SURFACE_LIFT: float = 0.035
-const WATER_SHADER := """
-shader_type spatial;
-render_mode cull_disabled, shadows_disabled;
-void fragment() {
-	float ripple = sin(UV.y * 5.2 - TIME * 1.4 + sin(UV.x * 17.0 + TIME * 0.45) * 0.7);
-	float fine = sin(UV.y * 16.0 - TIME * 2.1 + UV.x * 21.0);
-	float foam = smoothstep(0.39, 0.50, abs(UV.x - 0.5)) * (0.25 + 0.17 * fine);
-	ALBEDO = mix(vec3(0.035, 0.16, 0.20), vec3(0.13, 0.34, 0.35), 0.5 + 0.5 * ripple) + vec3(foam);
-	ROUGHNESS = 0.23;
-	METALLIC = 0.08;
-	EMISSION = vec3(0.018, 0.055, 0.060) + vec3(foam * 0.13);
-}
-"""
-const POOL_SHADER := """
-shader_type spatial;
-render_mode cull_disabled, shadows_disabled;
-varying vec2 world_xz;
-void vertex() { world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz; }
-void fragment() {
-	float ripple = sin(world_xz.x * 0.36 + TIME * 1.1) * sin(world_xz.y * 0.28 - TIME * 0.9);
-	float fine = sin(world_xz.x * 0.73 - world_xz.y * 0.42 + TIME * 1.7);
-	ALBEDO = mix(vec3(0.035, 0.16, 0.18), vec3(0.10, 0.27, 0.29), 0.52 + ripple * 0.22 + fine * 0.08);
-	ROUGHNESS = 0.24;
-	METALLIC = 0.06;
-	EMISSION = vec3(0.015, 0.04, 0.045);
-}
-"""
+const RIVER_SHADER = preload("res://assets/orchard_kit/river_water.gdshader")
+const POOL_SHADER_RESOURCE = preload("res://assets/orchard_kit/pool_water.gdshader")
 
 var _chunks: Array[MeshInstance3D] = []
 var _bounds: Array[Rect2] = []
@@ -52,8 +27,7 @@ func setup(model: Dictionary) -> void:
 	_route_snapshot = (model.get("river_polyline", []) as Array[Vector3]).duplicate()
 	if _material == null:
 		_material = ShaderMaterial.new()
-		_material.shader = Shader.new()
-		_material.shader.code = WATER_SHADER
+		_material.shader = RIVER_SHADER
 	var route: Array[Vector3] = model.get("river_polyline", [])
 	if route.size() < 2: return
 	var chunk_count: int = ceili(float(route.size() - 1) / CHUNK_SAMPLES)
@@ -94,6 +68,8 @@ func _rebuild_pools() -> void:
 	var step: float = float(_model.get("step", 2.0))
 	var origin: Vector2 = _model.get("origin", Vector2.ZERO)
 	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var tangents := PackedFloat32Array()
 	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
 	for index in pool.size():
@@ -108,6 +84,9 @@ func _rebuild_pools() -> void:
 		vertices.append(Vector3(center.x + radius, y, center.y - radius))
 		vertices.append(Vector3(center.x - radius, y, center.y + radius))
 		vertices.append(Vector3(center.x + radius, y, center.y + radius))
+		for corner in 4:
+			normals.append(Vector3.UP)
+			tangents.append_array(PackedFloat32Array([1.0, 0.0, 0.0, -1.0]))
 		uvs.append_array(PackedVector2Array([Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]))
 		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base + 1, base + 3, base + 2]))
 	if indices.is_empty():
@@ -120,14 +99,15 @@ func _rebuild_pools() -> void:
 		_pool_surface.name = "LandscapePools"
 		if _pool_material == null:
 			_pool_material = ShaderMaterial.new()
-			_pool_material.shader = Shader.new()
-			_pool_material.shader.code = POOL_SHADER
+			_pool_material.shader = POOL_SHADER_RESOURCE
 		_pool_surface.material_override = _pool_material
 		_pool_surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_pool_surface)
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
@@ -144,6 +124,8 @@ func _rebuild(chunk_index: int) -> void:
 	var first: int = chunk_index * CHUNK_SAMPLES
 	var last: int = mini(route.size() - 1, first + CHUNK_SAMPLES)
 	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var tangents := PackedFloat32Array()
 	var uvs := PackedVector2Array()
 	var indices := PackedInt32Array()
 	var wet := PackedByteArray()
@@ -173,6 +155,10 @@ func _rebuild(chunk_index: int) -> void:
 		var right := center + edge
 		vertices.append(Vector3(left.x, p.y + SURFACE_LIFT, left.y))
 		vertices.append(Vector3(right.x, p.y + SURFACE_LIFT, right.y))
+		var across := Vector3(right.x - left.x, 0.0, right.y - left.y).normalized()
+		for bank in 2:
+			normals.append(Vector3.UP)
+			tangents.append_array(PackedFloat32Array([across.x, 0.0, across.z, -1.0]))
 		uvs.append(Vector2(0.0, travelled * 0.1))
 		uvs.append(Vector2(1.0, travelled * 0.1))
 		bounds_min = bounds_min.min(left).min(right)
@@ -183,6 +169,8 @@ func _rebuild(chunk_index: int) -> void:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TANGENT] = tangents
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
