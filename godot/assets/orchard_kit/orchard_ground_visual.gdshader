@@ -1,18 +1,22 @@
-// Brann's Forge VR - Orchard ground, package 2 revision.
-// Drop-in: keeps EVERY existing uniform name/binding (grass_tex, soil_tex, micro_normal, macro_mask,
-// rain_wetness, snow_cover, palette uniforms, mask_origin_x). New optional input: exposure_tex (defaults
-// black = no effect) so Sol can paint Sunder/Raise exposure without changing terrain truth.
+// Brann's Forge VR - Orchard ground, live-revision 2026-09-29.
+// Drop-in: keeps EVERY uniform name/binding (grass_tex, soil_tex, micro_normal, macro_mask, exposure_tex,
+// rain_wetness, snow_cover, palette uniforms, mask_origin_x). exposure_tex contract is unchanged
+// (orchard_ground.gd apply_exposure_delta: r = fresh 0..1, g = cut depth / 4 m, b = heap / 2 m, 320 m @ 1 m/texel).
 //
-// Package-1 faults fixed here:
-//  * Angular solid patches: slope came from the per-vertex normal of a 2 m lattice and was pushed through
-//    hard smoothsteps, so each triangle became a flat colour. Slope is now softened (wide ramps, blended
-//    with the per-pixel derivative normal only at low weight) and all region noise is domain-warped fbm
-//    with the lattice never used as a colour threshold.
-//  * Material-debug look: palette mixing dominated the real textures. Textures now carry most of the
-//    value/hue detail (luminance-preserving modulation at 3 scales) and palette acts as a soft grade.
-//  * Strata on terrain came from raw world-Y sine bands -> striped rings on every hill. Rock bands are now
-//    warped by noise and only appear on genuinely steep faces or exposed cuts.
-// Mobile renderer: opaque, 7 texture reads (1 optional), cheap value noise, no triplanar.
+// Faults seen in real-game captures and fixed here:
+//  * Raise painted a huge uniform dark disc: r goes to 1 for any change > 16 cm, and the old shader
+//    turned all of r into soil. Now a heap keeps its turf; soil shows only where the ground was
+//    STRETCHED (gradient of the heap, from 4 offset taps): a narrow torn stress seam on the shoulder,
+//    tension cracks around it, a few fresh-stone outcrops at the crest.
+//  * Sunder: dark trench + equally dark wide margin. Shallow (< ~0.3 m) change is now trampled/
+//    disturbed turf with clods; bare soil starts at real depth. Walls get genuine strata keyed to
+//    depth BELOW THE ORIGINAL SURFACE (cut_m), so the bands follow the actual cut from any view.
+//    Floors get loose fallen topsoil and gravel instead of one flat colour.
+//  * 1 m exposure texels showed as squares/patches: exposure UV is noise-warped by ~0.7 m and
+//    thresholds are eroded by fine noise.
+//  * Broad flat green fields: macro value/hue drift at 3 scales, aspect-based moisture (shaded
+//    slopes cooler/lusher), clover/dry-tip clumps, near-field tuft breakup, roughness variation.
+// Mobile renderer: opaque, 7 texture reads baseline (+4 exposure taps only inside disturbed ground).
 shader_type spatial;
 render_mode cull_back, diffuse_lambert, specular_schlick_ggx;
 
@@ -20,27 +24,24 @@ uniform sampler2D grass_tex : source_color, repeat_enable, filter_linear_mipmap;
 uniform sampler2D soil_tex : source_color, repeat_enable, filter_linear_mipmap;
 uniform sampler2D micro_normal : hint_normal, repeat_enable, filter_linear_mipmap;
 uniform sampler2D macro_mask : repeat_disable, filter_linear;   // r=path/exposed, g=leaf litter, b=damp/bank, a=disturbed
-// NEW (optional, same 320 m mapping as macro_mask, RGBA8, 1 texel per metre or finer):
-//  r = fresh exposure 0..1 (painted by each real terrain op, decays over game time)
-//  g = cut depth below original surface / 4 m (0..1)  -> picks topsoil / dark subsoil / strata rock
-//  b = raised/heaped fraction 0..1 (Raise Earth, rims) -> loose clod soil
 uniform sampler2D exposure_tex : hint_default_black, repeat_disable, filter_linear;
 uniform float rain_wetness = 0.0;
 uniform float snow_cover = 0.0;
 
-uniform vec3 grass_cool : source_color = vec3(0.27, 0.45, 0.22);
-uniform vec3 grass_lush : source_color = vec3(0.40, 0.58, 0.20);
-uniform vec3 grass_warm : source_color = vec3(0.62, 0.64, 0.26);
-uniform vec3 meadow_dry : source_color = vec3(0.66, 0.60, 0.33);
-uniform vec3 soil_col   : source_color = vec3(0.42, 0.29, 0.18);
-uniform vec3 soil_dark  : source_color = vec3(0.24, 0.16, 0.10);
-uniform vec3 bank_wet   : source_color = vec3(0.20, 0.17, 0.12);
-uniform vec3 rock_mid   : source_color = vec3(0.58, 0.52, 0.47);
-uniform vec3 rock_warm  : source_color = vec3(0.62, 0.52, 0.42);
-uniform vec3 rock_band  : source_color = vec3(0.50, 0.46, 0.47);
-uniform vec3 rock_fresh : source_color = vec3(0.36, 0.31, 0.29);  // unweathered cut face: darker than cliffs
+uniform vec3 grass_cool : source_color = vec3(0.25, 0.42, 0.21);
+uniform vec3 grass_lush : source_color = vec3(0.37, 0.54, 0.19);
+uniform vec3 grass_warm : source_color = vec3(0.58, 0.60, 0.26);
+uniform vec3 meadow_dry : source_color = vec3(0.64, 0.58, 0.34);
+uniform vec3 soil_col   : source_color = vec3(0.40, 0.28, 0.18);
+uniform vec3 soil_dark  : source_color = vec3(0.22, 0.15, 0.10);
+uniform vec3 bank_wet   : source_color = vec3(0.21, 0.18, 0.13);
+uniform vec3 rock_mid   : source_color = vec3(0.55, 0.51, 0.47);
+uniform vec3 rock_warm  : source_color = vec3(0.60, 0.51, 0.42);
+uniform vec3 rock_band  : source_color = vec3(0.48, 0.45, 0.46);
+uniform vec3 rock_fresh : source_color = vec3(0.50, 0.46, 0.41);
 uniform vec3 gravel_col : source_color = vec3(0.47, 0.43, 0.36);
-uniform float texture_strength = 0.85;   // raised from 0.45: real textures now carry the detail
+uniform vec3 clay_col   : source_color = vec3(0.52, 0.38, 0.24);
+uniform float texture_strength = 0.85;
 uniform float strata_scale = 2.35;
 uniform float mask_origin_x = -360.0;
 
@@ -55,13 +56,23 @@ float noise2(vec2 p) {
 	           mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 float fbm(vec2 p) {
-	// 3 octaves, rotated each octave so no axis-aligned lattice survives
 	float a = 0.5, s = 0.0;
 	mat2 r = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8));
 	for (int i = 0; i < 3; i++) { s += a * noise2(p); p = r * p * 2.03 + 11.7; a *= 0.5; }
 	return s / 0.875;
 }
-// luminance-preserving texture detail: hue stays on palette, value/texture comes from the image
+// cellular edge distance (cracks / clods): x = F2-F1 (0 on a crack), y = cell id
+vec2 cells(vec2 p) {
+	vec2 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0; float id = 0.0;
+	for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+		vec2 o = vec2(float(x), float(y));
+		float h = hash21(i + o);
+		vec2 c = o + vec2(h, hash21(i + o + 5.3)) * 0.85 + 0.075;
+		float d = length(f - c);
+		if (d < d1) { d2 = d1; d1 = d; id = h; } else if (d < d2) { d2 = d; }
+	}
+	return vec2(d2 - d1, id);
+}
 vec3 tex_detail(sampler2D t, vec2 p, float s) {
 	vec2 q = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * p;
 	vec3 a = texture(t, p * s).rgb;
@@ -80,33 +91,40 @@ void vertex() {
 void fragment() {
 	vec2 uv = clamp((at + vec2(160.0)) / 320.0, vec2(0.0), vec2(1.0));
 	vec4 m = texture(macro_mask, uv);
-	vec4 ex = texture(exposure_tex, uv);
 
-	// domain warp once, reuse everywhere: organic, lattice-free region boundaries
 	vec2 warp = vec2(noise2(at * 0.045), noise2(at * 0.045 + 5.2)) * 9.0;
 	vec2 wp = at + warp;
+	float broad = fbm(wp * 0.006 + 2.0);
 	float regional = fbm(wp * 0.018);
 	float meander = fbm(wp * 0.07 + 3.0);
 	float fine = fbm(at * 0.55);
+	float dist_fade = 1.0 - smoothstep(0.02, 0.12, length(fwidth(at)));   // 1 near the viewer
 
-	// softened slope: interpolated vertex normal only, wide ramps (no per-triangle thresholds)
-	float slope = 1.0 - clamp(normalize(world_n).y, 0.0, 1.0);
+	vec3 nw = normalize(world_n);
+	float slope = 1.0 - clamp(nw.y, 0.0, 1.0);
 	float slope_soft = smoothstep(0.08, 0.55, slope + (meander - 0.5) * 0.10);
+	float aspect = dot(nw.xz, normalize(vec2(-0.55, 0.83))) * smoothstep(0.03, 0.25, slope); // + = shaded side
 
-	// --- textured meadow. Palette is a grade; image supplies value variation.
+	// --- textured meadow with macro/micro breakup
 	vec3 gt = tex_detail(grass_tex, at, 0.23);
 	vec3 g = mix(grass_cool, grass_lush, smoothstep(0.25, 0.75, regional));
-	g = mix(g, grass_warm, smoothstep(0.5, 0.85, meander) * 0.7);
-	g = mix(g, meadow_dry, smoothstep(0.6, 0.9, regional) * 0.45);
+	g = mix(g, grass_warm, smoothstep(0.5, 0.85, meander) * 0.6);
+	g = mix(g, meadow_dry, smoothstep(0.55, 0.85, broad) * 0.5 + smoothstep(0.1, 0.4, -aspect) * 0.07);   // rev-3: halved, vertex-normal aspect showed triangles
+	g = mix(g, grass_cool * 0.85, smoothstep(0.1, 0.5, aspect) * 0.16);            // moist shaded slopes
+	g *= mix(0.84, 1.1, broad);                                                     // field-scale value drift
 	g *= mix(1.0, luma(gt) * 2.2, texture_strength);
-	g = mix(g, g * (gt / max(luma(gt), 0.05)), 0.25 * texture_strength);   // keep some authored hue flecks
-	g *= mix(0.86, 1.10, fine);                                             // clumping at 1-3 m scale
+	g = mix(g, g * (gt / max(luma(gt), 0.05)), 0.25 * texture_strength);
+	g *= mix(0.86, 1.10, fine);
+	// clumps from smooth noise only (rev-2: cell-id patches drew hard yellow polygons)
+	float clump = noise2(at * 0.9 + warp * 0.1) * 0.6 + noise2(at * 2.1) * 0.4;
+	g *= mix(0.86, 1.06, clump);                                                    // clover / tussock clumps
+	g = mix(g, meadow_dry * 0.9, smoothstep(0.66, 0.86, fbm(wp * 0.11 + 7.0)) * 0.3); // soft dry seed-head drifts
+	g *= mix(1.0, 0.86 + 0.24 * noise2(at * 4.3), dist_fade * 0.8);                  // near-field tufts
 
 	vec3 st = tex_detail(soil_tex, at, 0.31);
 	vec3 s = mix(soil_col, soil_dark, slope_soft * 0.6 + fine * 0.2);
 	s *= mix(1.0, luma(st) * 2.2, texture_strength);
 
-	// --- ragged transitions: every mask edge is perturbed by fine noise so none reveals the 2 m lattice
 	float edge_n = (fine - 0.5) * 0.35 + (noise2(at * 1.7) - 0.5) * 0.15;
 	float leaf = m.g * (0.35 + 0.3 * meander);
 	float soil_amt = clamp(m.r * 0.9 + m.a * 0.5 + leaf * 0.35 + slope_soft * 0.45 + edge_n, 0.0, 1.0);
@@ -114,7 +132,6 @@ void fragment() {
 	vec3 colour = mix(g, s, soil_amt);
 	colour = mix(colour, vec3(0.36, 0.30, 0.17) * (0.8 + 0.5 * fine), leaf * 0.25);
 
-	// --- rock: warped, dipping bands; only on real steep faces
 	float wy = world_y + (meander - 0.5) * 1.6 + at.x * 0.06;
 	float band = sin(wy * strata_scale) + 0.45 * sin(wy * 5.1 + fine * 2.0);
 	vec3 rock = mix(mix(rock_mid, rock_warm, 0.5 + 0.3 * band), rock_band, smoothstep(0.6, 0.95, sin(wy * 1.3)) * 0.6);
@@ -122,39 +139,89 @@ void fragment() {
 	float rockiness = smoothstep(0.45, 0.70, slope + edge_n * 0.5);
 	colour = mix(colour, rock, rockiness);
 
-	// --- EXPOSURE (Sunder / Raise / Meteor): darker soil -> subsoil -> fresh stratified rock by depth.
-	// Irregular margin: exposure threshold is eroded by noise so the outline is torn, not a ribbon.
-	float fresh = smoothstep(0.15, 0.55, ex.r + edge_n * 0.9 - 0.1 * (1.0 - fine));
-	float depth = ex.g * 4.0; // metres
-	vec3 cut = mix(soil_col * 0.8, soil_dark, smoothstep(0.2, 1.2, depth + edge_n));
-	vec3 fresh_rock = mix(rock_fresh, rock_band * 0.8, 0.5 + 0.4 * sin(wy * strata_scale * 1.3 + fine * 3.0));
-	cut = mix(cut, fresh_rock, smoothstep(1.4, 2.6, depth + (fine - 0.5) * 1.2) * 0.9);
-	cut *= mix(1.0, luma(st) * 2.2, 0.9);
-	cut = mix(cut, gravel_col * mix(0.6, 1.1, noise2(at * 3.1)), smoothstep(0.7, 0.95, noise2(at * 0.9)) * 0.35); // rubble flecks
-	vec3 clod = mix(soil_col, soil_dark, noise2(at * 2.3)) * mix(1.0, luma(st) * 2.2, 0.9);
-	cut = mix(cut, clod, ex.b);
-	colour = mix(colour, cut, fresh);
+	// --- EXPOSURE -------------------------------------------------------------------------------
+	vec2 euv = uv + (vec2(noise2(at * 0.9), noise2(at * 0.9 + 7.1)) - 0.5) * (1.4 / 320.0);  // hide texels
+	vec4 ex = texture(exposure_tex, euv);
+	float fresh = 0.0;
+	float wall_amt = 0.0;
+	if (ex.r > 0.004) {
+		float o = 1.5 / 320.0;
+		vec4 ex_l = texture(exposure_tex, euv - vec2(o, 0.0));
+		vec4 ex_r = texture(exposure_tex, euv + vec2(o, 0.0));
+		vec4 ex_d = texture(exposure_tex, euv - vec2(0.0, o));
+		vec4 ex_u = texture(exposure_tex, euv + vec2(0.0, o));
+		float cut_m = ex.g * 4.0;
+		float heap_m = ex.b * 2.0;
+		float cut_grad = length(vec2(ex_r.g - ex_l.g, ex_u.g - ex_d.g)) * 4.0 / 3.0;    // m per m
+		float heap_grad = length(vec2(ex_r.b - ex_l.b, ex_u.b - ex_d.b)) * 2.0 / 3.0;
+		float n1 = noise2(at * 2.3), n2 = noise2(at * 0.8 + 4.0);
 
-	// --- riverbank: damp soil fading into gravel shelf near the water (hydrology-fed mask only)
+		// 1) disturbed turf everywhere the ground moved: flattened, browner grass, scattered clods
+		float moved = ex.r * (1.0 - smoothstep(0.3, 1.0, ex.b) * 0.7);                // heaved turf stays greener
+		vec2 cl = cells(at * 2.6);
+		float clods = smoothstep(0.12, 0.02, cl.x) * step(0.6, cl.y) * moved;
+		vec3 trampled = mix(colour, mix(colour, soil_col, 0.3) * 0.85, moved * 0.5);
+		trampled = mix(trampled, mix(soil_dark, soil_col, cl.y) * mix(1.0, luma(st) * 2.2, 0.8), clods * 0.8);
+		colour = trampled;
+
+		// 2) SUNDER cut: bare ground only where really deep or on walls; strata by depth below original
+		float bare_cut = smoothstep(0.22, 0.5, cut_m + (n1 - 0.5) * 0.3) + smoothstep(0.25, 0.6, cut_grad);
+		bare_cut = clamp(bare_cut, 0.0, 1.0) * ex.r;
+		float dz = cut_m + (fine - 0.5) * 0.25 + (n2 - 0.5) * 0.15;   // depth below original surface
+		vec3 strata = mix(vec3(0.20, 0.16, 0.10), soil_dark, smoothstep(0.02, 0.12, dz));       // root mat
+		strata = mix(strata, soil_col * 1.05, smoothstep(0.42, 0.52, dz));                         // subsoil
+		strata = mix(strata, gravel_col * mix(0.7, 1.05, n1), smoothstep(0.95, 1.05, dz));         // gravel lens
+		strata = mix(strata, clay_col, smoothstep(1.3, 1.42, dz));                                  // clay
+		strata = mix(strata, mix(rock_fresh, rock_band * 0.8, 0.5 + 0.4 * sin(wy * strata_scale * 1.3 + fine * 3.0)),
+			smoothstep(2.1, 2.3, dz));                                                               // bedrock
+		strata *= mix(1.0, luma(st) * 2.2, 0.85);
+		wall_amt = smoothstep(0.35, 0.9, cut_grad) * ex.r;
+		// floor: loose fallen topsoil/rubble on flat low ground (keeps floor darker, not one colour)
+		float floor_amt = (1.0 - wall_amt) * smoothstep(0.4, 0.8, cut_m);
+		vec3 loose = mix(soil_dark * 0.95, soil_col * 0.8, cl.y * 0.6) * mix(1.0, luma(st) * 2.2, 0.9);
+		loose = mix(loose, gravel_col * mix(0.55, 1.0, n1), smoothstep(0.1, 0.03, cl.x) * step(0.7, cl.y) * 0.8);
+		vec3 cut_col = mix(strata, loose, floor_amt * 0.7);
+		colour = mix(colour, cut_col, bare_cut);
+
+		// 3) RAISE heap: turf rides up intact; stretch tears a narrow seam + tension cracks
+		// rev-2: the seam is ONE narrow contour on the lower shoulder (0.55-0.95 m of heave, wobbling),
+		// only where the heave is steep; the rest of the flank keeps its turf with sparse cracks.
+		float stretch = heap_grad + (n1 - 0.5) * 0.12;
+		float contour = heap_m + (n2 - 0.5) * 0.35 + (fine - 0.5) * 0.2;
+		float seam = smoothstep(0.5, 0.62, contour) * smoothstep(1.02, 0.86, contour) * smoothstep(0.18, 0.32, stretch);
+		vec2 crack = cells(at * vec2(0.8, 1.2) + warp * 0.2);
+		float near_seam = smoothstep(0.2, 0.6, contour) * smoothstep(1.7, 1.1, contour);
+		float cracks = smoothstep(0.045, 0.01, crack.x) * near_seam * smoothstep(0.12, 0.3, stretch) * ex.r * step(0.35, crack.y);
+		float crest = smoothstep(0.85, 0.98, ex.b) * smoothstep(0.1, 0.02, heap_grad);
+		float outcrop = crest * smoothstep(0.8, 0.9, noise2(at * 0.9 + 9.0));
+		vec3 torn = mix(soil_dark, clay_col * 0.8, smoothstep(0.55, 0.8, n1)) * mix(1.0, luma(st) * 2.2, 0.85);
+		torn = mix(torn, rock_fresh * mix(0.85, 1.1, n2), smoothstep(0.72, 0.85, noise2(at * 3.3)) * 0.3);  // sparse rock chips in the seam (rev-3)
+		colour = mix(colour, soil_dark * 0.85 * mix(1.0, luma(st) * 2.2, 0.8), cracks * 0.85);
+		colour = mix(colour, torn, clamp(seam * ex.r, 0.0, 1.0));
+		colour = mix(colour, mix(rock_fresh, rock_mid, n2) * mix(1.0, luma(st) * 2.0, 0.6), outcrop);
+		fresh = clamp(bare_cut + seam * ex.r + cracks * 0.5 + outcrop, 0.0, 1.0);
+	}
+
+	// --- riverbank: damp soil fading into gravel shelf near the water
 	float bank = smoothstep(0.30, 0.85, m.b + edge_n * 0.4);
-	vec3 shelf = mix(bank_wet, gravel_col * mix(0.55, 1.0, noise2(at * 2.7)), smoothstep(0.6, 0.95, m.b) * 0.8);
+	vec2 pb = cells(at * 1.7);
+	vec3 shelf = mix(bank_wet, gravel_col * mix(0.55, 1.05, pb.y), smoothstep(0.6, 0.95, m.b) * smoothstep(0.02, 0.12, pb.x + 0.05));
 	shelf *= mix(1.0, luma(st) * 2.0, 0.7);
 	colour = mix(colour, shelf, bank * 0.85);
 
-	float damp = clamp(max(bank * 0.8, rain_wetness) + m.g * rain_wetness * 0.18 + fresh * 0.2, 0.0, 1.0);
-	colour *= 1.0 - damp * 0.22;
+	float damp = clamp(max(bank * 0.8, rain_wetness) + m.g * rain_wetness * 0.18 + fresh * 0.25, 0.0, 1.0);
+	colour *= 1.0 - damp * 0.24;
 	float puddle = smoothstep(0.70, 0.92, m.b * 0.55 + rain_wetness * 0.58 + meander * 0.14) * (1.0 - rockiness);
 	float snow = snow_cover * smoothstep(0.2, 0.6, snow_cover * 0.8 + fine * 0.4 - slope * 0.6);
 	colour = mix(colour, vec3(0.89, 0.93, 0.94) * mix(0.92, 1.02, fine), snow);
 
 	ALBEDO = colour;
-	// damp banks stay matte-ish (package 1's 0.40 roughness + 0.66 specular mirrored the pale sky at
-	// eye height and turned the whole bank into a grey-blue strip); only real puddles go glossy.
-	ROUGHNESS = mix(0.95 - rockiness * 0.08 - fresh * 0.05, 0.68, damp * 0.8);
+	float rough_var = mix(0.9, 1.0, noise2(at * 1.3));
+	ROUGHNESS = mix((0.95 - rockiness * 0.1 - fresh * 0.08) * rough_var, 0.66, damp * 0.8);
 	ROUGHNESS = mix(ROUGHNESS, 0.35, puddle * 0.85);
 	ROUGHNESS = mix(ROUGHNESS, 0.82, snow);
 	SPECULAR = mix(0.30, 0.45, damp) * (1.0 - snow * 0.3);
 	vec3 nm = mix(texture(micro_normal, at * 0.28).rgb, texture(micro_normal, at * 1.1 + 0.5).rgb, 0.4);
 	NORMAL_MAP = nm;
-	NORMAL_MAP_DEPTH = mix(0.55 + rockiness * 0.4 + fresh * 0.4, 0.08, snow);
+	NORMAL_MAP_DEPTH = mix(0.6 + rockiness * 0.4 + fresh * 0.5 + wall_amt * 0.4, 0.08, snow);
 }

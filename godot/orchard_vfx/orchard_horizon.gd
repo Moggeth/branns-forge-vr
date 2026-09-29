@@ -7,10 +7,15 @@ extends Node3D
 ## Place this node at the Orchard centre (y = valley floor). It never has collision.
 
 @export var seed := 7
-@export var radii := PackedFloat32Array([150.0, 230.0, 340.0])
-@export var heights := PackedFloat32Array([18.0, 42.0, 85.0])
-@export var colours := PackedColorArray([Color(0.2, 0.36, 0.15), Color(0.22, 0.34, 0.36), Color(0.42, 0.5, 0.6)])
-@export var haze_colour := Color(0.72, 0.8, 0.82)
+@export var radii := PackedFloat32Array([170.0, 250.0, 340.0])
+@export var heights := PackedFloat32Array([11.0, 40.0, 85.0])
+## Linear vertex colours. Live-revision: the old values (0.2,0.36,0.15 linear = pale sRGB mint) plus fog
+## drew a flat pale-green stripe behind the Orchard. Darker, more saturated values let the scene fog do
+## the aerial perspective, so each band separates by value instead of all fading to one pale wash.
+@export var colours := PackedColorArray([Color(0.045, 0.085, 0.032), Color(0.055, 0.085, 0.085), Color(0.13, 0.16, 0.21)])
+@export var haze_colour := Color(0.32, 0.4, 0.45)
+## Forest-edge serration on the near band (metres): reads as tree crowns, not a clay wall.
+@export var crown_height := 3.5
 ## Gaps to keep the tallest band away from the cast/work directions (radians, width).
 @export var low_sectors := PackedVector2Array([Vector2(0.0, 0.6)])
 
@@ -38,20 +43,25 @@ func _ridge(band: int, a: float, noise: FastNoiseLite) -> float:
 	var n := noise.get_noise_2d(cos(a) * 60.0, sin(a) * 60.0) * 0.5 + 0.5
 	var detail := noise.get_noise_2d(cos(a) * 190.0 + 500.0, sin(a) * 190.0) * 0.5 + 0.5
 	var shape: float
-	if band == 0: shape = pow(n, 1.3) * 0.8 + detail * 0.2                 # rounded foothills
+	if band == 0: shape = pow(n, 1.3) * 0.8 + detail * 0.2                 # rounded, wooded foothills
 	elif band == 1: shape = pow(n, 1.6) * 0.75 + detail * 0.25
 	else: shape = pow(n, 2.4) * 0.85 + pow(detail, 2.0) * 0.3            # sparse, sharper peaks
 	for sector in low_sectors:
 		var d := absf(wrapf(a - sector.x, -PI, PI))
 		shape *= lerpf(0.45, 1.0, smoothstep(sector.y * 0.6, sector.y, d)) if band == 2 else 1.0
-	return h * (0.18 + shape)
+	var top := h * (0.18 + shape)
+	if band == 0:  # tree-crown serration: irregular clumps, occasional clearings
+		var clump := noise.get_noise_2d(cos(a) * 900.0, sin(a) * 900.0) * 0.5 + 0.5
+		var clearing := smoothstep(0.25, 0.4, noise.get_noise_2d(cos(a) * 140.0 + 90.0, sin(a) * 140.0) * 0.5 + 0.5)
+		top += crown_height * clump * clearing
+	return top
 
 func _band(band: int) -> ArrayMesh:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed * 31 + band * 7
 	noise.frequency = 0.02
 	noise.fractal_octaves = 3
-	var segs: int = [72, 84, 96][mini(band, 2)]
+	var segs: int = [300, 120, 110][mini(band, 2)]
 	var r: float = radii[band]
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -73,9 +83,12 @@ func _band(band: int) -> ArrayMesh:
 			var a1: Vector3 = ring[i][layer + 1]
 			var b0: Vector3 = ring[j][layer]
 			var b1: Vector3 = ring[j][layer + 1]
-			var k := rng.randf_range(0.9, 1.08)
+			# rev-2: per-facet random value made vertical stripes on the 300-segment near band
+			var k := 1.0 + noise.get_noise_2d(float(i) * 0.9, float(band) * 50.0) * 0.12
 			# lower facets sink into valley haze; upper facets hold the silhouette colour
-			var col := base_col.lerp(haze_colour, 0.3 if layer == 0 else 0.0) * k
+			# facets turned toward the (default) sun side read lighter: gives the ridges form before fog
+			var facing := clampf((a1 - a0).cross(b0 - a0).normalized().dot(Vector3(-0.5, 0.4, 0.75).normalized()) * 0.5 + 0.5, 0.0, 1.0)
+			var col := base_col.lerp(haze_colour, (0.12 if band == 0 else 0.3) if layer == 0 else 0.0) * k * lerpf(0.85, 1.15, facing)
 			col.a = 1.0
 			for tri in [[a0, b0, a1], [a1, b0, b1]]:
 				var nrm := ((tri[2] as Vector3) - (tri[0] as Vector3)).cross((tri[1] as Vector3) - (tri[0] as Vector3)).normalized()
@@ -110,7 +123,7 @@ static func apply_orchard_grade(env: Environment, sun: DirectionalLight3D = null
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.08
 	env.adjustment_saturation = 1.06
+	# Live-revision: no longer writes sun energy/colour (that froze daylight). Day-night and weather
+	# stay owned by atmosphere_pipeline.gd; see orchard_atmosphere_grade.gd for the per-frame layer.
 	if sun != null:
-		sun.light_energy = 1.25
-		sun.light_color = Color(1.0, 0.93, 0.8)
 		sun.shadow_enabled = true

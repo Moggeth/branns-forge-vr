@@ -10,7 +10,12 @@ extends Node3D
 ## one shared MultiMesh per kit mesh (constant node count for any history).
 
 const KIT_PATH := "assets/spell_kit.glb"
-const KIT_MESHES := ["lip_a", "lip_b", "lip_c", "chunk_a", "chunk_b", "chunk_c", "clod_a", "pebble", "root_seg", "sapling", "leaf_puff"]
+const KIT_MESHES := ["lip_a", "lip_b", "lip_c", "crust_a", "wall_a", "wall_b", "chunk_a", "chunk_b", "chunk_c",
+	"scarp_a", "scarp_b", "clod_a", "clod_b", "pebble", "root_seg", "sapling", "sprout", "leaf_puff", "swell"]
+const LIPS := ["lip_a", "lip_b", "lip_c"]
+## Real world_builder trees: W.tree(size = 4.4 * scale); crown centre sits ~0.72 of that height.
+const REAL_TREE_CROWN_Y := 3.3
+const REAL_TREE_CROWN_R := 1.5
 const QUALITY := {"vr": 1.0, "rts": 0.8, "low": 0.45}
 const CURVE_SMOOTH := 0
 const CURVE_BACK := 1
@@ -172,57 +177,83 @@ func _build_sunder(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path:
 	var length: float = maxf(pl.length, 0.5)
 	# Tear front reaches the end at 66% progress; the terrain keeps sinking after.
 	var front := func(s: float) -> float: return 0.04 + 0.62 * s / length
-	# 1. Fracture lips: torn plates hinge up along both banks as the front passes.
-	var per_side: int = clampi(int(length / 1.35 * q), 2, 16)
+	# 1. Stratified walls: panels stand on the new floor at the foot of each bank, top at the
+	#    original surface, so the heightfield's cut reads as layered earth. They extend downward
+	#    with the sinking terrain (scale Y follows real local cut depth).
+	var s_wall := rng.randf_range(0.2, 1.2)
+	while s_wall < length - 0.3:
+		for side in [-1.0, 1.0]:
+			if rng.randf() < 0.2: continue                      # gaps: slumped sections
+			var at: Dictionary = pl.at(s_wall + rng.randf_range(-0.4, 0.4))
+			var out: Vector3 = at.right * side
+			var foot := _wall_foot(g, at.pos, out, w)
+			if foot.is_empty(): continue
+			var depth: float = foot.depth
+			var bpos: Vector3 = foot.pos
+			var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.25, 0.25)))
+			var lean := Basis(Vector3.BACK, deg_to_rad(rng.randf_range(8.0, 20.0)))   # top leans back into the bank
+			var mesh: String = "wall_a" if rng.randf() < 0.6 else "wall_b"
+			var sy: float = clampf(depth / 1.8, 0.25, 1.6)
+			var sxz := rng.randf_range(0.85, 1.2)
+			var t0: float = front.call(s_wall)
+			var top_before: float = bpos.y + depth
+			_piece(fx, mesh, Transform3D((basis * lean).scaled_local(Vector3(sxz, 0.04, sxz)), Vector3(bpos.x, top_before, bpos.z)),
+				Transform3D((basis * lean).scaled_local(Vector3(sxz, sy, sxz)), Vector3(bpos.x, top_before + 0.04, bpos.z)),
+				t0 + 0.02, minf(t0 + 0.34, 1.0), CURVE_SMOOTH, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0) * Color(1, 1, 1, 0.9), true)
+		s_wall += rng.randf_range(1.5, 2.4)
+	# 2. Fracture lips: irregular torn sod plates, clustered and gapped (never evenly spaced),
+	#    varied size/yaw/tilt, some half-buried crusts and clods between them.
 	for side in [-1.0, 1.0]:
-		for k in per_side:
-			var s: float = (k + 0.5 + rng.randf_range(-0.28, 0.28)) / per_side * length
+		var s := rng.randf_range(0.0, 0.8)
+		while s < length:
 			var at: Dictionary = pl.at(s)
 			var out: Vector3 = at.right * side
-			var hinge: Vector3 = at.pos + out * w * rng.randf_range(0.62, 0.82)
-			var yaw := rng.randf_range(-0.2, 0.2)
-			var basis := _frame(out.rotated(Vector3.UP, yaw))
-			var tilt := -deg_to_rad(rng.randf_range(9.0, 21.0)) + _slope_pitch(g, hinge, basis.x)
-			var mesh: String = ["lip_a", "lip_b", "lip_c"][rng.randi() % 3]
-			var sc := Vector3.ONE * rng.randf_range(0.8, 1.15)
+			var hinge: Vector3 = at.pos + out * w * rng.randf_range(0.78, 1.02) + at.tangent * rng.randf_range(-0.3, 0.3)
+			var basis := _frame(out.rotated(Vector3.UP, rng.randf_range(-0.55, 0.55)))
+			var big := rng.randf() < 0.4
+			var mesh: String = LIPS[rng.randi() % 3] if big else "crust_a"
+			var tilt := -deg_to_rad(rng.randf_range(8.0, 28.0) if big else rng.randf_range(3.0, 12.0)) + _slope_pitch(g, hinge, basis.x)
+			var sc := Vector3(rng.randf_range(0.7, 1.25), rng.randf_range(0.8, 1.2), rng.randf_range(0.6, 1.3))
 			var t0: float = front.call(s)
 			var hb: float = g.before(hinge)
-			var ht: float = maxf(g.target(hinge), hb - 0.1)
-			_piece(fx, mesh, Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, hb - 0.12, hinge.z)),
-				Transform3D((basis * Basis(Vector3.BACK, tilt)).scaled_local(sc), Vector3(hinge.x, ht + rng.randf_range(0.06, 0.2), hinge.z)),
-				t0, t0 + 0.24, CURVE_BACK, 0.0, Vector3.ZERO, _earth_tint(rng, 0.9), true)
-	# 2. Loosened rock and clods: pop out of the wall behind the front, tumble to the floor.
-	var n_debris: int = fx.max_debris
-	for i in n_debris:
+			var ht: float = maxf(g.target(hinge), hb - 0.15)
+			_piece(fx, mesh, Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, hb - 0.1, hinge.z)),
+				Transform3D((basis * Basis(Vector3.BACK, tilt) * Basis(Vector3.RIGHT, rng.randf_range(-0.15, 0.15))).scaled_local(sc),
+				Vector3(hinge.x, ht + rng.randf_range(0.0, 0.12), hinge.z)),
+				t0, t0 + rng.randf_range(0.18, 0.3), CURVE_BACK, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0), true)
+			s += rng.randf_range(1.2, 3.6) * (1.0 / maxf(q, 0.5))   # clustered + gapped, never a rail
+	# 3. Loosened rock and clods: spall off the wall at the moving front, drop to the floor.
+	for i in fx.max_debris:
 		var s: float = rng.randf() * length
 		var at: Dictionary = pl.at(s)
 		var side: float = -1.0 if rng.randf() < 0.5 else 1.0
 		var roll := rng.randf()
-		var mesh := "chunk_a" if roll < 0.28 else ("chunk_b" if roll < 0.5 else ("chunk_c" if roll < 0.62 else ("clod_a" if roll < 0.85 else "pebble")))
-		var sc := rng.randf_range(0.7, 1.35) * (1.0 if mesh != "pebble" else 1.6)
-		var start: Vector3 = at.pos + at.right * side * w * rng.randf_range(0.7, 1.0) + at.tangent * rng.randf_range(-0.3, 0.3)
-		var land: Vector3 = at.pos + at.right * side * w * rng.randf_range(-0.2, 0.55) + at.tangent * rng.randf_range(-0.2, 0.9)
-		start.y = g.before(start) - 0.05
-		land.y = g.target(land) + 0.06 * sc
-		var t0: float = front.call(s) + rng.randf_range(0.02, 0.2)
+		var mesh := "clod_a" if roll < 0.3 else ("clod_b" if roll < 0.52 else ("chunk_a" if roll < 0.68 else ("chunk_b" if roll < 0.8 else ("chunk_c" if roll < 0.86 else "pebble"))))
+		var sc := rng.randf_range(0.6, 1.25) * (1.0 if mesh != "pebble" else 1.8)
+		var start: Vector3 = at.pos + at.right * side * w * rng.randf_range(0.55, 0.9) + at.tangent * rng.randf_range(-0.3, 0.3)
+		var land: Vector3 = at.pos + at.right * side * w * rng.randf_range(-0.1, 0.45) + at.tangent * rng.randf_range(-0.2, 0.6)
+		start.y = lerpf(g.before(start), g.target(start), 0.3)
+		land.y = g.target(land) + 0.04 * sc
+		var t0: float = front.call(s) + rng.randf_range(0.0, 0.12)
 		var b0 := Basis.from_euler(Vector3(rng.randf() * TAU, rng.randf() * TAU, rng.randf() * TAU)).scaled(Vector3.ONE * sc)
 		var b1 := Basis.from_euler(Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * TAU, rng.randf_range(-0.3, 0.3))).scaled(Vector3.ONE * sc)
-		_piece(fx, mesh, Transform3D(b0, start), Transform3D(b1, land), t0, minf(t0 + rng.randf_range(0.2, 0.34), 1.0),
-			CURVE_FALL, rng.randf_range(0.15, 0.55), Vector3(rng.randf_range(-9, 9), rng.randf_range(-4, 4), rng.randf_range(-9, 9)),
+		_piece(fx, mesh, Transform3D(b0, start), Transform3D(b1, land), t0, minf(t0 + rng.randf_range(0.14, 0.24), 1.0),
+			CURVE_FALL, rng.randf_range(0.08, 0.35), Vector3(rng.randf_range(-8, 8), rng.randf_range(-3, 3), rng.randf_range(-8, 8)),
 			_rock_tint(rng, mesh), true)
-	# 3. Dust follows the tear: born behind the front, drifts along the direction of travel.
-	for i in fx.max_dust:
-		var s: float = pow(rng.randf(), 0.9) * length
+	# 4. Dust only where the tear is moving right now: born AT the front, low, short-lived and
+	#    thin enough that walls/lips stay readable; nothing is born after the front finishes.
+	for i in int(fx.max_dust * 0.55):
+		var s: float = rng.randf() * length
 		var at: Dictionary = pl.at(s)
 		var side: float = -1.0 if rng.randf() < 0.5 else 1.0
-		var pos: Vector3 = at.pos + at.right * side * w * rng.randf_range(0.0, 1.0)
-		pos.y = lerpf(g.before(pos), g.target(pos), 0.5) + 0.1
-		var vel: Vector3 = Vector3.UP * rng.randf_range(0.35, 1.2) + at.right * side * rng.randf_range(0.1, 0.6) + at.tangent * rng.randf_range(0.2, 0.9)
-		var ea := rng.randf_range(0.8, 1.1)
-		_dust(fx, pos, vel, _birth(fx, front.call(s) + rng.randf_range(0.02, 0.22)), rng.randf_range(0.9, 2.0),
-			rng.randf_range(0.3, 0.6) * w, rng.randf_range(1.1, 2.0) * w, Color(0.56 * ea, 0.44 * ea, 0.31 * ea, rng.randf_range(0.5, 0.78)))
-	# 4. Embers race along the fissure just ahead of the dust.
-	for i in int(36 * q):
+		var pos: Vector3 = at.pos + at.right * side * w * rng.randf_range(0.45, 1.0)
+		pos.y = g.before(pos) - 0.05
+		var vel: Vector3 = Vector3.UP * rng.randf_range(0.5, 1.3) + at.right * side * rng.randf_range(0.2, 0.7) + at.tangent * rng.randf_range(0.3, 1.1)
+		var ea := rng.randf_range(0.85, 1.1)
+		_dust(fx, pos, vel, _birth(fx, front.call(s) + rng.randf_range(0.0, 0.05)), rng.randf_range(0.6, 1.15),
+			rng.randf_range(0.18, 0.35) * w, rng.randf_range(0.5, 0.95) * w, Color(0.52 * ea, 0.42 * ea, 0.31 * ea, rng.randf_range(0.28, 0.5)))
+	# 5. Embers race along the fissure just ahead of the dust.
+	for i in int(24 * q):
 		var s: float = rng.randf() * length
 		var at: Dictionary = pl.at(s)
 		var pos: Vector3 = at.pos + at.right * rng.randf_range(-0.4, 0.4) * w
@@ -239,53 +270,80 @@ func _build_raise(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path: 
 	var r := g.radius(c)
 	var dir_bias := Vector3.ZERO
 	if path.size() > 1: dir_bias = ((path[path.size() - 1] as Vector3) - c).normalized()
-	# 1. Heave scarps: plates crack open around the rising shoulder.
-	var n_lips: int = clampi(int(r * 1.6 * q), 5, 14)
-	for k in n_lips:
-		var a := (k + rng.randf_range(-0.3, 0.3)) / n_lips * TAU
-		var dir := Vector3(cos(a), 0, sin(a))
-		var hinge := c + dir * r * rng.randf_range(0.55, 0.78)
-		var basis := _frame(-dir if not sinking else dir)
-		var tilt := -deg_to_rad(rng.randf_range(8.0, 18.0)) + _slope_pitch(g, hinge, basis.x)
-		var sc := Vector3.ONE * rng.randf_range(0.7, 1.0)
-		var t0 := rng.randf_range(0.18, 0.5)
-		var ht := g.target(hinge)
-		_piece(fx, ["lip_a", "lip_b", "lip_c"][rng.randi() % 3], Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, g.before(hinge) - 0.15, hinge.z)),
-			Transform3D((basis * Basis(Vector3.BACK, tilt)).scaled_local(sc), Vector3(hinge.x, ht + 0.1, hinge.z)),
-			t0, t0 + 0.36, CURVE_BACK, 0.0, Vector3.ZERO, _earth_tint(rng, 0.95), true)
-	# 2. Boundary churn: clods and stone forced up from below, rolled outward, settled at the toe.
-	for i in fx.max_debris:
+	# The stress seam sits on the shoulder where the heave is steepest (~half height),
+	# measured from the real samples, not a fixed fraction of the radius.
+	var seam_r := g.seam_radius(c, r)
+	# 1. Stress seam: two or three broken arcs (never a full ring). Turf crusts peel up,
+	#    fresh stone shards shoulder out, small rough scarp faces look downhill.
+	var arcs: int = 2 + int(rng.randf() < 0.6)
+	var arc0 := rng.randf() * TAU
+	for k in arcs:
+		var a_start := arc0 + k * TAU / arcs + rng.randf_range(-0.3, 0.3)
+		var span := rng.randf_range(0.5, 0.95) * TAU / arcs
+		var a := a_start
+		while a < a_start + span:
+			var dir := Vector3(cos(a), 0, sin(a))
+			var hinge := c + dir * seam_r * rng.randf_range(0.92, 1.08)
+			var ht := g.target(hinge)
+			var hb := g.before(hinge)
+			var t0 := clampf(0.12 + rng.randf_range(0.0, 0.3), 0.0, 0.8)
+			var roll := rng.randf()
+			var face := -dir if not sinking else dir
+			if roll < 0.45:        # peeled turf crust, hinge on the uphill side
+				var basis := _frame(face.rotated(Vector3.UP, rng.randf_range(-0.5, 0.5)))
+				var tilt := -deg_to_rad(rng.randf_range(12.0, 30.0)) + _slope_pitch(g, hinge, basis.x)
+				var sc := Vector3.ONE * rng.randf_range(0.6, 1.05)
+				_piece(fx, "crust_a" if rng.randf() < 0.65 else "lip_b", Transform3D(basis.scaled_local(sc * Vector3(1, 0.3, 1)), Vector3(hinge.x, hb - 0.1, hinge.z)),
+					Transform3D((basis * Basis(Vector3.BACK, tilt)).scaled_local(sc), Vector3(hinge.x, ht + 0.03, hinge.z)),
+					t0, t0 + 0.3, CURVE_BACK, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0), true)
+			elif roll < 0.9:       # fresh stone shard pushing out of the seam, leaning downhill
+				var sc := rng.randf_range(0.55, 1.1)
+				var b := Basis(Vector3.UP, a + rng.randf_range(-0.6, 0.6)) * Basis(Vector3.BACK, rng.randf_range(0.15, 0.55) * (1.0 if not sinking else -1.0))
+				b = b.scaled(Vector3.ONE * sc)
+				_piece(fx, "scarp_a" if rng.randf() < 0.55 else "scarp_b", Transform3D(b, Vector3(hinge.x, hb - 0.9 * sc, hinge.z)),
+					Transform3D(b, Vector3(hinge.x, ht - 0.35 * sc, hinge.z)), t0, minf(t0 + 0.45, 1.0), CURVE_BACK, 0.0, Vector3.ZERO,
+					_rock_tint(rng, "chunk_a"), true)
+			else:                  # rev-3: rare, low stratified step (wall_b read as a dark box when larger)
+				var basis := _frame(-face.rotated(Vector3.UP, rng.randf_range(-0.3, 0.3)))
+				var sy := clampf(absf(ht - hb) * 0.2 / 1.8, 0.08, 0.22)
+				var sxz := rng.randf_range(0.35, 0.55)
+				_piece(fx, "wall_b", Transform3D(basis.scaled_local(Vector3(sxz, 0.02, sxz)), Vector3(hinge.x, ht, hinge.z)),
+					Transform3D((basis * Basis(Vector3.BACK, deg_to_rad(25.0))).scaled_local(Vector3(sxz, sy, sxz)), Vector3(hinge.x, ht + 0.05, hinge.z)),
+					t0 + 0.05, minf(t0 + 0.4, 1.0), CURVE_SMOOTH, 0.0, Vector3.ZERO, _earth_tint(rng, 1.0), true)
+			a += rng.randf_range(1.8, 3.6) / maxf(seam_r, 1.0) / maxf(q, 0.5)   # sparse: the shader draws the seam itself
+	# 2. Seam spall: clods and small stones break out of the seam and roll a short way downhill.
+	for i in int(fx.max_debris * 0.45):
 		var a := rng.randf() * TAU
 		var dir := Vector3(cos(a), 0, sin(a))
-		var bias := 1.0 + maxf(dir.dot(dir_bias), 0.0) * 0.35
-		var start := c + dir * r * rng.randf_range(0.65, 0.95)
-		var land := c + dir * r * rng.randf_range(0.9, 1.12) * bias
-		start.y = g.before(start) - 0.35
+		var bias := 1.0 + maxf(dir.dot(dir_bias), 0.0) * 0.25
+		var start := c + dir * seam_r * rng.randf_range(0.9, 1.1)
+		var land := c + dir * lerpf(seam_r, r, rng.randf_range(0.3, 1.0)) * bias
+		start.y = lerpf(g.before(start), g.target(start), 0.5) - 0.1
 		var roll := rng.randf()
-		var mesh := "clod_a" if roll < 0.45 else ("chunk_b" if roll < 0.7 else ("chunk_a" if roll < 0.85 else "pebble"))
-		var sc := rng.randf_range(0.6, 1.15)
-		land.y = g.target(land) + 0.05 * sc
-		var t0 := rng.randf_range(0.08, 0.55)
+		var mesh := "clod_a" if roll < 0.35 else ("clod_b" if roll < 0.6 else ("chunk_b" if roll < 0.78 else ("chunk_a" if roll < 0.88 else "pebble")))
+		var sc := rng.randf_range(0.55, 1.05) * (1.0 if mesh != "pebble" else 1.8)
+		land.y = g.target(land) + 0.04 * sc
+		var t0 := rng.randf_range(0.15, 0.6)
 		_piece(fx, mesh, Transform3D(Basis.from_euler(Vector3(rng.randf() * TAU, rng.randf() * TAU, 0)).scaled(Vector3.ONE * sc), start),
 			Transform3D(Basis.from_euler(Vector3(0, rng.randf() * TAU, 0)).scaled(Vector3.ONE * sc), land),
-			t0, minf(t0 + rng.randf_range(0.3, 0.45), 1.0), CURVE_FALL, rng.randf_range(0.35, 0.8),
-			Vector3(rng.randf_range(-6, 6), 0, rng.randf_range(-6, 6)), _rock_tint(rng, mesh), true)
-	# 3. Bedrock crown: a few big stones shoulder up through the top of the mound.
+			t0, minf(t0 + rng.randf_range(0.25, 0.4), 1.0), CURVE_FALL, rng.randf_range(0.1, 0.35),
+			Vector3(rng.randf_range(-7, 7), 0, rng.randf_range(-7, 7)), _rock_tint(rng, mesh), true)
+	# 3. Bedrock crown: a couple of angular outcrops shoulder through the crest (not boulders on top).
 	if not sinking:
-		for i in 3:
-			var p := c + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)) * r * 0.3
-			var sc := rng.randf_range(1.6, 2.6)
-			var b := Basis.from_euler(Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.4, 0.4))).scaled(Vector3.ONE * sc)
-			_piece(fx, "chunk_c" if i == 0 else "chunk_a", Transform3D(b, Vector3(p.x, g.before(p) - 1.2 * sc, p.z)),
-				Transform3D(b, Vector3(p.x, g.target(p) - 0.18 * sc, p.z)), 0.1 + i * 0.12, 0.95, CURVE_BACK, 0.0, Vector3.ZERO, _rock_tint(rng, "chunk_a"), true)
-	# 4. Low dust rolling off the churning boundary.
-	for i in fx.max_dust:
+		for i in 2 + int(r > 6.0):
+			var p := c + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)) * seam_r * 0.45
+			var sc := rng.randf_range(1.1, 1.9)
+			var b := Basis.from_euler(Vector3(rng.randf_range(-0.35, 0.35), rng.randf() * TAU, rng.randf_range(-0.35, 0.35))).scaled(Vector3.ONE * sc)
+			_piece(fx, "scarp_b" if i == 0 else "chunk_c", Transform3D(b, Vector3(p.x, g.before(p) - 1.0 * sc, p.z)),
+				Transform3D(b, Vector3(p.x, g.target(p) - 0.3 * sc, p.z)), 0.15 + i * 0.12, 0.95, CURVE_BACK, 0.0, Vector3.ZERO, _rock_tint(rng, "chunk_a"), true)
+	# 4. Dust: small, low puffs spat from the seam while it opens; none after 70%.
+	for i in int(fx.max_dust * 0.45):
 		var a := rng.randf() * TAU
 		var dir := Vector3(cos(a), 0, sin(a))
-		var pos := c + dir * r * rng.randf_range(0.8, 1.15)
-		pos.y = g.target(pos) + 0.05
-		_dust(fx, pos, dir * rng.randf_range(0.3, 1.1) + Vector3.UP * rng.randf_range(0.1, 0.55), _birth(fx, rng.randf_range(0.1, 0.8)),
-			rng.randf_range(1.0, 2.2), rng.randf_range(0.4, 0.8), rng.randf_range(1.2, 2.4), Color(0.5, 0.4, 0.29, rng.randf_range(0.3, 0.55)))
+		var pos := c + dir * seam_r * rng.randf_range(0.9, 1.1)
+		pos.y = lerpf(g.before(pos), g.target(pos), 0.5)
+		_dust(fx, pos, dir * rng.randf_range(0.3, 0.9) + Vector3.UP * rng.randf_range(0.3, 0.8), _birth(fx, rng.randf_range(0.12, 0.7)),
+			rng.randf_range(0.6, 1.1), rng.randf_range(0.25, 0.45), rng.randf_range(0.7, 1.3), Color(0.5, 0.41, 0.3, rng.randf_range(0.25, 0.45)))
 	fx.light_color = Color(1.0, 0.7, 0.4)
 	fx.light_path = [c + Vector3.UP * 1.2]
 
@@ -300,6 +358,9 @@ func _build_grow(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path: A
 			var at: Dictionary = pl.at((k + 0.5) / count * pl.length)
 			trees.append(at.pos + at.right * rng.randf_range(-2.4, 2.4) + at.tangent * rng.randf_range(-0.8, 0.8))
 	var n := trees.size()
+	if p.has("tree_positions") and not grow_saplings_persist:
+		_build_grow_real(fx, rng, g, pl, trees, q)
+		return
 	var motes_each: int = maxi(2, int(fx.max_dust * 0.6) / maxi(n, 1))
 	for i in n:
 		var base: Vector3 = trees[i]
@@ -340,6 +401,92 @@ func _build_grow(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, path: A
 				rng.randf_range(0.8, 1.6), rng.randf_range(0.1, 0.2), Color(0.75, 1.0, 0.45, 1.6))
 	fx.light_color = Color(0.7, 1.0, 0.55)
 	for k in 5: fx.light_path.append((pl.at(pl.length * k / 4.0).pos as Vector3) + Vector3.UP * 1.5)
+
+## Grow Forest when world_builder_runtime owns the real trees (grow_saplings_persist=false).
+## Real tree i starts at along*0.4 and scales 0.05->1 over the next 0.4 of progress (2.4 s total).
+## The VFX never draws a second tree: it leads each one with a ground wave (sprouts + motes running
+## down the cast line from t=0), a heave ring and surface root runners, then unfolds transient leaf
+## clusters at the real crown height that bloom ahead of the real canopy and fold into it.
+func _build_grow_real(fx: Dictionary, rng: RandomNumberGenerator, g: _Ground, pl: _Polyline, trees: Array, q: float) -> void:
+	var length: float = maxf(pl.length, 0.5)
+	# 1. Wave front: seedlings flicker up along the cast line, 0 -> 0.45 progress (first 0.5 s visible).
+	var n_sprout: int = clampi(int(length * 3.0 * q), 10, 90)
+	for k in n_sprout:
+		var s := (float(k) + rng.randf()) / n_sprout * length
+		var at: Dictionary = pl.at(s)
+		var pos: Vector3 = at.pos + at.right * rng.randf_range(-3.2, 3.2)
+		pos.y = g.surface(pos, at.pos.y)
+		var t0 := 0.02 + s / length * 0.42
+		var sc := rng.randf_range(1.8, 3.2)          # ~0.5 m: readable from the RTS camera
+		var b := Basis(Vector3.UP, rng.randf() * TAU)
+		_piece(fx, "sprout", Transform3D(b.scaled(Vector3(0.2, 0.02, 0.2) * sc), pos), Transform3D(b.scaled(Vector3.ONE * sc), pos),
+			t0, minf(t0 + 0.12, 1.0), CURVE_BACK, 0.0, Vector3.ZERO, Color(rng.randf_range(0.9, 1.15), rng.randf_range(0.95, 1.1), 0.9, 0.0), false)
+		if k % 2 == 0:
+			_mote(fx, pos + Vector3.UP * 0.1, Vector3(0, rng.randf_range(0.8, 1.6), 0) + at.tangent * 0.6, _birth(fx, t0), rng.randf_range(0.5, 0.9),
+				rng.randf_range(0.12, 0.2), Color(0.8, 1.0, 0.5, 1.8))
+	var motes_each: int = maxi(3, int(fx.max_dust * 0.7) / maxi(trees.size(), 1))
+	for i in trees.size():
+		var base: Vector3 = trees[i]
+		base.y = g.surface(base, base.y)
+		var tb: float = pl.project(base) / length * 0.4           # identical to world_builder growth.start
+		# 2. Heave ring: turf swells and cracks just before the trunk appears.
+		var sb := Basis(Vector3.UP, rng.randf() * TAU)
+		var sw := rng.randf_range(1.1, 1.5)
+		_piece(fx, "swell", Transform3D(sb.scaled(Vector3(0.3, 0.01, 0.3) * sw), base + Vector3.DOWN * 0.1),
+			Transform3D(sb.scaled(Vector3(sw, 0.9, sw)), base + Vector3.DOWN * 0.05), maxf(tb - 0.04, 0.0), minf(tb + 0.16, 1.0),
+			CURVE_BACK, 0.0, Vector3.ZERO, Color(1, 1, 1, 0.5), false)
+		# 3. Surface root runners race outward (legible from RTS), then stay as the flare's reach.
+		var n_roots: int = 5 + rng.randi() % 3
+		for k in n_roots:
+			var a := (k + rng.randf_range(-0.35, 0.35)) / n_roots * TAU
+			var dir := Vector3(cos(a), -0.08, sin(a)).normalized()
+			var bas := Basis.looking_at(-dir, Vector3.UP)
+			var reach := rng.randf_range(1.2, 2.4)
+			var t0 := maxf(tb - 0.03, 0.0) + k * 0.012
+			var tip: Vector3 = base + Vector3(dir.x, 0, dir.z) * reach
+			_piece(fx, "root_seg", Transform3D(bas.scaled_local(Vector3(1.6, 1.6, 0.01)), base + Vector3.UP * 0.04),
+				Transform3D(bas.scaled_local(Vector3(2.0, 1.7, reach)), base + Vector3.UP * 0.02), t0, minf(t0 + 0.18, 1.0),
+				CURVE_SMOOTH, 0.0, Vector3.ZERO, Color(rng.randf_range(0.85, 1.05), 0.95, 0.9, 0.6), false)
+			_dust(fx, tip, Vector3.UP * 0.4, _birth(fx, t0 + 0.12), 0.7, 0.12, 0.45, Color(0.45, 0.35, 0.23, 0.4))
+		# 4. Unfolding crown: leaf clusters bloom at the real crown height while the real tree is at
+		#    ~30-70% scale, then fold back into its canopy (scale -> 0) as it reaches full size.
+		var yaw := rng.randf() * TAU
+		var tint := _leaf_tint(rng)
+		for j in 5:
+			var ang := yaw + j * TAU / 5.0 + rng.randf_range(-0.3, 0.3)
+			var off := Vector3(cos(ang), 0, sin(ang)) * REAL_TREE_CROWN_R * rng.randf_range(0.55, 0.85) + Vector3.UP * rng.randf_range(-0.3, 0.5)
+			# rev-2: the real tree is ~55% grown at tb+0.2; bloom starts from ITS crown, never floats above it
+			var crown: Vector3 = base + Vector3.UP * REAL_TREE_CROWN_Y * 0.95 + off * 1.15
+			var puff := rng.randf_range(0.7, 1.0)
+			var tl := tb + 0.18 + j * 0.02
+			var pb := Basis.from_euler(Vector3(0, rng.randf() * TAU, 0))
+			_piece(fx, "leaf_puff", Transform3D(pb.scaled(Vector3.ONE * 0.05), base + Vector3.UP * REAL_TREE_CROWN_Y * 0.6 + off * 0.4),
+				Transform3D(pb.scaled(Vector3(puff, puff * 0.9, puff)), crown), tl, minf(tl + 0.14, 1.0),
+				CURVE_BACK, 0.0, Vector3.ZERO, tint * Color(rng.randf_range(0.95, 1.1), rng.randf_range(0.95, 1.08), 1, 0), false)
+			fx.pieces[-1]["fold"] = minf(tb + 0.38, 0.98)              # fold into the real canopy as it completes
+		# 5. Motes spiral up the trunk to the crown in step with the real growth.
+		for m in motes_each:
+			var a := rng.randf() * TAU
+			var pos := base + Vector3(cos(a), 0.15, sin(a)) * rng.randf_range(0.3, 0.9)
+			_mote(fx, pos, Vector3(-sin(a) * 0.7, rng.randf_range(1.8, 3.2), cos(a) * 0.7), _birth(fx, tb + rng.randf_range(0.0, 0.3)),
+				rng.randf_range(0.8, 1.3), rng.randf_range(0.1, 0.18), Color(0.78, 1.0, 0.48, 1.7))
+	fx.light_color = Color(0.7, 1.0, 0.55)
+	for k in 5: fx.light_path.append((pl.at(pl.length * k / 4.0).pos as Vector3) + Vector3.UP * 1.5)
+
+## Where a sunder wall meets the new floor on one side: walks outward from the path centre and
+## returns {pos (on the floor at the wall foot), depth (original surface minus floor)}.
+func _wall_foot(g: _Ground, centre: Vector3, out: Vector3, w: float) -> Dictionary:
+	var floor_y := g.target(centre)
+	var max_cut := g.before(centre) - floor_y
+	if max_cut < 0.25: return {}
+	var best := 0.0
+	for k in range(1, 9):
+		var d := w * k / 8.0
+		var p := centre + out * d
+		if g.before(p) - g.target(p) >= max_cut * 0.72: best = d
+	var foot := centre + out * best
+	foot.y = g.target(foot)
+	return {"pos": foot, "depth": g.before(foot) - foot.y}
 
 # ---------------------------------------------------------------- piece helpers
 
@@ -479,6 +626,9 @@ func _piece_xform(piece: Dictionary, p: float) -> Transform3D:
 	var spin: Vector3 = piece.spin * (1.0 - u) * u
 	var basis := Basis(q) * Basis.from_euler(spin)
 	var scale := s0.lerp(s1, e).max(Vector3.ONE * 0.001)
+	if piece.has("fold"):   # transient bloom that folds back into the real canopy
+		var f := clampf((p - float(piece.fold)) / 0.14, 0.0, 1.0)
+		scale *= maxf(1.0 - f * f * (3.0 - 2.0 * f), 0.001)
 	return Transform3D(basis.scaled_local(scale), pos)
 
 func _eval_particles(fx: Dictionary, key: String, list: Array) -> void:
@@ -592,6 +742,20 @@ class _Ground:
 			if (hb[i] - ht[i] if cut else ht[i] - hb[i]) > 0.12:
 				w = maxf(w, pl.distance(Vector3(xz[i].x, 0, xz[i].y)))
 		return clampf(w, 0.6, 6.0) if w > 0.0 else 1.2
+
+	## Mean horizontal distance of samples whose heave is 35-65% of the peak: the steep shoulder.
+	func seam_radius(c: Vector3, r: float) -> float:
+		var peak := 0.0
+		for i in xz.size(): peak = maxf(peak, absf(ht[i] - hb[i]))
+		if peak < 0.1: return r * 0.6
+		var total := 0.0
+		var count := 0
+		for i in xz.size():
+			var k := absf(ht[i] - hb[i]) / peak
+			if k > 0.35 and k < 0.65:
+				total += xz[i].distance_to(Vector2(c.x, c.z))
+				count += 1
+		return clampf(total / count, r * 0.3, r * 0.9) if count > 0 else r * 0.6
 
 	func radius(c: Vector3) -> float:
 		var r := 0.0
