@@ -72,7 +72,9 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 			holder.set_meta("zone_kit_poses", poses.duplicate())
 			holder.material_override = part.material
 			holder.position = origin
-			holder.visibility_range_end = float(document.get("visibility_metres", 115.0))
+			# Survey zoom reaches 185 m; authored landmarks should not blink out
+			# while a strategic player inspects the same world from above.
+			holder.visibility_range_end = float(document.get("visibility_metres", 240.0))
 			holder.visibility_range_end_margin = 8.0
 			root.add_child(holder)
 			holders += 1

@@ -17,6 +17,8 @@ func _run() -> void:
 		if holder == null or holder.multimesh.instance_count != 2:
 			failures.append("placements were not batched")
 		else:
+			if holder.visibility_range_end < 220.0:
+				failures.append("authored kit disappears at full strategic zoom")
 			var poses: Array = holder.get_meta("zone_kit_poses", [])
 			# Godot's headless renderer does not expose MultiMesh GPU transforms.
 			# Check the retained source poses, then verify actual pixels graphically.
