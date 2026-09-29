@@ -2,6 +2,8 @@ extends SceneTree
 ## Synthetic presenter contract check. No game world or save files are opened.
 
 const Presenter = preload("res://orchard_vfx/orchard_spell_vfx.gd")
+## The authored spell kit has 19 mesh types, each with at most one permanent MultiMesh node.
+const PERMANENT_MESH_NODE_BUDGET := 19
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -43,25 +45,28 @@ func _run() -> void:
 	grow.tree_positions = [Vector3(-4, 0, -1), Vector3(0, 0, 2), Vector3(5, 0, -2)]
 	vfx.accept_event(grow)
 	_check(vfx.active_count() == 1 and vfx.get_child_count() <= 25, "grow start exceeded transient node budget", failures)
+	var grow_fx: Dictionary = vfx._active.get("forest-1", {})
+	var transient_roots := 0
+	for piece in grow_fx.get("pieces", []):
+		if piece.mesh == "root_seg": transient_roots += 1
+		_check(not piece.perm, "real-tree grow visual would persist beside game tree", failures)
+	_check(transient_roots > 0, "grow transient roots missing", failures)
 	vfx.accept_event(_phase(grow, "animating", 0.5))
 	vfx.accept_event(_phase(grow, "settled", 1.0))
-	var grow_pieces: Array = vfx._permanent.get("forest-1", [])
-	_check(not grow_pieces.is_empty(), "grow root pieces missing", failures)
-	for piece in grow_pieces:
-		if str(piece[0]) in ["sapling", "leaf_puff"]: failures.append("temporary sapling persisted beside game tree")
+	_check(not vfx._permanent.has("forest-1"), "real-tree grow visual persisted beside game tree", failures)
 	vfx.step(5.0)
 	await process_frame
 	_check(vfx.active_count() == 0 and vfx.get_child_count() <= 11, "grow tail retained transient nodes", failures)
 	# The presenter is dynamically typed here; GDScript cannot infer this call's return.
 	var grow_count: int = vfx.permanent_piece_count()
 	vfx.forget_operation("forest-1")
-	_check(vfx.permanent_piece_count() == sunder_pieces and grow_count > sunder_pieces, "forget did not remove forest roots", failures)
+	_check(vfx.permanent_piece_count() == sunder_pieces and grow_count == sunder_pieces, "forget changed permanent geology after transient grow", failures)
 	vfx.restore_event(grow)
-	_check(vfx.permanent_piece_count() == grow_count, "grow restore differed from settle", failures)
+	_check(vfx.permanent_piece_count() == grow_count and not vfx._permanent.has("forest-1"), "grow restore differed from settle", failures)
 	for i in 12:
 		var another := _event("op-extra-%d" % i, "raise", 300 + i, samples)
 		vfx.restore_event(another)
-		_check(vfx.permanent_piece_count() <= 500 and vfx.get_child_count() <= 11, "history exceeded permanent budget", failures)
+		_check(vfx.permanent_piece_count() <= 500 and vfx.get_child_count() <= PERMANENT_MESH_NODE_BUDGET, "history exceeded permanent budget", failures)
 	vfx.clear_all()
 	await process_frame
 	_check(vfx.active_count() == 0 and vfx.permanent_piece_count() == 0, "clear_all retained presenter state", failures)
