@@ -1462,6 +1462,19 @@ with `Get-Content | ConvertFrom-Json` during generation: one such attempted
 tail read stalled and was interrupted after ~15 s. Inspect file presence/
 size or wait for the runner's verified terminal result instead.
 
+Portal collision migration (2026-09-30): replaced the central solid collider
+with a thin `Area3D` ray target under the same portal metadata owner. The
+focused check swept a standing capsule through all 22 gate centres at three
+depths and aimed an approach ray at each trigger: `PORTAL_VISUAL_RESULT`
+reported no failures and 22 walkable interaction areas in 2.592 s. The first
+attempt exposed two Pinewood trunks, an Orchard trunk, Mushroom ring rocks,
+one Forge backdrop stone and a Pinewood ground-kit rock blocking real gates.
+Moved or excluded those deterministic placements; never assume removing the
+gateway's own collider makes the approach clear. The full integration passed
+in 54.964 s. A first check edit failed GDScript inference for a `var :=`
+assigned from an untyped portal list; explicitly annotate `Vector3` values
+before rerunning. Art-specific aperture and performance review remains next.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive

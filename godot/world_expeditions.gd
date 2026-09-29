@@ -26,7 +26,10 @@ static func orchard(root:Node3D,data:Dictionary,w:Script)->void:
 		if i<5: TreeAdapter.hanging_apple(w,root,data,id,orchard_tree)
 	for i in range(10):
 		var a=TAU*float(i)/10.0
-		w.tree(p,Vector3(cos(a)*22,0,sin(a)*21),6.0+float(i%3)*0.8,true)
+		var ring_tree := Vector3(cos(a)*22,0,sin(a)*21)
+		if ring_tree.z > 16.0 and ring_tree.x > 4.0 and ring_tree.x < 11.0:
+			ring_tree.z += 5.0 # Keep the Pinewood return gate clear.
+		w.tree(p,ring_tree,6.0+float(i%3)*0.8,true)
 	for i in range(7): w.flowers(p,Vector3(-15+i*5,0,8-i%3*5),22,2.0,"fff0cf")
 	OrchardArt.trail(p,[Vector3(0,0,21),Vector3(0,0,-20)],w)
 	for i in range(5):

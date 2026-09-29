@@ -279,7 +279,20 @@ static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, t
 	n.add_child(ring)
 	label(n,str(data.zones[target].name),Vector3(0,2.43,0),26)
 	label(n,"TRAVEL",Vector3(0,0.52,0.38),20,color)
-	body(n,Vector3(0,1.0,0),Vector3(1.6,2.0,0.7))
+	# A ray-targetable area keeps the travel action usable while the player can
+	# physically step into the gateway. The old central StaticBody blocked it.
+	var interaction := Area3D.new()
+	interaction.name = "PortalInteraction"
+	interaction.position = Vector3(0, 1.05, 0)
+	interaction.collision_layer = 1
+	interaction.collision_mask = 0
+	n.add_child(interaction)
+	var interaction_shape := CollisionShape3D.new()
+	interaction_shape.name = "CollisionShape3D"
+	var aperture := BoxShape3D.new()
+	aperture.size = Vector3(1.1, 1.9, 0.12)
+	interaction_shape.shape = aperture
+	interaction.add_child(interaction_shape)
 	data.portals.append(n)
 
 static func enemy(root: Node3D, data: Dictionary, zone: String, pos: Vector3, type: String, variant: String = "") -> void:
@@ -648,7 +661,11 @@ static func pinewood(root: Node3D, data: Dictionary) -> void:
 	var c: Vector3 = data.zones[id].center
 	for i in range(14):
 		var a: float = float(i)*TAU/14
-		tree(p,Vector3(cos(a)*12.5,0,sin(a)*12.5),5.5+(i%3),i%3!=0,i%3==0)
+		var tree_position := Vector3(cos(a)*12.5,0,sin(a)*12.5)
+		# The two northern waystones need a walkable approach through the grove.
+		if tree_position.z > 7.5 and absf(tree_position.x) > 5.0 and absf(tree_position.x) < 11.0:
+			tree_position.z += 4.5
+		tree(p,tree_position,5.5+(i%3),i%3!=0,i%3==0)
 	for v in [Vector3(-6,0,4),Vector3(5,0,2),Vector3(-7,0,-4)]:
 		var n := resource(root,data,id,c+v,"lumber","axe")
 		tree(n,Vector3.ZERO,4.7,false,true,1)
@@ -676,6 +693,10 @@ static func mushroom(root: Node3D, data: Dictionary) -> void:
 	var c: Vector3 = data.zones[id].center
 	for i in range(13):
 		var a: float = float(i)*TAU/13
+		# Leave real gaps in the stone ring at the two portal approaches.
+		var stone_position := Vector3(cos(a)*14,3,sin(a)*14)
+		if stone_position.z > 8.0 and absf(stone_position.x) > 5.0 and absf(stone_position.x) < 11.0:
+			continue
 		rock(p,Vector3(cos(a)*14,3,sin(a)*14),Vector3(4.0,6.0+(i%3),4.5),"828d91")
 		rock(p,Vector3(cos(a)*14,6,sin(a)*14),Vector3(4.1,0.8,4.6),"86a465")
 	# Shallow enchanted pool with stepping stones; water is safe to walk through.
@@ -857,7 +878,10 @@ static func backdrop(p: Node3D, id: String) -> void:
 		rock(p,v,Vector3(11.5,height,10.0),color)
 		if not hot and not sand:
 			rock(p,v+Vector3(0,height*0.30,0),Vector3(6.0,height*0.2,5.3),"bac8c0")
-			rock(p,Vector3(cos(a)*19,0.4,sin(a)*19),Vector3(8,2.4,7),"79916d")
+			var foreground_position := Vector3(cos(a)*19,0.4,sin(a)*19)
+			if id == "forge_yard" and foreground_position.distance_to(Vector3(10.5,0.4,10.8)) < 6.0:
+				foreground_position += Vector3(cos(a),0,sin(a))*8.0
+			rock(p,foreground_position,Vector3(8,2.4,7),"79916d")
 	if not hot:
 		for i in range(7):
 			var v := Vector3(-34+i*11,13+(i%3)*2.0,-34-(i%2)*5)

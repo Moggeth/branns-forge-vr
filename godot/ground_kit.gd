@@ -23,6 +23,11 @@ static func _mesh(asset:String)->Mesh:
 	return result
 
 static func _allowed(id:String,p:Vector3,trail:Array=[])->bool:
+	# The portal interaction area is nonblocking; procedural rocks must leave
+	# enough clear floor for a standing player on both sides of each gate.
+	if id in ["pinewood_ruins", "mushroom_glade"] and p.z > 7.0 and p.z < 12.5:
+		if absf(p.x - 7.5) < 2.0 or absf(p.x + 8.5) < 2.0: return false
+	if id == "orchard_highlands" and p.distance_to(Vector3(7.5, 0, 19.5)) < 2.5: return false
 	if id=="forge_yard":
 		if p.length()<6.5 or (absf(p.x)<9.5 and p.z<1.2) or p.z>8.3: return false
 	if id=="orchard_highlands":

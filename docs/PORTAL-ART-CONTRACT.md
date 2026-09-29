@@ -30,13 +30,14 @@ parented under the portal metadata owner; a ray hit must still resolve through
 `_owner()` to the travel action. Do not let decorative art catch rays or block
 the player's path.
 
-**Current baseline limitation:** `WorldZones.portal()` adds a central
-`StaticBody3D` of size 1.6 × 2.0 × 0.7 m. It fully blocks walking through the
-arch. The headless check reports this as `legacy_blocked_apertures`; it cannot
-claim current portals are walkable. A playable walk-through portal needs a
-production change that moves/replaces that collider while retaining a reachable
-interaction target and verifies the result with a player-sized physics sweep.
-This contract and optional art check do not modify that gameplay behavior.
+`WorldZones.portal()` now adds a thin, central `Area3D` named
+`PortalInteraction` instead of the old solid body. It is ray targetable and
+inherits the portal's travel action through `_owner()`, but does not block the
+player. The check sweeps a standing capsule at three depths through all 22
+gateways and aims a ray at each interaction area. Trees and dressing rocks
+previously blocked several approaches; their deterministic placements now
+leave intentional gaps around those portals. Decorative authored frames must
+remain collider free and keep the same aperture clearance.
 
 Run the source contract check from the repository root:
 
@@ -55,3 +56,7 @@ travel plus walk-through in the playable scene before accepting an integration.
 Verification lesson: the first facing assertion used local `-Z` and failed for
 all 22 gates. The existing `look_at(..., true)` call deliberately uses local
 `+Z`; assert that axis when checking portal facing or placing one-sided art.
+The first walk-through attempt found the old solid centre, then seven nearby
+obstructions: two Pinewood tree trunks, an Orchard tree trunk, two Mushroom
+ring boulders, one Forge Yard backdrop rock, and one Pinewood ground-kit rock.
+The capsule and ray checks expose these placements before art is accepted.

@@ -39,13 +39,49 @@ func _run() -> void:
 		var child: String = BRANCHES[parent]
 		if not links.get(parent, []).has(child) or not links.get(child, []).has(parent):
 			failures.append("missing branch pair " + parent + " / " + child)
-	var baseline_blocks := 0
+	var walkable_targets := 0
 	for portal in data.portals:
+		var interaction := portal.get_node_or_null("PortalInteraction") as Area3D
+		if interaction == null:
+			failures.append("missing nonblocking interaction surface on " + portal.name)
+			continue
+		var shape := interaction.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if shape == null or not (shape.shape is BoxShape3D):
+			failures.append("missing portal interaction shape on " + portal.name)
+			continue
+		if interaction.collision_layer == 0 or (shape.shape as BoxShape3D).size.x < 0.8:
+			failures.append("portal ray target is too narrow on " + portal.name)
+		walkable_targets += 1
 		for child in portal.get_children():
 			if child is StaticBody3D:
-				baseline_blocks += 1
-	if baseline_blocks != data.portals.size():
-		failures.append("legacy trigger-body count changed; revisit aperture migration")
+				failures.append("solid body still blocks the gateway on " + portal.name)
+	if walkable_targets != data.portals.size():
+		failures.append("not all portals have walkable interaction areas")
+	await physics_frame
+	var space := scene.get_world_3d().direct_space_state
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.27
+	capsule.height = 1.5
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.collision_mask = 1
+	for portal in data.portals:
+		for depth in [0.65, 0.0, -0.65]:
+			query.transform = Transform3D(portal.global_basis, portal.to_global(Vector3(0, 1.05, depth)))
+			var overlaps := space.intersect_shape(query, 8)
+			if not overlaps.is_empty():
+				var obstacle: CollisionObject3D = overlaps[0].collider
+				var obstacle_shape := obstacle.get_child(0) as CollisionShape3D if obstacle.get_child_count() > 0 else null
+				var dimensions := str((obstacle_shape.shape as BoxShape3D).size) if obstacle_shape != null and obstacle_shape.shape is BoxShape3D else (str(obstacle_shape.shape.get_class()) if obstacle_shape != null else "no shape")
+				failures.append("standing player capsule blocked at " + portal.name + " depth " + str(depth) + " by " + str(obstacle.name) + " parent " + str(obstacle.get_parent().name) + " shape " + dimensions + " at " + str(obstacle_shape.global_position if obstacle_shape != null else obstacle.global_position) + " portal " + str(portal.global_position))
+				break
+		var from: Vector3 = portal.to_global(Vector3(0, 1.05, 1.2))
+		var toward: Vector3 = portal.to_global(Vector3(0, 1.05, -0.4))
+		var ray := PhysicsRayQueryParameters3D.create(from, toward, 1)
+		ray.collide_with_areas = true
+		var hit := space.intersect_ray(ray)
+		if hit.is_empty() or hit.collider != portal.get_node_or_null("PortalInteraction"):
+			failures.append("approach ray does not reach interaction surface on " + portal.name + " (hit " + str(hit.collider.name if not hit.is_empty() else "nothing") + ")")
 	for arg in OS.get_cmdline_user_args():
 		if not arg.begins_with("--visual-scene="): continue
 		var path := arg.trim_prefix("--visual-scene=")
@@ -62,7 +98,7 @@ func _run() -> void:
 			portal.add_child(kit)
 			_check_kit(kit, target, failures)
 			kit.queue_free()
-	print("PORTAL_VISUAL_RESULT ", JSON.stringify({"failures":failures, "portals":data.portals.size(), "legacy_blocked_apertures":baseline_blocks}))
+	print("PORTAL_VISUAL_RESULT ", JSON.stringify({"failures":failures, "portals":data.portals.size(), "walkable_interaction_areas":walkable_targets}))
 	quit(0 if failures.is_empty() else 1)
 
 func _portal(portals: Array, source: String, target: String) -> Node3D:
