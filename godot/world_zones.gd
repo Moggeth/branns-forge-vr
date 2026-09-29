@@ -801,32 +801,36 @@ static func foundry(root: Node3D, data: Dictionary) -> void:
 	var id := "ember_foundry"
 	var p: Node3D = data.zones[id].root
 	var c: Vector3 = data.zones[id].center
+	var authored := FileAccess.file_exists("res://assets/zone_art/ember_foundry/placement.json")
 	box(p,Vector3(0,-0.7,0),Vector3(31,0.25,31),"ed803a",0.9)
 	floor_patch(p,Vector3(0,0,7),Vector2(24,15),"6e6870")
 	floor_patch(p,Vector3(0,0,-7),Vector2(22,10),"68616c")
 	floor_patch(p,Vector3(0,0,-1),Vector2(4,4),"7d7273")
-	for i in range(14):
-		var a: float = float(i)*TAU/14
-		rock(p,Vector3(cos(a)*15,2.8,sin(a)*15),Vector3(3.6,5.8+i%3,3.6),"685764")
-	for x in [-10,-6,6,10]:
-		box(p,Vector3(x,3.2,-11.6),Vector3(1.05,6.4,1.05),"716674")
-		box(p,Vector3(x,6.4,-11.6),Vector3(1.45,0.43,1.45),"867781")
-	box(p,Vector3(0,3.7,-12.5),Vector3(9,7.4,1.3),"635665")
-	arch(p,Vector3(0,0,-11.8),2.0,"92807d")
-	box(p,Vector3(0,2.1,-11.72),Vector3(3.2,4.2,0.10),"3e3946")
-	box(p,Vector3(0,2.3,-11.62),Vector3(0.1,3.9,0.04),"ffc36b",1.2)
-	box(p,Vector3(0,3.7,-11.59),Vector3(1.9,0.12,0.06),"ffc36b",1.2)
-	for side in [-1,1]:
-		box(p,Vector3(side*4.4,4.7,-11.3),Vector3(1.7,3.4,0.08),"a85d45")
-		label(p,"♜",Vector3(side*4.4,4.7,-11.22),80,"efb971")
-		for z in [-8,4,10]:
-			box(p,Vector3(side*9,0.65,z),Vector3(0.85,1.3,0.85),"8b7d7e")
-			cyl(p,Vector3(side*9,1.4,z),0.55,0.3,"52434c","taper")
-			for j in range(3): cyl(p,Vector3(side*9+(j-1)*0.21,1.8,z),0.16,0.65-(j%2)*0.12,"ffb94f","cone",1.2)
-	for i in range(12):
-		box(p,Vector3(-10+(i%6)*4,0.01,2+floorf(float(i)/6)*5),Vector3(3.94,0.05,4.94),"766c74" if i%2 else "6d6570")
-	for i in range(10):
-		cyl(p,Vector3(sin(i*3.2)*13,0.5,cos(i*2.4)*13),0.04,0.1,"ffd983","taper",1.0)
+	# Keep lava and gameplay floors authoritative while an authored kit replaces
+	# the old primitive perimeter, gate, floor decals and static braziers.
+	if not authored:
+		for i in range(14):
+			var a: float = float(i)*TAU/14
+			rock(p,Vector3(cos(a)*15,2.8,sin(a)*15),Vector3(3.6,5.8+i%3,3.6),"685764")
+		for x in [-10,-6,6,10]:
+			box(p,Vector3(x,3.2,-11.6),Vector3(1.05,6.4,1.05),"716674")
+			box(p,Vector3(x,6.4,-11.6),Vector3(1.45,0.43,1.45),"867781")
+		box(p,Vector3(0,3.7,-12.5),Vector3(9,7.4,1.3),"635665")
+		arch(p,Vector3(0,0,-11.8),2.0,"92807d")
+		box(p,Vector3(0,2.1,-11.72),Vector3(3.2,4.2,0.10),"3e3946")
+		box(p,Vector3(0,2.3,-11.62),Vector3(0.1,3.9,0.04),"ffc36b",1.2)
+		box(p,Vector3(0,3.7,-11.59),Vector3(1.9,0.12,0.06),"ffc36b",1.2)
+		for side in [-1,1]:
+			box(p,Vector3(side*4.4,4.7,-11.3),Vector3(1.7,3.4,0.08),"a85d45")
+			label(p,"♜",Vector3(side*4.4,4.7,-11.22),80,"efb971")
+			for z in [-8,4,10]:
+				box(p,Vector3(side*9,0.65,z),Vector3(0.85,1.3,0.85),"8b7d7e")
+				cyl(p,Vector3(side*9,1.4,z),0.55,0.3,"52434c","taper")
+				for j in range(3): cyl(p,Vector3(side*9+(j-1)*0.21,1.8,z),0.16,0.65-(j%2)*0.12,"ffb94f","cone",1.2)
+		for i in range(12):
+			box(p,Vector3(-10+(i%6)*4,0.01,2+floorf(float(i)/6)*5),Vector3(3.94,0.05,4.94),"766c74" if i%2 else "6d6570")
+		for i in range(10):
+			cyl(p,Vector3(sin(i*3.2)*13,0.5,cos(i*2.4)*13),0.04,0.1,"ffd983","taper",1.0)
 	enemy(root,data,id,c+Vector3(0,0,-7),"boss")
 	enemy(root,data,id,c+Vector3(5,0,-5),"skeleton","cinderkeep")
 	ore(root,data,id,c+Vector3(-7,0,-7),"iron","e7a55b")

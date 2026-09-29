@@ -44,7 +44,7 @@ For the next authored kits, run the route/resource acceptance check before and a
 
 The zone root counts support the visual triage only loosely: Gloamfen has 33 visible geometry nodes, Cloudbreak Keep 26, Sky Garden 73, Starfall Ridge 196, and Orchard Highlands 1,518. MultiMesh nodes can contain many instances, and other game systems may add visuals outside the zone root. Judge the PNGs first.
 
-Priority 3 has since been integrated: [Starfall Ridge's authored valley and actual-game comparison](STARFALL-ART-20260930.md). Priorities 1 and 2 likewise have their own art handoffs. Quarry has [an authored mining-yard pass](QUARRY-ART-20260930.md); Foundry remains the next large environment-art commission.
+Priority 3 has since been integrated: [Starfall Ridge's authored valley and actual-game comparison](STARFALL-ART-20260930.md). Priorities 1 and 2 likewise have their own art handoffs. Quarry has [an authored mining-yard pass](QUARRY-ART-20260930.md) and Foundry has [an authored basalt-and-iron pass](FOUNDRY-ART-20260930.md).
 
 ## Capture failure and recovery
 
