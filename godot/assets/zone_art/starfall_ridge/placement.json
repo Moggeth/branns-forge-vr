@@ -1,0 +1,3385 @@
+{
+ "schema": 1,
+ "assets": {
+  "cliff_a": "cliff_a.glb",
+  "cliff_b": "cliff_b.glb",
+  "cliff_c": "cliff_c.glb",
+  "cliff_shelf": "cliff_shelf.glb",
+  "boulder_a": "boulder_a.glb",
+  "boulder_b": "boulder_b.glb",
+  "boulder_c": "boulder_c.glb",
+  "scree": "scree.glb",
+  "geode_seam_a": "geode_seam_a.glb",
+  "geode_seam_b": "geode_seam_b.glb",
+  "crystal_cluster_cyan": "crystal_cluster_cyan.glb",
+  "crystal_cluster_violet": "crystal_cluster_violet.glb",
+  "crystal_spire": "crystal_spire.glb",
+  "meteor_fragment_large": "meteor_fragment_large.glb",
+  "meteor_fragment_small": "meteor_fragment_small.glb",
+  "crater_rim": "crater_rim.glb",
+  "mined_face": "mined_face.glb",
+  "mined_block_pile": "mined_block_pile.glb",
+  "observatory": "observatory.glb",
+  "ruin_column": "ruin_column.glb",
+  "ruin_column_fallen": "ruin_column_fallen.glb",
+  "waystone": "waystone.glb",
+  "paving_a": "paving_a.glb",
+  "paving_b": "paving_b.glb",
+  "tussock": "tussock.glb",
+  "shrub": "shrub.glb",
+  "cushion": "cushion.glb",
+  "deadpine": "deadpine.glb",
+  "ground_skin": "ground_skin.glb"
+ },
+ "placements": [
+  {
+   "asset": "ground_skin",
+   "position": [
+    0,
+    0.0,
+    0
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "crater_rim",
+   "position": [
+    16.5,
+    0.0,
+    11.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 0.85
+  },
+  {
+   "asset": "paving_a",
+   "position": [
+    0.0,
+    0.012,
+    20.0
+   ],
+   "yaw_degrees": 180,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_b",
+   "position": [
+    0.0,
+    0.012,
+    16.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_a",
+   "position": [
+    0.0,
+    0.012,
+    12.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_b",
+   "position": [
+    0.0,
+    0.012,
+    8.0
+   ],
+   "yaw_degrees": 180,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_a",
+   "position": [
+    0.0,
+    0.012,
+    4.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_b",
+   "position": [
+    0.0,
+    0.012,
+    0.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_a",
+   "position": [
+    0.0,
+    0.012,
+    -4.0
+   ],
+   "yaw_degrees": 180,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_b",
+   "position": [
+    0.0,
+    0.012,
+    -8.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_a",
+   "position": [
+    0.0,
+    0.012,
+    -12.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "paving_b",
+   "position": [
+    0.0,
+    0.012,
+    -16.0
+   ],
+   "yaw_degrees": 180,
+   "scale": 1.0
+  },
+  {
+   "asset": "waystone",
+   "position": [
+    4.7,
+    0.0,
+    17.5
+   ],
+   "yaw_degrees": 25,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "waystone",
+   "position": [
+    -4.7,
+    0.0,
+    10.5
+   ],
+   "yaw_degrees": -20,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "waystone",
+   "position": [
+    4.7,
+    0.0,
+    -1.5
+   ],
+   "yaw_degrees": 15,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "waystone",
+   "position": [
+    -4.7,
+    0.0,
+    -12.5
+   ],
+   "yaw_degrees": -10,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "waystone",
+   "position": [
+    4.7,
+    0.0,
+    -14.5
+   ],
+   "yaw_degrees": 30,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    -25.914,
+    0.0,
+    20
+   ],
+   "yaw_degrees": 96.16,
+   "scale": 1.221,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    25.04,
+    0.0,
+    17.936
+   ],
+   "yaw_degrees": -87.22,
+   "scale": 1.237,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    -26.076,
+    0.0,
+    10.5
+   ],
+   "yaw_degrees": 96.73,
+   "scale": 1.248,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    25.487,
+    0.0,
+    9.977
+   ],
+   "yaw_degrees": -84.24,
+   "scale": 1.215,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    -25.898,
+    0.0,
+    1
+   ],
+   "yaw_degrees": 96.33,
+   "scale": 1.176,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    26.081,
+    0.0,
+    1.503
+   ],
+   "yaw_degrees": -85.13,
+   "scale": 1.15,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    -25.606,
+    0.0,
+    -8.5
+   ],
+   "yaw_degrees": 90.08,
+   "scale": 1.119,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    25.032,
+    0.0,
+    -9.218
+   ],
+   "yaw_degrees": -96.26,
+   "scale": 1.004,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    -25.7,
+    0.0,
+    -18
+   ],
+   "yaw_degrees": 97.92,
+   "scale": 1.208,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    26.015,
+    0.0,
+    -20.777
+   ],
+   "yaw_degrees": -94.29,
+   "scale": 1.198,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    -24,
+    0.0,
+    27.22
+   ],
+   "yaw_degrees": 176.39,
+   "scale": 1.054,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    -17.5,
+    0.0,
+    27.157
+   ],
+   "yaw_degrees": 178.74,
+   "scale": 1.093,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    17.5,
+    0.0,
+    27.309
+   ],
+   "yaw_degrees": 174.61,
+   "scale": 1.121,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    24,
+    0.0,
+    27.041
+   ],
+   "yaw_degrees": 184.72,
+   "scale": 1.111,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    -24.5,
+    0.0,
+    -28.145
+   ],
+   "yaw_degrees": 3.22,
+   "scale": 1.187,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    -16.5,
+    0.0,
+    -28.772
+   ],
+   "yaw_degrees": 5.54,
+   "scale": 1.029,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    -11.0,
+    0.0,
+    -28.453
+   ],
+   "yaw_degrees": -5.86,
+   "scale": 1.02,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    11.0,
+    0.0,
+    -28.316
+   ],
+   "yaw_degrees": -3.65,
+   "scale": 1.221,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_a",
+   "position": [
+    16.5,
+    0.0,
+    -28.441
+   ],
+   "yaw_degrees": -0.86,
+   "scale": 1.175,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_b",
+   "position": [
+    24.5,
+    0.0,
+    -28.475
+   ],
+   "yaw_degrees": -0.21,
+   "scale": 1.155,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    -7.0,
+    0.0,
+    -34.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.6,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    8.0,
+    0.0,
+    -35.0
+   ],
+   "yaw_degrees": 10,
+   "scale": 1.7,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    0.0,
+    0.0,
+    -38.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.9,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    -27,
+    0.0,
+    -27
+   ],
+   "yaw_degrees": 45,
+   "scale": 1.1,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    27,
+    0.0,
+    -27
+   ],
+   "yaw_degrees": -45,
+   "scale": 1.1,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    -27,
+    0.0,
+    27
+   ],
+   "yaw_degrees": 135,
+   "scale": 1.1,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_c",
+   "position": [
+    27,
+    0.0,
+    27
+   ],
+   "yaw_degrees": -135,
+   "scale": 1.1,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    -13.5,
+    0.0,
+    -23.5
+   ],
+   "yaw_degrees": 25,
+   "scale": 0.75,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    13.5,
+    0.0,
+    -23.5
+   ],
+   "yaw_degrees": -25,
+   "scale": 0.75,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    -20.5,
+    0.0,
+    21.5
+   ],
+   "yaw_degrees": 120,
+   "scale": 0.8,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "cliff_shelf",
+   "position": [
+    21.0,
+    0.0,
+    21.5
+   ],
+   "yaw_degrees": -120,
+   "scale": 0.8,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "observatory",
+   "position": [
+    0.0,
+    0.0,
+    -26.2
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "crystal_spire",
+   "position": [
+    -4.2,
+    0,
+    -31.0
+   ],
+   "yaw_degrees": 247.26,
+   "scale": 1.5
+  },
+  {
+   "asset": "crystal_spire",
+   "position": [
+    4.0,
+    0,
+    -31.0
+   ],
+   "yaw_degrees": 172.6,
+   "scale": 1.8
+  },
+  {
+   "asset": "ruin_column",
+   "position": [
+    -9.6,
+    0.0,
+    -23.0
+   ],
+   "yaw_degrees": 40,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "ruin_column",
+   "position": [
+    9.2,
+    0.0,
+    -23.3
+   ],
+   "yaw_degrees": -20,
+   "scale": 1.15,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "ruin_column_fallen",
+   "position": [
+    -8.2,
+    0.0,
+    -14.2
+   ],
+   "yaw_degrees": 25,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "ruin_column_fallen",
+   "position": [
+    8.5,
+    0.0,
+    17.0
+   ],
+   "yaw_degrees": -35,
+   "scale": 0.9,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "geode_seam_a",
+   "position": [
+    19.8,
+    0.0,
+    -1.5
+   ],
+   "yaw_degrees": -90,
+   "scale": 1.15,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "geode_seam_b",
+   "position": [
+    -20.0,
+    0.0,
+    8.0
+   ],
+   "yaw_degrees": 90,
+   "scale": 1.15,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "geode_seam_b",
+   "position": [
+    20.5,
+    0.0,
+    -11.5
+   ],
+   "yaw_degrees": -90,
+   "scale": 0.85,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "geode_seam_a",
+   "position": [
+    -20.5,
+    0.0,
+    -9.5
+   ],
+   "yaw_degrees": 90,
+   "scale": 0.9,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "mined_face",
+   "position": [
+    -22.0,
+    0.0,
+    -1.8
+   ],
+   "yaw_degrees": 90,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "mined_block_pile",
+   "position": [
+    -17.2,
+    0.0,
+    -4.0
+   ],
+   "yaw_degrees": 40,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "mined_block_pile",
+   "position": [
+    15.5,
+    0.0,
+    -14.8
+   ],
+   "yaw_degrees": -25,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "mined_block_pile",
+   "position": [
+    -9.0,
+    0.0,
+    20.0
+   ],
+   "yaw_degrees": 80,
+   "scale": 0.9,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "meteor_fragment_large",
+   "position": [
+    17.1,
+    -0.5,
+    10.7
+   ],
+   "yaw_degrees": 20,
+   "scale": 1.0,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    10.727,
+    -0.05,
+    17.177
+   ],
+   "yaw_degrees": 180.93,
+   "scale": 0.49
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    12.059,
+    -0.05,
+    15.991
+   ],
+   "yaw_degrees": 190.92,
+   "scale": 0.77
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    12.917,
+    -0.05,
+    14.303
+   ],
+   "yaw_degrees": 32.84,
+   "scale": 0.56
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    14.823,
+    -0.05,
+    12.291
+   ],
+   "yaw_degrees": 356.3,
+   "scale": 0.84
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    -17.0,
+    0.0,
+    -13.5
+   ],
+   "yaw_degrees": 70,
+   "scale": 1.0
+  },
+  {
+   "asset": "meteor_fragment_small",
+   "position": [
+    7.5,
+    0.0,
+    19.5
+   ],
+   "yaw_degrees": 20,
+   "scale": 0.7
+  },
+  {
+   "asset": "scree",
+   "position": [
+    -14.6,
+    0.0,
+    4.0
+   ],
+   "yaw_degrees": 89.18,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    -15.4,
+    0.0,
+    0.4
+   ],
+   "yaw_degrees": 300.99,
+   "scale": 0.832
+  },
+  {
+   "asset": "scree",
+   "position": [
+    -6.6,
+    0.0,
+    -5.0
+   ],
+   "yaw_degrees": 259.27,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_violet",
+   "position": [
+    -7.4,
+    0.0,
+    -8.6
+   ],
+   "yaw_degrees": 22.47,
+   "scale": 1.023
+  },
+  {
+   "asset": "scree",
+   "position": [
+    6.6,
+    0.0,
+    4.0
+   ],
+   "yaw_degrees": 257.55,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    7.4,
+    0.0,
+    0.4
+   ],
+   "yaw_degrees": 294.9,
+   "scale": 1.045
+  },
+  {
+   "asset": "scree",
+   "position": [
+    14.6,
+    0.0,
+    -5.0
+   ],
+   "yaw_degrees": 144.14,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_violet",
+   "position": [
+    15.4,
+    0.0,
+    -8.6
+   ],
+   "yaw_degrees": 271.67,
+   "scale": 0.838
+  },
+  {
+   "asset": "scree",
+   "position": [
+    -12.6,
+    0.0,
+    -15.0
+   ],
+   "yaw_degrees": 22.14,
+   "scale": 0.8
+  },
+  {
+   "asset": "scree",
+   "position": [
+    2.7,
+    0.0,
+    -15.0
+   ],
+   "yaw_degrees": 128.28,
+   "scale": 0.8
+  },
+  {
+   "asset": "scree",
+   "position": [
+    12.6,
+    0.0,
+    -15.0
+   ],
+   "yaw_degrees": 251.67,
+   "scale": 0.8
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    -8.5,
+    0.0,
+    14.0
+   ],
+   "yaw_degrees": 80.55,
+   "scale": 1.012
+  },
+  {
+   "asset": "crystal_cluster_violet",
+   "position": [
+    9.0,
+    0.0,
+    6.5
+   ],
+   "yaw_degrees": 16.57,
+   "scale": 1.258
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    -8.0,
+    0.0,
+    -3.0
+   ],
+   "yaw_degrees": 77.12,
+   "scale": 1.251
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    9.5,
+    0.0,
+    -9.5
+   ],
+   "yaw_degrees": 332.53,
+   "scale": 1.215
+  },
+  {
+   "asset": "crystal_cluster_violet",
+   "position": [
+    -16.5,
+    0.0,
+    14.5
+   ],
+   "yaw_degrees": 66.74,
+   "scale": 0.925
+  },
+  {
+   "asset": "crystal_cluster_violet",
+   "position": [
+    15.5,
+    0.0,
+    -2.5
+   ],
+   "yaw_degrees": 229.39,
+   "scale": 1.042
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    -15.0,
+    0.0,
+    -15.0
+   ],
+   "yaw_degrees": 356.14,
+   "scale": 1.055
+  },
+  {
+   "asset": "crystal_cluster_cyan",
+   "position": [
+    13.0,
+    0.0,
+    19.5
+   ],
+   "yaw_degrees": 359.7,
+   "scale": 0.938
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -14.429,
+    -0.05,
+    15.189
+   ],
+   "yaw_degrees": 309.96,
+   "scale": 0.882,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -5.719,
+    -0.05,
+    15.717
+   ],
+   "yaw_degrees": 312.49,
+   "scale": 1.138
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    23.424,
+    -0.05,
+    -12.973
+   ],
+   "yaw_degrees": 296.55,
+   "scale": 1.125,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -9.788,
+    -0.05,
+    10.479
+   ],
+   "yaw_degrees": 330.51,
+   "scale": 1.352,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    13.744,
+    -0.05,
+    -0.397
+   ],
+   "yaw_degrees": 35.12,
+   "scale": 1.02,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    23.387,
+    -0.05,
+    6.528
+   ],
+   "yaw_degrees": 87.66,
+   "scale": 0.858,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -18.271,
+    -0.05,
+    18.137
+   ],
+   "yaw_degrees": 311.53,
+   "scale": 1.056
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -19.92,
+    -0.05,
+    -19.258
+   ],
+   "yaw_degrees": 350.58,
+   "scale": 0.968,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -10.524,
+    -0.05,
+    -0.011
+   ],
+   "yaw_degrees": 95.87,
+   "scale": 1.286
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    -22.485,
+    -0.05,
+    17.755
+   ],
+   "yaw_degrees": 180.59,
+   "scale": 1.453,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -16.654,
+    -0.05,
+    4.746
+   ],
+   "yaw_degrees": 238.36,
+   "scale": 1.347
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    19.633,
+    -0.05,
+    -8.021
+   ],
+   "yaw_degrees": 334.05,
+   "scale": 1.215,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -4.665,
+    -0.05,
+    4.803
+   ],
+   "yaw_degrees": 228.15,
+   "scale": 1.388,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -4.797,
+    -0.05,
+    -15.989
+   ],
+   "yaw_degrees": 262.78,
+   "scale": 0.912
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -15.07,
+    -0.05,
+    -20.419
+   ],
+   "yaw_degrees": 38.98,
+   "scale": 1.212
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    20.372,
+    -0.05,
+    16.471
+   ],
+   "yaw_degrees": 224.99,
+   "scale": 1.197,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    16.742,
+    -0.05,
+    -19.708
+   ],
+   "yaw_degrees": 169.18,
+   "scale": 1.083,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -3.92,
+    -0.05,
+    9.915
+   ],
+   "yaw_degrees": 245.21,
+   "scale": 0.822
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -21.626,
+    -0.05,
+    -18.988
+   ],
+   "yaw_degrees": 126.0,
+   "scale": 1.149
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    -21.687,
+    -0.05,
+    -20.655
+   ],
+   "yaw_degrees": 107.77,
+   "scale": 0.881,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -23.373,
+    -0.05,
+    -20.063
+   ],
+   "yaw_degrees": 262.6,
+   "scale": 0.855
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -15.477,
+    -0.05,
+    17.246
+   ],
+   "yaw_degrees": 134.87,
+   "scale": 1.381,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    7.27,
+    -0.05,
+    7.91
+   ],
+   "yaw_degrees": 295.21,
+   "scale": 0.874,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -4.351,
+    -0.05,
+    13.005
+   ],
+   "yaw_degrees": 26.59,
+   "scale": 1.147
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    -19.325,
+    -0.05,
+    21.236
+   ],
+   "yaw_degrees": 151.78,
+   "scale": 0.979,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -10.002,
+    -0.05,
+    -9.083
+   ],
+   "yaw_degrees": 254.04,
+   "scale": 0.858,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -4.133,
+    -0.05,
+    -9.986
+   ],
+   "yaw_degrees": 189.72,
+   "scale": 0.894,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    -15.75,
+    -0.05,
+    24.747
+   ],
+   "yaw_degrees": 339.38,
+   "scale": 1.345,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    10.616,
+    -0.05,
+    -0.061
+   ],
+   "yaw_degrees": 286.51,
+   "scale": 1.172,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    18.4,
+    -0.05,
+    20.524
+   ],
+   "yaw_degrees": 290.66,
+   "scale": 1.335,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    -20.808,
+    -0.05,
+    -17.513
+   ],
+   "yaw_degrees": 84.32,
+   "scale": 0.927
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    6.757,
+    -0.05,
+    13.464
+   ],
+   "yaw_degrees": 347.59,
+   "scale": 1.305,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    16.97,
+    -0.05,
+    18.579
+   ],
+   "yaw_degrees": 85.82,
+   "scale": 1.011,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -23.777,
+    -0.05,
+    8.436
+   ],
+   "yaw_degrees": 302.98,
+   "scale": 1.393,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    9.237,
+    -0.05,
+    3.977
+   ],
+   "yaw_degrees": 90.16,
+   "scale": 0.971,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -4.497,
+    -0.05,
+    18.465
+   ],
+   "yaw_degrees": 252.57,
+   "scale": 1.327,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_a",
+   "position": [
+    19.16,
+    -0.05,
+    6.25
+   ],
+   "yaw_degrees": 84.75,
+   "scale": 0.995,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    1.601,
+    -0.05,
+    24.624
+   ],
+   "yaw_degrees": 46.24,
+   "scale": 1.225,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -5.166,
+    -0.05,
+    -1.318
+   ],
+   "yaw_degrees": 243.77,
+   "scale": 1.398,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    18.307,
+    -0.05,
+    17.184
+   ],
+   "yaw_degrees": 94.16,
+   "scale": 1.244,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    13.542,
+    -0.05,
+    17.725
+   ],
+   "yaw_degrees": 259.55,
+   "scale": 1.198
+  },
+  {
+   "asset": "boulder_c",
+   "position": [
+    22.518,
+    -0.05,
+    -4.73
+   ],
+   "yaw_degrees": 66.16,
+   "scale": 0.933
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    -7.928,
+    -0.05,
+    9.95
+   ],
+   "yaw_degrees": 101.7,
+   "scale": 1.069,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "boulder_b",
+   "position": [
+    16.407,
+    -0.05,
+    24.351
+   ],
+   "yaw_degrees": 89.71,
+   "scale": 0.901,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.467,
+    0.0,
+    23.546
+   ],
+   "yaw_degrees": 113.7,
+   "scale": 0.975
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.781,
+    0.0,
+    21.984
+   ],
+   "yaw_degrees": 273.67,
+   "scale": 1.397
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.205,
+    0.0,
+    21.958
+   ],
+   "yaw_degrees": 128.51,
+   "scale": 1.268
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -22.644,
+    0.0,
+    22.421
+   ],
+   "yaw_degrees": 210.57,
+   "scale": 0.913
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.995,
+    0.0,
+    11.123
+   ],
+   "yaw_degrees": 94.45,
+   "scale": 1.196
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.38,
+    0.0,
+    9.321
+   ],
+   "yaw_degrees": 129.53,
+   "scale": 1.365
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.087,
+    0.0,
+    9.362
+   ],
+   "yaw_degrees": 153.56,
+   "scale": 0.813
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    5.656,
+    0.0,
+    15.927
+   ],
+   "yaw_degrees": 130.28,
+   "scale": 1.4
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    5.297,
+    0.0,
+    15.397
+   ],
+   "yaw_degrees": 246.81,
+   "scale": 1.132
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    4.596,
+    0.0,
+    15.48
+   ],
+   "yaw_degrees": 38.14,
+   "scale": 0.841
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    4.324,
+    0.0,
+    15.341
+   ],
+   "yaw_degrees": 358.04,
+   "scale": 0.904
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    15.391,
+    0.0,
+    -1.223
+   ],
+   "yaw_degrees": 12.81,
+   "scale": 1.098
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.004,
+    0.0,
+    -1.518
+   ],
+   "yaw_degrees": 268.41,
+   "scale": 1.243
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.278,
+    0.0,
+    -1.402
+   ],
+   "yaw_degrees": 119.0,
+   "scale": 0.912
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.282,
+    0.0,
+    -3.158
+   ],
+   "yaw_degrees": 228.34,
+   "scale": 1.359
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.643,
+    0.0,
+    -0.411
+   ],
+   "yaw_degrees": 40.33,
+   "scale": 1.023
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    10.247,
+    0.0,
+    -1.002
+   ],
+   "yaw_degrees": 17.86,
+   "scale": 1.314
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.847,
+    0.0,
+    -1.651
+   ],
+   "yaw_degrees": 2.68,
+   "scale": 0.82
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -20.512,
+    0.0,
+    10.946
+   ],
+   "yaw_degrees": 118.12,
+   "scale": 0.944
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.226,
+    0.0,
+    12.455
+   ],
+   "yaw_degrees": 269.63,
+   "scale": 0.811
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    10.127,
+    0.0,
+    -2.819
+   ],
+   "yaw_degrees": 333.67,
+   "scale": 0.85
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.495,
+    0.0,
+    -4.081
+   ],
+   "yaw_degrees": 330.98,
+   "scale": 1.338
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -12.77,
+    0.0,
+    -12.264
+   ],
+   "yaw_degrees": 64.85,
+   "scale": 0.84
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -14.75,
+    0.0,
+    -13.127
+   ],
+   "yaw_degrees": 93.61,
+   "scale": 1.007
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.292,
+    0.0,
+    24.222
+   ],
+   "yaw_degrees": 28.84,
+   "scale": 1.014
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    12.307,
+    0.0,
+    23.057
+   ],
+   "yaw_degrees": 286.88,
+   "scale": 0.93
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.196,
+    0.0,
+    22.133
+   ],
+   "yaw_degrees": 152.48,
+   "scale": 0.95
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.896,
+    0.0,
+    23.295
+   ],
+   "yaw_degrees": 254.41,
+   "scale": 1.091
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -19.695,
+    0.0,
+    -5.88
+   ],
+   "yaw_degrees": 86.07,
+   "scale": 1.387
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -20.497,
+    0.0,
+    -6.658
+   ],
+   "yaw_degrees": 277.61,
+   "scale": 1.35
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -19.23,
+    0.0,
+    -7.902
+   ],
+   "yaw_degrees": 92.42,
+   "scale": 1.049
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -20.92,
+    0.0,
+    -7.448
+   ],
+   "yaw_degrees": 150.51,
+   "scale": 0.872
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -14.977,
+    0.0,
+    -22.381
+   ],
+   "yaw_degrees": 114.29,
+   "scale": 1.296
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -14.045,
+    0.0,
+    -22.45
+   ],
+   "yaw_degrees": 9.56,
+   "scale": 1.161
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -13.935,
+    0.0,
+    -22.375
+   ],
+   "yaw_degrees": 45.63,
+   "scale": 0.813
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    9.448,
+    0.0,
+    12.56
+   ],
+   "yaw_degrees": 196.27,
+   "scale": 1.156
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    10.142,
+    0.0,
+    12.59
+   ],
+   "yaw_degrees": 139.88,
+   "scale": 1.325
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -22.743,
+    0.0,
+    16.482
+   ],
+   "yaw_degrees": 180.62,
+   "scale": 1.194
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -22.39,
+    0.0,
+    15.183
+   ],
+   "yaw_degrees": 135.38,
+   "scale": 0.948
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -22.143,
+    0.0,
+    15.978
+   ],
+   "yaw_degrees": 23.95,
+   "scale": 1.18
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    21.2,
+    0.0,
+    -5.317
+   ],
+   "yaw_degrees": 180.82,
+   "scale": 1.098
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    21.32,
+    0.0,
+    -7.141
+   ],
+   "yaw_degrees": 195.83,
+   "scale": 0.898
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    21.863,
+    0.0,
+    -5.906
+   ],
+   "yaw_degrees": 23.3,
+   "scale": 1.227
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    23.038,
+    0.0,
+    6.173
+   ],
+   "yaw_degrees": 220.81,
+   "scale": 0.873
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    23.147,
+    0.0,
+    4.441
+   ],
+   "yaw_degrees": 238.61,
+   "scale": 1.268
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    22.216,
+    0.0,
+    4.915
+   ],
+   "yaw_degrees": 31.92,
+   "scale": 0.927
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -14.589,
+    0.0,
+    -21.678
+   ],
+   "yaw_degrees": 38.61,
+   "scale": 1.29
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -13.827,
+    0.0,
+    -19.795
+   ],
+   "yaw_degrees": 74.91,
+   "scale": 1.012
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -14.512,
+    0.0,
+    -21.809
+   ],
+   "yaw_degrees": 355.38,
+   "scale": 0.812
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -13.653,
+    0.0,
+    -21.968
+   ],
+   "yaw_degrees": 11.21,
+   "scale": 0.916
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    4.604,
+    0.0,
+    14.362
+   ],
+   "yaw_degrees": 297.11,
+   "scale": 1.289
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    5.542,
+    0.0,
+    14.798
+   ],
+   "yaw_degrees": 65.66,
+   "scale": 1.293
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    6.434,
+    0.0,
+    14.771
+   ],
+   "yaw_degrees": 58.71,
+   "scale": 1.265
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    5.19,
+    0.0,
+    14.564
+   ],
+   "yaw_degrees": 249.22,
+   "scale": 1.118
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -12.439,
+    0.0,
+    8.771
+   ],
+   "yaw_degrees": 225.0,
+   "scale": 1.123
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -11.63,
+    0.0,
+    8.624
+   ],
+   "yaw_degrees": 182.59,
+   "scale": 1.019
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    20.817,
+    0.0,
+    1.241
+   ],
+   "yaw_degrees": 57.78,
+   "scale": 0.883
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    19.704,
+    0.0,
+    0.525
+   ],
+   "yaw_degrees": 153.3,
+   "scale": 1.397
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    20.963,
+    0.0,
+    0.91
+   ],
+   "yaw_degrees": 217.02,
+   "scale": 1.202
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -15.357,
+    0.0,
+    -19.536
+   ],
+   "yaw_degrees": 224.73,
+   "scale": 0.903
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -16.348,
+    0.0,
+    -19.449
+   ],
+   "yaw_degrees": 114.08,
+   "scale": 1.108
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -15.208,
+    0.0,
+    -19.106
+   ],
+   "yaw_degrees": 19.64,
+   "scale": 1.131
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.97,
+    0.0,
+    -5.742
+   ],
+   "yaw_degrees": 296.33,
+   "scale": 1.15
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.99,
+    0.0,
+    -6.074
+   ],
+   "yaw_degrees": 52.46,
+   "scale": 1.123
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -19.537,
+    0.0,
+    -6.059
+   ],
+   "yaw_degrees": 244.4,
+   "scale": 0.889
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -21.743,
+    0.0,
+    -5.689
+   ],
+   "yaw_degrees": 61.78,
+   "scale": 0.985
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -10.191,
+    0.0,
+    17.641
+   ],
+   "yaw_degrees": 181.33,
+   "scale": 1.052
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -11.309,
+    0.0,
+    17.521
+   ],
+   "yaw_degrees": 148.39,
+   "scale": 1.114
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -11.278,
+    0.0,
+    16.918
+   ],
+   "yaw_degrees": 250.77,
+   "scale": 0.967
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -4.504,
+    0.0,
+    19.178
+   ],
+   "yaw_degrees": 21.52,
+   "scale": 0.817
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -5.325,
+    0.0,
+    18.304
+   ],
+   "yaw_degrees": 291.61,
+   "scale": 1.369
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -6.02,
+    0.0,
+    20.198
+   ],
+   "yaw_degrees": 355.22,
+   "scale": 0.925
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -4.165,
+    0.0,
+    20.432
+   ],
+   "yaw_degrees": 4.59,
+   "scale": 1.042
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.851,
+    0.0,
+    -8.809
+   ],
+   "yaw_degrees": 248.8,
+   "scale": 0.926
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.889,
+    0.0,
+    -11.005
+   ],
+   "yaw_degrees": 75.79,
+   "scale": 1.167
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.261,
+    0.0,
+    -10.832
+   ],
+   "yaw_degrees": 284.7,
+   "scale": 1.187
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -23.631,
+    0.0,
+    -10.132
+   ],
+   "yaw_degrees": 241.83,
+   "scale": 0.857
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -22.994,
+    0.0,
+    -9.332
+   ],
+   "yaw_degrees": 132.0,
+   "scale": 1.35
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -23.905,
+    0.0,
+    -9.28
+   ],
+   "yaw_degrees": 7.41,
+   "scale": 1.063
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    8.039,
+    0.0,
+    14.966
+   ],
+   "yaw_degrees": 242.96,
+   "scale": 0.966
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    10.112,
+    0.0,
+    14.194
+   ],
+   "yaw_degrees": 56.56,
+   "scale": 0.907
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    8.508,
+    0.0,
+    14.787
+   ],
+   "yaw_degrees": 313.92,
+   "scale": 1.28
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -17.528,
+    0.0,
+    -11.782
+   ],
+   "yaw_degrees": 189.05,
+   "scale": 1.372
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -17.519,
+    0.0,
+    -12.291
+   ],
+   "yaw_degrees": 94.61,
+   "scale": 1.07
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -15.917,
+    0.0,
+    -12.876
+   ],
+   "yaw_degrees": 291.04,
+   "scale": 1.07
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -16.221,
+    0.0,
+    -11.957
+   ],
+   "yaw_degrees": 224.31,
+   "scale": 0.867
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    3.296,
+    0.0,
+    14.588
+   ],
+   "yaw_degrees": 97.86,
+   "scale": 1.374
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    4.218,
+    0.0,
+    14.582
+   ],
+   "yaw_degrees": 16.98,
+   "scale": 1.011
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    17.018,
+    0.0,
+    24.909
+   ],
+   "yaw_degrees": 203.51,
+   "scale": 1.091
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    16.833,
+    0.0,
+    24.579
+   ],
+   "yaw_degrees": 17.7,
+   "scale": 1.298
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.735,
+    0.0,
+    21.765
+   ],
+   "yaw_degrees": 60.21,
+   "scale": 0.972
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.046,
+    0.0,
+    23.618
+   ],
+   "yaw_degrees": 29.53,
+   "scale": 1.041
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    21.853,
+    0.0,
+    12.66
+   ],
+   "yaw_degrees": 331.48,
+   "scale": 1.023
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    22.557,
+    0.0,
+    12.451
+   ],
+   "yaw_degrees": 2.77,
+   "scale": 1.399
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    22.76,
+    0.0,
+    13.972
+   ],
+   "yaw_degrees": 252.98,
+   "scale": 0.984
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    23.632,
+    0.0,
+    12.828
+   ],
+   "yaw_degrees": 82.71,
+   "scale": 0.969
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    24.438,
+    0.0,
+    -20.296
+   ],
+   "yaw_degrees": 43.63,
+   "scale": 1.244
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    23.623,
+    0.0,
+    -19.184
+   ],
+   "yaw_degrees": 247.57,
+   "scale": 0.896
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    23.829,
+    0.0,
+    -21.23
+   ],
+   "yaw_degrees": 247.92,
+   "scale": 1.093
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    24.454,
+    0.0,
+    -21.121
+   ],
+   "yaw_degrees": 236.6,
+   "scale": 1.312
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -17.024,
+    0.0,
+    -21.501
+   ],
+   "yaw_degrees": 45.21,
+   "scale": 1.263
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -16.81,
+    0.0,
+    -19.574
+   ],
+   "yaw_degrees": 242.31,
+   "scale": 0.94
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -18.938,
+    0.0,
+    -20.577
+   ],
+   "yaw_degrees": 69.7,
+   "scale": 1.192
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    -19.122,
+    0.0,
+    -20.514
+   ],
+   "yaw_degrees": 230.72,
+   "scale": 1.388
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.653,
+    0.0,
+    4.121
+   ],
+   "yaw_degrees": 351.95,
+   "scale": 1.239
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.622,
+    0.0,
+    4.24
+   ],
+   "yaw_degrees": 154.27,
+   "scale": 0.908
+  },
+  {
+   "asset": "tussock",
+   "position": [
+    11.316,
+    0.0,
+    5.67
+   ],
+   "yaw_degrees": 280.72,
+   "scale": 0.93
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -20.481,
+    0.0,
+    9.134
+   ],
+   "yaw_degrees": 64.65,
+   "scale": 1.277
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    18.44,
+    0.0,
+    -5.828
+   ],
+   "yaw_degrees": 140.08,
+   "scale": 0.934
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    23.546,
+    0.0,
+    -5.893
+   ],
+   "yaw_degrees": 140.11,
+   "scale": 1.291
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -11.023,
+    0.0,
+    24.847
+   ],
+   "yaw_degrees": 182.13,
+   "scale": 1.376
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -17.882,
+    0.0,
+    -9.484
+   ],
+   "yaw_degrees": 87.42,
+   "scale": 0.9
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    11.034,
+    0.0,
+    20.153
+   ],
+   "yaw_degrees": 43.39,
+   "scale": 1.354
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    14.952,
+    0.0,
+    24.746
+   ],
+   "yaw_degrees": 7.13,
+   "scale": 0.876
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    23.254,
+    0.0,
+    -7.092
+   ],
+   "yaw_degrees": 107.68,
+   "scale": 1.05
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -4.315,
+    0.0,
+    19.141
+   ],
+   "yaw_degrees": 5.08,
+   "scale": 1.297
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    12.537,
+    0.0,
+    22.871
+   ],
+   "yaw_degrees": 271.17,
+   "scale": 0.945
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    9.814,
+    0.0,
+    -21.14
+   ],
+   "yaw_degrees": 183.18,
+   "scale": 0.949
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -23.756,
+    0.0,
+    3.408
+   ],
+   "yaw_degrees": 277.81,
+   "scale": 1.111
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    24.181,
+    0.0,
+    20.55
+   ],
+   "yaw_degrees": 49.05,
+   "scale": 1.31
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    21.162,
+    0.0,
+    -14.772
+   ],
+   "yaw_degrees": 319.72,
+   "scale": 1.346
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    12.948,
+    0.0,
+    -19.182
+   ],
+   "yaw_degrees": 22.62,
+   "scale": 1.063
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -16.006,
+    0.0,
+    -13.543
+   ],
+   "yaw_degrees": 0.71,
+   "scale": 0.932
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -15.505,
+    0.0,
+    10.293
+   ],
+   "yaw_degrees": 224.92,
+   "scale": 1.006
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -4.498,
+    0.0,
+    -16.701
+   ],
+   "yaw_degrees": 235.52,
+   "scale": 1.117
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    -21.711,
+    0.0,
+    23.829
+   ],
+   "yaw_degrees": 35.05,
+   "scale": 0.895
+  },
+  {
+   "asset": "shrub",
+   "position": [
+    15.31,
+    0.0,
+    22.377
+   ],
+   "yaw_degrees": 246.68,
+   "scale": 0.928
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    21.735,
+    0.0,
+    18.625
+   ],
+   "yaw_degrees": 338.91,
+   "scale": 0.817
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -16.215,
+    0.0,
+    -3.608
+   ],
+   "yaw_degrees": 224.14,
+   "scale": 1.246
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    14.312,
+    0.0,
+    2.71
+   ],
+   "yaw_degrees": 79.38,
+   "scale": 0.896
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    24.652,
+    0.0,
+    -1.635
+   ],
+   "yaw_degrees": 171.13,
+   "scale": 0.882
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -7.708,
+    0.0,
+    18.674
+   ],
+   "yaw_degrees": 145.41,
+   "scale": 0.84
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -11.461,
+    0.0,
+    -5.985
+   ],
+   "yaw_degrees": 294.91,
+   "scale": 0.805
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -16.654,
+    0.0,
+    24.159
+   ],
+   "yaw_degrees": 249.86,
+   "scale": 0.957
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    24.153,
+    0.0,
+    18.658
+   ],
+   "yaw_degrees": 207.09,
+   "scale": 1.227
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -13.661,
+    0.0,
+    12.196
+   ],
+   "yaw_degrees": 112.07,
+   "scale": 0.923
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    18.035,
+    0.0,
+    17.414
+   ],
+   "yaw_degrees": 341.01,
+   "scale": 1.027
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -18.467,
+    0.0,
+    17.004
+   ],
+   "yaw_degrees": 345.49,
+   "scale": 0.976
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -6.12,
+    0.0,
+    11.936
+   ],
+   "yaw_degrees": 271.11,
+   "scale": 0.862
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    16.405,
+    0.0,
+    -8.403
+   ],
+   "yaw_degrees": 215.9,
+   "scale": 1.077
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -4.901,
+    0.0,
+    0.691
+   ],
+   "yaw_degrees": 181.39,
+   "scale": 0.911
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -24.627,
+    0.0,
+    15.282
+   ],
+   "yaw_degrees": 213.26,
+   "scale": 1.018
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    22.314,
+    0.0,
+    -10.744
+   ],
+   "yaw_degrees": 54.21,
+   "scale": 1.39
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    12.185,
+    0.0,
+    2.251
+   ],
+   "yaw_degrees": 160.25,
+   "scale": 1.464
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -8.428,
+    0.0,
+    8.295
+   ],
+   "yaw_degrees": 331.88,
+   "scale": 0.859
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    23.888,
+    0.0,
+    -13.604
+   ],
+   "yaw_degrees": 281.95,
+   "scale": 1.343
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    24.379,
+    0.0,
+    -10.819
+   ],
+   "yaw_degrees": 138.08,
+   "scale": 1.063
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -20.589,
+    0.0,
+    23.959
+   ],
+   "yaw_degrees": 182.38,
+   "scale": 0.908
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -20.43,
+    0.0,
+    18.396
+   ],
+   "yaw_degrees": 331.83,
+   "scale": 1.018
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    19.783,
+    0.0,
+    -8.358
+   ],
+   "yaw_degrees": 299.03,
+   "scale": 1.202
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -5.67,
+    0.0,
+    -15.606
+   ],
+   "yaw_degrees": 232.27,
+   "scale": 1.352
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -4.382,
+    0.0,
+    3.663
+   ],
+   "yaw_degrees": 49.78,
+   "scale": 1.088
+  },
+  {
+   "asset": "cushion",
+   "position": [
+    -20.392,
+    0.0,
+    21.75
+   ],
+   "yaw_degrees": 164.51,
+   "scale": 1.18
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    -17.5,
+    0.0,
+    16.0
+   ],
+   "yaw_degrees": -14.32,
+   "scale": 1.376,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    18.5,
+    0.0,
+    -8.0
+   ],
+   "yaw_degrees": 184.2,
+   "scale": 1.037,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    -19.0,
+    0.0,
+    -15.0
+   ],
+   "yaw_degrees": -5.39,
+   "scale": 1.268,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    13.0,
+    0.0,
+    22.5
+   ],
+   "yaw_degrees": 171.19,
+   "scale": 1.197,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    -13.5,
+    0.0,
+    24.0
+   ],
+   "yaw_degrees": -14.32,
+   "scale": 0.974,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    20.5,
+    0.0,
+    4.0
+   ],
+   "yaw_degrees": 192.81,
+   "scale": 1.21,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    -21.0,
+    0.0,
+    -4.0
+   ],
+   "yaw_degrees": 4.03,
+   "scale": 1.032,
+   "collision": "asset_default"
+  },
+  {
+   "asset": "deadpine",
+   "position": [
+    22.0,
+    0.0,
+    -18.0
+   ],
+   "yaw_degrees": 198.68,
+   "scale": 1.476,
+   "collision": "asset_default"
+  }
+ ],
+ "asset_meta": {
+  "cliff_a": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      6.8,
+      8.7,
+      4.4
+     ],
+     "offset": [
+      0,
+      4.35,
+      0
+     ]
+    }
+   ]
+  },
+  "cliff_b": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      6.1,
+      7.7,
+      4.0
+     ],
+     "offset": [
+      0,
+      3.85,
+      0
+     ]
+    }
+   ]
+  },
+  "cliff_c": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      5.2,
+      14.5,
+      4.2
+     ],
+     "offset": [
+      0,
+      7.25,
+      0
+     ]
+    }
+   ]
+  },
+  "cliff_shelf": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      7.0,
+      3.6,
+      4.9
+     ],
+     "offset": [
+      0,
+      1.8,
+      0
+     ]
+    }
+   ]
+  },
+  "boulder_a": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      2.55,
+      1.8,
+      2.1
+     ],
+     "offset": [
+      0,
+      0.9,
+      0
+     ]
+    }
+   ]
+  },
+  "boulder_b": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      1.55,
+      1.4,
+      1.4
+     ],
+     "offset": [
+      0,
+      0.7,
+      0
+     ]
+    }
+   ]
+  },
+  "geode_seam_a": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      6.0,
+      3.5,
+      3.9
+     ],
+     "offset": [
+      0.15,
+      1.75,
+      0.2
+     ]
+    }
+   ]
+  },
+  "geode_seam_b": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      4.8,
+      4.6,
+      2.7
+     ],
+     "offset": [
+      -0.5,
+      2.3,
+      0.3
+     ]
+    }
+   ]
+  },
+  "meteor_fragment_large": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      4.4,
+      2.1,
+      3.8
+     ],
+     "offset": [
+      0.3,
+      1.05,
+      -0.5
+     ]
+    }
+   ]
+  },
+  "mined_face": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      6.7,
+      4.7,
+      4.4
+     ],
+     "offset": [
+      0,
+      2.35,
+      0
+     ]
+    }
+   ]
+  },
+  "mined_block_pile": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      3.2,
+      1.35,
+      2.6
+     ],
+     "offset": [
+      0,
+      0.675,
+      0
+     ]
+    }
+   ]
+  },
+  "observatory": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      0.55,
+      3.4,
+      5.2
+     ],
+     "offset": [
+      -3.1,
+      2.05,
+      0
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      0.55,
+      3.4,
+      5.2
+     ],
+     "offset": [
+      3.1,
+      2.05,
+      0
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      6.7,
+      3.4,
+      0.55
+     ],
+     "offset": [
+      0,
+      2.05,
+      -2.6
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.55,
+      3.4,
+      0.55
+     ],
+     "offset": [
+      -2.35,
+      2.05,
+      2.6
+     ]
+    },
+    {
+     "shape": "box",
+     "size": [
+      1.55,
+      3.4,
+      0.55
+     ],
+     "offset": [
+      2.35,
+      2.05,
+      2.6
+     ]
+    }
+   ]
+  },
+  "ruin_column": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.55,
+     "height": 3.25,
+     "offset": [
+      0,
+      1.625,
+      0
+     ]
+    }
+   ]
+  },
+  "ruin_column_fallen": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      4.6,
+      0.78,
+      1.45
+     ],
+     "offset": [
+      -0.35,
+      0.39,
+      -0.1
+     ]
+    }
+   ]
+  },
+  "waystone": {
+   "collision": [
+    {
+     "shape": "box",
+     "size": [
+      0.75,
+      2.5,
+      0.82
+     ],
+     "offset": [
+      0,
+      1.25,
+      0
+     ]
+    }
+   ]
+  },
+  "deadpine": {
+   "collision": [
+    {
+     "shape": "cylinder",
+     "radius": 0.24,
+     "height": 3.25,
+     "offset": [
+      0,
+      1.625,
+      0
+     ]
+    }
+   ]
+  }
+ }
+}

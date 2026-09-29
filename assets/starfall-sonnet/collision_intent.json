@@ -1,0 +1,222 @@
+{
+ "schema": 1,
+ "note": "Gameplay collision stays Codex-owned. This manifest states art intent only; positions/yaws come from placement.json. Local axes are Godot (X sideways, Y up, Z toward arrival = asset front).",
+ "floor": "Keep the existing flat floor collider at y=0. ground_skin is a visual replacement (hide the old uniform floor mesh). Outside |x|>4.2 it rises up to 0.3 m of relief and, beyond 23 m from centre, up to ~2.5 m in the cliff berm, so no collision is required there; the crater bowl dips 0.32 m (visual only).",
+ "keep_clear": [
+  {
+   "x": -12,
+   "z": 3,
+   "radius": 1.9,
+   "reason": "crystal ore"
+  },
+  {
+   "x": -4,
+   "z": -6,
+   "radius": 1.9,
+   "reason": "crystal ore"
+  },
+  {
+   "x": 4,
+   "z": 3,
+   "radius": 1.9,
+   "reason": "crystal ore"
+  },
+  {
+   "x": 12,
+   "z": -6,
+   "radius": 1.9,
+   "reason": "crystal ore"
+  },
+  {
+   "x": -10,
+   "z": -17,
+   "radius": 1.9,
+   "reason": "iron ore"
+  },
+  {
+   "x": 0,
+   "z": -17,
+   "radius": 1.9,
+   "reason": "iron ore"
+  },
+  {
+   "x": 10,
+   "z": -17,
+   "radius": 1.9,
+   "reason": "iron ore"
+  },
+  {
+   "x": -13,
+   "z": -8,
+   "radius": 1.3,
+   "reason": "grapple anchor pole"
+  },
+  {
+   "x": 0,
+   "z": -8,
+   "radius": 1.3,
+   "reason": "grapple anchor pole"
+  },
+  {
+   "x": 13,
+   "z": -8,
+   "radius": 1.3,
+   "reason": "grapple anchor pole"
+  },
+  {
+   "x": 6,
+   "z": -12,
+   "radius": 2.4,
+   "reason": "golem"
+  },
+  {
+   "x": -7,
+   "z": -21,
+   "radius": 2.4,
+   "reason": "skeleton"
+  },
+  {
+   "x": 0,
+   "z": -19,
+   "radius": 1.8,
+   "reason": "bomb barrier"
+  },
+  {
+   "aabb_x": [
+    -3.6,
+    3.6
+   ],
+   "aabb_z": [
+    -23.0,
+    24.0
+   ],
+   "reason": "primary travel corridor; nothing solid inside, both sides of the barrier open"
+  }
+ ],
+ "assets": {
+  "cliff_a": {
+   "mode": "convex_box_proxy",
+   "proxy": "one 0.6*W x 0.5*D x 0.9*H box centred on the module; rim only, players never reach it"
+  },
+  "cliff_b": {
+   "mode": "convex_box_proxy",
+   "proxy": "as cliff_a"
+  },
+  "cliff_c": {
+   "mode": "convex_box_proxy",
+   "proxy": "as cliff_a, tall"
+  },
+  "cliff_shelf": {
+   "mode": "convex_box_proxy",
+   "proxy": "single low box, top surface ~0.6*H; may be used as a step-up ledge"
+  },
+  "boulder_a": {
+   "mode": "convex_hull_single",
+   "proxy": "one convex hull from the mesh (<=64 points)"
+  },
+  "boulder_b": {
+   "mode": "convex_hull_single",
+   "proxy": "one convex hull"
+  },
+  "boulder_c": {
+   "mode": "none_or_hull",
+   "proxy": "small; hull optional, hands may pass"
+  },
+  "scree": {
+   "mode": "none",
+   "proxy": "decor only, below ankle-height mostly"
+  },
+  "geode_seam_a": {
+   "mode": "box_proxy",
+   "proxy": "body box 6.4x3.6 (Godot X x Y) x 4.4 Z at the rock only, exclude crystal spikes"
+  },
+  "geode_seam_b": {
+   "mode": "box_proxy",
+   "proxy": "body box 5.0 x 5.4 x 2.6, exclude crystal spikes"
+  },
+  "crystal_cluster_cyan": {
+   "mode": "none",
+   "proxy": "decor; crystals never collide so hands are not trapped. Natural crystal only."
+  },
+  "crystal_cluster_violet": {
+   "mode": "none",
+   "proxy": "decor"
+  },
+  "crystal_spire": {
+   "mode": "none",
+   "proxy": "decor; backdrop skyline, outside playable area"
+  },
+  "meteor_fragment_large": {
+   "mode": "convex_hull_single",
+   "proxy": "hull of the main mass (radius ~2.1 m), impact-scarred rock"
+  },
+  "meteor_fragment_small": {
+   "mode": "none_or_hull",
+   "proxy": "optional small hull"
+  },
+  "crater_rim": {
+   "mode": "none",
+   "proxy": "visual ring lip <=0.8 m; optional low ring of box proxies on the rim only, never in the bowl"
+  },
+  "mined_face": {
+   "mode": "box_proxy",
+   "proxy": "back mass box + 4 stepped benches as thin boxes; worked/quarried stone"
+  },
+  "mined_block_pile": {
+   "mode": "box_proxy",
+   "proxy": "3 boxes; worked stone spoil"
+  },
+  "observatory": {
+   "mode": "compound_simple",
+   "proxy": "plinth = 2 boxes (15x6.4x0.5, 12.6x5.4x0.9 top) with a walkable stair on the +Z front; drum = 8-12 thin box segments 0.7 m thick with the +Z doorway left open (1.9 m wide, 3.1 m high); dome ribs, telescope, colonnade stubs, crystals and rubble = NO collision. Sits behind the barrier centred (0,-26.2)."
+  },
+  "ruin_column": {
+   "mode": "cylinder",
+   "proxy": "single cylinder r=0.5 h=3.5"
+  },
+  "ruin_column_fallen": {
+   "mode": "box_proxy",
+   "proxy": "one box 4.2x1.0x1.0"
+  },
+  "waystone": {
+   "mode": "box_proxy",
+   "proxy": "single box 0.7x2.2x0.7; worked stone marker at the corridor edge (|x|=4.7)"
+  },
+  "paving_a": {
+   "mode": "none",
+   "proxy": "visual flagstones <=0.09 m proud of the floor"
+  },
+  "paving_b": {
+   "mode": "none",
+   "proxy": "as paving_a"
+  },
+  "tussock": {
+   "mode": "none",
+   "proxy": "decor"
+  },
+  "shrub": {
+   "mode": "none",
+   "proxy": "decor"
+  },
+  "cushion": {
+   "mode": "none",
+   "proxy": "decor"
+  },
+  "deadpine": {
+   "mode": "capsule",
+   "proxy": "trunk capsule r=0.25 h=3.5 only; branches decor"
+  },
+  "ground_skin": {
+   "mode": "none",
+   "proxy": "visual; keep flat collider"
+  }
+ },
+ "material_classes": {
+  "SF_Strata": "natural sedimentary rock",
+  "SF_Worked": "cut / mined / ruin stone (pale ashlar, chisel marks)",
+  "SF_Scar": "impact-scarred fused rock (dark, glassy, rust)",
+  "SF_Growth": "weathered highland vegetation (double sided)",
+  "SF_Crystal_Cyan": "naturally occurring crystal (weak emissive)",
+  "SF_Crystal_Violet": "naturally occurring crystal (weak emissive)"
+ }
+}

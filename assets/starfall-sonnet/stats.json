@@ -1,0 +1,765 @@
+{
+ "schema": 1,
+ "seed": 20260930,
+ "blender": "4.5.13 LTS",
+ "materials": [
+  "SF_Strata",
+  "SF_Worked",
+  "SF_Scar",
+  "SF_Growth",
+  "SF_Crystal_Cyan",
+  "SF_Crystal_Violet"
+ ],
+ "assets": {
+  "cliff_a": {
+   "triangles": 2240,
+   "vertices": 1134,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -4.924,
+    -0.25,
+    -2.772
+   ],
+   "bounds_godot_max": [
+    4.761,
+    9.34,
+    3.026
+   ],
+   "size_m": [
+    9.685,
+    9.59,
+    5.797
+   ],
+   "placements": 7,
+   "glb_bytes": 405496
+  },
+  "cliff_b": {
+   "triangles": 2240,
+   "vertices": 1134,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -4.209,
+    -0.25,
+    -2.3
+   ],
+   "bounds_godot_max": [
+    4.613,
+    8.246,
+    3.048
+   ],
+   "size_m": [
+    8.822,
+    8.496,
+    5.348
+   ],
+   "placements": 7,
+   "glb_bytes": 403124
+  },
+  "cliff_c": {
+   "triangles": 2240,
+   "vertices": 1134,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -3.755,
+    -0.25,
+    -2.411
+   ],
+   "bounds_godot_max": [
+    3.704,
+    15.875,
+    3.402
+   ],
+   "size_m": [
+    7.459,
+    16.125,
+    5.813
+   ],
+   "placements": 11,
+   "glb_bytes": 406288
+  },
+  "cliff_shelf": {
+   "triangles": 2240,
+   "vertices": 1134,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -4.959,
+    -0.228,
+    -2.957
+   ],
+   "bounds_godot_max": [
+    5.025,
+    4.251,
+    3.754
+   ],
+   "size_m": [
+    9.984,
+    4.479,
+    6.711
+   ],
+   "placements": 6,
+   "glb_bytes": 407060
+  },
+  "boulder_a": {
+   "triangles": 320,
+   "vertices": 162,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -1.728,
+    -0.104,
+    -1.453
+   ],
+   "bounds_godot_max": [
+    1.588,
+    2.116,
+    1.161
+   ],
+   "size_m": [
+    3.316,
+    2.22,
+    2.615
+   ],
+   "placements": 9,
+   "glb_bytes": 196376
+  },
+  "boulder_b": {
+   "triangles": 420,
+   "vertices": 222,
+   "materials_used": [
+    "SF_Growth",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -0.896,
+    -0.092,
+    -0.909
+   ],
+   "bounds_godot_max": [
+    1.11,
+    1.628,
+    0.906
+   ],
+   "size_m": [
+    2.006,
+    1.72,
+    1.815
+   ],
+   "placements": 22,
+   "glb_bytes": 228920
+  },
+  "boulder_c": {
+   "triangles": 320,
+   "vertices": 162,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -0.638,
+    -0.019,
+    -0.417
+   ],
+   "bounds_godot_max": [
+    0.579,
+    0.842,
+    0.505
+   ],
+   "size_m": [
+    1.217,
+    0.861,
+    0.922
+   ],
+   "placements": 13,
+   "glb_bytes": 196208
+  },
+  "scree": {
+   "triangles": 560,
+   "vertices": 294,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -1.518,
+    -0.042,
+    -1.263
+   ],
+   "bounds_godot_max": [
+    0.641,
+    0.901,
+    1.405
+   ],
+   "size_m": [
+    2.159,
+    0.943,
+    2.668
+   ],
+   "placements": 7,
+   "glb_bytes": 222108
+  },
+  "geode_seam_a": {
+   "triangles": 2730,
+   "vertices": 1551,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Crystal_Violet",
+    "SF_Scar",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -3.53,
+    -0.128,
+    -2.086
+   ],
+   "bounds_godot_max": [
+    3.972,
+    4.539,
+    2.784
+   ],
+   "size_m": [
+    7.501,
+    4.667,
+    4.87
+   ],
+   "placements": 2,
+   "glb_bytes": 647968
+  },
+  "geode_seam_b": {
+   "triangles": 2050,
+   "vertices": 1129,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Crystal_Violet",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -3.645,
+    -0.314,
+    -1.264
+   ],
+   "bounds_godot_max": [
+    2.113,
+    5.7,
+    2.161
+   ],
+   "size_m": [
+    5.757,
+    6.015,
+    3.425
+   ],
+   "placements": 2,
+   "glb_bytes": 399044
+  },
+  "crystal_cluster_cyan": {
+   "triangles": 680,
+   "vertices": 422,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -1.426,
+    -0.016,
+    -1.539
+   ],
+   "bounds_godot_max": [
+    1.54,
+    2.792,
+    1.769
+   ],
+   "size_m": [
+    2.966,
+    2.809,
+    3.309
+   ],
+   "placements": 7,
+   "glb_bytes": 240332
+  },
+  "crystal_cluster_violet": {
+   "triangles": 644,
+   "vertices": 396,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Crystal_Violet",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -1.321,
+    -0.05,
+    -1.186
+   ],
+   "bounds_godot_max": [
+    1.335,
+    2.558,
+    1.665
+   ],
+   "size_m": [
+    2.656,
+    2.608,
+    2.851
+   ],
+   "placements": 5,
+   "glb_bytes": 242732
+  },
+  "crystal_spire": {
+   "triangles": 572,
+   "vertices": 344,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Crystal_Violet",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -1.342,
+    -0.015,
+    -1.209
+   ],
+   "bounds_godot_max": [
+    1.357,
+    3.211,
+    1.321
+   ],
+   "size_m": [
+    2.698,
+    3.225,
+    2.53
+   ],
+   "placements": 2,
+   "glb_bytes": 233176
+  },
+  "meteor_fragment_large": {
+   "triangles": 2526,
+   "vertices": 1309,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Scar"
+   ],
+   "bounds_godot_min": [
+    -2.834,
+    -0.069,
+    -3.806
+   ],
+   "bounds_godot_max": [
+    3.73,
+    2.478,
+    2.007
+   ],
+   "size_m": [
+    6.564,
+    2.547,
+    5.813
+   ],
+   "placements": 1,
+   "glb_bytes": 489824
+  },
+  "meteor_fragment_small": {
+   "triangles": 640,
+   "vertices": 330,
+   "materials_used": [
+    "SF_Scar"
+   ],
+   "bounds_godot_min": [
+    -1.253,
+    -0.013,
+    -1.48
+   ],
+   "bounds_godot_max": [
+    1.15,
+    0.913,
+    0.818
+   ],
+   "size_m": [
+    2.403,
+    0.926,
+    2.298
+   ],
+   "placements": 6,
+   "glb_bytes": 301352
+  },
+  "crater_rim": {
+   "triangles": 1560,
+   "vertices": 825,
+   "materials_used": [
+    "SF_Scar",
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -8.45,
+    -0.477,
+    -8.606
+   ],
+   "bounds_godot_max": [
+    8.652,
+    1.264,
+    8.159
+   ],
+   "size_m": [
+    17.102,
+    1.741,
+    16.765
+   ],
+   "placements": 1,
+   "glb_bytes": 518172
+  },
+  "mined_face": {
+   "triangles": 1940,
+   "vertices": 1074,
+   "materials_used": [
+    "SF_Scar",
+    "SF_Strata",
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -4.213,
+    -0.25,
+    -3.022
+   ],
+   "bounds_godot_max": [
+    4.209,
+    5.562,
+    2.911
+   ],
+   "size_m": [
+    8.422,
+    5.812,
+    5.933
+   ],
+   "placements": 1,
+   "glb_bytes": 717636
+  },
+  "mined_block_pile": {
+   "triangles": 894,
+   "vertices": 481,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Strata",
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -1.965,
+    -0.046,
+    -1.522
+   ],
+   "bounds_godot_max": [
+    1.92,
+    1.755,
+    1.732
+   ],
+   "size_m": [
+    3.885,
+    1.801,
+    3.254
+   ],
+   "placements": 3,
+   "glb_bytes": 395900
+  },
+  "observatory": {
+   "triangles": 5096,
+   "vertices": 3059,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Crystal_Violet",
+    "SF_Scar",
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -7.51,
+    -0.038,
+    -4.197
+   ],
+   "bounds_godot_max": [
+    8.158,
+    11.529,
+    4.981
+   ],
+   "size_m": [
+    15.668,
+    11.568,
+    9.178
+   ],
+   "placements": 1,
+   "glb_bytes": 792332
+  },
+  "ruin_column": {
+   "triangles": 264,
+   "vertices": 144,
+   "materials_used": [
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -0.748,
+    -0.004,
+    -0.8
+   ],
+   "bounds_godot_max": [
+    1.938,
+    3.558,
+    0.758
+   ],
+   "size_m": [
+    2.687,
+    3.562,
+    1.558
+   ],
+   "placements": 2,
+   "glb_bytes": 147052
+  },
+  "ruin_column_fallen": {
+   "triangles": 620,
+   "vertices": 330,
+   "materials_used": [
+    "SF_Strata",
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -3.561,
+    -0.014,
+    -1.353
+   ],
+   "bounds_godot_max": [
+    2.57,
+    1.031,
+    1.029
+   ],
+   "size_m": [
+    6.13,
+    1.045,
+    2.382
+   ],
+   "placements": 2,
+   "glb_bytes": 348532
+  },
+  "waystone": {
+   "triangles": 168,
+   "vertices": 98,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -0.558,
+    -0.02,
+    -0.554
+   ],
+   "bounds_godot_max": [
+    0.569,
+    2.847,
+    0.772
+   ],
+   "size_m": [
+    1.127,
+    2.868,
+    1.327
+   ],
+   "placements": 5,
+   "glb_bytes": 161740
+  },
+  "paving_a": {
+   "triangles": 484,
+   "vertices": 264,
+   "materials_used": [
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -1.507,
+    -0.015,
+    -1.975
+   ],
+   "bounds_godot_max": [
+    1.639,
+    0.106,
+    1.976
+   ],
+   "size_m": [
+    3.145,
+    0.121,
+    3.951
+   ],
+   "placements": 5,
+   "glb_bytes": 165884
+  },
+  "paving_b": {
+   "triangles": 440,
+   "vertices": 240,
+   "materials_used": [
+    "SF_Worked"
+   ],
+   "bounds_godot_min": [
+    -1.502,
+    -0.018,
+    -1.989
+   ],
+   "bounds_godot_max": [
+    1.617,
+    0.106,
+    1.984
+   ],
+   "size_m": [
+    3.119,
+    0.124,
+    3.973
+   ],
+   "placements": 5,
+   "glb_bytes": 161304
+  },
+  "tussock": {
+   "triangles": 132,
+   "vertices": 176,
+   "materials_used": [
+    "SF_Growth"
+   ],
+   "bounds_godot_min": [
+    -0.531,
+    0.0,
+    -0.442
+   ],
+   "bounds_godot_max": [
+    0.362,
+    0.761,
+    0.359
+   ],
+   "size_m": [
+    0.893,
+    0.761,
+    0.801
+   ],
+   "placements": 107,
+   "glb_bytes": 34224
+  },
+  "shrub": {
+   "triangles": 120,
+   "vertices": 190,
+   "materials_used": [
+    "SF_Growth"
+   ],
+   "bounds_godot_min": [
+    -0.867,
+    -0.034,
+    -0.537
+   ],
+   "bounds_godot_max": [
+    0.662,
+    1.023,
+    0.745
+   ],
+   "size_m": [
+    1.528,
+    1.057,
+    1.282
+   ],
+   "placements": 20,
+   "glb_bytes": 35840
+  },
+  "cushion": {
+   "triangles": 250,
+   "vertices": 150,
+   "materials_used": [
+    "SF_Crystal_Cyan",
+    "SF_Growth"
+   ],
+   "bounds_godot_min": [
+    -0.525,
+    0.003,
+    -0.55
+   ],
+   "bounds_godot_max": [
+    0.862,
+    0.439,
+    0.549
+   ],
+   "size_m": [
+    1.387,
+    0.437,
+    1.099
+   ],
+   "placements": 26,
+   "glb_bytes": 59728
+  },
+  "deadpine": {
+   "triangles": 272,
+   "vertices": 322,
+   "materials_used": [
+    "SF_Growth"
+   ],
+   "bounds_godot_min": [
+    -0.744,
+    -0.12,
+    -0.575
+   ],
+   "bounds_godot_max": [
+    2.655,
+    4.429,
+    0.906
+   ],
+   "size_m": [
+    3.399,
+    4.549,
+    1.48
+   ],
+   "placements": 8,
+   "glb_bytes": 47408
+  },
+  "ground_skin": {
+   "triangles": 3200,
+   "vertices": 1681,
+   "materials_used": [
+    "SF_Strata"
+   ],
+   "bounds_godot_min": [
+    -33.0,
+    -0.244,
+    -33.0
+   ],
+   "bounds_godot_max": [
+    33.0,
+    8.435,
+    33.0
+   ],
+   "size_m": [
+    66.0,
+    8.679,
+    66.0
+   ],
+   "placements": 1,
+   "glb_bytes": 441844
+  }
+ },
+ "placements_total": 294,
+ "unique_triangles_total": 35862,
+ "rendered_triangles_all_instances": 161596,
+ "textures": {
+  "strata": [
+   "sf_strata_base",
+   "sf_strata_normal",
+   "sf_strata_orm"
+  ],
+  "worked": [
+   "sf_worked_base",
+   "sf_worked_normal",
+   "sf_worked_orm"
+  ],
+  "scar": [
+   "sf_scar_base",
+   "sf_scar_normal",
+   "sf_scar_orm"
+  ],
+  "growth": [
+   "sf_growth_base",
+   "sf_growth_normal",
+   "sf_growth_orm"
+  ],
+  "crystal": [
+   "sf_crystal_base",
+   "sf_crystal_normal",
+   "sf_crystal_orm"
+  ]
+ },
+ "build_seconds": 2.7
+}

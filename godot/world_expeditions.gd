@@ -155,26 +155,28 @@ static func ridge(root:Node3D,data:Dictionary,w:Script)->void:
 	var id="starfall_ridge"
 	var p:Node3D=data.zones[id].root
 	var c:Vector3=data.zones[id].center
-	for i in range(18):
+	var authored := FileAccess.file_exists("res://assets/zone_art/starfall_ridge/placement.json")
+	for i in range(0 if authored else 18):
 		var a=TAU*float(i)/18.0
 		var v=Vector3(cos(a)*23,2.5+float(i%4),sin(a)*23)
 		w.rock(p,v,Vector3(3.8,6+float(i%4)*2.0,4),"69718c")
 		if i%3==0: w.crystal_cluster(p,v+Vector3(0,3.0,0),1.2,"85d7ef")
-	for i in range(13):
+	for i in range(0 if authored else 13):
 		var v=Vector3(-16+float(i%4)*8,0,-16+float(floori(float(i)/4.0))*8)
 		w.crystal_cluster(p,v,0.9+float(i%3)*0.35,"96d9ef" if i%2 else "c491dd")
 	for i in range(4): w.ore(root,data,id,c+Vector3(-12+i*8,0,3-i%2*9),"crystal","9ec5e9")
 	for i in range(3): w.ore(root,data,id,c+Vector3(-10+i*10,0,-17),"iron","e6c57d")
-	w.path(p,Vector3(0,0,21),Vector3(0,0,-16),"a5b2c4")
-	w.arch(p,Vector3(0,0,-18),2.4,"8290a7",true)
+	if not authored:
+		w.path(p,Vector3(0,0,21),Vector3(0,0,-16),"a5b2c4")
+		w.arch(p,Vector3(0,0,-18),2.4,"8290a7",true)
 	w.barrier(root,data,id,c+Vector3(0,0,-19),"bomb")
 	for i in range(3):
 		var v=Vector3(-13+i*13,0,-8)
-		w.box(p,v+Vector3(0,2.5,0),Vector3(0.5,5,0.5),"8d9bb0")
+		if not authored: w.box(p,v+Vector3(0,2.5,0),Vector3(0.5,5,0.5),"8d9bb0")
 		w.anchor(root,data,id,c+v+Vector3(0,4.5,0),c+v+Vector3(0,0,1.5))
 	w.enemy(root,data,id,c+Vector3(6,0,-12),"golem")
 	w.enemy(root,data,id,c+Vector3(-7,0,-21),"skeleton","prismwatch")
-	w.label(p,"STARFALL RIDGE  ·  ORE BEHIND THE BREACH",Vector3(0,3.3,-13),24,"e5efff")
+	if not authored: w.label(p,"STARFALL RIDGE  ·  ORE BEHIND THE BREACH",Vector3(0,3.3,-13),24,"e5efff")
 	w.glow_light(p,Vector3(0,2,-13),"8bbce8",0.75,9)
 
 static func keep(root:Node3D,data:Dictionary,w:Script)->void:

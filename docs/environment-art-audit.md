@@ -21,6 +21,8 @@ The ignored `outputs/environment-art-review/` contains 24 named 1200 × 750 PNGs
 
 The zone root counts support the visual triage only loosely: Gloamfen has 33 visible geometry nodes, Cloudbreak Keep 26, Sky Garden 73, Starfall Ridge 196, and Orchard Highlands 1,518. MultiMesh nodes can contain many instances, and other game systems may add visuals outside the zone root. Judge the PNGs first.
 
+Priority 3 has since been integrated: [Starfall Ridge's authored valley and actual-game comparison](STARFALL-ART-20260930.md). Priorities 1 and 2 likewise have their own art handoffs. Quarry and Foundry remain the next large environment-art commission pair.
+
 ## Capture failure and recovery
 
 The first default run completed 24 files in 8.53 script seconds, but most were nearly solid haze. Hiding the horizon did not restore Pinewood; the game's own `--capture-zone=pinewood_ruins` reproduced the haze. A fresh Godot `Environment` probe showed that assigning `fog_mode=0` resets `fog_density` from `0.001` to `1.0`. `adventure_runtime.gd` restored `fog_mode` after setting the zone density. Commit `497b2c1` moved the density assignment after the grade defaults. The final default run after that fix completed 24 files in 8.97 script seconds (10.63 wall seconds), with no capture failures or fog audit notes. Orchard deliberately applies its separate 0.0028 atmosphere grade over its 0.0008 zone palette.
