@@ -1,0 +1,118 @@
+{
+  "bank_boulder": {
+    "meshes": 1,
+    "primitives": 1,
+    "materials": 1,
+    "images": 2,
+    "textures": 2,
+    "has_uv": true,
+    "has_normals": true,
+    "triangles": 1280,
+    "lights_ext": false,
+    "bbox_min": [
+      -0.64,
+      0,
+      -0.539
+    ],
+    "bbox_max": [
+      0.594,
+      0.698,
+      0.529
+    ],
+    "size_m": [
+      1.234,
+      0.698,
+      1.068
+    ],
+    "bytes": 58428,
+    "base_color_texture": true,
+    "roughness_texture": true
+  },
+  "river_slab": {
+    "meshes": 1,
+    "primitives": 1,
+    "materials": 1,
+    "images": 2,
+    "textures": 2,
+    "has_uv": true,
+    "has_normals": true,
+    "triangles": 1280,
+    "lights_ext": false,
+    "bbox_min": [
+      -0.737,
+      0,
+      -0.507
+    ],
+    "bbox_max": [
+      0.781,
+      0.22,
+      0.518
+    ],
+    "size_m": [
+      1.518,
+      0.22,
+      1.026
+    ],
+    "bytes": 65976,
+    "base_color_texture": true,
+    "roughness_texture": true
+  },
+  "fallen_branch": {
+    "meshes": 1,
+    "primitives": 1,
+    "materials": 1,
+    "images": 2,
+    "textures": 2,
+    "has_uv": true,
+    "has_normals": true,
+    "triangles": 710,
+    "lights_ext": false,
+    "bbox_min": [
+      -0.05,
+      0,
+      -0.281
+    ],
+    "bbox_max": [
+      2.5,
+      0.542,
+      0.388
+    ],
+    "size_m": [
+      2.55,
+      0.542,
+      0.669
+    ],
+    "bytes": 62832,
+    "base_color_texture": true,
+    "roughness_texture": true
+  },
+  "fern_patch": {
+    "meshes": 1,
+    "primitives": 1,
+    "materials": 1,
+    "images": 2,
+    "textures": 2,
+    "has_uv": true,
+    "has_normals": true,
+    "triangles": 1210,
+    "lights_ext": false,
+    "bbox_min": [
+      -0.402,
+      0,
+      -0.434
+    ],
+    "bbox_max": [
+      0.398,
+      0.308,
+      0.377
+    ],
+    "size_m": [
+      0.801,
+      0.308,
+      0.811
+    ],
+    "bytes": 55828,
+    "base_color_texture": true,
+    "roughness_texture": true
+  }
+}

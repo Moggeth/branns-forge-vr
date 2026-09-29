@@ -5,6 +5,13 @@ const Ground = preload("res://orchard_ground.gd")
 const Foliage = preload("res://orchard_foliage.gd")
 const GroundKitScript = preload("res://ground_kit.gd")
 const PREFIX := "res://assets/atmosphere/woodland/"
+const SONNET_PREFIX := "res://assets/atmosphere/sonnet_bank/"
+const SONNET_VARIANTS := {
+	"rock_mossy_boulder": "bank_boulder",
+	"rock_mossy_slab": "river_slab",
+	"branch_fallen_mossy": "fallen_branch",
+	"fern_bank_patch": "fern_patch",
+}
 const CHUNK := 64.0
 const EXTENT := 153.0
 const COUNTS := {
@@ -12,10 +19,12 @@ const COUNTS := {
 	"grass_tuft": 4300, "flower_clump": 1300,
 	"branch_fallen_mossy": 140, "rock_mossy_boulder": 130,
 	"rock_mossy_slab": 90, "litter_leaf_cluster": 2000,
+	"fern_bank_patch": 480,
 }
 const CULL := {"fern_sword": 48.0, "fern_lady": 48.0, "fern_bracken": 48.0,
 	"grass_tuft": 43.0, "flower_clump": 41.0, "branch_fallen_mossy": 63.0,
-	"rock_mossy_boulder": 85.0, "rock_mossy_slab": 85.0, "litter_leaf_cluster": 30.0}
+	"rock_mossy_boulder": 85.0, "rock_mossy_slab": 85.0, "litter_leaf_cluster": 30.0,
+	"fern_bank_patch": 48.0}
 
 static func _kind(id: String) -> String:
 	if id.begins_with("fern_"): return "fern"
@@ -39,7 +48,10 @@ static func _chance(id: String, mask: Color, patch: float) -> float:
 	return clampf(profile * (0.33 + patch * 0.92) * (1.0 - mask.r * 0.95), 0.0, 1.0)
 
 static func _asset(id: String) -> Dictionary:
-	var packed: PackedScene = load(PREFIX + id + ".glb")
+	var variant: String = SONNET_VARIANTS.get(id, "")
+	var variant_path := SONNET_PREFIX + variant + ".glb"
+	var use_variant := not variant.is_empty() and ResourceLoader.exists(variant_path)
+	var packed: PackedScene = load(variant_path if use_variant else PREFIX + id + ".glb")
 	if packed == null: return {}
 	var art: Node3D = packed.instantiate()
 	var parts := art.find_children("*", "MeshInstance3D", true, false)
@@ -53,7 +65,7 @@ static func _asset(id: String) -> Dictionary:
 	if source == null or source.albedo_texture == null or source.roughness_texture == null:
 		push_error("WOODLAND texture import incomplete: " + id)
 		return {}
-	return {"mesh": mesh, "finish": Foliage.kit_material(_kind(id), source)}
+	return {"mesh": mesh, "finish": Foliage.kit_material(_kind(id), source, id if use_variant else "")}
 
 static func populate(root: Node3D) -> void:
 	var scale := 1.0
@@ -102,7 +114,7 @@ static func _rock_collision(root: Node3D, id: String, pose: Transform3D) -> void
 	body.transform = pose
 	root.add_child(body)
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(0.95, 0.48, 0.78) if id == "rock_mossy_boulder" else Vector3(1.22, 0.32, 0.82)
+	shape.size = Vector3(1.18, 0.68, 1.02) if id == "rock_mossy_boulder" else Vector3(1.42, 0.21, 0.96)
 	var collider := CollisionShape3D.new()
 	collider.shape = shape
 	collider.position.y = shape.size.y * 0.48

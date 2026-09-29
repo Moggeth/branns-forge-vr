@@ -38,5 +38,16 @@ func _initialize() -> void:
 	if not Kit._allowed("orchard_highlands", Vector3(10,0,30), []): failures.append("ordinary site excluded")
 	if Kit._allowed("orchard_highlands", Vector3(0,0,0), []): failures.append("trail exclusion lost")
 	if Dressing._kind("fern_sword") != "fern" or Dressing._kind("rock_mossy_slab") != "rock": failures.append("dressing kind mapping")
+	var authored_finishes := []
+	for id in ["rock_mossy_boulder", "rock_mossy_slab", "branch_fallen_mossy", "fern_bank_patch"]:
+		var asset: Dictionary = Dressing._asset(id)
+		if asset.is_empty():
+			failures.append("authored Orchard asset missing: " + id)
+			continue
+		if asset.mesh.get_surface_count() != 1: failures.append("unexpected mesh surfaces: " + id)
+		var palette: Texture2D = asset.finish.get_shader_parameter("palette")
+		if palette == null or palette.get_width() < 256: failures.append("authored texture missing: " + id)
+		if asset.finish in authored_finishes: failures.append("texture atlas shared across distinct assets: " + id)
+		authored_finishes.append(asset.finish)
 	print("ORCHARD_DRESSING_FIELDS_RESULT ", failures)
 	quit(0 if failures.is_empty() else 1)

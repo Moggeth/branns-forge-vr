@@ -69,10 +69,13 @@ static func weather(wind: Vector2, strength: float, wet: float) -> void:
 		shader_material.set_shader_parameter("wind_strength", _strength)
 		shader_material.set_shader_parameter("wetness", _wetness)
 
-static func kit_material(kind: String, source: StandardMaterial3D) -> ShaderMaterial:
+static func kit_material(kind: String, source: StandardMaterial3D, variant: String = "") -> ShaderMaterial:
 	# Opus's nine GLBs use the same tiny palette atlas. Retain their authored UV
 	# colour and roughness while driving the whole library from one weather wind.
-	if _kit_materials.has(kind): return _kit_materials[kind]
+	# Sonnet additions have separate atlases: key those by asset to avoid a rock
+	# silently borrowing the first imported rock's texture.
+	var key := kind if variant.is_empty() else kind + ":" + variant
+	if _kit_materials.has(key): return _kit_materials[key]
 	var shader := Shader.new()
 	shader.code = """
 shader_type spatial;
@@ -107,5 +110,5 @@ void fragment() {
 	finish.set_shader_parameter("wind_strength", _strength)
 	finish.set_shader_parameter("wetness", _wetness)
 	finish.set_shader_parameter("sway", 0.12 if kind == "grass" else (0.085 if kind == "fern" else (0.035 if kind == "flower" else 0.0)))
-	_kit_materials[kind] = finish
+	_kit_materials[key] = finish
 	return finish
