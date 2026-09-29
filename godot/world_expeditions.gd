@@ -181,14 +181,15 @@ static func keep(root:Node3D,data:Dictionary,w:Script)->void:
 	var id="cloudbreak_keep"
 	var p:Node3D=data.zones[id].root
 	var c:Vector3=data.zones[id].center
+	var authored := FileAccess.file_exists("res://assets/zone_art/cloudbreak_keep/placement.json")
 	# Open-air traversal and several safe landing islands give Swallow Line room.
-	w.island(p,Vector3(0,0,10),Vector2(28,24))
-	w.island(p,Vector3(-16,2.2,-8),Vector2(13,12))
-	w.island(p,Vector3(15,4.2,-15),Vector2(12,12))
-	w.island(p,Vector3(-3,6.0,-25),Vector2(14,12))
+	w.island(p,Vector3(0,0,10),Vector2(28,24),authored)
+	w.island(p,Vector3(-16,2.2,-8),Vector2(13,12),authored)
+	w.island(p,Vector3(15,4.2,-15),Vector2(12,12),authored)
+	w.island(p,Vector3(-3,6.0,-25),Vector2(14,12),authored)
 	# Teal-roofed watch posts and gold-edged railings add scale cues to the
 	# grapple course without filling the airspace used by the player's line.
-	for spec in [[Vector3(-16,2.2,-8),6.0],[Vector3(15,4.2,-15),5.5],[Vector3(-3,6.0,-25),5.8]]:
+	for spec in ([] if authored else [[Vector3(-16,2.2,-8),6.0],[Vector3(15,4.2,-15),5.5],[Vector3(-3,6.0,-25),5.8]]):
 		var center:Vector3=spec[0]
 		var size:float=spec[1]
 		for side in [-1,1]:
@@ -203,15 +204,16 @@ static func keep(root:Node3D,data:Dictionary,w:Script)->void:
 		for side in [-1,1]:
 			w.box(p,center+Vector3(side*size*0.39,0.78,0),Vector3(0.13,0.52,size*0.75),"a09271")
 		w.lantern(p,center+Vector3(0,3.0,0))
-	for side in [-1,1]:
+	for side in ([] if authored else [-1,1]):
 		w.box(p,Vector3(side*9.2,0.65,9.0),Vector3(0.55,1.3,1.0),"9b9c87")
 		w.box(p,Vector3(side*9.2,1.45,9.0),Vector3(1.3,0.18,1.6),"d3bb83")
 		w.cyl(p,Vector3(side*9.2,1.95,9.0),0.34,0.9,"799f9e","taper")
 		w.glow_light(p,Vector3(side*9.2,2.5,9.0),"a4e5ea",0.4,4.0)
 	var landings=[Vector3(-13,2.2,-7),Vector3(13,4.2,-13),Vector3(-2,6,-24),Vector3(0,0,4)]
 	for v in landings:
-		w.box(p,v+Vector3(0,2.6,0),Vector3(0.35,5.2,0.35),"b3c4bc")
-		w.box(p,v+Vector3(0.8,5,0),Vector3(1.9,0.20,0.24),"a8bab7")
+		if not authored:
+			w.box(p,v+Vector3(0,2.6,0),Vector3(0.35,5.2,0.35),"b3c4bc")
+			w.box(p,v+Vector3(0.8,5,0),Vector3(1.9,0.20,0.24),"a8bab7")
 		w.anchor(root,data,id,c+v+Vector3(1.55,4.5,0),c+v+Vector3(0,0,0))
 	for i in range(3):
 		var v=Vector3(-5+float(i)*2.5,6,-25)
@@ -219,11 +221,13 @@ static func keep(root:Node3D,data:Dictionary,w:Script)->void:
 		w.cyl(flower,Vector3(0,0.45,0),0.045,0.9,"8cbfa0")
 		for j in range(6): w.rock(flower,Vector3(cos(j*TAU/6)*0.22,0.95,sin(j*TAU/6)*0.22),Vector3(0.34,0.14,0.25),"eaf7e3")
 		w.body(flower,Vector3(0,0.5,0),Vector3(0.8,1.1,0.8))
-	for v in [Vector3(-16,2.2,-8),Vector3(15,4.2,-15),Vector3(-3,6,-25)]: w.arch(p,v,1.2,"b7c7be",true)
+	if not authored:
+		for v in [Vector3(-16,2.2,-8),Vector3(15,4.2,-15),Vector3(-3,6,-25)]: w.arch(p,v,1.2,"b7c7be",true)
 	for i in range(2): w.enemy(root,data,id,c+Vector3(-15+i*13,2.2+i*3.8,-9-i*16),"skeleton","prismwatch")
-	for i in range(9):
-		var v=Vector3(-38+float(i)*9,-4+float(i%3)*2.0,-39-float(i%2)*7)
-		w.rock(p,v,Vector3(7,2.2,4),"dae6e5")
+	if not authored:
+		for i in range(9):
+			var v=Vector3(-38+float(i)*9,-4+float(i%3)*2.0,-39-float(i%2)*7)
+			w.rock(p,v,Vector3(7,2.2,4),"dae6e5")
 	# Put the guidance in front of the first grapple pole, with enough contrast
 	# against the bright sky to read it from the arrival island.
-	w.label(p,"CLOUDBREAK KEEP  ·  THE LINE IS YOUR BRIDGE",Vector3(0,3.5,6.5),24,"386b76")
+	if not authored: w.label(p,"CLOUDBREAK KEEP  ·  THE LINE IS YOUR BRIDGE",Vector3(0,3.5,6.5),24,"386b76")

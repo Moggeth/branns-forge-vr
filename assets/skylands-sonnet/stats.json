@@ -1,0 +1,1949 @@
+{
+ "assets": {
+  "island_under_sky_main": {
+   "triangles": 1800,
+   "vertices": 3672,
+   "materials": [
+    "turf",
+    "cliff"
+   ],
+   "bounds_min": [
+    -11.675,
+    -11.786,
+    -9.74
+   ],
+   "bounds_max": [
+    11.737,
+    0.035,
+    9.735
+   ],
+   "size": [
+    23.412,
+    11.821,
+    19.475
+   ],
+   "zone": "sky",
+   "collision_intent": "none (visual underside; top slab authoritative)",
+   "glb_bytes": 905236
+  },
+  "island_under_sky_small": {
+   "triangles": 1200,
+   "vertices": 2448,
+   "materials": [
+    "turf",
+    "cliff"
+   ],
+   "bounds_min": [
+    -5.712,
+    -7.749,
+    -5.726
+   ],
+   "bounds_max": [
+    5.749,
+    0.035,
+    5.782
+   ],
+   "size": [
+    11.461,
+    7.784,
+    11.508
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 847780
+  },
+  "hanging_crag_sky_a": {
+   "triangles": 144,
+   "vertices": 306,
+   "materials": [
+    "cliff"
+   ],
+   "bounds_min": [
+    -1.909,
+    -6.632,
+    -2.216
+   ],
+   "bounds_max": [
+    2.451,
+    0.0,
+    1.949
+   ],
+   "size": [
+    4.36,
+    6.632,
+    4.164
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 379928
+  },
+  "hanging_crag_sky_b": {
+   "triangles": 144,
+   "vertices": 306,
+   "materials": [
+    "cliff"
+   ],
+   "bounds_min": [
+    -1.352,
+    -4.572,
+    -1.538
+   ],
+   "bounds_max": [
+    1.651,
+    0.0,
+    1.52
+   ],
+   "size": [
+    3.003,
+    4.572,
+    3.057
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 379928
+  },
+  "root_cascade_sky_a": {
+   "triangles": 1052,
+   "vertices": 2214,
+   "materials": [
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.483,
+    -5.553,
+    -0.446
+   ],
+   "bounds_max": [
+    1.378,
+    0.23,
+    0.888
+   ],
+   "size": [
+    2.861,
+    5.783,
+    1.334
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 883396
+  },
+  "root_cascade_sky_b": {
+   "triangles": 1628,
+   "vertices": 3441,
+   "materials": [
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.971,
+    -3.842,
+    -0.499
+   ],
+   "bounds_max": [
+    2.435,
+    0.238,
+    0.883
+   ],
+   "size": [
+    4.406,
+    4.079,
+    1.382
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 944544
+  },
+  "root_cascade_sky_c": {
+   "triangles": 708,
+   "vertices": 1496,
+   "materials": [
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.926,
+    -6.891,
+    -0.399
+   ],
+   "bounds_max": [
+    1.052,
+    0.206,
+    0.86
+   ],
+   "size": [
+    1.978,
+    7.097,
+    1.259
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 847616
+  },
+  "rim_rock_sky_a": {
+   "triangles": 84,
+   "vertices": 236,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -0.919,
+    0.28,
+    -0.957
+   ],
+   "bounds_max": [
+    1.174,
+    1.54,
+    0.889
+   ],
+   "size": [
+    2.093,
+    1.26,
+    1.846
+   ],
+   "zone": "sky",
+   "collision_intent": "optional convex proxy ~1.4x1.0x1.2 m",
+   "glb_bytes": 921028
+  },
+  "rim_rock_sky_b": {
+   "triangles": 76,
+   "vertices": 204,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -1.03,
+    0.483,
+    -1.056
+   ],
+   "bounds_max": [
+    1.172,
+    1.771,
+    1.034
+   ],
+   "size": [
+    2.202,
+    1.288,
+    2.09
+   ],
+   "zone": "sky",
+   "collision_intent": "optional convex proxy ~1.4x1.0x1.2 m",
+   "glb_bytes": 919312
+  },
+  "rim_rock_sky_c": {
+   "triangles": 128,
+   "vertices": 352,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -1.231,
+    0.364,
+    -0.863
+   ],
+   "bounds_max": [
+    1.609,
+    2.002,
+    0.974
+   ],
+   "size": [
+    2.84,
+    1.638,
+    1.837
+   ],
+   "zone": "sky",
+   "collision_intent": "optional convex proxy ~1.4x1.0x1.2 m",
+   "glb_bytes": 926404
+  },
+  "tree_sky_a": {
+   "triangles": 937,
+   "vertices": 1854,
+   "materials": [
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.769,
+    -0.345,
+    -1.608
+   ],
+   "bounds_max": [
+    2.111,
+    5.133,
+    2.02
+   ],
+   "size": [
+    2.88,
+    5.478,
+    3.628
+   ],
+   "zone": "sky",
+   "collision_intent": "trunk capsule r0.2 h2.2 only",
+   "glb_bytes": 502500
+  },
+  "tree_sky_b": {
+   "triangles": 937,
+   "vertices": 1854,
+   "materials": [
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.804,
+    -0.249,
+    -1.1
+   ],
+   "bounds_max": [
+    1.588,
+    3.659,
+    1.495
+   ],
+   "size": [
+    2.392,
+    3.908,
+    2.595
+   ],
+   "zone": "sky",
+   "collision_intent": "trunk capsule r0.15 h1.6",
+   "glb_bytes": 502760
+  },
+  "tree_sky_c": {
+   "triangles": 937,
+   "vertices": 1854,
+   "materials": [
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.976,
+    -0.259,
+    -2.313
+   ],
+   "bounds_max": [
+    2.976,
+    7.011,
+    1.736
+   ],
+   "size": [
+    3.952,
+    7.271,
+    4.049
+   ],
+   "zone": "sky",
+   "collision_intent": "trunk capsule r0.25 h3",
+   "glb_bytes": 502584
+  },
+  "shrub_bloom_sky_a": {
+   "triangles": 440,
+   "vertices": 1140,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.69,
+    0.27,
+    -0.644
+   ],
+   "bounds_max": [
+    0.664,
+    0.712,
+    0.716
+   ],
+   "size": [
+    1.354,
+    0.443,
+    1.359
+   ],
+   "zone": "sky",
+   "collision_intent": "none (walk-through)",
+   "glb_bytes": 231476
+  },
+  "shrub_bloom_sky_b": {
+   "triangles": 720,
+   "vertices": 1860,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.494,
+    0.201,
+    -0.478
+   ],
+   "bounds_max": [
+    0.512,
+    0.526,
+    0.484
+   ],
+   "size": [
+    1.006,
+    0.325,
+    0.962
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 264848
+  },
+  "flower_bed_sky_a": {
+   "triangles": 1552,
+   "vertices": 3280,
+   "materials": [
+    "ashlar",
+    "cliff",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.681,
+    0.0,
+    -0.585
+   ],
+   "bounds_max": [
+    1.6,
+    0.907,
+    0.585
+   ],
+   "size": [
+    3.281,
+    0.907,
+    1.17
+   ],
+   "zone": "sky",
+   "collision_intent": "none / optional low box 3.2x0.2x1.2",
+   "glb_bytes": 1013388
+  },
+  "turf_patch_sky_a": {
+   "triangles": 694,
+   "vertices": 1674,
+   "materials": [
+    "turf",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -3.229,
+    0.012,
+    -2.668
+   ],
+   "bounds_max": [
+    4.012,
+    0.467,
+    3.365
+   ],
+   "size": [
+    7.24,
+    0.455,
+    6.033
+   ],
+   "zone": "sky",
+   "collision_intent": "none (3-8 cm relief)",
+   "glb_bytes": 623740
+  },
+  "turf_patch_sky_b": {
+   "triangles": 526,
+   "vertices": 1262,
+   "materials": [
+    "turf",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -2.768,
+    0.012,
+    -2.322
+   ],
+   "bounds_max": [
+    2.479,
+    0.467,
+    2.45
+   ],
+   "size": [
+    5.247,
+    0.455,
+    4.772
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 604596
+  },
+  "meadow_patch_sky_a": {
+   "triangles": 650,
+   "vertices": 1370,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.324,
+    -0.001,
+    -1.357
+   ],
+   "bounds_max": [
+    1.619,
+    0.801,
+    1.347
+   ],
+   "size": [
+    2.942,
+    0.802,
+    2.704
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 246032
+  },
+  "meadow_patch_sky_b": {
+   "triangles": 486,
+   "vertices": 1024,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.205,
+    -0.001,
+    -1.117
+   ],
+   "bounds_max": [
+    1.13,
+    0.743,
+    1.045
+   ],
+   "size": [
+    2.335,
+    0.744,
+    2.162
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 229028
+  },
+  "bell_flower_sky": {
+   "triangles": 145,
+   "vertices": 280,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -0.254,
+    -0.002,
+    -0.431
+   ],
+   "bounds_max": [
+    0.5,
+    1.33,
+    0.434
+   ],
+   "size": [
+    0.754,
+    1.332,
+    0.865
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 193648
+  },
+  "sky_falls_a": {
+   "triangles": 224,
+   "vertices": 272,
+   "materials": [
+    "water",
+    "leaf",
+    "cloud"
+   ],
+   "bounds_min": [
+    -1.985,
+    -13.381,
+    -0.946
+   ],
+   "bounds_max": [
+    2.062,
+    0.161,
+    2.388
+   ],
+   "size": [
+    4.048,
+    13.541,
+    3.335
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 198236
+  },
+  "sky_falls_b": {
+   "triangles": 224,
+   "vertices": 272,
+   "materials": [
+    "water",
+    "leaf",
+    "cloud"
+   ],
+   "bounds_min": [
+    -1.415,
+    -8.474,
+    -0.951
+   ],
+   "bounds_max": [
+    1.618,
+    0.157,
+    2.394
+   ],
+   "size": [
+    3.033,
+    8.631,
+    3.345
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 198452
+  },
+  "windmill_tower": {
+   "triangles": 1468,
+   "vertices": 3392,
+   "materials": [
+    "ashlar",
+    "timber",
+    "roof",
+    "gold",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.62,
+    0.0,
+    -1.921
+   ],
+   "bounds_max": [
+    1.62,
+    9.6,
+    1.868
+   ],
+   "size": [
+    3.24,
+    9.6,
+    3.789
+   ],
+   "zone": "sky",
+   "collision_intent": "cylinder r1.45 h6.3 (door faces +Z)",
+   "glb_bytes": 760428
+  },
+  "windmill_rotor": {
+   "triangles": 612,
+   "vertices": 1236,
+   "materials": [
+    "gold",
+    "timber",
+    "cloth"
+   ],
+   "bounds_min": [
+    -3.282,
+    -3.282,
+    -0.19
+   ],
+   "bounds_max": [
+    3.282,
+    3.282,
+    0.52
+   ],
+   "size": [
+    6.563,
+    6.563,
+    0.71
+   ],
+   "zone": "sky",
+   "collision_intent": "none; spin around local Z",
+   "glb_bytes": 285696
+  },
+  "garden_arch_sky": {
+   "triangles": 1476,
+   "vertices": 3221,
+   "materials": [
+    "ashlar",
+    "gold",
+    "timber",
+    "glow",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.89,
+    0.0,
+    -0.34
+   ],
+   "bounds_max": [
+    1.89,
+    3.797,
+    0.34
+   ],
+   "size": [
+    3.78,
+    3.797,
+    0.68
+   ],
+   "zone": "sky",
+   "collision_intent": "two column proxies r0.3 h2.2 at x=+-1.55; opening stays free",
+   "glb_bytes": 873328
+  },
+  "balustrade_span_sky": {
+   "triangles": 288,
+   "vertices": 268,
+   "materials": [
+    "ashlar",
+    "gold"
+   ],
+   "bounds_min": [
+    -0.18,
+    0.0,
+    -1.475
+   ],
+   "bounds_max": [
+    0.18,
+    1.085,
+    1.475
+   ],
+   "size": [
+    0.36,
+    1.085,
+    2.95
+   ],
+   "zone": "sky",
+   "collision_intent": "box 0.36x1.1x3.0",
+   "glb_bytes": 329568
+  },
+  "pillar_lantern_sky": {
+   "triangles": 184,
+   "vertices": 284,
+   "materials": [
+    "ashlar",
+    "gold",
+    "glow",
+    "roof"
+   ],
+   "bounds_min": [
+    -0.32,
+    0.0,
+    -0.32
+   ],
+   "bounds_max": [
+    0.32,
+    2.233,
+    0.32
+   ],
+   "size": [
+    0.64,
+    2.233,
+    0.64
+   ],
+   "zone": "sky",
+   "collision_intent": "cylinder r0.3 h1.5",
+   "glb_bytes": 388288
+  },
+  "gazebo_sky": {
+   "triangles": 1694,
+   "vertices": 3468,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "roof",
+    "glow",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -2.86,
+    0.0,
+    -2.86
+   ],
+   "bounds_max": [
+    2.86,
+    5.7,
+    2.86
+   ],
+   "size": [
+    5.72,
+    5.7,
+    5.72
+   ],
+   "zone": "sky",
+   "collision_intent": "ring of 8 post capsules r0.15 at radius 2.0; entrance gap free",
+   "glb_bytes": 954740
+  },
+  "spring_pool_sky": {
+   "triangles": 410,
+   "vertices": 934,
+   "materials": [
+    "ashlar",
+    "gold",
+    "water",
+    "leaf",
+    "petal",
+    "cliff",
+    "turf"
+   ],
+   "bounds_min": [
+    -1.8,
+    0.0,
+    -2.455
+   ],
+   "bounds_max": [
+    1.8,
+    2.48,
+    1.8
+   ],
+   "size": [
+    3.6,
+    2.48,
+    4.255
+   ],
+   "zone": "sky",
+   "collision_intent": "none (decor); optional low ring",
+   "glb_bytes": 1264664
+  },
+  "path_slab_sky_a": {
+   "triangles": 56,
+   "vertices": 150,
+   "materials": [
+    "ashlar",
+    "gold"
+   ],
+   "bounds_min": [
+    -0.659,
+    0.0,
+    -0.568
+   ],
+   "bounds_max": [
+    0.677,
+    0.087,
+    0.548
+   ],
+   "size": [
+    1.336,
+    0.087,
+    1.116
+   ],
+   "zone": "sky",
+   "collision_intent": "none (7 cm above floor)",
+   "glb_bytes": 315144
+  },
+  "path_slab_sky_b": {
+   "triangles": 56,
+   "vertices": 150,
+   "materials": [
+    "ashlar",
+    "gold"
+   ],
+   "bounds_min": [
+    -0.577,
+    0.0,
+    -0.533
+   ],
+   "bounds_max": [
+    0.624,
+    0.087,
+    0.6
+   ],
+   "size": [
+    1.201,
+    0.087,
+    1.133
+   ],
+   "zone": "sky",
+   "collision_intent": "none",
+   "glb_bytes": 315144
+  },
+  "waymark_sky": {
+   "triangles": 160,
+   "vertices": 241,
+   "materials": [
+    "ashlar",
+    "gold",
+    "glow"
+   ],
+   "bounds_min": [
+    -0.42,
+    0.0,
+    -0.42
+   ],
+   "bounds_max": [
+    0.42,
+    1.508,
+    0.42
+   ],
+   "size": [
+    0.84,
+    1.508,
+    0.84
+   ],
+   "zone": "sky",
+   "collision_intent": "cylinder r0.35 h1.0",
+   "glb_bytes": 323416
+  },
+  "grapple_post_sky": {
+   "triangles": 321,
+   "vertices": 351,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "glow"
+   ],
+   "bounds_min": [
+    -0.42,
+    0.0,
+    -0.42
+   ],
+   "bounds_max": [
+    2.15,
+    4.839,
+    0.42
+   ],
+   "size": [
+    2.57,
+    4.839,
+    0.84
+   ],
+   "zone": "sky",
+   "collision_intent": "post capsule r0.2 h4.3 only; ring at (1.8,3.5,0) stays free",
+   "glb_bytes": 562032
+  },
+  "islet_garden_a": {
+   "triangles": 3005,
+   "vertices": 6230,
+   "materials": [
+    "turf",
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -5.221,
+    -9.452,
+    -4.474
+   ],
+   "bounds_max": [
+    5.2,
+    4.824,
+    4.521
+   ],
+   "size": [
+    10.421,
+    14.275,
+    8.994
+   ],
+   "zone": "sky",
+   "collision_intent": "none (backdrop)",
+   "glb_bytes": 1445580
+  },
+  "islet_garden_b": {
+   "triangles": 3005,
+   "vertices": 6230,
+   "materials": [
+    "turf",
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -3.571,
+    -7.034,
+    -3.058
+   ],
+   "bounds_max": [
+    3.603,
+    4.002,
+    3.184
+   ],
+   "size": [
+    7.175,
+    11.035,
+    6.242
+   ],
+   "zone": "sky",
+   "collision_intent": "none (backdrop)",
+   "glb_bytes": 1445452
+  },
+  "islet_garden_falls": {
+   "triangles": 3033,
+   "vertices": 6286,
+   "materials": [
+    "turf",
+    "cliff",
+    "timber",
+    "leaf",
+    "petal",
+    "water"
+   ],
+   "bounds_min": [
+    -6.344,
+    -11.311,
+    -5.501
+   ],
+   "bounds_max": [
+    6.389,
+    5.718,
+    5.568
+   ],
+   "size": [
+    12.733,
+    17.029,
+    11.069
+   ],
+   "zone": "sky",
+   "collision_intent": "none (backdrop)",
+   "glb_bytes": 1449612
+  },
+  "cloud_bank_a": {
+   "triangles": 720,
+   "vertices": 378,
+   "materials": [
+    "cloud"
+   ],
+   "bounds_min": [
+    -8.088,
+    -1.118,
+    -6.899
+   ],
+   "bounds_max": [
+    7.159,
+    2.617,
+    5.662
+   ],
+   "size": [
+    15.247,
+    3.735,
+    12.561
+   ],
+   "zone": "shared",
+   "collision_intent": "none",
+   "glb_bytes": 34964
+  },
+  "cloud_bank_b": {
+   "triangles": 480,
+   "vertices": 252,
+   "materials": [
+    "cloud"
+   ],
+   "bounds_min": [
+    -3.938,
+    -0.824,
+    -4.082
+   ],
+   "bounds_max": [
+    3.69,
+    1.255,
+    2.647
+   ],
+   "size": [
+    7.628,
+    2.079,
+    6.729
+   ],
+   "zone": "shared",
+   "collision_intent": "none",
+   "glb_bytes": 23800
+  },
+  "island_under_cloud_main": {
+   "triangles": 2400,
+   "vertices": 4896,
+   "materials": [
+    "turf",
+    "cliff"
+   ],
+   "bounds_min": [
+    -14.801,
+    -16.751,
+    -12.935
+   ],
+   "bounds_max": [
+    14.751,
+    0.035,
+    12.9
+   ],
+   "size": [
+    29.552,
+    16.786,
+    25.835
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 962708
+  },
+  "island_under_cloud_small": {
+   "triangles": 1400,
+   "vertices": 2856,
+   "materials": [
+    "turf",
+    "cliff"
+   ],
+   "bounds_min": [
+    -7.222,
+    -11.589,
+    -6.718
+   ],
+   "bounds_max": [
+    7.232,
+    0.035,
+    6.766
+   ],
+   "size": [
+    14.454,
+    11.624,
+    13.485
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 866936
+  },
+  "hanging_crag_cloud_a": {
+   "triangles": 204,
+   "vertices": 486,
+   "materials": [
+    "cliff"
+   ],
+   "bounds_min": [
+    -2.177,
+    -8.1,
+    -2.553
+   ],
+   "bounds_max": [
+    3.304,
+    0.0,
+    2.389
+   ],
+   "size": [
+    5.481,
+    8.1,
+    4.942
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 388216
+  },
+  "hanging_crag_cloud_b": {
+   "triangles": 204,
+   "vertices": 486,
+   "materials": [
+    "cliff"
+   ],
+   "bounds_min": [
+    -1.858,
+    -5.135,
+    -1.747
+   ],
+   "bounds_max": [
+    1.435,
+    0.0,
+    1.58
+   ],
+   "size": [
+    3.293,
+    5.135,
+    3.327
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 388216
+  },
+  "root_cascade_cloud_a": {
+   "triangles": 940,
+   "vertices": 2005,
+   "materials": [
+    "cliff",
+    "timber",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.423,
+    -4.709,
+    -0.382
+   ],
+   "bounds_max": [
+    1.952,
+    0.246,
+    0.883
+   ],
+   "size": [
+    3.375,
+    4.955,
+    1.265
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 873220
+  },
+  "root_cascade_cloud_b": {
+   "triangles": 356,
+   "vertices": 687,
+   "materials": [
+    "cliff",
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -0.847,
+    -4.401,
+    -0.298
+   ],
+   "bounds_max": [
+    2.011,
+    0.16,
+    0.879
+   ],
+   "size": [
+    2.858,
+    4.561,
+    1.177
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 807784
+  },
+  "rim_rock_cloud_a": {
+   "triangles": 84,
+   "vertices": 236,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -0.782,
+    0.308,
+    -1.072
+   ],
+   "bounds_max": [
+    1.295,
+    1.694,
+    0.778
+   ],
+   "size": [
+    2.077,
+    1.386,
+    1.85
+   ],
+   "zone": "cloud",
+   "collision_intent": "optional convex proxy",
+   "glb_bytes": 921032
+  },
+  "rim_rock_cloud_b": {
+   "triangles": 76,
+   "vertices": 204,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -1.061,
+    0.546,
+    -0.848
+   ],
+   "bounds_max": [
+    1.08,
+    2.002,
+    1.101
+   ],
+   "size": [
+    2.141,
+    1.456,
+    1.95
+   ],
+   "zone": "cloud",
+   "collision_intent": "optional convex proxy",
+   "glb_bytes": 919316
+  },
+  "rim_rock_cloud_c": {
+   "triangles": 128,
+   "vertices": 352,
+   "materials": [
+    "cliff",
+    "turf",
+    "leaf"
+   ],
+   "bounds_min": [
+    -1.456,
+    0.42,
+    -1.186
+   ],
+   "bounds_max": [
+    1.727,
+    2.31,
+    1.464
+   ],
+   "size": [
+    3.183,
+    1.89,
+    2.65
+   ],
+   "zone": "cloud",
+   "collision_intent": "optional convex proxy",
+   "glb_bytes": 926408
+  },
+  "tree_cloud_a": {
+   "triangles": 517,
+   "vertices": 693,
+   "materials": [
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -0.914,
+    -0.375,
+    -1.612
+   ],
+   "bounds_max": [
+    4.841,
+    5.585,
+    2.223
+   ],
+   "size": [
+    5.755,
+    5.959,
+    3.835
+   ],
+   "zone": "cloud",
+   "collision_intent": "trunk capsule r0.2 h2.0",
+   "glb_bytes": 450196
+  },
+  "tree_cloud_b": {
+   "triangles": 517,
+   "vertices": 693,
+   "materials": [
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -0.529,
+    -0.274,
+    -1.15
+   ],
+   "bounds_max": [
+    4.096,
+    3.386,
+    1.361
+   ],
+   "size": [
+    4.625,
+    3.66,
+    2.51
+   ],
+   "zone": "cloud",
+   "collision_intent": "trunk capsule r0.15 h1.4",
+   "glb_bytes": 450420
+  },
+  "tree_cloud_c": {
+   "triangles": 517,
+   "vertices": 693,
+   "materials": [
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -1.087,
+    -0.3,
+    -2.176
+   ],
+   "bounds_max": [
+    5.941,
+    7.554,
+    2.14
+   ],
+   "size": [
+    7.029,
+    7.854,
+    4.315
+   ],
+   "zone": "cloud",
+   "collision_intent": "trunk capsule r0.25 h3",
+   "glb_bytes": 449800
+  },
+  "meadow_patch_cloud_a": {
+   "triangles": 650,
+   "vertices": 1370,
+   "materials": [
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -1.457,
+    -0.001,
+    -1.392
+   ],
+   "bounds_max": [
+    1.776,
+    0.763,
+    1.162
+   ],
+   "size": [
+    3.233,
+    0.764,
+    2.554
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 246032
+  },
+  "turf_patch_cloud_a": {
+   "triangles": 630,
+   "vertices": 1518,
+   "materials": [
+    "turf",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -3.342,
+    0.012,
+    -2.799
+   ],
+   "bounds_max": [
+    2.785,
+    0.456,
+    2.713
+   ],
+   "size": [
+    6.127,
+    0.444,
+    5.512
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 616492
+  },
+  "turf_patch_cloud_b": {
+   "triangles": 462,
+   "vertices": 1106,
+   "materials": [
+    "turf",
+    "leaf",
+    "petal"
+   ],
+   "bounds_min": [
+    -2.596,
+    0.012,
+    -2.177
+   ],
+   "bounds_max": [
+    2.078,
+    0.47,
+    1.729
+   ],
+   "size": [
+    4.674,
+    0.458,
+    3.906
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 597352
+  },
+  "crystal_cluster_a": {
+   "triangles": 128,
+   "vertices": 312,
+   "materials": [
+    "glow",
+    "cliff"
+   ],
+   "bounds_min": [
+    -0.57,
+    0.0,
+    -0.542
+   ],
+   "bounds_max": [
+    0.502,
+    1.2,
+    0.494
+   ],
+   "size": [
+    1.072,
+    1.2,
+    1.037
+   ],
+   "zone": "cloud",
+   "collision_intent": "optional cylinder r0.5 h1.0",
+   "glb_bytes": 381260
+  },
+  "crystal_cluster_b": {
+   "triangles": 128,
+   "vertices": 312,
+   "materials": [
+    "glow",
+    "cliff"
+   ],
+   "bounds_min": [
+    -0.546,
+    0.0,
+    -0.598
+   ],
+   "bounds_max": [
+    0.556,
+    0.75,
+    0.565
+   ],
+   "size": [
+    1.103,
+    0.75,
+    1.163
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 381248
+  },
+  "wind_banner_pole_a": {
+   "triangles": 126,
+   "vertices": 209,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "cloth"
+   ],
+   "bounds_min": [
+    -0.38,
+    0.0,
+    -0.38
+   ],
+   "bounds_max": [
+    2.5,
+    4.45,
+    0.38
+   ],
+   "size": [
+    2.88,
+    4.45,
+    0.76
+   ],
+   "zone": "cloud",
+   "collision_intent": "pole capsule r0.15 h4.2",
+   "glb_bytes": 549924
+  },
+  "wind_banner_pole_b": {
+   "triangles": 126,
+   "vertices": 209,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "cloth"
+   ],
+   "bounds_min": [
+    -0.38,
+    0.0,
+    -0.38
+   ],
+   "bounds_max": [
+    2.5,
+    3.25,
+    0.38
+   ],
+   "size": [
+    2.88,
+    3.25,
+    0.76
+   ],
+   "zone": "cloud",
+   "collision_intent": "pole capsule r0.15 h3.0",
+   "glb_bytes": 549896
+  },
+  "cairn_stack": {
+   "triangles": 140,
+   "vertices": 372,
+   "materials": [
+    "cliff",
+    "gold"
+   ],
+   "bounds_min": [
+    -0.407,
+    0.175,
+    -0.422
+   ],
+   "bounds_max": [
+    0.472,
+    2.096,
+    0.472
+   ],
+   "size": [
+    0.879,
+    1.921,
+    0.895
+   ],
+   "zone": "cloud",
+   "collision_intent": "cylinder r0.45 h1.5",
+   "glb_bytes": 384640
+  },
+  "watch_shelter": {
+   "triangles": 1034,
+   "vertices": 1822,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "roof",
+    "glow",
+    "cloth"
+   ],
+   "bounds_min": [
+    -3.0,
+    0.0,
+    -2.5
+   ],
+   "bounds_max": [
+    5.0,
+    6.1,
+    2.5
+   ],
+   "size": [
+    8.0,
+    6.1,
+    5.0
+   ],
+   "zone": "cloud",
+   "collision_intent": "plinth box 4.9x0.4x3.9; wall boxes at back (-Z) and -X sides; posts r0.15. Front (+Z) and roof volume clear",
+   "glb_bytes": 697648
+  },
+  "shelter_hall": {
+   "triangles": 1618,
+   "vertices": 2810,
+   "materials": [
+    "ashlar",
+    "timber",
+    "gold",
+    "roof",
+    "glow",
+    "cloth",
+    "cloud"
+   ],
+   "bounds_min": [
+    -4.5,
+    0.0,
+    -2.5
+   ],
+   "bounds_max": [
+    6.5,
+    7.526,
+    2.5
+   ],
+   "size": [
+    11.0,
+    7.526,
+    5.0
+   ],
+   "zone": "cloud",
+   "collision_intent": "plinth box 7.9x0.4x3.9; back wall + -X wall; posts r0.15",
+   "glb_bytes": 753708
+  },
+  "keep_wall_span": {
+   "triangles": 72,
+   "vertices": 144,
+   "materials": [
+    "ashlar",
+    "gold",
+    "roof"
+   ],
+   "bounds_min": [
+    -0.31,
+    0.0,
+    -1.5
+   ],
+   "bounds_max": [
+    0.31,
+    1.97,
+    1.5
+   ],
+   "size": [
+    0.62,
+    1.97,
+    3.0
+   ],
+   "zone": "cloud",
+   "collision_intent": "box 0.6x2.0x3.0",
+   "glb_bytes": 377716
+  },
+  "keep_tower": {
+   "triangles": 504,
+   "vertices": 1004,
+   "materials": [
+    "ashlar",
+    "gold",
+    "roof",
+    "timber",
+    "glow"
+   ],
+   "bounds_min": [
+    -1.9,
+    0.0,
+    -1.9
+   ],
+   "bounds_max": [
+    1.9,
+    9.05,
+    1.9
+   ],
+   "size": [
+    3.8,
+    9.05,
+    3.8
+   ],
+   "zone": "cloud",
+   "collision_intent": "cylinder r1.85 h5.4",
+   "glb_bytes": 650016
+  },
+  "pillar_lantern_cloud": {
+   "triangles": 184,
+   "vertices": 284,
+   "materials": [
+    "ashlar",
+    "gold",
+    "glow",
+    "roof"
+   ],
+   "bounds_min": [
+    -0.32,
+    0.0,
+    -0.32
+   ],
+   "bounds_max": [
+    0.32,
+    2.233,
+    0.32
+   ],
+   "size": [
+    0.64,
+    2.233,
+    0.64
+   ],
+   "zone": "cloud",
+   "collision_intent": "cylinder r0.3 h1.5",
+   "glb_bytes": 388292
+  },
+  "path_slab_cloud_a": {
+   "triangles": 56,
+   "vertices": 150,
+   "materials": [
+    "ashlar",
+    "gold"
+   ],
+   "bounds_min": [
+    -0.646,
+    0.0,
+    -0.524
+   ],
+   "bounds_max": [
+    0.75,
+    0.087,
+    0.534
+   ],
+   "size": [
+    1.396,
+    0.087,
+    1.057
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 315148
+  },
+  "path_slab_cloud_b": {
+   "triangles": 56,
+   "vertices": 150,
+   "materials": [
+    "ashlar",
+    "glow"
+   ],
+   "bounds_min": [
+    -0.542,
+    0.0,
+    -0.596
+   ],
+   "bounds_max": [
+    0.552,
+    0.087,
+    0.607
+   ],
+   "size": [
+    1.094,
+    0.087,
+    1.203
+   ],
+   "zone": "cloud",
+   "collision_intent": "none",
+   "glb_bytes": 315288
+  },
+  "waymark_cloud": {
+   "triangles": 160,
+   "vertices": 241,
+   "materials": [
+    "ashlar",
+    "gold",
+    "glow"
+   ],
+   "bounds_min": [
+    -0.42,
+    0.0,
+    -0.42
+   ],
+   "bounds_max": [
+    0.42,
+    1.508,
+    0.42
+   ],
+   "size": [
+    0.84,
+    1.508,
+    0.84
+   ],
+   "zone": "cloud",
+   "collision_intent": "cylinder r0.35 h1.0",
+   "glb_bytes": 323420
+  },
+  "grapple_post_cloud": {
+   "triangles": 341,
+   "vertices": 391,
+   "materials": [
+    "ashlar",
+    "gold",
+    "timber",
+    "cloth"
+   ],
+   "bounds_min": [
+    -0.55,
+    0.0,
+    -0.55
+   ],
+   "bounds_max": [
+    1.9,
+    5.411,
+    0.55
+   ],
+   "size": [
+    2.45,
+    5.411,
+    1.1
+   ],
+   "zone": "cloud",
+   "collision_intent": "post capsule r0.3 h5.2 only; ring at (1.55,4.5,0) stays free",
+   "glb_bytes": 563644
+  },
+  "islet_crag_a": {
+   "triangles": 1285,
+   "vertices": 2317,
+   "materials": [
+    "turf",
+    "cliff",
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -5.074,
+    -11.28,
+    -4.274
+   ],
+   "bounds_max": [
+    4.976,
+    4.301,
+    4.4
+   ],
+   "size": [
+    10.05,
+    15.581,
+    8.674
+   ],
+   "zone": "cloud",
+   "collision_intent": "none (backdrop)",
+   "glb_bytes": 1258444
+  },
+  "islet_crag_b": {
+   "triangles": 1285,
+   "vertices": 2317,
+   "materials": [
+    "turf",
+    "cliff",
+    "timber",
+    "leaf"
+   ],
+   "bounds_min": [
+    -3.33,
+    -8.322,
+    -2.934
+   ],
+   "bounds_max": [
+    3.416,
+    3.211,
+    3.012
+   ],
+   "size": [
+    6.746,
+    11.533,
+    5.946
+   ],
+   "zone": "cloud",
+   "collision_intent": "none (backdrop)",
+   "glb_bytes": 1257960
+  }
+ },
+ "zones": {
+  "sky_garden": {
+   "play_area_triangles": 97714,
+   "backdrop_triangles": 29616,
+   "placements": 223,
+   "unique_assets": 39,
+   "total_triangles": 127330,
+   "materials": [
+    "ashlar",
+    "cliff",
+    "cloth",
+    "cloud",
+    "glow",
+    "gold",
+    "leaf",
+    "petal",
+    "roof",
+    "timber",
+    "turf",
+    "water"
+   ],
+   "material_count": 12
+  },
+  "cloudbreak_keep": {
+   "play_area_triangles": 74183,
+   "backdrop_triangles": 23990,
+   "placements": 262,
+   "unique_assets": 33,
+   "total_triangles": 98173,
+   "materials": [
+    "ashlar",
+    "cliff",
+    "cloth",
+    "cloud",
+    "glow",
+    "gold",
+    "leaf",
+    "petal",
+    "roof",
+    "timber",
+    "turf"
+   ],
+   "material_count": 11
+  }
+ },
+ "generated_seconds": 1.6
+}

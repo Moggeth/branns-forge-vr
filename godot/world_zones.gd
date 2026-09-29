@@ -460,12 +460,19 @@ static func build(root: Node3D) -> Dictionary:
 				push_error("Zone art %s: %s" % [id, art_result.error])
 			else:
 				z["authored_art"] = art_result
+				if id in ["sky_garden", "cloudbreak_keep"]:
+					# The authored posts include their own visible gold rings. Keep
+					# the grapple target bodies, but hide duplicate primitive rings.
+					for grapple in data.anchors:
+						if grapple.get_meta("zone", "") != id: continue
+						for piece in grapple.get_children():
+							if piece is VisualInstance3D: piece.visible = false
 		GroundKit.populate(z.root,id,float(z.bounds.size.x)*0.5)
 		if id == "orchard_highlands": OrchardDressing.populate(z.root)
 		# These masses are one or two batched surfaces inside their own container.
 		# The container prevents decoration batching from adding convex canopy-like
 		# collision around them; only the kit's deliberate simple proxies are solid.
-		if id in ["sandstone_quarry","crystal_hollow","ember_foundry","cloudbreak_keep"]:
+		if id in ["sandstone_quarry","crystal_hollow","ember_foundry","cloudbreak_keep"] and not (id == "cloudbreak_keep" and z.has("authored_art")):
 			var landmark_kit = LandmarkKit.new(id)
 			if id=="cloudbreak_keep":
 				# Shape existing islands without introducing new bridges or grapple routes.
@@ -726,8 +733,11 @@ static func crystal_hollow(root: Node3D, data: Dictionary) -> void:
 	crate(p,Vector3(-6,0,5),0.8)
 	label(p,"EVERY STONE HOLDS A LITTLE SKY",Vector3(0,6.2,-10.9),26,"b7e5ed")
 
-static func island(p: Node3D, pos: Vector3, size: Vector2) -> void:
+static func island(p: Node3D, pos: Vector3, size: Vector2, authored_edges: bool = false) -> void:
 	floor_patch(p,pos,size,"92aa69")
+	# Keep the authoritative top collision while an authored kit supplies the
+	# cliff lip and underside. The old box/cone would show through that shell.
+	if authored_edges: return
 	box(p,pos+Vector3(0,-0.8,0),Vector3(size.x,1.15,size.y),"b3b7a5")
 	var base := primitive(p,"cone",pos+Vector3(0,-3.4,0),Vector3(size.x,5.3,size.y),"8d98a1")
 	base.rotation.z = PI
@@ -737,28 +747,36 @@ static func sky(root: Node3D, data: Dictionary) -> void:
 	var id := "sky_garden"
 	var p: Node3D = data.zones[id].root
 	var c: Vector3 = data.zones[id].center
-	island(p,Vector3(0,0,6),Vector2(22,18))
-	island(p,Vector3(-10,1.8,-11),Vector2(10,10))
-	island(p,Vector3(10,3.2,-10),Vector2(9,9))
-	for side in [-1,1]:
-		for j in range(4):
-			var v := Vector3(side*10,0,0+j*3)
-			box(p,v+Vector3(0,0.75,0),Vector3(0.35,1.5,0.35),"c4cbb7")
-			box(p,v+Vector3(0,0.55,1.5),Vector3(0.25,0.25,2.8),"bdc7b2")
-		flowers(p,Vector3(side*7,0,5),45,2.2)
+	var authored := FileAccess.file_exists("res://assets/zone_art/sky_garden/placement.json")
+	island(p,Vector3(0,0,6),Vector2(22,18),authored)
+	island(p,Vector3(-10,1.8,-11),Vector2(10,10),authored)
+	island(p,Vector3(10,3.2,-10),Vector2(9,9),authored)
+	if not authored:
+		for side in [-1,1]:
+			for j in range(4):
+				var v := Vector3(side*10,0,0+j*3)
+				box(p,v+Vector3(0,0.75,0),Vector3(0.35,1.5,0.35),"c4cbb7")
+				box(p,v+Vector3(0,0.55,1.5),Vector3(0.25,0.25,2.8),"bdc7b2")
+			flowers(p,Vector3(side*7,0,5),45,2.2)
 	# The windmill sits high across open air; gold rings have explicit safe landing points.
-	cyl(p,Vector3(-10,4.8,-11),1.4,6,"c8c8aa","taper")
-	cyl(p,Vector3(-10,8.1,-11),1.8,1.6,"b8704b","cone")
-	arch(p,Vector3(-10,1.8,-9.65),0.65,"aab2a0")
+	if not authored:
+		cyl(p,Vector3(-10,4.8,-11),1.4,6,"c8c8aa","taper")
+		cyl(p,Vector3(-10,8.1,-11),1.8,1.6,"b8704b","cone")
+		arch(p,Vector3(-10,1.8,-9.65),0.65,"aab2a0")
 	var rotor=Node3D.new(); p.add_child(rotor); rotor.name="WindmillRotor"; rotor.position=Vector3(-10,6.6,-9.45)
-	for i in range(4):
-		var arm=Node3D.new(); rotor.add_child(arm); arm.rotation.z=i*PI/2+0.4
-		line(arm,Vector3.ZERO,Vector3(3.2,0,0),0.12,"8f7957")
-		for side in [-1,1]: line(arm,Vector3(1,side*0.30,0),Vector3(3.2,side*0.30,0),0.065,"ba9b68")
-		for j in range(6): line(arm,Vector3(1+j*0.42,-0.3,0),Vector3(1+j*0.42,0.3,0),0.065,"cbb583")
+	if authored:
+		var authored_rotor := load("res://assets/zone_art/sky_garden/windmill_rotor.glb") as PackedScene
+		if authored_rotor != null: rotor.add_child(authored_rotor.instantiate())
+	else:
+		for i in range(4):
+			var arm=Node3D.new(); rotor.add_child(arm); arm.rotation.z=i*PI/2+0.4
+			line(arm,Vector3.ZERO,Vector3(3.2,0,0),0.12,"8f7957")
+			for side in [-1,1]: line(arm,Vector3(1,side*0.30,0),Vector3(3.2,side*0.30,0),0.065,"ba9b68")
+			for j in range(6): line(arm,Vector3(1+j*0.42,-0.3,0),Vector3(1+j*0.42,0.3,0),0.065,"cbb583")
 	for v in [Vector3(-7,1.8,-8),Vector3(8,3.2,-8),Vector3(-4,0,0)]:
-		box(p,v+Vector3(0,2.1,0),Vector3(0.23,4.2,0.23),"95794e")
-		box(p,v+Vector3(0.9,4,0),Vector3(2,0.18,0.18),"95794e")
+		if not authored:
+			box(p,v+Vector3(0,2.1,0),Vector3(0.23,4.2,0.23),"95794e")
+			box(p,v+Vector3(0.9,4,0),Vector3(2,0.18,0.18),"95794e")
 		anchor(root,data,id,c+v+Vector3(1.8,3.5,0),c+v+Vector3(1,0,0.7))
 	for i in range(3):
 		var n := resource(root,data,id,c+Vector3(9+(i%2),3.2,-10+i*1.2),"sky_bloom","",3)
@@ -766,10 +784,11 @@ static func sky(root: Node3D, data: Dictionary) -> void:
 		for j in range(5): rock(n,Vector3(cos(j*TAU/5)*0.21,1,sin(j*TAU/5)*0.21),Vector3(0.35,0.14,0.35),"e9e6bc")
 		rock(n,Vector3(0,1.06,0),Vector3.ONE*0.18,"94deda")
 		body(n,Vector3(0,0.6,0),Vector3(0.8,1.3,0.8))
-	for i in range(6):
-		var v := Vector3(-20+i*8,-3-i%2,21)
-		rock(p,v,Vector3(6,2,3),"e5eef0")
-	label(p,"THE WIND KNOWS ANOTHER WAY",Vector3(0,2.9,0),27)
+	if not authored:
+		for i in range(6):
+			var v := Vector3(-20+i*8,-3-i%2,21)
+			rock(p,v,Vector3(6,2,3),"e5eef0")
+	if not authored: label(p,"THE WIND KNOWS ANOTHER WAY",Vector3(0,2.9,0),27)
 
 static func foundry(root: Node3D, data: Dictionary) -> void:
 	var id := "ember_foundry"
@@ -818,6 +837,7 @@ static func glow_light(p: Node3D, pos: Vector3, color: String, energy: float, ra
 	p.add_child(light)
 
 static func backdrop(p: Node3D, id: String) -> void:
+	if id == "sky_garden" and FileAccess.file_exists("res://assets/zone_art/sky_garden/placement.json"): return
 	if id in ["crystal_hollow","enchanted_kitchen","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep"]: return
 	if id == "sky_garden":
 		# A layered archipelago gives the islands a scale reference in the open air.

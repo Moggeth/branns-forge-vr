@@ -1,0 +1,2660 @@
+{
+ "schema": 1,
+ "assets": {
+  "cairn_stack": "cairn_stack.glb",
+  "cloud_bank_a": "cloud_bank_a.glb",
+  "cloud_bank_b": "cloud_bank_b.glb",
+  "crystal_cluster_a": "crystal_cluster_a.glb",
+  "crystal_cluster_b": "crystal_cluster_b.glb",
+  "grapple_post_cloud": "grapple_post_cloud.glb",
+  "hanging_crag_cloud_a": "hanging_crag_cloud_a.glb",
+  "hanging_crag_cloud_b": "hanging_crag_cloud_b.glb",
+  "island_under_cloud_main": "island_under_cloud_main.glb",
+  "island_under_cloud_small": "island_under_cloud_small.glb",
+  "islet_crag_a": "islet_crag_a.glb",
+  "islet_crag_b": "islet_crag_b.glb",
+  "keep_tower": "keep_tower.glb",
+  "keep_wall_span": "keep_wall_span.glb",
+  "meadow_patch_cloud_a": "meadow_patch_cloud_a.glb",
+  "path_slab_cloud_a": "path_slab_cloud_a.glb",
+  "path_slab_cloud_b": "path_slab_cloud_b.glb",
+  "pillar_lantern_cloud": "pillar_lantern_cloud.glb",
+  "rim_rock_cloud_a": "rim_rock_cloud_a.glb",
+  "rim_rock_cloud_b": "rim_rock_cloud_b.glb",
+  "rim_rock_cloud_c": "rim_rock_cloud_c.glb",
+  "root_cascade_cloud_a": "root_cascade_cloud_a.glb",
+  "root_cascade_cloud_b": "root_cascade_cloud_b.glb",
+  "shelter_hall": "shelter_hall.glb",
+  "tree_cloud_a": "tree_cloud_a.glb",
+  "tree_cloud_b": "tree_cloud_b.glb",
+  "tree_cloud_c": "tree_cloud_c.glb",
+  "turf_patch_cloud_a": "turf_patch_cloud_a.glb",
+  "turf_patch_cloud_b": "turf_patch_cloud_b.glb",
+  "watch_shelter": "watch_shelter.glb",
+  "waymark_cloud": "waymark_cloud.glb",
+  "wind_banner_pole_a": "wind_banner_pole_a.glb",
+  "wind_banner_pole_b": "wind_banner_pole_b.glb"
+ },
+ "placements": [
+  {
+   "asset": "island_under_cloud_main",
+   "position": [
+    0,
+    0,
+    10
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "island_under_cloud_small",
+   "position": [
+    -16,
+    2.2,
+    -8
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "island_under_cloud_small",
+   "position": [
+    15,
+    4.2,
+    -15
+   ],
+   "yaw_degrees": 0,
+   "scale": 0.96
+  },
+  {
+   "asset": "island_under_cloud_small",
+   "position": [
+    -3,
+    6.0,
+    -25
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.08
+  },
+  {
+   "asset": "hanging_crag_cloud_a",
+   "position": [
+    -7,
+    -6.5,
+    14
+   ],
+   "yaw_degrees": 6.02,
+   "scale": 1.1
+  },
+  {
+   "asset": "hanging_crag_cloud_a",
+   "position": [
+    6,
+    -7.5,
+    8
+   ],
+   "yaw_degrees": 351.64,
+   "scale": 1.0
+  },
+  {
+   "asset": "hanging_crag_cloud_b",
+   "position": [
+    0,
+    -5.5,
+    19
+   ],
+   "yaw_degrees": 29.3,
+   "scale": 0.8
+  },
+  {
+   "asset": "hanging_crag_cloud_b",
+   "position": [
+    -16,
+    -2.3,
+    -8
+   ],
+   "yaw_degrees": 345.86,
+   "scale": 0.9
+  },
+  {
+   "asset": "hanging_crag_cloud_a",
+   "position": [
+    16,
+    -0.3,
+    -14
+   ],
+   "yaw_degrees": 53.2,
+   "scale": 0.9
+  },
+  {
+   "asset": "hanging_crag_cloud_b",
+   "position": [
+    -3,
+    1,
+    -25
+   ],
+   "yaw_degrees": 308.7,
+   "scale": 0.9
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -11.27,
+    -0.3,
+    22.5
+   ],
+   "yaw_degrees": 0.94,
+   "scale": 1.127
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -5.551,
+    -0.3,
+    22.5
+   ],
+   "yaw_degrees": 2.56,
+   "scale": 1.249
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -0.509,
+    -0.3,
+    22.5
+   ],
+   "yaw_degrees": 5.94,
+   "scale": 0.87
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    6.416,
+    -0.3,
+    22.5
+   ],
+   "yaw_degrees": -7.88,
+   "scale": 1.129
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    11.46,
+    -0.3,
+    22.5
+   ],
+   "yaw_degrees": -11.18,
+   "scale": 1.212
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -10.989,
+    -0.3,
+    -2.5
+   ],
+   "yaw_degrees": 185.59,
+   "scale": 0.98
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -6.23,
+    -0.3,
+    -2.5
+   ],
+   "yaw_degrees": 185.94,
+   "scale": 1.211
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -1.646,
+    -0.3,
+    -2.5
+   ],
+   "yaw_degrees": 173.65,
+   "scale": 1.222
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    5.354,
+    -0.3,
+    -2.5
+   ],
+   "yaw_degrees": 182.37,
+   "scale": 1.071
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    10.715,
+    -0.3,
+    -2.5
+   ],
+   "yaw_degrees": 191.33,
+   "scale": 1.204
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    14.5,
+    -0.3,
+    0.872
+   ],
+   "yaw_degrees": 89.14,
+   "scale": 1.07
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    14.5,
+    -0.3,
+    7.174
+   ],
+   "yaw_degrees": 96.71,
+   "scale": 1.121
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    14.5,
+    -0.3,
+    12.473
+   ],
+   "yaw_degrees": 85.61,
+   "scale": 1.161
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    14.5,
+    -0.3,
+    18.635
+   ],
+   "yaw_degrees": 97.91,
+   "scale": 1.032
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -14.5,
+    -0.3,
+    0.849
+   ],
+   "yaw_degrees": -78.44,
+   "scale": 1.227
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -14.5,
+    -0.3,
+    6.18
+   ],
+   "yaw_degrees": -84.51,
+   "scale": 1.119
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -14.5,
+    -0.3,
+    12.531
+   ],
+   "yaw_degrees": -93.16,
+   "scale": 1.12
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -14.5,
+    -0.3,
+    17.75
+   ],
+   "yaw_degrees": -98.81,
+   "scale": 0.917
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -11.886,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 329.68,
+   "scale": 1.135
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -6.947,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 173.31,
+   "scale": 0.711
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -1.919,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 196.65,
+   "scale": 1.02
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    2.52,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 76.95,
+   "scale": 0.784
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    5.995,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 257.0,
+   "scale": 1.037
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    10.892,
+    -0.05,
+    22.62
+   ],
+   "yaw_degrees": 32.14,
+   "scale": 1.038
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -11.634,
+    -0.05,
+    -2.62
+   ],
+   "yaw_degrees": 23.47,
+   "scale": 1.049
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -6.429,
+    -0.05,
+    -2.62
+   ],
+   "yaw_degrees": 233.16,
+   "scale": 0.933
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -1.014,
+    -0.05,
+    -2.62
+   ],
+   "yaw_degrees": 167.95,
+   "scale": 0.948
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    3.487,
+    -0.05,
+    -2.62
+   ],
+   "yaw_degrees": 67.3,
+   "scale": 0.799
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    8.223,
+    -0.05,
+    -2.62
+   ],
+   "yaw_degrees": 230.3,
+   "scale": 0.745
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    14.62,
+    -0.05,
+    0.18
+   ],
+   "yaw_degrees": 265.02,
+   "scale": 0.705
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    14.62,
+    -0.05,
+    4.782
+   ],
+   "yaw_degrees": 153.07,
+   "scale": 0.804
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    14.62,
+    -0.05,
+    9.336
+   ],
+   "yaw_degrees": 35.72,
+   "scale": 0.799
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    14.62,
+    -0.05,
+    14.698
+   ],
+   "yaw_degrees": 17.25,
+   "scale": 0.978
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    14.62,
+    -0.05,
+    19.563
+   ],
+   "yaw_degrees": 259.29,
+   "scale": 1.121
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -14.62,
+    -0.05,
+    0.284
+   ],
+   "yaw_degrees": 29.93,
+   "scale": 0.751
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -14.62,
+    -0.05,
+    4.07
+   ],
+   "yaw_degrees": 97.98,
+   "scale": 1.136
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -14.62,
+    -0.05,
+    7.621
+   ],
+   "yaw_degrees": 324.69,
+   "scale": 0.881
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -14.62,
+    -0.05,
+    11.973
+   ],
+   "yaw_degrees": 129.92,
+   "scale": 1.113
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -14.62,
+    -0.05,
+    16.447
+   ],
+   "yaw_degrees": 332.24,
+   "scale": 0.75
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -14.35,
+    -0.05,
+    -2.35
+   ],
+   "yaw_degrees": 334.06,
+   "scale": 0.925
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -14.35,
+    -0.05,
+    22.35
+   ],
+   "yaw_degrees": 83.97,
+   "scale": 0.995
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    14.35,
+    -0.05,
+    -2.35
+   ],
+   "yaw_degrees": 33.6,
+   "scale": 0.956
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    14.35,
+    -0.05,
+    22.35
+   ],
+   "yaw_degrees": 190.66,
+   "scale": 1.236
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -20.138,
+    1.9,
+    -1.5
+   ],
+   "yaw_degrees": 4.34,
+   "scale": 1.053
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -15.324,
+    1.9,
+    -1.5
+   ],
+   "yaw_degrees": -1.81,
+   "scale": 0.894
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -11.542,
+    1.9,
+    -1.5
+   ],
+   "yaw_degrees": -3.97,
+   "scale": 0.873
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -20.185,
+    1.9,
+    -14.5
+   ],
+   "yaw_degrees": 184.62,
+   "scale": 1.044
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -15.215,
+    1.9,
+    -14.5
+   ],
+   "yaw_degrees": 190.22,
+   "scale": 1.179
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -9.0,
+    1.9,
+    -11.585
+   ],
+   "yaw_degrees": 92.48,
+   "scale": 0.928
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -9.0,
+    1.9,
+    -6.804
+   ],
+   "yaw_degrees": 101.22,
+   "scale": 1.148
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -23.0,
+    1.9,
+    -11.745
+   ],
+   "yaw_degrees": -81.04,
+   "scale": 1.013
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -23.0,
+    1.9,
+    -8.256
+   ],
+   "yaw_degrees": -97.47,
+   "scale": 0.875
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -23.0,
+    1.9,
+    -3.765
+   ],
+   "yaw_degrees": -82.14,
+   "scale": 1.136
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -20.778,
+    2.15,
+    -1.38
+   ],
+   "yaw_degrees": 358.52,
+   "scale": 0.872
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -16.394,
+    2.15,
+    -1.38
+   ],
+   "yaw_degrees": 325.37,
+   "scale": 0.75
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -11.992,
+    2.15,
+    -1.38
+   ],
+   "yaw_degrees": 223.51,
+   "scale": 1.015
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -20.527,
+    2.15,
+    -14.62
+   ],
+   "yaw_degrees": 290.08,
+   "scale": 0.832
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -16.427,
+    2.15,
+    -14.62
+   ],
+   "yaw_degrees": 289.42,
+   "scale": 1.103
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -13.301,
+    2.15,
+    -14.62
+   ],
+   "yaw_degrees": 335.02,
+   "scale": 0.915
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -8.88,
+    2.15,
+    -12.016
+   ],
+   "yaw_degrees": 11.05,
+   "scale": 0.804
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -8.88,
+    2.15,
+    -7.903
+   ],
+   "yaw_degrees": 53.83,
+   "scale": 0.798
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -8.88,
+    2.15,
+    -4.179
+   ],
+   "yaw_degrees": 293.04,
+   "scale": 0.959
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -23.12,
+    2.15,
+    -12.15
+   ],
+   "yaw_degrees": 343.5,
+   "scale": 1.063
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -23.12,
+    2.15,
+    -7.893
+   ],
+   "yaw_degrees": 22.6,
+   "scale": 1.11
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -23.12,
+    2.15,
+    -4.724
+   ],
+   "yaw_degrees": 132.72,
+   "scale": 0.971
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -22.85,
+    2.15,
+    -14.35
+   ],
+   "yaw_degrees": 240.82,
+   "scale": 1.113
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -22.85,
+    2.15,
+    -1.65
+   ],
+   "yaw_degrees": 45.69,
+   "scale": 1.162
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -9.15,
+    2.15,
+    -14.35
+   ],
+   "yaw_degrees": 148.41,
+   "scale": 0.956
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -9.15,
+    2.15,
+    -1.65
+   ],
+   "yaw_degrees": 97.53,
+   "scale": 1.082
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    11.268,
+    3.9,
+    -8.5
+   ],
+   "yaw_degrees": 4.69,
+   "scale": 1.038
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    15.286,
+    3.9,
+    -8.5
+   ],
+   "yaw_degrees": -9.38,
+   "scale": 0.874
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    18.903,
+    3.9,
+    -8.5
+   ],
+   "yaw_degrees": 11.45,
+   "scale": 1.07
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    11.345,
+    3.9,
+    -21.5
+   ],
+   "yaw_degrees": 168.84,
+   "scale": 1.024
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    16.305,
+    3.9,
+    -21.5
+   ],
+   "yaw_degrees": 176.45,
+   "scale": 1.099
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    21.5,
+    3.9,
+    -18.643
+   ],
+   "yaw_degrees": 97.19,
+   "scale": 1.216
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    21.5,
+    3.9,
+    -14.868
+   ],
+   "yaw_degrees": 88.22,
+   "scale": 1.148
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    8.5,
+    3.9,
+    -18.785
+   ],
+   "yaw_degrees": -79.42,
+   "scale": 1.234
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    8.5,
+    3.9,
+    -14.184
+   ],
+   "yaw_degrees": -82.09,
+   "scale": 0.864
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    11.006,
+    4.15,
+    -8.38
+   ],
+   "yaw_degrees": 72.3,
+   "scale": 1.008
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    13.986,
+    4.15,
+    -8.38
+   ],
+   "yaw_degrees": 160.33,
+   "scale": 0.907
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    17.056,
+    4.15,
+    -8.38
+   ],
+   "yaw_degrees": 332.07,
+   "scale": 1.12
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    11.001,
+    4.15,
+    -21.62
+   ],
+   "yaw_degrees": 266.2,
+   "scale": 1.078
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    15.265,
+    4.15,
+    -21.62
+   ],
+   "yaw_degrees": 249.66,
+   "scale": 0.731
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    18.453,
+    4.15,
+    -21.62
+   ],
+   "yaw_degrees": 4.42,
+   "scale": 1.134
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    21.62,
+    4.15,
+    -18.981
+   ],
+   "yaw_degrees": 37.72,
+   "scale": 1.148
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    21.62,
+    4.15,
+    -15.192
+   ],
+   "yaw_degrees": 117.98,
+   "scale": 1.08
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    21.62,
+    4.15,
+    -12.47
+   ],
+   "yaw_degrees": 239.72,
+   "scale": 0.86
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    8.38,
+    4.15,
+    -19.158
+   ],
+   "yaw_degrees": 193.99,
+   "scale": 1.052
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    8.38,
+    4.15,
+    -14.841
+   ],
+   "yaw_degrees": 253.53,
+   "scale": 0.772
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    8.38,
+    4.15,
+    -12.042
+   ],
+   "yaw_degrees": 298.01,
+   "scale": 1.119
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    8.65,
+    4.15,
+    -21.35
+   ],
+   "yaw_degrees": 316.66,
+   "scale": 1.194
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    8.65,
+    4.15,
+    -8.65
+   ],
+   "yaw_degrees": 32.76,
+   "scale": 1.065
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    21.35,
+    4.15,
+    -21.35
+   ],
+   "yaw_degrees": 51.13,
+   "scale": 0.93
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    21.35,
+    4.15,
+    -8.65
+   ],
+   "yaw_degrees": 2.45,
+   "scale": 1.235
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -7.593,
+    5.7,
+    -18.5
+   ],
+   "yaw_degrees": 0.75,
+   "scale": 1.112
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -4.152,
+    5.7,
+    -18.5
+   ],
+   "yaw_degrees": -7.98,
+   "scale": 0.93
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -0.641,
+    5.7,
+    -18.5
+   ],
+   "yaw_degrees": -4.36,
+   "scale": 1.042
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    -7.805,
+    5.7,
+    -31.5
+   ],
+   "yaw_degrees": 184.24,
+   "scale": 0.921
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -4.232,
+    5.7,
+    -31.5
+   ],
+   "yaw_degrees": 177.89,
+   "scale": 1.199
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    0.746,
+    5.7,
+    -31.5
+   ],
+   "yaw_degrees": 187.8,
+   "scale": 1.047
+  },
+  {
+   "asset": "root_cascade_cloud_a",
+   "position": [
+    4.5,
+    5.7,
+    -28.66
+   ],
+   "yaw_degrees": 78.94,
+   "scale": 0.942
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    4.5,
+    5.7,
+    -23.889
+   ],
+   "yaw_degrees": 78.85,
+   "scale": 0.964
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -10.5,
+    5.7,
+    -28.596
+   ],
+   "yaw_degrees": -99.22,
+   "scale": 1.134
+  },
+  {
+   "asset": "root_cascade_cloud_b",
+   "position": [
+    -10.5,
+    5.7,
+    -23.921
+   ],
+   "yaw_degrees": -97.06,
+   "scale": 1.187
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -8.096,
+    5.95,
+    -18.38
+   ],
+   "yaw_degrees": 26.36,
+   "scale": 1.087
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -3.919,
+    5.95,
+    -18.38
+   ],
+   "yaw_degrees": 65.52,
+   "scale": 1.025
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -0.176,
+    5.95,
+    -18.38
+   ],
+   "yaw_degrees": 350.19,
+   "scale": 1.063
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -8.194,
+    5.95,
+    -31.62
+   ],
+   "yaw_degrees": 208.01,
+   "scale": 1.141
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -4.977,
+    5.95,
+    -31.62
+   ],
+   "yaw_degrees": 33.54,
+   "scale": 0.719
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    -0.811,
+    5.95,
+    -31.62
+   ],
+   "yaw_degrees": 21.71,
+   "scale": 1.137
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    4.62,
+    5.95,
+    -29.232
+   ],
+   "yaw_degrees": 110.64,
+   "scale": 1.062
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    4.62,
+    5.95,
+    -26.152
+   ],
+   "yaw_degrees": 359.07,
+   "scale": 1.084
+  },
+  {
+   "asset": "rim_rock_cloud_a",
+   "position": [
+    4.62,
+    5.95,
+    -22.746
+   ],
+   "yaw_degrees": 95.17,
+   "scale": 1.079
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -10.62,
+    5.95,
+    -29.026
+   ],
+   "yaw_degrees": 87.82,
+   "scale": 0.921
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -10.62,
+    5.95,
+    -24.895
+   ],
+   "yaw_degrees": 134.54,
+   "scale": 0.915
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -10.62,
+    5.95,
+    -21.274
+   ],
+   "yaw_degrees": 60.52,
+   "scale": 0.906
+  },
+  {
+   "asset": "rim_rock_cloud_c",
+   "position": [
+    -10.35,
+    5.95,
+    -31.35
+   ],
+   "yaw_degrees": 22.65,
+   "scale": 1.076
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    -10.35,
+    5.95,
+    -18.65
+   ],
+   "yaw_degrees": 105.51,
+   "scale": 1.24
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    4.35,
+    5.95,
+    -31.35
+   ],
+   "yaw_degrees": 55.14,
+   "scale": 0.923
+  },
+  {
+   "asset": "rim_rock_cloud_b",
+   "position": [
+    4.35,
+    5.95,
+    -18.65
+   ],
+   "yaw_degrees": 129.24,
+   "scale": 1.08
+  },
+  {
+   "asset": "keep_wall_span",
+   "position": [
+    -13.4,
+    0,
+    15.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "keep_wall_span",
+   "position": [
+    -13.4,
+    0,
+    18.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "keep_tower",
+   "position": [
+    -12.1,
+    0,
+    20.5
+   ],
+   "yaw_degrees": 146.69,
+   "scale": 1.0
+  },
+  {
+   "asset": "pillar_lantern_cloud",
+   "position": [
+    -9.2,
+    0,
+    9
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "crystal_cluster_a",
+   "position": [
+    -12.5,
+    0,
+    4.0
+   ],
+   "yaw_degrees": 288.86,
+   "scale": 1.0
+  },
+  {
+   "asset": "crystal_cluster_b",
+   "position": [
+    -12.0,
+    0,
+    6.5
+   ],
+   "yaw_degrees": 85.92,
+   "scale": 0.9
+  },
+  {
+   "asset": "keep_wall_span",
+   "position": [
+    13.4,
+    0,
+    15.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "keep_wall_span",
+   "position": [
+    13.4,
+    0,
+    18.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "keep_tower",
+   "position": [
+    12.1,
+    0,
+    20.5
+   ],
+   "yaw_degrees": 171.26,
+   "scale": 1.0
+  },
+  {
+   "asset": "pillar_lantern_cloud",
+   "position": [
+    9.2,
+    0,
+    9
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "crystal_cluster_a",
+   "position": [
+    12.5,
+    0,
+    4.0
+   ],
+   "yaw_degrees": 303.72,
+   "scale": 1.0
+  },
+  {
+   "asset": "crystal_cluster_b",
+   "position": [
+    12.0,
+    0,
+    6.5
+   ],
+   "yaw_degrees": 24.65,
+   "scale": 0.9
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    -3.8,
+    0,
+    17.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_b",
+   "position": [
+    3.8,
+    0,
+    17.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_b",
+   "position": [
+    -3.8,
+    0,
+    14.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    3.8,
+    0,
+    14.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    -3.8,
+    0,
+    10.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_b",
+   "position": [
+    3.8,
+    0,
+    10.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_b",
+   "position": [
+    -3.8,
+    0,
+    7.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    3.8,
+    0,
+    7.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    5.656,
+    0.0,
+    18.544
+   ],
+   "yaw_degrees": 222.68,
+   "scale": 1.0
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    4.663,
+    0.0,
+    17.788
+   ],
+   "yaw_degrees": 237.47,
+   "scale": 1.019
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    3.777,
+    0.0,
+    16.888
+   ],
+   "yaw_degrees": 226.77,
+   "scale": 1.029
+  },
+  {
+   "asset": "path_slab_cloud_b",
+   "position": [
+    2.946,
+    0.0,
+    16.077
+   ],
+   "yaw_degrees": 216.9,
+   "scale": 1.079
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    2.219,
+    0.0,
+    15.15
+   ],
+   "yaw_degrees": 216.66,
+   "scale": 1.063
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    2.067,
+    0.0,
+    14.976
+   ],
+   "yaw_degrees": 211.93,
+   "scale": 1.091
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    1.594,
+    0.0,
+    13.843
+   ],
+   "yaw_degrees": 211.81,
+   "scale": 0.92
+  },
+  {
+   "asset": "path_slab_cloud_b",
+   "position": [
+    1.266,
+    0.0,
+    12.764
+   ],
+   "yaw_degrees": 209.75,
+   "scale": 1.026
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.866,
+    0.0,
+    11.597
+   ],
+   "yaw_degrees": 202.23,
+   "scale": 1.015
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.329,
+    0.0,
+    10.607
+   ],
+   "yaw_degrees": 178.02,
+   "scale": 0.975
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.242,
+    0.0,
+    9.473
+   ],
+   "yaw_degrees": 183.43,
+   "scale": 1.02
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -0.016,
+    0.0,
+    7.073
+   ],
+   "yaw_degrees": 187.08,
+   "scale": 1.098
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.042,
+    0.0,
+    2.6
+   ],
+   "yaw_degrees": 190.4,
+   "scale": 1.075
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -0.017,
+    0.0,
+    1.531
+   ],
+   "yaw_degrees": 184.23,
+   "scale": 1.053
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.013,
+    0.0,
+    0.566
+   ],
+   "yaw_degrees": 168.23,
+   "scale": 0.988
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    0.017,
+    0.0,
+    -0.395
+   ],
+   "yaw_degrees": 187.43,
+   "scale": 0.933
+  },
+  {
+   "asset": "grapple_post_cloud",
+   "position": [
+    0,
+    0,
+    4
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_c",
+   "position": [
+    -12.6,
+    0,
+    12.6
+   ],
+   "yaw_degrees": 298.55,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_a",
+   "position": [
+    12.6,
+    0,
+    12.0
+   ],
+   "yaw_degrees": 322.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_b",
+   "position": [
+    -12.8,
+    0,
+    8.0
+   ],
+   "yaw_degrees": 20.47,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_b",
+   "position": [
+    12.7,
+    0,
+    8.2
+   ],
+   "yaw_degrees": 31.77,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_b",
+   "position": [
+    -6.5,
+    0,
+    20.8
+   ],
+   "yaw_degrees": 108.61,
+   "scale": 0.9
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    -8,
+    0.0,
+    15
+   ],
+   "yaw_degrees": 19.98,
+   "scale": 1.1
+  },
+  {
+   "asset": "turf_patch_cloud_b",
+   "position": [
+    7.5,
+    0.002,
+    14
+   ],
+   "yaw_degrees": 243.55,
+   "scale": 1.0
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    -5,
+    0.004,
+    8.5
+   ],
+   "yaw_degrees": 67.51,
+   "scale": 0.9
+  },
+  {
+   "asset": "turf_patch_cloud_b",
+   "position": [
+    6.5,
+    0.006,
+    6
+   ],
+   "yaw_degrees": 112.9,
+   "scale": 0.8
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    0.5,
+    0.008,
+    19.5
+   ],
+   "yaw_degrees": 206.34,
+   "scale": 1.0
+  },
+  {
+   "asset": "turf_patch_cloud_b",
+   "position": [
+    -9.5,
+    0.01,
+    3
+   ],
+   "yaw_degrees": 294.6,
+   "scale": 0.9
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    9.4,
+    0.012,
+    2.5
+   ],
+   "yaw_degrees": 295.21,
+   "scale": 0.8
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -10.6,
+    0,
+    6.0
+   ],
+   "yaw_degrees": 266.84,
+   "scale": 1.188
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    10.8,
+    0,
+    5.6
+   ],
+   "yaw_degrees": 328.95,
+   "scale": 0.903
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -5.8,
+    0,
+    19.3
+   ],
+   "yaw_degrees": 281.19,
+   "scale": 0.938
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -6.5,
+    0,
+    1.0
+   ],
+   "yaw_degrees": 353.31,
+   "scale": 0.815
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    7.0,
+    0,
+    0.6
+   ],
+   "yaw_degrees": 46.44,
+   "scale": 1.188
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -10.5,
+    0,
+    12.5
+   ],
+   "yaw_degrees": 111.06,
+   "scale": 1.152
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    10.6,
+    0,
+    14.2
+   ],
+   "yaw_degrees": 352.25,
+   "scale": 0.86
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    -11.0,
+    0,
+    1.4
+   ],
+   "yaw_degrees": 336.56,
+   "scale": 0.998
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    11.2,
+    0,
+    1.0
+   ],
+   "yaw_degrees": 116.55,
+   "scale": 1.101
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    -4.3,
+    0,
+    20.9
+   ],
+   "yaw_degrees": 272.23,
+   "scale": 0.993
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    11.0,
+    0,
+    17.0
+   ],
+   "yaw_degrees": 127.03,
+   "scale": 0.971
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    -1.6,
+    0,
+    -1.2
+   ],
+   "yaw_degrees": 223.51,
+   "scale": 1.0
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    1.6,
+    0,
+    -1.2
+   ],
+   "yaw_degrees": 337.66,
+   "scale": 1.0
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    -7.0,
+    0,
+    -1.4
+   ],
+   "yaw_degrees": 353.32,
+   "scale": 1.0
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    7.0,
+    0,
+    -1.4
+   ],
+   "yaw_degrees": 35.83,
+   "scale": 1.0
+  },
+  {
+   "asset": "grapple_post_cloud",
+   "position": [
+    -13,
+    2.2,
+    -7
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "watch_shelter",
+   "position": [
+    -19.1,
+    2.2,
+    -11.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_a",
+   "position": [
+    -21.4,
+    2.2,
+    -4.0
+   ],
+   "yaw_degrees": 20,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_b",
+   "position": [
+    -14.5,
+    2.2,
+    -13.0
+   ],
+   "yaw_degrees": 200,
+   "scale": 1.0
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    -10.8,
+    2.2,
+    -3.2
+   ],
+   "yaw_degrees": 40,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_a",
+   "position": [
+    -21.6,
+    2.2,
+    -7.0
+   ],
+   "yaw_degrees": 10,
+   "scale": 0.9
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -17.0,
+    2.2,
+    -4.6
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    -17.4,
+    2.2,
+    -6.0
+   ],
+   "yaw_degrees": 30,
+   "scale": 0.8
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    -11.6,
+    2.2,
+    -4.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "wind_banner_pole_b",
+   "position": [
+    -21.6,
+    2.2,
+    -13.2
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -13.023,
+    2.2,
+    -8.062
+   ],
+   "yaw_degrees": 227.87,
+   "scale": 1.068
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -14.046,
+    2.2,
+    -8.674
+   ],
+   "yaw_degrees": 233.68,
+   "scale": 0.963
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -14.868,
+    2.2,
+    -9.281
+   ],
+   "yaw_degrees": 246.12,
+   "scale": 1.1
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -15.478,
+    2.2,
+    -9.655
+   ],
+   "yaw_degrees": 247.93,
+   "scale": 0.902
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -16.474,
+    2.2,
+    -9.951
+   ],
+   "yaw_degrees": 256.95,
+   "scale": 0.904
+  },
+  {
+   "asset": "grapple_post_cloud",
+   "position": [
+    13,
+    4.2,
+    -13
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "watch_shelter",
+   "position": [
+    17.6,
+    4.2,
+    -18.4
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_c",
+   "position": [
+    19.8,
+    4.2,
+    -10.6
+   ],
+   "yaw_degrees": 30,
+   "scale": 0.9
+  },
+  {
+   "asset": "tree_cloud_b",
+   "position": [
+    10.2,
+    4.2,
+    -19.6
+   ],
+   "yaw_degrees": 90,
+   "scale": 1.0
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    10.0,
+    4.2,
+    -10.2
+   ],
+   "yaw_degrees": 0,
+   "scale": 0.9
+  },
+  {
+   "asset": "crystal_cluster_b",
+   "position": [
+    20.4,
+    4.2,
+    -14.6
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.1
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    16.2,
+    4.2,
+    -12.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 0.9
+  },
+  {
+   "asset": "turf_patch_cloud_b",
+   "position": [
+    14.6,
+    4.2,
+    -18.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 0.9
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    20.4,
+    4.2,
+    -20.4
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    11.3,
+    4.2,
+    -11.4
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    13.011,
+    4.2,
+    -13.79
+   ],
+   "yaw_degrees": 126.26,
+   "scale": 1.02
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    13.756,
+    4.2,
+    -14.579
+   ],
+   "yaw_degrees": 142.73,
+   "scale": 1.022
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    14.519,
+    4.2,
+    -15.473
+   ],
+   "yaw_degrees": 127.72,
+   "scale": 1.039
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    15.017,
+    4.2,
+    -15.989
+   ],
+   "yaw_degrees": 157.78,
+   "scale": 1.088
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    15.535,
+    4.2,
+    -16.879
+   ],
+   "yaw_degrees": 157.54,
+   "scale": 1.041
+  },
+  {
+   "asset": "grapple_post_cloud",
+   "position": [
+    -2,
+    6,
+    -24
+   ],
+   "yaw_degrees": 0.0,
+   "scale": 1.0
+  },
+  {
+   "asset": "shelter_hall",
+   "position": [
+    -3.0,
+    6.0,
+    -28.6
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_a",
+   "position": [
+    -8.6,
+    6.0,
+    -21.0
+   ],
+   "yaw_degrees": 200,
+   "scale": 1.0
+  },
+  {
+   "asset": "tree_cloud_c",
+   "position": [
+    2.6,
+    6.0,
+    -21.4
+   ],
+   "yaw_degrees": 80,
+   "scale": 0.9
+  },
+  {
+   "asset": "cairn_stack",
+   "position": [
+    2.4,
+    6.0,
+    -29.8
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "crystal_cluster_a",
+   "position": [
+    -8.8,
+    6.0,
+    -29.0
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "meadow_patch_cloud_a",
+   "position": [
+    -7.2,
+    6.0,
+    -24.5
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "turf_patch_cloud_a",
+   "position": [
+    -4.0,
+    6.0,
+    -25.5
+   ],
+   "yaw_degrees": 30,
+   "scale": 0.9
+  },
+  {
+   "asset": "wind_banner_pole_a",
+   "position": [
+    3.0,
+    6.0,
+    -26.6
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "waymark_cloud",
+   "position": [
+    0.7,
+    6.0,
+    -22.4
+   ],
+   "yaw_degrees": 0,
+   "scale": 1.0
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -1.972,
+    6.0,
+    -23.008
+   ],
+   "yaw_degrees": 200.0,
+   "scale": 0.955
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -2.351,
+    6.0,
+    -24.122
+   ],
+   "yaw_degrees": 195.17,
+   "scale": 0.926
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -2.677,
+    6.0,
+    -25.164
+   ],
+   "yaw_degrees": 199.87,
+   "scale": 0.995
+  },
+  {
+   "asset": "path_slab_cloud_a",
+   "position": [
+    -2.913,
+    6.0,
+    -26.311
+   ],
+   "yaw_degrees": 198.89,
+   "scale": 0.936
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    -38.339,
+    -5.548,
+    -42.563
+   ],
+   "yaw_degrees": 338.26,
+   "scale": 0.943
+  },
+  {
+   "asset": "islet_crag_b",
+   "position": [
+    -28.099,
+    -3.949,
+    -50.737
+   ],
+   "yaw_degrees": 140.03,
+   "scale": 0.806
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    -20.97,
+    1.304,
+    -40.694
+   ],
+   "yaw_degrees": 31.78,
+   "scale": 1.132
+  },
+  {
+   "asset": "islet_crag_b",
+   "position": [
+    -12.884,
+    -4.721,
+    -48.366
+   ],
+   "yaw_degrees": 320.21,
+   "scale": 1.007
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    -0.146,
+    -1.643,
+    -41.579
+   ],
+   "yaw_degrees": 120.34,
+   "scale": 1.106
+  },
+  {
+   "asset": "islet_crag_b",
+   "position": [
+    6.553,
+    1.911,
+    -49.1
+   ],
+   "yaw_degrees": 352.39,
+   "scale": 1.139
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    16.069,
+    -6.164,
+    -41.662
+   ],
+   "yaw_degrees": 72.44,
+   "scale": 0.806
+  },
+  {
+   "asset": "islet_crag_b",
+   "position": [
+    25.472,
+    -2.628,
+    -50.938
+   ],
+   "yaw_degrees": 240.88,
+   "scale": 0.954
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    33.719,
+    1.468,
+    -40.962
+   ],
+   "yaw_degrees": 8.07,
+   "scale": 0.902
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    -42,
+    -2,
+    -12
+   ],
+   "yaw_degrees": 329.07,
+   "scale": 1.0
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    42,
+    0,
+    -26
+   ],
+   "yaw_degrees": 244.65,
+   "scale": 1.1
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    44,
+    -6,
+    4
+   ],
+   "yaw_degrees": 37.15,
+   "scale": 0.9
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    -44,
+    -8,
+    18
+   ],
+   "yaw_degrees": 343.78,
+   "scale": 1.0
+  },
+  {
+   "asset": "islet_crag_a",
+   "position": [
+    30,
+    8,
+    -38
+   ],
+   "yaw_degrees": 201.47,
+   "scale": 0.7
+  },
+  {
+   "asset": "cloud_bank_a",
+   "position": [
+    44.495,
+    -22,
+    -3.275
+   ],
+   "yaw_degrees": 153.55,
+   "scale": 1.383
+  },
+  {
+   "asset": "cloud_bank_b",
+   "position": [
+    39.165,
+    -25,
+    28.615
+   ],
+   "yaw_degrees": 144.5,
+   "scale": 2.045
+  },
+  {
+   "asset": "cloud_bank_a",
+   "position": [
+    10.622,
+    -28,
+    54.126
+   ],
+   "yaw_degrees": 250.72,
+   "scale": 1.636
+  },
+  {
+   "asset": "cloud_bank_b",
+   "position": [
+    -20.145,
+    -31,
+    30.239
+   ],
+   "yaw_degrees": 171.07,
+   "scale": 1.378
+  },
+  {
+   "asset": "cloud_bank_a",
+   "position": [
+    -48.827,
+    -22,
+    15.316
+   ],
+   "yaw_degrees": 198.93,
+   "scale": 1.813
+  },
+  {
+   "asset": "cloud_bank_b",
+   "position": [
+    -64.27,
+    -25,
+    -19.713
+   ],
+   "yaw_degrees": 44.47,
+   "scale": 1.946
+  },
+  {
+   "asset": "cloud_bank_a",
+   "position": [
+    -32.044,
+    -28,
+    -41.594
+   ],
+   "yaw_degrees": 188.35,
+   "scale": 1.306
+  },
+  {
+   "asset": "cloud_bank_b",
+   "position": [
+    -8.988,
+    -31,
+    -64.261
+   ],
+   "yaw_degrees": 148.73,
+   "scale": 1.476
+  },
+  {
+   "asset": "cloud_bank_a",
+   "position": [
+    29.099,
+    -22,
+    -68.123
+   ],
+   "yaw_degrees": 214.69,
+   "scale": 1.792
+  },
+  {
+   "asset": "cloud_bank_b",
+   "position": [
+    39.95,
+    -25,
+    -30.713
+   ],
+   "yaw_degrees": 195.17,
+   "scale": 1.599
+  }
+ ]
+}
