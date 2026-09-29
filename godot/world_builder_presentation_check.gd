@@ -19,6 +19,16 @@ func _check() -> void:
 	view.setup(game, game.world_builder)
 	if view.arrival_elapsed != 0.0 or view.camera.global_position.distance_to(game.camera.global_position) > 0.05:
 		failures.append("desktop survey did not begin at the Hero camera")
+	if view.overlay.modulate.a > 0.05:
+		failures.append("survey controls did not fade in with the camera")
+	view._advance_arrival(0.08)
+	var interrupted_pose: Transform3D = view.camera.global_transform
+	view.zoom = clampf(view.zoom - 6.0, 28.0, 185.0)
+	view._position_camera()
+	if view.camera.global_transform.origin.distance_to(interrupted_pose.origin) > 0.05 or view.arrival_elapsed != 0.0:
+		failures.append("zoom during survey arrival snapped the camera")
+	if view.arrival_to.origin.distance_to(interrupted_pose.origin) < 0.05:
+		failures.append("zoom during survey arrival did not retarget the camera")
 	if view.tactical_viewport.world_3d != game.get_world_3d():
 		failures.append("desktop survey lost the live Hero world")
 	await create_timer(0.7).timeout
@@ -52,17 +62,39 @@ func _check() -> void:
 	f9.pressed = true
 	view._input(f9)
 	await process_frame
-	if is_instance_valid(view): failures.append("F9 did not return to the Hero")
+	if not is_instance_valid(view) or not view.returning_to_hero:
+		failures.append("F9 did not start the return to the Hero")
+	else:
+		var return_from: Transform3D = view.camera.global_transform
+		var return_to: Transform3D = game.camera.global_transform
+		if return_from.origin.distance_to(return_to.origin) < 1.0:
+			failures.append("return check started too near the Hero")
+		view._advance_arrival(0.12)
+		var return_mid: Transform3D = view.camera.global_transform
+		if return_mid.origin.distance_to(return_from.origin) < 0.05 or return_mid.origin.distance_to(return_to.origin) < 0.05:
+			failures.append("return camera did not move between survey and Hero")
+		if view.overlay.modulate.a >= view.return_overlay_from_alpha:
+			failures.append("survey controls did not fade during return")
+		view._advance_arrival(view.ARRIVAL_SECONDS)
+		await process_frame
+		if is_instance_valid(view): failures.append("F9 did not finish the return to the Hero")
 	if root.gui_embed_subwindows != original_embed: failures.append("subwindow preference was not restored")
 	var quick_return: Window = load("res://world_builder_view.gd").new()
 	quick_return.visible = false
 	game.add_child(quick_return)
 	game.world_builder_view = quick_return
 	quick_return.setup(game, game.world_builder)
+	quick_return.hero_mouse_was_captured = true
 	await process_frame
+	var early_pose: Transform3D = quick_return.camera.global_transform
 	quick_return._input(f9)
+	if not quick_return.returning_to_hero or quick_return.camera.global_transform.origin.distance_to(early_pose.origin) > 0.05:
+		failures.append("F9 during arrival snapped instead of reversing the camera")
+	quick_return._advance_arrival(quick_return.ARRIVAL_SECONDS)
 	await process_frame
-	if is_instance_valid(quick_return): failures.append("F9 did not interrupt the camera arrival immediately")
+	if is_instance_valid(quick_return): failures.append("F9 during arrival did not finish the return")
+	if not game.desktop_look.captured: failures.append("return did not restore captured Hero mouse input")
+	game.desktop_look.release_capture()
 	if game.get_window().mode != original_game_mode: failures.append("return changed the Hero window mode")
 	game.vr = true
 	var companion: Window = load("res://world_builder_view.gd").new()

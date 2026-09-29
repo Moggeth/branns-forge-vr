@@ -61,6 +61,10 @@ var arrival_elapsed := ARRIVAL_SECONDS
 var arrival_from := Transform3D.IDENTITY
 var arrival_to := Transform3D.IDENTITY
 var arrival_from_fov := 56.0
+var arrival_to_fov := 56.0
+var returning_to_hero := false
+var return_overlay_from_alpha := 1.0
+var hero_mouse_was_captured := false
 
 func _enter_tree() -> void:
 	previous_embed_subwindows = get_tree().root.gui_embed_subwindows
@@ -100,6 +104,7 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	close_requested.connect(close)
 	visible = true
 	if not companion_mode and DisplayServer.get_name() != "headless":
+		hero_mouse_was_captured = game.desktop_look != null and game.desktop_look.captured
 		game.desktop_look.release_capture()
 		mode = Window.MODE_FULLSCREEN
 		_start_arrival()
@@ -110,6 +115,7 @@ func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(builder): return
 	clock += delta
 	_advance_arrival(delta)
+	if returning_to_hero: return
 	if mode == Window.MODE_MINIMIZED:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
@@ -150,21 +156,47 @@ func tick(delta: float) -> void:
 	_update_preview()
 
 func close() -> void:
+	if returning_to_hero: return
+	if not companion_mode and is_instance_valid(game.camera):
+		returning_to_hero = true
+		arrival_from = camera.global_transform
+		arrival_to = game.camera.global_transform
+		arrival_from_fov = camera.fov
+		arrival_to_fov = game.camera.fov
+		arrival_elapsed = 0.0
+		return_overlay_from_alpha = overlay.modulate.a
+		return
+	_finish_close()
+
+func _finish_close() -> void:
 	print("WORLD_BUILDER_VIEW closed")
 	if is_instance_valid(marker): marker.queue_free()
 	if is_instance_valid(route_preview): route_preview.queue_free()
 	visible = false
 	if not companion_mode:
 		game.get_window().grab_focus()
+		if hero_mouse_was_captured and game.desktop_look != null:
+			game.desktop_look.call_deferred("capture")
 	queue_free()
 
 func _position_camera() -> void:
 	if camera == null: return
-	arrival_elapsed = ARRIVAL_SECONDS
-	camera.fov = 56.0
+	var was_arriving := arrival_elapsed < ARRIVAL_SECONDS
+	var current_transform := camera.global_transform
+	var current_fov := camera.fov
 	var horizontal := cos(pitch) * zoom
 	camera.global_position = focus_point + Vector3(sin(yaw) * horizontal, sin(pitch) * zoom, cos(yaw) * horizontal)
 	camera.look_at(focus_point, Vector3.UP)
+	if was_arriving:
+		arrival_from = current_transform
+		arrival_to = camera.global_transform
+		arrival_from_fov = current_fov
+		arrival_to_fov = 56.0
+		arrival_elapsed = 0.0
+		camera.global_transform = current_transform
+		camera.fov = current_fov
+	else:
+		camera.fov = 56.0
 
 func _start_arrival() -> void:
 	if not is_instance_valid(game.camera): return
@@ -172,9 +204,11 @@ func _start_arrival() -> void:
 	arrival_from = game.camera.global_transform
 	if arrival_from.origin.distance_to(arrival_to.origin) > ARRIVAL_MAX_DISTANCE: return
 	arrival_from_fov = game.camera.fov
+	arrival_to_fov = 56.0
 	arrival_elapsed = 0.0
 	camera.global_transform = arrival_from
 	camera.fov = arrival_from_fov
+	overlay.modulate.a = 0.0
 
 func _advance_arrival(delta: float) -> void:
 	if arrival_elapsed >= ARRIVAL_SECONDS: return
@@ -182,7 +216,10 @@ func _advance_arrival(delta: float) -> void:
 	var fraction := arrival_elapsed / ARRIVAL_SECONDS
 	var eased := 1.0 - pow(1.0 - fraction, 3.0)
 	camera.global_transform = arrival_from.interpolate_with(arrival_to, eased)
-	camera.fov = lerpf(arrival_from_fov, 56.0, eased)
+	camera.fov = lerpf(arrival_from_fov, arrival_to_fov, eased)
+	overlay.modulate.a = lerpf(return_overlay_from_alpha, 0.0, eased) if returning_to_hero else eased
+	if returning_to_hero and arrival_elapsed >= ARRIVAL_SECONDS:
+		_finish_close()
 
 func _build_ui() -> void:
 	world_picture = TextureRect.new()
@@ -435,7 +472,7 @@ func _act(local: Vector3) -> void:
 	_say(result if result != "" else builder.progress_message)
 
 func _input(event: InputEvent) -> void:
-	if not visible or not has_focus(): return
+	if not visible or not has_focus() or returning_to_hero: return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode >= KEY_1 and event.keycode <= KEY_8: select_action(ACTIONS[event.keycode - KEY_1])
 		elif event.keycode == KEY_9: _hire()
