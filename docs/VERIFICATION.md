@@ -22,6 +22,15 @@ avoids opening the toolbelt over the bomb; the clean capture took 10.834 s.
 `outputs/overnight-*` and copies are provided in the isolated art briefs.
 Inspect the actual PNG, not only the capture exit code.
 
+The generic `--capture-tool=quarry_pick` art pose initially stalled because the
+diagnostic copy is a `Node3D`, not a `RigidBody3D`; trying to set `freeze` was
+invalid. Hiding Godot output obscured that failure, so keep parser/errors
+visible on the first run and use `--quit-after 1200` as a guard. Removing the
+invalid property yielded `CAPTURE 0` in 10.671 s and a clear in-game pick PNG.
+The tool pose is for repeatable asset scale/material review, not held-grip
+calibration. The final graphical command is `--capture=<absolute PNG path>
+--capture-tool=quarry_pick`.
+
 ## Playable zone fog regression — 2026-09-29
 
 Pinewood and Quarry rendered as nearly solid sky-coloured fog in the graphical

@@ -71,6 +71,7 @@ var tuning
 var music
 var bomb_art
 var capture_bomb_stage=""
+var capture_tool_id=""
 var capture_tuning=false
 var capture_quick=false
 var hand_sockets={}
@@ -161,6 +162,7 @@ func _ready():
 		if argument == "--capture-qol": capture_qol = true
 		if argument == "--capture-feedback": capture_feedback = true
 		if argument.begins_with("--capture-bomb-stage="): capture_bomb_stage=argument.trim_prefix("--capture-bomb-stage=")
+		if argument.begins_with("--capture-tool="): capture_tool_id=argument.trim_prefix("--capture-tool=")
 		if argument == "--capture-tuning": capture_tuning=true
 		if argument == "--capture-quick":
 			capture_tuning=true
@@ -805,6 +807,13 @@ func _capture():
 		point.y=0.15
 		bomb_art.explosion(point,3.2)
 		await get_tree().create_timer(0.18).timeout
+	if not capture_tool_id.is_empty() and capture_tool_id in adventure.ORDER:
+		# A camera-mounted copy makes a repeatable scale/material review.
+		# This is a diagnostic art pose, not the playable hand grip.
+		var review_tool=adventure._tool_model(capture_tool_id)
+		camera.add_child(review_tool)
+		review_tool.position=Vector3(0.34,-0.62,-1.05)
+		review_tool.rotation=Vector3(-0.32,0.12,-0.18)
 	if OS.get_cmdline_user_args().has("--capture-lantern-pair"):
 		adventure.travel("forge_yard")
 		camera.global_position=Vector3(9.6,1.72,7.0)
