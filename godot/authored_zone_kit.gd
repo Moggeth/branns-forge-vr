@@ -78,7 +78,56 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 			holder.visibility_range_end_margin = 8.0
 			root.add_child(holder)
 			holders += 1
-	var result := {"assets":cache.size(),"placements":placements.size(),"holders":holders}
+	# Only major authored solids opt into collision. Small flora, banks and
+	# atmospheric pieces remain visual, so a dense kit stays cheap and walkable.
+	var collider_count := 0
+	var asset_meta: Dictionary = document.get("asset_meta", {})
+	for entry in placements:
+		if str(entry.get("collision", "none")) != "asset_default": continue
+		var asset_id: String = str(entry.get("asset", ""))
+		var meta: Variant = asset_meta.get(asset_id, {})
+		if not meta is Dictionary: continue
+		var specs: Variant = meta.get("collision", [])
+		if specs is Dictionary: specs = [specs]
+		if not specs is Array or specs.is_empty(): continue
+		var at_values: Array = entry.position
+		var at := Vector3(float(at_values[0]), float(at_values[1]), float(at_values[2]))
+		var yaw := deg_to_rad(float(entry.get("yaw_degrees", 0.0)))
+		var scale: float = float(entry.get("scale", 1.0))
+		var solid := StaticBody3D.new()
+		solid.name = "ZoneArtSolid_%s" % asset_id
+		solid.set_meta("kind", "solid")
+		solid.position = at
+		solid.rotation.y = yaw
+		for spec in specs:
+			if not spec is Dictionary: continue
+			var shape: Shape3D
+			match str(spec.get("shape", "")):
+				"box":
+					var size: Variant = spec.get("size", [])
+					if not size is Array or size.size() != 3: continue
+					var box_shape := BoxShape3D.new()
+					box_shape.size = Vector3(float(size[0]), float(size[1]), float(size[2])) * scale
+					shape = box_shape
+				"cylinder":
+					var cylinder := CylinderShape3D.new()
+					cylinder.radius = float(spec.get("radius", 0.0)) * scale
+					cylinder.height = float(spec.get("height", 0.0)) * scale
+					shape = cylinder
+				_:
+					continue
+			var offset: Variant = spec.get("offset", [0, 0, 0])
+			if not offset is Array or offset.size() != 3: continue
+			var collision := CollisionShape3D.new()
+			collision.shape = shape
+			collision.position = Vector3(float(offset[0]), float(offset[1]), float(offset[2])) * scale
+			solid.add_child(collision)
+			collider_count += 1
+		if solid.get_child_count() == 0:
+			solid.free()
+		else:
+			root.add_child(solid)
+	var result := {"assets":cache.size(),"placements":placements.size(),"holders":holders,"colliders":collider_count}
 	print("ZONE_KIT ", JSON.stringify(result))
 	return result
 

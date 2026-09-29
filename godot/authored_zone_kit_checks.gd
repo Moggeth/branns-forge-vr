@@ -26,6 +26,21 @@ func _run() -> void:
 				failures.append("zone-local placement or per-instance scale drifted")
 	var invalid := Kit.emit(parent,{"schema":1,"assets":{"rock":"../elsewhere.glb"},"placements":[]},"res://assets/orchard_kit")
 	if not invalid.has("error"): failures.append("asset escaped the zone-kit directory")
+	var collision_doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/orchard_kit/zone_kit_fixture.json"))
+	collision_doc["asset_meta"] = {"rock":{"collision":{"shape":"box","size":[0.8,1.0,0.8],"offset":[0.0,0.5,0.0]}}}
+	for placement in collision_doc.placements: placement["collision"] = "asset_default"
+	var collision_root := Node3D.new()
+	root.add_child(collision_root)
+	var collision_result: Dictionary = Kit.emit(collision_root, collision_doc, "res://assets/orchard_kit")
+	var solids: Array = []
+	for child in collision_root.get_children():
+		if child is StaticBody3D: solids.append(child)
+	if int(collision_result.get("colliders", 0)) != 2 or solids.size() != 2:
+		failures.append("opt-in authored colliders did not match placements")
+	else:
+		var first_shape := solids[0].get_child(0) as CollisionShape3D
+		if first_shape == null or first_shape.shape == null or first_shape.position.y != 0.5:
+			failures.append("authored collision shape lost its size or offset")
 	for argument in OS.get_cmdline_user_args():
 		if not argument.begins_with("--kit-capture="): continue
 		root.size = Vector2i(960, 600)

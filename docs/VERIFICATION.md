@@ -1502,6 +1502,15 @@ disposable-fixture integration passed in 55.387 s with no zone manifests
 installed. An authored-zone capture is still required after the first kit
 arrives.
 
+Authored collision intent (2026-09-30): the manifest adapter now installs
+simple box/cylinder proxies only for explicitly marked major placements,
+leaving small decorative flora visual-only. The fixture check exercises
+two offsets and reports `AUTHORED_ZONE_KIT_RESULT []` in 0.212 s. Its first
+assertion used `find_children("ZoneArtSolid_*")` and missed a sibling after
+Godot renamed duplicate node names; iterating direct children by type is the
+reliable approach for this check. The actual Gloamfen kit still needs a
+full scene collision and walkability review after import.
+
 Measured integration attempts, including fixture creation and all four Godot
 stages: 54.563 s (original failures), 54.620 s (Siegebird assertions fixed;
 audio shutdown error), 55.072 s (verbose leak diagnosis), 46.563 s (OneDrive
