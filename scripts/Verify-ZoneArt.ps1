@@ -11,6 +11,7 @@ $project = Join-Path $repo 'godot'
 $logDir = Join-Path $repo 'logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$validationLog = Join-Path $logDir "zone-art-validation-$stamp.json"
 $importLog = Join-Path $logDir "zone-art-import-$stamp.log"
 $routeLog = Join-Path $logDir "zone-art-route-$stamp.log"
 $renderLog = Join-Path $logDir "zone-art-render-$stamp.log"
@@ -20,13 +21,16 @@ $outcome = 'failed'
 
 try {
   if (!(Test-Path -LiteralPath $godot)) { throw "Godot executable missing: $godot" }
+  $manifests = @()
   foreach ($zone in $Zones) {
     if ($zone -notmatch '^[a-z][a-z0-9_]*$') { throw "Invalid zone name: $zone" }
     $manifest = Join-Path $project "assets/zone_art/$zone/placement.json"
     if (!(Test-Path -LiteralPath $manifest)) { throw "Authored manifest missing: $manifest" }
-    & python (Join-Path $repo 'scripts/validate_zone_art.py') $manifest
-    if ($LASTEXITCODE -ne 0) { throw "Asset validation failed for $zone" }
+    $manifests += $manifest
   }
+  & python (Join-Path $repo 'scripts/validate_zone_art.py') @manifests *> $validationLog
+  if ($LASTEXITCODE -ne 0) { throw "Asset validation failed; inspect $validationLog" }
+  Write-Output "ZONE_ART_VALIDATION_OK $validationLog"
 
   & $godot --headless --editor --xr-mode off --audio-driver Dummy --path $project --import --quit *> $importLog
   if ($LASTEXITCODE -ne 0) { throw "Godot asset import failed; inspect $importLog" }
