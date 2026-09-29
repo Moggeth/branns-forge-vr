@@ -48,6 +48,8 @@ Priority 3 has since been integrated: [Starfall Ridge's authored valley and actu
 
 The [Enchanted Kitchen rebuild](KITCHEN-ART-20260930.md) now replaces its uniform shelves and ceiling with an authored timber hall. The first per-piece import cost 1,327 ground-eye draws, above the 950 pre-art baseline; compiling its static layout into 20 material batches reduced that to 862. This is a useful pattern for small self-contained destinations, while outdoor kits still need chunks for culling and local editing.
 
+The [Mushroom Glade rebuild](GLADE-ART-20260930.md) has an irregular pond/bank, mossy backdrop, varied physical mushrooms and rooted detail. Its actual-game ground/RTS capture and protected route checks passed; the final installed manifest has 59 placements, five preserved spore pickups and 25 conservative collision shapes.
+
 ## Capture failure and recovery
 
 The first default run completed 24 files in 8.53 script seconds, but most were nearly solid haze. Hiding the horizon did not restore Pinewood; the game's own `--capture-zone=pinewood_ruins` reproduced the haze. A fresh Godot `Environment` probe showed that assigning `fog_mode=0` resets `fog_density` from `0.001` to `1.0`. `adventure_runtime.gd` restored `fog_mode` after setting the zone density. Commit `497b2c1` moved the density assignment after the grade defaults. The final default run after that fix completed 24 files in 8.97 script seconds (10.63 wall seconds), with no capture failures or fog audit notes. Orchard deliberately applies its separate 0.0028 atmosphere grade over its 0.0008 zone palette.

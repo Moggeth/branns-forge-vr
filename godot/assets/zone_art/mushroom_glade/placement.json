@@ -1,0 +1,739 @@
+{
+  "schema": 1,
+  "assets": {
+    "mushroom_violet_tall": "mushroom_violet_tall.glb",
+    "mushroom_violet_squat": "mushroom_violet_squat.glb",
+    "mushroom_violet_lean": "mushroom_violet_lean.glb",
+    "mushroom_cluster": "mushroom_cluster.glb",
+    "pond_bank": "pond_bank.glb",
+    "stepping_stones": "stepping_stones.glb",
+    "boulder_mossy_a": "boulder_mossy_a.glb",
+    "boulder_mossy_b": "boulder_mossy_b.glb",
+    "rock_cluster": "rock_cluster.glb",
+    "root_sprawl": "root_sprawl.glb",
+    "root_arch": "root_arch.glb",
+    "spore_cloud": "spore_cloud.glb",
+    "glow_sprouts": "glow_sprouts.glb",
+    "ruin_waterfall": "ruin_waterfall.glb"
+  },
+  "placements": [
+    {
+      "asset": "ruin_waterfall",
+      "position": [
+        0,
+        0.0,
+        -12
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "pond_bank",
+      "position": [
+        1.0,
+        0.0,
+        -3.0
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0
+    },
+    {
+      "asset": "stepping_stones",
+      "position": [
+        0.4,
+        0.0,
+        -0.3
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.0
+    },
+    {
+      "asset": "mushroom_violet_tall",
+      "position": [
+        -11.5,
+        0.0,
+        -3.0
+      ],
+      "yaw_degrees": 30,
+      "scale": 3.4,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_tall",
+      "position": [
+        9.5,
+        0.0,
+        -8.5
+      ],
+      "yaw_degrees": 140,
+      "scale": 3.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_tall",
+      "position": [
+        -12.8,
+        0.0,
+        6.5
+      ],
+      "yaw_degrees": 260,
+      "scale": 3.6,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_tall",
+      "position": [
+        12.8,
+        0.0,
+        3.0
+      ],
+      "yaw_degrees": 75,
+      "scale": 2.8,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_squat",
+      "position": [
+        7.6,
+        0.0,
+        -6.0
+      ],
+      "yaw_degrees": 200,
+      "scale": 2.6,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_squat",
+      "position": [
+        -7.0,
+        0.0,
+        -7.5
+      ],
+      "yaw_degrees": 100,
+      "scale": 2.2,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_squat",
+      "position": [
+        13.0,
+        0.0,
+        -9.0
+      ],
+      "yaw_degrees": 10,
+      "scale": 3.2,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_squat",
+      "position": [
+        12.6,
+        0.0,
+        10.5
+      ],
+      "yaw_degrees": 300,
+      "scale": 3.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_lean",
+      "position": [
+        -10.8,
+        0.0,
+        1.5
+      ],
+      "yaw_degrees": 60,
+      "scale": 2.5,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_lean",
+      "position": [
+        6.6,
+        0.0,
+        -1.5
+      ],
+      "yaw_degrees": 210,
+      "scale": 2.2,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_lean",
+      "position": [
+        11.5,
+        0.0,
+        -0.5
+      ],
+      "yaw_degrees": 330,
+      "scale": 2.6,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_violet_lean",
+      "position": [
+        -13.0,
+        0.0,
+        -9.5
+      ],
+      "yaw_degrees": 90,
+      "scale": 3.0,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        -6.0,
+        0.0,
+        -9.8
+      ],
+      "yaw_degrees": 20,
+      "scale": 1.9,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        5.5,
+        0.0,
+        -9.0
+      ],
+      "yaw_degrees": 130,
+      "scale": 1.8,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        -9.0,
+        0.0,
+        -5.6
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.6,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        8.8,
+        0.0,
+        2.0
+      ],
+      "yaw_degrees": 40,
+      "scale": 1.5,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        -11.6,
+        0.0,
+        10.6
+      ],
+      "yaw_degrees": 300,
+      "scale": 1.8,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "mushroom_cluster",
+      "position": [
+        11.8,
+        0.0,
+        7.8
+      ],
+      "yaw_degrees": 90,
+      "scale": 1.5,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_a",
+      "position": [
+        -14.2,
+        0.0,
+        9.5
+      ],
+      "yaw_degrees": 20,
+      "scale": 1.9,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_b",
+      "position": [
+        14.2,
+        0.0,
+        8.0
+      ],
+      "yaw_degrees": 100,
+      "scale": 2.1,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_a",
+      "position": [
+        14.2,
+        0.0,
+        14.0
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.6,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_b",
+      "position": [
+        -14.3,
+        0.0,
+        14.2
+      ],
+      "yaw_degrees": 40,
+      "scale": 1.8,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_a",
+      "position": [
+        -14.5,
+        0.0,
+        -7.5
+      ],
+      "yaw_degrees": 150,
+      "scale": 1.4,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "boulder_mossy_b",
+      "position": [
+        14.5,
+        0.0,
+        -4.5
+      ],
+      "yaw_degrees": 300,
+      "scale": 1.3,
+      "collision": "asset_default"
+    },
+    {
+      "asset": "rock_cluster",
+      "position": [
+        -6.5,
+        0.0,
+        -1.6
+      ],
+      "yaw_degrees": 30,
+      "scale": 1.0
+    },
+    {
+      "asset": "rock_cluster",
+      "position": [
+        7.0,
+        0.0,
+        -3.0
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.1
+    },
+    {
+      "asset": "rock_cluster",
+      "position": [
+        3.5,
+        0.0,
+        -8.8
+      ],
+      "yaw_degrees": 90,
+      "scale": 0.9
+    },
+    {
+      "asset": "rock_cluster",
+      "position": [
+        -10.8,
+        0.0,
+        5.6
+      ],
+      "yaw_degrees": 10,
+      "scale": 0.9
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        -11.5,
+        0.0,
+        -3.0
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.6
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        9.5,
+        0.0,
+        -8.5
+      ],
+      "yaw_degrees": 70,
+      "scale": 1.5
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        -12.8,
+        0.0,
+        6.5
+      ],
+      "yaw_degrees": 30,
+      "scale": 1.7
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        12.8,
+        0.0,
+        3.0
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.4
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        13.0,
+        0.0,
+        -9.0
+      ],
+      "yaw_degrees": 100,
+      "scale": 1.5
+    },
+    {
+      "asset": "root_sprawl",
+      "position": [
+        -13.0,
+        0.0,
+        -9.5
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.4
+    },
+    {
+      "asset": "root_arch",
+      "position": [
+        -3.6,
+        0.0,
+        -12.6
+      ],
+      "yaw_degrees": 10,
+      "scale": 1.5
+    },
+    {
+      "asset": "root_arch",
+      "position": [
+        6.8,
+        0.0,
+        -11.0
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.2
+    },
+    {
+      "asset": "root_arch",
+      "position": [
+        -12.0,
+        0.0,
+        -5.8
+      ],
+      "yaw_degrees": 80,
+      "scale": 1.6
+    },
+    {
+      "asset": "root_arch",
+      "position": [
+        11.0,
+        0.0,
+        5.0
+      ],
+      "yaw_degrees": 300,
+      "scale": 1.4
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        2,
+        0.0,
+        -3
+      ],
+      "yaw_degrees": 0,
+      "scale": 0.864
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        7,
+        0.0,
+        -6
+      ],
+      "yaw_degrees": 30,
+      "scale": 0.72
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        -10,
+        0.0,
+        -4
+      ],
+      "yaw_degrees": 90,
+      "scale": 0.792
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        10,
+        0.0,
+        -2
+      ],
+      "yaw_degrees": 10,
+      "scale": 0.72
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        -3,
+        0.0,
+        -11
+      ],
+      "yaw_degrees": 60,
+      "scale": 0.72
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        6,
+        0.0,
+        -11
+      ],
+      "yaw_degrees": 120,
+      "scale": 0.648
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        -9,
+        0.0,
+        7
+      ],
+      "yaw_degrees": 200,
+      "scale": 0.72
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        9,
+        0.0,
+        6
+      ],
+      "yaw_degrees": 300,
+      "scale": 0.72
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        -5,
+        0.0,
+        0
+      ],
+      "yaw_degrees": 0,
+      "scale": 0.576
+    },
+    {
+      "asset": "spore_cloud",
+      "position": [
+        4,
+        0.0,
+        3
+      ],
+      "yaw_degrees": 40,
+      "scale": 0.576
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        -9,
+        0.0,
+        -2
+      ],
+      "yaw_degrees": 0,
+      "scale": 1.2
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        8,
+        0.0,
+        -4.5
+      ],
+      "yaw_degrees": 90,
+      "scale": 1.2
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        5.6,
+        0.0,
+        -9
+      ],
+      "yaw_degrees": 20,
+      "scale": 1.3
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        -7.5,
+        0.0,
+        -8.4
+      ],
+      "yaw_degrees": 200,
+      "scale": 1.2
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        -12,
+        0.0,
+        4
+      ],
+      "yaw_degrees": 50,
+      "scale": 1.2
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        10.5,
+        0.0,
+        6
+      ],
+      "yaw_degrees": 130,
+      "scale": 1.2
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        3.5,
+        0.0,
+        -8.6
+      ],
+      "yaw_degrees": 70,
+      "scale": 1.0
+    },
+    {
+      "asset": "glow_sprouts",
+      "position": [
+        -2.8,
+        0.0,
+        -6.6
+      ],
+      "yaw_degrees": 15,
+      "scale": 1.0
+    }
+  ],
+  "asset_meta": {
+    "mushroom_violet_tall": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.19,
+          "height": 0.8,
+          "offset": [
+            0,
+            0.4,
+            0
+          ]
+        }
+      ]
+    },
+    "mushroom_violet_squat": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.24,
+          "height": 0.5,
+          "offset": [
+            0,
+            0.25,
+            0
+          ]
+        }
+      ]
+    },
+    "mushroom_violet_lean": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.17,
+          "height": 0.8,
+          "offset": [
+            0,
+            0.4,
+            0
+          ]
+        }
+      ]
+    },
+    "mushroom_cluster": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 0.18,
+          "height": 0.65,
+          "offset": [
+            0,
+            0.325,
+            0
+          ]
+        }
+      ]
+    },
+    "boulder_mossy_a": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 1.3,
+          "height": 1.2,
+          "offset": [
+            0,
+            0.6,
+            0
+          ]
+        }
+      ]
+    },
+    "boulder_mossy_b": {
+      "collision": [
+        {
+          "shape": "cylinder",
+          "radius": 1.4,
+          "height": 1.0,
+          "offset": [
+            0,
+            0.5,
+            0
+          ]
+        }
+      ]
+    },
+    "ruin_waterfall": {
+      "collision": [
+        {
+          "shape": "box",
+          "size": [
+            31.0,
+            5.0,
+            3.3
+          ],
+          "offset": [
+            0,
+            2.5,
+            -4.0
+          ]
+        }
+      ]
+    }
+  }
+}

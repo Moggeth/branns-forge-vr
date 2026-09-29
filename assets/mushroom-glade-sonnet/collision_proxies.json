@@ -1,0 +1,128 @@
+{
+ "note": "godot XZ; assets: local to asset before placement yaw/scale (cyl=[x,z,r]); ruin_waterfall_world: world-space solids",
+ "assets": {
+  "mushroom_violet_tall": [
+   [
+    "cyl",
+    0,
+    0,
+    0.19
+   ]
+  ],
+  "mushroom_violet_squat": [
+   [
+    "cyl",
+    0,
+    0,
+    0.24
+   ]
+  ],
+  "mushroom_violet_lean": [
+   [
+    "cyl",
+    0,
+    0,
+    0.17
+   ]
+  ],
+  "mushroom_cluster": [
+   [
+    "cyl",
+    0,
+    0,
+    0.18
+   ],
+   [
+    "cyl",
+    0.75,
+    -0.35,
+    0.1
+   ],
+   [
+    "cyl",
+    -0.6,
+    -0.5,
+    0.08
+   ]
+  ],
+  "boulder_mossy_a": [
+   [
+    "cyl",
+    0,
+    0,
+    1.3
+   ]
+  ],
+  "boulder_mossy_b": [
+   [
+    "cyl",
+    0,
+    0,
+    1.4
+   ]
+  ],
+  "rock_cluster": [
+   [
+    "cyl",
+    0,
+    0,
+    0.75
+   ]
+  ]
+ },
+ "ruin_waterfall_world": [
+  [
+   "box",
+   -15.5,
+   -17.6,
+   15.5,
+   -14.3
+  ],
+  [
+   "cyl",
+   -8.6,
+   -13.6,
+   0.5
+  ],
+  [
+   "cyl",
+   -5.2,
+   -13.6,
+   0.5
+  ],
+  [
+   "box",
+   -13.3,
+   -13.8,
+   -9.9,
+   -13.0
+  ],
+  [
+   "box",
+   -13.6,
+   -11.7,
+   -11.2,
+   -10.9
+  ],
+  [
+   "box",
+   8.0,
+   -13.3,
+   11.2,
+   -12.7
+  ],
+  [
+   "cyl",
+   12.2,
+   -12.6,
+   0.48
+  ],
+  [
+   "box",
+   10.2,
+   -11.5,
+   12.2,
+   -10.5
+  ]
+ ]
+}

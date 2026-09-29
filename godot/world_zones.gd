@@ -687,6 +687,17 @@ static func mushroom(root: Node3D, data: Dictionary) -> void:
 	var id := "mushroom_glade"
 	var p: Node3D = data.zones[id].root
 	var c: Vector3 = data.zones[id].center
+	if FileAccess.file_exists("res://assets/zone_art/mushroom_glade/placement.json"):
+		# Authored banks, pond, fungi and ruin replace the old static props.
+		# Keep spore pickups and the wisp at their existing gameplay locations.
+		for i in range(5):
+			var n := resource(root,data,id,c+Vector3(-7+i*3,0,4+(i%2)*2),"spore","",3)
+			for j in range(3):
+				cyl(n,Vector3((j-1)*0.28,0.22,0),0.05,0.44,"b8d2a6")
+				rock(n,Vector3((j-1)*0.28,0.47,0),Vector3(0.38,0.25,0.38),"b789d6")
+			body(n,Vector3(0,0.4,0),Vector3(1,0.8,0.7))
+		enemy(root,data,id,c+Vector3(-4,0,-4),"wisp")
+		return
 	for i in range(13):
 		var a: float = float(i)*TAU/13
 		# Leave real gaps in the stone ring at the two portal approaches.

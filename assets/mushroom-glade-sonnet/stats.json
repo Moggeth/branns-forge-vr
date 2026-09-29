@@ -1,0 +1,141 @@
+{
+ "assets": {
+  "mushroom_violet_tall": {
+   "triangles": 992,
+   "by_material": {
+    "cap": 336,
+    "stem": 656
+   }
+  },
+  "mushroom_violet_squat": {
+   "triangles": 992,
+   "by_material": {
+    "cap": 336,
+    "stem": 656
+   }
+  },
+  "mushroom_violet_lean": {
+   "triangles": 992,
+   "by_material": {
+    "cap": 336,
+    "stem": 656
+   }
+  },
+  "mushroom_cluster": {
+   "triangles": 3968,
+   "by_material": {
+    "cap": 1344,
+    "stem": 2624
+   }
+  },
+  "pond_bank": {
+   "triangles": 908,
+   "by_material": {
+    "water": 220,
+    "stone": 680,
+    "glow": 8
+   }
+  },
+  "stepping_stones": {
+   "triangles": 120,
+   "by_material": {
+    "stone": 120
+   }
+  },
+  "boulder_mossy_a": {
+   "triangles": 72,
+   "by_material": {
+    "stone": 72
+   }
+  },
+  "boulder_mossy_b": {
+   "triangles": 69,
+   "by_material": {
+    "stone": 69
+   }
+  },
+  "rock_cluster": {
+   "triangles": 80,
+   "by_material": {
+    "stone": 80
+   }
+  },
+  "root_sprawl": {
+   "triangles": 336,
+   "by_material": {
+    "bark": 336
+   }
+  },
+  "root_arch": {
+   "triangles": 106,
+   "by_material": {
+    "bark": 106
+   }
+  },
+  "spore_cloud": {
+   "triangles": 336,
+   "by_material": {
+    "glow": 336
+   }
+  },
+  "glow_sprouts": {
+   "triangles": 168,
+   "by_material": {
+    "stem": 120,
+    "glow": 48
+   }
+  },
+  "ruin_waterfall": {
+   "triangles": 1298,
+   "by_material": {
+    "stone": 1086,
+    "bark": 180,
+    "water": 32
+   }
+  }
+ },
+ "materials": [
+  "M_MossStone",
+  "M_MushroomCap",
+  "M_RootBark",
+  "M_Spore",
+  "M_StemGill",
+  "M_Water"
+ ],
+ "unique_triangles": 10437,
+ "material_count": 6,
+ "placement_count": 59,
+ "texture_mean_rgb": {
+  "tex_bark": [
+   0.303,
+   0.211,
+   0.117
+  ],
+  "tex_cap": [
+   0.501,
+   0.236,
+   0.693
+  ],
+  "tex_glow": [
+   0.693,
+   0.923,
+   0.753
+  ],
+  "tex_stem": [
+   0.844,
+   0.756,
+   0.629
+  ],
+  "tex_stone": [
+   0.404,
+   0.449,
+   0.395
+  ],
+  "tex_water": [
+   0.151,
+   0.518,
+   0.567
+  ]
+ },
+ "keepout_violations": []
+}
