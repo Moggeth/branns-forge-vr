@@ -1,5 +1,27 @@
 # Verification and recovery evidence — 2026-09-12
 
+## Overnight Sonnet and art-review fast path — 2026-09-29
+
+The sanitized personal Claude CLI reported `fauxgrady@gmail.com`, `claude.ai`
+Pro and `apiKeySource=none`; a tiny explicit `claude-sonnet-5-5` probe reported
+the same canonical model in session metadata. A subsequent real Stonewhisper
+commission was rejected by the subscription's five-hour limit with `resets
+12am (Australia/Sydney)`. No asset files were delivered, so do not infer that
+the model probe reserved usable art time. The runner
+`scripts/Run-Sonnet-Commission.ps1` repeats the identity and actual-model checks
+in the same sanitized child environment and refuses a metered API fallback.
+Resume the ignored prepared commissions after the reset, Stonewhisper first.
+
+Actual-game `--capture=<path>` requires an absolute path: the relative portal
+capture returned Godot's `save_png` failure even though the process exited.
+The first `--capture-portals` camera at (0, 3, 1) sat behind workshop geometry;
+the adjusted central-garden pose at (0, 2, 4.7) produced a clear seven-gate
+baseline in 10.568 s. `--capture-bomb-stage=ready` without `--capture-quick`
+avoids opening the toolbelt over the bomb; the clean capture took 10.834 s.
+`--capture-bomb-stage=burst` took 11.223 s. These images are in ignored
+`outputs/overnight-*` and copies are provided in the isolated art briefs.
+Inspect the actual PNG, not only the capture exit code.
+
 ## Playable zone fog regression — 2026-09-29
 
 Pinewood and Quarry rendered as nearly solid sky-coloured fog in the graphical
