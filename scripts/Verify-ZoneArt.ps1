@@ -14,7 +14,7 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $importLog = Join-Path $logDir "zone-art-import-$stamp.log"
 $routeLog = Join-Path $logDir "zone-art-route-$stamp.log"
 $renderLog = Join-Path $logDir "zone-art-render-$stamp.log"
-$routeZones = @('sandstone_quarry', 'ember_foundry', 'enchanted_kitchen', 'mushroom_glade')
+$routeZones = @('sandstone_quarry', 'ember_foundry', 'enchanted_kitchen', 'mushroom_glade', 'pinewood_ruins', 'crystal_hollow')
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $outcome = 'failed'
 
