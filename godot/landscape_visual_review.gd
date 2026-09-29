@@ -71,6 +71,7 @@ func _run() -> void:
 		await create_timer(0.48).timeout
 		await _pair("02-sunder-during", builder, land, tactical, hero_view, eye, sunder, sunder, Vector2(-57, 7), 49.0, output)
 		land._finish_transition()
+		await _await_hydrology(land)
 		await _pair("03-sunder-after", builder, land, tactical, hero_view, eye, sunder, sunder, Vector2(-57, 7), 49.0, output)
 	else: failures.append("sunder: " + error)
 	await _pair("04-raise-before", builder, land, tactical, hero_view, eye, raise_at, raise_at, Vector2(-55, 55), 45.0, output)
@@ -80,6 +81,7 @@ func _run() -> void:
 		await create_timer(0.40).timeout
 		await _pair("05-raise-during", builder, land, tactical, hero_view, eye, raise_at, raise_at, Vector2(-55, 55), 45.0, output)
 		land._finish_transition()
+		await _await_hydrology(land)
 		await _pair("06-raise-after", builder, land, tactical, hero_view, eye, raise_at, raise_at, Vector2(-55, 55), 45.0, output)
 	else: failures.append("raise: " + error)
 	await _pair("07-grow-before", builder, land, tactical, hero_view, eye, grow, grow, Vector2(50, -59), 59.0, output)
@@ -92,6 +94,14 @@ func _run() -> void:
 		await _pair("09-grow-after", builder, land, tactical, hero_view, eye, grow, grow, Vector2(50, -59), 59.0, output)
 	else: failures.append("grow: " + error)
 	_finish(output)
+
+func _await_hydrology(land: Node) -> void:
+	# The visual target is the stable world, including bank/ecology placement.
+	# A review capture taken before the worker merge can miss the final dressing.
+	for frame in 90:
+		if land.pending_hydrology.is_empty(): return
+		await process_frame
+	failures.append("hydrology did not settle before visual capture")
 
 func _pair(label: String, builder: Node, land: Node, tactical: Window, hero_view: SubViewport, eye: Camera3D, focus: Vector2, look: Vector2, eye_at: Vector2, distance: float, output: String) -> void:
 	var center: Vector3 = builder.center
