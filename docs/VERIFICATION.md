@@ -1784,3 +1784,28 @@ Actual HMD feel remains unverified. Root authoring/review wall-clock spans and
 individual process times are recorded separately in `logs/work-timing.csv`;
 spans include inspection, waits and corrections and must not be added to their
 overlapping process timings.
+
+## Starfall hard contact and meteor geometry — 2026-10-01
+
+The meteor shell now emits Godot-clockwise visible triangles while retaining
+outward geometric normals. Fixed shared poles and omitted degenerate cap
+triangles close the shell; a trimesh collider comes from those same triangles.
+`landscape_meteor_checks.gd` validates nondegenerate face orientation, top and
+side physics rays, and saved surface scars. `hard_surface_contact_checks.gd`
+uses the authored Stonewhisper tip markers, a 2 m swept contact, shaft-first
+contact, 16/33 ms held frames, one reward per stroke, withdrawal and the FPS
+stop/recoil pose. Run both with Godot 4.7.2 `--headless --xr-mode off
+--audio-driver Dummy --path godot --script res://<check>.gd --quit-after 1200
+-- --world-builder-check`. Both result arrays must be empty and engine errors
+absent. These checks avoid live saves, service and paid APIs.
+
+Failed strategy: the first winding assertion hit an old cap triangle made
+from longitudinally different pole heights. Its near-zero radial normal was
+not a renderer material error; use one pole vertex and skip degenerate cap
+triangles, then compare winding and normals separately. A radius-only scar
+assertion later rejected a valid narrow facet; raycast the saved scar back to
+the actual collider instead. After the builder accepted an optional contact
+normal, the fake builder test fixture still took four arguments and emitted
+engine errors; update contract fixtures when the production signature changes.
+The headless checks establish geometry and mechanics, not headset feel or
+final material/VFX appearance. A bounded actual-render review is still needed.

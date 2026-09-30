@@ -1,5 +1,7 @@
 extends Node
 ## Contact constraints are separate from tracked hands: real hands cannot be stopped.
+signal hard_surface_contact(event: Dictionary)
+const HardContact = preload("res://hard_surface_contact.gd")
 const MIN_STRIKE_SPEED=1.0
 const CUT_HEIGHT_TOLERANCE=0.18
 const CUTS_TO_FELL=3
@@ -8,6 +10,7 @@ const WITHDRAW_DISTANCE=0.10
 const TREE_FELLING = preload("res://tree_felling.gd")
 var game
 var tracks={}
+var desktop_contact: Dictionary = {}
 
 func setup(owner_game): game=owner_game
 
@@ -30,18 +33,25 @@ func tick(delta):
 		if not game.vr and hand==game.desktop_hand and item.get_parent()==game.desktop_hand:
 			tracks.erase(id)
 			continue
-		var tip=item.get_meta("tip",Vector3.UP*0.65)
-		if not tracks.has(id): tracks[id]={"previous":item.to_global(tip),"correction":Vector3.ZERO,"block":{},"item":item}
+		var regions: Array[Dictionary]=HardContact.regions(item)
+		if not tracks.has(id):
+			var previous_regions={}
+			for region in regions: previous_regions[region.name]=item.to_global(region.local)
+			tracks[id]={"previous":previous_regions[regions[0].name],"regions":previous_regions,"correction":Vector3.ZERO,"block":{},"item":item}
 		var track=tracks[id]
 		item.position-=track.correction
 		track.correction=Vector3.ZERO
-		var desired=item.to_global(tip)
-		if game.grips.adjusting.has(key): track.previous=desired; track.block={}; continue
-		var speed=desired.distance_to(track.previous)/maxf(delta,0.001)
+		var current={}
+		for region in regions: current[region.name]=item.to_global(region.local)
+		if game.grips.adjusting.has(key):
+			track.regions=current; track.previous=current[regions[0].name]; track.block={}
+			continue
 		if not track.block.is_empty():
 			var block=track.block
+			var desired:Vector3=current[block.region]
+			var speed=desired.distance_to(track.regions.get(block.region,desired))/maxf(delta,0.001)
 			var anchor:Vector3=block.target.to_global(block.local_point) if is_instance_valid(block.target) and block.has("local_point") else block.point
-			if not is_instance_valid(block.target) or not block.target.is_visible_in_tree() or (desired-anchor).dot(block.normal)>WITHDRAW_DISTANCE or desired.distance_to(anchor)>0.32:
+			if not is_instance_valid(block.target) or not block.target.is_visible_in_tree() or (desired-anchor).dot(block.normal)>WITHDRAW_DISTANCE or desired.distance_to(anchor)>(0.10 if block.get("glance",false) else 0.32):
 				if is_instance_valid(block.target) and block.get("blade",false) and block.target.get_meta("enemy_type","")=="skeleton" and speed>1.4 and game.skeleton_structure!=null:
 					var torn=game.skeleton_structure.hit(block.target,anchor,block.normal,maxf(2.0,speed*0.8),"blade")
 					if torn.detached and is_instance_valid(torn.item):
@@ -49,20 +59,45 @@ func tick(delta):
 						game._notice("A bone came free on the blade! Grip it with your other hand.",4)
 				track.block={}
 			else:
-				constrain(item,track,desired,anchor-block.normal*BITE_DEPTH)
+				constrain(item,track,desired,anchor+block.normal*0.008 if block.get("glance",false) else anchor-block.normal*float(block.get("bite",BITE_DEPTH)))
+				for region in regions: track.regions[region.name]=item.to_global(region.local)
 				continue
-		if desired.distance_to(track.previous)>0.8: track.previous=desired; continue
-		var query=PhysicsRayQueryParameters3D.create(track.previous,desired,1)
-		var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+		var best={}
+		var best_region=""
+		var best_desired=Vector3.ZERO
+		var best_speed=0.0
+		var best_fraction=INF
+		for region in regions:
+			var start:Vector3=track.regions.get(region.name,current[region.name])
+			var finish:Vector3=current[region.name]
+			var length=start.distance_to(finish)
+			if length<0.0001 or length>2.5: continue
+			var query=PhysicsRayQueryParameters3D.create(start,finish,1)
+			var candidate=game.get_world_3d().direct_space_state.intersect_ray(query)
+			if candidate.is_empty(): continue
+			var fraction:float=start.distance_to(candidate.position)/length
+			if fraction<best_fraction:
+				best=candidate; best_region=region.name; best_desired=finish
+				best_speed=length/maxf(delta,0.001); best_fraction=fraction
+		var hit=best
 		if not hit.is_empty():
 			var target=game._owner(hit.collider)
 			if target==null: target=hit.collider
+			var motion:Vector3=best_desired-track.regions.get(best_region,best_desired)
+			var response=HardContact.response(target,item,hit.position,hit.normal,motion,best_speed,best_region)
 			var completed=false
-			if speed>=MIN_STRIKE_SPEED: completed=strike(target,hit.position,hit.normal,speed,hand,item)
-			if not completed:
-				track.block={"target":target,"point":hit.position,"normal":hit.normal,"local_point":target.to_local(hit.position),"blade":_is_blade(item,hit.normal)}
-				constrain(item,track,desired,hit.position-hit.normal*(BITE_DEPTH if speed>=MIN_STRIKE_SPEED else 0.0))
-		track.previous=item.to_global(tip)
+			if best_speed>=MIN_STRIKE_SPEED: completed=strike(target,hit.position,hit.normal,best_speed,hand,item,best_region)
+			if not response.is_empty() and best_speed>=MIN_STRIKE_SPEED:
+				response["completed"] = completed
+				response["damage_result"] = "mined" if completed and response.material=="star_iron" else "contact"
+				hard_surface_contact.emit(response)
+			if not completed or response.get("block",false) or response.get("glance",false):
+				var bite:float=float(response.get("bite",BITE_DEPTH)) if best_speed>=MIN_STRIKE_SPEED else 0.0
+				var glance:bool=bool(response.get("glance",false))
+				track.block={"target":target,"point":hit.position,"normal":hit.normal,"local_point":target.to_local(hit.position),"blade":_is_blade(item,hit.normal),"bite":bite,"region":best_region,"glance":glance}
+				constrain(item,track,best_desired,hit.position+hit.normal*0.008 if glance else hit.position-hit.normal*bite)
+		for region in regions: track.regions[region.name]=item.to_global(region.local)
+		track.previous=track.regions[regions[0].name]
 	for id in tracks.keys():
 		if not is_instance_valid(tracks[id].item) or tracks[id].item not in seen: tracks.erase(id)
 
@@ -71,6 +106,31 @@ func constrain(item,track,desired:Vector3,stopped:Vector3):
 	item.global_position+=stopped-desired
 	track.correction=item.position-before
 	track.previous=stopped
+
+func desktop_hard_contact(item: Node3D, target: Node3D, point: Vector3,
+		normal: Vector3, speed: float, contact_pose: Transform3D,
+		completed: bool = false) -> bool:
+	var motion: Vector3 = -game.camera.global_basis.z if game != null and game.camera != null else -normal
+	var response := HardContact.response(target,item,point,normal,motion,speed,"pick_point" if str(item.get_meta("id", "")) == "quarry_pick" else "working")
+	desktop_contact.clear()
+	if response.is_empty(): return false
+	response["completed"] = completed
+	response["damage_result"] = "mined" if completed and response.material == "star_iron" else "contact"
+	hard_surface_contact.emit(response)
+	if not bool(response.block): return false
+	desktop_contact={"item":item,"pose":contact_pose}
+	return true
+
+func desktop_contact_pose(item: Node3D, rest_pose: Transform3D,
+		progress: float) -> Transform3D:
+	if desktop_contact.get("item") != item: return Transform3D()
+	return HardContact.desktop_pose(desktop_contact.pose,rest_pose,progress)
+
+func desktop_contact_active(item: Node3D) -> bool:
+	return desktop_contact.get("item") == item
+
+func clear_desktop_contact() -> void:
+	desktop_contact.clear()
 
 func _is_blade(item,normal:Vector3)->bool:
 	# Orchard's Edge cuts along local +X in the Knuckles grip. A target
@@ -92,7 +152,7 @@ func _lodge_bone(axe:Node3D,bone:RigidBody3D)->void:
 	bone.reparent(axe,true)
 	bone.set_meta("lodged_on_axe",true)
 
-func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
+func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_region:String="working")->bool:
 	if game.atelier!=null: game.atelier.impact(item,speed)
 	if game.sunfall!=null and game.sunfall.is_sunfall(item):
 		var motion=(point-tracks.get(item.get_instance_id(),{}).get("previous",point)).normalized()*speed
@@ -101,7 +161,8 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 	game.adventure.haptic(hand,"impact")
 	var kind=target.get_meta("kind","")
 	if kind=="meteor_ore" and game.world_builder!=null:
-		return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed)
+		if str(item.get_meta("id", "")) == "quarry_pick" and strike_region not in ["pick_point", "opposite_point", "working"]: return false
+		return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed,normal)
 	if str(kind).begins_with("hollow_"):
 		return game.adventure.interact(target,str(item.get_meta("id","apprentice_hammer")),hand)
 	if kind=="apple" and game.apples!=null:
@@ -114,14 +175,14 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 	if kind=="builder_forest" and game.world_builder!=null and str(item.get_meta("id", ""))=="woodland_axe":
 		return game.world_builder.chop_scenic(point,_is_blade(item,normal),normal,hand)
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
-		return chop(target,point,normal,hand) if item.get_meta("id","")=="woodland_axe" else false
+		return chop(target,point,normal,hand,speed) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":
 		game.item_actions.resonant_mine(item,target,point,hand)
 		game.adventure.interact(target,"quarry_pick",hand)
 		return target.get_meta("collecting",false) or not target.visible
 	if kind=="dummy":
 		game._dummy_hit(target)
-		mark(target,point,normal,0.13)
+		mark(target,point,normal,0.13,speed,str(item.get_meta("id","")))
 		return false
 	if kind=="enemy":
 		var direction=(point-tracks.get(item.get_instance_id(),{}).get("previous",point)).normalized()
@@ -138,9 +199,6 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		var result={}
 		if target.get_meta("enemy_type","")=="skeleton" and game.skeleton_structure!=null and not shielded:
 			result=game.skeleton_structure.hit(target,point,direction,impact_force,"blade" if blade else "blunt")
-			# Audible contact on every connected bone strike, not only when a
-			# whole limb breaks free. PhysicalRemains pools and throttles the clack.
-			game.remains._clack(point)
 			remaining_energy-=5.5 if blade else 3.0
 			if powered and blade:
 				var cut_regions=[result.get("region","")]
@@ -162,9 +220,11 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		if target.get_meta("enemy_type","")!="skeleton":
 			target.set_meta("knock_velocity",Vector3(impulse.x,0,impulse.z))
 		game.adventure.hurt_enemy(target,damage,hand,impulse,"physical",point)
-		if result.get("detached",false):
+		if game.impact_feedback!=null:
+			var enemy_material: String={"skeleton":"bone","golem":"stone","ent":"wood"}.get(str(target.get_meta("enemy_type","")),"flesh")
+			game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","")),enemy_material)
+		elif target.get_meta("enemy_type","")=="skeleton":
 			game.remains._clack(point)
-			game._effect(point,Color("efddba"),0.2,0.28)
 		if not target.get_meta("alive",true): return true
 		# The blade stops when it has spent its energy inside bone. A stronger
 		# swing or a freshly severed part lets it continue along its path.
@@ -172,7 +232,7 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 	if kind=="rat": game._kill_rat(target); return true
 	return false
 
-func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
+func chop(target,point:Vector3,normal:Vector3,hand=null,speed:float=2.4)->bool:
 	if target.get_meta("collecting",false) or target.get_meta("felled",false) or not target.visible: return true
 	var bands=target.get_meta("cut_bands",[])
 	var height=target.to_local(point).y
@@ -186,11 +246,9 @@ func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
 		selected=bands.size()-1
 	bands[selected].hits+=1
 	target.set_meta("cut_bands",bands)
-	game._effect(point,Color("cba36c"),0.32,0.14+0.05*bands[selected].hits)
+	if game.impact_feedback!=null:
+		game.impact_feedback.contact(target,point,normal,speed,"woodland_axe","wood")
 	notch(target,bands[selected])
-	for chip in range(2+bands[selected].hits*2):
-		var spread=Vector3(randf_range(-0.16,0.16),randf_range(-0.10,0.18),randf_range(-0.16,0.16))
-		game._effect(point+spread,Color("e0b982"),0.12,randf_range(0.035,0.07))
 	_authored_chips(target,point,normal,int(bands[selected].hits))
 	if bands[selected].hits<CUTS_TO_FELL:
 		game._notice("Cut %d / 3 · strike this height again."%bands[selected].hits,3)
@@ -204,11 +262,12 @@ func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
 	game._notice("Timber down! Reach for the log to collect lumber.",4)
 	return true
 
-func mark(target,point:Vector3,normal:Vector3,size:float):
+func mark(target,point:Vector3,normal:Vector3,size:float,speed:float=2.4,tool_id:String=""):
 	var chip=game.adventure._box(target,target.to_local(point+normal*0.002),Vector3(size,0.035,0.018),Color("c89358"))
 	chip.name="CutMark"
 	chip.look_at(point+normal,Vector3.UP if absf(normal.y)<0.9 else Vector3.RIGHT,true)
-	game._effect(point,Color("cba36c"),0.4,size)
+	if game.impact_feedback!=null:
+		game.impact_feedback.contact(target,point,normal,speed,tool_id,"wood")
 
 func notch(target,band):
 	if not target.has_meta("trunk"): return

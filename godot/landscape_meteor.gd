@@ -10,6 +10,7 @@ const GEM_VEINS := 6
 const MAX_GEMS_PER_VEIN := 2
 const ORE_UNITS := 8
 const HIT_REACH := 3.4
+const MAX_SCARS := 24
 
 var record: Dictionary = {}
 var falling := false
@@ -17,9 +18,11 @@ var fall_elapsed := 0.0
 var impacted := false
 var core: MeshInstance3D
 var collider: StaticBody3D
+var scar_display: MultiMeshInstance3D
 var gems: Array[MeshInstance3D] = []
 var shock: MeshInstance3D
 static var _shared_rock: ArrayMesh
+static var _shared_scar: ArrayMesh
 
 static func make_record(at: Vector2, seed: int, ground_y: float) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
@@ -29,7 +32,7 @@ static func make_record(at: Vector2, seed: int, ground_y: float) -> Dictionary:
 		veins.append(MAX_GEMS_PER_VEIN)
 	return {"version": 1, "center": [snappedf(at.x, 0.01), snappedf(at.y, 0.01)],
 		"ground_y": snappedf(ground_y, 0.01), "seed": seed,
-		"veins": veins, "ore": ORE_UNITS, "radius": 10.0,
+		"veins": veins, "ore": ORE_UNITS, "scars": [], "radius": 10.0,
 		"rotation": snappedf(rng.randf_range(0.0, TAU), 0.0001)}
 
 static func crater_operation(source: Dictionary) -> Dictionary:
@@ -56,11 +59,13 @@ func setup(source: Dictionary, animate := true) -> void:
 	if not _valid_record(record):
 		push_error("Invalid meteor record")
 		return
+	if not record.has("scars"): record["scars"] = []
 	name = "StarfallMeteorite"
 	var at: Array = record.center
 	position = Vector3(float(at[0]), float(record.ground_y), float(at[1]))
 	rotation.y = float(record.rotation)
 	_build_visuals()
+	_refresh_scars()
 	falling = animate
 	impacted = not animate
 	if animate:
@@ -73,6 +78,10 @@ func setup(source: Dictionary, animate := true) -> void:
 	else:
 		core.position.y = 0.65
 		shock.visible = false
+		if remaining_gems() == 0 and remaining_ore() == 0:
+			core.scale = Vector3.ONE * 0.65
+			collider.scale = core.scale
+			collider.set_meta("depleted", true)
 	set_process(animate)
 
 func to_record() -> Dictionary:
@@ -86,7 +95,8 @@ func remaining_gems() -> int:
 func remaining_ore() -> int:
 	return int(record.get("ore", 0))
 
-func strike(hit_world_position: Vector3, tool_id: String, energy: float = 1.0) -> Dictionary:
+func strike(hit_world_position: Vector3, tool_id: String, energy: float = 1.0,
+		surface_normal: Vector3 = Vector3.ZERO) -> Dictionary:
 	if not impacted: return {"ok": false, "reason": "falling"}
 	if tool_id not in ["quarry_pick", "crystal_resonator"]: return {"ok": false, "reason": "pick_required"}
 	if not is_finite(energy) or energy < 0.35: return {"ok": false, "reason": "weak_strike"}
@@ -110,12 +120,74 @@ func strike(hit_world_position: Vector3, tool_id: String, energy: float = 1.0) -
 		kind = "star_iron"
 	else:
 		return {"ok": false, "reason": "depleted"}
+	_record_scar(hit_world_position, surface_normal, energy)
 	if remaining_gems() == 0 and remaining_ore() == 0:
 		core.scale = Vector3.ONE * 0.65
+		collider.scale = core.scale
 		collider.set_meta("depleted", true)
 	inventory_changed.emit(to_record())
 	return {"ok": true, "kind": kind, "units": 1,
-		"remaining_gems": remaining_gems(), "remaining_ore": remaining_ore()}
+		"remaining_gems": remaining_gems(), "remaining_ore": remaining_ore(),
+		"damage_result": "fresh_chip", "scar_count": record.scars.size()}
+
+func _record_scar(point: Vector3, surface_normal: Vector3, energy: float) -> void:
+	# Gem markers sit partially inside the rock. Project their reward point to
+	# the first visible facet so a saved mark never disappears under the shell.
+	var outward: Vector3 = (point-core.global_position).normalized()
+	if outward.length_squared() < 0.25: outward = Vector3.UP
+	if is_inside_tree():
+		var query := PhysicsRayQueryParameters3D.create(core.global_position+outward*4.0,core.global_position)
+		var surface_hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+		if surface_hit.get("collider") == collider:
+			point = surface_hit.position
+			surface_normal = surface_hit.normal
+	var local_point: Vector3 = core.to_local(point)
+	var normal: Vector3 = core.global_basis.inverse() * surface_normal
+	if normal.length_squared() < 0.25: normal = local_point.normalized()
+	if normal.length_squared() < 0.25: normal = Vector3.UP
+	normal = normal.normalized()
+	var scar := {"point": [snappedf(local_point.x,0.001),snappedf(local_point.y,0.001),snappedf(local_point.z,0.001)],
+		"normal": [snappedf(normal.x,0.001),snappedf(normal.y,0.001),snappedf(normal.z,0.001)],
+		"size": snappedf(clampf(0.055 + energy * 0.018,0.055,0.12),0.001)}
+	record.scars.append(scar)
+	if record.scars.size() > MAX_SCARS: record.scars.pop_front()
+	_refresh_scars()
+
+func _refresh_scars() -> void:
+	var batch := MultiMesh.new()
+	batch.transform_format = MultiMesh.TRANSFORM_3D
+	batch.mesh = _scar_mesh()
+	batch.instance_count = record.scars.size()
+	for i in record.scars.size():
+		var scar: Dictionary = record.scars[i]
+		var p: Array = scar.point
+		var n: Array = scar.normal
+		var normal := Vector3(float(n[0]),float(n[1]),float(n[2])).normalized()
+		var position := Vector3(float(p[0]),float(p[1]),float(p[2])) + normal * 0.006
+		var basis := Basis.looking_at(-normal,Vector3.UP if absf(normal.y)<0.9 else Vector3.RIGHT)
+		batch.set_instance_transform(i,Transform3D(basis.scaled(Vector3.ONE*float(scar.size)),position))
+	scar_display.multimesh = batch
+
+static func _scar_mesh() -> ArrayMesh:
+	if _shared_scar != null: return _shared_scar
+	var ring := [Vector2(-0.9,0.1),Vector2(-0.43,0.72),Vector2(0.17,0.9),Vector2(0.82,0.43),Vector2(0.7,-0.47),Vector2(-0.05,-0.8)]
+	var points := PackedVector3Array()
+	var face_normals := PackedVector3Array()
+	for i in ring.size():
+		for v in [Vector2.ZERO,ring[i],ring[(i+1)%ring.size()]]:
+			points.append(Vector3(v.x,v.y,0.0))
+			face_normals.append(Vector3.BACK)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = points
+	arrays[Mesh.ARRAY_NORMAL] = face_normals
+	_shared_scar = ArrayMesh.new()
+	_shared_scar.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.105,0.105,0.13)
+	material.roughness = 0.95
+	_shared_scar.surface_set_material(0,material)
+	return _shared_scar
 
 func _process(delta: float) -> void:
 	advance(delta)
@@ -151,6 +223,9 @@ func _build_visuals() -> void:
 	core.mesh = _rock_mesh()
 	add_child(core)
 	core.position.y = 0.65
+	scar_display = MultiMeshInstance3D.new()
+	scar_display.name = "MiningScars"
+	core.add_child(scar_display)
 	collider = StaticBody3D.new()
 	collider.name = "MineableMeteorite"
 	collider.set_meta("requires", "pick")
@@ -158,9 +233,9 @@ func _build_visuals() -> void:
 	add_child(collider)
 	collider.position.y = 0.65
 	var shape := CollisionShape3D.new()
-	var sphere := SphereShape3D.new()
-	sphere.radius = 2.1
-	shape.shape = sphere
+	# Keep the mineable surface on the rendered facets. A bounding sphere made
+	# the pick stop in empty air around the narrower shoulders and poles.
+	shape.shape = core.mesh.create_trimesh_shape()
 	collider.add_child(shape)
 	var gem_mesh := CylinderMesh.new()
 	gem_mesh.top_radius = 0.025
@@ -208,8 +283,10 @@ static func _rock_mesh() -> ArrayMesh:
 			var d := _rock_point(latitude + 1, longitude + 1, rings, sides)
 			var hue := float((latitude * 17 + longitude * 7) % 13) / 12.0
 			var tint := Color(0.23, 0.25, 0.31).lerp(Color(0.35, 0.28, 0.25), hue * 0.58)
-			_rock_face(vertices, normals, colors, a, b, c, tint)
-			_rock_face(vertices, normals, colors, b, d, c, tint.darkened(0.10))
+			if latitude > 0:
+				_rock_face(vertices, normals, colors, a, b, c, tint)
+			if latitude < rings - 1:
+				_rock_face(vertices, normals, colors, b, d, c, tint.darkened(0.10))
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -228,6 +305,7 @@ static func _rock_point(latitude: int, longitude: int, rings: int, sides: int) -
 	var phi := PI * float(latitude) / float(rings)
 	var theta := TAU * float(longitude) / float(sides)
 	var irregular := 0.92 + 0.08 * sin(float(latitude * 43 + longitude * 29))
+	if latitude == 0 or latitude == rings: irregular = 0.92
 	return Vector3(sin(phi) * cos(theta) * 2.05 * irregular,
 		cos(phi) * 1.7 * irregular,
 		sin(phi) * sin(theta) * 2.05 * irregular)
@@ -235,7 +313,9 @@ static func _rock_point(latitude: int, longitude: int, rings: int, sides: int) -
 static func _rock_face(vertices: PackedVector3Array, normals: PackedVector3Array, colors: PackedColorArray,
 		a: Vector3, b: Vector3, c: Vector3, tint: Color) -> void:
 	var normal := (b - a).cross(c - a).normalized()
-	for point in [a, b, c]:
+	for point in [a, c, b]:
+		# Godot renders clockwise fronts. The geometric cross product above is
+		# outward, so reverse emission order while retaining that outward normal.
 		vertices.append(point)
 		normals.append(normal)
 		colors.append(tint)
@@ -264,4 +344,10 @@ static func _valid_record(source: Dictionary) -> bool:
 	for count in source.veins:
 		if not (count is int or count is float) or not is_finite(float(count)): return false
 		if float(count) != float(int(count)) or int(count) < 0 or int(count) > MAX_GEMS_PER_VEIN: return false
+	var scars = source.get("scars", [])
+	if not scars is Array or scars.size() > MAX_SCARS: return false
+	for scar in scars:
+		if not scar is Dictionary or not scar.get("point") is Array or not scar.get("normal") is Array: return false
+		if scar.point.size() != 3 or scar.normal.size() != 3: return false
+		if not is_finite(float(scar.get("size", NAN))): return false
 	return int(source.get("ore", -1)) >= 0 and int(source.get("ore", -1)) <= ORE_UNITS
