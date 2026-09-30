@@ -160,6 +160,7 @@ func _detach(actor: Node3D, rig: Dictionary, part: String, homes: Array, directi
 	body.set_meta("remains", true)
 	body.set_meta("source_actor", actor.get_instance_id())
 	body.set_meta("skeleton_part", part)
+	if part=="head" and game.get("remains")!=null and game.remains!=null: game.remains.tag_skull(body,actor)
 	body.set_meta("born", float(game.elapsed))
 	body.set_meta("zone", str(actor.get_meta("zone", game.adventure.zone if game.get("adventure") != null else "")))
 	body.set_meta("damage_at", 0.0)

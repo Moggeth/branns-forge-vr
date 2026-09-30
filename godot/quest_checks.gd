@@ -17,7 +17,7 @@ func run(game):
 		get_tree().quit(2)
 		return
 	check(game.quests.data.get("level")==1,"Initial level")
-	game.quests.index=1
+	game.quests.index=2 # Skull basket is the first job; the skeleton hunt follows rats.
 	await game.quests.act("primary")
 	check(game.quests.selected().get("status")=="active","Native accept action")
 	var count=0

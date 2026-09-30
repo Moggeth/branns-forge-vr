@@ -22,15 +22,18 @@ func setup(g):
 			var saved=JSON.parse_string(bytes.get_string_from_utf8())
 			if saved is Array:
 				for event in saved.slice(0,2048):
-					if event is Dictionary and event.get("eventId") is String and event.get("kind")=="enemy" and event.get("target") in ["rat","skeleton","golem","ghost","minotaur","ember_warden"]: outbox.append(event)
+					if not event is Dictionary or not event.get("eventId") is String: continue
+					if event.get("kind")=="enemy" and event.get("target") in ["rat","skeleton","golem","ghost","minotaur","ember_warden"]: outbox.append(event)
+					elif event.get("kind")=="delivery" and event.get("target")=="skeleton_skull" and event.get("skullId") is String and event.get("eventId")=="skull:"+event.skullId: outbox.append(event)
 	print("QUEST_READY pending_events=",outbox.size())
 
-func _save():
-	if game.diagnostic_offline or game.smoke: return
+func _save()->bool:
+	if game.diagnostic_offline or game.smoke: return true
 	var file=FileAccess.open(OUTBOX+".tmp",FileAccess.WRITE)
-	if file==null: push_warning("QUEST_OUTBOX cannot save"); return
+	if file==null: push_warning("QUEST_OUTBOX cannot save"); return false
 	file.store_string(JSON.stringify(outbox)); file.close()
-	if DirAccess.rename_absolute(OUTBOX+".tmp",OUTBOX)!=OK: push_warning("QUEST_OUTBOX cannot replace save")
+	if DirAccess.rename_absolute(OUTBOX+".tmp",OUTBOX)!=OK: push_warning("QUEST_OUTBOX cannot replace save"); return false
+	return true
 
 func enemy_defeated(enemy,kind:String):
 	if (game.diagnostic_offline or game.smoke) and not test_events: return
@@ -42,6 +45,25 @@ func enemy_defeated(enemy,kind:String):
 	sequence+=1
 	outbox.append({"eventId":"hunt-"+session+"-"+str(sequence),"kind":"enemy","target":kind})
 	_save()
+
+func delivery_instance_id():
+	for quest in data.get("quests",[]):
+		if quest.get("id")=="skull_basket" and quest.get("status") in ["active","ready"]: return quest.get("instanceId")
+	return null
+
+func skull_delivered(skull_id:String,instance_id)->bool:
+	if (game.diagnostic_offline or game.smoke) and not test_events: return false
+	if not skull_id.begins_with("skull-") or skull_id.length()>150: return false
+	var event_id="skull:"+skull_id
+	if outbox.any(func(event):return event.get("eventId")==event_id): return true
+	if outbox.size()>=2048:
+		game._notice("Quest journal is full while offline. Reconnect before storing more skulls.",6)
+		return false
+	outbox.append({"eventId":event_id,"kind":"delivery","target":"skeleton_skull","skullId":skull_id,"instanceId":instance_id})
+	if not _save():
+		outbox.pop_back()
+		return false
+	return true
 
 func tick(_delta):
 	if not sending and not outbox.is_empty() and game.elapsed>=retry_at and not game.diagnostic_offline: _flush.call_deferred()
@@ -56,7 +78,7 @@ func _flush():
 		if not response.get("transportError",false):
 			print("QUEST_EVENT_REJECTED id=",event.eventId," reason=",response.error)
 			retry_at=game.elapsed+30
-			game._notice("Hunt progress is queued. The forge could not save it yet.",5)
+			game._notice("Quest progress is queued. The forge could not save it yet.",5)
 	else:
 		ingest(response.get("rpg",{}),true)
 		if int(response.get("xpAwarded",0))>0 and game.elapsed>=celebration_until: game._notice("+%d XP · %s"%[response.xpAwarded,level_line()],3)
@@ -98,10 +120,11 @@ func journal()->String:
 	if data.is_empty(): return "FIELD JOURNAL\nConnect to the forge to load jobs and experience." + hollow_line
 	var quest=selected()
 	if quest.is_empty(): return level_line()+"\nNo jobs available." + hollow_line
-	var location={"skeleton":"Pinewood Ruins","rat":"Enchanted Kitchen","lumber":"Pinewood Ruins","stone":"Sandstone Quarry"}.get(str(quest.get("target","")),"Explore the world")
+	var location={"skeleton":"Pinewood Ruins","skeleton_skull":"Pinewood Ruins → portable basket","rat":"Enchanted Kitchen","lumber":"Pinewood Ruins","stone":"Sandstone Quarry"}.get(str(quest.get("target","")),"Explore the world")
 	var status=str(quest.get("status","available"))
 	var hint="Accept near Brann before setting out." if status=="available" else ("Return to Brann to collect your reward." if status=="ready" else "Progress stays saved between visits.")
-	return "%s · %s\n\n%s  [%d/%d]\n%s\n%d / %d · %s · Reward %d XP\n%s%s"%[level_line(),data.get("title","Adventurer"),quest.get("name","Job"),index+1,data.quests.size(),location+" · "+("Defeat " if quest.get("kind")=="enemy" else "Gather ")+str(quest.get("target","")).replace("_"," "),quest.get("progress",0),quest.get("goal",3),status.capitalize(),quest.get("xpReward",0),hint,hollow_line]
+	var objective="Place real Skeleton Skulls in the basket · E carry/drop · F store/take" if quest.get("kind")=="delivery" else ("Defeat " if quest.get("kind")=="enemy" else "Gather ")+str(quest.get("target","")).replace("_"," ")
+	return "%s · %s\n\n%s  [%d/%d]\n%s\n%d / %d · %s · Reward %d XP\n%s%s"%[level_line(),data.get("title","Adventurer"),quest.get("name","Job"),index+1,data.quests.size(),location+" · "+objective,quest.get("progress",0),quest.get("goal",3),status.capitalize(),quest.get("xpReward",0),hint,hollow_line]
 
 func act(action:String):
 	if action=="previous": index-=1; game.qol._build(); return

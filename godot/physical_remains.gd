@@ -65,6 +65,7 @@ func shatter(actor,impulse=Vector3.ZERO):
 		body.set_meta("display_name",("Skeleton bone" if rig.type=="skeleton" else "Fallen "+rig.type+" piece")+" · grip / throw")
 		body.set_meta("remains",true)
 		body.set_meta("source_actor",actor.get_instance_id())
+		if rig.type=="skeleton" and home.parent==rig.joints.get("head"): tag_skull(body,actor)
 		body.set_meta("born",game.elapsed)
 		body.set_meta("zone",str(actor.get_meta("zone",game.adventure.zone)))
 		body.set_meta("damage_at",0.0)
@@ -82,6 +83,16 @@ func shatter(actor,impulse=Vector3.ZERO):
 	rig.pieces=[]
 	print("REMAINS spawned=",count," type=",rig.type)
 	_trim()
+
+func tag_skull(body:RigidBody3D,actor:Node3D)->void:
+	# Identity is assigned only to the actor's actual detached head mesh. It
+	# travels with that rigid body through grips, the basket and offline retry.
+	if body.has_meta("skull_id"): return
+	body.set_meta("skeleton_skull",true)
+	body.set_meta("skeleton_part","head")
+	body.set_meta("skull_id","skull-%d-%d-%d-%d"%[int(Time.get_unix_time_from_system()),OS.get_process_id(),Time.get_ticks_usec(),body.get_instance_id()])
+	body.set_meta("display_name","Skeleton Skull · grip / place in basket")
+	body.set_meta("source_actor",actor.get_instance_id())
 
 func _impact(body,other):
 	if is_instance_valid(body) and not body.freeze and body.linear_velocity.length()>1.0: _clack(body.global_position)
@@ -223,6 +234,7 @@ func release(body,velocity,angular):
 	body.angular_velocity=angular.limit_length(15)
 
 func _protected(body):
+	if body.get_meta("basket_stored",false): return true
 	if body in game.held.values() or game.grips.is_stowed(body): return true
 	# A bone wedged onto an axe should not expire while that axe is being used.
 	if body.get_meta("lodged_on_axe",false):
