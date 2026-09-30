@@ -302,6 +302,7 @@ static func _rock_mesh() -> ArrayMesh:
 	return _shared_rock
 
 static func _rock_point(latitude: int, longitude: int, rings: int, sides: int) -> Vector3:
+	longitude = posmod(longitude,sides)
 	var phi := PI * float(latitude) / float(rings)
 	var theta := TAU * float(longitude) / float(sides)
 	var irregular := 0.92 + 0.08 * sin(float(latitude * 43 + longitude * 29))

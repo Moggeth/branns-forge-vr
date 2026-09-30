@@ -22,12 +22,24 @@ func _run() -> void:
 	var mesh: ArrayMesh = Meteor._rock_mesh()
 	var vertices: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 	var normals: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+	var edges: Dictionary = {}
 	for i in range(0, vertices.size(), 3):
 		var centroid: Vector3 = (vertices[i] + vertices[i+1] + vertices[i+2]) / 3.0
 		var winding: Vector3 = (vertices[i+1]-vertices[i]).cross(vertices[i+2]-vertices[i])
+		for edge in 3:
+			var a: Vector3=vertices[i+edge]
+			var b: Vector3=vertices[i+(edge+1)%3]
+			var ka := "%d,%d,%d" % [roundi(a.x*10000),roundi(a.y*10000),roundi(a.z*10000)]
+			var kb := "%d,%d,%d" % [roundi(b.x*10000),roundi(b.y*10000),roundi(b.z*10000)]
+			var edge_key: String=ka+"|"+kb if ka<kb else kb+"|"+ka
+			edges[edge_key]=int(edges.get(edge_key,0))+1
 		if winding.length_squared() < 0.000001: continue
 		if winding.dot(centroid) >= 0.00001 or normals[i].dot(centroid) <= 0.00001:
 			failures.append("meteor front winding or normal faces inward at triangle %d" % (i / 3))
+			break
+	for count in edges.values():
+		if int(count) != 2:
+			failures.append("meteor mesh has an open or nonmanifold edge")
 			break
 	var impacts := [0]
 	meteor.impact_ready.connect(func(_value): impacts[0] += 1)
