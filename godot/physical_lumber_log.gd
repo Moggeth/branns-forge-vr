@@ -4,12 +4,16 @@ extends RigidBody3D
 const LOG_ART_PATH := "res://assets/tree_cutting/log_y.glb"
 const PICKUP_DELAY := 1.1
 const ASSIST_RADIUS := 2.15
+const ASSIST_SPEED := 5.5
 
 var game: Node
 var source: Node3D
 var felling: Node
 var age := 0.0
 var claiming := false
+var pickup_requested := false
+var pickup_hand: Node3D
+var pickup_desktop := false
 
 func setup(owner_game: Node, resource: Node3D, owner_felling: Node) -> void:
 	game = owner_game
@@ -17,6 +21,7 @@ func setup(owner_game: Node, resource: Node3D, owner_felling: Node) -> void:
 	felling = owner_felling
 	set_meta("kind", "lumber_log")
 	set_meta("resource", "lumber")
+	add_to_group("physical_lumber_log")
 	continuous_cd = true
 	contact_monitor = true
 	max_contacts_reported = 4
@@ -57,20 +62,42 @@ func _physics_process(delta: float) -> void:
 			# A failed gather request leaves the physical log in the world.
 			freeze = false
 			claiming = false
+			pickup_requested = false
 		return
-	if age < PICKUP_DELAY: return
-	var receiver: Node3D = game.camera if game.get("camera") is Node3D else game.rig
-	var target: Vector3 = receiver.global_position + Vector3(0, -0.35, 0)
-	var distance := global_position.distance_to(target)
-	if distance > ASSIST_RADIUS: return
-	if distance > 0.48:
-		var pull := (target - global_position).normalized() * clampf((ASSIST_RADIUS - distance) * 7.0, 1.0, 9.0)
-		apply_central_force(pull * mass)
+	if not pickup_requested: return
+	if not is_instance_valid(pickup_hand):
+		pickup_requested = false
+		freeze = false
 		return
-	_claim()
+	var target: Vector3 = pickup_hand.global_position
+	if pickup_desktop: target += Vector3(0, -0.38, 0)
+	global_position = global_position.move_toward(target, ASSIST_SPEED * delta)
+	if global_position.distance_to(target) <= 0.18: _claim()
+
+func try_grab(hand: Node3D, desktop: bool = false) -> bool:
+	# Called by the ordinary E/grip input path. A low fallen log is selected
+	# within comfortable standing reach, then tethered to the hand/chest.
+	if claiming or pickup_requested or age < PICKUP_DELAY or not is_instance_valid(source) or not is_instance_valid(hand): return false
+	if global_position.distance_to(hand.global_position) > ASSIST_RADIUS: return false
+	pickup_requested = true
+	pickup_hand = hand
+	pickup_desktop = desktop
+	freeze = true
+	return true
 
 func _claim() -> void:
 	if claiming: return
 	claiming = true
 	freeze = true
-	game.adventure.gather(source)
+	if source.has_meta("scenic_builder_key"):
+		if game.world_builder.claim_scenic_log(source):
+			source.set_meta("collecting", true)
+			source.visible = false
+			if is_instance_valid(felling): felling.log_collected()
+			queue_free()
+		else:
+			freeze = false
+			claiming = false
+			pickup_requested = false
+	else:
+		game.adventure.gather(source)

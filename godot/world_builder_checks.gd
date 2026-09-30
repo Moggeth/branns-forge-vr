@@ -112,9 +112,14 @@ func _check() -> void:
 				axe.set_meta("id", "woodland_axe")
 				game.add_child(axe)
 				var trunk: StaticBody3D = builder.scenic_by_key[hero_tree_key].collision.get_parent()
-				var hit: Vector3 = builder.center + builder.scenic_by_key[hero_tree_key].position + Vector3.UP
+				var proxy: CollisionShape3D = builder.scenic_by_key[hero_tree_key].collision
+				var hit: Vector3 = proxy.global_position + Vector3.DOWN * (proxy.shape.height * 0.5 - 1.0)
 				for i in range(3): game.melee.strike(trunk, hit, Vector3.LEFT, 2.4, game.desktop_hand, axe)
-				if hero_tree_key not in builder.data.harvested or int(builder.data.wood) <= before_wood: failures.append("Hero axe did not change the shared forest and ledger")
+				if hero_tree_key in builder.data.harvested or int(builder.data.wood) != before_wood: failures.append("Hero axe awarded scenic lumber before log pickup")
+				var revealed: Node3D = builder.scenic_pending.get(hero_tree_key, null)
+				if not is_instance_valid(revealed) or not revealed.get_meta("felled", false): failures.append("Hero axe did not fell the revealed forest tree")
+				elif not builder.claim_scenic_log(revealed) or hero_tree_key not in builder.data.harvested or int(builder.data.wood) != before_wood + 1:
+					failures.append("intentional scenic log claim did not change the shared forest ledger")
 		var patrol_error: String = builder.summon_patrol(Vector3(75, 0, -60))
 		if patrol_error != "" or builder.data.threats.size() != 1: failures.append("encounter order missing: " + patrol_error)
 		else:

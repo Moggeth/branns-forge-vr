@@ -118,6 +118,10 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		collision.shape=shape
 		collision.position=point+Vector3.UP*shape.height*0.5
 		collision.set_meta("builder_timber", true)
+		collision.set_meta("builder_species", "pine" if pine else "apple")
+		collision.set_meta("builder_scale", scale)
+		collision.set_meta("builder_seed", abs(str(candidate.id).hash())%100000)
+		collision.set_meta("builder_rotation", float(candidate.rotation))
 		trunks.add_child(collision)
 	Art.grove(p,placements,TRAIL)
 	var natural_rocks: Array = []

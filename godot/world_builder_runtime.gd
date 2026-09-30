@@ -22,6 +22,8 @@ const Ecology = preload("res://landscape_ecology.gd")
 const Navigation = preload("res://landscape_navigation.gd")
 const Water = preload("res://landscape_water.gd")
 const Meteor = preload("res://landscape_meteor.gd")
+const TreeKit = preload("res://tree_kit.gd")
+const TreeFelling = preload("res://tree_felling.gd")
 
 signal forest_visual_event(payload: Dictionary)
 
@@ -38,7 +40,8 @@ var summoned_nodes: Dictionary = {}
 var warning_nodes: Dictionary = {}
 var resource_by_key: Dictionary = {}
 var scenic_by_key: Dictionary = {}
-var scenic_cuts: Dictionary = {}
+var scenic_instance_by_key: Dictionary = {}
+var scenic_pending: Dictionary = {}
 var meteor_nodes: Dictionary = {}
 var test_mode := false
 var save_path := SAVE
@@ -66,7 +69,7 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
 
 func _valid(value: Variant) -> bool:
 	if not value is Dictionary or int(value.get("schema", 0)) != 1: return false
@@ -77,6 +80,11 @@ func _valid(value: Variant) -> bool:
 	if value.get("groves") is not Array or value.groves.size() > MAX_GROVES: return false
 	if value.get("bridges") is not Array or value.bridges.size() > MAX_BRIDGES: return false
 	if value.get("harvested") is not Array or value.harvested.size() > 512: return false
+	if value.get("scenic_cut_heights", {}) is not Dictionary or value.get("scenic_cut_heights", {}).size() > 512: return false
+	for key in value.get("scenic_cut_heights", {}):
+		if not key is String or key.length() > 24: return false
+		var height: Variant = value.scenic_cut_heights[key]
+		if not height is float and not height is int or not is_finite(float(height)) or float(height) < 0.25 or float(height) > 3.0: return false
 	if value.get("marked") is not Array or value.marked.size() > 512: return false
 	if value.get("carried", []) is not Array or value.get("carried", []).size() > 5: return false
 	if value.get("threats", []) is not Array or value.get("threats", []).size() > MAX_THREATS: return false
@@ -137,6 +145,7 @@ func _load() -> void:
 		if not data.has("meteors"): data.meteors = []
 		if not data.has("star_gems"): data.star_gems = 0
 		if not data.has("star_iron"): data.star_iron = 0
+		if not data.has("scenic_cut_heights"): data.scenic_cut_heights = {}
 	else:
 		push_warning("WORLD_BUILDER invalid save; preserving file and starting an empty settlement")
 		save_blocked = true
@@ -183,6 +192,7 @@ func tick(delta: float) -> void:
 func _index_timber() -> void:
 	resource_by_key.clear()
 	scenic_by_key.clear()
+	scenic_instance_by_key.clear()
 	for resource in game.scene.resources:
 		if not is_instance_valid(resource) or str(resource.get_meta("zone", "")) != ZONE or str(resource.get_meta("resource_id", "")) != "lumber": continue
 		resource_by_key[_key(resource.global_position - center)] = resource
@@ -193,6 +203,14 @@ func _index_timber() -> void:
 				var local: Vector3 = child.position
 				local.y = 0
 				scenic_by_key[_key(local)] = {"position": local, "collision": child}
+	var orchard_root: Node3D = game.scene.zones[ZONE].root
+	for holder in orchard_root.find_children("*", "MultiMeshInstance3D", true, false):
+		if not holder.has_meta("builder_positions"): continue
+		var positions: Array = holder.get_meta("builder_positions")
+		for index in positions.size():
+			var key := _key(positions[index])
+			if not scenic_instance_by_key.has(key): scenic_instance_by_key[key] = []
+			scenic_instance_by_key[key].append({"holder": holder, "index": index})
 
 func _key(local: Vector3) -> String:
 	return "%d:%d" % [roundi(local.x * 10.0), roundi(local.z * 10.0)]
@@ -482,6 +500,7 @@ func mark_harvest(local: Vector3) -> String:
 		if distance < best: selected = key; best = distance
 	for key in scenic_by_key:
 		if key in data.harvested or key in data.marked: continue
+		if scenic_pending.has(key): continue
 		var record: Dictionary = scenic_by_key[key]
 		if not is_instance_valid(record.collision) or record.collision.disabled: continue
 		var distance: float = local.distance_to(record.position)
@@ -492,10 +511,9 @@ func mark_harvest(local: Vector3) -> String:
 	_changed("A lumberjack is heading for the marked tree.")
 	return ""
 
-func chop_scenic(global_hit: Vector3, blade: bool) -> bool:
+func chop_scenic(global_hit: Vector3, blade: bool, normal: Vector3 = Vector3.RIGHT, hand = null) -> bool:
 	if not blade: return false
 	var local: Vector3 = global_hit - center
-	if local.y < 0.25 or local.y > 1.8: return false
 	var nearest := ""
 	var best := 1.1
 	for key in scenic_by_key:
@@ -504,26 +522,65 @@ func chop_scenic(global_hit: Vector3, blade: bool) -> bool:
 		var distance := Vector2(local.x - point.x, local.z - point.z).length()
 		if distance < best: best = distance; nearest = key
 	if nearest == "": return false
-	var cut: Dictionary = scenic_cuts.get(nearest, {"height": local.y, "hits": 0})
-	if absf(float(cut.height) - local.y) > 0.20: cut = {"height": local.y, "hits": 0}
-	cut.hits = int(cut.hits) + 1
-	scenic_cuts[nearest] = cut
-	game._effect(global_hit, Color("d5ab72"), 0.28, 0.12)
-	if int(cut.hits) < 3:
-		game._notice("Orchard cut %d / 3 · strike near the same height." % int(cut.hits), 2)
-		return false
-	var point: Vector3 = scenic_by_key[nearest].position
-	_hide_scenic(point)
-	scenic_cuts.erase(nearest)
-	data.harvested.append(nearest)
-	data.marked.erase(nearest)
+	var collision: CollisionShape3D = scenic_by_key[nearest].collision
+	var trunk_height: float = collision.shape.height if collision.shape is CylinderShape3D else 2.5
+	var hit_height: float = global_hit.y - (collision.global_position.y - trunk_height * 0.5)
+	if hit_height < 0.25 or hit_height > 1.8: return false
+	var timber: Node3D = scenic_pending.get(nearest, null)
+	if not is_instance_valid(timber): timber = _reveal_scenic(nearest)
+	if not is_instance_valid(timber): return false
+	return game.melee.chop(timber, global_hit, normal, hand)
+
+func _reveal_scenic(key: String) -> Node3D:
+	if key in data.harvested or not scenic_by_key.has(key): return null
+	var record: Dictionary = scenic_by_key[key]
+	var collision: CollisionShape3D = record.collision
+	if not is_instance_valid(collision): return null
+	var trunk_height: float = collision.shape.height if collision.shape is CylinderShape3D else 2.5
+	var base: Vector3 = collision.global_position - Vector3.UP * trunk_height * 0.5
+	var resource := Node3D.new()
+	resource.name = "ScenicTimber_" + key.replace(":", "_")
+	game.adventure.zone_groups[ZONE].add_child(resource)
+	resource.global_position = base
+	resource.rotation.y = float(collision.get_meta("builder_rotation", 0.0))
+	resource.set_meta("kind", "resource")
+	resource.set_meta("requires", "axe")
+	resource.set_meta("resource", "lumber")
+	resource.set_meta("amount", 1)
+	resource.set_meta("scenic_builder_key", key)
+	var species := str(collision.get_meta("builder_species", "apple"))
+	var scale: float = float(collision.get_meta("builder_scale", 1.0))
+	var seed: int = int(collision.get_meta("builder_seed", abs(hash(key)) % 100000))
+	var tree_info: Dictionary = TreeKit.adapt_timber(resource, species, seed, {"height": 5.0 * scale})
+	resource.set_meta("trunk", tree_info.trunk)
+	resource.set_meta("trunk_mesh", tree_info.trunk.mesh)
+	resource.set_meta("trunk_material", tree_info.trunk.material_override)
+	scenic_pending[key] = resource
+	_hide_scenic(record.position)
+	# The Hero now owns this tree's fall. A queued worker must not harvest the
+	# same scenic key while the physical log is still waiting for a grab.
+	data.marked.erase(key)
 	for i in range(jobs.size() - 1, -1, -1):
-		if str(jobs[i].key) == nearest: jobs.remove_at(i)
+		if str(jobs[i].key) == key: jobs.remove_at(i)
 	for worker in worker_nodes:
-		if str(worker.get_meta("job", "")) == nearest: worker.set_meta("job", "")
+		if str(worker.get_meta("job", "")) == key: worker.set_meta("job", "")
+	return resource
+
+func claim_scenic_log(resource: Node3D) -> bool:
+	var key := str(resource.get_meta("scenic_builder_key", ""))
+	if key == "" or not scenic_by_key.has(key): return false
+	if key in data.harvested: return true # Retry cannot award settlement wood twice.
+	if scenic_pending.get(key, null) != resource or not resource.get_meta("felled", false): return false
+	data.harvested.append(key)
+	data.scenic_cut_heights[key] = float(resource.get_meta("cut_height", 1.0))
+	data.marked.erase(key)
+	for i in range(jobs.size() - 1, -1, -1):
+		if str(jobs[i].key) == key: jobs.remove_at(i)
+	for worker in worker_nodes:
+		if str(worker.get_meta("job", "")) == key: worker.set_meta("job", "")
 	data.wood = mini(200, int(data.wood) + 1)
-	W.cyl(root, point + Vector3(0, 0.14, 0), 0.37, 0.28, "9a754e")
-	_changed("The Hero felled a tree. The settlement gained 1 lumber.")
+	scenic_pending.erase(key)
+	_changed("The Hero collected a fallen log. The settlement gained 1 lumber.")
 	return true
 
 func plant_grove(local: Vector3) -> String:
@@ -647,7 +704,7 @@ func _rebuild_saved() -> void:
 		elif scenic_by_key.has(str(key)):
 			var point: Vector3 = scenic_by_key[str(key)].position
 			_hide_scenic(point)
-			W.cyl(root, point + Vector3(0, 0.14, 0), 0.37, 0.28, "9a754e")
+			_restore_scenic_stump(str(key), float(data.scenic_cut_heights.get(str(key), 1.0)))
 	for value in data.groves: _render_grove(_unpack(value))
 	for entry in data.forest_spells:
 		_render_forest(_unpack_forest(entry.placements) if entry.has("placements") else Ecology.grow(game.landscape.model, entry.region, int(entry.seed)), false)
@@ -706,13 +763,28 @@ func _hide_scenic(point: Vector3) -> void:
 	if scenic_by_key.has(key):
 		var collision: CollisionShape3D = scenic_by_key[key].collision
 		if is_instance_valid(collision): collision.set_deferred("disabled", true)
-	var orchard_root: Node3D = game.scene.zones[ZONE].root
-	for holder in orchard_root.find_children("*", "MultiMeshInstance3D", true, false):
-		if not holder.has_meta("builder_positions"): continue
-		var positions: Array = holder.get_meta("builder_positions")
-		for i in range(positions.size()):
-			if _key(positions[i]) == key:
-				holder.multimesh.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -200, 0)))
+	for entry in scenic_instance_by_key.get(key, []):
+		var holder: MultiMeshInstance3D = entry.holder
+		if is_instance_valid(holder): holder.multimesh.set_instance_transform(int(entry.index), Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -200, 0)))
+
+func _restore_scenic_stump(key: String, height: float) -> void:
+	if not scenic_by_key.has(key): return
+	var collision: CollisionShape3D = scenic_by_key[key].collision
+	if not is_instance_valid(collision): return
+	var trunk_height: float = collision.shape.height if collision.shape is CylinderShape3D else 2.5
+	var temporary := Node3D.new()
+	root.add_child(temporary)
+	temporary.global_position = collision.global_position - Vector3.UP * trunk_height * 0.5
+	temporary.rotation.y = float(collision.get_meta("builder_rotation", 0.0))
+	var species := str(collision.get_meta("builder_species", "apple"))
+	var seed: int = int(collision.get_meta("builder_seed", abs(hash(key)) % 100000))
+	var scale: float = float(collision.get_meta("builder_scale", 1.0))
+	var tree_info: Dictionary = TreeKit.adapt_timber(temporary, species, seed, {"height": 5.0 * scale})
+	temporary.set_meta("trunk", tree_info.trunk)
+	var permanent := TreeFelling.new()
+	root.add_child(permanent)
+	permanent.restore_stump(temporary, height)
+	temporary.queue_free()
 
 func _clear_grove_collision(a: Vector3, b: Vector3) -> void:
 	# The authored canopy is instanced; clearing one placement removes its visible
@@ -894,6 +966,7 @@ func _for_each_worker(delta: float) -> void:
 			continue
 		if not resource_by_key.has(key) and not scenic_by_key.has(key): worker.set_meta("job", ""); continue
 		if key in data.harvested: worker.set_meta("job", ""); continue
+		if scenic_pending.has(key): worker.set_meta("job", ""); continue
 		var target: Node3D = resource_by_key.get(key, null)
 		if target != null and not is_instance_valid(target): worker.set_meta("job", ""); continue
 		var target_position: Vector3 = target.global_position - center if target != null else scenic_by_key[key].position

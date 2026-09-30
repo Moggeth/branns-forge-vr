@@ -136,11 +136,14 @@ func _add_endgrain() -> void:
 	var radius: float = unit_radius * maxf(trunk.transform.basis.x.length(), trunk.transform.basis.z.length())
 	var centre: Vector3 = trunk.transform * Vector3(0, local_y, 0)
 	centre.y = cut_y
-	for placement in [stump, upper]:
+	var placements: Array[Node3D] = [stump]
+	if is_instance_valid(upper): placements.append(upper)
+	for placement in placements:
 		var cap: Node3D
 		if ResourceLoader.exists(ENDCAP_ART_PATH):
 			cap = load(ENDCAP_ART_PATH).instantiate()
-			cap.scale = Vector3(radius, 1.0, radius)
+			cap.scale = Vector3.ONE * radius
+			if placement == upper: cap.rotation.x = PI
 		else:
 			var fallback := MeshInstance3D.new()
 			var cylinder := CylinderMesh.new()
@@ -178,12 +181,33 @@ func _drop_log() -> void:
 	log = LOG_SCRIPT.new()
 	log.name = "PhysicalLumberLog"
 	get_parent().add_child(log)
-	log.global_position = source.to_global(Vector3(0, maxf(cut_y, 0.3) + 0.55, 0))
+	var outward: Vector3 = (source.global_basis * fall_normal).normalized()
+	log.global_position = source.to_global(Vector3(0, maxf(cut_y, 0.3) + 0.30, 0)) + outward * 1.0
 	log.setup(game, source, self)
-	log.apply_central_impulse((source.global_basis * -fall_normal + Vector3.UP * 0.4).normalized() * 1.4)
+	log.apply_central_impulse((outward + Vector3.UP * 0.25).normalized() * 1.3)
 
 func log_collected() -> void:
 	collected = true
+	if is_instance_valid(source) and source.has_meta("scenic_builder_key"):
+		# The World Builder ledger is permanent; retain this actual clipped stump
+		# instead of running the ordinary 35-second resource respawn.
+		set_process(false)
+		if is_instance_valid(upper): upper.queue_free()
+
+func restore_stump(resource: Node3D, height: float) -> void:
+	# Rebuild the same clipped stump from persisted scenic cut height on load.
+	source = resource
+	cut_y = height
+	global_transform = resource.global_transform
+	stump = Node3D.new()
+	stump.name = "RootedStump"
+	add_child(stump)
+	for child in resource.get_children():
+		if child is MeshInstance3D and child.name in CUT_SURFACES:
+			_add_piece(child, stump, false)
+	_add_endgrain()
+	_add_stump_collision()
+	set_process(false)
 
 func _process(_delta: float) -> void:
 	if not is_instance_valid(source):

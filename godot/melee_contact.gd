@@ -112,7 +112,7 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 		if motion.length()<0.01: motion=-normal*speed
 		return game.pumpkins.impact(target,item,point,normal,motion)
 	if kind=="builder_forest" and game.world_builder!=null and str(item.get_meta("id", ""))=="woodland_axe":
-		return game.world_builder.chop_scenic(point,_is_blade(item,normal))
+		return game.world_builder.chop_scenic(point,_is_blade(item,normal),normal,hand)
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
 		return chop(target,point,normal,hand) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":
@@ -197,6 +197,7 @@ func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
 		return false
 	var felling= TREE_FELLING.new()
 	game.adventure.zone_groups.get(game.adventure.zone,game).add_child(felling)
+	target.set_meta("cut_height",float(bands[selected].height))
 	felling.start(game,target,float(bands[selected].height),normal)
 	target.set_meta("felled",true)
 	target.set_meta("cut_bands",[])
@@ -213,6 +214,13 @@ func notch(target,band):
 	if not target.has_meta("trunk"): return
 	var trunk=target.get_meta("trunk")
 	if not is_instance_valid(trunk): return
+	var wedge_path := "res://assets/tree_cutting/cut_wedge_%d.glb" % clampi(int(band.hits), 1, 3)
+	if ResourceLoader.exists(wedge_path):
+		# Authored wedges follow the actual surface of an uncut TreeKit trunk.
+		# Retain its original mesh so the lip does not hover over a second hole.
+		trunk.mesh = target.get_meta("trunk_mesh", trunk.mesh)
+		_authored_cut(target, band, trunk)
+		return
 	var profiles=[]
 	var levels=[-0.5,0.5]
 	for cut in target.get_meta("cut_bands",[band]):
@@ -261,15 +269,19 @@ func _authored_cut(target: Node3D, band: Dictionary, trunk: MeshInstance3D) -> v
 	var wedge: Node3D = load(path).instantiate()
 	wedge.name = "CutWedge"
 	target.add_child(wedge)
-	var centre: Vector3 = target.to_local(band.point)
 	var outward: Vector3 = target.global_basis.inverse() * band.normal
 	outward.y = 0.0
 	if outward.length_squared() < 0.01: outward = Vector3.RIGHT
 	outward = outward.normalized()
-	var radius: float = 0.25 * maxf(trunk.transform.basis.x.length(), trunk.transform.basis.z.length())
-	wedge.position = Vector3(centre.x, float(band.height), centre.z) + outward * radius * 0.82
+	var local_y: float = (float(band.height) - trunk.position.y) / maxf(absf(trunk.transform.basis.y.y), 0.001)
+	var unit_radius: float = lerpf(0.5, 0.25, clampf(local_y + 0.5, 0.0, 1.0))
+	var radius: float = unit_radius * maxf(trunk.transform.basis.x.length(), trunk.transform.basis.z.length())
+	var centre: Vector3 = trunk.transform * Vector3(0, local_y, 0)
+	centre.y = float(band.height)
+	wedge.position = centre + outward * radius
 	wedge.rotation.y = -atan2(outward.z, outward.x)
-	wedge.scale = Vector3.ONE * radius
+	var stage_spread: float = {1: 1.8, 2: 1.5, 3: 1.12}.get(hit_index, 1.0)
+	wedge.scale = Vector3(radius, radius * stage_spread, radius * stage_spread)
 
 func _authored_chips(target: Node3D, point: Vector3, normal: Vector3, hit_index: int) -> void:
 	for i in range(2 + hit_index):
@@ -278,7 +290,7 @@ func _authored_chips(target: Node3D, point: Vector3, normal: Vector3, hit_index:
 		var chip: Node3D = load(path).instantiate()
 		target.get_parent().add_child(chip)
 		chip.global_position = point + Vector3(randf_range(-0.08,0.08),randf_range(-0.05,0.08),randf_range(-0.08,0.08))
-		chip.scale = Vector3.ONE * randf_range(0.07,0.12)
+		chip.scale = Vector3.ONE * randf_range(0.7,1.3)
 		var travel := (normal + Vector3(randf_range(-0.5,0.5),0.7,randf_range(-0.5,0.5))).normalized() * randf_range(0.24,0.5)
 		var tween := create_tween()
 		tween.tween_property(chip,"global_position",chip.global_position + travel,0.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
