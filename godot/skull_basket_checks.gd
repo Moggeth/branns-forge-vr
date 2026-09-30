@@ -15,9 +15,13 @@ class FakeTuning extends Node:
 
 class FakeQuests extends Node:
 	var deliveries=[]
-	func delivery_instance_id(): return "accepted-instance"
+	var instance_id=null
+	var status="available"
+	func delivery_instance_id(): return instance_id
 	func skull_delivered(skull_id:String,instance_id)->bool:
+		if instance_id==null: return false
 		deliveries.append([skull_id,instance_id])
+		if deliveries.size()>=3: status="ready"
 		return true
 
 class FakeScene extends Node3D:
@@ -98,7 +102,12 @@ func _run():
 		skull.freeze=true
 		skull.global_position=basket.basket.to_global(Vector3(0,0,0))
 		basket.tick()
-	if basket.contents.size()!=3 or game.quests.deliveries.size()!=3: failures.append("World insertion must deliver three distinct skulls")
+	if basket.contents.size()!=3 or not game.quests.deliveries.is_empty(): failures.append("Pre-accept skulls must stay stored without sending null-instance deliveries")
+	game.quests.instance_id="accepted-instance"
+	game.quests.status="active"
+	basket.bind_pending_deliveries()
+	if game.quests.deliveries.size()!=3: failures.append("Accepting later must deliver three distinct stored skulls")
+	if game.quests.status!="ready": failures.append("Deposit before accept, then accept, must reach the three-skull ready goal")
 	for call in game.quests.deliveries:
 		if call[1]!="accepted-instance": failures.append("Delivery lost accepted instance identity")
 	var first=basket.retrieve()
@@ -116,6 +125,9 @@ func _run():
 	var replay=restored.retrieve()
 	if replay!=null: restored.deposit(replay)
 	if game.quests.deliveries.size()!=3: failures.append("Restart and reinsertion duplicated credit")
+	game.quests.instance_id="new-instance"
+	restored.bind_pending_deliveries()
+	if game.quests.deliveries.size()!=3: failures.append("Abandoned or claimed skulls credited a new quest instance")
 	print("SKULL_BASKET_RESULT ",JSON.stringify(failures))
 	game.free()
 	DirAccess.remove_absolute(path)

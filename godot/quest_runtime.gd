@@ -54,6 +54,7 @@ func delivery_instance_id():
 func skull_delivered(skull_id:String,instance_id)->bool:
 	if (game.diagnostic_offline or game.smoke) and not test_events: return false
 	if not skull_id.begins_with("skull-") or skull_id.length()>150: return false
+	if not instance_id is String or instance_id.is_empty(): return false
 	var event_id="skull:"+skull_id
 	if outbox.any(func(event):return event.get("eventId")==event_id): return true
 	if outbox.size()>=2048:
@@ -66,10 +67,28 @@ func skull_delivered(skull_id:String,instance_id)->bool:
 	return true
 
 func tick(_delta):
-	if not sending and not outbox.is_empty() and game.elapsed>=retry_at and not game.diagnostic_offline: _flush.call_deferred()
+	if not sending and not outbox.is_empty() and game.elapsed>=retry_at and not game.diagnostic_offline:
+		if outbox[0].get("kind")=="delivery" and outbox[0].get("instanceId")==null and delivery_instance_id()==null: return
+		_flush.call_deferred()
+
+func _bind_unassigned_deliveries():
+	var instance_id=delivery_instance_id()
+	if instance_id==null: return
+	var changed=[]
+	for event in outbox:
+		if event.get("kind")=="delivery" and event.get("instanceId")==null:
+			event.instanceId=instance_id
+			changed.append(event)
+	if not changed.is_empty() and not _save():
+		for event in changed: event.instanceId=null
+		return
+	var basket=game.get("skull_basket")
+	if basket!=null: basket.bind_pending_deliveries()
 
 func _flush():
 	if sending or outbox.is_empty(): return
+	_bind_unassigned_deliveries()
+	if outbox[0].get("kind")=="delivery" and outbox[0].get("instanceId")==null: return
 	sending=true
 	var event=outbox[0]
 	var response=await game._request("/api/vr/quests/event",event)
@@ -90,6 +109,7 @@ func ingest(value:Dictionary,_announce=false):
 	var previous=data; var first=previous.is_empty()
 	var changed=int(value.get("revision",0))!=revision
 	data=value.duplicate(true); revision=int(value.get("revision",0))
+	_bind_unassigned_deliveries()
 	if not first:
 		if int(data.get("level",1))>int(previous.get("level",1)):
 			celebration_until=game.elapsed+6
@@ -122,7 +142,7 @@ func journal()->String:
 	if quest.is_empty(): return level_line()+"\nNo jobs available." + hollow_line
 	var location={"skeleton":"Pinewood Ruins","skeleton_skull":"Pinewood Ruins → portable basket","rat":"Enchanted Kitchen","lumber":"Pinewood Ruins","stone":"Sandstone Quarry"}.get(str(quest.get("target","")),"Explore the world")
 	var status=str(quest.get("status","available"))
-	var hint="Accept near Brann before setting out." if status=="available" else ("Return to Brann to collect your reward." if status=="ready" else "Progress stays saved between visits.")
+	var hint=("Accept near Brann; skulls already stored in the basket will count." if quest.get("kind")=="delivery" else "Accept near Brann before setting out.") if status=="available" else ("Return to Brann to collect your reward." if status=="ready" else "Progress stays saved between visits.")
 	var objective="Place real Skeleton Skulls in the basket · E carry/drop · F store/take" if quest.get("kind")=="delivery" else ("Defeat " if quest.get("kind")=="enemy" else "Gather ")+str(quest.get("target","")).replace("_"," ")
 	return "%s · %s\n\n%s  [%d/%d]\n%s\n%d / %d · %s · Reward %d XP\n%s%s"%[level_line(),data.get("title","Adventurer"),quest.get("name","Job"),index+1,data.quests.size(),location+" · "+objective,quest.get("progress",0),quest.get("goal",3),status.capitalize(),quest.get("xpReward",0),hint,hollow_line]
 

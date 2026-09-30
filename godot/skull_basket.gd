@@ -185,12 +185,22 @@ func deposit(skull:RigidBody3D)->bool:
 
 func _retry_pending():
 	if game.quests==null: return
+	var instance_id=game.quests.delivery_instance_id()
 	for skull_id in used_ids.keys():
 		var entry=used_ids[skull_id]
-		if not entry is Dictionary or entry.get("state")!="pending": continue
+		if not entry is Dictionary or (entry.get("state")!="pending" and not (entry.get("state")=="queued" and entry.get("instanceId")==null)): continue
+		# A real skull deposited before acceptance stays unassigned and durable.
+		# Bind it only when the service confirms an accepted quest instance.
+		if entry.get("instanceId")==null:
+			if instance_id==null: continue
+			entry.instanceId=instance_id
+			if not _save(): entry.instanceId=null; return
 		if not game.quests.skull_delivered(skull_id,entry.get("instanceId")): return
 		entry.state="queued"
 		_save()
+
+func bind_pending_deliveries():
+	_retry_pending()
 
 func retrieve()->RigidBody3D:
 	if contents.is_empty(): return null
@@ -272,7 +282,7 @@ func try_grab(hand:Node3D,desktop:bool)->bool:
 	basket.freeze=true
 	game.grips._attach(hand,basket)
 	zone=game.adventure.zone
-	game._notice("Basket carried · E drop · F store a loose skull",4)
+	game._notice("Basket carried · E drop · F store a skull. Stored skulls count after you accept Brann's first job.",6)
 	return true
 
 func release(hand:Node3D,desktop:bool)->bool:
