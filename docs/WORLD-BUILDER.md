@@ -1,8 +1,8 @@
 # Orchard World Builder
 
-Choose **World Builder** in the persistent launcher, select VR or Monitor / projector, then start normally. **F9** opens the strategic view during desktop play and switches the primary perspective while it is open. Both live perspectives remain visible in one presentation window. Its cameras render the Hero's actual Godot `World3D`: terrain, weather, enemies, trees, structures and avatar share one simulation. This is local asymmetric play on one PC; remote multiplayer is not implemented.
+Choose **World Builder** in the persistent launcher, select VR or Monitor / projector, then start normally. **F9** opens the strategic view during desktop play; **Tab** switches input focus without changing its layout. Both live perspectives remain visible in one presentation window. Its cameras render the Hero's actual Godot `World3D`: terrain, weather, enemies, trees, structures and avatar share one simulation. This is local asymmetric play on one PC; remote multiplayer is not implemented.
 
-[Shared-world direction](RTS-SHARED-WORLD-DIRECTION.md) describes the next dependencies. [September 30 evidence](RTS-SHARED-WORLD-20260930.md) records the earlier sources; [October 1 physical/art/dual-view pass](STARFALL-PHYSICAL-RTS-20261001.md) records the current verification and limits.
+[Shared-world direction](RTS-SHARED-WORLD-DIRECTION.md) describes the next dependencies. [September 30 evidence](RTS-SHARED-WORLD-20260930.md) records the earlier sources; [October 1 physical/art pass](STARFALL-PHYSICAL-RTS-20261001.md) records its earlier evidence; [native split-view and golem pass](DUAL-VIEW-AND-GOLEM-20261001.md) records the current controls, verification and limits.
 
 ## Controls and Mana
 
@@ -10,23 +10,23 @@ The original Opus 5.5 panel now has a Sonnet 5.5 refinement: an animated Tidal G
 
 - **F1–F4** select Land, Life, Construction and Encounters; **1–9** select a card in that palette.
 - Click a point for radial spells or choose two endpoints / drag a line for linear spells. Successful casts retain the selected spell.
-- **Right-click** or **Escape** cancels targeting. **F9** switches between the Hero and strategic primary view. **F11** toggles fullscreen.
+- **Escape** first releases captured FPS mouse look. With the cursor free, right-click/Escape cancels RTS targeting. **Tab** switches FPS/RTS control focus while preserving layout. **Shift+F9** toggles inset/split; **F9** swaps primary views in inset mode or changes focus in split mode. **F11** toggles fullscreen.
 - **WASD** pans, right/middle-drag orbits, wheel zooms. **F** finds/follows the Hero.
 - Hover cards for cost, description, gesture, cooldown and failure reasons. Construction previews show the actual lumber cost. Every implemented spatial action has its own animated, terrain-conforming preview; these include Sundering's shoulders, forest corridors, exact prospective tree positions, the tree-ring planting band, meteor crater and damage radius. Invalid placement turns the preview red and reports the reason; rejected casts show a brief fading red message.
-- Drag the inset by its header, resize with its lower-right corner, or press **Swap views** / **Focus Hero** / **Focus RTS**. Window size, position, fullscreen and inset layout persist in `user://world-builder-view.cfg`. The Hero primary view restores its FPS HUD and clears the RTS panel/header from the weapon view.
+- Use **Split**, **Inset**, **Flip** and **40% / 50% / 60%** in the top bar. Drag the split divider; double-click it for 50/50. Hold Alt to bypass the 40/50/60 snapping. In inset mode, drag the header or resize the lower-right corner. **Escape** frees the cursor for these controls, and clicking the FPS picture recaptures look without firing. Window/fullscreen, inset and split settings persist in user://world-builder-view.cfg. RTS controls stay within the RTS pane; the Hero HUD is retained for panes at least 600 pixels wide.
 
 Mana starts at 12 and caps at 20; old `aether` saves migrate without resetting reserves. **Testing 4×** regeneration defaults to 0.22 Mana/second, against normal 0.055. The panel exposes both presets; tuning key: `worldbuilder.mana_regen_multiplier`. Failed placement spends nothing and starts no cooldown.
 
-The strategic camera starts at **120 fps / 65% resolution**, with selectable 60 fps, 30 fps or uncapped redraws. It pauses while minimized and can reduce to 20 fps / 50% when VR remains below 72 fps after warmup. The secondary world view uses one shared-world SubViewport; the Hero picture reuses the existing root viewport texture and adds no third camera. During desktop RTS play the small Hero view can reduce its 3D scale to fit the inset; swapping or closing restores its original scale. Native UI stays crisp. The RTX 3080 Ti benchmark sustained about 120 fps at 1280×800 with both cameras active; this does not establish 4K or Vive Pro 2 performance.
+Both cameras default to **full native pane resolution** and a **120 fps** strategic redraw target. Each pane has its own aspect and pixel dimensions, so a windowed view uses its actual window/pane size; an inset is rendered at its actual content size rather than a reduced texture stretched across the screen. The secondary world view uses one shared-world SubViewport; the Hero picture reuses the existing root viewport texture and adds no third camera. Optional 65%/50% world detail only affects the RTS 3D texture. Minimized RTS redraw stops. VR can back off to 20 fps after sustained slow frames, while preserving full pixels and leaving the HMD viewport unchanged. Closing restores the original Hero scale/content sizing. An offline actual-Main desktop sample observed 120.2 fps at 1080p and 4K in this scene; this is not a guarantee for headset play or heavy combat.
 
 | Palette | Shortcuts in order |
 | --- | --- |
 | Land / F1 | 1 Path; 2 Sunder; 3 Raise Earth; 4 Earthen Wall; 5 Starfall; 6 Crystal Fault |
 | Life / F2 | 1 Grove; 2 Forest line; 3 Tree Ring; 4 Awaken Ent; 5 Mark Harvest; 6 Hire Helper; 7 Calm Ent; 8 Plant Magical Seed |
 | Construction / F3 | 1 Bridge; 2 Ramp; 3 Stairs; 4 Boardwalk; 5 Outpost; 6 Tower; 7 Platform; 8 Gate; 9 Barricade |
-| Encounters / F4 | 1 Skeleton Patrol; 2 Assemble Golem |
+| Encounters / F4 | 1 Skeleton Patrol; 2 Bone Duelist; 3 Shield Patrol; 4 Rat Swarm; 5 Haunting; 6 Stone Sentinel |
 
-Outpost, Tower, Platform, Gate, Barricade and Assemble Golem are **unavailable future entries**. No resources are spent on them. Terrain spells use the persistent primitives in [terraforming](TERRAFORMING-SPELLS.md). Starfall leaves mineable material; no meteor creature emerges yet.
+Outpost, Tower, Platform, Gate and Barricade are **unavailable future entries**. No resources are spent on them. Terrain spells use the persistent primitives in [terraforming](TERRAFORMING-SPELLS.md). Starfall leaves mineable material; no meteor creature emerges yet.
 
 ## Free construction and resources
 
@@ -52,7 +52,20 @@ Claimed seeds, planted trees and source defeat persist. Loose fruit/log/drop pos
 
 ## Encounters
 
-Skeleton Patrol costs four Mana and warns for 1.7 seconds before three real enemies rise. Objectives: keep defeats within 14 m of the warning; clear within 45 seconds; or defeat the middle captain last. Up to eight patrols / 24 skeletons coexist.
+All six summons work in the active region, including maps outside the Orchard. Other land/life/construction operations remain Orchard-specific. The view automatically chooses Encounters after travelling elsewhere. Every summon checks bounds, dry walkable floor, slope, obstacles, unit spacing and Hero clearance before spending Mana. Threats retain their region/kind/elevation through save/reload; inactive regions do not advance encounter warnings. Warning circles appear before enemies arrive.
+
+| Summon | Units | Mana | Cooldown |
+| --- | --- | --- | --- |
+| Skeleton Patrol | 3 skeletons | 4 | 12 s |
+| Bone Duelist | 1 skeleton | 3 | 10 s |
+| Shield Patrol | 2 shield guardians | 5 | 16 s |
+| Rat Swarm | 3 rats | 3 | 14 s |
+| Haunting | 2 fire-only ghosts | 5 | 18 s |
+| Stone Sentinel | 1 authored golem | 6 | 20 s |
+
+At most eight encounter records coexist globally. Current formation maximum is 24 skeletons, not an unlimited summon wave. Summoned rats leave their tail in their own region; enemies register with the same combat/animation/loot systems as normal enemies. The golem starts with 110 HP and uses the authored modular armour/core/slam adapter.
+
+Skeleton Patrol costs four Mana and warns for 1.7 seconds before three real enemies rise. Objectives: keep defeats within 14 m of the warning; clear within 45 seconds; or defeat the middle captain last. Up to eight encounter records coexist.
 
 A successful clear in a new 24 m sector earns up to two Mana; varying the objective from the previous reward can also grant one lumber. Each sector pays once, capped at 40 rewards. Objective, timing, kill order and reward history survive JSON save/reload. Ordinary skeleton loot and quest XP remain repeatable under the existing rules; this is not a complete anti-farming system.
 
@@ -75,4 +88,4 @@ Run from this repository:
 
 Native captures: `outputs/worldbuilder-panel/`, `outputs/worldbuilder-art/`. Reviews exercise installed art and runtime facing, but do not replace an in-world/HMD playtest.
 
-Remaining limits: navigation uses terrain/deck-aware grid steering, not a complete scenery navmesh. Later terrain edits can bury/expose decks; routes reject inaccessible crossings but structures do not repair themselves. Free structures are straight and grade-limited. Supply outposts, component golems, purposeful weather-bottle quests, remote sessions and talents remain future work.
+Remaining limits: navigation uses terrain/deck-aware grid steering, not a complete scenery navmesh. Later terrain edits can bury/expose decks; routes reject inaccessible crossings but structures do not repair themselves. Free structures are straight and grade-limited. Supply outposts, player-built component golems, purposeful weather-bottle quests, remote sessions and talents remain future work. Summoned Stone Sentinels are implemented.

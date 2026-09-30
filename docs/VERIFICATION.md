@@ -1985,3 +1985,23 @@ implementation. This pass again wasted reads on names resembling older files.
 The current owners are `adventure_runtime.gd`, `qol_runtime.gd`, `fairy_coop.gd`,
 `siegebird_runtime.gd` and `siegebird_extras.gd`. Read shared instructions and this
 verified path list before repeating a large scene or artist operation.
+
+## Native split-view and regional summon lessons (2026-10-01)
+
+The current native acceptance fixture is dual_view_checks.gd, invoked with --xr-mode off --audio-driver Dummy -- --world-builder-check. It instantiates actual Main with isolated state, covers six layouts up to 4K, checks actual texture pixels rather than only a requested scale, and captures both cameras and the installed golem after its timing samples. The earlier world_builder_view_gpu_checks/world_builder_presentation_check scripts describe the older fixed fullscreen/inset policy; they do not establish acceptance of the new layout.
+
+A native no-focus diagnostic window must stay visible but offscreen. Hiding the root can make its reused Hero texture black. Godot can clamp a position assigned before showing a new Window; apply the diagnostic position again after visible=true. Avoid all focus/capture restoration in diagnostic_offline on close. Headless display coordinates do not prove native window placement.
+
+A secondary TextureRect added after the command panel covered the whole RTS panel in Hero-primary split mode. Visibility/bounds tests alone missed this. Keep LiveHeroPicture first in overlay child order, so native pane controls render above it, and assert that order as well as reviewing actual screenshots.
+
+Do not finish a camera-arrival test by setting elapsed to its duration without applying its target transform: that froze the RTS camera at the Hero's pose. Advance the real arrival method. Place eye-height review cameras using the production supported-landing finder, not a guessed absolute Y or a tree canopy. One-pixel width differences when flipping an odd usable split width are unavoidable rounding; test within one pixel, not strictly less.
+
+Readbacks/capture after the performance window only. TIME_PROCESS is a sampled engine monitor and retained resize/fixture spikes inconsistent with observed steady frame intervals in these short samples; keep the raw values in the log, but do not label them a trustworthy steady CPU percentile. Native frame intervals are separately measured. A clear eye-height scene and broad RTS view, not a camera inside a leaf, are required for useful render timing.
+
+Other regions' walkable floors use collision layer 1, while the Orchard terrain also occupies layer 2. A mask of 2 silently made non-Orchard targeting fail. Use floor layer 1 and dry/upward-normal/site validation; preview, click and runtime validation must agree. New summon live checks tick the production builder rather than directly bypassing it through _sync_threats, then free actual Main before quitting to avoid fixture ObjectDB leak warnings.
+
+On this shared PC, the active gh account changed to mitch-dromeda while the long art/test work ran. A stale initial account check was insufficient: the first private-repo query and push failed as Repository not found. Before each push re-check the owner/account, switch to Moggeth when unambiguous, verify isPrivate=true, and stop the sequence if verification fails. Never continue a dependent command chain merely because the next shell command can run.
+
+Final fixture correction: headless DisplayServer does not preserve native Window.unfocusable flags either. Gate both no-focus and offscreen assertions to native rendering; the actual native fixture checks both. The spell-save fixture deliberately submits an invalid save and expects the preserving-file warning; accept that exact warning when its own result marker reports no failures, while continuing to reject SCRIPT ERROR/ERROR and unexpected warnings. Do not turn deliberate corruption-recovery coverage into a failed build by blanket warning matching.
+
+Partial staging on Windows: Python subprocess text=True normalized CRLF patch context, so git apply --cached --check rejected a valid isolated main.gd rat-region hunk. Keeping git diff output and patch input as bytes applied the exact hunk immediately. Preserve bytes for index patches; use --check before mutation, and branch on the actual tool exit before running dependent commit or push calls.

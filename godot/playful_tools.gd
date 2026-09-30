@@ -247,7 +247,7 @@ func tick(delta):
 	if state=="held" and not is_instance_valid(holder): _home()
 	if state=="held":
 		# A gripped metal ring stays fixed in the palm; spin belongs to flight.
-		if holder==game.get("desktop_hand"):
+		if holder==game.get("desktop_hand") and game._desktop_hero_has_keyboard_focus():
 			var direction=(1.0 if Input.is_physical_key_pressed(KEY_R) else 0.0)-(1.0 if Input.is_physical_key_pressed(KEY_Q) else 0.0)
 			desktop_bank=clampf(desktop_bank+direction*60*delta,-65,65)
 			ring.rotation.z=-deg_to_rad(desktop_bank)

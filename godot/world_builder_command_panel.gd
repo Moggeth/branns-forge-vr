@@ -68,6 +68,7 @@ var _palette := "land"
 var _selected := ""
 var _hover := ""                         # "card:<id>", "tab:<pal>", "regen:<i>", "orb"
 var _compact := false
+var _stacked := false                   # pane-width layout; keeps type readable in split and PiP
 
 var _atlas: Texture2D
 var _atlas_cols := 1
@@ -226,6 +227,10 @@ func bottom_extent() -> float:
 func layout_for_size(sz: Vector2) -> void:
 	if _font == null:
 		_font = ThemeDB.fallback_font
+	_stacked = sz.x < 760.0 or sz.y < 360.0
+	if _stacked:
+		_layout_stacked(sz)
+		return
 	_compact = sz.y < 680.0 or sz.x < 1100.0
 	var bw := C_BASE_W if _compact else BASE_W
 	var bh := C_BASE_H if _compact else BASE_H
@@ -277,6 +282,43 @@ func layout_for_size(sz: Vector2) -> void:
 	_orb_redraw()
 
 
+func _layout_stacked(sz: Vector2) -> void:
+	# The old proportional compact layout made 410 px PiP labels 5-7 px tall.
+	# Stack the same controls at native type size instead of shrinking them.
+	_compact = true
+	_s = 1.0
+	var w := maxf(minf(sz.x - 8.0, 700.0), 1.0)
+	var h := minf(sz.y - 4.0, clampf(sz.y * 0.52, 196.0, 250.0))
+	h = maxf(h, 1.0)
+	_panel = Rect2(roundf((sz.x - w) * 0.5), roundf(sz.y - h), roundf(w), roundf(h))
+	var o := _panel.position
+	_orb_c = o + Vector2(30.0, 25.0)
+	_orb_r = 17.0
+	_info = Rect2(o + Vector2(57.0, 4.0), Vector2(w - 63.0, 43.0))
+	_regen.clear()
+	_regen.append(Rect2(Vector2(_info.end.x - 87.0, _info.position.y + 12.0), Vector2(40.0, 20.0)))
+	_regen.append(Rect2(Vector2(_info.end.x - 44.0, _info.position.y + 12.0), Vector2(40.0, 20.0)))
+	_tabs.clear()
+	_cards.clear()
+	_layout_tabs(o, 7.0, 51.0, w - 14.0, 25.0)
+	var gap := 4.0
+	var cw := (w - 16.0 - gap * 2.0) / 3.0
+	var ch := (h - 84.0 - gap * 2.0) / 3.0
+	for i in 9:
+		_cards.append(Rect2(o + Vector2(8.0 + (i % 3) * (cw + gap), 80.0 + (i / 3) * (ch + gap)), Vector2(cw, ch)))
+	_build_styles()
+	_place_orb_nodes()
+	queue_redraw()
+	_orb_redraw()
+
+
+func _tab_title(p: Dictionary) -> String:
+	if _stacked and _panel.size.x < 480.0:
+		if p.id == "construction": return "Build"
+		if p.id == "encounters": return "Foes"
+	return str(p.title)
+
+
 func _layout_tabs(o: Vector2, x: float, y: float, w: float, h: float) -> void:
 	## Tab widths follow measured text (icon + label + padding); spare width is shared out equally.
 	var gap := 4.0
@@ -286,11 +328,11 @@ func _layout_tabs(o: Vector2, x: float, y: float, w: float, h: float) -> void:
 		widths.clear()
 		var total := gap * (PALETTES.size() - 1)
 		for p in PALETTES:
-			var tw := _font.get_string_size(str(p.title), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x / _s
+			var tw := _font.get_string_size(_tab_title(p), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x / _s
 			var cw := (6.0 + 13.0 + 4.0 + 6.0 if _compact else 10.0 + 15.0 + 6.0 + 10.0) + tw
 			widths.append(cw)
 			total += cw
-		if total <= w or fs <= MIN_FONT:
+		if total <= w or fs <= (12 if _stacked else MIN_FONT):
 			var extra := maxf(w - total, 0.0) / PALETTES.size()
 			for i in widths.size():
 				widths[i] += extra
@@ -398,6 +440,9 @@ func _draw_frame() -> void:
 	draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2], poly[3]]), C_BRASS, 1.5 * _s, true)
 	for q in [poly[1], poly[2]]:   # brass rivets at chamfers
 		draw_circle(q + Vector2(0, 6 * _s), 2.5 * _s, C_BRASS_HI)
+	if _stacked:
+		draw_line(Vector2(p.position.x + 7.0, _tabs[0].position.y - 2.0), Vector2(p.end.x - 7.0, _tabs[0].position.y - 2.0), C_BRASS_DIM, 1.0)
+		return
 	# column dividers: orb | info | palette
 	var d1 := _info.position.x - 6 * _s
 	var d2 := _tabs[0].position.x - 6 * _s
@@ -409,6 +454,11 @@ func _draw_orb_bezel() -> void:
 	## Brass bezel and dark backing; the shader child paints the glass over the inside.
 	var c := _orb_c
 	var r := _orb_r
+	if _stacked:
+		draw_circle(c, r + 4.0, Color(0.05, 0.035, 0.025))
+		draw_circle(c, r, Color(0.02, 0.022, 0.05))
+		draw_arc(c, r + 2.0, 0, TAU, 48, C_BRASS, 2.0, true)
+		return
 	draw_circle(c, r + 9 * _s, Color(0.05, 0.035, 0.025))
 	draw_circle(c, r, Color(0.02, 0.022, 0.05))
 	draw_arc(c, r + 5 * _s, 0, TAU, 96, C_BRASS_DIM, 8 * _s, true)
@@ -436,13 +486,22 @@ func _draw_regen() -> void:
 		_sb_tab.border_color = C_TEAL if on else (C_BRASS if hov else C_BRASS_DIM)
 		draw_style_box(_sb_tab, rr)
 		var lbl := str(REGEN_PRESETS[i].label) if _compact else "%s %s" % [REGEN_PRESETS[i].hint, REGEN_PRESETS[i].label]
-		var fs := _fs(11.5)
+		var fs := 12 if _stacked else _fs(11.5)
 		_text_c(rr, lbl, fs, C_TEXT if on else C_TEXT_DIM)
 
 
 func _draw_info() -> void:
 	var r := _info
 	draw_style_box(_sb_plaque, r)
+	if _stacked:
+		var x := r.position.x + 7.0
+		var w := maxf(r.size.x - 104.0, 36.0)
+		var e := _sel_entry()
+		var title := str(e.title) if not e.is_empty() else "Choose an ability"
+		var cost := _cost_line(e) if not e.is_empty() else "1-9 select · F1-F4 tabs"
+		_txt(x, r.position.y + 3.0, _ellipsize(title, w, 14), 14, C_TEXT, w)
+		_txt(x, r.position.y + 22.0, _ellipsize(cost, w, 12), 12, C_TEAL if not e.is_empty() else C_TEXT_DIM, w)
+		return
 	var pad := (11.0 if _compact else 15.0) * _s
 	var x := r.position.x + pad
 	var w := r.size.x - 2.0 * pad
@@ -525,17 +584,20 @@ func _draw_tabs() -> void:
 			draw_rect(Rect2(r.position.x + 5 * _s, r.end.y - 4 * _s, r.size.x - 10 * _s, 2.5 * _s), p.hue)
 		var col: Color = C_TEXT if on else C_TEXT_DIM
 		var icol: Color = p.hue if on else Color(p.hue, 0.60)
-		var tw := _font.get_string_size(str(p.title), HORIZONTAL_ALIGNMENT_LEFT, -1, _tab_fs).x
+		var title := _tab_title(p)
+		var tw := _font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, _tab_fs).x
 		var isz := minf(15.0 * _s, r.size.y - 8 * _s)
 		var total := isz + 6 * _s + tw
 		var sx := r.position.x + (r.size.x - total) * 0.5
 		Sym.draw(self, str(p.id), Rect2(sx, r.position.y + (r.size.y - isz) * 0.5 - 1 * _s, isz, isz), icol, 1.3 * _s)
 		var lh := _font.get_height(_tab_fs)
-		_txt(sx + isz + 6 * _s, r.position.y + (r.size.y - lh) * 0.5 - 1 * _s, str(p.title), _tab_fs, col)
+		_txt(sx + isz + 6 * _s, r.position.y + (r.size.y - lh) * 0.5 - 1 * _s, title, _tab_fs, col)
 
 
 func _card_parts(r: Rect2) -> Dictionary:
 	## Icon area / label band split. Full: icon on top, label below. Compact: icon left, label right.
+	if _stacked:
+		return {"icon_area": Rect2(r.position, Vector2(26.0, r.size.y)), "label": Rect2(r.position.x + 26.0, r.position.y, r.size.x - 26.0, r.size.y)}
 	if _compact:
 		var iw := 30.0 * _s
 		return {"icon_area": Rect2(r.position, Vector2(iw, r.size.y)), "label": Rect2(r.position.x + iw, r.position.y, r.size.x - iw, r.size.y)}
@@ -548,7 +610,7 @@ func _draw_cards() -> void:
 	var hue: Color = _pal_def(_palette).hue
 	var mana := float(_state.get("mana", 0.0))
 	var cds: Dictionary = _state.get("cooldowns", {})
-	var f_label := _fs(12.5 if not _compact else 11.5)
+	var f_label := 12 if _stacked else _fs(12.5 if not _compact else 11.5)
 	for i in 9:
 		var r := _cards[i]
 		if i >= ids.size():
@@ -579,8 +641,8 @@ func _draw_cards() -> void:
 		else:
 			draw_line(Vector2(r.position.x + 4 * _s, lb.position.y), Vector2(r.end.x - 4 * _s, lb.position.y), Color(C_BRASS_DIM, 0.6), 1.0 * _s)
 		# icon
-		var isz := (20.0 if _compact else 22.0) * _s
-		var ic := ia.get_center() + (Vector2(4, -2) * _s if _compact else Vector2.ZERO)
+		var isz := 18.0 if _stacked else (20.0 if _compact else 22.0) * _s
+		var ic := ia.get_center() if _stacked else ia.get_center() + (Vector2(4, -2) * _s if _compact else Vector2.ZERO)
 		var irect := Rect2(ic - Vector2(isz, isz) * 0.5, Vector2(isz, isz))
 		var icol := Color(hue, 0.55 if (blocked or not ready) else 0.92)
 		if not ready:
@@ -602,7 +664,8 @@ func _draw_cards() -> void:
 		# label: full title, wrapped to at most two lines and centred in its band
 		var lpad := 6.0 * _s
 		var lw := lb.size.x - 2.0 * lpad
-		var t := _fit(str(e.title), lw, f_label, 2, f_label - 2)
+		var label := "%d %s" % [i + 1, str(e.title)] if _stacked else str(e.title)
+		var t := _fit(label, lw, f_label, 2, 12 if _stacked else f_label - 2)
 		var lh := _font.get_height(int(t.fs))
 		var block := lh * (t.lines as Array).size()
 		var ly := lb.position.y + (lb.size.y - block) * 0.5
@@ -612,13 +675,14 @@ func _draw_cards() -> void:
 		if blocked and ready:
 			draw_rect(r.grow(-2 * _s), Color(0.14, 0.02, 0.02, 0.30))
 		# hotkey badge
-		var bs := 15.0 * _s
-		var b := Rect2(r.position + Vector2(4, 4) * _s if not _compact else r.position + Vector2(3, 3) * _s, Vector2(bs, bs))
-		draw_rect(b, Color(0.04, 0.03, 0.02, 0.92))
-		draw_rect(b, C_BRASS_DIM, false, 1.0 * _s)
-		_text_c(b, str(i + 1), _fs(11.0), C_BRASS_HI)
+		if not _stacked:
+			var bs := 15.0 * _s
+			var b := Rect2(r.position + Vector2(4, 4) * _s if not _compact else r.position + Vector2(3, 3) * _s, Vector2(bs, bs))
+			draw_rect(b, Color(0.04, 0.03, 0.02, 0.92))
+			draw_rect(b, C_BRASS_DIM, false, 1.0 * _s)
+			_text_c(b, str(i + 1), _fs(11.0), C_BRASS_HI)
 		# mana cost (icon + number); red when unaffordable
-		if float(e.mana) > 0.0 and ready:
+		if float(e.mana) > 0.0 and ready and not _stacked:
 			var f_cost := _fs(12.0 if not _compact else 11.0)
 			var cs := str(int(e.mana))
 			var ccol := C_WARN if poor else C_TEAL
@@ -654,7 +718,7 @@ func _draw_tooltip() -> void:
 		return
 	var idx: int = (_by_palette.get(_palette, []) as Array).find(id)
 	var anchor := _cards[maxi(idx, 0)]
-	var w := minf(300.0 * _s, size.x - 16.0)
+	var w := size.x - 12.0 if _stacked else minf(300.0 * _s, size.x - 16.0)
 	var pad := 12.0 * _s
 	var iw := w - 2.0 * pad
 	var f_t := _fs(16.0)
@@ -673,7 +737,8 @@ func _draw_tooltip() -> void:
 	var gapv := 5.0 * _s
 	var h := pad * 2 + th + gapv + ch + (gapv + bh if bh > 0.0 else 0.0) + (gapv + gh if gh > 0.0 else 0.0) + (gapv + rh if rh > 0.0 else 0.0)
 	var pos := Vector2(anchor.get_center().x - w * 0.5, _panel.position.y - h - 10 * _s)
-	pos.x = clampf(pos.x, 8 * _s, maxf(size.x - w - 8 * _s, 0.0))
+	var margin := 6.0 if _stacked else 8.0 * _s
+	pos.x = clampf(pos.x, margin, maxf(size.x - w - margin, margin))
 	pos.y = clampf(pos.y, 4.0, maxf(size.y - h - 4.0, 4.0))
 	var r := Rect2(pos, Vector2(w, h))
 	draw_style_box(_sb_parch, r)
@@ -787,6 +852,14 @@ func _draw_orb_overlay() -> void:
 		if mana > 0.0:
 			ci.draw_colored_polygon(pts, Color(0.30, 0.16, 0.70))
 	ci.draw_arc(c, r - 1.0 * _s, 0, TAU, 96, Color(0.02, 0.02, 0.05, 0.9), 2.0 * _s, true)
+	if _stacked:
+		var caption := "M"
+		var amount := str(floori(mana + 0.0001))
+		var cap_w := _font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+		var amount_w := _font.get_string_size(amount, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		ci.draw_string(_font, Vector2(c.x - cap_w * 0.5, c.y - 3.0), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, C_TEAL)
+		ci.draw_string(_font, Vector2(c.x - amount_w * 0.5, c.y + 11.0), amount, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, C_TEXT)
+		return
 	ci.draw_arc(c, r - 3.0 * _s, PI * 1.55, PI * 2.25, 32, Color(0.75, 0.85, 1.0, 0.16), 1.2 * _s, true)
 	var fs_big := maxi(int(r * 0.37), 14)
 	var fs_sep := maxi(int(fs_big * 0.66), MIN_FONT)

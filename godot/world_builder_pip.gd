@@ -14,6 +14,7 @@ var picture: TextureRect
 var return_button: Button
 var swap_button: Button
 var caption := "HERO · LIVE VIEW"
+var split_mode := false
 var dragging := false
 var resizing := false
 var drag_at := Vector2.ZERO
@@ -49,6 +50,18 @@ func keep_inside(bounds: Vector2) -> void:
 
 func _place_children() -> void:
 	if picture == null: return
+	if split_mode:
+		picture.position = Vector2.ZERO
+		picture.size = size
+		picture.stretch_mode = TextureRect.STRETCH_SCALE
+		return_button.visible = false
+		swap_button.visible = false
+		queue_redraw()
+		return
+	picture.position = Vector2(3, HEADER)
+	picture.stretch_mode = TextureRect.STRETCH_SCALE
+	return_button.visible = true
+	swap_button.visible = true
 	picture.size = Vector2(size.x - 6, size.y - HEADER - 3)
 	return_button.position = Vector2(size.x - 105, 3)
 	return_button.size = Vector2(100, HEADER - 6)
@@ -57,6 +70,7 @@ func _place_children() -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if split_mode: return
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.015, 0.023, 0.03, 0.98))
 	draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, HEADER)), Color(0.08, 0.14, 0.16, 0.98))
 	draw_rect(Rect2(Vector2.ZERO, size), Color("b8d4bc"), false, 2.0)
@@ -65,6 +79,7 @@ func _draw() -> void:
 	draw_colored_polygon(PackedVector2Array([Vector2(size.x - 18, size.y - 4), Vector2(size.x - 4, size.y - 18), Vector2(size.x - 4, size.y - 4)]), Color("b8d4bc"))
 
 func _gui_input(event: InputEvent) -> void:
+	if split_mode: return
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 		if button.button_index == MOUSE_BUTTON_LEFT:
@@ -94,7 +109,4 @@ func contains_screen_point(point: Vector2) -> bool:
 	return Rect2(global_position, size).has_point(point)
 
 func content_rect_screen() -> Rect2:
-	var source := picture.texture.get_size() if picture.texture != null else picture.size
-	var fit := minf(picture.size.x / maxf(source.x, 1.0), picture.size.y / maxf(source.y, 1.0))
-	var drawn := source * fit
-	return Rect2(global_position + picture.position + (picture.size - drawn) * 0.5, drawn)
+	return Rect2(global_position + picture.position, picture.size)

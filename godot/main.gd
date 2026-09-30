@@ -198,7 +198,7 @@ func _ready():
 			adventure_smoke = true
 			smoke = true
 	diagnostic_offline = OS.get_cmdline_user_args().has("--playful-check") or OS.get_cmdline_user_args().has("--playful-demo") or OS.get_cmdline_user_args().has("--playful-showcase") or OS.get_cmdline_user_args().has("--fuel-combat-check") or OS.get_cmdline_user_args().has("--weather-game-check") or OS.get_cmdline_user_args().has("--quest-check") or OS.get_cmdline_user_args().has("--fire-check") or not capture_path.is_empty() or runtime_check or OS.get_cmdline_user_args().has("--living-showcase") or OS.get_cmdline_user_args().has("--living-check-network") or OS.get_cmdline_user_args().has("--living-check") or OS.get_cmdline_user_args().has("--siegebird-check") or capture_workshop_tier>0 or capture_tinker or OS.get_cmdline_user_args().has("--workshop-check")
-	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--guardian-check") or OS.get_cmdline_user_args().has("--desktop-hero-check") or OS.get_cmdline_user_args().has("--expedition-check") or OS.get_cmdline_user_args().has("--director-check") or OS.get_cmdline_user_args().has("--director-network-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--guardian-check") or OS.get_cmdline_user_args().has("--desktop-hero-check") or OS.get_cmdline_user_args().has("--desktop-focus-check") or OS.get_cmdline_user_args().has("--expedition-check") or OS.get_cmdline_user_args().has("--director-check") or OS.get_cmdline_user_args().has("--director-network-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check") or OS.get_cmdline_user_args().has("--phoenix-bow-check")
@@ -461,6 +461,7 @@ func _ready():
 		add_child(landscape_check)
 		landscape_check.run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--desktop-hero-check"): preload("res://desktop_hero_integration_checks.gd").run.call_deferred(self)
+	if OS.get_cmdline_user_args().has("--desktop-focus-check"): preload("res://desktop_focus_input_checks.gd").run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--phoenix-bow-check"): preload("res://phoenix_bow_checks.gd").run.call_deferred(self)
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="):
@@ -946,7 +947,7 @@ func _hud():
 	help.add_theme_color_override("font_color",Color("e6ebdd"))
 	help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size.x=450
-	help.text="MOVE  WASD walk · Space jump · Mouse look · Esc cursor\nGEAR  E take / gentle drop · X throw · LMB primary · RMB alternate\nCROSSBOW  9 equip · R reload / hold to reel · C fit/return reel at rack\nAXE  LMB swing · hold RMB through contact for Power Cleave\nSKULLS  Carry the basket · F store/take a skull · deposit three to complete\nTRAVEL  M map · F next destination · G travel · walk through portals\nSUPPLIES  I resource guide · J activities / discoveries\nTOOLS  1–8 equip · T teleport · U workshop · V talk\nVIEW  F11 fullscreen · Q turn left · F1 close help"
+	help.text="MOVE  WASD walk · Space jump · Mouse look · Esc frees cursor\nGEAR  E take / gentle drop · X throw · LMB primary · RMB alternate\nCROSSBOW  9 equip · R reload / hold to reel · C fit/return reel at rack\nAXE  LMB swing · hold RMB through contact for Power Cleave\nSKULLS  Carry the basket · F store/take a skull · deposit three to complete\nTRAVEL  M map · F next destination · G travel · walk through portals\nSUPPLIES  I resource guide · J activities / discoveries\nTOOLS  1–8 equip · T teleport · U workshop · V talk\nVIEW  F11 fullscreen · F1 close help"
 	desktop_help_panel.visible=false
 	help.text += "\nBOW  0 Emberwing · hold LMB draw, release fire · hold RMB + turn to bend"
 	var cross = Label.new()
@@ -980,7 +981,7 @@ func _process(delta):
 				forge_stage=str(job.get("status")); break
 		print("FRAME_HITCH ms=",snappedf(delta*1000,0.1)," forge=",forge_stage," zone=",adventure.zone if adventure!=null else "startup")
 	if desktop_look!=null:
-		var survey_owns_input=is_instance_valid(world_builder_view) and world_builder_view.has_focus() and not world_builder_view.hero_primary
+		var survey_owns_input=is_instance_valid(world_builder_view) and world_builder_view.has_focus() and not world_builder_view.hero_has_input()
 		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened) and not (travel_navigation!=null and travel_navigation.hero_modal_open()))
 	if recording!=null: recording.tick(delta)
 	if wyrmspout!=null: wyrmspout.tick(delta)
@@ -994,7 +995,7 @@ func _process(delta):
 	for lantern in forge_lanterns: lantern.tick(delta)
 	if not smoke:
 		if vr: _xr_input()
-		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus() or world_builder_view.hero_primary): _desktop_input(delta)
+		elif _desktop_hero_has_keyboard_focus(): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
 	if not smoke and not adventure.travelling: portal_walkthrough.tick(self,delta)
 	held_pose.refresh(self)
@@ -1143,18 +1144,28 @@ func _open_world_builder_view() -> void:
 		if not vr and desktop_look!=null:
 			desktop_look.set_enabled(true)
 			desktop_look.capture())
+	if not vr and desktop_look!=null:
+		world_builder_view.focus_exited.connect(desktop_look.release_capture)
 	world_builder_view.setup(self, world_builder)
 	print("WORLD_BUILDER_VIEW opened for the same live simulation; vr=", vr)
 
 func _world_builder_hero_input(event: InputEvent) -> void:
-	if vr or not is_instance_valid(world_builder_view) or not world_builder_view.hero_primary: return
+	if vr or not is_instance_valid(world_builder_view) or not world_builder_view.hero_has_input(): return
 	var forwarded=event.duplicate()
 	if forwarded is InputEventMouse:
-		forwarded.position=event.position*get_viewport().get_visible_rect().size/Vector2(world_builder_view.size)
+		var hero_rect: Rect2=world_builder_view.hero_input_rect()
+		if hero_rect.size.x<=0.0 or hero_rect.size.y<=0.0: return
+		forwarded.position=(event.position-hero_rect.position)*get_viewport().get_visible_rect().size/hero_rect.size
 		forwarded.global_position=forwarded.position
 	_unhandled_input(forwarded)
 
 func _unhandled_input(event):
+	# Escape is a cursor release while Hero look owns the pointer. Handle it before
+	# modal, tool and adventure routes, including events forwarded by World Builder.
+	if not vr and desktop_look!=null and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_ESCAPE and desktop_look.captured:
+		desktop_look.release_capture()
+		get_viewport().set_input_as_handled()
+		return
 	if travel_navigation!=null and travel_navigation.input_event(event,self): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F9:
 		_open_world_builder_view(); return
@@ -1190,11 +1201,9 @@ func _unhandled_input(event):
 			KEY_X:
 				if magnetic_wand!=null and magnetic_wand.secondary(desktop_hand): return
 				_desktop_release(true)
-			KEY_Q: _snap(deg_to_rad(qol.settings.snap_degrees))
 			KEY_R:
 				if siegebird.desktop_weapon(desktop_hand)!=null:
 					if not siegebird.extras.tethered(siegebird.desktop_weapon(desktop_hand)): siegebird.desktop_reload(desktop_hand)
-				else: _snap(-deg_to_rad(qol.settings.snap_degrees))
 			KEY_T: _teleport(camera)
 			KEY_H: _button("upgrade")
 			KEY_V: _button("retry")
@@ -1280,6 +1289,12 @@ func _desktop_alternate() -> bool:
 		return true
 	return false
 
+func _desktop_hero_has_keyboard_focus()->bool:
+	if is_instance_valid(world_builder_view) and world_builder_view.has_focus():
+		return world_builder_view.hero_has_input()
+	if is_instance_valid(director_local_view) and director_local_view.has_focus(): return false
+	return get_window().has_focus()
+
 func _desktop_input(delta):
 	if travel_navigation!=null and travel_navigation.hero_modal_open(): return
 	if adventure.travelling: return
@@ -1337,7 +1352,7 @@ func _desktop_weapon_motion(delta:float):
 				desktop_swing_started=-1.0
 				desktop_swing_item=null
 	var crossbow=siegebird.desktop_weapon(desktop_hand)
-	if crossbow!=null and siegebird.extras.tethered(crossbow) and Input.is_physical_key_pressed(KEY_R):
+	if crossbow!=null and _desktop_hero_has_keyboard_focus() and siegebird.extras.tethered(crossbow) and Input.is_physical_key_pressed(KEY_R):
 		siegebird.extras.reel(crossbow,delta*TAU*1.4,delta)
 
 func _desktop_melee_pose(item:Node3D,progress:float,rest:Vector3,rest_roll:float)->void:

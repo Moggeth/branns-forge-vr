@@ -5,13 +5,16 @@ signal hero_focus_requested
 signal targeting_changed(state: Dictionary)
 const CommandPanel = preload("res://world_builder_command_panel.gd")
 const HeroPip = preload("res://world_builder_pip.gd")
+const DualLayout = preload("res://dual_view_layout.gd")
+const ViewChrome = preload("res://dual_view_chrome.gd")
 const Targeting = preload("res://world_builder_targeting.gd")
 const SpellAtlas = preload("res://assets/worldbuilder/icons/spell-atlas.png")
 const LINE_ACTIONS = ["path", "sunder", "forest", "wall", "fault", "bridge", "ramp", "stairs", "boardwalk"]
 const ICON_INDICES = {"path":0,"sunder":1,"raise":2,"wall":3,"meteor":4,"fault":5,
 	"grove":6,"forest":7,"ring":8,"awaken":9,"calm":9,"bridge":10,"ramp":11,
 	"stairs":12,"boardwalk":13,"outpost":14,"tower":15,"platform":16,"gate":17,
-	"barricade":18,"patrol":19,"golem":20,"harvest":21,"hire":22,"seed":8}
+	"barricade":18,"patrol":19,"duelist":19,"shield_patrol":19,"rat_swarm":19,"ghosts":23,
+	"golem":20,"harvest":21,"hire":22,"seed":8}
 
 const TOP_HEIGHT = 64
 const WINDOWED_SIZE = Vector2i(1280, 800)
@@ -35,6 +38,20 @@ var hero_hud_layer: CanvasLayer
 var hero_hud_was_visible := true
 var hero_3d_scale_before := 1.0
 var hero_primary := false
+var hero_focus := false
+var layout_mode := "pip"
+var split_left := "fps"
+var split_ratio := 0.5
+var pane_layout: Dictionary = {}
+var view_chrome: Control
+var hero_content_before := Vector2i.ZERO
+var hero_content_mode_before := Window.CONTENT_SCALE_MODE_DISABLED
+var hero_content_aspect_before := Window.CONTENT_SCALE_ASPECT_IGNORE
+var hero_content_factor_before := 1.0
+var hero_render_override := false
+var next_resolution_resize := 0.0
+var resolution_resize_pending := false
+var current_zone := "orchard_highlands"
 var preferred_fullscreen := true
 var preferred_window_size := WINDOWED_SIZE
 var preferred_window_position := Vector2i(-1, -1)
@@ -65,7 +82,7 @@ var dragging := false
 var hero_mouse_down := false
 var last_mouse := Vector2.ZERO
 var pan := Vector2.ZERO
-var render_scale := 0.65
+var render_scale := 1.0
 var refresh_limit := 120
 var refresh_elapsed := 0.0
 var message := "Choose a palette, then shape the shared world. F9 returns to the Hero."
@@ -100,7 +117,7 @@ func _exit_tree() -> void:
 	get_tree().root.gui_embed_subwindows = previous_embed_subwindows
 	if is_instance_valid(game) and game.is_inside_tree() and not game.is_queued_for_deletion():
 		_restore_hero_hud()
-		game.get_viewport().scaling_3d_scale = hero_3d_scale_before
+		_restore_hero_resolution()
 	# Preview meshes live under the Orchard, outside this Window's ownership.
 	# Also release them when a caller frees the Window without calling close().
 	for preview in [marker, route_preview, preview_boundary, target_visual]:
@@ -110,6 +127,10 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	game = owner_game
 	builder = owner_builder
 	hero_3d_scale_before = game.get_viewport().scaling_3d_scale
+	hero_content_before = game.get_window().content_scale_size
+	hero_content_mode_before = game.get_window().content_scale_mode
+	hero_content_aspect_before = game.get_window().content_scale_aspect
+	hero_content_factor_before = game.get_window().content_scale_factor
 	title = "Brann's Forge — Orchard Survey"
 	companion_mode = bool(game.vr)
 	size = WINDOWED_SIZE
@@ -117,11 +138,23 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_MOUSE_FOCUS
 	unresizable = false
 	_load_layout()
+	if bool(game.get("diagnostic_offline")):
+		# Offline captures must never take focus or cover a resident play session.
+		preferred_fullscreen = false
+		preferred_window_position = Vector2i(-10600, -12000)
+		unfocusable = true
+	hero_focus = hero_primary and not companion_mode
 	size = preferred_window_size
-	if preferred_window_position.x >= 0:
+	if preferred_window_position.x >= 0 or bool(game.get("diagnostic_offline")):
 		initial_position = Window.WINDOW_INITIAL_POSITION_ABSOLUTE
 		position = preferred_window_position
-	focus_point = builder.center + Vector3(19, 0, -39)
+	current_zone = str(game.adventure.zone)
+	if current_zone != builder.ZONE:
+		selected = "patrol"
+		palette = "encounters"
+		zoom = 40.0
+	var active_center: Vector3 = game.scene.zones.get(current_zone, {}).get("center", builder.center)
+	focus_point = builder.center + Vector3(19, 0, -39) if current_zone == builder.ZONE else active_center
 	tactical_viewport = SubViewport.new()
 	tactical_viewport.name = "BuilderSharedWorld"
 	tactical_viewport.size = Vector2i(832, 520)
@@ -136,9 +169,9 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	tactical_viewport.add_child(camera)
 	camera.current = true
 	_position_camera()
+	_remember_hero_hud()
 	_build_ui()
-	_hide_hero_hud_for_pip()
-	if hero_primary: _restore_hero_hud()
+	_sync_hero_hud()
 	_build_preview()
 	var illustrated: Node3D = preload("res://world_builder_targeting_art.gd").new()
 	set_target_visual(illustrated)
@@ -147,15 +180,17 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	_publish_targeting()
 	size_changed.connect(_layout_ui)
 	size_changed.connect(_schedule_layout_save)
+	focus_exited.connect(_release_pointer)
 	_layout_ui()
 	close_requested.connect(close)
 	visible = true
+	if bool(game.get("diagnostic_offline")): position = preferred_window_position
 	if not companion_mode and DisplayServer.get_name() != "headless":
 		hero_mouse_was_captured = game.desktop_look != null and game.desktop_look.captured
 		game.desktop_look.release_capture()
 		mode = Window.MODE_FULLSCREEN if preferred_fullscreen else Window.MODE_WINDOWED
 		_start_arrival()
-	grab_focus()
+	if not unfocusable: grab_focus()
 	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale, " mode=", mode, " companion=", companion_mode)
 
 func tick(delta: float) -> void:
@@ -170,6 +205,9 @@ func tick(delta: float) -> void:
 		error_label.modulate.a = clampf(remaining / 0.55, 0.0, 1.0) if remaining < 0.55 else 1.0
 		error_label.visible = remaining > 0.0
 	_advance_arrival(delta)
+	if resolution_resize_pending and clock >= next_resolution_resize:
+		resolution_resize_pending = false
+		_sync_hero_resolution()
 	if returning_to_hero: return
 	if mode == Window.MODE_MINIMIZED:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -178,10 +216,9 @@ func tick(delta: float) -> void:
 		slow_vr_seconds = slow_vr_seconds + delta if frame_ms_ema > 13.8 else maxf(0.0, slow_vr_seconds - delta)
 		if slow_vr_seconds > 2.0:
 			protected_vr = true
-			render_scale = 0.5
 			refresh_limit = 20
 			_layout_ui()
-			_say("Builder view reduced to protect VR smoothness.")
+			_say("Builder redraw rate reduced to protect VR; resolution stays full.")
 	if refresh_limit > 0:
 		refresh_elapsed += delta
 		if refresh_elapsed >= 1.0 / float(refresh_limit):
@@ -191,7 +228,10 @@ func tick(delta: float) -> void:
 	else:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var axis := Vector3.ZERO
-	if has_focus() and not hero_primary and not (game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(self)):
+	if current_zone != str(game.adventure.zone): _change_region(str(game.adventure.zone))
+	if view_chrome != null:
+		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale)
+	if has_focus() and not hero_focus and not (game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(self)):
 		if Input.is_key_pressed(KEY_W): axis.z -= 1
 		if Input.is_key_pressed(KEY_S): axis.z += 1
 		if Input.is_key_pressed(KEY_A): axis.x -= 1
@@ -201,8 +241,9 @@ func tick(delta: float) -> void:
 		var forward := Vector3(-sin(yaw), 0, -cos(yaw))
 		var right := Vector3(cos(yaw), 0, -sin(yaw))
 		focus_point += (right * axis.x - forward * axis.z).normalized() * delta * zoom * 0.42
-		focus_point.x = clampf(focus_point.x, builder.center.x - 132, builder.center.x + 132)
-		focus_point.z = clampf(focus_point.z, builder.center.z - 132, builder.center.z + 132)
+		var bounds: Rect2 = game.scene.zones.get(current_zone, {}).get("bounds", Rect2(Vector2(builder.center.x-132,builder.center.z-132),Vector2(264,264)))
+		focus_point.x = clampf(focus_point.x,bounds.position.x,bounds.end.x)
+		focus_point.z = clampf(focus_point.z,bounds.position.y,bounds.end.y)
 		_position_camera()
 	elif follow_hero and is_instance_valid(game.camera):
 		var hero_at: Vector3 = game.camera.global_position
@@ -234,13 +275,13 @@ func _finish_close() -> void:
 		" rts_fps_target=", refresh_limit, " vr_backoff=", protected_vr)
 	_save_layout()
 	_restore_hero_hud()
-	game.get_viewport().scaling_3d_scale = hero_3d_scale_before
+	_restore_hero_resolution()
 	if is_instance_valid(marker): marker.queue_free()
 	if is_instance_valid(route_preview): route_preview.queue_free()
 	if is_instance_valid(preview_boundary): preview_boundary.queue_free()
 	if is_instance_valid(target_visual): target_visual.queue_free()
 	visible = false
-	if not companion_mode:
+	if not companion_mode and not bool(game.get("diagnostic_offline")):
 		game.get_window().grab_focus()
 		if hero_mouse_was_captured and game.desktop_look != null:
 			game.desktop_look.call_deferred("capture")
@@ -307,7 +348,7 @@ func _build_ui() -> void:
 	quality_button.position = Vector2(760,8)
 	quality_button.size = Vector2(170,31)
 	for text in ["World detail 100%", "World detail 65%", "World detail 50%"]: quality_button.add_item(text)
-	quality_button.select(1)
+	quality_button.select(0)
 	quality_button.tooltip_text = "Render the same live world at a smaller resolution to save GPU time. Text and icons stay crisp."
 	quality_button.item_selected.connect(_quality)
 	top_panel.add_child(quality_button)
@@ -344,6 +385,15 @@ func _build_ui() -> void:
 		else: _focus_hero())
 	hero_pip.swap_requested.connect(swap_primary)
 	hero_pip.layout_changed.connect(_pip_changed)
+	# The secondary picture belongs behind its pane controls, regardless of primary camera.
+	overlay.move_child(hero_pip, 0)
+	view_chrome = ViewChrome.new()
+	view_chrome.name = "DualViewChrome"
+	view_chrome.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	overlay.add_child(view_chrome)
+	view_chrome.setup()
+	view_chrome.command.connect(_view_command)
+	view_chrome.ratio_dragged.connect(_drag_split_ratio)
 	_apply_primary_textures()
 	error_label = _label(overlay, "", Vector2.ZERO, Vector2(660, 70), 25, Color("ff696d"))
 	error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -366,6 +416,12 @@ func _load_layout() -> void:
 	preferred_pip_position = Vector2(settings.get_value("layout", "pip_position", Vector2(-1, -1)))
 	preferred_pip_size = Vector2(settings.get_value("layout", "pip_size", Vector2(410, 263)))
 	hero_primary = bool(settings.get_value("layout", "hero_primary", false))
+	layout_mode = str(settings.get_value("layout", "mode", "pip"))
+	if layout_mode not in ["pip","split"]: layout_mode = "pip"
+	split_left = str(settings.get_value("layout", "split_left", "fps"))
+	if split_left not in ["fps","rts"]: split_left = "fps"
+	var loaded_ratio: float = float(settings.get_value("layout", "split_ratio", 0.5))
+	split_ratio = clampf(loaded_ratio,0.25,0.75) if is_finite(loaded_ratio) else 0.5
 
 func _save_layout() -> void:
 	if bool(game.get("diagnostic_offline")): return
@@ -378,14 +434,16 @@ func _save_layout() -> void:
 	settings.set_value("window", "size", preferred_window_size)
 	settings.set_value("window", "position", preferred_window_position)
 	settings.set_value("layout", "hero_primary", hero_primary)
-	if hero_pip != null:
+	settings.set_value("layout", "mode", layout_mode)
+	settings.set_value("layout", "split_left", split_left)
+	settings.set_value("layout", "split_ratio", split_ratio)
+	if hero_pip != null and layout_mode == "pip":
 		settings.set_value("layout", "pip_position", hero_pip.position)
 		settings.set_value("layout", "pip_size", hero_pip.size)
 	var error := settings.save(LAYOUT_FILE)
 	if error != OK: push_warning("WORLD_BUILDER_VIEW layout save failed: %d" % error)
 
 func _schedule_layout_save() -> void:
-	_sync_hero_resolution()
 	if mode == Window.MODE_WINDOWED:
 		preferred_window_size = size.max(WINDOWED_MIN_SIZE)
 		preferred_window_position = position
@@ -393,70 +451,156 @@ func _schedule_layout_save() -> void:
 
 func _pip_changed() -> void:
 	pip_layout_touched = true
+	preferred_pip_position = hero_pip.position
+	preferred_pip_size = hero_pip.size
+	_layout_ui()
 	_schedule_layout_save()
 
 func _apply_primary_textures() -> void:
 	if world_picture == null or hero_pip == null: return
-	if is_instance_valid(command_panel): command_panel.visible = not hero_primary
-	# The root texture already contains the FPS HUD. Keep its top rows clear.
-	if is_instance_valid(top_panel): top_panel.visible = not hero_primary
+	if is_instance_valid(command_panel): command_panel.visible = layout_mode == "split" or not hero_primary or not hero_focus
+	if is_instance_valid(top_panel): top_panel.visible = layout_mode == "split" or not hero_primary
 	world_picture.texture = game.get_viewport().get_texture() if hero_primary else tactical_viewport.get_texture()
 	hero_pip.picture.texture = tactical_viewport.get_texture() if hero_primary else game.get_viewport().get_texture()
 	hero_pip.caption = "RTS · LIVE VIEW" if hero_primary else "HERO · LIVE VIEW"
 	hero_pip.return_button.text = "Focus RTS" if hero_primary else "Focus Hero"
 	hero_pip.queue_redraw()
-	hero_pip.keep_inside(Vector2(size))
-	_sync_hero_resolution()
+	_layout_ui()
 
 func _sync_hero_resolution() -> void:
-	if companion_mode or hero_pip == null: return
-	if hero_primary:
-		game.get_viewport().scaling_3d_scale = hero_3d_scale_before
+	if hero_pip == null or pane_layout.is_empty(): return
+	var tactical_size := Vector2i(pane_layout.rts.size * render_scale).max(Vector2i(64,64))
+	if tactical_viewport.size != tactical_size: tactical_viewport.size = tactical_size
+	next_resolution_resize = clock + 0.05
+	if companion_mode: return
+	var hero_window := game.get_window()
+	var wanted := DualLayout.viewport_size(hero_input_rect())
+	if hero_window.content_scale_size != wanted:
+		hero_window.content_scale_size = wanted
+		hero_window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+		hero_window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_IGNORE
+		hero_window.content_scale_factor = 1.0
+		hero_render_override = true
+	game.get_viewport().scaling_3d_scale = 1.0
+	_sync_hero_hud()
+
+func _restore_hero_resolution() -> void:
+	if not is_instance_valid(game): return
+	game.get_viewport().scaling_3d_scale = hero_3d_scale_before
+	if hero_render_override:
+		var hero_window := game.get_window()
+		hero_window.content_scale_size = hero_content_before
+		hero_window.content_scale_mode = hero_content_mode_before
+		hero_window.content_scale_aspect = hero_content_aspect_before
+		hero_window.content_scale_factor = hero_content_factor_before
+		hero_render_override = false
+
+func hero_input_rect() -> Rect2:
+	return pane_layout.get("fps", Rect2(Vector2.ZERO,Vector2(size)))
+
+func hero_has_input() -> bool:
+	return hero_focus and visible and has_focus() and not companion_mode
+
+func _pointer_captured() -> bool:
+	return game != null and game.desktop_look != null and game.desktop_look.captured
+
+func _release_pointer() -> void:
+	if game != null and game.desktop_look != null: game.desktop_look.release_capture()
+	hero_mouse_down = false
+	dragging = false
+
+func _set_focus(hero: bool, capture_mouse := true) -> void:
+	hero_focus = hero and not companion_mode
+	hero_mouse_down = false
+	dragging = false
+	if hero_focus and capture_mouse: hero_focus_requested.emit()
+	else: _release_pointer()
+	if is_instance_valid(command_panel): command_panel.visible = layout_mode == "split" or not hero_primary or not hero_focus
+	_layout_ui()
+	if not unfocusable: grab_focus()
+	_schedule_layout_save()
+
+func toggle_input_focus() -> void:
+	_set_focus(not hero_focus)
+	_say("Hero controls · Esc frees the mouse · Tab returns to RTS." if hero_focus else "RTS controls · Tab returns to the Hero.")
+
+func _view_command(action: String) -> void:
+	if action == "focus": toggle_input_focus(); return
+	if action == "fullscreen": _toggle_fullscreen(); return
+	if action.begins_with("ratio:"):
+		split_ratio = float(action.trim_prefix("ratio:"))/100.0
+		layout_mode = "split"
+	elif action in ["pip","split"]:
+		layout_mode = action
+		if action == "pip":
+			hero_pip.position = preferred_pip_position
+			hero_pip.size = preferred_pip_size
+	elif action == "flip":
+		if layout_mode == "split":
+			split_left = "rts" if split_left == "fps" else "fps"
+			split_ratio = 1.0 - split_ratio
+		else: swap_primary(); return
+	_apply_primary_textures()
+	_schedule_layout_save()
+
+func _drag_split_ratio(value: float) -> void:
+	split_ratio = DualLayout.snap_ratio(DualLayout.clamp_ratio(value,Vector2(size),ui_scale),Input.is_physical_key_pressed(KEY_ALT))
+	_layout_ui()
+	_schedule_layout_save()
+
+func _toggle_fullscreen() -> void:
+	if mode in [Window.MODE_FULLSCREEN,Window.MODE_EXCLUSIVE_FULLSCREEN]:
+		mode = Window.MODE_WINDOWED
+		size = preferred_window_size
+		preferred_fullscreen = false
 	else:
-		var hero_size := Vector2(game.get_viewport().size)
-		var inset_size: Vector2 = hero_pip.content_rect_screen().size
-		var needed := maxf(inset_size.x / maxf(hero_size.x, 1.0), inset_size.y / maxf(hero_size.y, 1.0))
-		game.get_viewport().scaling_3d_scale = minf(hero_3d_scale_before, clampf(needed * 1.25, 0.5, 1.0))
+		preferred_window_size = size
+		preferred_window_position = position
+		mode = Window.MODE_FULLSCREEN
+		preferred_fullscreen = true
+	_schedule_layout_save()
 
 func swap_primary() -> void:
 	hero_primary = not hero_primary
-	if hero_primary: _restore_hero_hud()
-	else: _hide_hero_hud_for_pip()
+	_restore_hero_hud()
 	_apply_primary_textures()
-	if hero_primary: hero_focus_requested.emit()
-	elif game.desktop_look != null: game.desktop_look.release_capture()
+	_set_focus(hero_primary)
 	hero_mouse_down = false
 	_schedule_layout_save()
 	_say("Hero fills the view; RTS stays in the inset." if hero_primary else "RTS fills the view; Hero stays in the inset.")
 
 func _focus_hero() -> void:
-	if not hero_primary: swap_primary()
-	grab_focus()
-	_say("Hero has the large live view. Esc frees the cursor; F9 returns to RTS.")
+	if not hero_primary and layout_mode == "pip": swap_primary()
+	_set_focus(true)
+	_say("Hero controls. Esc frees the cursor; Tab switches to RTS.")
 
 func focus_survey() -> void:
 	if not visible: visible = true
-	if hero_primary: swap_primary()
+	if hero_primary and layout_mode == "pip": swap_primary()
 	if preferred_fullscreen and not companion_mode: mode = Window.MODE_FULLSCREEN
-	if game.desktop_look != null: game.desktop_look.release_capture()
-	grab_focus()
+	_set_focus(false,false)
 
 func set_target_visual(visual: Node3D) -> void:
 	## Optional art module: update_targeting(targeting_state) runs on hover changes.
 	if is_instance_valid(target_visual): target_visual.queue_free()
 	target_visual = visual
-	if visual != null: game.adventure.zone_groups[builder.ZONE].add_child(visual)
+	if visual != null: game.adventure.zone_groups[current_zone].add_child(visual)
 	last_target_state = {}
 	_publish_targeting()
 
-func _hide_hero_hud_for_pip() -> void:
+func _remember_hero_hud() -> void:
 	var node: Node = game.get("hud")
 	if not is_instance_valid(node): return
 	while node != null and not node is CanvasLayer: node = node.get_parent()
 	if node is CanvasLayer:
 		hero_hud_layer = node
 		hero_hud_was_visible = hero_hud_layer.visible
-		hero_hud_layer.visible = false
+
+func _sync_hero_hud() -> void:
+	# The original HUD remains inside the FPS camera texture. Hide it only in
+	# a tiny spectator inset that cannot fit the normal controls block.
+	if is_instance_valid(hero_hud_layer):
+		hero_hud_layer.visible = hero_hud_was_visible and hero_input_rect().size.x >= 600.0
 
 func _restore_hero_hud() -> void:
 	if is_instance_valid(hero_hud_layer): hero_hud_layer.visible = hero_hud_was_visible
@@ -489,23 +633,64 @@ func _layout_ui() -> void:
 	if top_panel == null: return
 	ui_scale = clampf(minf(float(size.x) / 1440.0, float(size.y) / 900.0), 1.0, 2.0)
 	overlay.scale = Vector2.ONE
-	top_panel.scale = Vector2.ONE * ui_scale
-	var width := float(size.x) / ui_scale
-	top_panel.size.x = width
-	tactical_viewport.size = Vector2i(maxi(1, roundi(float(size.x) * render_scale)), maxi(1, roundi(float(size.y) * render_scale)))
-	quality_button.position = Vector2(width - 350, 8)
-	fps_button.position = Vector2(width - 175, 8)
-	follow_button.position = Vector2(width - 526, 8)
-	title_label.size.x = maxf(160.0, width - 558)
-	status_label.size.x = width - 36
-	command_panel.layout_for_size(Vector2(size))
-	if hero_pip != null:
+	var bar_height := 34.0 * ui_scale
+	var content_size := Vector2(size.x,size.y-bar_height)
+	var settings := {"mode":layout_mode,"split_left":split_left,"split_ratio":split_ratio,"ui_scale_override":ui_scale}
+	if layout_mode == "split":
+		pane_layout = DualLayout.layout_rects(content_size,settings)
+		for key in ["fps","rts","divider","divider_hit"]: pane_layout[key].position.y += bar_height
+		hero_pip.split_mode = true
+		var secondary: Rect2 = pane_layout.rts if hero_primary else pane_layout.fps
+		hero_pip.position = secondary.position
+		hero_pip.size = secondary.size
+		hero_pip._place_children()
+	else:
+		hero_pip.split_mode = false
 		if preferred_pip_position.x < 0.0 and not pip_layout_touched:
-			hero_pip.position = Vector2(size.x - hero_pip.size.x - 16.0, TOP_HEIGHT * ui_scale + 14.0)
+			hero_pip.position = Vector2(size.x-preferred_pip_size.x-16.0,bar_height+TOP_HEIGHT*ui_scale+14.0)
+		else: hero_pip.position = preferred_pip_position
+		hero_pip.size = preferred_pip_size
 		hero_pip.keep_inside(Vector2(size))
-		_sync_hero_resolution()
+		hero_pip.position.y = maxf(hero_pip.position.y,bar_height+4.0)
+		hero_pip._place_children()
+		var large := Rect2(Vector2(0,bar_height),content_size)
+		var small: Rect2 = hero_pip.content_rect_screen()
+		pane_layout = {"fps":large if hero_primary else small,"rts":small if hero_primary else large,"divider":Rect2(),"divider_hit":Rect2()}
+	world_picture.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	var primary_rect: Rect2 = pane_layout.fps if hero_primary else pane_layout.rts
+	world_picture.position = primary_rect.position
+	world_picture.size = primary_rect.size
+	_sync_hero_hud()
+	var rts_rect: Rect2 = pane_layout.rts
+	var panel_scale := clampf(rts_rect.size.x/1200.0,1.0,2.0)
+	top_panel.scale = Vector2.ONE * panel_scale
+	top_panel.position = rts_rect.position
+	top_panel.size = Vector2(rts_rect.size.x/panel_scale,TOP_HEIGHT)
+	top_panel.visible = rts_rect.size.y >= 350.0 and (layout_mode == "split" or not hero_primary or not hero_focus)
+	var width := top_panel.size.x
+	var wide := width >= 980.0
+	quality_button.visible = wide
+	fps_button.visible = wide
+	follow_button.visible = width >= 700.0
+	quality_button.position = Vector2(width-350,8)
+	fps_button.position = Vector2(width-175,8)
+	follow_button.position = Vector2(width-(526 if wide else 176),8)
+	title_label.size.x = maxf(160.0,width-(558 if wide else 196 if width >= 700.0 else 28))
+	status_label.size.x = width-36
+	command_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	command_panel.position = rts_rect.position
+	command_panel.size = rts_rect.size
+	command_panel.clip_contents = true
+	command_panel.layout_for_size(rts_rect.size)
+	if view_chrome != null:
+		view_chrome.size = Vector2(size)
+		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale)
+	if clock >= next_resolution_resize: _sync_hero_resolution()
+	else: resolution_resize_pending = true
 	if error_label != null:
-		error_label.position = Vector2((size.x - error_label.size.x) * 0.5, maxf(TOP_HEIGHT + 80.0, size.y * 0.38))
+		error_label.size.x = minf(660.0,rts_rect.size.x-20.0)
+		error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		error_label.position = rts_rect.position+Vector2((rts_rect.size.x-error_label.size.x)*0.5,maxf(75.0,rts_rect.size.y*0.30))
 
 func _spell(action: String) -> Dictionary:
 	for entry in catalogue:
@@ -517,7 +702,8 @@ func _availability(action: String) -> String:
 
 func _refresh_ui() -> void:
 	if status_label == null: return
-	status_label.text = "Seed %d · %d earth edits · %d gems · %d star iron · %.1f ms/frame   |   WASD pan · right/middle-drag orbit · wheel zoom · F11 fullscreen · F9 Hero" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.star_gems), int(builder.data.star_iron), frame_ms_ema]
+	title_label.text = str(game.scene.zones.get(current_zone,{}).get("name","Shared World")).to_upper()+" · RTS"
+	status_label.text = "%d gems · %d star iron · Tab focus · M map" % [int(builder.data.star_gems),int(builder.data.star_iron)] if top_panel.size.x < 980.0 else "Seed %d · %d earth edits · %d gems · %d star iron · %.1f ms/frame   |   WASD pan · drag orbit · wheel zoom · Tab focus" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.star_gems), int(builder.data.star_iron), frame_ms_ema]
 	follow_button.text = "F  Following Hero" if follow_hero else "F  Find Hero"
 	var availability := {}
 	var cooldowns := {}
@@ -623,21 +809,21 @@ func _build_preview() -> void:
 	preview_invalid = _preview_material(Color("ed8065"))
 	marker.material_override = preview_valid
 	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[builder.ZONE].add_child(marker)
+	game.adventure.zone_groups[current_zone].add_child(marker)
 	marker.visible = false
 	route_preview = MeshInstance3D.new()
 	route_preview.name = "SurveyRoutePreview"
 	route_preview.mesh = BoxMesh.new()
 	route_preview.material_override = preview_valid
 	route_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[builder.ZONE].add_child(route_preview)
+	game.adventure.zone_groups[current_zone].add_child(route_preview)
 	route_preview.visible = false
 	preview_boundary = MeshInstance3D.new()
 	preview_boundary.name = "SurveyFootprint"
 	preview_boundary.mesh = ImmediateMesh.new()
 	preview_boundary.material_override = preview_valid
 	preview_boundary.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[builder.ZONE].add_child(preview_boundary)
+	game.adventure.zone_groups[current_zone].add_child(preview_boundary)
 	preview_boundary.visible = false
 
 func _preview_material(color: Color) -> StandardMaterial3D:
@@ -654,16 +840,17 @@ func _line_start() -> Vector3:
 
 func _preview_plan() -> Dictionary:
 	if selected == "": return {}
-	return Targeting.plan(selected, _line_start(), hovered, builder, game, _availability(selected))
+	return Targeting.plan(selected, _line_start(), hovered, builder, game, _availability(selected), current_zone)
 
 func targeting_state() -> Dictionary:
 	## Read-only contract for the illustrated target layer and command panel.
 	var state := _preview_plan()
 	state["first_point"] = _line_start()
 	state["hovered"] = hovered
-	state["hovered_world"] = builder.center + hovered if hovered != Vector3.INF else Vector3.INF
-	state["world_origin"] = builder.center
-	state["first_world"] = builder.center + _line_start() if _line_start() != Vector3.INF else Vector3.INF
+	state["zone"] = current_zone
+	state["hovered_world"] = _region_origin() + hovered if hovered != Vector3.INF else Vector3.INF
+	state["world_origin"] = _region_origin()
+	state["first_world"] = _region_origin() + _line_start() if _line_start() != Vector3.INF else Vector3.INF
 	state["footprint"] = Targeting.spec(selected)
 	state["selected"] = selected
 	state["terrain_revision"] = game.landscape.world_revision
@@ -678,7 +865,14 @@ func _publish_targeting() -> void:
 		target_visual.call("update_targeting", state)
 
 func _ground_preview(local: Vector3) -> Vector3:
-	return builder.center + Vector3(local.x, game.landscape.height_at(Vector2(local.x,local.z)) + 0.18,local.z)
+	if current_zone == builder.ZONE:
+		return builder.center + Vector3(local.x, game.landscape.height_at(Vector2(local.x,local.z)) + 0.18,local.z)
+	var world_point := _region_origin() + local
+	var query := PhysicsRayQueryParameters3D.create(world_point + Vector3.UP * 3.0, world_point - Vector3.UP * 3.0, 1)
+	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty() and hit.normal.y > 0.4:
+		return hit.position + Vector3.UP * 0.18
+	return world_point + Vector3.UP * 0.18
 
 func _boundary_line(mesh: ImmediateMesh, a: Vector3, b: Vector3) -> void:
 	mesh.surface_add_vertex(a)
@@ -782,24 +976,20 @@ func _update_preview() -> void:
 	mesh.surface_end()
 
 func _world_at(screen: Vector2) -> Vector3:
-	var scaled := Vector2.ZERO
-	if hero_primary:
-		if hero_pip == null: return Vector3.INF
-		var content: Rect2 = hero_pip.content_rect_screen()
-		if not content.has_point(screen): return Vector3.INF
-		scaled = (screen - content.position) * Vector2(tactical_viewport.size) / content.size
-	else:
-		if screen.y < TOP_HEIGHT * ui_scale or command_panel.is_over_panel(screen): return Vector3.INF
-		if hero_pip != null and hero_pip.contains_screen_point(screen): return Vector3.INF
-		scaled = screen * Vector2(tactical_viewport.size) / Vector2(size)
+	var content: Rect2 = pane_layout.get("rts",Rect2(Vector2.ZERO,Vector2(size)))
+	if not content.has_point(screen) or _ui_point(screen): return Vector3.INF
+	if layout_mode == "pip" and not hero_primary and hero_pip.contains_screen_point(screen): return Vector3.INF
+	var scaled: Vector2 = (screen-content.position)*Vector2(tactical_viewport.size)/content.size
 	var origin := camera.project_ray_origin(scaled)
 	var direction := camera.project_ray_normal(scaled)
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 700.0, 2)
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 700.0, 1)
 	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty(): return Vector3.INF
-	var point: Vector3 = hit.position - builder.center
-	point.y = game.landscape.height_at(Vector2(point.x, point.z))
-	return point if builder._inside(point) else Vector3.INF
+	if hit.normal.y < 0.4: return Vector3.INF
+	var origin_center := _region_origin()
+	var point: Vector3 = hit.position-origin_center
+	var bounds: Rect2 = game.scene.zones.get(current_zone,{}).get("bounds",Rect2())
+	return point if bounds.has_point(Vector2(hit.position.x,hit.position.z)) else Vector3.INF
 
 func _act(local: Vector3) -> void:
 	if selected == "": return
@@ -814,19 +1004,20 @@ func _act(local: Vector3) -> void:
 		result = _cast_line(first_point,local)
 		if result == "": first_point = Vector3.INF
 	else:
-		match selected:
-			"harvest": result = builder.mark_harvest(local)
-			"hire": result = builder.hire_worker()
-			"grove": result = builder.plant_grove(local)
-			"patrol": result = builder.summon_patrol(local)
-			"raise": result = builder.cast_raise(local)
-			"ring": result = builder.cast_tree_ring(local)
-			"meteor": result = builder.cast_meteor(local)
-			"awaken": result = builder.cast_awaken(local)
-			"calm": result = builder.calm_ent(local)
-			"seed": result = builder.ents.plant_seed(local)
-			"golem": result = builder.assemble_golem(local)
-			_: result = "This construction is not available yet."
+		if selected in ["patrol","duelist","shield_patrol","rat_swarm","ghosts","golem"]:
+			result = builder.summon_encounter(selected,_region_origin()+local,current_zone)
+		else:
+			match selected:
+				"harvest": result = builder.mark_harvest(local)
+				"hire": result = builder.hire_worker()
+				"grove": result = builder.plant_grove(local)
+				"raise": result = builder.cast_raise(local)
+				"ring": result = builder.cast_tree_ring(local)
+				"meteor": result = builder.cast_meteor(local)
+				"awaken": result = builder.cast_awaken(local)
+				"calm": result = builder.calm_ent(local)
+				"seed": result = builder.ents.plant_seed(local)
+				_: result = "This construction is not available yet."
 	if result != "": show_error(result)
 	else: _say(builder.progress_message)
 	# Keep selection after successful casts, including unsuccessful placement attempts.
@@ -844,9 +1035,30 @@ func _cast_line(a: Vector3,b: Vector3) -> String:
 
 func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
+	_route_input(event)
+
+func _route_input(event: InputEvent) -> void:
+	# Separate native focus gating from save-free, unfocusable UI verification.
+	if event is InputEventKey and event.pressed and not event.echo:
+		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		if code == KEY_ESCAPE and _pointer_captured():
+			_release_pointer(); set_input_as_handled(); return
+		if code == KEY_TAB:
+			toggle_input_focus(); set_input_as_handled(); return
+		if code == KEY_F9 and event.shift_pressed:
+			_view_command("split" if layout_mode == "pip" else "pip"); set_input_as_handled(); return
+		if code == KEY_F9:
+			if companion_mode: close()
+			elif layout_mode == "split": toggle_input_focus()
+			else: _focus_hero() if not hero_primary else focus_survey()
+			set_input_as_handled(); return
+		if code == KEY_F11:
+			_toggle_fullscreen(); set_input_as_handled(); return
+	if event is InputEventMouse and hero_has_input() and _pointer_captured():
+		hero_input_requested.emit(event)
+		set_input_as_handled(); return
 	if game.get("travel_navigation")!=null and game.travel_navigation.input_event(event,self): return
-	var header_height: float = 0.0 if hero_primary else TOP_HEIGHT * ui_scale
-	if hero_primary and event is InputEventKey:
+	if hero_focus and event is InputEventKey:
 		var hero_key := event as InputEventKey
 		if not (hero_key.pressed and not hero_key.echo and hero_key.keycode in [KEY_F9, KEY_F11]):
 			hero_input_requested.emit(event)
@@ -857,32 +1069,19 @@ func _input(event: InputEvent) -> void:
 			set_input_as_handled()
 			return
 		if event.keycode == KEY_F: _toggle_follow()
-		elif event.keycode == KEY_F9:
-			if companion_mode: close()
-			elif hero_primary: focus_survey()
-			else: _focus_hero()
-		elif event.keycode == KEY_F11:
-			if mode == Window.MODE_FULLSCREEN or mode == Window.MODE_EXCLUSIVE_FULLSCREEN:
-				mode = Window.MODE_WINDOWED
-				size = preferred_window_size
-				preferred_fullscreen = false
-			else:
-				preferred_window_size = size
-				preferred_window_position = position
-				mode = Window.MODE_FULLSCREEN
-				preferred_fullscreen = true
-			_schedule_layout_save()
 		else: return
 		set_input_as_handled()
 	elif event is InputEventMouseButton:
-		var in_hero: bool = hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= header_height
-		if in_hero or (hero_primary and hero_mouse_down and not event.pressed):
+		if _ui_point(event.position): return
+		var in_hero: bool = _hero_point(event.position)
+		if in_hero or (hero_mouse_down and not event.pressed):
+			if event.pressed and event.button_index in [MOUSE_BUTTON_LEFT,MOUSE_BUTTON_RIGHT,MOUSE_BUTTON_MIDDLE] and not hero_focus: _set_focus(true,false)
 			if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]: hero_mouse_down = event.pressed
 			hero_input_requested.emit(event)
 			set_input_as_handled()
 			return
-		var in_rts_pip: bool = hero_primary and hero_pip.content_rect_screen().has_point(event.position)
-		if not in_rts_pip and (command_panel.is_over_panel(event.position) or event.position.y < header_height): return
+		if not (pane_layout.get("rts",Rect2()) as Rect2).has_point(event.position): return
+		if event.pressed and hero_focus: _set_focus(false,false)
 		if event.button_index in [MOUSE_BUTTON_RIGHT,MOUSE_BUTTON_MIDDLE]:
 			if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed: _cancel_targeting()
 			dragging = event.pressed
@@ -912,8 +1111,9 @@ func _input(event: InputEvent) -> void:
 			_position_camera()
 			set_input_as_handled()
 	elif event is InputEventMouseMotion:
-		if hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= header_height and not dragging:
+		if _hero_point(event.position) and hero_focus and not dragging:
 			hero_input_requested.emit(event)
+			set_input_as_handled()
 			return
 		hovered = _world_at(event.position)
 		if dragging:
@@ -924,3 +1124,33 @@ func _input(event: InputEvent) -> void:
 			pitch = clampf(pitch + movement.y * 0.004,0.42,1.36)
 			_position_camera()
 			set_input_as_handled()
+
+func _ui_point(point: Vector2) -> bool:
+	if point.y < 34.0*ui_scale: return true
+	if layout_mode == "split" and (pane_layout.get("divider_hit",Rect2()) as Rect2).has_point(point): return true
+	if is_instance_valid(top_panel) and top_panel.visible and top_panel.get_global_rect().has_point(point): return true
+	if is_instance_valid(command_panel) and command_panel.visible and command_panel.is_over_panel(point): return true
+	if layout_mode == "pip" and hero_pip.contains_screen_point(point) and not hero_pip.content_rect_screen().has_point(point): return true
+	return false
+
+func _hero_point(point: Vector2) -> bool:
+	if not hero_input_rect().has_point(point) or _ui_point(point): return false
+	if layout_mode == "pip" and hero_primary and hero_pip.contains_screen_point(point): return false
+	return true
+
+func _region_origin() -> Vector3:
+	if game.get("scene") is Dictionary: return game.scene.zones.get(current_zone,{}).get("center",builder.center)
+	return builder.center
+
+func _change_region(zone: String) -> void:
+	current_zone = zone
+	focus_point = _region_origin()
+	first_point = Vector3.INF; spell_drag_start = Vector3.INF; hovered = Vector3.INF
+	if zone != builder.ZONE:
+		zoom = 40.0
+		_select_palette("encounters")
+	for visual in [marker,route_preview,preview_boundary,target_visual]:
+		if is_instance_valid(visual) and game.adventure.zone_groups.has(zone): visual.reparent(game.adventure.zone_groups[zone])
+	last_target_state = {}
+	_position_camera()
+	_publish_targeting()
