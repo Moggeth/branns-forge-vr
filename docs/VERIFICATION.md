@@ -1840,8 +1840,13 @@ type inference error on `completed` while its process still exited zero;
 declare the boolean type and require both an empty named result array and no
 `SCRIPT ERROR` text, rather than trusting exit status alone. Two integrated
 `--skeleton-combat-check` runs each failed only on `detached knee did not react
-to motion` (7.680 s and 7.709 s). That assertion is in the detached-leg joint
-fixture: `_tick_leg_joints` can skip sleeping/invisible bodies after the fixture
-sets angular velocity, a possible cause that needs inspection. The hard-contact
-edit does not touch those files; this regression remains for the skeleton owner
-to resolve.
+to motion` (7.680 s and 7.709 s). Instrumentation identified the fixture cause:
+it spawned the actor in hidden `forge_yard` while the active test zone was
+`orchard_highlands`; the detached leg had `visible=true`, `sleeping=false`, but
+`is_visible_in_tree()=false`, so `_tick_leg_joints` correctly skipped it. The
+fixture now spawns in the active zone and uses the real grab/release wake path.
+It checks both knee and ankle motion, the foot-aligned melee tip and foot
+collider, while retaining living-skeleton planted-feet checks. The final
+integrated result is `SKELETON_COMBAT_RESULT []` in 7.971 s. When a physics
+fixture reports inert joints, inspect ancestor visibility and body wake state
+before changing the joint solver.

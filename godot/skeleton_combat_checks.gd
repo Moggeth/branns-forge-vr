@@ -5,7 +5,8 @@ static func run(game) -> void:
 	game.set_process(false)
 	var failures := []
 	var data := {"enemies": []}
-	preload("res://world_zones.gd").enemy(game, data, "forge_yard", Vector3(25, 0, 25), "skeleton")
+	# Detached remains must be in the visible zone for their joint update.
+	preload("res://world_zones.gd").enemy(game, data, str(game.adventure.zone), Vector3(25, 0, 25), "skeleton")
 	var actor: Node3D = data.enemies[0]
 	actor.set_meta("hp", 200.0)
 	actor.set_meta("max_hp", 200.0)
@@ -53,9 +54,24 @@ static func run(game) -> void:
 		if not leg.get_meta("articulated_leg", false) or leg.get_node_or_null("SpringKnee") == null or leg.get_node_or_null("SpringKnee/SpringAnkle") == null:
 			failures.append("detached leg lacks springy knee and ankle")
 		else:
-			leg.angular_velocity = Vector3(5, 0, 0)
+			if not leg.is_visible_in_tree(): failures.append("detached leg spawned in a hidden zone")
+			game.remains.grab(leg)
+			game.remains.release(leg, Vector3.ZERO, Vector3(5, 0, 0))
+			if leg.freeze or leg.sleeping or leg.angular_velocity.x < 4.9:
+				failures.append("released leg did not wake with angular motion")
 			game.remains._tick_leg_joints(0.016)
-			if absf(leg.get_node("SpringKnee").rotation.x) < 0.0001: failures.append("detached knee did not react to motion")
+			var knee: Node3D = leg.get_node("SpringKnee")
+			var ankle: Node3D = leg.get_node("SpringKnee/SpringAnkle")
+			if absf(knee.rotation.x) < 0.0001: failures.append("detached knee did not react to motion")
+			if absf(ankle.rotation.x + knee.rotation.x * 0.7) > 0.0001 or absf(ankle.rotation.x) < 0.0001:
+				failures.append("detached ankle did not follow the springy knee")
+			var foot: Node3D = leg.get_node("SpringKnee/SpringAnkle/ArticulatedFoot")
+			var foot_collider: CollisionShape3D = leg.get_node("ArticulatedFootCollider")
+			if leg.to_global(leg.get_meta("tip", Vector3.ZERO)).distance_to(foot.global_position) > 0.0001:
+				failures.append("detached leg melee tip did not follow its foot")
+			var foot_pose: Transform3D = leg.global_transform.affine_inverse() * foot.global_transform
+			if not foot_collider.transform.is_equal_approx(foot_pose):
+				failures.append("detached foot collider did not follow its joint")
 		var collider: CollisionShape3D = null
 		for child in leg.get_children():
 			if child is CollisionShape3D: collider = child
