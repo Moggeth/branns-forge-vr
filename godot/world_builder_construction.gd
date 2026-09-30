@@ -46,7 +46,7 @@ func preview(kind: String, a: Vector3, b: Vector3) -> Dictionary:
 		var at := aa.lerp(bb, t)
 		var terrain: float = landscape.height_at(at)
 		if landscape.water_at(at) > 0.45: wet += 1
-		if terrain > lerpf(ay, by, t) + 0.5: return _reject(result, "High ground cuts through the proposed deck.")
+		if terrain > lerpf(ay, by, t) + 0.15: return _reject(result, "High ground cuts through the proposed deck.")
 		if lerpf(ay, by, t) - terrain > 4.5: unsupported += 1
 	if unsupported > 0: return _reject(result, "The deck needs support taller than 4.5 m.")
 	if kind == "bridge":
