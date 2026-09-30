@@ -1737,3 +1737,36 @@ gameplay files are `adventure_runtime.gd` and `tuning_runtime.gd`, and quest
 configuration is `service/quests-config.json`, not a generic `config/` folder.
 Use `rg -g '*.gd' godot` rather than a positional wildcard in PowerShell.
 Each failed guessed path loses time without providing useful evidence.
+
+## VR held steadiness integration — 2026-09-30
+
+[Boundary, controls and native checks](VR-HELD-STEADINESS.md). Filter once at
+the calibrated grip in tracking space, before held mechanics. A plain local
+socket transform under XRController3D still inherits later raw parent updates;
+make the occupied socket top-level, preserve its ownership parent, and refresh
+only the rig-space transform after movement. Keep HMD/controllers, release
+history, climb deltas and fixed crank anchors raw. Two-handed positional
+anchors and movable Living Workshop offsets must use the same filtered socket.
+
+The first new integration fixture omitted required entity `color` values. The
+component validator correctly returned errors and no entities, then the fixture
+mistakenly dereferenced `prop` and left its SceneTree running. Stop that
+diagnostic alone, check `fixture.errors` before dereferencing, and install a
+bounded failure watchdog. The first yielded run took 10.013 s; interrupt took
+0.013 s. The corrected final run passes 32 checks in 6.821 s. The standalone
+filter's first 144 Hz step-cap assertion also needed a disclosed 0.01-degree
+quaternion numerical tolerance; the cap itself stayed 0.8 degrees.
+
+The route review caught a light-bolt mass bug: `make_bolt()` did not define the
+metadata assumed by the weight classifier. Author `held_mass=0.08` at creation
+instead of checking a nonexistent tag. Existing tool `combat_mass` also provides
+an authored weight, so use it instead of inventing another inconsistent table.
+
+Final regressions: 80 filter checks (0.347 s); 31 grip checks (7.012 s);
+Siegebird (7.380 s); FPS (7.663 s); Living Workshop (6.913 s); 14 focused
+service/tuning tests; disposable service integration (59.745 s). CPU adapter
+benchmark is 6.39 microseconds per hand, not measured headset frame time.
+Actual HMD feel remains unverified. Root authoring/review wall-clock spans and
+individual process times are recorded separately in `logs/work-timing.csv`;
+spans include inspection, waits and corrections and must not be added to their
+overlapping process timings.
