@@ -512,6 +512,7 @@ func _refresh_ui() -> void:
 		var plan := _preview_plan()
 		preview_details = plan
 		if str(plan.get("reason", "")) != "": words = str(plan.reason)
+		elif selected == "meteor": words = "Starfall in %.2f s · 8 m damage zone · 10 m impact." % float(plan.get("delay", 1.25))
 		elif selected in ["bridge", "ramp", "stairs", "boardwalk"] and plan.has("length"):
 			words = "%.1f m %s · %d lumber. Choose two endpoints or drag." % [float(plan.length), selected, int(plan.lumber)]
 		elif selected == "path" and (first_point != Vector3.INF or spell_drag_start != Vector3.INF):
@@ -734,7 +735,7 @@ func _update_preview() -> void:
 					_preview_circle(mesh, hovered + Vector3(cos(TAU * i / 3.0), 0, sin(TAU * i / 3.0)) * 1.8, 0.48, 16)
 			"impact":
 				_preview_circle(mesh, hovered, float(spec.radius))
-				_preview_circle(mesh, hovered, 8.0)
+				_preview_circle(mesh, hovered, float(spec.damage_radius))
 				_preview_circle(mesh, hovered, 1.0, 20)
 			"circle":
 				_preview_circle(mesh, hovered, float(spec.radius))

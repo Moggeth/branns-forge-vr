@@ -13,7 +13,7 @@ const SPECS := {
 	"stairs": {"kind":"deck", "width":3.0, "minimum":3.0, "maximum":18.0},
 	"boardwalk": {"kind":"deck", "width":3.4, "minimum":3.0, "maximum":36.0},
 	"raise": {"kind":"circle", "radius":15.0, "height":3.6},
-	"meteor": {"kind":"impact", "radius":10.0, "delay":1.7},
+	"meteor": {"kind":"impact", "radius":10.0, "damage_radius":8.0, "delay":1.25},
 	"grove": {"kind":"trees", "radius":3.1, "count":3},
 	"ring": {"kind":"annulus", "inner":14.0, "outer":24.0},
 	"awaken": {"kind":"tree", "radius":5.0},
