@@ -1,6 +1,7 @@
 extends SceneTree
 ## Isolated construction/physics/navigation fixture; no player save or live game.
 const Construction = preload("res://world_builder_construction.gd")
+const Presentation = preload("res://world_builder_construction_presentation.gd")
 const Navigation = preload("res://landscape_navigation.gd")
 
 class FakeLandscape:
@@ -42,6 +43,9 @@ func _check() -> void:
 	var module := Construction.new()
 	game.add_child(module)
 	module.setup(builder)
+	for texture_path in [Presentation.TEX_PLANK, Presentation.TEX_DARK, Presentation.TEX_END, Presentation.TEX_BARK]:
+		if not ResourceLoader.exists(texture_path) or load(texture_path) is not Texture2D:
+			failures.append("authored timber texture unavailable in Godot: " + texture_path)
 	var a := Vector3(-5, 0, 0)
 	var b := Vector3(5, 0, 0)
 	var preview: Dictionary = module.preview("bridge", a, b)
@@ -57,6 +61,7 @@ func _check() -> void:
 	var result: String = module.place("bridge", a, b)
 	if not result.is_empty() or int(builder.data.wood) != 24 or builder.data.constructions.size() != 1 or int(builder.data.revision) != 1:
 		failures.append("valid bridge did not atomically debit and record: " + result)
+	_check_visual(builder.root, failures)
 	if not Construction.valid_records(builder.data.constructions): failures.append("placed record failed persistence validation")
 	var corrupt: Array = builder.data.constructions.duplicate(true)
 	corrupt[0].a[0] = INF
@@ -90,6 +95,7 @@ func _check() -> void:
 		if not plan.valid: failures.append(str(entry.kind) + " preview rejected: " + str(plan.reason)); continue
 		var construction_result: String = module.place(entry.kind, entry.a, entry.b)
 		if not construction_result.is_empty(): failures.append(str(entry.kind) + " placement rejected: " + construction_result)
+		else: _check_visual(builder.root, failures)
 	await physics_frame
 	for sample in [Vector2(0, 6), Vector2(0, -6), Vector2(0, 12)]:
 		var top: float = module.surface_height(sample, game.landscape.height_at(sample))
@@ -97,6 +103,10 @@ func _check() -> void:
 		var floor_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(floor_ray)
 		if floor_hit.is_empty() or str(floor_hit.collider.get_meta("kind", "")) != "floor" or absf(float(floor_hit.position.y) - top) > 0.1:
 			failures.append("constructed walkway height/collision disagree at " + str(sample))
+	var long_visual := Node3D.new()
+	game.add_child(long_visual)
+	Presentation.render({"kind": "boardwalk", "a": [-8.0, 0.2, 30.0], "b": [28.0, 0.2, 30.0], "width": 3.4}, long_visual, game.landscape)
+	_check_visual(long_visual, failures)
 	var model := _model()
 	var start := Vector2(-8, 0)
 	var goal := Vector2(8, 0)
@@ -108,6 +118,25 @@ func _check() -> void:
 	print("CONSTRUCTION_CHECK failures=", failures)
 	for failure in failures: push_error(failure)
 	quit(0 if failures.is_empty() else 1)
+
+func _check_visual(parent: Node3D, failures: Array[String]) -> void:
+	var visuals := parent.find_children("TimberVisual", "MeshInstance3D", true, false)
+	if visuals.is_empty(): failures.append("authored timber visual missing"); return
+	var mesh: ArrayMesh = visuals[-1].mesh
+	if mesh == null or mesh.get_surface_count() > 6: failures.append("construction exceeds six merged visual surfaces"); return
+	var triangles := 0
+	for surface in mesh.get_surface_count():
+		var arrays: Array = mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		triangles += vertices.size() / 3
+		for face in range(0, vertices.size(), 3):
+			var geometric := (vertices[face + 1] - vertices[face]).cross(vertices[face + 2] - vertices[face]).normalized()
+			if geometric.dot(normals[face]) < 0.9:
+				failures.append("timber face winding disagrees with its normal")
+				return
+	if triangles < 50 or triangles > 12000: failures.append("unexpected visual triangle budget: %d" % triangles)
+	print("CONSTRUCTION_VISUAL surfaces=", mesh.get_surface_count(), " triangles=", triangles)
 
 func _model() -> Dictionary:
 	var size := 25

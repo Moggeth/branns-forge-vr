@@ -1,6 +1,7 @@
 extends Node
 ## Bounded, local-space timber structures. The builder persists records and resources.
 const W = preload("res://world_zones.gd")
+const Presentation = preload("res://world_builder_construction_presentation.gd")
 const KINDS := ["bridge", "ramp", "stairs", "boardwalk"]
 const MAX_RECORDS := 32
 const WIDTH := {"bridge": 4.0, "ramp": 3.0, "stairs": 3.0, "boardwalk": 3.4}
@@ -198,6 +199,7 @@ func _render(record: Dictionary) -> void:
 	node.position = (a + b) * 0.5
 	node.rotation.y = atan2(horizontal.x, horizontal.y)
 	var width := float(record.width)
+	Presentation.render(record, node, builder.game.landscape)
 	if str(record.kind) == "stairs":
 		var steps := maxi(1, ceili(absf(b.y - a.y) / 0.18))
 		steps = maxi(steps, ceili(length / 0.48))
@@ -205,26 +207,19 @@ func _render(record: Dictionary) -> void:
 			var t := (float(i) + 0.5) / float(steps)
 			var y := lerpf(a.y, b.y, float(i + 1) / float(steps)) - node.position.y
 			var pos := Vector3(0, y - 0.09, (t - 0.5) * length)
-			W.box(node, pos, Vector3(width, 0.18, length / float(steps) + 0.02), "9b7048")
 			W.body(node, pos, Vector3(width, 0.18, length / float(steps) + 0.02), "floor")
 	else:
 		var pitch := -atan2(b.y - a.y, length)
 		var deck := Node3D.new()
 		node.add_child(deck)
 		deck.rotation.x = pitch
-		W.box(deck, Vector3(0, -0.11, 0), Vector3(width, 0.22, length + 0.10), "9b7048")
 		W.body(deck, Vector3(0, -0.11, 0), Vector3(width, 0.22, length + 0.10), "floor")
-	if str(record.kind) in ["bridge", "boardwalk"]:
+	if str(record.kind) in ["bridge", "boardwalk", "ramp"]:
 		for side in [-1.0, 1.0]:
 			var rail := Node3D.new()
 			node.add_child(rail)
 			rail.rotation.x = -atan2(b.y - a.y, length)
-			W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.82, 0), Vector3(0.17, 0.16, length), "745139")
 			W.body(rail, Vector3(side * (width * 0.5 - 0.10), 0.45, 0), Vector3(0.20, 0.90, length), "solid")
-			var post_count := maxi(2, ceili(length / 1.8))
-			for post in range(post_count + 1):
-				var along := (float(post) / float(post_count) - 0.5) * length
-				W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.42, along), Vector3(0.19, 0.84, 0.19), "63442e")
 	# Timbers bear on the actual terrain/streambed, not an arbitrary world plane.
 	var pier_count := maxi(1, ceili(length / 3.0))
 	for pier in range(pier_count + 1):
@@ -236,5 +231,4 @@ func _render(record: Dictionary) -> void:
 		for side in [-1.0, 1.0]:
 			var post_pos := Vector3(side * (width * 0.5 - 0.35), ground + height * 0.5 - node.position.y, (t - 0.5) * length)
 			var post_size := Vector3(0.24, height, 0.24)
-			W.box(node, post_pos, post_size, "63442e")
 			W.body(node, post_pos, post_size, "solid")
