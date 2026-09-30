@@ -12,6 +12,8 @@ var zone = "forge_yard"
 var selected = "bomb_glove"
 var hp = 100.0
 var dying = false
+var travelling = false
+var arrival_serial := 0
 var formation = {}
 var ready_bombs = {}
 var motion = {}
@@ -186,9 +188,15 @@ func keyboard(event):
 			return true
 		match event.physical_keycode:
 			KEY_F:
-				destination_index = (destination_index+1)%ZONES.size()
-				game._notice("Destination: "+ZONES[destination_index].replace("_"," ")+" · G to travel")
-			KEY_G: travel(ZONES[destination_index])
+				if game.get("travel_navigation")!=null: game.travel_navigation.cycle()
+				else:
+					destination_index = (destination_index+1)%ZONES.size()
+					game._notice("Destination: "+ZONES[destination_index].replace("_"," ")+" · G to travel")
+				return true
+			KEY_G:
+				if game.get("travel_navigation")!=null: game.travel_navigation.travel_selected()
+				else: travel(ZONES[destination_index])
+				return true
 			KEY_U: upgrade()
 	return false
 
@@ -612,7 +620,7 @@ func _enemies(delta):
 			enemy.set_meta("combat_phase","idle")
 			enemy.set_meta("attack_damage_done",true)
 			var quiet_type := str(enemy.get_meta("enemy_type", ""))
-			if zone!="forge_yard" and quiet_type in ["skeleton", "ent"] and distance>10:
+			if zone!="forge_yard" and quiet_type in ["skeleton", "ent"] and distance>10 and Vector2(enemy.global_position.x-home.x,enemy.global_position.z-home.z).length()<=IdleWander.HOME_RADIUS:
 				_idle_wander(enemy, delta, orchard_ground)
 				continue
 			if orchard_ground:
@@ -947,25 +955,48 @@ func upgrade():
 			return
 
 func travel(id:String):
+	if not game.scene.get("zones",{}).has(id): return
+	arrival_serial += 1
+	var ticket := arrival_serial
+	travelling = true
+	var data: Dictionary = game.scene.zones[id]
+	var preferred: Vector3 = data.get("spawn",Vector3.ZERO)
+	var landing: Dictionary = {}
+	# Keep the previous supported location until startup/collider swaps are ready.
+	for attempt in 16:
+		if ticket != arrival_serial: return
+		if game.get("respawn_recovery")!=null and game.respawn_recovery.game!=null:
+			landing = game.respawn_recovery.find(preferred)
+			if not landing.is_empty(): break
+		await game.get_tree().physics_frame
+		if attempt>1: await game.get_tree().create_timer(0.06).timeout
+	if ticket != arrival_serial: return
+	if landing.is_empty():
+		travelling = false
+		game._notice("No clear landing yet at "+str(data.get("name",id))+". Let the earth settle, then try G again.",7)
+		return
 	motion.clear()
 	if game.tuning!=null: game.tuning.history.clear()
-	if not game.scene.get("zones",{}).has(id): return
 	var previous_zone: String = zone
 	if previous_zone != id:
 		var leaving_visual := _portal_visual(previous_zone, id)
 		if leaving_visual != null: leaving_visual.play_entrance()
 	zone=id
 	_apply_zone_environment(id)
-	var data=game.scene.zones[id]
-	game.rig.global_position=data.get("spawn",Vector3.ZERO)
 	game.rig.rotation=Vector3.ZERO
+	var lateral: Vector3 = game.camera.global_position-game.rig.global_position
+	lateral.y=0.0
+	game.rig.global_position=landing.feet-lateral
 	if game.get("desktop_locomotion")!=null: game.desktop_locomotion.reset()
 	if game.get("portal_walkthrough")!=null: game.portal_walkthrough.reset(game)
 	game.camera.rotation.x=0
 	game.desktop_pitch=0
 	game.visiting=id=="forge_yard"
 	game.shield_until=game.elapsed+3
-	game._notice(data.get("name",id.replace("_"," "))+" · Explore, gather and invent. F / G selects another destination.",6)
+	travelling = false
+	if game.get("travel_navigation")!=null: game.travel_navigation.on_travel(id)
+	game.held_pose.refresh(game)
+	game._notice(data.get("name",id.replace("_"," "))+" · M map · F next destination · G travel.",6)
 	if previous_zone != id:
 		var arriving_visual := _portal_visual(id, previous_zone)
 		if arriving_visual != null: arriving_visual.play_exit()

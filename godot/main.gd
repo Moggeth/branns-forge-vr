@@ -1,6 +1,7 @@
 extends Node3D
 
 const SCENE = preload("res://workshop_scene.gd")
+const TerrainSafety = preload("res://terrain_safety.gd")
 const VOICES = ["vesper", "ripple", "stone", "meridian", "cinder", "marin", "willow", "quartz"]
 var service = "http://127.0.0.1:8787"
 var scene: Dictionary
@@ -50,6 +51,8 @@ var desktop_hint_override = ""
 var desktop_window_mode_before_fullscreen = Window.MODE_WINDOWED
 var previous_tips: Dictionary = {}
 var hud: Label
+var travel_target: Label
+var travel_navigation
 var info: Label
 var markers: Array[Node3D] = []
 var smoke = false
@@ -380,6 +383,7 @@ func _ready():
 		var comparison_label=WorkshopScene.label(collection.root,"LANTERN STUDY · TWO ARTISTS\nSame controls · grip to compare · shutter opens by hand",Vector3(12.0,2.3,7.0),18)
 		comparison_label.rotation.y=-PI/2
 	discoveries=preload("res://discoveries.gd").new(); add_child(discoveries); discoveries.setup(self,self)
+	travel_navigation=preload("res://travel_navigation.gd").new(); add_child(travel_navigation); travel_navigation.setup(self)
 	hearth_torch.create_stand(ember_gallery.court,Vector3(-3.4,1.05,5))
 	if OS.get_cmdline_user_args().has("--fairy-coop"): _start_fairy()
 	if OS.get_cmdline_user_args().has("--world-builder") or OS.get_cmdline_user_args().has("--world-builder-check"):
@@ -924,6 +928,11 @@ func _hud():
 	info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	info.custom_minimum_size.x=450
 	info.text="Click to look · WASD move · E take · F1 controls"
+	travel_target=Label.new()
+	column.add_child(travel_target)
+	travel_target.add_theme_font_size_override("font_size",14)
+	travel_target.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	travel_target.custom_minimum_size.x=450
 	desktop_help_panel=PanelContainer.new()
 	column.add_child(desktop_help_panel)
 	desktop_help_panel.custom_minimum_size=Vector2(470,0)
@@ -934,7 +943,7 @@ func _hud():
 	help.add_theme_color_override("font_color",Color("e6ebdd"))
 	help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size.x=450
-	help.text="MOVE  WASD walk · Space jump · Mouse look · Esc cursor\nGEAR  E take / gentle drop · X throw · LMB primary · RMB alternate\nCROSSBOW  9 equip · R reload / hold to reel · C fit/return reel at rack\nAXE  LMB swing · hold RMB through contact for Power Cleave\nSKULLS  Carry the basket · F store/take a skull · deposit three to complete\nTRAVEL  Walk through a portal · F destination · G travel\nTOOLS  1–8 equip · T teleport · U workshop · V talk\nVIEW  F11 fullscreen · Q turn left · F1 close help"
+	help.text="MOVE  WASD walk · Space jump · Mouse look · Esc cursor\nGEAR  E take / gentle drop · X throw · LMB primary · RMB alternate\nCROSSBOW  9 equip · R reload / hold to reel · C fit/return reel at rack\nAXE  LMB swing · hold RMB through contact for Power Cleave\nSKULLS  Carry the basket · F store/take a skull · deposit three to complete\nTRAVEL  M map · F next destination · G travel · walk through portals\nSUPPLIES  I resource guide · J activities / discoveries\nTOOLS  1–8 equip · T teleport · U workshop · V talk\nVIEW  F11 fullscreen · Q turn left · F1 close help"
 	desktop_help_panel.visible=false
 	help.text += "\nBOW  0 Emberwing · hold LMB draw, release fire · hold RMB + turn to bend"
 	var cross = Label.new()
@@ -958,6 +967,7 @@ func _desktop_panel_style()->StyleBoxFlat:
 
 func _process(delta):
 	elapsed += delta
+	if travel_navigation!=null: travel_navigation.tick()
 	held_pose.tick(self,delta)
 	if not smoke and delta>0.09 and elapsed-last_frame_hitch_log>2.0:
 		last_frame_hitch_log=elapsed
@@ -968,7 +978,7 @@ func _process(delta):
 		print("FRAME_HITCH ms=",snappedf(delta*1000,0.1)," forge=",forge_stage," zone=",adventure.zone if adventure!=null else "startup")
 	if desktop_look!=null:
 		var survey_owns_input=is_instance_valid(world_builder_view) and world_builder_view.has_focus() and not world_builder_view.hero_primary
-		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened))
+		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened) and not (travel_navigation!=null and travel_navigation.any_open()))
 	if recording!=null: recording.tick(delta)
 	if wyrmspout!=null: wyrmspout.tick(delta)
 	if sunfall!=null: sunfall.tick(delta)
@@ -983,7 +993,7 @@ func _process(delta):
 		if vr: _xr_input()
 		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus() or world_builder_view.hero_primary): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
-	if not smoke: portal_walkthrough.tick(self,delta)
+	if not smoke and not adventure.travelling: portal_walkthrough.tick(self,delta)
 	held_pose.refresh(self)
 	if elapsed > next_poll and not busy and not diagnostic_offline:
 		next_poll = elapsed + 2.0
@@ -1142,6 +1152,7 @@ func _world_builder_hero_input(event: InputEvent) -> void:
 	_unhandled_input(forwarded)
 
 func _unhandled_input(event):
+	if travel_navigation!=null and travel_navigation.input_event(event,self): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F9:
 		_open_world_builder_view(); return
 	if not vr and event is InputEventKey and event.pressed and not event.echo:
@@ -1158,7 +1169,7 @@ func _unhandled_input(event):
 	if discoveries!=null and discoveries.input_event(event): return
 	if qol.keyboard(event): return
 	if desktop_look!=null:
-		desktop_look.set_enabled(not (discoveries!=null and discoveries.opened) and not qol.opened)
+		desktop_look.set_enabled(not (discoveries!=null and discoveries.opened) and not qol.opened and not adventure.travelling)
 		if desktop_look.handle_event(event): return
 	# The contextual basket action must run before F's destination selection.
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F:
@@ -1267,6 +1278,8 @@ func _desktop_alternate() -> bool:
 	return false
 
 func _desktop_input(delta):
+	if travel_navigation!=null and travel_navigation.any_open(): return
+	if adventure.travelling: return
 	if discoveries!=null and discoveries.opened: return
 	if fairy!=null and fairy.active: return
 	if qol.opened: return
@@ -1282,7 +1295,7 @@ func _desktop_input(delta):
 
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
-	if adventure!=null and adventure.dying:
+	if adventure!=null and (adventure.dying or adventure.travelling or (travel_navigation!=null and travel_navigation.any_open())):
 		desktop_swing_started=-1.0
 		desktop_swing_item=null
 		if melee!=null: melee.clear_desktop_contact()
@@ -1485,17 +1498,16 @@ func _cancel_inactive_playful_hand(hand):
 	if playful_tools!=null and playful_tools.busy(hand): playful_tools._home()
 	if magnetic_wand!=null and magnetic_wand.busy(hand): magnetic_wand._home()
 
-func _move_to(destination: Vector3):
-	var bounded = destination
-	var floor_query = PhysicsRayQueryParameters3D.create(destination+Vector3.UP*3.0,destination+Vector3.DOWN*4.0,1)
-	var floor_hit = get_world_3d().direct_space_state.intersect_ray(floor_query)
-	if floor_hit.is_empty() or floor_hit.normal.y<0.8: return
-	var floor_owner = _owner(floor_hit.collider)
-	if floor_owner==null or floor_owner.get_meta("kind","") not in ["floor","solid"]: return
-	if floor_owner.get_meta("kind","")=="solid" and float(floor_hit.position.y)-rig.global_position.y>0.35: return
-	bounded.y = float(floor_hit.position.y)+0.02
-	if _player_capsule_clear(bounded):
-		rig.position = bounded
+func _move_to(destination: Vector3, walking: bool = true):
+	if adventure!=null and adventure.travelling: return
+	var lateral := Vector3(camera.global_position.x-rig.global_position.x,0,camera.global_position.z-rig.global_position.z)
+	var feet := destination + lateral
+	var hit := TerrainSafety.floor_hit(self,feet,maxf(3.0,absf(destination.y-rig.global_position.y)+1.0),4.0,0.68,1)
+	if hit.is_empty(): return
+	if walking and float(hit.position.y)-rig.global_position.y>0.42: return
+	feet.y=float(hit.position.y)+0.025
+	if _player_capsule_clear(feet):
+		rig.global_position = feet-lateral
 		held_pose.refresh(self)
 
 func _player_capsule_clear(feet: Vector3) -> bool:
@@ -1514,13 +1526,13 @@ func _safe_respawn_position(preferred: Vector3) -> Vector3:
 
 func _teleport(source: Node3D):
 	var hit = _ray(source, 12.0)
-	if hit.is_empty() or hit.normal.y < 0.8: return
+	if hit.is_empty() or hit.normal.y < 0.68: return
 	var target = _owner(hit.collider)
 	if target == null or target.get_meta("kind", "") != "floor": return
 	var destination: Vector3 = hit.position
 	var offset = camera.global_position - rig.global_position
 	destination -= Vector3(offset.x, 0, offset.z)
-	_move_to(destination)
+	_move_to(destination,false)
 	desktop_locomotion.reset()
 	portal_walkthrough.reset(self)
 	tuning.history.clear()

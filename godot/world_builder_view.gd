@@ -191,7 +191,7 @@ func tick(delta: float) -> void:
 	else:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var axis := Vector3.ZERO
-	if has_focus() and not hero_primary:
+	if has_focus() and not hero_primary and not (game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(self)):
 		if Input.is_key_pressed(KEY_W): axis.z -= 1
 		if Input.is_key_pressed(KEY_S): axis.z += 1
 		if Input.is_key_pressed(KEY_A): axis.x -= 1
@@ -844,6 +844,7 @@ func _cast_line(a: Vector3,b: Vector3) -> String:
 
 func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
+	if game.get("travel_navigation")!=null and game.travel_navigation.input_event(event,self): return
 	var header_height: float = 0.0 if hero_primary else TOP_HEIGHT * ui_scale
 	if hero_primary and event is InputEventKey:
 		var hero_key := event as InputEventKey

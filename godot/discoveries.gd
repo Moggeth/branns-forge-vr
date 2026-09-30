@@ -26,7 +26,9 @@ const HINTS={
 func setup(g,target,f=null):
  game=g; fairy=f
  layer=CanvasLayer.new(); layer.layer=70; target.add_child(layer)
- var shortcut=Button.new(); layer.add_child(shortcut); shortcut.text="Discoveries · M"; shortcut.position=Vector2(18,200); shortcut.pressed.connect(show_menu)
+ var shortcut=Button.new(); layer.add_child(shortcut); shortcut.text="Map · M"; shortcut.position=Vector2(18,200); shortcut.pressed.connect(func():
+  if game.get("travel_navigation")!=null: game.travel_navigation.show_for(target,"map",fairy)
+  else: show_menu())
  if fairy==null:
   shortcut.anchor_top=1; shortcut.anchor_bottom=1
   shortcut.offset_left=18; shortcut.offset_right=150
@@ -82,7 +84,7 @@ func request_reset():
  detail.text="Reset Ember Creek only?\n\nClear its spilled fuel and close its puzzle gate. You and your companion return to the creek entrance. Held items, inventory, progression and every other area remain unchanged."
  action_index=3; back.grab_focus()
 func input_event(event):
- if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_M:
+ if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==(KEY_N if fairy!=null else KEY_J):
   if opened: close_menu()
   else: show_menu()
   return true

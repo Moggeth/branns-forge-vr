@@ -157,6 +157,7 @@ func set_display_mode(mode:String):
 	note("Display: "+mode+" · F3 hand · F4 launch · Delete clear pings · F11 fullscreen · F6/F7 half screen · F10 maximize")
 
 func _capture_mouse():
+	if game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(window): return
 	if not active or (discoveries!=null and discoveries.opened): return
 	focused=true; mouse_look=true
 	if not owns_input_policy:
@@ -173,6 +174,7 @@ func note(text_value):
 
 func input_event(event):
 	if not active: return
+	if game.get("travel_navigation")!=null and game.travel_navigation.input_event(event,window,self): return
 	if discoveries!=null and discoveries.input_event(event): return
 	if event is InputEventKey:
 		keys[event.physical_keycode]=event.pressed
@@ -262,6 +264,7 @@ func axis(id:int)->float:
 func key(code)->float: return 1.0 if focused and keys.get(code,false) else 0.0
 
 func controls(dt:float)->Dictionary:
+	if game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(window): return {"stick":Vector3.ZERO,"boost":false,"brake":true}
 	if discoveries!=null and discoveries.opened: return {"stick":Vector3.ZERO,"boost":false,"brake":true}
 	if pad_buttons.get(JOY_BUTTON_START,false): return {"stick":Vector3.ZERO,"boost":false,"brake":true}
 	var connected=Input.get_connected_joypads()

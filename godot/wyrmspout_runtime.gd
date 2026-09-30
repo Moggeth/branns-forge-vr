@@ -204,6 +204,7 @@ func _update_stream_lights(record: Dictionary):
 		moving_light.light_energy = 0.48 + 0.10 * sin(game.elapsed * 17.0 + i * 2.1)
 
 func _pressed(hand: Node3D) -> bool:
+	if game.get("travel_navigation")!=null and game.travel_navigation.any_open(): return false
 	if diagnostic_force_trigger:
 		var arguments = OS.get_cmdline_user_args()
 		if arguments.has("--wyrmspout-check"): return true
