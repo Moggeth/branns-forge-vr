@@ -31,6 +31,14 @@ func _check() -> void:
 		failures.append("zoom during survey arrival did not retarget the camera")
 	if view.tactical_viewport.world_3d != game.get_world_3d():
 		failures.append("desktop survey lost the live Hero world")
+	if view.hero_pip.picture.texture != game.get_viewport().get_texture():
+		failures.append("Hero inset is not the actual existing Hero viewport")
+	if view.hero_pip.get_children().filter(func(n: Node) -> bool: return n is SubViewport or n is Camera3D).size() != 0:
+		failures.append("Hero inset created an unnecessary renderer or camera")
+	if view.refresh_limit != 120 or view.fps_button.selected != 2:
+		failures.append("desktop survey does not default to a 120 fps redraw target")
+	if view.hero_hud_layer != null and view.hero_hud_layer.visible:
+		failures.append("screen-space FPS HUD obscures the live Hero inset")
 	await create_timer(0.7).timeout
 	if view.arrival_elapsed < view.ARRIVAL_SECONDS or view.camera.global_position.distance_to(view.arrival_to.origin) > 0.05:
 		failures.append("survey camera did not settle promptly over the orchard")
@@ -62,9 +70,15 @@ func _check() -> void:
 	f9.pressed = true
 	view._input(f9)
 	await process_frame
-	if not is_instance_valid(view) or not view.returning_to_hero:
-		failures.append("F9 did not start the return to the Hero")
+	if not is_instance_valid(view) or not view.hero_primary:
+		failures.append("F9 did not make Hero primary while keeping RTS visible")
 	else:
+		if view.world_picture.texture != game.get_viewport().get_texture() or view.hero_pip.picture.texture != view.tactical_viewport.get_texture():
+			failures.append("swap did not display both live perspectives")
+		view._input(f9)
+		if view.hero_primary: failures.append("second F9 did not restore RTS primary")
+		view.close()
+		if not view.returning_to_hero: failures.append("explicit close did not start Hero return")
 		var return_from: Transform3D = view.camera.global_transform
 		var return_to: Transform3D = game.camera.global_transform
 		if return_from.origin.distance_to(return_to.origin) < 1.0:
@@ -87,12 +101,12 @@ func _check() -> void:
 	quick_return.hero_mouse_was_captured = true
 	await process_frame
 	var early_pose: Transform3D = quick_return.camera.global_transform
-	quick_return._input(f9)
+	quick_return.close()
 	if not quick_return.returning_to_hero or quick_return.camera.global_transform.origin.distance_to(early_pose.origin) > 0.05:
-		failures.append("F9 during arrival snapped instead of reversing the camera")
+		failures.append("close during arrival snapped instead of reversing the camera")
 	quick_return._advance_arrival(quick_return.ARRIVAL_SECONDS)
 	await process_frame
-	if is_instance_valid(quick_return): failures.append("F9 during arrival did not finish the return")
+	if is_instance_valid(quick_return): failures.append("close during arrival did not finish the return")
 	if not game.desktop_look.captured: failures.append("return did not restore captured Hero mouse input")
 	game.desktop_look.release_capture()
 	if game.get_window().mode != original_game_mode: failures.append("return changed the Hero window mode")

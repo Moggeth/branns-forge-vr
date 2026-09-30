@@ -1740,6 +1740,14 @@ Each failed guessed path loses time without providing useful evidence.
 
 ## Shared-world RTS integration — 2026-09-30
 
+### Dual-view and targeting fast path — 2026-10-01
+
+Run `tools/godot/Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_view_contract_checks.gd --quit-after 1200` before starting the full game. The native fixture verifies the Hero texture is the existing root viewport, that swap keeps both camera textures visible, that the inset creates no renderer/camera, and that every implemented catalogue entry has a target plan while unavailable entries have none. It does not launch Main, the service, or saves. The first passing run took **0.322 s**.
+
+The integrated `world_builder_checks.gd` fixture still needs `-- --world-builder-check` and a 45-second watchdog. While other subsystems were concurrently edited, it failed first on `melee_contact.gd:85`, then `respawn_recovery.gd:120`; these were unrelated parse blockers, not view outcomes. The view's own dynamic PiP properties also required explicit `Vector2`/`bool` annotations at `inset_size` and `in_hero`. Use the standalone fixture to discriminate view faults before retrying Main during parallel edits. Running `world_builder_view.gd` directly with `--script` is a poor parse check because it inherits `Window`, not `SceneTree`; one repeat stalled until its owned diagnostic process was stopped. Use the fixture command above.
+
+`targeting_state()` is the art/panel contract: it contains the selected id, kind, validity/reason, local and world hover/start coordinates, footprint geometry, dynamic path cost or structure lumber. `targeting_changed(state)` emits when the plan changes. An optional Node3D art adapter installed through `set_target_visual()` receives `update_targeting(state)`; the ground-projected line/circle/tree/sprout/triad fallback stays available without the art adapter. The editor's visual check should use a graphical no-focus root Window and the offscreen capture path, with its 45-second watchdog; headless cannot establish how the GPU textures look.
+
 [Controls and state](WORLD-BUILDER.md), [verification/source handoff](RTS-SHARED-WORLD-20260930.md), and [next dependencies](RTS-SHARED-WORLD-DIRECTION.md). Use the existing native renderer diagnostics rather than recomissioning assets to inspect them. Final panel/full-scene/Ent fixtures pass in 6.969 / 7.782 / 7.503 seconds; three native panel sizes render in 1.813 s, and seven installed art views in 2.000 s. These are offline desktop measurements, not headset performance.
 
 For procedural geometry, compare triangle cross products with declared normals before GPU review; inward winding failed the first timber fixture. Use a choppable TreeKit fixture with the actual named Trunk, not a Crown-only tree, and transform Trunk coordinates into the PI-rotated Ent presentation space. Preserve per-instance eye materials while sharing other meshes/materials.
@@ -1788,10 +1796,10 @@ overlapping process timings.
 ## Starfall hard contact and meteor geometry — 2026-10-01
 
 The meteor shell now emits Godot-clockwise visible triangles while retaining
-outward geometric normals. Fixed shared poles and omitted degenerate cap
+outward geometric normals. Fixed shared poles, wrapped longitude irregularity and omitted degenerate cap
 triangles close the shell; a trimesh collider comes from those same triangles.
 `landscape_meteor_checks.gd` validates nondegenerate face orientation, top and
-side physics rays, and saved surface scars. `hard_surface_contact_checks.gd`
+side physics rays, paired manifold edges, and saved surface scars. `hard_surface_contact_checks.gd`
 uses the authored Stonewhisper tip markers, a 2 m swept contact, shaft-first
 contact, 16/33 ms held frames, one reward per stroke, withdrawal and the FPS
 stop/recoil pose. Run both with Godot 4.7.2 `--headless --xr-mode off
@@ -1802,7 +1810,9 @@ absent. These checks avoid live saves, service and paid APIs.
 Failed strategy: the first winding assertion hit an old cap triangle made
 from longitudinally different pole heights. Its near-zero radial normal was
 not a renderer material error; use one pole vertex and skip degenerate cap
-triangles, then compare winding and normals separately. A radius-only scar
+triangles, then compare winding and normals separately. A later edge-pair
+assertion exposed the 360-degree seam: wrap longitude before evaluating
+irregularity so seam endpoints have identical positions. A radius-only scar
 assertion later rejected a valid narrow facet; raycast the saved scar back to
 the actual collider instead. After the builder accepted an optional contact
 normal, the fake builder test fixture still took four arguments and emitted
