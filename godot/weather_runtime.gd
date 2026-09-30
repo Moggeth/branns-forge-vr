@@ -47,21 +47,27 @@ func remember_zone():
 
 func refresh():
 	if rebuilding: return
+	var previous_zone=zone
+	var preserve_coverage=coverage_ready and enabled and previous_zone==game.adventure.zone
 	remember_zone(); rebuilding=true; coverage_ready=false
 	zone=game.adventure.zone
 	var scan_zone=zone
 	engine.surface_root=game.scene.zones.orchard_highlands.root if zone=="orchard_highlands" else null
-	engine.visible=false
-	engine.overlay.set_shader_parameter("weather_visible",0.0)
+	# A moving grid scans cooperatively. Keep the previous completed map visible
+	# until its replacement is ready; only travel/off actually hides weather.
+	if not preserve_coverage:
+		engine.visible=false
+		engine.overlay.set_shader_parameter("weather_visible",0.0)
 	if zone not in OUTDOORS or not enabled:
 		engine.ambience.volume_db=-80
 		for voice in engine.voices: voice.stop()
 		rebuilding=false; return
 	var center=Vector2(roundf(camera.global_position.x/8)*8,roundf(camera.global_position.z/8)*8)
-	engine.set_origin(center-Vector2(12,12))
+	# Surface rasterization needs the next origin, but the shader must retain the
+	# previous origin until the new image is uploaded in the same frame.
+	engine.ORIGIN=center-Vector2(12,12)
 	engine.heights.fill(.04); engine.snow.fill(0); engine.wet.fill(0)
 	engine.kinds.fill("earth" if zone=="orchard_highlands" else "stone")
-	engine.update_field(); engine.field_texture.update(engine.field_image)
 	var start=Time.get_ticks_msec()
 	await engine.capture_surfaces(true)
 	if not enabled or game.adventure.zone!=scan_zone:
@@ -81,6 +87,7 @@ func refresh():
 		if node.global_position.distance_to(camera.global_position)>70: continue
 		engine.overlay_targets.append(node)
 	engine.update_field(); engine.field_texture.update(engine.field_image)
+	engine.overlay.set_shader_parameter("grid_origin",engine.ORIGIN)
 	engine.set_overlay_active(engine.snow[0]+engine.wet[0]>.03,true)
 	engine.overlay.set_shader_parameter("weather_visible",1.0)
 	scanned_revision=game.workshop.revision
@@ -142,7 +149,10 @@ func action(value:String):
 				for voice in engine.voices: voice.stop()
 		"enabled":
 			enabled=not enabled
-			if not enabled: game.adventure._apply_zone_environment(zone)
+			if not enabled:
+				engine.visible=false
+				engine.overlay.set_shader_parameter("weather_visible",0.0)
+				game.adventure._apply_zone_environment(zone)
 			refresh.call_deferred()
 	save(); game.qol._build()
 	game._notice("Weather · "+engine.weather+" · %02d:%02d"%[int(engine.hour),int(fposmod(engine.hour,1)*60)],4)

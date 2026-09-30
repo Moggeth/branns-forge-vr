@@ -71,6 +71,8 @@ var poured=0.0
 var evaporated=0.0
 var current_snapshot=""
 var weather_buttons=[]
+var metal_test_surface:MeshInstance3D
+var wood_test_surface:MeshInstance3D
 
 func setup(owner_demo,for_game=false,fuel_only=false):
 	native_mode=for_game
@@ -97,9 +99,9 @@ func make_test_surfaces():
 	var w=preload("res://workshop_scene.gd")
 	var timber=w.material("795338")
 	var steel=w.material("769097",.8,.24)
-	var tray=w.box(demo.art,Vector3(-2.9,.85,3.2),Vector3(1.5,.1,1),steel); tray.set_meta("weather_material","metal")
+	var tray=w.box(demo.art,Vector3(-2.9,.85,3.2),Vector3(1.5,.1,1),steel); tray.set_meta("weather_material","metal"); metal_test_surface=tray
 	for x in [-3.5,-2.3]: w.box(demo.art,Vector3(x,.42,3.2),Vector3(.12,.84,.7),timber)
-	var roof=w.box(demo.art,Vector3(-5.4,2,3),Vector3(2.0,.13,1.5),timber); roof.rotation.z=.12; roof.set_meta("weather_material","wood")
+	var roof=w.box(demo.art,Vector3(-5.4,2,3),Vector3(2.0,.13,1.5),timber); roof.rotation.z=.12; roof.set_meta("weather_material","wood"); wood_test_surface=roof
 	for x in [-6.2,-4.6]: w.box(demo.art,Vector3(x,1,3),Vector3(.1,2,.1),timber)
 
 func cell_index(pos:Vector3)->int:
@@ -162,13 +164,13 @@ func raster(mesh:Mesh,transform:Transform3D,mat,forced:String):
 func make_overlay():
 	var shader=Shader.new()
 	shader.code="""shader_type spatial;
-render_mode blend_mix, depth_prepass_alpha;
+render_mode blend_mix, depth_draw_never;
 uniform sampler2D state_map : filter_linear, repeat_disable;
 uniform float weather_visible=1.0;
 uniform vec2 grid_origin=vec2(-12.,-10.);
 varying vec3 world; varying vec3 normal_world;
-void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;normal_world=normalize(MODEL_NORMAL_MATRIX*NORMAL);VERTEX+=NORMAL*.003;}
-void fragment(){if(weather_visible<.5)discard;vec2 uv=(world.xz-grid_origin)/24.;if(any(lessThan(uv,vec2(0.)))||any(greaterThan(uv,vec2(1.))))discard;vec4 s=texture(state_map,uv);float exposed=1.-smoothstep(.12,.32,abs(world.y-s.r));float up=smoothstep(.35,.85,normal_world.y);float snow=s.g*up*exposed;float wet=s.b*exposed;ALBEDO=mix(vec3(.09,.16,.19),vec3(.89,.94,1.),snow);ROUGHNESS=mix(.16,.84,snow);ALPHA=clamp(snow+wet*.18,0.,.96);if(ALPHA<.025)discard;}
+void vertex(){world=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;normal_world=normalize(MODEL_NORMAL_MATRIX*NORMAL);VERTEX+=NORMAL*.012;}
+void fragment(){if(weather_visible<.5)discard;vec2 uv=(world.xz-grid_origin)/24.;if(any(lessThan(uv,vec2(0.)))||any(greaterThan(uv,vec2(1.))))discard;vec4 s=texture(state_map,uv);float exposed=1.-smoothstep(.12,.32,abs(world.y-s.r));float up=smoothstep(.35,.85,normalize(normal_world).y);float snow=s.g*up*exposed;float wet=s.b*exposed;ALBEDO=mix(vec3(.09,.16,.19),vec3(.89,.94,1.),snow);ROUGHNESS=mix(.16,.84,snow);ALPHA=clamp(snow+wet*.18,0.,.96);if(ALPHA<.025)discard;}
 """
 	overlay=ShaderMaterial.new(); overlay.shader=shader; overlay.set_shader_parameter("state_map",field_texture)
 	if native_mode: return
@@ -196,6 +198,20 @@ func make_particles():
 	make_fluid_particles()
 	var ring_mesh=TorusMesh.new(); ring_mesh.inner_radius=.075; ring_mesh.outer_radius=.085; ring_mesh.rings=10; ring_mesh.ring_segments=4; ring_mesh.material=material("b0d2df",.1); rings=instances(ring_mesh,48)
 	var drop=SphereMesh.new(); drop.radius=.025; drop.height=.05; drop.radial_segments=5; drop.rings=2; drop.material=material("dbac65",.4); splash=instances(drop,96)
+
+func precipitation_cell(i:int,viewer:Vector3)->Vector2:
+	# Keep every instance on a fixed world lattice. A row or column wraps to the
+	# far edge only when the viewer leaves its 24 m neighbourhood.
+	const STEP=.96
+	const COLUMNS=25
+	const ROWS=26
+	var column=i%COLUMNS
+	var row=int(i/COLUMNS)
+	var width=COLUMNS*STEP
+	var depth=ROWS*STEP
+	var x=column*STEP+floorf((viewer.x-column*STEP+width*.5)/width)*width
+	var z=row*STEP+floorf((viewer.z-row*STEP+depth*.5)/depth)*depth
+	return Vector2(x,z)
 
 func make_fluid_particles():
 	# One square tile per occupied cell. Neighbour flags remove inner borders so
@@ -456,11 +472,13 @@ func tick(delta):
 		var count=mini(rain_budget,particles.multimesh.instance_count) if weather=="rain" else particles.multimesh.instance_count
 		particles.multimesh.visible_instance_count=count
 		for i in range(count):
-			var x=demo.camera.global_position.x+sin(i*83.71)*11.7
-			var z=demo.camera.global_position.z+cos(i*37.51)*11.7
+			var cell=precipitation_cell(i,demo.camera.global_position)
+			var phase=fposmod(sin(cell.dot(Vector2(127.1,311.7)))*43758.5453,1.0)
+			var x=cell.x+sin(phase*TAU)*.28
+			var z=cell.y+cos(phase*TAU)*.28
 			var id=cell_index(Vector3(x,0,z)); var ground=heights[id] if id>=0 else .04
-			var height=ground+.06+fposmod(i*.319-elapsed*(9 if weather=="rain" else .75),maxf(2,12-ground))
-			if weather=="snow": x+=sin(elapsed*.7+i)*.08
+			var height=ground+.06+fposmod(phase*12.0-elapsed*(9 if weather=="rain" else .75),maxf(2,12-ground))
+			if weather=="snow": x+=sin(elapsed*.7+phase*TAU)*.08
 			else:
 				x+=wind.x*height*.045*wind_strength
 				z+=wind.y*height*.045*wind_strength
@@ -532,9 +550,19 @@ func total_fuel()->float:
 
 func checks()->Array:
 	var failures=[]
-	var metal=cell_index(Vector3(-2.9,0,3.2)); var wood=cell_index(Vector3(-5.4,0,3))
-	if kinds[metal]!="metal": failures.append("metal surface classification")
-	if kinds[wood]!="wood": failures.append("wood surface classification")
+	var snow_cell=precipitation_cell(212,Vector3.ZERO)
+	if snow_cell!=precipitation_cell(212,Vector3(.2,0,.2)): failures.append("Precipitation must remain world-anchored during small viewer movement")
+	if snow_cell==precipitation_cell(212,Vector3(30,0,30)): failures.append("Precipitation volume must recycle at its far edge")
+	# The wider visual scene can cover these fixtures. Raster each test mesh in
+	# isolation so classification does not depend on unrelated dressing height.
+	var saved_heights=heights.duplicate()
+	var saved_kinds=kinds.duplicate()
+	for fixture in [metal_test_surface,wood_test_surface]:
+		heights.fill(-INF); kinds.fill("stone")
+		raster(fixture.mesh,fixture.global_transform,fixture.material_override,str(fixture.get_meta("weather_material")))
+		var fixture_cell=cell_index(fixture.global_position)
+		if fixture_cell<0 or kinds[fixture_cell]!=str(fixture.get_meta("weather_material")): failures.append(str(fixture.get_meta("weather_material"))+" surface classification")
+	heights=saved_heights; kinds=saved_kinds
 	var roof=cell_index(Vector3(0,0,-4))
 	if heights[roof]<4: failures.append("roof exposure sampling")
 	set_weather("snow")
@@ -634,6 +662,11 @@ func set_overlay_active(active:bool,force=false):
 		if not is_instance_valid(node): continue
 		if active and node.material_overlay==null: node.material_overlay=overlay
 		elif not active and node.material_overlay==overlay: node.material_overlay=null
+
+func _exit_tree():
+	# Release overlays while their geometry and shader are still alive. The
+	# headless renderer otherwise queries a freed material during teardown.
+	set_overlay_active(false,true)
 
 func update_fluid_visuals():
 	var seen=0; var lit=0

@@ -14,6 +14,14 @@ func run(game):
 	game.weather.action("snow")
 	for i in range(30): game.weather.tick(.1)
 	check(game.weather.engine.snow[0]>0,"Native snow accumulation")
+	var old_shader_origin=game.weather.engine.overlay.get_shader_parameter("grid_origin")
+	game.camera.global_position.x+=8
+	game.weather.refresh()
+	check(game.weather.rebuilding,"Moving-grid surface scan yields")
+	check(game.weather.engine.visible,"Existing snow stays visible while a same-zone scan yields")
+	check(game.weather.engine.overlay.get_shader_parameter("grid_origin")==old_shader_origin,"Snow shader keeps the completed map until scan commit")
+	await settle(game)
+	check(game.weather.engine.overlay.get_shader_parameter("grid_origin")!=old_shader_origin,"Moving grid commits the new world origin")
 	var saved_snow=game.weather.engine.snow[0]
 	game.weather.refresh()
 	check(game.weather.rebuilding,"Surface scan yields for interruption test")
