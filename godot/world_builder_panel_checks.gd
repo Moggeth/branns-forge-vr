@@ -86,12 +86,23 @@ func _run() -> void:
 	_check(not view.preview_boundary.visible,"preview clears outside world")
 	_check(game.player_avatar.head != null,"adventurer has authored head")
 	_check((game.camera.cull_mask & (1 << 1)) == 0 and (view.camera.cull_mask & (1 << 1)) != 0,"Hero omits self-head while strategic player sees it")
-	for extent in [Vector2i(960,620),Vector2i(1920,1080),Vector2i(3840,2160)]:
+	for extent in [Vector2i(960,620),Vector2i(1280,720),Vector2i(1600,900),Vector2i(1920,1080),Vector2i(3840,2160)]:
 		view.size = extent
 		view._layout_ui()
 		_check(panel._panel.position.x >= 0 and panel._panel.end.x <= extent.x,"panel fits native width " + str(extent))
 		_check(panel._cards.back().end.y <= extent.y,"cards fit native height " + str(extent))
 		_check(not panel.is_over_panel(Vector2(20,150)),"world outside command bar remains clickable")
+		for palette_entry in panel.PALETTES:
+			panel._palette = palette_entry.id
+			var ids: Array = panel._by_palette[palette_entry.id]
+			for index in ids.size():
+				var label_area: Rect2 = panel._card_parts(panel._cards[index]).label
+				var fs: int = panel._fs(11.5 if panel._compact else 12.5)
+				var fitted: Dictionary = panel._fit(panel._catalogue[ids[index]].title,label_area.size.x-12.0*panel._s,fs,2,fs-2)
+				_check(not fitted.truncated,"ability title shortened: " + str(ids[index]) + " at " + str(extent))
+				_check(panel._font.get_height(fitted.fs)*fitted.lines.size()<=label_area.size.y,"ability label exceeds its band: " + str(ids[index]) + " at " + str(extent))
+		for index in range(1,4): _check(panel._tabs[index].position.x>panel._tabs[index-1].position.x,"category keyboard order is horizontal")
+	_check(panel._orb_mat!=null and panel._orb_rect.mouse_filter==Control.MOUSE_FILTER_IGNORE,"Mana shader exists without intercepting world input")
 	view.close()
 	await process_frame
 	_check(not is_instance_valid(view),"headless survey lifecycle ends without animation frames")
