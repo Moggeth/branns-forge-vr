@@ -8,7 +8,8 @@ const GRASS=["gk_grass_meadow_tuft","gk_grass_meadow_tuft_small","gk_grass_clove
 const ROCKS=["gk_rock_mossy_boulder","gk_rock_sandstone_ledge","gk_rock_split_shards"]
 const ROCK_SIZES=[Vector3(1.34,0.63,1.08),Vector3(1.69,0.51,1.20),Vector3(0.95,0.95,0.63)]
 const ZONE_DENSITY={"forge_yard":[110,7],"pinewood_ruins":[85,8],"orchard_highlands":[7200,120],"mushroom_glade":[80,7],"sandstone_quarry":[30,10],
-	"enchanted_kitchen":[0,4],"crystal_hollow":[0,8],"ember_foundry":[0,7],"gloamfen":[65,7],"starfall_ridge":[0,12]}
+	# Other biomes use their existing authored zone art until surface-kit props import.
+	"enchanted_kitchen":[0,0],"crystal_hollow":[0,0],"ember_foundry":[0,0],"gloamfen":[0,0],"starfall_ridge":[0,0]}
 const ORCHARD_CHUNK := 64.0
 const SURFACE_KIT := "res://assets/ground-surface-kit/"
 const SURFACE_MANIFEST := SURFACE_KIT + "manifest.json"
