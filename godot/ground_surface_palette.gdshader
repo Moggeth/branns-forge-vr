@@ -29,8 +29,11 @@ void fragment() {
 	vec2 warp = vec2(smooth_noise(at * 0.11), smooth_noise(at * 0.11 + 17.0)) * 0.38;
 	vec2 uv = (at + warp) * tile_per_m;
 	vec2 uv_alt = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * uv * 0.71 + 13.7;
+	// A second incommensurate projection prevents broad marks painted into one
+	// seamless tile from forming an obvious repeated grid across a full floor.
+	vec2 uv_broken = mat2(vec2(0.56, 0.83), vec2(-0.83, 0.56)) * uv * 1.37 + 7.31;
 	float blend = smoothstep(0.47, 0.76, broad * 0.68 + middle * 0.32) * accent_amount;
-	vec3 first = texture(base_albedo, uv).rgb;
+	vec3 first = mix(texture(base_albedo, uv).rgb, texture(base_albedo, uv_broken).rgb, 0.46);
 	vec3 second = texture(accent_albedo, uv_alt).rgb;
 	vec3 colour = mix(first, second, blend);
 	colour *= tint * mix(0.89, 1.08, broad) * mix(0.96, 1.04, middle);

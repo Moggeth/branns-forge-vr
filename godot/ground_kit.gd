@@ -9,13 +9,29 @@ const ROCKS=["gk_rock_mossy_boulder","gk_rock_sandstone_ledge","gk_rock_split_sh
 const ROCK_SIZES=[Vector3(1.34,0.63,1.08),Vector3(1.69,0.51,1.20),Vector3(0.95,0.95,0.63)]
 const ZONE_DENSITY={"forge_yard":[110,7],"pinewood_ruins":[85,8],"orchard_highlands":[7200,120],"mushroom_glade":[80,7],"sandstone_quarry":[30,10],
 	# Other biomes use their existing authored zone art until surface-kit props import.
-	"enchanted_kitchen":[0,0],"crystal_hollow":[0,0],"ember_foundry":[0,0],"gloamfen":[0,0],"starfall_ridge":[0,0]}
+	"enchanted_kitchen":[0,0],"crystal_hollow":[0,0],"ember_foundry":[0,0],"gloamfen":[0,0],"starfall_ridge":[0,0],
+	"sky_garden":[0,0],"cloudbreak_keep":[0,0]}
 const ORCHARD_CHUNK := 64.0
 const SURFACE_KIT := "res://assets/ground-surface-kit/"
 const SURFACE_MANIFEST := SURFACE_KIT + "manifest.json"
 const SURFACE_SPEC_LIMIT := 8 # Caps Orchard at eight asset families x 25 visible chunks.
 const SURFACE_BUDGET := {"forge_yard":110,"pinewood_ruins":100,"orchard_highlands":1400,"mushroom_glade":100,
-	"sandstone_quarry":75,"enchanted_kitchen":65,"crystal_hollow":45,"ember_foundry":50,"gloamfen":105,"starfall_ridge":85}
+	"sandstone_quarry":75,"enchanted_kitchen":65,"crystal_hollow":45,"ember_foundry":50,"gloamfen":105,"starfall_ridge":85,
+	"sky_garden":70,"cloudbreak_keep":85}
+const SURFACE_ISLANDS := {
+	"sky_garden":[[Vector3(0,0,6),Vector2(22,18)],[Vector3(-10,1.8,-11),Vector2(10,10)],[Vector3(10,3.2,-10),Vector2(9,9)]],
+	"cloudbreak_keep":[[Vector3(0,0,10),Vector2(28,24)],[Vector3(-16,2.2,-8),Vector2(13,12)],
+		[Vector3(15,4.2,-15),Vector2(12,12)],[Vector3(-3,6,-25),Vector2(14,12)]],
+}
+const SURFACE_KIND_PRIORITY := {
+	"orchard_highlands":["grass","fern","litter","wood","stone","debris","frost"],
+	"pinewood_ruins":["fern","litter","wood","grass","stone","debris","frost"],
+	"mushroom_glade":["fern","litter","wood","stone","grass","debris","frost"],
+	"gloamfen":["litter","fern","wood","stone","grass","debris","frost"],
+	"sky_garden":["grass","litter","fern","wood","stone","debris","frost"],
+	"cloudbreak_keep":["frost","debris","stone","grass","litter","wood","fern"],
+}
+static var _surface_mesh_cache: Dictionary = {}
 
 static func _mesh(asset:String)->Mesh:
 	var scene=load(PATH+asset+".glb")
@@ -178,12 +194,48 @@ static func _surface_specs(zone_id: String) -> Array:
 		var weight: float = clampf(float(prop.get("weight",1.0)),0.0,10.0)
 		if weight <= 0.0: continue
 		selected.append(prop)
-	if selected.size() > SURFACE_SPEC_LIMIT:
-		push_warning("Ground surface zone "+zone_id+" has more than eight prop families; using the first eight")
-		selected.resize(SURFACE_SPEC_LIMIT)
-	return selected
+	if selected.size() <= SURFACE_SPEC_LIMIT: return selected
+	# Round-robin kinds so a long, stone-first manifest cannot silently remove
+	# every grass/fern from a meadow. Scarcer biome props win within each kind.
+	var priority: Array = SURFACE_KIND_PRIORITY.get(zone_id,["stone","debris","litter","grass","wood","fern","frost"])
+	var chosen: Array = []
+	var used: Dictionary = {}
+	while chosen.size() < SURFACE_SPEC_LIMIT:
+		var progress := false
+		for kind in priority:
+			var best: Dictionary = {}
+			var best_score := -1.0
+			for spec in selected:
+				var id: String = str(spec.get("id",""))
+				if str(spec.kind) != kind or used.has(id): continue
+				var score := 10.0/maxf(float(spec.zones.size()),1.0)+float(spec.get("weight",1.0))*0.05
+				if score > best_score:
+					best = spec
+					best_score = score
+			if best.is_empty(): continue
+			chosen.append(best)
+			used[str(best.id)] = true
+			progress = true
+			if chosen.size() >= SURFACE_SPEC_LIMIT: break
+		if not progress: break
+	print("GROUND_SURFACE_SELECT zone=",zone_id," eligible=",selected.size()," selected=",chosen.map(func(spec: Dictionary) -> String: return str(spec.id)))
+	return chosen
+
+static func _surface_island_point(rng: RandomNumberGenerator, zone_id: String) -> Vector3:
+	var islands: Array = SURFACE_ISLANDS[zone_id]
+	var total := 0.0
+	for island in islands: total += float(island[1].x*island[1].y)
+	var roll := rng.randf()*total
+	for island in islands:
+		roll -= float(island[1].x*island[1].y)
+		if roll > 0.0: continue
+		var center: Vector3 = island[0]
+		var half: Vector2 = island[1]*0.5-Vector2.ONE*1.4
+		return center+Vector3(rng.randf_range(-half.x,half.x),0,rng.randf_range(-half.y,half.y))
+	return islands[0][0]
 
 static func _surface_mesh(asset: String) -> Mesh:
+	if _surface_mesh_cache.has(asset): return _surface_mesh_cache[asset]
 	var packed := load(SURFACE_KIT+asset) as PackedScene
 	if packed == null: return null
 	var scene := packed.instantiate()
@@ -193,6 +245,7 @@ static func _surface_mesh(asset: String) -> Mesh:
 	if parts.size() > 1 or mesh == null:
 		push_error("Ground surface prop needs one merged mesh: "+asset)
 	scene.free()
+	if mesh != null: _surface_mesh_cache[asset] = mesh
 	return mesh
 
 static func _surface_kind_chance(kind: String, zone_id: String, point: Vector3, model: Dictionary, patch: float = 1.0) -> float:
@@ -223,6 +276,9 @@ static func _surface_pose(model: Dictionary, point: Vector3, kind: String, size:
 
 static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, model: Dictionary, trail: Array) -> void:
 	if not SURFACE_BUDGET.has(zone_id): return
+	# Diagnostic A/B capture of the same camera and surface shader without
+	# authored prop batches; normal play never sets this flag.
+	if OS.get_cmdline_user_args().has("--ground-surface-quality=off"): return
 	var specs := _surface_specs(zone_id)
 	if specs.is_empty(): return
 	var budget: int = SURFACE_BUDGET[zone_id]
@@ -261,9 +317,11 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 		var record: Dictionary = meshes[id]
 		var spec: Dictionary = record.spec
 		var kind: String = str(spec.kind)
-		var p := Vector3(rng.randf_range(-extent+2,extent-2),0,rng.randf_range(-extent+2,extent-2))
+		var p := _surface_island_point(rng,zone_id) if SURFACE_ISLANDS.has(zone_id) else Vector3(rng.randf_range(-extent+2,extent-2),0,rng.randf_range(-extent+2,extent-2))
 		if not _allowed(zone_id,p,trail): continue
-		if zone_id != "orchard_highlands" and p.length() < 3.0: continue
+		if zone_id != "orchard_highlands" and Vector2(p.x,p.z).length() < 3.0: continue
+		if zone_id=="sky_garden" and (p.distance_to(Vector3(7.5,0,9.5)) < 3.0 or p.distance_to(Vector3(-8.5,0,9.5)) < 3.0): continue
+		if zone_id=="cloudbreak_keep" and p.distance_to(Vector3(7.5,0,19.5)) < 3.0: continue
 		var patch := 0.08+0.86*smoothstep(-0.32,0.26,patch_noise.get_noise_2d(p.x,p.z))
 		if rng.randf() > _surface_kind_chance(kind,zone_id,p,model,patch): continue
 		var limits: Variant = spec.get("scale",[0.8,1.2])
@@ -284,17 +342,18 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 		var kind: String = str(spec.kind)
 		var chunks: Dictionary = {}
 		for pose in record.poses:
-			var key := Vector2i(floori(pose.origin.x/ORCHARD_CHUNK),floori(pose.origin.z/ORCHARD_CHUNK)) if zone_id=="orchard_highlands" else Vector2i.ZERO
+			# Align the 320 m Orchard to exactly five 64 m chunks per axis.
+			var key := Vector2i(floori((pose.origin.x+extent)/ORCHARD_CHUNK),floori((pose.origin.z+extent)/ORCHARD_CHUNK)) if zone_id=="orchard_highlands" else Vector2i.ZERO
 			if not chunks.has(key): chunks[key]=[]
 			chunks[key].append(pose)
 		for key in chunks:
-			var origin := Vector3((float(key.x)+0.5)*ORCHARD_CHUNK,0,(float(key.y)+0.5)*ORCHARD_CHUNK) if zone_id=="orchard_highlands" else Vector3.ZERO
+			var origin := Vector3(-extent+(float(key.x)+0.5)*ORCHARD_CHUNK,0,-extent+(float(key.y)+0.5)*ORCHARD_CHUNK) if zone_id=="orchard_highlands" else Vector3.ZERO
 			var poses: Array = chunks[key]
 			var multi := MultiMesh.new()
 			multi.transform_format = MultiMesh.TRANSFORM_3D
 			multi.mesh = record.mesh
 			multi.instance_count = poses.size()
-			multi.custom_aabb = AABB(Vector3(-ORCHARD_CHUNK*0.5-2,-2,-ORCHARD_CHUNK*0.5-2),Vector3(ORCHARD_CHUNK+4,8,ORCHARD_CHUNK+4)) if zone_id=="orchard_highlands" else AABB(Vector3(-extent-2,-2,-extent-2),Vector3((extent+2)*2,8,(extent+2)*2))
+			multi.custom_aabb = AABB(Vector3(-ORCHARD_CHUNK*0.5-2,-2,-ORCHARD_CHUNK*0.5-2),Vector3(ORCHARD_CHUNK+4,8,ORCHARD_CHUNK+4)) if zone_id=="orchard_highlands" else AABB(Vector3(-extent-2,-2,-extent-2),Vector3((extent+2)*2,12 if SURFACE_ISLANDS.has(zone_id) else 8,(extent+2)*2))
 			var addresses := PackedVector3Array()
 			for i in range(poses.size()):
 				multi.set_instance_transform(i,Transform3D(poses[i].basis,poses[i].origin-origin))
