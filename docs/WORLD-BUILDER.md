@@ -1,53 +1,77 @@
-# Orchard world-builder: one live world, two local perspectives
+# Orchard World Builder
 
-The current playable slice is **the 320 × 320 m Orchard Highlands**. The Hero's VR/desktop scene and the elevated native Godot window use the **same `World3D` and the same running simulation**. The second window is a controller and camera, not a copy of the map. A tree planted from above visibly grows for 2.4 seconds in front of the Hero; a worker's tree felling, path carving, bridge construction, and skeleton patrol all happen in the scene the Hero can walk through. Chopping an authored orchard tree with Orchard's Edge changes the strategic ledger immediately.
+Choose **World Builder** in the persistent launcher, select VR or Monitor / projector, then start normally. **F9** opens/returns from the strategic view during desktop play. Its camera renders the Hero's actual Godot `World3D`: terrain, weather, enemies, trees, structures and avatar share one simulation. This is local asymmetric play on one PC; remote multiplayer is not implemented.
 
-This is **same-PC asymmetric play**. One person can wear the Vive Pro 2 while another uses the mouse and keyboard in the builder window. A networked second machine, remote invitation codes, a separate settlement screen, and a seamless merge of all existing zones are not implemented. The Orchard itself is one broad continuous zone; existing portals remain travel between other zones.
+[Shared-world direction](RTS-SHARED-WORLD-DIRECTION.md) describes the next dependencies. [September 30 evidence](RTS-SHARED-WORLD-20260930.md) records sources, measurements and limitations.
 
-## Playing
+## Controls and Mana
 
-From **Brann's Forge Launcher**, choose **World Builder — develop the orchard**, select **VR headset** for a Hero in VR or **Monitor / projector** for a desktop rehearsal, then start. The launcher handles SteamVR initialization as on the normal VR path. On an already-running normal game, press **F9** in the game's desktop mirror to open the builder without restarting; F9 in the builder closes it. The Hero can travel to Orchard Highlands through the Pinewood route. Launching the World Builder role starts the Hero in the orchard so both players can try it immediately.
+The Opus 5.5-authored native command panel has illustrated icons, a Mana orb, resource costs, cooldown progress and unavailable-action reasons. Text draws at native resolution independently of the secondary 3D render scale.
 
-The builder window uses `1`–`5` for construction/encounter tools, `6` Sunder, `7` Raise Earth, `8` Grow Forest, `9` hire, `0` Earthen Wall, `Q` Tree Ring, `E` Starfall and `R` Crystal Fault. [The illustrated spell guide](TERRAFORMING-SPELLS.md) shows their results and costs. Left-click acts, drag or two clicks draws a line, `WASD` pans, right-drag orbits, the wheel zooms, `F` follows the Hero, `F11` toggles fullscreen, and `Esc` cancels a half-drawn path or closes the window. The window's 30/60 fps and 50/65/100% render controls affect **only its secondary viewport**. It starts at 30 fps / 65%, stops drawing while minimized, and drops to 20 fps / 50% if the live VR frame rate stays below 72 fps for two seconds after warmup. That protects VR priority but is not a substitute for headset measurement.
+- **F1–F4** select Land, Life, Construction and Encounters; **1–9** select a card in that palette.
+- Click a point for radial spells or choose two endpoints / drag a line for linear spells. Successful casts retain the selected spell.
+- **Right-click** or **Escape** cancels targeting. **F9** returns to the Hero. **F11** toggles fullscreen.
+- **WASD** pans, right/middle-drag orbits, wheel zooms. **F** finds/follows the Hero.
+- Hover cards for cost, description, gesture, cooldown and failure reasons. Construction previews show the actual lumber cost. Terrain previews include Sundering's shoulders, forest corridors, the tree-ring planting band and meteor crater.
 
-| Action | Cost and result |
+Mana starts at 12 and caps at 20; old `aether` saves migrate without resetting reserves. **Testing 4×** regeneration defaults to 0.22 Mana/second, against normal 0.055. The panel exposes both presets; tuning key: `worldbuilder.mana_regen_multiplier`. Failed placement spends nothing and starts no cooldown.
+
+The secondary camera starts at 30 fps / 65% resolution, pauses while minimized, and can reduce to 20 fps / 50% when VR remains below 72 fps after warmup. Its quality controls affect only that viewport. Actual Vive Pro 2 frame time remains unmeasured.
+
+| Palette | Shortcuts in order |
 | --- | --- |
-| Mark timber | Point near one of the ~399 actual scenic trees or an interactive lumber tree. A helper walks to it, chops, carries a visible log home, then adds lumber to the settlement stockpile. A felled tree stays a stump. |
-| Carve path | Two points, 3–36 m apart. Costs one aether per started 7 m. A walkable-width earth ribbon and an authored waymarker appear; trees and colliders in its corridor are cleared. |
-| Build bridge | Three stockpiled lumber at the marked Windfall Brook crossing. The authored stone-and-timber bridge has tagged deck/rail collision and can be crossed in first person. The shallow brook remains wadeable. |
-| Grow grove | Three aether. Three harvestable trees grow visibly; up to 24 groves. |
-| Muster bones | Four aether. A violet warning gives the Hero 1.7 seconds, then three improved Mossward skeletons appear in the same world. Their deaths remove the units from the strategic state. At most eight patrol groups (24 skeletons) coexist. Cannot be placed within 7 m of the Hero. |
-| Hire helper | Two delivered lumber, up to five workers. Independent workers pick up marked tree jobs. |
+| Land / F1 | 1 Path; 2 Sunder; 3 Raise Earth; 4 Earthen Wall; 5 Starfall; 6 Crystal Fault |
+| Life / F2 | 1 Grove; 2 Forest line; 3 Tree Ring; 4 Awaken Ent; 5 Mark Harvest; 6 Hire Helper; 7 Calm Ent; 8 Plant Magical Seed |
+| Construction / F3 | 1 Bridge; 2 Ramp; 3 Stairs; 4 Boardwalk; 5 Outpost; 6 Tower; 7 Platform; 8 Gate; 9 Barricade |
+| Encounters / F4 | 1 Skeleton Patrol; 2 Assemble Golem |
 
-Aether starts at 12, regenerates slowly to 20, and is shared between paths, groves and encounters. Lumber only becomes spendable when a worker reaches the stockpile, or when the Hero fells a scenic tree. Orchard's Edge takes three blade strikes at roughly the same height to fell one of those trees. This settlement stockpile is currently separate from the Hero's crafting pouch; merging the two economies needs an explicit balancing decision.
+Outpost, Tower, Platform, Gate, Barricade and Assemble Golem are **unavailable future entries**. No resources are spent on them. Terrain spells use the persistent primitives in [terraforming](TERRAFORMING-SPELLS.md). Starfall leaves mineable material; no meteor creature emerges yet.
 
-## State and lifecycle
+## Free construction and resources
 
-`godot/world_builder_runtime.gd` owns the authoritative world state and is constructed during **every ordinary launch**, including launches without the builder window. `godot/world_builder_view.gd` only issues actions and renders that `World3D`. The persisted bounded ledger is `user://world_builder_v1.json` (on this PC, under Godot's `app_userdata/Brann's Forge VR`). It contains grove/path/bridge placements, felled and marked tree addresses, workers, aether/lumber, timber in transit, and surviving patrol slots. It writes through a temporary file and atomic rename, autosaves regenerating aether about every 15 seconds, and saves at every discrete action. An invalid/oversized file is left untouched and blocks replacement; inspect the game log before recovery. Offline checks use an isolated temporary path and never read or write the player's settlement.
+Bridge, ramp, stairs and boardwalk support manual two-endpoint placement. Length, grade, water, support height, standing trees, existing structures and lumber are checked before commitment. Decks, rails and terrain-grounded supports have real collision; worker routes include decks and invalidate when another structure is added.
 
-The initial forest is still authored in batched `MultiMesh` chunks. Each tree placement has an address. Clearing a tree hides only its corresponding near/far mesh instances and disables its trunk shape; it does not rebuild the 320 m forest. Paths are one mesh per segment. The carved main river uses short water ribbons and locally updated source-fed pools. Authored waymarkers are capped at 24 instances even if the path ledger reaches 96 segments. Workers have Opus-authored idle/walk/chop clips; at most five are active. The stockpile has three primitive collision proxies. The imported bridge's deck and parapet colliders are gameplay-tagged `floor`/`solid`, so the Hero's existing locomotion query can cross it.
+Maximum lengths: bridge 32 m, ramp/stairs 18 m, boardwalk 36 m. At most 32 free structures persist. The old three-lumber authored bridge at the marked brook crossing remains compatible; native construction controls use free placement.
 
-The compact builder layout follows the Opus 5.5 UI commission's scene-first palette, readable status, feedback and camera controls. The full spec in `assets/worldbuilder/orchard_kit/BUILDER-UI.md` sketches further route splines, richer ghosts, costs at the cursor and Director follow; those are future design directions, not a claim that every control in the spec is live.
+Workers chop marked trees and carry timber home before crediting the settlement. Hire Helper costs two delivered lumber, with at most five workers. Hero-collected scenic logs and defeated Ents credit settlement timber once; Ent logs have an already-credited tag to prevent double gathering. The settlement stockpile and Hero pouch remain distinct inventories.
 
-## Assets and rebuilds
+The Sonnet 5.5-authored renderer uses shared timber textures and one mesh with six material surfaces per structure; a maximum-length boardwalk has 6,924 triangles. [Construction checks and constraints](CONSTRUCTION-VERIFICATION.md).
 
-- Playable bridge: `godot/assets/worldbuilder/orchard_bridge.glb`; editable source, deterministic builder and review image: `assets/worldbuilder/orchard_bridge/`. This is the previously reviewed Opus bridge from the orchard 2D-to-3D study.
-- Playable worker, stockpile and waymarker: `godot/assets/worldbuilder/{worker,stockpile,waymarker}.glb`. The full Opus 5.5 commission, editable `.blend`, deterministic builder, validation script, textures, reports and review renders are in `assets/worldbuilder/orchard_kit/`.
-- Rebuild the kit from its source directory with `blender --background --factory-startup --python build_orchard_kit.py` and then `blender --background --factory-startup --python validate_kit.py`. Review the renders/import inventory before copying the three new GLBs into `godot/assets/worldbuilder/`; do not replace the approved playable files silently.
+## Ents and physical consequences
 
-The Claude child environment was cleaned of Anthropic/API overrides, and `claude auth status` verified `fauxgrady@gmail.com`, `authMethod: claude.ai`, an active Pro subscription and explicit `claude-opus-5-5` metadata. The isolated commission stayed in ignored `work/opus-worldbuilder-20260928/`; measured CLI wall time was 699.21 s. Codex reviewed and integrated the assets; no Claude-generated game code was merged.
+Awaken Ent costs three Mana. An existing tree becomes the creature, retaining its trunk, canopy, identity, species and size. The Sonnet visual layer fits a bark face and articulated branch/root limbs to that trunk. At most eight living Ents coexist; defeated records recycle within the bounded ledger.
 
-## Verification and limits
+Pine Ents are tougher. Calm Ent costs two Mana and grants a 90-second guardian interval. Calmed Apple Ents provide real edible fruit, restoring up to 40 health across its bites when carried near the face. Production reuses a bounded fruit entry at most once every 30 seconds.
 
-Run from the project root:
+Shared fire ignites an Ent and makes it more dangerous; it emits heat through the existing contact system. Shared water quenches it with a brief reignition guard. This does not persist burning/felling for every decorative forest tree.
+
+Defeat yields credited timber, a grabbable physical log and magical seed. Grip/gather the seed to recover it into the bounded settlement pouch; **Life / 8**, then valid dry soil, plants a persistent, harvestable tree of the original species. Invalid placement retains the seed; capacity is eight.
+
+Claimed seeds, planted trees and source defeat persist. Loose fruit/log/drop positions are session physics, not a saved physics replay. Newly grown fruit-tree interaction needs a further registration pass.
+
+## Encounters
+
+Skeleton Patrol costs four Mana and warns for 1.7 seconds before three real enemies rise. Objectives: keep defeats within 14 m of the warning; clear within 45 seconds; or defeat the middle captain last. Up to eight patrols / 24 skeletons coexist.
+
+A successful clear in a new 24 m sector earns up to two Mana; varying the objective from the previous reward can also grant one lumber. Each sector pays once, capped at 40 rewards. Objective, timing, kill order and reward history survive JSON save/reload. Ordinary skeleton loot and quest XP remain repeatable under the existing rules; this is not a complete anti-farming system.
+
+## State, sources and verification
+
+`world_builder_runtime.gd` owns state even when the survey window is closed. `world_builder_view.gd` issues commands and renders that world. The bounded ledger is `user://world_builder_v1.json`, under Godot's `app_userdata/Brann's Forge VR`. It saves placements, terrain/ecology references, Mana/cooldowns, lumber, workers/jobs, Ents, claimed seeds, patrols and rewards. Writes use temporary-file replacement. Invalid files remain untouched and block overwrite. Offline fixtures use disposable state.
+
+The forest remains chunk-instanced with addressed trees; clearing updates near/far instances and trunk collision without rebuilding the entire forest. Original worker/stockpile/waymarker/fixed bridge sources remain under `assets/worldbuilder/`. New editable UI/Ent/construction commissions and verified metadata are in `assets/source-commissions/rts-20260930/`; installed `godot/world_builder_*.gd` files include reviewed integration corrections.
+
+Run from this repository:
 
 ```powershell
-& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_checks.gd -- --world-builder-check
-& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_visual_check.gd -- --world-builder --world-builder-preview
-& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_stress_check.gd -- --world-builder --world-builder-preview
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File launcher/launcher.ps1 -Validate
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_panel_checks.gd -- --world-builder-check
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_ents_checks.gd -- --world-builder-check
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_construction_live_checks.gd -- --world-builder-check
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_encounters_checks.gd
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_panel_checks.gd -- --panel-capture
+& .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_art_review.gd
 ```
 
-The named result `WORLD_BUILDER_RESULT {"failures":[]}` verifies same-scene dual camera, timber delivery, authored forest clearing, Hero axe changes, grove growth, path/bridge collision, active and defeated skeleton patrols, a save/load round trip, and builder window lifecycle. Review `outputs/world-builder-live.png`, `world-builder-ground.png` and `world-builder-camp.png` for the overhead map, walkable crossing and work site. The graphical stress check held **24 authored skeletons plus the tactical viewport at the 120 fps desktop cap** in 12.1 seconds on this PC, with 30 fps / 65% tactical settings. That is a useful catastrophic-regression check, **not an HMD frame-time or stereo-performance measurement**. Playtest in the Vive Pro 2 before raising population caps.
+Native captures: `outputs/worldbuilder-panel/`, `outputs/worldbuilder-art/`. Reviews exercise installed art and runtime facing, but do not replace an in-world/HMD playtest.
 
-Current limitations: workers and Orchard ground enemies use terrain-aware route steering, not a full obstacle navmesh, so some scenery can still impede or clip routes; a harvested scenic tree disappears into a stump rather than playing a full falling/ragdoll sequence; bridges are at one surveyed crossing, not freeform spanning; river water is shallow and has no current or wetness effects; paths clear trees but not every pre-existing rock or ruin; patrols are a bounded encounter tool rather than army formations. A forest fire does not yet burn its individual authored trees into settlement state. These are concrete next extensions of the shared-world model, not separate mode-specific simulations.
+Remaining limits: navigation uses terrain/deck-aware grid steering, not a complete scenery navmesh. Later terrain edits can bury/expose decks; routes reject inaccessible crossings but structures do not repair themselves. Free structures are straight and grade-limited. Supply outposts, component golems, purposeful weather-bottle quests, remote sessions and talents remain future work.

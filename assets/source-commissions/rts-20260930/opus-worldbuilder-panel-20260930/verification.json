@@ -1,0 +1,10 @@
+{
+  "email": "fauxgrady@gmail.com",
+  "authMethod": "claude.ai",
+  "subscriptionType": "pro",
+  "requestedModel": "claude-opus-5-5",
+  "actualModel": "claude-opus-5-5",
+  "seconds": 192.9463402000256,
+  "timedOut": false,
+  "output": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\work\\opus-worldbuilder-panel-20260930"
+}

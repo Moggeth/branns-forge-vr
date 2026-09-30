@@ -1738,6 +1738,20 @@ configuration is `service/quests-config.json`, not a generic `config/` folder.
 Use `rg -g '*.gd' godot` rather than a positional wildcard in PowerShell.
 Each failed guessed path loses time without providing useful evidence.
 
+## Shared-world RTS integration — 2026-09-30
+
+[Controls and state](WORLD-BUILDER.md), [verification/source handoff](RTS-SHARED-WORLD-20260930.md), and [next dependencies](RTS-SHARED-WORLD-DIRECTION.md). Use the existing native renderer diagnostics rather than recomissioning assets to inspect them. Final panel/full-scene/Ent fixtures pass in 6.969 / 7.782 / 7.503 seconds; three native panel sizes render in 1.813 s, and seven installed art views in 2.000 s. These are offline desktop measurements, not headset performance.
+
+For procedural geometry, compare triangle cross products with declared normals before GPU review; inward winding failed the first timber fixture. Use a choppable TreeKit fixture with the actual named Trunk, not a Crown-only tree, and transform Trunk coordinates into the PI-rotated Ent presentation space. Preserve per-instance eye materials while sharing other meshes/materials.
+
+The old fairy heat diagnostic hung for 151.553 s when fluid was absent. It now has a 45-second watchdog and a null-fluid rejection. Run it with **both** `--world-builder-check --experimental-fuel-combat`; `--fuel-combat-check` additionally schedules a different checker from Main and is not an interchangeable flag. The corrected 18-check regression passed in 7.233 s. Stop only identified diagnostic processes.
+
+Native text must stay outside secondary 3D render scaling. Preload the imported atlas texture for export. Keep palettes within 1–9; JSON whole-number validators must allow finite integral floats from an actual save/load round trip, without accepting fractional or nonfinite values. Frozen headless Window lifecycle tests must close immediately instead of awaiting cosmetic arrival animation.
+
+A Claude command-wrapper timeout did not stop its descendant Node process; the Ent refinement ran 347.360 s despite the shorter deadline. Do not regard `terminate(claude.cmd)` as a reliable cap. Use verified process-tree termination or a Job Object for future commissions and preserve timeout metadata honestly. The source was accepted only after separate native parse, render and gameplay checks.
+
+Discovery in this task still repeated guessed-path failures despite earlier guidance. Use `rg --files` first; construction evidence is `docs/CONSTRUCTION-VERIFICATION.md`, and terrain operators are `landscape_operations.gd`.
+
 ## VR held steadiness integration — 2026-09-30
 
 [Boundary, controls and native checks](VR-HELD-STEADINESS.md). Filter once at
