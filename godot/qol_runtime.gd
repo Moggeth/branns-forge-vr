@@ -1,13 +1,19 @@
 extends Node
 ## Comfort settings, wrist inventory and safe reset. No external calls are made here.
 var game
+const ResourceGuide = preload("res://resource_guide.gd")
+var supplies_index := 0
+var supplies_selected := 0
+var supplies_snapshot := {}
+var supplies_pages_cache: Array = []
+var next_supplies_sample := 0.0
 var settings = {"dominant":"right","turn":"snap","snap_degrees":30,"turn_speed":60,"seated":false,"height_offset":0.0,"reach":3.0,"throw_arc":false}
 var menu: Node3D
 var title: Label3D
 var detail: Label3D
 var tracking_space: Node3D
 var buttons: Array = []
-var page = "tools"
+var page = "quick"
 var opened = false
 var latch = false
 var ready_queue: Array = []
@@ -151,9 +157,9 @@ func _build():
 		button.free()
 	buttons.clear()
 	recording_button=null
-	detail.position.y=-0.14 if page=="inventions" else (-0.075 if page=="journal" else -0.43)
-	detail.font_size=14 if page=="inventions" else (18 if page=="journal" else 15)
-	var tabs=["quick","journal","tools","travel","comfort","inventions","tuning","weather"]
+	detail.position.y=-0.14 if page in ["inventions","supplies"] else (-0.075 if page=="journal" else -0.43)
+	detail.font_size=13 if page=="supplies" else (14 if page=="inventions" else (18 if page=="journal" else 15))
+	var tabs=["quick","journal","supplies","travel","comfort","inventions","tuning","weather"]
 	if OS.get_cmdline_user_args().has("--playful-demo"): tabs[-1]="demo"
 	for i in range(tabs.size()):
 		_button("Dev tools" if tabs[i]=="tools" else tabs[i].capitalize(),"page:"+tabs[i],Vector3(-0.2925+(i%4)*0.195,0.355-floorf(i/4.0)*0.065,0.005),0.185)
@@ -175,6 +181,13 @@ func _build():
 			var places=_travel_rows()
 			travel_page=clampi(travel_page,0,maxi(0,ceili(places.size()/12.0)-1))
 			rows=places.slice(travel_page*12,travel_page*12+12)
+		"supplies":
+			var pages:=_supplies_pages()
+			supplies_index=clampi(supplies_index,0,maxi(0,pages.size()-1))
+			if not pages.is_empty():
+				for index in pages[supplies_index].rows.size():
+					var entry:Dictionary=pages[supplies_index].rows[index]
+					rows.append([_supplies_row_title(entry),"supply:select:"+str(index)])
 		"comfort":
 			rows=[
 				["Hand: "+settings.dominant,"dominant"],
@@ -193,11 +206,15 @@ func _build():
 			rows=[["Previous item","item_prev"],["Next item","item_next"],["Present within reach","present"],["Equip selected","equip"],["Compare previous","compare"],["Refine with Brann","refine"]]
 		"tuning": game.tuning.build_menu(false)
 		"quick": game.tuning.build_menu(true)
+	if page=="quick": rows.append(["Dev tools","page:tools"])
 	for i in range(rows.size()):
 		_button(rows[i][0],rows[i][1],Vector3(-0.185 if i%2==0 else 0.185,0.185-floorf(i/2.0)*0.075,0.005))
 	if page=="travel":
 		_button("Previous places","places:previous",Vector3(-0.185,-.265,.005))
 		_button("More places","places:next",Vector3(.185,-.265,.005))
+	if page=="supplies":
+		_button("Previous ledger","supply:previous",Vector3(-.185,-.265,.005))
+		_button("Next ledger","supply:next",Vector3(.185,-.265,.005))
 	if page=="quick":
 		recording_button=_button("Start video","record",Vector3(-0.185,-0.34,0.005))
 	else:
@@ -263,6 +280,8 @@ func tick(delta):
 			detail.text=game.demo_session.status_text() if game.demo_session!=null else "Offline preview · progress resets on exit."
 		elif page=="travel":
 			detail.text="Places %d / %d · Choose somewhere to play"%[travel_page+1,ceili(_travel_rows().size()/12.0)]
+			if game.get("travel_navigation")!=null: detail.text+="\nSelected: "+game.travel_navigation.destination_name()
+		elif page=="supplies": _supplies_detail()
 		elif page=="journal":
 			detail.text=game.quests.journal() if game.quests!=null else "Your field journal is loading."
 		elif page!="inventions":
@@ -309,6 +328,15 @@ func menu_trigger(source):
 	return true
 
 func action(value):
+	if value.begins_with("supply:"):
+		var pages:=_supplies_pages()
+		if value in ["supply:next","supply:previous"]:
+			supplies_index=posmod(supplies_index+(1 if value=="supply:next" else -1),maxi(1,pages.size()))
+			supplies_selected=0
+			_build()
+		else: supplies_selected=int(value.get_slice(":",2))
+		_supplies_detail()
+		return
 	if value in ["places:next","places:previous"]:
 		var count=maxi(1,ceili(_travel_rows().size()/12.0))
 		travel_page=posmod(travel_page+(1 if value=="places:next" else -1),count)
@@ -399,6 +427,55 @@ func action(value):
 	save()
 	apply_height()
 	_build()
+
+func _supplies_pages() -> Array:
+	# The native folio and physical toolbelt consume one read-only guide. Keep
+	# generation and pagination off the per-frame VR interaction path.
+	if supplies_snapshot.is_empty() or game.elapsed>=next_supplies_sample:
+		next_supplies_sample=game.elapsed+0.2
+		supplies_snapshot=ResourceGuide.build(game)
+		supplies_pages_cache.clear()
+		for wallet in supplies_snapshot.wallets:
+			var wallet_rows:Array=wallet.rows
+			for offset in range(0,wallet_rows.size(),8):
+				supplies_pages_cache.append({"title":wallet.title,"rows":wallet_rows.slice(offset,offset+8)})
+		for section in ["items","costs"]:
+			var entries:Array=supplies_snapshot[section]
+			for offset in range(0,entries.size(),8):
+				supplies_pages_cache.append({"title":"Equipment" if section=="items" else "Actions and costs","rows":entries.slice(offset,offset+8)})
+	return supplies_pages_cache
+
+func _supplies_row_title(entry:Dictionary) -> String:
+	# Complex prices and precise restrictions appear in the selected detail;
+	# narrow palm buttons show the name and current balance/availability.
+	return str(entry.name)+"\n"+str(entry.get("amount",entry.get("state","")))
+
+func _supplies_detail() -> void:
+	var pages:Array=_supplies_pages()
+	if pages.is_empty():
+		detail.text="Supplies are still loading."
+		return
+	supplies_index=clampi(supplies_index,0,pages.size()-1)
+	var ledger:Dictionary=pages[supplies_index]
+	var entries:Array=ledger.rows
+	supplies_selected=clampi(supplies_selected,0,maxi(0,entries.size()-1))
+	# Refresh labels without rebuilding collision buttons under the pointing hand.
+	for button in buttons:
+		var action_name:String=str(button.get_meta("action",""))
+		if not action_name.begins_with("qol:supply:select:"): continue
+		var index:int=int(action_name.get_slice(":",3))
+		for child in button.get_children():
+			if child is Label3D:
+				child.text=_supplies_row_title(entries[index]) if index<entries.size() else "No longer available"
+				child.modulate=Color("fbd590") if index==supplies_selected else Color("fff0ce")
+	detail.text="%s · %d / %d"%[str(ledger.title),supplies_index+1,pages.size()]
+	if entries.is_empty(): return
+	var entry:Dictionary=entries[supplies_selected]
+	detail.text+="\n"+str(entry.name)
+	if entry.has("amount"): detail.text+=" · "+str(entry.amount)
+	elif entry.has("cost"): detail.text+="\nCost: "+str(entry.cost)+" · "+str(entry.get("state",""))
+	else: detail.text+=" · "+str(entry.get("state",""))
+	detail.text+="\n"+str(entry.get("purpose",entry.get("description","")))
 
 func recall_home():
 	cancel_forming()
