@@ -41,7 +41,8 @@ func impact(item:Node3D,target:Node3D,point:Vector3,normal:Vector3,speed:float,h
 	_bonk(point,speed)
 	if game.heat_contacts!=null: game.heat_contacts.touch(point,.55,270,game.adventure.zone,"sunfall",item,.1)
 	game.adventure.haptic(hand,"impact")
-	game._effect(point,Color("ff8f3b"),0.35,0.42)
+	if game.impact_feedback!=null:
+		game.impact_feedback.contact(target,point,normal,speed,ITEM_ID)
 	var direction=(velocity+Vector3.UP*2.0).normalized()
 	var kind=str(target.get_meta("kind","")) if target!=null else ""
 	if kind=="enemy":

@@ -1282,6 +1282,11 @@ func _desktop_input(delta):
 
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
+	if adventure!=null and adventure.dying:
+		desktop_swing_started=-1.0
+		desktop_swing_item=null
+		if melee!=null: melee.clear_desktop_contact()
+		return
 	var distance=Vector2(rig.global_position.x-desktop_last_position.x,rig.global_position.z-desktop_last_position.z).length()
 	desktop_last_position=rig.global_position
 	var moving=not (discoveries!=null and discoveries.opened) and not qol.opened and distance>0.0001 and distance<0.25
@@ -1995,7 +2000,6 @@ func _bomb(position: Vector3):
 
 func _dummy_hit(dummy: Node3D):
 	dummy.set_meta("hits", int(dummy.get_meta("hits", 0)) + 1)
-	_effect(dummy.global_position + Vector3.UP, Color("ffcc66"), 0.4, 0.5)
 	_notice("Practice target hit · " + str(dummy.get_meta("hits")))
 
 func _effect(position: Vector3, color: Color, seconds: float, size: float):

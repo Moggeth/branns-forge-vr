@@ -724,16 +724,8 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	if str(enemy.get_meta("enemy_type",""))=="boss" and game.elapsed<float(enemy.get_meta("exposed_until",0)): damage*=2
 	var health = float(enemy.get_meta("hp",60))-damage
 	enemy.set_meta("hp",health)
-	# Bone strikes read best at the actual contact. A large chest-centred orb
-	# disguised limb failure and made strong chops feel like generic HP damage.
-	if damage_type=="physical" and game.impact_feedback!=null:
-		var contact_point: Vector3 = impact_point if impact_point!=null else enemy.global_position+Vector3.UP*0.9
-		var contact_normal: Vector3 = (game.camera.global_position-contact_point).normalized()
-		var tool_id="projectile"
-		if is_instance_valid(hand):
-			var tool=game.held.get(str(hand.get_instance_id()))
-			if is_instance_valid(tool): tool_id=str(tool.get_meta("id","weapon"))
-		game.impact_feedback.contact(enemy,contact_point,contact_normal,maxf(1.0,sqrt(float(damage)*0.2)),tool_id)
+	# Exact melee/projectile contacts own feedback. Damage itself must not invent
+	# a chest impact which duplicates or suppresses the measured surface event.
 	haptic(hand,"impact")
 	if health>0:
 		game._notice("%s · %d health"%[str(enemy.get_meta("enemy_type","guardian")).capitalize(),ceili(health)],2)

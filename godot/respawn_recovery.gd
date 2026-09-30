@@ -126,7 +126,9 @@ func recover(preferred: Vector3) -> Dictionary:
 	game.desktop_locomotion.reset()
 	game.held_pose.refresh(game)
 	game.previous_tips.clear()
-	if game.melee != null: game.melee.tracks.clear()
+	if game.melee != null:
+		game.melee.tracks.clear()
+		game.melee.clear_desktop_contact()
 	arrival = feet
 	watch_until = game.elapsed + 1.5
 	next_watch = game.elapsed

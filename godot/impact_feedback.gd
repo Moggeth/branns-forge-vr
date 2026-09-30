@@ -86,6 +86,8 @@ func emit_contact(event: Dictionary) -> bool:
 	normal = normal.normalized()
 	var target: Node3D = event.get("target")
 	var material: String = str(event.get("material", classify(target)))
+	var sound_material := "metal" if material == "star_iron" else material
+	if material == "star_iron": material = "stone"
 	if material not in MATERIALS: material = "stone"
 	var target_key: int = target.get_instance_id() if is_instance_valid(target) else 0
 	var now: float = game.elapsed
@@ -117,7 +119,7 @@ func emit_contact(event: Dictionary) -> bool:
 				"scale": float(spec.get("size", 0.04)) * rng.randf_range(0.75, 1.2),
 				"spin": Vector3(rng.randf(), rng.randf(), rng.randf()) * 7.0,
 				"color": Color(spec.get("tint", Color.WHITE)).lightened(rng.randf_range(0.0, 0.12))})
-	_sound(material, point, strength, bool(event.get("glance", false)))
+	_sound(sound_material if sound_material in MATERIALS else material, point, strength, bool(event.get("glance", false)))
 	_mark(target, point, normal, material, strength)
 	emitted += 1
 	return true
@@ -127,7 +129,7 @@ func _sound(material: String, point: Vector3, strength: float, glance: bool) -> 
 	var voice: AudioStreamPlayer3D = voices[voice_cursor % voices.size()]
 	voice_cursor += 1
 	voice.stop()
-	voice.stream = sounds[material][sequence % 3]
+	voice.stream = sounds[material][sequence % sounds[material].size()]
 	sequence += 1
 	voice.global_position = point
 	voice.pitch_scale = rng.randf_range(0.94, 1.07) * (1.08 if glance else 1.0)

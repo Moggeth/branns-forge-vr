@@ -128,7 +128,6 @@ func _finish(entry:Dictionary):
 	entry.body.visible=false
 	entry.body.freeze=true
 	entry.body.collision_layer=0
-	game._effect(entry.body.global_position,Color("ffa644"),0.36,0.52)
 
 func _piece(entry:Dictionary,position:Vector3,mesh:Mesh,material:Material,velocity:Vector3,weight:float,rotation:Basis=Basis.IDENTITY):
 	var fragment=RigidBody3D.new(); game.adventure.zone_groups.forge_yard.add_child(fragment)

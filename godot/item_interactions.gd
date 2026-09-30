@@ -135,7 +135,6 @@ func desktop_axe_state(item: Node3D, held: bool) -> void:
 
 func desktop_axe_impact(item: Node3D, point: Vector3, powered: bool) -> void:
 	if not is_instance_valid(item) or str(item.get_meta("id",""))!="woodland_axe" or not powered: return
-	if game.impact_feedback!=null: game.impact_feedback.contact(null,point,Vector3.UP,3.2,"woodland_axe","wood")
 	game._notice("Powered cleave!",2)
 
 func _clear_pick_charge(item:Node3D)->void:
@@ -159,7 +158,6 @@ func resonant_mine(item,target,point:Vector3,hand)->void:
 	if not str(target.get_meta("requires", "")) in ["pick","mine"]: return
 	_clear_pick_charge(item)
 	target.set_meta("resonant_bonus",1)
-	if game.impact_feedback!=null: game.impact_feedback.contact(target,point,Vector3.UP,4.5,"quarry_pick","stone")
 	var fractured=0
 	for ore in game.scene.get("resources",[]):
 		if ore==target or not is_instance_valid(ore) or not ore.is_visible_in_tree() or ore.get_meta("collecting",false): continue
