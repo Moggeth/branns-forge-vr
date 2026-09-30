@@ -5,6 +5,7 @@ const CUT_HEIGHT_TOLERANCE=0.18
 const CUTS_TO_FELL=3
 const BITE_DEPTH=0.045
 const WITHDRAW_DISTANCE=0.10
+const TREE_FELLING = preload("res://tree_felling.gd")
 var game
 var tracks={}
 
@@ -172,9 +173,11 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item)->bool:
 	return false
 
 func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
-	if target.get_meta("collecting",false) or not target.visible: return true
+	if target.get_meta("collecting",false) or target.get_meta("felled",false) or not target.visible: return true
 	var bands=target.get_meta("cut_bands",[])
 	var height=target.to_local(point).y
+	var allowed: Vector2 = target.get_meta("chop_band", Vector2(0.3, 2.2))
+	if height < allowed.x or height > allowed.y: return false
 	var selected=-1
 	for i in range(bands.size()):
 		if absf(bands[i].height-height)<=CUT_HEIGHT_TOLERANCE: selected=i; break
@@ -183,30 +186,21 @@ func chop(target,point:Vector3,normal:Vector3,hand=null)->bool:
 		selected=bands.size()-1
 	bands[selected].hits+=1
 	target.set_meta("cut_bands",bands)
-	game._effect(point,Color("cba36c"),0.25,0.10)
+	game._effect(point,Color("cba36c"),0.32,0.14+0.05*bands[selected].hits)
 	notch(target,bands[selected])
-	print("AXE_CUT height=",height," hits=",bands[selected].hits)
+	for chip in range(2+bands[selected].hits*2):
+		var spread=Vector3(randf_range(-0.16,0.16),randf_range(-0.10,0.18),randf_range(-0.16,0.16))
+		game._effect(point+spread,Color("e0b982"),0.12,randf_range(0.035,0.07))
+	_authored_chips(target,point,normal,int(bands[selected].hits))
 	if bands[selected].hits<CUTS_TO_FELL:
 		game._notice("Cut %d / 3 · strike this height again."%bands[selected].hits,3)
 		return false
-	# A falling visual copy keeps the original harvest/respawn lifecycle authoritative.
-	var falling=Node3D.new()
-	game.adventure.zone_groups.get(game.adventure.zone,game).add_child(falling)
-	falling.global_position=target.global_position+Vector3.UP*height
-	for child in target.get_children():
-		if child is MeshInstance3D:
-			var copy=child.duplicate()
-			falling.add_child(copy)
-			copy.transform=child.transform
-			copy.position.y-=height
-	var fall_axis=Vector3.UP.cross(-normal).normalized()
-	if fall_axis.length()<0.1: fall_axis=Vector3.RIGHT
-	var tween=create_tween()
-	tween.tween_property(falling,"quaternion",Quaternion(fall_axis,1.48),1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_interval(4)
-	tween.tween_callback(falling.queue_free)
+	var felling= TREE_FELLING.new()
+	game.adventure.zone_groups.get(game.adventure.zone,game).add_child(felling)
+	felling.start(game,target,float(bands[selected].height),normal)
+	target.set_meta("felled",true)
 	target.set_meta("cut_bands",[])
-	game.adventure.gather(target,hand)
+	game._notice("Timber down! Reach for the log to collect lumber.",4)
 	return true
 
 func mark(target,point:Vector3,normal:Vector3,size:float):
@@ -218,13 +212,14 @@ func mark(target,point:Vector3,normal:Vector3,size:float):
 func notch(target,band):
 	if not target.has_meta("trunk"): return
 	var trunk=target.get_meta("trunk")
+	if not is_instance_valid(trunk): return
 	var profiles=[]
 	var levels=[-0.5,0.5]
 	for cut in target.get_meta("cut_bands",[band]):
 		var center=trunk.to_local(cut.point)
-		var y=clampf(center.y,-0.43,0.43)
+		var y=clampf(center.y,-0.38,0.38)
 		profiles.append({"y":y,"angle":atan2(center.z,center.x),"hits":cut.hits})
-		for level in [y-0.04,y,y+0.04]:
+		for level in [y-0.12,y-0.065,y,y+0.065,y+0.12]:
 			if not levels.has(level): levels.append(level)
 	levels.sort()
 	var rings=[]
@@ -234,25 +229,61 @@ func notch(target,band):
 			var a=TAU*i/32
 			var r=lerpf(0.5,0.25,level+0.5)
 			for cut in profiles:
-				r-=maxf(0,1-absf(level-cut.y)/0.04)*maxf(0,1-absf(angle_difference(cut.angle,a))/0.8)*0.1*cut.hits
+				var vertical=maxf(0.0,1.0-absf(level-cut.y)/0.12)
+				var width=0.55+0.16*cut.hits
+				var around=maxf(0.0,1.0-absf(angle_difference(cut.angle,a))/width)
+				r-=vertical*around*(0.07+0.055*cut.hits)
 			ring.append(Vector3(cos(a)*maxf(r,0.04),level,sin(a)*maxf(r,0.04)))
 		rings.append(ring)
 	var s=SurfaceTool.new()
 	s.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bark: Color=target.get_meta("trunk_color",Color("825537"))
 	for j in range(levels.size()-1):
 		for i in range(32):
 			var k=(i+1)%32
 			var exposed=false
 			for cut in profiles:
-				if absf((levels[j]+levels[j+1])*0.5-cut.y)<0.041 and absf(angle_difference(cut.angle,TAU*(i+0.5)/32))<0.8: exposed=true
-			s.set_color(Color("d9b179") if exposed else Color("825537"))
+				if absf((levels[j]+levels[j+1])*0.5-cut.y)<0.085 and absf(angle_difference(cut.angle,TAU*(i+0.5)/32))<0.55+0.16*cut.hits: exposed=true
+			s.set_color(Color("d9b179") if exposed else bark.darkened(0.04*float(i%3)))
 			for v in [rings[j][i],rings[j][k],rings[j+1][k],rings[j][i],rings[j+1][k],rings[j+1][i]]: s.add_vertex(v)
 	s.generate_normals()
 	trunk.mesh=s.commit()
-	var material=StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo=true
-	material.roughness=0.95
-	trunk.material_override=material
+	# TreeKit's shared shader consumes vertex colours; retain its material and
+	# wind/emission conventions instead of replacing it with a flat override.
+	_authored_cut(target,band,trunk)
+
+func _authored_cut(target: Node3D, band: Dictionary, trunk: MeshInstance3D) -> void:
+	var old := target.get_node_or_null("CutWedge")
+	if old != null: old.free()
+	var hit_index: int = clampi(int(band.hits), 1, 3)
+	var path := "res://assets/tree_cutting/cut_wedge_%d.glb" % hit_index
+	if not ResourceLoader.exists(path): return
+	var wedge: Node3D = load(path).instantiate()
+	wedge.name = "CutWedge"
+	target.add_child(wedge)
+	var centre: Vector3 = target.to_local(band.point)
+	var outward: Vector3 = target.global_basis.inverse() * band.normal
+	outward.y = 0.0
+	if outward.length_squared() < 0.01: outward = Vector3.RIGHT
+	outward = outward.normalized()
+	var radius: float = 0.25 * maxf(trunk.transform.basis.x.length(), trunk.transform.basis.z.length())
+	wedge.position = Vector3(centre.x, float(band.height), centre.z) + outward * radius * 0.82
+	wedge.rotation.y = -atan2(outward.z, outward.x)
+	wedge.scale = Vector3.ONE * radius
+
+func _authored_chips(target: Node3D, point: Vector3, normal: Vector3, hit_index: int) -> void:
+	for i in range(2 + hit_index):
+		var path := "res://assets/tree_cutting/chip_%s.glb" % ("a" if i % 2 == 0 else "b")
+		if not ResourceLoader.exists(path): continue
+		var chip: Node3D = load(path).instantiate()
+		target.get_parent().add_child(chip)
+		chip.global_position = point + Vector3(randf_range(-0.08,0.08),randf_range(-0.05,0.08),randf_range(-0.08,0.08))
+		chip.scale = Vector3.ONE * randf_range(0.07,0.12)
+		var travel := (normal + Vector3(randf_range(-0.5,0.5),0.7,randf_range(-0.5,0.5))).normalized() * randf_range(0.24,0.5)
+		var tween := create_tween()
+		tween.tween_property(chip,"global_position",chip.global_position + travel,0.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(chip,"transparency",1.0,0.28) if chip is GeometryInstance3D else tween.tween_interval(0.28)
+		tween.tween_callback(chip.queue_free)
 
 func alternate(item,hand):
 	item.set_meta("axe_power_armed",true)
