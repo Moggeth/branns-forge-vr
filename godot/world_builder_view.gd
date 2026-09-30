@@ -98,6 +98,9 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	get_tree().root.gui_embed_subwindows = previous_embed_subwindows
+	if is_instance_valid(game) and game.is_inside_tree() and not game.is_queued_for_deletion():
+		_restore_hero_hud()
+		game.get_viewport().scaling_3d_scale = hero_3d_scale_before
 	# Preview meshes live under the Orchard, outside this Window's ownership.
 	# Also release them when a caller frees the Window without calling close().
 	for preview in [marker, route_preview, preview_boundary, target_visual]:
@@ -135,6 +138,7 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	_position_camera()
 	_build_ui()
 	_hide_hero_hud_for_pip()
+	if hero_primary: _restore_hero_hud()
 	_build_preview()
 	var illustrated: Node3D = preload("res://world_builder_targeting_art.gd").new()
 	set_target_visual(illustrated)
@@ -393,6 +397,9 @@ func _pip_changed() -> void:
 
 func _apply_primary_textures() -> void:
 	if world_picture == null or hero_pip == null: return
+	if is_instance_valid(command_panel): command_panel.visible = not hero_primary
+	# The root texture already contains the FPS HUD. Keep its top rows clear.
+	if is_instance_valid(top_panel): top_panel.visible = not hero_primary
 	world_picture.texture = game.get_viewport().get_texture() if hero_primary else tactical_viewport.get_texture()
 	hero_pip.picture.texture = tactical_viewport.get_texture() if hero_primary else game.get_viewport().get_texture()
 	hero_pip.caption = "RTS · LIVE VIEW" if hero_primary else "HERO · LIVE VIEW"
@@ -413,6 +420,8 @@ func _sync_hero_resolution() -> void:
 
 func swap_primary() -> void:
 	hero_primary = not hero_primary
+	if hero_primary: _restore_hero_hud()
+	else: _hide_hero_hud_for_pip()
 	_apply_primary_textures()
 	if hero_primary: hero_focus_requested.emit()
 	elif game.desktop_look != null: game.desktop_look.release_capture()
@@ -441,8 +450,8 @@ func set_target_visual(visual: Node3D) -> void:
 	_publish_targeting()
 
 func _hide_hero_hud_for_pip() -> void:
-	if not is_instance_valid(game.hud): return
-	var node: Node = game.hud
+	var node: Node = game.get("hud")
+	if not is_instance_valid(node): return
 	while node != null and not node is CanvasLayer: node = node.get_parent()
 	if node is CanvasLayer:
 		hero_hud_layer = node
@@ -835,6 +844,7 @@ func _cast_line(a: Vector3,b: Vector3) -> String:
 
 func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
+	var header_height: float = 0.0 if hero_primary else TOP_HEIGHT * ui_scale
 	if hero_primary and event is InputEventKey:
 		var hero_key := event as InputEventKey
 		if not (hero_key.pressed and not hero_key.echo and hero_key.keycode in [KEY_F9, KEY_F11]):
@@ -864,14 +874,14 @@ func _input(event: InputEvent) -> void:
 		else: return
 		set_input_as_handled()
 	elif event is InputEventMouseButton:
-		var in_hero: bool = hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= TOP_HEIGHT * ui_scale
+		var in_hero: bool = hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= header_height
 		if in_hero or (hero_primary and hero_mouse_down and not event.pressed):
 			if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]: hero_mouse_down = event.pressed
 			hero_input_requested.emit(event)
 			set_input_as_handled()
 			return
 		var in_rts_pip: bool = hero_primary and hero_pip.content_rect_screen().has_point(event.position)
-		if not in_rts_pip and (command_panel.is_over_panel(event.position) or event.position.y < TOP_HEIGHT * ui_scale): return
+		if not in_rts_pip and (command_panel.is_over_panel(event.position) or event.position.y < header_height): return
 		if event.button_index in [MOUSE_BUTTON_RIGHT,MOUSE_BUTTON_MIDDLE]:
 			if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed: _cancel_targeting()
 			dragging = event.pressed
@@ -901,7 +911,7 @@ func _input(event: InputEvent) -> void:
 			_position_camera()
 			set_input_as_handled()
 	elif event is InputEventMouseMotion:
-		if hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= TOP_HEIGHT * ui_scale and not dragging:
+		if hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= header_height and not dragging:
 			hero_input_requested.emit(event)
 			return
 		hovered = _world_at(event.position)

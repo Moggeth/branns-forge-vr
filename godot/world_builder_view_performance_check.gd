@@ -37,6 +37,11 @@ func _check() -> void:
 	view.mode = Window.MODE_WINDOWED
 	view.size = Vector2i(1280, 800)
 	view.position = Vector2i(-10600, -12000)
+	view.select_action("meteor")
+	view.hovered = Vector3(20,0,-40)
+	view._update_preview()
+	var capture_dir := ProjectSettings.globalize_path("res://../outputs/world-builder-live-review")
+	DirAccess.make_dir_recursive_absolute(capture_dir)
 	var hero_rid: RID = game.get_viewport().get_viewport_rid()
 	var rts_rid: RID = view.tactical_viewport.get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(hero_rid, true)
@@ -51,6 +56,16 @@ func _check() -> void:
 			samples.append(await _sample(game, view, hero_rid, rts_rid, target))
 	RenderingServer.viewport_set_measure_render_time(hero_rid, false)
 	RenderingServer.viewport_set_measure_render_time(rts_rid, false)
+	# GPU readback stalls; keep all screenshots outside measured windows.
+	for hero_is_primary in [false,true]:
+		if view.hero_primary != hero_is_primary: view.swap_primary()
+		for i in 4: await process_frame
+		await RenderingServer.frame_post_draw
+		var shot := view.get_texture().get_image()
+		if shot.save_png(capture_dir.path_join("hero-primary.png" if hero_is_primary else "rts-primary.png")) != OK:
+			printerr("WORLD_BUILDER_VIEW_PERF capture write failed")
+			quit(1)
+			return
 	view.visible = false
 	view.queue_free()
 	await process_frame

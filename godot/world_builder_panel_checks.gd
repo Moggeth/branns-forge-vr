@@ -103,6 +103,13 @@ func _run() -> void:
 				_check(panel._font.get_height(fitted.fs)*fitted.lines.size()<=label_area.size.y,"ability label exceeds its band: " + str(ids[index]) + " at " + str(extent))
 		for index in range(1,4): _check(panel._tabs[index].position.x>panel._tabs[index-1].position.x,"category keyboard order is horizontal")
 	_check(panel._orb_mat!=null and panel._orb_rect.mouse_filter==Control.MOUSE_FILTER_IGNORE,"Mana shader exists without intercepting world input")
+	view.swap_primary()
+	_check(not panel.visible and not panel.is_over_panel(panel._panel.get_center()),"Hero primary exposes weapons and releases panel hit region")
+	_check(not view.top_panel.visible,"Hero primary leaves FPS HUD clear of the RTS header")
+	_check(view.hero_hud_layer.visible == view.hero_hud_was_visible,"Hero primary restores actual FPS status")
+	view.swap_primary()
+	_check(panel.visible and not view.hero_hud_layer.visible,"RTS primary restores the command panel and keeps the Hero inset clear")
+	_check(view.top_panel.visible,"RTS primary restores survey controls")
 	view.close()
 	await process_frame
 	_check(not is_instance_valid(view),"headless survey lifecycle ends without animation frames")

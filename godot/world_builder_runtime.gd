@@ -471,7 +471,10 @@ func _meteor_impact(event: Dictionary, id: String) -> void:
 			data.meteors[i] = record
 			break
 	var impact: Vector3 = center + event.center
-	game._effect(impact + Vector3.UP, Color("ffb363"), 0.45, 4.0)
+	if game.impact_feedback != null:
+		game.impact_feedback.emit_contact({"point":impact,"normal":Vector3.UP,"material":"stone",
+			"tool":"meteor","tool_material":"stone","strike_region":"rock_body",
+			"relative_velocity":Vector3.DOWN*12.0,"energy":80.0})
 	var hero_local: Vector3 = game.rig.global_position - center
 	var hero_damage: float = Meteor.damage_at(event, hero_local)
 	if game.adventure.zone == ZONE and hero_damage > 0.0: game.adventure.take_damage(hero_damage, "Starfall")
