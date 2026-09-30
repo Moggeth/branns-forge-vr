@@ -189,6 +189,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check") or OS.get_cmdline_user_args().has("--phoenix-bow-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--weapon-inspection")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--atmosphere-test")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--landscape-check")
 	for argument in OS.get_cmdline_user_args():

@@ -89,6 +89,11 @@ Latest fairy expansion: `outputs/fairy-night-build/Play Flight Practice.cmd` or 
 
 # Brann's Forge VR
 
+**Weapon inspection:** `python scripts/weapon_review.py` produces standard
+actual-engine model, VR grip, FPS and holster diagrams in one cached offline
+batch. `--weapons woodland_axe,siegebird` narrows the selection; `--check-only`
+runs the pose audit without screenshots. [Workflow and coverage](docs/WEAPON-INSPECTION.md).
+
 **Asset authoring:** `scripts/asset_lab.py` now offers a repeatable Blender → GLB →
 Khronos validation → disposable Godot import path for new models. Run
 `scripts/Setup-AssetLab.ps1 -SmokeTest` once, then build the small Forge Yard
