@@ -1918,7 +1918,7 @@ func _kill_rat(rat: Node3D):
 	var tail = Node3D.new()
 	add_child(tail)
 	tail.global_position = rat.global_position + Vector3.UP * 0.12
-	tail.reparent(adventure.zone_groups.get("enchanted_kitchen",self))
+	tail.reparent(adventure.zone_groups.get(str(rat.get_meta("zone","enchanted_kitchen")),self))
 	tail.set_meta("kind", "tail")
 	tail.set_meta("id", id)
 	tail.add_to_group("pickup")

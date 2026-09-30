@@ -27,7 +27,14 @@ const SPECS := {
 	"hire": {"kind":"instant"},
 	"seed": {"kind":"sprout", "radius":3.0},
 	"patrol": {"kind":"triad", "radius":3.0, "hero_clearance":7.0},
+	"duelist": {"kind":"encounter", "radius":2.2, "count":1, "hero_clearance":7.0},
+	"shield_patrol": {"kind":"encounter", "radius":2.8, "count":2, "hero_clearance":7.0},
+	"rat_swarm": {"kind":"encounter", "radius":3.1, "count":3, "hero_clearance":7.0},
+	"ghosts": {"kind":"encounter", "radius":2.8, "count":2, "hero_clearance":7.0},
+	"golem": {"kind":"encounter", "radius":2.5, "count":1, "hero_clearance":7.0},
 }
+
+const ENCOUNTERS := ["patrol", "duelist", "shield_patrol", "rat_swarm", "ghosts", "golem"]
 
 static func spec(action: String) -> Dictionary:
 	return SPECS.get(action, {}).duplicate(true)
@@ -35,7 +42,7 @@ static func spec(action: String) -> Dictionary:
 static func is_targetable(entry: Dictionary) -> bool:
 	return bool(entry.get("implemented", true)) and SPECS.has(str(entry.get("id", "")))
 
-static func plan(action: String, start: Vector3, point: Vector3, builder: Node, game: Node3D, availability: String) -> Dictionary:
+static func plan(action: String, start: Vector3, point: Vector3, builder: Node, game: Node3D, availability: String, zone: String = "orchard_highlands") -> Dictionary:
 	var result: Dictionary = spec(action)
 	result["id"] = action
 	result["reason"] = availability
@@ -86,13 +93,23 @@ static func plan(action: String, start: Vector3, point: Vector3, builder: Node, 
 		result["reason"] = "The Orchard already holds its maximum of ten meteorites."
 	elif action == "meteor" and availability == "" and game.landscape.operation_count() >= game.landscape.MAX_OPERATIONS:
 		result["reason"] = "The landscape cannot record another impact."
-	elif action == "patrol" and availability == "":
-		var hero: Vector3 = game.camera.global_position - builder.center
+	elif action in ENCOUNTERS:
+		var world_origin: Vector3 = builder.center
+		if game.get("scene") is Dictionary and game.scene.get("zones", {}) is Dictionary:
+			world_origin = game.scene.zones.get(zone, {}).get("center", world_origin)
+		var hero: Vector3 = game.camera.global_position - world_origin
 		result["hero_clearance_center"] = Vector3(hero.x, 0, hero.z)
-		if builder.data.threats.size() >= builder.MAX_THREATS:
-			result["reason"] = "Too many patrols are active in the orchard."
-		elif point.distance_to(Vector3(hero.x, 0, hero.z)) < 7.0:
-			result["reason"] = "Give the Hero at least seven metres of warning."
+		var count := int(result.get("count", 3))
+		var positions: Array[Vector3] = []
+		for slot in range(count): positions.append(point + Vector3((float(slot) - float(count - 1) * 0.5) * 1.6, 0.0, 0.0))
+		result["unit_positions"] = positions
+		if availability == "":
+			if builder.has_method("encounter_target_error"):
+				result["reason"] = builder.encounter_target_error(action, world_origin + point, zone)
+			elif builder.data.threats.size() >= builder.MAX_THREATS:
+				result["reason"] = "Too many patrols are active in the orchard."
+			elif Vector2(point.x - hero.x, point.z - hero.z).length() < 7.0:
+				result["reason"] = "Give the Hero at least seven metres of warning."
 	elif action == "grove" and availability == "":
 		if point.distance_to(builder.CAMP) < 7.0:
 			result["reason"] = "Choose a clearing away from camp."

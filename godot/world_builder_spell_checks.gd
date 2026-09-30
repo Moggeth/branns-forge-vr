@@ -28,7 +28,13 @@ func _check() -> void:
 	var normal := Builder.mana_after_regen(5.0, 10.0, 1.0) - 5.0
 	var fast := Builder.mana_after_regen(5.0, 10.0, 4.0) - 5.0
 	if absf(normal - 0.55) > 0.0001 or absf(fast - 2.2) > 0.0001 or absf(fast / normal - 4.0) > 0.0001: failures.append("Mana regen is not exactly fourfold")
-	if builder.spell_catalogue().size() != 25: failures.append("spell catalogue lost an action")
+	var catalogue: Array = builder.spell_catalogue()
+	if catalogue.size() != 29: failures.append("spell catalogue lost an action")
+	for expected in ["duelist", "shield_patrol", "rat_swarm", "ghosts"]:
+		var matches := 0
+		for spell in catalogue:
+			if str(spell.id) == expected and str(spell.palette).to_lower() == "encounters": matches += 1
+		if matches != 1: failures.append("new encounter missing or duplicated: " + expected)
 	if builder.spell_availability("raise") != "": failures.append("affordable spell unavailable")
 	var before: float = builder.data.mana
 	builder.spells.begin("raise", builder)

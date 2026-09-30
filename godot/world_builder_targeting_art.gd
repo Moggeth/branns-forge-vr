@@ -1,11 +1,11 @@
 extends Node3D
 ## Bespoke ground-conforming survey previews. One cached ArrayMesh (two surfaces, so two
 ## draw calls at most), rebuilt only when the targeting state changes (throttled while the
-## cursor drags). Every vertex is lifted from game.landscape.height_at() and stood 6 cm off
-## the surface; nothing floats, and nothing here changes mechanics.
+## cursor drags). Orchard vertices use the landscape heightfield; other regions
+## use their walkable floor collisions. The mesh stands 6 cm off that surface.
 ##
 ## Coordinates: the node is top_level with an identity transform, so vertices are authored in
-## WORLD space as   world_origin + Vector3(local.x, height + 0.06, local.z).
+## WORLD space as   world_origin + Vector3(local.x, local_floor_y + 0.06, local.z).
 ## Footprint numbers always come from state.footprint; the SPECS-style defaults below are only
 ## a fallback if a key is missing.
 ##
@@ -27,6 +27,8 @@ const PALETTE := {
 	"raise": Color(0.72, 0.86, 0.42), "meteor": Color(1.0, 0.5, 0.14), "grove": Color(0.4, 0.85, 0.5),
 	"ring": Color(0.72, 0.58, 0.97), "awaken": Color(0.62, 0.92, 0.4), "calm": Color(0.5, 0.86, 0.82),
 	"harvest": Color(0.96, 0.66, 0.26), "seed": Color(0.5, 0.95, 0.55), "patrol": Color(0.85, 0.72, 1.0),
+	"duelist": Color(0.98, 0.68, 0.42), "shield_patrol": Color(0.53, 0.76, 1.0),
+	"rat_swarm": Color(0.9, 0.72, 0.47), "ghosts": Color(0.55, 0.95, 0.88), "golem": Color(0.98, 0.52, 0.29),
 }
 
 ## Fallbacks only (mirrors input/world_builder_targeting.gd SPECS).
@@ -60,6 +62,8 @@ var _pending: Dictionary = {}
 var _last_key := ""
 var _last_build := -10.0
 var _origin := Vector3.ZERO
+var _zone := "orchard_highlands"
+var _hover_y := 0.0
 var _hcache: Dictionary = {}
 var _ok := true
 var _base := Color.WHITE
@@ -128,8 +132,8 @@ func _key(state: Dictionary, hovered: Vector3) -> String:
 	var fp: Dictionary = state.get("footprint", {})
 	var origin: Vector3 = state.get("world_origin", Vector3.ZERO)
 	var hero: Variant = state.get("hero_clearance_center", Vector3.INF)
-	return "%s|%s|%s|%.2f,%.2f|%s|%s|%s|%s|%d|%s" % [state.get("id", ""), state.get("valid", false), state.get("stage", fp.get("stage", "")),
-		snappedf(hovered.x, MOVE_EPSILON), snappedf(hovered.z, MOVE_EPSILON), first, origin.snapped(Vector3.ONE * 0.05),
+	return "%s@%s|%s|%s|%.2f,%.2f,%.2f|%s|%s|%s|%s|%d|%s" % [state.get("id", ""), state.get("zone", "orchard_highlands"), state.get("valid", false), state.get("stage", fp.get("stage", "")),
+		snappedf(hovered.x, MOVE_EPSILON), snappedf(hovered.y, MOVE_EPSILON), snappedf(hovered.z, MOVE_EPSILON), first, origin.snapped(Vector3.ONE * 0.05),
 		var_to_str(fp), hero, _tree_hash(state), state.get("terrain_revision", 0)]
 
 ## Exact upcoming tree positions (Orchard-local Vector3s, max 30) from the targeting state; optional.
@@ -155,7 +159,10 @@ func _build(state: Dictionary) -> void:
 	stats.height_samples = 0
 	var id := str(state.id)
 	var fp: Dictionary = state.get("footprint", {})
+	var hovered: Vector3 = state.hovered
 	_origin = state.get("world_origin", Vector3.ZERO)
+	_zone = str(state.get("zone", "orchard_highlands"))
+	_hover_y = hovered.y
 	_ok = bool(state.get("valid", false))
 	_base = PALETTE[id] if _ok else CRIMSON
 	_hi = _base.lerp(Color(1, 1, 0.92), 0.38)
@@ -166,7 +173,6 @@ func _build(state: Dictionary) -> void:
 			if _trees.size() >= MAX_TREE_GLYPHS: break
 			if typeof(v) == TYPE_VECTOR3 and (v as Vector3).is_finite(): _trees.push_back(Vector2(v.x, v.z))
 	_paint_width = _fnum(fp, state, "paint_width", PATH_PAINT_DEFAULT) if id == "path" else 0.0
-	var hovered: Vector3 = state.hovered
 	var p := Vector2(hovered.x, hovered.z)
 	var first_v: Variant = state.get("first_point", Vector3.INF)
 	var has_first: bool = typeof(first_v) == TYPE_VECTOR3 and (first_v as Vector3).is_finite()
@@ -186,7 +192,8 @@ func _build(state: Dictionary) -> void:
 		"calm": _calm(p, _fnum(fp, state, "radius", 5.0))
 		"harvest": _harvest(p, _fnum(fp, state, "radius", 5.0))
 		"seed": _seed_glyph(p, _fnum(fp, state, "radius", 3.0))
-		"patrol": _patrol(p, _fnum(fp, state, "radius", 3.0), state, _fnum(fp, state, "hero_clearance", 7.0))
+		"patrol", "duelist", "shield_patrol", "rat_swarm", "ghosts", "golem":
+			_encounter(id, p, _fnum(fp, state, "radius", 3.0), state, _fnum(fp, state, "hero_clearance", 7.0))
 	if not _ok: _blocked(p)
 	_cursor(p)
 	_commit()
@@ -234,10 +241,23 @@ func _commit() -> void:
 
 func _h(p: Vector2) -> float:
 	if _hcache.has(p): return _hcache[p]
-	var height := 0.0
-	if game != null and game.get("landscape") != null:
+	var height := _hover_y
+	if _zone == "orchard_highlands" and game != null and game.get("landscape") != null:
 		height = float(game.landscape.height_at(p))
 		stats.height_samples += 1
+	elif game != null and game.is_inside_tree():
+		var world_point := _origin + Vector3(p.x, _hover_y, p.y)
+		var query := PhysicsRayQueryParameters3D.create(world_point + Vector3.UP * 3.0, world_point + Vector3.DOWN * 4.0, 1)
+		var ignored: Array[RID] = []
+		for attempt in 4:
+			var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+			stats.height_samples += 1
+			if hit.is_empty(): break
+			if hit.normal.y >= 0.75 and str(hit.collider.get_meta("kind", "")) == "floor":
+				height = float(hit.position.y - _origin.y)
+				break
+			ignored.append(hit.rid)
+			query.exclude = ignored
 	_hcache[p] = height
 	return height
 
@@ -772,9 +792,8 @@ func _hero_dir(p: Vector2, state: Dictionary) -> Vector2:
 		if d2.length() > 0.1: return d2.normalized()
 	return Vector2(0, 1)
 
-func _patrol(p: Vector2, radius: float, state: Dictionary, clearance: float) -> void:
+func _encounter(id: String, p: Vector2, radius: float, state: Dictionary, clearance: float) -> void:
 	var face := _hero_dir(p, state)
-	var perp := Vector2(-face.y, face.x)
 	_polar(p, 0.0, radius, _c(_base, 0.22), _c(_base, 0.0), 0, 1.0, 0, 32, 1.6)
 	_ring_line(p, radius * 0.96, 0.12, 0.55, 2.0, 1.2, 0, 48)
 	var hero: Variant = state.get("hero_clearance_center", Vector3.INF)
@@ -783,13 +802,34 @@ func _patrol(p: Vector2, radius: float, state: Dictionary, clearance: float) -> 
 		if hc.distance_to(p) < clearance + 9.0:
 			_ring_line(hc, clearance, 0.18, 0.4 if _ok else 0.7, 2.0, 1.4, 0, 56)
 	if not _ok: return
-	# formation: point-man ahead, two flankers behind, all facing the Hero
-	var spawns := [p + face * radius * 0.56, p - face * radius * 0.3 + perp * radius * 0.5, p - face * radius * 0.3 - perp * radius * 0.5]
+	var spawns: Array = state.get("unit_positions", [])
+	if spawns.is_empty():
+		var count := int(state.get("count", 1 if id in ["duelist", "golem"] else (2 if id in ["shield_patrol", "ghosts"] else 3)))
+		for slot in range(count): spawns.append(Vector3(p.x + (float(slot) - float(count - 1) * 0.5) * 1.6, _hover_y, p.y))
 	for spawn in spawns:
-		var q: Vector2 = spawn
-		_ring_line(q, 0.42, 0.09, 0.85, 0.0, 1.0, 1, 20)
-		_polar(q, 0.0, 0.42, _c(_hi, 0.45), _c(_base, 0.0), 0.0, 1.0, 0, 16, 1.0)
-		_chevron(q + face * 0.7, face, 0.5, 0.12, 0.9)
+		if typeof(spawn) != TYPE_VECTOR3: continue
+		var q := Vector2((spawn as Vector3).x, (spawn as Vector3).z)
+		match id:
+			"patrol":
+				_ring_line(q, 0.42, 0.09, 0.85, 0.0, 1.0, 1, 20)
+				_polar(q, 0.0, 0.42, _c(_hi, 0.45), _c(_base, 0.0), 0.0, 1.0, 0, 16, 1.0)
+				_chevron(q + face * 0.7, face, 0.5, 0.12, 0.9)
+			"duelist":
+				_ring_line(q, 0.55, 0.1, 0.9, 0.0, 1.0, 1, 24)
+				_rung(q, Vector2(1, 1).normalized(), 0.49, 0.12, 0.95)
+				_rung(q, Vector2(1, -1).normalized(), 0.49, 0.12, 0.95)
+			"shield_patrol":
+				_polar(q, 0.0, 0.58, _c(_base, 0.1), _c(_base, 0.55), 0, 1.0, 1, 20)
+				_star(q, 0.53, 0.3, PI * 0.25, _c(_hi, 0.9), _c(_base, 0.0), 1, 4)
+			"rat_swarm":
+				_polar(q, 0.0, 0.29, _c(_hi, 0.7), _c(_base, 0.25), 0, 1.0, 1, 18)
+				for side in [-1.0, 1.0]: _rung(q + Vector2(side * 0.24, 0.18), Vector2(side, 0.5).normalized(), 0.22, 0.035, 0.7)
+			"ghosts":
+				_ring_line(q, 0.52, 0.1, 0.85, 1.0, 1.1, 1, 28)
+				_star(q, 0.37, 0.14, PI * 0.25, _c(_hi, 0.6), _c(_base, 0.0), 1, 4)
+			"golem":
+				_ring_line(q, 0.87, 0.2, 0.95, 2.0, 1.2, 1, 32)
+				_star(q, 0.72, 0.42, PI * 0.25, _c(_hi, 0.9), _c(_base, 0.1), 1, 4)
 
 # --------------------------------------------------------------- materials
 

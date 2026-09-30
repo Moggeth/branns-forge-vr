@@ -16,6 +16,8 @@ const MAX_WAYMARKERS = 24
 const MAX_GROVES = 24
 const MAX_BRIDGES = 4
 const MAX_THREATS = 8
+const ENCOUNTER_KINDS = ["patrol", "duelist", "shield_patrol", "rat_swarm", "ghosts", "golem"]
+const ENCOUNTER_ZONES = ["forge_yard", "sandstone_quarry", "enchanted_kitchen", "pinewood_ruins", "mushroom_glade", "crystal_hollow", "sky_garden", "ember_foundry", "orchard_highlands", "gloamfen", "starfall_ridge", "cloudbreak_keep"]
 const MAX_FOREST_SPELLS = 64
 ## Terrain operations are the durable safety budget (256 across all spells).
 ## Keep the same bound for save validation; only nearby rocks get individual nodes.
@@ -145,8 +147,8 @@ func calm_ent(point: Vector3) -> String:
 		save()
 	return result
 
-func assemble_golem(_point: Vector3) -> String:
-	return spell_availability("golem")
+func assemble_golem(point: Vector3) -> String:
+	return summon_encounter("golem", center + point, ZONE)
 
 func _canonical_state(value: Variant) -> Variant:
 	if not value is Dictionary: return value
@@ -158,6 +160,11 @@ func _canonical_state(value: Variant) -> Variant:
 	if not candidate.has("ents"): candidate.ents = []
 	if not candidate.has("encounter_history"): candidate.encounter_history = []
 	if not candidate.has("ent_seeds"): candidate.ent_seeds = []
+	if candidate.get("threats") is Array:
+		for threat in candidate.threats:
+			if threat is Dictionary:
+				if not threat.has("zone"): threat.zone = ZONE
+				if not threat.has("kind"): threat.kind = "patrol"
 	return candidate
 
 func _valid(value: Variant) -> bool:
@@ -213,6 +220,10 @@ func _valid(value: Variant) -> bool:
 		if int(load.worker) < 0 or int(load.worker) >= 5 or int(load.amount) < 1 or int(load.amount) > 5: return false
 	for threat in value.get("threats", []):
 		if not threat is Dictionary or not _point_valid(threat.get("at")) or str(threat.get("state", "")) not in ["warning", "active"]: return false
+		if str(threat.get("zone", ZONE)) not in ENCOUNTER_ZONES or str(threat.get("kind", "patrol")) not in ENCOUNTER_KINDS: return false
+		var zone_limit := 154.0 if str(threat.get("zone", ZONE)) == ZONE else _zone_half_extent(str(threat.zone)) - 2.0
+		if absf(float(threat.at[0])) > zone_limit or absf(float(threat.at[1])) > zone_limit: return false
+		if threat.has("at_y") and (not (threat.at_y is float or threat.at_y is int) or not is_finite(float(threat.at_y)) or absf(float(threat.at_y)) > 50.0): return false
 		if not Encounters.valid_threat(threat): return false
 		if not threat.get("alive") is Array or threat.alive.size() > 3: return false
 		if not threat.get("id") is float and not threat.get("id") is int: return false
@@ -230,6 +241,14 @@ func _valid(value: Variant) -> bool:
 
 func _point_valid(value: Variant) -> bool:
 	return value is Array and value.size() == 2 and (value[0] is float or value[0] is int) and (value[1] is float or value[1] is int) and is_finite(float(value[0])) and is_finite(float(value[1])) and absf(float(value[0])) < 155 and absf(float(value[1])) < 155
+
+static func _zone_half_extent(zone: String) -> float:
+	# The Orchard save contract stores planar coordinates strictly inside 155 m.
+	# Keep the whole encounter formation inside its established 145 m spell area.
+	if zone == ZONE: return 148.0
+	if zone in ["gloamfen", "starfall_ridge", "cloudbreak_keep"]: return 28.0
+	if zone == "sky_garden": return 22.0
+	return 15.0
 
 func _load() -> void:
 	if not FileAccess.file_exists(save_path): return
@@ -831,55 +850,125 @@ func hire_worker() -> String:
 	return ""
 
 func summon_patrol(local: Vector3) -> String:
-	if not _inside(local): return "Outside the orchard boundary."
-	if data.threats.size() >= MAX_THREATS: return "Too many patrols are active in the orchard."
-	if float(data.mana) < 4.0: return "Need 4 Mana to call a skeleton patrol."
-	var ready := spells.begin("patrol", self)
+	return summon_encounter("patrol", center + local, ZONE)
+
+func encounter_target_error(action: String, global_point: Vector3, zone: String = "") -> String:
+	var region := zone if zone != "" else str(game.adventure.zone)
+	if action not in ENCOUNTER_KINDS: return "Unknown encounter."
+	if not ENCOUNTER_ZONES.has(region) or not game.scene.zones.has(region) or not game.adventure.zone_groups.has(region): return "That region is unavailable."
+	if str(game.adventure.zone) != region: return "Follow the Hero into this region before summoning."
+	if not Spells.supports_region(action, region): return "This encounter cannot be called here."
+	if data.threats.size() >= MAX_THREATS: return "At most eight encounters can be active across the world."
+	var local: Vector3 = global_point - game.scene.zones[region].center
+	if absf(local.x) > _zone_half_extent(region) - 3.0 or absf(local.z) > _zone_half_extent(region) - 3.0: return "Choose a point farther inside the region."
+	if Vector2(global_point.x - game.camera.global_position.x, global_point.z - game.camera.global_position.z).length() < 7.0: return "Give the Hero at least seven metres of warning."
+	for slot in range(_encounter_count(action)):
+		var position := global_point + _encounter_offset(action, slot)
+		if Vector2(position.x - game.camera.global_position.x, position.z - game.camera.global_position.z).length() < 7.0: return "Give every arriving creature seven metres of warning."
+		var site: Dictionary = _encounter_site(region, position)
+		if site.has("error"): return str(site.error)
+	return ""
+
+func _encounter_site(region: String, point: Vector3) -> Dictionary:
+	var local: Vector3 = point - game.scene.zones[region].center
+	if absf(local.x) > _zone_half_extent(region) - 2.0 or absf(local.z) > _zone_half_extent(region) - 2.0: return {"error": "The formation needs more room inside the region."}
+	var ground := point
+	if region == ZONE:
+		if game.landscape.water_at(Vector2(local.x, local.z)) > 0.3: return {"error": "The formation needs dry ground."}
+		ground.y = game.landscape.height_at(Vector2(local.x, local.z))
+		var left: float = game.landscape.height_at(Vector2(local.x - 0.7, local.z))
+		var right: float = game.landscape.height_at(Vector2(local.x + 0.7, local.z))
+		var front: float = game.landscape.height_at(Vector2(local.x, local.z - 0.7))
+		var back: float = game.landscape.height_at(Vector2(local.x, local.z + 0.7))
+		if maxf(absf(left - right), absf(front - back)) > 0.9: return {"error": "The formation needs gentler ground."}
+	else:
+		var query := PhysicsRayQueryParameters3D.create(point + Vector3.UP * 3.0, point + Vector3.DOWN * 3.0, 1)
+		var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty() or hit.normal.y < 0.75 or str(hit.collider.get_meta("kind", "")) != "floor": return {"error": "Choose a clear walkable floor."}
+		ground = hit.position
+		if absf(point.y - ground.y) > 2.0: return {"error": "Choose the visible floor level."}
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.48
+	capsule.height = 1.8
+	var shape_query := PhysicsShapeQueryParameters3D.new()
+	shape_query.shape = capsule
+	shape_query.transform = Transform3D(Basis.IDENTITY, ground + Vector3.UP * 0.95)
+	shape_query.collision_mask = 1
+	for overlap in game.get_world_3d().direct_space_state.intersect_shape(shape_query, 12):
+		if str(overlap.collider.get_meta("kind", "")) != "floor": return {"error": "The formation would intersect an object."}
+	return {"position": ground}
+
+static func _encounter_count(action: String) -> int:
+	return 1 if action in ["duelist", "golem"] else (2 if action in ["shield_patrol", "ghosts"] else 3)
+
+static func _encounter_offset(action: String, slot: int) -> Vector3:
+	return Vector3((float(slot) - float(_encounter_count(action) - 1) * 0.5) * 1.6, 0, 0)
+
+func summon_encounter(action: String, global_point: Vector3, zone: String = "") -> String:
+	var region := zone if zone != "" else str(game.adventure.zone)
+	var error := encounter_target_error(action, global_point, region)
+	if error != "": return error
+	var ready := spells.begin(action, self)
 	if ready != "": return ready
-	var hero_local: Vector3 = game.camera.global_position - center
-	if local.distance_to(Vector3(hero_local.x, 0, hero_local.z)) < 7.0: return "Give the Hero at least seven metres of warning."
-	data.mana = float(data.mana) - 4.0
-	spells.success("patrol", self)
-	var threat := {"id": int(data.revision) + 1, "at": _pack(local), "state": "warning", "delay": 1.7, "alive": [0, 1, 2]}
-	encounters.prepare(threat)
+	var site: Dictionary = _encounter_site(region, global_point)
+	if site.has("error"): return str(site.error)
+	var mana := float(Spells.entry(action).get("mana", 0.0))
+	var count := _encounter_count(action)
+	var alive := []
+	for slot in range(count): alive.append(slot)
+	var local: Vector3 = site.position - game.scene.zones[region].center
+	var threat := {"id": int(data.revision) + 1, "zone": region, "kind": action, "at": _pack(local), "at_y": snappedf(float(site.position.y), 0.1), "state": "warning", "delay": 1.7 if action == "patrol" else 2.0, "alive": alive}
+	if action == "patrol" and region == ZONE: encounters.prepare(threat)
+	data.mana = float(data.mana) - mana
+	spells.success(action, self)
 	data.threats.append(threat)
-	_changed("A violet warning marks where three skeletons will rise. " + encounters.brief(threat))
+	_changed("A warning marks the incoming %s. %s" % [str(Spells.entry(action).title).to_lower(), encounters.brief(threat) if threat.has("objective") else "The Hero can engage it after two seconds."])
 	return ""
 
 func _sync_threats(delta: float) -> void:
 	if game.animation == null: return
 	for threat in data.threats.duplicate():
 		var id := str(int(threat.id))
+		var region := str(threat.get("zone", ZONE))
+		if str(game.adventure.zone) != region: continue # Inactive regions consume no encounter tick budget.
+		var kind := str(threat.get("kind", "patrol"))
 		if str(threat.state) == "warning":
 			if not warning_nodes.has(id):
 				var warning := Node3D.new()
-				warning.name = "SkeletonPatrolWarning_" + id
-				warning.position = _unpack(threat.at)
-				root.add_child(warning)
+				warning.name = "EncounterWarning_" + id
+				game.adventure.zone_groups[region].add_child(warning)
+				var warning_point: Vector3 = game.scene.zones[region].center + _unpack(threat.at)
+				warning_point.y = float(threat.get("at_y", 0.0))
+				warning.global_position = _encounter_site(region, warning_point).get("position", warning_point)
 				W.cyl(warning, Vector3(0, 0.10, 0), 1.3, 0.12, "9869b7", "disc", 0.7)
-				W.label(warning, "BONES ARE STIRRING", Vector3(0, 1.7, 0), 18, "edc8ff")
+				W.label(warning, str(Spells.entry(kind).title).to_upper() + " APPROACHES", Vector3(0, 1.7, 0), 18, "edc8ff")
 				warning_nodes[id] = warning
 			threat.delay = maxf(0.0, float(threat.get("delay", 1.7)) - delta)
 			if float(threat.delay) > 0.0: continue
+			if not _threat_clear_of_hero(threat):
+				threat.delay = 0.4
+				continue
 			if warning_nodes.has(id):
 				warning_nodes[id].queue_free()
 				warning_nodes.erase(id)
 			threat.state = "active"
-			_spawn_threat(threat)
-			_changed("Three skeletons rise in the live orchard. The Hero can fight them.")
+			if not _spawn_threat(threat): continue
+			if threat not in data.threats: continue
+			_changed("%s arrives in %s. The Hero can fight it." % [str(Spells.entry(kind).title), str(game.scene.zones[region].name)])
 			continue
-		if not summoned_nodes.has(id): _spawn_threat(threat)
-		encounters.tick_threat(threat, delta)
+		if not summoned_nodes.has(id) and not _spawn_threat(threat): continue
+		if threat not in data.threats: continue
+		if threat.has("objective"): encounters.tick_threat(threat, delta)
 		var units: Array = summoned_nodes.get(id, [])
 		var changed := false
 		for unit in units:
 			if int(unit.slot) not in threat.alive: continue
 			if not is_instance_valid(unit.node) or not bool(unit.node.get_meta("alive", true)):
-				encounters.unit_down(threat, int(unit.slot), unit.node)
+				if threat.has("objective"): encounters.unit_down(threat, int(unit.slot), unit.node)
 				threat.alive.erase(int(unit.slot))
 				changed = true
 		if threat.alive.is_empty():
-			var reward: Dictionary = encounters.complete(threat)
+			var reward: Dictionary = encounters.complete(threat) if threat.has("objective") else {"message": "%s cleared in %s." % [str(Spells.entry(kind).title), str(game.scene.zones[region].name)]}
 			data.threats.erase(threat)
 			summoned_nodes.erase(id)
 			_changed(str(reward.message))
@@ -889,28 +978,70 @@ func _sync_threats(delta: float) -> void:
 			print("WORLD_BUILDER patrol defeated id=", id, " remaining=", data.threats.size())
 			save()
 
-func _spawn_threat(threat: Dictionary) -> void:
-	var id := str(int(threat.id))
-	if summoned_nodes.has(id): return
-	var units: Array = []
-	var at: Vector3 = _unpack(threat.at)
+func _threat_clear_of_hero(threat: Dictionary) -> bool:
+	var region := str(threat.get("zone", ZONE))
+	if str(game.adventure.zone) != region: return true
+	var at: Vector3 = game.scene.zones[region].center + _unpack(threat.at)
 	for slot in threat.alive:
-		var position := center + at + Vector3((float(slot) - 1.0) * 1.4, 0, 0)
-		W.enemy(game, game.scene, ZONE, position, "skeleton", "mossward")
-		var enemy: Node3D = game.scene.enemies.back()
-		enemy.set_meta("alive", true)
-		enemy.set_meta("home", position)
-		enemy.set_meta("hp", 56)
-		enemy.set_meta("max_hp", 56)
-		enemy.set_meta("damage", 11)
+		var position := at + _encounter_offset(str(threat.get("kind", "patrol")), int(slot))
+		if Vector2(position.x - game.camera.global_position.x, position.z - game.camera.global_position.z).length() < 2.2: return false
+	return true
+
+func _spawn_threat(threat: Dictionary) -> bool:
+	var id := str(int(threat.id))
+	if summoned_nodes.has(id): return true
+	if not _threat_clear_of_hero(threat): return false
+	var units: Array = []
+	var region := str(threat.get("zone", ZONE))
+	var kind := str(threat.get("kind", "patrol"))
+	var at: Vector3 = game.scene.zones[region].center + _unpack(threat.at)
+	at.y = float(threat.get("at_y", 0.0))
+	var positions: Array[Vector3] = []
+	for slot in threat.alive:
+		var site: Dictionary = _encounter_site(region, at + _encounter_offset(kind, int(slot)))
+		if site.has("error"):
+			push_warning("WORLD_BUILDER skipped unsafe encounter %s in %s: %s" % [id, region, site.error])
+			data.threats.erase(threat)
+			_changed("The encounter faded because its ground is no longer safe.")
+			return false
+		positions.append(site.position)
+	for index in range(threat.alive.size()):
+		var slot: int = int(threat.alive[index])
+		var position: Vector3 = positions[index]
+		var enemy: Node3D
+		if kind == "rat_swarm":
+			enemy = preload("res://workshop_scene.gd").make_rat(int(slot))
+			game.adventure.zone_groups[region].add_child(enemy)
+			enemy.global_position = position
+			game.scene.rats.append(enemy)
+			game.animation.register(enemy)
+		elif kind == "ghosts":
+			enemy = game.firecraft._ghost(region, position)
+		else:
+			var variant := ""
+			if kind in ["patrol", "shield_patrol"]:
+				variant = "prismwatch" if region in ["crystal_hollow", "starfall_ridge"] else ("cinderkeep" if region == "ember_foundry" else "mossward")
+			enemy = W.enemy(game, game.scene, region, position, "golem" if kind == "golem" else "skeleton", variant)
+			# One runtime registration owns health, zone parent and authored actor art.
+			game.adventure.register_enemy(enemy)
+			if variant != "":
+				game.guardians.attach(enemy, variant)
+				game.guardian_authored.attach(enemy, variant)
+		if kind in ["rat_swarm", "ghosts"]:
+			enemy.set_meta("alive", true)
+			enemy.set_meta("home", position)
+		elif kind != "golem":
+			var hp := 52 if kind == "duelist" else (72 if kind == "shield_patrol" else 56)
+			enemy.set_meta("hp", hp)
+			enemy.set_meta("max_hp", hp)
+			enemy.set_meta("damage", 13 if kind == "duelist" else 11)
+			if kind == "duelist": enemy.set_meta("skeleton_move_scale", 1.5)
 		enemy.set_meta("world_builder_patrol", id)
-		enemy.set_meta("id", "orchard-patrol-%s-%d" % [id, int(slot)])
-		enemy.reparent(game.adventure.zone_groups[ZONE])
-		game.animation.register(enemy)
-		game.guardians.attach(enemy, "mossward")
-		game.guardian_authored.attach(enemy, "mossward")
+		enemy.set_meta("id", "world-encounter-%s-%d" % [id, int(slot)])
+		enemy.set_meta("zone", region)
 		units.append({"slot": int(slot), "node": enemy})
 	summoned_nodes[id] = units
+	return true
 
 func _changed(message: String) -> void:
 	data.revision = int(data.revision) + 1

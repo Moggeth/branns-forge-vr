@@ -21,8 +21,12 @@ const ENTRIES = [
 	{"id":"platform", "title":"Platform", "palette":"Construction", "cost":"4 lumber", "wood":4, "gesture":"point", "cooldown":4.0, "description":"Build a walkable elevated deck.", "icon":"platform", "implemented":false},
 	{"id":"gate", "title":"Gate", "palette":"Construction", "cost":"4 lumber", "wood":4, "gesture":"point", "cooldown":4.0, "description":"Build a passable gate.", "icon":"gate", "implemented":false},
 	{"id":"barricade", "title":"Barricade", "palette":"Construction", "cost":"2 lumber", "wood":2, "gesture":"line", "cooldown":3.0, "description":"Build a defensive obstacle.", "icon":"barricade", "implemented":false},
-	{"id":"patrol", "title":"Skeleton Patrol", "palette":"Encounters", "cost":"4 Mana", "mana":4.0, "gesture":"point", "cooldown":12.0, "description":"Warn the Hero before three skeletons rise.", "icon":"skeleton"},
-	{"id":"golem", "title":"Assemble Golem", "palette":"Encounters", "cost":"Recovered timber, stone and metal heart", "gesture":"point", "cooldown":20.0, "description":"Future construction from recovered physical timber, stone and a metal heart.", "icon":"golem", "implemented":false},
+	{"id":"patrol", "title":"Skeleton Patrol", "palette":"Encounters", "cost":"4 Mana", "mana":4.0, "gesture":"point", "cooldown":12.0, "regions":"all", "description":"Warn the Hero before three skeletons rise.", "icon":"skeleton"},
+	{"id":"duelist", "title":"Bone Duelist", "palette":"Encounters", "cost":"3 Mana", "mana":3.0, "gesture":"point", "cooldown":10.0, "regions":"all", "description":"Call a quick lone skeleton for a close duel.", "icon":"skeleton"},
+	{"id":"shield_patrol", "title":"Shield Patrol", "palette":"Encounters", "cost":"5 Mana", "mana":5.0, "gesture":"point", "cooldown":16.0, "regions":"all", "description":"Call two shield guardians whose flanks can be exploited.", "icon":"skeleton"},
+	{"id":"rat_swarm", "title":"Rat Swarm", "palette":"Encounters", "cost":"3 Mana", "mana":3.0, "gesture":"point", "cooldown":14.0, "regions":"all", "description":"Send three real workshop rats scurrying at the Hero.", "icon":"skeleton"},
+	{"id":"ghosts", "title":"Haunting", "palette":"Encounters", "cost":"5 Mana", "mana":5.0, "gesture":"point", "cooldown":18.0, "regions":"all", "description":"Call two ghosts; only fire can defeat them.", "icon":"skeleton"},
+	{"id":"golem", "title":"Stone Sentinel", "palette":"Encounters", "cost":"6 Mana", "mana":6.0, "gesture":"point", "cooldown":20.0, "regions":"all", "description":"Call one heavy golem with a visible warning.", "icon":"golem"},
 	{"id":"harvest", "title":"Mark Harvest", "palette":"Life", "cost":"Free", "gesture":"point", "cooldown":0.0, "description":"Assign a helper to a standing tree; delivered timber enters the stockpile.", "icon":"axe"},
 	{"id":"hire", "title":"Hire Helper", "palette":"Life", "cost":"2 lumber", "wood":2, "gesture":"button", "cooldown":0.0, "description":"Equip another lumberjack at the work site.", "icon":"worker"},
 	{"id":"calm", "title":"Calm Ent", "palette":"Life", "cost":"2 Mana", "mana":2.0, "gesture":"point", "cooldown":10.0, "description":"Calm an awakened tree for a short time.", "icon":"hand"},
@@ -31,18 +35,28 @@ const ENTRIES = [
 
 static func catalogue() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for entry in ENTRIES: result.append(entry.duplicate(true))
+	for item in ENTRIES: result.append(entry(str(item.id)))
 	return result
 
 static func entry(action: String) -> Dictionary:
 	for item in ENTRIES:
-		if item.id == action: return item.duplicate(true)
+		if item.id == action:
+			var result: Dictionary = item.duplicate(true)
+			if not result.has("regions"): result.regions = ["orchard_highlands"]
+			return result
 	return {}
+
+static func supports_region(action: String, zone: String) -> bool:
+	var item := entry(action)
+	if item.is_empty(): return false
+	return (item.regions is String and item.regions == "all") or (item.regions is Array and zone in item.regions)
 
 func availability(action: String, builder: Node) -> String:
 	var item := entry(action)
 	if item.is_empty(): return "Unknown spell."
 	if not bool(item.get("implemented", true)): return "%s is not available yet." % item.title
+	if builder.game != null and not supports_region(action, str(builder.game.adventure.zone)):
+		return "%s is available in the Orchard Highlands." % item.title
 	if action == "seed" and builder.data.get("ent_seeds", []).is_empty(): return "Recover a magical seed from a fallen Ent first."
 	var remaining := float(builder.data.get("spell_cooldowns", {}).get(action, 0.0))
 	if remaining > 0.001: return "%s recharges in %.1f s." % [item.title, remaining]
