@@ -1026,6 +1026,7 @@ func _ensure_workers() -> void:
 		worker.set_meta("nav_transitioning", false)
 		worker.set_meta("nav_initialized", false)
 		worker.set_meta("nav_bridge_available", false)
+		worker.set_meta("nav_construction_count", -1)
 		if ResourceLoader.exists(WORKER):
 			var scene: PackedScene = load(WORKER)
 			if scene != null:
@@ -1158,7 +1159,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 	var bridge_available: bool = not data.bridges.is_empty() or not data.constructions.is_empty()
 	var path_index: int = int(worker.get_meta("nav_index", 0))
 	var off_route: bool = not path.is_empty() and path_index < path.size() and here.distance_to(path[path_index]) > 10.0
-	if not bool(worker.get_meta("nav_initialized", false)) or old_goal.distance_to(goal) > 0.5 or int(worker.get_meta("nav_op_count", -1)) != op_count or bool(worker.get_meta("nav_transitioning", false)) != transitioning or bool(worker.get_meta("nav_bridge_available", false)) != bridge_available or off_route:
+	if not bool(worker.get_meta("nav_initialized", false)) or old_goal.distance_to(goal) > 0.5 or int(worker.get_meta("nav_op_count", -1)) != op_count or bool(worker.get_meta("nav_transitioning", false)) != transitioning or bool(worker.get_meta("nav_bridge_available", false)) != bridge_available or int(worker.get_meta("nav_construction_count", -1)) != data.constructions.size() or off_route:
 		var options := {"allow_bridge": not data.bridges.is_empty()}
 		if construction != null: options.merge(construction.navigation_options(), true)
 		path = Navigation.route(model, here, goal, options)
@@ -1168,6 +1169,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 		worker.set_meta("nav_op_count", op_count)
 		worker.set_meta("nav_transitioning", transitioning)
 		worker.set_meta("nav_bridge_available", bridge_available)
+		worker.set_meta("nav_construction_count", data.constructions.size())
 		worker.set_meta("nav_initialized", true)
 		worker.set_meta("nav_bridge", Water.crossing(model) if not data.bridges.is_empty() else {})
 	if path.is_empty():
