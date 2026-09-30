@@ -557,6 +557,11 @@ func interact(target,id,hand=null) -> bool:
 
 func gather(target,hand=null):
 	if not target.visible or target.get_meta("collecting",false): return
+	if target.has_meta("ent_seed_key") and game.world_builder != null:
+		var result: String = game.world_builder.ents.claim_seed(target)
+		game._notice(result if result != "" else "Magical seed recovered. Plant it from the Life palette.")
+		if result == "": haptic(hand,"impact")
+		return
 	target.set_meta("collecting",true)
 	var resource = str(target.get_meta("resource",target.get_meta("resource_id","stone")))
 	var amount = clampi(int(target.get_meta("amount",3))+int(target.get_meta("resonant_bonus",0)),1,5)

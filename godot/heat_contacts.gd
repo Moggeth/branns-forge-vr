@@ -106,7 +106,7 @@ func register_fixture(node:Node3D,mesh:MeshInstance3D,body:StaticBody3D,zone_id:
 
 func water(point:Vector3,radius:float,zone_id:String)->int:
 	if zone_id!=game.adventure.zone: return 0
-	var changed=game.firecraft.fluid.extinguish_near(point,radius) if game.firecraft!=null else 0
+	var changed=game.firecraft.fluid.extinguish_near(point,radius) if game.firecraft!=null and game.firecraft.fluid!=null else 0
 	for fixture in fixtures:
 		if fixture.zone!=zone_id or not is_instance_valid(fixture.node) or fixture.node.global_position.distance_to(point)>radius+.4: continue
 		fixture.wet=minf(100,float(fixture.wet)+70)
@@ -117,6 +117,8 @@ func water(point:Vector3,radius:float,zone_id:String)->int:
 			if not is_instance_valid(entry.node) or entry.node.global_position.distance_to(point)>radius+entry.size.length()*.2: continue
 			entry.state.wet=minf(100,float(entry.state.wet)+70)
 			entry.state.heat=maxf(0,float(entry.state.heat)-180)
+	if game.world_builder != null and game.world_builder.ents != null:
+		changed += game.world_builder.ents.on_water(point, radius, zone_id)
 	return changed
 
 func _melt_snow(a:Vector3,b:Vector3,radius:float,heat_amount:float):

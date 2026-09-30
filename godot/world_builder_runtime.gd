@@ -87,7 +87,7 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "mana": 12.0, "spell_cooldowns": {}, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "constructions": [], "ents": [], "encounter_history": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "mana": 12.0, "spell_cooldowns": {}, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "constructions": [], "ents": [], "ent_seeds": [], "encounter_history": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
 
 func spell_catalogue() -> Array[Dictionary]:
 	return Spells.catalogue()
@@ -142,6 +142,7 @@ func _canonical_state(value: Variant) -> Variant:
 	if not candidate.has("constructions"): candidate.constructions = []
 	if not candidate.has("ents"): candidate.ents = []
 	if not candidate.has("encounter_history"): candidate.encounter_history = []
+	if not candidate.has("ent_seeds"): candidate.ent_seeds = []
 	return candidate
 
 func _valid(value: Variant) -> bool:
@@ -159,6 +160,7 @@ func _valid(value: Variant) -> bool:
 	if value.get("bridges") is not Array or value.bridges.size() > MAX_BRIDGES: return false
 	if not Construction.valid_records(value.get("constructions")): return false
 	if not Ents.valid_records(value.get("ents")): return false
+	if not Ents.valid_seeds(value.get("ent_seeds", [])): return false
 	if not Encounters.valid_history(value.get("encounter_history")): return false
 	if value.get("harvested") is not Array or value.harvested.size() > 512: return false
 	if value.get("scenic_cut_heights", {}) is not Dictionary or value.get("scenic_cut_heights", {}).size() > 512: return false
@@ -185,7 +187,7 @@ func _valid(value: Variant) -> bool:
 			if not grove.placements is Array or grove.placements.size() > 30: return false
 			for placement in grove.placements:
 				if not placement is Array or placement.size() != 5 or not _point_valid([placement[0], placement[1]]): return false
-				if not placement[2] is float and not placement[2] is int or int(placement[2]) not in [0, 1, 2]: return false
+				if not placement[2] is float and not placement[2] is int or int(placement[2]) not in [0, 1, 2, 3]: return false
 				if not placement[3] is float and not placement[3] is int or not is_finite(float(placement[3])) or float(placement[3]) < 0.4 or float(placement[3]) > 2.0: return false
 				if not placement[4] is float and not placement[4] is int or not is_finite(float(placement[4])) or absf(float(placement[4])) > TAU + 0.01: return false
 	for field in ["harvested", "marked"]:
@@ -552,7 +554,7 @@ func _pack_forest(trees: Array[Dictionary]) -> Array:
 	for record in trees:
 		if placements.size() >= 30: break
 		var at: Vector3 = record.position
-		var species: int = ["oak", "birch", "pine"].find(str(record.species))
+		var species: int = ["oak", "birch", "pine", "apple"].find(str(record.species))
 		placements.append([snappedf(at.x, 0.01), snappedf(at.z, 0.01), species, snappedf(float(record.scale), 0.001), snappedf(float(record.rotation), 0.001)])
 	return placements
 
@@ -560,7 +562,7 @@ func _unpack_forest(placements: Array) -> Array[Dictionary]:
 	var trees: Array[Dictionary] = []
 	for value in placements:
 		var at := Vector2(float(value[0]), float(value[1]))
-		trees.append({"position": Vector3(at.x, game.landscape.height_at(at), at.y), "species": ["oak", "birch", "pine"][int(value[2])], "scale":float(value[3]), "rotation":float(value[4])})
+		trees.append({"position": Vector3(at.x, game.landscape.height_at(at), at.y), "species": ["oak", "birch", "pine", "apple"][int(value[2])], "scale":float(value[3]), "rotation":float(value[4])})
 	return trees
 
 func _render_forest(trees: Array[Dictionary], animate: bool, from: Vector3 = Vector3.ZERO, to: Vector3 = Vector3.ZERO) -> Array[Vector3]:
@@ -574,7 +576,7 @@ func _render_forest(trees: Array[Dictionary], animate: bool, from: Vector3 = Vec
 		if resource_by_key.has(key): continue
 		roots.append(center + at)
 		var timber: Node3D = W.resource(game.adventure.zone_groups[ZONE], game.scene, ZONE, center + at, "lumber", "axe", 2)
-		W.tree(timber, Vector3.ZERO, 4.4 * float(record.scale), str(record.species) == "pine", str(record.species) == "birch")
+		W.tree(timber, Vector3.ZERO, 4.4 * float(record.scale), str(record.species) == "pine", str(record.species) == "apple")
 		timber.rotation.y = float(record.rotation)
 		timber.set_meta("landscape_growth", true)
 		if animate:

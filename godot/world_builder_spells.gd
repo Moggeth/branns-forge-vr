@@ -24,8 +24,9 @@ const ENTRIES = [
 	{"id":"patrol", "title":"Skeleton Patrol", "palette":"Encounters", "cost":"4 Mana", "mana":4.0, "gesture":"point", "cooldown":12.0, "description":"Warn the Hero before three skeletons rise.", "icon":"skeleton"},
 	{"id":"golem", "title":"Assemble Golem", "palette":"Encounters", "cost":"Recovered timber, stone and metal heart", "gesture":"point", "cooldown":20.0, "description":"Future construction from recovered physical timber, stone and a metal heart.", "icon":"golem", "implemented":false},
 	{"id":"harvest", "title":"Mark Harvest", "palette":"Life", "cost":"Free", "gesture":"point", "cooldown":0.0, "description":"Assign a helper to a standing tree; delivered timber enters the stockpile.", "icon":"axe"},
-	{"id":"hire", "title":"Hire Helper", "palette":"Construction", "cost":"2 lumber", "wood":2, "gesture":"button", "cooldown":0.0, "description":"Equip another lumberjack at the work site.", "icon":"worker"},
-	{"id":"calm", "title":"Calm Ent", "palette":"Life", "cost":"2 Mana", "mana":2.0, "gesture":"point", "cooldown":10.0, "description":"Calm an awakened tree for a short time.", "icon":"hand"}
+	{"id":"hire", "title":"Hire Helper", "palette":"Life", "cost":"2 lumber", "wood":2, "gesture":"button", "cooldown":0.0, "description":"Equip another lumberjack at the work site.", "icon":"worker"},
+	{"id":"calm", "title":"Calm Ent", "palette":"Life", "cost":"2 Mana", "mana":2.0, "gesture":"point", "cooldown":10.0, "description":"Calm an awakened tree for a short time.", "icon":"hand"},
+	{"id":"seed", "title":"Plant Magical Seed", "palette":"Life", "cost":"1 recovered seed", "gesture":"point", "cooldown":0.0, "description":"Plant a recovered Ent seed in valid soil; its original species survives.", "icon":"seed"}
 ]
 
 static func catalogue() -> Array[Dictionary]:
@@ -42,6 +43,7 @@ func availability(action: String, builder: Node) -> String:
 	var item := entry(action)
 	if item.is_empty(): return "Unknown spell."
 	if not bool(item.get("implemented", true)): return "%s is not available yet." % item.title
+	if action == "seed" and builder.data.get("ent_seeds", []).is_empty(): return "Recover a magical seed from a fallen Ent first."
 	var remaining := float(builder.data.get("spell_cooldowns", {}).get(action, 0.0))
 	if remaining > 0.001: return "%s recharges in %.1f s." % [item.title, remaining]
 	if action == "wall" and int(builder.data.get("star_iron", 0)) >= 2: return ""

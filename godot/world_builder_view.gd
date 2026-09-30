@@ -1,11 +1,12 @@
 extends Window
 ## The second perspective is an input surface over the Hero's actual World3D.
 const CommandPanel = preload("res://world_builder_command_panel.gd")
+const SpellAtlas = preload("res://assets/worldbuilder/icons/spell-atlas.png")
 const LINE_ACTIONS = ["path", "sunder", "forest", "wall", "fault", "bridge", "ramp", "stairs", "boardwalk"]
 const ICON_INDICES = {"path":0,"sunder":1,"raise":2,"wall":3,"meteor":4,"fault":5,
 	"grove":6,"forest":7,"ring":8,"awaken":9,"calm":9,"bridge":10,"ramp":11,
 	"stairs":12,"boardwalk":13,"outpost":14,"tower":15,"platform":16,"gate":17,
-	"barricade":18,"patrol":19,"golem":20,"harvest":21,"hire":22}
+	"barricade":18,"patrol":19,"golem":20,"harvest":21,"hire":22,"seed":8}
 
 const TOP_HEIGHT = 64
 const WINDOWED_SIZE = Vector2i(1280, 800)
@@ -264,9 +265,7 @@ func _build_ui() -> void:
 	command_panel.name = "WorldBuilderCommandPanel"
 	overlay.add_child(command_panel)
 	command_panel.setup(catalogue)
-	var atlas := Image.load_from_file("res://assets/worldbuilder/icons/spell-atlas.png")
-	if atlas != null and not atlas.is_empty():
-		command_panel.set_icon_atlas(ImageTexture.create_from_image(atlas), 4, 6, ICON_INDICES)
+	command_panel.set_icon_atlas(SpellAtlas, 4, 6, ICON_INDICES)
 	command_panel.spell_selected.connect(select_action)
 	command_panel.palette_selected.connect(_select_palette)
 	command_panel.regen_preset_selected.connect(_regen_preset)
@@ -480,9 +479,9 @@ func _update_preview() -> void:
 		var direction := Vector2(hovered.x - start.x, hovered.z - start.z).normalized()
 		var side := Vector3(-direction.y,0,direction.x)
 		var half_width := 1.0
-		if selected == "sunder": half_width = 5.0
+		if selected == "sunder": half_width = 8.0 # 4 m fissure half-width plus its 4 m displaced-earth shoulder.
 		elif selected == "wall": half_width = 6.5
-		elif selected == "forest": half_width = 8.0
+		elif selected == "forest": half_width = 5.5
 		elif selected == "fault": half_width = 4.0
 		elif selected in ["bridge","ramp","stairs","boardwalk"]: half_width = float(plan.get("width",3.0)) * 0.5
 		for edge in [-1.0,1.0]:
@@ -501,15 +500,18 @@ func _update_preview() -> void:
 			_boundary_line(mesh,_ground_preview(point),builder.center + endpoint + Vector3.UP * 1.2)
 	else:
 		var radius := 0.8
-		if selected == "raise": radius = 13.0
+		if selected == "raise": radius = 15.0
 		elif selected == "ring": radius = 19.0
-		elif selected == "meteor": radius = 11.0
+		elif selected == "meteor": radius = 10.0
 		elif selected == "grove": radius = 4.0
 		elif selected in ["awaken","calm"]: radius = 3.0
-		for i in 64:
-			var a := hovered + Vector3(cos(TAU * i / 64.0),0,sin(TAU * i / 64.0)) * radius
-			var b := hovered + Vector3(cos(TAU * (i+1) / 64.0),0,sin(TAU * (i+1) / 64.0)) * radius
-			_boundary_line(mesh,_ground_preview(a),_ground_preview(b))
+		var radii := [radius]
+		if selected == "ring": radii = [radius - 5.0, radius + 5.0]
+		for boundary_radius in radii:
+			for i in 64:
+				var a := hovered + Vector3(cos(TAU * i / 64.0),0,sin(TAU * i / 64.0)) * float(boundary_radius)
+				var b := hovered + Vector3(cos(TAU * (i+1) / 64.0),0,sin(TAU * (i+1) / 64.0)) * float(boundary_radius)
+				_boundary_line(mesh,_ground_preview(a),_ground_preview(b))
 	mesh.surface_end()
 
 func _world_at(screen: Vector2) -> Vector3:
@@ -547,6 +549,7 @@ func _act(local: Vector3) -> void:
 			"meteor": result = builder.cast_meteor(local)
 			"awaken": result = builder.cast_awaken(local)
 			"calm": result = builder.calm_ent(local)
+			"seed": result = builder.ents.plant_seed(local)
 			"golem": result = builder.assemble_golem(local)
 			_: result = "This construction is not available yet."
 	_say(result if result != "" else builder.progress_message)
