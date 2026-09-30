@@ -56,7 +56,8 @@ func _check() -> void:
 	var builder := BuilderFixture.new()
 	root.add_child(builder)
 	var path: Dictionary = Targeting.plan("path", Vector3.ZERO, Vector3(14, 0, 0), builder, game, "")
-	if not path.valid or int(path.cost) != 2 or float(path.width) != 2.0: failures.append("path plan cost or footprint")
+	if not path.valid or int(path.cost) != 2 or float(path.width) != 4.0 or float(path.paint_width) != 9.0:
+		failures.append("path plan cost or painted footprint")
 	var short_path: Dictionary = Targeting.plan("path", Vector3.ZERO, Vector3(2, 0, 0), builder, game, "")
 	if short_path.valid: failures.append("short path was shown as castable")
 	var ring: Dictionary = Targeting.spec("ring")

@@ -3,7 +3,7 @@ extends RefCounted
 ## Gameplay remains authoritative; this is a truthful, cheap pre-cast preview.
 
 const SPECS := {
-	"path": {"kind":"line", "width":2.0, "minimum":3.0, "maximum":36.0},
+	"path": {"kind":"line", "width":4.0, "paint_width":9.0, "minimum":3.0, "maximum":36.0},
 	"sunder": {"kind":"line", "width":16.0, "minimum":8.0, "maximum":110.0},
 	"wall": {"kind":"line", "width":13.0, "minimum":8.0, "maximum":85.0},
 	"forest": {"kind":"line", "width":11.0, "minimum":6.0, "maximum":100.0},
