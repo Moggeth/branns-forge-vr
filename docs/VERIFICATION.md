@@ -1748,6 +1748,8 @@ The integrated `world_builder_checks.gd` fixture still needs `-- --world-builder
 
 `targeting_state()` is the art/panel contract: it contains the selected id, kind, validity/reason, local and world hover/start coordinates, footprint geometry, dynamic path cost or structure lumber. `targeting_changed(state)` emits when the plan changes. An optional Node3D art adapter installed through `set_target_visual()` receives `update_targeting(state)`; the ground-projected line/circle/tree/sprout/triad fallback stays available without the art adapter. The editor's visual check should use a graphical no-focus root Window and the offscreen capture path, with its 45-second watchdog; headless cannot establish how the GPU textures look.
 
+For the GPU contract, run the bundled engine graphically with `--xr-mode off --audio-driver Dummy --path godot --script res://world_builder_view_gpu_checks.gd --quit-after 1200`, under a 45-second process watchdog. It places the root Window offscreen and unfocusable, renders the same simple World3D through the root Hero camera and survey SubViewport, captures both primary orders in `outputs/world-builder-dual-view-*-gpu.png`, and reads nonblack pixels from each view. The clean paired capture took **2.614 s** on the RTX 3080 Ti with Vulkan Forward Mobile. Both pictures were inspected: the Hero perspective shows the gold landmark at eye level and the survey perspective shows it from above. The first version left a child Window visible while quitting, which produced a `gui_embed_subwindows` warning; hiding and freeing that Window before quit removed the warning.
+
 [Controls and state](WORLD-BUILDER.md), [verification/source handoff](RTS-SHARED-WORLD-20260930.md), and [next dependencies](RTS-SHARED-WORLD-DIRECTION.md). Use the existing native renderer diagnostics rather than recomissioning assets to inspect them. Final panel/full-scene/Ent fixtures pass in 6.969 / 7.782 / 7.503 seconds; three native panel sizes render in 1.813 s, and seven installed art views in 2.000 s. These are offline desktop measurements, not headset performance.
 
 For procedural geometry, compare triangle cross products with declared normals before GPU review; inward winding failed the first timber fixture. Use a choppable TreeKit fixture with the actual named Trunk, not a Crown-only tree, and transform Trunk coordinates into the PI-rotated Ent presentation space. Preserve per-instance eye materials while sharing other meshes/materials.
@@ -1817,5 +1819,12 @@ assertion later rejected a valid narrow facet; raycast the saved scar back to
 the actual collider instead. After the builder accepted an optional contact
 normal, the fake builder test fixture still took four arguments and emitted
 engine errors; update contract fixtures when the production signature changes.
-The headless checks establish geometry and mechanics, not headset feel or
-final material/VFX appearance. A bounded actual-render review is still needed.
+The headless checks establish geometry and mechanics, not headset feel.
+`meteor_visual_capture.gd -- --world-builder-preview` rendered near, side, high
+and four-hit mined views on the actual NVIDIA Forward Mobile path in 2.046 s.
+The shell was visually solid in all three angles; dark local chips appeared
+on the mined view. Images are in ignored `outputs/meteor-contact/`. The first
+mined capture tried `viewport.world_3d`, which was null for the inherited
+world; use `meteor.get_world_3d()` after the node joins the viewport. Its
+script error left the diagnostic running until that exact session was stopped
+at 11.775 s. Final headset feel and VFX/audio art remain unverified.
