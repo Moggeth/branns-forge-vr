@@ -36,7 +36,7 @@ The managed/generated route audit is narrower than the native catalogue: `main._
 
 ## Main dispatch points
 
-The main scene owns keyboard and mouse input. Its integration must route `C` to `desktop_toggle_reel`, call the hint mapper from `_desktop_hint`, and update `desktop_axe_state` every desktop frame. `_desktop_alternate` must arm the axe before generic alternates and call `atelier.trigger` for Glowmoth/Stormbell. `_desktop_primary` must pass Forge Lantern clicks to its shutter action before the generic melee branch. `E` must be a deliberate drop with sampled hand velocity cleared; `X` uses the sampled velocity for a real throw, and `Space` uses the locomotion jump path. A generated invention with an installed server ability needs a desktop alternate fallback that calls `_trigger`; this should be limited to registered generated inventions so plain props are not advertised as weapons.
+The main scene owns keyboard and mouse input. Its integration must route `C` to `desktop_toggle_reel`, call the hint mapper from `_desktop_hint`, and update `desktop_axe_state` every desktop frame. `_desktop_alternate` must arm the axe before generic alternates and call `atelier.trigger` for Glowmoth/Stormbell. Forge Lantern already sets `ranged=true`, so LMB bypasses the generic melee branch and reaches its shutter trigger. `E` must be a deliberate drop with sampled hand velocity cleared; `X` uses the sampled velocity for a real throw, and `Space` uses the locomotion jump path. A generated invention with an installed server ability needs a desktop alternate fallback that calls `_trigger`; this should be limited to registered generated inventions so plain props are not advertised as weapons.
 
 ## Fast check
 
