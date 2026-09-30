@@ -125,7 +125,10 @@ func _check() -> void:
 	escape.pressed = true
 	companion._input(escape)
 	await process_frame
-	if is_instance_valid(companion): failures.append("Escape did not close the VR companion")
+	if companion.selected != "": failures.append("Escape did not cancel companion targeting")
+	companion.close()
+	await process_frame
+	if is_instance_valid(companion): failures.append("VR companion did not close")
 	if root.gui_embed_subwindows != original_embed: failures.append("VR companion did not restore subwindow preference")
 	print("WORLD_BUILDER_PRESENTATION ", JSON.stringify({"failures": failures, "desktop_mode": desktop_mode, "desktop_size": desktop_size, "capture": shot_path}))
 	quit(0 if failures.is_empty() else 1)
