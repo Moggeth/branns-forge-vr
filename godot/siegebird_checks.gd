@@ -249,6 +249,7 @@ static func run(game,failures:Array):
 	system._knife_contact(knife,hand,0.05)
 	if int(dummy.get_meta("hits",0))!=1: failures.append("held bolt tip did not stab dummy")
 	knife.queue_free(); dummy.queue_free()
+	await system.projectile_checks(failures)
 	for key in [str(hand.get_instance_id()),str(other.get_instance_id())]:
 		game.held.erase(key); game.grips.grips.erase(key); system.occupied.erase(key)
 	for shot in system.projectiles: shot.node.queue_free()

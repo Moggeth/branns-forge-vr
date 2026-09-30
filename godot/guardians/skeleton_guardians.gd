@@ -57,6 +57,7 @@ const YANK_WINDOW := 1.4
 const MAX_SOUNDS := 6
 const SHIELD_HANDLE := Vector3(0.0, 0.0, -0.055)
 const PALM_GRIP := Vector3(0.0, -0.045, -0.035)
+const SkeletonContact=preload("res://skeleton_projectile_contact.gd")
 
 var game
 var guardians := {}   # actor instance id -> record
@@ -73,6 +74,49 @@ func _exit_tree() -> void:
 
 func setup(owner_game) -> void:
 	game = owner_game
+
+## Actual skinned guardian contact. The imported part meshes contain bind-pose
+## triangles; each rigid part follows its Skeleton3D bone pose for this query.
+## Attachments are created only after a hit so embedded shafts follow the bone.
+func projectile_contact(actor: Node3D, start: Vector3, finish: Vector3) -> Dictionary:
+	if game.guardian_authored==null: return {}
+	var entry: Dictionary=game.guardian_authored.entries.get(actor.get_instance_id(),{})
+	if entry.is_empty() or entry.get("shattered",false) or not entry.visual.is_visible_in_tree(): return {}
+	var skeleton: Skeleton3D=entry.get("skeleton")
+	if skeleton==null: return {}
+	var best := {}
+	var best_distance := start.distance_squared_to(finish)
+	for spec in [["Head","head"],["Torso","rib"],["LeftArm","arm_l"],["RightArm","arm_r"],["LeftLeg","leg_l"],["RightLeg","leg_r"],["Shield","shield"]]:
+		var part: String=spec[1]
+		if part!="shield" and actor.get_meta("skeleton_missing_"+part,false): continue
+		if part=="shield" and str(entry.guardian.get("state",""))!="carried": continue
+		var mesh: MeshInstance3D=entry.shield if part=="shield" else (game.guardian_authored._find_mesh(entry.visual,"Torso") if part=="rib" else entry.part_meshes.get(part))
+		if not is_instance_valid(mesh) or not mesh.is_visible_in_tree(): continue
+		var bone_name: String="LeftArm" if part=="shield" else spec[0]
+		var bone: int=int(entry.bones.get(bone_name,-1))
+		if bone<0: continue
+		var pose: Transform3D=skeleton.get_bone_global_pose(bone)
+		var rest: Transform3D=skeleton.get_bone_global_rest(bone)
+		var skin: Transform3D=skeleton.global_transform*pose*rest.affine_inverse()*skeleton.global_transform.affine_inverse()
+		var found: Dictionary=SkeletonContact.mesh_contact(mesh,start,finish,skin*mesh.global_transform)
+		if found.is_empty(): continue
+		var distance:float=start.distance_squared_to(found.position)
+		if distance>=best_distance: continue
+		best_distance=distance
+		best={"position":found.position,"normal":found.normal,"part":part,"surface":_projectile_attachment(entry,bone)}
+	return best
+
+func _projectile_attachment(entry: Dictionary, bone: int) -> BoneAttachment3D:
+	var attachments: Dictionary=entry.get("projectile_attachments",{})
+	if attachments.has(bone) and is_instance_valid(attachments[bone]): return attachments[bone]
+	var skeleton: Skeleton3D=entry.skeleton
+	var attachment:=BoneAttachment3D.new()
+	attachment.name="ProjectileContact_"+str(bone)
+	attachment.bone_name=skeleton.get_bone_name(bone)
+	skeleton.add_child(attachment)
+	attachments[bone]=attachment
+	entry.projectile_attachments=attachments
+	return attachment
 
 # -------------------------------------------------------------------------------- attach / art
 

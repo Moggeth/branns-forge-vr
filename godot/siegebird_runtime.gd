@@ -15,6 +15,7 @@ var embedded=[]
 const BOLT_LIFETIME=120.0
 const BOLT_CAP=20
 const GRAVITY=2.4
+const SkeletonContact=preload("res://skeleton_projectile_contact.gd")
 var loose=[]
 var supply:Node3D
 var sounds={}
@@ -474,7 +475,7 @@ func tick(delta):
 			for segment in range(steps):
 				game.heat_contacts.sweep(start.lerp(end,float(segment)/steps),start.lerp(end,float(segment+1)/steps),.18,95,shot.zone,"hot_bolt",shot.node,delta/steps)
 		shot.velocity=shot.velocity*decay+terminal*(1.0-decay)
-		var hit=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(start,end,1))
+		var hit=_projectile_contact(start,end)
 		var forward=shot.velocity.normalized()
 		shot.node.global_basis=Basis.looking_at(forward,Vector3.RIGHT if absf(forward.dot(Vector3.UP))>0.98 else Vector3.UP)*Basis(Vector3.RIGHT,Vector3.FORWARD,Vector3.UP)
 		var tip=shot.node.get_meta("tip",Vector3.UP*0.35)
@@ -483,7 +484,7 @@ func tick(delta):
 			if shot.get("hot",false) and game.heat_contacts!=null:
 				game.heat_contacts.touch(hit.position+hit.normal*.035,.45,240,shot.zone,"hot_bolt_impact",shot.node,.1)
 			var target=game._owner(hit.collider)
-			var embed_surface:Node3D=hit.collider
+			var embed_surface:Node3D=hit.get("surface",hit.collider)
 			if target!=null:
 				match str(target.get_meta("kind","")):
 					"pumpkin":
@@ -495,9 +496,11 @@ func tick(delta):
 						var fallen=game.apples.impact(target,shot.velocity.length(),hit.position,shot.velocity)
 						if is_instance_valid(fallen): embed_surface=fallen
 					"enemy":
-						var local_hit=target.to_local(hit.position)
-						var headshot=str(target.get_meta("enemy_type",""))=="skeleton" and hit.position.distance_to(game.enchantments._head_position(target))<0.32
-						game.adventure.hurt_enemy(target,float(shot.get("damage",95))*(2.0 if headshot else 1.0),shot.hand,shot.velocity.normalized(),"headshot" if headshot else ("fire" if shot.get("hot",false) else "projectile"),hit.position)
+						var skeleton_hit=str(target.get_meta("enemy_type",""))=="skeleton"
+						var headshot=skeleton_hit and str(hit.get("part",""))=="head"
+						game.adventure.hurt_enemy(target,_projectile_damage(target,float(shot.get("damage",95)),headshot),shot.hand,shot.velocity.normalized(),"headshot" if headshot else ("fire" if shot.get("hot",false) else "projectile"),hit.position)
+						if skeleton_hit and not target.get_meta("alive",true):
+							embed_surface=_fallen_bone(target,hit.position,str(hit.get("part","")))
 					"rat": game._kill_rat(target)
 					"dummy": game._dummy_hit(target)
 			extras.impact(shot,hit,target)
@@ -532,11 +535,132 @@ func embed(bolt:Node3D,surface:Node3D):
 		if is_instance_valid(old.node): extras.retire(old.node); old.node.queue_free()
 	print("BOLT_EMBED count=",embedded.size()," lifetime=",BOLT_LIFETIME)
 
+func _projectile_contact(start: Vector3,end: Vector3) -> Dictionary:
+	var space=game.get_world_3d().direct_space_state
+	var excluded: Array[RID]=[]
+	var world_hit := {}
+	# The interaction box is useful for hand targeting, but has no physical
+	# bone surface. Skip only that box and retain all scenery/shield hits.
+	for attempt in range(24):
+		var query=PhysicsRayQueryParameters3D.create(start,end,1,excluded)
+		world_hit=space.intersect_ray(query)
+		if world_hit.is_empty(): break
+		var target=game._owner(world_hit.collider)
+		if target==null or str(target.get_meta("kind",""))!="enemy" or str(target.get_meta("enemy_type",""))!="skeleton": break
+		excluded.append(world_hit.collider.get_rid())
+		world_hit={}
+	var limit=start.distance_squared_to(world_hit.position) if not world_hit.is_empty() else start.distance_squared_to(end)
+	var bone_hit := {}
+	for actor in game.scene.get("enemies",[]):
+		if not is_instance_valid(actor) or str(actor.get_meta("enemy_type",""))!="skeleton" or not actor.get_meta("alive",true): continue
+		if str(actor.get_meta("zone",game.adventure.zone))!=game.adventure.zone: continue
+		if Geometry3D.get_closest_point_to_segment(actor.global_position+Vector3.UP,start,end).distance_squared_to(actor.global_position+Vector3.UP)>4.0: continue
+		var contact := {}
+		if game.guardians!=null and game.guardians.has_method("projectile_contact"):
+			contact=game.guardians.projectile_contact(actor,start,end)
+		if contact.is_empty():
+			var rig: Dictionary=game.animation.actors.get(actor.get_instance_id(),{})
+			contact=SkeletonContact.contact(actor,rig,start,end)
+		if contact.is_empty(): continue
+		var distance=start.distance_squared_to(contact.position)
+		if distance>limit: continue
+		limit=distance
+		bone_hit={"position":contact.position,"normal":contact.normal,"collider":actor,"surface":contact.surface,"part":contact.part}
+	return bone_hit if not bone_hit.is_empty() else world_hit
+
+func _projectile_damage(target: Node3D, base_damage: float, headshot: bool) -> float:
+	if str(target.get_meta("enemy_type",""))!="skeleton": return base_damage
+	# The default skeleton has 66 HP. A body bolt must not one-shot it even
+	# when a live interaction profile increases the base crossbow damage.
+	if headshot:
+		return maxf(base_damage*2.0,float(target.get_meta("max_hp",66))) if str(target.get_meta("guardian_variant",""))=="" else base_damage*2.0
+	return minf(base_damage*0.35,32.0)
+
+func _fallen_bone(actor: Node3D, point: Vector3, part: String) -> Node3D:
+	var nearest: Node3D=null
+	var distance:=INF
+	for body in game.remains.bodies:
+		if not is_instance_valid(body) or int(body.get_meta("source_actor",-1))!=actor.get_instance_id(): continue
+		for piece in body.get_children():
+			if not piece is Node3D: continue
+			if part=="head" and piece.name!="Skull": continue
+			var candidate:float=piece.global_position.distance_squared_to(point)
+			if candidate<distance:
+				distance=candidate
+				nearest=piece
+	return nearest if nearest!=null else game.adventure.zone_groups.get(game.adventure.zone,game)
+
 func checks(failures:Array):
 	if _turns({"item":null})!=TURNS: failures.append("quickwind default turns changed")
 	# The strict optic geometry must reject a point behind the eye and sideways gaze.
 	var axis=Vector3.UP; var optic=Vector3(0,0.30,0); var behind=Vector3(0,-0.30,0)
 	if optic.dot(axis)<0.03 or behind.dot(axis)>=0.03 or Vector3.RIGHT.dot(axis)>0.94: failures.append("optic front/back/gaze regression")
+
+## Invoked by the offline Siegebird check. A real layer-1 interaction box
+## surrounds separated visible meshes, so this tests the complete ray choice.
+func projectile_checks(failures:Array) -> void:
+	var actor:=Node3D.new()
+	actor.name="ProjectileContactFixture"
+	game.add_child(actor)
+	actor.global_position=Vector3(800,40,800)
+	actor.set_meta("kind","enemy")
+	actor.set_meta("enemy_type","skeleton")
+	actor.set_meta("zone",game.adventure.zone)
+	actor.set_meta("alive",true)
+	actor.set_meta("max_hp",66)
+	var box:=StaticBody3D.new()
+	actor.add_child(box)
+	box.position=Vector3(0,1,0)
+	var collision:=CollisionShape3D.new()
+	box.add_child(collision)
+	var shape:=BoxShape3D.new()
+	shape.size=Vector3(1.2,2.2,0.9)
+	collision.shape=shape
+	var visual:=Node3D.new()
+	actor.add_child(visual)
+	var joints:={"head":Node3D.new(),"body":Node3D.new()}
+	var homes:=[]
+	for spec in [["head",Vector3(0,1.65,0),Vector3(0.32,0.30,0.24)],["body",Vector3(0,1.05,0),Vector3(0.40,0.07,0.20)],["body",Vector3(0,1.28,0),Vector3(0.34,0.07,0.20)]]:
+		var joint:Node3D=joints[spec[0]]
+		if joint.get_parent()==null: visual.add_child(joint)
+		var piece:=Node3D.new()
+		piece.name="Skull" if spec[0]=="head" else "Rib"
+		joint.add_child(piece)
+		piece.position=spec[1]
+		var mesh:=MeshInstance3D.new()
+		piece.add_child(mesh)
+		var bone:=BoxMesh.new()
+		bone.size=spec[2]
+		mesh.mesh=bone
+		homes.append({"piece":piece,"parent":joint,"transform":piece.transform})
+	var id:=actor.get_instance_id()
+	game.animation.actors[id]={"homes":homes,"joints":joints}
+	game.scene.enemies.append(actor)
+	await game.get_tree().physics_frame
+	await game.get_tree().physics_frame
+	var origin:Vector3=actor.global_position
+	var gap:=_projectile_contact(origin+Vector3(0.15,1.16,0.6),origin+Vector3(0.15,1.16,-0.6))
+	if not gap.is_empty(): failures.append("bolt stopped inside empty skeletal gap")
+	var skull:=_projectile_contact(origin+Vector3(0,1.65,0.6),origin+Vector3(0,1.65,-0.6))
+	if skull.is_empty() or skull.get("part","")!="head": failures.append("bolt missed visible skull")
+	var torso:=_projectile_contact(origin+Vector3(0,1.05,0.6),origin+Vector3(0,1.05,-0.6))
+	if torso.is_empty() or torso.get("part","")!="rib": failures.append("bolt missed visible rib")
+	if _projectile_damage(actor,95.0,true)<66.0 or _projectile_damage(actor,95.0,false)>=66.0:
+		failures.append("skull and body damage no longer differ")
+	if not torso.is_empty():
+		var bolt:=Node3D.new()
+		game.add_child(bolt)
+		bolt.global_position=torso.position
+		embed(bolt,torso.surface)
+		var entry:Dictionary=embedded.back()
+		torso.surface.global_position+=Vector3(0.3,0.1,0)
+		if (torso.surface.global_transform*entry.local).origin.distance_to(bolt.global_position+Vector3(0.3,0.1,0))>0.001:
+			failures.append("embedded bolt lost animated bone attachment")
+		embedded.erase(entry)
+		bolt.queue_free()
+	game.scene.enemies.erase(actor)
+	game.animation.actors.erase(id)
+	actor.queue_free()
 
 func _knife_contact(bolt,hand,delta):
 	var tip=bolt.to_global(bolt.get_meta("tip",Vector3.UP*0.35))
