@@ -45,3 +45,7 @@ __pycache__/
 *.blend2
 Thumbs.db
 .DS_Store
+
+# Tree kit GLBs embed their textures; import extracts these automatically.
+godot/assets/tree_cutting/*.png
+godot/assets/tree_cutting/*.import
