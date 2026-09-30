@@ -98,6 +98,8 @@ func _run() -> void:
 	event_art.sound_requested.connect(func(kind: String, _position: Vector3, _strength: float) -> void:
 		sound_order.append(kind))
 	var meteors: Array[Node3D] = []
+	var first_slot := -1
+	var first_light_index := -1
 	for i in 8:
 		var local := Vector2(float(i)*2.0, 20.0)
 		var record: Dictionary = Meteor.make_record(local, 8000+i,
@@ -115,7 +117,24 @@ func _run() -> void:
 			_check(gem.mesh is ArrayMesh and gem.mesh.surface_get_material(0) == art.meteor_material(),
 				"meteor vein uses shared luminous crystal material")
 		meteor.visual_event.emit({"phase":"descent","seed":int(record.seed),"progress":.7})
+		if i == 0:
+			event_art.tick(.016)
+			for index in event_art._slots.size():
+				if int(event_art._slots[index].mid) == meteor.get_instance_id(): first_slot = index
+			first_light_index = event_art._light_owner.find(first_slot)
+			_check(first_slot >= 0 and first_light_index >= 0 and event_art._lights[first_light_index].visible,
+				"descent receives a visible representative light")
+			if first_light_index >= 0:
+				var first_position: Vector3 = event_art._lights[first_light_index].global_position
+				meteor.core.position.y -= 1.5
+				event_art.tick(.016)
+				_check(event_art._lights[first_light_index].global_position.y < first_position.y - 1.4,
+					"descent light follows the falling meteor head")
 		meteor.visual_event.emit({"phase":"impact","seed":int(record.seed)})
+		if i == 0:
+			_check(event_art._light_owner.count(first_slot) == 1 and
+				event_art._light_owner.find(first_slot) == first_light_index,
+				"impact retains one representative light without allocating another")
 		meteor.visual_event.emit({"phase":"crystal_reveal","seed":int(record.seed)})
 	_check(event_art.active_slots() == 6 and event_art._watched.size() == 8,
 		"eight simultaneous meteors stay within six event slots")
@@ -136,7 +155,9 @@ func _run() -> void:
 	_check(event_art._watched.is_empty(), "freed meteor watchers do not leak")
 	# A real World Builder meteor signals through the impact callback. The crater
 	# height and physics surface must already match when advance() returns.
-	var site := Vector2(-78,35)
+	# Keep the rock within the runtime's 52 m near radius so the ordinary
+	# visibility manager does not replace this live node with its distant batch.
+	var site := Vector2(-20,25)
 	var before_height: float = game.landscape.height_at(site)
 	var impact_record: Dictionary = Meteor.make_record(site, 99001, before_height)
 	impact_record["id"] = "presentation-fixture-impact"
@@ -161,11 +182,30 @@ func _run() -> void:
 		"contact never exposes the obsolete collider")
 	_check(not next_hit.is_empty() and absf(float(next_hit.get("position",Vector3.ZERO).y)-world_at.y)<.22,
 		"real meteor collider matches current terrain by the next physics frame")
+	await create_timer(1.2).timeout
+	var bed_world: Vector3 = game.landscape.zone_root.to_global(Vector3(site.x,game.landscape.height_at(site),site.y))
+	var bed_ray := PhysicsRayQueryParameters3D.create(bed_world+Vector3.UP*5.0,bed_world-Vector3.UP*5.0,1)
+	bed_ray.exclude = [impact_meteor.collider.get_rid()]
+	var bed_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(bed_ray)
+	var bottom: float = impact_meteor.core.global_position.y + impact_meteor.core.mesh.get_aabb().position.y * impact_meteor.core.scale.y
+	_check(not bed_hit.is_empty() and absf(float(bed_hit.get("position",Vector3.ZERO).y)-bottom)<.25,
+		"settled meteor shell plants its lowest point at real crater ground")
 	var gem: MeshInstance3D = impact_meteor.gems[0]
 	var result: Dictionary = impact_meteor.strike(gem.global_position,"quarry_pick",1.0)
 	_check(result.get("ok",false) and result.get("kind","") == "meteor_gem" and
 		impact_meteor.remaining_gems() == 11 and impact_meteor.record.scars.size() == 1,
 		"mining the authored gem retains reward and saved scar state")
+	var saved: Dictionary = impact_meteor.to_record()
+	var reloaded := Meteor.new()
+	builder.root.add_child(reloaded)
+	reloaded.setup(saved,false)
+	presenter.watch_meteor(reloaded)
+	_check(reloaded.remaining_gems() == 11 and int(reloaded.record.veins[0]) == 1 and
+		reloaded.record.scars.size() == 1 and reloaded.scar_display.multimesh.instance_count == 1,
+		"saved and reloaded meteor retains gem inventory and visible mining scar")
+	var reload_bottom: float = reloaded.core.global_position.y + reloaded.core.mesh.get_aabb().position.y * reloaded.core.scale.y
+	_check(not bed_hit.is_empty() and absf(reload_bottom-float(bed_hit.get("position",Vector3.ZERO).y))<.25,
+		"reloaded meteor shell remains seated in its saved crater")
 	await _fault(game)
 	print("STARFALL_PRESENTATION_RESULT ",JSON.stringify({"failures":failures,"geometry":geometry,
 		"seconds":float(Time.get_ticks_usec()-started)/1000000.0}))

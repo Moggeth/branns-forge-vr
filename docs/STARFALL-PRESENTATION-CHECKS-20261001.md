@@ -17,6 +17,11 @@ spires must use the authored shared shader material and crystal group, with no
 individual lights. A real meteor callback must change the crater height before
 returning and expose its matching collider by the next physics frame, while a
 pick strike still grants the gem and records a scar.
+The extended check also proves that a representative event light follows the
+falling meteor head and remains the same light through impact. After the sink
+tween, a terrain ray excluding the meteor collider must place the shell's lowest
+point within 0.25 m of the crater bed. Reloading its saved record must retain
+that seating, one mined gem unit and the visible mining scar.
 
 The check does not render the shaders or judge their appearance in a headset.
 After it passes, visual review is still needed for glow, legibility and stereo
@@ -34,3 +39,9 @@ physics query broadphase registers the replacement collider on the next physics
 frame. The check rejects an old surface in the interim and verifies the new one
 after one frame. Godot also suffixes duplicate node names (`Spire2`, etc.), so
 the fault assertion counts crystals by group membership in the new fault group.
+The first settlement fixture placed its rock beyond the runtime's 52 m near
+radius; the visibility manager correctly replaced that live node with a distant
+batch during the tween. Keep the source fixture inside the near radius when
+checking a live shell. A first expression also treated `global_scale` as a
+property rather than using the actual core scale; the corrected check uses the
+mesh AABB, core transform and scale. These were fixture errors, not regressions.
