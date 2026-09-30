@@ -69,6 +69,18 @@ func _check() -> void:
 	var rail_query := PhysicsRayQueryParameters3D.create(Vector3(0, 0.65, 0), Vector3(0, 0.65, 3), 1)
 	var rail_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(rail_query)
 	if rail_hit.is_empty() or str(rail_hit.collider.get_meta("kind", "")) != "solid": failures.append("bridge rail does not contain the Hero")
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(builder.data))
+	if not Construction.valid_records(saved.constructions): failures.append("JSON save round trip lost construction record")
+	builder.root.queue_free()
+	await physics_frame
+	builder.root = Node3D.new()
+	game.add_child(builder.root)
+	builder.data = saved
+	module.setup(builder)
+	module.restore()
+	await physics_frame
+	var restored_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+	if restored_hit.is_empty() or str(restored_hit.collider.get_meta("kind", "")) != "floor": failures.append("restored record did not rebuild physical deck")
 	if absf(module.surface_height(Vector2.ZERO, -0.3) - 0.2) > 0.02: failures.append("worker deck height differs from collider")
 	for entry in [
 		{"kind": "ramp", "a": Vector3(-4, 0, 6), "b": Vector3(4, 0, 6)},

@@ -7,7 +7,7 @@ Run offline; `--world-builder-check` keeps the live-scene fixture away from the 
 & .\tools\godot\Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_construction_live_checks.gd -- --world-builder-check
 ```
 
-The synthetic fixture checks all four deck kinds against physics rays and worker height sampling, rejects wet bridge banks and insufficient lumber without ledger changes, validates persisted records, and proves A* can cross a river only after a free bridge exists. The live fixture surveys a real Orchard river span away from the fixed bridge, builds without writing the save, checks the Hero's floor ray, finds a route over wet cells, and moves an actual lumberjack over that deck.
+The synthetic fixture checks all four deck kinds against physics rays and worker height sampling, rejects wet bridge banks and insufficient lumber without ledger changes, validates persisted records, rebuilds the physical deck after a JSON save round trip, and proves A* can cross a river only after a free bridge exists. The live fixture surveys a real Orchard river span away from the fixed bridge, builds without writing the save, checks the Hero's floor ray, finds a route over wet cells, and moves an actual lumberjack over that deck.
 
 The existing authored stone arch bridge is 5.88 m long with a 4.6 m clear water span. It is retained for the fixed crossing. The free structures use dimensions matched to their actual colliders; scaling the full stone arch to an arbitrary span would break the authored proportions. A reusable authored timber module would improve their appearance.
 
