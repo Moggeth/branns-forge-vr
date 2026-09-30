@@ -1850,3 +1850,14 @@ collider, while retaining living-skeleton planted-feet checks. The final
 integrated result is `SKELETON_COMBAT_RESULT []` in 7.971 s. When a physics
 fixture reports inert joints, inspect ancestor visibility and body wake state
 before changing the joint solver.
+
+Authored zone collision proxies now accept `asset_meta.<asset>.surface_material`
+and a placement-level `surface_material` override, in that order of precedence.
+Only unmistakable tree/log and rock names provide a fallback; mixed and unknown
+assets keep the existing stone default, as does unclassified terrain. The forge
+anvil's metal face and wooden stump have separate collision bodies; racks,
+crates, a gate, Brann and common workshop controls carry explicit material
+metadata. `authored_zone_kit_checks.gd` verifies override precedence, fallback
+classification and proxy metadata (`AUTHORED_ZONE_KIT_RESULT []`, 0.422 s).
+The native skeleton integration also remains green (`SKELETON_COMBAT_RESULT
+[]`, 7.852 s) with these fixtures present. No per-hit pixel inspection is used.

@@ -63,9 +63,10 @@ static func station_sign(parent: Node3D, title: String, subtitle: String, pos: V
 	label(parent, title, pos + Vector3(0, 0.07, 0.065), 35)
 	label(parent, subtitle, pos + Vector3(0, -0.14, 0.065), 18, Color("d6e1d4"))
 
-static func collision(parent: Node3D, pos: Vector3, size: Vector3) -> StaticBody3D:
+static func collision(parent: Node3D, pos: Vector3, size: Vector3, surface_material: String = "") -> StaticBody3D:
 	var body: StaticBody3D = StaticBody3D.new()
 	body.position = pos
+	if not surface_material.is_empty(): body.set_meta("surface_material", surface_material)
 	parent.add_child(body)
 	var shape: BoxShape3D = BoxShape3D.new()
 	shape.size = size
@@ -145,12 +146,15 @@ static func build(root: Node3D) -> Dictionary:
 	box(root, Vector3(-0.35,1.13,-2.9),Vector3(0.83,0.16,0.43),iron)
 	var horn: MeshInstance3D = cylinder(root, Vector3(0.22,1.11,-2.9),0.18,0.45,iron,0.02)
 	horn.rotation.z = -PI/2.0
-	collision(root, Vector3(-0.35,0.6,-2.9),Vector3(1.25,1.2,0.8))
+	# Keep the wooden stump distinct from the metal working face for contacts.
+	collision(root, Vector3(-0.35,0.35,-2.9),Vector3(0.95,0.7,0.95),"wood")
+	collision(root, Vector3(-0.35,0.95,-2.9),Vector3(1.25,0.50,0.8),"metal")
 	preload("res://workshop_details.gd").anvil(root)
 	var brann: Node3D = Node3D.new()
 	brann.name = "BrannCopperpot"
 	brann.position = Vector3(0,0,-4)
 	brann.set_meta("kind","brann")
+	brann.set_meta("surface_material","flesh")
 	root.add_child(brann)
 	var skin: Material = material("d3a279")
 	var beard: Material = material("a95628")
@@ -213,7 +217,7 @@ static func build(root: Node3D) -> Dictionary:
 	brann.add_child(resting_arm)
 	resting_arm.position=Vector3(0.44,1.12,0)
 	preload("res://workshop_details.gd").arm(resting_arm,shirt,skin)
-	collision(brann,Vector3(0,0.9,0),Vector3(0.95,1.8,0.65))
+	collision(brann,Vector3(0,0.9,0),Vector3(0.95,1.8,0.65),"flesh")
 	label(brann,"BRANN · TALK",Vector3(0,2.2,0),31)
 	var question: Label3D = label(brann,"?",Vector3(0,2.65,0),110,Color("ffdc45"))
 	question.visible = false
@@ -222,7 +226,7 @@ static func build(root: Node3D) -> Dictionary:
 	rack.name = "FinishedWeaponRack"
 	root.add_child(rack)
 	box(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),oak)
-	collision(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9))
+	collision(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),"wood")
 	for side in [-1,1]:
 		box(rack,Vector3(side*0.55,-0.52,0),Vector3(0.1,0.92,0.66),wood)
 	label(rack,"PICK UP TOOLS",Vector3(0,0.72,-0.3),25)
@@ -252,6 +256,7 @@ static func build(root: Node3D) -> Dictionary:
 		button.set_meta("action",actions[i])
 		button.set_meta("hint_position",Vector3(5.4,3.75,-4.65))
 		button.set_meta("kind","button")
+		button.set_meta("surface_material","wood")
 		root.add_child(button)
 		box(button,Vector3.ZERO,Vector3(0.9,0.31,0.2),teal if i < 2 else wood)
 		label(button,captions[i],Vector3(0,0,0.115),20)
@@ -267,6 +272,7 @@ static func build(root: Node3D) -> Dictionary:
 		var button := Node3D.new()
 		button.position = Vector3(-7.72+(i%2)*1.64,2.52-floorf(float(i)/2.0)*0.48,-4.26)
 		button.set_meta("kind","button")
+		button.set_meta("surface_material","wood")
 		button.set_meta("action","tool:"+tool_ids[i])
 		button.set_meta("hint_position",Vector3(-6.9,0.25,-4.02))
 		root.add_child(button)
@@ -278,6 +284,7 @@ static func build(root: Node3D) -> Dictionary:
 	var upgrade := Node3D.new()
 	upgrade.position = Vector3(-6.9,0.59,-4.21)
 	upgrade.set_meta("kind","button")
+	upgrade.set_meta("surface_material","wood")
 	upgrade.set_meta("action","upgrade")
 	upgrade.set_meta("hint_position",Vector3(-6.9,0.25,-4.02))
 	root.add_child(upgrade)
@@ -310,7 +317,7 @@ static func build(root: Node3D) -> Dictionary:
 		ball(dummy,Vector3(0,1.37,0.225),Vector3(0.3,0.3,0.025),material("a14c38"))
 		ball(dummy,Vector3(0,1.37,0.25),Vector3(0.14,0.14,0.02),cream)
 		detail_dummy(dummy,wood,cream)
-		collision(dummy,Vector3(0,1.2,0),Vector3(1.15,1.8,0.6))
+		collision(dummy,Vector3(0,1.2,0),Vector3(1.15,1.8,0.6),"wood")
 		label(dummy,"TEST YOUR CRAFT",Vector3(0,2.4,0),25)
 		dummies.append(dummy)
 	var result: Dictionary = {"brann":brann,"arm":arm,"question":question,"rack":rack,"board":board,"hammer":hammer,"rats":rats,"dummies":dummies,"buttons":buttons,"status_label":status_label,"bounty_label":bounty_label,"voice_label":voice_label}
@@ -370,7 +377,7 @@ static func make_rat(index: int) -> Node3D:
 	for i in range(3):
 		var tuft=ball(node,Vector3((i-1)*0.075,0.33,-0.11+i*0.09),Vector3(0.085,0.06,0.15),fur)
 		tuft.rotation.z=(i-1)*0.3
-	collision(node,Vector3(0,0.19,0.04),Vector3(0.38,0.4,0.78))
+	collision(node,Vector3(0,0.19,0.04),Vector3(0.38,0.4,0.78),"flesh")
 	return node
 
 # Sack seams, bindings and replaceable target plates retain the existing hit body.

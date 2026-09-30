@@ -1,6 +1,9 @@
 extends SceneTree
 
 const Kit = preload("res://authored_zone_kit.gd")
+const HardContact = preload("res://hard_surface_contact.gd")
+const WorldZones = preload("res://world_zones.gd")
+const WorkshopScene = preload("res://workshop_scene.gd")
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -27,8 +30,9 @@ func _run() -> void:
 	var invalid := Kit.emit(parent,{"schema":1,"assets":{"rock":"../elsewhere.glb"},"placements":[]},"res://assets/orchard_kit")
 	if not invalid.has("error"): failures.append("asset escaped the zone-kit directory")
 	var collision_doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/orchard_kit/zone_kit_fixture.json"))
-	collision_doc["asset_meta"] = {"rock":{"collision":{"shape":"box","size":[0.8,1.0,0.8],"offset":[0.0,0.5,0.0]}}}
+	collision_doc["asset_meta"] = {"rock":{"collision":{"shape":"box","size":[0.8,1.0,0.8],"offset":[0.0,0.5,0.0]},"surface_material":"wood"}}
 	collision_doc.placements[0]["scale"] = [1.2, 0.6, 1.1]
+	collision_doc.placements[0]["surface_material"] = "metal"
 	for placement in collision_doc.placements: placement["collision"] = "asset_default"
 	var collision_root := Node3D.new()
 	root.add_child(collision_root)
@@ -39,9 +43,17 @@ func _run() -> void:
 	if int(collision_result.get("colliders", 0)) != 2 or solids.size() != 2:
 		failures.append("opt-in authored colliders did not match placements")
 	else:
+		if HardContact.material_for(solids[0]) != "metal" or HardContact.material_for(solids[1]) != "wood":
+			failures.append("placement and asset material overrides lost precedence")
 		var first_shape := solids[0].get_child(0) as CollisionShape3D
 		if first_shape == null or first_shape.shape == null or not is_equal_approx(first_shape.position.y, 0.3) or (first_shape.shape as BoxShape3D).size.distance_to(Vector3(0.96, 0.6, 0.88)) > 0.01:
 			failures.append("authored collision shape lost its size or offset")
+	if Kit._surface_from_asset_name("fallen_log") != "wood" or Kit._surface_from_asset_name("tree_cloud_a") != "wood" or Kit._surface_from_asset_name("boulder_mossy_a") != "stone" or Kit._surface_from_asset_name("cordwood_ore_rack") != "":
+		failures.append("asset-name surface fallback is ambiguous")
+	var fixture_body := WorldZones.body(parent, Vector3.ZERO, Vector3.ONE, "solid", "wood")
+	var anvil_body := WorkshopScene.collision(parent, Vector3.ZERO, Vector3.ONE, "metal")
+	if HardContact.material_for(fixture_body) != "wood" or HardContact.material_for(anvil_body) != "metal":
+		failures.append("common static-proxy surface metadata missing")
 	var scaled_holder := collision_root.get_child(0) as MultiMeshInstance3D
 	if scaled_holder == null:
 		failures.append("nonuniform authored placement missing")

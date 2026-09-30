@@ -75,7 +75,7 @@ static func rock(p: Node3D, v: Vector3, s: Vector3, c: String) -> MeshInstance3D
 static func cyl(p: Node3D, v: Vector3, radius: float, height: float, c: String, shape: String = "cylinder", glow: float = 0.0) -> MeshInstance3D:
 	return primitive(p, shape, v, Vector3(radius*2.0,height,radius*2.0), c, glow)
 
-static func body(p: Node3D, v: Vector3, s: Vector3, kind: String = "") -> StaticBody3D:
+static func body(p: Node3D, v: Vector3, s: Vector3, kind: String = "", surface_material: String = "") -> StaticBody3D:
 	var b := StaticBody3D.new()
 	b.position = v
 	p.add_child(b)
@@ -85,6 +85,7 @@ static func body(p: Node3D, v: Vector3, s: Vector3, kind: String = "") -> Static
 	col.shape = shape
 	b.add_child(col)
 	if not kind.is_empty(): b.set_meta("kind",kind)
+	if not surface_material.is_empty(): b.set_meta("surface_material",surface_material)
 	return b
 
 static func label(p: Node3D, text: String, v: Vector3, size: int = 28, color: String = "fff0c8") -> Label3D:
@@ -181,7 +182,7 @@ static func ore(root: Node3D, data: Dictionary, zone: String, pos: Vector3, reso
 		var a: float = float(i)*TAU/5.0
 		var crystal := cyl(n,Vector3(cos(a)*0.48,0.65+0.12*(i%3),sin(a)*0.48),0.19,0.85,color,"taper",0.2)
 		crystal.rotation = Vector3(cos(a)*0.4,0,sin(a)*0.4)
-	body(n,Vector3(0,0.7,0),Vector3(1.6,1.4,1.4))
+	body(n,Vector3(0,0.7,0),Vector3(1.6,1.4,1.4),"","stone")
 
 static func tree(p: Node3D, pos: Vector3, h: float, pine: bool = false, apples: bool = false, pickups: int = 0) -> Node3D:
 	return TreeAdapter.tree(p,pos,h,pine,apples,pickups)
@@ -208,7 +209,7 @@ static func arch(p: Node3D, pos: Vector3, radius: float, color: String, broken: 
 	for side in [-1,1]:
 		for j in range(4):
 			box(p,pos+Vector3(side*radius,0.4+j*0.78,0),Vector3(0.72,0.74,0.9),color)
-		body(p,pos+Vector3(side*radius,1.5,0),Vector3(0.8,3,0.95))
+		body(p,pos+Vector3(side*radius,1.5,0),Vector3(0.8,3,0.95),"","stone")
 	for i in range(9):
 		if broken and i == 3: continue
 		var a: float = float(i)*PI/8.0
@@ -221,7 +222,7 @@ static func crate(p: Node3D, pos: Vector3, size: float = 1.0) -> void:
 		box(p,pos+Vector3(side*size*0.43,size*0.5,size*0.51),Vector3(size*0.12,size,size*0.06),"b38552")
 		box(p,pos+Vector3(0,size*(0.5+side*0.43),size*0.51),Vector3(size,size*0.12,size*0.06),"b38552")
 	line(p,pos+Vector3(-size*0.4,size*0.1,size*0.52),pos+Vector3(size*0.4,size*0.9,size*0.52),size*0.1,"bd9160")
-	body(p,pos+Vector3(0,size*0.5,0),Vector3.ONE*size)
+	body(p,pos+Vector3(0,size*0.5,0),Vector3.ONE*size,"","wood")
 
 static func lantern(p: Node3D, pos: Vector3) -> void:
 	box(p,pos,Vector3(0.24,0.4,0.24),"ffcb68",1.0)
@@ -512,7 +513,7 @@ static func forge(p: Node3D) -> void:
 	var gate=Node3D.new(); p.add_child(gate); gate.name="FoundryGate"; gate.add_to_group("foundry_gate")
 	ForgeMaterials.dress(box(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.16),"73553c"),"timber","8c6e55")
 	for y in [0.6,2.2]: box(gate,Vector3(0,y,-7.48),Vector3(2.95,0.13,0.10),"b49b67")
-	body(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.2),"solid")
+	body(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.2),"solid","wood")
 	label(gate,"THE HEARTH BEYOND\nAwakens with the Everburning Forge",Vector3(0,3.16,-7.35),17)
 	var smoke=preload("res://forge_atmosphere.gd").new()
 	p.add_child(smoke)

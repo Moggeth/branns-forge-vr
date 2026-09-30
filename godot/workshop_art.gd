@@ -91,7 +91,7 @@ static func bucket(parent,pos)->Node3D:
 	wall.material_override=WorkshopScene.material("987449"); wall.material_override.cull_mode=BaseMaterial3D.CULL_DISABLED
 	WorkshopScene.cylinder(n,Vector3(0,0.02,0),0.23,0.035,WorkshopScene.material("886239"))
 	# An open collision shell, not a solid box across the mouth.
-	var solid=StaticBody3D.new(); n.add_child(solid)
+	var solid=StaticBody3D.new(); n.add_child(solid); solid.set_meta("surface_material","wood")
 	for i in range(12):
 		var angle=i*TAU/12; var wall_shape=CollisionShape3D.new(); wall_shape.shape=BoxShape3D.new(); wall_shape.shape.size=Vector3(0.035,0.30,0.14)
 		wall_shape.position=Vector3(cos(angle)*0.27,0.15,sin(angle)*0.27); wall_shape.rotation.y=-angle; solid.add_child(wall_shape)

@@ -3,6 +3,7 @@ extends RefCounted
 ## Zone-local GLB placements share meshes/materials and are chunked for culling.
 const CHUNK_METRES := 64.0
 const MAX_PLACEMENTS := 2000
+const SURFACE_MATERIALS := ["stone", "wood", "metal", "glass", "bone"]
 
 static func load_into(root: Node3D, manifest_path: String) -> Dictionary:
 	if not FileAccess.file_exists(manifest_path): return {"error":"missing manifest: " + manifest_path}
@@ -117,6 +118,12 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		var solid := StaticBody3D.new()
 		solid.name = "ZoneArtSolid_%s" % asset_id
 		solid.set_meta("kind", "solid")
+		var surface := str(entry.get("surface_material", meta.get("surface_material", "")))
+		if not surface.is_empty() and surface not in SURFACE_MATERIALS:
+			solid.free()
+			return {"error":"invalid surface_material for " + asset_id}
+		if surface.is_empty(): surface = _surface_from_asset_name(asset_id)
+		if not surface.is_empty(): solid.set_meta("surface_material", surface)
 		solid.position = at
 		solid.rotation.y = yaw
 		for spec in specs:
@@ -150,6 +157,16 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 	var result := {"assets":cache.size(),"placements":placements.size(),"holders":holders,"colliders":collider_count}
 	print("ZONE_KIT ", JSON.stringify(result))
 	return result
+
+static func _surface_from_asset_name(asset_id: String) -> String:
+	# Names denote a whole collision proxy, not individual triangles/materials.
+	# Mixed or unknown assets deliberately retain the runtime's stone default.
+	var name := asset_id.to_lower()
+	if name.begins_with("tree_") or name.begins_with("fen_tree_") or name.begins_with("conifer_") or name in ["deadpine", "fallen_log", "heart_arch_tree"]:
+		return "wood"
+	if name.begins_with("boulder") or name.begins_with("cliff_") or name.begins_with("ruin_") or name.begins_with("standing_stone") or name in ["cairn_stack", "cut_slab_stack", "strata_wall"]:
+		return "stone"
+	return ""
 
 static func _ground_finish(zone_id: String, asset_id: String, parts: Array) -> void:
 	# Keep authored relief, rock sides and water. Only known ground surfaces adopt
