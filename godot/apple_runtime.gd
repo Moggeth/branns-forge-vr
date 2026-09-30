@@ -110,7 +110,7 @@ func impact(target: Node3D, speed: float, point: Vector3, direction: Vector3) ->
 	if game.elapsed - float(entry.last_impact) < 0.14: return entry.collider
 	entry.last_impact = game.elapsed
 	entry.wobble_speed += clampf(speed * 0.28, 0.2, 2.1) * (-1 if direction.x < 0 else 1)
-	game._effect(point, Color("f1b66b"), 0.08, 0.10)
+	if game.impact_feedback!=null: game.impact_feedback.contact(target,point,-direction.normalized(),speed,"apple_impact","flesh")
 	if speed >= DETACH_SPEED:
 		return _detach(entry, direction.normalized() * minf(speed * 0.32, 8.0) + Vector3.UP * 0.6)
 	return entry.collider

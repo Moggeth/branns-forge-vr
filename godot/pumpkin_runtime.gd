@@ -91,7 +91,7 @@ func impact(target:Node3D,item:Node3D,point:Vector3,normal:Vector3,velocity:Vect
 			entry.stabs+=1
 			_carve(entry)
 		game._notice("Pumpkin face · %d / 3 stabs"%mini(entry.stabs,3),2)
-		game._effect(point,Color("ffc56d"),0.2,0.16)
+		if game.impact_feedback!=null: game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","knife")),"flesh")
 		entry.body.apply_central_impulse(velocity.normalized()*0.35)
 		return true
 	if mode=="slice":

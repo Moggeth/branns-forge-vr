@@ -135,7 +135,7 @@ func desktop_axe_state(item: Node3D, held: bool) -> void:
 
 func desktop_axe_impact(item: Node3D, point: Vector3, powered: bool) -> void:
 	if not is_instance_valid(item) or str(item.get_meta("id",""))!="woodland_axe" or not powered: return
-	game._effect(point,Color("ffd18c"),0.25,0.30)
+	if game.impact_feedback!=null: game.impact_feedback.contact(null,point,Vector3.UP,3.2,"woodland_axe","wood")
 	game._notice("Powered cleave!",2)
 
 func _clear_pick_charge(item:Node3D)->void:
@@ -159,7 +159,7 @@ func resonant_mine(item,target,point:Vector3,hand)->void:
 	if not str(target.get_meta("requires", "")) in ["pick","mine"]: return
 	_clear_pick_charge(item)
 	target.set_meta("resonant_bonus",1)
-	game._effect(point,Color("97bed3"),0.65,1.4)
+	if game.impact_feedback!=null: game.impact_feedback.contact(target,point,Vector3.UP,4.5,"quarry_pick","stone")
 	var fractured=0
 	for ore in game.scene.get("resources",[]):
 		if ore==target or not is_instance_valid(ore) or not ore.is_visible_in_tree() or ore.get_meta("collecting",false): continue
@@ -167,7 +167,7 @@ func resonant_mine(item,target,point:Vector3,hand)->void:
 		if not str(ore.get_meta("requires","")) in ["pick","mine"]: continue
 		if ore.global_position.distance_to(point)>6.5: continue
 		game.adventure.interact(ore,"quarry_pick",hand)
-		game._effect(ore.global_position,Color("a9d9e6"),0.35,0.32)
+		if game.impact_feedback!=null: game.impact_feedback.contact(ore,ore.global_position+Vector3.UP*0.6,Vector3.UP,2.2,"quarry_pick","stone")
 		fractured+=1
 		if fractured>=2: break
 	game.adventure.haptic(hand,"impact")
@@ -274,7 +274,7 @@ func tick(delta):
 				elif target.get_meta("kind","")=="rat": game._kill_rat(target)
 				elif shot.kind=="crystal": game.adventure.interact(target,"crystal_resonator",shot.hand)
 				elif shot.kind=="fire": game.adventure.interact(target,"ember_gauntlet",shot.hand)
-			game._effect(hit.position,shot.color,0.3,0.22)
+			if game.impact_feedback!=null and shot.kind!="fire": game.impact_feedback.contact(target,hit.position,hit.normal,shot.velocity.length()*0.25,str(shot.kind))
 		if not hit.is_empty() or game.elapsed>shot.until: shot.node.queue_free(); projectiles.erase(shot)
 	for garden in gardens.duplicate():
 		if game.elapsed>garden.until: garden.node.queue_free(); gardens.erase(garden); continue

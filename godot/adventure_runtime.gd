@@ -726,8 +726,14 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	enemy.set_meta("hp",health)
 	# Bone strikes read best at the actual contact. A large chest-centred orb
 	# disguised limb failure and made strong chops feel like generic HP damage.
-	if str(enemy.get_meta("enemy_type",""))!="skeleton": game._effect(enemy.global_position+Vector3.UP,Color("ffe0a0"),0.3,0.7)
-	elif impact_point!=null: game._effect(impact_point,Color("efddba"),0.11,0.16)
+	if damage_type=="physical" and game.impact_feedback!=null:
+		var contact_point: Vector3 = impact_point if impact_point!=null else enemy.global_position+Vector3.UP*0.9
+		var contact_normal: Vector3 = (game.camera.global_position-contact_point).normalized()
+		var tool_id="projectile"
+		if is_instance_valid(hand):
+			var tool=game.held.get(str(hand.get_instance_id()))
+			if is_instance_valid(tool): tool_id=str(tool.get_meta("id","weapon"))
+		game.impact_feedback.contact(enemy,contact_point,contact_normal,maxf(1.0,sqrt(float(damage)*0.2)),tool_id)
 	haptic(hand,"impact")
 	if health>0:
 		game._notice("%s · %d health"%[str(enemy.get_meta("enemy_type","guardian")).capitalize(),ceili(health)],2)
@@ -822,16 +828,16 @@ func die():
 		await game._poll()
 		_sync_cache()
 		game._notice("Brann pulled you home. Your tools are safe; recover your materials at "+death_zone.replace("_"," ")+".",12)
-	_finish_death_recovery()
+	await _finish_death_recovery()
 
 func _finish_death_recovery() -> void:
+	dying=true
 	hp=100
 	travel("forge_yard")
-	if not game.vr:
-		# Arrive on the open approach rather than in the crowded workshop.
-		game.rig.global_position=game._safe_respawn_position(game.scene.zones.forge_yard.spawn+Vector3(0,0,4))
-		game.desktop_last_position=game.rig.global_position
-		print("DESKTOP_RESPAWN zone=forge_yard feet=",game.rig.global_position)
+	var result: Dictionary = await game.respawn_recovery.recover(game.scene.zones.forge_yard.spawn+Vector3(0,0,4))
+	if not bool(result.get("ok",false)):
+		game._notice(str(result.get("reason","Recovery is obstructed.")),8)
+		return
 	game.shield_until=game.elapsed+8
 	dying=false
 

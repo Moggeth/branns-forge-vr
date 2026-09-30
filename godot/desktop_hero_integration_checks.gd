@@ -31,7 +31,7 @@ static func run(game) -> void:
 	await game.get_tree().physics_frame
 	game.adventure.dying = true
 	game.adventure.hp = 0
-	game.adventure._finish_death_recovery()
+	await game.adventure._finish_death_recovery()
 	var recovered: Vector3 = game.rig.global_position
 	if recovered.distance_to(blocker.global_position - Vector3.UP * 0.8) < 0.9:
 		failures.append("death recovery placed Hero inside an occupied forge spawn")

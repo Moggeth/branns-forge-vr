@@ -491,10 +491,10 @@ func _meteor_inventory(record: Dictionary, id: String) -> void:
 			break
 
 
-func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float) -> bool:
+func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float, normal: Vector3 = Vector3.ZERO) -> bool:
 	var meteor: Node = target.get_parent()
 	if meteor == null or not meteor_nodes.values().has(meteor): return false
-	var reward: Dictionary = meteor.strike(point, tool_id, maxf(0.0, speed) * 0.45)
+	var reward: Dictionary = meteor.strike(point, tool_id, maxf(0.0, speed) * 0.45, normal)
 	if not bool(reward.get("ok", false)):
 		if str(reward.get("reason", "")) == "pick_required": game._notice("A mining pick can break the star-metal.", 2)
 		return false
@@ -504,7 +504,6 @@ func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float) 
 	else:
 		data.star_iron = mini(200, int(data.star_iron) + 1)
 		_changed("Star iron recovered. Two pieces can raise an earthen wall.")
-	game._effect(point, Color("86f6f4") if str(reward.kind) == "meteor_gem" else Color("f6b276"), 0.25, 0.45)
 	return true
 
 

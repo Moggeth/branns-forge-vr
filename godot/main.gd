@@ -92,6 +92,8 @@ var delivery_seen={}
 var workshop_delivery
 var tool_physics
 var melee
+var impact_feedback
+var respawn_recovery=preload("res://respawn_recovery.gd").new()
 var visit_entered=false
 var voice_client_message=""
 var grips
@@ -330,6 +332,11 @@ func _ready():
 	melee=preload("res://melee_contact.gd").new()
 	add_child(melee)
 	melee.setup(self)
+	respawn_recovery.setup(self)
+	impact_feedback=preload("res://impact_feedback.gd").new()
+	add_child(impact_feedback)
+	impact_feedback.setup(self)
+	melee.hard_surface_contact.connect(impact_feedback.emit_contact)
 	collection=preload("res://collection_runtime.gd").new()
 	add_child(collection)
 	collection.setup(self)
@@ -960,7 +967,8 @@ func _process(delta):
 				forge_stage=str(job.get("status")); break
 		print("FRAME_HITCH ms=",snappedf(delta*1000,0.1)," forge=",forge_stage," zone=",adventure.zone if adventure!=null else "startup")
 	if desktop_look!=null:
-		desktop_look.set_enabled(not smoke and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened))
+		var survey_owns_input=is_instance_valid(world_builder_view) and world_builder_view.has_focus() and not world_builder_view.hero_primary
+		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened))
 	if recording!=null: recording.tick(delta)
 	if wyrmspout!=null: wyrmspout.tick(delta)
 	if sunfall!=null: sunfall.tick(delta)
@@ -973,7 +981,7 @@ func _process(delta):
 	for lantern in forge_lanterns: lantern.tick(delta)
 	if not smoke:
 		if vr: _xr_input()
-		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus()): _desktop_input(delta)
+		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus() or world_builder_view.hero_primary): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
 	if not smoke: portal_walkthrough.tick(self,delta)
 	held_pose.refresh(self)
@@ -992,6 +1000,8 @@ func _process(delta):
 		visit_entered=visiting
 	_speech_tick(delta)
 	adventure.tick(delta)
+	respawn_recovery.tick(delta)
+	if impact_feedback!=null: impact_feedback.tick(delta)
 	if music!=null and not diagnostic_offline and not smoke: music.tick(delta)
 	if apples!=null: apples.tick(delta)
 	if pumpkins!=null: pumpkins.tick(delta)
@@ -1109,14 +1119,27 @@ func _notice(message: String, seconds = 7.0):
 
 func _open_world_builder_view() -> void:
 	if is_instance_valid(world_builder_view):
-		world_builder_view.grab_focus()
+		world_builder_view.focus_survey()
 		return
 	if world_builder == null: return
 	world_builder_view = preload("res://world_builder_view.gd").new()
 	world_builder_view.visible = false
 	add_child(world_builder_view)
+	world_builder_view.hero_input_requested.connect(_world_builder_hero_input)
+	world_builder_view.hero_focus_requested.connect(func():
+		if not vr and desktop_look!=null:
+			desktop_look.set_enabled(true)
+			desktop_look.capture())
 	world_builder_view.setup(self, world_builder)
 	print("WORLD_BUILDER_VIEW opened for the same live simulation; vr=", vr)
+
+func _world_builder_hero_input(event: InputEvent) -> void:
+	if vr or not is_instance_valid(world_builder_view) or not world_builder_view.hero_primary: return
+	var forwarded=event.duplicate()
+	if forwarded is InputEventMouse:
+		forwarded.position=event.position*get_viewport().get_visible_rect().size/Vector2(world_builder_view.size)
+		forwarded.global_position=forwarded.position
+	_unhandled_input(forwarded)
 
 func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F9:
@@ -1205,6 +1228,7 @@ func _desktop_primary() -> void:
 			return
 		if elapsed<desktop_swing_ready: return
 		desktop_swing_ready=elapsed+0.42
+		melee.clear_desktop_contact()
 		desktop_swing_started=elapsed
 		desktop_swing_item=item
 		desktop_swing_contact=false
@@ -1275,6 +1299,7 @@ func _desktop_weapon_motion(delta:float):
 			desktop_swing_item=null
 		else:
 			desktop_hand.transform=DesktopWeaponPose.swing(item,progress,rest_pose,desktop_swing_reach)
+			if melee.desktop_contact_active(item): desktop_hand.transform=melee.desktop_contact_pose(item,rest_pose,progress)
 			if progress>=0.5 and not desktop_swing_contact:
 				desktop_swing_contact=true
 				var hit=_ray(camera,DESKTOP_MELEE_REACH)
@@ -1285,8 +1310,8 @@ func _desktop_weapon_motion(delta:float):
 					desktop_hand.transform=DesktopWeaponPose.swing(item,.5,rest_pose,desktop_swing_reach)
 					var powered=melee._powered(item,desktop_hand)
 					var struck=melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
+					melee.desktop_hard_contact(item,strike_target,hit.position,hit.normal,2.4,desktop_hand.transform,struck)
 					if struck: item_actions.desktop_axe_impact(item,hit.position,powered)
-				else: _effect(camera.global_position-camera.global_basis.z*0.8,Color("e9c184"),0.07,0.10)
 			if progress>=1.0:
 				desktop_swing_started=-1.0
 				desktop_swing_item=null
@@ -1346,6 +1371,7 @@ func _setup_skull_basket()->void:
 	portal_walkthrough.reset(self)
 
 func _xr_input():
+	if adventure!=null and adventure.dying: return
 	for hand in hands:
 		if not hand.get_is_active():
 			_cancel_inactive_playful_hand(hand)
@@ -1478,25 +1504,8 @@ func _player_capsule_clear(feet: Vector3) -> bool:
 	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
 
 func _safe_respawn_position(preferred: Vector3) -> Vector3:
-	# The forge evolves and loose or generated objects may occupy an old spawn.
-	# Find real floor support and a clear movement capsule before placing the Hero.
-	var offsets = [Vector3.ZERO]
-	var directions = [Vector3.BACK, Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD,
-		Vector3(1,0,1).normalized(), Vector3(-1,0,1).normalized(),
-		Vector3(1,0,-1).normalized(), Vector3(-1,0,-1).normalized()]
-	for radius in [2.0, 4.0, 6.0, 8.0]:
-		for direction in directions: offsets.append(direction * radius)
-	for offset in offsets:
-		var candidate: Vector3 = preferred + offset
-		var floor_query = PhysicsRayQueryParameters3D.create(candidate + Vector3.UP * 3.0, candidate + Vector3.DOWN * 4.0, 1)
-		var floor_hit = get_world_3d().direct_space_state.intersect_ray(floor_query)
-		if floor_hit.is_empty() or floor_hit.normal.y < 0.8: continue
-		var floor_owner = _owner(floor_hit.collider)
-		if floor_owner == null or floor_owner.get_meta("kind", "") != "floor": continue
-		var feet = Vector3(candidate.x, float(floor_hit.position.y) + 0.02, candidate.z)
-		if _player_capsule_clear(feet): return feet
-	push_warning("No clear forge respawn near " + str(preferred))
-	return preferred
+	var result: Dictionary = respawn_recovery.find(preferred)
+	return result.get("feet", Vector3.INF)
 
 func _teleport(source: Node3D):
 	var hit = _ray(source, 12.0)

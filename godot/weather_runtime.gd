@@ -110,6 +110,7 @@ func tick(delta):
 		refresh.call_deferred(); return
 	engine.tick(delta)
 	OrchardFoliage.weather(engine.wind,engine.wind_strength,engine.wet[0])
+	preload("res://ground_surface_palette.gd").weather(engine.wet[0],engine.snow[0])
 	if zone=="orchard_highlands":
 		OrchardGround.weather(engine.wet[0],engine.snow[0])
 		game.orchard_atmosphere.tick(engine.hour,engine.weather,engine.wind)

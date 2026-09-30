@@ -252,7 +252,7 @@ func impact(shot,hit,target):
 	var stone=true
 	if target!=null and str(target.get_meta("kind","")) in ["resource","enemy","dummy"]: stone=false
 	system.sound("click" if stone else "seat",hit.position)
-	game._effect(hit.position,Color("efc883") if stone else Color("c39566"),0.16,0.15)
+	if game.impact_feedback!=null: game.impact_feedback.contact(target,hit.position,hit.normal,shot.velocity.length()*0.18,"crossbow_bolt")
 	# Stone/metal get a shallow bite. Timber/flesh retain more shaft depth.
 	shot.node.global_position-=shot.velocity.normalized()*(0.035 if stone else -0.035)
 	if shot.get("grapple",false) and is_instance_valid(shot.weapon.item) and shot.weapon.item in game.held.values():
