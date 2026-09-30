@@ -36,11 +36,16 @@ class BuilderFixture extends Node:
 	const MAX_THREATS := 8
 	var center := Vector3.ZERO
 	var unavailable_reason := ""
+	var construction := ConstructionFixture.new()
 	var data := {"mana": 20.0, "wood": 20, "revision": 0, "forest_spells": [], "groves": [], "meteors": [], "ent_seeds": [], "threats": []}
 	func spell_availability(_action: String) -> String: return unavailable_reason
 	func can_path(a: Vector3, b: Vector3) -> String: return "" if a.distance_to(b) >= 3.0 else "Choose a longer route."
 	func _inside(_point: Vector3) -> bool: return true
 	func _pack(point: Vector3) -> Array: return [snappedf(point.x, 0.1), snappedf(point.z, 0.1)]
+
+class ConstructionFixture extends RefCounted:
+	func preview(kind: String, _a: Vector3, _b: Vector3) -> Dictionary:
+		return {"kind":kind,"width":5.25,"valid":true,"reason":"","lumber":4}
 
 func _initialize() -> void:
 	call_deferred("_check")
@@ -93,6 +98,15 @@ func _check() -> void:
 		failures.append("path plan cost or painted footprint")
 	var short_path: Dictionary = Targeting.plan("path", Vector3.ZERO, Vector3(2, 0, 0), builder, game, "")
 	if short_path.valid: failures.append("short path was shown as castable")
+	view.selected = "bridge"
+	view.first_point = Vector3.ZERO
+	view.hovered = Vector3(14, 0, 0)
+	var live_deck: Dictionary = view.targeting_state()
+	if str(live_deck.kind) != "deck" or str(live_deck.footprint.kind) != "deck" or float(live_deck.footprint.width) != 5.25:
+		failures.append("construction dimensions or gesture kind lost at art boundary")
+	view.selected = "path"
+	view.first_point = Vector3.INF
+	view.hovered = Vector3.INF
 	var ring: Dictionary = Targeting.spec("ring")
 	if float(ring.inner) != 14.0 or float(ring.outer) != 24.0: failures.append("tree ring annulus bounds")
 	var model: Dictionary = Fields.create(814)

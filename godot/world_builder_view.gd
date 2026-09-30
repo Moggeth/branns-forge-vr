@@ -39,6 +39,9 @@ var hero_hud_was_visible := true
 var hero_3d_scale_before := 1.0
 var hero_primary := false
 var hero_focus := false
+var quick_cast_enabled := true
+var quick_cast_key := -1
+var quick_cast_action := ""
 var layout_mode := "pip"
 var split_left := "fps"
 var split_ratio := 0.5
@@ -191,7 +194,7 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 		mode = Window.MODE_FULLSCREEN if preferred_fullscreen else Window.MODE_WINDOWED
 		_start_arrival()
 	if not unfocusable: grab_focus()
-	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale, " mode=", mode, " companion=", companion_mode)
+	print("WORLD_BUILDER_VIEW shared_world=", tactical_viewport.world_3d.get_instance_id(), " refresh=", refresh_limit, " scale=", render_scale, " mode=", mode, " companion=", companion_mode, " quick_cast=", quick_cast_enabled)
 
 func tick(delta: float) -> void:
 	if game == null or not is_instance_valid(builder): return
@@ -230,7 +233,7 @@ func tick(delta: float) -> void:
 	var axis := Vector3.ZERO
 	if current_zone != str(game.adventure.zone): _change_region(str(game.adventure.zone))
 	if view_chrome != null:
-		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale)
+		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale,quick_cast_enabled)
 	if has_focus() and not hero_focus and not (game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(self)):
 		if Input.is_key_pressed(KEY_W): axis.z -= 1
 		if Input.is_key_pressed(KEY_S): axis.z += 1
@@ -250,11 +253,15 @@ func tick(delta: float) -> void:
 		if focus_point.distance_to(Vector3(hero_at.x, 0, hero_at.z)) > 0.05:
 			focus_point = Vector3(hero_at.x, 0, hero_at.z)
 			_position_camera()
+	if quick_cast_key >= 0: hovered = _cursor_target()
 	_refresh_ui()
 	_update_preview()
 
 func close() -> void:
 	if returning_to_hero: return
+	_cancel_quick_cast()
+	hovered = Vector3.INF
+	_update_preview()
 	if DisplayServer.get_name() == "headless":
 		_finish_close()
 		return
@@ -270,6 +277,7 @@ func close() -> void:
 	_finish_close()
 
 func _finish_close() -> void:
+	_cancel_quick_cast()
 	print("WORLD_BUILDER_VIEW closed requested_frames=", requested_frames,
 		" frame_ms_ema=", snappedf(frame_ms_ema, 0.01), " rts_scale=", render_scale,
 		" rts_fps_target=", refresh_limit, " vr_backoff=", protected_vr)
@@ -409,6 +417,7 @@ func _load_layout() -> void:
 	if bool(game.get("diagnostic_offline")): return
 	var settings := ConfigFile.new()
 	if settings.load(LAYOUT_FILE) != OK: return
+	quick_cast_enabled = bool(settings.get_value("input", "quick_cast", true))
 	preferred_fullscreen = bool(settings.get_value("window", "fullscreen", true))
 	preferred_window_size = Vector2i(settings.get_value("window", "size", WINDOWED_SIZE))
 	preferred_window_size = preferred_window_size.max(WINDOWED_MIN_SIZE)
@@ -430,6 +439,7 @@ func _save_layout() -> void:
 		preferred_window_position = position
 	var settings := ConfigFile.new()
 	settings.load(LAYOUT_FILE)
+	settings.set_value("input", "quick_cast", quick_cast_enabled)
 	settings.set_value("window", "fullscreen", preferred_fullscreen)
 	settings.set_value("window", "size", preferred_window_size)
 	settings.set_value("window", "position", preferred_window_position)
@@ -505,12 +515,19 @@ func _pointer_captured() -> bool:
 	return game != null and game.desktop_look != null and game.desktop_look.captured
 
 func _release_pointer() -> void:
+	_cancel_quick_cast()
+	hovered = Vector3.INF
+	_update_preview()
 	if game != null and game.desktop_look != null: game.desktop_look.release_capture()
 	hero_mouse_down = false
 	dragging = false
 
 func _set_focus(hero: bool, capture_mouse := true) -> void:
+	_cancel_quick_cast()
 	hero_focus = hero and not companion_mode
+	if hero_focus:
+		hovered = Vector3.INF
+		_update_preview()
 	hero_mouse_down = false
 	dragging = false
 	if hero_focus and capture_mouse: hero_focus_requested.emit()
@@ -526,6 +543,8 @@ func toggle_input_focus() -> void:
 
 func _view_command(action: String) -> void:
 	if action == "focus": toggle_input_focus(); return
+	if action == "quickcast": set_quick_cast(not quick_cast_enabled); return
+	_cancel_quick_cast()
 	if action == "fullscreen": _toggle_fullscreen(); return
 	if action.begins_with("ratio:"):
 		split_ratio = float(action.trim_prefix("ratio:"))/100.0
@@ -684,7 +703,7 @@ func _layout_ui() -> void:
 	command_panel.layout_for_size(rts_rect.size)
 	if view_chrome != null:
 		view_chrome.size = Vector2(size)
-		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale)
+		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale,quick_cast_enabled)
 	if clock >= next_resolution_resize: _sync_hero_resolution()
 	else: resolution_resize_pending = true
 	if error_label != null:
@@ -729,6 +748,7 @@ func _refresh_ui() -> void:
 		"availability":availability,"cooldowns":cooldowns,"regen":game.tuning.value("worldbuilder.mana_regen_multiplier")})
 
 func select_action(action: String) -> void:
+	_cancel_quick_cast()
 	var entry := _spell(action)
 	if entry.is_empty() or not Targeting.is_targetable(entry):
 		show_error("This action is not available yet.")
@@ -750,9 +770,13 @@ func select_action(action: String) -> void:
 	_refresh_ui()
 
 func _gesture(action: String) -> String:
-	return "Choose two endpoints or drag a line." if action in LINE_ACTIONS else ("Acts instantly at the work site." if action == "hire" else "Click a place in the world.")
+	if action == "hire": return "Acts instantly at the work site."
+	if quick_cast_enabled:
+		return "Hold its number to start a line; release to cast. Or click/drag." if action in LINE_ACTIONS else "Press its number to cast under the cursor. Or click a place."
+	return "Choose two endpoints or drag a line." if action in LINE_ACTIONS else "Click a place in the world."
 
 func _select_palette(id: String) -> void:
+	_cancel_quick_cast()
 	palette = id.to_lower()
 	for entry in catalogue:
 		if str(entry.palette).to_lower() == palette and Targeting.is_targetable(entry):
@@ -766,6 +790,7 @@ func _regen_preset(multiplier: float) -> void:
 	_refresh_ui()
 
 func _cancel_targeting() -> void:
+	_cancel_quick_cast()
 	selected = ""
 	first_point = Vector3.INF
 	spell_drag_start = Vector3.INF
@@ -851,7 +876,12 @@ func targeting_state() -> Dictionary:
 	state["hovered_world"] = _region_origin() + hovered if hovered != Vector3.INF else Vector3.INF
 	state["world_origin"] = _region_origin()
 	state["first_world"] = _region_origin() + _line_start() if _line_start() != Vector3.INF else Vector3.INF
-	state["footprint"] = Targeting.spec(selected)
+	# A validated plan may refine construction width/radii. Preserve those in the
+	# art contract instead of replacing them with the catalogue's static defaults.
+	var footprint: Dictionary = Targeting.spec(selected)
+	for key in footprint.keys():
+		if state.has(key): footprint[key] = state[key]
+	state["footprint"] = footprint
 	state["selected"] = selected
 	state["terrain_revision"] = game.landscape.world_revision
 	return state
@@ -870,7 +900,7 @@ func _ground_preview(local: Vector3) -> Vector3:
 	var world_point := _region_origin() + local
 	var query := PhysicsRayQueryParameters3D.create(world_point + Vector3.UP * 3.0, world_point - Vector3.UP * 3.0, 1)
 	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
-	if not hit.is_empty() and hit.normal.y > 0.4:
+	if not hit.is_empty() and hit.normal.y >= 0.75 and str(hit.collider.get_meta("kind", "")) == "floor":
 		return hit.position + Vector3.UP * 0.18
 	return world_point + Vector3.UP * 0.18
 
@@ -893,16 +923,18 @@ func _preview_arrow(mesh: ImmediateMesh, a: Vector3, b: Vector3, side: Vector3, 
 func _update_preview() -> void:
 	if marker == null: return
 	_publish_targeting()
-	var spec: Dictionary = Targeting.spec(selected)
+	var spec: Dictionary = last_target_state.get("footprint", {})
 	var showing := hovered != Vector3.INF and selected != "" and not spec.is_empty() and str(spec.kind) != "instant"
 	var art_active := is_instance_valid(target_visual) and target_visual.has_method("update_targeting")
 	marker.visible = showing and not art_active
 	preview_boundary.visible = showing and not art_active
 	route_preview.visible = false
 	var mesh: ImmediateMesh = preview_boundary.mesh
-	mesh.clear_surfaces()
-	if not showing: return
-	var plan := _preview_plan()
+	if mesh.get_surface_count() > 0: mesh.clear_surfaces()
+	# The authored renderer already consumes the same validated state. Avoid
+	# rebuilding an invisible fallback (and querying every vertex's floor).
+	if art_active or not showing: return
+	var plan: Dictionary = last_target_state
 	var valid := bool(plan.get("valid", false))
 	var skin := preview_valid if valid else preview_invalid
 	marker.global_position = _ground_preview(hovered)
@@ -1037,8 +1069,79 @@ func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
 	_route_input(event)
 
+func set_quick_cast(enabled: bool) -> void:
+	_cancel_quick_cast()
+	first_point = Vector3.INF
+	spell_drag_start = Vector3.INF
+	quick_cast_enabled = enabled
+	_say("Quick-cast on · tap 1–9 for point spells; hold/release for lines." if enabled else "Quick-cast off · 1–9 selects, then click to place.")
+	_layout_ui()
+	_refresh_ui()
+	_update_preview()
+	_schedule_layout_save()
+
+func _cursor_target() -> Vector3:
+	## Sample the current pointer, not the last mouse-motion event's stale hover.
+	return _world_at(get_mouse_position())
+
+func _cancel_quick_cast() -> void:
+	var armed := quick_cast_key >= 0
+	quick_cast_key = -1
+	quick_cast_action = ""
+	if armed:
+		first_point = Vector3.INF
+		spell_drag_start = Vector3.INF
+
+func _quick_cast_input(event: InputEventKey) -> bool:
+	if not quick_cast_enabled or CommandPanel.shortcut_slot(event) < 0: return false
+	var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+	if not event.pressed:
+		if code != quick_cast_key: return true
+		var action := quick_cast_action
+		var start := first_point
+		hovered = _cursor_target()
+		_cancel_quick_cast()
+		if selected == action and start != Vector3.INF:
+			var problem := _availability(action)
+			if hovered == Vector3.INF: problem = "Point at clear ground to finish the spell."
+			if problem == "": problem = _cast_line(start, hovered)
+			if problem != "": show_error(problem)
+			else: _say(builder.progress_message)
+		_refresh_ui()
+		_update_preview()
+		return true
+	if event.echo or code == quick_cast_key: return true
+	# Modified digits remain selection shortcuts; never turn Ctrl/Alt commands
+	# into an irreversible world cast. A new plain digit replaces any held line.
+	if event.ctrl_pressed or event.alt_pressed or event.meta_pressed: return false
+	_cancel_quick_cast()
+	var action: String = command_panel.shortcut_spell(event)
+	if action == "": return true
+	select_action(action)
+	if str(Targeting.spec(action).get("kind", "")) == "instant": return true
+	if selected != action: return true
+	var problem := _availability(action)
+	if problem != "": show_error(problem); return true
+	hovered = _cursor_target()
+	if hovered == Vector3.INF:
+		show_error("Point at clear ground to cast.")
+		_update_preview()
+		return true
+	if action in LINE_ACTIONS:
+		quick_cast_key = code
+		quick_cast_action = action
+		first_point = hovered
+		spell_drag_start = Vector3.INF
+		_say("Start set · hold the key to aim, release to cast. Esc cancels.")
+		_refresh_ui()
+	else:
+		_act(hovered)
+	_update_preview()
+	return true
+
 func _route_input(event: InputEvent) -> void:
 	# Separate native focus gating from save-free, unfocusable UI verification.
+	if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]: _cancel_quick_cast()
 	if event is InputEventKey and event.pressed and not event.echo:
 		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
 		if code == KEY_ESCAPE and _pointer_captured():
@@ -1057,13 +1160,24 @@ func _route_input(event: InputEvent) -> void:
 	if event is InputEventMouse and hero_has_input() and _pointer_captured():
 		hero_input_requested.emit(event)
 		set_input_as_handled(); return
-	if game.get("travel_navigation")!=null and game.travel_navigation.input_event(event,self): return
+	if game.get("travel_navigation")!=null and game.travel_navigation.input_event(event,self):
+		_cancel_quick_cast()
+		hovered = Vector3.INF
+		_update_preview()
+		return
 	if hero_focus and event is InputEventKey:
 		var hero_key := event as InputEventKey
 		if not (hero_key.pressed and not hero_key.echo and hero_key.keycode in [KEY_F9, KEY_F11]):
 			hero_input_requested.emit(event)
 			set_input_as_handled()
 			return
+	if event is InputEventKey:
+		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		if code == KEY_Q and event.pressed and not event.echo and not (event.ctrl_pressed or event.alt_pressed or event.meta_pressed):
+			set_quick_cast(not quick_cast_enabled)
+			set_input_as_handled(); return
+		if _quick_cast_input(event):
+			set_input_as_handled(); return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if command_panel.handle_shortcut(event):
 			set_input_as_handled()
@@ -1143,6 +1257,7 @@ func _region_origin() -> Vector3:
 	return builder.center
 
 func _change_region(zone: String) -> void:
+	_cancel_quick_cast()
 	current_zone = zone
 	focus_point = _region_origin()
 	first_point = Vector3.INF; spell_drag_start = Vector3.INF; hovered = Vector3.INF

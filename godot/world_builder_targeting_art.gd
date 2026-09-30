@@ -477,8 +477,10 @@ func _line_path(a: Vector2, b: Vector2, width: float) -> void:
 func _line_sunder(a: Vector2, b: Vector2, width: float) -> void:
 	var pts := _line_pts(a, b, 2.5)
 	var n := pts.size()
-	var half := width * 0.5
-	var shoulder := 8.0
+	# The footprint is the full disturbed corridor: an 8 m scar plus 4 m
+	# shoulders on each side. Ops.bounds() uses the same total half-extent.
+	var half := width * 0.25
+	var shoulder := width * 0.25
 	var dir := (b - a).normalized()
 	var perp := Vector2(-dir.y, dir.x)
 	var neg := PackedFloat32Array()
@@ -491,8 +493,8 @@ func _line_sunder(a: Vector2, b: Vector2, width: float) -> void:
 		var jb := half + (_hash(i * 3 + 2) - 0.5) * 1.6 * edge_jag
 		neg.push_back(-ja)
 		pos.push_back(jb)
-		neg_out.push_back(-ja - shoulder)
-		pos_out.push_back(jb + shoulder)
+		neg_out.push_back(-half - shoulder)
+		pos_out.push_back(half + shoulder)
 	_band(pts, neg, pos, _c(_base, 0.06), _c(_base, 0.06), 4, 1.0, 0, 2.4, _c(_base, 0.3))
 	_band(pts, pos, pos_out, _c(_base, 0.15), _c(_base, 0.0), 0, 1.0, 0, 2.7)
 	_band(pts, neg, neg_out, _c(_base, 0.15), _c(_base, 0.0), 0, 1.0, 0, 2.7)
@@ -665,7 +667,8 @@ func _meteor(p: Vector2, state: Dictionary, radius: float, damage: float) -> voi
 	_ring_line(p, radius, 0.22, 0.55, 0.0, 1.0, 0, 72)
 	_polar(p, damage - 0.22, damage + 0.22, _c(_base, 0.85), _c(_base, 0.85), 2, 1.3, 1, 64, 2.0, 0.0, TAU, 0.0, false)
 	var core := 2.0
-	_polar(p, 0.0, core, _c(Color(0.28, 0.06, 0.03), 0.6 if _ok else 0.45), _c(Color(0.28, 0.06, 0.03), 0.0), 0, 1.0, 0, 28, 2.0)
+	var core_color := Color(0.28, 0.06, 0.03) if _ok else _base
+	_polar(p, 0.0, core, _c(core_color, 0.6 if _ok else 0.45), _c(core_color, 0.0), 0, 1.0, 0, 28, 2.0)
 	_ring_line(p, core, 0.14, 0.9, 0.0, 1.0, 1, 40)
 	if not _ok: return
 	# star-streak arrow: a comet streak arrives from the far side and ends on the crater core.

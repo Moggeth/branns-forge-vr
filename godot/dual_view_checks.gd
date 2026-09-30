@@ -77,6 +77,21 @@ func _run() -> void:
 		_check(view.command_panel.global_position == rts_rect.position,"%s panel origin" % spec.name)
 		_check(view.command_panel.size == rts_rect.size,"%s panel bounded to RTS" % spec.name)
 		_check(view.hero_pip.get_index() < view.command_panel.get_index(),"%s secondary picture cannot cover RTS controls" % spec.name)
+		if native:
+			var quick_button := Rect2()
+			for button in view.view_chrome.hit_boxes:
+				_check(button.rect.end.x <= view.size.x,"%s toolbar clipped: %s" % [spec.name,button.id])
+				if button.id == "quickcast": quick_button = button.rect
+			_check(quick_button.has_area(),"%s visible quick-cast toggle" % spec.name)
+			if quick_button.has_area():
+				var previous_quick: bool = view.quick_cast_enabled
+				var toggle := InputEventMouseButton.new()
+				toggle.pressed = true
+				toggle.button_index = MOUSE_BUTTON_LEFT
+				toggle.position = quick_button.get_center()
+				view.view_chrome._gui_input(toggle)
+				_check(view.quick_cast_enabled != previous_quick and view.view_chrome.quick_cast_enabled == view.quick_cast_enabled,"%s toggle routes and redraws" % spec.name)
+				view.set_quick_cast(previous_quick)
 		if spec.mode == "split":
 			_check(not fps_rect.intersects(rts_rect),"%s panes do not overlap" % spec.name)
 			_check(view.hero_pip.split_mode,"%s full split content" % spec.name)

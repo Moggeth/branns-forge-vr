@@ -58,7 +58,10 @@ static func plan(action: String, start: Vector3, point: Vector3, builder: Node, 
 		result["stage"] = "end"
 		if result.kind == "deck":
 			var deck: Dictionary = builder.construction.preview(action, start, point)
-			for key in deck: result[key] = deck[key]
+			# Construction's kind names the asset (bridge/ramp); targeting's kind
+			# names the gesture. Keep the latter while adopting the live dimensions.
+			for key in deck:
+				if key != "kind": result[key] = deck[key]
 			if availability != "": result["reason"] = availability
 		elif action == "path":
 			result["cost"] = ceili(start.distance_to(point) / 7.0)

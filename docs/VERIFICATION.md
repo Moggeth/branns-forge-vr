@@ -2005,3 +2005,58 @@ On this shared PC, the active gh account changed to mitch-dromeda while the long
 Final fixture correction: headless DisplayServer does not preserve native Window.unfocusable flags either. Gate both no-focus and offscreen assertions to native rendering; the actual native fixture checks both. The spell-save fixture deliberately submits an invalid save and expects the preserving-file warning; accept that exact warning when its own result marker reports no failures, while continuing to reject SCRIPT ERROR/ERROR and unexpected warnings. Do not turn deliberate corruption-recovery coverage into a failed build by blanket warning matching.
 
 Partial staging on Windows: Python subprocess text=True normalized CRLF patch context, so git apply --cached --check rejected a valid isolated main.gd rat-region hunk. Keeping git diff output and patch input as bytes applied the exact hunk immediately. Preserve bytes for index patches; use --check before mutation, and branch on the actual tool exit before running dependent commit or push calls.
+
+## RTS quick-cast and ground-preview audit (2026-10-01)
+
+Quick-cast defaults on; Q toggles only in RTS, and the top-bar toggle saves to
+user://world-builder-view.cfg, input/quick_cast. Numbers/keypad numbers resolve
+through one command-panel mapping. Point actions sample the current pointer on
+press; line actions capture an anchor on press and sample their endpoint on the
+same physical key's release. The production _route_input handles both edges.
+Selection, focus, modal map/supplies, region, layout, window focus loss, closing
+and explicit cancellation disarm the gesture. Diagnostic mode skips preferences
+and live saves. The existing local simulation remains authoritative for costs,
+placement rejection and cooldowns.
+
+Final actual-Main world_builder_quick_cast_checks.gd passes **59 checks** in
+**7.806 s** (see the measured row in logs/work-timing.csv): fresh cursor,
+keypad, repeat/wrong release, replacement/cancellation, legacy mode, FPS isolation,
+real Starfall/Sunder/Hire outcomes, no-spend invalid release, and no invisible
+fallback mesh construction beneath the authored preview. The native
+**dual_view_checks.gd** run passes all six layouts through 4K in **22.694 s**,
+including toolbar bounds, actual GUI toggle routing and pane pixel checks.
+Capture: outputs/dual-view-oct1/split-960.png. The native diagnostic remains
+unfocusable/offscreen; resident games, services, headset and save files were not
+restarted. This verifies desktop rendering, not headset comfort.
+
+The catalogue sweep checks all **29 entries / 23 spatial previews / five
+unavailable entries / one immediate action**, including crimson invalid states,
+stale geometry removal and Sunder's actual 16 m footprint. Its final run took
+**0.274 s**, peaked at **1,580 triangles / two surfaces**, and recorded a maximum
+build of **2.044 ms**. Construction's live dimensions now reach the art contract,
+while the targeting gesture remains deck rather than being overwritten by an
+asset kind such as bridge. The view contract proves a changed width survives.
+Non-Orchard fallback floor criteria match runtime's floor tag and >=0.75 normal.
+The authored preview bypasses rebuilding an invisible fallback every tick.
+
+Other passing checks: actual-Main panel **7.739 s**, spell/save **0.551 s**,
+regional targeting **0.457 s**, live-footprint contract **0.462 s**, and narrow
+panel **148 checks / 0.275 s**. The save fixture deliberately emits its documented
+invalid-save preserving-file warning; all result markers are clean, with no
+SCRIPT ERROR or ERROR. The 23-preview native contact sheet was reviewed at
+outputs/world-builder-ground-previews.png; its render took **2.319 s**.
+
+Recovery lessons: the first quick-cast fixture exposed an armed gesture surviving
+a direct _finish_close; clear both normal and final close paths. GDScript cannot
+infer := from dynamically typed Node/Dictionary method results: annotate int
+where known instead of retrying engine runs. Viewport readback can be RGB8;
+convert it to the contact sheet's RGBA8 before Image.blit_rect. In a fixture,
+initialise art before publishing its populated target, or clear target state
+before art setup; setup clears geometry, so reusing the identical cached state
+will otherwise leave a valid preview hidden. Positional PowerShell wildcard
+paths still fail; use rg over godot with -g filters, as AGENTS.md already says.
+For documentation patches, match the full current line rather than a paragraph's
+prefix; prepending UTF-8 bytes preserves existing Windows newlines. Failed and
+repaired runs, review/authoring windows and final command durations are recorded
+in ignored logs/work-timing.csv; overlapping worker timings must not be summed
+as elapsed wall time.

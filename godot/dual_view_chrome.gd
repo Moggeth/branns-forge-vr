@@ -7,6 +7,7 @@ const C_TEAL := Color("3fb6a8")
 var mode := "pip"
 var hero_focus := false
 var captured := false
+var quick_cast_enabled := true
 var ratio := 0.5
 var ui_scale := 1.0
 var panes := {}
@@ -19,10 +20,11 @@ var clock := 0.0
 func setup() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_NONE
-	tooltip_text = "Tab switches Hero / RTS controls. Escape frees the mouse. Shift+F9 changes layout."
+	tooltip_text = "Tab switches Hero / RTS controls. Escape frees the mouse. Q toggles RTS quick-cast: tap a number for point spells, hold/release for lines. Shift+F9 changes layout."
 
-func update_layout(view_mode: String, focus: bool, locked: bool, left_ratio: float, layout: Dictionary, scale_value: float) -> void:
+func update_layout(view_mode: String, focus: bool, locked: bool, left_ratio: float, layout: Dictionary, scale_value: float, quick_value := true) -> void:
 	mode = view_mode; hero_focus = focus; captured = locked; ratio = left_ratio
+	quick_cast_enabled = quick_value
 	panes = layout; ui_scale = scale_value
 	divider = layout.get("divider", Rect2())
 	divider_hit = layout.get("divider_hit", Rect2())
@@ -41,6 +43,7 @@ func _draw() -> void:
 	var x := 8.0 * ui_scale
 	for item in [["focus", "HERO · Tab" if hero_focus else "RTS · Tab"], ["pip","Inset"], ["split","Split"], ["flip","Flip"]]:
 		x = _draw_button(str(item[0]),str(item[1]),x,h,font,fs)
+	x = _draw_button("quickcast", "Quick: On · Q" if quick_cast_enabled else "Quick: Off · Q", x,h,font,fs)
 	if mode == "split":
 		for percent in [40,50,60]: x = _draw_button("ratio:"+str(percent), str(percent)+"%",x,h,font,fs)
 	x = _draw_button("fullscreen","F11 Fullscreen",x,h,font,fs)
@@ -60,7 +63,7 @@ func _draw() -> void:
 func _draw_button(id: String, label: String, x: float, h: float, font: Font, fs: int) -> float:
 	var w := font.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,fs).x + 18.0 * ui_scale
 	var box := Rect2(x,4.0*ui_scale,w,h-8.0*ui_scale)
-	var active := id == mode or (id.begins_with("ratio:") and is_equal_approx(ratio,float(id.trim_prefix("ratio:"))/100.0))
+	var active := id == mode or (id == "quickcast" and quick_cast_enabled) or (id.begins_with("ratio:") and is_equal_approx(ratio,float(id.trim_prefix("ratio:"))/100.0))
 	draw_rect(box,Color(C_TEAL,0.22) if active else Color(0.08,0.13,0.11))
 	draw_rect(box,Color(C_GOLD,0.6),false,1.0)
 	draw_string(font,box.position+Vector2(9.0*ui_scale,box.size.y*0.72),label,HORIZONTAL_ALIGNMENT_LEFT,-1,fs,Color("e9ddbf"))

@@ -196,21 +196,32 @@ func is_over_panel(pos: Vector2) -> bool:
 	return _panel.has_point(local) or local.distance_to(_orb_c) <= _orb_r + 10.0 * _s
 
 
+static func shortcut_slot(event: InputEventKey) -> int:
+	if event == null: return -1
+	var k: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+	if k >= KEY_1 and k <= KEY_9: return k - KEY_1
+	if k >= KEY_KP_1 and k <= KEY_KP_9: return k - KEY_KP_1
+	return -1
+
+
+func shortcut_spell(event: InputEventKey) -> String:
+	## Resolve without emitting a selection: quick-cast owns the press/release gesture.
+	var n := shortcut_slot(event)
+	var ids: Array = _by_palette.get(_palette, [])
+	return str(ids[n]) if n >= 0 and n < ids.size() else ""
+
+
 func handle_shortcut(event: InputEventKey) -> bool:
 	if event == null or not event.pressed or event.echo:
 		return false
-	var k := event.keycode
+	var k: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
 	if k == KEY_ESCAPE:
 		cancel_targeting.emit()
 		return true
 	if k >= KEY_F1 and k <= KEY_F4:
 		_choose_palette(PALETTES[k - KEY_F1].id)
 		return true
-	var n := -1
-	if k >= KEY_1 and k <= KEY_9:
-		n = k - KEY_1
-	elif k >= KEY_KP_1 and k <= KEY_KP_9:
-		n = k - KEY_KP_1
+	var n := shortcut_slot(event)
 	if n >= 0:
 		var ids: Array = _by_palette.get(_palette, [])
 		if n < ids.size():
