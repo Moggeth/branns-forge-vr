@@ -1664,3 +1664,35 @@ two fresh complete runs took 52.591 s with **all 308 PNGs byte-identical** and
 identical source/pose records. The cache hit took 0.117 s. The review ZIP is
 27,088,011 bytes. See `docs/WEAPON-INSPECTION.md` for flags, omissions and
 calibration migration. HMD comfort and body clearance still require playtesting.
+
+## Snow coverage and precipitation stability — 2026-09-30
+
+The outdoor weather refresh now leaves the completed field texture, shader
+origin and overlay visible while its next 24 m surface scan yields. It uploads
+the replacement field and moves the shader origin together. Disabling weather
+still hides effects immediately, including during an interrupted scan. The
+overlay samples world position and world normal, uses a slightly larger surface
+offset and does not write a transparent depth prepass. Snow and rain use fixed
+world cells that recycle by row or column at the local volume edge; small
+camera movements no longer move every particle.
+
+The desktop check first failed after newer scene dressing covered its metal
+tray and timber roof samples: the exposed grid correctly reported stone at
+both old coordinates. Test those fixture meshes in isolation when checking
+their material classification, and keep the scene-wide exposure check for the
+actual roof. A successful headless check then emitted 87 dummy-renderer
+`material_get_instance_shader_parameters` errors on shutdown because overlays
+remained attached as their shader was freed. Detach owned overlays in
+`weather_lab._exit_tree()` before the scene tears down. The native check also
+found that disabling during a preserved scan must hide the engine immediately;
+waiting for the deferred refresh is too late for the same frame.
+
+Final actual-engine checks: desktop Weather Lab simulation passed in 8.041 s;
+final Mobile renderer capture/check passed in 18.725 s with
+`WEATHER_CHECK_RESULT []`, `WEATHER_CAPTURE_COMPLETE`, and no engine errors.
+The snow PNG in `outputs/visual-lab/weather-snow.png` was visually inspected.
+The native weather game check passed in 9.664 s with
+`WEATHER_GAME_CHECK_RESULT []`, including an 8 m moving-grid scan, an
+interrupted scan, travel, and weather disable/re-enable. These timings are
+measured process wall time; the failed intermediate runs and repeats are in
+`logs/work-timing.csv`. No live session, save, API, or headset was used.
