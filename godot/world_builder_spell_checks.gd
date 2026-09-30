@@ -42,6 +42,12 @@ func _check() -> void:
 	var path: String = "user://world_builder_spell_verification_%d.json" % Time.get_ticks_usec()
 	builder.save_path = path
 	builder.test_mode = false
+	var legacy_file := FileAccess.open(path, FileAccess.WRITE)
+	legacy_file.store_string(JSON.stringify(legacy))
+	legacy_file.close()
+	builder.data = Builder.fresh_state()
+	builder._load()
+	if float(builder.data.mana) != 7.25 or builder.data.has("aether"): failures.append("legacy save file migration failed")
 	builder.data = migrated
 	builder.data.spell_cooldowns = {"raise": 4.0}
 	if not builder.save(): failures.append("isolated save failed")
@@ -49,7 +55,7 @@ func _check() -> void:
 	builder._load()
 	if float(builder.data.mana) != 7.25 or float(builder.data.spell_cooldowns.get("raise", -1)) != 4.0: failures.append("Mana or cooldown persistence failed")
 	var broken: Dictionary = builder.data.duplicate(true)
-	broken.mana = INF
+	broken.mana = "not a finite number"
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(broken))
 	file.close()
