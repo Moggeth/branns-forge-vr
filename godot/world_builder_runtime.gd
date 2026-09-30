@@ -27,6 +27,7 @@ const TreeFelling = preload("res://tree_felling.gd")
 const Spells = preload("res://world_builder_spells.gd")
 const Construction = preload("res://world_builder_construction.gd")
 const Ents = preload("res://world_builder_ents.gd")
+const Encounters = preload("res://world_builder_encounters.gd")
 
 signal forest_visual_event(payload: Dictionary)
 
@@ -55,6 +56,7 @@ var progress_until := 0.0
 var spells := Spells.new()
 var construction: Node
 var ents: Node
+var encounters: Node
 
 func setup(owner_game: Node3D, offline := false) -> void:
 	game = owner_game
@@ -78,11 +80,14 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	ents = Ents.new()
 	add_child(ents)
 	ents.setup(self)
+	encounters = Encounters.new()
+	add_child(encounters)
+	encounters.setup(self)
 	_ensure_workers()
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "mana": 12.0, "spell_cooldowns": {}, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "constructions": [], "ents": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "mana": 12.0, "spell_cooldowns": {}, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "constructions": [], "ents": [], "encounter_history": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
 
 func spell_catalogue() -> Array[Dictionary]:
 	return Spells.catalogue()
@@ -136,6 +141,7 @@ func _canonical_state(value: Variant) -> Variant:
 	if not candidate.has("spell_cooldowns"): candidate.spell_cooldowns = {}
 	if not candidate.has("constructions"): candidate.constructions = []
 	if not candidate.has("ents"): candidate.ents = []
+	if not candidate.has("encounter_history"): candidate.encounter_history = []
 	return candidate
 
 func _valid(value: Variant) -> bool:
@@ -153,6 +159,7 @@ func _valid(value: Variant) -> bool:
 	if value.get("bridges") is not Array or value.bridges.size() > MAX_BRIDGES: return false
 	if not Construction.valid_records(value.get("constructions")): return false
 	if not Ents.valid_records(value.get("ents")): return false
+	if not Encounters.valid_history(value.get("encounter_history")): return false
 	if value.get("harvested") is not Array or value.harvested.size() > 512: return false
 	if value.get("scenic_cut_heights", {}) is not Dictionary or value.get("scenic_cut_heights", {}).size() > 512: return false
 	for key in value.get("scenic_cut_heights", {}):
@@ -189,6 +196,7 @@ func _valid(value: Variant) -> bool:
 		if int(load.worker) < 0 or int(load.worker) >= 5 or int(load.amount) < 1 or int(load.amount) > 5: return false
 	for threat in value.get("threats", []):
 		if not threat is Dictionary or not _point_valid(threat.get("at")) or str(threat.get("state", "")) not in ["warning", "active"]: return false
+		if not Encounters.valid_threat(threat): return false
 		if not threat.get("alive") is Array or threat.alive.size() > 3: return false
 		if not threat.get("id") is float and not threat.get("id") is int: return false
 		for slot in threat.alive:
@@ -754,8 +762,10 @@ func summon_patrol(local: Vector3) -> String:
 	if local.distance_to(Vector3(hero_local.x, 0, hero_local.z)) < 7.0: return "Give the Hero at least seven metres of warning."
 	data.mana = float(data.mana) - 4.0
 	spells.success("patrol", self)
-	data.threats.append({"id": int(data.revision) + 1, "at": _pack(local), "state": "warning", "delay": 1.7, "alive": [0, 1, 2]})
-	_changed("A violet warning marks where three skeletons will rise.")
+	var threat := {"id": int(data.revision) + 1, "at": _pack(local), "state": "warning", "delay": 1.7, "alive": [0, 1, 2]}
+	encounters.prepare(threat)
+	data.threats.append(threat)
+	_changed("A violet warning marks where three skeletons will rise. " + encounters.brief(threat))
 	return ""
 
 func _sync_threats(delta: float) -> void:
@@ -781,17 +791,21 @@ func _sync_threats(delta: float) -> void:
 			_changed("Three skeletons rise in the live orchard. The Hero can fight them.")
 			continue
 		if not summoned_nodes.has(id): _spawn_threat(threat)
+		encounters.tick_threat(threat, delta)
 		var units: Array = summoned_nodes.get(id, [])
 		var changed := false
 		for unit in units:
 			if int(unit.slot) not in threat.alive: continue
 			if not is_instance_valid(unit.node) or not bool(unit.node.get_meta("alive", true)):
+				encounters.unit_down(threat, int(unit.slot), unit.node)
 				threat.alive.erase(int(unit.slot))
 				changed = true
 		if threat.alive.is_empty():
+			var reward: Dictionary = encounters.complete(threat)
 			data.threats.erase(threat)
 			summoned_nodes.erase(id)
-			changed = true
+			_changed(str(reward.message))
+			continue
 		if changed:
 			data.revision = int(data.revision) + 1
 			print("WORLD_BUILDER patrol defeated id=", id, " remaining=", data.threats.size())
