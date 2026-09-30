@@ -87,9 +87,9 @@ func tick(delta):
 			var response=HardContact.response(target,item,hit.position,hit.normal,motion,best_speed,best_region)
 			var completed=false
 			if best_speed>=MIN_STRIKE_SPEED: completed=strike(target,hit.position,hit.normal,best_speed,hand,item,best_region)
-			if not response.is_empty() and best_speed>=MIN_STRIKE_SPEED:
+			if not response.is_empty() and best_speed>=MIN_STRIKE_SPEED and str(target.get_meta("kind",""))!="enemy":
 				response["completed"] = completed
-				response["damage_result"] = "mined" if completed and response.material=="star_iron" else "contact"
+				response["damage_result"] = "mined" if completed and response.material=="star_iron" else ("felled" if completed and response.material=="wood" else ("cut" if response.material=="wood" else "contact"))
 				hard_surface_contact.emit(response)
 			if not completed or response.get("block",false) or response.get("glance",false):
 				var bite:float=float(response.get("bite",BITE_DEPTH)) if best_speed>=MIN_STRIKE_SPEED else 0.0
@@ -116,7 +116,8 @@ func desktop_hard_contact(item: Node3D, target: Node3D, point: Vector3,
 	if response.is_empty(): return false
 	response["completed"] = completed
 	response["damage_result"] = "mined" if completed and response.material == "star_iron" else "contact"
-	hard_surface_contact.emit(response)
+	# Enemy strikes already emitted their exact material event from strike().
+	if str(target.get_meta("kind", "")) != "enemy": hard_surface_contact.emit(response)
 	if not bool(response.block): return false
 	desktop_contact={"item":item,"pose":contact_pose}
 	return true
@@ -175,7 +176,7 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 	if kind=="builder_forest" and game.world_builder!=null and str(item.get_meta("id", ""))=="woodland_axe":
 		return game.world_builder.chop_scenic(point,_is_blade(item,normal),normal,hand)
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
-		return chop(target,point,normal,hand,speed) if item.get_meta("id","")=="woodland_axe" else false
+		return chop(target,point,normal,hand,speed,false) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":
 		game.item_actions.resonant_mine(item,target,point,hand)
 		game.adventure.interact(target,"quarry_pick",hand)
@@ -220,19 +221,26 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 		if target.get_meta("enemy_type","")!="skeleton":
 			target.set_meta("knock_velocity",Vector3(impulse.x,0,impulse.z))
 		game.adventure.hurt_enemy(target,damage,hand,impulse,"physical",point)
-		if game.impact_feedback!=null:
-			var enemy_material: String={"skeleton":"bone","golem":"stone","ent":"wood"}.get(str(target.get_meta("enemy_type","")),"flesh")
-			game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","")),enemy_material)
+		var completed: bool = not target.get_meta("alive",true) or not blade or shielded or result.get("detached",false) or remaining_energy>9.0 or effective_speed<1.8
+		var material_response: Dictionary=HardContact.response(target,item,point,normal,direction*speed,speed,strike_region)
+		if not material_response.is_empty():
+			material_response["completed"] = completed
+			material_response["damage_result"] = "detached" if result.get("detached",false) else ("defeated" if not target.get_meta("alive",true) else "damaged")
+			if material_response.material=="bone" and completed:
+				material_response["bite"] = 0.0
+				material_response["response"] = "cleave" if result.get("detached",false) else "impact"
+			hard_surface_contact.emit(material_response)
+		elif game.impact_feedback!=null:
+			game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","")),"flesh")
 		elif target.get_meta("enemy_type","")=="skeleton":
 			game.remains._clack(point)
-		if not target.get_meta("alive",true): return true
 		# The blade stops when it has spent its energy inside bone. A stronger
 		# swing or a freshly severed part lets it continue along its path.
-		return not blade or shielded or result.get("detached",false) or remaining_energy>9.0 or effective_speed<1.8
+		return completed
 	if kind=="rat": game._kill_rat(target); return true
 	return false
 
-func chop(target,point:Vector3,normal:Vector3,hand=null,speed:float=2.4)->bool:
+func chop(target,point:Vector3,normal:Vector3,hand=null,speed:float=2.4,emit_feedback:bool=true)->bool:
 	if target.get_meta("collecting",false) or target.get_meta("felled",false) or not target.visible: return true
 	var bands=target.get_meta("cut_bands",[])
 	var height=target.to_local(point).y
@@ -246,7 +254,7 @@ func chop(target,point:Vector3,normal:Vector3,hand=null,speed:float=2.4)->bool:
 		selected=bands.size()-1
 	bands[selected].hits+=1
 	target.set_meta("cut_bands",bands)
-	if game.impact_feedback!=null:
+	if emit_feedback and game.impact_feedback!=null:
 		game.impact_feedback.contact(target,point,normal,speed,"woodland_axe","wood")
 	notch(target,bands[selected])
 	_authored_chips(target,point,normal,int(bands[selected].hits))

@@ -11,6 +11,8 @@ class FakeGrips:
 class FakeAdventure:
 	var pulses := 0
 	func haptic(_hand, _kind) -> void: pulses += 1
+	func hurt_enemy(target,damage: float,_hand,_impulse,_damage_type,_point) -> void:
+		target.set_meta("hp",float(target.get_meta("hp",100.0))-damage)
 
 class FakeBuilder:
 	var meteor
@@ -27,6 +29,10 @@ class FakeGame extends Node3D:
 	var vr := true
 	var atelier = null
 	var sunfall = null
+	var guardians = null
+	var skeleton_structure = null
+	var impact_feedback = null
+	var last_inputs := {}
 	var adventure := FakeAdventure.new()
 	var world_builder := FakeBuilder.new()
 	var camera := Camera3D.new()
@@ -106,6 +112,75 @@ func _run() -> void:
 	if not plan.block or plan.bite <= 0 or plan.material != "star_iron": failures.append("sharp normal-entry bite")
 	var scrape: Dictionary=Hard.response(meteor.collider,item,Vector3.ZERO,normal,Vector3.FORWARD*2.0,2.0,"shaft")
 	if scrape.block or scrape.bite != 0: failures.append("shaft scrape embedded")
+	var shaft_hit: Dictionary=Hard.response(meteor.collider,item,Vector3.ZERO,normal,Vector3.LEFT*2.0,2.0,"shaft")
+	if not shaft_hit.block or shaft_hit.bite != 0 or shaft_hit.sharp or shaft_hit.energy >= plan.energy:
+		failures.append("shaft contact failed to arrest with reduced energy")
+	var axe := Node3D.new()
+	axe.set_meta("id","woodland_axe")
+	axe.set_meta("combat_mass",1.65)
+	game.add_child(axe)
+	axe.basis = Basis(Vector3.UP,PI)
+	var wood := Node3D.new()
+	wood.set_meta("kind","enemy")
+	wood.set_meta("enemy_type","ent")
+	wood.set_meta("hp",100.0)
+	wood.set_meta("alive",true)
+	game.add_child(wood)
+	var edge_wood: Dictionary=Hard.response(wood,axe,Vector3(0.2,0.9,0),normal,Vector3.LEFT*2.4,2.4)
+	if edge_wood.material != "wood" or edge_wood.strike_region != "blade_edge" or edge_wood.bite <= 0 or not edge_wood.block:
+		failures.append("axe edge did not bite Ent timber")
+	var golem := Node3D.new()
+	golem.set_meta("kind","enemy")
+	golem.set_meta("enemy_type","golem")
+	golem.set_meta("hp",100.0)
+	golem.set_meta("alive",true)
+	game.add_child(golem)
+	var edge_stone: Dictionary=Hard.response(golem,axe,Vector3.ZERO,normal,Vector3.LEFT*2.4,2.4)
+	if edge_stone.material != "stone" or edge_stone.bite != 0 or edge_stone.hardness <= edge_wood.hardness:
+		failures.append("axe edge penetrated hard golem stone")
+	var timber := Node3D.new()
+	timber.set_meta("kind","resource")
+	timber.set_meta("requires","chop")
+	game.add_child(timber)
+	if Hard.material_for(timber) != "wood": failures.append("choppable resource is not wood")
+	var curtain := StaticBody3D.new()
+	curtain.set_meta("surface_material", "cloth")
+	game.add_child(curtain)
+	if Hard.material_for(curtain) != "": failures.append("soft surface metadata became hard stone")
+	var glass := StaticBody3D.new()
+	glass.set_meta("surface_material", "glass")
+	game.add_child(glass)
+	var glass_hit: Dictionary = Hard.response(glass,axe,Vector3.ZERO,normal,Vector3.LEFT*2.4,2.4)
+	if glass_hit.material != "glass" or glass_hit.bite != 0: failures.append("glass metadata ignored")
+	var skeleton := Node3D.new()
+	skeleton.set_meta("kind","enemy")
+	skeleton.set_meta("enemy_type","skeleton")
+	skeleton.set_meta("hp",100.0)
+	skeleton.set_meta("alive",true)
+	game.add_child(skeleton)
+	var edge_bone: Dictionary=Hard.response(skeleton,axe,Vector3.ZERO,normal,Vector3.LEFT*2.4,2.4)
+	if edge_bone.material != "bone" or edge_bone.bite <= 0 or edge_bone.block:
+		failures.append("bone response overrode structural lodge result")
+	axe.basis = Basis.IDENTITY
+	var poll_wood: Dictionary=Hard.response(wood,axe,Vector3.ZERO,normal,Vector3.LEFT*2.4,2.4)
+	if poll_wood.strike_region != "axe_poll" or poll_wood.bite != 0 or poll_wood.sharp:
+		failures.append("axe poll acted like blade edge")
+	if scrape.sharp:
+		failures.append("non-tip pick strike transferred full tip energy")
+	axe.basis = Basis(Vector3.UP,PI)
+	var contact_point := Vector3(0.2,0.9,0)
+	var previous_events := events.size()
+	var bone_completed: bool=melee.strike(skeleton,contact_point,normal,2.4,vr_hand,axe)
+	if events.size() != previous_events+1 or events[-1].material != "bone" or events[-1].normal != normal or events[-1].point != contact_point or events[-1].completed != bone_completed:
+		failures.append("skeleton lost exact physical contact event")
+	previous_events = events.size()
+	var ent_completed: bool=melee.strike(wood,contact_point,normal,2.4,vr_hand,axe)
+	if events.size() != previous_events+1 or events[-1].material != "wood" or events[-1].normal != normal or events[-1].completed != ent_completed:
+		failures.append("Ent lost exact physical contact event")
+	previous_events = events.size()
+	var golem_completed: bool=melee.strike(golem,contact_point,normal,2.4,vr_hand,axe)
+	if events.size() != previous_events+1 or events[-1].material != "stone" or events[-1].bite != 0 or events[-1].completed != golem_completed:
+		failures.append("golem stone lost exact blocked contact event")
 	var pose := Hard.desktop_pose(Transform3D.IDENTITY,Transform3D(Basis.IDENTITY,Vector3(1,0,0)),0.6)
 	if pose.origin.length_squared() > 0.0001: failures.append("FPS contact did not dwell")
 	if not melee.desktop_hard_contact(item,meteor.collider,Vector3.ZERO,Vector3.BACK,2.4,

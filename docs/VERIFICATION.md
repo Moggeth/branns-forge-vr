@@ -1828,3 +1828,20 @@ mined capture tried `viewport.world_3d`, which was null for the inherited
 world; use `meteor.get_world_3d()` after the node joins the viewport. Its
 script error left the diagnostic running until that exact session was stopped
 at 11.775 s. Final headset feel and VFX/audio art remain unverified.
+
+Hard contact now classifies material from authored metadata before body type,
+and reports tool region, entry energy, hardness, bite, exact hit normal and
+completion in one event. The focused check covers axe edge/poll on Ent timber,
+golem stone and skeleton bone, pick shaft versus point, soft cloth and glass
+overrides, and one rich event per enemy strike. The October 1 focused checks
+passed in 0.329 s (`HARD_SURFACE_CONTACT_RESULT []`) and 0.251 s
+(`LANDSCAPE_METEOR_RESULT []`). An earlier focused run reported a GDScript
+type inference error on `completed` while its process still exited zero;
+declare the boolean type and require both an empty named result array and no
+`SCRIPT ERROR` text, rather than trusting exit status alone. Two integrated
+`--skeleton-combat-check` runs each failed only on `detached knee did not react
+to motion` (7.680 s and 7.709 s). That assertion is in the detached-leg joint
+fixture: `_tick_leg_joints` can skip sleeping/invisible bodies after the fixture
+sets angular velocity, a possible cause that needs inspection. The hard-contact
+edit does not touch those files; this regression remains for the skeleton owner
+to resolve.
