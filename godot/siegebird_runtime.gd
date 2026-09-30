@@ -195,6 +195,7 @@ func try_grab(hand)->bool:
 
 func make_bolt()->Node3D:
 	var bolt=Node3D.new(); game.add_child(bolt)
+	bolt.set_meta("held_mass",0.08)
 	for w in weapons:
 		if not is_instance_valid(w.item): continue
 		var copy=w.bolt.duplicate(0)
@@ -402,7 +403,7 @@ func tick(delta):
 			# Same authored/calibrated pose as initial attachment. Two hands remain
 			# governed by their positions in grip_runtime, never this one-hand path.
 			w.item.global_transform=aim.global_transform*game.grips.pose_for(w.item,hand)
-			game.grips.grips[entries[0]].point=w.item.to_local(hand.global_position)
+			game.grips.grips[entries[0]].point=w.item.to_local(game.hand_socket(hand).global_position)
 			game.grips.grips[entries[0]].basis=game.hand_socket(hand).global_basis.inverse()*w.item.global_basis
 		if w.release>0:
 			w.release=maxf(0,w.release-delta)

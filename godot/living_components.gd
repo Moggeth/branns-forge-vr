@@ -280,7 +280,10 @@ func _hold_entry(nearest,hand)->bool:
 	var key=str(hand.get_instance_id())
 	projectiles.grabbed(nearest)
 	var climb=nearest.components.has("climbable") and not nearest.components.has("grabbable")
-	held[key]={"entry":nearest,"hand":hand,"climbing":climb,"previous":hand.global_position,"velocity":Vector3.ZERO,"offset":hand.global_transform.affine_inverse()*nearest.node.global_transform}
+	# Movable creations share the calibrated socket with authored tools. Keep
+	# climbing and release motion sampled from the unfiltered controller.
+	var attach_pose: Transform3D = hand.global_transform if climb else game.hand_socket(hand).global_transform
+	held[key]={"entry":nearest,"hand":hand,"climbing":climb,"previous":hand.global_position,"velocity":Vector3.ZERO,"offset":attach_pose.affine_inverse()*nearest.node.global_transform}
 	hand.set_meta("anchored_grip",true)
 	if not climb:
 		if nearest.node is RigidBody3D: nearest.node.freeze=true; nearest.node.linear_velocity=Vector3.ZERO
@@ -486,7 +489,7 @@ func tick(delta:float):
 			var local:Vector3=e.node.to_local(h.hand.global_position); var half:Vector3=e.size*.5
 			if local.distance_to(local.clamp(-half,half))>.65: _release_key(key); continue
 			climb_motion-=movement; climb_hands+=1; game.item_actions.falling=false
-		else: e.node.global_transform=h.hand.global_transform*h.offset
+		else: e.node.global_transform=game.hand_socket(h.hand).global_transform*h.offset
 	if climb_hands>0:
 		game.item_actions.move_rig((climb_motion/climb_hands).limit_length(.12))
 		for h in held.values():

@@ -229,7 +229,7 @@ func bind(hand,item):
 	for slot in slots:
 		if slot.item==item: slot.item=null
 	game.adventure.thrown=game.adventure.thrown.filter(func(entry):return entry.node!=item)
-	grips[_key(hand)]={"hand":hand,"item":item,"point":item.to_local(hand.global_position),"basis":game.hand_socket(hand).global_basis.inverse()*item.global_basis}
+	grips[_key(hand)]={"hand":hand,"item":item,"point":item.to_local(game.hand_socket(hand).global_position),"basis":game.hand_socket(hand).global_basis.inverse()*item.global_basis}
 	game._set_collisions(item,false)
 
 func try_grab(hand)->bool:
@@ -366,7 +366,7 @@ func tick(delta):
 		if active.size()==2:
 			var b=grips[active[1]]
 			var local_axis:Vector3=b.point-a.point
-			var world_axis:Vector3=b.hand.global_position-a.hand.global_position
+			var world_axis:Vector3=game.hand_socket(b.hand).global_position-game.hand_socket(a.hand).global_position
 			if local_axis.length()>0.06 and world_axis.length()>0.06:
 				var from=(basis*local_axis).normalized()
 				var to=world_axis.normalized()
@@ -374,7 +374,7 @@ func tick(delta):
 				if cross.length()>0.0001: basis=Basis(cross.normalized(),acos(clampf(from.dot(to),-1,1)))*basis
 				elif from.dot(to)<-0.999: basis=Basis((basis*Vector3.RIGHT).normalized(),PI)*basis
 		item.global_basis=basis
-		item.global_position=a.hand.global_position-basis*a.point
+		item.global_position=game.hand_socket(a.hand).global_position-basis*a.point
 		if active.size()==2:
 			var support=grips[active[1]]
 			var visual=support.hand.get_meta("hand_visual") if support.hand.has_meta("hand_visual") else null

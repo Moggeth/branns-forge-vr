@@ -81,6 +81,7 @@ var capture_tool_id=""
 var capture_tuning=false
 var capture_quick=false
 var hand_sockets={}
+var held_pose=preload("res://held_pose_runtime.gd").new()
 var aim_nodes={}
 var speech_level=0.0
 var speech_target=0.0
@@ -195,6 +196,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--grip-pose-check") or OS.get_cmdline_user_args().has("--world-builder-check") or OS.get_cmdline_user_args().has("--world-builder-preview")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--skeleton-combat-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--hand-art-check") or OS.get_cmdline_user_args().has("--phoenix-bow-check")
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--held-pose-check")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--weapon-inspection")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--atmosphere-test")
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--landscape-check")
@@ -949,6 +951,7 @@ func _desktop_panel_style()->StyleBoxFlat:
 
 func _process(delta):
 	elapsed += delta
+	held_pose.tick(self,delta)
 	if not smoke and delta>0.09 and elapsed-last_frame_hitch_log>2.0:
 		last_frame_hitch_log=elapsed
 		var forge_stage="idle"
@@ -973,6 +976,7 @@ func _process(delta):
 		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus()): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
 	if not smoke: portal_walkthrough.tick(self,delta)
+	held_pose.refresh(self)
 	if elapsed > next_poll and not busy and not diagnostic_offline:
 		next_poll = elapsed + 2.0
 		_poll()
@@ -1015,6 +1019,7 @@ func _process(delta):
 	if is_instance_valid(world_builder_view): world_builder_view.tick(delta)
 	if workshop!=null: workshop.tick(delta)
 	if enchantments!=null: enchantments.tick(delta)
+	held_pose.refresh(self)
 	grips.tick(delta)
 	siegebird.tick(delta)
 	if archery!=null: archery.tick(delta)
@@ -1053,6 +1058,7 @@ func _process(delta):
 	animation.tick(delta)
 	guardians.tick(delta)
 	guardian_authored.tick(delta)
+	held_pose.refresh(self)
 	melee.tick(delta)
 	for key in held.keys():
 		var weapon = held[key]
@@ -1341,9 +1347,6 @@ func _setup_skull_basket()->void:
 
 func _xr_input():
 	for hand in hands:
-		# Roll about the already-corrected finger axis, mirrored for the two palms.
-		hand_socket(hand).basis=_hand_basis(hand)
-	for hand in hands:
 		if not hand.get_is_active():
 			_cancel_inactive_playful_hand(hand)
 			continue
@@ -1460,7 +1463,9 @@ func _move_to(destination: Vector3):
 	if floor_owner==null or floor_owner.get_meta("kind","") not in ["floor","solid"]: return
 	if floor_owner.get_meta("kind","")=="solid" and float(floor_hit.position.y)-rig.global_position.y>0.35: return
 	bounded.y = float(floor_hit.position.y)+0.02
-	if _player_capsule_clear(bounded): rig.position = bounded
+	if _player_capsule_clear(bounded):
+		rig.position = bounded
+		held_pose.refresh(self)
 
 func _player_capsule_clear(feet: Vector3) -> bool:
 	var query = PhysicsShapeQueryParameters3D.new()

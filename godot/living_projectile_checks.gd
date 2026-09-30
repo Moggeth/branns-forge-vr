@@ -32,6 +32,7 @@ class Game extends Node3D:
 	var elapsed=0.0
 	func initialize():add_child(rig);rig.add_child(camera);add_child(desktop_hand);camera.position=Vector3(-3,1.5,9)
 	func aim_source(hand):return hand
+	func hand_socket(hand):return hand
 	func _notice(_message,_duration=0):pass
 var game
 var runtime
