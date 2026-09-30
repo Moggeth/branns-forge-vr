@@ -2,6 +2,7 @@ extends Node
 
 const Presentation = preload("res://world_builder_ent_presentation.gd")
 const EntLog = preload("res://world_builder_ent_log.gd")
+const IdleWander = preload("res://creature_idle_wander.gd")
 ## Awakens indexed orchard timber in place. The source tree remains the enemy body.
 const ZONE := "orchard_highlands"
 const MAX_ENTS := 8
@@ -20,6 +21,7 @@ var clock := 0.0
 var attack_at: Dictionary = {}
 var fruit_entry_by_key: Dictionary = {}
 var quenched_until: Dictionary = {}
+var saved_motion_at: Dictionary = {}
 
 func setup(owner_builder: Node) -> void:
 	builder = owner_builder
@@ -65,6 +67,15 @@ static func valid_records(value: Variant) -> bool:
 			if not item.burn_left is float and not item.burn_left is int: return false
 			if not is_finite(float(item.burn_left)) or float(item.burn_left) < 0.0 or float(item.burn_left) > BURN_SECONDS: return false
 		if str(item.get("condition", "")) not in ["healthy", "burning"]: return false
+		if item.has("position"):
+			if not item.position is Array or item.position.size() != 2: return false
+			for axis in item.position:
+				if not axis is float and not axis is int: return false
+				if not is_finite(float(axis)) or absf(float(axis)) > IdleWander.HOME_RADIUS: return false
+			if Vector2(float(item.position[0]), float(item.position[1])).length() > IdleWander.HOME_RADIUS: return false
+		if item.has("yaw"):
+			if not item.yaw is float and not item.yaw is int: return false
+			if not is_finite(float(item.yaw)) or absf(float(item.yaw)) > TAU: return false
 	return true
 
 func _record(key: String) -> Dictionary:
@@ -146,13 +157,22 @@ func _living_count() -> int:
 
 func _activate(tree: Node3D, record: Dictionary) -> void:
 	var key: String = record.key
+	var origin: Vector3 = tree.get_meta("ent_origin", tree.global_position)
+	tree.set_meta("ent_origin", origin)
 	if tree.get_parent() != game.adventure.zone_groups[ZONE]: tree.reparent(game.adventure.zone_groups[ZONE], true)
+	if record.has("position"):
+		var offset := Vector2(float(record.position[0]), float(record.position[1]))
+		var root: Node3D = game.scene.zones.orchard_highlands.root
+		var local: Vector3 = root.to_local(origin + Vector3(offset.x, 0.0, offset.y))
+		local.y = game.landscape.height_at(Vector2(local.x, local.z))
+		tree.global_position = root.to_global(local)
+	if record.has("yaw"): tree.rotation.y = float(record.yaw)
 	tree.set_meta("kind", "enemy")
 	tree.set_meta("enemy_type", "ent")
 	tree.set_meta("ent_key", key)
 	tree.set_meta("zone", ZONE)
 	tree.set_meta("id", "orchard-ent-" + key)
-	tree.set_meta("home", tree.global_position)
+	tree.set_meta("home", origin)
 	tree.set_meta("alive", true)
 	tree.set_meta("hp", float(record.hp))
 	tree.set_meta("max_hp", (130.0 if record.species == "pine" else 92.0) * float(record.scale))
@@ -213,6 +233,10 @@ func tick(delta: float) -> void:
 		if record.is_empty() or record.state == "dead": continue
 		if record.state == "calm":
 			_guard(tree, delta)
+			if game.adventure.zone == ZONE and tree.is_visible_in_tree() and not _guard_target_near(tree):
+				game.adventure._idle_wander(tree, delta, true)
+			else:
+				tree.set_meta("idle_wander", IdleWander.interrupt(tree.get_meta("idle_wander", {}), game.elapsed))
 			record.calm_left = maxf(0.0, float(record.calm_left) - delta)
 			if float(record.calm_left) <= 0.0:
 				record.state = "active"
@@ -237,6 +261,25 @@ func tick(delta: float) -> void:
 		if record.species == "apple" and record.state == "calm" and clock >= float(attack_at.get(key + ":fruit", 0.0)):
 			_spawn_apple(tree, key)
 			attack_at[key + ":fruit"] = clock + 30.0
+		_save_motion(key, tree, record)
+
+func _guard_target_near(tree: Node3D) -> bool:
+	for enemy in game.scene.enemies:
+		if not is_instance_valid(enemy) or enemy == tree or enemy.has_meta("ent_key"): continue
+		if bool(enemy.get_meta("alive", false)) and str(enemy.get_meta("zone", "")) == ZONE and tree.global_position.distance_to(enemy.global_position) < 4.0: return true
+	return false
+
+func _save_motion(key: String, tree: Node3D, record: Dictionary) -> void:
+	if clock < float(saved_motion_at.get(key, 0.0)): return
+	var origin: Vector3 = tree.get_meta("ent_origin", tree.global_position)
+	var offset := Vector2(tree.global_position.x - origin.x, tree.global_position.z - origin.z)
+	var saved: Array = record.get("position", [0.0, 0.0])
+	var yaw := wrapf(tree.rotation.y, -PI, PI)
+	if Vector2(float(saved[0]), float(saved[1])).distance_to(offset) < 0.15 and absf(wrapf(yaw - float(record.get("yaw", yaw)), -PI, PI)) < 0.15: return
+	record.position = [snappedf(offset.x, 0.01), snappedf(offset.y, 0.01)]
+	record.yaw = yaw
+	saved_motion_at[key] = clock + 3.0
+	if not builder.test_mode: builder.save()
 
 func _spawn_apple(tree: Node3D, key: String) -> void:
 	if game.apples == null or game.apples.apple_mesh == null: return

@@ -3,6 +3,7 @@ extends Node
 const Horizon = preload("res://horizon.gd")
 const OrchardHorizon = preload("res://orchard_vfx/orchard_horizon.gd")
 const Navigation = preload("res://landscape_navigation.gd")
+const IdleWander = preload("res://creature_idle_wander.gd")
 const TOOL_NAMES = {"apprentice_hammer":"Copperpot’s Promise", "woodland_axe":"Orchard’s Edge", "quarry_pick":"Stonewhisper", "bomb_glove":"Pocket Thunder", "grappling_hook":"Swallow Line", "spore_lantern":"Mooncap Lantern", "crystal_resonator":"Hollow’s Song", "ember_gauntlet":"The Last Hearth"}
 const ORDER = ["apprentice_hammer", "woodland_axe", "quarry_pick", "bomb_glove", "grappling_hook", "spore_lantern", "crystal_resonator", "ember_gauntlet"]
 const ZONES = ["forge_yard","sandstone_quarry","enchanted_kitchen","pinewood_ruins","mushroom_glade","crystal_hollow","sky_garden","ember_foundry","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep"]
@@ -610,6 +611,10 @@ func _enemies(delta):
 		if distance>10 or zone=="forge_yard":
 			enemy.set_meta("combat_phase","idle")
 			enemy.set_meta("attack_damage_done",true)
+			var quiet_type := str(enemy.get_meta("enemy_type", ""))
+			if zone!="forge_yard" and quiet_type in ["skeleton", "ent"] and distance>10:
+				_idle_wander(enemy, delta, orchard_ground)
+				continue
 			if orchard_ground:
 				var home_route: Dictionary = _orchard_pursuit(enemy,home)
 				if bool(home_route.available):
@@ -619,6 +624,8 @@ func _enemies(delta):
 				enemy.global_position = enemy.global_position.move_toward(home,delta*0.45)
 			continue
 		var type = str(enemy.get_meta("enemy_type","skeleton"))
+		if type in ["skeleton", "ent"]:
+			enemy.set_meta("idle_wander", IdleWander.interrupt(enemy.get_meta("idle_wander", {}), game.elapsed))
 		var speed = (0.48 if type in ["boss","golem"] else 0.72)*game.tuning.value("combat.enemy_speed")
 		if type=="skeleton": speed*=float(enemy.get_meta("skeleton_move_scale",1.0))
 		if game.elapsed<float(enemy.get_meta("slow_until",0)): speed*=0.25
@@ -646,6 +653,52 @@ func _enemies(delta):
 			enemy.set_meta("wave_at",game.elapsed+9)
 			_boss_wave(enemy,game.rig.global_position)
 		_step_attack(enemy,attack_distance,type)
+
+func _idle_wander(enemy: Node3D, delta: float, orchard_ground: bool) -> void:
+	var home: Vector3 = enemy.get_meta("home", enemy.global_position)
+	var state: Dictionary = enemy.get_meta("idle_wander", {})
+	if orchard_ground and game.landscape != null:
+		var operation: int = game.landscape.operation_count()
+		if state.has("operation") and int(state.operation) != operation:
+			state = IdleWander.interrupt(state, game.elapsed)
+		state.operation = operation
+	var seed: int = hash(str(enemy.get_meta("id", enemy.name)))
+	var speed := 0.48 * float(enemy.get_meta("skeleton_move_scale", 1.0)) if str(enemy.get_meta("enemy_type", "")) == "skeleton" else 0.38
+	var result: Dictionary = IdleWander.step(state, seed, game.elapsed, delta, enemy.global_position, home,
+		speed, func(start: Vector3, goal: Vector3) -> Array: return _idle_wander_route(enemy, start, goal, orchard_ground))
+	enemy.set_meta("idle_wander", result.state)
+	if not bool(result.moving): return
+	enemy.global_position = result.position
+	if orchard_ground: _orchard_ground_enemy(enemy)
+	var heading: Vector3 = result.heading
+	enemy.rotation.y = lerp_angle(enemy.rotation.y, atan2(heading.x, heading.z), clampf(delta * game.tuning.value("enemy.turn_speed"), 0.0, 1.0))
+
+func _idle_wander_route(enemy: Node3D, start: Vector3, goal: Vector3, orchard_ground: bool) -> Array:
+	if orchard_ground:
+		if not game.landscape.transition.is_empty(): return []
+		var root: Node3D = game.scene.zones.orchard_highlands.root
+		var a: Vector3 = root.to_local(start)
+		var b: Vector3 = root.to_local(goal)
+		var path: Array[Vector2] = Navigation.route(game.landscape.model, Vector2(a.x, a.z), Vector2(b.x, b.z))
+		var result: Array = []
+		for point in path:
+			result.append(root.to_global(Vector3(point.x, game.landscape.height_at(point), point.y)))
+		return result
+	var world: World3D = game.get_world_3d()
+	if world == null: return []
+	var result: Array = [start]
+	var steps := maxi(2, ceili(start.distance_to(goal) / 0.5))
+	var last := start
+	for i in range(1, steps + 1):
+		var flat := start.lerp(goal, float(i) / float(steps))
+		var query := PhysicsRayQueryParameters3D.create(flat + Vector3.UP * 2.0, flat + Vector3.DOWN * 3.0, 1)
+		var hit: Dictionary = world.direct_space_state.intersect_ray(query)
+		if hit.is_empty() or (hit.normal as Vector3).y < 0.72: return []
+		var ground: Vector3 = hit.position
+		if absf(ground.y - last.y) > 0.38: return []
+		last = ground
+		result.append(ground)
+	return result
 
 func _orchard_pursuit(enemy: Node3D, destination: Vector3) -> Dictionary:
 	var zone_root: Node3D = game.scene.zones.orchard_highlands.root
