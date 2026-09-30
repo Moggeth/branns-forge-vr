@@ -7,6 +7,7 @@
   "resourceXp": { "rat_tail": 0, "lumber": 3, "stone": 3, "iron": 4, "apple": 1, "spore": 3, "crystal": 5, "haunted_bone": 4, "sky_bloom": 5, "ember_core": 12 },
   "titles": [{"level":1,"name":"Forgehand"},{"level":3,"name":"Trailhand"},{"level":5,"name":"Adventurer"},{"level":8,"name":"Wayfinder"},{"level":12,"name":"Forgekeeper"}],
   "quests": [
+    {"id":"skull_basket","name":"Skulls for the forge","description":"Place three real skeleton skulls in the portable basket, then report to Brann. E carries or drops it; F stores a nearby skull or takes one out.","kind":"delivery","target":"skeleton_skull","goal":3,"xpReward":60},
     {"id":"rat_patrol","name":"A quieter yard","description":"Defeat 3 rats, then report to Brann.","kind":"enemy","target":"rat","goal":3,"xpReward":35},
     {"id":"skeleton_patrol","name":"Bones to pick","description":"Defeat 3 skeletons, then report to Brann.","kind":"enemy","target":"skeleton","goal":3,"xpReward":55},
     {"id":"lumber_run","name":"Timber for tomorrow","description":"Gather 3 fresh lumber, then report to Brann. Keep your materials.","kind":"resource","target":"lumber","goal":3,"xpReward":30},
