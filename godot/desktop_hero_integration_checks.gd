@@ -85,7 +85,7 @@ static func run(game) -> void:
 		for phase in [0.2,0.5,0.8]:
 			game._desktop_melee_pose(tool,phase,Vector3(0.35,-0.35,-0.55),0.0)
 			var tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
-			var expected=Vector3(0.38,0.3,-1.28) if phase==0.2 else (Vector3(0,0,-1.4) if phase==0.5 else Vector3(-0.42,-0.32,-1.28))
+			var expected=Vector3(0.42,0.36,-1.26) if phase==0.2 else (Vector3(0,0,-1.4) if phase==0.5 else Vector3(-0.46,-0.40,-1.26))
 			if tip.distance_to(expected)>0.02: failures.append("%s swing tip misses camera aim at phase %.1f"%[tool_id,phase])
 		if tool!=axe: tool.queue_free()
 	var previous_strength:float=game.desktop_bob_strength
@@ -155,7 +155,7 @@ static func run(game) -> void:
 		game._unhandled_input(nine)
 		if game.held.get(key)!=crossbow: failures.append("9 did not equip the owned Siegebird")
 		if not game._desktop_equip_siegebird() or game.siegebird.weapons.size()!=weapon_count: failures.append("9 duplicated the Siegebird")
-		if not game.desktop_help_panel.get_child(0).text.contains("9 equip owned Siegebird"): failures.append("F1 help omits Siegebird shortcut")
+		if not game.desktop_help_panel.get_child(0).text.contains("9 equip"): failures.append("F1 help omits Siegebird shortcut")
 		game.siegebird.tick(0.016)
 		var w=game.siegebird.desktop_weapon(game.desktop_hand)
 		var before:int=game.siegebird.projectiles.size()

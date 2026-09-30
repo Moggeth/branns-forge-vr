@@ -1,6 +1,6 @@
 # Item controls and input audit
 
-The 20 entries in `godot/weapon_inspection_catalog.json` are covered by the explicit binding map in `godot/item_control_hints.gd`. The map is used for the FPS corner hint and the short VR item billboard. These are controls of installed native behaviours, not prose copied from a model or generated invention. FPS `Space` jumps, `E` takes or deliberately drops held equipment, and `X` throws it with a sampled impulse; Sunskipper uses `E` to throw its ring and Copper Kite uses `X` to toss captured cargo. VR grip takes or releases equipment.
+The 20 entries in `godot/weapon_inspection_catalog.json` are covered by the explicit binding map in `godot/item_control_hints.gd`. The map is used for the FPS corner hint and the short VR item billboard. These are controls of installed native behaviours, not prose copied from a model or generated invention. FPS `Space` jumps, `E` takes or deliberately drops held equipment, and `X` throws it with a sampled impulse; Copper Kite uses `X` to toss captured cargo. VR grip takes or releases equipment.
 
 | Item | FPS | VR | Action owner |
 |---|---|---|---|
@@ -18,7 +18,7 @@ The 20 entries in `godot/weapon_inspection_catalog.json` are covered by the expl
 | Siegebird | LMB fire; R cock/seat unlimited bolt; C at rack fit/return real reel; RMB switch bolt/grapple when fitted; hold R to reel live tether | Trigger fire/release tether; free hand crank/seat belt bolt; physical reel/socket and brass selector | `siegebird_runtime`, `siegebird_extras` |
 | Wyrmspout v2 | Hold LMB fire; release to cool; RMB vent | Hold trigger fire; right B vent | `wyrmspout_runtime` |
 | Emberwing | Hold LMB draw, release fire; hold RMB and turn for phoenix arc | Grip bow/string, draw/release; bend for phoenix arc | `phoenix_bow` |
-| Sunskipper | LMB change power/recall; E throw; Q/R bank | Trigger change power/recall; release grip to throw; wrist bank | `playful_tools` |
+| Sunskipper | LMB change power/recall; E gentle drop; X throw; Q/R bank | Trigger change power/recall; release grip to throw; wrist bank | `playful_tools` |
 | Copper Kite | LMB pull/drop marked block; X toss | Trigger pull/drop; A toss | `magnetic_wand` |
 | Mossward, Prismwatch and Cinderkeep shields | LMB bash; RMB variant ability | Face shield to block, swing to bash, trigger variant ability | `guardians/skeleton_guardians` |
 

@@ -55,7 +55,6 @@ static func desktop_movement() -> String:
 static func desktop_release(item: Node3D) -> String:
 	if not is_instance_valid(item): return "E take"
 	var id:=str(item.get_meta("id",""))
-	if id=="sunskipper": return "E throw"
 	if id=="copper_kite": return "E drop" # Its X action tosses captured cargo.
 	return "E drop · X throw"
 
