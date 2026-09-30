@@ -24,6 +24,9 @@ const Water = preload("res://landscape_water.gd")
 const Meteor = preload("res://landscape_meteor.gd")
 const TreeKit = preload("res://tree_kit.gd")
 const TreeFelling = preload("res://tree_felling.gd")
+const Spells = preload("res://world_builder_spells.gd")
+const Construction = preload("res://world_builder_construction.gd")
+const Ents = preload("res://world_builder_ents.gd")
 
 signal forest_visual_event(payload: Dictionary)
 
@@ -49,6 +52,9 @@ var save_blocked := false
 var autosave_at := 0.0
 var progress_message := ""
 var progress_until := 0.0
+var spells := Spells.new()
+var construction: Node
+var ents: Node
 
 func setup(owner_game: Node3D, offline := false) -> void:
 	game = owner_game
@@ -65,20 +71,88 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	_build_brook()
 	_build_camp()
 	_rebuild_saved()
+	construction = Construction.new()
+	add_child(construction)
+	construction.setup(self)
+	construction.restore()
+	ents = Ents.new()
+	add_child(ents)
+	ents.setup(self)
 	_ensure_workers()
 	print("WORLD_BUILDER_READY revision=", data.revision, " paths=", data.paths.size(), " groves=", data.groves.size(), " bridges=", data.bridges.size(), " wood=", data.wood)
 
 static func fresh_state() -> Dictionary:
-	return {"schema": 1, "revision": 0, "aether": 12.0, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
+	return {"schema": 1, "revision": 0, "mana": 12.0, "spell_cooldowns": {}, "wood": 0, "workers": 1, "paths": [], "groves": [], "bridges": [], "constructions": [], "ents": [], "forest_spells": [], "meteors": [], "star_gems": 0, "star_iron": 0, "harvested": [], "scenic_cut_heights": {}, "marked": [], "carried": [], "threats": []}
+
+func spell_catalogue() -> Array[Dictionary]:
+	return Spells.catalogue()
+
+func spell_availability(action: String) -> String:
+	return spells.availability(action, self)
+
+func spell_cooldown_fraction(action: String) -> float:
+	return spells.cooldown_fraction(action, self)
+
+func construct(kind: String, a: Vector3, b: Vector3) -> String:
+	if construction == null: return "The construction team is not ready."
+	var ready := spells.begin(kind, self)
+	if ready != "": return ready
+	var result: String = construction.place(kind, a, b)
+	if result == "":
+		spells.success(kind, self)
+		# Construction.place saves its structural edit; persist the cooldown too.
+		save()
+	return result
+
+func cast_awaken(point: Vector3) -> String:
+	if ents == null: return "The Orchard trees are not ready."
+	var ready := spells.begin("awaken", self)
+	if ready != "": return ready
+	var result: String = ents.awaken(point)
+	if result == "":
+		if not data.ents.is_empty(): _cancel_tree_job(str(data.ents[-1].key))
+		spells.success("awaken", self)
+		save()
+	return result
+
+func calm_ent(point: Vector3) -> String:
+	if ents == null: return "The Orchard trees are not ready."
+	var ready := spells.begin("calm", self)
+	if ready != "": return ready
+	var result: String = ents.calm(point)
+	if result == "":
+		spells.success("calm", self)
+		save()
+	return result
+
+func assemble_golem(_point: Vector3) -> String:
+	return spell_availability("golem")
+
+func _canonical_state(value: Variant) -> Variant:
+	if not value is Dictionary: return value
+	var candidate: Dictionary = value.duplicate(true)
+	if not candidate.has("mana") and candidate.has("aether"): candidate.mana = candidate.aether
+	candidate.erase("aether")
+	if not candidate.has("spell_cooldowns"): candidate.spell_cooldowns = {}
+	if not candidate.has("constructions"): candidate.constructions = []
+	if not candidate.has("ents"): candidate.ents = []
+	return candidate
 
 func _valid(value: Variant) -> bool:
 	if not value is Dictionary or int(value.get("schema", 0)) != 1: return false
 	for field in ["revision", "wood", "workers"]:
 		if not value.get(field) is float and not value.get(field) is int: return false
-	if not value.get("aether") is float and not value.get("aether") is int: return false
+	if not value.get("mana") is float and not value.get("mana") is int: return false
+	if value.get("spell_cooldowns") is not Dictionary or value.spell_cooldowns.size() > Spells.ENTRIES.size(): return false
+	for action in value.spell_cooldowns:
+		if not action is String or Spells.entry(action).is_empty(): return false
+		var remaining: Variant = value.spell_cooldowns[action]
+		if not remaining is float and not remaining is int or not is_finite(float(remaining)) or float(remaining) < 0.0 or float(remaining) > float(Spells.entry(action).cooldown): return false
 	if value.get("paths") is not Array or value.paths.size() > MAX_PATHS: return false
 	if value.get("groves") is not Array or value.groves.size() > MAX_GROVES: return false
 	if value.get("bridges") is not Array or value.bridges.size() > MAX_BRIDGES: return false
+	if not Construction.valid_records(value.get("constructions")): return false
+	if not Ents.valid_records(value.get("ents")): return false
 	if value.get("harvested") is not Array or value.harvested.size() > 512: return false
 	if value.get("scenic_cut_heights", {}) is not Dictionary or value.get("scenic_cut_heights", {}).size() > 512: return false
 	for key in value.get("scenic_cut_heights", {}):
@@ -121,7 +195,7 @@ func _valid(value: Variant) -> bool:
 			if int(slot) not in [0, 1, 2]: return false
 	if int(value.get("workers", 0)) < 1 or int(value.workers) > 5: return false
 	if int(value.get("wood", -1)) < 0 or int(value.wood) > 200: return false
-	if not is_finite(float(value.get("aether", -1))) or float(value.aether) < 0 or float(value.aether) > 20: return false
+	if not is_finite(float(value.mana)) or float(value.mana) < 0 or float(value.mana) > 20: return false
 	for path in value.paths:
 		if not path is Dictionary or not _point_valid(path.get("a")) or not _point_valid(path.get("b")): return false
 	for field in ["groves", "bridges"]:
@@ -136,7 +210,7 @@ func _load() -> void:
 	if not FileAccess.file_exists(save_path): return
 	var bytes := FileAccess.get_file_as_bytes(save_path)
 	if bytes.size() > 131072: push_warning("WORLD_BUILDER save too large; keeping the world untouched"); save_blocked = true; return
-	var candidate: Variant = JSON.parse_string(bytes.get_string_from_utf8())
+	var candidate: Variant = _canonical_state(JSON.parse_string(bytes.get_string_from_utf8()))
 	if _valid(candidate):
 		data = candidate
 		if not data.has("carried"): data.carried = []
@@ -164,6 +238,8 @@ func save() -> bool:
 
 func tick(delta: float) -> void:
 	if game == null: return
+	_tick_resources(delta)
+	if ents != null: ents.tick(delta)
 	_sync_threats(delta)
 	for i in range(growing_trees.size() - 1, -1, -1):
 		var growth: Dictionary = growing_trees[i]
@@ -182,12 +258,24 @@ func tick(delta: float) -> void:
 		var phase := "settled" if float(visual.elapsed) >= 2.4 else "animating"
 		forest_visual_event.emit(_forest_visual_phase(visual.payload, phase, float(visual.elapsed) / 2.4))
 		if phase == "settled": active_forest_visuals.remove_at(i)
-	if data.aether < 20.0:
-		data.aether = minf(20.0, float(data.aether) + delta * 0.055)
-		if game.elapsed >= autosave_at:
-			autosave_at = game.elapsed + 15.0
-			save()
 	_for_each_worker(delta)
+
+func _tick_resources(delta: float) -> void:
+	var remaining_cooldowns: bool = not data.spell_cooldowns.is_empty()
+	_tick_cooldowns(delta)
+	if data.mana < 20.0:
+		data.mana = mana_after_regen(float(data.mana), delta, game.tuning.value("worldbuilder.mana_regen_multiplier"))
+	if (data.mana < 20.0 or remaining_cooldowns) and game.elapsed >= autosave_at:
+		autosave_at = game.elapsed + 15.0
+		save()
+
+static func mana_after_regen(current: float, delta: float, multiplier: float) -> float:
+	return minf(20.0, current + maxf(delta, 0.0) * 0.055 * clampf(multiplier, 1.0, 8.0))
+
+func _tick_cooldowns(delta: float) -> void:
+	for action in data.spell_cooldowns.keys():
+		data.spell_cooldowns[action] = maxf(0.0, float(data.spell_cooldowns[action]) - maxf(delta, 0.0))
+		if float(data.spell_cooldowns[action]) <= 0.0: data.spell_cooldowns.erase(action)
 
 func _index_timber() -> void:
 	resource_by_key.clear()
@@ -239,14 +327,17 @@ func can_path(a: Vector3, b: Vector3) -> String:
 	if length < 3.0 or length > 36.0: return "Choose a route between 3 and 36 metres."
 	if data.paths.size() >= MAX_PATHS: return "The route ledger is full."
 	var cost := ceili(length / 7.0)
-	if float(data.aether) < cost: return "Need %d aether to carve this route." % cost
+	var ready := spells.begin("path", self)
+	if ready != "": return ready
+	if float(data.mana) < cost: return "Need %d Mana to carve this route." % cost
 	return ""
 
 func carve_path(a: Vector3, b: Vector3) -> String:
 	a.y = 0; b.y = 0
 	var problem := can_path(a, b)
 	if problem != "": return problem
-	data.aether = float(data.aether) - ceili(a.distance_to(b) / 7.0)
+	data.mana = float(data.mana) - ceili(a.distance_to(b) / 7.0)
+	spells.success("path", self)
 	data.paths.append({"a": _pack(a), "b": _pack(b)})
 	preload("res://orchard_ground.gd").add_path(a,b)
 	_render_path(a, b)
@@ -258,21 +349,27 @@ func cast_sunder(a: Vector3, b: Vector3) -> String:
 	if not _inside(a) or not _inside(b): return "Draw within the Orchard boundary."
 	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 	if distance < 8.0 or distance > 110.0: return "Draw a scar between 8 and 110 metres long."
-	if float(data.aether) < 5.0: return "Need 5 aether to sunder the land."
+	if float(data.mana) < 5.0: return "Need 5 Mana to sunder the land."
+	var ready := spells.begin("sunder", self)
+	if ready != "": return ready
 	var op := {"type":"sunder", "points":[_pack(a), _pack(b)], "width":8.0, "depth":4.2, "height":1.2, "shoulder":4.0, "seed":int(data.revision) + game.landscape.seed}
 	var result: String = game.landscape.apply_magic(op)
 	if result != "": return result
-	data.aether = float(data.aether) - 5.0
+	data.mana = float(data.mana) - 5.0
+	spells.success("sunder", self)
 	_changed("The earth is opening. The scar remains in the world.")
 	return ""
 
 func cast_raise(point: Vector3) -> String:
 	if not _inside(point): return "Choose ground within the Orchard."
-	if float(data.aether) < 4.0: return "Need 4 aether to raise earth."
+	if float(data.mana) < 4.0: return "Need 4 Mana to raise earth."
+	var ready := spells.begin("raise", self)
+	if ready != "": return ready
 	var op := {"type":"raise", "center":_pack(point), "radius":15.0, "height":3.6}
 	var result: String = game.landscape.apply_magic(op)
 	if result != "": return result
-	data.aether = float(data.aether) - 4.0
+	data.mana = float(data.mana) - 4.0
+	spells.success("raise", self)
 	_changed("A hill rises beneath the same sky the Hero can see.")
 	return ""
 
@@ -282,20 +379,25 @@ func cast_wall(a: Vector3, b: Vector3) -> String:
 	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 	if distance < 8.0 or distance > 85.0: return "Draw a wall between 8 and 85 metres."
 	var use_iron := int(data.star_iron) >= 2
-	if not use_iron and float(data.aether) < 4.0: return "Need 4 aether or 2 mined star iron for an earthen wall."
+	if not use_iron and float(data.mana) < 4.0: return "Need 4 Mana or 2 mined star iron for an earthen wall."
+	var ready := spells.begin("wall", self)
+	if ready != "": return ready
 	var op := {"type":"ridge", "points":[_pack(a),_pack(b)], "width":13.0, "height":4.0,
 		"feature":"earthen_wall"}
 	var result: String = game.landscape.apply_magic(op)
 	if result != "": return result
 	if use_iron: data.star_iron = int(data.star_iron) - 2
-	else: data.aether = float(data.aether) - 4.0
+	else: data.mana = float(data.mana) - 4.0
+	spells.success("wall", self)
 	_changed("An earthen wall rises. Its slope and collision are real.")
 	return ""
 
 
 func cast_tree_ring(point: Vector3) -> String:
 	if not _inside(point) or absf(point.x) > 119.0 or absf(point.z) > 119.0: return "Choose a ring with room inside the Orchard."
-	if float(data.aether) < 4.0: return "Need 4 aether to grow a tree ring."
+	if float(data.mana) < 4.0: return "Need 4 Mana to grow a tree ring."
+	var ready := spells.begin("ring", self)
+	if ready != "": return ready
 	if data.forest_spells.size() >= MAX_FOREST_SPELLS: return "The grove ledger is full."
 	var region := {"type":"ring", "center":_pack(point), "radius":19.0, "width":10.0}
 	var spell_seed: int = int(game.landscape.seed) + int(data.revision) * 101 + 8357
@@ -304,14 +406,17 @@ func cast_tree_ring(point: Vector3) -> String:
 	if trees.size() > 30: trees.resize(30)
 	data.forest_spells.append({"region":region,"seed":spell_seed,"placements":_pack_forest(trees),"feature":"tree_ring"})
 	_render_forest(trees, true)
-	data.aether = float(data.aether) - 4.0
+	data.mana = float(data.mana) - 4.0
+	spells.success("ring", self)
 	_changed("A ring of harvestable trees is growing around the chosen ground.")
 	return ""
 
 
 func cast_meteor(point: Vector3) -> String:
 	if not _inside(point) or absf(point.x) > 132.0 or absf(point.z) > 132.0: return "Call Starfall farther inside the Orchard."
-	if float(data.aether) < 8.0: return "Need 8 aether to call Starfall."
+	if float(data.mana) < 8.0: return "Need 8 Mana to call Starfall."
+	var ready := spells.begin("meteor", self)
+	if ready != "": return ready
 	if data.meteors.size() >= MAX_METEORS: return "The Orchard already holds its maximum of ten meteorites."
 	if game.landscape.operation_count() >= game.landscape.MAX_OPERATIONS: return "The landscape cannot record another impact."
 	var at := Vector2(point.x,point.z)
@@ -320,7 +425,8 @@ func cast_meteor(point: Vector3) -> String:
 	record["phase"] = "falling"
 	data.meteors.append(record)
 	_render_meteor(record, true)
-	data.aether = float(data.aether) - 8.0
+	data.mana = float(data.mana) - 8.0
+	spells.success("meteor", self)
 	_changed("STARFALL! Leave the glowing impact site; then mine its gems with Stonewhisper.")
 	return ""
 
@@ -397,13 +503,16 @@ func cast_prism_fault(a: Vector3, b: Vector3) -> String:
 	var distance := Vector2(a.x,a.z).distance_to(Vector2(b.x,b.z))
 	if distance < 7.0 or distance > 65.0: return "Draw a crystal fault between 7 and 65 metres."
 	if int(data.star_gems) < 2: return "Mine two star gems from a meteorite first."
-	if float(data.aether) < 2.0: return "Need 2 aether to awaken those gems."
+	if float(data.mana) < 2.0: return "Need 2 Mana to awaken those gems."
+	var ready := spells.begin("fault", self)
+	if ready != "": return ready
 	var op := {"type":"ridge", "points":[_pack(a),_pack(b)], "width":8.0, "height":4.6,
 		"feature":"crystal_fault", "seed":int(game.landscape.seed) + int(data.revision) * 37}
 	var result: String = game.landscape.apply_magic(op)
 	if result != "": return result
 	data.star_gems = int(data.star_gems) - 2
-	data.aether = float(data.aether) - 2.0
+	data.mana = float(data.mana) - 2.0
+	spells.success("fault", self)
 	_changed("Your mined gems raised a lasting, luminous crystal fault.")
 	return ""
 
@@ -411,7 +520,9 @@ func cast_forest(a: Vector3, b: Vector3) -> String:
 	if not _inside(a) or not _inside(b): return "Draw within the Orchard boundary."
 	var distance := Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 	if distance < 6.0 or distance > 100.0: return "Draw a grove between 6 and 100 metres long."
-	if float(data.aether) < 3.0: return "Need 3 aether to grow a forest."
+	if float(data.mana) < 3.0: return "Need 3 Mana to grow a forest."
+	var ready := spells.begin("forest", self)
+	if ready != "": return ready
 	if data.forest_spells.size() >= MAX_FOREST_SPELLS: return "The grove ledger is full."
 	var region := {"type":"line", "points":[_pack(a), _pack(b)], "width":11.0}
 	var spell_seed: int = int(game.landscape.seed) + int(data.revision) * 101 + 7501
@@ -423,7 +534,8 @@ func cast_forest(a: Vector3, b: Vector3) -> String:
 		var payload: Dictionary = _forest_visual_payload(a, b, roots, spell_seed, data.forest_spells.size())
 		forest_visual_event.emit(payload.duplicate(false))
 		active_forest_visuals.append({"payload": payload, "elapsed": 0.0})
-	data.aether = float(data.aether) - 3.0
+	data.mana = float(data.mana) - 3.0
+	spells.success("forest", self)
 	_changed("A living forest has taken root where you drew it.")
 	return ""
 
@@ -493,13 +605,13 @@ func mark_harvest(local: Vector3) -> String:
 	var selected := ""
 	var best := 5.0
 	for key in resource_by_key:
-		if key in data.harvested or key in data.marked: continue
+		if key in data.harvested or key in data.marked or _ent_live(str(key)): continue
 		var tree: Node3D = resource_by_key[key]
 		if not is_instance_valid(tree) or not tree.visible: continue
 		var distance := tree.global_position.distance_to(center + local)
 		if distance < best: selected = key; best = distance
 	for key in scenic_by_key:
-		if key in data.harvested or key in data.marked: continue
+		if key in data.harvested or key in data.marked or _ent_live(str(key)): continue
 		if scenic_pending.has(key): continue
 		var record: Dictionary = scenic_by_key[key]
 		if not is_instance_valid(record.collision) or record.collision.disabled: continue
@@ -511,13 +623,25 @@ func mark_harvest(local: Vector3) -> String:
 	_changed("A lumberjack is heading for the marked tree.")
 	return ""
 
+func _ent_live(key: String) -> bool:
+	for record in data.get("ents", []):
+		if str(record.get("key", "")) == key and str(record.get("state", "")) in ["active", "calm"]: return true
+	return false
+
+func _cancel_tree_job(key: String) -> void:
+	data.marked.erase(key)
+	for i in range(jobs.size() - 1, -1, -1):
+		if str(jobs[i].key) == key: jobs.remove_at(i)
+	for worker in worker_nodes:
+		if str(worker.get_meta("job", "")) == key: worker.set_meta("job", "")
+
 func chop_scenic(global_hit: Vector3, blade: bool, normal: Vector3 = Vector3.RIGHT, hand = null) -> bool:
 	if not blade: return false
 	var local: Vector3 = global_hit - center
 	var nearest := ""
 	var best := 1.1
 	for key in scenic_by_key:
-		if key in data.harvested: continue
+		if key in data.harvested or _ent_live(str(key)): continue
 		var point: Vector3 = scenic_by_key[key].position
 		var distance := Vector2(local.x - point.x, local.z - point.z).length()
 		if distance < best: best = distance; nearest = key
@@ -586,10 +710,13 @@ func claim_scenic_log(resource: Node3D) -> bool:
 func plant_grove(local: Vector3) -> String:
 	if not _inside(local) or local.distance_to(CAMP) < 7.0: return "Choose a clearing away from camp."
 	if data.groves.size() >= MAX_GROVES: return "The grove ledger is full."
-	if float(data.aether) < 3.0: return "Need 3 aether to grow a grove."
+	if float(data.mana) < 3.0: return "Need 3 Mana to grow a grove."
+	var ready := spells.begin("grove", self)
+	if ready != "": return ready
 	for value in data.groves:
 		if _unpack(value).distance_to(local) < 9.0: return "Leave more room between groves."
-	data.aether = float(data.aether) - 3.0
+	data.mana = float(data.mana) - 3.0
+	spells.success("grove", self)
 	data.groves.append(_pack(local))
 	_render_grove(local, true)
 	_changed("New trees have taken root. Their timber can support future work.")
@@ -599,7 +726,10 @@ func place_bridge(local: Vector3) -> String:
 	if local.distance_to(CROSSING) > 10.0: return "Place the crossing at the marked brook site."
 	if data.bridges.size() >= MAX_BRIDGES or not data.bridges.is_empty(): return "This brook already has a bridge."
 	if int(data.wood) < 3: return "Need 3 lumber in the settlement stockpile."
+	var ready := spells.begin("bridge", self)
+	if ready != "": return ready
 	data.wood = int(data.wood) - 3
+	spells.success("bridge", self)
 	data.bridges.append(_pack(CROSSING))
 	_render_bridge(CROSSING)
 	_changed("The bridge is built. Follow the new crossing in first person.")
@@ -617,10 +747,13 @@ func hire_worker() -> String:
 func summon_patrol(local: Vector3) -> String:
 	if not _inside(local): return "Outside the orchard boundary."
 	if data.threats.size() >= MAX_THREATS: return "Too many patrols are active in the orchard."
-	if float(data.aether) < 4.0: return "Need 4 aether to call a skeleton patrol."
+	if float(data.mana) < 4.0: return "Need 4 Mana to call a skeleton patrol."
+	var ready := spells.begin("patrol", self)
+	if ready != "": return ready
 	var hero_local: Vector3 = game.camera.global_position - center
 	if local.distance_to(Vector3(hero_local.x, 0, hero_local.z)) < 7.0: return "Give the Hero at least seven metres of warning."
-	data.aether = float(data.aether) - 4.0
+	data.mana = float(data.mana) - 4.0
+	spells.success("patrol", self)
 	data.threats.append({"id": int(data.revision) + 1, "at": _pack(local), "state": "warning", "delay": 1.7, "alive": [0, 1, 2]})
 	_changed("A violet warning marks where three skeletons will rise.")
 	return ""
@@ -691,7 +824,7 @@ func _changed(message: String) -> void:
 	data.revision = int(data.revision) + 1
 	progress_message = message
 	progress_until = game.elapsed + 6.0
-	print("WORLD_BUILDER revision=", data.revision, " wood=", data.wood, " aether=", snappedf(float(data.aether), 0.1), " paths=", data.paths.size(), " marked=", data.marked.size(), " :: ", message)
+	print("WORLD_BUILDER revision=", data.revision, " wood=", data.wood, " Mana=", snappedf(float(data.mana), 0.1), " paths=", data.paths.size(), " marked=", data.marked.size(), " :: ", message)
 	save()
 
 func _rebuild_saved() -> void:
@@ -857,7 +990,7 @@ func _render_bridge(local: Vector3) -> void:
 func _jobs_from_marked() -> void:
 	jobs.clear()
 	for key in data.marked:
-		if (resource_by_key.has(str(key)) or scenic_by_key.has(str(key))) and not str(key) in data.harvested:
+		if (resource_by_key.has(str(key)) or scenic_by_key.has(str(key))) and not str(key) in data.harvested and not _ent_live(str(key)):
 			jobs.append({"key": str(key), "assigned": false, "progress": 0.0})
 
 func _ensure_workers() -> void:
@@ -966,6 +1099,7 @@ func _for_each_worker(delta: float) -> void:
 			continue
 		if not resource_by_key.has(key) and not scenic_by_key.has(key): worker.set_meta("job", ""); continue
 		if key in data.harvested: worker.set_meta("job", ""); continue
+		if _ent_live(key): _cancel_tree_job(key); continue
 		if scenic_pending.has(key): worker.set_meta("job", ""); continue
 		var target: Node3D = resource_by_key.get(key, null)
 		if target != null and not is_instance_valid(target): worker.set_meta("job", ""); continue
@@ -1007,11 +1141,12 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 	var transitioning: bool = not game.landscape.transition.is_empty()
 	var path: Array[Vector2] = worker.get_meta("nav_path")
 	var old_goal: Vector2 = worker.get_meta("nav_target")
-	var bridge_available: bool = not data.bridges.is_empty()
+	var bridge_available: bool = not data.bridges.is_empty() or not data.constructions.is_empty()
 	var path_index: int = int(worker.get_meta("nav_index", 0))
 	var off_route: bool = not path.is_empty() and path_index < path.size() and here.distance_to(path[path_index]) > 10.0
 	if not bool(worker.get_meta("nav_initialized", false)) or old_goal.distance_to(goal) > 0.5 or int(worker.get_meta("nav_op_count", -1)) != op_count or bool(worker.get_meta("nav_transitioning", false)) != transitioning or bool(worker.get_meta("nav_bridge_available", false)) != bridge_available or off_route:
-		var options := {"allow_bridge": bridge_available}
+		var options := {"allow_bridge": not data.bridges.is_empty()}
+		if construction != null: options.merge(construction.navigation_options(), true)
 		path = Navigation.route(model, here, goal, options)
 		worker.set_meta("nav_path", path)
 		worker.set_meta("nav_target", goal)
@@ -1020,7 +1155,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 		worker.set_meta("nav_transitioning", transitioning)
 		worker.set_meta("nav_bridge_available", bridge_available)
 		worker.set_meta("nav_initialized", true)
-		worker.set_meta("nav_bridge", Water.crossing(model) if bridge_available else {})
+		worker.set_meta("nav_bridge", Water.crossing(model) if not data.bridges.is_empty() else {})
 	if path.is_empty():
 		worker.position.y = _worker_surface_height(worker, here)
 		_animate_worker_travel(worker, 0.0, delta)
@@ -1045,6 +1180,7 @@ func _worker_travel(worker: Node3D, destination: Vector3, delta: float, speed: f
 
 func _worker_surface_height(worker: Node3D, point: Vector2) -> float:
 	var ground: float = game.landscape.height_at(point)
+	if construction != null: ground = construction.surface_height(point, ground)
 	var bridge: Dictionary = worker.get_meta("nav_bridge", {})
 	if bridge.is_empty() or game.landscape.water_at(point) <= 0.45: return ground
 	var center_2d := Vector2(bridge.position.x, bridge.position.z)
