@@ -1,12 +1,13 @@
 extends Window
 ## The second perspective is an input surface over the Hero's actual World3D.
-const ACTIONS = ["harvest", "path", "bridge", "grove", "patrol", "sunder", "raise", "forest", "wall", "ring", "meteor", "fault"]
-const TITLES = ["MARK TIMBER", "CARVE PATH", "BUILD BRIDGE", "GROW GROVE", "MUSTER BONES", "SUNDER EARTH", "RAISE EARTH", "GROW FOREST", "EARTHEN WALL", "TREE RING", "STARFALL", "CRYSTAL FAULT"]
-const HINTS = ["Choose an orchard tree. A helper fells it and carries the timber home.", "Choose route endpoints 3–36 m apart. The path costs aether.", "Build the Windfall Brook crossing for 3 lumber.", "Grow three harvestable trees for 3 aether.", "Warn the Hero, then raise three skeletons for 4 aether.", "Drag a line, or choose two endpoints, to carve a lasting ravine. Costs 5 aether.", "Choose a point to raise a traversable hill. Costs 4 aether.", "Drag a line, or choose two endpoints, to grow a living forest. Costs 3 aether.", "Draw a defensive ridge. Costs 4 aether, or 2 mined star iron.", "Choose a point to grow a harvestable ring of trees. Costs 4 aether.", "Choose an impact site. A falling meteor hurts nearby actors, carves a crater, and leaves mineable gems. Costs 8 aether.", "Draw a crystal-lined ridge using 2 mined star gems and 2 aether."]
-const HOTKEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "0", "Q", "E", "R"]
-const COSTS = ["helper + timber", "aether / distance", "3 lumber", "3 aether", "4 aether", "5 aether", "4 aether", "3 aether", "4 aether / 2 iron", "4 aether", "8 aether", "2 gems + 2 aether"]
+const CommandPanel = preload("res://world_builder_command_panel.gd")
+const LINE_ACTIONS = ["path", "sunder", "forest", "wall", "fault", "bridge", "ramp", "stairs", "boardwalk"]
+const ICON_INDICES = {"path":0,"sunder":1,"raise":2,"wall":3,"meteor":4,"fault":5,
+	"grove":6,"forest":7,"ring":8,"awaken":9,"calm":9,"bridge":10,"ramp":11,
+	"stairs":12,"boardwalk":13,"outpost":14,"tower":15,"platform":16,"gate":17,
+	"barricade":18,"patrol":19,"golem":20,"harvest":21,"hire":22}
+
 const TOP_HEIGHT = 64
-const BOTTOM_HEIGHT = 224
 const WINDOWED_SIZE = Vector2i(1280, 800)
 const WINDOWED_MIN_SIZE = Vector2i(960, 620)
 const ARRIVAL_SECONDS = 0.36
@@ -19,17 +20,17 @@ var world_picture: TextureRect
 var camera: Camera3D
 var overlay: Control
 var top_panel: Panel
-var bottom_panel: Panel
+var command_panel: Control
+var catalogue: Array = []
+var palette := "land"
+var preview_details: Dictionary = {}
+var preview_boundary: MeshInstance3D
 var title_label: Label
 var status_label: Label
-var hint_label: Label
-var feedback_label: Label
-var buttons: Array[Button] = []
-var hire_button: Button
 var follow_button: Button
 var quality_button: OptionButton
 var fps_button: OptionButton
-var selected := "harvest"
+var selected := "path"
 var first_point := Vector3.INF
 var spell_drag_start := Vector3.INF
 var hovered := Vector3.INF
@@ -43,7 +44,7 @@ var pan := Vector2.ZERO
 var render_scale := 0.65
 var refresh_limit := 30
 var refresh_elapsed := 0.0
-var message := "Choose timber to start a crossing."
+var message := "Choose a palette, then shape the shared world. F9 returns to the Hero."
 var message_until := 0.0
 var clock := 0.0
 var marker: MeshInstance3D
@@ -157,6 +158,9 @@ func tick(delta: float) -> void:
 
 func close() -> void:
 	if returning_to_hero: return
+	if DisplayServer.get_name() == "headless":
+		_finish_close()
+		return
 	if not companion_mode and is_instance_valid(game.camera):
 		returning_to_hero = true
 		arrival_from = camera.global_transform
@@ -172,6 +176,7 @@ func _finish_close() -> void:
 	print("WORLD_BUILDER_VIEW closed")
 	if is_instance_valid(marker): marker.queue_free()
 	if is_instance_valid(route_preview): route_preview.queue_free()
+	if is_instance_valid(preview_boundary): preview_boundary.queue_free()
 	visible = false
 	if not companion_mode:
 		game.get_window().grab_focus()
@@ -230,52 +235,42 @@ func _build_ui() -> void:
 	world_picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(world_picture)
 	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay)
-	top_panel = _panel(Vector2.ZERO, Vector2(1280, TOP_HEIGHT))
-	title_label = _label(top_panel, "THE ORCHARD SURVEY", Vector2(20, 3), Vector2(640, 29), 22, Color("ffe2a6"))
-	status_label = _label(top_panel, "", Vector2(21, 34), Vector2(900, 25), 15, Color("e6e9d8"))
-	bottom_panel = _panel(Vector2(0, 800 - BOTTOM_HEIGHT), Vector2(1280, BOTTOM_HEIGHT))
-	hint_label = _label(bottom_panel, "", Vector2(20, 4), Vector2(1220, 20), 14, Color("c6dcd0"))
-	feedback_label = _label(bottom_panel, "", Vector2(20, 26), Vector2(1220, 20), 14, Color("ffdfa4"))
-	for i in range(ACTIONS.size()):
-		var button := Button.new()
-		button.position = Vector2(20 + (i % 5) * 200, 51 + (i / 5) * 54)
-		button.size = Vector2(190, 48)
-		button.text = "%s  %s\n%s" % [HOTKEYS[i], TITLES[i], COSTS[i]]
-		button.tooltip_text = HINTS[i]
-		button.pressed.connect(select_action.bind(ACTIONS[i]))
-		bottom_panel.add_child(button)
-		buttons.append(button)
-	hire_button = Button.new()
-	hire_button.position = Vector2(20 + 2 * 200, 159)
-	hire_button.size = Vector2(190, 48)
-	hire_button.text = "9  HIRE HELPER\n2 lumber"
-	hire_button.tooltip_text = "Hire another lumberjack. Up to five can work independently."
-	hire_button.pressed.connect(_hire)
-	bottom_panel.add_child(hire_button)
+	top_panel = _panel(Vector2.ZERO, Vector2(size.x, TOP_HEIGHT))
+	title_label = _label(top_panel, "THE ORCHARD  ·  ONE SHARED WORLD", Vector2(18,8), Vector2(390,22), 18, Color("efddb6"))
+	status_label = _label(top_panel, "", Vector2(18,34), Vector2(760,22), 12, Color("b0c9be"))
 	quality_button = OptionButton.new()
-	quality_button.position = Vector2(920, 8)
-	quality_button.size = Vector2(168, 31)
-	for item in ["Render 100%", "Render 65%", "Render 50%"]: quality_button.add_item(item)
+	quality_button.position = Vector2(760,8)
+	quality_button.size = Vector2(170,31)
+	for text in ["World detail 100%", "World detail 65%", "World detail 50%"]: quality_button.add_item(text)
 	quality_button.select(1)
+	quality_button.tooltip_text = "Render the same live world at a smaller resolution to save GPU time. Text and icons stay crisp."
 	quality_button.item_selected.connect(_quality)
 	top_panel.add_child(quality_button)
 	fps_button = OptionButton.new()
-	fps_button.position = Vector2(1094, 8)
-	fps_button.size = Vector2(165, 31)
-	for item in ["View 30 fps", "View 60 fps"]: fps_button.add_item(item)
-	fps_button.select(0)
+	fps_button.size = Vector2(150,31)
+	for text in ["Survey 30 fps", "Survey 60 fps"]: fps_button.add_item(text)
 	fps_button.item_selected.connect(_fps)
 	top_panel.add_child(fps_button)
 	follow_button = Button.new()
-	follow_button.position = Vector2(742, 8)
-	follow_button.size = Vector2(166, 31)
-	follow_button.text = "F  Find Hero"
-	follow_button.tooltip_text = "Follow the VR player in the same live world. Pan or orbit to stop following."
+	follow_button.size = Vector2(166,31)
+	follow_button.tooltip_text = "F: follow the adventurer in the same live world. Pan or orbit to free the camera."
 	follow_button.pressed.connect(_toggle_follow)
 	top_panel.add_child(follow_button)
+	catalogue = builder.spell_catalogue()
+	command_panel = CommandPanel.new()
+	command_panel.name = "WorldBuilderCommandPanel"
+	overlay.add_child(command_panel)
+	command_panel.setup(catalogue)
+	var atlas := Image.load_from_file("res://assets/worldbuilder/icons/spell-atlas.png")
+	if atlas != null and not atlas.is_empty():
+		command_panel.set_icon_atlas(ImageTexture.create_from_image(atlas), 4, 6, ICON_INDICES)
+	command_panel.spell_selected.connect(select_action)
+	command_panel.palette_selected.connect(_select_palette)
+	command_panel.regen_preset_selected.connect(_regen_preset)
+	command_panel.cancel_targeting.connect(_cancel_targeting)
 	_refresh_ui()
 
 func _panel(pos: Vector2, extent: Vector2) -> Panel:
@@ -305,57 +300,84 @@ func _label(parent: Control, words: String, pos: Vector2, extent: Vector2, font_
 func _layout_ui() -> void:
 	if top_panel == null: return
 	ui_scale = clampf(minf(float(size.x) / 1440.0, float(size.y) / 900.0), 1.0, 2.0)
-	overlay.scale = Vector2.ONE * ui_scale
-	overlay.size = Vector2(size) / ui_scale
-	var width := overlay.size.x
-	var height := overlay.size.y
-	tactical_viewport.size = Vector2i(maxi(1, roundi(float(size.x) * render_scale)), maxi(1, roundi(float(size.y) * render_scale)))
+	overlay.scale = Vector2.ONE
+	top_panel.scale = Vector2.ONE * ui_scale
+	var width := float(size.x) / ui_scale
 	top_panel.size.x = width
-	bottom_panel.position.y = height - BOTTOM_HEIGHT
-	bottom_panel.size.x = width
-	quality_button.position.x = width - 360
-	fps_button.position.x = width - 185
-	follow_button.position.x = width - 538
-	title_label.size.x = maxf(200.0, width - 570.0)
-	status_label.size.x = width - 50
-	hint_label.size.x = width - 40
-	feedback_label.size.x = width - 40
-	var action_width := clampf((width - 40 - 4 * 8) / 5.0, 132.0, 230.0)
-	var actions_left := maxf(20.0, (width - (action_width * 5.0 + 8.0 * 4.0)) * 0.5)
-	for i in range(buttons.size()):
-		buttons[i].position.x = actions_left + (i % 5) * (action_width + 8)
-		buttons[i].position.y = 51 + (i / 5) * 54
-		buttons[i].size.x = action_width
-	hire_button.position.x = actions_left + 2 * (action_width + 8)
-	hire_button.position.y = 159
-	hire_button.size.x = action_width
+	tactical_viewport.size = Vector2i(maxi(1, roundi(float(size.x) * render_scale)), maxi(1, roundi(float(size.y) * render_scale)))
+	quality_button.position = Vector2(width - 350, 8)
+	fps_button.position = Vector2(width - 175, 8)
+	follow_button.position = Vector2(width - 526, 8)
+	title_label.size.x = maxf(160.0, width - 558)
+	status_label.size.x = width - 36
+	command_panel.layout_for_size(Vector2(size))
+
+func _spell(action: String) -> Dictionary:
+	for entry in catalogue:
+		if str(entry.id) == action: return entry
+	return {}
+
+func _availability(action: String) -> String:
+	return builder.spell_availability(action)
 
 func _refresh_ui() -> void:
 	if status_label == null: return
-	status_label.text = "Seed %d  ·  %d earth edits  ·  %d lumber  ·  %.1f/20 aether  ·  %d star-gems  ·  %d star iron  ·  %d helpers" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.wood), float(builder.data.aether), int(builder.data.star_gems), int(builder.data.star_iron), int(builder.data.workers)]
-	var action_index := ACTIONS.find(selected)
-	hint_label.text = HINTS[action_index] + "    WASD pan · right-drag orbit · wheel zoom · F11 window/fullscreen · F9 or Esc return"
-	var route_hint := ""
-	if selected == "path" and first_point != Vector3.INF and hovered != Vector3.INF:
-		var length := first_point.distance_to(hovered)
-		var problem: String = builder.can_path(first_point, hovered)
-		route_hint = ("Route %.1f m · %d aether" % [length, ceili(length / 7.0)]) if problem == "" else problem
-	feedback_label.text = route_hint if route_hint != "" else ("Choose the second end of the route." if first_point != Vector3.INF else (message if clock < message_until else builder.progress_message if game.elapsed < builder.progress_until else "Edits appear live for the Hero and persist between visits."))
-	for i in range(buttons.size()):
-		var unaffordable := (i == 2 and int(builder.data.wood) < 3) or (i in [3, 7] and float(builder.data.aether) < 3.0) or (i in [4, 6, 9] and float(builder.data.aether) < 4.0) or (i == 5 and float(builder.data.aether) < 5.0) or (i == 8 and int(builder.data.star_iron) < 2 and float(builder.data.aether) < 4.0) or (i == 10 and float(builder.data.aether) < 8.0) or (i == 11 and (int(builder.data.star_gems) < 2 or float(builder.data.aether) < 2.0))
-		buttons[i].modulate = Color("ffe1a1") if selected == ACTIONS[i] else (Color("df907c") if unaffordable else Color.WHITE)
-	hire_button.disabled = int(builder.data.wood) < 2 or int(builder.data.workers) >= 5
+	status_label.text = "Seed %d · %d earth edits · %d gems · %d star iron   |   WASD pan · right/middle-drag orbit · wheel zoom · F11 fullscreen · F9 Hero" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.star_gems), int(builder.data.star_iron)]
 	follow_button.text = "F  Following Hero" if follow_hero else "F  Find Hero"
+	var availability := {}
+	var cooldowns := {}
+	for entry in catalogue:
+		availability[entry.id] = _availability(str(entry.id))
+		cooldowns[entry.id] = builder.spell_cooldown_fraction(str(entry.id))
+	var words: String = message if clock < message_until else (builder.progress_message if game.elapsed < builder.progress_until else "Right-click / Esc cancels. F9 returns to the Hero.")
+	var cost := float(_spell(selected).get("mana", 0.0))
+	if hovered != Vector3.INF and selected != "":
+		var plan := _preview_plan()
+		preview_details = plan
+		if str(plan.get("reason", "")) != "": words = str(plan.reason)
+		elif selected in ["bridge", "ramp", "stairs", "boardwalk"] and plan.has("length"):
+			words = "%.1f m %s · %d lumber. Choose two endpoints or drag." % [float(plan.length), selected, int(plan.lumber)]
+		elif selected == "path" and (first_point != Vector3.INF or spell_drag_start != Vector3.INF):
+			cost = float(ceili(_line_start().distance_to(hovered) / 7.0))
+			words = "Route %.1f m · %.0f Mana" % [_line_start().distance_to(hovered), cost]
+		elif selected == "awaken" and str(plan.get("risk", "")) != "": words = str(plan.risk)
+	command_panel.update_state({"mana":float(builder.data.mana),"max_mana":20.0,
+		"wood":int(builder.data.wood),"selected":selected,"palette":palette,"spell_cost":cost,
+		"feedback":words,"seed":game.landscape.seed,"helpers":int(builder.data.workers),
+		"availability":availability,"cooldowns":cooldowns,"regen":game.tuning.value("worldbuilder.mana_regen_multiplier")})
 
 func select_action(action: String) -> void:
-	if action not in ACTIONS: return
+	var entry := _spell(action)
+	if entry.is_empty(): return
 	selected = action
+	palette = str(entry.palette).to_lower()
 	first_point = Vector3.INF
-	_say(HINTS[ACTIONS.find(action)])
+	spell_drag_start = Vector3.INF
+	_say(str(entry.description) + " " + _gesture(action))
+	_refresh_ui()
 
-func _hire() -> void:
-	var result: String = builder.hire_worker()
-	_say(result if result != "" else "A helper joins the work site.")
+func _gesture(action: String) -> String:
+	return "Choose two endpoints or drag a line." if action in LINE_ACTIONS else "Click a place in the world."
+
+func _select_palette(id: String) -> void:
+	palette = id.to_lower()
+	for entry in catalogue:
+		if str(entry.palette).to_lower() == palette:
+			select_action(str(entry.id))
+			return
+
+func _regen_preset(multiplier: float) -> void:
+	# This testing preference is local to the running game; never rewrite live tuning files.
+	game.tuning.runtime_overrides["worldbuilder.mana_regen_multiplier"] = 4.0 if multiplier > 2.0 else 1.0
+	_say("Mana regeneration: Testing 4x" if multiplier > 2.0 else "Mana regeneration: Normal 1x")
+	_refresh_ui()
+
+func _cancel_targeting() -> void:
+	selected = ""
+	first_point = Vector3.INF
+	spell_drag_start = Vector3.INF
+	_say("Targeting cancelled. Choose another spell with 1–9.")
+	_refresh_ui()
 
 func _quality(index: int) -> void:
 	render_scale = [1.0, 0.65, 0.5][index]
@@ -396,6 +418,13 @@ func _build_preview() -> void:
 	route_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	game.adventure.zone_groups[builder.ZONE].add_child(route_preview)
 	route_preview.visible = false
+	preview_boundary = MeshInstance3D.new()
+	preview_boundary.name = "SurveyFootprint"
+	preview_boundary.mesh = ImmediateMesh.new()
+	preview_boundary.material_override = preview_valid
+	preview_boundary.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	game.adventure.zone_groups[builder.ZONE].add_child(preview_boundary)
+	preview_boundary.visible = false
 
 func _preview_material(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -406,31 +435,85 @@ func _preview_material(color: Color) -> StandardMaterial3D:
 	material.no_depth_test = true
 	return material
 
+func _line_start() -> Vector3:
+	return first_point if first_point != Vector3.INF else spell_drag_start
+
+func _preview_plan() -> Dictionary:
+	var result := {"reason": _availability(selected)}
+	if hovered == Vector3.INF or selected == "": return result
+	var start := _line_start()
+	if selected in ["bridge", "ramp", "stairs", "boardwalk"] and start != Vector3.INF:
+		var plan: Dictionary = builder.construction.preview(selected, start, hovered)
+		if result.reason != "": plan.reason = result.reason
+		return plan
+	if selected == "path" and start != Vector3.INF and result.reason == "": result.reason = builder.can_path(start, hovered)
+	if selected == "awaken" and result.reason == "": result = builder.ents.preview(hovered)
+	if selected == "harvest": result.reason = "Choose an existing tree for a helper to harvest."
+	return result
+
+func _ground_preview(local: Vector3) -> Vector3:
+	return builder.center + Vector3(local.x, game.landscape.height_at(Vector2(local.x,local.z)) + 0.18,local.z)
+
+func _boundary_line(mesh: ImmediateMesh, a: Vector3, b: Vector3) -> void:
+	mesh.surface_add_vertex(a)
+	mesh.surface_add_vertex(b)
+
 func _update_preview() -> void:
 	if marker == null: return
-	marker.visible = hovered != Vector3.INF
-	if marker.visible:
-		marker.global_position = builder.center + hovered + Vector3.UP * 0.15
-		marker.scale = Vector3.ONE * (1.0 + sin(clock * 4.0) * 0.08)
-		var valid := true
-		if selected == "path" and first_point != Vector3.INF: valid = builder.can_path(first_point, hovered) == ""
-		elif selected == "bridge": valid = hovered.distance_to(builder.CROSSING) <= 10.0 and int(builder.data.wood) >= 3 and builder.data.bridges.is_empty()
-		elif selected == "grove": valid = float(builder.data.aether) >= 3.0 and hovered.distance_to(builder.CAMP) >= 7.0
-		elif selected == "patrol": valid = float(builder.data.aether) >= 4.0 and builder.data.threats.size() < builder.MAX_THREATS
-		marker.material_override = preview_valid if valid else preview_invalid
-		route_preview.material_override = marker.material_override
-	var line_start: Vector3 = spell_drag_start if spell_drag_start != Vector3.INF else first_point
-	route_preview.visible = selected in ["path", "sunder", "forest", "wall", "fault"] and line_start != Vector3.INF and hovered != Vector3.INF
-	if route_preview.visible:
-		var a: Vector3 = builder.center + line_start
-		var b: Vector3 = builder.center + hovered
-		var span: Vector3 = b - a
-		route_preview.global_position = (a + b) * 0.5 + Vector3.UP * 0.16
-		route_preview.scale = Vector3(2.0, 0.025, maxf(span.length(), 0.01))
-		route_preview.rotation.y = atan2(span.x, span.z)
+	var showing := hovered != Vector3.INF and selected != ""
+	marker.visible = showing
+	preview_boundary.visible = showing
+	route_preview.visible = false
+	var mesh: ImmediateMesh = preview_boundary.mesh
+	mesh.clear_surfaces()
+	if not showing: return
+	var plan := _preview_plan()
+	var valid := str(plan.get("reason", "")) == "" or selected == "harvest"
+	var skin := preview_valid if valid else preview_invalid
+	marker.global_position = _ground_preview(hovered)
+	marker.scale = Vector3.ONE * (1.0 + sin(clock * 4.0) * 0.05)
+	marker.material_override = skin
+	preview_boundary.material_override = skin
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	var start := _line_start()
+	if selected in LINE_ACTIONS and start != Vector3.INF:
+		var direction := Vector2(hovered.x - start.x, hovered.z - start.z).normalized()
+		var side := Vector3(-direction.y,0,direction.x)
+		var half_width := 1.0
+		if selected == "sunder": half_width = 5.0
+		elif selected == "wall": half_width = 6.5
+		elif selected == "forest": half_width = 8.0
+		elif selected == "fault": half_width = 4.0
+		elif selected in ["bridge","ramp","stairs","boardwalk"]: half_width = float(plan.get("width",3.0)) * 0.5
+		for edge in [-1.0,1.0]:
+			for i in 24:
+				var a: Vector3 = start.lerp(hovered,float(i)/24.0) + side * half_width * edge
+				var b: Vector3 = start.lerp(hovered,float(i+1)/24.0) + side * half_width * edge
+				if selected in ["bridge","ramp","stairs","boardwalk"] and plan.has("a"):
+					a.y = plan.a.lerp(plan.b,float(i)/24.0).y + 0.10
+					b.y = plan.a.lerp(plan.b,float(i+1)/24.0).y + 0.10
+					_boundary_line(mesh, builder.center + a, builder.center + b)
+				else: _boundary_line(mesh,_ground_preview(a),_ground_preview(b))
+		for point in [start,hovered]:
+			_boundary_line(mesh,_ground_preview(point - side * half_width),_ground_preview(point + side * half_width))
+			# Vertical endpoints make the actual crossing/deck height readable from RTS.
+			var endpoint: Vector3 = plan.a if point == start and plan.has("a") else plan.get("b",point)
+			_boundary_line(mesh,_ground_preview(point),builder.center + endpoint + Vector3.UP * 1.2)
+	else:
+		var radius := 0.8
+		if selected == "raise": radius = 13.0
+		elif selected == "ring": radius = 19.0
+		elif selected == "meteor": radius = 11.0
+		elif selected == "grove": radius = 4.0
+		elif selected in ["awaken","calm"]: radius = 3.0
+		for i in 64:
+			var a := hovered + Vector3(cos(TAU * i / 64.0),0,sin(TAU * i / 64.0)) * radius
+			var b := hovered + Vector3(cos(TAU * (i+1) / 64.0),0,sin(TAU * (i+1) / 64.0)) * radius
+			_boundary_line(mesh,_ground_preview(a),_ground_preview(b))
+	mesh.surface_end()
 
 func _world_at(screen: Vector2) -> Vector3:
-	if screen.y < TOP_HEIGHT * ui_scale or screen.y > float(size.y) - BOTTOM_HEIGHT * ui_scale: return Vector3.INF
+	if screen.y < TOP_HEIGHT * ui_scale or command_panel.is_over_panel(screen): return Vector3.INF
 	var scaled := screen * Vector2(tactical_viewport.size) / Vector2(size)
 	var origin := camera.project_ray_origin(scaled)
 	var direction := camera.project_ray_normal(scaled)
@@ -442,84 +525,86 @@ func _world_at(screen: Vector2) -> Vector3:
 	return point if builder._inside(point) else Vector3.INF
 
 func _act(local: Vector3) -> void:
+	if selected == "": return
+	var available := _availability(selected)
+	if available != "": _say(available); return
 	var result := ""
-	match selected:
-		"harvest": result = builder.mark_harvest(local)
-		"path":
-			if first_point == Vector3.INF:
-				first_point = local
-				_say("Route start set. Choose its other end.")
-				return
-			result = builder.carve_path(first_point, local)
-			if result == "": first_point = Vector3.INF
-		"bridge": result = builder.place_bridge(local)
-		"grove": result = builder.plant_grove(local)
-		"patrol": result = builder.summon_patrol(local)
-		"sunder", "forest", "wall", "fault":
-			if first_point == Vector3.INF:
-				first_point = local
-				_say("Start set. Choose the other end, or drag a line.")
-				return
-			match selected:
-				"sunder": result = builder.cast_sunder(first_point, local)
-				"forest": result = builder.cast_forest(first_point, local)
-				"wall": result = builder.cast_wall(first_point, local)
-				"fault": result = builder.cast_prism_fault(first_point, local)
-			if result == "": first_point = Vector3.INF
-		"raise": result = builder.cast_raise(local)
-		"ring": result = builder.cast_tree_ring(local)
-		"meteor": result = builder.cast_meteor(local)
+	if selected in LINE_ACTIONS:
+		if first_point == Vector3.INF:
+			first_point = local
+			_say("Start set. Choose the other end, or drag a line.")
+			return
+		result = _cast_line(first_point,local)
+		if result == "": first_point = Vector3.INF
+	else:
+		match selected:
+			"harvest": result = builder.mark_harvest(local)
+			"hire": result = builder.hire_worker()
+			"grove": result = builder.plant_grove(local)
+			"patrol": result = builder.summon_patrol(local)
+			"raise": result = builder.cast_raise(local)
+			"ring": result = builder.cast_tree_ring(local)
+			"meteor": result = builder.cast_meteor(local)
+			"awaken": result = builder.cast_awaken(local)
+			"calm": result = builder.calm_ent(local)
+			"golem": result = builder.assemble_golem(local)
+			_: result = "This construction is not available yet."
 	_say(result if result != "" else builder.progress_message)
+	# Keep selection after successful casts, including unsuccessful placement attempts.
+	_refresh_ui()
+
+func _cast_line(a: Vector3,b: Vector3) -> String:
+	match selected:
+		"path": return builder.carve_path(a,b)
+		"sunder": return builder.cast_sunder(a,b)
+		"forest": return builder.cast_forest(a,b)
+		"wall": return builder.cast_wall(a,b)
+		"fault": return builder.cast_prism_fault(a,b)
+		"bridge","ramp","stairs","boardwalk": return builder.construct(selected,a,b)
+	return "Unknown line spell."
 
 func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode >= KEY_1 and event.keycode <= KEY_8: select_action(ACTIONS[event.keycode - KEY_1])
-		elif event.keycode == KEY_9: _hire()
-		elif event.keycode == KEY_0: select_action("wall")
-		elif event.keycode == KEY_Q: select_action("ring")
-		elif event.keycode == KEY_E: select_action("meteor")
-		elif event.keycode == KEY_R: select_action("fault")
-		elif event.keycode == KEY_F: _toggle_follow()
-		elif event.keycode == KEY_ESCAPE:
-			if first_point != Vector3.INF: first_point = Vector3.INF; _say("Route preview cancelled.")
-			else: close()
+		if command_panel.handle_shortcut(event):
+			set_input_as_handled()
+			return
+		if event.keycode == KEY_F: _toggle_follow()
 		elif event.keycode == KEY_F9: close()
 		elif event.keycode == KEY_F11:
 			if mode == Window.MODE_FULLSCREEN or mode == Window.MODE_EXCLUSIVE_FULLSCREEN:
 				mode = Window.MODE_WINDOWED
 				size = WINDOWED_SIZE
 			else: mode = Window.MODE_FULLSCREEN
+		else: return
 		set_input_as_handled()
 	elif event is InputEventMouseButton:
-		if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+		if command_panel.is_over_panel(event.position) or event.position.y < TOP_HEIGHT * ui_scale: return
+		if event.button_index in [MOUSE_BUTTON_RIGHT,MOUSE_BUTTON_MIDDLE]:
+			if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed: _cancel_targeting()
 			dragging = event.pressed
 			last_mouse = event.position
 			set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			var location := _world_at(event.position)
-			if event.pressed and selected in ["sunder", "forest", "wall", "fault"] and location != Vector3.INF:
+			if event.pressed and selected in LINE_ACTIONS and location != Vector3.INF:
 				spell_drag_start = location
 				set_input_as_handled()
 			elif not event.pressed and spell_drag_start != Vector3.INF:
-				var start := spell_drag_start
+				var start := first_point if first_point != Vector3.INF else spell_drag_start
 				spell_drag_start = Vector3.INF
-				if location != Vector3.INF and Vector2(start.x, start.z).distance_to(Vector2(location.x, location.z)) >= 6.0:
-					var result: String = ""
-					match selected:
-						"sunder": result = builder.cast_sunder(start, location)
-						"forest": result = builder.cast_forest(start, location)
-						"wall": result = builder.cast_wall(start, location)
-						"fault": result = builder.cast_prism_fault(start, location)
-					first_point = Vector3.INF
+				if location != Vector3.INF and Vector2(start.x,start.z).distance_to(Vector2(location.x,location.z)) >= 3.0:
+					var result := _cast_line(start,location)
+					if result == "": first_point = Vector3.INF
+					else: first_point = start
 					_say(result if result != "" else builder.progress_message)
 				elif location != Vector3.INF: _act(location)
 				set_input_as_handled()
 			elif event.pressed and location != Vector3.INF:
 				_act(location)
 				set_input_as_handled()
-		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			zoom = clampf(zoom + (-6.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 6.0), 28.0, 185.0)
+		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
+			zoom = clampf(zoom + (-6.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 6.0),28.0,185.0)
 			_position_camera()
 			set_input_as_handled()
 	elif event is InputEventMouseMotion:
@@ -529,6 +614,6 @@ func _input(event: InputEvent) -> void:
 			var movement: Vector2 = event.position - last_mouse
 			last_mouse = event.position
 			yaw -= movement.x * 0.006
-			pitch = clampf(pitch + movement.y * 0.004, 0.42, 1.36)
+			pitch = clampf(pitch + movement.y * 0.004,0.42,1.36)
 			_position_camera()
 			set_input_as_handled()
