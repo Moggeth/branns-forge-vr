@@ -352,6 +352,9 @@ func _load_layout() -> void:
 
 func _save_layout() -> void:
 	if bool(game.get("diagnostic_offline")): return
+	if mode == Window.MODE_WINDOWED:
+		preferred_window_size = size.max(WINDOWED_MIN_SIZE)
+		preferred_window_position = position
 	var settings := ConfigFile.new()
 	settings.load(LAYOUT_FILE)
 	settings.set_value("window", "fullscreen", preferred_fullscreen)
