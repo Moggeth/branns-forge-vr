@@ -1,0 +1,192 @@
+{
+  "file": "bow.glb",
+  "bytes": 1459448,
+  "triangles": 15732,
+  "surfaces": 13,
+  "materials": 5,
+  "material_names": [
+    "Leather",
+    "Brass",
+    "Wood",
+    "Ember",
+    "EmberEye"
+  ],
+  "embedded_textures": 8,
+  "dimensions_m": {
+    "x": 0.4799,
+    "y": 1.2508,
+    "z": 0.3035
+  },
+  "bounds_min": [
+    -0.2519,
+    -0.6254,
+    -0.1809
+  ],
+  "bounds_max": [
+    0.2281,
+    0.6254,
+    0.1226
+  ],
+  "marker_world_positions": {
+    "Bow": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "Grip": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "ArrowRest": [
+      0.0,
+      0.115,
+      0.1
+    ],
+    "ArrowGuide": [
+      0.0,
+      0.115,
+      -0.012
+    ],
+    "StringTop": [
+      0.0,
+      0.6,
+      0.1
+    ],
+    "StringBottom": [
+      0.0,
+      -0.6,
+      0.1
+    ],
+    "UpperLimb": [
+      0.0,
+      0.18,
+      -0.045
+    ],
+    "LowerLimb": [
+      0.0,
+      -0.1,
+      -0.022
+    ],
+    "PhoenixCore": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "GripMesh": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "parents": {
+    "Grip": "Bow",
+    "GripMesh": "Bow",
+    "ArrowRest": "Bow",
+    "ArrowGuide": "Bow",
+    "StringTop": "UpperLimb",
+    "StringBottom": "LowerLimb",
+    "UpperLimb": "Bow",
+    "LowerLimb": "Bow",
+    "PhoenixCore": "Bow"
+  },
+  "limbs": {
+    "UpperLimb_pivot": [
+      0.0,
+      0.18,
+      -0.045
+    ],
+    "LowerLimb_pivot": [
+      0.0,
+      -0.1,
+      -0.022
+    ]
+  },
+  "arrow_corridor_check": {
+    "radius_m": 0.014,
+    "z_range": [
+      -0.68,
+      0.1
+    ],
+    "centre": [
+      0,
+      0.115
+    ],
+    "vertices_inside": 16,
+    "intruding_primitives": {
+      "RiserMesh/Brass": {
+        "verts_in_14mm": 16,
+        "min_dist_mm": 9.05,
+        "y_range": [
+          0.1068,
+          0.1086
+        ]
+      }
+    },
+    "guide_shelf_top_y": 0.1068,
+    "note": "only the ArrowGuide shelf (brass, RiserMesh) is expected inside the corridor, below the shaft"
+  },
+  "negative_signed_volume_primitives": [],
+  "per_primitive": {
+    "GripMesh/Leather": {
+      "tris": 1540,
+      "signed_volume_cm3": 75.054
+    },
+    "GripMesh/Brass": {
+      "tris": 88,
+      "signed_volume_cm3": 58.38
+    },
+    "LowerLimbMesh/Wood": {
+      "tris": 380,
+      "signed_volume_cm3": 219.278
+    },
+    "LowerLimbMesh/Brass": {
+      "tris": 2808,
+      "signed_volume_cm3": 1181.623
+    },
+    "LowerLimbMesh/Ember": {
+      "tris": 736,
+      "signed_volume_cm3": 60.945
+    },
+    "PhoenixCore/Brass": {
+      "tris": 4060,
+      "signed_volume_cm3": 288.823
+    },
+    "PhoenixCore/Ember": {
+      "tris": 580,
+      "signed_volume_cm3": 6.357
+    },
+    "PhoenixCore/EmberEye": {
+      "tris": 200,
+      "signed_volume_cm3": 0.568
+    },
+    "RiserMesh/Wood": {
+      "tris": 1188,
+      "signed_volume_cm3": 149.773
+    },
+    "RiserMesh/Brass": {
+      "tris": 228,
+      "signed_volume_cm3": 16.731
+    },
+    "UpperLimbMesh/Wood": {
+      "tris": 380,
+      "signed_volume_cm3": 183.343
+    },
+    "UpperLimbMesh/Brass": {
+      "tris": 2808,
+      "signed_volume_cm3": 924.099
+    },
+    "UpperLimbMesh/Ember": {
+      "tris": 736,
+      "signed_volume_cm3": 56.919
+    }
+  },
+  "budgets": {
+    "tris<=22000": true,
+    "surfaces<=14": true,
+    "materials<=8": true,
+    "textures<=8": true,
+    "bytes<3MB": true,
+    "dims<=.60x1.35x.40": true
+  }
+}

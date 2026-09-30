@@ -1,40 +1,59 @@
-# Emberwing handoff (revision 2, time-capped)
+# Emberwing final craftsmanship pass (bow only)
 
-Files: `bow.glb`, `arrow.glb`, `wings.glb`, `source.blend`, `builder.py`, `render.py`, `render_*.png`.
+Files: installed `godot/weapons/emberwing/bow.glb`, `source.blend`, `builder.py` (deterministic bow source), `finish-report.json` (from `report.py`), and `previews/refined-*.png`.
+Arrow and wing art are retained from the original playable revision.
 
-## Rebuild
-```
-../../tools/blender-4.5.13-windows-x64/blender.exe --background --python-exit-code 2 --python builder.py -- --out ABS_DIR
-../../tools/blender-4.5.13-windows-x64/blender.exe --background --python-exit-code 2 --python render.py -- --out ABS_DIR   # studio PNGs from the GLBs
-```
-Builder is deterministic. Geometry is authored directly in final glTF coordinates (+Y up, arrow -Z).
-Textures (gold/ember/wing feather gradients) are generated in code and packed into each GLB.
+Rebuild: `blender.exe --background --python-exit-code 2 --python builder.py -- --out ABS_DIR [--all]`
+(`--all` also runs the preserved `flight_builder.py`, reproducing the original arrow/wings without applying the bow's new metal atlas.)
+Report: `... --python report.py -- --out ABS_DIR`. Renders: `... --python render_final.py -- --out ABS_DIR`.
+The approved structural source is retained in Git commit `dec98e1`; its report and `STRUCTURE-HANDOFF.md` remain alongside this final source.
 
-## Budgets (measured from the exported GLB JSON)
-| asset | tris | surfaces | materials |
-|---|---|---|---|
-| bow.glb | 13,538 (limit 22k) | 13 (limit 14) | 5 |
-| arrow.glb | 1,250 (limit 1,800) | 5 | 4 |
-| wings.glb | 2,400 (limit 2,800) | 3 | 2 |
+## Measured (report.py on the final GLB)
+| item | value | limit |
+|---|---|---|
+| triangles | 15,732 | 22,000 |
+| surfaces | 13 | 14 |
+| materials | 5: Leather, Brass, Wood, Ember, EmberEye | 8 |
+| embedded images | 8 | 8 |
+| size | 1,459,448 B | 3 MB |
+| dimensions | 0.480 x 1.251 x 0.304 m | 0.60 x 1.35 x 0.40 |
 
-## Revision 2 (visual, after game review)
-- Limbs: the fern ladder is gone. Each limb is now ONE swept wing on its dominant side (upper +X, lower -X, rotationally symmetric), built from 7 primaries, 5 secondaries and 4 coverts of varied length/angle/width, all curling forward. The opposite side has only 3 short gold spurs. Primaries are gold frames with a deep ember interior on the player-facing face; the outermost carry azure tips. A azure-gold tip blade runs to each nock. Bow cores are still slim, string tips unchanged.
-- Bust: a head, hooked brass beak, azure eyes, brow ridges, swept crest, glowing heart (brass cage) and mantle feathers. The bird leans FORWARD (-Z) on a neck: head centre (0,0.207,-0.148), beak tip z~-0.22. It has to be forward because the limb core passes through x=0 and would hide anything sitting on the limb line. All of it is at y>=0.09 or below y=-0.098. The arrow port and finger area are untouched. The head is ~0.2 m above the arrow line, so please check the sight picture in game.
-- Materials: baked walnut grain (dark), stitched leather, brass with a base-colour patina and a packed metallicRoughness map (G = roughness 0.26-0.62, B = metal), a dark-to-fire ember texture (dark root, deep orange, hot gold, azure), and emissive strength cut to 0.85. Ember/wing base colours are darkened so diffuse light does not wash them out. The heart and azure gems sample special spots of the ember texture (u 0.78 and 0.975), so they cost no extra surface. No lights or particles.
-- Wings: 9 primaries, 7 secondaries and 6 coverts per wing, swept back with outward-flicking tips and azure-gold tips, still 3 surfaces. Span held at 0.544 m, same pivots.
-- Mesh bounds (bow): x -0.223..0.229, y +/-0.625, z -0.218..0.111. This is wider than v1 (x +/-0.187) because the wing is one-sided; shrink the 0.84 length factor in `limb_feathers` if it collides in game.
+Anchors are exact and unchanged: Grip (0,0,0), ArrowRest (0,.115,.10), ArrowGuide (0,.115,-.012), UpperLimb (0,.18,-.045), LowerLimb (0,-.10,-.022),
+StringTop world (0,.60,.10) under UpperLimb, StringBottom world (0,-.60,.10) under LowerLimb; PhoenixCore, GripMesh and RiserMesh present. All primitives have positive signed volume.
+Corridor check is identical to the approved structure: only 16 guide-shelf vertices sit inside the 14 mm sight radius, all below the shaft (y 0.1068-0.1086, nearest 9.05 mm). No limb, feather, head or chest geometry was moved into it: the chest, riser, limb spines and root sleeves are unchanged except that both limbs' brass root sleeves are shorter (now ends at spine parameter 0.055 instead of 0.10; it still starts 16 mm before the pivot and overlaps the riser).
 
-## Nodes / markers (glTF coordinates, verified in exported JSON)
-- Bow: `Bow` > `Grip` (0,0,0), `ArrowRest` (0,0,0.10), `StringTop` (0,0.60,0.10), `StringBottom` (0,-0.60,0.10), `GripMesh`, `PhoenixCore`,
-  `UpperLimb` / `LowerLimb` (empties pivoted at the origin; children `*Core`, `*Feathers_Gold`, `*Feathers_Ember`).
-  Revision 2 mesh bounds: x -0.223..0.229, y ±0.625, z -0.218..0.111. Grip is 3.5 cm diameter and 16 cm long.
-- Arrow: `Arrow` > `ArrowNock` (0,0,0), `ArrowTip` (0,0,-0.78), meshes `Shaft`, `Nock`, `Head`, `Fletching` (z -0.04..-0.165), `Bindings` (brass whipping and a tiny inlaid phoenix).
-- Wings: `Wings` > `WingLeft` (-0.035,0,0), `WingRight` (0.035,0,0) (each with its own mesh, pivot-local), `EmberTrail`. Span is 0.544 m. Wing materials are emissive. There are no lights or particles.
+## The material-slot bug (fixed in the SOURCE builder)
+`MB.face()` used to store an index into `self.slots` (order of first use) and `build(..., slots=[...])` then wrote those indices unchanged. GripMesh's first face was brass, so the indices were swapped: Leather 88 tris, Brass 1540.
+Now `MB.face()` stores the material NAME; `build()` resolves each face to the index in the OUTPUT slot list and raises if a face names a material that is not in it.
+GripMesh now reports Leather 1540 / Brass 88. Audit: RiserMesh forced `["Wood","Brass"]`, which happened to match first-use order, so it was already correct. Limbs and PhoenixCore use first-use order, so they were fine. There is no game-side override.
 
-## Arrow line
-The arrow line is x=0, y=0, z<=0.10, so it passes through the grip. `GripMesh` therefore has a boolean-cut, brass-lined 2.1 cm arrow port along that line. Nothing else crosses it: the limbs start at y=0.075, the phoenix bust sits above and the tail plumes below.
+## What changed
+- **Material budget**: Gold feathers, aged-brass fittings and dark-bronze skull are three regions of ONE `Brass` metal atlas (512^2). Logical names Gold / Brass / Bronze map to a region through `ALIAS` in `MB.build`. This frees surfaces for the head. The exported emissive materials are `Ember` and `EmberEye`.
+- **Head**: dark-bronze skull, neck, cheek volumes and lower jaw; gold brow ridges, hooked upper beak and socket rims; two small sapphire eyes as a separate `EmberEye` material (radius 4.2 mm, set into gold socket rims); cheek plumes sweep back into the mantle; three crest pairs (longest gold with an ember inlay, middle bronze). Ember is restrained to a small heart in a gold rim on the breast, a three-scale throat gorget and the inlays. The chest is bronze, no longer a pink loft.
+- **Feathers**: three masses per limb with different sweep, angle and length: a five-feather fanned shoulder whose 0.29 m third feather is the strongest, a looser mid mass whose 0.34 m primary is the leading edge, and a slim two-feather tip flick. Gaps between the masses give negative space. Per-feather sweep/curl varies; the strongest feathers are thicker and cupped. Coverts, underside layer, spurs and tip gems are kept. The silhouette is still asymmetric (upper +X, lower -X).
+- **Grip**: leather now maps correctly, with a pebbled hide normal map, a helical wrap seam with raised lip and stitch pits, and roughness that is lower on raised wear. Geometry is unchanged (oval, palm swell, brass collars).
+- **UVs**: rings are mirrored in v (`fold`), so tubes and lofts have no wrap seam and every atlas region stays valid. Atlas u is shifted per polygon.
+- **Emissive**: Ember emission is its own texture x 0.5, with restrained runtime draw/curve modulation. EmberEye is a flat sapphire with emission (0.08,0.42,1.0) x 0.6. The asset contains no lights, transparency, particles or string; the game supplies the string.
 
-## Known limits / next iteration
-- Studio renders (strong key light) wash the ember to salmon; a dim render shows the intended dark-to-fire contrast. The integration owner subsequently validated all three GLBs and reviewed actual Godot captures; see `../../docs/EMBERWING-20260930.md`.
-- The bird is small and cartoon-like at 3 cm scale. Next step: sculpted head silhouette, more curved primaries, and a runtime flame-alpha look for wing tips.
-- Wings export opaque and emissive. Fade and scale are left to runtime.
+## Texture / material provenance (all generated by builder.py, deterministic, no external files)
+Numpy only; tileable FFT-filtered noise, fixed `RandomState` seeds. glTF metallic-roughness maps use G = roughness, B = metallic.
+1. `wood_bc` 512x256 + `wood_orm` (also 512x256): walnut; longitudinal fibre streaks, ring bands, pores. Roughness varies with grain and pores.
+2. `leather_bc`, `leather_orm`, `leather_n` (256x512 each): pebbled dark-brown hide, helical wrap seam, stitches. Tiles 6x along the grip.
+3. `metal_bc`, `metal_orm` (512x512 atlas): v .55-.95 gold feather (root patina, barbs, rachis, bright border, engraved line); v .05-.45 u 0-.8 aged brass (patina blotches, longitudinal scratches); u .82-1 dark bronze.
+4. `ember_bc` (256x256): deep-orange gradient with dark rim, barb detail and a sapphire end used only for the limb-tip gems.
+Sizes: the 8 images make up most of the 1.46 MB.
+
+## Verification done / not done
+- Done: builder run (0.9 s Blender build), `report.py` budgets and anchors above, `--all` build succeeds into a temp folder, review of the renders (three-quarter front and back, grip/head, head close-up, grip close-up, dark view).
+- At the artist handoff, Godot import, hand fit and runtime checks had not been performed. Codex subsequently imported the final GLB, passed Khronos/disposable-engine gates and **38 actual-game assertions**, inspected both articulated gloves at brace/draw and two dark draw/curve frames, and reproduced all three installed GLBs byte-for-byte with `--all`. See `REFINEMENT.md` for measured durations and commands.
+- Live headset comfort and stereo GPU acceptance remain unverified. `render_final.py` uses Blender EEVEE; use the retained Godot captures when judging in-game specular and emission strength.
+
+## Known limitations
+- Gold feather barb detail still shows a slight moire at some angles when magnified; it is 44 cycles along a 0.2 m feather.
+- The lower-limb brass root sleeve (and the heel behind it) still reads as a large gold barrel in the grip/head view; it is the least refined fitting.
+- Feather edges are metal and pick up the grey studio world as pale slivers; in-game reflection probes will change that.
+- Leather grain and seams live in the normal map, not geometry; at grazing angles the grip silhouette is still a smooth oval.
+- The upper grip end shows the same notch where the riser rails enter, as in the approved structure.
+- Limb tip gems and heart use ember-atlas UV spots, not the `EmberEye` material; only the head eyes are `EmberEye`.
+- Embedded images are at the 8-image cap; adding any per-material map needs another merge.
+- Ember inlay reads as saturated red-orange under AgX in Blender; it may be redder or oranger in Godot, so check it there.

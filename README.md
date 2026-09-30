@@ -4,7 +4,7 @@ Open **Brann's Forge Launcher** from the desktop or run `Brann's Forge Launcher.
 
 The [Emberwing designer review](assets/emberwing-sonnet/REVIEW.md) provides twelve labelled standard views, a public orbit showroom and a full-resolution review ZIP with GLBs and editable source. The image set can be rebuilt deterministically in about five seconds without a model commission.
 
-Emberwing's [physical refinement](assets/emberwing-sonnet/REFINEMENT.md) moves the arrow above the gripping fingers, adds an open sight window and connects string sockets to authored limb pivots. The offline review now captures both actual game gloves at brace and draw, and the 37-assertion archery regression checks the imported arrow corridor. Relaunch to load the new mesh.
+Emberwing's [craftsmanship refinement](assets/emberwing-sonnet/REFINEMENT.md) adds a solid leather grip, raised arrow window, connected string fittings, sculpted bronze/gold phoenix and varied cambered feathers. Walnut, stitched leather, engraved brass, ember inlays and sapphire eyes have distinct material treatment. Both articulated gloves and dark draw/curve poses were reviewed in Godot; 38 archery assertions pass. The 15,732-triangle bow uses 13 surfaces and no added lights. Relaunch to load the new mesh.
 
 **Enchanted Kitchen visual rebuild (2026-09-30):** Sonnet 5.5's timber hall, hearth, counters, shelves, magical teacups and textured supper table replace the primitive interior while preserving rats, routes and collision. The static room is compiled into 20 material batches so the actual-game review uses fewer ground-eye draw calls than the old room. [Matched screenshots, source and rebuild/check commands](docs/KITCHEN-ART-20260930.md). Relaunch the game to load it.
 

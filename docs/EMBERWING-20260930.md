@@ -81,7 +81,7 @@ asset checks. The final source rebuild reproduced all three GLBs byte-for-byte.
 
 | Asset | Triangles | Surfaces | Materials | GLB bytes |
 |---|---:|---:|---:|---:|
-| Bow | 13,538 | 13 | 5 | 538,208 |
+| Bow (craftsmanship revision) | 15,732 | 13 | 5 | 1,459,448 |
 | Arrow | 1,250 | 5 | 4 | 101,448 |
 | Wings | 2,400 | 3 | 2 | 91,080 |
 
@@ -89,20 +89,32 @@ Editable Blender source, builder, contracts, studio renders and the artist's
 handoff are retained in `assets/emberwing-sonnet/`. Installed assets, extracted
 textures and import descriptors live in `godot/weapons/emberwing/`.
 
+The approved designer critique prompted two further serial Sonnet passes:
+physical construction followed by materials/sculpture. The arrow now runs
+through an open window above a solid oval leather grip. String sockets belong
+to authored limb pivots and remain seated as those limbs flex. The bronze/gold
+phoenix has a shaped beak, brow, neck and recessed blue eyes; feather groups
+have varied camber and sweep. Wood, stitched leather and an aged metal atlas
+add surface definition, while draw/curve emission stays restrained and adds
+no lights. [Final hand/night captures and verification](../assets/emberwing-sonnet/REFINEMENT.md).
+The arrow and wing GLBs remain byte-identical to their original playable art.
+
 From the repository root, rebuild into a separate output folder:
 
 ```powershell
-& tools/blender-4.5.13-windows-x64/blender.exe --background --python-exit-code 2 --python assets/emberwing-sonnet/builder.py -- --out "$PWD/outputs/emberwing-rebuild"
+& tools/blender-4.5.13-windows-x64/blender.exe --background --python-exit-code 2 --python assets/emberwing-sonnet/builder.py -- --out "$PWD/outputs/emberwing-rebuild" --all
 python scripts/asset_lab.py inspect assets/emberwing-sonnet/bow.json outputs/emberwing-rebuild/bow.glb --out outputs/asset-lab/emberwing-bow
 ```
 
 Repeat inspection with `arrow.json` / `arrow.glb` and `wings.json` / `wings.glb`
 before promoting a new art revision. Do not build over the installed assets.
 
-The focused offline regression passed **28 assertions** covering mirrored grip
+The focused offline regression passed **38 assertions** covering mirrored grip
 axes, input ownership, physical quiver/nocking, release/cancel, conventional
 gravity, gesture symmetry/translation/roll, wing banking, preview agreement and
-real swept collision with persistent embedding. Service tests and the full
+real swept collision with persistent embedding. It also checks the imported
+arrow corridor, real leather contact, raised guide, seated moving nocks and
+draw/curve emission. Service tests and the full
 disposable-fixture integration suite also passed. Run:
 
 ```powershell
@@ -130,6 +142,12 @@ Byte-identical source rebuild: 0.876 s.
 Focused 28-assertion check: 6.898 s. Full integration: 63.714 s. Initial game
 draw/flight captures: 12.057 / 11.897 s. Art and engineering overlapped; their
 durations should not be summed as one serial wall-clock run.
+
+Craftsmanship review: structural commission 464.731 s; material/sculpture
+commission 574.990 s. Final asset gate 2.519 s; import 4.104 s; 38-assertion
+archery check 6.984 s; isolated integration 61.513 s; ten actual-engine
+hand/night captures 11.062 s; twelve standard views 4.843 s; all-three-asset
+byte-identical rebuild 0.997 s.
 
 Headset acceptance remains: reach behind the shoulder, comfortable left/right
 draw alignment, finger mating, arc sensitivity and GPU frame time with several

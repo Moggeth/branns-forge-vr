@@ -19,10 +19,12 @@ static func run(game,output:String):
 	environment.tonemap_mode=Environment.TONE_MAPPER_FILMIC; environment.glow_enabled=false
 	camera.environment=environment
 	var centre=Vector3(10000,5,10000)
+	var review_lights=[]
 	for light in [[Vector3(-1,2,1),1.3],[Vector3(1,0,-2),0.7]]:
 		var sun=DirectionalLight3D.new(); game.add_child(sun)
 		sun.global_position=centre+light[0]; sun.look_at(centre)
 		sun.light_energy=light[1]; sun.shadow_enabled=false
+		review_lights.append(sun)
 	var archery=game.archery
 	archery.cancel_draw()
 	archery.hint.hide(); archery.quiver.hide(); archery.preview.hide()
@@ -57,7 +59,21 @@ static func run(game,output:String):
 				var path=folder.path_join("mechanics-%s-%s.png"%[stem,angle])
 				var result=game.get_viewport().get_texture().get_image().save_png(path)
 				failed=failed or result!=OK
-				records.append({"file":path.get_file(),"side":side,"draw_m":draw,"view":angle})
+				records.append({"file":path.get_file(),"side":side,"draw_m":draw,"view":angle,
+					"visible_draw_calls":game.get_viewport().get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE,Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+					"visible_primitives":game.get_viewport().get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE,Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME)})
+			if side=="right_hand" and draw>0:
+				environment.background_color=Color("0d182b"); environment.ambient_light_energy=.07
+				for light in review_lights: light.light_energy*=.06
+				camera.global_position=centre+Vector3(1.3,.25,2.3); camera.look_at(centre+Vector3(0,.04,.19))
+				for bending in [false,true]:
+					archery.curve_state={"curve":Vector3.UP*.7} if bending else {}
+					archery.update_draw_visuals()
+					await RenderingServer.frame_post_draw
+					var path=folder.path_join("mechanics-night-%s.png"%("curved" if bending else "drawn"))
+					failed=failed or game.get_viewport().get_texture().get_image().save_png(path)!=OK
+					records.append({"file":path.get_file(),"side":side,"draw_m":draw,"view":"night","curve_mode":bending})
+				archery.curve_state.clear()
 		archery.nocked.clear(); arrow.free()
 		game.held.erase(str(holder.get_instance_id())); game.grips.grips.erase(str(holder.get_instance_id()))
 		archery.bow.reparent(game)

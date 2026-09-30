@@ -15,6 +15,8 @@ os.makedirs(OUT, exist_ok=True)
 V = Vector
 def B(p):  # glTF -> Blender
     return (p[0], -p[2], p[1])
+def fold(t):  # mirrored v around a ring: seamless (no wrap seam) and keeps atlas regions valid
+    return 1 - abs(2 * t - 1)
 def norm(v):
     v = V(v); return v.normalized() if v.length > 1e-9 else v
 def smooth(a, b, x):
@@ -24,80 +26,102 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 
 # ------------------------------------------------------------------ textures / materials
-def make_tex(name, fn, W=256, H=128):
-    us = np.linspace(0, 1, W)[None, :].repeat(H, 0)
-    vs = np.linspace(0, 1, H)[:, None].repeat(W, 1)
-    rgb = fn(us, vs)
-    px = np.concatenate([np.clip(rgb, 0, 1), np.ones((H, W, 1))], axis=2).astype(np.float32)
-    img = bpy.data.images.new(name, W, H, alpha=False)
-    img.pixels.foreach_set(px.ravel()); img.pack(); img.colorspace_settings.name = "sRGB"
-    return img
-
-def ramp(u, keys):
-    out = np.zeros(u.shape + (3,))
-    xs = [k[0] for k in keys]
-    for c in range(3):
-        out[..., c] = np.interp(u, xs, [k[1][c] for k in keys])
-    return out
-
-def tnoise(u, v, seed, n=7, fmax=9):
-    rg = np.random.RandomState(seed); out = np.zeros(u.shape)
-    for k in range(n):
-        fx = rg.randint(0, fmax); fy = rg.randint(1, fmax)
-        out += rg.uniform(0.4, 1.0) / (1 + 0.25 * (fx + fy)) * np.sin(2 * math.pi * (fx * u + fy * v) + rg.uniform(0, 6.28))
-    return out / max(np.abs(out).max(), 1e-6)
-
-def feather_detail(u, v, col, edge_tint):
-    e = np.abs(v - 0.5) * 2
-    col = col * (1 - 0.35 * e[..., None] ** 3)
-    col = col * (0.88 + 0.12 * (0.5 + 0.5 * np.sin(v * 70 + u * 9))[..., None])
-    m = smooth_np(0.78, 1.0, e)[..., None]
-    col = col * (1 - m) + np.array(edge_tint) * m
-    rach = (np.abs(v - 0.5) < 0.018)[..., None]
-    col = np.where(rach, np.clip(col * 1.25 + 0.06, 0, 1), col)
-    return col
+# All textures are deterministic numpy arrays (tileable FFT noise, no external files).  Array axes are (v rows, u cols).
+def fnoise(H, W, seed, cu, cv):
+    """Tileable smooth noise in [-1, 1]; cu / cv = low-pass cutoff in cycles across the image along u / v."""
+    F = np.fft.fft2(np.random.RandomState(seed).randn(H, W))
+    fy = np.fft.fftfreq(H)[:, None] * H; fx = np.fft.fftfreq(W)[None, :] * W
+    n = np.fft.ifft2(F * np.exp(-((fx / cu) ** 2 + (fy / cv) ** 2))).real
+    return n / max(np.abs(n).max(), 1e-9)
 
 def smooth_np(a, b, x):
     t = np.clip((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
 
-def gold_fn(u, v):
-    c = ramp(u, [(0, (0.22, 0.10, 0.03)), (.25, (0.75, 0.45, 0.10)), (.7, (1.0, 0.76, 0.26)), (1, (1.0, 0.9, 0.55))])
-    return feather_detail(u, v, c, (1.0, 0.72, 0.18))
-def ember_fn(u, v):
-    # dark ember root -> deep orange -> hot gold (u~.78, also the heart) -> azure tip (u>.93, also the eyes)
-    c = ramp(u, [(0, (0.16, 0.035, 0.02)), (.25, (0.55, 0.10, 0.02)), (.5, (1.0, 0.34, 0.03)), (.7, (1.0, 0.6, 0.1)),
-                 (.78, (1.0, 0.88, 0.5)), (.88, (1.0, 0.6, 0.2)), (.93, (0.12, 0.5, 1.0)), (1, (0.55, 0.88, 1.0))])
-    return feather_detail(u, v, c, (1.0, 0.72, 0.18))
-def wing_fn(u, v):
-    c = ramp(u, [(0, (0.4, 0.08, 0.02)), (.3, (1, 0.36, 0.05)), (.65, (1, 0.6, 0.14)), (.85, (1, 0.82, 0.4)), (.93, (0.15, 0.55, 1.0)), (1, (0.6, 0.9, 1.0))])
-    return feather_detail(u, v, c, (1.0, 0.72, 0.2))
-def wood_fn(u, v):
-    warp = 0.07 * np.sin(2 * math.pi * (u * 2)) + 0.04 * tnoise(u, v * 0 + 0.3, 3, 4, 6)
-    g = 0.5 + 0.5 * np.sin(2 * math.pi * (v * 6 + warp * 3) + 4 * tnoise(u, v, 5, 5, 4))
-    fine = 0.5 + 0.5 * np.sin(2 * math.pi * (v * 31) + 6 * tnoise(u, v, 8, 5, 5))
-    n = 0.5 + 0.5 * tnoise(u, v, 11, 8, 12)
-    t = np.clip(0.30 * g + 0.35 * fine * n + 0.15 * n, 0, 1)[..., None]
-    dark = np.array((0.035, 0.018, 0.010)); light = np.array((0.155, 0.078, 0.036))
-    return dark * (1 - t) + light * t
-def leather_fn(u, v):
-    d = np.abs(np.sin(math.pi * (u * 2 + v * 4))) < 0.10
-    d |= np.abs(np.sin(math.pi * (u * 2 - v * 4))) < 0.10
-    n = 0.5 + 0.5 * tnoise(u, v, 21, 9, 14)
-    base = np.array((0.15, 0.07, 0.04)) * (0.65 + 0.5 * n[..., None])
-    return np.where(d[..., None], base * 0.45, base)
-def brass_fn(u, v):
-    n = 0.5 + 0.5 * tnoise(u, v, 31, 9, 10)
-    pat = smooth_np(0.55, 0.9, n)[..., None]
-    gold = np.array((0.86, 0.60, 0.22)) * (0.8 + 0.3 * n[..., None])
-    return gold * (1 - pat) + np.array((0.36, 0.20, 0.07)) * pat
-def brass_orm(u, v):
-    n = 0.5 + 0.5 * tnoise(u, v, 31, 9, 10)
-    pat = smooth_np(0.55, 0.9, n)
-    r = 0.26 + 0.14 * n + 0.22 * pat
-    m = 1.0 - 0.30 * pat
-    return np.stack([np.ones_like(r), r, m], axis=-1)
+def grid(H, W):
+    return np.linspace(0, 1, W, endpoint=False)[None, :] * np.ones((H, 1)), np.linspace(0, 1, H, endpoint=False)[:, None] * np.ones((1, W))
 
-def make_mat(name, color=(0.5, 0.5, 0.5), metal=0.0, rough=0.5, emit=None, estr=1.0, tex=None, emit_tex=False, orm=None):
+def ramp(u, keys):
+    out = np.zeros(u.shape + (3,)); xs = [k[0] for k in keys]
+    for c in range(3): out[..., c] = np.interp(u, xs, [k[1][c] for k in keys])
+    return out
+
+def mix(a, b, t): return a * (1 - t[..., None]) + b * t[..., None]
+
+def make_img(name, rgb, linear=False):
+    H, W = rgb.shape[:2]
+    px = np.concatenate([np.clip(rgb, 0, 1), np.ones((H, W, 1))], axis=2).astype(np.float32)
+    img = bpy.data.images.new(name, W, H, alpha=False)
+    img.pixels.foreach_set(px.ravel()); img.pack(); img.colorspace_settings.name = "Non-Color" if linear else "sRGB"
+    return img
+
+def orm(rough, metal=None, ao=None):
+    z = np.zeros_like(rough)
+    return np.stack([np.ones_like(rough) if ao is None else ao, rough, z if metal is None else metal], axis=-1)
+
+def wood_maps():
+    H, W = 256, 512; u, v = grid(H, W)
+    rings = 0.5 + 0.5 * np.sin(2 * math.pi * (v * 7 + 0.35 * fnoise(H, W, 3, 2, 3) + 0.10 * fnoise(H, W, 5, 3, 8)))
+    fibre = fnoise(H, W, 8, 5, 110); pores = np.clip(fnoise(H, W, 9, 40, 150) - 0.35, 0, 1)
+    t = np.clip(0.42 * rings + 0.34 * (0.5 + 0.5 * fibre) + 0.12 * (0.5 + 0.5 * fnoise(H, W, 11, 3, 5)), 0, 1)
+    col = mix(np.array((0.040, 0.019, 0.010)), np.array((0.205, 0.100, 0.044)), t) * (1 - 0.55 * pores[..., None])
+    rough = np.clip(0.50 + 0.22 * (1 - t) + 0.10 * fibre + 0.25 * pores, 0.3, 0.9)
+    return col, orm(rough, ao=1 - 0.5 * pores)
+
+def leather_maps():
+    H, W = 512, 256; u, v = grid(H, W)          # u tiles 6x along the grip, v is the half-circumference (mirrored)
+    cell = smooth_np(0.55, 1.0, 1 - np.abs(fnoise(H, W, 21, 30, 22)))                       # pebbled hide, slightly stretched around the grip
+    fibre = fnoise(H, W, 22, 6, 90)                                                        # fine creases running along the grip
+    wear = smooth_np(0.1, 0.7, 0.5 + 0.5 * fnoise(H, W, 23, 3, 3))
+    p = (u + 0.5 * v) % 1.0; d = np.abs(((p + 0.5) % 1.0) - 0.5)                            # distance to the helical wrap seam (one per tile)
+    g = np.exp(-(d / 0.011) ** 2)                                                          # seam groove
+    st = np.exp(-((d - 0.036) / 0.007) ** 2) * (np.sin(2 * math.pi * v * 26) > 0.35)       # stitch pits beside the seam
+    ridge = np.exp(-((d - 0.028) / 0.010) ** 2)                                            # raised lip of the wrap
+    h = 0.42 * cell + 0.12 * fibre + 0.10 * ridge - 0.75 * g - 0.35 * st + 0.10 * wear
+    nx = -(np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 11.0; ny = -(np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 11.0
+    nn = np.sqrt(nx * nx + ny * ny + 1); nrm = np.stack([nx / nn, ny / nn, 1 / nn], -1) * 0.5 + 0.5
+    raised = np.clip(0.35 + 0.55 * cell + 0.3 * wear - 0.7 * g - 0.3 * st, 0, 1)
+    col = mix(np.array((0.042, 0.020, 0.010)), np.array((0.165, 0.084, 0.040)), raised) * (0.92 + 0.08 * fibre[..., None])
+    col = mix(col, col * 0.55, np.clip(g + 0.5 * st, 0, 1))
+    rough = np.clip(0.86 - 0.30 * raised * (0.5 + 0.5 * wear) + 0.12 * g, 0.4, 1.0)
+    return col, orm(rough), nrm
+
+def metal_maps():
+    """One 512^2 atlas, three regions.  Gold feathers v .55-.95 (u = along the feather); brass fittings v .05-.45, u 0-.8; dark bronze v .05-.45, u .82-1."""
+    H = W = 512; col = np.zeros((H, W, 3)) + np.array((0.2, 0.13, 0.06)); rough = np.full((H, W), 0.5); metal = np.full((H, W), 0.9)
+    def put(y0, x0, c, r, m):
+        h, w = r.shape; col[y0:y0 + h, x0:x0 + w] = c; rough[y0:y0 + h, x0:x0 + w] = r; metal[y0:y0 + h, x0:x0 + w] = m
+    h, w = int(.4 * H), W; u, v = grid(h, w); vc = np.abs(v - 0.5) * 2
+    base = ramp(u, [(0, (0.24, 0.13, 0.04)), (.14, (0.55, 0.33, 0.08)), (.45, (0.86, 0.60, 0.20)), (.85, (0.97, 0.75, 0.30)), (1, (1.0, 0.82, 0.42))])
+    barb = 0.5 + 0.5 * np.sin(2 * math.pi * (u * 44 - vc * 8 + 0.30 * fnoise(h, w, 41, 8, 6)))
+    blot = 0.5 + 0.5 * fnoise(h, w, 42, 7, 5); pat = smooth_np(0.55, 0.95, blot) * (1 - smooth_np(0.0, 0.7, u) * 0.4)
+    c = base * (0.92 + 0.08 * barb[..., None]) * (0.90 + 0.18 * blot[..., None])
+    c = mix(c, np.array((0.32, 0.20, 0.07)), 0.40 * pat)
+    c = np.where((np.abs(v - 0.5) < 0.022)[..., None], np.clip(c * 1.18 + 0.03, 0, 1), c)          # rachis
+    c = mix(c, np.clip(c * 1.16 + 0.02, 0, 1), smooth_np(0.86, 0.97, vc))                          # bright border
+    c = mix(c, c * 0.5, np.exp(-((vc - 0.80) / 0.028) ** 2))                                       # engraved line inside the border
+    put(int(.55 * H), 0, c, np.clip(0.36 + 0.10 * (1 - barb) + 0.20 * pat + 0.08 * blot, 0.25, 0.85), np.clip(0.85 - 0.30 * pat, 0.4, 1.0))
+    h, w = int(.4 * H), int(.8 * W); u, v = grid(h, w)
+    n1 = 0.5 + 0.5 * fnoise(h, w, 51, 6, 6); n2 = 0.5 + 0.5 * fnoise(h, w, 52, 18, 18)
+    pat = smooth_np(0.50, 0.85, 0.6 * n1 + 0.4 * n2); scr = np.clip(fnoise(h, w, 53, 6, 120) - 0.45, 0, 1) * 3
+    c = mix(np.array((0.74, 0.52, 0.19)) * (0.90 + 0.16 * n2[..., None]), np.array((0.30, 0.21, 0.08)), 0.75 * pat)
+    put(int(.05 * H), 0, np.clip(c + scr[..., None] * 0.10, 0, 1), np.clip(0.26 + 0.38 * pat + 0.10 * n2 - 0.06 * scr, 0.18, 0.9), np.clip(0.92 - 0.40 * pat, 0.4, 1.0))
+    h, w = int(.4 * H), W - int(.82 * W); u, v = grid(h, w)
+    n1 = 0.5 + 0.5 * fnoise(h, w, 61, 5, 8); n2 = 0.5 + 0.5 * fnoise(h, w, 62, 14, 22)
+    c = mix(np.array((0.115, 0.075, 0.040)), np.array((0.245, 0.165, 0.080)), 0.6 * n1 * n2 + 0.2)
+    c = mix(c, np.array((0.06, 0.04, 0.025)), smooth_np(0.65, 0.95, n2) * 0.7)
+    put(int(.05 * H), int(.82 * W), c, 0.36 + 0.28 * n2, np.full((h, w), 0.85))
+    return col, orm(rough, metal)
+
+def ember_map():
+    H = W = 256; u, v = grid(H, W); vc = np.abs(v - 0.5) * 2
+    c = ramp(u, [(0, (0.10, 0.020, 0.012)), (.22, (0.40, 0.060, 0.010)), (.50, (0.78, 0.21, 0.012)), (.70, (0.96, 0.40, 0.02)),
+                 (.78, (1.0, 0.52, 0.08)), (.88, (0.80, 0.24, 0.02)), (.915, (0.22, 0.09, 0.03)), (.935, (0.03, 0.17, 0.80)), (1, (0.30, 0.62, 1.0))])
+    barb = 0.5 + 0.5 * np.sin(2 * math.pi * (u * 32 - vc * 6 + 0.3 * fnoise(H, W, 71, 6, 5)))
+    c = c * (0.80 + 0.20 * barb[..., None]) * (0.88 + 0.16 * (0.5 + 0.5 * fnoise(H, W, 72, 8, 6))[..., None])
+    c = mix(c, c * np.array((0.55, 0.32, 0.15)), smooth_np(0.55, 0.98, vc) * (u < 0.9))     # dark rim -> reads as a recess
+    return np.where((np.abs(v - 0.5) < 0.02)[..., None] & (u[..., None] < 0.9), np.clip(c * 1.25 + 0.03, 0, 1), c)
+
+def make_mat(name, color=(1, 1, 1), metal=0.0, rough=0.5, emit=None, estr=1.0, tex=None, emit_tex=False, orm_img=None, normal=None):
     m = bpy.data.materials.new(name); m.use_nodes = True
     nt = m.node_tree; bsdf = nt.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (*color, 1)
@@ -112,72 +136,96 @@ def make_mat(name, color=(0.5, 0.5, 0.5), metal=0.0, rough=0.5, emit=None, estr=
     elif emit is not None:
         bsdf.inputs["Emission Color"].default_value = (*emit, 1)
         bsdf.inputs["Emission Strength"].default_value = estr
-    if orm is not None:  # glTF metallicRoughness: G = roughness, B = metallic
-        o = nt.nodes.new("ShaderNodeTexImage"); o.image = orm; orm.colorspace_settings.name = "Non-Color"
+    if orm_img is not None:  # glTF metallicRoughness: G = roughness, B = metallic
+        o = nt.nodes.new("ShaderNodeTexImage"); o.image = orm_img
         sp = nt.nodes.new("ShaderNodeSeparateColor")
         nt.links.new(o.outputs["Color"], sp.inputs["Color"])
         nt.links.new(sp.outputs["Green"], bsdf.inputs["Roughness"])
         nt.links.new(sp.outputs["Blue"], bsdf.inputs["Metallic"])
+    if normal is not None:
+        n = nt.nodes.new("ShaderNodeTexImage"); n.image = normal
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        nt.links.new(n.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
     return m
 
-TEX_GOLD = make_tex("tex_gold", gold_fn)
-TEX_EMBER = make_tex("tex_ember", ember_fn)
-TEX_WING = make_tex("tex_wing", wing_fn)
-TEX_WOOD = make_tex("tex_wood", wood_fn, 512, 256)
-TEX_LEATHER = make_tex("tex_leather", leather_fn, 256, 128)
-TEX_BRASS = make_tex("tex_brass", brass_fn, 256, 128)
-TEX_BRASS_ORM = make_tex("tex_brass_orm", brass_orm, 256, 128); TEX_BRASS_ORM.colorspace_settings.name = "Non-Color"
+# 8 embedded images: wood bc+orm, leather bc+orm+normal, metal bc+orm (gold feathers, brass, dark bronze share one atlas), ember bc
+_wc, _wo = wood_maps(); _lc, _lo, _ln = leather_maps(); _mc, _mo = metal_maps()
 M = {
-    "Wood": make_mat("Wood", (1, 1, 1), 0.0, 0.62, tex=TEX_WOOD),
-    "Leather": make_mat("Leather", (1, 1, 1), 0.0, 0.7, tex=TEX_LEATHER),
-    "Brass": make_mat("Brass", (1, 1, 1), 1.0, 0.3, tex=TEX_BRASS, orm=TEX_BRASS_ORM),
-    "FeatherGold": make_mat("FeatherGold", (1, 1, 1), 0.85, 0.34, tex=TEX_GOLD),
-    "FeatherEmber": make_mat("FeatherEmber", (0.45, 0.32, 0.28), 0.0, 0.5, tex=TEX_EMBER, emit_tex=True, estr=0.85),
+    "Wood": make_mat("Wood", tex=make_img("wood_bc", _wc), orm_img=make_img("wood_orm", _wo, True)),
+    "Leather": make_mat("Leather", tex=make_img("leather_bc", _lc), orm_img=make_img("leather_orm", _lo, True), normal=make_img("leather_n", _ln, True)),
+    "Brass": make_mat("Brass", tex=make_img("metal_bc", _mc), orm_img=make_img("metal_orm", _mo, True)),
+    "Ember": make_mat("Ember", rough=0.55, tex=make_img("ember_bc", ember_map()), emit_tex=True, estr=0.5),
+    "Eye": make_mat("EmberEye", (0.02, 0.16, 0.85), 0.0, 0.16, emit=(0.08, 0.42, 1.0), estr=0.6),
     "Steel": make_mat("Steel", (0.66, 0.69, 0.74), 1.0, 0.27),
     "AshShaft": make_mat("AshShaft", (0.46, 0.30, 0.15), 0.0, 0.55),
     "Fletch": make_mat("Fletch", (0.88, 0.80, 0.66), 0.0, 0.8),
-    "WingFeather": make_mat("WingFeather", (0.5, 0.36, 0.3), 0.0, 0.5, tex=TEX_WING, emit_tex=True, estr=1.0),
-    "WingFlame": make_mat("WingFlame", (1.0, 0.45, 0.08), 0.0, 0.6, emit=(1.0, 0.5, 0.1), estr=3.0),
 }
-UV_HOT = (0.78, 0.5); UV_AZURE = (0.975, 0.5)  # special spots of the ember texture (heart / eyes / gems)
+if "--all" in argv:   # wings keep their original (unchanged) look
+    def _wing(u, v):
+        e = np.abs(v - 0.5) * 2
+        c = ramp(u, [(0, (0.4, 0.08, 0.02)), (.3, (1, 0.36, 0.05)), (.65, (1, 0.6, 0.14)), (.85, (1, 0.82, 0.4)), (.93, (0.15, 0.55, 1.0)), (1, (0.6, 0.9, 1.0))])
+        c = c * (1 - 0.35 * e[..., None] ** 3); c = c * (0.88 + 0.12 * (0.5 + 0.5 * np.sin(v * 70 + u * 9))[..., None])
+        m = smooth_np(0.78, 1.0, e)[..., None]; c = c * (1 - m) + np.array((1.0, 0.72, 0.2)) * m
+        return np.where((np.abs(v - 0.5) < 0.018)[..., None], np.clip(c * 1.25 + 0.06, 0, 1), c)
+    _u, _v = grid(128, 256)
+    M["WingFeather"] = make_mat("WingFeather", (0.5, 0.36, 0.3), 0.0, 0.5, tex=make_img("tex_wing", _wing(_u, _v)), emit_tex=True, estr=1.0)
+    M["WingFlame"] = make_mat("WingFlame", (1.0, 0.45, 0.08), 0.0, 0.6, emit=(1.0, 0.5, 0.1), estr=3.0)
+UV_HOT = (0.78, 0.5); UV_AZURE = (0.975, 0.5)  # special spots of the ember texture (heart / tip gems)
+
+# Logical material names -> (real material, u scale, u offset, v scale, v offset): Gold / Brass / Bronze are regions of ONE metal atlas.
+ALIAS = {"Gold": ("Brass", 1.0, 0.0, 0.4, 0.55), "Brass": ("Brass", 0.8, 0.0, 0.4, 0.05), "Bronze": ("Brass", 0.16, 0.82, 0.4, 0.05)}
+def real_mat(n): return ALIAS[n][0] if n in ALIAS else n
 
 # ------------------------------------------------------------------ mesh builder
 class MB:
     def __init__(self, mirror=False):
-        self.v, self.uv, self.f, self.fm, self.fuv = [], [], [], [], []
-        self.slots = []; self.mirror = mirror
+        self.v, self.uv, self.f, self.fm = [], [], [], []
+        self.mirror = mirror
     def vert(self, p, uv=(0.5, 0.5)):
         p = V(p)
         if self.mirror: p = V((p.x, -p.y, p.z))
         self.v.append(p); self.uv.append(uv); return len(self.v) - 1
     def face(self, idx, mat):
         if self.mirror: idx = idx[::-1]
-        if mat not in self.slots: self.slots.append(mat)
-        self.f.append(tuple(idx)); self.fm.append(self.slots.index(mat))
+        self.f.append(tuple(idx)); self.fm.append(mat)          # logical material NAME; slot index is resolved in build()
     def scale_x(self, k):
         for p in self.v: p.x *= k
     def tris(self):
         return sum(len(f) - 2 for f in self.f)
+    def slot_order(self, slots=None):
+        if slots: return list(slots)
+        out = []
+        for n in self.fm:
+            if real_mat(n) not in out: out.append(real_mat(n))
+        return out
     def build(self, name, parent=None, origin=(0, 0, 0), slots=None):
         me = bpy.data.meshes.new(name)
         o = V(origin)
         verts = [B(p - o) for p in self.v]
         me.from_pydata(verts, [], self.f)
-        for s in (slots or self.slots): me.materials.append(M[s])
-        me.polygons.foreach_set("material_index", self.fm)
+        order = self.slot_order(slots)
+        for s in order: me.materials.append(M[s])
+        for n in self.fm:
+            if real_mat(n) not in order: raise RuntimeError(f"{name}: face material {n} not in slots {order}")
+        me.polygons.foreach_set("material_index", [order.index(real_mat(n)) for n in self.fm])   # FIX: each face's NAMED material -> OUTPUT slot
         me.polygons.foreach_set("use_smooth", [True] * len(self.f))
         uvl = me.uv_layers.new(name="UVMap")
-        for poly in me.polygons:
+        for poly, mname in zip(me.polygons, self.fm):
             uvs = [self.uv[vi] for vi in poly.vertices]
             wrap = max(t[1] for t in uvs) - min(t[1] for t in uvs) > 0.6  # tube seam: unwrap v across the seam
-            for li, uv in zip(poly.loop_indices, uvs):
-                uvl.data[li].uv = (uv[0], uv[1] + 1.0 if wrap and uv[1] < 0.5 else uv[1])
+            uvs = [(t[0], t[1] + 1.0 if wrap and t[1] < 0.5 else t[1]) for t in uvs]
+            if mname in ALIAS:
+                _, ua, ub, va, vb = ALIAS[mname]; sh = math.floor(min(t[0] for t in uvs) + 1e-6)
+                uvs = [((t[0] - sh) * ua + ub, min(max(t[1], 0.0), 1.0) * va + vb) for t in uvs]
+            for li, uv in zip(poly.loop_indices, uvs): uvl.data[li].uv = uv
         me.update()
+        print(f"  {name}: " + ", ".join(f"{s}={sum(len(f) - 2 for f, n in zip(self.f, self.fm) if real_mat(n) == s)}" for s in order))
         ob = bpy.data.objects.new(name, me)
         scene.collection.objects.link(ob)
         ob.location = B(o); ob.parent = parent
         if parent is not None: ob.location = B(o - V(parent.get("gpos", (0, 0, 0))))
         return ob
+
 
 def empty(name, p, parent=None):
     e = bpy.data.objects.new(name, None); e.empty_display_type = "PLAIN_AXES"; e.empty_display_size = 0.02
@@ -200,7 +248,7 @@ def tube(mb, pts, radii, mats, sides=8, ref=V((1, 0, 0)), caps=(True, True), squ
         ring = []
         for j in range(sides):
             ang = 2 * math.pi * j / sides
-            ring.append(mb.vert(p + radii[i] * (math.cos(ang) * a + math.sin(ang) * b * squash), (uscale * i / max(n - 1, 1), j / sides)))
+            ring.append(mb.vert(p + radii[i] * (math.cos(ang) * a + math.sin(ang) * b * squash), (uscale * i / max(n - 1, 1), fold(j / sides))))
         rings.append(ring)
     flip = None
     for i in range(n - 1):
@@ -345,7 +393,7 @@ def loft(mb, rings, mats, sides=20, n_exp=2.4, uu=0.5, caps=(True, True), cap_ma
         for j in range(sides):
             a = 2 * math.pi * j / sides; c, s = math.cos(a), math.sin(a)
             row.append(mb.vert(V((cx + rx * math.copysign(abs(c) ** ex, c), y, cz + rz * math.copysign(abs(s) ** ex, s))),
-                               (uu[i] if isinstance(uu, (list, tuple)) else uu, j / sides)))
+                               (uu[i] if isinstance(uu, (list, tuple)) else uu, fold(j / sides))))
         R.append(row)
     for i in range(len(rings) - 1):
         m = mats if isinstance(mats, str) else mats[i]
@@ -377,14 +425,14 @@ def box(mb, c, h, mat):
 
 # ---- limb feathers ---------------------------------------------------------------------------
 def limb_feather(sp, mbL, side, u, ang, L, w, zo=0.0, curl=0.03, azure=False, ember=True, N=8,
-                 thick=(0.0075, 0.0016), cup=0.20, gss=(-1, -0.5, 0, 0.5, 1), ulen=0.10):
+                 thick=(0.0075, 0.0016), cup=0.20, gss=(-1, -0.5, 0, 0.5, 1), ulen=0.10, sweep=0.50):
     """One cambered swept feather: thick bronze-gold body (+ ember inlay on the player-facing face)."""
     root = sp.p(u) + X * side * 0.010 + sp.n(u) * zo
     pts, nrs = [root], [sp.n(u)]
     p = root
     for k in range(N):
         tk = (k + 0.5) / N; uu = min(u + tk * ulen, 1.0)
-        a = ang * (1 - 0.50 * tk ** 1.4)
+        a = ang * (1 - sweep * tk ** 1.4)
         d = norm(sp.t(uu) * math.cos(a) + X * side * math.sin(a))
         p = p + d * (L / N)
         nn = sp.n(uu)
@@ -392,26 +440,29 @@ def limb_feather(sp, mbL, side, u, ang, L, w, zo=0.0, curl=0.03, azure=False, em
     ym = max(q.y for q in pts)
     if ym > YMAX:
         k = (YMAX - root.y) / (ym - root.y); pts = [root + (q - root) * k for q in pts]
-    feather(mbL, pts, nrs, w, thick, cup, "FeatherGold", ss=gss, prof=prof_blade, uvrange=(0.0, 1.0))
+    feather(mbL, pts, nrs, w, thick, cup, "Gold", ss=gss, prof=prof_blade, uvrange=(0.0, 1.0))
     if ember:
         t0, t1 = thick
         pin = [q + n * (t0 + (t1 - t0) * i / N + 0.0005) for i, (q, n) in enumerate(zip(pts, nrs))][1:]
-        feather(mbL, pin, nrs[1:], w * 0.56, (0.0012, 0.0008), cup, "FeatherEmber", ss=(-1, 0, 1),
+        feather(mbL, pin, nrs[1:], w * 0.56, (0.0012, 0.0008), cup, "Ember", ss=(-1, 0, 1),
                 prof=lambda t: prof_blade(0.06 + 0.9 * t), asym=0.15, uvrange=(0.0, 1.0 if azure else 0.82))
 
 def limb_feathers(sp, mbL, rg, side, scale):
-    """Three readable masses: shoulder, mid, tip.  (u, angle, length, width)"""
+    """Three masses with breathing room between them: a fanned shoulder (strongest feather at its heart), a looser mid mass whose
+    longest primary is the sweep's leading edge, and a slim tip flick.  (u, angle, length, width, sweep)"""
     j = lambda: rg.uniform(-1, 1)
-    A = [(0.10, 1.48, 0.17, 0.052), (0.155, 1.38, 0.23, 0.060), (0.215, 1.26, 0.27, 0.062), (0.275, 1.13, 0.25, 0.054)]
-    Bm = [(0.42, 1.02, 0.31, 0.058), (0.49, 0.92, 0.335, 0.058), (0.56, 0.82, 0.29, 0.050)]
-    C = [(0.72, 0.62, 0.17, 0.040), (0.785, 0.52, 0.15, 0.034)]
-    cov = [(0.13, 1.42, 0.12, 0.050), (0.20, 1.30, 0.14, 0.050), (0.46, 0.98, 0.15, 0.046), (0.53, 0.88, 0.15, 0.044), (0.75, 0.58, 0.09, 0.032)]
+    A = [(0.085, 1.52, 0.150, 0.046, 0.30), (0.135, 1.34, 0.235, 0.058, 0.45), (0.190, 1.18, 0.290, 0.066, 0.62),   # 0.29 = strongest
+         (0.245, 1.38, 0.185, 0.048, 0.35), (0.295, 1.06, 0.235, 0.052, 0.55)]
+    Bm = [(0.405, 0.98, 0.265, 0.052, 0.60), (0.470, 0.76, 0.340, 0.060, 0.72), (0.545, 0.92, 0.210, 0.044, 0.40)]
+    C = [(0.705, 0.66, 0.190, 0.038, 0.55), (0.775, 0.40, 0.135, 0.030, 0.30)]
+    cov = [(0.115, 1.44, 0.11, 0.046), (0.215, 1.26, 0.13, 0.048), (0.445, 0.94, 0.14, 0.044), (0.515, 0.86, 0.115, 0.040)]
     back = [(0.12, 1.56, 0.20, 0.040), (0.36, 1.24, 0.19, 0.036), (0.64, 0.74, 0.12, 0.030)]
     spur = [(0.20, 0.95, 0.075, 0.024), (0.45, 0.80, 0.085, 0.024)]
     for grp in (A, Bm, C):
-        for i, (u, a, L, w) in enumerate(grp):
-            limb_feather(sp, mbL, side, u, a + 0.04 * j(), L * scale * (1 + 0.05 * j()), w, zo=-0.004, curl=0.045,
-                         azure=(grp is C and i == len(grp) - 1), N=9)
+        for i, (u, a, L, w, sw) in enumerate(grp):
+            big = L >= 0.285
+            limb_feather(sp, mbL, side, u, a + 0.04 * j(), L * scale * (1 + 0.05 * j()), w, zo=-0.004, curl=0.02 + 0.05 * sw, sweep=sw,
+                         azure=(grp is C and i == len(grp) - 1), N=9, thick=(0.0088, 0.0018) if big else (0.0075, 0.0016), cup=0.24 if big else 0.20)
     for u, a, L, w in cov:
         limb_feather(sp, mbL, side, u, a + 0.03 * j(), L * scale * (1 + 0.06 * j()), w, zo=0.011, curl=0.02, ember=False, N=6,
                      thick=(0.0055, 0.0014), cup=0.26)
@@ -433,8 +484,8 @@ def build_limb(root, sign, name, sp, pivot, scale):
     tube(mb, [sp.p(u) for u in us], [rad(u) for u in us], "Wood", sides=10, ref=X, squash=sq, caps=(True, True), uscale=3.0)
     # root sleeve: overlaps the riser socket 16 mm beyond the pivot so the joint never opens under +/-0.09 rad draw
     r0 = rad(0)
-    ps = [sp.p(0) - sp.t(0) * 0.016, sp.p(0.0), sp.p(0.05), sp.p(0.10)]
-    tube(mb, ps, [r0 * 1.26, r0 * 1.36, r0 * 1.36, r0 * 1.10], "Brass", sides=12, ref=X, squash=1.65, caps=(True, True))
+    ps = [sp.p(0) - sp.t(0) * 0.016, sp.p(0.0), sp.p(0.028), sp.p(0.055)]
+    tube(mb, ps, [r0 * 1.20, r0 * 1.26, r0 * 1.26, r0 * 1.04], "Brass", sides=12, ref=X, squash=1.65, caps=(True, True))
     for ub in (0.45, 0.75):
         seg = [ub - 0.015, ub - 0.008, ub + 0.008, ub + 0.015]; r = rad(ub)
         tube(mb, [sp.p(u) for u in seg], [r * 1.05, r * 1.22, r * 1.22, r * 1.05], "Brass", sides=12, ref=X, squash=sq, caps=(True, True))
@@ -443,7 +494,7 @@ def build_limb(root, sign, name, sp, pivot, scale):
     offs = [-0.024, -0.014, -0.006, 0.0, 0.006, 0.013, 0.019]
     rr = [0.0064, 0.0088, 0.0088, 0.0058, 0.0088, 0.0090, 0.0056]
     tube(mb, [pe + te * o for o in offs], rr, "Brass", sides=12, ref=X, squash=1.5, caps=(True, True))
-    ellipsoid(mb, pe + te * 0.0195, (0.0048, 0.0048, 0.0048), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)
+    ellipsoid(mb, pe + te * 0.0195, (0.0048, 0.0048, 0.0048), "Ember", seg=8, rings=5, uv=UV_AZURE)
     limb_feathers(sp, mb, rg, sign, scale)
     ob = mb.build(name + "Mesh", lim)
     print(name + "Mesh", "tris", mb.tris())
@@ -491,38 +542,64 @@ def build_riser(root):
     return mb.build("RiserMesh", root, slots=["Wood", "Brass"])
 
 # ---- phoenix -----------------------------------------------------------------------------------
+def ring_path(c, n, R, k=20):
+    """Closed circle of radius R about centre c in the plane normal to n (for socket / heart rims)."""
+    ax = norm(V(n).cross(YV)); ay = norm(V(n).cross(ax))
+    return [V(c) + R * (math.cos(2 * math.pi * i / k) * ax + math.sin(2 * math.pi * i / k) * ay) for i in range(k + 1)]
+
 def build_core(root):
     mb = MB()
-    # chest / bridge: closes the top of the arrow window (underside y=0.134, 5 mm above the arrow corridor) and flows into the upper limb socket
+    # chest / bridge, dark bronze: closes the top of the arrow window (underside y=0.134) and flows into the upper limb socket
     chest = [(0.134, 0.0, -0.018, 0.034, 0.0120), (0.142, 0.0, -0.021, 0.034, 0.0150), (0.156, 0.0, -0.030, 0.027, 0.0185),
              (0.175, 0.0, -0.040, 0.0205, 0.0195), (0.197, 0.0, -0.046, 0.0165, 0.0135)]
-    loft(mb, chest, "FeatherEmber", sides=20, n_exp=2.4, uu=0.30, caps=(True, True))
-    ellipsoid(mb, V((0, 0.163, -0.060)), (0.0055, 0.0055, 0.0040), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)   # breast gem
-    # neck sweeps forward and up, then blends into the skull
+    loft(mb, chest, "Bronze", sides=20, n_exp=2.4, uu=0.5, caps=(True, True))
+    # ember heart: a small deep-orange recess in a gold rim, low on the breast
+    hp = V((0, 0.164, -0.0522)); hn = norm(V((0, -0.5, -0.86)))
+    ellipsoid(mb, hp, (0.0072, 0.0090, 0.0030), "Ember", seg=10, rings=6, uv=UV_HOT)
+    tube(mb, ring_path(hp + hn * 0.0004, hn, 0.0092), [0.0012] * 21, "Gold", sides=6, ref=X, caps=(False, False), uscale=1.0)
+    # neck sweeps forward and up in dark bronze; a throat gorget of three small gold-edged ember scales keeps the ember restrained
     neck = cr([V((0, 0.170, -0.048)), V((0, 0.190, -0.070)), V((0, 0.208, -0.092)), V((0, 0.220, -0.106))], 3)
-    nr = [0.0165 - 0.0035 * math.sin(math.pi * i / (len(neck) - 1)) for i in range(len(neck))]
-    tube(mb, neck, nr, "FeatherEmber", sides=12, ref=X, caps=(False, False), uscale=0.4)
+    nr = [0.0160 - 0.0035 * math.sin(math.pi * i / (len(neck) - 1)) for i in range(len(neck))]
+    tube(mb, neck, nr, "Bronze", sides=12, ref=X, caps=(False, False), uscale=0.4)
+    tng = norm(neck[-1] - neck[0]); front = norm(V((0, -tng.z, tng.y)) * -1)       # underside / throat direction
+    for k, (f, L, w) in enumerate(((0.28, 0.036, 0.0125), (0.52, 0.032, 0.0115), (0.76, 0.028, 0.0100))):
+        i = int(f * (len(neck) - 1)); base = neck[i] + front * (nr[i] * 0.90)
+        d = norm(-tng * 0.85 + front * 0.30)
+        pts = [base + d * L * q / 5 + front * 0.0025 * (q / 5) ** 2 for q in range(6)]
+        nrf = [front] * 6
+        feather(mb, pts, nrf, w, (0.0034, 0.0010), 0.25, "Gold", prof=prof_blade)
+        feather(mb, [q + front * 0.0026 for q in pts[1:]], nrf[1:], w * 0.52, (0.0009, 0.0006), 0.2, "Ember", ss=(-1, 0, 1),
+                prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0.15, 0.80))
     hc = V((0, 0.224, -0.114))
-    ellipsoid(mb, hc, (0.0190, 0.0185, 0.0245), "FeatherEmber", seg=14, rings=8, uv=(0.42, 0.5))
-    # cheek pads, sunk eyes and brow ridges that flow into the hooked beak
+    ellipsoid(mb, hc, (0.0190, 0.0185, 0.0245), "Bronze", seg=14, rings=8)
     for s in (-1, 1):
-        ellipsoid(mb, hc + V((s * 0.0140, -0.006, -0.008)), (0.0070, 0.0075, 0.0110), "FeatherEmber", seg=8, rings=5, uv=(0.55, 0.5))
-        ellipsoid(mb, hc + V((s * 0.0158, 0.0020, -0.0125)), (0.0044, 0.0044, 0.0046), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)
+        ellipsoid(mb, hc + V((s * 0.0140, -0.006, -0.008)), (0.0070, 0.0075, 0.0110), "Bronze", seg=8, rings=5)          # cheek volume
+        ec = hc + V((s * 0.0150, 0.0020, -0.0125)); en = norm(V((s, 0.0, -0.30)))
+        ellipsoid(mb, ec, (0.0042, 0.0042, 0.0044), "Eye", seg=10, rings=6)                                               # sapphire eye, set into a gold socket rim
+        tube(mb, ring_path(ec + en * 0.0022, en, 0.0056), [0.0011] * 21, "Gold", sides=6, ref=X, caps=(False, False), uscale=1.0)
         brow = cr([hc + V((s * 0.0120, 0.0130, 0.0040)), hc + V((s * 0.0172, 0.0100, -0.0110)), hc + V((s * 0.0120, 0.0080, -0.0260)), hc + V((s * 0.0050, 0.0040, -0.0350))], 3)
-        tube(mb, brow, [0.0038 - 0.0012 * i / (len(brow) - 1) for i in range(len(brow))], "FeatherGold", sides=8, ref=YV, caps=(True, True), uscale=1.0)
+        tube(mb, brow, [0.0038 - 0.0012 * i / (len(brow) - 1) for i in range(len(brow))], "Gold", sides=8, ref=YV, caps=(True, True), uscale=1.0)
+        # cheek plumes sweep back along the neck and flow into the mantle
+        for q, (dz, dy, L) in enumerate(((0.0, -0.002, 0.070), (0.006, -0.010, 0.052))):
+            st = hc + V((s * 0.0160, dy, 0.004 + dz)); tgt = V((s * 0.030, 0.178 - 0.012 * q, -0.052 + 0.010 * q))
+            d = norm(tgt - st)
+            pts = [st + d * L * i / 6 + V((s * 0.006 * math.sin(math.pi * i / 6), 0.0, 0.0)) for i in range(7)]
+            feather(mb, pts, [norm(V((s * 1.0, 0.35, 0.5)))] * 7, 0.0075 - 0.0015 * q, (0.0032, 0.0010), 0.24, "Gold", prof=prof_blade)
     beak = cr([hc + V((0, -0.002, -0.018)), hc + V((0, -0.001, -0.040)), hc + V((0, -0.010, -0.058)), hc + V((0, -0.030, -0.066))], 3)
     br = [0.0125 * (1 - i / (len(beak) - 1)) ** 0.8 + 0.0006 for i in range(len(beak))]
-    tube(mb, beak, br, "FeatherGold", sides=10, ref=X, caps=(True, True), squash=1.25, uscale=1.0)
+    tube(mb, beak, br, "Gold", sides=10, ref=X, caps=(True, True), squash=1.25, uscale=1.0)
     jaw = cr([hc + V((0, -0.011, -0.016)), hc + V((0, -0.014, -0.040)), hc + V((0, -0.022, -0.054))], 3)
-    tube(mb, jaw, [0.0070 * (1 - i / (len(jaw) - 1)) ** 0.8 + 0.0005 for i in range(len(jaw))], "FeatherGold", sides=8, ref=X, caps=(True, True), uscale=1.0)
-    # crest: three plume pairs sweeping up and back, merging into the limb
+    tube(mb, jaw, [0.0070 * (1 - i / (len(jaw) - 1)) ** 0.8 + 0.0005 for i in range(len(jaw))], "Bronze", sides=8, ref=X, caps=(True, True), uscale=1.0)
+    # crest: three plume pairs sweeping up and back into the limb; the longest pair is gold with an ember inlay
     for k, (a, L) in enumerate(((0.28, 0.090), (0.62, 0.072), (1.02, 0.052))):
         for s in (-1, 1):
             st = hc + V((s * 0.005, 0.016, 0.004)); d = norm(V((s * math.sin(a) * 0.95, 0.88, 0.32)))
             pts = [st + d * L * i / 7 + V((0, -0.030 * (i / 7) ** 2 * L / 0.09, 0.034 * (i / 7) ** 2)) for i in range(8)]
-            gold = (k + (s > 0)) % 2 == 0
-            feather(mb, pts, [V((s * 0.4, 0.3, 1.0))] * 8, 0.0100, (0.0040, 0.0010), 0.22,
-                    "FeatherGold" if gold else "FeatherEmber", prof=prof_blade, uvrange=(0, 1.0) if gold or k == 0 else (0, 0.82))
+            nrs = [V((s * 0.4, 0.3, 1.0))] * 8
+            feather(mb, pts, nrs, 0.0100, (0.0040, 0.0010), 0.22, "Bronze" if k == 1 else "Gold", prof=prof_blade)
+            if k == 0:
+                feather(mb, [q + norm(V((s * 0.4, 0.3, 1.0))) * 0.0045 for q in pts[1:]], nrs[1:], 0.0056, (0.0010, 0.0007), 0.22, "Ember", ss=(-1, 0, 1),
+                        prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0.1, 0.80))
     # mantle: thick cambered shoulder feathers sweeping out over the limb root
     for side in (-1, 1):
         for k in range(3):
@@ -532,11 +609,11 @@ def build_core(root):
             st = V((side * 0.020, 0.152 + 0.014 * k, -0.040))
             pts = [st + d * L * i / 7 + V((0, 0, 0.020 * (i / 7) ** 2)) for i in range(8)]
             nr2 = [norm(V((0, 0.2, 1.0))) for _ in pts]
-            feather(mb, pts, nr2, 0.0170, (0.0060, 0.0012), 0.22, "FeatherGold", prof=prof_blade)
-            feather(mb, [q + V((0, 0, 0.0056)) for q in pts[1:]], nr2[1:], 0.0092, (0.0012, 0.0008), 0.22, "FeatherEmber", ss=(-1, 0, 1),
-                    prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0, 0.82 if k < 2 else 1.0))
+            feather(mb, pts, nr2, 0.0170, (0.0060, 0.0012), 0.22, "Gold", prof=prof_blade)
+            feather(mb, [q + V((0, 0, 0.0056)) for q in pts[1:]], nr2[1:], 0.0092, (0.0012, 0.0008), 0.22, "Ember", ss=(-1, 0, 1),
+                    prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0, 0.82))
     print("PhoenixCore tris", mb.tris())
-    return mb.build("PhoenixCore", root, slots=["FeatherEmber", "FeatherGold"])
+    return mb.build("PhoenixCore", root)
 
 def build_bow():
     root = empty("Bow", (0, 0, 0))
@@ -678,9 +755,12 @@ def glb_report(fname):
     print("    local bounds min", [round(x, 3) for x in mn], "max", [round(x, 3) for x in mx])
 
 if __name__ == "__main__":
-    ALL = "--all" in argv     # arrow / wings are unchanged in this pass; only rebuilt with --all
     jobs = [(build_bow(), "bow.glb")]
-    if ALL: jobs += [(build_arrow(), "arrow.glb"), (build_wings(), "wings.glb")]
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "source.blend"))
     for objs, fn in jobs:
         export(objs, fn); glb_report(fn)
+    if "--all" in argv:
+        # Preserve the installed conventional arrow and flight-wing art. They
+        # use their frozen original atlas, not this bow's new metal materials.
+        import runpy
+        runpy.run_path(os.path.join(os.path.dirname(__file__), "flight_builder.py"), run_name="__main__")

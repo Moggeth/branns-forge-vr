@@ -18,6 +18,8 @@ static func run(game):
 	check.call(bow.guide!=null and bow.model.to_local(bow.guide.global_position).distance_to(Vector3(0,.115,-.012))<.001,"physical guide matches raised nock line"); assertions+=1
 	check.call(bow.top.get_parent()==bow.upper and bow.bottom.get_parent()==bow.lower,"string sockets belong to moving limb roots"); assertions+=1
 	check.call(bow.bow.find_children("*","Light3D",true,false).is_empty(),"draw glow uses materials without per-bow lights"); assertions+=1
+	var palm_material=_grip_contact_material(bow)
+	check.call("leather" in palm_material.to_lower(),"palm contact surface is leather rather than swapped brass ("+palm_material+")"); assertions+=1
 	for side in ["left_hand","right_hand"]:
 		var controller=XRController3D.new(); controller.tracker=StringName(side); game.qol.tracking_space.add_child(controller)
 		game.grips._attach(controller,bow.bow)
@@ -126,9 +128,30 @@ static func _arrow_obstructions(archery)->Array:
 		var faces:PackedVector3Array=mesh.mesh.get_faces()
 		var inverse=mesh.global_transform.affine_inverse()
 		for offset in [Vector3.ZERO,Vector3(.0037,0,0),Vector3(-.0037,0,0),Vector3(0,.0037,0),Vector3(0,-.0037,0)]:
-			var from=inverse*(archery.rest.global_position+archery.bow.global_basis*offset)
-			var to=inverse*(archery.rest.global_position+archery.bow.global_basis*(offset+Vector3.FORWARD*.80))
+			# The native triangle helper uses an absolute epsilon; metre-scale
+			# millimetre triangles need a centimetre coordinate frame for this probe.
+			var from=(inverse*(archery.rest.global_position+archery.bow.global_basis*offset))*100.0
+			var to=(inverse*(archery.rest.global_position+archery.bow.global_basis*(offset+Vector3.FORWARD*.80)))*100.0
 			for index in range(0,faces.size(),3):
-				if Geometry3D.segment_intersects_triangle(from,to,faces[index],faces[index+1],faces[index+2])!=null:
+				if Geometry3D.segment_intersects_triangle(from,to,faces[index]*100.0,faces[index+1]*100.0,faces[index+2]*100.0)!=null:
 					blocked.append(mesh.name); break
 	return blocked
+
+static func _grip_contact_material(archery)->String:
+	var grip=archery.model.find_child("GripMesh",true,false)
+	if not grip is MeshInstance3D: return "missing grip mesh"
+	var a=grip.to_local(archery.bow.to_global(Vector3(.12,.0053,.0012)))*100.0
+	var b=grip.to_local(archery.bow.to_global(Vector3(-.12,.0053,.0012)))*100.0
+	var distance=INF
+	var name="no palm surface"
+	for surface in grip.mesh.get_surface_count():
+		var arrays=grip.mesh.surface_get_arrays(surface)
+		var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+		var indices:PackedInt32Array=arrays[Mesh.ARRAY_INDEX]
+		for index in range(0,indices.size(),3):
+			var hit=Geometry3D.segment_intersects_triangle(a,b,vertices[indices[index]]*100.0,vertices[indices[index+1]]*100.0,vertices[indices[index+2]]*100.0)
+			if hit!=null and a.distance_to(hit)<distance:
+				distance=a.distance_to(hit)
+				var material=grip.get_active_material(surface)
+				name=material.resource_name if material!=null else "missing material"
+	return name

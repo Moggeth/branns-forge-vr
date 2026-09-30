@@ -1574,3 +1574,49 @@ DNS and verify the existing endpoint rather than repeatedly creating tunnels.
 The selected static review files require `.png` and `.zip` MIME entries in the
 showroom server. Its root boundary, real-path guard and extension allowlist
 remain in force; never copy a whole project into the public folder.
+
+Emberwing craftsmanship revision (2026-09-30): two serial, subscription-verified
+Sonnet 5.5 commissions separated physical construction (464.731 s) from final
+sculpture/materials (574.990 s). Send actual articulated-hand game captures to
+the finishing artist rather than accepting studio-only hand fit. The solid
+grip/raised arrow window, limb-parented nock markers and authored pivots are
+now asset contracts. The final bow is 15,732 triangles, 13 surfaces, five
+materials, eight images and 1,459,448 bytes, with no added lights.
+
+The artist's first structural mesh appeared to have a gold grip. Its builder
+stored face material indices in first-use order, then exported a different
+forced slot order: Leather 88 / Brass 1540 triangles. Resolve faces by material
+name into the output slots in the source builder; do not hide the defect with
+a game override. Final contact material and counts are Leather 1540 / Brass 88.
+
+The first two real-mesh contact checks failed to intersect tiny triangles
+(7.334 / 6.987 s) despite correct visible geometry. A 0.193-second isolated
+probe distinguished the helper's scale sensitivity from import/material
+failure. Scale both local ray and triangle coordinates by 100 for these
+millimetre-scale tests. Apply the same normalization to shaft-clearance rays
+so a missed tiny face cannot become a false clearance pass. Defer the probe's
+global-transform read until its nodes are inside the tree. Final archery checks
+passed 38 assertions in 6.984 s, including the actual imported shaft corridor
+at brace/draw, leather contact, moving seated nocks and emissive response.
+
+Preserve the original arrow/wing source separately: a bow material atlas must
+not silently alter their artwork. Initial block extraction missed shared `X`
+and `random` definitions (0.530 / 0.556 s); retain shared dependencies explicitly
+and verify outputs by hash. `builder.py --all` now invokes `flight_builder.py`
+and reproduced all three installed GLBs byte-for-byte in 0.997 s.
+
+Final GLB gate/import: 2.519 / 4.104 s. Service unit tests and the complete
+isolated integration passed (61.513 s). Eight actual articulated-hand poses
+plus two dark draw/curve views captured in 11.062 s; all twelve standard views
+rendered in 4.843 s. The assembled showroom GLB passed its own Khronos/Godot
+gate in 2.520 s. These offline checks did not restart a live game, voice helper
+or headset and do not establish physical comfort or stereo GPU performance.
+Source, actual game captures and remaining art limitations are documented in
+`assets/emberwing-sonnet/REFINEMENT.md` and the designer review handoff.
+
+Refined review publication reused the healthy tunnel in 1.341 s. The first
+HEAD verification failed in 0.151 s because PowerShell 7 returns HTTP header
+values as string arrays; normalize with `@($response.Headers['Content-Length'])[0]`
+before numeric conversion (likewise Content-Type). Corrected PNG/ZIP size/MIME
+and overview SHA-256 checks passed in 1.236 s. Keep the prior model/pack URLs
+for comparison instead of replacing previously shared review artefacts.
