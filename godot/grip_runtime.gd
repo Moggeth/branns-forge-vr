@@ -58,7 +58,8 @@ func _build_holster(root: Node3D, side: int):
 func _holster_pose(item: Node3D, side: int) -> Transform3D:
 	var id := str(item.get_meta("id", "")).to_lower()
 	if item.get_meta("guardian_shield", false):
-		return Transform3D(Basis(Vector3.FORWARD, side * 0.22) * Basis(Vector3.RIGHT, -PI * 0.5), Vector3(side * 0.04, -0.13, -0.07))
+		# Hang vertically outside the hip; the old pose made a horizontal tray.
+		return Transform3D(Basis(Vector3.UP,side*PI*0.5),Vector3(side*0.10,-0.24,0.05))
 	if item.get_meta("crossbow", false):
 		return Transform3D(Basis(Vector3.UP, side * PI * 0.5) * Basis(Vector3.RIGHT, -0.25), Vector3(side * 0.025, -0.12, -0.07))
 	if item.get_meta("phoenix_bow",false):
@@ -106,7 +107,29 @@ func _key(hand): return str(hand.get_instance_id())
 
 func _pose_key(item:Node3D,hand:Node3D)->String:
 	var side=str(hand.tracker) if hand is XRController3D else "desktop"
+	# A calibration belongs to an authored pose as well as a creation version.
+	# Changing a default cannot accidentally resurrect an earlier wrong roll.
+	var signature=JSON.stringify(_pose_to_array(_default_pose(item,hand))).sha256_text().left(12)
+	return "%s|%d|%s|%s"%[str(item.get_meta("id","")),int(item.get_meta("creation_version",1)),signature,side]
+
+func _legacy_pose_key(item:Node3D,hand:Node3D)->String:
+	var side=str(hand.tracker) if hand is XRController3D else "desktop"
 	return "%s|%d|%s"%[str(item.get_meta("id","")),int(item.get_meta("creation_version",1)),side]
+
+func _legacy_pose_compatible(item:Node3D,hand:Node3D)->bool:
+	var id=str(item.get_meta("id",""))
+	# Keep old entries on disk, but retire unversioned overrides of corrected axes.
+	if item.get_meta("crossbow",false) or id in ["woodland_axe","quarry_pick","apprentice_hammer","starter_hammer","crystal_resonator","stormbell",WYRM_V1,WYRM_V2] or id.begins_with("guardian_shield_") or id.begins_with("forge_lantern_"): return false
+	if not item.get_meta("grip_preferences",{}).is_empty(): return false
+	# Migrate only when the current default still equals the historical generic
+	# convention. Future default changes cannot inherit an unversioned override.
+	var old=Transform3D(Basis.from_euler(Vector3(-.3,0,0)),Vector3.ZERO)
+	if hand is XRController3D:
+		var side=1.0 if str(hand.tracker).begins_with("left") else -1.0
+		var basis=Basis(Vector3.FORWARD,Vector3.RIGHT*side,Vector3.DOWN*side)
+		var y=clampf(.13,float(item.get_meta("grip_min",0)),float(item.get_meta("grip_max",.35)))
+		old=Transform3D(basis,Vector3(0,-.045,-.035)-basis*Vector3(0,y,0))
+	return _default_pose(item,hand).is_equal_approx(old)
 
 func _pose_to_array(pose:Transform3D)->Array:
 	return [pose.basis.x.x,pose.basis.x.y,pose.basis.x.z,pose.basis.y.x,pose.basis.y.y,pose.basis.y.z,pose.basis.z.x,pose.basis.z.y,pose.basis.z.z,pose.origin.x,pose.origin.y,pose.origin.z]
@@ -137,7 +160,7 @@ func _save_pose(item:Node3D,hand:Node3D,pose:Transform3D):
 	var file=FileAccess.open(GRIP_POSE_PATH,FileAccess.WRITE)
 	if file!=null:
 		file.store_string(JSON.stringify(data,"\t"))
-		print("GRIP_POSE_SAVED item=",item.get_meta("id","")," side=",key.get_slice("|",2))
+		print("GRIP_POSE_SAVED item=",item.get_meta("id","")," side=",key.get_slice("|",3))
 	else: push_warning("Could not save grip pose: "+str(FileAccess.get_open_error()))
 
 func _default_wyrm_pose(item:Node3D,hand:Node3D)->Transform3D:
@@ -150,6 +173,39 @@ func _default_wyrm_pose(item:Node3D,hand:Node3D)->Transform3D:
 		if id==WYRM_V2: basis=Basis(Vector3.BACK,-side*PI/2)*basis
 		return Transform3D(basis,Vector3(0,-0.018,-0.035))
 	return Transform3D(basis,Vector3(-0.12,-0.04,-0.16))
+
+func _default_pose(item:Node3D,hand:Node3D)->Transform3D:
+	var side=str(hand.tracker) if hand is XRController3D else "desktop"
+	var preferences=item.get_meta("grip_preferences",{})
+	if preferences.has(side): return preferences[side]
+	var id=str(item.get_meta("id",""))
+	if id in [WYRM_V1,WYRM_V2]: return _default_wyrm_pose(item,hand)
+	if item.get_meta("crossbow",false):
+		var roll=(PI/2 if side=="left_hand" else -PI/2) if hand is XRController3D else 0.0
+		var basis=Basis(Vector3.FORWARD,roll)*Basis(Vector3.RIGHT,Vector3.FORWARD,Vector3.UP)
+		return Transform3D(basis,-(basis*item.get_meta("grip_axis_origin",Vector3.ZERO)))
+	if hand is XRController3D:
+		var thumb_side=1.0 if side=="left_hand" else -1.0
+		var basis=Basis(Vector3.FORWARD,Vector3.RIGHT*thumb_side,Vector3.DOWN*thumb_side)
+		var grip_y=clampf(0.13,float(item.get_meta("grip_min",0)),float(item.get_meta("grip_max",0.35)))
+		return Transform3D(basis,Vector3(0,-0.045,-0.035)-basis*Vector3(0,grip_y,0))
+	if id=="woodland_axe":
+		return Transform3D(Basis.from_euler(Vector3(-0.4,-PI/2,0.45))*Basis(Vector3.UP,PI),Vector3(-0.03,-0.16,-0.28))
+	if id in ["apprentice_hammer","quarry_pick","crystal_resonator","starter_hammer","stormbell"]:
+		# These hafts have a +X working face, not the usual local -Z muzzle.
+		var basis=Basis.from_euler(Vector3(-0.25,PI/2,0.08))
+		var grip_y=clampf(0.13,float(item.get_meta("grip_min",0)),float(item.get_meta("grip_max",0.35)))
+		return Transform3D(basis,Vector3(0,-0.02,-0.08)-basis*Vector3(0,grip_y,0))
+	return Transform3D(Basis.from_euler(Vector3(-0.3,0,0)),Vector3.ZERO)
+
+func pose_for(item:Node3D,hand:Node3D)->Transform3D:
+	var key=_pose_key(item,hand)
+	var adjustments=item.get_meta("grip_adjustments",{})
+	if adjustments.has(key): return adjustments[key]
+	if saved_poses.has(key): return saved_poses[key]
+	var legacy=_legacy_pose_key(item,hand)
+	if _legacy_pose_compatible(item,hand) and saved_poses.has(legacy): return saved_poses[legacy]
+	return _default_pose(item,hand)
 
 ## These props own their attachment, release and secondary controls. Still curl
 ## the visual hand, but never enroll them in generic weapon grips or holsters.
@@ -205,26 +261,7 @@ func _attach(hand,item):
 	game.tool_physics.detach(item)
 	if game.melee!=null: game.melee.tracks.erase(item.get_instance_id())
 	item.reparent(game.hand_socket(hand))
-	var preferences=item.get_meta("grip_preferences",{})
-	var side=str(hand.tracker) if hand is XRController3D else "desktop"
-	if preferences.has(side): item.transform=preferences[side]
-	elif saved_poses.has(_pose_key(item,hand)): item.transform=saved_poses[_pose_key(item,hand)]
-	else:
-		if str(item.get_meta("id","")) in [WYRM_V1,WYRM_V2]:
-			item.transform=_default_wyrm_pose(item,hand)
-		elif hand is XRController3D:
-			var thumb_side=1.0 if str(hand.tracker).begins_with("left") else -1.0
-			# Authored handle +Y crosses the curled fingers toward the thumb.
-			# Palm is -Y in the calibrated visual; finger tips begin along -Z.
-			item.basis=Basis(Vector3.FORWARD,Vector3.RIGHT*thumb_side,Vector3.DOWN*thumb_side)
-			var grip_y=clampf(0.13,float(item.get_meta("grip_min",0)),float(item.get_meta("grip_max",0.35)))
-			item.position=Vector3(0,-0.045,-0.035)-item.basis*Vector3(0,grip_y,0)
-		else:
-			item.position=Vector3(-0.03,-0.16,-0.28) if str(item.get_meta("id",""))=="woodland_axe" else Vector3.ZERO
-			item.rotation=Vector3(-0.4,-PI/2,0.45) if str(item.get_meta("id",""))=="woodland_axe" else Vector3(-0.3,0,0)
-			# Keep the haft pose, but turn the authored +X edge away from the
-			# player around the haft's own +Y axis.
-			if str(item.get_meta("id",""))=="woodland_axe": item.basis=item.basis*Basis(Vector3.UP,PI)
+	item.transform=pose_for(item,hand)
 	game.held[_key(hand)]=item
 	bind(hand,item)
 	item.set_meta("controls_until",game.elapsed+8.0)
@@ -252,11 +289,11 @@ func adjust(hand,pressed):
 			item.reparent(game.hand_socket(hand))
 			item.position=-(item.basis*grips[key].point)
 		grips[key].basis=game.hand_socket(hand).global_basis.inverse()*item.global_basis
-		var preferences=item.get_meta("grip_preferences",{})
-		var side=str(hand.tracker) if hand is XRController3D else "desktop"
-		preferences[side]=game.hand_socket(hand).global_transform.affine_inverse()*item.global_transform
-		item.set_meta("grip_preferences",preferences)
-		_save_pose(item,hand,preferences[side])
+		var adjustments=item.get_meta("grip_adjustments",{})
+		var pose=game.hand_socket(hand).global_transform.affine_inverse()*item.global_transform
+		adjustments[_pose_key(item,hand)]=pose
+		item.set_meta("grip_adjustments",adjustments)
+		_save_pose(item,hand,pose)
 		game.tuning.history.erase(key)
 		game.adventure.haptic(hand,"ready")
 

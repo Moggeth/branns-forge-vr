@@ -294,7 +294,8 @@ func _shield_grip_preferences() -> Dictionary:
 	var poses := {}
 	for side_name in ["left_hand", "right_hand"]:
 		var side := 1.0 if side_name == "left_hand" else -1.0
-		var basis := Basis(Vector3.UP * side, Vector3.BACK, Vector3.RIGHT * side)
+		# +Y follows the thumb/haft axis; +Z faces along the index, away from us.
+		var basis := Basis(Vector3.UP * side, Vector3.RIGHT * side, Vector3.FORWARD)
 		poses[side_name] = Transform3D(basis, PALM_GRIP - basis * SHIELD_HANDLE)
 	# DesktopHand is a child of the camera: its local -Z points at the scene.
 	var desktop_basis := Basis(Vector3.LEFT, Vector3.UP, Vector3.FORWARD)

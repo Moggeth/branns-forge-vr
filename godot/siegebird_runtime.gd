@@ -398,13 +398,10 @@ func tick(delta):
 		if entries.size()==1 and not game.grips.adjusting.has(entries[0]):
 			var hand=game.grips.grips[entries[0]].hand
 			var aim=game.aim_source(hand)
-			# Model +Y is the rail, +Z is the sight/top. Keep the grip at the hand.
-			var roll=0.0
-			if hand is XRController3D: roll=PI/2 if str(hand.tracker).begins_with("left") else -PI/2
-			w.item.global_basis=aim.global_basis*Basis(Vector3.FORWARD,roll)*Basis(Vector3.RIGHT,Vector3.FORWARD,Vector3.UP)
-			var grip_point=w.model.transform*w.grip.position
-			w.item.global_position=hand.global_position-w.item.global_basis*grip_point
-			game.grips.grips[entries[0]].point=grip_point
+			# Same authored/calibrated pose as initial attachment. Two hands remain
+			# governed by their positions in grip_runtime, never this one-hand path.
+			w.item.global_transform=aim.global_transform*game.grips.pose_for(w.item,hand)
+			game.grips.grips[entries[0]].point=w.item.to_local(hand.global_position)
 			game.grips.grips[entries[0]].basis=game.hand_socket(hand).global_basis.inverse()*w.item.global_basis
 		if w.release>0:
 			w.release=maxf(0,w.release-delta)

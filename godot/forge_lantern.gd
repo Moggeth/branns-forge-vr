@@ -48,9 +48,11 @@ func setup(owner_game, item_id: String, name: String, asset_path: String) -> voi
 		push_error("FORGE_LANTERN required exported socket missing")
 		return
 	var grip_offset: Vector3 = item.to_local(grip.global_position)
-	var pose := Transform3D(Basis.IDENTITY, -grip_offset + Vector3(0, -0.02, 0))
-	item.set_meta("grip_preferences", {"left_hand": pose, "right_hand": pose,
-		"left": pose, "right": pose,
+	var left_basis := Basis(Vector3.BACK,-PI/2)
+	var right_basis := Basis(Vector3.BACK,PI/2)
+	var palm := Vector3(0,-0.02,0)
+	item.set_meta("grip_preferences", {"left_hand": Transform3D(left_basis,palm-left_basis*grip_offset),
+		"right_hand": Transform3D(right_basis,palm-right_basis*grip_offset),
 		"desktop": Transform3D(Basis.IDENTITY, Vector3(-0.11, -0.01, -0.28) - grip_offset)})
 	light = OmniLight3D.new()
 	light.name = "ShutteredFlameLight"

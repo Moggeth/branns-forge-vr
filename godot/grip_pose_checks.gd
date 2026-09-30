@@ -40,6 +40,30 @@ func run():
 	var pose=Transform3D(Basis(Vector3.FORWARD,0.21),Vector3(0.02,-0.03,-0.04))
 	check(game.grips._array_to_pose(game.grips._pose_to_array(pose)).is_equal_approx(pose),"calibrated grip save round-trip")
 	check(game.grips._array_to_pose([1,2]).is_equal_approx(Transform3D.IDENTITY),"invalid pose rejected")
+	# A saved adjustment must beat authored defaults, while a changed default
+	# must get a new calibration key. No player file is touched by this fixture.
+	var authored=Node3D.new(); game.add_child(authored)
+	authored.set_meta("id","calibration_fixture")
+	authored.set_meta("grip_preferences",{"desktop":Transform3D.IDENTITY})
+	var initial_key=game.grips._pose_key(authored,game.desktop_hand)
+	game.grips.saved_poses[initial_key]=pose
+	game.grips._attach(game.desktop_hand,authored)
+	check(authored.transform.is_equal_approx(pose),"persisted adjustment overrides authored pose")
+	authored.set_meta("grip_preferences",{"desktop":Transform3D(Basis.IDENTITY,Vector3(.01,0,0))})
+	check(game.grips._pose_key(authored,game.desktop_hand)!=initial_key,"authored pose change invalidates calibration key")
+	check(game.grips.pose_for(authored,game.desktop_hand).origin.is_equal_approx(Vector3(.01,0,0)),"stale calibration does not restore old default")
+	var source_pose=authored.get_meta("grip_preferences").duplicate()
+	game.grips.adjust(game.desktop_hand,true); game.grips.adjust(game.desktop_hand,false)
+	check(authored.get_meta("grip_preferences")==source_pose,"adjusting never mutates authored defaults")
+	check(authored.has_meta("grip_adjustments"),"in-session adjustment stored separately")
+	game.held.erase(str(game.desktop_hand.get_instance_id())); game.grips.grips.erase(str(game.desktop_hand.get_instance_id())); authored.queue_free()
+	var legacy=Node3D.new(); legacy.set_meta("id","woodland_axe")
+	game.grips.saved_poses[game.grips._legacy_pose_key(legacy,game.desktop_hand)]=pose
+	check(game.grips.pose_for(legacy,game.desktop_hand).is_equal_approx(game.grips._default_pose(legacy,game.desktop_hand)),"old axe override cannot restore backward edge")
+	legacy.set_meta("id","unchanged_fixture")
+	game.grips.saved_poses[game.grips._legacy_pose_key(legacy,game.desktop_hand)]=pose
+	check(game.grips.pose_for(legacy,game.desktop_hand).is_equal_approx(pose),"legacy adjustment preserved for unchanged item")
+	game.grips.saved_poses.clear(); legacy.free()
 	game.player_avatar._process(0.016)
 	var head_forward: Vector3 = -game.camera.global_basis.z
 	head_forward.y = 0

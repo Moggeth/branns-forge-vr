@@ -89,10 +89,12 @@ static func run(game):
 		tracked.tracker=side_name
 		game.add_child(tracked)
 		tracked.global_basis=game.rig.global_basis
+		var socket=game.hand_socket(tracked)
+		tracked.global_basis=game.rig.global_basis*Basis(Vector3.BACK,side*PI/2)*socket.basis.inverse()
 		game.grips._attach(tracked,item)
-		if item.basis.z.dot(Vector3.RIGHT*side)<0.98: failures.append(variant+" VR shield face sideways")
+		if item.basis.z.dot(Vector3.FORWARD)<0.98: failures.append(variant+" VR shield face sideways")
 		if item.global_basis.z.dot(-game.rig.global_basis.z)<0.98: failures.append(variant+" VR shield face not ahead of hero")
-		if item.basis.y.dot(Vector3.BACK)<0.98: failures.append(variant+" VR shield not upright")
+		if item.global_basis.y.dot(game.rig.global_basis.y)<0.98: failures.append(variant+" VR shield not upright")
 		if not (item.transform*game.guardians.SHIELD_HANDLE).is_equal_approx(game.guardians.PALM_GRIP): failures.append(variant+" VR shield handle misses grip")
 		var tracked_key=str(tracked.get_instance_id())
 		game.held.erase(tracked_key)
