@@ -8,7 +8,7 @@ class MockBuilder extends Node:
 	func _unpack(value: Array) -> Vector3:
 		return Vector3(float(value[0]), 0.0, float(value[1]))
 	func _point_valid(value: Variant) -> bool:
-		return value is Array and value.size() == 2 and value[0] is int and value[1] is int
+		return value is Array and value.size() == 2 and (value[0] is int or value[0] is float) and (value[1] is int or value[1] is float) and is_finite(float(value[0])) and is_finite(float(value[1]))
 
 func _initialize() -> void:
 	call_deferred("_check")
@@ -67,13 +67,13 @@ func _check() -> void:
 	builder.data.mana = 20.0
 	builder.data.wood = 200
 	if encounters.complete(full).awarded or builder.data.encounter_history.size() != 2: failures.append("full resources consumed ledger without reward")
-	builder.data = before
+	builder.data = before.duplicate(true)
 	var invalid_resources := _new_threat(10, 144, 24, "swift")
 	invalid_resources.kills = [0, 1, 2]
 	invalid_resources.alive = []
 	builder.data.mana = NAN
 	if encounters.complete(invalid_resources).awarded or builder.data.encounter_history.size() != 2: failures.append("invalid resources mutated completion ledger")
-	builder.data = before
+	builder.data = before.duplicate(true)
 	var forged: Array = builder.data.encounter_history.duplicate(true)
 	forged.append(forged[0].duplicate(true))
 	if Encounters.valid_history(forged): failures.append("duplicate history accepted")
@@ -81,6 +81,24 @@ func _check() -> void:
 	for i in 41: capped.append({"id": i, "cell": "%d:0" % i, "objective": "swift", "mana": 2.0, "wood": 0})
 	if Encounters.valid_history(capped): failures.append("unbounded history accepted")
 	if not Encounters.valid_history(builder.data.encounter_history): failures.append("valid history rejected")
+	var roundtrip: Variant = JSON.parse_string(JSON.stringify(builder.data))
+	if not roundtrip is Dictionary or not Encounters.valid_history(roundtrip.encounter_history): failures.append("completed reward history failed JSON round-trip")
+	else:
+		builder.data = roundtrip
+		builder.data.wood = float(builder.data.wood)
+		var restored: Variant = JSON.parse_string(JSON.stringify(_new_threat(11, 144, 24, "swift")))
+		restored.kills = [0.0, 1.0, 2.0]
+		restored.alive = []
+		if not Encounters.valid_threat(restored) or not encounters.complete(restored).awarded: failures.append("restored whole-number wood/kills blocked valid reward")
+	var fractional: Variant = JSON.parse_string(JSON.stringify(builder.data.encounter_history))
+	fractional[0].id = 1.5
+	if Encounters.valid_history(fractional): failures.append("fractional reward id accepted")
+	fractional[0].id = 1.0
+	fractional[0].wood = 0.5
+	if Encounters.valid_history(fractional): failures.append("fractional lumber reward accepted")
+	var fractional_threat := _new_threat(12, 144, 48, "contain")
+	fractional_threat.kills = [0.5]
+	if Encounters.valid_threat(fractional_threat): failures.append("fractional kill slot accepted")
 	if OS.get_cmdline_user_args().has("--integration"):
 		await _real_patrol(failures)
 	print("WORLD_BUILDER_ENCOUNTERS_RESULT ", JSON.stringify({"failures": failures}))
@@ -107,13 +125,24 @@ func _real_patrol(failures: Array[String]) -> void:
 	if not builder.summoned_nodes.has(id): failures.append("live patrol actors absent"); return
 	var units: Array = builder.summoned_nodes[id]
 	var order: Array = [0, 2, 1] if str(threat.objective) == "captain_last" else [0, 1, 2]
+	var checked_active := false
 	for slot in order:
 		for unit in units:
 			if int(unit.slot) != int(slot): continue
 			unit.node.global_position = builder.center + at
 			unit.node.set_meta("alive", false)
 			builder._sync_threats(0.1)
+			if not checked_active:
+				checked_active = true
+				var active_save: Variant = builder._canonical_state(JSON.parse_string(JSON.stringify(builder.data)))
+				if not builder._valid(active_save) or active_save.threats.size() != 1 or not Encounters.valid_threat(active_save.threats[0]): failures.append("active patrol objective failed full builder JSON reload")
 	if builder.data.threats.size() != 0 or builder.data.encounter_history.size() != 1:
 		failures.append("live completed patrol did not earn one keyed reward")
 	elif not str(builder.progress_message).contains("objective complete"):
 		failures.append("live patrol reward message absent")
+	var completed_save: Variant = builder._canonical_state(JSON.parse_string(JSON.stringify(builder.data)))
+	if not builder._valid(completed_save) or completed_save.encounter_history.size() != 1: failures.append("rewarded patrol failed full builder JSON reload")
+	else:
+		builder.data = completed_save
+		var preserved_wood := int(builder.data.wood)
+		if builder.encounters.complete(threat).awarded or int(builder.data.wood) != preserved_wood or builder.data.encounter_history.size() != 1: failures.append("rewarded patrol paid again after JSON reload")
