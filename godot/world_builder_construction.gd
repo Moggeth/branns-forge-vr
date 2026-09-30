@@ -222,13 +222,15 @@ func _render(record: Dictionary) -> void:
 			W.body(rail, Vector3(side * (width * 0.5 - 0.10), 0.45, 0), Vector3(0.20, 0.90, length), "solid")
 	# Timbers bear on the actual terrain/streambed, not an arbitrary world plane.
 	var pier_count := maxi(1, ceili(length / 3.0))
+	var pier_side := Vector2(horizontal.y, -horizontal.x).normalized()
 	for pier in range(pier_count + 1):
 		var t := float(pier) / float(pier_count)
 		var at := a.lerp(b, t)
-		var ground: float = builder.game.landscape.height_at(Vector2(at.x, at.z))
-		var height := at.y - ground - 0.18
-		if height < 0.42: continue
 		for side in [-1.0, 1.0]:
+			var support_point: Vector2 = Vector2(at.x, at.z) + pier_side * float(side) * (width * 0.5 - 0.35)
+			var ground: float = builder.game.landscape.height_at(support_point)
+			var height := at.y - ground - 0.18
+			if height < 0.42: continue
 			var post_pos := Vector3(side * (width * 0.5 - 0.35), ground + height * 0.5 - node.position.y, (t - 0.5) * length)
 			var post_size := Vector3(0.24, height, 0.24)
 			W.body(node, post_pos, post_size, "solid")

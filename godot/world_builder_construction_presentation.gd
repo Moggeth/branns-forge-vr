@@ -245,22 +245,27 @@ static func _rails_and_posts(m: Mesher, rng: RandomNumberGenerator, kind: String
 static func _piles(m: Mesher, rng: RandomNumberGenerator, kind: String, a: Vector3, b: Vector3, length: float, width: float, mid_y: float, dark: Color, landscape: Node) -> void:
 	var bays := maxi(1, ceili(length / 3.0))
 	var px := width * 0.5 - 0.35
+	var side_axis := Vector2(b.z - a.z, a.x - b.x).normalized()
 	for i in bays + 1:
 		var t: float = float(i) / float(bays)
 		var z: float = (t - 0.5) * length
 		var at := a.lerp(b, t)
-		var ground: float = landscape.height_at(Vector2(at.x, at.z))
-		var d: float = at.y - ground - 0.18
-		if d < 0.42: continue
-		var center_y := ground + d * 0.5 - mid_y
+		var brace_depth := INF
+		var support_count := 0
 		for side in [-1.0, 1.0]:
+			var support_point: Vector2 = Vector2(at.x, at.z) + side_axis * float(side) * px
+			var ground: float = landscape.height_at(support_point)
+			var d: float = at.y - ground - 0.18
+			if d < 0.42: continue
+			brace_depth = minf(brace_depth, d)
+			support_count += 1
+			var center_y := ground + d * 0.5 - mid_y
 			m.box(Transform3D(Basis.IDENTITY, Vector3(side * px, center_y, z)), Vector3(0.24, d, 0.24), S.DARK, S.END, 1, _tint(rng, dark, 0.08), Vector2(rng.randf(), rng.randf()))
 			m.box(Transform3D(Basis.IDENTITY, Vector3(side * px, ground + d - mid_y, z)), Vector3(0.34, 0.04, 0.34), S.BRASS, S.BRASS, 1, Color(0.72, 0.58, 0.36))
-		if kind == "bridge" and d > 0.8:
-			# X cross-brace between the pair, below the cap
-			var y0 := ground + d - mid_y - 0.1
-			m.beam(Vector3(-px, y0, z), Vector3(px, y0 - d * 0.6, z), 0.1, 0.06, S.DARK, S.END, _tint(rng, dark, 0.05))
-			m.beam(Vector3(px, y0, z), Vector3(-px, y0 - d * 0.6, z), 0.1, 0.06, S.DARK, S.END, _tint(rng, dark, 0.05))
+		if kind == "bridge" and support_count == 2 and brace_depth > 0.8:
+			var y0 := at.y - mid_y - 0.28
+			m.beam(Vector3(-px, y0, z), Vector3(px, y0 - brace_depth * 0.6, z), 0.1, 0.06, S.DARK, S.END, _tint(rng, dark, 0.05))
+			m.beam(Vector3(px, y0, z), Vector3(-px, y0 - brace_depth * 0.6, z), 0.1, 0.06, S.DARK, S.END, _tint(rng, dark, 0.05))
 
 
 static func _stairs(m: Mesher, rng: RandomNumberGenerator, a: Vector3, b: Vector3, length: float, width: float, mid_y: float, warm: Color, dark: Color) -> void:

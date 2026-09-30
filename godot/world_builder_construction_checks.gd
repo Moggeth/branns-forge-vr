@@ -9,7 +9,7 @@ class FakeLandscape:
 	func height_at(point: Vector2) -> float:
 		if point.y > 4.0 and point.y < 9.0: return clampf((point.x + 4.0) / 8.0, 0.0, 1.0) * 2.0
 		if point.y < -4.0: return clampf((point.x + 4.0) / 8.0, 0.0, 1.0) * 4.0
-		return -0.3 if absf(point.x) < 1.5 else 0.0
+		return -1.2 if absf(point.x) < 1.5 else 0.0
 	func water_at(point: Vector2) -> float:
 		return 1.0 if absf(point.y) < 2.0 and absf(point.x) < 1.5 else 0.0
 
@@ -74,6 +74,18 @@ func _check() -> void:
 	var rail_query := PhysicsRayQueryParameters3D.create(Vector3(0, 0.65, 0), Vector3(0, 0.65, 3), 1)
 	var rail_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(rail_query)
 	if rail_hit.is_empty() or str(rail_hit.collider.get_meta("kind", "")) != "solid": failures.append("bridge rail does not contain the Hero")
+	var grounded_piers := 0
+	for body in builder.root.find_children("*", "StaticBody3D", true, false):
+		if str(body.get_meta("kind", "")) != "solid": continue
+		var shape_node: CollisionShape3D = body.get_child(0)
+		if not shape_node.shape is BoxShape3D: continue
+		var box_shape: BoxShape3D = shape_node.shape
+		if absf(box_shape.size.x - 0.24) > 0.01: continue
+		grounded_piers += 1
+		var foot: float = body.global_position.y - box_shape.size.y * 0.5
+		var expected_ground: float = game.landscape.height_at(Vector2(body.global_position.x, body.global_position.z))
+		if absf(foot - expected_ground) > 0.03: failures.append("support pier floats above its own sampled ground")
+	if grounded_piers == 0: failures.append("bridge over water has no solid piers")
 	var saved: Dictionary = JSON.parse_string(JSON.stringify(builder.data))
 	if not Construction.valid_records(saved.constructions): failures.append("JSON save round trip lost construction record")
 	builder.root.queue_free()
