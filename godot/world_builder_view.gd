@@ -111,7 +111,9 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	unresizable = false
 	_load_layout()
 	size = preferred_window_size
-	if preferred_window_position.x >= 0: position = preferred_window_position
+	if preferred_window_position.x >= 0:
+		initial_position = Window.WINDOW_INITIAL_POSITION_ABSOLUTE
+		position = preferred_window_position
 	focus_point = builder.center + Vector3(19, 0, -39)
 	tactical_viewport = SubViewport.new()
 	tactical_viewport.name = "BuilderSharedWorld"
