@@ -1,0 +1,327 @@
+{
+ "schema": 1,
+ "normal_convention": "OpenGL +Y",
+ "orm_channels": "R AO / G roughness / B metallic",
+ "props": [
+  {
+   "id": "pebble_scatter",
+   "asset": "props/pebble_scatter.glb",
+   "kind": "stone",
+   "zones": [
+    "orchard_highlands",
+    "sandstone_quarry",
+    "forge_yard",
+    "pinewood_ruins",
+    "gloamfen",
+    "cloudbreak_keep",
+    "starfall_ridge",
+    "sky_garden"
+   ],
+   "weight": 1.0,
+   "scale": [
+    0.7,
+    1.5
+   ],
+   "max_distance": 30
+  },
+  {
+   "id": "river_stones",
+   "asset": "props/river_stones.glb",
+   "kind": "stone",
+   "zones": [
+    "gloamfen",
+    "mushroom_glade",
+    "orchard_highlands",
+    "pinewood_ruins",
+    "sky_garden"
+   ],
+   "weight": 0.8,
+   "scale": [
+    0.8,
+    1.6
+   ],
+   "max_distance": 35
+  },
+  {
+   "id": "mossy_rock",
+   "asset": "props/mossy_rock.glb",
+   "kind": "stone",
+   "zones": [
+    "pinewood_ruins",
+    "mushroom_glade",
+    "gloamfen",
+    "orchard_highlands",
+    "sky_garden"
+   ],
+   "weight": 0.5,
+   "scale": [
+    0.7,
+    1.7
+   ],
+   "max_distance": 55
+  },
+  {
+   "id": "sandstone_chip",
+   "asset": "props/sandstone_chip.glb",
+   "kind": "stone",
+   "zones": [
+    "sandstone_quarry",
+    "forge_yard",
+    "cloudbreak_keep",
+    "ember_foundry",
+    "starfall_ridge"
+   ],
+   "weight": 1.0,
+   "scale": [
+    0.7,
+    1.5
+   ],
+   "max_distance": 40
+  },
+  {
+   "id": "twig_fork",
+   "asset": "props/twig_fork.glb",
+   "kind": "wood",
+   "zones": [
+    "pinewood_ruins",
+    "mushroom_glade",
+    "gloamfen",
+    "orchard_highlands",
+    "sky_garden"
+   ],
+   "weight": 1.0,
+   "scale": [
+    0.8,
+    1.4
+   ],
+   "max_distance": 25
+  },
+  {
+   "id": "fallen_branch",
+   "asset": "props/fallen_branch.glb",
+   "kind": "wood",
+   "zones": [
+    "pinewood_ruins",
+    "orchard_highlands",
+    "mushroom_glade",
+    "gloamfen"
+   ],
+   "weight": 0.45,
+   "scale": [
+    0.7,
+    1.3
+   ],
+   "max_distance": 40
+  },
+  {
+   "id": "bark_shards",
+   "asset": "props/bark_shards.glb",
+   "kind": "wood",
+   "zones": [
+    "pinewood_ruins",
+    "orchard_highlands",
+    "mushroom_glade",
+    "forge_yard",
+    "ember_foundry"
+   ],
+   "weight": 0.7,
+   "scale": [
+    0.7,
+    1.3
+   ],
+   "max_distance": 30
+  },
+  {
+   "id": "leaf_litter",
+   "asset": "props/leaf_litter.glb",
+   "kind": "litter",
+   "zones": [
+    "orchard_highlands",
+    "pinewood_ruins",
+    "mushroom_glade",
+    "gloamfen",
+    "sky_garden"
+   ],
+   "weight": 1.2,
+   "scale": [
+    0.8,
+    1.4
+   ],
+   "max_distance": 30
+  },
+  {
+   "id": "grass_tuft",
+   "asset": "props/grass_tuft.glb",
+   "kind": "grass",
+   "zones": [
+    "orchard_highlands",
+    "sky_garden",
+    "pinewood_ruins",
+    "gloamfen",
+    "mushroom_glade",
+    "cloudbreak_keep"
+   ],
+   "weight": 1.4,
+   "scale": [
+    0.8,
+    1.3
+   ],
+   "max_distance": 35
+  },
+  {
+   "id": "seedhead_grass",
+   "asset": "props/seedhead_grass.glb",
+   "kind": "grass",
+   "zones": [
+    "orchard_highlands",
+    "sky_garden",
+    "sandstone_quarry",
+    "cloudbreak_keep",
+    "starfall_ridge"
+   ],
+   "weight": 0.9,
+   "scale": [
+    0.8,
+    1.25
+   ],
+   "max_distance": 35
+  },
+  {
+   "id": "broadleaf_plant",
+   "asset": "props/broadleaf_plant.glb",
+   "kind": "fern",
+   "zones": [
+    "orchard_highlands",
+    "mushroom_glade",
+    "gloamfen",
+    "pinewood_ruins",
+    "enchanted_kitchen"
+   ],
+   "weight": 0.6,
+   "scale": [
+    0.8,
+    1.3
+   ],
+   "max_distance": 35
+  },
+  {
+   "id": "fern_delicate",
+   "asset": "props/fern_delicate.glb",
+   "kind": "fern",
+   "zones": [
+    "pinewood_ruins",
+    "mushroom_glade",
+    "gloamfen",
+    "sky_garden",
+    "crystal_hollow"
+   ],
+   "weight": 0.8,
+   "scale": [
+    0.8,
+    1.3
+   ],
+   "max_distance": 40
+  },
+  {
+   "id": "meadow_flowers",
+   "asset": "props/meadow_flowers.glb",
+   "kind": "grass",
+   "zones": [
+    "orchard_highlands",
+    "sky_garden",
+    "cloudbreak_keep",
+    "enchanted_kitchen"
+   ],
+   "weight": 0.7,
+   "scale": [
+    0.8,
+    1.3
+   ],
+   "max_distance": 40
+  },
+  {
+   "id": "mushroom_cluster",
+   "asset": "props/mushroom_cluster.glb",
+   "kind": "litter",
+   "zones": [
+    "mushroom_glade",
+    "gloamfen",
+    "pinewood_ruins",
+    "crystal_hollow"
+   ],
+   "weight": 0.6,
+   "scale": [
+    0.8,
+    1.4
+   ],
+   "max_distance": 30
+  },
+  {
+   "id": "root_tangle",
+   "asset": "props/root_tangle.glb",
+   "kind": "wood",
+   "zones": [
+    "pinewood_ruins",
+    "mushroom_glade",
+    "gloamfen",
+    "orchard_highlands"
+   ],
+   "weight": 0.3,
+   "scale": [
+    0.8,
+    1.5
+   ],
+   "max_distance": 45
+  },
+  {
+   "id": "pinecone",
+   "asset": "props/pinecone.glb",
+   "kind": "litter",
+   "zones": [
+    "pinewood_ruins",
+    "starfall_ridge",
+    "cloudbreak_keep"
+   ],
+   "weight": 0.8,
+   "scale": [
+    0.9,
+    1.4
+   ],
+   "max_distance": 25
+  },
+  {
+   "id": "acorn_pair",
+   "asset": "props/acorn_pair.glb",
+   "kind": "litter",
+   "zones": [
+    "orchard_highlands",
+    "pinewood_ruins",
+    "mushroom_glade"
+   ],
+   "weight": 0.6,
+   "scale": [
+    0.9,
+    1.5
+   ],
+   "max_distance": 22
+  },
+  {
+   "id": "frost_char_debris",
+   "asset": "props/frost_char_debris.glb",
+   "kind": "debris",
+   "zones": [
+    "ember_foundry",
+    "forge_yard",
+    "starfall_ridge",
+    "cloudbreak_keep",
+    "crystal_hollow"
+   ],
+   "weight": 0.8,
+   "scale": [
+    0.7,
+    1.4
+   ],
+   "max_distance": 40
+  }
+ ]
+}

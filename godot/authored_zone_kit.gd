@@ -65,6 +65,7 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 					override_finish.vertex_color_use_as_albedo = true
 					part.material = override_finish
 				parts[part_index] = part
+		_ground_finish(asset_dir.get_file(), str(asset_id), parts)
 		cache[asset_id] = parts
 	var holders := 0
 	for group_key in grouped:
@@ -149,6 +150,27 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 	var result := {"assets":cache.size(),"placements":placements.size(),"holders":holders,"colliders":collider_count}
 	print("ZONE_KIT ", JSON.stringify(result))
 	return result
+
+static func _ground_finish(zone_id: String, asset_id: String, parts: Array) -> void:
+	# Keep authored relief, rock sides and water. Only known ground surfaces adopt
+	# the shared world-scale soil/weather finish; never override a whole island.
+	var finish_zone := ""
+	if zone_id == "pinewood_ruins" and asset_id == "ground_patch": finish_zone = zone_id
+	elif zone_id in ["sky_garden", "cloudbreak_keep"] and asset_id.begins_with("island_under_"): finish_zone = zone_id
+	if finish_zone.is_empty(): return
+	var finish := GroundSurfacePalette.material(finish_zone)
+	if finish == null: return
+	for index in parts.size():
+		var part: Dictionary = parts[index]
+		if not part.mesh is ArrayMesh: continue
+		var mesh := (part.mesh as ArrayMesh).duplicate() as ArrayMesh
+		for surface in mesh.get_surface_count():
+			var material := mesh.surface_get_material(surface)
+			var surface_name := str(material.resource_name).to_lower() if material != null else ""
+			if surface_name in ["pw_ground", "turf"]:
+				mesh.surface_set_material(surface, finish)
+		part.mesh = mesh
+		parts[index] = part
 
 static func _collect(node: Node3D, pose: Transform3D, parts: Array) -> void:
 	for child in node.get_children():
