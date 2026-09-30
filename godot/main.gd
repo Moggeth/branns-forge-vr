@@ -31,6 +31,11 @@ var hurts_until = 0.0
 var status_until = 0.0
 var desktop_pitch = 0.0
 var desktop_look
+var desktop_locomotion=preload("res://desktop_locomotion.gd").new()
+var portal_walkthrough=preload("res://portal_walkthrough.gd").new()
+var desktop_release_mode="drop"
+const DesktopWeaponPose=preload("res://desktop_weapon_pose.gd")
+const ItemControlHints=preload("res://item_control_hints.gd")
 var desktop_swing_ready = 0.0
 var desktop_swing_started = -1.0
 var desktop_swing_item: Node3D
@@ -95,6 +100,7 @@ var collection
 var living
 var weather
 var quests
+var skull_basket
 var playful_tools
 var playful_encounters
 var playful_feedback
@@ -335,6 +341,7 @@ func _ready():
 	sunfall=preload("res://sunfall_runtime.gd").new(); add_child(sunfall); sunfall.setup(self)
 	living=preload("res://living_runtime.gd").new(); add_child(living); living.setup(self)
 	quests=preload("res://quest_runtime.gd").new(); add_child(quests); quests.setup(self)
+	_setup_skull_basket()
 	playful_feedback=preload("res://playful_feedback.gd").new(); add_child(playful_feedback); playful_feedback.setup(self)
 	playful_tools=preload("res://playful_tools.gd").new(); add_child(playful_tools); playful_tools.setup(self)
 	magnetic_wand=preload("res://magnetic_wand.gd").new(); add_child(magnetic_wand); magnetic_wand.setup(self)
@@ -916,7 +923,9 @@ func _hud():
 	desktop_help_panel.add_child(help)
 	help.add_theme_font_size_override("font_size",15)
 	help.add_theme_color_override("font_color",Color("e6ebdd"))
-	help.text="MOVE  WASD walk · Mouse look · Esc cursor\nGEAR  E take/drop · Left click primary · Right click alternate\nCROSSBOW  9 equip owned Siegebird · R cock + seat bolt · Hold R to reel tether\nTOOLS  1–8 equip · F destination · G travel\nWORLD  T teleport · U workshop · V talk to Brann\nVIEW  F11 fullscreen · Q turn left · F1 close help"
+	help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	help.custom_minimum_size.x=450
+	help.text="MOVE  WASD walk · Space jump · Mouse look · Esc cursor\nGEAR  E take / gentle drop · X throw · LMB primary · RMB alternate\nCROSSBOW  9 equip · R reload / hold to reel · C fit/return reel at rack\nAXE  LMB swing · hold RMB through contact for Power Cleave\nSKULLS  Carry the basket · F store/take a skull · deposit three to complete\nTRAVEL  Walk through a portal · F destination · G travel\nTOOLS  1–8 equip · T teleport · U workshop · V talk\nVIEW  F11 fullscreen · Q turn left · F1 close help"
 	desktop_help_panel.visible=false
 	help.text += "\nBOW  0 Emberwing · hold LMB draw, release fire · hold RMB + turn to bend"
 	var cross = Label.new()
@@ -963,6 +972,7 @@ func _process(delta):
 		if vr: _xr_input()
 		elif (director_local_view==null or not is_instance_valid(director_local_view) or not director_local_view.has_focus()) and (world_builder_view==null or not is_instance_valid(world_builder_view) or not world_builder_view.has_focus()): _desktop_input(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
+	if not smoke: portal_walkthrough.tick(self,delta)
 	if elapsed > next_poll and not busy and not diagnostic_offline:
 		next_poll = elapsed + 2.0
 		_poll()
@@ -983,6 +993,7 @@ func _process(delta):
 	if pumpkins!=null: pumpkins.tick(delta)
 	if living!=null: living.tick(delta)
 	if quests!=null: quests.tick(delta)
+	if skull_basket!=null: skull_basket.tick(delta)
 	if cargo_playground!=null: cargo_playground.tick(delta)
 	if magnetic_wand!=null: magnetic_wand.tick(delta)
 	if playful_encounters!=null: playful_encounters.tick(delta)
@@ -1120,16 +1131,22 @@ func _unhandled_input(event):
 	if desktop_look!=null:
 		desktop_look.set_enabled(not (discoveries!=null and discoveries.opened) and not qol.opened)
 		if desktop_look.handle_event(event): return
+	# The contextual basket action must run before F's destination selection.
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_F:
+		if skull_basket!=null and skull_basket.desktop_action(KEY_F,desktop_hand): return
 	if adventure.keyboard(event): return
 	var mouse_action=preload("res://desktop_hero_actions.gd").route(event,false,false,Callable(self,"_desktop_primary"),Callable(self,"_desktop_alternate"))
 	if mouse_action.handled: return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E: _grip(desktop_hand, true)
+			KEY_SPACE: desktop_locomotion.request_jump(self)
+			KEY_C: siegebird.extras.desktop_toggle_reel(desktop_hand)
 			KEY_9: _desktop_equip_siegebird()
 			KEY_0: archery.equip(desktop_hand)
 			KEY_X:
-				if magnetic_wand!=null: magnetic_wand.secondary(desktop_hand)
+				if magnetic_wand!=null and magnetic_wand.secondary(desktop_hand): return
+				_desktop_release(true)
 			KEY_Q: _snap(deg_to_rad(qol.settings.snap_degrees))
 			KEY_R:
 				if siegebird.desktop_weapon(desktop_hand)!=null:
@@ -1157,7 +1174,7 @@ func _desktop_equip_siegebird()->bool:
 		# rest so it remains recoverable in the world.
 		tuning.history.erase(key)
 		adventure.motion.erase(key)
-		adventure.release(desktop_hand,false)
+		_desktop_release(false)
 	if held.has(key):
 		_notice("Put down the held item before equipping Siegebird.",3)
 		return false
@@ -1205,23 +1222,33 @@ func _desktop_alternate() -> bool:
 			item_actions.detach()
 			_notice("Swallow Line released.",2)
 		return true
+	if str(item.get_meta("id",""))=="woodland_axe":
+		melee.alternate(item,desktop_hand)
+		return true
 	if magnetic_wand!=null and magnetic_wand.secondary(desktop_hand): return true
 	if enchantments.alternate(item,desktop_hand): return true
 	if guardians.trigger(desktop_hand,camera): return true
+	if atelier!=null and atelier.trigger(desktop_hand,camera): return true
 	if item_actions.trigger(desktop_hand,camera): return true
+	# Generated inventions retain the live server-backed ability route.
+	if item.has_meta("use_instructions") and not ItemControlHints.has(str(item.get_meta("id",""))):
+		_trigger(desktop_hand,true)
+		return true
 	return false
 
 func _desktop_input(delta):
 	if discoveries!=null and discoveries.opened: return
 	if fairy!=null and fairy.active: return
 	if qol.opened: return
+	if adventure.dying: return
+	item_actions.desktop_axe_state(held.get(str(desktop_hand.get_instance_id())),Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 	var movement = Vector3.ZERO
 	if Input.is_physical_key_pressed(KEY_W): movement.z -= 1
 	if Input.is_physical_key_pressed(KEY_S): movement.z += 1
 	if Input.is_physical_key_pressed(KEY_A): movement.x -= 1
 	if Input.is_physical_key_pressed(KEY_D): movement.x += 1
 	var step = rig.basis * movement.normalized() * delta * tuning.value("locomotion.speed") * guardians.movement_multiplier()
-	_move_to(rig.position + step)
+	desktop_locomotion.step(self,step,delta)
 
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
@@ -1232,10 +1259,8 @@ func _desktop_weapon_motion(delta:float):
 	desktop_bob_strength=move_toward(desktop_bob_strength,target,delta*3.5)
 	if desktop_bob_strength>0.001: desktop_bob_phase+=delta*10.0
 	var bob=desktop_bob_strength
-	var rest=Vector3(0.35+sin(desktop_bob_phase)*0.008*bob,-0.35+absf(cos(desktop_bob_phase))*0.012*bob,-0.55)
-	var rest_roll=0.018*sin(desktop_bob_phase)*bob
-	desktop_hand.position=rest
-	desktop_hand.rotation=Vector3(0,0,rest_roll)
+	var rest_pose=DesktopWeaponPose.idle(elapsed,desktop_bob_phase,bob)
+	desktop_hand.transform=rest_pose
 	var item=held.get(str(desktop_hand.get_instance_id()))
 	if desktop_swing_started>=0:
 		var progress=clampf((elapsed-desktop_swing_started)/0.38,0.0,1.0)
@@ -1243,51 +1268,29 @@ func _desktop_weapon_motion(delta:float):
 			desktop_swing_started=-1.0
 			desktop_swing_item=null
 		else:
+			desktop_hand.transform=DesktopWeaponPose.swing(item,progress,rest_pose,desktop_swing_reach)
 			if progress>=0.5 and not desktop_swing_contact:
 				desktop_swing_contact=true
 				var hit=_ray(camera,DESKTOP_MELEE_REACH)
 				var strike_target=_owner(hit.get("collider")) if hit.has("collider") else null
 				if strike_target!=null:
 					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,DESKTOP_MELEE_REACH)
-					melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
+					# Resolve at the actual centre-ray pose, once, before follow-through.
+					desktop_hand.transform=DesktopWeaponPose.swing(item,.5,rest_pose,desktop_swing_reach)
+					var powered=melee._powered(item,desktop_hand)
+					var struck=melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
+					if struck: item_actions.desktop_axe_impact(item,hit.position,powered)
 				else: _effect(camera.global_position-camera.global_basis.z*0.8,Color("e9c184"),0.07,0.10)
 			if progress>=1.0:
 				desktop_swing_started=-1.0
 				desktop_swing_item=null
-			else: _desktop_melee_pose(item,progress,rest,rest_roll)
 	var crossbow=siegebird.desktop_weapon(desktop_hand)
 	if crossbow!=null and siegebird.extras.tethered(crossbow) and Input.is_physical_key_pressed(KEY_R):
 		siegebird.extras.reel(crossbow,delta*TAU*1.4,delta)
 
 func _desktop_melee_pose(item:Node3D,progress:float,rest:Vector3,rest_roll:float)->void:
-	# Drive the actual contact tip across the camera ray. This also works for
-	# tools whose authored tips and grip offsets differ from the axe's.
-	var tip:Vector3=item.get_meta("tip",Vector3.UP*0.65)
-	var rest_tip=rest+Basis(Vector3.FORWARD,rest_roll)*(item.transform*tip)
-	var reach=desktop_swing_reach
-	var windup=Vector3(0.38,0.3,-reach+0.12)
-	var contact=Vector3(0,0,-reach)
-	var follow=Vector3(-0.42,-0.32,-reach+0.12)
-	var desired:Vector3
-	var roll:float
-	if progress<0.2:
-		var blend=smoothstep(0.0,0.2,progress)
-		desired=rest_tip.lerp(windup,blend)
-		roll=lerpf(rest_roll,0.32,blend)
-	elif progress<0.5:
-		var blend=smoothstep(0.2,0.5,progress)
-		desired=windup.lerp(contact,blend)
-		roll=lerpf(0.32,-0.08,blend)
-	elif progress<0.8:
-		var blend=smoothstep(0.5,0.8,progress)
-		desired=contact.lerp(follow,blend)
-		roll=lerpf(-0.08,-0.48,blend)
-	else:
-		var blend=smoothstep(0.8,1.0,progress)
-		desired=follow.lerp(rest_tip,blend)
-		roll=lerpf(-0.48,rest_roll,blend)
-	desktop_hand.rotation=Vector3(-0.18*sin(progress*PI),0.12*sin(progress*PI),roll)
-	desktop_hand.position=desired-desktop_hand.basis*(item.transform*tip)
+	var rest_pose=Transform3D(Basis(Vector3.FORWARD,rest_roll),rest)
+	desktop_hand.transform=DesktopWeaponPose.swing(item,progress,rest_pose,desktop_swing_reach)
 
 func _desktop_fullscreen():
 	var window=get_window()
@@ -1298,19 +1301,43 @@ func _desktop_fullscreen():
 		window.mode=Window.MODE_FULLSCREEN
 
 func _desktop_hint()->String:
-	var crossbow=siegebird.desktop_weapon(desktop_hand)
-	if crossbow!=null:
-		var state_text="reloading" if crossbow.get("desktop_reloading",false) else ("ready" if crossbow.loaded else ("cocked · empty" if crossbow.draw>=0.999 else "empty"))
-		return "Siegebird %s · unlimited bolts · LMB fire · R reload · F1 controls"%state_text
 	var item=held.get(str(desktop_hand.get_instance_id()))
-	if archery!=null and item==archery.bow and is_instance_valid(item): return "Emberwing · hold LMB draw, release fire · hold RMB + turn for phoenix arc · 0 equip · F1 controls"
-	if wyrmspout!=null and wyrmspout.is_wyrmspout(item): return "Wyrmspout · hold LMB for fire · release to cool · RMB vent · F1 controls"
-	if is_instance_valid(item) and str(item.get_meta("id","")).begins_with("forge_lantern_"): return "Lantern · LMB toggle shutter · E drop · F1 controls"
-	if is_instance_valid(item) and melee.handles(item):
-		var action=str(item_actions.CONTROLS.get(str(item.get_meta("id","")),"Swing: strike · Trigger: special"))
-		action=action.replace("Swing:","LMB").replace("Trigger:","RMB").replace("trigger:","RMB")
-		return action + " · E drop · 9 Siegebird · F1 controls"
-	return "WASD move · Click to look · LMB use · E take · 9 Siegebird · F1 controls"
+	if skull_basket!=null and item==skull_basket.basket:
+		return "Skull basket %d/3 · F store/take skull · E drop · X throw · Space jump · F1 controls"%skull_basket.contents.size()
+	return ItemControlHints.desktop(self,item,desktop_hand)
+
+func _desktop_release(throwing:bool=false)->void:
+	var key=str(desktop_hand.get_instance_id())
+	# E discards animation velocity as well as the explicit forward throw assist.
+	# The tracked VR path retains its original sampled release momentum.
+	desktop_release_mode="throw" if throwing else "drop"
+	tuning.history.erase(key)
+	adventure.motion.erase(key)
+	if throwing:
+		adventure.motion[key]={"velocity":tuning.release_velocity(desktop_hand,true),"angular":Vector3.ZERO}
+	if archery!=null: archery.cancel_draw()
+	adventure.release(desktop_hand,true)
+	desktop_release_mode="drop"
+	adventure.motion.erase(key)
+	desktop_swing_started=-1.0
+	desktop_swing_item=null
+
+func _setup_skull_basket()->void:
+	var parent:Node3D=adventure.zone_groups.forge_yard
+	var position=Vector3(-3.6,0,1.8)
+	var stand=Node3D.new()
+	stand.name="SkullBasketStand"
+	parent.add_child(stand)
+	stand.position=position
+	WorldZones.box(stand,Vector3(0,.88,0),Vector3(.8,.08,.55),"806047")
+	for x in [-.30,.30]:
+		for z in [-.18,.18]: WorldZones.box(stand,Vector3(x,.43,z),Vector3(.07,.86,.07),"684c38")
+	WorldZones.body(stand,Vector3(0,.44,0),Vector3(.75,.88,.5),"solid")
+	WorldZones.label(stand,"BRANN'S FIRST ERRAND\nBring three Skeleton Skulls",Vector3(0,1.25,0),16)
+	skull_basket=preload("res://skull_basket.gd").new()
+	add_child(skull_basket)
+	skull_basket.setup(self,parent.to_global(position+Vector3(0,.93,0)))
+	portal_walkthrough.reset(self)
 
 func _xr_input():
 	for hand in hands:
@@ -1475,6 +1502,8 @@ func _teleport(source: Node3D):
 	var offset = camera.global_position - rig.global_position
 	destination -= Vector3(offset.x, 0, offset.z)
 	_move_to(destination)
+	desktop_locomotion.reset()
+	portal_walkthrough.reset(self)
 	tuning.history.clear()
 	adventure.motion.clear()
 
@@ -1502,15 +1531,22 @@ func _notification(what):
 		if world_builder!=null: world_builder.save()
 
 func _grip(hand: Node3D, desktop: bool):
-	if archery!=null and archery.busy(hand): return true
+	if archery!=null and archery.busy(hand):
+		if desktop: archery.cancel_draw()
+		return true
 	if fairy!=null: fairy.offer_to(hand)
 	if fairy!=null and fairy.perched_on(hand): return true
 	var key = str(hand.get_instance_id())
-	if desktop and (workshop.busy(hand) or enchantments.busy(hand) or living.busy(hand) or ((playful_tools!=null and playful_tools.busy(hand)) or (magnetic_wand!=null and magnetic_wand.busy(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand))))):
-		adventure.release(hand,true); return true
+	if desktop and (firecraft.busy(hand) or siegebird.busy(hand) or workshop.busy(hand) or enchantments.busy(hand) or living.busy(hand) or ((playful_tools!=null and playful_tools.busy(hand)) or (magnetic_wand!=null and magnetic_wand.busy(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand))))):
+		_desktop_release(false); return true
 	if held.has(key):
-		if desktop: adventure.release(hand,true)
+		if desktop: _desktop_release(false)
 		return true
+	if skull_basket!=null and skull_basket.try_grab(hand,desktop): return true
+	var logs=get_tree().get_nodes_in_group("physical_lumber_log")
+	logs.sort_custom(func(a,b):return a.global_position.distance_squared_to(hand.global_position)<b.global_position.distance_squared_to(hand.global_position))
+	for log in logs:
+		if is_instance_valid(log) and log.try_grab(hand,desktop): return true
 	for lantern in forge_lanterns:
 		if lantern.try_grab_shutter(hand,desktop): return true
 	if apples!=null and apples.try_grab(hand,desktop): return true

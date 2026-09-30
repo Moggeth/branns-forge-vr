@@ -368,6 +368,7 @@ func begin_bomb(hand):
 
 func release(hand,desktop=false):
 	if game.guardians!=null: game.guardians.cancel_grip(hand)
+	if game.get("skull_basket")!=null and game.skull_basket.release(hand,desktop): return
 	for lantern in game.forge_lanterns:
 		if lantern.release(hand): return
 	if game.apples!=null and game.apples.release(hand): return
@@ -897,6 +898,8 @@ func travel(id:String):
 	var data=game.scene.zones[id]
 	game.rig.global_position=data.get("spawn",Vector3.ZERO)
 	game.rig.rotation=Vector3.ZERO
+	if game.get("desktop_locomotion")!=null: game.desktop_locomotion.reset()
+	if game.get("portal_walkthrough")!=null: game.portal_walkthrough.reset(game)
 	game.camera.rotation.x=0
 	game.desktop_pitch=0
 	game.visiting=id=="forge_yard"

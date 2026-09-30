@@ -301,4 +301,4 @@ func alternate(item,hand):
 	item.set_meta("axe_power_armed",true)
 	item.set_meta("axe_power_started",game.elapsed)
 	game.adventure.haptic(hand,"ready")
-	game._notice("Hold trigger and swing: powered cleave.",3)
+	game._notice("Hold RMB through the swing: powered cleave." if hand==game.desktop_hand else "Hold trigger and swing: powered cleave.",3)

@@ -77,12 +77,16 @@ func release_velocity(hand,desktop=false)->Vector3:
 	var key=str(hand.get_instance_id())
 	var current:Vector3=game.adventure.motion.get(key,{}).get("velocity",Vector3.ZERO)
 	var result=Vector3.ZERO
-	if desktop:
+	var mode=str(game.get("desktop_release_mode"))
+	if hand==game.get("desktop_hand") and game.get("vr")!=true and mode=="drop":
+		result=Vector3.ZERO
+	elif desktop:
 		result=(-game.camera.global_basis.z*9.0*value("throw.gain")+Vector3.UP*(1.8+value("throw.assist_lift"))).limit_length(value("throw.max_speed"))
 	else:
 		result=estimate(history.get(key,[]),current)
 	last_throw={"rawSpeed":snappedf(current.length(),0.01),"launchSpeed":snappedf(result.length(),0.01),"velocity":game._vec(result),"revision":revision,"zone":game.adventure.zone}
-	print("THROW ",JSON.stringify(last_throw))
+	last_throw["releaseMode"]=mode
+	print("DROP " if mode=="drop" and hand==game.get("desktop_hand") and game.get("vr")!=true else "THROW ",JSON.stringify(last_throw))
 	history.erase(key)
 	return result
 

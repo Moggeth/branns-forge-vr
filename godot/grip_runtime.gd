@@ -316,6 +316,8 @@ func release(hand)->bool:
 		game.tuning.history.clear()
 		game.adventure.haptic(survivor,"ready")
 		return true
+	# A desktop Drop is deliberate. Only tracked hands auto-holster.
+	if not game.vr and hand==game.desktop_hand: return false
 	var velocity=game.adventure.motion.get(key,{}).get("velocity",Vector3.ZERO)
 	for slot in slots:
 		if is_instance_valid(slot.item): continue
