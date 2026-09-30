@@ -103,6 +103,7 @@ func show_for(target: Node, page: String = "map", fairy_owner = null) -> void:
 		panel.destination_selected.connect(select_destination)
 		panel.travel_requested.connect(func(id: String): select_destination(id); travel_selected())
 		panel.closed.connect(close_all)
+		panel.reset_requested.connect(func(): game.world_reset.request(target))
 		views[key] = {"layer": layer, "panel": panel, "opened": false, "fairy": fairy_owner}
 		target.tree_exiting.connect(_forget_view.bind(key),CONNECT_ONE_SHOT)
 	var view: Dictionary = views[key]

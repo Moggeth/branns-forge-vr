@@ -126,6 +126,7 @@ var fairy
 var director
 var director_local_view
 var world_builder
+var world_reset
 var landscape
 var orchard_spell_vfx: Node3D
 var orchard_atmosphere
@@ -384,10 +385,11 @@ func _ready():
 		comparison_label.rotation.y=-PI/2
 	discoveries=preload("res://discoveries.gd").new(); add_child(discoveries); discoveries.setup(self,self)
 	travel_navigation=preload("res://travel_navigation.gd").new(); add_child(travel_navigation); travel_navigation.setup(self)
+	world_reset=preload("res://world_reset.gd").new(); add_child(world_reset)
 	hearth_torch.create_stand(ember_gallery.court,Vector3(-3.4,1.05,5))
 	if OS.get_cmdline_user_args().has("--fairy-coop"): _start_fairy()
 	if OS.get_cmdline_user_args().has("--world-builder") or OS.get_cmdline_user_args().has("--world-builder-check"):
-		adventure.travel("orchard_highlands")
+		if not get_tree().root.has_meta(world_reset.BOOT_NOTICE): adventure.travel("orchard_highlands")
 		if not OS.get_cmdline_user_args().has("--world-builder-check"):
 			_open_world_builder_view()
 	if OS.get_cmdline_user_args().has("--director-mode") or OS.get_cmdline_user_args().has("--director-check"):
@@ -421,6 +423,7 @@ func _ready():
 	feedback = preload("res://interaction_feedback.gd").new()
 	add_child(feedback)
 	feedback.setup(self)
+	world_reset.setup(self)
 	if not capture_path.is_empty():
 		adventure.travel(capture_zone)
 		var framing=scene.get("zones",{}).get(capture_zone,{})

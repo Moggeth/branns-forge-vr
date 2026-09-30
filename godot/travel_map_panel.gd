@@ -5,6 +5,7 @@ extends Control
 signal destination_selected(zone_id: String)
 signal travel_requested(zone_id: String)
 signal closed
+signal reset_requested
 
 const C_DIM := Color(0.04, 0.035, 0.03, 0.72)
 const C_PANEL := Color("1d1a17")
@@ -196,9 +197,15 @@ func _build() -> void:
 	_sup_scroll.add_child(_sup_box)
 
 	root.add_child(_rule())
-	var foot := _label("M  Map     F  Next destination     G  Travel     Esc  Close", 14, C_MUTED)
-	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var foot := HBoxContainer.new()
 	root.add_child(foot)
+	var shortcuts := _label("M  Map     F  Next destination     G  Travel     Esc  Close", 14, C_MUTED, true)
+	shortcuts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(shortcuts)
+	var reset := _button("Reset World…", 160, 40, 16)
+	reset.tooltip_text = "Restore the Orchard. Keeps character progress and saves a backup. Confirmation required."
+	reset.pressed.connect(func(): reset_requested.emit())
+	foot.add_child(reset)
 	_update_detail()
 
 

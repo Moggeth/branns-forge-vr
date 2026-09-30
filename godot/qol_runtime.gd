@@ -218,11 +218,14 @@ func _build():
 	if page=="quick":
 		recording_button=_button("Start video","record",Vector3(-0.185,-0.34,0.005))
 	else:
-		_button("Recall tools + return","home",Vector3(-0.185,-0.34,0.005))
+		if page=="travel" and game.get("world_reset")!=null:
+			_button("Yes, reset world" if game.world_reset.is_armed() else "Reset World…","world:reset",Vector3(-0.185,-0.34,0.005))
+		else: _button("Recall tools + return","home",Vector3(-0.185,-0.34,0.005))
 	_button("Close","close",Vector3(0.185,-0.34,0.005))
 	game._set_collisions(menu,opened)
 
 func toggle():
+	if opened and game.get("world_reset")!=null: game.world_reset.cancel()
 	game.tuning.dragging=""
 	opened=not opened
 	menu.visible=opened
@@ -257,6 +260,9 @@ static func allows_menu_button(tracker_name:String)->bool:
 	return tracker_name.begins_with("left")
 
 func tick(delta):
+	if game.get("world_reset")!=null and game.world_reset.armed_until>=0.0 and game.elapsed>=game.world_reset.armed_until:
+		game.world_reset.cancel()
+		if opened and page=="travel": _build()
 	if demo_reset_until>=0 and game.elapsed>=demo_reset_until:
 		demo_reset_until=-1.0
 		if opened and page=="demo": _build()
@@ -281,6 +287,7 @@ func tick(delta):
 		elif page=="travel":
 			detail.text="Places %d / %d · Choose somewhere to play"%[travel_page+1,ceili(_travel_rows().size()/12.0)]
 			if game.get("travel_navigation")!=null: detail.text+="\nSelected: "+game.travel_navigation.destination_name()
+			if game.get("world_reset")!=null and game.world_reset.is_armed(): detail.text="Are you sure? Reset terrain, trees, buildings and meteors.\nCharacter progress stays. Yes, reset world confirms; Close cancels."
 		elif page=="supplies": _supplies_detail()
 		elif page=="journal":
 			detail.text=game.quests.journal() if game.quests!=null else "Your field journal is loading."
@@ -328,6 +335,14 @@ func menu_trigger(source):
 	return true
 
 func action(value):
+	if value=="world:reset" and game.get("world_reset")!=null:
+		if game.vr:
+			if game.world_reset.is_armed(): game.world_reset.confirm_vr()
+			else: game.world_reset.arm_vr()
+			_build()
+		else: game.world_reset.request(game)
+		return
+	if value=="close" and game.get("world_reset")!=null: game.world_reset.cancel()
 	if value.begins_with("supply:"):
 		var pages:=_supplies_pages()
 		if value in ["supply:next","supply:previous"]:
