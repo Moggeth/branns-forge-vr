@@ -589,6 +589,7 @@ func gather(target,hand=null):
 
 func _enemies(delta):
 	for enemy in game.scene.get("enemies",[]):
+		if is_instance_valid(enemy) and enemy.has_meta("ent_key") and enemy.get_meta("ent_calm", false): continue
 		if is_instance_valid(enemy) and enemy.get_meta("enemy_type","")=="ghost": continue
 		if is_instance_valid(enemy) and enemy.get_meta("director_paused",false): continue
 		if not is_instance_valid(enemy) or not enemy.get_meta("alive",true): continue
@@ -702,6 +703,10 @@ func _step_attack(enemy,distance,type):
 	enemy.set_meta("combat_progress",progress)
 
 func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physical",impact_point=null):
+	# Awakened trees keep their original resource identity and keyed timber/seed
+	# rewards. They must never run the skeleton-remains or respawn path below.
+	if game.world_builder != null and game.world_builder.ents != null:
+		if game.world_builder.ents.on_hit(enemy, damage, hand, impulse, damage_type): return
 	if enemy.get_meta("enemy_type","")=="ghost":
 		if game.firecraft!=null: game.firecraft.hurt_ghost(enemy,damage,damage_type)
 		return
