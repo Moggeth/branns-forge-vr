@@ -37,7 +37,13 @@ def main():
             with Image.open(root / pose["file"]) as image:
                 sheet.paste(ImageOps.pad(image.convert("RGB"), (width, height), color="#363c43"), (x, y))
             draw.text((x + 20, y + height + 6), item["name"] + " · " + mode.replace("_", " "), font=font(22), fill="#f2eee4")
-            draw.text((x + 20, y + height + 37), f"{view} · Aim {pose['forward_dot']:.3f} · Up {pose['up_dot']:.3f}", font=font(18), fill="#b6c0c8")
+            if "forward_dot" in pose:
+                detail = f"Aim {pose['forward_dot']:.3f} · Up {pose['up_dot']:.3f}"
+            elif "span_m" in pose:
+                detail = f"Orthographic span {pose['span_m']:.2f} m"
+            else:
+                detail = f"Perspective FOV {pose['fov_degrees']:.1f}°"
+            draw.text((x + 20, y + height + 37), view + " · " + detail, font=font(18), fill="#b6c0c8")
             pair.append(pose)
         evidence.append({"id": identifier, "before": pair[0], "after": pair[1]})
     args.out.parent.mkdir(parents=True, exist_ok=True)
