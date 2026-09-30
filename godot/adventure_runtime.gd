@@ -68,14 +68,7 @@ func setup(owner_game):
 	overlay.add_theme_color_override("font_color",Color("ffebbb"))
 	for hand in game.hands: build_hand(hand)
 	for enemy in game.scene.get("enemies", []):
-		enemy.set_meta("alive", true)
-		enemy.set_meta("home", enemy.global_position)
-		var health={"skeleton":66,"wisp":44,"golem":110,"boss":440}.get(str(enemy.get_meta("enemy_type","skeleton")),66)
-		enemy.set_meta("hp",health)
-		enemy.set_meta("max_hp",health)
-		enemy.set_meta("damage",30 if str(enemy.get_meta("enemy_type",""))=="boss" else 15)
-		enemy.set_meta("attack_at", 0.0)
-		enemy.set_meta("id", "enemy-"+str(enemy.get_instance_id()))
+		_initialize_enemy(enemy)
 	# Parent visibility preserves each resource/enemy's own harvested/dead state.
 	for zone_id in game.scene.get("zones",{}):
 		var container=Node3D.new()
@@ -94,6 +87,26 @@ func setup(owner_game):
 	hollow.setup(game, zone_groups.get("crystal_hollow"))
 	_apply_zone_environment("forge_yard")
 	game._notice("Fire is ready from the start: desktop 1 then right-click, or grip Copperpot's Promise in VR and press trigger for Forge Pulse. Only fire hurts ghosts. Pocket Thunder: grip empty hand, hold trigger, release grip to throw.",12)
+
+func _initialize_enemy(enemy: Node3D) -> void:
+	enemy.set_meta("alive", true)
+	enemy.set_meta("home", enemy.global_position)
+	var health = {"skeleton":66,"wisp":44,"golem":110,"boss":440}.get(str(enemy.get_meta("enemy_type","skeleton")),66)
+	enemy.set_meta("hp", health)
+	enemy.set_meta("max_hp", health)
+	enemy.set_meta("damage", 30 if str(enemy.get_meta("enemy_type",""))=="boss" else 15)
+	enemy.set_meta("attack_at", 0.0)
+	enemy.set_meta("id", "enemy-"+str(enemy.get_instance_id()))
+
+## Runtime summons use WorldZones.enemy(...), then this method. The existing
+## static startup path still registers its actors through ActorAnimation.setup.
+func register_enemy(enemy: Node3D) -> void:
+	if not is_instance_valid(enemy): return
+	if not game.scene.enemies.has(enemy): game.scene.enemies.append(enemy)
+	_initialize_enemy(enemy)
+	var zone_id := str(enemy.get_meta("zone", zone))
+	if zone_groups.has(zone_id): enemy.reparent(zone_groups[zone_id])
+	if game.animation != null and not game.animation.actors.has(enemy.get_instance_id()): game.animation.register(enemy)
 
 func tick(delta):
 	if hollow != null: hollow.tick(delta, zone)
@@ -506,7 +519,7 @@ func trigger(hand,source) -> bool:
 		if not game.vr: return false
 		game._notice("Grip an empty hand, then press and hold trigger to form Pocket Thunder. Release grip to throw.")
 		return true
-	if target != null and interact(target,id,hand): return true
+	if target != null and interact(target,id,hand,hit.get("position")): return true
 	if id=="bone_club": return true
 	if id in ORDER:
 		if game.elapsed<attack_at: return true
@@ -527,7 +540,7 @@ func trigger(hand,source) -> bool:
 		return true
 	return false
 
-func interact(target,id,hand=null) -> bool:
+func interact(target,id,hand=null,impact_point=null) -> bool:
 	var kind = str(target.get_meta("kind",""))
 	if kind.begins_with("hollow_") and hollow != null: return hollow.interact(target,id,hand)
 	if kind=="anchor":
@@ -549,7 +562,7 @@ func interact(target,id,hand=null) -> bool:
 	if kind=="enemy":
 		if game.elapsed>=attack_at:
 			attack_at=game.elapsed+0.45
-			hurt_enemy(target,35 if id in ["crystal_resonator","ember_gauntlet"] else 22,hand,Vector3.ZERO,"fire" if id=="ember_gauntlet" else "physical")
+			hurt_enemy(target,35 if id in ["crystal_resonator","ember_gauntlet"] else 22,hand,Vector3.ZERO,"fire" if id=="ember_gauntlet" else "physical",impact_point,id)
 		return true
 	if kind=="resource":
 		var requires = str(target.get_meta("requires",""))
@@ -617,6 +630,7 @@ func _enemies(delta):
 		var home:Vector3 = enemy.get_meta("home",enemy.global_position)
 		var orchard_ground: bool = zone=="orchard_highlands" and str(enemy.get_meta("zone",""))=="orchard_highlands" and str(enemy.get_meta("enemy_type","skeleton")) not in ["wisp","ghost"] and game.landscape!=null
 		if distance>10 or zone=="forge_yard":
+			if enemy.get_meta("enemy_type","")=="golem" and game.animation!=null and game.animation.golem_runtime!=null: game.animation.golem_runtime.cancel_slam(enemy)
 			enemy.set_meta("combat_phase","idle")
 			enemy.set_meta("attack_damage_done",true)
 			var quiet_type := str(enemy.get_meta("enemy_type", ""))
@@ -632,9 +646,17 @@ func _enemies(delta):
 				enemy.global_position = enemy.global_position.move_toward(home,delta*0.45)
 			continue
 		var type = str(enemy.get_meta("enemy_type","skeleton"))
+		if type=="golem" and game.elapsed<float(enemy.get_meta("golem_stagger_until",0.0)):
+			enemy.set_meta("combat_phase","recovery")
+			enemy.set_meta("combat_progress",0.86)
+			continue
+		if type=="golem" and str(enemy.get_meta("combat_phase",""))=="recovery" and enemy.get_meta("attack_damage_done",false) and game.elapsed>=float(enemy.get_meta("golem_stagger_until",0.0)) and enemy.get_meta("golem_stagger_until",0.0)>0.0:
+			enemy.set_meta("combat_phase","idle")
+			enemy.set_meta("golem_stagger_until",0.0)
 		if type in ["skeleton", "ent"]:
 			enemy.set_meta("idle_wander", IdleWander.interrupt(enemy.get_meta("idle_wander", {}), game.elapsed))
 		var speed = (0.48 if type in ["boss","golem"] else 0.72)*game.tuning.value("combat.enemy_speed")
+		if type=="golem": speed*=float(enemy.get_meta("golem_move_scale",1.0))
 		if type=="skeleton": speed*=float(enemy.get_meta("skeleton_move_scale",1.0))
 		if game.elapsed<float(enemy.get_meta("slow_until",0)): speed*=0.25
 		var knock:Vector3=enemy.get_meta("knock_velocity",Vector3.ZERO)
@@ -736,11 +758,18 @@ func _step_attack(enemy,distance,type):
 	if phase=="idle" and distance<2.5:
 		enemy.set_meta("attack_fairy",enemy.get_meta("fairy_target",false))
 		enemy.set_meta("attack_started",game.elapsed)
-		enemy.set_meta("attack_windup",game.tuning.value("enemy.windup"))
-		enemy.set_meta("attack_recovery",game.tuning.value("enemy.recovery"))
+		enemy.set_meta("attack_windup",maxf(1.35,game.tuning.value("enemy.windup")) if type=="golem" else game.tuning.value("enemy.windup"))
+		enemy.set_meta("attack_recovery",maxf(1.4,game.tuning.value("enemy.recovery")) if type=="golem" else game.tuning.value("enemy.recovery"))
 		enemy.set_meta("attack_damage_done",false)
 		phase="windup"
-		game._notice(type.capitalize()+" raises its weapon — step back!",2)
+		if type=="golem" and game.animation!=null and game.animation.golem_runtime!=null:
+			var slam_target: Vector3 = game.rig.global_position
+			if enemy.get_meta("attack_fairy",false):
+				slam_target = game.fairy.avatar.global_position
+				slam_target.y = enemy.global_position.y
+			game.animation.golem_runtime.begin_slam(enemy,slam_target)
+			game._notice("Golem marks a ground slam — leave the amber circle!",2)
+		else: game._notice(type.capitalize()+" raises its weapon — step back!",2)
 	if phase not in ["windup","strike","recovery"]: return
 	var age=game.elapsed-float(enemy.get_meta("attack_started",game.elapsed))
 	var attack_scale=maxf(0.3,float(enemy.get_meta("skeleton_attack_scale",1.0))) if type=="skeleton" else 1.0
@@ -760,7 +789,9 @@ func _step_attack(enemy,distance,type):
 	else: phase="idle"
 	if age>=windup+strike*0.5 and not enemy.get_meta("attack_damage_done",false):
 		enemy.set_meta("attack_damage_done",true)
-		if enemy.get_meta("attack_fairy",false):
+		if type=="golem" and game.animation!=null and game.animation.golem_runtime!=null:
+			game.animation.golem_runtime.slam(enemy)
+		elif enemy.get_meta("attack_fairy",false):
 			if game.get("fairy")!=null and game.fairy.active and game.fairy.avatar.global_position.distance_to(enemy.global_position+Vector3.UP)<2.3:
 				game.fairy.hurt(float(enemy.get_meta("damage",12)),type+" caught you")
 		elif game.camera.global_position.distance_to(enemy.global_position+Vector3.UP)<2.8:
@@ -768,7 +799,7 @@ func _step_attack(enemy,distance,type):
 	enemy.set_meta("combat_phase",phase)
 	enemy.set_meta("combat_progress",progress)
 
-func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physical",impact_point=null):
+func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physical",impact_point=null,tool_id=""):
 	# Awakened trees keep their original resource identity and keyed timber/seed
 	# rewards. They must never run the skeleton-remains or respawn path below.
 	if game.world_builder != null and game.world_builder.ents != null:
@@ -778,6 +809,8 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 		return
 	if not enemy.get_meta("alive",true): return
 	if game.guardians!=null: damage=game.guardians.filter_damage(enemy,damage,hand,damage_type)
+	if str(enemy.get_meta("enemy_type",""))=="golem" and game.animation!=null and game.animation.golem_runtime!=null:
+		damage=game.animation.golem_runtime.filter_hit(enemy,damage,hand,damage_type,impact_point,tool_id)
 	if game.elapsed<float(enemy.get_meta("exposed_until",-100.0)) and (game.guardians==null or not game.guardians.guardians.has(enemy.get_instance_id())): damage*=1.5
 	if game.animation!=null: game.animation.hit(enemy,impulse if impulse.length()>0 else enemy.global_position-game.camera.global_position)
 	if game.guardian_authored!=null:
@@ -795,6 +828,7 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	if game.quests!=null and not enemy.get_meta("director_spawned",false): game.quests.enemy_defeated(enemy,str(enemy.get_meta("enemy_type","skeleton")))
 	enemy.set_meta("combat_phase","dead")
 	enemy.set_meta("attack_at",0.0)
+	if str(enemy.get_meta("enemy_type",""))=="golem" and game.animation!=null and game.animation.golem_runtime!=null: game.animation.golem_runtime.defeated(enemy)
 	game.remains.shatter(enemy,impulse)
 	enemy.visible=false
 	game._set_collisions(enemy,false)

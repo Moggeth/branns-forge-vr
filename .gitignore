@@ -49,3 +49,7 @@ Thumbs.db
 # Tree kit GLBs embed their textures; import extracts these automatically.
 godot/assets/tree_cutting/*.png
 godot/assets/tree_cutting/*.import
+
+# The golem GLB embeds material images; Godot recreates these on import.
+godot/assets/golem/*.png
+godot/assets/golem/*.import

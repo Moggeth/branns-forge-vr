@@ -1,0 +1,139 @@
+{
+ "bytes": 17145728,
+ "nodes": [
+  "ForearmHandL",
+  "ForearmL",
+  "ElbowL",
+  "ShoulderL",
+  "UpperArmL",
+  "ArmL",
+  "ForearmHandR",
+  "ForearmR",
+  "ElbowR",
+  "ShoulderR",
+  "UpperArmR",
+  "ArmR",
+  "BodyCoreMesh",
+  "ChestPlate",
+  "CoreGlow",
+  "BodyCore",
+  "HeadMesh",
+  "Head",
+  "LegLMesh",
+  "LegL",
+  "LegRMesh",
+  "LegR",
+  "Golem"
+ ],
+ "meshes": 14,
+ "materials": [
+  "Stone_Main",
+  "Stone_Dark",
+  "Moss",
+  "Iron",
+  "Copper",
+  "Gold",
+  "Leather",
+  "Stone_Pale",
+  "Glow"
+ ],
+ "images": 28,
+ "textures": 28,
+ "animations": [
+  "Idle",
+  "Walk",
+  "Slam"
+ ],
+ "triangles": 20006,
+ "all_materials_have_base_texture": true,
+ "emissive_texture": [
+  "Glow"
+ ],
+ "mr_texture": [
+  "Stone_Main",
+  "Stone_Dark",
+  "Moss",
+  "Iron",
+  "Copper",
+  "Gold",
+  "Leather",
+  "Stone_Pale",
+  "Glow"
+ ],
+ "normal_texture": [
+  "Stone_Main",
+  "Stone_Dark",
+  "Moss",
+  "Iron",
+  "Copper",
+  "Gold",
+  "Leather",
+  "Stone_Pale",
+  "Glow"
+ ],
+ "bounds_blender_min": [
+  -1.042,
+  -0.595,
+  -0.009
+ ],
+ "bounds_blender_max": [
+  1.042,
+  0.529,
+  2.336
+ ],
+ "part_triangles": {
+  "BodyCoreMesh": 4112,
+  "ChestPlate": 1312,
+  "CoreGlow": 432,
+  "HeadMesh": 2990,
+  "UpperArmL": 600,
+  "ShoulderL": 946,
+  "ForearmHandL": 1308,
+  "ForearmL": 644,
+  "LegLMesh": 2082,
+  "UpperArmR": 600,
+  "ShoulderR": 946,
+  "ForearmHandR": 1308,
+  "ForearmR": 644,
+  "LegRMesh": 2082
+ },
+ "texture_stats": {
+  "Stone_Main": {
+   "mean_base_luminance": 0.323,
+   "moss_or_patina_coverage": 0.077
+  },
+  "Stone_Dark": {
+   "mean_base_luminance": 0.241,
+   "moss_or_patina_coverage": 0.049
+  },
+  "Stone_Pale": {
+   "mean_base_luminance": 0.447,
+   "moss_or_patina_coverage": 0.058
+  },
+  "Moss": {
+   "mean_base_luminance": 0.181,
+   "moss_or_patina_coverage": 0.0
+  },
+  "Copper": {
+   "mean_base_luminance": 0.449,
+   "moss_or_patina_coverage": 0.149
+  },
+  "Gold": {
+   "mean_base_luminance": 0.549,
+   "moss_or_patina_coverage": 0.11
+  },
+  "Iron": {
+   "mean_base_luminance": 0.333,
+   "moss_or_patina_coverage": 0.152
+  },
+  "Leather": {
+   "mean_base_luminance": 0.263,
+   "moss_or_patina_coverage": 0.0
+  },
+  "Glow": {
+   "mean_base_luminance": 0.356,
+   "moss_or_patina_coverage": 0.0
+  }
+ },
+ "build_seconds": 2.6
+}

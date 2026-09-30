@@ -257,7 +257,7 @@ static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, t
 	interaction.add_child(interaction_shape)
 	data.portals.append(n)
 
-static func enemy(root: Node3D, data: Dictionary, zone: String, pos: Vector3, type: String, variant: String = "") -> void:
+static func enemy(root: Node3D, data: Dictionary, zone: String, pos: Vector3, type: String, variant: String = "") -> Node3D:
 	var n := entity(root,zone,"enemy",pos,"adventure_enemy")
 	n.set_meta("enemy_type",type)
 	if type=="skeleton" and variant!="": n.set_meta("guardian_variant",variant)
@@ -305,6 +305,7 @@ static func enemy(root: Node3D, data: Dictionary, zone: String, pos: Vector3, ty
 			label(n,"THE CINDER WARDEN",Vector3(0,4.4,0),32,"ffcf85")
 	body(n,Vector3(0,1.8 if type == "boss" else 1.0,0),Vector3(2.6,3.7,1.5) if type == "boss" else Vector3(1.2,2.2,0.9))
 	data.enemies.append(n)
+	return n
 
 static func barrier(root: Node3D, data: Dictionary, zone: String, pos: Vector3, requires: String = "bomb") -> void:
 	var n := entity(root,zone,"barrier",pos,"adventure_wall")

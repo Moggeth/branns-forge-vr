@@ -4,9 +4,13 @@ const PROFILES={"skeleton":{"stride":0.8,"swing":0.5,"bob":0.025},"rat":{"stride
 var game
 var actors={}
 var debug_states=false
+var golem_runtime
 
 func setup(owner_game):
 	game=owner_game
+	golem_runtime=preload("res://golem_runtime.gd").new()
+	add_child(golem_runtime)
+	golem_runtime.setup(game,self)
 	for actor in game.scene.enemies+game.scene.rats: register(actor)
 
 func register(actor):
@@ -88,6 +92,7 @@ func register(actor):
 		library.add_animation(clip_name,clip)
 	player.add_animation_library("",library)
 	actors[actor.get_instance_id()]={"actor":actor,"type":type,"visual":visual,"joints":joints,"pieces":pieces,"player":player,"distance":0.0,"last":actor.global_position,"state":"","clip":"","hit_at":-100.0,"hit_dir":Vector3.ZERO,"homes":pieces.map(func(p):return {"piece":p,"parent":p.get_parent(),"transform":p.transform})}
+	if type=="golem" and golem_runtime!=null: golem_runtime.attach(actor,actors[actor.get_instance_id()])
 
 func pose(actor,clip_name,progress):
 	var rig=actors.get(actor.get_instance_id(),{})
@@ -139,6 +144,7 @@ func tick(delta):
 			rig.joints.tail.rotation.y+=sin(game.elapsed*5.0+gait*TAU)*0.17
 			if state=="strike": rig.visual.position.z=0.075*sin(clampf(progress,0,1)*PI)
 		rig.visual.rotation=Vector3(rig.hit_dir.z*recoil*0.12,0,-rig.hit_dir.x*recoil*0.12)
+	if golem_runtime!=null: golem_runtime.tick(delta)
 
 func restore(actor):
 	var rig=actors.get(actor.get_instance_id(),{})
@@ -160,4 +166,5 @@ func restore(actor):
 	actor.set_meta("bite_at",-100.0)
 	rig.visual.transform=Transform3D.IDENTITY
 	pose(actor,"idle",0)
+	if golem_runtime!=null: golem_runtime.restore(actor)
 	if game.guardian_authored!=null: game.guardian_authored.after_restore(actor)
