@@ -1,5 +1,6 @@
 extends RefCounted
 ## Feet-based FPS motion. The existing game capsule and floor tags remain authoritative.
+const TerrainSafety = preload("res://terrain_safety.gd")
 const GRAVITY=18.0
 const JUMP_SPEED=5.85 # 0.95 m above takeoff with this gravity.
 const FALL_SPEED=22.0
@@ -7,6 +8,8 @@ const COYOTE_SECONDS=.10
 const FEET_OFFSET=.02
 const MAX_FRAME=.25
 const MAX_HORIZONTAL=1.92
+const STEP_HEIGHT=.42
+const WALKABLE_NORMAL=.68
 var vertical_speed=0.0
 var grounded=false
 var coyote_left=0.0
@@ -21,14 +24,29 @@ func reset():
 	jump_locked=false
 
 func _floor(game,feet:Vector3,above:float,below:float)->Dictionary:
-	var start=feet+Vector3.UP*above
-	var end=feet+Vector3.DOWN*below
-	var query=PhysicsRayQueryParameters3D.create(start,end,1)
-	var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty() or hit.normal.y<.8: return {}
-	var owner=game._owner(hit.collider)
-	if owner==null or owner.get_meta("kind","") not in ["floor","solid"]: return {}
-	return hit
+	return TerrainSafety.floor_hit(game,feet,above,below,WALKABLE_NORMAL,1)
+
+func _escape_altered_ground(game, feet: Vector3) -> bool:
+	var expected := TerrainSafety.orchard_height(game, feet)
+	if not is_finite(expected): return false
+	if expected <= feet.y + .10 and game._player_capsule_clear(feet): return false
+	# Preserve the X/Z position first, then search just outside a narrow fold.
+	# Every candidate needs current collision support and an empty body volume.
+	var offsets := [Vector2.ZERO, Vector2(.28,0), Vector2(-.28,0), Vector2(0,.28), Vector2(0,-.28),
+		Vector2(.28,.28), Vector2(-.28,.28), Vector2(.28,-.28), Vector2(-.28,-.28)]
+	for offset in offsets:
+		var probe := feet + Vector3(offset.x, 0, offset.y)
+		var hit := _floor(game, probe, 2.0, maxf(2.0, absf(expected-feet.y)+1.0))
+		if hit.is_empty(): continue
+		var raised := Vector3(probe.x, float(hit.position.y)+FEET_OFFSET, probe.z)
+		if raised.y < feet.y - .1 or not game._player_capsule_clear(raised): continue
+		game.rig.global_position = raised
+		grounded = true
+		vertical_speed = 0.0
+		coyote_left = COYOTE_SECONDS
+		jump_locked = false
+		return true
+	return false
 
 func request_jump(game)->bool:
 	if game.vr: return false
@@ -53,6 +71,11 @@ func step(game,horizontal_step:Vector3,delta:float)->void:
 
 func _substep(game,horizontal:Vector3,dt:float)->void:
 	var feet:Vector3=game.rig.global_position
+	if _escape_altered_ground(game, feet): return
+	# During a height/collider swap, hold the rig for a frame instead of
+	# letting gravity carry it below the new surface.
+	var expected := TerrainSafety.orchard_height(game, feet)
+	if is_finite(expected) and expected > feet.y + .10: return
 	if grounded:
 		var old_support=_floor(game,feet,.28,.18)
 		if old_support.is_empty() or absf(float(old_support.position.y)+FEET_OFFSET-feet.y)>.12:
@@ -63,10 +86,10 @@ func _substep(game,horizontal:Vector3,dt:float)->void:
 		if game._player_capsule_clear(destination): feet=destination
 		else:
 			# A low obstacle can be stepped onto, while a wall remains solid.
-			var upper=_floor(game,destination,.36,.5)
+			var upper=_floor(game,destination,STEP_HEIGHT+.12,.5)
 			if grounded and not upper.is_empty():
 				var rise=float(upper.position.y)+FEET_OFFSET-feet.y
-				if rise>0.0 and rise<=.30:
+				if rise>0.0 and rise<=STEP_HEIGHT:
 					var stepped=Vector3(destination.x,float(upper.position.y)+FEET_OFFSET,destination.z)
 					if game._player_capsule_clear(stepped): feet=stepped
 			if feet.x==game.rig.global_position.x and feet.z==game.rig.global_position.z:
@@ -75,11 +98,11 @@ func _substep(game,horizontal:Vector3,dt:float)->void:
 				var along_z=feet+Vector3(0,0,horizontal.z)
 				if horizontal.z!=0.0 and game._player_capsule_clear(along_z): feet=along_z
 	if grounded:
-		var support=_floor(game,feet,.34,.42)
+		var support=_floor(game,feet,STEP_HEIGHT+.12,.48)
 		if not support.is_empty():
 			var ground_y=float(support.position.y)+FEET_OFFSET
 			var difference=ground_y-feet.y
-			if difference>=-.34 and difference<=.30:
+			if difference>=-.38 and difference<=STEP_HEIGHT:
 				var snapped=Vector3(feet.x,ground_y,feet.z)
 				if game._player_capsule_clear(snapped):
 					game.rig.global_position=snapped

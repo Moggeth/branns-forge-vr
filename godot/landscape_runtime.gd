@@ -187,6 +187,16 @@ func apply_magic(raw: Dictionary) -> String:
 	print("LANDSCAPE_OP type=", raw.type, " cells=", changed.size(), " chunks=", dirty.size(), " target_ms=", snappedf(last_operation_ms, 0.01))
 	return ""
 
+func apply_impact_magic(raw: Dictionary) -> String:
+	# Starfall needs its crater at contact, before debris and post-impact physics.
+	# Keep the normal operation journal and events, but finish this one in-frame.
+	var previous_ground := _player_ground()
+	var result := apply_magic(raw)
+	if result.is_empty():
+		_finish_transition(true)
+		_lift_player(previous_ground)
+	return result
+
 func undo_last() -> bool:
 	if operations.is_empty(): return false
 	if not transition.is_empty(): _finish_transition()
@@ -245,14 +255,14 @@ func _process(delta: float) -> void:
 		last_rebuild_ms = float(Time.get_ticks_usec() - stamp) / 1000.0
 	if t >= 1.0: _finish_transition()
 
-func _finish_transition() -> void:
+func _finish_transition(immediate_collision: bool = false) -> void:
 	if transition.is_empty(): return
 	_paint_transition_exposure()
 	var started := Time.get_ticks_usec()
 	model["height"] = transition.target
 	var box: Rect2 = transition.bounds
 	if float(transition.elapsed) < float(transition.duration):
-		for key in transition.dirty: _rebuild_chunk(key)
+		for key in transition.dirty: _rebuild_chunk(key, immediate_collision)
 	Fields.derive_region(model, box)
 	# Height/collision move first. The drainage graph is calculated from an
 	# isolated snapshot, then merged only if no newer spell superseded it.
@@ -361,7 +371,8 @@ func _apply_hydrology(computed: Dictionary, revision: int, bounds: Rect2) -> voi
 
 func _player_ground() -> float:
 	if game == null or game.rig == null: return NAN
-	var local: Vector3 = game.rig.global_position - zone_root.global_position
+	var tracked: Vector3 = game.camera.global_position if game.vr else game.rig.global_position
+	var local: Vector3 = zone_root.to_local(tracked)
 	if absf(local.x) > 155.0 or absf(local.z) > 155.0: return NAN
 	return height_at(Vector2(local.x, local.z))
 
@@ -369,9 +380,11 @@ func _lift_player(previous: float) -> void:
 	if not is_finite(previous): return
 	var now := _player_ground()
 	if now > previous and game.rig.global_position.y < zone_root.global_position.y + now + 0.45:
-		game.rig.global_position += Vector3.UP * (now - previous)
-		_falling_with_earth = false
-		_fall_speed = 0.0
+		var raised: Vector3 = game.rig.global_position + Vector3.UP * (now - previous)
+		if game._player_capsule_clear(raised):
+			game.rig.global_position = raised
+			_falling_with_earth = false
+			_fall_speed = 0.0
 	elif now < previous - 0.001 and game.rig.global_position.y < zone_root.global_position.y + previous + 0.45:
 		_falling_with_earth = true
 
@@ -383,12 +396,13 @@ func _settle_player(delta: float) -> void:
 	_fall_speed = minf(_fall_speed + 9.8 * delta, 9.5)
 	var pos: Vector3 = game.rig.global_position
 	pos.y = maxf(floor_y, pos.y - _fall_speed * delta)
+	if not game._player_capsule_clear(pos): return
 	game.rig.global_position = pos
 	if pos.y <= floor_y + 0.01:
 		_falling_with_earth = false
 		_fall_speed = 0.0
 
-func _rebuild_chunk(key: Vector2i) -> void:
+func _rebuild_chunk(key: Vector2i, immediate_collision: bool = false) -> void:
 	var size: int = model.size
 	var step: float = model.step
 	var origin: Vector2 = model.origin
@@ -468,7 +482,7 @@ func _rebuild_chunk(key: Vector2i) -> void:
 	(record.visual as MeshInstance3D).mesh = mesh
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(faces)
-	if is_inside_tree(): (record.collider as CollisionShape3D).set_deferred("shape", shape)
+	if is_inside_tree() and not immediate_collision: (record.collider as CollisionShape3D).set_deferred("shape", shape)
 	else: (record.collider as CollisionShape3D).shape = shape
 
 func _load_operations() -> void:

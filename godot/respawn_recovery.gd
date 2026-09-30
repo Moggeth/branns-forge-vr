@@ -1,6 +1,7 @@
 extends RefCounted
 ## Recovery is a short transaction: reserve floor, clear equipment, flush physics,
 ## verify the body volume, then permit input. Never return an unchecked spawn.
+const TerrainSafety = preload("res://terrain_safety.gd")
 const BODY_MASK := 1 | 8
 const SAFE_ITEM_SPOTS := [Vector3(-7.5, 1.0, 8.5), Vector3(-6.0, 1.0, 8.5), Vector3(-4.5, 1.0, 8.5), Vector3(-7.5, 1.0, 10.0), Vector3(-6.0, 1.0, 10.0), Vector3(-4.5, 1.0, 10.0)]
 var game
@@ -38,14 +39,23 @@ func _movable(collider: Node) -> Node3D:
 	return null
 
 func support(candidate: Vector3) -> Dictionary:
-	var query := PhysicsRayQueryParameters3D.create(candidate + Vector3.UP * 4.0, candidate + Vector3.DOWN * 5.0, BODY_MASK)
+	var expected := TerrainSafety.orchard_height(game, candidate)
+	var start_y := candidate.y + 4.0
+	var end_y := candidate.y - 5.0
+	if is_finite(expected):
+		start_y = maxf(start_y, expected + 2.0)
+		end_y = minf(end_y, expected - 0.5)
+	var query := PhysicsRayQueryParameters3D.create(Vector3(candidate.x, start_y, candidate.z), Vector3(candidate.x, end_y, candidate.z), BODY_MASK)
 	var excluded: Array[RID] = []
 	# Loose equipment must not be mistaken for the support floor or obscure it.
 	for attempt in 24:
 		var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
 		if hit.is_empty(): return {}
 		var owner: Node3D = game._owner(hit.collider)
-		if owner != null and owner.get_meta("kind", "") == "floor" and hit.normal.y >= 0.8: return hit
+		if owner != null and owner.get_meta("kind", "") == "floor" and hit.normal.y >= 0.68:
+			if is_finite(expected) and game.landscape.is_ancestor_of(owner) and absf(float(hit.position.y) - expected) > TerrainSafety.COLLIDER_TOLERANCE:
+				return {}
+			return hit
 		if _movable(hit.collider) == null: return {}
 		excluded.append(hit.collider.get_rid())
 		query.exclude = excluded
