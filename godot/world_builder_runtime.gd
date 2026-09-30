@@ -17,7 +17,13 @@ const MAX_GROVES = 24
 const MAX_BRIDGES = 4
 const MAX_THREATS = 8
 const MAX_FOREST_SPELLS = 64
-const MAX_METEORS = 10
+## Terrain operations are the durable safety budget (256 across all spells).
+## Keep the same bound for save validation; only nearby rocks get individual nodes.
+const MAX_METEOR_RECORDS = 256
+const MAX_NEAR_METEORS = 20
+const MAX_CONCURRENT_FALLS = 4
+const METEOR_NEAR_DISTANCE = 52.0
+const METEOR_REFRESH_SECONDS = 0.4
 const Ecology = preload("res://landscape_ecology.gd")
 const Navigation = preload("res://landscape_navigation.gd")
 const Water = preload("res://landscape_water.gd")
@@ -47,6 +53,8 @@ var scenic_by_key: Dictionary = {}
 var scenic_instance_by_key: Dictionary = {}
 var scenic_pending: Dictionary = {}
 var meteor_nodes: Dictionary = {}
+var distant_meteors: MultiMeshInstance3D
+var meteor_refresh_remaining := 0.0
 var test_mode := false
 var save_path := SAVE
 var save_blocked := false
@@ -66,6 +74,9 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	root.name = "LivingOrchardSettlement"
 	game.adventure.zone_groups[ZONE].add_child(root)
 	root.global_position = center
+	distant_meteors = MultiMeshInstance3D.new()
+	distant_meteors.name = "DistantMeteorites"
+	root.add_child(distant_meteors)
 	data = fresh_state()
 	_index_timber()
 	if not test_mode: _load()
@@ -172,7 +183,7 @@ func _valid(value: Variant) -> bool:
 	if value.get("carried", []) is not Array or value.get("carried", []).size() > 5: return false
 	if value.get("threats", []) is not Array or value.get("threats", []).size() > MAX_THREATS: return false
 	if value.get("forest_spells", []) is not Array or value.get("forest_spells", []).size() > MAX_FOREST_SPELLS: return false
-	if value.get("meteors", []) is not Array or value.get("meteors", []).size() > MAX_METEORS: return false
+	if value.get("meteors", []) is not Array or value.get("meteors", []).size() > MAX_METEOR_RECORDS: return false
 	if int(value.get("star_gems", 0)) < 0 or int(value.get("star_gems", 0)) > 200: return false
 	if int(value.get("star_iron", 0)) < 0 or int(value.get("star_iron", 0)) > 200: return false
 	for rock in value.get("meteors", []):
@@ -219,7 +230,7 @@ func _point_valid(value: Variant) -> bool:
 func _load() -> void:
 	if not FileAccess.file_exists(save_path): return
 	var bytes := FileAccess.get_file_as_bytes(save_path)
-	if bytes.size() > 131072: push_warning("WORLD_BUILDER save too large; keeping the world untouched"); save_blocked = true; return
+	if bytes.size() > 2097152: push_warning("WORLD_BUILDER save too large; keeping the world untouched"); save_blocked = true; return
 	var candidate: Variant = _canonical_state(JSON.parse_string(bytes.get_string_from_utf8()))
 	if _valid(candidate):
 		data = candidate
@@ -248,6 +259,10 @@ func save() -> bool:
 
 func tick(delta: float) -> void:
 	if game == null: return
+	meteor_refresh_remaining -= delta
+	if meteor_refresh_remaining <= 0.0:
+		meteor_refresh_remaining = METEOR_REFRESH_SECONDS
+		_refresh_meteor_visibility()
 	_tick_resources(delta)
 	if ents != null: ents.tick(delta)
 	_sync_threats(delta)
@@ -427,14 +442,14 @@ func cast_meteor(point: Vector3) -> String:
 	if float(data.mana) < 8.0: return "Need 8 Mana to call Starfall."
 	var ready := spells.begin("meteor", self)
 	if ready != "": return ready
-	if data.meteors.size() >= MAX_METEORS: return "The Orchard already holds its maximum of ten meteorites."
+	if data.meteors.size() >= MAX_METEOR_RECORDS: return "The Orchard's impact record is full."
 	if game.landscape.operation_count() >= game.landscape.MAX_OPERATIONS: return "The landscape cannot record another impact."
 	var at := Vector2(point.x,point.z)
 	var record: Dictionary = Meteor.make_record(at, int(game.landscape.seed) + int(data.revision) * 503 + 2903, game.landscape.height_at(at))
 	record["id"] = "meteor-%06d" % (int(data.revision) + 1)
 	record["phase"] = "falling"
 	data.meteors.append(record)
-	_render_meteor(record, true)
+	_refresh_meteor_visibility()
 	data.mana = float(data.mana) - 8.0
 	spells.success("meteor", self)
 	_changed("STARFALL! Leave the glowing impact site; then mine its gems with Stonewhisper.")
@@ -452,11 +467,62 @@ func _render_meteor(record: Dictionary, animate: bool) -> void:
 	meteor_nodes[id] = meteor
 
 
+func _refresh_meteor_visibility() -> void:
+	if distant_meteors == null or game == null: return
+	var viewer: Vector3 = game.rig.global_position - center
+	var candidates: Array[Dictionary] = []
+	var desired: Dictionary = {}
+	var falling_count := 0
+	for record in data.meteors:
+		if str(record.get("phase", "")) == "falling":
+			if falling_count < MAX_CONCURRENT_FALLS:
+				desired[str(record.id)] = true
+				falling_count += 1
+			continue
+		var at: Array = record.center
+		var distance := Vector2(viewer.x, viewer.z).distance_squared_to(Vector2(float(at[0]), float(at[1])))
+		if distance <= METEOR_NEAR_DISTANCE * METEOR_NEAR_DISTANCE:
+			candidates.append({"id": str(record.id), "distance": distance})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.distance) < float(b.distance))
+	for i in mini(MAX_NEAR_METEORS, candidates.size()): desired[str(candidates[i].id)] = true
+	for id in meteor_nodes.keys():
+		if desired.has(id): continue
+		var old: Node = meteor_nodes[id]
+		meteor_nodes.erase(id)
+		if is_instance_valid(old): old.queue_free()
+	var far: Array[Dictionary] = []
+	for record in data.meteors:
+		var id := str(record.id)
+		if desired.has(id):
+			if not meteor_nodes.has(id): _render_meteor(record, str(record.phase) == "falling")
+		elif str(record.get("phase", "")) == "landed":
+			far.append(record)
+	var batch := MultiMesh.new()
+	batch.transform_format = MultiMesh.TRANSFORM_3D
+	batch.mesh = Meteor._rock_mesh()
+	batch.instance_count = far.size()
+	for i in far.size():
+		var record: Dictionary = far[i]
+		var at: Array = record.center
+		var scale_factor := 0.65 if _meteor_depleted(record) else 1.0
+		var basis := Basis(Vector3.UP, float(record.rotation)).scaled(Vector3.ONE * scale_factor)
+		batch.set_instance_transform(i, Transform3D(basis,
+			Vector3(float(at[0]), float(record.ground_y) + 0.65, float(at[1]))))
+	distant_meteors.multimesh = batch
+
+
+func _meteor_depleted(record: Dictionary) -> bool:
+	if int(record.get("ore", 0)) > 0: return false
+	for count in record.get("veins", []):
+		if int(count) > 0: return false
+	return true
+
+
 func _meteor_impact(event: Dictionary, id: String) -> void:
 	if not meteor_nodes.has(id): return
 	var meteor = meteor_nodes[id]
 	var record: Dictionary = meteor.to_record()
-	var result: String = game.landscape.apply_magic(Meteor.crater_operation(record))
+	var result: String = game.landscape.apply_impact_magic(Meteor.crater_operation(record))
 	if result != "":
 		push_warning("STARFALL terrain edit failed: " + result)
 		return
@@ -470,11 +536,8 @@ func _meteor_impact(event: Dictionary, id: String) -> void:
 			record.phase = "landed"
 			data.meteors[i] = record
 			break
+	meteor_refresh_remaining = 0.0
 	var impact: Vector3 = center + event.center
-	if game.impact_feedback != null:
-		game.impact_feedback.emit_contact({"point":impact,"normal":Vector3.UP,"material":"stone",
-			"tool":"meteor","tool_material":"stone","strike_region":"rock_body",
-			"relative_velocity":Vector3.DOWN*12.0,"energy":80.0})
 	var hero_local: Vector3 = game.rig.global_position - center
 	var hero_damage: float = Meteor.damage_at(event, hero_local)
 	if game.adventure.zone == ZONE and hero_damage > 0.0: game.adventure.take_damage(hero_damage, "Starfall")
@@ -492,6 +555,7 @@ func _meteor_inventory(record: Dictionary, id: String) -> void:
 			record.phase = "landed"
 			data.meteors[i] = record
 			break
+	meteor_refresh_remaining = 0.0
 
 
 func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float, normal: Vector3 = Vector3.ZERO) -> bool:
@@ -859,7 +923,7 @@ func _rebuild_saved() -> void:
 	for value in data.groves: _render_grove(_unpack(value))
 	for entry in data.forest_spells:
 		_render_forest(_unpack_forest(entry.placements) if entry.has("placements") else Ecology.grow(game.landscape.model, entry.region, int(entry.seed)), false)
-	for record in data.meteors: _render_meteor(record, str(record.phase) == "falling")
+	_refresh_meteor_visibility()
 	for segment in data.paths:
 		var a := _unpack(segment.a)
 		var b := _unpack(segment.b)

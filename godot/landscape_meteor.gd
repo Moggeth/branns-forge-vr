@@ -4,8 +4,11 @@ extends Node3D
 
 signal impact_ready(event: Dictionary)
 signal inventory_changed(record: Dictionary)
+## Visual adapters can subscribe without owning impact timing or saved state.
+signal visual_event(payload: Dictionary)
 
 const FALL_SECONDS := 1.25
+const SETTLE_SECONDS := 1.35
 const GEM_VEINS := 6
 const MAX_GEMS_PER_VEIN := 2
 const ORE_UNITS := 8
@@ -16,11 +19,12 @@ var record: Dictionary = {}
 var falling := false
 var fall_elapsed := 0.0
 var impacted := false
+var settling := false
+var settle_elapsed := 0.0
 var core: MeshInstance3D
 var collider: StaticBody3D
 var scar_display: MultiMeshInstance3D
 var gems: Array[MeshInstance3D] = []
-var shock: MeshInstance3D
 static var _shared_rock: ArrayMesh
 static var _shared_scar: ArrayMesh
 
@@ -72,12 +76,8 @@ func setup(source: Dictionary, animate := true) -> void:
 		core.position.y = 24.0
 		collider.process_mode = Node.PROCESS_MODE_DISABLED
 		for gem in gems: gem.visible = false
-		shock.visible = true
-		shock.scale = Vector3.ONE * 4.0
-		shock.transparency = 0.4
 	else:
 		core.position.y = 0.65
-		shock.visible = false
 		if remaining_gems() == 0 and remaining_ore() == 0:
 			core.scale = Vector3.ONE * 0.65
 			collider.scale = core.scale
@@ -86,6 +86,11 @@ func setup(source: Dictionary, animate := true) -> void:
 
 func to_record() -> Dictionary:
 	return record.duplicate(true)
+
+func set_crystal_art(artist: Object) -> void:
+	# Keep GemVein nodes and their positions as the stable strike/reward API.
+	if artist != null and artist.has_method("decorate_meteor"):
+		artist.decorate_meteor(self, gems)
 
 func remaining_gems() -> int:
 	var total := 0
@@ -190,7 +195,16 @@ static func _scar_mesh() -> ArrayMesh:
 	return _shared_scar
 
 func _process(delta: float) -> void:
-	advance(delta)
+	if falling: advance(delta)
+	elif settling:
+		settle_elapsed = minf(settle_elapsed + maxf(delta, 0.0), SETTLE_SECONDS)
+		visual_event.emit({"phase": "settling", "progress": settle_elapsed / SETTLE_SECONDS,
+			"elapsed_seconds": settle_elapsed, "duration_seconds": SETTLE_SECONDS,
+			"center": position, "seed": int(record.seed)})
+		if settle_elapsed >= SETTLE_SECONDS:
+			settling = false
+			visual_event.emit({"phase": "settled", "center": position, "seed": int(record.seed)})
+			set_process(false)
 
 func advance(delta: float) -> void:
 	if not falling: return
@@ -198,24 +212,21 @@ func advance(delta: float) -> void:
 	var t := fall_elapsed / FALL_SECONDS
 	core.position.y = lerpf(24.0, 0.65, t * t)
 	core.rotation.x = t * 3.2
-	shock.scale = Vector3.ONE * (3.3 + 0.55 * sin(t * TAU * 7.0))
-	shock.transparency = 0.2 + 0.25 * sin(t * TAU * 7.0)
+	visual_event.emit({"phase": "descent", "progress": t,
+		"elapsed_seconds": fall_elapsed, "duration_seconds": FALL_SECONDS, "center": position,
+		"seed": int(record.seed)})
 	if t < 1.0: return
 	falling = false
 	impacted = true
 	core.rotation.x = 0.0
 	collider.process_mode = Node.PROCESS_MODE_INHERIT
-	for i in gems.size(): _update_gem(i)
-	shock.visible = true
-	shock.scale = Vector3.ONE * 0.3
-	shock.transparency = 0.0
-	if is_inside_tree():
-		var tween := create_tween().set_parallel(true)
-		tween.tween_property(shock, "scale", Vector3.ONE * 8.0, 0.5)
-		tween.tween_property(shock, "transparency", 1.0, 0.5)
-		tween.chain().tween_callback(func(): shock.visible = false)
+	visual_event.emit({"phase": "impact", "center": position, "seed": int(record.seed)})
 	impact_ready.emit(impact_event(record))
-	set_process(false)
+	for i in gems.size(): _update_gem(i)
+	visual_event.emit({"phase": "crystal_reveal", "center": position,
+		"seed": int(record.seed)})
+	settling = true
+	settle_elapsed = 0.0
 
 func _build_visuals() -> void:
 	core = MeshInstance3D.new()
@@ -254,17 +265,7 @@ func _build_visuals() -> void:
 		add_child(gem)
 		gems.append(gem)
 		_update_gem(i)
-	shock = MeshInstance3D.new()
-	shock.name = "ImpactWave"
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.9
-	ring.outer_radius = 1.0
-	ring.rings = 8
-	ring.ring_segments = 32
-	shock.mesh = ring
-	shock.material_override = _material(Color(1.0, 0.55, 0.22, 0.68), true)
-	shock.position.y = 0.15
-	add_child(shock)
+	# Starfall VFX attach to visual_event. No generic impact sphere is built.
 
 static func _rock_mesh() -> ArrayMesh:
 	# A tiny shared, flat-shaded shell gives every meteorite readable stone
