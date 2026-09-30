@@ -1696,3 +1696,44 @@ The native weather game check passed in 9.664 s with
 interrupted scan, travel, and weather disable/re-enable. These timings are
 measured process wall time; the failed intermediate runs and repeats are in
 `logs/work-timing.csv`. No live session, save, API, or headset was used.
+
+## FPS/VR playtest integration and failures learned — 2026-09-30
+
+The final [playtest handoff](PLAYTEST-20260930.md) records controls, physics/log
+semantics, persistent skull delivery, native checks and actual-render commands.
+The full disposable service integration initially failed in 51.061 s because a
+new generic `not game.vr` guard bypassed auto-holstering for its simulated
+tracked-hand fixtures. Scope gentle-drop velocity and the holster bypass to
+`hand == game.desktop_hand`, as well as FPS mode. Retest tracked-hand storage,
+recall and throws; do not relax those existing assertions. The corrected broad
+integration passed in 60.300 s with all result arrays empty.
+
+The first actual swing captures (2.805 s) showed the axe blade almost edge-on
+at contact when its working plane was perfectly aligned with the slash. A
+small out-of-plane cant retains the diagonal stroke and exposes the blade;
+the revised twelve actual-mesh frames were reviewed (2.595 s). This diagnostic
+uses real grip transforms and production animation without loading Main.
+
+The final script batch accidentally read a portal implementation while its
+owner was editing its companion fixture. That intermediate check reported a
+missing `vr` property (0.454 s). Wait for the owning agent's tested handoff
+before running dependent tests; the completed room-scale fixture passes in
+0.220 s. The same batch incorrectly expected every success marker to be
+`RESULT []`, marking the valid managed-release JSON result as failure (0.551 s).
+Inspect the named JSON `failures` field instead: its rerun passes all seven
+checks in 0.549 s. Process exit 0 alone remains insufficient; also reject
+SCRIPT ERROR/ERROR output.
+
+Other final standalone process times: locomotion 0.234 s; timber 1.103 s;
+skull basket 0.272 s; item controls 0.455 s; bone contact 0.458 s; Main input
+integration and direct-helper benchmark 1.565 s. Eighteen service tests pass
+in 0.432 s. Sonnet's actual model metadata reports `claude-sonnet-5-5` on the
+verified personal Claude.ai subscription; the isolated art commission took
+339.287 s and its GLB budgets/source are preserved under `assets/tree-cutting/`.
+Physical headset feel and live VR frame time remain unmeasured.
+
+For discovery, use `rg --files` before guessing module paths: this project's
+gameplay files are `adventure_runtime.gd` and `tuning_runtime.gd`, and quest
+configuration is `service/quests-config.json`, not a generic `config/` folder.
+Use `rg -g '*.gd' godot` rather than a positional wildcard in PowerShell.
+Each failed guessed path loses time without providing useful evidence.
