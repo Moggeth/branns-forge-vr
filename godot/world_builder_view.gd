@@ -322,7 +322,9 @@ func _build_ui() -> void:
 	hero_pip.size = preferred_pip_size
 	overlay.add_child(hero_pip)
 	hero_pip.setup(game.get_viewport().get_texture())
-	hero_pip.return_requested.connect(_focus_hero)
+	hero_pip.return_requested.connect(func() -> void:
+		if hero_primary: focus_survey()
+		else: _focus_hero())
 	hero_pip.swap_requested.connect(swap_primary)
 	hero_pip.layout_changed.connect(_pip_changed)
 	_apply_primary_textures()
@@ -378,6 +380,7 @@ func _apply_primary_textures() -> void:
 	world_picture.texture = game.get_viewport().get_texture() if hero_primary else tactical_viewport.get_texture()
 	hero_pip.picture.texture = tactical_viewport.get_texture() if hero_primary else game.get_viewport().get_texture()
 	hero_pip.caption = "RTS · LIVE VIEW" if hero_primary else "HERO · LIVE VIEW"
+	hero_pip.return_button.text = "Focus RTS" if hero_primary else "Focus Hero"
 	hero_pip.queue_redraw()
 	hero_pip.keep_inside(Vector2(size))
 	_sync_hero_resolution()
@@ -404,7 +407,7 @@ func swap_primary() -> void:
 func _focus_hero() -> void:
 	if not hero_primary: swap_primary()
 	grab_focus()
-	_say("Hero has the large live view. F9 or Swap views returns to RTS.")
+	_say("Hero has the large live view. Esc frees the cursor; F9 returns to RTS.")
 
 func focus_survey() -> void:
 	if not visible: visible = true
