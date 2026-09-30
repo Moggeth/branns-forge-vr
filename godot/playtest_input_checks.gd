@@ -174,13 +174,17 @@ func _bone_query_benchmark(game: Node3D)->Dictionary:
 			homes.append({"piece":piece})
 		actors.append(actor)
 		rigs.append({"homes":homes,"joints":{}})
-	var started:=Time.get_ticks_usec()
-	var hits:=0
-	for bolt_index in range(20):
-		var x:=0.0 if bolt_index%2==0 else .18
-		var start:=Vector3(x,1.72,.7)
-		var finish:=Vector3(x,1.72,-.7)
-		for actor_index in range(20):
-			if not BoneContact.contact(actors[actor_index],rigs[actor_index],start,finish).is_empty(): hits+=1
-	var elapsed_ms:=float(Time.get_ticks_usec()-started)/1000.0
-	return {"actors":20,"bolts":20,"queries":400,"hits":hits,"total_ms":snappedf(elapsed_ms,.01),"per_bolt_ms":snappedf(elapsed_ms/20.0,.01)}
+	var scenarios:=[]
+	for spread in [false,true]:
+		for actor_index in range(20): actors[actor_index].position.x=actor_index*3.0 if spread else 0.0
+		var started:=Time.get_ticks_usec()
+		var hits:=0
+		for bolt_index in range(20):
+			var x:float=bolt_index*3.0+.18 if spread else (0.0 if bolt_index%2==0 else .18)
+			var start:=Vector3(x,1.72,.7)
+			var finish:=Vector3(x,1.72,-.7)
+			for actor_index in range(20):
+				if not BoneContact.contact(actors[actor_index],rigs[actor_index],start,finish).is_empty(): hits+=1
+		var elapsed_ms:=float(Time.get_ticks_usec()-started)/1000.0
+		scenarios.append({"layout":"spread" if spread else "overlap","actors":20,"bolts":20,"queries":400,"hits":hits,"total_ms":snappedf(elapsed_ms,.01),"per_bolt_ms":snappedf(elapsed_ms/20.0,.01)})
+	return {"scenarios":scenarios}

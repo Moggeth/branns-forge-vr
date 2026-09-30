@@ -4,6 +4,7 @@ extends SceneTree
 const Siegebird=preload("res://siegebird_runtime.gd")
 const Guardians=preload("res://guardians/skeleton_guardians.gd")
 const Authored=preload("res://guardian_authored_animation.gd")
+const BoneContact=preload("res://skeleton_projectile_contact.gd")
 
 class Zone:
 	var zone:="test"
@@ -43,6 +44,7 @@ func _run() -> void:
 	var failures:=[]
 	await system.projectile_checks(failures)
 	_authored_head_check(game,failures)
+	_envelope_checks(game,failures)
 	print("SKELETON_PROJECTILE_RESULT ",JSON.stringify(failures))
 	quit(0 if failures.is_empty() else 5)
 
@@ -75,4 +77,42 @@ func _authored_head_check(game: Game, failures: Array) -> void:
 	var hit:Dictionary=guardians.projectile_contact(actor,center+Vector3(0,0,1),center+Vector3(0,0,-1))
 	if hit.get("part","")!="head" or not hit.get("surface") is BoneAttachment3D:
 		failures.append("authored guardian skull missed posed bone triangles")
+	actor.queue_free()
+
+func _envelope_checks(game: Node3D, failures: Array) -> void:
+	var actor:=Node3D.new()
+	actor.set_meta("alive",true)
+	game.add_child(actor)
+	var arm_joint:=Node3D.new()
+	arm_joint.position=Vector3(.3,1.2,0)
+	actor.add_child(arm_joint)
+	var arm:=Node3D.new()
+	arm_joint.add_child(arm)
+	var arm_mesh:=MeshInstance3D.new()
+	var arm_box:=BoxMesh.new()
+	arm_box.size=Vector3(.16,.3,.12)
+	arm_mesh.mesh=arm_box
+	arm_mesh.position.x=.6
+	arm.add_child(arm_mesh)
+	var skull:=Node3D.new()
+	skull.name="Skull"
+	skull.position.y=1.65
+	actor.add_child(skull)
+	var head_mesh:=MeshInstance3D.new()
+	var head_box:=BoxMesh.new()
+	head_box.size=Vector3(.25,.25,.22)
+	head_mesh.mesh=head_box
+	skull.add_child(head_mesh)
+	var rig:={"homes":[{"piece":arm},{"piece":skull}],"joints":{"arm_r":arm_joint}}
+	var outside:=BoneContact.contact(actor,rig,Vector3(.9,1.2,.6),Vector3(.9,1.2,-.6))
+	if outside.get("part","")!="arm_r": failures.append("visible arm beyond interaction box rejected by bone envelope")
+	if not BoneContact.contact(actor,rig,Vector3(.4,1.0,.6),Vector3(.4,1.0,-.6)).is_empty():
+		failures.append("empty gap acquired bone contact")
+	if BoneContact.contact(actor,rig,Vector3(0,1.65,.6),Vector3(0,1.65,-.6)).get("part","")!="head":
+		failures.append("skull lost head classification after envelope")
+	# A cached envelope remains conservative as the joint rotates in place.
+	arm_joint.rotation.y=PI/2.0
+	var moved:=arm_mesh.global_position
+	if BoneContact.contact(actor,rig,moved+Vector3(0,0,.6),moved+Vector3(0,0,-.6)).is_empty():
+		failures.append("animated arm missed cached envelope")
 	actor.queue_free()
