@@ -1,22 +1,23 @@
 # Orchard World Builder
 
-Choose **World Builder** in the persistent launcher, select VR or Monitor / projector, then start normally. **F9** opens/returns from the strategic view during desktop play. Its camera renders the Hero's actual Godot `World3D`: terrain, weather, enemies, trees, structures and avatar share one simulation. This is local asymmetric play on one PC; remote multiplayer is not implemented.
+Choose **World Builder** in the persistent launcher, select VR or Monitor / projector, then start normally. **F9** opens the strategic view during desktop play and switches the primary perspective while it is open. Both live perspectives remain visible in one presentation window. Its cameras render the Hero's actual Godot `World3D`: terrain, weather, enemies, trees, structures and avatar share one simulation. This is local asymmetric play on one PC; remote multiplayer is not implemented.
 
-[Shared-world direction](RTS-SHARED-WORLD-DIRECTION.md) describes the next dependencies. [September 30 evidence](RTS-SHARED-WORLD-20260930.md) records sources, measurements and limitations.
+[Shared-world direction](RTS-SHARED-WORLD-DIRECTION.md) describes the next dependencies. [September 30 evidence](RTS-SHARED-WORLD-20260930.md) records the earlier sources; [October 1 physical/art/dual-view pass](STARFALL-PHYSICAL-RTS-20261001.md) records the current verification and limits.
 
 ## Controls and Mana
 
-The Opus 5.5-authored native command panel has illustrated icons, a Mana orb, resource costs, cooldown progress and unavailable-action reasons. Text draws at native resolution independently of the secondary 3D render scale.
+The original Opus 5.5 panel now has a Sonnet 5.5 refinement: an animated Tidal Glass Mana orb, horizontal category icons, readable wrapped card labels, cost/clock/gesture symbols and Lumber/Helpers icons. Seed is absent from the resource strip. Text draws at native resolution independently of the secondary 3D render scale.
 
 - **F1–F4** select Land, Life, Construction and Encounters; **1–9** select a card in that palette.
 - Click a point for radial spells or choose two endpoints / drag a line for linear spells. Successful casts retain the selected spell.
-- **Right-click** or **Escape** cancels targeting. **F9** returns to the Hero. **F11** toggles fullscreen.
+- **Right-click** or **Escape** cancels targeting. **F9** switches between the Hero and strategic primary view. **F11** toggles fullscreen.
 - **WASD** pans, right/middle-drag orbits, wheel zooms. **F** finds/follows the Hero.
-- Hover cards for cost, description, gesture, cooldown and failure reasons. Construction previews show the actual lumber cost. Terrain previews include Sundering's shoulders, forest corridors, the tree-ring planting band and meteor crater.
+- Hover cards for cost, description, gesture, cooldown and failure reasons. Construction previews show the actual lumber cost. Every implemented spatial action has its own animated, terrain-conforming preview; these include Sundering's shoulders, forest corridors, exact prospective tree positions, the tree-ring planting band, meteor crater and damage radius. Invalid placement turns the preview red and reports the reason; rejected casts show a brief fading red message.
+- Drag the inset by its header, resize with its lower-right corner, or press **Swap views** / **Focus Hero** / **Focus RTS**. Window size, position, fullscreen and inset layout persist in `user://world-builder-view.cfg`. The Hero primary view restores its FPS HUD and clears the RTS panel/header from the weapon view.
 
 Mana starts at 12 and caps at 20; old `aether` saves migrate without resetting reserves. **Testing 4×** regeneration defaults to 0.22 Mana/second, against normal 0.055. The panel exposes both presets; tuning key: `worldbuilder.mana_regen_multiplier`. Failed placement spends nothing and starts no cooldown.
 
-The secondary camera starts at 30 fps / 65% resolution, pauses while minimized, and can reduce to 20 fps / 50% when VR remains below 72 fps after warmup. Its quality controls affect only that viewport. Actual Vive Pro 2 frame time remains unmeasured.
+The strategic camera starts at **120 fps / 65% resolution**, with selectable 60 fps, 30 fps or uncapped redraws. It pauses while minimized and can reduce to 20 fps / 50% when VR remains below 72 fps after warmup. The secondary world view uses one shared-world SubViewport; the Hero picture reuses the existing root viewport texture and adds no third camera. During desktop RTS play the small Hero view can reduce its 3D scale to fit the inset; swapping or closing restores its original scale. Native UI stays crisp. The RTX 3080 Ti benchmark sustained about 120 fps at 1280×800 with both cameras active; this does not establish 4K or Vive Pro 2 performance.
 
 | Palette | Shortcuts in order |
 | --- | --- |

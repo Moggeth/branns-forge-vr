@@ -1861,3 +1861,68 @@ metadata. `authored_zone_kit_checks.gd` verifies override precedence, fallback
 classification and proxy metadata (`AUTHORED_ZONE_KIT_RESULT []`, 0.422 s).
 The native skeleton integration also remains green (`SKELETON_COMBAT_RESULT
 []`, 7.852 s) with these fixtures present. No per-hit pixel inspection is used.
+
+## Starfall art, recovery and final presentation integration — 2026-10-01
+
+The current handoff is [STARFALL-PHYSICAL-RTS-20261001.md](STARFALL-PHYSICAL-RTS-20261001.md).
+Before redoing artist work, use the installed native fixtures and saved source
+commissions. Ground source exports survived an 840.330-second artist timeout;
+the initial impact commission also reached its 720.331-second cap. Preserve
+those outcomes honestly. The bounded impact completion passed in 59.899 s and
+the UI refinement in 510.744 s, with successful final model metadata. Invoke
+the direct native Claude executable through `scripts/claude_commission.py`,
+which checks the cleaned child identity/model and kills its owned process tree;
+do not retry the stale `.cmd` wrapper that failed to enforce a deadline.
+
+Asset discovery must account for ignored paths. `rg --files` without
+`--no-ignore` omitted the artist's `output/` directory and initially led review
+to its `check/` copies. Use `rg --files --no-ignore <commission-folder>` and
+compare the final handoff before integrating. Do not guess gameplay file names
+or fixture folders; this task again lost inspection time on nonexistent paths.
+
+Keep editable `.blend` source outside `godot/`. The first placement activated
+the external Blender importer and failed in 4.578 s. Moving it to the source
+commission folder gave a clean 8.749-second import; its 1.5-second compression
+preserves a manageable individual Git file. Final script/audio resource import
+passed in 4.307 s. Commit the generated resource UID/import descriptors, not
+the `.godot` cache.
+
+The targeting fixture initially failed in 0.398 / 0.417 s because a fast
+headless SceneTree timer did not advance the 33 ms wall-clock mesh throttle.
+Await the adapter's pending update with a real-time watchdog. The corrected
+test passes in 0.476 s without changing production throttling. The first
+isolated material-art floor used the wrong triangle winding and was invisible;
+correct the capture fixture geometry, then rerender. The final fifteen-view
+native review passed in 3.016 s. Do not modify production shaders to hide a
+diagnostic-stage geometry fault.
+
+Respawn tests must match real ownership and held collision. A guessed
+`scene.spawn` path stalled a diagnostic for 47.685 s; use
+`scene.zones.forge_yard.spawn`. A held fixture with enabled loose-object
+collision made recovery correctly choose a different safe position. Set the
+same collision state as actual grip attachment before asserting the preferred
+spawn; do not weaken the recovery search. Final recovery covers three
+coincident tools plus a late fourth item in 8.014 s. The actual FPS fixture
+passes in 8.868 s with a known ObjectDB teardown leak warning; an empty result
+array is not evidence that all shutdown warnings are gone.
+
+Use absolute `--log-file` paths with native Godot on Windows. A relative
+`../logs/...` path resolved under `user://`, failing to create the intended
+log. For GPU diagnostics, keep the root window offscreen and unfocusable but
+visible: hiding it prevents the texture update under test. Screenshot readback
+stalls must happen after all timed sample windows. Placing captures between
+the two primary-view samples caused a latched 225.23 ms CPU p95; it measured
+readback, not gameplay. The corrected 22.273-second shell run sustained about
+120 fps with both views active; its end-of-run capture still produces a
+roughly 134 ms diagnostic hitch. Startup warmup and captures are deliberately
+excluded from the steady frame measurements and disclosed separately.
+
+Visual review caught two real UI defects that functional allocation checks
+missed: Plant Magical Seed did not fit its label band, and restoring the FPS
+HUD under the survey header caused overlap. Check every catalogue title's
+wrapped width and height at each supported panel size. Hide the RTS command
+panel/header in Hero primary, restore the original HUD on swap/close/raw
+teardown and release hidden hit regions. The final actual-Main panel fixture
+passes these behaviours in 7.894 s. Native screenshots confirm the FPS HUD is
+fully visible while the tactical inset stays live. Headset feel and physical
+display refresh remain unverified.
