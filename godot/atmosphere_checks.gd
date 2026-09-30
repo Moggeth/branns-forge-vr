@@ -57,7 +57,7 @@ func _run() -> void:
 			var positions: PackedVector3Array = holder.get_meta("dressing_positions")
 			var point: Vector3 = positions[i]
 			if absf(point.x) > 130.0 or absf(point.z) > 130.0: continue
-			builder.data.aether = 20.0
+			builder.data.mana = 20.0
 			var result: String = builder.carve_path(point - Vector3(2.0, 0, 0), point + Vector3(2.0, 0, 0))
 			check(result == "", "World-builder can carve through the woodland kit")
 			var hidden: PackedByteArray = holder.get_meta("dressing_hidden")

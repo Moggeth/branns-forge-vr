@@ -65,7 +65,7 @@ func _run() -> void:
 	var grow := Vector2(61, -73)
 	await _pair("00-brook-bank-natural", builder, land, tactical, hero_view, eye, brook, Vector2(25, -48), Vector2(35, -38), 48.0, output)
 	await _pair("01-sunder-before", builder, land, tactical, hero_view, eye, sunder, sunder, Vector2(-57, 7), 49.0, output)
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	var error: String = builder.cast_sunder(Vector3(-69, 0, -5), Vector3(-24, 0, -5))
 	if error.is_empty():
 		await create_timer(0.48).timeout
@@ -75,7 +75,7 @@ func _run() -> void:
 		await _pair("03-sunder-after", builder, land, tactical, hero_view, eye, sunder, sunder, Vector2(-57, 7), 49.0, output)
 	else: failures.append("sunder: " + error)
 	await _pair("04-raise-before", builder, land, tactical, hero_view, eye, raise_at, raise_at, Vector2(-55, 55), 45.0, output)
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	error = builder.cast_raise(Vector3(raise_at.x, 0, raise_at.y))
 	if error.is_empty():
 		await create_timer(0.40).timeout
@@ -85,7 +85,7 @@ func _run() -> void:
 		await _pair("06-raise-after", builder, land, tactical, hero_view, eye, raise_at, raise_at, Vector2(-55, 55), 45.0, output)
 	else: failures.append("raise: " + error)
 	await _pair("07-grow-before", builder, land, tactical, hero_view, eye, grow, grow, Vector2(50, -59), 59.0, output)
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	error = builder.cast_forest(Vector3(45, 0, -73), Vector3(77, 0, -73))
 	if error.is_empty():
 		builder.tick(0.55)

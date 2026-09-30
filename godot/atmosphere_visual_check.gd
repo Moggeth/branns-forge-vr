@@ -63,7 +63,7 @@ func _capture() -> void:
 		for i in range(locations.size()):
 			var point: Vector3 = locations[i]
 			if absf(point.x) > 130.0 or absf(point.z) > 130.0: continue
-			builder.data.aether = 20.0
+			builder.data.mana = 20.0
 			var problem: String = builder.carve_path(point - Vector3(2, 0, 0), point + Vector3(2, 0, 0))
 			var actual: Transform3D = holder.multimesh.get_instance_transform(i)
 			cleared = problem.is_empty() and actual.origin.y < -100.0

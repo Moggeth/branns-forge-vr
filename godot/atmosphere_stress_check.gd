@@ -46,7 +46,7 @@ func _check() -> void:
 		return
 	var builder: Node = game.world_builder
 	for i in range(8):
-		builder.data.aether = 20.0
+		builder.data.mana = 20.0
 		var angle := TAU * float(i) / 8.0
 		var at := Vector3(cos(angle) * 18.0, 0, sin(angle) * 18.0)
 		var problem: String = builder.summon_patrol(at)
@@ -55,6 +55,7 @@ func _check() -> void:
 			quit(1)
 			return
 		builder.tick(1.8)
+		builder._tick_cooldowns(12.0) # Distinct fixture summons, independent of real play time.
 	game.weather.engine.cycle = false
 	game.weather.engine.automatic = false
 	game.weather.engine.hour = 16.0

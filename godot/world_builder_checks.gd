@@ -40,9 +40,9 @@ func _check() -> void:
 				if str(helper.get_meta("clip", "")) != "Worker_Chop": failures.append("worker did not enter work animation")
 		if builder.root.find_children("*", "MeshInstance3D", true, false).is_empty(): failures.append("authored work site absent")
 		if not builder._valid(builder.data): failures.append("fresh state invalid")
-		var before_aether: float = builder.data.aether
+		var before_mana: float = builder.data.mana
 		var path_error: String = builder.carve_path(Vector3(0, 0, -25), Vector3(18, 0, -45))
-		if path_error != "" or builder.data.paths.size() != 1 or float(builder.data.aether) >= before_aether: failures.append("path did not spend aether and change live land: " + path_error)
+		if path_error != "" or builder.data.paths.size() != 1 or float(builder.data.mana) >= before_mana: failures.append("path did not spend mana and change live land: " + path_error)
 		if builder.root.find_children("RouteWaymarker", "Node3D", true, false).is_empty(): failures.append("authored route marker absent from live world")
 		var timber: Node3D
 		for candidate in game.scene.resources:

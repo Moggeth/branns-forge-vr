@@ -11,12 +11,13 @@ func _check() -> void:
 	var builder: Node = game.world_builder
 	game.adventure.hp = 9999.0
 	for i in range(8):
-		builder.data.aether = 20.0
+		builder.data.mana = 20.0
 		var angle := TAU * float(i) / 8.0
 		var point := Vector3(cos(angle) * 18.0, 0, sin(angle) * 18.0)
 		var problem: String = builder.summon_patrol(point)
 		if problem != "": push_error("WORLD_BUILDER_STRESS summon failed: " + problem); quit(1); return
 		builder.tick(1.8)
+		builder._tick_cooldowns(12.0) # Populate the stress scene without waiting between orders.
 	var live_count := 0
 	for units in builder.summoned_nodes.values(): live_count += units.size()
 	var main_viewport: RID = game.get_viewport().get_viewport_rid()

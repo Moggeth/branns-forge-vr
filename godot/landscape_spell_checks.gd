@@ -28,7 +28,7 @@ func _run() -> void:
 	land.visual_event.connect(func(payload: Dictionary) -> void: visual_events.append(payload))
 	var wall_mid := Vector2(-45.0, 39.0)
 	var prior: float = land.height_at(wall_mid)
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	var error: String = builder.cast_wall(Vector3(-65, 0, 39), Vector3(-25, 0, 39))
 	if error != "": failures.append("wall: " + error)
 	else:
@@ -36,11 +36,11 @@ func _run() -> void:
 		if land.height_at(wall_mid) < prior + 3.0: failures.append("wall not real terrain")
 		if preload("res://orchard_ground.gd").exposure_sample(wall_mid).b < 0.5: failures.append("raised earth did not expose heaped soil")
 		if str(land.operations[-1].get("feature", "")) != "earthen_wall": failures.append("wall provenance lost")
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	error = builder.cast_tree_ring(Vector3(62, 0, -58))
 	if error != "": failures.append("ring: " + error)
 	elif builder.data.forest_spells.is_empty() or builder.data.forest_spells[-1].placements.size() < 10: failures.append("ring is not recognisable or persistent")
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	var impact_at := Vector2(71.0, 44.0)
 	var impact_before: float = land.height_at(impact_at)
 	error = builder.cast_meteor(Vector3(impact_at.x, 0, impact_at.y))
@@ -66,7 +66,7 @@ func _run() -> void:
 		for i in 2:
 			if not builder.mine_meteor(meteor.collider, rock_top, "quarry_pick", 2.0): failures.append("pick missed star iron")
 		if int(builder.data.star_iron) != 2: failures.append("mined iron ledger")
-		builder.data.aether = 20.0
+		builder.data.mana = 20.0
 		var fault_at := Vector2(35.0, 48.0)
 		var fault_before: float = land.height_at(fault_at)
 		error = builder.cast_prism_fault(Vector3(20,0,48), Vector3(50,0,48))
@@ -76,7 +76,8 @@ func _run() -> void:
 			if land.height_at(fault_at) < fault_before + 2.0: failures.append("fault not real terrain")
 			if int(builder.data.star_gems) != 0: failures.append("fault did not spend gems")
 		var prior_iron := int(builder.data.star_iron)
-		builder.data.aether = 0.0
+		builder._tick_cooldowns(8.0) # Verify the alternate payment after wall recharge.
+		builder.data.mana = 0.0
 		error = builder.cast_wall(Vector3(-60,0,60), Vector3(-30,0,60))
 		if error != "" or int(builder.data.star_iron) != prior_iron - 2: failures.append("iron-paid wall: " + error)
 		land._finish_transition()

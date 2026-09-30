@@ -56,14 +56,15 @@ func _check() -> void:
 	RenderingServer.viewport_set_measure_render_time(main_viewport, true)
 	if tactical_view: RenderingServer.viewport_set_measure_render_time(tactical_viewport, true)
 	for i in guardian_count / 3:
-		builder.data.aether = 20.0
+		builder.data.mana = 20.0
 		var angle := TAU * float(i) / 8.0
 		var problem: String = builder.summon_patrol(Vector3(cos(angle) * 19.0,0,sin(angle) * 19.0))
 		if not problem.is_empty(): push_error(problem); quit(1); return
 		builder.tick(1.8)
+		builder._tick_cooldowns(12.0) # Populate the stress scene without waiting between orders.
 	await create_timer(1.0).timeout
 	var baseline: Dictionary = await _sample(120, main_viewport, tactical_viewport, game.world_builder_view)
-	builder.data.aether = 20.0
+	builder.data.mana = 20.0
 	var cast_start := Time.get_ticks_usec()
 	var error: String = builder.cast_sunder(Vector3(-52,0,16),Vector3(52,0,16))
 	if not error.is_empty(): push_error(error); quit(1); return
