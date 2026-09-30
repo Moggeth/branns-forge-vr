@@ -1,6 +1,7 @@
 extends RefCounted
 ## One opaque surface with world-scale distribution and close-range detail maps.
 const MASK_PATH := "res://assets/atmosphere/orchard_masks.png"
+const SURFACE_MATERIALS := "res://assets/ground-surface-kit/materials/"
 const EXTENT := 160.0
 const RESOLUTION := 512
 const EXPOSURE_RESOLUTION := 320
@@ -18,9 +19,17 @@ static func material() -> ShaderMaterial:
 	_mask_texture = ImageTexture.create_from_image(_mask_image)
 	_material = ShaderMaterial.new()
 	_material.shader = load("res://assets/orchard_kit/orchard_ground_visual.gdshader")
-	_material.set_shader_parameter("grass_tex", load("res://assets/atmosphere/grass_albedo.png"))
-	_material.set_shader_parameter("soil_tex", load("res://assets/atmosphere/soil_albedo.png"))
-	_material.set_shader_parameter("micro_normal", load("res://assets/atmosphere/micro_normal.png"))
+	var meadow := ResourceLoader.exists(SURFACE_MATERIALS+"meadow_albedo.png")
+	var loam := ResourceLoader.exists(SURFACE_MATERIALS+"loam_albedo.png")
+	_material.set_shader_parameter("grass_tex", load(SURFACE_MATERIALS+"meadow_albedo.png" if meadow else "res://assets/atmosphere/grass_albedo.png"))
+	_material.set_shader_parameter("soil_tex", load(SURFACE_MATERIALS+"loam_albedo.png" if loam else "res://assets/atmosphere/soil_albedo.png"))
+	_material.set_shader_parameter("micro_normal", load(SURFACE_MATERIALS+"meadow_normal.png" if ResourceLoader.exists(SURFACE_MATERIALS+"meadow_normal.png") else "res://assets/atmosphere/micro_normal.png"))
+	_material.set_shader_parameter("grass_tile_per_m",0.60 if meadow else 0.23)
+	_material.set_shader_parameter("soil_tile_per_m",0.68 if loam else 0.31)
+	if ResourceLoader.exists(SURFACE_MATERIALS+"meadow_orm.png") and ResourceLoader.exists(SURFACE_MATERIALS+"loam_orm.png"):
+		_material.set_shader_parameter("grass_orm",load(SURFACE_MATERIALS+"meadow_orm.png"))
+		_material.set_shader_parameter("soil_orm",load(SURFACE_MATERIALS+"loam_orm.png"))
+		_material.set_shader_parameter("use_authored_orm",1.0)
 	_material.set_shader_parameter("macro_mask", _mask_texture)
 	_exposure_image = Image.create(EXPOSURE_RESOLUTION, EXPOSURE_RESOLUTION, false, Image.FORMAT_RGBA8)
 	_exposure_image.fill(Color(0.0, 0.0, 0.0, 0.0))

@@ -26,6 +26,11 @@ render_mode cull_back, diffuse_lambert, specular_schlick_ggx;
 uniform sampler2D grass_tex : source_color, repeat_enable, filter_linear_mipmap;
 uniform sampler2D soil_tex : source_color, repeat_enable, filter_linear_mipmap;
 uniform sampler2D micro_normal : hint_normal, repeat_enable, filter_linear_mipmap;
+uniform sampler2D grass_orm : repeat_enable, filter_linear_mipmap;
+uniform sampler2D soil_orm : repeat_enable, filter_linear_mipmap;
+uniform float use_authored_orm = 0.0;
+uniform float grass_tile_per_m = 0.23;
+uniform float soil_tile_per_m = 0.31;
 uniform sampler2D macro_mask : repeat_disable, filter_linear;   // r=path/exposed, g=leaf litter, b=damp/bank, a=disturbed
 uniform sampler2D exposure_tex : hint_default_black, repeat_disable, filter_linear;
 uniform float rain_wetness = 0.0;
@@ -117,7 +122,7 @@ void fragment() {
 	float aspect = dot(nw.xz, normalize(vec2(-0.55, 0.83))) * smoothstep(0.03, 0.25, slope); // + = shaded side
 
 	// --- textured meadow with macro/micro breakup
-	vec3 gt = tex_detail(grass_tex, at, 0.23);
+	vec3 gt = tex_detail(grass_tex, at, grass_tile_per_m);
 	vec3 g = mix(grass_cool, grass_lush, smoothstep(0.25, 0.75, regional));
 	g = mix(g, grass_warm, smoothstep(0.5, 0.85, meander) * 0.6);
 	g = mix(g, meadow_dry, smoothstep(0.55, 0.85, broad) * 0.5 + smoothstep(0.1, 0.4, -aspect) * 0.07);   // rev-3: halved, vertex-normal aspect showed triangles
@@ -132,7 +137,7 @@ void fragment() {
 	g = mix(g, meadow_dry * 0.9, smoothstep(0.66, 0.86, fbm(wp * 0.11 + 7.0)) * 0.3); // soft dry seed-head drifts
 	g *= mix(1.0, 0.86 + 0.24 * noise2(at * 4.3), dist_fade * 0.8);                  // near-field tufts
 
-	vec3 st = tex_detail(soil_tex, at, 0.31);
+	vec3 st = tex_detail(soil_tex, at, soil_tile_per_m);
 	vec3 s = mix(soil_col, soil_dark, slope_soft * 0.6 + fine * 0.2);
 	s *= mix(1.0, luma(st) * 2.2, texture_strength);
 
@@ -291,6 +296,11 @@ void fragment() {
 	ALBEDO = colour;
 	float rough_var = mix(0.9, 1.0, noise2(at * 1.3));
 	ROUGHNESS = mix((0.95 - rockiness * 0.1 - fresh * 0.08) * rough_var, 0.66, damp * 0.8);
+	if (use_authored_orm > 0.5) {
+		float grass_rough = texture(grass_orm, at * grass_tile_per_m).g;
+		float soil_rough = texture(soil_orm, at * soil_tile_per_m).g;
+		ROUGHNESS = mix(ROUGHNESS, clamp(mix(grass_rough, soil_rough, soil_amt), 0.45, 1.0), 0.52 * (1.0 - damp));
+	}
 	ROUGHNESS = mix(ROUGHNESS, 0.35, puddle * 0.85);
 	ROUGHNESS = mix(ROUGHNESS, 0.82, snow);
 	SPECULAR = mix(0.30, 0.45, damp) * (1.0 - snow * 0.3);
