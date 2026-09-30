@@ -87,7 +87,7 @@ func preview(point: Vector3) -> Dictionary:
 	if source.key in builder.data.harvested: result.reason = "This tree has already been harvested."
 	elif not _record(source.key).is_empty(): result.reason = "This tree has already awakened."
 	elif source.key in builder.data.marked or builder.scenic_pending.has(source.key): result.reason = "This tree is already claimed for harvest."
-	elif builder.data.ents.size() >= MAX_ENTS: result.reason = "The Ent ledger is full."
+	elif _living_count() >= MAX_ENTS: result.reason = "Eight Ents are already awake."
 	elif float(builder.data.mana) < COST: result.reason = "Need 3 Mana to awaken a tree."
 	result.risk = "Burning Ent: spreads shared heat and strikes hard." if source.condition == "burning" else ("Pine Ent: sturdy, wide defense." if source.species == "pine" else "Apple Ent: can drop healing fruit; hostile until calmed.")
 	return result
@@ -102,11 +102,20 @@ func awaken(point: Vector3) -> String:
 	var hp := (130.0 if choice.species == "pine" else 92.0) * float(choice.scale)
 	var record := {"key": key, "state": "active", "species": choice.species, "scale": choice.scale, "condition": choice.condition, "hp": hp, "calm_left": 0.0}
 	_activate(tree, record)
+	for i in range(builder.data.ents.size() - 1, -1, -1):
+		if builder.data.ents.size() < MAX_ENTS: break
+		if str(builder.data.ents[i].state) == "dead": builder.data.ents.remove_at(i)
 	builder.data.ents.append(record)
 	builder.data.mana = float(builder.data.mana) - COST
 	ent_event.emit({"phase": "awaken", "key": key, "tree": tree, "species": choice.species, "scale": choice.scale, "condition": choice.condition})
 	builder._changed("An existing %s tree awakened as an Ent. %s" % [choice.species, choice.risk])
 	return ""
+
+func _living_count() -> int:
+	var count := 0
+	for record in builder.data.ents:
+		if str(record.state) != "dead": count += 1
+	return count
 
 func _activate(tree: Node3D, record: Dictionary) -> void:
 	var key: String = record.key
