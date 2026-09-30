@@ -12,6 +12,7 @@ class Adventure:
 		game.rig.global_position=Vector3(20,0,0.8) if target=="b" else Vector3(0,0,0.8)
 
 class Game extends Node3D:
+	var vr:=false
 	var rig:=Node3D.new()
 	var camera:=Camera3D.new()
 	var scene:={"portals":[]}
@@ -115,6 +116,45 @@ func _run() -> void:
 	game.rig.global_position=rotated.to_global(Vector3(0,0,-0.3))
 	walker.tick(game,0.016)
 	if game.adventure.calls.size()!=5: failures.append("rotated portal crossing missed")
+	# In room-scale VR the XROrigin can stay fixed while the HMD walks through.
+	game.vr=true
+	game.adventure.zone="a"
+	game.rig.global_position=Vector3(0,0,1.0)
+	game.camera.position=Vector3(0,1.65,-0.2)
+	walker.reset(game)
+	for i in range(65): walker.tick(game,0.016)
+	for i in range(1,8):
+		game.camera.position.z=-0.2-float(i)*0.2
+		walker.tick(game,0.016)
+	if game.adventure.calls.size()!=6: failures.append("tracked VR walk with stationary origin missed portal")
+	# A shallow head lean can cross the membrane, but is not a committed walk.
+	game.adventure.zone="a"
+	game.rig.global_position=Vector3(0,0,0.25)
+	game.camera.position=Vector3(0,1.65,0.35)
+	walker.reset(game)
+	for i in range(65): walker.tick(game,0.016)
+	for i in range(1,6):
+		game.camera.position.z=0.35-float(i)*0.19
+		walker.tick(game,0.016)
+	for i in range(130): walker.tick(game,0.016)
+	if game.adventure.calls.size()!=6: failures.append("shallow VR head lean caused travel")
+	# The same tracked crossing works from the back face of the gateway.
+	game.rig.global_position=Vector3(0,0,-1.0)
+	game.camera.position.z=0.2
+	walker.reset(game)
+	for i in range(65): walker.tick(game,0.016)
+	for i in range(1,8):
+		game.camera.position.z=0.2+float(i)*0.2
+		walker.tick(game,0.016)
+	if game.adventure.calls.size()!=7: failures.append("reverse tracked VR walk missed portal")
+	# A one-frame tracked jump is treated as a recenter, not a walk.
+	game.adventure.zone="a"
+	game.rig.global_position=Vector3(0,0,1.0)
+	game.camera.position.z=0.0
+	walker.reset(game)
+	game.camera.position.z=-1.5
+	walker.tick(game,0.016)
+	if game.adventure.calls.size()!=7: failures.append("VR recenter caused portal travel")
 	print("PORTAL_WALKTHROUGH_RESULT ",JSON.stringify(failures))
 	game.free()
 	quit(0 if failures.is_empty() else 5)
