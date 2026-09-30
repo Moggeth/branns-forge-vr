@@ -537,7 +537,7 @@ func interact(target,id,hand=null) -> bool:
 			var destination:Vector3 = target.get_meta("destination",target.global_position)
 			game._effect(target.global_position,Color("a6edff"),0.5,0.5)
 			var offset:Vector3=game.camera.global_position-game.rig.global_position
-			game._move_to(destination-Vector3(offset.x,0,offset.z))
+			game._move_to(destination-Vector3(offset.x,0,offset.z),false)
 			motion.clear()
 			game.tuning.history.clear()
 			if game.rig.global_position.distance_to(destination-Vector3(offset.x,0,offset.z))>0.3:

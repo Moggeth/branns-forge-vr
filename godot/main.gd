@@ -978,7 +978,7 @@ func _process(delta):
 		print("FRAME_HITCH ms=",snappedf(delta*1000,0.1)," forge=",forge_stage," zone=",adventure.zone if adventure!=null else "startup")
 	if desktop_look!=null:
 		var survey_owns_input=is_instance_valid(world_builder_view) and world_builder_view.has_focus() and not world_builder_view.hero_primary
-		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened) and not (travel_navigation!=null and travel_navigation.any_open()))
+		desktop_look.set_enabled(not smoke and not survey_owns_input and not (fairy!=null and fairy.active) and not (discoveries!=null and discoveries.opened) and not (qol!=null and qol.opened) and not (travel_navigation!=null and travel_navigation.hero_modal_open()))
 	if recording!=null: recording.tick(delta)
 	if wyrmspout!=null: wyrmspout.tick(delta)
 	if sunfall!=null: sunfall.tick(delta)
@@ -1278,7 +1278,7 @@ func _desktop_alternate() -> bool:
 	return false
 
 func _desktop_input(delta):
-	if travel_navigation!=null and travel_navigation.any_open(): return
+	if travel_navigation!=null and travel_navigation.hero_modal_open(): return
 	if adventure.travelling: return
 	if discoveries!=null and discoveries.opened: return
 	if fairy!=null and fairy.active: return
@@ -1295,7 +1295,7 @@ func _desktop_input(delta):
 
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
-	if adventure!=null and (adventure.dying or adventure.travelling or (travel_navigation!=null and travel_navigation.any_open())):
+	if adventure!=null and (adventure.dying or adventure.travelling or (travel_navigation!=null and travel_navigation.hero_modal_open())):
 		desktop_swing_started=-1.0
 		desktop_swing_item=null
 		if melee!=null: melee.clear_desktop_contact()
@@ -1523,6 +1523,10 @@ func _player_capsule_clear(feet: Vector3) -> bool:
 func _safe_respawn_position(preferred: Vector3) -> Vector3:
 	var result: Dictionary = respawn_recovery.find(preferred)
 	return result.get("feet", Vector3.INF)
+
+func terrain_height_at(world_point: Vector3) -> float:
+	var height:=TerrainSafety.orchard_height(self,world_point)
+	return world_point.y if not is_finite(height) else height
 
 func _teleport(source: Node3D):
 	var hit = _ray(source, 12.0)

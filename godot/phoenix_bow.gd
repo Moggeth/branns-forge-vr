@@ -252,8 +252,8 @@ func desktop_update(pressed:bool,bending:bool,delta:float):
 	elif not bending: curve_state.clear()
 
 func _blocked()->bool:
-	if game.get("travel_navigation")!=null and game.travel_navigation.any_open(): return true
-	return game.qol.opened or (game.discoveries!=null and game.discoveries.opened) or (game.fairy!=null and game.fairy.active and not game.vr) or (is_instance_valid(game.world_builder_view) and game.world_builder_view.has_focus()) or (is_instance_valid(game.director_local_view) and game.director_local_view.has_focus())
+	if game.get("travel_navigation")!=null and game.travel_navigation.hero_modal_open(): return true
+	return game.qol.opened or (game.discoveries!=null and game.discoveries.opened) or (game.fairy!=null and game.fairy.active and not game.vr) or (not game.vr and is_instance_valid(game.world_builder_view) and game.world_builder_view.has_focus() and not game.world_builder_view.hero_primary) or (not game.vr and is_instance_valid(game.director_local_view) and game.director_local_view.has_focus())
 
 func tick(delta:float):
 	if not is_instance_valid(bow): return

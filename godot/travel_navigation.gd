@@ -82,6 +82,15 @@ func any_open() -> bool:
 		if bool(view.opened): return true
 	return false
 
+func hero_modal_open() -> bool:
+	# The fairy and strategic player own independent views of this same world.
+	# Their folios must not cancel the VR player's draw or freeze Hero controls.
+	if is_open_for(game) or is_open_for(game.get_window()): return true
+	return is_instance_valid(game.world_builder_view) and game.world_builder_view.hero_primary and is_open_for(game.world_builder_view)
+
+func _forget_view(key:int) -> void:
+	views.erase(key)
+
 func show_for(target: Node, page: String = "map", fairy_owner = null) -> void:
 	close_all(false)
 	var key := target.get_instance_id()
@@ -95,6 +104,7 @@ func show_for(target: Node, page: String = "map", fairy_owner = null) -> void:
 		panel.travel_requested.connect(func(id: String): select_destination(id); travel_selected())
 		panel.closed.connect(close_all)
 		views[key] = {"layer": layer, "panel": panel, "opened": false, "fairy": fairy_owner}
+		target.tree_exiting.connect(_forget_view.bind(key),CONNECT_ONE_SHOT)
 	var view: Dictionary = views[key]
 	last_mouse_mode = Input.mouse_mode
 	view.opened = true
@@ -103,11 +113,12 @@ func show_for(target: Node, page: String = "map", fairy_owner = null) -> void:
 	view.panel.set_page(page)
 	view.panel.set_model(model())
 	if fairy_owner != null: fairy_owner._focus_lost(); fairy_owner.focused = true
-	elif game.desktop_look != null: game.desktop_look.release_capture()
-	if game.archery != null: game.archery.cancel_draw()
-	game.desktop_swing_started = -1.0
-	game.desktop_swing_item = null
-	if game.melee != null: game.melee.clear_desktop_contact()
+	elif hero_modal_open() and game.desktop_look != null: game.desktop_look.release_capture()
+	if hero_modal_open():
+		if game.archery != null: game.archery.cancel_draw()
+		game.desktop_swing_started = -1.0
+		game.desktop_swing_item = null
+		if game.melee != null: game.melee.clear_desktop_contact()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func close_all(restore: bool = true) -> void:
