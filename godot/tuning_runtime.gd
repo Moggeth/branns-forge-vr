@@ -4,7 +4,7 @@ const DEFAULTS = {
 "crossbow.gravity":4.0,"crossbow.drag":0.12,"crossbow.trigger_break":0.72,"crossbow.bolt_lifetime":120.0,"crossbow.bolt_cap":20.0,"grapple.reel_speed":2.8,
 "crossbow.bolt_speed":44.0,"crossbow.crank_reach":0.13,"crossbow.load_reach":0.19,"crossbow.damage":95.0,
 "enemy.stride":1.0,"enemy.bob":1.0,"enemy.turn_speed":5.0,"enemy.windup":1.2,"enemy.recovery":2.5,"enemy.recoil":1.0,"enemy.death_scatter":1.0,
-"grip.secondary_reach":0.18,"holster.reach":0.2,"holster.height":0.65,
+"grip.secondary_reach":0.18,"grip.smoothing":0.65,"holster.reach":0.2,"holster.height":0.65,
 "input.grip_press":0.6,"input.grip_release":0.5,"hands.pitch_degrees":-90.0,"hands.yaw_degrees":0.0,"hands.roll_degrees":0.0,"player.eye_height":1.7,
 "bomb.formation_seconds":0.45,"bomb.radius":0.095,
 "throw.gain":1.45,"throw.window_seconds":0.12,"throw.assist_lift":0.65,"throw.min_speed":1.0,"throw.max_speed":18.0,

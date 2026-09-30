@@ -8,3 +8,21 @@ test('presets reset unspecified fields and reset remains undoable',t=>{const {tu
 
 
 test('offline animation lab schema matches service tuning',()=>{assert.deepEqual(JSON.parse(fs.readFileSync(path.join(__dirname,'../godot/tuning_schema.json'),'utf8')),SCHEMA);});
+test('held-object steadiness accepts zero, rejects invalid values, and restores older snapshots',t=>{
+  const {dir,tuning}=fixture(t);
+  assert.equal(SCHEMA['grip.smoothing'].default,.65);
+  assert.equal(SCHEMA['grip.smoothing'].min,0);
+  assert.equal(SCHEMA['grip.smoothing'].max,1);
+  assert.equal(SCHEMA['grip.smoothing'].step,.05);
+  for(const value of [-.01,1.01,'0',null,NaN])
+    assert.throws(()=>tuning.change({values:{'grip.smoothing':value}}),/Invalid tuning value/);
+  tuning.change({values:{'grip.smoothing':0}});
+  assert.equal(new Tuning(dir).values['grip.smoothing'],0);
+  fs.writeFileSync(tuning.file,JSON.stringify({revision:3,values:{'throw.gain':2},previous:{'throw.gain':1.7}}));
+  const migrated=new Tuning(dir);
+  assert.equal(migrated.values['grip.smoothing'],.65);
+  assert.equal(migrated.snapshot().canUndo,true);
+  migrated.change({action:'undo'});
+  assert.equal(migrated.values['throw.gain'],1.7);
+  assert.equal(migrated.values['grip.smoothing'],.65);
+});

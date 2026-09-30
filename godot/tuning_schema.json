@@ -179,6 +179,16 @@
     "help": "Distance from the handle for a support grip or regrip.",
     "group": "grip"
   },
+  "grip.smoothing": {
+    "type": "number",
+    "default": 0.65,
+    "min": 0,
+    "max": 1,
+    "step": 0.05,
+    "label": "Held-object steadiness",
+    "help": "Subtly damps VR hand-held jitter. Zero keeps exact tracking; larger deliberate motions stay responsive. Desktop and head tracking are unchanged.",
+    "group": "grip"
+  },
   "holster.reach": {
     "type": "number",
     "default": 0.2,

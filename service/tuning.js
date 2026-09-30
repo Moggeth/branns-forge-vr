@@ -19,6 +19,7 @@ const entries=[
 ['enemy.recoil',1,0,2,.1,'Hit reaction','Cosmetic recoil strength, not gameplay stagger.'],
 ['enemy.death_scatter',1,0,2,.1,'Death scatter','Impulse multiplier for physical character pieces.'],
 ['grip.secondary_reach',.18,.08,.3,.01,'Second hand reach','Distance from the handle for a support grip or regrip.'],
+['grip.smoothing',.65,0,1,.05,'Held-object steadiness','Subtly damps VR hand-held jitter. Zero keeps exact tracking; larger deliberate motions stay responsive. Desktop and head tracking are unchanged.'],
 ['holster.reach',.2,.1,.35,.01,'Holster reach','Distance from a hip slot to store or retrieve tools.'],
 ['holster.height',.65,.4,.9,.05,'Hip offset','Distance below the headset to the estimated belt.'],
 ['input.grip_press',.6,.15,.95,.05,'Grip to grab','Squeeze value needed to begin grabbing. Release is clamped below this value.'],
