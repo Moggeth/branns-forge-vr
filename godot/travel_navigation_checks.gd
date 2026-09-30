@@ -3,6 +3,23 @@ extends SceneTree
 var failures: Array[String] = []
 var started := Time.get_ticks_usec()
 
+class FakeFairy:
+	extends RefCounted
+	var focused := false
+	var keys := {}
+	var pad_buttons := {}
+	var buttons := {}
+	var lost := 0
+	var captured := 0
+	func _focus_lost() -> void:
+		lost += 1
+	func _capture_mouse() -> void:
+		captured += 1
+
+class FakeSurvey:
+	extends Window
+	var hero_primary := false
+
 func _initialize() -> void:
 	_run.call_deferred()
 
@@ -32,6 +49,61 @@ func _blocker(game: Node3D, point: Vector3) -> StaticBody3D:
 	collision.shape = shape
 	body.add_child(collision)
 	return body
+
+func _modal_ownership(game: Node3D) -> void:
+	var nav = game.travel_navigation
+	var fairy_window := Window.new()
+	fairy_window.visible = false
+	root.add_child(fairy_window)
+	var fairy := FakeFairy.new()
+	game.archery.desktop_down = true
+	game.desktop_swing_started = game.elapsed - .1
+	game.desktop_swing_item = game.desktop_hand
+	nav.show_for(fairy_window, "map", fairy)
+	_check(nav.is_open_for(fairy_window) and not nav.hero_modal_open(),
+		"Fairy folio belongs only to its own window")
+	_check(game.archery.desktop_down and game.desktop_swing_started >= 0 and not game.archery._blocked(),
+		"Fairy folio preserves Hero draw, swing and bow ability")
+	var hero_pose: Vector3 = game.rig.global_position
+	game.rig.global_position += Vector3.UP
+	game.desktop_locomotion.reset()
+	var suspended: Vector3 = game.rig.global_position
+	game._desktop_input(.1)
+	_check(game.rig.global_position.y < suspended.y,
+		"Fairy folio does not gate Hero locomotion")
+	game.rig.global_position = hero_pose
+	game.desktop_locomotion.reset()
+	var selected: String = nav.selected
+	_check(nav.input_event(_key(KEY_F),fairy_window,fairy) and nav.selected != selected,
+		"Fairy folio consumes its own travel input")
+	_check(not nav.input_event(_key(KEY_F),game.get_window()),
+		"Fairy folio leaves Hero window input available")
+	nav.close_all()
+	_check(fairy.captured == 1 and not nav.is_open_for(fairy_window),
+		"closing Fairy folio restores only Fairy capture")
+	var fairy_id := fairy_window.get_instance_id()
+	fairy_window.free()
+	_check(not nav.views.has(fairy_id), "freed Fairy window removes its folio view")
+	var survey := FakeSurvey.new()
+	survey.visible = false
+	root.add_child(survey)
+	var prior_view = game.world_builder_view
+	game.world_builder_view = survey
+	nav.show_for(survey)
+	_check(nav.is_open_for(survey) and not nav.hero_modal_open() and game.archery.desktop_down,
+		"strategic RTS folio does not block Hero bow")
+	nav.close_all()
+	survey.hero_primary = true
+	game.archery.desktop_down = true
+	game.desktop_swing_started = game.elapsed - .1
+	nav.show_for(survey)
+	_check(nav.hero_modal_open() and not game.archery.desktop_down and game.desktop_swing_started < 0,
+		"Hero-primary RTS folio cancels Hero combat input")
+	_check(game.archery._blocked(), "Hero-primary RTS folio blocks bow ability")
+	var survey_id := survey.get_instance_id()
+	survey.free()
+	_check(not nav.any_open() and not nav.views.has(survey_id), "freed RTS window removes open folio view")
+	game.world_builder_view = prior_view
 
 func _run() -> void:
 	if not OS.get_cmdline_user_args().has("--world-builder-check"):
@@ -66,7 +138,7 @@ func _run() -> void:
 	old_zone = game.adventure.zone
 	old_position = game.rig.global_position
 	game._unhandled_input(_key(KEY_M))
-	_check(nav.any_open(), "M opens Map")
+	_check(nav.any_open() and nav.hero_modal_open(), "M opens Hero-owned Map")
 	var direct := "forge_yard" if old_zone != "forge_yard" else "sandstone_quarry"
 	nav.select_destination(direct)
 	_check(nav.selected == direct and game.adventure.zone == old_zone and game.rig.global_position == old_position,
@@ -132,6 +204,7 @@ func _run() -> void:
 	_check(game.rig.global_position == before, "VR-style move refuses a blocked HMD-aligned body")
 	blocker.queue_free()
 	game.camera.position = hmd_local
+	_modal_ownership(game)
 	print("TRAVEL_NAVIGATION_RESULT ", JSON.stringify({"failures":failures,
 		"seconds":float(Time.get_ticks_usec()-started)/1000000.0}))
 	quit(0 if failures.is_empty() else 1)
