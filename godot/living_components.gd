@@ -298,16 +298,20 @@ func release(hand)->bool: return _release_key(str(hand.get_instance_id()))
 func _release_key(key:String,throw_projectile=true)->bool:
 	if not held.has(key): return false
 	var h=held[key]; var e=h.entry; held.erase(key)
+	var desktop=is_instance_valid(h.hand) and h.hand==game.desktop_hand
+	var release_velocity:Vector3=(game.tuning.release_velocity(h.hand,true) if str(game.get("desktop_release_mode"))=="throw" else Vector3.ZERO) if desktop else h.velocity
 	if is_instance_valid(h.hand): h.hand.set_meta("anchored_grip",false)
 	if is_instance_valid(e.node):
 		if h.climbing: game.item_actions.falling=true
 		else:
 			e.node.collision_layer=8 if e.node is RigidBody3D else 5
-			if e.node is RigidBody3D: e.node.freeze=false; e.node.linear_velocity=h.velocity.limit_length(12)
+			if e.node is RigidBody3D:
+				e.node.freeze=false; e.node.linear_velocity=release_velocity.limit_length(12)
+				if desktop and str(game.get("desktop_release_mode"))!="throw": e.node.angular_velocity=Vector3.ZERO
 		if e.has("tether"): _detach(e)
 		if e.recording: e.recording=false; e.replay=0.0; _emit(e.owner,"recorded",e.id,{"samples":e.samples.size()})
 		_emit(e.owner,"released",e.id)
-		if throw_projectile and e.components.has("returning_projectile") and e.owner.active: projectiles.launch(e,h.hand,h.velocity)
+		if throw_projectile and e.components.has("returning_projectile") and e.owner.active and (not desktop or str(game.get("desktop_release_mode"))=="throw"): projectiles.launch(e,h.hand,release_velocity)
 	return true
 
 func _point(hand,distance:float)->Dictionary:

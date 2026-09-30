@@ -198,8 +198,9 @@ func release(hand: Node3D) -> bool:
 	body.freeze = false
 	body.collision_layer = 8
 	body.collision_mask = 9
-	body.linear_velocity = (-game.camera.global_basis.z * 4 + Vector3.UP * 0.7) if hand == game.desktop_hand else game.tuning.release_velocity(hand, false)
-	body.angular_velocity = game.adventure.motion.get(key, {}).get("angular", Vector3.ZERO).limit_length(12)
+	var desktop = hand == game.desktop_hand
+	body.linear_velocity = (game.tuning.release_velocity(hand, true) if str(game.get("desktop_release_mode")) == "throw" else Vector3.ZERO) if desktop else game.tuning.release_velocity(hand, false)
+	body.angular_velocity = Vector3.ZERO if desktop and str(game.get("desktop_release_mode")) != "throw" else game.adventure.motion.get(key, {}).get("angular", Vector3.ZERO).limit_length(12)
 	return true
 
 func bite(hand: Node3D) -> bool:

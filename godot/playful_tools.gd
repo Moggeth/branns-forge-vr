@@ -190,14 +190,14 @@ func _attach(hand):
 	_clear_trail(); _sound(1)
 	_pulse(ring.global_position,"catch")
 	game.adventure.haptic(hand,"ready")
-	game._notice("Sunskipper: bank your wrist to curve. Trigger changes power; release / E throws. Trigger in flight pulls it back. Desktop Q / R banks.",7)
+	game._notice("Sunskipper: bank your wrist to curve. Trigger changes power; release throws in VR. Desktop E drops, X throws, Q / R bank.",7)
 
 func trigger(hand)->bool:
 	if busy(hand):
 		mode=(mode+1)%SPEEDS.size(); charge_flash=.4
 		held_label.text=MODES[mode]; _sound(mode)
 		game.adventure.haptic(hand,"ready")
-		game._notice("Sunskipper · "+MODES[mode]+". Release grip / E to throw.",3)
+		game._notice("Sunskipper · "+MODES[mode]+". Release grip in VR; desktop X throws, E drops.",3)
 		return true
 	if state in ["flying","returning"] and caller==hand and _free_hand(hand):
 		state="returning"; _pulse(ring.global_position,"recall"); game.adventure.haptic(hand,"release"); return true
@@ -205,18 +205,21 @@ func trigger(hand)->bool:
 
 func release(hand)->bool:
 	if not busy(hand): return false
+	var desktop_drop=hand==game.desktop_hand and str(game.get("desktop_release_mode"))!="throw"
 	var source=game.camera if hand==game.desktop_hand else game.aim_source(hand)
 	var tracked:Vector3=game.adventure.motion.get(_key(hand),{}).get("velocity",Vector3.ZERO)
-	velocity=launch_velocity(tracked,-source.global_basis.z,mode,hand==game.desktop_hand,_tuned("playful.ring_toss_gain",1,.5,1.5))
-	bank=deg_to_rad(desktop_bank) if hand==game.desktop_hand else FLIGHT.bank_angle(ring.global_basis.y,velocity)
+	velocity=Vector3.ZERO if desktop_drop else launch_velocity(tracked,-source.global_basis.z,mode,hand==game.desktop_hand,_tuned("playful.ring_toss_gain",1,.5,1.5))
+	bank=0.0 if desktop_drop else (deg_to_rad(desktop_bank) if hand==game.desktop_hand else FLIGHT.bank_angle(ring.global_basis.y,velocity))
 	scored_colliders.clear()
-	ring.reparent(game); holder=null; state="flying"; flight_age=0; bounce_count=0
-	throw_id+=1;launch_position=game.camera.global_position;last_bounce_ref=null;last_bounce_at=-1.0
-	ring.global_position+=velocity.normalized()*.12
+	ring.reparent(game); holder=null; state="dropped" if desktop_drop else "flying"; flight_age=0; bounce_count=0
+	if not desktop_drop: throw_id+=1
+	launch_position=game.camera.global_position;last_bounce_ref=null;last_bounce_at=-1.0
+	if not desktop_drop: ring.global_position+=velocity.normalized()*.12
 	held_label.visible=false; _sound(0); game.adventure.haptic(hand,"release")
-	_pulse(ring.global_position,"throw")
-	_announce_throw()
-	print("PLAYFUL_TOOLS throw mode=",mode," speed=",snappedf(velocity.length(),.1))
+	if not desktop_drop:
+		_pulse(ring.global_position,"throw")
+		_announce_throw()
+		print("PLAYFUL_TOOLS throw mode=",mode," speed=",snappedf(velocity.length(),.1))
 	return true
 
 static func launch_velocity(tracked:Vector3,forward:Vector3,power:int,desktop:bool,toss_gain:float=1.0)->Vector3:
@@ -255,7 +258,7 @@ func tick(delta):
 		ring.visible=stand.is_visible_in_tree()
 	else:
 		var remaining=minf(maxf(delta,0),.25)
-		while remaining>0.00001 and state in ["flying","returning"]:
+		while remaining>0.00001 and state in ["flying","returning","dropped"]:
 			var step=minf(remaining,.02); remaining-=step; _flight_step(step)
 		spinner.rotate_y(delta*22)
 		trail_clock+=delta
@@ -266,6 +269,19 @@ func tick(delta):
 			trail[0].global_position=ring.global_position; trail[0].visible=state in ["flying","returning"]
 
 func _flight_step(delta):
+	if state=="dropped":
+		# The desktop drop falls in place and stays retrievable; it never enters
+		# the scoring/recall flight path or receives camera-forward launch speed.
+		velocity+=Vector3.DOWN*9.8*delta
+		var start=ring.global_position
+		var hit=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(start,start+velocity*delta,1))
+		if hit.is_empty(): ring.global_position=start+velocity*delta
+		else:
+			ring.global_position=hit.position+hit.normal*.08
+			velocity=Vector3.ZERO
+			state="resting"
+		if ring.global_position.y< -12: _home()
+		return
 	flight_age+=delta
 	if flight_age>12 or ring.global_position.y < -12: _home(); return
 	var destination=Vector3.ZERO

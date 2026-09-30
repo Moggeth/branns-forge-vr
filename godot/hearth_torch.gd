@@ -160,7 +160,10 @@ func release(hand)->bool:
 	body=RigidBody3D.new(); game.adventure.zone_groups[dropped_zone].add_child(body); body.global_transform=torch.global_transform
 	torch.reparent(body); body.mass=.55; body.collision_layer=8; body.collision_mask=9; body.continuous_cd=true
 	var col=CollisionShape3D.new(); body.add_child(col); var shape=CapsuleShape3D.new(); shape.radius=.07; shape.height=.6; col.shape=shape; col.position.y=.06
-	body.linear_velocity=velocity.limit_length(10); body.angular_velocity=Vector3(.2,0,.4); torch.set_meta("body",body)
+	var desktop=hand==game.desktop_hand
+	body.linear_velocity=(game.tuning.release_velocity(hand,true).limit_length(10) if str(game.get("desktop_release_mode"))=="throw" else Vector3.ZERO) if desktop else velocity.limit_length(10)
+	body.angular_velocity=Vector3.ZERO if desktop and str(game.get("desktop_release_mode"))!="throw" else Vector3(.2,0,.4)
+	torch.set_meta("body",body)
 	return true
 
 func _clear_body():

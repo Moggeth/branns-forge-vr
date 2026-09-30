@@ -131,7 +131,7 @@ func release(hand)->bool:
 	if n==box and hand.global_position.distance_to(dock.global_position)<0.3:
 		n.reparent(dock); n.transform=Transform3D.IDENTITY; return true
 	var velocity:Vector3=n.get_meta("velocity",Vector3.ZERO)
-	if hand==game.desktop_hand and n.get_meta("fire_kind")=="vial": velocity=-game.camera.global_basis.z*8+Vector3.UP*1.2
+	if hand==game.desktop_hand: velocity=game.tuning.release_velocity(hand,true) if str(game.get("desktop_release_mode"))=="throw" else Vector3.ZERO
 	var root=game.adventure.zone_groups[game.adventure.zone]
 	var body=RigidBody3D.new(); root.add_child(body); body.global_transform=n.global_transform; n.reparent(body)
 	body.mass=0.15; body.collision_layer=8; body.collision_mask=9; body.continuous_cd=true
