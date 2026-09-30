@@ -23,6 +23,8 @@ func _check() -> void:
 		game.add_child(ents)
 		ents.setup(builder)
 		builder.ents = ents
+		# Heat and water operate only in the active zone; exercise the Orchard.
+		game.adventure.travel("orchard_highlands")
 		var source: Node3D = null
 		var source_key := ""
 		for key in builder.resource_by_key:

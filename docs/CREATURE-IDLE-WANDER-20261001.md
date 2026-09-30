@@ -15,14 +15,16 @@ Focused offline checks:
 | First real-scene Ent check | Failed: test remained in hidden Forge zone | 9.9 |
 | Repaired real-scene Ent/skeleton/animation/persistence check | `CREATURE_IDLE_WANDER_SCENE_RESULT` with no failures | 8.9 |
 | Existing living skeleton structure/combat check | `SKELETON_COMBAT_RESULT []` | 8.0 |
-| Existing Ent lifecycle check | Two existing heat/water fixture failures | 8.5 |
+| Existing Ent lifecycle check before fixture repair | Two heat/water fixture failures | 8.5 |
+| Ent lifecycle check after active-zone repair | `WORLD_BUILDER_ENTS_RESULT {"failures":[]}` | 8.5 |
 
-The old Ent lifecycle fixture calls `heat_contacts.water` while the adventure is still in the Forge Yard. That method returns immediately when the requested zone differs from the current zone; its later heat fixture has the same active-zone guard. Those two failures do not exercise wandering. For the real-scene wander check, travel to the Orchard before ticking an Ent. A parse failure can still leave the main game running and flood the console; use `--quit-after` for parser-only checks and fix the first `SCRIPT ERROR` before repeating a scene run.
+The old Ent lifecycle fixture called `heat_contacts.water` while the adventure was still in the Forge Yard. That method returns immediately when the requested zone differs from the current zone; its later heat fixture has the same active-zone guard. The fixture now travels to the Orchard before exercising heat/water, and the full lifecycle passes. For any real-scene Ent check, enter the Orchard before ticking the creature. A parse failure can still leave the main game running and flood the console; use `--quit-after` for parser-only checks and fix the first `SCRIPT ERROR` before repeating a scene run.
 
 Commands (from the repository root, bundled Godot):
 
 ```powershell
 & 'tools/godot/Godot_v4.7.2-stable_win64_console.exe' --headless --xr-mode off --audio-driver Dummy --path godot --script res://creature_idle_wander_checks.gd
 & 'tools/godot/Godot_v4.7.2-stable_win64_console.exe' --headless --xr-mode off --audio-driver Dummy --path godot --script res://creature_idle_wander_scene_checks.gd
+& 'tools/godot/Godot_v4.7.2-stable_win64_console.exe' --headless --xr-mode off --audio-driver Dummy --path godot --script res://world_builder_ents_checks.gd
 & 'tools/godot/Godot_v4.7.2-stable_win64_console.exe' --headless --xr-mode off --audio-driver Dummy --path godot --quit-after 1 -- --skeleton-combat-check
 ```
