@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import math
 import os
@@ -21,6 +22,9 @@ PROJECT = Path(__file__).resolve().parents[1]
 CATALOG = PROJECT / "godot/weapon_inspection_catalog.json"
 ENGINE = PROJECT / "tools/godot/Godot_v4.7.2-stable_win64_console.exe"
 VERSION = 1
+# Same-device GPU rasterization can differ at a few reflective texture samples.
+# Keep exact pose/source comparisons, plus a strict, disclosed pixel noise budget.
+PIXEL_LIMITS = {"max_channel_delta": 8, "changed_fraction": 0.002, "max_rms": 0.08}
 
 
 def write_json(path: Path, value: object) -> None:
@@ -41,7 +45,7 @@ def fingerprints() -> tuple[str, dict]:
         old = json.loads(index_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         old = {}
-    paths = {Path(__file__), CATALOG}
+    paths = {Path(__file__), CATALOG, ENGINE}
     source_extensions = {".gd", ".gdshader", ".json", ".tscn", ".tres", ".godot"}
     for directory, children, files in os.walk(PROJECT / "godot"):
         children[:] = [name for name in children if name not in {".godot", ".git"}]
@@ -110,7 +114,7 @@ def package(folder: Path, report: dict) -> list[str]:
     overview = Image.new("RGB", (small * 4, 116 + rows * (small + 48)), "#151b20")
     draw = ImageDraw.Draw(overview)
     draw.text((24, 15), "BRANN'S FORGE / WEAPON GRIP AUDIT", font=font(36), fill="#f2eee4")
-    draw.text((24, 70), f"{len(report['subjects'])} actual items · {report['checks']} checks · {len(report['failures'])} failures · open individual sheets for all views", font=font(21), fill="#b6c0c8")
+    draw.text((24, 70), f"{len(report['subjects'])} actual items · {report['pose_checks']} pose checks · {report['capture_checks']} captures · open individual sheets for all views", font=font(21), fill="#b6c0c8")
     for n, item in enumerate(report["subjects"]):
         x, y = (n % 4) * small, 116 + (n // 4) * (small + 48)
         view = next(v for v in item["views"] if v["mode"] == "right_hand" and v["view"] == "quarter")
@@ -130,13 +134,74 @@ def package(folder: Path, report: dict) -> list[str]:
         encoding="utf-8")
     products.extend(["START-HERE.md", "report.json"])
     members = sorted(set(products + [v["file"] for item in report["subjects"] for v in item["views"]]))
+    write_archive(folder, members)
+    products = sorted(set(products + members + ["weapon-review.zip"]))
+    return products
+
+
+def write_archive(folder: Path, members: list[str]) -> None:
     with zipfile.ZipFile(folder / "weapon-review.zip", "w", zipfile.ZIP_DEFLATED) as archive:
         for member in members:
             archive.write(folder / member, member)
     with zipfile.ZipFile(folder / "weapon-review.zip") as archive:
         if archive.testzip(): raise ValueError("Review archive CRC failed")
-    products.append("weapon-review.zip")
-    return products
+
+
+def compare_pixels(before: bytes, after: bytes) -> dict:
+    """Disclose byte equality separately from tightly bounded renderer noise."""
+    from PIL import Image, ImageChops, ImageStat
+    if before == after:
+        return {"byte_identical": True, "within_tolerance": True}
+    with Image.open(io.BytesIO(before)) as first, Image.open(io.BytesIO(after)) as second:
+        if first.size != second.size:
+            return {"byte_identical": False, "within_tolerance": False, "reason": "resolution changed"}
+        difference = ImageChops.difference(first.convert("RGB"), second.convert("RGB"))
+        channels = difference.split()
+        maximum = ImageChops.lighter(ImageChops.lighter(channels[0], channels[1]), channels[2])
+        fraction = 1 - maximum.histogram()[0] / (first.width * first.height)
+        delta = max(pair[1] for pair in difference.getextrema())
+        rms = max(ImageStat.Stat(difference).rms)
+        return {"byte_identical": False,
+                "within_tolerance": delta <= PIXEL_LIMITS["max_channel_delta"]
+                    and fraction <= PIXEL_LIMITS["changed_fraction"] and rms <= PIXEL_LIMITS["max_rms"],
+                "changed_fraction": fraction, "max_channel_delta": delta, "max_rms": rms,
+                "bounds": difference.getbbox()}
+
+
+def verify_repeat(args, folder: Path, report: dict) -> dict:
+    """Force a fresh engine run and compare pixels and semantic poses, not timers."""
+    def snapshot(value):
+        return {item["id"]: item["views"] for item in value["subjects"]}
+    before = snapshot(report)
+    images = {v["file"]: (folder / v["file"]).read_bytes()
+              for item in report["subjects"] for v in item["views"]} if not args.check_only else {}
+    command = [sys.executable, str(Path(__file__).resolve()), "--weapons", args.weapons,
+               "--out", str(folder), "--size", str(args.size), "--timeout", str(args.timeout), "--force"]
+    if args.check_only: command.append("--check-only")
+    child = subprocess.run(command, cwd=PROJECT, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=args.timeout + 60,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    log = PROJECT / "logs" / ("weapon-review-repeat-" + time.strftime("%Y%m%d-%H%M%S") + ".log")
+    log.write_text(child.stdout + child.stderr, encoding="utf-8")
+    if child.returncode != 0: raise RuntimeError(f"Repeat run failed: {log}")
+    after = json.loads((folder / "report.json").read_text(encoding="utf-8"))
+    changed = [name for name, content in images.items() if hashlib.sha256((folder / name).read_bytes()).digest() != hashlib.sha256(content).digest()]
+    differences = {name: compare_pixels(images[name], (folder / name).read_bytes()) for name in changed}
+    for name in changed:
+        reference = folder / "repeat-differences" / (name.removesuffix(".png") + "-before.png")
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        reference.write_bytes(images[name])
+        reference.with_name(reference.name.replace("-before", "-after")).write_bytes((folder / name).read_bytes())
+    result = {"images": len(images), "changed_images": changed, "poses_identical": before == snapshot(after),
+              "byte_identical": not changed, "source_sha256": report["source_sha256"],
+              "sources_identical": report["source_sha256"] == after["source_sha256"],
+              "pixel_limits": PIXEL_LIMITS, "differences": differences,
+              "within_render_tolerance": all(value["within_tolerance"] for value in differences.values()),
+              "scope": "same engine, renderer, machine and inputs"}
+    result["passed"] = result["poses_identical"] and result["sources_identical"] and result["within_render_tolerance"]
+    write_json(folder / "repeat.json", result)
+    if not result["passed"]: raise RuntimeError(f"Non-deterministic inspection: {folder / 'repeat.json'}")
+    return result
 
 
 def main() -> int:
@@ -147,6 +212,7 @@ def main() -> int:
     parser.add_argument("--size", type=int, default=768, choices=(512, 768, 1024, 1536))
     parser.add_argument("--check-only", action="store_true", help="Headless pose checks; no GPU images")
     parser.add_argument("--force", action="store_true", help="Ignore the output cache")
+    parser.add_argument("--verify-repeat", action="store_true", help="Render twice; require identical poses/sources and images within disclosed GPU noise limits")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--timeout", type=int, default=240)
     args = parser.parse_args()
@@ -168,7 +234,7 @@ def main() -> int:
     manifest_path = folder / "cache.json"
     try: cache = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError): cache = {}
-    if not args.force and cache.get("key") == cache_key and report_path.is_file() and all((folder / f).is_file() for f in cache.get("products", [])):
+    if not args.force and not args.verify_repeat and cache.get("key") == cache_key and report_path.is_file() and all((folder / f).is_file() for f in cache.get("products", [])):
         report = json.loads(report_path.read_text(encoding="utf-8"))
         print(json.dumps({"cached": True, "seconds": round(time.perf_counter()-started, 3), "report": str(report_path), "failures": report["failures"]}))
         return 1 if report["failures"] else 0
@@ -177,6 +243,7 @@ def main() -> int:
     write_json(folder / "config.json", config)
     # No stale report may accidentally turn a crashed engine into a passing run.
     report_path.unlink(missing_ok=True); manifest_path.unlink(missing_ok=True)
+    (folder / "repeat.json").unlink(missing_ok=True)
     log = PROJECT / "logs" / ("weapon-review-" + time.strftime("%Y%m%d-%H%M%S") + ".log")
     command = [str(ENGINE), "--xr-mode", "off", "--audio-driver", "Dummy", "--path", str(PROJECT / "godot")]
     command += ["--headless"] if args.check_only else ["--position", "-32000,-32000", "--resolution", "64x64", "--no-focus"]
@@ -189,14 +256,24 @@ def main() -> int:
     if "WEAPON_INSPECTION_RESULT " not in text or not report_path.is_file() or "SCRIPT ERROR:" in text or "\nERROR:" in text:
         raise RuntimeError(f"Inspection engine failed; see {log}\n" + text[-2400:])
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    report.update(size=args.size, source_sha256=source_hash, sources=sources, engine=ENGINE.name)
+    report.update(size=args.size, source_sha256=source_hash, source_files=len(sources), engine=ENGINE.name)
     write_json(report_path, report)
     products = ["report.json"] if args.check_only else package(folder, report)
+    repeated = None
+    if args.verify_repeat:
+        try:
+            repeated = verify_repeat(args, folder, report)
+        except Exception:
+            manifest_path.unlink(missing_ok=True)
+            raise
+        products.append("repeat.json")
+        if not args.check_only:
+            write_archive(folder, [name for name in products if name != "weapon-review.zip"])
     write_json(manifest_path, {"key": cache_key, "products": products})
     seconds = round(time.perf_counter() - started, 3)
     with (PROJECT / "logs/work-timing.csv").open("a", encoding="utf-8", newline="") as output:
         csv.writer(output).writerow(["Deterministic weapon review", f"{len(report['subjects'])} items; {report['checks']} checks; {len(report['failures'])} failures; render={not args.check_only}", seconds])
-    print(json.dumps({"cached": False, "seconds": seconds, "items": len(report["subjects"]), "checks": report["checks"], "failures": report["failures"], "report": str(report_path), "overview": str(folder / "overview.png") if not args.check_only else None, "log": str(log)}))
+    print(json.dumps({"cached": False, "seconds": seconds, "items": len(report["subjects"]), "checks": report["checks"], "failures": report["failures"], "report": str(report_path), "overview": str(folder / "overview.png") if not args.check_only else None, "repeat": repeated, "log": str(log)}))
     return 1 if report["failures"] else (0 if result.returncode == 0 else 2)
 
 
@@ -204,5 +281,9 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as error:
-        print(f"WEAPON_REVIEW_ERROR {type(error).__name__}: {error}", file=sys.stderr)
+        import traceback
+        crash = PROJECT / "logs" / ("weapon-review-error-" + time.strftime("%Y%m%d-%H%M%S") + ".log")
+        crash.parent.mkdir(parents=True, exist_ok=True)
+        crash.write_text(traceback.format_exc(), encoding="utf-8")
+        print(f"WEAPON_REVIEW_ERROR {type(error).__name__}: {error}\nCrash log: {crash}", file=sys.stderr)
         sys.exit(2)

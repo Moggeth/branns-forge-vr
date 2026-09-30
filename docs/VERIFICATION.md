@@ -1620,3 +1620,47 @@ values as string arrays; normalize with `@($response.Headers['Content-Length'])[
 before numeric conversion (likewise Content-Type). Corrected PNG/ZIP size/MIME
 and overview SHA-256 checks passed in 1.236 s. Keep the prior model/pack URLs
 for comparison instead of replacing previously shared review artefacts.
+
+## Actual-engine weapon inspection and grip corrections, 2026-09-30
+
+Use `python scripts/weapon_review.py` and the documented selector/cache before
+rebuilding an ad hoc Blender viewer. A 19-item visual baseline took 23.281 s and
+exposed 21 alignment assertion failures across five FPS tool poses, two VR
+lanterns and three VR shields. The review also found two harness defects:
+guardian theft initially left the authored shield hidden until its normal frame
+sync, and the bow string required its production draw update before bounds and
+capture. Fix those adapters rather than substituting visible approximation meshes.
+Model presence is now an explicit assertion.
+
+The initial headless run (7.787 s) caught an invalid root Window hide call and a
+typed hand-array erase. Hide the game scene and use an off-screen no-focus window
+for image capture; erase desktop fixtures only from untyped grip maps. A later
+headless run caught unary negation of a Basis during crossbow grip-origin
+calculation: negate the transformed Vector3 explicitly. Engine script errors
+must fail the CLI even if Godot itself exits with status zero.
+
+Calibration regressions passed 31 assertions in 7.1995 s. Guardian interaction
+checks passed in 6.6827 s; the complete Siegebird mechanism/reload/ballistic check
+passed in 7.6643 s; Emberwing passed 38 assertions in 7.4585 s; FPS interaction
+checks passed in 8.417 s. Both physical forge lantern variants passed 54 shutter,
+placement and pose assertions. Service unit tests passed in 0.2943 s, followed
+by the full disposable service integration in 61.944 s. No paid API call or live
+game restart was used. Existing ObjectDB shutdown warnings in the grip/FPS
+fixtures are not a new runtime failure; no SCRIPT ERROR or ERROR was present.
+
+A full repeat initially differed in one Wyrmspout view, despite exact pose
+records. Two warm-up draws alone did not guarantee byte equality. Inspecting
+retained differences showed scattered reflective samples (at most 5/255; fewer
+than 0.1% pixels in the targeted failure), not an orientation or camera change.
+The exact shader/driver source of this rounding was not established. Freeze
+imported processing as well as shader clocks, record exact PNG identity, and
+use the explicit narrow noise budget only for the visual comparison. Six Python
+regressions (0.017 s) reject meaningful image changes; never silently rewrite
+the reference or relax the semantic/source comparisons.
+
+Final actual-engine suite: 20 registered items, 100 pose conditions, 308 capture
+checks, zero failures. Headless took 7.725 s; the render/pack cycle about 26 s;
+two fresh complete runs took 52.591 s with **all 308 PNGs byte-identical** and
+identical source/pose records. The cache hit took 0.117 s. The review ZIP is
+27,088,011 bytes. See `docs/WEAPON-INSPECTION.md` for flags, omissions and
+calibration migration. HMD comfort and body clearance still require playtesting.

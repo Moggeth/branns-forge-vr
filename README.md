@@ -93,6 +93,12 @@ Latest fairy expansion: `outputs/fairy-night-build/Play Flight Practice.cmd` or 
 actual-engine model, VR grip, FPS and holster diagrams in one cached offline
 batch. `--weapons woodland_axe,siegebird` narrows the selection; `--check-only`
 runs the pose audit without screenshots. [Workflow and coverage](docs/WEAPON-INSPECTION.md).
+`--verify-repeat` compares two runs and includes the evidence in the review ZIP.
+The 20-item suite takes about 26 seconds, checks 100 pose conditions and makes
+308 captures; an unchanged cached run took 0.117 seconds. Confirmed FPS tool,
+VR shield/lantern and shield-holster poses are corrected, and saved adjustments
+are now scoped to the authored pose so stale calibrations cannot restore an
+older orientation. Relaunch normally to load the runtime fixes.
 
 **Asset authoring:** `scripts/asset_lab.py` now offers a repeatable Blender → GLB →
 Khronos validation → disposable Godot import path for new models. Run

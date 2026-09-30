@@ -1,28 +1,351 @@
 {
   "schema_version": 1,
   "subjects": [
-    {"id":"apprentice_hammer","name":"Copperpot's Promise","factory":"builtin","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"woodland_axe","name":"Orchard's Edge","factory":"builtin","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"quarry_pick","name":"Stonewhisper","factory":"builtin","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"grappling_hook","name":"Swallow Line","factory":"builtin","forward":[1,0,0],"up":[0,1,0]},
-    {"id":"spore_lantern","name":"Mooncap Lantern","factory":"builtin","forward":[1,0,0],"up":[0,1,0]},
-    {"id":"crystal_resonator","name":"Hollow's Song","factory":"builtin","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"ember_gauntlet","name":"The Last Hearth","factory":"builtin","forward":[1,0,0],"up":[0,1,0]},
-    {"id":"starter_hammer","name":"Copperpot's apprentice hammer","factory":"collection","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"glowmoth","name":"Glowmoth Lantern","factory":"collection","forward":[1,0,0],"up":[0,1,0]},
-    {"id":"stormbell","name":"Stormbell","factory":"collection","forward":[1,0,0],"up":[0,1,0],"check_forward":true},
-    {"id":"forge_lantern_sol","name":"Forge lantern (Sol)","factory":"collection","forward":[0,0,-1],"up":[0,1,0],"check_up":true},
-    {"id":"forge_lantern_opus","name":"Forge lantern (Opus)","factory":"collection","forward":[0,0,-1],"up":[0,1,0],"check_up":true},
-    {"id":"siegebird","name":"Siegebird","factory":"crossbow","forward":[0,1,0],"up":[0,0,1],"check_forward":true,"check_up":true},
-    {"id":"wyrmspout_v2","name":"Wyrmspout v2","factory":"wyrm","forward":[0,0,-1],"up":[0,1,0],"check_forward":true,"check_up":true},
-    {"id":"emberwing","name":"Emberwing","factory":"bow","forward":[0,0,-1],"up":[0,1,0],"check_forward":true,"check_up":true},
-    {"id":"sunskipper","name":"Sunskipper","factory":"ring","forward":[0,0,-1],"up":[0,1,0]},
-    {"id":"guardian_shield_mossward","name":"Mossward shield","factory":"shield","variant":"mossward","forward":[0,0,1],"up":[0,1,0],"check_forward":true,"check_up":true},
-    {"id":"guardian_shield_prismwatch","name":"Prismwatch shield","factory":"shield","variant":"prismwatch","forward":[0,0,1],"up":[0,1,0],"check_forward":true,"check_up":true},
-    {"id":"guardian_shield_cinderkeep","name":"Cinderkeep shield","factory":"shield","variant":"cinderkeep","forward":[0,0,1],"up":[0,1,0],"check_forward":true,"check_up":true}
+    {
+      "id": "apprentice_hammer",
+      "name": "Copperpot's Promise",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "two_handed": true
+    },
+    {
+      "id": "woodland_axe",
+      "name": "Orchard's Edge",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "two_handed": true
+    },
+    {
+      "id": "quarry_pick",
+      "name": "Stonewhisper",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "two_handed": true
+    },
+    {
+      "id": "grappling_hook",
+      "name": "Swallow Line",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "spore_lantern",
+      "name": "Mooncap Lantern",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "crystal_resonator",
+      "name": "Hollow's Song",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "two_handed": true
+    },
+    {
+      "id": "ember_gauntlet",
+      "name": "The Last Hearth",
+      "factory": "builtin",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "starter_hammer",
+      "name": "Copperpot's apprentice hammer",
+      "factory": "collection",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "two_handed": true
+    },
+    {
+      "id": "glowmoth",
+      "name": "Glowmoth Lantern",
+      "factory": "collection",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "stormbell",
+      "name": "Stormbell",
+      "factory": "collection",
+      "forward": [
+        1,
+        0,
+        0
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true
+    },
+    {
+      "id": "forge_lantern_sol",
+      "name": "Forge lantern (Sol)",
+      "factory": "collection",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_up": true
+    },
+    {
+      "id": "forge_lantern_opus",
+      "name": "Forge lantern (Opus)",
+      "factory": "collection",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_up": true
+    },
+    {
+      "id": "siegebird",
+      "name": "Siegebird",
+      "factory": "crossbow",
+      "forward": [
+        0,
+        1,
+        0
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "check_forward": true,
+      "check_up": true,
+      "two_handed": true
+    },
+    {
+      "id": "wyrmspout_v2",
+      "name": "Wyrmspout v2",
+      "factory": "wyrm",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "check_up": true
+    },
+    {
+      "id": "emberwing",
+      "name": "Emberwing",
+      "factory": "bow",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "check_up": true
+    },
+    {
+      "id": "sunskipper",
+      "name": "Sunskipper",
+      "factory": "ring",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "holster": false
+    },
+    {
+      "id": "copper_kite",
+      "name": "Copper Kite",
+      "factory": "wand",
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "holster": false
+    },
+    {
+      "id": "guardian_shield_mossward",
+      "name": "Mossward shield",
+      "factory": "shield",
+      "variant": "mossward",
+      "forward": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "check_up": true
+    },
+    {
+      "id": "guardian_shield_prismwatch",
+      "name": "Prismwatch shield",
+      "factory": "shield",
+      "variant": "prismwatch",
+      "forward": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "check_up": true
+    },
+    {
+      "id": "guardian_shield_cinderkeep",
+      "name": "Cinderkeep shield",
+      "factory": "shield",
+      "variant": "cinderkeep",
+      "forward": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "check_forward": true,
+      "check_up": true
+    }
   ],
   "special_cases": [
-    {"id":"bomb_glove","reason":"Pocket Thunder is a worn hand ability, not a held collection prop. Existing bomb/hand checks cover its runtime."},
-    {"id":"wyrmspout_v1","reason":"Original generated model is not installed as a native asset; do not substitute the v2 mesh for a historical version."}
+    {
+      "id": "bomb_glove",
+      "reason": "Pocket Thunder is a worn hand ability, not a held collection prop. Existing bomb/hand checks cover its runtime."
+    },
+    {
+      "id": "wyrmspout_v1",
+      "reason": "Original generated model is not installed as a native asset; do not substitute the v2 mesh for a historical version."
+    },
+    {
+      "id": "generated_inventions",
+      "reason": "Historical generated GLBs, including Sunfall, require a registered real-import adapter. They are not counted as inspected native items."
+    }
   ]
 }

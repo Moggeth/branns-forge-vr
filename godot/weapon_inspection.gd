@@ -10,6 +10,7 @@ var folder:String
 var records:Array=[]
 var errors:Array=[]
 var checks=0
+var capture_checks=0
 var helpers:Array=[]
 var frozen_materials:Dictionary={}
 
@@ -21,10 +22,12 @@ func _initialize():
 func vec(value:Array)->Vector3: return Vector3(value[0],value[1],value[2])
 func check(ok:bool,label:String):
 	checks+=1
+	if label.begins_with("save "): capture_checks+=1
 	if not ok: errors.append(label)
 
 func run():
 	var started=Time.get_ticks_usec()
+	seed(0)
 	var config_path=""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--inspection-config="): config_path=arg.trim_prefix("--inspection-config=")
@@ -41,6 +44,7 @@ func run():
 	viewport.size=Vector2i(int(config.size),int(config.size))
 	viewport.own_world_3d=true; viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 	stage=Node3D.new(); viewport.add_child(stage)
+	stage.process_mode=Node.PROCESS_MODE_DISABLED
 	camera=Camera3D.new(); stage.add_child(camera); camera.current=true
 	camera.projection=Camera3D.PROJECTION_ORTHOGONAL
 	var environment=Environment.new(); environment.background_mode=Environment.BG_COLOR
@@ -67,9 +71,12 @@ func run():
 		for side in ["left_hand","right_hand","desktop"]:
 			var hand=make_hand(side)
 			if spec.factory=="ring": game.playful_tools._attach(hand)
+			elif spec.factory=="wand":
+				game.magnetic_wand.holder=hand; game.magnetic_wand._pose()
 			else: game.grips._attach(hand,item)
 			if spec.factory=="crossbow": game.siegebird.tick(0.0)
 			if spec.factory=="bow": game.archery.update_draw_visuals()
+			sanitize(item)
 			HANDS.tick(hand,true,.25)
 			var socket=game.hand_socket(hand)
 			var forward=(item.global_basis*vec(spec.forward)).normalized()
@@ -85,20 +92,23 @@ func run():
 			if side!="desktop": await capture(item,spec,side,"side",Vector3(3,.15,.2),subject_records,hand)
 			else: await capture_fps(item,spec,hand,subject_records)
 			clear_helpers()
+			if side!="desktop" and spec.get("two_handed",false):
+				await two_hands(item,spec,hand,side,subject_records)
 			game.held.erase(str(hand.get_instance_id())); game.grips.grips.erase(str(hand.get_instance_id()))
 			item.reparent(stage); item.transform=Transform3D.IDENTITY
 			if hand is XRController3D: game.hands.erase(hand)
 			hand.free()
 		for side in [-1,1]:
+			if not spec.get("holster",true): continue
 			var slot=game.grips.slots[0 if side<0 else 1].root.duplicate(0)
 			stage.add_child(slot); slot.transform=Transform3D.IDENTITY; sanitize(slot)
 			item.reparent(slot); item.transform=game.grips._holster_pose(item,side)
 			if spec.factory=="bow": game.archery.update_draw_visuals()
 			await capture(item,spec,"holster-left" if side<0 else "holster-right","quarter",Vector3(1.8,.7,2.6),subject_records,slot)
 			item.reparent(stage); item.transform=Transform3D.IDENTITY; slot.free()
-		records.append({"id":spec.id,"name":spec.name,"views":subject_records,"seconds":(Time.get_ticks_usec()-before)/1000000.0})
+		records.append({"id":spec.id,"name":spec.name,"factory":spec.factory,"holster":spec.get("holster",true),"two_handed":spec.get("two_handed",false),"views":subject_records,"seconds":(Time.get_ticks_usec()-before)/1000000.0})
 		item.hide(); item.reparent(game)
-	var report={"schema_version":1,"renderer":"Godot actual models, articulated gloves and runtime attachment paths","headset_acceptance":false,"saved_calibrations":"excluded; authored defaults only","checks":checks,"failures":errors,"subjects":records,"special_cases":config.get("special_cases",[]),"seconds":(Time.get_ticks_usec()-started)/1000000.0}
+	var report={"schema_version":1,"renderer":"Godot actual models, articulated gloves and runtime attachment paths","headset_acceptance":false,"saved_calibrations":"excluded; authored defaults only","checks":checks,"pose_checks":checks-capture_checks,"capture_checks":capture_checks,"failures":errors,"subjects":records,"special_cases":config.get("special_cases",[]),"seconds":(Time.get_ticks_usec()-started)/1000000.0}
 	var output=FileAccess.open(folder.path_join("report.json"),FileAccess.WRITE)
 	if output==null: quit(2); return
 	output.store_string(JSON.stringify(report,"\t")); output.close()
@@ -116,6 +126,7 @@ func subject(spec:Dictionary):
 		"bow":
 			game.archery.cancel_draw(); game.archery.hint.hide(); game.archery.quiver.hide(); return game.archery.bow
 		"ring": return game.playful_tools.ring
+		"wand": return game.magnetic_wand.wand
 		"wyrm":
 			var item=Node3D.new(); game.add_child(item)
 			var model=(load("res://assets/wyrmspout.glb") as PackedScene).instantiate(); item.add_child(model)
@@ -143,6 +154,33 @@ func make_hand(side:String)->Node3D:
 		var roll=PI/2 if side=="left_hand" else -PI/2
 		hand.basis=Basis(Vector3.BACK,roll)*socket.basis.inverse()
 	return hand
+
+func two_hands(item:Node3D,spec:Dictionary,hand:Node3D,side:String,list:Array):
+	var support=make_hand("right_hand" if side=="left_hand" else "left_hand")
+	var axis_origin:Vector3=item.get_meta("grip_axis_origin",Vector3.ZERO)
+	var point=Vector3(axis_origin.x,float(item.get_meta("grip_max",.35)),axis_origin.z)
+	support.global_position=item.to_global(point)
+	var attached=game.grips.try_grab(support)
+	check(attached and game.grips._entries(item).size()==2,str(spec.id)+" "+side+" physical second grip")
+	if attached:
+		game.grips.tick(.016)
+		if spec.factory=="crossbow": game.siegebird.tick(0.0)
+		var initial=(item.global_basis*vec(spec.forward)).normalized()
+		var rest_basis=hand.basis
+		hand.basis=hand.basis*Basis(Vector3.UP,.65)
+		game.grips.tick(.016)
+		if spec.factory=="crossbow":
+			game.siegebird.tick(0.0)
+			var direction=(support.global_position-hand.global_position).normalized()
+			check((item.global_basis*vec(spec.forward)).normalized().dot(direction)>.99,str(spec.id)+" "+side+" two hands determine flight direction")
+			check((item.global_basis*vec(spec.forward)).normalized().dot(initial)>.999,str(spec.id)+" "+side+" rear wrist cannot steer rail")
+		HANDS.tick(support,true,.25)
+		await capture(item,spec,"two-hand-"+side.trim_suffix("_hand"),"quarter",Vector3(1.8,.7,2.6),list,support,{"rear_wrist_yaw_degrees":rad_to_deg(.65)})
+		hand.basis=rest_basis
+	game.held.erase(str(support.get_instance_id())); game.grips.grips.erase(str(support.get_instance_id()))
+	game.hands.erase(support); support.free()
+	item.transform=game.grips.pose_for(item,hand)
+	game.grips.grips[str(hand.get_instance_id())].basis=item.basis
 
 func sanitize(node:Node):
 	if node is Label3D or node is Light3D or node is GPUParticles3D: node.hide()
@@ -186,6 +224,12 @@ func capture(item:Node3D,spec:Dictionary,mode:String,view:String,direction:Vecto
 	record.merge(metrics)
 	if config.get("render",true):
 		DirAccess.make_dir_recursive_absolute(folder.path_join(str(spec.id)))
+		if mode=="model" and view=="front":
+			# Imported material/texture uploads need a settled first draw. Subsequent
+			# poses are already warm; do not accept a shader-cache-dependent first PNG.
+			viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
+			await RenderingServer.frame_post_draw
+			await RenderingServer.frame_post_draw
 		viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
 		await RenderingServer.frame_post_draw
 		check(viewport.get_texture().get_image().save_png(folder.path_join(record.file))==OK,"save "+record.file)
@@ -195,6 +239,12 @@ func capture_fps(item:Node3D,spec:Dictionary,hand:Node3D,list:Array):
 	# The production rest offset and camera FOV, rather than a reframed studio view.
 	hand.position=game.desktop_hand.position
 	if spec.factory=="bow": game.archery.update_draw_visuals()
+	if spec.factory=="wand":
+		# This managed gadget follows the camera, not DesktopHand's rest offset.
+		var previous=game.camera.global_transform
+		game.camera.global_transform=Transform3D.IDENTITY
+		game.magnetic_wand.holder=game.desktop_hand; game.magnetic_wand._pose()
+		game.camera.global_transform=previous; game.magnetic_wand.holder=hand
 	viewport.size=Vector2i(int(config.size),roundi(int(config.size)*9.0/16.0))
 	camera.projection=Camera3D.PROJECTION_PERSPECTIVE
 	camera.fov=game.camera.fov; camera.position=Vector3.ZERO; camera.basis=Basis.IDENTITY
@@ -205,6 +255,7 @@ func capture_fps(item:Node3D,spec:Dictionary,hand:Node3D,list:Array):
 		await RenderingServer.frame_post_draw
 		check(viewport.get_texture().get_image().save_png(folder.path_join(record.file))==OK,"save "+record.file)
 	list.append(record); hand.position=Vector3.ZERO
+	if spec.factory=="wand": game.magnetic_wand._pose()
 	viewport.size=Vector2i(int(config.size),int(config.size))
 
 func axis(origin:Vector3,direction:Vector3,color:Color):
