@@ -14,6 +14,7 @@ var game
 var bow:Node3D
 var model:Node3D
 var rest:Node3D
+var guide:Node3D
 var top:Node3D
 var bottom:Node3D
 var strings:Array=[]
@@ -38,6 +39,7 @@ var upper:Node3D
 var lower:Node3D
 var upper_rest=Basis.IDENTITY
 var lower_rest=Basis.IDENTITY
+var magic_materials:Array=[]
 
 func setup(owner_game):
 	game=owner_game
@@ -53,6 +55,7 @@ func setup(owner_game):
 	var packed:PackedScene=load(ART+"bow.glb")
 	model=packed.instantiate(); bow.add_child(model)
 	rest=model.find_child("ArrowRest",true,false)
+	guide=model.find_child("ArrowGuide",true,false)
 	top=model.find_child("StringTop",true,false)
 	bottom=model.find_child("StringBottom",true,false)
 	upper=model.find_child("UpperLimb",true,false)
@@ -61,6 +64,7 @@ func setup(owner_game):
 		push_error("EMBERWING art contract incomplete"); bow.queue_free(); bow=null; return
 	if upper!=null: upper_rest=upper.basis
 	if lower!=null: lower_rest=lower.basis
+	_bind_magic_materials()
 	# Author axes are already game axes. Never run this bow through the generic
 	# transverse haft transform (the source of previous 90-degree weapon errors).
 	# The shaft crosses curled fingers on the palm's thumb axis (+/-X), while
@@ -178,7 +182,8 @@ func _aim()->Vector3:
 		# Never reverse the arrow towards the player's face in that case.
 		return direction.normalized() if direction.dot(forward)>0.08 else forward
 	if not nocked.is_empty() and not nocked.get("desktop",false):
-		var direction=rest.global_position-game.hand_socket(nocked.hand).to_global(HAND_NOCK)
+		var aim_anchor=guide.global_position if guide!=null else rest.global_position
+		var direction=aim_anchor-game.hand_socket(nocked.hand).to_global(HAND_NOCK)
 		if direction.length()>0.09 and direction.normalized().dot(-bow.global_basis.z)>0.1: return direction.normalized()
 	return -bow.global_basis.z.normalized()
 
@@ -274,12 +279,8 @@ func tick(delta:float):
 			arrow.global_position=_nock_position()
 			arrow.global_basis=Basis.looking_at(direction,Vector3.RIGHT if absf(direction.dot(bow.global_basis.y))>0.98 else bow.global_basis.y.normalized())
 			if not curve_state.is_empty(): curve_state.curve=FLIGHT.gesture(curve_state.basis,curve_state.origin,bow.global_basis,bow.global_position)
+	update_draw_visuals()
 	var amount=0.0 if nocked.is_empty() else float(nocked.draw)/MAX_DRAW
-	if upper!=null: upper.basis=upper_rest*Basis(Vector3.RIGHT,amount*0.09)
-	if lower!=null: lower.basis=lower_rest*Basis(Vector3.RIGHT,-amount*0.09)
-	var nock=_nock_position()
-	_segment(strings[0],model.to_global(upper.basis*top.position) if upper!=null else top.global_position,nock)
-	_segment(strings[1],model.to_global(lower.basis*bottom.position) if lower!=null else bottom.global_position,nock)
 	hint.visible=holder!=null
 	hint.text="PHOENIX ARC · %.0f°"%rad_to_deg(curve_state.curve.length()) if not curve_state.is_empty() else ("DRAW · %.0f%%"%(amount*100) if not nocked.is_empty() else "BACK QUIVER / STRING · DRAW TRIGGER")
 	_draw_preview()
@@ -288,6 +289,35 @@ func tick(delta:float):
 		if not is_instance_valid(entry.node) or game.elapsed>entry.until:
 			if is_instance_valid(entry.node): entry.node.queue_free()
 			embedded.erase(entry)
+
+func _bind_magic_materials():
+	# Copy only emissive materials, once per shared source. The bow's small
+	# inlays brighten without modifying other imported instances or adding lights.
+	var copies:Dictionary={}
+	for mesh in model.find_children("*","MeshInstance3D",true,false):
+		for surface in mesh.mesh.get_surface_count():
+			var original=mesh.get_active_material(surface)
+			if not original is StandardMaterial3D or not original.emission_enabled: continue
+			var key=original.get_instance_id()
+			if not copies.has(key):
+				var material=original.duplicate()
+				copies[key]=material
+				magic_materials.append({"material":material,"base":material.emission_energy_multiplier,"eye":"eye" in original.resource_name.to_lower()})
+			mesh.set_surface_override_material(surface,copies[key])
+
+func update_draw_visuals():
+	var amount=0.0 if nocked.is_empty() else clampf(float(nocked.draw)/MAX_DRAW,0,1)
+	if upper!=null: upper.basis=upper_rest*Basis(Vector3.RIGHT,amount*0.09)
+	if lower!=null: lower.basis=lower_rest*Basis(Vector3.RIGHT,-amount*0.09)
+	# Nock sockets are parented to their authored limbs. Their complete world
+	# transforms include the actual root pivot, avoiding a floating string end.
+	var nock=_nock_position()
+	_segment(strings[0],top.global_position,nock)
+	_segment(strings[1],bottom.global_position,nock)
+	var bending=not curve_state.is_empty()
+	for entry in magic_materials:
+		var multiplier=(1.0+0.25*amount+(0.85 if bending else 0.0)) if entry.eye else (1.0+0.45*amount+(0.40 if bending else 0.0))
+		entry.material.emission_energy_multiplier=entry.base*multiplier
 
 func _segment(node:Node3D,a:Vector3,b:Vector3):
 	var direction=b-a

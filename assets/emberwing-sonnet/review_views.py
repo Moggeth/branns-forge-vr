@@ -103,7 +103,7 @@ views = [
     ("06-bottom", "Bottom (-Y) · enlarged", (0,-3,0), (0,0,0), .64, "ORTHO"),
     ("07-front-quarter", "Front three-quarter", (1.6,.25,-2.1), (0,0,0), 1.50, "ORTHO"),
     ("08-back-quarter", "Back three-quarter", (-1.6,.25,2.1), (0,0,0), 1.50, "ORTHO"),
-    ("09-grip", "Grip / arrow port close-up", (.4,.04,-1), (0,.005,0), .31, "ORTHO"),
+    ("09-grip", "Grip / arrow guide close-up", (.4,.04,-1), (0,.025,0), .34, "ORTHO"),
     ("10-phoenix", "Phoenix / material close-up", (.4,.35,-1), (0,.20,-.08), .36, "ORTHO"),
     ("11-drawn", "50 cm draw · side view", (3,0,.18), (0,0,.18), 1.50, "ORTHO"),
     ("12-wireframe", "Triangulated mesh · front quarter", (1.6,.25,-2.1), (0,0,0), 1.50, "ORTHO"),
@@ -139,9 +139,10 @@ lower = bpy.data.objects["LowerLimb"]
 for obj, angle in [(upper, flex), (lower, -flex)]:
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = obj.rotation_quaternion @ Quaternion((1,0,0), angle)
-draw_nock = point((0,0,.60))
-strings = [strand("DrawStringUpper", Quaternion((1,0,0),flex) @ top, draw_nock),
-           strand("DrawStringLower", draw_nock, Quaternion((1,0,0),-flex) @ bottom)]
+draw_nock = nock + point((0,0,.50))
+bpy.context.view_layer.update()
+strings = [strand("DrawStringUpper", bpy.data.objects["StringTop"].matrix_world.translation.copy(), draw_nock),
+           strand("DrawStringLower", draw_nock, bpy.data.objects["StringBottom"].matrix_world.translation.copy())]
 before_import = set(scene.objects)
 bpy.ops.import_scene.gltf(filepath=str(model.parent / "arrow.glb"))
 arrow_objects = [obj for obj in scene.objects if obj not in before_import]

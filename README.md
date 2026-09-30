@@ -4,6 +4,8 @@ Open **Brann's Forge Launcher** from the desktop or run `Brann's Forge Launcher.
 
 The [Emberwing designer review](assets/emberwing-sonnet/REVIEW.md) provides twelve labelled standard views, a public orbit showroom and a full-resolution review ZIP with GLBs and editable source. The image set can be rebuilt deterministically in about five seconds without a model commission.
 
+Emberwing's [physical refinement](assets/emberwing-sonnet/REFINEMENT.md) moves the arrow above the gripping fingers, adds an open sight window and connects string sockets to authored limb pivots. The offline review now captures both actual game gloves at brace and draw, and the 37-assertion archery regression checks the imported arrow corridor. Relaunch to load the new mesh.
+
 **Enchanted Kitchen visual rebuild (2026-09-30):** Sonnet 5.5's timber hall, hearth, counters, shelves, magical teacups and textured supper table replace the primitive interior while preserving rats, routes and collision. The static room is compiled into 20 material batches so the actual-game review uses fewer ground-eye draw calls than the old room. [Matched screenshots, source and rebuild/check commands](docs/KITCHEN-ART-20260930.md). Relaunch the game to load it.
 
 **Mushroom Glade visual rebuild (2026-09-30):** A Sonnet 5.5-authored pond, mossy ruin, waterfall, roots and varied violet fungi replace the old disc and generic mushrooms. Spore pickups, wisp, portal approaches and wading floor remain intact; large stems and boulders have physical collision. [Actual-game screenshots, source, rebuild and route checks](docs/GLADE-ART-20260930.md). Relaunch the game to load it.

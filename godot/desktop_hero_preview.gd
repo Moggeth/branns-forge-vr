@@ -9,6 +9,9 @@ static func run(game,tool:String):
 	if output.is_empty(): game.get_tree().quit(2); return
 	game.get_window().size=Vector2i(1600,900)
 	if tool=="bow":
+		if OS.get_cmdline_user_args().has("--preview-bow-mechanics"):
+			await preload("res://phoenix_bow_review.gd").run(game,output)
+			return
 		if not game.archery.equip(game.desktop_hand): game.get_tree().quit(2); return
 		if OS.get_cmdline_user_args().has("--preview-bow-flight"):
 			game.set_process(false)

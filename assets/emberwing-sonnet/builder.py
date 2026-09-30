@@ -268,16 +268,17 @@ def feather(mb, pts, nrefs, wmax, thick, cup, mat, ss=(-1, -0.5, 0, 0.5, 1), pro
         n = norm(V(nrefs[i]) - tan * V(nrefs[i]).dot(tan))
         wv = norm(n.cross(tan)); w = wmax * prof(t)
         u = uvrange[0] + (uvrange[1] - uvrange[0]) * t
+        th = (thick[0] + (thick[1] - thick[0]) * t) if isinstance(thick, (tuple, list)) else thick
         top, bot = [], []
         for k, s in enumerate(ss):
             lat = s * w * (1.0 if s > 0 else 1 - asym)
             cupv = cup * w * s * s
-            h = thick * (1 - 0.55 * abs(s)) if abs(s) < 1 else 0.0
+            h = th * (1 - 0.55 * abs(s)) if abs(s) < 1 else 0.0
             top.append(mb.vert(p + wv * lat + n * (h + cupv), (u, (s + 1) / 2)))
         for k, s in enumerate(ss):
             if abs(s) >= 1: bot.append(top[k]); continue
             lat = s * w * (1.0 if s > 0 else 1 - asym)
-            bot.append(mb.vert(p + wv * lat + n * (-thick * 0.5 * (1 - 0.5 * abs(s)) + cup * w * s * s), (u, (s + 1) / 2)))
+            bot.append(mb.vert(p + wv * lat + n * (-th * 0.5 * (1 - 0.5 * abs(s)) + cup * w * s * s), (u, (s + 1) / 2)))
         T.append(top); Bt.append(bot)
     # orientation: top face normal should point to nref
     nr = V(nrefs[N // 2])
@@ -292,7 +293,7 @@ def feather(mb, pts, nrefs, wmax, thick, cup, mat, ss=(-1, -0.5, 0, 0.5, 1), pro
             if Bt[i][k] == T[i][k] and Bt[i][k + 1] == T[i][k + 1]: continue
             fq(Bt[i][k], Bt[i][k + 1], Bt[i + 1][k + 1], Bt[i + 1][k], -nr)
 
-# ------------------------------------------------------------------ BOW
+# ------------------------------------------------------------------ BOW  (structural revision 3)
 def bez(p0, p1, p2, p3, u):
     a = 1 - u
     return a**3 * p0 + 3 * a * a * u * p1 + 3 * a * u * u * p2 + u**3 * p3
@@ -300,173 +301,252 @@ def bezt(p0, p1, p2, p3, u):
     a = 1 - u
     return norm(3 * a * a * (p1 - p0) + 6 * a * u * (p2 - p1) + 3 * u * u * (p3 - p2))
 
-SP = [V((0, 0.075, -0.004)), V((0, 0.32, -0.17)), V((0, 0.55, -0.01)), V((0, 0.60, 0.10))]
-def spine(u): return bez(*SP, u)
-def stan(u): return bezt(*SP, u)
-def snorm(u):
-    t = stan(u); return norm(V((0, -t.z, t.y)))
-X = V((1, 0, 0))
-
 import random
+X = V((1, 0, 0)); YV = V((0, 1, 0)); ZV = V((0, 0, 1))
 YMAX = 0.625
+ARROW_Y = 0.115           # arrow line height (string nock point); ArrowRest = (0, ARROW_Y, 0.10)
 def prof_blade(t):
     return min(1.0, t * 4.5) ** 0.6 * (1 - t ** 1.7) ** 0.85
 
-def limb_feather(mbG, mbE, side, u, ang, L, w, zo=0.0, curl=0.03, azure=False, ember=True, N=8, gss=(-1, -0.5, 0, 0.5, 1)):
-    """One swept feather: gold frame (+ ember interior on the player-facing side)."""
-    root = spine(u) + X * side * 0.010 + snorm(u) * zo
-    pts, nrs = [root], [snorm(u)]
+class Spine:
+    """Limb centreline in AUTHORING space (positive y; the lower limb is mirrored in y by its MB)."""
+    def __init__(self, pts): self.P = [V(p) for p in pts]
+    def p(self, u): return bez(*self.P, u)
+    def t(self, u): return bezt(*self.P, u)
+    def n(self, u):
+        t = self.t(u); return norm(V((0, -t.z, t.y)))
+
+SP_UP = Spine([(0, 0.170, -0.040), (0, 0.340, -0.140), (0, 0.550, -0.020), (0, 0.600, 0.100)])
+SP_LO = Spine([(0, 0.100, -0.022), (0, 0.340, -0.150), (0, 0.550, -0.020), (0, 0.600, 0.100)])
+PIV_UP = (0, 0.180, -0.045); PIV_LO = (0, -0.100, -0.022)
+
+def cr(pts, n=4):
+    """Catmull-Rom resample of a control polyline (n samples per span)."""
+    P = [V(p) for p in pts]; out = []
+    for i in range(len(P) - 1):
+        p0 = P[max(i - 1, 0)]; p1 = P[i]; p2 = P[i + 1]; p3 = P[min(i + 2, len(P) - 1)]
+        for k in range(n):
+            t = k / n
+            out.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    out.append(P[-1]); return out
+
+def face_out(mb, q, mat, c):
+    vs = [mb.v[k] for k in q[:3]]
+    cen = sum((mb.v[k] for k in q), V()) / len(q)
+    nn = (vs[1] - vs[0]).cross(vs[2] - vs[0])
+    mb.face(q if nn.dot(cen - c) > 0 else q[::-1], mat)
+
+def loft(mb, rings, mats, sides=20, n_exp=2.4, uu=0.5, caps=(True, True), cap_mat=None):
+    """Superellipse loft along +y.  rings: (y, cx, cz, rx, rz).  mats: str or per-segment list."""
+    R = []
+    ex = 2.0 / n_exp
+    for i, (y, cx, cz, rx, rz) in enumerate(rings):
+        row = []
+        for j in range(sides):
+            a = 2 * math.pi * j / sides; c, s = math.cos(a), math.sin(a)
+            row.append(mb.vert(V((cx + rx * math.copysign(abs(c) ** ex, c), y, cz + rz * math.copysign(abs(s) ** ex, s))),
+                               (uu[i] if isinstance(uu, (list, tuple)) else uu, j / sides)))
+        R.append(row)
+    for i in range(len(rings) - 1):
+        m = mats if isinstance(mats, str) else mats[i]
+        cc = V((rings[i][1] + rings[i + 1][1], rings[i][0] + rings[i + 1][0], rings[i][2] + rings[i + 1][2])) / 2
+        for j in range(sides):
+            face_out(mb, (R[i][j], R[i][(j + 1) % sides], R[i + 1][(j + 1) % sides], R[i + 1][j]), m, cc)
+    for k, e in enumerate((0, len(rings) - 1)):
+        if not caps[k]: continue
+        y, cx, cz, rx, rz = rings[e]
+        m = cap_mat or (mats if isinstance(mats, str) else mats[min(e, len(rings) - 2)])
+        cen = V((cx, y, cz)); c = mb.vert(cen, (0.5, 0.5))
+        inward = V((0, 1 if e == 0 else -1, 0))     # caps face away from the loft body
+        for j in range(sides):
+            q = (c, R[e][j], R[e][(j + 1) % sides])
+            face_out(mb, q, m, cen + inward)
+    return R
+
+def box(mb, c, h, mat):
+    c = V(c); idx = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            for sz in (-1, 1):
+                idx.append(mb.vert(c + V((sx * h[0], sy * h[1], sz * h[2])), (0.5, 0.5)))
+    def vi(a, b, d): return idx[a * 4 + b * 2 + d]
+    for q in (((0,0,0),(0,1,0),(0,1,1),(0,0,1)), ((1,0,0),(1,1,0),(1,1,1),(1,0,1)),
+              ((0,0,0),(1,0,0),(1,0,1),(0,0,1)), ((0,1,0),(1,1,0),(1,1,1),(0,1,1)),
+              ((0,0,0),(1,0,0),(1,1,0),(0,1,0)), ((0,0,1),(1,0,1),(1,1,1),(0,1,1))):
+        face_out(mb, tuple(vi(*t) for t in q), mat, c)
+
+# ---- limb feathers ---------------------------------------------------------------------------
+def limb_feather(sp, mbL, side, u, ang, L, w, zo=0.0, curl=0.03, azure=False, ember=True, N=8,
+                 thick=(0.0075, 0.0016), cup=0.20, gss=(-1, -0.5, 0, 0.5, 1), ulen=0.10):
+    """One cambered swept feather: thick bronze-gold body (+ ember inlay on the player-facing face)."""
+    root = sp.p(u) + X * side * 0.010 + sp.n(u) * zo
+    pts, nrs = [root], [sp.n(u)]
     p = root
     for k in range(N):
-        tk = (k + 0.5) / N; uu = min(u + tk * 0.10, 1.0)
+        tk = (k + 0.5) / N; uu = min(u + tk * ulen, 1.0)
         a = ang * (1 - 0.50 * tk ** 1.4)
-        d = norm(stan(uu) * math.cos(a) + X * side * math.sin(a))
+        d = norm(sp.t(uu) * math.cos(a) + X * side * math.sin(a))
         p = p + d * (L / N)
-        nn = snorm(uu)
+        nn = sp.n(uu)
         pts.append(p - nn * curl * tk * tk); nrs.append(nn)
     ym = max(q.y for q in pts)
     if ym > YMAX:
         k = (YMAX - root.y) / (ym - root.y); pts = [root + (q - root) * k for q in pts]
-    feather(mbG, pts, nrs, w, 0.0016, 0.10, "FeatherGold", ss=gss, prof=prof_blade, uvrange=(0.0, 1.0))
+    feather(mbL, pts, nrs, w, thick, cup, "FeatherGold", ss=gss, prof=prof_blade, uvrange=(0.0, 1.0))
     if ember:
-        pin = [q + n * 0.0021 for q, n in zip(pts, nrs)][1:]
-        feather(mbE, pin, nrs[1:], w * 0.56, 0.0012, 0.10, "FeatherEmber", ss=(-1, 0, 1), prof=lambda t: prof_blade(0.06 + 0.9 * t),
-                asym=0.15, uvrange=(0.0, 1.0 if azure else 0.82))
+        t0, t1 = thick
+        pin = [q + n * (t0 + (t1 - t0) * i / N + 0.0005) for i, (q, n) in enumerate(zip(pts, nrs))][1:]
+        feather(mbL, pin, nrs[1:], w * 0.56, (0.0012, 0.0008), cup, "FeatherEmber", ss=(-1, 0, 1),
+                prof=lambda t: prof_blade(0.06 + 0.9 * t), asym=0.15, uvrange=(0.0, 1.0 if azure else 0.82))
 
-def limb_feathers(mbG, mbE, rg, side):
-    #        u     ang   len   width      clusters of three, a lone long primary, then a tip pair
-    prim = [(0.10, 1.50, 0.16, 0.040), (0.19, 1.42, 0.24, 0.046), (0.28, 1.30, 0.30, 0.050), (0.40, 1.14, 0.34, 0.052),
-            (0.52, 1.00, 0.31, 0.048), (0.64, 0.84, 0.24, 0.040), (0.78, 0.60, 0.15, 0.030)]
-    sec = [(0.16, 1.45, 0.12, 0.040), (0.30, 1.32, 0.17, 0.042), (0.44, 1.18, 0.17, 0.040), (0.58, 1.02, 0.13, 0.034), (0.72, 0.80, 0.09, 0.026)]
-    cov = [(0.12, 1.50, 0.060, 0.034), (0.26, 1.40, 0.075, 0.034), (0.42, 1.28, 0.070, 0.032), (0.58, 1.12, 0.060, 0.028)]
-    spur = [(0.20, 0.90, 0.070, 0.022), (0.40, 0.75, 0.085, 0.024), (0.62, 0.60, 0.060, 0.018)]
+def limb_feathers(sp, mbL, rg, side, scale):
+    """Three readable masses: shoulder, mid, tip.  (u, angle, length, width)"""
     j = lambda: rg.uniform(-1, 1)
-    for i, (u, a, L, w) in enumerate(prim):   # the wing proper: all on this limb's dominant side (rotationally symmetric bow)
-        limb_feather(mbG, mbE, side, u, a + 0.05 * j(), 0.84 * L * (1 + 0.07 * j()), w, zo=-0.006, curl=0.04, azure=i >= len(prim) - 2, N=10)
-    for u, a, L, w in sec:
-        limb_feather(mbG, mbE, side, u, a + 0.05 * j(), 0.84 * L * (1 + 0.08 * j()), w, zo=0.004, curl=0.025, N=8)
+    A = [(0.10, 1.48, 0.17, 0.052), (0.155, 1.38, 0.23, 0.060), (0.215, 1.26, 0.27, 0.062), (0.275, 1.13, 0.25, 0.054)]
+    Bm = [(0.42, 1.02, 0.31, 0.058), (0.49, 0.92, 0.335, 0.058), (0.56, 0.82, 0.29, 0.050)]
+    C = [(0.72, 0.62, 0.17, 0.040), (0.785, 0.52, 0.15, 0.034)]
+    cov = [(0.13, 1.42, 0.12, 0.050), (0.20, 1.30, 0.14, 0.050), (0.46, 0.98, 0.15, 0.046), (0.53, 0.88, 0.15, 0.044), (0.75, 0.58, 0.09, 0.032)]
+    back = [(0.12, 1.56, 0.20, 0.040), (0.36, 1.24, 0.19, 0.036), (0.64, 0.74, 0.12, 0.030)]
+    spur = [(0.20, 0.95, 0.075, 0.024), (0.45, 0.80, 0.085, 0.024)]
+    for grp in (A, Bm, C):
+        for i, (u, a, L, w) in enumerate(grp):
+            limb_feather(sp, mbL, side, u, a + 0.04 * j(), L * scale * (1 + 0.05 * j()), w, zo=-0.004, curl=0.045,
+                         azure=(grp is C and i == len(grp) - 1), N=9)
     for u, a, L, w in cov:
-        limb_feather(mbG, mbE, side, u, a + 0.04 * j(), 0.84 * L * (1 + 0.08 * j()), w, zo=0.010, curl=0.012, ember=False, N=6)
-    for u, a, L, w in spur:                   # short leading-edge spurs on the other side
-        limb_feather(mbG, mbE, -side, u, a, L, w, zo=0.002, curl=0.01, ember=False, N=5)
-    # azure-gold tip blade running along the limb to its nock
-    limb_feather(mbG, mbE, side, 0.87, 0.14, 0.055, 0.0085, zo=0.0, curl=0.0, azure=True, N=5)
+        limb_feather(sp, mbL, side, u, a + 0.03 * j(), L * scale * (1 + 0.06 * j()), w, zo=0.011, curl=0.02, ember=False, N=6,
+                     thick=(0.0055, 0.0014), cup=0.26)
+    for u, a, L, w in back:   # layered underside feathers behind the main face
+        limb_feather(sp, mbL, side, u, a + 0.03 * j(), L * scale, w, zo=-0.014, curl=0.03, ember=False, N=6,
+                     thick=(0.0055, 0.0014), cup=0.12)
+    for u, a, L, w in spur:   # short leading-edge spurs on the other side
+        limb_feather(sp, mbL, -side, u, a, L, w, zo=0.0, curl=0.01, ember=False, N=5, thick=(0.0045, 0.0012))
+    limb_feather(sp, mbL, side, 0.865, 0.14, 0.055, 0.010, zo=0.0, curl=0.0, azure=True, N=5, thick=(0.0035, 0.0012))
 
-def build_limb(root, sign, name):
-    lim = empty(name, (0, 0, 0), root)
+def build_limb(root, sign, name, sp, pivot, scale):
+    lim = empty(name, pivot, root)
     rg = random.Random(11 if sign > 0 else 23)
-    mbC = MB(mirror=sign < 0); mbG = MB(mirror=sign < 0); mbE = MB(mirror=sign < 0)
-    us = [i / 18 for i in range(19)]
-    pts = [spine(u) for u in us]
-    rad = [0.0125 - 0.0058 * u for u in us]
-    tube(mbC, pts, rad, "Wood", sides=8, ref=X, squash=0.85, caps=(False, False))
-    for ub, w in ((0.10, 0.030), (0.42, 0.024), (0.74, 0.024), (0.955, 0.030)):
-        seg = [ub - w / 2, ub - w / 3, ub + w / 3, ub + w / 2]
-        ps = [spine(u) for u in seg]; r0 = 0.0125 - 0.0058 * ub
-        tube(mbC, ps, [r0 * 1.05, r0 * 1.42, r0 * 1.42, r0 * 1.05], "Brass", sides=10, ref=X, squash=0.88, caps=(True, True))
-    # tip nock cap + azure gem (gem samples the azure spot of the ember texture -> no extra surface)
-    tp = spine(1.0); tt = stan(1.0)
-    tube(mbC, [tp - tt * 0.02, tp, tp + tt * 0.010], [0.0072, 0.0085, 0.0045], "Brass", sides=10, ref=X, caps=(False, True))
-    ellipsoid(mbE, tp - tt * 0.030 - snorm(1.0) * 0.008, (0.0065, 0.011, 0.0065), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)
-    limb_feathers(mbG, mbE, rg, sign)
-    parts = []
-    for nm, mb in ((f"{name}Core", mbC), (f"{name}Feathers_Gold", mbG), (f"{name}Feathers_Ember", mbE)):
-        parts.append(mb.build(nm, lim)); print(nm, "tris", mb.tris())
-    return [lim] + parts
+    mb = MB(mirror=sign < 0)
+    sq = 1.85
+    U1 = 0.975
+    us = [i / 18 * U1 for i in range(19)]
+    rad = lambda u: 0.0115 - 0.0068 * u ** 0.85
+    tube(mb, [sp.p(u) for u in us], [rad(u) for u in us], "Wood", sides=10, ref=X, squash=sq, caps=(True, True), uscale=3.0)
+    # root sleeve: overlaps the riser socket 16 mm beyond the pivot so the joint never opens under +/-0.09 rad draw
+    r0 = rad(0)
+    ps = [sp.p(0) - sp.t(0) * 0.016, sp.p(0.0), sp.p(0.05), sp.p(0.10)]
+    tube(mb, ps, [r0 * 1.26, r0 * 1.36, r0 * 1.36, r0 * 1.10], "Brass", sides=12, ref=X, squash=1.65, caps=(True, True))
+    for ub in (0.45, 0.75):
+        seg = [ub - 0.015, ub - 0.008, ub + 0.008, ub + 0.015]; r = rad(ub)
+        tube(mb, [sp.p(u) for u in seg], [r * 1.05, r * 1.22, r * 1.22, r * 1.05], "Brass", sides=12, ref=X, squash=sq, caps=(True, True))
+    # seated string nock: grooved bronze fitting whose groove centre IS the StringTop/Bottom marker (spine end)
+    pe, te = sp.p(1.0), sp.t(1.0)
+    offs = [-0.024, -0.014, -0.006, 0.0, 0.006, 0.013, 0.019]
+    rr = [0.0064, 0.0088, 0.0088, 0.0058, 0.0088, 0.0090, 0.0056]
+    tube(mb, [pe + te * o for o in offs], rr, "Brass", sides=12, ref=X, squash=1.5, caps=(True, True))
+    ellipsoid(mb, pe + te * 0.0195, (0.0048, 0.0048, 0.0048), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)
+    limb_feathers(sp, mb, rg, sign, scale)
+    ob = mb.build(name + "Mesh", lim)
+    print(name + "Mesh", "tris", mb.tris())
+    return lim, ob
 
-def build_core(root):
-    mbE, mbB, mbG = MB(), MB(), MB()
-    Zn = V((0, 0, 1)); Y = V((0, 1, 0))
-    # chest + glowing heart (front, -Z), neck, head with eyes and hooked beak, all above the grip window (y >= 0.09)
-    ellipsoid(mbE, V((0, 0.124, -0.046)), (0.027, 0.031, 0.021), "FeatherEmber", seg=14, rings=7, uv=(0.30, 0.5))
-    ellipsoid(mbE, V((0, 0.118, -0.064)), (0.0105, 0.0125, 0.0075), "FeatherEmber", seg=10, rings=6, uv=UV_HOT)   # heart
-    tube(mbB, [V((0, 0.108, -0.070)), V((0, 0.118, -0.0715)), V((0, 0.130, -0.068))], [0.0125, 0.0135, 0.010], "Brass", sides=12, caps=(False, False), ref=X, squash=0.55)  # heart cage
-    neck = [V((0, 0.135, -0.050)), V((0, 0.165, -0.088)), V((0, 0.192, -0.124))]
-    tube(mbE, neck, [0.0165, 0.0135, 0.012], "FeatherEmber", sides=10, ref=X, caps=(False, False))
-    hc = V((0, 0.207, -0.148))
-    ellipsoid(mbE, hc, (0.022, 0.021, 0.027), "FeatherEmber", seg=12, rings=7, uv=(0.40, 0.5))
-    for s in (-1, 1):
-        ellipsoid(mbE, hc + V((s * 0.0175, 0.005, -0.010)), (0.0055, 0.006, 0.007), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)  # eye
-        pts = [hc + V((s * 0.0155, 0.015, -0.004)), hc + V((s * 0.0175, 0.0155, -0.020)), hc + V((s * 0.008, 0.014, -0.034))]
-        feather(mbB, pts, [Y] * 3, 0.0045, 0.0010, 0.0, "Brass", ss=(-1, 0, 1), asym=0)  # brow ridge -> fierce look
-    beak = [hc + V((0, -0.002, -0.018)), hc + V((0, -0.003, -0.044)), hc + V((0, -0.018, -0.066)), hc + V((0, -0.036, -0.070))]
-    tube(mbB, beak, [0.0115, 0.0090, 0.0055, 0.0004], "Brass", sides=8, ref=X, caps=(True, False), squash=1.15)
-    tube(mbB, [hc + V((0, -0.012, -0.018)), hc + V((0, -0.016, -0.046)), hc + V((0, -0.026, -0.058))], [0.0068, 0.0048, 0.0004], "Brass", sides=6, ref=X, caps=(True, False))
-    # swept crest: plumes sweeping back (+Z) and up
-    for k, a in enumerate((-0.55, -0.25, 0.0, 0.25, 0.55)):
-        L = (0.055, 0.075, 0.095, 0.075, 0.055)[k]
-        st = hc + V((0, 0.018, 0.006)); d = norm(V((math.sin(a) * 0.9, 0.75, 0.55)))
-        pts = [st + d * L * i / 7 + V((0, -0.030 * (i / 7) ** 2 * L / 0.09, 0.03 * (i / 7) ** 2)) for i in range(8)]
-        gold = k % 2 == 0
-        feather(mbG if gold else mbE, pts, [V((math.sin(a), 0.4, 0.9))] * 8, 0.0085, 0.0011, 0.1,
-                "FeatherGold" if gold else "FeatherEmber", prof=prof_blade, uvrange=(0, 1.0) if (gold or k == 2) else (0, 0.82))
-    # mantle: shoulder feathers sweeping outward and up behind the head
-    for side in (-1, 1):
-        for k in range(5):
-            f = k / 4; ang = 0.30 + f * 0.95
-            d = norm(V((side * math.cos(ang), 0.20 + 0.75 * math.sin(ang), 0.20)))
-            L = (0.070, 0.092, 0.105, 0.088, 0.062)[k]
-            st = V((side * 0.020, 0.122 + 0.006 * k, -0.040))
-            pts = [st + d * L * i / 7 + V((0, 0, 0.022 * (i / 7) ** 2)) for i in range(8)]
-            nr = [norm(V((0, 0.2, 1.0))) for _ in pts]
-            feather(mbG, pts, nr, 0.0155, 0.0013, 0.1, "FeatherGold", ss=(-1, 0, 1), prof=prof_blade)
-            feather(mbE, [q + V((0, 0, 0.0021)) for q in pts[1:]], nr[1:], 0.0086, 0.0010, 0.1, "FeatherEmber", ss=(-1, 0, 1),
-                    prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0, 0.82 if k < 4 else 1.0))
-    # tail fan below the grip window, forward of the lower limb core, clear of the hand
-    for k in range(5):
-        a = (k - 2) * 0.30
-        st = V((0, -0.098, -0.052)); d = norm(V((math.sin(a) * 0.9, -1, -0.10)))
-        L = 0.115 - 0.018 * abs(k - 2)
-        pts = [st + d * L * i / 7 + V((0, 0, -0.008 * (i / 7) ** 2)) for i in range(8)]
-        nr = [Zn] * 8
-        feather(mbG, pts, nr, 0.0105, 0.0012, 0.12, "FeatherGold", prof=prof_blade)
-        feather(mbE, [q + V((0, 0, 0.002)) for q in pts[1:]], nr[1:], 0.0056, 0.001, 0.1, "FeatherEmber", ss=(-1, 0, 1),
-                prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0, 0.82 if k != 2 else 1.0))
-    tube(mbB, [V((0, 0.052, -0.010)), V((0, 0.070, -0.010))], [0.0195, 0.0140], "Brass", sides=14, caps=(False, False))
-    ob = MB()
-    for src in (mbE, mbB, mbG):
-        base = len(ob.v)
-        ob.v += [p.copy() for p in src.v]; ob.uv += src.uv
-        for f, m in zip(src.f, src.fm):
-            ob.face(tuple(i + base for i in f), src.slots[m])
-    print("PhoenixCore tris", ob.tris())
-    return ob.build("PhoenixCore", root)
-
-
+# ---- riser / grip ------------------------------------------------------------------------------
 def build_grip(root):
     mb = MB()
-    ys = [-0.08 + 0.16 * i / 62 for i in range(63)]
-    pts = [V((0, y, 0)) for y in ys]; rad = []; mats = []
-    for i, y in enumerate(ys):
-        e = min(y + 0.08, 0.08 - y)
-        r = 0.0173 * (1 + 0.022 * math.cos(2 * math.pi * y / 0.0104))
-        r *= 1 + 0.12 * max(0, 1 - e / 0.006) ** 1.5  # flared brass collars
-        rad.append(r); mats.append("Brass" if e < 0.0065 else "Leather")
-    tube(mb, pts, rad, mats[:-1], sides=18, ref=V((0, 0, 1)), caps=(True, True), cap_mat="Brass", uscale=6.0)
-    grip = mb.build("GripMesh", root, slots=["Leather", "Brass"])
-    # arrow port bored through the grip on the arrow line (boolean, brass-lined)
-    cut = MB(); tube(cut, [V((0, 0, -0.06)), V((0, 0, 0.06))], [0.0105, 0.0105], "Brass", sides=20, ref=X, caps=(True, True))
-    co = cut.build("cutter", root, slots=["Leather", "Brass"])
-    co.data.polygons.foreach_set("material_index", [1] * len(co.data.polygons))
-    md = grip.modifiers.new("port", "BOOLEAN"); md.object = co; md.operation = "DIFFERENCE"; md.solver = "EXACT"
-    try: md.material_mode = "INDEX"
-    except Exception: pass
-    bpy.context.view_layer.objects.active = grip
-    for o in bpy.context.selected_objects: o.select_set(False)
-    grip.select_set(True)
-    bpy.ops.object.modifier_apply(modifier="port")
-    bpy.data.objects.remove(co, do_unlink=True)
-    print("GripMesh tris", sum(len(p.vertices) - 2 for p in grip.data.polygons))
-    return grip
+    N = 36; rings, mats = [], []
+    for i in range(N + 1):
+        t = i / N; y = -0.0725 + 0.145 * t
+        rx = 0.0150 + 0.0012 * math.sin(math.pi * t) + 0.0028 * smooth(0.80, 1.0, t) + 0.0016 * (1 - smooth(0.0, 0.14, t))
+        rz = 0.0172 * (1 + 0.010 * math.cos(2 * math.pi * t * 3)) + 0.0016 * smooth(0.80, 1.0, t)
+        cz = 0.0014 * math.sin(math.pi * t) ** 1.5 + 0.0010 * smooth(0.75, 1.0, t)     # palm swell towards the archer
+        e = min(t, 1 - t)
+        col = 1.0 + 0.11 * max(0.0, 1 - e / 0.03) ** 1.4 if e < 0.03 else 1.0
+        rings.append((y, 0.0, cz, rx * col, rz * col)); mats.append("Brass" if e < 0.024 else "Leather")
+    loft(mb, rings, mats[:-1], sides=22, n_exp=2.3, uu=[k / N * 6 for k in range(N + 1)], cap_mat="Brass")
+    return mb.build("GripMesh", root, slots=["Leather", "Brass"])
+
+def build_riser(root):
+    mb = MB()
+    # two side rails route the riser AROUND the arrow window; window = x +/-0.0175, y 0.078..0.134
+    ctrl = [(0.009, 0.052, -0.003), (0.019, 0.078, -0.008), (0.027, 0.100, -0.013), (0.028, 0.124, -0.018), (0.022, 0.148, -0.028), (0.014, 0.162, -0.036)]
+    rr = [0.0080, 0.0092, 0.0095, 0.0095, 0.0090, 0.0085]
+    for s in (-1, 1):
+        pts = cr([(s * x, y, z) for x, y, z in ctrl], 4)
+        n = len(pts) - 1
+        rad = [float(np.interp(i / n, [k / (len(rr) - 1) for k in range(len(rr))], rr)) for i in range(n + 1)]
+        tube(mb, pts, rad, "Wood", sides=12, ref=ZV, squash=1.6, caps=(True, True), uscale=2.0)
+        for a, b in ((0.05, 0.10), (0.82, 0.88)):      # brass rail collars either side of the window
+            ia, ib = int(a * n), int(b * n)
+            seg = pts[ia:ib + 1]
+            rs = [rad[ia + k] * (1.28 if 0 < k < len(seg) - 1 else 1.05) for k in range(len(seg))]
+            tube(mb, seg, rs, "Brass", sides=12, ref=ZV, squash=1.6, caps=(True, True))
+    # arrow guide: small brass shelf BELOW the shaft (shaft r .0037; top = ARROW_Y - .0037 - .0045), bridging the rails
+    top = ARROW_Y - 0.0037 - 0.0045
+    box(mb, V((0, top - 0.0020, -0.012)), (0.0215, 0.0020, 0.018), "Brass")
+    for s in (-1, 1):   # low lips keep the shaft centred on the shelf
+        box(mb, V((s * 0.0075, top + 0.0009, -0.012)), (0.0011, 0.0009, 0.016), "Brass")
+    # lower heel: grip -> lower limb socket
+    heel = [(-0.128, 0.0, -0.025, 0.0150, 0.0100), (-0.104, 0.0, -0.018, 0.0170, 0.0130), (-0.086, 0.0, -0.006, 0.0178, 0.0170),
+            (-0.0725, 0.0, 0.0, 0.0160, 0.0180), (-0.060, 0.0, 0.0, 0.0140, 0.0160)]
+    loft(mb, heel, "Wood", sides=18, n_exp=2.3, uu=[0.2 * k for k in range(len(heel))], caps=(True, True))
+    return mb.build("RiserMesh", root, slots=["Wood", "Brass"])
+
+# ---- phoenix -----------------------------------------------------------------------------------
+def build_core(root):
+    mb = MB()
+    # chest / bridge: closes the top of the arrow window (underside y=0.134, 5 mm above the arrow corridor) and flows into the upper limb socket
+    chest = [(0.134, 0.0, -0.018, 0.034, 0.0120), (0.142, 0.0, -0.021, 0.034, 0.0150), (0.156, 0.0, -0.030, 0.027, 0.0185),
+             (0.175, 0.0, -0.040, 0.0205, 0.0195), (0.197, 0.0, -0.046, 0.0165, 0.0135)]
+    loft(mb, chest, "FeatherEmber", sides=20, n_exp=2.4, uu=0.30, caps=(True, True))
+    ellipsoid(mb, V((0, 0.163, -0.060)), (0.0055, 0.0055, 0.0040), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)   # breast gem
+    # neck sweeps forward and up, then blends into the skull
+    neck = cr([V((0, 0.170, -0.048)), V((0, 0.190, -0.070)), V((0, 0.208, -0.092)), V((0, 0.220, -0.106))], 3)
+    nr = [0.0165 - 0.0035 * math.sin(math.pi * i / (len(neck) - 1)) for i in range(len(neck))]
+    tube(mb, neck, nr, "FeatherEmber", sides=12, ref=X, caps=(False, False), uscale=0.4)
+    hc = V((0, 0.224, -0.114))
+    ellipsoid(mb, hc, (0.0190, 0.0185, 0.0245), "FeatherEmber", seg=14, rings=8, uv=(0.42, 0.5))
+    # cheek pads, sunk eyes and brow ridges that flow into the hooked beak
+    for s in (-1, 1):
+        ellipsoid(mb, hc + V((s * 0.0140, -0.006, -0.008)), (0.0070, 0.0075, 0.0110), "FeatherEmber", seg=8, rings=5, uv=(0.55, 0.5))
+        ellipsoid(mb, hc + V((s * 0.0158, 0.0020, -0.0125)), (0.0044, 0.0044, 0.0046), "FeatherEmber", seg=8, rings=5, uv=UV_AZURE)
+        brow = cr([hc + V((s * 0.0120, 0.0130, 0.0040)), hc + V((s * 0.0172, 0.0100, -0.0110)), hc + V((s * 0.0120, 0.0080, -0.0260)), hc + V((s * 0.0050, 0.0040, -0.0350))], 3)
+        tube(mb, brow, [0.0038 - 0.0012 * i / (len(brow) - 1) for i in range(len(brow))], "FeatherGold", sides=8, ref=YV, caps=(True, True), uscale=1.0)
+    beak = cr([hc + V((0, -0.002, -0.018)), hc + V((0, -0.001, -0.040)), hc + V((0, -0.010, -0.058)), hc + V((0, -0.030, -0.066))], 3)
+    br = [0.0125 * (1 - i / (len(beak) - 1)) ** 0.8 + 0.0006 for i in range(len(beak))]
+    tube(mb, beak, br, "FeatherGold", sides=10, ref=X, caps=(True, True), squash=1.25, uscale=1.0)
+    jaw = cr([hc + V((0, -0.011, -0.016)), hc + V((0, -0.014, -0.040)), hc + V((0, -0.022, -0.054))], 3)
+    tube(mb, jaw, [0.0070 * (1 - i / (len(jaw) - 1)) ** 0.8 + 0.0005 for i in range(len(jaw))], "FeatherGold", sides=8, ref=X, caps=(True, True), uscale=1.0)
+    # crest: three plume pairs sweeping up and back, merging into the limb
+    for k, (a, L) in enumerate(((0.28, 0.090), (0.62, 0.072), (1.02, 0.052))):
+        for s in (-1, 1):
+            st = hc + V((s * 0.005, 0.016, 0.004)); d = norm(V((s * math.sin(a) * 0.95, 0.88, 0.32)))
+            pts = [st + d * L * i / 7 + V((0, -0.030 * (i / 7) ** 2 * L / 0.09, 0.034 * (i / 7) ** 2)) for i in range(8)]
+            gold = (k + (s > 0)) % 2 == 0
+            feather(mb, pts, [V((s * 0.4, 0.3, 1.0))] * 8, 0.0100, (0.0040, 0.0010), 0.22,
+                    "FeatherGold" if gold else "FeatherEmber", prof=prof_blade, uvrange=(0, 1.0) if gold or k == 0 else (0, 0.82))
+    # mantle: thick cambered shoulder feathers sweeping out over the limb root
+    for side in (-1, 1):
+        for k in range(3):
+            ang = 0.35 + 0.42 * k
+            d = norm(V((side * math.cos(ang), 0.25 + 0.70 * math.sin(ang), 0.22)))
+            L = (0.085, 0.100, 0.078)[k]
+            st = V((side * 0.020, 0.152 + 0.014 * k, -0.040))
+            pts = [st + d * L * i / 7 + V((0, 0, 0.020 * (i / 7) ** 2)) for i in range(8)]
+            nr2 = [norm(V((0, 0.2, 1.0))) for _ in pts]
+            feather(mb, pts, nr2, 0.0170, (0.0060, 0.0012), 0.22, "FeatherGold", prof=prof_blade)
+            feather(mb, [q + V((0, 0, 0.0056)) for q in pts[1:]], nr2[1:], 0.0092, (0.0012, 0.0008), 0.22, "FeatherEmber", ss=(-1, 0, 1),
+                    prof=lambda t: prof_blade(0.06 + 0.9 * t), uvrange=(0, 0.82 if k < 2 else 1.0))
+    print("PhoenixCore tris", mb.tris())
+    return mb.build("PhoenixCore", root, slots=["FeatherEmber", "FeatherGold"])
 
 def build_bow():
     root = empty("Bow", (0, 0, 0))
     objs = [root]
-    for n, p in (("Grip", (0, 0, 0)), ("ArrowRest", (0, 0, 0.10)), ("StringTop", (0, 0.60, 0.10)), ("StringBottom", (0, -0.60, 0.10))):
+    for n, p in (("Grip", (0, 0, 0)), ("ArrowRest", (0, ARROW_Y, 0.10)), ("ArrowGuide", (0, ARROW_Y, -0.012))):
         objs.append(empty(n, p, root))
-    objs.append(build_grip(root))
-    objs += build_limb(root, 1, "UpperLimb")
-    objs += build_limb(root, -1, "LowerLimb")
+    objs.append(build_grip(root)); objs.append(build_riser(root))
+    up, upm = build_limb(root, 1, "UpperLimb", SP_UP, PIV_UP, 0.98)
+    lo, lom = build_limb(root, -1, "LowerLimb", SP_LO, PIV_LO, 1.10)
+    objs += [up, upm, empty("StringTop", (0, 0.60, 0.10), up), lo, lom, empty("StringBottom", (0, -0.60, 0.10), lo)]
     objs.append(build_core(root))
     return objs
 
@@ -598,7 +678,9 @@ def glb_report(fname):
     print("    local bounds min", [round(x, 3) for x in mn], "max", [round(x, 3) for x in mx])
 
 if __name__ == "__main__":
-    bow = build_bow(); arrow = build_arrow(); wings = build_wings()
+    ALL = "--all" in argv     # arrow / wings are unchanged in this pass; only rebuilt with --all
+    jobs = [(build_bow(), "bow.glb")]
+    if ALL: jobs += [(build_arrow(), "arrow.glb"), (build_wings(), "wings.glb")]
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "source.blend"))
-    for objs, fn in ((bow, "bow.glb"), (arrow, "arrow.glb"), (wings, "wings.glb")):
+    for objs, fn in jobs:
         export(objs, fn); glb_report(fn)
