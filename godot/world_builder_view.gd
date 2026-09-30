@@ -214,7 +214,9 @@ func close() -> void:
 	_finish_close()
 
 func _finish_close() -> void:
-	print("WORLD_BUILDER_VIEW closed")
+	print("WORLD_BUILDER_VIEW closed requested_frames=", requested_frames,
+		" frame_ms_ema=", snappedf(frame_ms_ema, 0.01), " rts_scale=", render_scale,
+		" rts_fps_target=", refresh_limit, " vr_backoff=", protected_vr)
 	_save_layout()
 	_restore_hero_hud()
 	game.get_viewport().scaling_3d_scale = hero_3d_scale_before
