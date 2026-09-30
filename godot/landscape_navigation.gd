@@ -1,8 +1,9 @@
 extends RefCounted
 ## Deterministic local A* over the authoritative landscape grid (local X/Z metres).
-## Routes may cross the creek only at the authored bridge returned by Water.crossing.
+## Routes account for the authored crossing and bounded player-built decks.
 
 const Water = preload("res://landscape_water.gd")
+const Construction = preload("res://world_builder_construction.gd")
 const NEIGHBORS := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1)]
 
 
@@ -167,9 +168,10 @@ static func _position(model: Dictionary, index: int) -> Vector2:
 static func _cell_passable(model: Dictionary, index: int, bridge: Dictionary, options: Dictionary) -> bool:
 	var count: int = int(model.size) * int(model.size)
 	var traversability: PackedFloat32Array = model.get("traversability", PackedFloat32Array())
-	if traversability.size() == count and traversability[index] < float(options.get("min_traversability", 0.22)): return false
+	var constructed := _construction_height(_position(model, index), options)
+	if traversability.size() == count and traversability[index] < float(options.get("min_traversability", 0.22)) and constructed < -999.0: return false
 	var water: PackedFloat32Array = model.get("water", PackedFloat32Array())
-	if water.size() == count and water[index] > float(options.get("max_water", 0.45)) and not _on_bridge(_position(model, index), bridge, options): return false
+	if water.size() == count and water[index] > float(options.get("max_water", 0.45)) and not _on_bridge(_position(model, index), bridge, options) and constructed < -999.0: return false
 	return true
 
 
@@ -179,9 +181,20 @@ static func _edge_passable(model: Dictionary, a: int, b: int, bridge: Dictionary
 	var a_bridge: bool = _on_bridge(_position(model, a), bridge, options)
 	var b_bridge: bool = _on_bridge(_position(model, b), bridge, options)
 	if a_bridge and b_bridge: return true # Deck spans the carved channel.
-	var rise: float = absf(heights[a] - heights[b])
+	var a_deck := _construction_height(_position(model, a), options)
+	var b_deck := _construction_height(_position(model, b), options)
+	var a_height: float = maxf(heights[a], a_deck)
+	var b_height: float = maxf(heights[b], b_deck)
+	var rise: float = absf(a_height - b_height)
 	var distance: float = _position(model, a).distance_to(_position(model, b))
 	return rise <= float(options.get("max_step", 0.9)) and rise <= distance * float(options.get("max_grade", 0.65))
+
+
+static func _construction_height(point: Vector2, options: Dictionary, margin: float = 0.0) -> float:
+	var best := -1000.0
+	for record in options.get("constructions", []):
+		if record is Dictionary: best = maxf(best, Construction.deck_height(record, point, margin))
+	return best
 
 
 static func _on_bridge(point: Vector2, bridge: Dictionary, options: Dictionary) -> bool:
