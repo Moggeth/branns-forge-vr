@@ -156,6 +156,9 @@ func _check() -> void:
 		var sample := {"key": "1:2", "state": "active", "species": "apple", "scale": 1.0, "condition": "burning", "hp": 10.0, "calm_left": 0.0}
 		if not Ents.valid_records([sample]): failures.append("burning condition serialization")
 		if not Ents.valid_seeds([{"key": "1:2", "species": "apple"}]) or Ents.valid_seeds([{"key": "1:2", "species": "apple"}, {"key": "1:2", "species": "pine"}]): failures.append("bounded seed schema")
+		var excess_seeds: Array = []
+		for i in 9: excess_seeds.append({"key": "%d:2" % i, "species": "pine"})
+		if Ents.valid_seeds(excess_seeds): failures.append("seed pouch accepted more than eight records")
 		var many: Array = []
 		for i in 9:
 			var another := sample.duplicate()
