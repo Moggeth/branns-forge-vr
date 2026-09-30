@@ -8,7 +8,11 @@ var flame
 func check(ok,message):
 	checks+=1
 	if not ok: failures.append(message); print("HEAT_ASSERT ",message)
-func _initialize(): run.call_deferred()
+func _initialize():
+	create_timer(45.0).timeout.connect(func():
+		printerr("FAIRY_HEAT_RESULT timeout=45")
+		quit(2))
+	run.call_deferred()
 func vial_at(wick:Vector3):
 	var n=game.firecraft._prop("vial",wick-Vector3.UP*.215)
 	return n
@@ -16,6 +20,10 @@ func sweep(wick:Vector3): hand.heat_sweep(wick-Vector3.RIGHT*.25,wick+Vector3.RI
 func run():
 	game=load("res://main.tscn").instantiate(); root.add_child(game)
 	await physics_frame; await physics_frame; await physics_frame
+	if game.firecraft.fluid == null:
+		printerr("FAIRY_HEAT_RESULT missing fluid: add --experimental-fuel-combat to the offline diagnostic arguments")
+		quit(2)
+		return
 	game.set_process(false); game.smoke=true; game.adventure.test_mode=true
 	game.adventure.travel("forge_yard"); game._start_fairy()
 	fairy=game.fairy; fairy.test_mode=true; fairy.window.hide(); hand=fairy.handheld
