@@ -1926,3 +1926,62 @@ teardown and release hidden hit regions. The final actual-Main panel fixture
 passes these behaviours in 7.894 s. Native screenshots confirm the FPS HUD is
 fully visible while the tactical inset stays live. Headset feel and physical
 display refresh remain unverified.
+
+## Travel, living Orchard and crystal-event integration — 2026-10-01
+
+Start from [the integrated handoff](ORCHARD-TRAVEL-STARFALL-20261001.md) and its
+focused fixtures. The final native review passed 20 ground/survey captures in
+18.211 s; six concurrent impact effects measured 1.21 ms adapter CPU p95. The
+fixture pauses general gameplay, so that number is not full-game/HMD frame time.
+Keep GPU readbacks outside timed windows and preserve the measurement scope.
+
+Prefer a bounded, file-first UI commission. The first verified Opus 5.5 session
+thought through too much context and timed out after 480.338 s without an export.
+A smaller concrete delivery request completed in 128.105 s. Inspect ignored
+artist output with `rg --files --no-ignore <commission-folder>`; an ordinary
+file search can hide the actual deliverable. Sonnet's event/crystal source then
+completed in 642.970 s and a screenshot-directed refinement in 64.285 s. Preserve
+the rejected first outcome as a failed strategy, not as accepted design work.
+
+Native Control bounds need full-rect anchors, explicit offsets and a deferred
+fit after font minimum sizes update. The initial folio overflowed its 960-pixel
+layout and briefly started at zero size. The repaired native check covers Map
+and Supplies at 960×620, 1920×1080 and 3840×2160, with scrolling preserved during
+live refresh. Do not name a script constant `Panel`, which shadows Godot's native
+class; use `MapPanel`. Type dynamic scene locals explicitly and reject logs with
+script/engine errors even when the process exits zero or prints an empty result.
+
+Always force `--xr-mode off` for offline diagnostics. Setting gameplay `vr=false`
+does not suppress the project-enabled OpenXR engine startup. An omitted flag
+let a resource-guide run produce its result but hang during XR teardown for
+262.069 s. Only the owned fixture process was terminated; the resident game and
+VR services were preserved. The corrected offline runs exit cleanly in roughly
+nine seconds. Use absolute native `--log-file` paths.
+
+Travel intentionally waits for terrain/collision support. The first render
+fixture asserted arrival too early and failed in 9.289 s; awaiting the real
+asynchronous landing made it pass in 18.579 s. Do not disable the safety
+transaction to speed up a diagnostic. Heightfield assignment happens on impact,
+while physics broadphase queries observe the replacement collider by the next
+physics frame. Reject stale-floor hits during the handoff and check after that
+frame. Seat the meteor from the actual crater bed and visible shell AABB rather
+than subtracting a fixed sink height.
+
+Godot ArrayMesh front faces use clockwise winding. A conventional triangle cross
+product therefore points opposite an outward stored normal. The artist's meshes
+were correct; the initial counterclockwise-based suspicion was a reviewer/fixture
+error. Use the [engine convention](https://docs.godotengine.org/en/4.5/classes/class_arraymesh.html)
+and check nondegeneracy as well as winding before flipping good geometry.
+
+Modal ownership must recognise both Main's Node and its Window. Test Hero,
+Fairy, strategic RTS and Hero-primary RTS Maps separately: only the Hero-owned
+folio cancels or blocks Hero ability. Freeing a secondary window removes its
+registry entry, not the already-closed cached Main view. A near/far meteor test
+must keep the inspected source inside the 52 m visibility budget or its live
+node will correctly be replaced by a distant batch before the tween finishes.
+
+Before guessing a gameplay path, use `rg --files godot` and select the actual
+implementation. This pass again wasted reads on names resembling older files.
+The current owners are `adventure_runtime.gd`, `qol_runtime.gd`, `fairy_coop.gd`,
+`siegebird_runtime.gd` and `siegebird_extras.gd`. Read shared instructions and this
+verified path list before repeating a large scene or artist operation.

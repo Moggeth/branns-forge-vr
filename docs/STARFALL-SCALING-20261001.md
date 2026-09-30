@@ -28,12 +28,17 @@ limit remains the next scale boundary.
 Verification: `landscape_meteor_checks.gd` reports `LANDSCAPE_METEOR_RESULT []`.
 `starfall_scaling_checks.gd -- --world-builder-check` reports zero failures for
 128 records, 128-record save/reload including a mined vein and scar, near/far
-collider swaps, and a crater whose height and collider match immediately after
-contact. A representative offline full-scene run measured 1.042 ms for the
+collider swaps, and a crater whose authoritative height changes on contact and
+whose replacement collider is queryable by the next physics frame. A
+representative offline full-scene run measured 1.042 ms for the
 128-record visibility refresh and 12.98 ms for the full impact callback,
 including terrain collision replacement. These are CPU wall-clock samples on
 this machine, not headset frame-time measurements. Current art integration and
-headset feel require separate visual/HMD review.
+headset feel require separate visual/HMD review. The final art-integrated repeat
+passed 128-record save/reload in 7.964 seconds, measuring a 1.312 ms visibility
+refresh and 12.489 ms impact callback. Ground-level and elevated native GPU
+captures and their scope are recorded in
+[the integrated handoff](ORCHARD-TRAVEL-STARFALL-20261001.md).
 
 Diagnostic lessons: Godot inferred no type for a test ray's computed position;
 declare it `Vector3` explicitly and require a named empty result plus no script
