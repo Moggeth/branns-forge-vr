@@ -578,5 +578,15 @@
     "label": "Ring bounce energy",
     "help": "Speed retained after mirror-angle scenery ricochets.",
     "group": "playful"
+  },
+  "worldbuilder.mana_regen_multiplier": {
+    "type": "number",
+    "default": 4,
+    "min": 1,
+    "max": 8,
+    "step": 0.25,
+    "label": "Mana recovery speed",
+    "help": "World Builder Mana recovery relative to the original 0.055 Mana per second. Four is the testing pace.",
+    "group": "worldbuilder"
   }
 }

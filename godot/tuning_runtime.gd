@@ -14,7 +14,8 @@ const DEFAULTS = {
 "locomotion.speed":2.7,"combat.enemy_speed":1.0,
 "playful.ring_curve":4.2,"playful.ring_drag":0.025,"playful.ring_recall_accel":28.0,"playful.ring_bounce":0.84,
 "playful.ring_toss_gain":1.0,"playful.ring_gravity":1.1,"playful.ring_recall_speed":18.0,
-"playful.magnet_range":4.5,"playful.magnet_pull":22.0,"playful.magnet_fling":4.2}
+"playful.magnet_range":4.5,"playful.magnet_pull":22.0,"playful.magnet_fling":4.2,
+"worldbuilder.mana_regen_multiplier":4.0}
 var game
 var values=DEFAULTS.duplicate()
 var runtime_overrides={}

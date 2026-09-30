@@ -58,11 +58,12 @@ const entries=[
 ["playful.ring_curve", 4.2, 0, 9, 0.2, "Ring banking curve", "Sideways turn strength at full bank; flat throws stay straight."],
 ["playful.ring_drag", 0.025, 0, 0.2, 0.005, "Ring air drag", "Gentle speed loss while gliding."],
 ["playful.ring_recall_accel", 28, 6, 60, 1, "Ring recall pull", "Acceleration pulling momentum back towards the hand; no instant reversal."],
-["playful.ring_bounce", 0.84, 0.4, 1, 0.02, "Ring bounce energy", "Speed retained after mirror-angle scenery ricochets."]
+["playful.ring_bounce", 0.84, 0.4, 1, 0.02, "Ring bounce energy", "Speed retained after mirror-angle scenery ricochets."],
+['worldbuilder.mana_regen_multiplier',4,1,8,.25,'Mana recovery speed','World Builder Mana recovery relative to the original 0.055 Mana per second. Four is the testing pace.']
 ];
 const SCHEMA=Object.fromEntries(entries.map(([key,value,min,max,step,label,help,type='number'])=>[key,{type,default:value,min,max,step,label,help,group:key.split('.')[0]}]));
 const defaults=()=>Object.fromEntries(Object.entries(SCHEMA).map(([k,s])=>[k,s.default]));
-const PRESETS={default:{},gentle:{'throw.gain':1.2,'throw.assist_lift':.8,'bomb.fuse_seconds':4,'bomb.self_damage_ratio':.4,'haptics.strength':.7},punchy:{'throw.gain':1.7,'throw.assist_lift':.5,'bomb.fuse_seconds':2.5,'vfx.intensity':1.3,'haptics.strength':1.2}};
+const PRESETS={default:{},gentle:{'throw.gain':1.2,'throw.assist_lift':.8,'bomb.fuse_seconds':4,'bomb.self_damage_ratio':.4,'haptics.strength':.7},punchy:{'throw.gain':1.7,'throw.assist_lift':.5,'bomb.fuse_seconds':2.5,'vfx.intensity':1.3,'haptics.strength':1.2},'normal-mana':{'worldbuilder.mana_regen_multiplier':1},'fast-mana':{'worldbuilder.mana_regen_multiplier':4}};
 function values(input,base){if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Tuning values must be an object.');const result={...base};for(const [key,value] of Object.entries(input)){const rule=Object.hasOwn(SCHEMA,key)?SCHEMA[key]:null;if(!rule)throw Error('Unknown tuning key: '+key);if(typeof value!=='number'||!Number.isFinite(value)||(rule.type==='integer'&&!Number.isInteger(value))||value<rule.min||value>rule.max)throw Error('Invalid tuning value: '+key);result[key]=value;}return result;}
 class Tuning {
 constructor(directory,log=()=>{}){this.file=path.join(directory,'tuning.json');this.log=log;this.revision=0;this.values=defaults();this.previous=null;fs.mkdirSync(directory,{recursive:true});if(fs.existsSync(this.file)){const saved=JSON.parse(fs.readFileSync(this.file,'utf8'));if(!Number.isSafeInteger(saved.revision)||saved.revision<0)throw Error('Invalid tuning revision; preserve tuning.json for recovery.');this.values=values(saved.values,defaults());this.previous=saved.previous?values(saved.previous,defaults()):null;this.revision=saved.revision;}}
