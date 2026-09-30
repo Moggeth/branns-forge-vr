@@ -5,16 +5,16 @@ const Hints = preload("res://item_control_hints.gd")
 const DirectorView = preload("res://director_local_view.gd")
 
 const HERO_MATERIALS := [
-	["rat_tail", "Rat tails", "Three open the first workshop tier; five can earn a forging favour at Brann."],
+	["rat_tail", "Rat tails", "Tier 2 offering or Quickwind mechanism; five can earn a forging favour."],
 	["lumber", "Lumber", "Three with three stone can open workshop tier 2. Separate from settlement timber."],
 	["stone", "Stone", "Three with three Hero lumber can open workshop tier 2."],
-	["iron", "Iron", "Three with three haunted bones can open workshop tier 3."],
-	["apple", "Apples", "Eating collected fruit restores Hero health."],
-	["spore", "Spores", "Gathered expedition material; no current workshop tier cost."],
-	["crystal", "Crystals", "Gathered expedition material; not a Starfall star gem."],
-	["haunted_bone", "Haunted bones", "Three with three iron can open workshop tier 3."],
-	["sky_bloom", "Sky blooms", "Gathered expedition material; no current workshop tier cost."],
-	["ember_core", "Ember cores", "One from the Ember Warden can open workshop tier 4."],
+	["iron", "Iron", "Tier 3 offering or Quickwind mechanism."],
+	["apple", "Apples", "Eating fruit restores Hero health; Verdant restorative module."],
+	["spore", "Spores", "Verdant restorative module."],
+	["crystal", "Crystals", "Truesight optic module; separate from Starfall star gems."],
+	["haunted_bone", "Haunted bones", "Tier 3 offering or Truesight optic module."],
+	["sky_bloom", "Sky blooms", "Hearth ward module."],
+	["ember_core", "Ember cores", "Tier 4 offering or Hearth ward module."],
 ]
 
 static func build(game: Node) -> Dictionary:
@@ -22,16 +22,24 @@ static func build(game: Node) -> Dictionary:
 	if game == null: return result
 	var state: Dictionary = game.state if game.state is Dictionary else {}
 	var hero_balance: Dictionary = state.get("resources", {}) if state.get("resources", {}) is Dictionary else {}
+	var workshop_state: Dictionary = state.get("workshop", {}) if state.get("workshop", {}) is Dictionary else {}
 	var hero_rows: Array[Dictionary] = []
 	for spec in HERO_MATERIALS:
 		var amount := int(state.get("tails", hero_balance.get("rat_tail", 0))) if spec[0] == "rat_tail" else int(hero_balance.get(spec[0], 0))
-		hero_rows.append(_row(spec[1], str(amount) if game.online else "—", spec[2]))
+		hero_rows.append(_row(spec[1], str(amount) if game.online else "—", _material_use(workshop_state, spec)))
+	var locations := _workshop_locations(workshop_state, game.workshop)
+	hero_rows.append(_row("Reserved workshop offerings", _count_text(locations.bucket) if game.online else "—",
+		"Already removed from the pouch and saved in the selected donation buckets. Pull the lever to commit, or withdraw them."))
+	hero_rows.append(_row("Loose workshop pieces", _count_text(locations.loose) if game.online else "—",
+		"Physical pieces already removed from the pouch; return them to the pouch or place them in a bucket."))
+	hero_rows.append(_row("Held workshop pieces", _count_text(locations.held) if game.online else "—",
+		"Physical pieces in a hand; also already removed from the pouch. These three location rows never add to the pouch count."))
 	hero_rows.append(_row("Forging favours", str(int(state.get("favours", 0))) if game.online else "—",
 		"Earn by handing five rat tails to Brann; used by eligible commissions."))
 	hero_rows.append(_row("Workshop tier", "%d / 4" % int(state.get("tier", 1)) if game.online else "—",
 		"Unlocks built-in tools and invention capabilities."))
 	result.wallets.append({"title": "Hero pouch / Brann's workshop",
-		"description": "Saved by the forge service. Death drops carried materials in a recoverable satchel.",
+		"description": "One saved Hero ledger. Pouch, bucket, loose and held pieces are separate locations for the same materials; death drops carried pouch materials.",
 		"rows": hero_rows})
 	var builder: Node = game.world_builder
 	if builder != null:
@@ -64,8 +72,34 @@ static func build(game: Node) -> Dictionary:
 	_build_director_costs(game, view, result.costs)
 	result.costs.append({"name": "Siegebird bolts / Emberwing arrows", "cost": "Free, unlimited",
 		"state": "Physical loading/drawing still required",
-		"description": "Bolt tokens track held/loaded/fired objects; legacy available=6 is not remaining ammo."})
+		"description": "Take a belt bolt and load the crossbow, or draw an arrow from the back quiver."})
 	return result
+
+static func _material_use(workshop_state: Dictionary, spec: Array) -> String:
+	for material in workshop_state.get("materials", []):
+		if material is Dictionary and str(material.get("id", "")) == str(spec[0]):
+			return str(material.get("use", spec[2]))
+	return str(spec[2])
+
+static func _workshop_locations(workshop_state: Dictionary, workshop: Node) -> Dictionary:
+	var result := {"bucket": {}, "loose": {}, "held": {}}
+	var held_ids: Dictionary = {}
+	if workshop != null and workshop.held is Dictionary:
+		for token_id in workshop.held.values(): held_ids[str(token_id)] = true
+	for token in workshop_state.get("tokens", []):
+		if not token is Dictionary: continue
+		var resource := str(token.get("resource", ""))
+		var place := str(token.get("place", ""))
+		var group: String = "bucket" if place == "bucket" else ("held" if held_ids.has(str(token.get("id", ""))) else "loose")
+		result[group][resource] = int(result[group].get(resource, 0)) + 1
+	return result
+
+static func _count_text(counts: Dictionary) -> String:
+	if counts.is_empty(): return "None"
+	var parts: Array[String] = []
+	for resource in counts.keys(): parts.append("%s %d" % [str(resource).replace("_", " "), int(counts[resource])])
+	parts.sort()
+	return ", ".join(parts)
 
 static func _row(name: String, amount: String, purpose: String) -> Dictionary:
 	return {"name": name, "amount": amount, "purpose": purpose}
@@ -92,6 +126,7 @@ static func _equipment_line(game: Node) -> String:
 static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 	if game.adventure == null: return
 	var held := _held_item(game)
+	var seen_ids: Dictionary = {}
 	var owned: Dictionary = {}
 	for spec in state.get("tools", []):
 		if spec is Dictionary: owned[str(spec.get("id", ""))] = true
@@ -99,6 +134,7 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 	for spec in state.get("recipes", []):
 		if spec is Dictionary: recipes[str(spec.get("id", ""))] = spec
 	for id in game.adventure.ORDER:
+		seen_ids[str(id)] = true
 		var index: int = game.adventure.ORDER.find(id)
 		var tier := 1 if index < 4 else (2 if index < 6 else (3 if id == "crystal_resonator" else 4))
 		var recipe: Dictionary = recipes.get(id, {})
@@ -111,24 +147,71 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 	for spec in state.get("items", []):
 		if not spec is Dictionary: continue
 		var id := str(spec.get("id", ""))
+		seen_ids[id] = true
 		var installed: bool = game.imported.has(id)
 		var ready: bool = installed and bool(game.imported[id].get_meta("delivery_ready", true))
 		items.append({"name": str(spec.get("name", id)),
 			"state": "Held" if held != null and str(held.get_meta("id", "")) == id else ("Ready to equip" if ready else "Brann is finishing it"),
 			"description": str(spec.get("useInstructions", spec.get("description", "Inspect in Inventions.")))})
-	if held != null and not game.adventure.TOOL_NAMES.has(str(held.get_meta("id", ""))):
-		var found := false
-		for entry in items:
-			if str(entry.name) == str(held.get_meta("display_name", "")): found = true
-		if not found:
-			items.append({"name": str(held.get_meta("display_name", held.name)), "state": "Held",
-				"description": Hints.vr(game, held) if game.vr else Hints.desktop(game, held, game.desktop_hand)})
+	if game.collection != null:
+		for id in game.collection.homes.keys():
+			var home: Dictionary = game.collection.homes[id]
+			_native_item(game, home.get("item"), str(id), seen_ids, items)
+	if game.siegebird != null:
+		for weapon in game.siegebird.weapons:
+			if weapon is Dictionary:
+				_native_item(game, weapon.get("item"), "siegebird", seen_ids, items)
+	if game.archery != null: _native_item(game, game.archery.bow, "emberwing", seen_ids, items)
+	if game.skull_basket != null:
+		var basket: Node3D = game.skull_basket.basket
+		if is_instance_valid(basket):
+			_native_item(game, basket, "skull_basket", seen_ids, items,
+				"Stores %d / 3 physical skeleton skulls for Brann's first job. FPS: F stores/takes; VR: release a skull into the opening." % game.skull_basket.contents.size())
+	if game.hearth_torch != null:
+		_native_item(game, game.hearth_torch.torch, "hearthlight", seen_ids, items,
+			"Carry for light; fuel and flame are managed on the physical torch.")
+	if game.firecraft != null:
+		_native_item(game, game.firecraft.box, "emberdew_matchbox", seen_ids, items,
+			"Free refillable matches. Open the drawer, strike a match, then light a vial wick.")
+		var matches := 0
+		var vials := 0
+		for prop in game.firecraft.props:
+			if not is_instance_valid(prop): continue
+			if str(prop.get_meta("fire_kind", "")) == "match": matches += 1
+			elif str(prop.get_meta("fire_kind", "")) == "vial": vials += 1
+		items.append({"name": "Emberdew matches", "state": "%d physical matches in the world" % matches,
+			"description": "Free refills at the forge; a lit match lasts about 10 seconds."})
+		items.append({"name": "Emberdew vials", "state": "%d physical vials in the world" % vials,
+			"description": "Free refills at the forge. Light the wick, then throw; fire defeats ghosts."})
+	if held != null:
+		_native_item(game, held, str(held.get_meta("id", held.name)), seen_ids, items)
+
+static func _native_item(game: Node, value: Variant, fallback_id: String,
+		seen_ids: Dictionary, items: Array, explicit_description: String = "") -> void:
+	if not value is Node3D or not is_instance_valid(value): return
+	var item: Node3D = value
+	var id := str(item.get_meta("id", fallback_id))
+	if seen_ids.has(id): return
+	seen_ids[id] = true
+	var state := "Held" if item in game.held.values() else (
+		"On belt" if game.grips != null and game.grips.is_stowed(item) else (
+			"At collection stand" if game.collection != null and item.get_parent() == game.collection.root else "In world"))
+	var description := explicit_description
+	if description == "":
+		description = str(item.get_meta("use_instructions", ""))
+	if description == "":
+		description = Hints.vr(game, item) if game.vr else Hints.desktop(game, item, game.desktop_hand)
+	items.append({"name": str(item.get_meta("display_name", item.get_meta("title", item.name))),
+		"state": state, "description": description})
 
 static func _build_hero_costs(game: Node, state: Dictionary, balance: Dictionary, costs: Array) -> void:
 	var tier := int(state.get("tier", 1))
-	var donations: Dictionary = state.get("workshop", {}).get("donations", {})
+	var workshop_state: Dictionary = state.get("workshop", {})
+	var donations: Dictionary = workshop_state.get("donations", {})
 	var selected := int(donations.get("option", 0))
 	var donated: Dictionary = donations.get("counts", {})
+	var reserved_total := 0
+	for amount in donated.values(): reserved_total += int(amount)
 	for upgrade in state.get("upgrades", []):
 		if not upgrade is Dictionary or int(upgrade.get("tier", 0)) != tier + 1: continue
 		var options: Array = upgrade.get("costs", [])
@@ -139,12 +222,30 @@ static func _build_hero_costs(game: Node, state: Dictionary, balance: Dictionary
 			for resource in option:
 				var have: int = int(state.get("tails", 0)) if resource == "rat_tail" else int(balance.get(resource, 0))
 				var placed: int = int(donated.get(resource, 0)) if i == selected else 0
-				parts.append("%s %d/%d" % [str(resource).replace("_", " "), have + placed, int(option[resource])])
+				parts.append("%s: pouch %d + bucket %d / %d" % [str(resource).replace("_", " "), have, placed, int(option[resource])])
 				if have + placed < int(option[resource]): affordable = false
+			var fully_offered := i == selected
+			for resource in option:
+				if int(donated.get(resource, 0)) != int(option[resource]): fully_offered = false
+			var status := "Withdraw offerings to change option" if i != selected and reserved_total > 0 else (
+				"Ready to pull lever" if fully_offered else ("Can fill buckets" if affordable else "Need materials"))
 			costs.append({"name": "Workshop tier %d · option %d" % [tier + 1, i + 1],
 				"cost": " + ".join(parts),
-				"state": "Ready to donate at Brann" if affordable else "Need materials",
-				"description": "Use the physical pouch, buckets and lever. Select this option at the workshop."})
+				"state": status,
+				"description": "Pouch, loose pieces and reserved bucket pieces are the same Hero materials. Select this option, fill its buckets, then pull the lever."})
+	for module in workshop_state.get("catalog", []):
+		if not module is Dictionary: continue
+		var ingredients: Dictionary = module.get("costs", {})
+		var text_parts: Array[String] = []
+		var affordable := true
+		for resource in ingredients:
+			var have: int = int(state.get("tails", 0)) if resource == "rat_tail" else int(balance.get(resource, 0))
+			text_parts.append("%s %d/%d" % [str(resource).replace("_", " "), have, int(ingredients[resource])])
+			if have < int(ingredients[resource]): affordable = false
+		costs.append({"name": str(module.get("name", "Workshop module")),
+			"cost": " + ".join(text_parts),
+			"state": "Requires workshop tier %d" % int(module.get("tier", 1)) if tier < int(module.get("tier", 1)) else ("Materials ready" if affordable else "Need materials"),
+			"description": str(module.get("description", "Craft at Brann's workshop."))})
 	if tier >= 4:
 		costs.append({"name": "Workshop tiers", "cost": "Complete", "state": "All tiers unlocked", "description": "Built-in recipes stay free."})
 	if not game.online:
