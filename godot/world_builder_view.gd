@@ -136,6 +136,11 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	_build_ui()
 	_hide_hero_hud_for_pip()
 	_build_preview()
+	var illustrated: Node3D = preload("res://world_builder_targeting_art.gd").new()
+	set_target_visual(illustrated)
+	illustrated.setup(game)
+	last_target_state = {}
+	_publish_targeting()
 	size_changed.connect(_layout_ui)
 	size_changed.connect(_schedule_layout_save)
 	_layout_ui()
@@ -652,6 +657,7 @@ func targeting_state() -> Dictionary:
 	state["first_world"] = builder.center + _line_start() if _line_start() != Vector3.INF else Vector3.INF
 	state["footprint"] = Targeting.spec(selected)
 	state["selected"] = selected
+	state["terrain_revision"] = game.landscape.world_revision
 	return state
 
 func _publish_targeting() -> void:

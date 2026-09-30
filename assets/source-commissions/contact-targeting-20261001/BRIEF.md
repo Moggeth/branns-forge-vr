@@ -1,0 +1,10 @@
+# Complete the exported Sonnet impact/targeting deliverable
+You are Sonnet 5.5, specialist artist. Prior commission produced the two modules in input but hit a 720-second cap while iterating. Do not redesign/rebuild. Finish this very small deliverable in under 240 seconds. Stay only in this isolated folder, never edit active game, deploy, publish, alter credentials or use another model/API. No large scene renders.
+
+1. Copy the two completed input modules to output/surface_impact_art.gd and output/world_builder_targeting_art.gd immediately.
+2. Adjust path DEFAULTS width from 2 to 4, and add soft outer paint corridor from actual footprint.paint_width=9. Continue using dynamic footprint values, not fixed guesses.
+3. State now exposes tree_positions, exact upcoming tree locations in Orchard LOCAL Vector3s for forest/ring (maximum30). If provided, use those for glyphs instead of invented placements. Preserve excellent circular Tree Ring aesthetic. Other state/API unchanged; input/world_builder_targeting.gd is canonical.
+4. Run only fast standalone native headless parse/static check. Do not spend all time capturing; root will integrate and capture all. Godot installed C:/Users/mog/OneDrive/Documents/Coding/Personal/Python/things_are_different_now/branns-forge-vr/tools/godot/Godot_v4.7.2-stable_win64_console.exe. Use an isolated check project, no main/service/user saves. Fix compile issues if any. Do not stop unrelated processes.
+5. HANDOFF.md exact delivered paths, visual rationale, bounded budgets and what is truly verified. Supply final result before cap. No spending new output or large processes. The actual model must remain claude-sonnet-5-5.
+
+Existing impact API profiles() dictionaries cached meshes/materials. Root pools ballistics and caps, gives instance colors/alpha, implements optional gate='metal_tool'. Marks are XZ-planeUP, target-relative. True 3D chips, sparse dust, tiny sparks; no generic spheres. Target mesh <=4000 triangles,<=2surfaces. Every ground vertex samples terrain height; dynamic tree placements must use same. Correctness and clean final exports are the only remaining assignment.

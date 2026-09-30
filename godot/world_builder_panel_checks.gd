@@ -80,10 +80,10 @@ func _run() -> void:
 	view.first_point = Vector3(-118,0,-70)
 	view.hovered = Vector3(-100,0,-70)
 	view._update_preview()
-	_check(view.preview_boundary.visible and view.preview_boundary.mesh.get_surface_count() == 1,"bridge has endpoint/deck world preview")
+	_check(is_instance_valid(view.target_visual) and view.target_visual.instance.visible and view.target_visual.stats.surfaces <= 2,"bridge has illustrated endpoint/deck world preview")
 	view.hovered = Vector3.INF
 	view._update_preview()
-	_check(not view.preview_boundary.visible,"preview clears outside world")
+	_check(not view.target_visual.instance.visible,"preview clears outside world")
 	_check(game.player_avatar.head != null,"adventurer has authored head")
 	_check((game.camera.cull_mask & (1 << 1)) == 0 and (view.camera.cull_mask & (1 << 1)) != 0,"Hero omits self-head while strategic player sees it")
 	for extent in [Vector2i(960,620),Vector2i(1280,720),Vector2i(1600,900),Vector2i(1920,1080),Vector2i(3840,2160)]:

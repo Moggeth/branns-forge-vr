@@ -105,6 +105,7 @@ func emit_contact(event: Dictionary) -> bool:
 	for pool in pools.values():
 		if str(pool.material) != material: continue
 		var spec: Dictionary = pool.spec
+		if str(spec.get("gate", "")) == "metal_tool" and not _metal_tool(event): continue
 		if str(spec.kind) == "spark" and (str(event.get("strike_region", "")).contains("shaft") or str(event.get("strike_region", "")) == "handle" or tool.contains("bone")): continue
 		var count := clampi(roundi(float(spec.get("count", 4)) * strength), 1, 16)
 		for i in count:
@@ -114,8 +115,10 @@ func emit_contact(event: Dictionary) -> bool:
 			var direction: Vector3 = (normal * rng.randf_range(0.35, 1.15) + tangent * rng.randf_range(-0.8, 0.8) + bitangent * rng.randf_range(-0.8, 0.8)).normalized()
 			var lifetime := float(spec.get("life", 0.55)) * rng.randf_range(0.85, 1.15)
 			var velocity := direction * float(spec.get("speed", 2.0)) * rng.randf_range(0.65, 1.15) * strength
+			var orientation := Basis.from_euler(Vector3(rng.randf(), rng.randf(), rng.randf()) * TAU)
+			if str(spec.kind) == "spark": orientation = _streak_basis(velocity)
 			pool.particles.append({"position": point + normal * 0.012, "velocity": velocity, "age": 0.0,
-				"life": lifetime, "basis": Basis.from_euler(Vector3(rng.randf(), rng.randf(), rng.randf()) * TAU),
+				"life": lifetime, "basis": orientation,
 				"scale": float(spec.get("size", 0.04)) * rng.randf_range(0.75, 1.2),
 				"spin": Vector3(rng.randf(), rng.randf(), rng.randf()) * 7.0,
 				"color": Color(spec.get("tint", Color.WHITE)).lightened(rng.randf_range(0.0, 0.12))})
@@ -123,6 +126,17 @@ func emit_contact(event: Dictionary) -> bool:
 	_mark(target, point, normal, material, strength)
 	emitted += 1
 	return true
+
+static func _metal_tool(event: Dictionary) -> bool:
+	var declared := str(event.get("tool_material", ""))
+	if declared != "": return declared in ["metal", "iron", "steel", "brass", "star_iron"]
+	var tool := str(event.get("tool", ""))
+	return tool in ["quarry_pick", "woodland_axe", "ember_hammer", "siegebird", "crossbow", "crossbow_bolt", "bolt", "chakram", "sunfall_sledge", "copperpot_hammer"] or tool.contains("sword") or tool.contains("blade")
+
+static func _streak_basis(velocity: Vector3) -> Basis:
+	var x := velocity.normalized() if velocity.length_squared() > 0.001 else Vector3.RIGHT
+	var z := x.cross(Vector3.UP if absf(x.y) < 0.9 else Vector3.FORWARD).normalized()
+	return Basis(x, z.cross(x).normalized(), z)
 
 func _sound(material: String, point: Vector3, strength: float, glance: bool) -> void:
 	if game.diagnostic_offline or sounds.get(material, []).is_empty(): return
@@ -177,6 +191,7 @@ func tick(delta: float) -> void:
 				p.velocity += Vector3.UP * delta * 0.2
 			else: p.velocity += Vector3.DOWN * delta * 7.5
 			p.position += p.velocity * delta
+			if kind == "spark": p.basis = _streak_basis(p.velocity)
 			if kind == "chip": p.basis = p.basis.rotated(p.spin.normalized(), p.spin.length() * delta)
 			var fade := clampf((float(p.life) - float(p.age)) / maxf(float(p.life) * 0.35, 0.01), 0.0, 1.0)
 			var scale: float = p.scale * (1.0 + float(p.age) * 1.2 if kind == "dust" else fade)
