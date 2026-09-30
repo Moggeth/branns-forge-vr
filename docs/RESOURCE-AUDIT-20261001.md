@@ -66,3 +66,19 @@ script or engine errors remained. An earlier 8.3-second run reported six engine 
 errors despite an empty result array: Godot's `%` formatter does not support
 `%g`. Use `%.2f` or `String.num` and require no `ERROR:`/`SCRIPT ERROR`
 alongside the named empty result. A corrected run passed in 9.5 seconds.
+
+The Supplies QA pass found a blank Pocket Thunder row: the built-in tool is
+absent from `item_control_hints.gd`'s static dictionaries because it forms in
+an empty hand, though `item_interactions.gd` and the Adventure input route
+define its controls. The guide now gives explicit desktop LMB and VR trigger
+formation/release instructions. Other built-in rows use native control hints,
+falling back to the authoritative interaction controls or workshop recipe
+description. Generated deliveries use authored use instructions, installed
+metadata, requested function or description in that order; missing authoring
+is reported explicitly rather than silently leaving a blank row. The fixture
+asserts a nonempty use description for every item, plus platform-specific
+Pocket Thunder controls. The offline native check passed in 9.7 seconds:
+`RESOURCE_GUIDE_RESULT {"costs":35,"failures":[],"items":22,"wallets":4}`,
+with no script errors or teardown warning. The independent Supplies/toolbelt
+fixture also passes all 13 pages and 74 guide rows in 8.6 seconds:
+`SUPPLIES_TOOLBELT_RESULT {"failures":[],"pages":13,"rows":74}`.

@@ -2,6 +2,7 @@ extends RefCounted
 ## Read-only snapshot for the Map / Supplies overlay. No save or service calls.
 const Spells = preload("res://world_builder_spells.gd")
 const Hints = preload("res://item_control_hints.gd")
+const Interactions = preload("res://item_interactions.gd")
 const DirectorView = preload("res://director_local_view.gd")
 
 const HERO_MATERIALS := [
@@ -141,7 +142,7 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 		var acquired: bool = index < 4 or bool(owned.get(id, false)) or bool(recipe.get("owned", false))
 		var state_text := "Held" if held != null and str(held.get_meta("id", "")) == id else (
 			"Owned" if acquired else ("Available · free to craft" if int(state.get("tier", 1)) >= tier else "Locked · workshop tier %d" % tier))
-		var controls := str(Hints.VR.get(id, "")) if game.vr else str(Hints.DESKTOP.get(id, ""))
+		var controls := _built_in_controls(id, game.vr, recipe)
 		items.append({"name": str(game.adventure.TOOL_NAMES.get(id, id)), "state": state_text,
 			"description": controls})
 	for spec in state.get("items", []):
@@ -150,9 +151,15 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 		seen_ids[id] = true
 		var installed: bool = game.imported.has(id)
 		var ready: bool = installed and bool(game.imported[id].get_meta("delivery_ready", true))
+		var instructions := str(spec.get("useInstructions", "")).strip_edges()
+		if instructions == "" and installed:
+			instructions = str(game.imported[id].get_meta("use_instructions", "")).strip_edges()
+		if instructions == "": instructions = str(spec.get("requestedFunction", "")).strip_edges()
+		if instructions == "": instructions = str(spec.get("description", "")).strip_edges()
+		if instructions == "": instructions = "Brann has not supplied use instructions for this delivery; inspect or refine it at the workshop."
 		items.append({"name": str(spec.get("name", id)),
 			"state": "Held" if held != null and str(held.get_meta("id", "")) == id else ("Ready to equip" if ready else "Brann is finishing it"),
-			"description": str(spec.get("useInstructions", spec.get("description", "Inspect in Inventions.")))})
+			"description": instructions})
 	if game.collection != null:
 		for id in game.collection.homes.keys():
 			var home: Dictionary = game.collection.homes[id]
@@ -198,11 +205,25 @@ static func _native_item(game: Node, value: Variant, fallback_id: String,
 			"At collection stand" if game.collection != null and item.get_parent() == game.collection.root else "In world"))
 	var description := explicit_description
 	if description == "":
-		description = str(item.get_meta("use_instructions", ""))
+		description = str(item.get_meta("use_instructions", item.get_meta("description", ""))).strip_edges()
 	if description == "":
-		description = Hints.vr(game, item) if game.vr else Hints.desktop(game, item, game.desktop_hand)
+		if Hints.has(id):
+			description = Hints.vr(game, item) if game.vr else Hints.desktop(game, item, game.desktop_hand)
+		elif Interactions.CONTROLS.has(id):
+			description = str(Interactions.CONTROLS[id])
+		else:
+			description = "Grip from the collection; this creation has no authored action instructions yet."
 	items.append({"name": str(item.get_meta("display_name", item.get_meta("title", item.name))),
 		"state": state, "description": description})
+
+static func _built_in_controls(id: String, vr: bool, recipe: Dictionary) -> String:
+	if id == "bomb_glove":
+		return "Grip an empty hand, hold trigger to form a bomb, then release grip to throw." if vr else "Hold LMB with an empty hand to form Pocket Thunder; release to throw."
+	var controls := str(Hints.VR.get(id, "")) if vr else str(Hints.DESKTOP.get(id, ""))
+	if controls != "": return controls
+	if Interactions.CONTROLS.has(id): return str(Interactions.CONTROLS[id])
+	controls = str(recipe.get("description", "")).strip_edges()
+	return controls if controls != "" else "This tool has no authored control description; inspect it at Brann's workshop."
 
 static func _build_hero_costs(game: Node, state: Dictionary, balance: Dictionary, costs: Array) -> void:
 	var tier := int(state.get("tier", 1))

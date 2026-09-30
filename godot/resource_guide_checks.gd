@@ -64,6 +64,15 @@ func _check() -> void:
 		failures.append("unlimited ammunition boundary missing")
 	if result.items.size() < 15 or str(result.equipment_line).is_empty():
 		failures.append("equipment catalogue or controls missing")
+	if not _description(result.items, "Pocket Thunder").contains("LMB"):
+		failures.append("Pocket Thunder desktop use is blank or omits the actual input")
+	game.vr = true
+	if not _description(Guide.build(game).items, "Pocket Thunder").contains("trigger"):
+		failures.append("Pocket Thunder VR use is blank or omits the actual input")
+	game.vr = false
+	for entry in result.items:
+		if str(entry.get("description", "")).strip_edges() == "":
+			failures.append("empty item use: " + str(entry.get("name", "")))
 	for native_name in ["Emberwing", "Hearthlight", "Emberdew matches", "Emberdew vials"]:
 		if _state(result.items, native_name) == "missing": failures.append("native item omitted: " + native_name)
 	if _state(result.items, "Skull basket · E carry/drop · F store/take") == "missing":
@@ -161,4 +170,9 @@ func _amount(rows: Array, name: String) -> String:
 func _state(rows: Array, name: String) -> String:
 	for row in rows:
 		if str(row.get("name", "")) == name: return str(row.get("state", ""))
+	return "missing"
+
+func _description(rows: Array, name: String) -> String:
+	for row in rows:
+		if str(row.get("name", "")) == name: return str(row.get("description", ""))
 	return "missing"
