@@ -13,6 +13,7 @@ const CONTROLS={
 "ember_gauntlet":"Swing: strike · Trigger: firebolt + brief ward (3s)",
 "bomb_glove":"Grip, then hold trigger: form bomb · Release grip: throw",
 "20dc22c5-7bcc-43df-b07f-e81eab521b0f":"Trigger: fire / release tether · Grip crank: wind / reel\nBelt: unlimited bolts · Brass tab: bolt / grapple"}
+const ControlHints=preload("res://item_control_hints.gd")
 var game
 var cooldowns={}
 var projectiles=[]
@@ -102,6 +103,41 @@ func trigger(hand,source)->bool:
 	game.adventure.haptic(hand,"release")
 	return true
 
+## Main calls this each desktop frame while Orchard's Edge is equipped.
+func desktop_axe_state(item: Node3D, held: bool) -> void:
+	if not is_instance_valid(item) or str(item.get_meta("id",""))!="woodland_axe": return
+	var previous:bool=bool(item.get_meta("axe_power_ready",false))
+	if held and not bool(item.get_meta("axe_power_armed",false)):
+		game.melee.alternate(item,game.desktop_hand)
+	item.set_meta("axe_power_ready",held)
+	if not held: item.set_meta("axe_power_armed",false)
+	var marker:MeshInstance3D=item.get_meta("axe_power_marker") if item.has_meta("axe_power_marker") else null
+	if held and not is_instance_valid(marker):
+		marker=MeshInstance3D.new()
+		marker.name="PowerCleaveReady"
+		var sphere:=SphereMesh.new()
+		sphere.radius=0.055
+		sphere.height=0.11
+		marker.mesh=sphere
+		var material:=StandardMaterial3D.new()
+		material.albedo_color=Color("ffc26b")
+		material.emission_enabled=true
+		material.emission=Color("ff8f35")
+		material.emission_energy_multiplier=1.4
+		marker.material_override=material
+		item.add_child(marker)
+		marker.position=item.get_meta("tip",Vector3.UP*0.65)
+		item.set_meta("axe_power_marker",marker)
+	if is_instance_valid(marker):
+		marker.visible=held
+		if held: marker.scale=Vector3.ONE*(0.85+0.15*sin(game.elapsed*13.0))
+	if held and not previous: game._effect(item.to_global(item.get_meta("tip",Vector3.UP*0.65)),Color("ffad60"),0.14,0.14)
+
+func desktop_axe_impact(item: Node3D, point: Vector3, powered: bool) -> void:
+	if not is_instance_valid(item) or str(item.get_meta("id",""))!="woodland_axe" or not powered: return
+	game._effect(point,Color("ffd18c"),0.25,0.30)
+	game._notice("Powered cleave!",2)
+
 func _clear_pick_charge(item:Node3D)->void:
 	item.set_meta("stonewhisper_charged_until",0.0)
 	var crystal=item.get_meta("stonewhisper_crystal_material") if item.has_meta("stonewhisper_crystal_material") else null
@@ -184,15 +220,11 @@ func tick(delta):
 		var item=game.held[key]
 		var id=str(item.get_meta("id",""))
 		if item.has_meta("spool") and item.get_meta("reeling",false): item.get_meta("spool").rotate_x(delta*4)
-		if (CONTROLS.has(id) or item.has_meta("use_instructions")) and not game.qol.opened and game.elapsed<float(item.get_meta("controls_until",0)):
+		if (ControlHints.has(id) or item.has_meta("use_instructions")) and not game.qol.opened and game.elapsed<float(item.get_meta("controls_until",0)):
 			# Desktop controls live in the readable corner HUD. A head-locked 3D
 			# billboard becomes enormous when a weapon is held near the camera.
 			if not game.vr: continue
-			var instruction=str(CONTROLS.get(id,item.get_meta("use_instructions","Trigger: activate")))
-			if not game.vr:
-				if id=="grappling_hook": instruction="Left click: attach · hold: reel · right click: detach"
-				elif item.get_meta("crossbow",false): instruction=instruction.replace("Trigger:","Left click:")
-				else: instruction=instruction.replace("Trigger:","Right click:").replace("trigger:","right click:")
+			var instruction=ControlHints.vr(game,item)
 			controls.text=instruction
 			controls.global_position=item.global_position+Vector3.UP*0.30
 			controls.look_at(game.camera.global_position,Vector3.UP,true)

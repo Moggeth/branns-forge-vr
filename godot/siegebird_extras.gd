@@ -17,6 +17,7 @@ var next_sync=0.0
 var profiles={}
 var applied_versions={}
 var retired=[]
+const DESKTOP_REEL_REACH=3.0
 
 func setup(g,s):
 	game=g; system=s; session=str(Time.get_unix_time_from_system())+"-"+str(randi())
@@ -158,6 +159,7 @@ func try_grab(hand)->bool:
 		if reel_owner!=null:
 			if tethered(reel_owner): game._notice("Release the tether before removing the reel."); return true
 			reel_owner.reel_installed=false; reel_owner.grapple_mode=false
+			system.mechanism(reel_owner)
 		reel_owner=null; reel_item.reparent(game.hand_socket(hand)); reel_item.position=Vector3(0,0,-0.08)
 		system.occupied[str(hand.get_instance_id())]={"type":"reel","hand":hand,"node":reel_item}; return true
 	for entry in system.embedded.duplicate():
@@ -188,7 +190,49 @@ func release_reel(hand,entry):
 			reel_owner=w; w.reel_installed=true; w.grapple_mode=true
 			reel_item.reparent(w.reel_socket); reel_item.transform=Transform3D.IDENTITY; reel_item.rotation.z=PI/2
 			game.adventure.haptic(hand,"ready"); game._notice("Grapple reel attached. Fire, then crank to pull yourself in. Trigger cuts the line.",6); system.mechanism(w); return
-	reel_item.reparent(rack); reel_item.position=Vector3(0.42,0.97,0); reel_item.rotation=Vector3.ZERO
+	_return_reel_to_rack()
+
+## FPS has one hand, so C transfers the same physical reel between the rack
+## and the held Siegebird. It cannot create a second reel or break a tether.
+func desktop_toggle_reel(hand: Node3D) -> bool:
+	if game.vr: return false
+	var w=system.desktop_weapon(hand)
+	if w==null: return false
+	if not is_instance_valid(reel_item) or not is_instance_valid(rack):
+		game._notice("Siegebird's reel stand is still loading.",3)
+		return true
+	if tethered(w):
+		game._notice("Release the tether before moving the reel.",3)
+		return true
+	if game.adventure.zone!="forge_yard" or game.camera.global_position.distance_to(rack.to_global(Vector3(0,1,0)))>DESKTOP_REEL_REACH:
+		game._notice("Stand near Siegebird's supply rack to fit or return its reel.",4)
+		return true
+	if reel_owner==w and w.reel_installed:
+		w.reel_installed=false
+		w.grapple_mode=false
+		reel_owner=null
+		_return_reel_to_rack()
+		system.mechanism(w)
+		game._notice("Grapple reel returned to its stand. Siegebird fires standard bolts.",4)
+		return true
+	if reel_owner!=null or reel_item.get_parent()!=rack:
+		game._notice("The reel is already fitted or held in another hand.",3)
+		return true
+	reel_owner=w
+	w.reel_installed=true
+	w.grapple_mode=true
+	reel_item.reparent(w.reel_socket)
+	reel_item.transform=Transform3D.IDENTITY
+	reel_item.rotation.z=PI/2
+	system.mechanism(w)
+	game._notice("Grapple reel fitted. LMB fires hook bolts, RMB switches bolt mode, hold R to reel after impact.",6)
+	return true
+
+func _return_reel_to_rack() -> void:
+	if not is_instance_valid(reel_item) or not is_instance_valid(rack): return
+	reel_item.reparent(rack)
+	reel_item.position=Vector3(0.42,0.97,0)
+	reel_item.rotation=Vector3.ZERO
 
 func tethered(w)->bool: return not rope.state.is_empty() and rope.state.item==w.item
 func trigger(w,hand)->bool:
