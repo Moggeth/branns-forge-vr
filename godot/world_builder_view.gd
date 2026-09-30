@@ -755,7 +755,6 @@ func _update_preview() -> void:
 	mesh.surface_end()
 
 func _world_at(screen: Vector2) -> Vector3:
-	if screen.y < TOP_HEIGHT * ui_scale or command_panel.is_over_panel(screen): return Vector3.INF
 	var scaled := Vector2.ZERO
 	if hero_primary:
 		if hero_pip == null: return Vector3.INF
@@ -763,6 +762,7 @@ func _world_at(screen: Vector2) -> Vector3:
 		if not content.has_point(screen): return Vector3.INF
 		scaled = (screen - content.position) * Vector2(tactical_viewport.size) / content.size
 	else:
+		if screen.y < TOP_HEIGHT * ui_scale or command_panel.is_over_panel(screen): return Vector3.INF
 		if hero_pip != null and hero_pip.contains_screen_point(screen): return Vector3.INF
 		scaled = screen * Vector2(tactical_viewport.size) / Vector2(size)
 	var origin := camera.project_ray_origin(scaled)
@@ -852,7 +852,8 @@ func _input(event: InputEvent) -> void:
 			hero_input_requested.emit(event)
 			set_input_as_handled()
 			return
-		if command_panel.is_over_panel(event.position) or event.position.y < TOP_HEIGHT * ui_scale: return
+		var in_rts_pip: bool = hero_primary and hero_pip.content_rect_screen().has_point(event.position)
+		if not in_rts_pip and (command_panel.is_over_panel(event.position) or event.position.y < TOP_HEIGHT * ui_scale): return
 		if event.button_index in [MOUSE_BUTTON_RIGHT,MOUSE_BUTTON_MIDDLE]:
 			if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed: _cancel_targeting()
 			dragging = event.pressed
@@ -882,7 +883,7 @@ func _input(event: InputEvent) -> void:
 			_position_camera()
 			set_input_as_handled()
 	elif event is InputEventMouseMotion:
-		if hero_primary and not hero_pip.contains_screen_point(event.position) and not dragging:
+		if hero_primary and not hero_pip.contains_screen_point(event.position) and not command_panel.is_over_panel(event.position) and event.position.y >= TOP_HEIGHT * ui_scale and not dragging:
 			hero_input_requested.emit(event)
 			return
 		hovered = _world_at(event.position)
