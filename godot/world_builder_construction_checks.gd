@@ -66,6 +66,9 @@ func _check() -> void:
 	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty() or str(hit.collider.get_meta("kind", "")) != "floor" or absf(float(hit.position.y) - 0.2) > 0.03:
 		failures.append("bridge floor ray missed constructed deck: " + str(hit))
+	var rail_query := PhysicsRayQueryParameters3D.create(Vector3(0, 0.65, 0), Vector3(0, 0.65, 3), 1)
+	var rail_hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(rail_query)
+	if rail_hit.is_empty() or str(rail_hit.collider.get_meta("kind", "")) != "solid": failures.append("bridge rail does not contain the Hero")
 	if absf(module.surface_height(Vector2.ZERO, -0.3) - 0.2) > 0.02: failures.append("worker deck height differs from collider")
 	for entry in [
 		{"kind": "ramp", "a": Vector3(-4, 0, 6), "b": Vector3(4, 0, 6)},

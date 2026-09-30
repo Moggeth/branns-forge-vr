@@ -219,7 +219,9 @@ func _render(record: Dictionary) -> void:
 			var rail := Node3D.new()
 			node.add_child(rail)
 			rail.rotation.x = -atan2(b.y - a.y, length)
-			W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.48, 0), Vector3(0.15, 0.16, length), "745139")
-			W.body(rail, Vector3(side * (width * 0.5 - 0.10), 0.48, 0), Vector3(0.15, 0.16, length), "solid")
-			for end in [-1.0, 1.0]:
-				W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.17, end * length * 0.48), Vector3(0.19, 0.52, 0.19), "63442e")
+			W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.82, 0), Vector3(0.17, 0.16, length), "745139")
+			W.body(rail, Vector3(side * (width * 0.5 - 0.10), 0.45, 0), Vector3(0.20, 0.90, length), "solid")
+			var post_count := maxi(2, ceili(length / 1.8))
+			for post in range(post_count + 1):
+				var along := (float(post) / float(post_count) - 0.5) * length
+				W.box(rail, Vector3(side * (width * 0.5 - 0.10), 0.42, along), Vector3(0.19, 0.84, 0.19), "63442e")
