@@ -98,6 +98,10 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	get_tree().root.gui_embed_subwindows = previous_embed_subwindows
+	# Preview meshes live under the Orchard, outside this Window's ownership.
+	# Also release them when a caller frees the Window without calling close().
+	for preview in [marker, route_preview, preview_boundary, target_visual]:
+		if is_instance_valid(preview) and not preview.is_queued_for_deletion(): preview.queue_free()
 
 func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	game = owner_game
