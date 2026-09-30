@@ -65,6 +65,7 @@ var spells := Spells.new()
 var construction: Node
 var ents: Node
 var encounters: Node
+var starfall_presentation: Node3D
 
 func setup(owner_game: Node3D, offline := false) -> void:
 	game = owner_game
@@ -74,6 +75,9 @@ func setup(owner_game: Node3D, offline := false) -> void:
 	root.name = "LivingOrchardSettlement"
 	game.adventure.zone_groups[ZONE].add_child(root)
 	root.global_position = center
+	starfall_presentation=preload("res://starfall_presentation.gd").new()
+	root.add_child(starfall_presentation)
+	starfall_presentation.setup(game)
 	distant_meteors = MultiMeshInstance3D.new()
 	distant_meteors.name = "DistantMeteorites"
 	root.add_child(distant_meteors)
@@ -259,6 +263,7 @@ func save() -> bool:
 
 func tick(delta: float) -> void:
 	if game == null: return
+	if starfall_presentation!=null: starfall_presentation.tick(delta)
 	meteor_refresh_remaining -= delta
 	if meteor_refresh_remaining <= 0.0:
 		meteor_refresh_remaining = METEOR_REFRESH_SECONDS
@@ -462,6 +467,7 @@ func _render_meteor(record: Dictionary, animate: bool) -> void:
 	var meteor := Meteor.new()
 	root.add_child(meteor)
 	meteor.setup(record, animate)
+	if starfall_presentation!=null: starfall_presentation.watch_meteor(meteor)
 	meteor.impact_ready.connect(_meteor_impact.bind(id))
 	meteor.inventory_changed.connect(_meteor_inventory.bind(id))
 	meteor_nodes[id] = meteor
@@ -526,8 +532,12 @@ func _meteor_impact(event: Dictionary, id: String) -> void:
 	if result != "":
 		push_warning("STARFALL terrain edit failed: " + result)
 		return
-	# The rock sinks with its crater; the same final height is stored for reload.
-	record.ground_y = float(record.ground_y) - 1.4
+	# Plant the visible rock's lowest point into the actual crater bed rather
+	# than applying a fixed sink offset that can leave the meteor floating.
+	var at:Array=record.center
+	var bed:float=game.landscape.height_at(Vector2(float(at[0]),float(at[1])))
+	var shell_bottom:float=meteor.core.mesh.get_aabb().position.y*meteor.core.scale.y+meteor.core.position.y
+	record.ground_y = bed-shell_bottom-0.12
 	meteor.record.ground_y = record.ground_y
 	var sink := create_tween()
 	sink.tween_property(meteor, "position:y", float(record.ground_y), 1.1)

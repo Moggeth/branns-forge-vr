@@ -3,6 +3,7 @@ extends Node3D
 ## edit the ground. No collision: terrain itself remains the source of physics.
 const Art = preload("res://landscape_asset_library.gd")
 const Fields = preload("res://landscape_fields.gd")
+const CrystalArt = preload("res://starfall_crystal_art.gd")
 const ASSETS := {
 	"split": "res://assets/landscape/geo_boulder_split_b.glb",
 	"spire": "res://assets/landscape/geo_spell_spire.glb",
@@ -11,6 +12,7 @@ const MAX_DRESSED_OPERATIONS := 64
 
 var _meshes: Dictionary = {}
 var _records: Array[Dictionary] = []
+var crystal_art = CrystalArt.new()
 
 func setup(model: Dictionary, operations: Array) -> void:
 	for kind in ASSETS: _meshes[kind] = Art.tuned_mesh(ASSETS[kind])
@@ -27,7 +29,7 @@ func add_operation(op: Dictionary, target_model: Dictionary, duration: float) ->
 	var placements := _placements(op)
 	var anchors: Array[Dictionary] = []
 	for p in placements:
-		var mesh: Mesh = _meshes.get(p.kind)
+		var mesh: Mesh = crystal_art.mesh_for_fault(int(op.get("seed",0))+anchors.size()*7919) if str(p.kind)=="spire" else _meshes.get(p.kind)
 		if mesh == null: continue
 		var point: Vector2 = p.position
 		var ground := Fields.sample(target_model, "height", point)
@@ -35,14 +37,11 @@ func add_operation(op: Dictionary, target_model: Dictionary, duration: float) ->
 		item.name = str(p.kind).capitalize()
 		item.mesh = mesh
 		if str(p.kind) == "spire":
-			var crystal := StandardMaterial3D.new()
-			crystal.albedo_color = Color("62cbd2")
-			crystal.metallic = 0.18
-			crystal.roughness = 0.22
-			crystal.emission_enabled = true
-			crystal.emission = Color("55d8f3")
-			crystal.emission_energy_multiplier = 2.1
-			item.material_override = crystal
+			var seed_value:=int(op.get("seed",0))+anchors.size()*7919
+			item.mesh=crystal_art.mesh_for_fault(seed_value)
+			item.add_to_group("landscape_crystal")
+			item.set_meta("crystal_seed",seed_value)
+			item.set_instance_shader_parameter("seedv",float(absi(seed_value)%997)/97.0)
 		item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		item.position = Vector3(point.x, ground, point.y)
 		item.rotation.y = float(p.angle)
