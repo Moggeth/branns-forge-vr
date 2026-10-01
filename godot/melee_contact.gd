@@ -161,6 +161,11 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 		return game.sunfall.impact(item,target,point,normal,speed,hand,motion)
 	game.adventure.haptic(hand,"impact")
 	var kind=target.get_meta("kind","")
+	if kind == "authored_tree":
+		if str(item.get_meta("id", "")) != "woodland_axe": return false
+		target = preload("res://authored_zone_kit.gd").ensure_choppable(target, game)
+		if target == null: return false
+		kind = target.get_meta("kind", "")
 	if kind=="meteor_ore" and game.world_builder!=null:
 		if str(item.get_meta("id", "")) == "quarry_pick" and strike_region not in ["pick_point", "opposite_point", "working"]: return false
 		return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed,normal)
@@ -174,7 +179,10 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 		if motion.length()<0.01: motion=-normal*speed
 		return game.pumpkins.impact(target,item,point,normal,motion)
 	if kind=="builder_forest" and game.world_builder!=null and str(item.get_meta("id", ""))=="woodland_axe":
-		return game.world_builder.chop_scenic(point,_is_blade(item,normal),normal,hand)
+		# The authored FPS action is a blade swing. A curved trunk proxy's normal
+		# must not reject it only on the first hit, before conversion to timber.
+		var desktop_cut: bool = hand != null and hand == game.desktop_hand
+		return game.world_builder.chop_scenic(point,desktop_cut or _is_blade(item,normal),normal,hand)
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
 		return chop(target,point,normal,hand,speed,false) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":

@@ -751,13 +751,11 @@ func chop_scenic(global_hit: Vector3, blade: bool, normal: Vector3 = Vector3.RIG
 		var distance := Vector2(local.x - point.x, local.z - point.z).length()
 		if distance < best: best = distance; nearest = key
 	if nearest == "": return false
-	var collision: CollisionShape3D = scenic_by_key[nearest].collision
-	var trunk_height: float = collision.shape.height if collision.shape is CylinderShape3D else 2.5
-	var hit_height: float = global_hit.y - (collision.global_position.y - trunk_height * 0.5)
-	if hit_height < 0.25 or hit_height > 1.8: return false
 	var timber: Node3D = scenic_pending.get(nearest, null)
 	if not is_instance_valid(timber): timber = _reveal_scenic(nearest)
 	if not is_instance_valid(timber): return false
+	# Use the real species' local chop band, including placement scale and
+	# terrain elevation, just like every subsequent hit on this timber.
 	return game.melee.chop(timber, global_hit, normal, hand)
 
 func _reveal_scenic(key: String) -> Node3D:

@@ -122,16 +122,16 @@ func _check_scenic(game: FakeGame, failures: Array[String]) -> void:
 	var collision := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = 0.32
-	cylinder.height = 2.5
+	cylinder.height = 5.0
 	collision.shape = cylinder
-	collision.position = Vector3(4.0, 1.25, 0.0)
+	collision.position = Vector3(4.0, 2.5, 0.0)
 	collision.set_meta("builder_species", "apple")
-	collision.set_meta("builder_scale", 1.0)
+	collision.set_meta("builder_scale", 2.0)
 	collision.set_meta("builder_seed", 4101)
 	proxy.add_child(collision)
 	var key := "40:0"
 	builder.scenic_by_key[key] = {"position": Vector3(4, 0, 0), "collision": collision}
-	var hit := Vector3(4.25, 1.0, 0)
+	var hit := Vector3(4.25, 2.0, 0) # Local cut height 1 m on a double-scale tree.
 	if builder.chop_scenic(hit, true, Vector3.RIGHT): failures.append("scenic first hit felled")
 	if not builder.scenic_pending.has(key): failures.append("scenic tree did not reveal")
 	if builder.chop_scenic(hit + Vector3.UP * 0.04, true, Vector3.RIGHT): failures.append("scenic second hit felled")

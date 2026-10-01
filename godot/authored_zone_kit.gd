@@ -18,7 +18,8 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 	if not assets is Dictionary or not placements is Array or placements.size() > MAX_PLACEMENTS:
 		return {"error":"invalid zone-kit assets or placement count"}
 	var grouped: Dictionary = {}
-	for entry in placements:
+	for placement_index in placements.size():
+		var entry: Variant = placements[placement_index]
 		if not entry is Dictionary: return {"error":"placement must be an object"}
 		var asset_id: String = str(entry.get("asset", ""))
 		if not assets.has(asset_id): return {"error":"unknown asset: " + asset_id}
@@ -30,10 +31,11 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		var yaw := deg_to_rad(float(entry.get("yaw_degrees", 0.0)))
 		var key := Vector2i(floori(at.x / CHUNK_METRES), floori(at.z / CHUNK_METRES))
 		var group_key := asset_id + ":" + str(key.x) + ":" + str(key.y)
-		if not grouped.has(group_key): grouped[group_key] = {"asset":asset_id,"chunk":key,"poses":[]}
+		if not grouped.has(group_key): grouped[group_key] = {"asset":asset_id,"chunk":key,"poses":[],"indices":[]}
 		# Apply nonuniform scale in asset-local axes before yaw. Basis.scaled()
 		# alone scales world axes and distorts angled ridge instances.
 		grouped[group_key].poses.append(Transform3D(Basis(Vector3.UP, yaw) * Basis.IDENTITY.scaled(scale), at))
+		grouped[group_key].indices.append(placement_index)
 	var cache: Dictionary = {}
 	for asset_id in assets:
 		var filename: String = str(assets[asset_id])
@@ -69,6 +71,7 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		_ground_finish(asset_dir.get_file(), str(asset_id), parts)
 		cache[asset_id] = parts
 	var holders := 0
+	var visual_by_placement: Dictionary = {}
 	for group_key in grouped:
 		var group: Dictionary = grouped[group_key]
 		var chunk: Vector2i = group.chunk
@@ -98,12 +101,19 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 			holder.visibility_range_end = float(document.get("visibility_metres", 240.0))
 			holder.visibility_range_end_margin = 8.0
 			root.add_child(holder)
+			for index in poses.size():
+				var placement_index: int = group.indices[index]
+				if not visual_by_placement.has(placement_index): visual_by_placement[placement_index] = []
+				var original: Transform3D = poses[index]
+				original.origin -= origin
+				visual_by_placement[placement_index].append({"holder": holder, "index": index, "transform": original * part.pose})
 			holders += 1
 	# Only major authored solids opt into collision. Small flora, banks and
 	# atmospheric pieces remain visual, so a dense kit stays cheap and walkable.
 	var collider_count := 0
 	var asset_meta: Dictionary = document.get("asset_meta", {})
-	for entry in placements:
+	for placement_index in placements.size():
+		var entry: Dictionary = placements[placement_index]
 		if str(entry.get("collision", "none")) != "asset_default": continue
 		var asset_id: String = str(entry.get("asset", ""))
 		var meta: Variant = asset_meta.get(asset_id, {})
@@ -117,7 +127,18 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		var scale := _scale_vector(entry.get("scale", 1.0))
 		var solid := StaticBody3D.new()
 		solid.name = "ZoneArtSolid_%s" % asset_id
-		solid.set_meta("kind", "solid")
+		if _tree_asset(asset_id):
+			solid.set_meta("kind", "authored_tree")
+			solid.set_meta("authored_tree_asset", asset_id)
+			solid.set_meta("zone", str(root.name))
+			solid.set_meta("id", "%s_authored_tree_%d" % [str(root.name), placement_index])
+			solid.set_meta("base_position", at)
+			solid.set_meta("authored_tree_parts", cache[asset_id])
+			solid.set_meta("authored_tree_scale", scale)
+			solid.set_meta("authored_tree_views", visual_by_placement.get(placement_index, []))
+			solid.set_meta("chop_band", Vector2(0.25, 2.2))
+		else:
+			solid.set_meta("kind", "solid")
 		var surface := str(entry.get("surface_material", meta.get("surface_material", "")))
 		if not surface.is_empty() and surface not in SURFACE_MATERIALS:
 			solid.free()
@@ -158,6 +179,66 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 	print("ZONE_KIT ", JSON.stringify(result))
 	return result
 
+static func _tree_asset(asset_id: String) -> bool:
+	var name := asset_id.to_lower()
+	return name.begins_with("tree_") or name.begins_with("fen_tree_") or name.begins_with("conifer_") or name in ["deadpine", "heart_arch_tree"]
+
+## Materialize one struck tree from its batched GLB parts. The existing collider
+## becomes the resource body; the other trees in its MultiMesh stay batched.
+static func ensure_choppable(target: Node3D, game: Node) -> Node3D:
+	if not is_instance_valid(target) or not target.has_meta("authored_tree_parts"): return null
+	if target.get_meta("authored_tree_revealed", false): return target
+	var scale: Vector3 = target.get_meta("authored_tree_scale", Vector3.ONE)
+	var trunk: MeshInstance3D = null
+	var trunk_score := -INF
+	for part in target.get_meta("authored_tree_parts", []):
+		var visual := MeshInstance3D.new()
+		visual.name = str(part.get("name", "AuthoredTreePart"))
+		visual.mesh = part.mesh
+		visual.material_override = part.material
+		visual.transform = Transform3D(Basis.IDENTITY.scaled(scale), Vector3.ZERO) * part.pose
+		visual.set_meta("tree_cut_surface", true)
+		target.add_child(visual)
+		var bounds: AABB = visual.transform * visual.mesh.get_aabb()
+		var low := bounds.position.y <= 0.6 and bounds.end.y >= 0.45
+		var narrow := maxf(bounds.size.x, bounds.size.z) < maxf(bounds.size.y, 0.1) * 1.2
+		var score := (100.0 if str(visual.name).to_lower().contains("trunk") or str(visual.name).to_lower().contains("stem") else 0.0) + (10.0 if low and narrow else 0.0) + bounds.size.y
+		if low and score > trunk_score:
+			trunk = visual
+			trunk_score = score
+	if trunk != null:
+		target.set_meta("trunk", trunk)
+		target.set_meta("trunk_mesh", trunk.mesh)
+		target.set_meta("trunk_material", trunk.material_override)
+	for view in target.get_meta("authored_tree_views", []):
+		var holder: MultiMeshInstance3D = view.holder
+		if is_instance_valid(holder): holder.multimesh.set_instance_transform(int(view.index), Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -200, 0)))
+	target.set_meta("kind", "resource")
+	target.set_meta("resource", "lumber")
+	target.set_meta("resource_id", "lumber")
+	target.set_meta("requires", "axe")
+	target.set_meta("amount", 1)
+	target.set_meta("authored_tree_revealed", true)
+	target.set_meta("authored_tree_game", game)
+	target.add_to_group("adventure_resource")
+	if not target in game.scene.resources: game.scene.resources.append(target)
+	return target
+
+static func restore_batch(resource: Node3D) -> void:
+	if not is_instance_valid(resource) or not resource.get_meta("authored_tree_revealed", false): return
+	for child in resource.get_children():
+		if child is MeshInstance3D and child.get_meta("tree_cut_surface", false): child.queue_free()
+	for view in resource.get_meta("authored_tree_views", []):
+		var holder: MultiMeshInstance3D = view.holder
+		if is_instance_valid(holder): holder.multimesh.set_instance_transform(int(view.index), view.transform)
+	var game: Node = resource.get_meta("authored_tree_game", null)
+	if is_instance_valid(game): game.scene.resources.erase(resource)
+	for key in ["resource", "resource_id", "requires", "amount", "trunk", "trunk_mesh", "trunk_material", "felled", "cut_bands", "cut_height", "authored_tree_game"]:
+		if resource.has_meta(key): resource.remove_meta(key)
+	resource.set_meta("kind", "authored_tree")
+	resource.set_meta("authored_tree_revealed", false)
+	resource.remove_from_group("adventure_resource")
+
 static func _surface_from_asset_name(asset_id: String) -> String:
 	# Names denote a whole collision proxy, not individual triangles/materials.
 	# Mixed or unknown assets deliberately retain the runtime's stone default.
@@ -194,7 +275,7 @@ static func _collect(node: Node3D, pose: Transform3D, parts: Array) -> void:
 		if not child is Node3D: continue
 		var local: Transform3D = pose * child.transform
 		if child is MeshInstance3D and child.mesh != null:
-			parts.append({"mesh":child.mesh,"pose":local,"material":child.material_override})
+			parts.append({"name":child.name,"mesh":child.mesh,"pose":local,"material":child.material_override})
 		_collect(child, local, parts)
 
 static func _scale_vector(value: Variant) -> Vector3:

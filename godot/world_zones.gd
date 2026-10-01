@@ -482,7 +482,17 @@ static func build(root: Node3D) -> Dictionary:
 			else:
 				landmark_kit.add_suggested()
 			data.zones[id]["landmarks"] = landmark_kit.build(z.root)
+	for id in data.zones:
+		_register_decorative_timber(data, str(id))
 	return data
+
+static func _register_decorative_timber(data: Dictionary, zone: String) -> void:
+	for tree in data.zones[zone].root.find_children("*", "Node3D", true, false):
+		if not tree.get_meta("decorative_timber", false): continue
+		tree.set_meta("zone", zone)
+		tree.set_meta("id", "%s_tree_%d_%d" % [zone, roundi(tree.global_position.x * 10.0), roundi(tree.global_position.z * 10.0)])
+		tree.set_meta("base_position", tree.position)
+		data.resources.append(tree)
 
 static func forge(p: Node3D) -> void:
 	# The authored shell keeps Brann, the boards and all upgrade anchors where

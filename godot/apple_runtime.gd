@@ -56,6 +56,17 @@ func _zone(node: Node) -> String:
 		current = current.get_parent()
 	return "forge_yard"
 
+func _host_tree(entry: Dictionary) -> Node3D:
+	var source: Node3D = entry.source
+	if is_instance_valid(source) and source.has_meta("host_tree"):
+		return source.get_meta("host_tree") as Node3D
+	var parent: Node3D = entry.collider.get_parent() if is_instance_valid(entry.collider) else null
+	return parent if is_instance_valid(parent) and parent.is_in_group("interactive_apple_tree") else null
+
+func _host_ready(entry: Dictionary) -> bool:
+	var host := _host_tree(entry)
+	return host == null or (is_instance_valid(host) and host.visible and not host.get_meta("felled", false) and not host.get_meta("collecting", false))
+
 func _add(parent: Node3D, local_pos: Vector3, zone: String, source: Node3D, visual: MultiMeshInstance3D, instance: int, fruit: Dictionary):
 	var collider = StaticBody3D.new()
 	collider.name = "AppleStem"
@@ -107,6 +118,7 @@ func impact(target: Node3D, speed: float, point: Vector3, direction: Vector3) ->
 		entry.body.apply_central_impulse(direction.normalized() * minf(speed * 0.09, 1.2))
 		return entry.body
 	if entry.state != "attached": return null
+	if not _host_ready(entry): return null
 	if game.elapsed - float(entry.last_impact) < 0.14: return entry.collider
 	entry.last_impact = game.elapsed
 	entry.wobble_speed += clampf(speed * 0.28, 0.2, 2.1) * (-1 if direction.x < 0 else 1)
@@ -162,6 +174,7 @@ func try_grab(hand: Node3D, desktop: bool = false) -> bool:
 			chosen = entries[int(owner.get_meta("apple_entry"))]
 	for entry in entries:
 		if entry.zone != game.adventure.zone or entry.state not in ["attached", "loose"]: continue
+		if entry.state == "attached" and not _host_ready(entry): continue
 		var node: Node3D = entry.body if entry.state == "loose" else entry.collider
 		if not is_instance_valid(node) or not node.is_visible_in_tree(): continue
 		var gap = hand.global_position.distance_to(node.global_position)
@@ -251,8 +264,7 @@ func tick(delta: float):
 	for entry in entries:
 		if entry.zone != game.adventure.zone: continue
 		if entry.state == "attached":
-			var host = entry.source.get_meta("host_tree") if is_instance_valid(entry.source) and entry.source.has_meta("host_tree") else null
-			if host != null and not host.visible:
+			if not _host_ready(entry):
 				_detach(entry, Vector3.UP * 0.8)
 				continue
 			if absf(entry.wobble) > 0.001 or absf(entry.wobble_speed) > 0.001:
@@ -281,6 +293,13 @@ func tick(delta: float):
 func _reset(entry: Dictionary):
 	if is_instance_valid(entry.body): entry.body.queue_free()
 	entry.body = null
+	if not _host_ready(entry):
+		entry.state = "eaten"
+		entry.respawn_at = game.elapsed + 1.0
+		entry.collider.collision_layer = 0
+		entry.collider.visible = false
+		_draw(entry)
+		return
 	entry.state = "attached"
 	entry.wobble = 0.0
 	entry.wobble_speed = 0.0

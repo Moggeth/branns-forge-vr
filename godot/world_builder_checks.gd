@@ -114,7 +114,9 @@ func _check() -> void:
 				var trunk: StaticBody3D = builder.scenic_by_key[hero_tree_key].collision.get_parent()
 				var proxy: CollisionShape3D = builder.scenic_by_key[hero_tree_key].collision
 				var hit: Vector3 = proxy.global_position + Vector3.DOWN * (proxy.shape.height * 0.5 - 1.0)
-				for i in range(3): game.melee.strike(trunk, hit, Vector3.LEFT, 2.4, game.desktop_hand, axe)
+				# A cylinder normal can oppose the authored FPS blade orientation; the
+				# deliberate mouse swing must still cut on its first batched-tree hit.
+				for i in range(3): game.melee.strike(trunk, hit, Vector3.RIGHT, 2.4, game.desktop_hand, axe)
 				if hero_tree_key in builder.data.harvested or int(builder.data.wood) != before_wood: failures.append("Hero axe awarded scenic lumber before log pickup")
 				var revealed: Node3D = builder.scenic_pending.get(hero_tree_key, null)
 				if not is_instance_valid(revealed) or not revealed.get_meta("felled", false): failures.append("Hero axe did not fell the revealed forest tree")

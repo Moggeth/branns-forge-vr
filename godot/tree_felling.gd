@@ -89,7 +89,7 @@ func start(owner_game: Node, resource: Node3D, height: float, normal: Vector3) -
 	upper.position.y = cut_y
 	add_child(upper)
 	for child in source.get_children():
-		if child is MeshInstance3D and child.name in CUT_SURFACES:
+		if child is MeshInstance3D and (child.name in CUT_SURFACES or child.get_meta("tree_cut_surface", false)):
 			hidden.append({"node": child, "visible": child.visible})
 			child.visible = false
 			_add_piece(child, stump, false)
@@ -215,7 +215,7 @@ func restore_stump(resource: Node3D, height: float) -> void:
 	stump.name = "RootedStump"
 	add_child(stump)
 	for child in resource.get_children():
-		if child is MeshInstance3D and child.name in CUT_SURFACES:
+		if child is MeshInstance3D and (child.name in CUT_SURFACES or child.get_meta("tree_cut_surface", false)):
 			_add_piece(child, stump, false)
 	_add_endgrain()
 	_add_stump_collision()
@@ -233,4 +233,6 @@ func _process(_delta: float) -> void:
 		game._set_collisions(source, true)
 		source.set_meta("felled", false)
 		source.set_meta("cut_bands", [])
+		if source.get_meta("authored_tree_revealed", false):
+			preload("res://authored_zone_kit.gd").restore_batch(source)
 		queue_free()

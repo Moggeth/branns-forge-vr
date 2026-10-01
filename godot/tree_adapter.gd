@@ -11,9 +11,10 @@ extends RefCounted
 ##    (Crown + unit-taper Trunk + ChopProxy) and sets `trunk` / `trunk_mesh` exactly as
 ##    the old code did. Existing w.body(...) calls after tree() may stay (a second,
 ##    larger box is harmless) or be removed.
-##  * otherwise (decoration in a zone root): a Node3D tree is added under p. It is not
-##    a direct MeshInstance3D child, so batch_decorations() neither batches it nor adds
-##    convex collision; the tree carries its own trunk box.
+##  * otherwise (decoration in a zone root): a Node3D tree is added under p. Full-size
+##    trees receive the same chop contract as timber resources. WorldZones registers
+##    them with their zone after all zone dressing has been built. The tree is not a
+##    direct MeshInstance3D child, so batch_decorations() does not batch its pieces.
 ##  * Trees further than FAR_RADIUS (40 m) from the zone origin, or under 2.5 m tall
 ##    (backdrop islands), use the FAR mesh only; all other
 ##    decorative trees get a near mesh with an automatic FAR swap at LOD_SWITCH metres.
@@ -43,7 +44,13 @@ static func tree(p: Node3D, pos: Vector3, h: float, pine: bool = false, apples: 
 	else:
 		opts["lod"] = "near"
 		opts["lod_switch"] = LOD_SWITCH
-	var node := TreeKit.make_tree(species, seed, opts)
+	var node := Node3D.new()
+	node.name = "Tree_%s_%d" % [species, seed]
+	if h >= 2.5:
+		TreeKit.adapt_timber(node, species, seed, opts)
+		_mark_decorative_timber(node)
+	else:
+		TreeKit.build_into(node, species, seed, opts)
 	node.position = pos
 	p.add_child(node)
 	return node
@@ -60,10 +67,23 @@ static func fen_tree(p: Node3D, pos: Vector3, h: float = 5.2, dead: bool = false
 	if p.get_meta("requires", "") == "axe":
 		TreeKit.adapt_timber(p, species, seed, {"height": h})
 		return p
-	var node := TreeKit.make_tree(species, seed, {"height": h, "lod": "far" if pos.length() > FAR_RADIUS else "near", "lod_switch": LOD_SWITCH})
+	var node := Node3D.new()
+	node.name = "Tree_%s_%d" % [species, seed]
+	TreeKit.adapt_timber(node, species, seed, {"height": h, "lod": "far" if pos.length() > FAR_RADIUS else "near", "lod_switch": LOD_SWITCH})
+	_mark_decorative_timber(node)
 	node.position = pos
 	p.add_child(node)
 	return node
+
+static func _mark_decorative_timber(node: Node3D) -> void:
+	node.set_meta("decorative_timber", true)
+	node.set_meta("kind", "resource")
+	node.set_meta("resource", "lumber")
+	node.set_meta("resource_id", "lumber")
+	node.set_meta("requires", "axe")
+	node.set_meta("amount", 1)
+	node.set_meta("trunk_material", TreeKit.tree_material())
+	node.add_to_group("adventure_resource")
 
 ## Apple harvest resource hanging at a tree's reach point, created through the game's
 ## own WorldZones.resource() so meta, groups and data.resources are unchanged.
@@ -82,4 +102,5 @@ static func hanging_apple(w: Script, root: Node3D, data: Dictionary, zone: Strin
 		root_pos += parent.position
 		parent = parent.get_parent() as Node3D
 	var n: Node3D = w.resource(root, data, zone, root_pos, "apple", "", 1)
+	n.set_meta("host_tree", tree_node)
 	return n
