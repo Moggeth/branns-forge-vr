@@ -64,7 +64,7 @@ static func response(target: Node, item: Node3D, point: Vector3, normal: Vector3
 	var hardness: float = {"wood":0.42,"glass":0.55,"bone":0.65,"stone":0.88,"star_iron":1.0,"metal":0.95}.get(material,0.8)
 	var bite := 0.0
 	if entry > 0.5 and speed > 1.5:
-		if pick_point and material in ["stone","star_iron"] and energy >= 1.0:
+		if pick_point and material in ["stone","star_iron","glass"] and energy >= 1.0:
 			bite = minf(MAX_BITE,0.008 + speed * 0.003)
 		elif axe_edge and material == "wood" and energy >= 0.8:
 			bite = minf(WOOD_BITE,0.012 + speed * 0.006)

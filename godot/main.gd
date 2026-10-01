@@ -95,6 +95,7 @@ var delivery_seen={}
 var workshop_delivery
 var tool_physics
 var melee
+var mining
 var impact_feedback
 var respawn_recovery=preload("res://respawn_recovery.gd").new()
 var visit_entered=false
@@ -355,6 +356,7 @@ func _ready():
 	item_actions=preload("res://item_interactions.gd").new()
 	add_child(item_actions)
 	item_actions.setup(self)
+	mining=preload("res://mining_runtime.gd").new(); add_child(mining); mining.setup(self)
 	zone_details=preload("res://zone_details.gd").new(); add_child(zone_details); zone_details.setup(self)
 	firecraft=preload("res://firecraft.gd").new(); add_child(firecraft); firecraft.setup(self)
 	wyrmspout=preload("res://wyrmspout_runtime.gd").new(); add_child(wyrmspout); wyrmspout.setup(self)
@@ -1047,6 +1049,7 @@ func _process(delta):
 	if director!=null: director.tick(delta)
 	if is_instance_valid(director_local_view): director_local_view.tick(delta)
 	if world_builder!=null: world_builder.tick(delta)
+	if mining!=null: mining.tick(delta)
 	if is_instance_valid(world_builder_view): world_builder_view.tick(delta)
 	if workshop!=null: workshop.tick(delta)
 	if enchantments!=null: enchantments.tick(delta)
@@ -1608,8 +1611,10 @@ func _grip(hand: Node3D, desktop: bool):
 	if desktop and (firecraft.busy(hand) or siegebird.busy(hand) or workshop.busy(hand) or enchantments.busy(hand) or living.busy(hand) or ((playful_tools!=null and playful_tools.busy(hand)) or (magnetic_wand!=null and magnetic_wand.busy(hand)) or ((cargo_playground!=null and cargo_playground.busy(hand)) or (echo_bells!=null and echo_bells.busy(hand))))):
 		_desktop_release(false); return true
 	if held.has(key):
+		if mining!=null and mining.try_grab(hand,desktop): return true
 		if desktop: _desktop_release(false)
 		return true
+	if mining!=null and mining.try_grab(hand,desktop): return true
 	if skull_basket!=null and skull_basket.try_grab(hand,desktop): return true
 	var logs=get_tree().get_nodes_in_group("physical_lumber_log")
 	logs.sort_custom(func(a,b):return a.global_position.distance_squared_to(hand.global_position)<b.global_position.distance_squared_to(hand.global_position))
@@ -2797,6 +2802,8 @@ func _actor_checks(failures):
 	var data={"enemies":[]}
 	preload("res://world_zones.gd").enemy(self,data,"forge_yard",Vector3(3,0,0),"skeleton")
 	var actor=data.enemies[0]
+	actor.reparent(self,true)
+	scene.enemies.append(actor)
 	actor.set_meta("hp",60)
 	actor.set_meta("home",actor.global_position)
 	animation.register(actor)
@@ -2811,21 +2818,51 @@ func _actor_checks(failures):
 	var saved_health=adventure.hp
 	var saved_hurts=hurts_until
 	var saved_shield=shield_until
+	var saved_camera_pose: Transform3D = camera.global_transform
+	var saved_rig_pose: Transform3D = rig.global_transform
 	hurts_until=0
 	shield_until=0
-	adventure._step_attack(actor,1,"skeleton")
+	actor.set_meta("fairy_target",false)
+	var engagement: float = skeleton_attack_contact.engagement_distance(actor)
+	var attack_distance: float = maxf(0.1,engagement-0.1)
+	adventure._step_attack(actor,attack_distance,"skeleton")
 	if actor.get_meta("combat_phase","")!="windup" or adventure.hp!=saved_health: failures.append("windup deals early damage")
-	elapsed+=tuning.value("enemy.windup")+0.1
-	adventure._step_attack(actor,1,"skeleton")
-	if actor.get_meta("combat_phase","")!="strike" or not actor.get_meta("attack_damage_done",false): failures.append("strike and damage timeline disagree")
+	var attack_windup: float = float(actor.get_meta("attack_windup",tuning.value("enemy.windup")))
+	elapsed=saved_time+attack_windup*0.5
+	adventure._step_attack(actor,attack_distance,"skeleton")
+	if actor.get_meta("combat_phase","")!="windup" or adventure.hp!=saved_health: failures.append("windup contact landed early")
+	elapsed=saved_time+attack_windup+0.10
+	adventure._step_attack(actor,attack_distance,"skeleton")
+	if actor.get_meta("combat_phase","")!="strike" or actor.get_meta("attack_damage_done",false) or adventure.hp!=saved_health:
+		failures.append("skeleton strike auto-damaged before weapon contact")
+	# Skeleton damage is now resolved by the visible weapon sweep after posing.
+	# Place the diagnostic Hero capsule on that measured sweep, then resolve it.
+	var source: Dictionary = skeleton_attack_contact._source(actor)
+	if source.is_empty():
+		failures.append("skeleton attack has no visible weapon source")
+	else:
+		var saved_source: Dictionary = skeleton_attack_contact._save_source(source)
+		skeleton_attack_contact._seek_source(source,float(actor.get_meta("combat_progress",0.0)))
+		var segment: Dictionary = skeleton_attack_contact._source_segment(source)
+		skeleton_attack_contact._restore_source(source,saved_source)
+		if segment.is_empty(): failures.append("skeleton strike has no weapon segment")
+		else:
+			var contact_point: Vector3 = (segment.a+segment.b)*0.5
+			rig.global_position=contact_point-Vector3.UP*0.30
+			camera.global_position=contact_point+Vector3.UP*0.14
+			adventure.tick_skeleton_contacts()
+			if not actor.get_meta("attack_damage_done",false) or adventure.hp>=saved_health:
+				failures.append("visible skeleton strike did not damage at contact")
 	var once_health=adventure.hp
 	hurts_until=0
-	adventure._step_attack(actor,1,"skeleton")
+	adventure.tick_skeleton_contacts()
 	if adventure.hp!=once_health: failures.append("strike damage repeats")
 	elapsed=saved_time
 	adventure.hp=saved_health
 	hurts_until=saved_hurts
 	shield_until=saved_shield
+	rig.global_transform=saved_rig_pose
+	camera.global_transform=saved_camera_pose
 	var parts=actor_rig.pieces.duplicate()
 	var poses=parts.map(func(p):return p.global_transform)
 	var before=remains.bodies.size()
@@ -2883,6 +2920,7 @@ func _actor_checks(failures):
 	for home in actor_rig.homes:
 		if home.has("template") and is_instance_valid(home.template): home.template.free()
 	animation.actors.erase(actor.get_instance_id())
+	scene.enemies.erase(actor)
 	actor.queue_free()
 	print("ACTOR_CHECKS ",JSON.stringify({"failures":failures,"pieces":parts.size()}))
 

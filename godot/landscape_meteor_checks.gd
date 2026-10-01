@@ -9,6 +9,10 @@ func _initialize() -> void:
 func _run() -> void:
 	var failures: Array[String] = []
 	var source: Dictionary = Meteor.make_record(Vector2(10.0, -12.0), 421, 3.0)
+	var legacy: Dictionary = source.duplicate(true)
+	legacy.version = 1
+	legacy.erase("mining_sites")
+	if not Meteor._valid_record(legacy): failures.append("legacy record rejected")
 	var roundtrip: Dictionary = JSON.parse_string(JSON.stringify(source))
 	if int(roundtrip.ore) != int(source.ore) or roundtrip.veins.size() != source.veins.size(): failures.append("record JSON roundtrip")
 	var op: Dictionary = Meteor.crater_operation(source)
@@ -62,9 +66,20 @@ func _run() -> void:
 	var near: Vector3 = meteor.gems[0].global_position
 	if meteor.strike(near, "woodland_axe").get("ok", false): failures.append("wrong tool mined")
 	if meteor.strike(near, "quarry_pick", 0.2).get("ok", false): failures.append("weak strike mined")
-	var mined := meteor.strike(near, "quarry_pick", 1.0)
-	if mined.get("kind", "") != "meteor_gem" or meteor.remaining_gems() != 11: failures.append("gem extraction")
-	if int(mined.get("scar_count",0)) != 1 or meteor.scar_display.multimesh.instance_count != 1:
+	if meteor.strike(near, "quarry_pick", 2.0, Vector3.ZERO, {"strike_region":"shaft"}).get("ok", false): failures.append("shaft mined")
+	if meteor.strike(near, "quarry_pick", 2.0, Vector3.ZERO, {"incidence":0.1}).get("ok", false): failures.append("glancing hit mined")
+	var first := meteor.strike(near, "quarry_pick", 1.0)
+	if not first.get("ok",false) or first.get("extracted",false) or meteor.remaining_gems() != 12:
+		failures.append("first chip paid reward")
+	var exposed := meteor.strike(near, "quarry_pick", 1.0)
+	if exposed.get("damage_result","") != "exposed" or exposed.get("extracted",false) or meteor.gems[0].scale.x <= 0.3:
+		failures.append("crystal did not expose before extraction")
+	var mined: Dictionary = {}
+	for i in 5:
+		mined = meteor.strike(near, "quarry_pick", 1.0)
+		if mined.get("extracted",false): break
+	if mined.get("kind", "") != "meteor_gem" or meteor.remaining_gems() != 11 or str(mined.get("reward_id", "")).is_empty(): failures.append("gem extraction")
+	if int(mined.get("scar_count",0)) < 3 or meteor.scar_display.multimesh.instance_count < 3:
 		failures.append("successful strike left no local surface mark")
 	var scar_point: Array = meteor.record.scars[0].point
 	var scar_world: Vector3 = meteor.core.to_global(Vector3(float(scar_point[0]),float(scar_point[1]),float(scar_point[2])))
@@ -74,19 +89,26 @@ func _run() -> void:
 	if scar_ray.is_empty() or scar_ray.collider != meteor.collider or scar_ray.position.distance_to(scar_world) > 0.02:
 		failures.append("gem strike mark is buried inside the meteor")
 	var saved: Dictionary = JSON.parse_string(JSON.stringify(meteor.to_record()))
+	var malformed: Dictionary = saved.duplicate(true)
+	malformed.mining_sites = [{"point":[NAN,0,0], "kind":"crystal", "target":0, "damage":1.0, "stage":1}]
+	if Meteor._valid_record(malformed): failures.append("malformed mining site accepted")
 	meteor.queue_free()
 	var restored := Meteor.new()
 	root.add_child(restored)
 	restored.setup(saved, false)
 	if restored.remaining_gems() != 11 or not restored.impacted: failures.append("mined state restore")
-	if restored.record.scars.size() != 1 or restored.scar_display.multimesh.instance_count != 1:
+	if restored.record.scars.size() < 3 or restored.scar_display.multimesh.instance_count < 3:
 		failures.append("mining scar was lost on save restore")
 	for gem in restored.gems:
-		for i in 2: restored.strike(gem.global_position, "quarry_pick", 1.0)
+		for count in 2:
+			for i in 8:
+				if restored.strike(gem.global_position, "quarry_pick", 1.0).get("extracted", false): break
 	if restored.remaining_gems() != 0 or restored.gems[0].visible: failures.append("finite veins")
 	var rock_top := restored.global_position + Vector3.UP * 2.55
-	for i in 8: restored.strike(rock_top, "quarry_pick", 0.5)
+	for count in 8:
+		for i in 12:
+			if restored.strike(rock_top, "quarry_pick", 1.0).get("extracted", false): break
 	if restored.remaining_ore() != 0 or restored.strike(rock_top, "quarry_pick").get("reason", "") != "depleted": failures.append("finite ore")
-	if restored.record.scars.size() != 20: failures.append("cumulative meteor scars were not saved")
+	if restored.record.scars.size() != Meteor.MAX_SCARS: failures.append("cumulative meteor scars were not bounded and saved")
 	print("LANDSCAPE_METEOR_RESULT ", failures)
 	quit(0 if failures.is_empty() else 1)

@@ -54,6 +54,10 @@ func _run() -> void:
 	pick.set_meta("id", "quarry_pick")
 	fixture.held[str(pick_hand.get_instance_id())] = pick
 	var core_point := enemy.to_global(Vector3(0, 1.27, 0.43))
+	pick.set_meta("mining_contact", {"energy":3.0,"incidence":0.1,"strike_region":"pick_point"})
+	_check(runtime.filter_hit(enemy, 20.0, pick_hand, "physical", core_point) == 0.0 and
+		not enemy.get_meta("golem_core_exposed", false), "glancing pick cannot activate core weakpoint")
+	pick.remove_meta("mining_contact")
 	var core: float = runtime.filter_hit(enemy, 20.0, pick_hand, "physical", core_point)
 	_check(core >= 50.0, "pick deals pronounced core weakpoint damage")
 	_check(enemy.get_meta("golem_core_exposed", false), "core exposure is recorded")
@@ -69,6 +73,16 @@ func _run() -> void:
 	_check(float(enemy.get_meta("golem_stagger_until", 0.0)) > fixture.elapsed, "core strike staggers")
 	fixture.elapsed += 2.0
 	var before_aimed_break: int = fixture.impact_feedback.contacts
+	var arm_hit: Vector3 = enemy.to_global(Vector3(0.7, 1.35, 0.15))
+	pick.set_meta("mining_contact", {"energy":3.0,"incidence":0.1,"strike_region":"pick_point"})
+	_check(runtime.filter_hit(enemy, 18.0, pick_hand, "physical", arm_hit) == 0.0, "glancing pick does not damage armour")
+	pick.set_meta("mining_contact", {"energy":3.0,"incidence":1.0,"strike_region":"shaft"})
+	_check(runtime.filter_hit(enemy, 18.0, pick_hand, "physical", arm_hit) == 0.0, "pick shaft does not damage armour")
+	pick.set_meta("mining_contact", {"energy":1.8,"incidence":1.0,"strike_region":"pick_point"})
+	var far_arm_hit: Vector3 = enemy.to_global(Vector3(1.45, 1.35, 0.15))
+	runtime.filter_hit(enemy, 18.0, pick_hand, "physical", far_arm_hit)
+	_check(runtime.entries[enemy.get_instance_id()].armor_sites.size() == 1, "first arm site recorded")
+	_check(not enemy.get_meta("golem_broken_arm_r",false), "first arm strike does not detach plate")
 	for i in 3: runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(0.7, 1.35, 0.15)))
 	_check(enemy.get_meta("golem_broken_arm_r", false), "localized armour can chip away")
 	_check(fixture.impact_feedback.contacts == before_aimed_break, "aimed armour break did not preempt exact pick contact")
@@ -77,7 +91,7 @@ func _run() -> void:
 		_check(not runtime.entries[enemy.get_instance_id()].armor_nodes.ShoulderR.visible, "damaged shoulder source closes")
 		_check(not runtime.entries[enemy.get_instance_id()].armor_nodes.ForearmR.visible, "damaged forearm source closes")
 	_check(absf(float(enemy.get_meta("golem_slam_scale", 0.0)) - 0.8) < 0.001, "broken arm weakens slam")
-	runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(-0.2, 0.52, 0.18)))
+	for i in 3: runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(-0.2, 0.52, 0.18)))
 	_check(enemy.get_meta("golem_broken_leg_l", false), "pick chips leg armour")
 	_check(absf(float(enemy.get_meta("golem_move_scale", 0.0)) - 0.75) < 0.001, "broken leg slows pursuit")
 	fixture.camera.global_position = Vector3(0, 1.6, 0)
@@ -93,6 +107,7 @@ func _run() -> void:
 	runtime.restore(enemy)
 	_check(not enemy.get_meta("golem_broken_arm_r", false), "respawn restores armour")
 	_check(not enemy.get_meta("golem_core_exposed", false), "respawn resets weakpoint state")
+	_check(runtime.entries[enemy.get_instance_id()].armor_sites.is_empty(), "respawn clears local fractures")
 	if FileAccess.file_exists("res://assets/golem/golem.glb"):
 		_check(runtime.entries[enemy.get_instance_id()].armor_nodes.ShoulderR.visible, "respawn restores shoulder plate")
 		_check(runtime.entries[enemy.get_instance_id()].armor_nodes.ForearmR.visible, "respawn restores forearm plate")
@@ -104,7 +119,7 @@ func _run() -> void:
 	fixture.remains.setup(fixture)
 	var part_count: int = fixture.animation.actors[enemy.get_instance_id()].homes.size()
 	if FileAccess.file_exists("res://assets/golem/golem.glb"):
-		runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(0.7, 1.35, 0.15)))
+		for i in 3: runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(0.7, 1.35, 0.15)))
 	enemy.set_meta("alive", false)
 	var before_direct_death: int = fixture.impact_feedback.contacts
 	runtime.defeated(enemy, enemy.to_global(Vector3(0.7, 1.35, 0.15)))

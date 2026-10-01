@@ -60,7 +60,19 @@ func _run() -> void:
 		await _capture(view, builder.center + Vector3(-20,0,75), 45.0, output.path_join("05-meteorite.jpg"))
 		await _capture(view, builder.center + Vector3(-20,0,75), 29.0, output.path_join("05-meteorite-close.jpg"))
 		for i in 2:
-			builder.mine_meteor(meteor.collider, meteor.gems[0].global_position, "quarry_pick", 3.0)
+			var remaining: int = meteor.remaining_gems()
+			for strike in 12:
+				builder.mine_meteor(meteor.collider, meteor.gems[0].global_position, "quarry_pick", 3.0)
+				if meteor.remaining_gems() < remaining: break
+			if meteor.remaining_gems() >= remaining:
+				errors.append("gem did not detach")
+				break
+			var collected := false
+			for body in game.mining.pickups.active.values():
+				if is_instance_valid(body) and game.mining.pickups.collect(body):
+					collected = true
+					break
+			if not collected: errors.append("gem was not physically collected")
 	builder.data.mana = 20.0
 	result = builder.cast_prism_fault(Vector3(6,0,75), Vector3(46,0,75))
 	if result != "": errors.append("fault " + result)

@@ -1,0 +1,17 @@
+{
+  "account": "fauxgrady@gmail.com",
+  "auth_method": "claude.ai",
+  "subscription": "pro",
+  "requested_model": "claude-sonnet-5-5",
+  "time_cap_seconds": 85.0,
+  "output": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\work\\sonnet-mining-refine-20261001",
+  "outcome": "failed",
+  "pid": 62256,
+  "exit_code": 1,
+  "actual_model": "claude-sonnet-5-5",
+  "canonical_model": "claude-sonnet-5-5",
+  "model_verified": true,
+  "final_verified": false,
+  "reason": "No verified final result",
+  "elapsed_seconds": 31.135
+}

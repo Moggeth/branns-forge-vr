@@ -72,7 +72,8 @@ func tick(delta: float) -> void:
 	for index in lights.size():
 		var light:=lights[index]
 		var live:bool=in_zone and index<light_sources.size() and is_instance_valid(light_sources[index]) and light_sources[index].is_visible_in_tree()
-		light.light_energy=lerpf(light.light_energy,0.58 if live else 0.0,clampf(delta*9.0,0.0,1.0))
+		var target_energy := float(light_sources[index].get_meta("mining_light_strength", 0.58)) if live else 0.0
+		light.light_energy=lerpf(light.light_energy,target_energy,clampf(delta*9.0,0.0,1.0))
 		if live:
 			var source:=light_sources[index]
 			light.global_position=source.global_position+Vector3.UP*0.35

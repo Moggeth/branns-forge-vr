@@ -192,8 +192,21 @@ func _run() -> void:
 		"settled meteor shell plants its lowest point at real crater ground")
 	var gem: MeshInstance3D = impact_meteor.gems[0]
 	var result: Dictionary = impact_meteor.strike(gem.global_position,"quarry_pick",1.0)
+	_check(result.get("ok",false) and not result.get("extracted",false) and impact_meteor.remaining_gems() == 12,
+		"first authored gem contact only chips the shell")
+	var light_before: float = gem.material_override.emission_energy_multiplier if gem.material_override is StandardMaterial3D else 0.0
+	var heat_before: float = float(gem.get_instance_shader_parameter("heat")) if gem.mesh.surface_get_material(0) is ShaderMaterial else 0.0
+	result = impact_meteor.strike(gem.global_position,"quarry_pick",1.0)
+	_check(result.get("damage_result","") == "exposed" and gem.scale.x > 0.3 and
+		(gem.material_override is not StandardMaterial3D or gem.material_override.emission_energy_multiplier > light_before) and
+		float(gem.get_meta("mining_light_strength",0.0)) > 0.5 and
+		(gem.mesh.surface_get_material(0) is not ShaderMaterial or float(gem.get_instance_shader_parameter("heat")) > heat_before),
+		"local fracture exposes and brightens crystal before extraction")
+	for i in 6:
+		result = impact_meteor.strike(gem.global_position,"quarry_pick",1.0)
+		if result.get("extracted",false): break
 	_check(result.get("ok",false) and result.get("kind","") == "meteor_gem" and
-		impact_meteor.remaining_gems() == 11 and impact_meteor.record.scars.size() == 1,
+		impact_meteor.remaining_gems() == 11 and impact_meteor.record.scars.size() >= 3,
 		"mining the authored gem retains reward and saved scar state")
 	var saved: Dictionary = impact_meteor.to_record()
 	var reloaded := Meteor.new()
@@ -201,7 +214,7 @@ func _run() -> void:
 	reloaded.setup(saved,false)
 	presenter.watch_meteor(reloaded)
 	_check(reloaded.remaining_gems() == 11 and int(reloaded.record.veins[0]) == 1 and
-		reloaded.record.scars.size() == 1 and reloaded.scar_display.multimesh.instance_count == 1,
+		reloaded.record.scars.size() >= 3 and reloaded.scar_display.multimesh.instance_count >= 3,
 		"saved and reloaded meteor retains gem inventory and visible mining scar")
 	var reload_bottom: float = reloaded.core.global_position.y + reloaded.core.mesh.get_aabb().position.y * reloaded.core.scale.y
 	_check(not bed_hit.is_empty() and absf(reload_bottom-float(bed_hit.get("position",Vector3.ZERO).y))<.25,

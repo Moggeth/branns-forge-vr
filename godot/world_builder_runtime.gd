@@ -4,6 +4,7 @@ extends Node
 const W = preload("res://world_zones.gd")
 const ZONE = "orchard_highlands"
 const SAVE = "user://world_builder_v1.json"
+const MAX_SAVE_BYTES = 8 * 1024 * 1024
 const BRIDGE = "res://assets/worldbuilder/orchard_bridge.glb"
 const WORKER = "res://assets/worldbuilder/worker.glb"
 const WORKER_WALK_SPEED = 2.1
@@ -195,6 +196,17 @@ func _valid(value: Variant) -> bool:
 	if value.get("threats", []) is not Array or value.get("threats", []).size() > MAX_THREATS: return false
 	if value.get("forest_spells", []) is not Array or value.get("forest_spells", []).size() > MAX_FOREST_SPELLS: return false
 	if value.get("meteors", []) is not Array or value.get("meteors", []).size() > MAX_METEOR_RECORDS: return false
+	if not preload("res://mining_pickups.gd").valid_records(value.get("mining_pending", [])): return false
+	if not value.get("mining_epoch", "") is String or str(value.get("mining_epoch", "")).length() > 80: return false
+	if not preload("res://mining_deposits.gd").valid_records(value.get("mining_deposits", {})): return false
+	if not value.get("mining_claimed", []) is Array or value.get("mining_claimed", []).size() > 8192: return false
+	for id in value.get("mining_claimed", []):
+		if not id is String or id.length() > 160 or id.is_empty(): return false
+	if not value.get("mining_outbox", []) is Array or value.get("mining_outbox", []).size() > 6144: return false
+	for reward in value.get("mining_outbox", []):
+		if not reward is Dictionary or str(reward.get("resource", "")) not in ["stone", "iron", "crystal"]: return false
+		if int(reward.get("amount",0)) < 1 or int(reward.get("amount",0)) > 5: return false
+		if not reward.get("id") is String or str(reward.id).length() > 160: return false
 	if int(value.get("star_gems", 0)) < 0 or int(value.get("star_gems", 0)) > 200: return false
 	if int(value.get("star_iron", 0)) < 0 or int(value.get("star_iron", 0)) > 200: return false
 	for rock in value.get("meteors", []):
@@ -253,7 +265,7 @@ static func _zone_half_extent(zone: String) -> float:
 func _load() -> void:
 	if not FileAccess.file_exists(save_path): return
 	var bytes := FileAccess.get_file_as_bytes(save_path)
-	if bytes.size() > 2097152: push_warning("WORLD_BUILDER save too large; keeping the world untouched"); save_blocked = true; return
+	if bytes.size() > MAX_SAVE_BYTES: push_warning("WORLD_BUILDER save too large; keeping the world untouched"); save_blocked = true; return
 	var candidate: Variant = _canonical_state(JSON.parse_string(bytes.get_string_from_utf8()))
 	if _valid(candidate):
 		data = candidate
@@ -271,10 +283,14 @@ func _load() -> void:
 func save() -> bool:
 	if test_mode: return true
 	if save_blocked: return false
+	var serialized := JSON.stringify(data)
+	if serialized.to_utf8_buffer().size() > MAX_SAVE_BYTES:
+		push_warning("WORLD_BUILDER save exceeds bounded file budget; preserving previous save")
+		return false
 	var temporary := save_path + ".tmp"
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null: push_warning("WORLD_BUILDER save open failed: " + str(FileAccess.get_open_error())); return false
-	file.store_string(JSON.stringify(data)); file.close()
+	file.store_string(serialized); file.close()
 	if DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary), ProjectSettings.globalize_path(save_path)) != OK:
 		push_warning("WORLD_BUILDER atomic save replace failed")
 		return false
@@ -587,19 +603,24 @@ func _meteor_inventory(record: Dictionary, id: String) -> void:
 	meteor_refresh_remaining = 0.0
 
 
-func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float, normal: Vector3 = Vector3.ZERO) -> bool:
+func mine_meteor(target: Node3D, point: Vector3, tool_id: String, speed: float, normal: Vector3 = Vector3.ZERO, contact: Dictionary = {}) -> bool:
 	var meteor: Node = target.get_parent()
 	if meteor == null or not meteor_nodes.values().has(meteor): return false
-	var reward: Dictionary = meteor.strike(point, tool_id, maxf(0.0, speed) * 0.45, normal)
+	if game.get("mining") != null and not game.mining.can_extract(): return false
+	var reward: Dictionary = meteor.strike(point, tool_id, maxf(0.0, speed) * 0.45, normal, contact)
 	if not bool(reward.get("ok", false)):
 		if str(reward.get("reason", "")) == "pick_required": game._notice("A mining pick can break the star-metal.", 2)
 		return false
-	if str(reward.kind) == "meteor_gem":
-		data.star_gems = mini(200, int(data.star_gems) + 1)
-		_changed("A star-gem came free. Two gems can focus a Crystal Fault spell.")
-	else:
-		data.star_iron = mini(200, int(data.star_iron) + 1)
-		_changed("Star iron recovered. Two pieces can raise an earthen wall.")
+	target.set_meta("mining_last_result", reward.get("damage_result","contact"))
+	if reward.get("extracted", false):
+		if game.get("mining") != null:
+			game.mining.spawn_reward({"id":str(meteor.record.get("id",meteor.record.seed))+":"+str(reward.reward_id),"kind":reward.kind,"units":reward.units},point,normal)
+		else:
+			# Minimal diagnostic fixtures may omit the collection controller.
+			var key := "star_gems" if str(reward.kind)=="meteor_gem" else "star_iron"
+			data[key] = mini(200,int(data[key])+int(reward.units))
+	data.revision = int(data.revision)+1
+	save()
 	return true
 
 

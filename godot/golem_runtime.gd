@@ -2,6 +2,7 @@ extends Node
 ## Quarry sentinel gameplay and authored modular art. ActorAnimation owns the pose;
 ## AdventureRuntime owns health, loot and respawn. Nothing here moves the actor root.
 const ART_PATH := "res://assets/golem/golem.glb"
+const MiningDamage = preload("res://mining_damage.gd")
 const PARTS := {"BodyCore":"body", "Head":"head", "ArmL":"arm_l", "ArmR":"arm_r", "LegL":"leg_l", "LegR":"leg_r"}
 const ARMOR := {"ChestPlate":"chest", "ShoulderL":"arm_l", "ShoulderR":"arm_r", "ForearmL":"arm_l", "ForearmR":"arm_r"}
 const ARMOR_HEALTH := 24.0
@@ -27,12 +28,13 @@ func attach(actor: Node3D, rig: Dictionary) -> void:
 	var entry := {"actor":actor, "rig":rig, "armor":{}, "armor_nodes":{}, "core":null,
 		"core_scale":Vector3.ONE, "core_intact_material":null, "core_exposed_material":null,
 		"marker":null, "mark":Vector3.ZERO, "art":false, "last_notice":-100.0,
-		"unlocated_impact_at":-100.0}
+		"unlocated_impact_at":-100.0, "armor_sites":[], "armor_cracks":{}}
 	for region in ["chest", "head", "arm_l", "arm_r", "leg_l", "leg_r"]:
 		entry.armor[region] = ARMOR_HEALTH
 	entries[actor.get_instance_id()] = entry
 	actor.set_meta("golem_stagger_until", 0.0)
 	actor.set_meta("golem_core_exposed", false)
+	actor.set_meta("golem_armor_sites", [])
 	actor.set_meta("golem_slam_scale", 1.0)
 	actor.set_meta("golem_move_scale", 1.0)
 	actor.set_meta("surface_material", "stone")
@@ -158,6 +160,14 @@ func filter_hit(actor: Node3D, damage: float, hand, damage_type: String, impact_
 	if tool == "" and is_instance_valid(hand) and game.held.has(str(hand.get_instance_id())):
 		tool = str(game.held[str(hand.get_instance_id())].get_meta("id", ""))
 	var pick := tool == "quarry_pick"
+	var item: Node3D = null
+	if pick and is_instance_valid(hand) and game.held.has(str(hand.get_instance_id())):
+		item = game.held[str(hand.get_instance_id())]
+	var context: Dictionary = item.get_meta("mining_contact", {}) if is_instance_valid(item) else {}
+	if pick and not context.is_empty():
+		if str(context.get("strike_region", "")) not in ["pick_point", "opposite_point", "working"] or \
+			float(context.get("incidence", 1.0)) < 0.30 or float(context.get("energy", 0.0)) < 0.35:
+			return 0.0
 	var local := Vector3.ZERO
 	var aimed := impact_point is Vector3
 	if aimed: local = actor.to_local(impact_point)
@@ -182,11 +192,24 @@ func filter_hit(actor: Node3D, damage: float, hand, damage_type: String, impact_
 		elif local.x > 0.40: region = "arm_r"
 	var armor_left := float(entry.armor.get(region, 0.0))
 	if armor_left > 0.0:
-		entry.armor[region] = maxf(0.0, armor_left - damage * (1.7 if pick else 1.0))
-		damage *= 0.82 if pick else (0.6 if damage_type == "physical" else 0.78)
+		if pick and aimed:
+			var energy := float(context.get("energy", maxf(0.0, damage) * 0.1))
+			var target := ["chest", "head", "arm_l", "arm_r", "leg_l", "leg_r"].find(region)
+			var local_point: Vector3 = actor.to_local(impact_point)
+			var mining: Dictionary = MiningDamage.apply(entry.armor_sites, local_point, "stone", energy, context, target)
+			if not bool(mining.accepted): return 0.0
+			entry.armor_sites = mining.sites
+			actor.set_meta("golem_armor_sites", entry.armor_sites.duplicate(true))
+			_show_armor_crack(entry, region, impact_point, int(mining.stage))
+			# The plate absorbs the strike until a local fracture releases it.
+			damage *= 0.26
+			if bool(mining.extracted): entry.armor[region] = 0.0
+		else:
+			entry.armor[region] = maxf(0.0, armor_left - damage)
+			damage *= 0.6 if damage_type == "physical" else 0.78
 		if float(entry.armor[region]) <= 0.0:
 			_break_armor(entry, region, impact_point if aimed else actor.global_position + Vector3.UP * 1.2, not aimed)
-			damage *= 1.25
+			damage *= 3.8 if pick else 1.25
 	else:
 		damage *= 1.35 if pick else 1.15
 	if pick and aimed and region in ["leg_l", "leg_r"]: _stagger(actor, 0.75)
@@ -194,6 +217,7 @@ func filter_hit(actor: Node3D, damage: float, hand, damage_type: String, impact_
 
 func _break_armor(entry: Dictionary, region: String, point: Vector3, emit_fallback: bool) -> void:
 	var actor: Node3D = entry.actor
+	_clear_armor_crack(entry, region)
 	for plate_name in entry.armor_nodes:
 		if ARMOR[plate_name] == region and is_instance_valid(entry.armor_nodes[plate_name]):
 			var plate: Node3D = entry.armor_nodes[plate_name]
@@ -225,6 +249,40 @@ func _stagger(actor: Node3D, seconds: float) -> void:
 	actor.set_meta("combat_progress", 0.86)
 	cancel_slam(actor)
 
+func _show_armor_crack(entry: Dictionary, region: String, point: Vector3, stage: int) -> void:
+	# Damage is authoritative in armor_sites. Art is an optional view, parented
+	# to the moving plate so the crack follows animation without a new collider.
+	var art_path := "res://mining_visual_art.gd"
+	if not ResourceLoader.exists(art_path): return
+	var plate: Node3D = null
+	for plate_name in entry.armor_nodes:
+		if ARMOR[plate_name] == region and is_instance_valid(entry.armor_nodes[plate_name]):
+			plate = entry.armor_nodes[plate_name]
+			break
+	if plate == null: return
+	var art = load(art_path)
+	if art == null or not art.has_method("crack_mesh"): return
+	var mesh = art.crack_mesh(stage, int(entry.actor.get_instance_id()) + region.hash())
+	if not mesh is Mesh: return
+	var crack: MeshInstance3D = entry.armor_cracks.get(region)
+	if not is_instance_valid(crack):
+		crack = MeshInstance3D.new()
+		crack.name = "ArmorFracture_" + region
+		plate.add_child(crack)
+		entry.armor_cracks[region] = crack
+	crack.mesh = mesh
+	var local := plate.to_local(point)
+	var outward := (point - plate.global_position).normalized()
+	if outward.length_squared() < 0.25: outward = plate.global_basis.z.normalized()
+	var local_normal := (plate.global_basis.inverse() * outward).normalized()
+	crack.position = local + local_normal * 0.012
+	crack.basis = Basis.looking_at(-local_normal, Vector3.UP if absf(local_normal.y) < 0.9 else Vector3.RIGHT)
+
+func _clear_armor_crack(entry: Dictionary, region: String) -> void:
+	var crack = entry.armor_cracks.get(region)
+	if is_instance_valid(crack): crack.queue_free()
+	entry.armor_cracks.erase(region)
+
 func defeated(actor: Node3D, impact_point = null) -> void:
 	cancel_slam(actor)
 	var entry: Dictionary = entries.get(actor.get_instance_id(), {})
@@ -248,6 +306,9 @@ func restore(actor: Node3D) -> void:
 	var entry: Dictionary = entries.get(actor.get_instance_id(), {})
 	if entry.is_empty(): return
 	cancel_slam(actor)
+	for region in entry.armor_cracks.keys(): _clear_armor_crack(entry, str(region))
+	entry.armor_sites = []
+	actor.set_meta("golem_armor_sites", [])
 	for region in entry.armor: entry.armor[region] = ARMOR_HEALTH
 	for region in ["chest", "head", "arm_l", "arm_r", "leg_l", "leg_r"]:
 		if actor.has_meta("golem_broken_" + region): actor.remove_meta("golem_broken_" + region)

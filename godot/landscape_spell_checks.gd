@@ -60,11 +60,11 @@ func _run() -> void:
 		if land.height_at(impact_at) > impact_before - 2.0: failures.append("crater depth missing")
 		if preload("res://orchard_ground.gd").exposure_sample(impact_at).g < 0.4: failures.append("crater did not expose cut ground")
 		for i in 2:
-			if not builder.mine_meteor(meteor.collider, meteor.gems[0].global_position, "quarry_pick", 3.0): failures.append("pick missed gem")
+			if not _mine_one(builder, game, meteor, meteor.gems[0].global_position, "gem", 3.0): failures.append("pick missed gem or physical collection failed")
 		if int(builder.data.star_gems) != 2: failures.append("mined gem ledger")
 		var rock_top: Vector3 = meteor.global_position + Vector3.UP * 2.55
 		for i in 2:
-			if not builder.mine_meteor(meteor.collider, rock_top, "quarry_pick", 2.0): failures.append("pick missed star iron")
+			if not _mine_one(builder, game, meteor, rock_top, "iron", 2.0): failures.append("pick missed star iron or physical collection failed")
 		if int(builder.data.star_iron) != 2: failures.append("mined iron ledger")
 		builder.data.mana = 20.0
 		var fault_at := Vector2(35.0, 48.0)
@@ -98,3 +98,16 @@ func _run() -> void:
 	if land.last_compile_stages.is_empty(): failures.append("derived fields did not refresh")
 	print("LANDSCAPE_SPELL_RESULT failures=", failures, " ops=", land.operation_count(), " hydro_ms=", land.last_hydrology_ms)
 	quit(0 if failures.is_empty() else 1)
+
+func _mine_one(builder: Node, game: Node3D, meteor: Node3D, point: Vector3, kind: String, speed: float) -> bool:
+	var before: int = meteor.remaining_gems() if kind == "gem" else meteor.remaining_ore()
+	for i in 16:
+		if not builder.mine_meteor(meteor.collider, point, "quarry_pick", speed): return false
+		var after: int = meteor.remaining_gems() if kind == "gem" else meteor.remaining_ore()
+		if after < before:
+			if game.get("mining") == null: return false
+			var pickups: Node = game.mining.pickups
+			for body in pickups.active.values():
+				if is_instance_valid(body) and pickups.collect(body): return true
+			return false
+	return false

@@ -7,6 +7,8 @@ signal inventory_changed(record: Dictionary)
 ## Visual adapters can subscribe without owning impact timing or saved state.
 signal visual_event(payload: Dictionary)
 
+const MiningDamage = preload("res://mining_damage.gd")
+
 const FALL_SECONDS := 1.25
 const SETTLE_SECONDS := 1.35
 const GEM_VEINS := 6
@@ -24,6 +26,7 @@ var settle_elapsed := 0.0
 var core: MeshInstance3D
 var collider: StaticBody3D
 var scar_display: MultiMeshInstance3D
+var damage_display: Node3D
 var gems: Array[MeshInstance3D] = []
 static var _shared_rock: ArrayMesh
 static var _shared_scar: ArrayMesh
@@ -34,9 +37,9 @@ static func make_record(at: Vector2, seed: int, ground_y: float) -> Dictionary:
 	var veins: Array = []
 	for i in GEM_VEINS:
 		veins.append(MAX_GEMS_PER_VEIN)
-	return {"version": 1, "center": [snappedf(at.x, 0.01), snappedf(at.y, 0.01)],
+	return {"version": 2, "center": [snappedf(at.x, 0.01), snappedf(at.y, 0.01)],
 		"ground_y": snappedf(ground_y, 0.01), "seed": seed,
-		"veins": veins, "ore": ORE_UNITS, "scars": [], "radius": 10.0,
+		"veins": veins, "ore": ORE_UNITS, "scars": [], "mining_sites": [], "radius": 10.0,
 		"rotation": snappedf(rng.randf_range(0.0, TAU), 0.0001)}
 
 static func crater_operation(source: Dictionary) -> Dictionary:
@@ -64,12 +67,14 @@ func setup(source: Dictionary, animate := true) -> void:
 		push_error("Invalid meteor record")
 		return
 	if not record.has("scars"): record["scars"] = []
+	if not record.has("mining_sites"): record["mining_sites"] = []
 	name = "StarfallMeteorite"
 	var at: Array = record.center
 	position = Vector3(float(at[0]), float(record.ground_y), float(at[1]))
 	rotation.y = float(record.rotation)
 	_build_visuals()
 	_refresh_scars()
+	_refresh_damage_visuals()
 	falling = animate
 	impacted = not animate
 	if animate:
@@ -91,6 +96,7 @@ func set_crystal_art(artist: Object) -> void:
 	# Keep GemVein nodes and their positions as the stable strike/reward API.
 	if artist != null and artist.has_method("decorate_meteor"):
 		artist.decorate_meteor(self, gems)
+		for i in gems.size(): _update_gem(i)
 
 func remaining_gems() -> int:
 	var total := 0
@@ -101,7 +107,7 @@ func remaining_ore() -> int:
 	return int(record.get("ore", 0))
 
 func strike(hit_world_position: Vector3, tool_id: String, energy: float = 1.0,
-		surface_normal: Vector3 = Vector3.ZERO) -> Dictionary:
+		surface_normal: Vector3 = Vector3.ZERO, context: Dictionary = {}) -> Dictionary:
 	if not impacted: return {"ok": false, "reason": "falling"}
 	if tool_id not in ["quarry_pick", "crystal_resonator"]: return {"ok": false, "reason": "pick_required"}
 	if not is_finite(energy) or energy < 0.35: return {"ok": false, "reason": "weak_strike"}
@@ -113,27 +119,42 @@ func strike(hit_world_position: Vector3, tool_id: String, energy: float = 1.0,
 		if int(record.veins[i]) <= 0: continue
 		var d := hit_world_position.distance_squared_to(gems[i].global_position)
 		if d < best_distance: best_distance = d; best = i
-	var kind := ""
-	# Aim the pick at a visible vein for a gem. Rock elsewhere yields iron;
-	# otherwise the six veins would unintentionally block ore until exhausted.
-	if best >= 0 and best_distance <= 0.8 * 0.8 and energy >= 0.7:
-		record.veins[best] = int(record.veins[best]) - 1
-		_update_gem(best)
-		kind = "meteor_gem"
-	elif remaining_ore() > 0:
-		record.ore = remaining_ore() - 1
-		kind = "star_iron"
-	else:
-		return {"ok": false, "reason": "depleted"}
+	# The anchored vein determines the local material. Rock elsewhere has its
+	# own damage site; walking around the shell does not advance a distant site.
+	var gem_target := best if best >= 0 and best_distance <= 0.8 * 0.8 else -1
+	var material_kind := "crystal" if gem_target >= 0 else "meteor"
+	if gem_target < 0 and remaining_ore() <= 0: return {"ok": false, "reason": "depleted"}
+	var local_hit := core.to_local(hit_world_position)
+	var damage: Dictionary = MiningDamage.apply(record.mining_sites, local_hit, material_kind, energy, context, gem_target)
+	if not bool(damage.accepted): return {"ok": false, "reason": str(damage.reason), "damage_result": str(damage.damage_result)}
+	record.mining_sites = damage.sites
 	_record_scar(hit_world_position, surface_normal, energy)
+	if bool(damage.extracted) and not record.scars.is_empty():
+		record.scars[-1]["stage"] = 3
+	_refresh_damage_visuals()
+	var kind := ""
+	var reward_id := ""
+	if bool(damage.extracted):
+		if gem_target >= 0:
+			reward_id = "%s:crystal:%d:%d" % [str(record.seed), gem_target, int(record.veins[gem_target])]
+			record.veins[gem_target] = int(record.veins[gem_target]) - 1
+			kind = "meteor_gem"
+		else:
+			reward_id = "%s:iron:%d" % [str(record.seed), remaining_ore()]
+			record.ore = remaining_ore() - 1
+			kind = "star_iron"
+	if gem_target >= 0: _update_gem(gem_target)
 	if remaining_gems() == 0 and remaining_ore() == 0:
 		core.scale = Vector3.ONE * 0.65
 		collider.scale = core.scale
 		collider.set_meta("depleted", true)
 	inventory_changed.emit(to_record())
-	return {"ok": true, "kind": kind, "units": 1,
+	return {"ok": true, "extracted": bool(damage.extracted), "reason": "",
+		"kind": kind, "units": 1 if bool(damage.extracted) else 0,
+		"reward_id": reward_id,
 		"remaining_gems": remaining_gems(), "remaining_ore": remaining_ore(),
-		"damage_result": "fresh_chip", "scar_count": record.scars.size()}
+		"damage_result": damage.damage_result, "stage": damage.stage,
+		"quality": damage.quality, "scar_count": record.scars.size()}
 
 func _record_scar(point: Vector3, surface_normal: Vector3, energy: float) -> void:
 	# Gem markers sit partially inside the rock. Project their reward point to
@@ -229,14 +250,19 @@ func advance(delta: float) -> void:
 	settle_elapsed = 0.0
 
 func _build_visuals() -> void:
+	var mining_art = load("res://mining_visual_art.gd") if ResourceLoader.exists("res://mining_visual_art.gd") else null
 	core = MeshInstance3D.new()
 	core.name = "MeteoriteCore"
 	core.mesh = _rock_mesh()
+	if mining_art != null: core.material_override = mining_art.material("meteor")
 	add_child(core)
 	core.position.y = 0.65
 	scar_display = MultiMeshInstance3D.new()
 	scar_display.name = "MiningScars"
 	core.add_child(scar_display)
+	damage_display = Node3D.new()
+	damage_display.name = "LocalFractures"
+	core.add_child(damage_display)
 	collider = StaticBody3D.new()
 	collider.name = "MineableMeteorite"
 	collider.set_meta("requires", "pick")
@@ -259,6 +285,13 @@ func _build_visuals() -> void:
 		var gem := MeshInstance3D.new()
 		gem.name = "GemVein_%02d" % i
 		gem.mesh = gem_mesh
+		gem.material_override = gem_mat.duplicate()
+		if mining_art != null and mining_art.has_method("crystal_mesh"):
+			var authored_crystal = mining_art.crystal_mesh(int(record.seed) + i)
+			if authored_crystal is Mesh: gem.mesh = authored_crystal
+		if mining_art != null and mining_art.has_method("material"):
+			var crystal_material = mining_art.material("crystal")
+			if crystal_material is Material: gem.material_override = crystal_material.duplicate()
 		var angle := TAU * float(i) / GEM_VEINS + float(record.rotation)
 		gem.position = Vector3(cos(angle) * 1.55, 0.95 + 0.50 * sin(angle * 2.0), sin(angle) * 1.55)
 		gem.rotation = Vector3(0.35 * sin(angle), angle, 0.65 * cos(angle))
@@ -266,6 +299,48 @@ func _build_visuals() -> void:
 		gems.append(gem)
 		_update_gem(i)
 	# Starfall VFX attach to visual_event. No generic impact sphere is built.
+
+func _refresh_damage_visuals() -> void:
+	if damage_display == null: return
+	for child in damage_display.get_children(): child.free()
+	if not ResourceLoader.exists("res://mining_visual_art.gd"): return
+	var mining_art = load("res://mining_visual_art.gd")
+	if mining_art == null or not mining_art.has_method("crack_mesh"): return
+	var sites: Array = record.get("mining_sites", [])
+	for i in sites.size():
+		var site: Dictionary = sites[i]
+		var raw: Array = site.point
+		var local_point := Vector3(float(raw[0]),float(raw[1]),float(raw[2]))
+		var normal := local_point.normalized()
+		if normal.length_squared() < 0.25: normal = Vector3.UP
+		if is_inside_tree() and collider != null:
+			var world_normal := (core.global_basis * normal).normalized()
+			var surface_hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(
+				PhysicsRayQueryParameters3D.create(core.global_position + world_normal * 4.0, core.global_position))
+			if surface_hit.get("collider") == collider:
+				local_point = core.to_local(surface_hit.position)
+				normal = (core.global_basis.inverse() * surface_hit.normal).normalized()
+		var stage := 3 if int(site.get("stage", 0)) >= 1 else (2 if float(site.get("damage", 0.0)) >= 0.6 else 1)
+		var mesh = mining_art.crack_mesh(stage, int(record.seed) + i * 37)
+		if not mesh is Mesh: continue
+		var crack := MeshInstance3D.new()
+		crack.name = "Fracture_%02d" % i
+		crack.mesh = mesh
+		damage_display.add_child(crack)
+		crack.position = local_point + normal * 0.012
+		crack.basis = Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.RIGHT)
+	for i in record.scars.size():
+		var scar: Dictionary = record.scars[i]
+		if int(scar.get("stage", 0)) != 3: continue
+		var p: Array = scar.point
+		var n: Array = scar.normal
+		var normal := Vector3(float(n[0]),float(n[1]),float(n[2])).normalized()
+		var crack := MeshInstance3D.new()
+		crack.name = "ExtractionFracture_%02d" % i
+		crack.mesh = mining_art.crack_mesh(3, int(record.seed) + i * 59)
+		damage_display.add_child(crack)
+		crack.position = Vector3(float(p[0]),float(p[1]),float(p[2])) + normal * 0.012
+		crack.basis = Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.RIGHT)
 
 static func _rock_mesh() -> ArrayMesh:
 	# A tiny shared, flat-shaded shell gives every meteorite readable stone
@@ -324,8 +399,21 @@ static func _rock_face(vertices: PackedVector3Array, normals: PackedVector3Array
 
 func _update_gem(i: int) -> void:
 	var count := int(record.veins[i])
+	var exposed := false
+	for site in record.get("mining_sites", []):
+		if int(site.get("target", -1)) == i and str(site.get("kind", "")) == "crystal" and int(site.get("stage", 0)) >= 1:
+			exposed = true
+			break
+	# A small glint marks an embedded vein; repeated local hits expose the
+	# crystal before it can detach. GemVein anchors stay stable for art adapters.
 	gems[i].visible = count > 0
-	gems[i].scale = Vector3.ONE * (0.65 + 0.22 * count)
+	gems[i].scale = Vector3.ONE * ((0.65 + 0.22 * count) if exposed else 0.30)
+	gems[i].set_meta("mining_light_strength", 0.58 if exposed else 0.12)
+	if gems[i].material_override is StandardMaterial3D:
+		var crystal_light: StandardMaterial3D = gems[i].material_override
+		crystal_light.emission_energy_multiplier = 1.8 if exposed else 0.28
+	if gems[i].mesh != null and gems[i].mesh.get_surface_count() > 0 and gems[i].mesh.surface_get_material(0) is ShaderMaterial:
+		gems[i].set_instance_shader_parameter("heat", 0.9 if exposed else 0.05)
 
 static func _material(color: Color, glow: bool) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -352,4 +440,13 @@ static func _valid_record(source: Dictionary) -> bool:
 		if not scar is Dictionary or not scar.get("point") is Array or not scar.get("normal") is Array: return false
 		if scar.point.size() != 3 or scar.normal.size() != 3: return false
 		if not is_finite(float(scar.get("size", NAN))): return false
+		if scar.has("stage") and int(scar.stage) != 3: return false
+	var sites: Variant = source.get("mining_sites", [])
+	if not MiningDamage.valid_sites(sites): return false
+	for site in sites:
+		var target := int(site.target)
+		if target < -1 or target >= GEM_VEINS: return false
+		if str(site.kind) != ("meteor" if target == -1 else "crystal"): return false
+		if target >= 0 and int(source.veins[target]) <= 0: return false
+		if target == -1 and int(source.get("ore", -1)) <= 0: return false
 	return int(source.get("ore", -1)) >= 0 and int(source.get("ore", -1)) <= ORE_UNITS

@@ -51,8 +51,9 @@ static func build(game: Node) -> Dictionary:
 			"rows": [
 				_row("Mana", mana, "Regenerates; pays for land, life and encounter spells."),
 				_row("Stockpile lumber", str(int(b.get("wood", 0))), "Delivered by helpers or recovered physical timber; builds structures and hires helpers."),
-				_row("Star gems", str(int(b.get("star_gems", 0))), "Mined from Starfall; two plus 2 Mana raise a Crystal Fault."),
-				_row("Star iron", str(int(b.get("star_iron", 0))), "Mined from Starfall; two build an Earthen Wall before Mana is used."),
+				_row("Star gems", str(int(b.get("star_gems", 0))), "Strike one meteor seam repeatedly with the pick tip, then E / grip the loose crystal. Two plus 2 Mana raise a Crystal Fault."),
+				_row("Star iron", str(int(b.get("star_iron", 0))), "Chip the meteor crust at one spot, then collect the loose metal. Two build an Earthen Wall before Mana is used."),
+				_row("Uncollected mining chunks", str(b.get("mining_pending", []).size()), "Physical valuables remain in the world and survive reload. E can collect a nearby aimed chunk while your pick stays held."),
 				_row("Ent seeds", str(b.get("ent_seeds", []).size()), "Recovered from fallen Ents; one plants a magical tree.")
 			]})
 	var fairy: Node = game.fairy

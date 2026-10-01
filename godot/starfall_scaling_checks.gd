@@ -41,10 +41,22 @@ func _check() -> void:
 		if near.collider.process_mode == Node.PROCESS_MODE_DISABLED:
 			failures.append("nearby meteor collider is disabled")
 		var gem_position: Vector3 = near.gems[0].global_position
-		if not builder.mine_meteor(near.collider, gem_position, "quarry_pick", 2.0):
-			failures.append("nearby gem could not be mined")
+		var accepted := false
+		for strike in 12:
+			accepted = builder.mine_meteor(near.collider, gem_position, "quarry_pick", 2.0)
+			if int(near.record.veins[0]) == 1: break
+		if not accepted or int(near.record.veins[0]) != 1:
+			failures.append("nearby gem could not be extracted")
 		elif int(builder.data.meteors[0].veins[0]) != 1:
 			failures.append("mining reward was not recorded")
+		else:
+			var collected := false
+			for body in game.mining.pickups.active.values():
+				if is_instance_valid(body) and game.mining.pickups.collect(body):
+					collected = true
+					break
+			if not collected or int(builder.data.star_gems) != 1:
+				failures.append("physical gem was not collected once")
 	var path := "user://starfall_scaling_verification_%d.json" % Time.get_ticks_usec()
 	builder.save_path = path
 	builder.test_mode = false
@@ -54,7 +66,7 @@ func _check() -> void:
 	reloaded.save_path = path
 	reloaded.data = Builder.fresh_state()
 	reloaded._load()
-	if reloaded.data.meteors.size() != 128 or int(reloaded.data.meteors[0].veins[0]) != 1 or reloaded.data.meteors[0].scars.size() != 1:
+	if reloaded.data.meteors.size() != 128 or int(reloaded.data.meteors[0].veins[0]) != 1 or reloaded.data.meteors[0].scars.size() < 3:
 		failures.append("saved ore, scars or records did not reload")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	game.rig.global_position = builder.center + Vector3(120.0, 3.0, 112.0)

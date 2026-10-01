@@ -154,6 +154,10 @@ func _lodge_bone(axe:Node3D,bone:RigidBody3D)->void:
 	bone.set_meta("lodged_on_axe",true)
 
 func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_region:String="working")->bool:
+	var mining_contact: Dictionary = {}
+	if str(item.get_meta("id",""))=="quarry_pick" and game.get("mining")!=null:
+		mining_contact = game.mining.contact(item,target,point,normal,speed,strike_region,hand)
+		item.set_meta("mining_contact",mining_contact)
 	if game.atelier!=null: game.atelier.impact(item,speed)
 	if game.sunfall!=null and game.sunfall.is_sunfall(item):
 		var motion=(point-tracks.get(item.get_instance_id(),{}).get("previous",point)).normalized()*speed
@@ -168,7 +172,10 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 		kind = target.get_meta("kind", "")
 	if kind=="meteor_ore" and game.world_builder!=null:
 		if str(item.get_meta("id", "")) == "quarry_pick" and strike_region not in ["pick_point", "opposite_point", "working"]: return false
+		if game.get("mining")!=null: return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed,normal,mining_contact)
 		return game.world_builder.mine_meteor(target,point,str(item.get_meta("id","")),speed,normal)
+	if kind=="mining_deposit" and game.get("mining")!=null and str(item.get_meta("id",""))=="quarry_pick":
+		return game.mining.strike(item,target,point,normal,speed,mining_contact)
 	if str(kind).begins_with("hollow_"):
 		return game.adventure.interact(target,str(item.get_meta("id","apprentice_hammer")),hand)
 	if kind=="apple" and game.apples!=null:
@@ -186,6 +193,8 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 	if kind=="resource" and target.get_meta("requires","") in ["axe","chop"]:
 		return chop(target,point,normal,hand,speed,false) if item.get_meta("id","")=="woodland_axe" else false
 	if kind=="resource" and item.get_meta("id","")=="quarry_pick":
+		if game.get("mining")!=null and target.get_meta("requires","") in ["pick","mine"]:
+			return game.mining.strike(item,target,point,normal,speed,mining_contact)
 		game.item_actions.resonant_mine(item,target,point,hand)
 		game.adventure.interact(target,"quarry_pick",hand)
 		return target.get_meta("collecting",false) or not target.visible
