@@ -24,8 +24,11 @@ static func material() -> ShaderMaterial:
 	_material.set_shader_parameter("grass_tex", load(SURFACE_MATERIALS+"meadow_albedo.png" if meadow else "res://assets/atmosphere/grass_albedo.png"))
 	_material.set_shader_parameter("soil_tex", load(SURFACE_MATERIALS+"loam_albedo.png" if loam else "res://assets/atmosphere/soil_albedo.png"))
 	_material.set_shader_parameter("micro_normal", load(SURFACE_MATERIALS+"meadow_normal.png" if ResourceLoader.exists(SURFACE_MATERIALS+"meadow_normal.png") else "res://assets/atmosphere/micro_normal.png"))
-	_material.set_shader_parameter("grass_tile_per_m",0.60 if meadow else 0.23)
-	_material.set_shader_parameter("soil_tile_per_m",0.68 if loam else 0.31)
+	# Sonnet ground refinement: the PBR meadow/loam grain was tiled at 0.60-0.68/m (1.5-1.7 m repeat), which
+	# read as a fine speckled carpet at eye height. 0.40/0.44 per m (~2.5 m repeat) keeps grain visible on
+	# the nearest ground while the shader's stylized drifts carry the large-scale value structure.
+	_material.set_shader_parameter("grass_tile_per_m",0.40 if meadow else 0.23)
+	_material.set_shader_parameter("soil_tile_per_m",0.44 if loam else 0.31)
 	if ResourceLoader.exists(SURFACE_MATERIALS+"meadow_orm.png") and ResourceLoader.exists(SURFACE_MATERIALS+"loam_orm.png"):
 		_material.set_shader_parameter("grass_orm",load(SURFACE_MATERIALS+"meadow_orm.png"))
 		_material.set_shader_parameter("soil_orm",load(SURFACE_MATERIALS+"loam_orm.png"))

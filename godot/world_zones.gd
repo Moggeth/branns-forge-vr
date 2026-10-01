@@ -188,15 +188,7 @@ static func tree(p: Node3D, pos: Vector3, h: float, pine: bool = false, apples: 
 	return TreeAdapter.tree(p,pos,h,pine,apples,pickups)
 
 static func flowers(p: Node3D, pos: Vector3, count: int, spread: float, color: String = "fff0bd") -> void:
-	for i in range(count):
-		var a: float = float(i)*2.39996
-		var r: float = sqrt(float(i)/maxf(float(count),1.0))*spread
-		var v := pos+Vector3(cos(a)*r,0.1,sin(a)*r)
-		var blade := box(p,v,Vector3(0.07,0.25+0.06*(i%3),0.02),"7e9f49")
-		blade.rotation.z = sin(a)*0.25
-		if i%3 == 0:
-			rock(p,v+Vector3(0,0.17,0),Vector3(0.16,0.07,0.16),color)
-			rock(p,v+Vector3(0,0.21,0),Vector3.ONE*0.055,"e9bd55")
+	preload("res://ground_garden_art.gd").flowers(p,pos,count,spread,color)
 
 static func path(p: Node3D, start: Vector3, end: Vector3, color: String = "c5b999") -> void:
 	var distance: float = start.distance_to(end)

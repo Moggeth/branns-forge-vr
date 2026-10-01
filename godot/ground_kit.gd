@@ -12,6 +12,16 @@ const ZONE_DENSITY={"forge_yard":[110,7],"pinewood_ruins":[85,8],"orchard_highla
 	"enchanted_kitchen":[0,0],"crystal_hollow":[0,0],"ember_foundry":[0,0],"gloamfen":[0,0],"starfall_ridge":[0,0],
 	"sky_garden":[0,0],"cloudbreak_keep":[0,0]}
 const ORCHARD_CHUNK := 64.0
+# The pre-PBR gk_grass_* blades (flat green sticks) are superseded by the surface kit's grass/fern/flower
+# props. Fraction of their authored clusters still emitted, per zone. RNG draws are NOT skipped, so rock
+# placement and collision (drawn after the grass loop from the same stream) stay bit-identical.
+const LEGACY_GRASS_KEEP := {"orchard_highlands":0.0,"pinewood_ruins":0.30,"mushroom_glade":0.30,"sandstone_quarry":0.50}
+# Ecology tuning for the surface-kit pass. Anchors are placed stones/wood/debris (plus optional tree roots);
+# understory kinds gather around them and thin out over open lawn.
+const ANCHOR_KINDS := ["stone","wood","debris"]
+const ANCHOR_SHARE := 0.30
+const ANCHOR_CELL := 4.0
+const ANCHOR_RADIUS := 3.4
 const SURFACE_KIT := "res://assets/ground-surface-kit/"
 const SURFACE_MANIFEST := SURFACE_KIT + "manifest.json"
 const SURFACE_SPEC_LIMIT := 8 # Caps Orchard at eight asset families x 25 visible chunks.
@@ -90,6 +100,7 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 	var grass_count:int=counts[0]
 	for cluster in range(ceili(float(grass_count)/4.0)):
 		var center=Vector3(rng.randf_range(-extent+2,extent-2),0,rng.randf_range(-extent+2,extent-2))
+		var keep_cluster:bool=float((cluster*37)%100)<float(LEGACY_GRASS_KEEP.get(id,1.0))*100.0
 		for local_index in range(4):
 			var at=center+Vector3(rng.randf_range(-1.0,1.0),0,rng.randf_range(-1.0,1.0))
 			if not _allowed(id,at,trail): continue
@@ -98,7 +109,8 @@ static func populate(root:Node3D,id:String,extent:float)->void:
 			var name=GRASS[0] if choice<0.46 else (GRASS[1] if choice<0.74 else (GRASS[2] if choice<0.91 else GRASS[3]))
 			var size=rng.randf_range(0.78,1.16)
 			if name==GRASS[3]: size=minf(size,1.0)
-			transforms[name].append(Transform3D(Basis(Vector3.UP,rng.randf_range(0,TAU)).scaled(Vector3.ONE*size),at))
+			var grass_yaw:float=rng.randf_range(0,TAU)
+			if keep_cluster: transforms[name].append(Transform3D(Basis(Vector3.UP,grass_yaw).scaled(Vector3.ONE*size),at))
 	var rock_count:int=counts[1]
 	for i in range(rock_count):
 		for retry in range(25):
@@ -221,6 +233,27 @@ static func _surface_specs(zone_id: String) -> Array:
 	print("GROUND_SURFACE_SELECT zone=",zone_id," eligible=",selected.size()," selected=",chosen.map(func(spec: Dictionary) -> String: return str(spec.id)))
 	return chosen
 
+static func _anchor_key(p: Vector3) -> Vector2i:
+	return Vector2i(floori(p.x/ANCHOR_CELL),floori(p.z/ANCHOR_CELL))
+
+static func _anchor_add(grid: Dictionary, p: Vector3) -> void:
+	var key := _anchor_key(p)
+	if not grid.has(key): grid[key] = []
+	grid[key].append(Vector2(p.x,p.z))
+
+static func _anchor_proximity(grid: Dictionary, p: Vector3) -> float:
+	## 0 on open ground, 1 right beside a rock/log/trunk. Constant-time 3x3 cell lookup.
+	if grid.is_empty(): return 0.0
+	var origin := _anchor_key(p)
+	var flat := Vector2(p.x,p.z)
+	var nearest := ANCHOR_RADIUS
+	for dz in range(-1,2):
+		for dx in range(-1,2):
+			var cell: Variant = grid.get(origin+Vector2i(dx,dz),null)
+			if cell == null: continue
+			for anchor in cell: nearest = minf(nearest,flat.distance_to(anchor))
+	return 1.0-smoothstep(0.7,ANCHOR_RADIUS,nearest)
+
 static func _surface_island_point(rng: RandomNumberGenerator, zone_id: String) -> Vector3:
 	var islands: Array = SURFACE_ISLANDS[zone_id]
 	var total := 0.0
@@ -248,13 +281,18 @@ static func _surface_mesh(asset: String) -> Mesh:
 	if mesh != null: _surface_mesh_cache[asset] = mesh
 	return mesh
 
-static func _surface_kind_chance(kind: String, zone_id: String, point: Vector3, model: Dictionary, patch: float = 1.0) -> float:
+static func _surface_kind_chance(kind: String, zone_id: String, point: Vector3, model: Dictionary, patch: float = 1.0, id: String = "") -> float:
 	var chance := 1.0
 	if not model.is_empty():
 		chance = field_chance(model,Vector2(point.x,point.z),"rock" if kind in ["stone","debris"] else "shrub" if kind in ["fern","wood"] else "grass")
 		var mask: Color = load("res://orchard_ground.gd").sample(Vector2(point.x,point.z))
 		if mask.r > 0.42 or mask.b > 0.82: return 0.0
 		if kind in ["grass","fern","litter"]: chance *= 1.0-mask.a*0.45
+		# Ecology from the same mask that paints the ground: stones and ferns gather on damp banks, litter
+		# and fallen wood under the leaf-litter mask, so props explain the shader instead of ignoring it.
+		if kind == "stone": chance *= 0.55+mask.b*1.7+mask.a*0.5
+		elif kind == "fern": chance *= 0.70+mask.b*1.1+mask.g*0.5
+		elif kind in ["litter","wood"]: chance *= 0.30+mask.g*2.0
 	elif zone_id in ["sandstone_quarry","starfall_ridge","crystal_hollow","ember_foundry"] and kind in ["grass","fern"]:
 		chance *= 0.17
 	elif zone_id == "enchanted_kitchen" and kind in ["grass","fern"]:
@@ -293,6 +331,18 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 	patch_noise.seed = int(rng.seed) % 2147483647
 	patch_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	patch_noise.frequency = 0.075
+	# Deliberate gaps: a second, slower field opens clean lawn/soil between understory drifts so the ground
+	# shader (not another tuft) is what you see across them.
+	var gap_noise := FastNoiseLite.new()
+	gap_noise.seed = int(rng.seed+11) % 2147483647
+	gap_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	gap_noise.frequency = 0.036
+	var anchors: Dictionary = {}
+	# Optional hook: the orchard can publish tree base positions (Vector3 array) so litter/ferns gather at roots.
+	var tree_roots: Variant = root.get_meta("orchard_tree_positions",[])
+	if tree_roots is Array or tree_roots is PackedVector3Array:
+		for tree_at in tree_roots:
+			if tree_at is Vector3: _anchor_add(anchors,tree_at)
 	var meshes: Dictionary = {}
 	var weights: Array[float] = []
 	var total_weight := 0.0
@@ -307,6 +357,11 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 		weights.append(total_weight)
 	if meshes.is_empty() or total_weight <= 0.0: return
 	var ids := meshes.keys()
+	var has_anchor_kind := false
+	for id in ids:
+		if str(meshes[id].spec.kind) in ANCHOR_KINDS: has_anchor_kind = true
+	var anchor_target := roundi(float(budget)*ANCHOR_SHARE) if has_anchor_kind else 0
+	var anchors_placed := 0
 	var placed := 0
 	for attempt in range(budget*18):
 		if placed >= budget: break
@@ -317,13 +372,23 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 		var record: Dictionary = meshes[id]
 		var spec: Dictionary = record.spec
 		var kind: String = str(spec.kind)
+		var anchor_phase := anchors_placed < anchor_target and attempt < budget*5
+		if anchor_phase and not kind in ANCHOR_KINDS: continue
 		var p := _surface_island_point(rng,zone_id) if SURFACE_ISLANDS.has(zone_id) else Vector3(rng.randf_range(-extent+2,extent-2),0,rng.randf_range(-extent+2,extent-2))
 		if not _allowed(zone_id,p,trail): continue
 		if zone_id != "orchard_highlands" and Vector2(p.x,p.z).length() < 3.0: continue
 		if zone_id=="sky_garden" and (p.distance_to(Vector3(7.5,0,9.5)) < 3.0 or p.distance_to(Vector3(-8.5,0,9.5)) < 3.0): continue
 		if zone_id=="cloudbreak_keep" and p.distance_to(Vector3(7.5,0,19.5)) < 3.0: continue
 		var patch := 0.08+0.86*smoothstep(-0.32,0.26,patch_noise.get_noise_2d(p.x,p.z))
-		if rng.randf() > _surface_kind_chance(kind,zone_id,p,model,patch): continue
+		var near := 0.0 if anchor_phase else _anchor_proximity(anchors,p)
+		var ecology := 1.0
+		if kind in ["grass","fern","litter"] or id == "meadow_flowers":
+			var open_lawn := smoothstep(0.18,0.46,gap_noise.get_noise_2d(p.x,p.z))
+			ecology = lerpf(1.0-open_lawn*0.88,1.0,near)*(0.40+1.35*near)
+			if id == "meadow_flowers":
+				# Flowers are drifts at gap edges and rock feet, never a uniform sprinkle.
+				ecology *= smoothstep(0.45,0.78,patch_noise.get_noise_2d(p.x*1.7+90.0,p.z*1.7)*0.5+0.5)*(0.55+near*0.9)
+		if rng.randf() > _surface_kind_chance(kind,zone_id,p,model,patch,id)*ecology: continue
 		var limits: Variant = spec.get("scale",[0.8,1.2])
 		var low := 0.8
 		var high := 1.2
@@ -335,6 +400,9 @@ static func _populate_surface_kit(root: Node3D, zone_id: String, extent: float, 
 		record.poses.append(pose)
 		meshes[id] = record
 		placed += 1
+		if kind in ANCHOR_KINDS:
+			_anchor_add(anchors,p)
+			anchors_placed += 1
 	var holders := 0
 	for id in ids:
 		var record: Dictionary = meshes[id]

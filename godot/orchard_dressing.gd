@@ -12,6 +12,14 @@ const SONNET_VARIANTS := {
 	"branch_fallen_mossy": "fallen_branch",
 	"fern_bank_patch": "fern_patch",
 }
+# Retired legacy species. The chunky single-mesh flower_clump is superseded by the surface kit's PBR
+# meadow_flowers (placed by ground_kit.gd as drifts). It is still *placed* so the shared RNG stream, and
+# therefore every later asset and rock collision, stays identical; it is simply not emitted.
+const RETIRED := ["flower_clump"]
+# Understory rim: tufts/ferns that gather at stones and fallen wood. Own RNG, appended after the main pass,
+# and counted well under the retired flower + legacy gk_grass instances (see HANDOFF.md budget table).
+const RIM_PLANTS := {"grass_tuft": [3, 6], "fern_lady": [1, 2]}
+const RIM_CHANCE := 0.72
 const CHUNK := 64.0
 const EXTENT := 153.0
 const COUNTS := {
@@ -77,6 +85,7 @@ static func populate(root: Node3D) -> void:
 	rng.seed = int(model.seed) if not model.is_empty() else 290929
 	var trail: Array = root.get_meta("orchard_trail", [])
 	var total := 0
+	var rim_anchors: Array[Vector3] = []
 	for id in COUNTS:
 		var source := _asset(id)
 		if source.is_empty(): continue
@@ -102,10 +111,48 @@ static func populate(root: Node3D) -> void:
 			elif id == "grass_tuft": size *= rng.randf_range(0.68, 1.05)
 			var pose := Transform3D(Basis(Vector3.UP, rng.randf_range(0, TAU)).scaled(Vector3.ONE * size), point - Vector3.UP * (0.035 if _kind(id) == "rock" else 0.0))
 			placements.append(pose)
-			if _kind(id) == "rock": _rock_collision(root, id, pose)
+			if _kind(id) == "rock":
+				_rock_collision(root, id, pose)
+				rim_anchors.append(point)
+			elif id == "branch_fallen_mossy":
+				rim_anchors.append(point)
+		if RETIRED.has(id): continue
 		_emit(root, id, source, placements)
 		total += placements.size()
+	total += _rim_pass(root, rim_anchors, trail, model, scale)
 	print("WOODLAND_DRESSING density=", scale, " instances=", total, " assets=", COUNTS.size(), " chunk_m=", CHUNK)
+
+static func _rim_pass(root: Node3D, anchors: Array[Vector3], trail: Array, model: Dictionary, quality: float) -> int:
+	## Ecotone: plants hug the feet of boulders, slabs and logs, shaded side first, leaving the lawn between
+	## them open. Deterministic (own seed), same exclusion/field rules as the main pass, batched per species.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (int(model.seed) if not model.is_empty() else 290929) + 4417
+	var groups := {}
+	for id in RIM_PLANTS: groups[id] = []
+	for anchor in anchors:
+		if rng.randf() > RIM_CHANCE: continue
+		for id in RIM_PLANTS:
+			var span: Array = RIM_PLANTS[id]
+			var count := roundi(rng.randf_range(float(span[0]), float(span[1])) * quality)
+			for k in range(count):
+				var angle := rng.randf_range(0.0, TAU)
+				# bias toward the north-west (shaded, damper) foot of the stone
+				angle = lerp_angle(angle, 2.35, 0.35)
+				var point := anchor + Vector3(cos(angle), 0.0, sin(angle)) * rng.randf_range(0.65, 1.7)
+				if not GroundKitScript._allowed("orchard_highlands", point, trail): continue
+				if point.distance_to(Vector3(15, 0, -27)) < 10.5 or point.distance_to(Vector3(25, 0, -48)) < 6.0: continue
+				if not model.is_empty() and rng.randf() > GroundKitScript.field_chance(model, Vector2(point.x, point.z), "grass"): continue
+				var mask := Ground.sample(Vector2(point.x, point.z))
+				if mask.r > 0.48 or mask.b > 0.87: continue
+				var size := rng.randf_range(0.7, 1.15)
+				groups[id].append(Transform3D(Basis(Vector3.UP, rng.randf_range(0, TAU)).scaled(Vector3.ONE * size), point))
+	var total := 0
+	for id in groups:
+		var source := _asset(id)
+		if source.is_empty() or groups[id].is_empty(): continue
+		_emit(root, id, source, groups[id], "rim_")
+		total += groups[id].size()
+	return total
 
 static func _rock_collision(root: Node3D, id: String, pose: Transform3D) -> void:
 	var body := StaticBody3D.new()
@@ -120,7 +167,7 @@ static func _rock_collision(root: Node3D, id: String, pose: Transform3D) -> void
 	collider.position.y = shape.size.y * 0.48
 	body.add_child(collider)
 
-static func _emit(root: Node3D, id: String, source: Dictionary, placements: Array) -> void:
+static func _emit(root: Node3D, id: String, source: Dictionary, placements: Array, tag: String = "") -> void:
 	var chunks: Dictionary = {}
 	for pose in placements:
 		var key := Vector2i(floori(pose.origin.x / CHUNK), floori(pose.origin.z / CHUNK))
@@ -137,7 +184,7 @@ static func _emit(root: Node3D, id: String, source: Dictionary, placements: Arra
 		for i in range(poses.size()):
 			batch.set_instance_transform(i, Transform3D(poses[i].basis, poses[i].origin - origin))
 		var holder := MultiMeshInstance3D.new()
-		holder.name = "Woodland_" + id + "_%d_%d" % [key.x, key.y]
+		holder.name = "Woodland_" + tag + id + "_%d_%d" % [key.x, key.y]
 		holder.position = origin
 		holder.multimesh = batch
 		var addresses := PackedVector3Array()

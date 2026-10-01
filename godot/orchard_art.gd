@@ -80,6 +80,21 @@ static func _emit(root:Node3D,id:String,poses:Array)->void:
 			holder.visibility_range_end=90.0 if id.begins_with("apple_tree") else (100.0 if id.begins_with("wall") else (75.0 if id in ["rock_mossy","rubble_split","path_straight"] else (60.0 if id in ["hedge_dense","shrub_flowering"] else 0.0)))
 			holder.visibility_range_end_margin=10.0 if holder.visibility_range_end>0.0 else 0.0
 			root.add_child(holder)
+			if leafy and id.begins_with("apple_tree") and holder.cast_shadow==GeometryInstance3D.SHADOW_CASTING_SETTING_ON:
+				# Same MultiMesh resource (so route clearing/hiding still affects both): the visible crown stops
+				# casting its hard faceted hull; a leaf-gap shadow twin casts the dappled version instead.
+				holder.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				var shadow:=MultiMeshInstance3D.new()
+				shadow.name=holder.name+"_LeafShadow"
+				shadow.position=origin
+				shadow.multimesh=multi
+				# The visible holder owns these shared instance transforms and bounds.
+				shadow.set_meta("landscape_shared_instance_owner",holder)
+				shadow.material_override=Foliage.shadow_material("tree")
+				shadow.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+				shadow.visibility_range_end=holder.visibility_range_end
+				shadow.visibility_range_end_margin=holder.visibility_range_end_margin
+				root.add_child(shadow)
 
 static func _pose(at:Vector3,scale:float,yaw:float)->Dictionary:
 	return {"at":at,"scale":scale,"yaw":yaw}
@@ -99,7 +114,18 @@ static func upgrade_tree_visual(tree:Node3D)->void:
 		# ShootableApples supplies the visible fruit on an interactive tree.
 		if "Fruit" in node.name: node.visible=false
 		else:
-			if "Canopy" in node.name: node.material_override=Foliage.material("tree")
+			if "Canopy" in node.name:
+				node.material_override=Foliage.material("tree")
+				# Leaf-gap shadow twin replaces the hard hull shadow (see Foliage.shadow_material).
+				node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				var shadow:=MeshInstance3D.new()
+				shadow.name="CanopyLeafShadow"
+				shadow.mesh=node.mesh
+				shadow.material_override=Foliage.shadow_material("tree")
+				shadow.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+				shadow.visibility_range_end=85.0
+				shadow.visibility_range_end_margin=2.0
+				node.add_child(shadow)
 			node.visibility_range_end=85.0
 			node.visibility_range_end_margin=2.0
 	for child_name in ["Crown","Far","LeafCards"]:
@@ -113,6 +139,10 @@ static func upgrade_tree_visual(tree:Node3D)->void:
 	tree.add_child(art)
 
 static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
+	var root_positions := PackedVector3Array()
+	for placement in placements:
+		root_positions.append(placement.position)
+	root.set_meta("orchard_tree_positions",root_positions)
 	var authored:Dictionary={}
 	for id in ASSETS:
 		if id.begins_with("apple_tree"): authored[id]=[]

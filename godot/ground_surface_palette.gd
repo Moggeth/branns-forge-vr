@@ -12,14 +12,29 @@ const FAMILY := {
 	"forge_yard": ["meadow", "loam", Color("bec8a3")],
 	"sandstone_quarry": ["sand", "stone", Color("d2af89")],
 	"enchanted_kitchen": ["stone", "loam", Color("c5b69d")],
-	"pinewood_ruins": ["loam", "meadow", Color("929b78")],
-	"mushroom_glade": ["loam", "meadow", Color("7f9a79")],
+	"pinewood_ruins": ["loam", "meadow", Color("e6dcc0")],
+	"mushroom_glade": ["loam", "meadow", Color("c4d4c0")],
 	"crystal_hollow": ["stone", "loam", Color("828198")],
 	"sky_garden": ["meadow", "stone", Color("a5b99a")],
 	"ember_foundry": ["ash", "stone", Color("777178")],
-	"gloamfen": ["loam", "meadow", Color("788b83")],
+	"gloamfen": ["loam", "meadow", Color("b0c4bc")],
 	"starfall_ridge": ["stone", "ash", Color("8990a6")],
 	"cloudbreak_keep": ["snow", "stone", Color("bdc9c8")],
+}
+# Per-zone hue drift (rgb = tint multiplier of the 6-18 m patches, a = strength). Keeps each floor one coherent
+# biome while giving it two readable colour regions: lawn/moss for greens, rust/ochre for quarry and foundry.
+const DRIFT := {
+	"forge_yard": Color(0.84, 1.00, 0.74, 0.30),
+	"pinewood_ruins": Color(0.90, 1.00, 0.84, 0.30),
+	"mushroom_glade": Color(0.80, 0.92, 1.00, 0.30),
+	"sandstone_quarry": Color(1.10, 0.88, 0.68, 0.30),
+	"sky_garden": Color(0.86, 1.06, 0.86, 0.30),
+	"gloamfen": Color(0.78, 0.92, 0.90, 0.30),
+	"ember_foundry": Color(1.18, 0.80, 0.66, 0.34),
+	"enchanted_kitchen": Color(1.08, 0.92, 0.78, 0.26),
+	"crystal_hollow": Color(0.82, 0.86, 1.12, 0.30),
+	"starfall_ridge": Color(0.82, 0.90, 1.08, 0.26),
+	"cloudbreak_keep": Color(0.90, 0.98, 1.06, 0.20),
 }
 static var _materials: Dictionary = {}
 static var _flat_orm: Texture2D
@@ -51,9 +66,16 @@ static func material(zone_id: String) -> ShaderMaterial:
 	finish.set_shader_parameter("base_orm", _texture(ROOT + main + "_orm.png", "") if ResourceLoader.exists(ROOT + main + "_orm.png") else _orm())
 	finish.set_shader_parameter("accent_orm", _texture(ROOT + accent + "_orm.png", "") if ResourceLoader.exists(ROOT + accent + "_orm.png") else _orm())
 	finish.set_shader_parameter("tint", profile[2])
-	finish.set_shader_parameter("tile_per_m", 0.58 if main in ["meadow", "loam", "snow"] else 0.72)
-	finish.set_shader_parameter("accent_amount", 0.28 if main in ["meadow", "loam"] else 0.20)
-	finish.set_shader_parameter("normal_strength", 0.48 if main in ["meadow", "snow"] else 0.65)
+	# Sonnet refinement: larger repeat (less carpet speckle), stronger accent transitions and per-family
+	# contrast/hue drift ("contrast", "drift_amount" are new uniforms in ground_surface_palette.gdshader).
+	# final grade: loam repeats every ~1.6 m (0.62/m; leaf fragments ~10-15 cm instead of banana-chip 30+ cm), normal 0.30 so the denser tile does not sparkle.
+	# iter2 (superseded): loam repeats every ~4.2 m (was 2.5 m) and its albedo is a calmer, lighter revised map; contrast is a
+	# gentle luminance-only 1.08 so dark families are never crushed.
+	finish.set_shader_parameter("tile_per_m", 0.62 if main == "loam" else 0.40 if main in ["meadow", "snow"] else 0.52)
+	finish.set_shader_parameter("accent_amount", 0.34 if main == "loam" else 0.42 if main == "meadow" else 0.30)
+	finish.set_shader_parameter("contrast", 1.08 if main in ["meadow", "loam", "stone", "sand"] else 1.04)
+	finish.set_shader_parameter("drift_amount", DRIFT.get(zone_id, Color(0.0, 0.0, 0.0, 0.0)))
+	finish.set_shader_parameter("normal_strength", 0.48 if main in ["meadow", "snow"] else 0.30 if main == "loam" else 0.65)
 	finish.set_shader_parameter("rain_wetness", _wetness)
 	finish.set_shader_parameter("snow_cover", _snow)
 	_materials[zone_id] = finish

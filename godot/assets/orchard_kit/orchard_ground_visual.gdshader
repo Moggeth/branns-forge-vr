@@ -36,12 +36,16 @@ uniform sampler2D exposure_tex : hint_default_black, repeat_disable, filter_line
 uniform float rain_wetness = 0.0;
 uniform float snow_cover = 0.0;
 
-uniform vec3 grass_cool : source_color = vec3(0.25, 0.42, 0.21);
-uniform vec3 grass_lush : source_color = vec3(0.37, 0.54, 0.19);
-uniform vec3 grass_warm : source_color = vec3(0.58, 0.60, 0.26);
-uniform vec3 meadow_dry : source_color = vec3(0.64, 0.58, 0.34);
-uniform vec3 soil_col   : source_color = vec3(0.40, 0.28, 0.18);
-uniform vec3 soil_dark  : source_color = vec3(0.22, 0.15, 0.10);
+// rev-5 (Sonnet ground refinement 2026-10-01): stylized-fantasy palette. Cooler, deeper shade greens against
+// warmer sunlit yellow-greens so value contrast comes from hue + light, not from a speckled albedo texture.
+uniform vec3 grass_cool : source_color = vec3(0.13, 0.37, 0.24);
+uniform vec3 grass_lush : source_color = vec3(0.40, 0.66, 0.20);
+uniform vec3 grass_warm : source_color = vec3(0.76, 0.72, 0.26);
+uniform vec3 grass_clover : source_color = vec3(0.26, 0.55, 0.34);
+uniform vec3 moss_col   : source_color = vec3(0.16, 0.33, 0.22);
+uniform vec3 meadow_dry : source_color = vec3(0.66, 0.57, 0.32);
+uniform vec3 soil_col   : source_color = vec3(0.37, 0.25, 0.16);
+uniform vec3 soil_dark  : source_color = vec3(0.20, 0.13, 0.09);
 uniform vec3 bank_wet   : source_color = vec3(0.21, 0.18, 0.13);
 uniform vec3 rock_mid   : source_color = vec3(0.55, 0.51, 0.47);
 uniform vec3 rock_warm  : source_color = vec3(0.60, 0.51, 0.42);
@@ -103,7 +107,11 @@ void vertex() {
 
 void fragment() {
 	vec2 uv = clamp((at + vec2(160.0)) / 320.0, vec2(0.0), vec2(1.0));
-	vec4 m = texture(macro_mask, uv);
+	// rev-5: the mask is 0.625 m/texel; a noise-warped lookup breaks the straight bilinear edges that read as
+	// hard tan/brown polygons (worn patches, path margins) without changing what the mask means.
+	vec2 mask_warp = (vec2(noise2(at * 0.33 + 1.3), noise2(at * 0.33 + 8.1)) - 0.5) * (2.6 / 320.0)
+		+ (vec2(noise2(at * 1.4), noise2(at * 1.4 + 3.7)) - 0.5) * (0.9 / 320.0);
+	vec4 m = texture(macro_mask, clamp(uv + mask_warp, vec2(0.0), vec2(1.0)));
 
 	vec2 warp = vec2(noise2(at * 0.045), noise2(at * 0.045 + 5.2)) * 9.0;
 	vec2 wp = at + warp;
@@ -127,15 +135,33 @@ void fragment() {
 	g = mix(g, grass_warm, smoothstep(0.5, 0.85, meander) * 0.6);
 	g = mix(g, meadow_dry, smoothstep(0.55, 0.85, broad) * 0.5 + smoothstep(0.1, 0.4, -aspect) * 0.07);   // rev-3: halved, vertex-normal aspect showed triangles
 	g = mix(g, grass_cool * 0.85, smoothstep(0.1, 0.5, aspect) * 0.16);            // moist shaded slopes
-	g *= mix(0.84, 1.1, broad);                                                     // field-scale value drift
-	g *= mix(1.0, luma(gt) * 2.2, texture_strength);
-	g = mix(g, g * (gt / max(luma(gt), 0.05)), 0.25 * texture_strength);
-	g *= mix(0.86, 1.10, fine);
+	g *= mix(0.76, 1.20, broad);                                                    // field-scale value drift (iter2: wider again)
+	// iter2 painterly light: 25-60 m pools of warm sunlit gold-green and cool shaded blue-green, plus pale
+	// wildflower-blush drifts. All are low-frequency (no per-pixel noise), so the lawn gains big deliberate
+	// colour shapes at VR distance while close-up grain stays calm.
+	float glade = fbm(wp * 0.024 + 57.0);
+	g = mix(g, g * vec3(1.16, 1.10, 0.80), smoothstep(0.52, 0.80, glade) * 0.55);
+	g = mix(g, g * vec3(0.78, 0.94, 1.08), smoothstep(0.52, 0.80, 1.0 - glade) * 0.45);
+	float bloom = smoothstep(0.70, 0.90, fbm(wp * 0.075 + 77.0));
+	g = mix(g, g * vec3(1.20, 1.10, 1.22) + vec3(0.03, 0.02, 0.03), bloom * 0.34);
+	// rev-5: the albedo texture supplies grain, not the value structure. Its luma multiplier is compressed
+	// (strength 0.62 and a 1.6 gain) and the 0.55/m + 4.3/m noise layers that read as speckle are softened.
+	float gl = luma(gt);
+	g *= mix(1.0, clamp(gl * 1.6, 0.55, 1.45), texture_strength * 0.30);   // iter2: 0.62 -> 0.30, texture is grain not structure
+	g = mix(g, g * (gt / max(gl, 0.05)), 0.10 * texture_strength);
+	g *= mix(0.975, 1.03, fine);
 	// clumps from smooth noise only (rev-2: cell-id patches drew hard yellow polygons)
 	float clump = noise2(at * 0.9 + warp * 0.1) * 0.6 + noise2(at * 2.1) * 0.4;
-	g *= mix(0.86, 1.06, clump);                                                    // clover / tussock clumps
+	g *= mix(0.965, 1.03, clump);
 	g = mix(g, meadow_dry * 0.9, smoothstep(0.66, 0.86, fbm(wp * 0.11 + 7.0)) * 0.3); // soft dry seed-head drifts
-	g *= mix(1.0, 0.86 + 0.24 * noise2(at * 4.3), dist_fade * 0.8);                  // near-field tufts
+	g *= mix(1.0, 0.965 + 0.07 * noise2(at * 2.6), dist_fade * 0.6);                  // near-field tufts (was 0.86+0.24 @4.3/m)
+	// rev-5 stylized drifts at 4-14 m: sun-warmed knolls, clover/moss pools in the hollows. These give the
+	// lawn deliberate large shapes (readable at VR distance) instead of a uniform carpet.
+	float drift_a = fbm(wp * 0.052 + 19.0);
+	float drift_b = fbm(wp * 0.085 + 41.0);
+	g = mix(g, grass_clover, smoothstep(0.52, 0.74, drift_a) * 0.55);
+	g = mix(g, moss_col, smoothstep(0.58, 0.80, drift_b) * 0.50 * (0.4 + 0.6 * clamp(m.g + m.b, 0.0, 1.0)));
+	g = mix(g, grass_warm * 1.04, smoothstep(0.62, 0.86, 1.0 - drift_a) * 0.28 * (1.0 - clamp(m.g * 2.0, 0.0, 1.0)));
 
 	vec3 st = tex_detail(soil_tex, at, soil_tile_per_m);
 	vec3 s = mix(soil_col, soil_dark, slope_soft * 0.6 + fine * 0.2);
@@ -182,8 +208,20 @@ void fragment() {
 		path_rubble = lost * smoothstep(0.7, 0.88, noise2(at * 0.33 + 5.0)) * 0.45;   // sparse soft soil spots
 	}
 	float soil_amt = clamp(path * path_keep * 0.9 + worn * scuff * 0.7 + leaf * 0.35 + steep * 0.6 + edge_n, 0.0, 1.0);
-	soil_amt = smoothstep(0.3, 0.75, soil_amt);
+	// rev-5 grass/soil transition. (1) Thin-turf pools: soil shows through low-frequency patches where the
+	// turf is thin, cut by the grass albedo's own blade structure so the edge is ragged, never a painted disc.
+	// (2) Frayed margins: along any soil edge (0.15<soil<0.85) grass blades overlap the soil, so paths/banks
+	// read as turf growing over earth. Both only act where no real exposure/lift owns the pixel.
+	float thin_n = fbm(wp * 0.15 + 29.0);
+	float thin = smoothstep(0.60, 0.74, thin_n + (gl - 0.4) * 0.35) * (1.0 - lifted) * (1.0 - steep) * 0.42;
+	soil_amt = clamp(soil_amt + thin * (1.0 - leaf), 0.0, 1.0);
+	float soil_raw = smoothstep(0.3, 0.75, soil_amt);
+	float edge_zone = soil_raw * (1.0 - soil_raw) * 4.0;
+	float blade_cut = smoothstep(0.38, 0.62, gl + (fine - 0.5) * 0.5);   // 1 where a blade stands
+	soil_amt = clamp(soil_raw - edge_zone * blade_cut * 0.55 * (1.0 - steep), 0.0, 1.0);
 	vec3 colour = mix(g, s, soil_amt);
+	// a rim of darker, damper soil at the turf edge gives the transition depth instead of a flat brown fill
+	colour *= 1.0 - edge_zone * (1.0 - blade_cut) * 0.16;
 	if (path_lift > 0.0) {
 		// tread: broad tilt tone; turf over lost tread slightly drier and trampled; rubble = fresh earth
 		// + pale stone chips; cracks thin and dark but at reduced strength (0.5)
@@ -201,6 +239,13 @@ void fragment() {
 	vec3 rock = mix(mix(rock_mid, rock_warm, 0.5 + 0.3 * band), rock_band, smoothstep(0.6, 0.95, sin(wy * 1.3)) * 0.6);
 	rock *= mix(1.0, luma(st) * 2.0, 0.6);
 	float rockiness = smoothstep(0.50, 0.75, slope + edge_n * 0.5) * (1.0 - lifted * 0.85);
+	// rev-5 soil->rock: a scree skirt (gravel flecks on bare soil) starts below the rock threshold, and moss
+	// pools hug the lip of the rock on the shaded side, so slopes step grass -> soil -> gravel -> strata.
+	float scree_zone = smoothstep(0.30, 0.52, slope + edge_n * 0.4) * (1.0 - rockiness) * (1.0 - lifted);
+	float fleck = smoothstep(0.66, 0.80, noise2(at * 3.1) * 0.6 + noise2(at * 7.3) * 0.4);
+	colour = mix(colour, gravel_col * mix(0.7, 1.05, fine) * mix(0.9, 1.1, noise2(at * 1.9)), scree_zone * fleck * 0.75);
+	float rock_lip = smoothstep(0.38, 0.55, slope + edge_n * 0.4) * (1.0 - smoothstep(0.55, 0.72, slope)) * (1.0 - lifted);
+	colour = mix(colour, moss_col * mix(0.85, 1.15, noise2(at * 0.8)), rock_lip * (0.25 + clamp(aspect, 0.0, 1.0) * 0.35));
 	colour = mix(colour, rock, rockiness);
 
 	// --- EXPOSURE -------------------------------------------------------------------------------
@@ -304,7 +349,14 @@ void fragment() {
 	ROUGHNESS = mix(ROUGHNESS, 0.35, puddle * 0.85);
 	ROUGHNESS = mix(ROUGHNESS, 0.82, snow);
 	SPECULAR = mix(0.30, 0.45, damp) * (1.0 - snow * 0.3);
-	vec3 nm = mix(texture(micro_normal, at * 0.28).rgb, texture(micro_normal, at * 1.1 + 0.5).rgb, 0.4);
-	NORMAL_MAP = nm;
-	NORMAL_MAP_DEPTH = mix(0.6 + rockiness * 0.4 + fresh * 0.5 + wall_amt * 0.4, 0.08, snow);
+	// rev-6 anti-speckle: the 1.1/m micro-normal layer (0.9 m repeat) was the high-frequency sparkle at ground/RTS
+	// height. It now fades out by view distance (full under 6 m, gone past 22 m; continuous, no per-triangle jumps),
+	// the fine layer is mixed in at a lower weight, and the broad 0.28/m layer keeps a calm, quiet far ground.
+	// Rock, cut walls and fresh earth keep their full relief; only the grass/soil base depth is eased.
+	float nrm_near = 1.0 - smoothstep(6.0, 22.0, length(VERTEX));
+	vec3 nm_broad = texture(micro_normal, at * 0.28).rgb;
+	vec3 nm_fine = texture(micro_normal, at * 1.1 + 0.5).rgb;
+	NORMAL_MAP = mix(nm_broad, nm_fine, 0.32 * nrm_near);
+	float base_depth = mix(0.30, 0.46, nrm_near);
+	NORMAL_MAP_DEPTH = mix(base_depth + rockiness * 0.5 + fresh * 0.5 + wall_amt * 0.4, 0.08, snow);
 }

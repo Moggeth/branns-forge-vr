@@ -55,6 +55,12 @@ func _check() -> void:
 	holder.multimesh = multi
 	zone.add_child(holder)
 	holder.set_meta("dressing_positions", PackedVector3Array([Vector3(2, 0, 0), Vector3(-2, 0, 0)]))
+	var shadow := MultiMeshInstance3D.new()
+	shadow.name = "Orchard_LeafShadow"
+	shadow.multimesh = multi
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	shadow.set_meta("landscape_shared_instance_owner", holder)
+	zone.add_child(shadow)
 	var model: Dictionary = _model()
 	var projection := Reprojection.new()
 	var started: int = Time.get_ticks_msec()

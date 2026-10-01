@@ -10,6 +10,8 @@ uniform vec3 tint : source_color = vec3(1.0);
 uniform float tile_per_m = 0.58;
 uniform float accent_amount = 0.28;
 uniform float normal_strength = 0.55;
+uniform float contrast = 1.18;                    // value contrast about mid-grey, per family
+uniform vec4 drift_amount = vec4(0.0);          // rgb = hue multiplier of large patches, a = strength
 uniform float rain_wetness = 0.0;
 uniform float snow_cover = 0.0;
 varying vec3 world_at;
@@ -32,11 +34,27 @@ void fragment() {
 	// A second incommensurate projection prevents broad marks painted into one
 	// seamless tile from forming an obvious repeated grid across a full floor.
 	vec2 uv_broken = mat2(vec2(0.56, 0.83), vec2(-0.83, 0.56)) * uv * 1.37 + 7.31;
-	float blend = smoothstep(0.47, 0.76, broad * 0.68 + middle * 0.32) * accent_amount;
+	float blend_field = broad * 0.68 + middle * 0.32;
 	vec3 first = mix(texture(base_albedo, uv).rgb, texture(base_albedo, uv_broken).rgb, 0.46);
 	vec3 second = texture(accent_albedo, uv_alt).rgb;
+	// ragged accent edge: the accent texture's own luma erodes the smooth blend front (soil/rock/grass interleave)
+	float edge_grain = dot(second, vec3(0.299, 0.587, 0.114)) - 0.35;
+	float blend = smoothstep(0.45, 0.62, blend_field + edge_grain * 0.30) * accent_amount * 1.35;
+	blend = clamp(blend, 0.0, 0.85);
 	vec3 colour = mix(first, second, blend);
-	colour *= tint * mix(0.89, 1.08, broad) * mix(0.96, 1.04, middle);
+	// Sonnet refinement: stylized drifts. Large (8-30 m) patches shift hue toward the zone's drift colour and
+	// push value contrast, so a flat floor reads as two or three deliberate regions rather than one tile.
+	float region = smoothstep(0.42, 0.68, smooth_noise(at * 0.047 + 31.0) * 0.7 + broad * 0.3);
+	float pool = smoothstep(0.60, 0.78, smooth_noise(at * 0.11 + 63.0));
+	colour *= tint * mix(0.84, 1.14, broad) * mix(0.95, 1.05, middle);
+	colour = mix(colour, colour * drift_amount.rgb, clamp(region * drift_amount.a * 1.6 + pool * drift_amount.a * 0.5, 0.0, 0.8));
+	float lum = dot(colour, vec3(0.299, 0.587, 0.114));
+	colour = clamp((colour - lum) * 1.06 + lum, 0.0, 1.0);            // slight chroma lift
+	// iter2: contrast acts on LUMINANCE ONLY about a low linear pivot (0.10 ~ sRGB 0.35). The first pass pivoted each
+	// channel at 0.32 linear (sRGB 0.60), which pushed every dark PBR texel to 0 and turned Pinewood black.
+	lum = dot(colour, vec3(0.299, 0.587, 0.114));
+	float lum_c = max((lum - 0.10) * contrast + 0.10, 0.0);
+	colour = clamp(colour * (lum_c / max(lum, 1e-4)), 0.0, 1.0);
 	float wet = rain_wetness * (0.7 + broad * 0.3);
 	float snow = snow_cover * smoothstep(0.25, 0.68, broad * 0.45 + middle * 0.25 + snow_cover * 0.5);
 	colour *= 1.0 - wet * 0.19;

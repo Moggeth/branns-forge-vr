@@ -20,6 +20,7 @@ class FakeGame extends Node3D:
 	var camera: Node3D
 	var melee: Node
 	var world_builder: Node
+	var impact_feedback: Node
 	var elapsed := 0.0
 	func _effect(_at: Vector3, _color: Color, _duration: float, _size: float) -> void: pass
 	func _notice(_message: String, _duration: float = 3.0) -> void: pass

@@ -25,6 +25,9 @@ func setup(root: Node3D, model: Dictionary) -> Dictionary:
 		if not candidate is Node3D: continue
 		var node: Node3D = candidate
 		if node == root or node == _terrain_root: continue
+		# Shadow-only twins share the visible holder's MultiMesh. Updating them
+		# again can undo terrain/path hiding and wastes a second full traversal.
+		if node.has_meta("landscape_shared_instance_owner"): continue
 		var point: Vector3 = node.get_meta("_landscape_base_point", _terrain_root.to_local(node.global_position))
 		if not _inside(Vector2(point.x, point.z)): continue
 		if node is MultiMeshInstance3D and _is_dressing(node):

@@ -61,6 +61,7 @@ const PALETTES := {
 }
 
 static var _material: ShaderMaterial
+static var _shadow_material: ShaderMaterial
 static var _card_materials: Dictionary = {}
 static var _mesh_cache: Dictionary = {}
 static var _pickup_mesh: ArrayMesh
@@ -85,8 +86,23 @@ uniform bool use_viewer_position = false;
 uniform float emission_energy = 0.6;
 uniform float roughness_value : hint_range(0.0, 1.0) = 0.88;
 varying float v_glow;
+varying vec3 v_local;
+varying vec3 v_world;
+varying vec3 v_wn;
+float tk_hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float tk_noise(vec3 p) {
+	vec3 i = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix(tk_hash(i), tk_hash(i + vec3(1.0, 0.0, 0.0)), f.x), mix(tk_hash(i + vec3(0.0, 1.0, 0.0)), tk_hash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+	           mix(mix(tk_hash(i + vec3(0.0, 0.0, 1.0)), tk_hash(i + vec3(1.0, 0.0, 1.0)), f.x), mix(tk_hash(i + vec3(0.0, 1.0, 1.0)), tk_hash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+}
+// Leaf vertices are the green-dominant ones; bark (r > g), fruit (red) and glow fungus keep their authored colour.
+float tk_leaf(vec3 c) { return smoothstep(0.0, 0.05, c.g - c.r * 0.92) * step(c.b, c.g); }
 void vertex() {
 	v_glow = UV2.x;
+	v_local = VERTEX;
+	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	v_wn = normalize(mat3(MODEL_MATRIX) * NORMAL);
 	float w = COLOR.a;
 	if (wind_strength > 0.0 && w > 0.001) {
 		vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -102,11 +118,36 @@ void vertex() {
 	}
 }
 void fragment() {
-	ALBEDO = COLOR.rgb;
+	//TK_SHADOW_DAPPLE
+	vec3 c = COLOR.rgb;
+	float leaf = tk_leaf(c);
+	if (leaf > 0.0) {
+		// Canopy surface variation (subtle, leaf-only): sun-lit tops lean warm yellow-green, undersides and
+		// inner faces lean cool blue-green, and ~0.5 m / ~1.6 m clump noise (anchored in tree-local space so it
+		// never swims with the wind) breaks each facet's flat fill into leaf masses.
+		float up = clamp(v_wn.y * 0.5 + 0.5, 0.0, 1.0);
+		float clump = tk_noise(v_local * 1.9) * 0.65 + tk_noise(v_local * 5.2 + 3.1) * 0.35;
+		vec3 warm = c * vec3(1.10, 1.06, 0.82);
+		vec3 cool = c * vec3(0.84, 0.97, 1.04);
+		vec3 shaded = mix(cool, warm, smoothstep(0.30, 0.85, up));
+		shaded *= mix(0.90, 1.10, clump);
+		c = mix(c, shaded, leaf * 0.85);
+	}
+	ALBEDO = c;
 	ROUGHNESS = roughness_value;
 	SPECULAR = 0.25;
 	EMISSION = COLOR.rgb * v_glow * emission_energy;
 }
+"""
+
+# Shadow-only twin of the tree material: identical vertex (same wind) but leaves are punched with ~0.35 m
+# clump holes so canopy shadows read as filtered, dappled light. It is only ever used by SHADOWS_ONLY instances.
+const _SHADOW_MARK := "//TK_SHADOW_DAPPLE"
+const _SHADOW_DAPPLE := """
+	if (tk_leaf(COLOR.rgb) > 0.0) {
+		float h = tk_noise(v_local * 3.1) * 0.6 + tk_noise(v_local * 7.7 + 5.0) * 0.4;
+		if (h < 0.34) discard;
+	}
 """
 
 const _CARD_SHADER_CODE := """
@@ -151,6 +192,29 @@ static func tree_material() -> ShaderMaterial:
 		_material.shader = shader
 	return _material
 
+## Material of the dappled shadow-only twin (see _SHADOW_DAPPLE).
+static func shadow_material() -> ShaderMaterial:
+	if _shadow_material == null:
+		var shader = Shader.new()
+		shader.code = _SHADER_CODE.replace(_SHADOW_MARK, _SHADOW_DAPPLE)
+		_shadow_material = ShaderMaterial.new()
+		_shadow_material.shader = shader
+	return _shadow_material
+
+## Dappled canopy shadow: the visible mesh stops casting and a shadow-only instance of the SAME mesh (same
+## transform, same wind vertex code, no extra triangles in the main pass) casts through a leaf-punched material.
+## Trunks and fruit are never punched, so stems still throw solid shadows.
+static func _dapple_shadow(visible: MeshInstance3D) -> void:
+	var twin = MeshInstance3D.new()
+	twin.name = visible.name + "Shadow"
+	twin.mesh = visible.mesh
+	twin.material_override = shadow_material()
+	twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	twin.visibility_range_end = visible.visibility_range_end
+	twin.visibility_range_end_margin = visible.visibility_range_end_margin
+	visible.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visible.add_child(twin)
+
 ## Optional alpha-scissor leaf-card material (uses the processed painterly atlas).
 static func card_material(texture: Texture2D = null) -> ShaderMaterial:
 	var key = "cards"
@@ -169,7 +233,7 @@ static func card_material(texture: Texture2D = null) -> ShaderMaterial:
 ## (0.0 disables; 0.04-0.08 reads as a breeze). Collision proxies never move and
 ## geometry within 3 m of the camera is held still (full sway from 9 m) to avoid VR jitter.
 static func set_wind(strength: float, direction: Vector2 = Vector2(0.8, 0.6), speed: float = 0.8) -> void:
-	for m in [tree_material()] + _card_materials.values():
+	for m in [tree_material(), shadow_material()] + _card_materials.values():
 		m.set_shader_parameter("wind_strength", strength)
 		m.set_shader_parameter("wind_direction", direction.normalized())
 		m.set_shader_parameter("wind_speed", speed)
@@ -178,7 +242,7 @@ static func set_wind(strength: float, direction: Vector2 = Vector2(0.8, 0.6), sp
 ## (e.g. TreeKit.set_viewer(xr_camera.global_position)) so shadows match the calm
 ## geometry. Pass `enabled = false` to fall back to the rendering camera.
 static func set_viewer(position: Vector3, enabled: bool = true) -> void:
-	for m in [tree_material()] + _card_materials.values():
+	for m in [tree_material(), shadow_material()] + _card_materials.values():
 		m.set_shader_parameter("viewer_position", position)
 		m.set_shader_parameter("use_viewer_position", enabled)
 
@@ -299,6 +363,7 @@ static func build_into(node: Node3D, species: String, seed: int, opts: Dictionar
 	crown.material_override = tree_material()
 	crown.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(crown)
+	if shadows and lod == "near": _dapple_shadow(crown)
 	info["crown"] = crown
 	var triangles = crown_buf.triangle_count()
 	if choppable:
@@ -335,6 +400,10 @@ static func build_into(node: Node3D, species: String, seed: int, opts: Dictionar
 			if child != null:
 				child.visibility_range_end = lod_switch
 				child.visibility_range_end_margin = 1.0
+				for twin in child.get_children():
+					if twin is MeshInstance3D:
+						twin.visibility_range_end = lod_switch
+						twin.visibility_range_end_margin = 1.0
 		info["far"] = far
 	if choppable or bool(opts.get("collision", true)):
 		info["proxy"] = _chop_proxy(node, sk.trunk)
