@@ -127,6 +127,18 @@ func _add_piece(original: MeshInstance3D, parent: Node3D, above: bool) -> void:
 	parent.add_child(copy)
 	copy.transform = original.transform
 	if above: copy.position.y -= cut_y
+	# Keep the foliage's cutout shadow tied to the clipped geometry after splitting.
+	# The original shadow child cannot be copied verbatim: it contains the whole tree.
+	for child in original.get_children():
+		if child is MeshInstance3D and child.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+			var shadow := MeshInstance3D.new()
+			shadow.name = child.name
+			shadow.mesh = mesh
+			shadow.material_override = child.material_override
+			shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			shadow.visibility_range_begin = copy.visibility_range_begin
+			shadow.visibility_range_end = copy.visibility_range_end
+			copy.add_child(shadow)
 
 func _add_endgrain() -> void:
 	var trunk: MeshInstance3D = source.get_meta("trunk", null)

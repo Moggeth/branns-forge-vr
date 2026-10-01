@@ -79,6 +79,11 @@ func _check() -> void:
 	if felling == null: failures.append("felling helper missing")
 	else:
 		if absf(felling.cut_y - cut_y) > 0.001: failures.append("fall plane does not use selected first-hit height")
+		var fallen_crown: MeshInstance3D = felling.upper.get_node_or_null("Crown")
+		if fallen_crown != null:
+			var shadow: MeshInstance3D = fallen_crown.get_node_or_null("CrownShadow")
+			if shadow == null: failures.append("split canopy lost foliage shadow")
+			elif shadow.mesh != fallen_crown.mesh: failures.append("split canopy shadow uses uncut tree geometry")
 		if felling.stump.get_child_count() < 2: failures.append("rooted stump missing geometry")
 		felling._drop_log()
 		if not is_instance_valid(felling.log): failures.append("physical log missing")
