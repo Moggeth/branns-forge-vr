@@ -31,9 +31,10 @@ func fallen_surface(actor: Node3D, point: Vector3, part: String) -> Node3D:
 	if game.remains != null:
 		for body in game.remains.bodies:
 			if not is_instance_valid(body) or int(body.get_meta("source_actor", -1)) != actor.get_instance_id(): continue
+			if part != "" and str(body.get_meta("skeleton_part", "")) != part: continue
 			for piece in body.get_children():
 				if not piece is Node3D: continue
-				if part == "head" and piece.name != "Skull": continue
+				if piece is CollisionShape3D: continue
 				var candidate: float = piece.global_position.distance_squared_to(point)
 				if candidate < distance:
 					distance = candidate

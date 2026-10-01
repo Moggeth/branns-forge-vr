@@ -97,6 +97,7 @@ func shatter(actor,impulse=Vector3.ZERO):
 		body.set_meta("grip_max",box.size.y*0.3)
 		body.set_meta("tip",Vector3(0,box.position.y if part.begins_with("leg") else maxf(0.1,box.end.y),0))
 		if rig.type == "skeleton" and part.begins_with("leg"): add_articulated_leg(body,box,display,not snapshot.is_empty(),snapshot.get("joints",{}))
+		if game.get("projectile_attachments") != null: game.projectile_attachments.handoff(actor,part,body,piece)
 		var outward=(body.global_position-actor.global_position-Vector3.UP*0.8).normalized()
 		body.linear_velocity=snapshot.get("linear_velocity",Vector3.ZERO)+(impulse+outward*0.8+Vector3.UP*0.4)*game.tuning.value("enemy.death_scatter")
 		body.angular_velocity=snapshot.get("angular_velocity",Vector3.ZERO)+Vector3(sin(count*2.4),cos(count*1.7),sin(count))*3

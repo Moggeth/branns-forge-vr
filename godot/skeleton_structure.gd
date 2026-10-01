@@ -185,6 +185,7 @@ func _detach(actor: Node3D, rig: Dictionary, part: String, homes: Array, directi
 	body.set_meta("tip", Vector3(0.0, box.position.y if part.begins_with("leg") else maxf(0.1, box.end.y), 0.0))
 	if part.begins_with("leg") and game.get("remains") != null and game.remains != null:
 		game.remains.add_articulated_leg(body,box,body.get_child(0),not authored.is_empty(),authored.get("joints",{}))
+	if game.get("projectile_attachments") != null: game.projectile_attachments.handoff(actor,part,body)
 	var outward := direction.normalized() if direction.length_squared() > 0.001 else (point_from_actor(body, actor) + Vector3.UP * 0.4).normalized()
 	body.linear_velocity = authored.get("linear_velocity", Vector3.ZERO) + outward * clampf(force * 0.85, 1.2, 7.0) + Vector3.UP * 0.5
 	body.angular_velocity = authored.get("angular_velocity", Vector3.ZERO) + Vector3(1.3, 2.0, 0.8)

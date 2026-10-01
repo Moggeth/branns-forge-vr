@@ -155,6 +155,7 @@ var skeleton_structure
 var skeleton_pose_handoff
 var skeleton_attack_contact
 var enemy_contacts
+var projectile_attachments
 var remains
 var animation_lab
 var lab_mode=false
@@ -332,6 +333,8 @@ func _ready():
 	skeleton_attack_contact.setup(self)
 	enemy_contacts=preload("res://enemy_projectile_contact.gd").new()
 	enemy_contacts.setup(self)
+	projectile_attachments=preload("res://projectile_attachment.gd").new()
+	projectile_attachments.setup(self)
 	for enemy in scene.enemies:
 		var variant=str(enemy.get_meta("guardian_variant",""))
 		if variant!="": guardian_authored.attach(enemy,variant)
@@ -1067,6 +1070,7 @@ func _process(delta):
 	bomb_art.audio_volume=0.0 if diagnostic_offline else tuning.value("audio.volume")
 	bomb_art.tick(delta)
 	remains.tick()
+	projectile_attachments.tick()
 	var working = workshop_delivery.finishing
 	var ready_count = 0
 	for job in state.get("jobs", []):

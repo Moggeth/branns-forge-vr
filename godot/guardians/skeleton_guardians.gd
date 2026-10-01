@@ -121,7 +121,7 @@ func projectile_contact(actor: Node3D, start: Vector3, finish: Vector3) -> Dicti
 		if distance>=best_distance: continue
 		best_distance=distance
 		var follow_bone := _weighted_hit_bone(mesh,skeleton,found,bone)
-		best={"position":found.position,"normal":found.normal,"part":part,"surface":_projectile_attachment(entry,follow_bone)}
+		best={"position":found.position,"normal":found.normal,"part":part,"surface":_projectile_attachment(entry,follow_bone),"bone_name":skeleton.get_bone_name(follow_bone)}
 	return best
 
 func _posed_mesh_bounds(mesh: MeshInstance3D, skeleton: Skeleton3D) -> AABB:
@@ -424,6 +424,7 @@ func _release_from_owner(record: Dictionary, velocity: Vector3) -> Node3D:
 	record.item = body
 	record.actor.set_meta("guardian_shield", "loose")
 	items[body.get_instance_id()] = {"item": body, "record": record}
+	if game.get("projectile_attachments") != null: game.projectile_attachments.handoff(record.actor,"shield",body,shield)
 	return body
 
 func _shield_grip_preferences() -> Dictionary:

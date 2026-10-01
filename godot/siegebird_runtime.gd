@@ -504,7 +504,7 @@ func tick(delta):
 					"rat": game._kill_rat(target)
 					"dummy": game._dummy_hit(target)
 			extras.impact(shot,hit,target)
-			embed(shot.node,embed_surface)
+			embed(shot.node,embed_surface,hit)
 			projectiles.erase(shot)
 		elif game.elapsed>shot.until:
 			extras.retire(shot.node); shot.node.queue_free(); projectiles.erase(shot)
@@ -512,8 +512,12 @@ func tick(delta):
 		if not is_instance_valid(entry.node): embedded.erase(entry); continue
 		if game.elapsed>entry.until:
 			extras.retire(entry.node); entry.node.queue_free(); embedded.erase(entry)
-		elif is_instance_valid(entry.surface) and entry.surface.is_visible_in_tree(): entry.node.global_transform=entry.surface.global_transform*entry.local
-		elif is_instance_valid(entry.surface) and not entry.surface.is_visible_in_tree(): entry.node.visible=false
+		elif game.get("projectile_attachments")!=null:
+			if not game.projectile_attachments.update(entry):
+				extras.retire(entry.node); entry.node.queue_free(); embedded.erase(entry)
+		elif is_instance_valid(entry.surface):
+			entry.node.global_transform=entry.surface.global_transform*entry.local
+			entry.node.visible=entry.surface.is_visible_in_tree()
 	for entry in loose.duplicate():
 		entry.body.freeze=entry.get("zone",game.adventure.zone)!=game.adventure.zone
 		entry.body.visible=not entry.body.freeze
@@ -521,7 +525,7 @@ func tick(delta):
 			if is_instance_valid(entry.node): extras.retire(entry.node)
 			entry.body.queue_free(); loose.erase(entry)
 
-func embed(bolt:Node3D,surface:Node3D):
+func embed(bolt:Node3D,surface:Node3D,hit:Dictionary={}):
 	var owner=game._owner(surface)
 	if owner!=null and owner.get_meta("kind","")=="enemy" and not owner.get_meta("alive",true):
 		extras._drop(bolt); return
@@ -529,7 +533,13 @@ func embed(bolt:Node3D,surface:Node3D):
 	var local=surface.global_transform.affine_inverse()*bolt.global_transform
 	bolt.reparent(zone)
 	for child in bolt.find_children("*","MeshInstance3D",true,false): child.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	embedded.append({"node":bolt,"until":game.elapsed+game.tuning.value("crossbow.bolt_lifetime"),"zone":zone,"surface":surface,"local":local})
+	hit=hit.duplicate()
+	hit["penetration_depth"]=0.045
+	hit["direction"]=(bolt.global_basis*bolt.get_meta("tip",Vector3.UP)).normalized()
+	var attachment:Dictionary=game.projectile_attachments.bind(bolt,surface,hit) if game.get("projectile_attachments")!=null else {"node":bolt,"surface":surface,"local":local}
+	attachment["until"]=game.elapsed+game.tuning.value("crossbow.bolt_lifetime")
+	attachment["zone"]=zone
+	embedded.append(attachment)
 	while embedded.size()>int(game.tuning.value("crossbow.bolt_cap")):
 		var old=embedded.pop_front()
 		if is_instance_valid(old.node): extras.retire(old.node); old.node.queue_free()

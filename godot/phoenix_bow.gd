@@ -291,11 +291,8 @@ func tick(delta:float):
 			if is_instance_valid(entry.node): entry.node.queue_free()
 			embedded.erase(entry)
 		elif entry.has("surface"):
-			if not is_instance_valid(entry.surface):
+			if not game.projectile_attachments.update(entry):
 				entry.node.queue_free(); embedded.erase(entry)
-			else:
-				entry.node.global_transform=entry.surface.global_transform*entry.local
-				entry.node.visible=entry.surface.is_visible_in_tree()
 
 func _bind_magic_materials():
 	# Copy only emissive materials, once per shared source. The bow's small
@@ -390,9 +387,13 @@ func _impact(shot:Dictionary,hit:Dictionary):
 				game.pumpkins.impact(target,point,hit.position,hit.normal,shot.velocity); point.free()
 	shot.node.global_position+=shot.velocity.normalized()*0.035
 	if not is_instance_valid(embed_surface): embed_surface=game.adventure.zone_groups.get(game.adventure.zone,game)
-	var local:Transform3D=embed_surface.global_transform.affine_inverse()*shot.node.global_transform
 	shot.node.reparent(game.adventure.zone_groups.get(game.adventure.zone,game))
-	embedded.append({"node":shot.node,"until":game.elapsed+150,"surface":embed_surface,"local":local})
+	var attachment_hit:Dictionary=hit.duplicate()
+	attachment_hit["direction"]=shot.velocity.normalized()
+	attachment_hit["penetration_depth"]=0.035
+	var attachment:Dictionary=game.projectile_attachments.bind(shot.node,embed_surface,attachment_hit)
+	attachment["until"]=game.elapsed+150
+	embedded.append(attachment)
 	while embedded.size()>ARROW_CAP:
 		var old=embedded.pop_front()
 		if is_instance_valid(old.node): old.node.queue_free()

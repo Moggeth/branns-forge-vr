@@ -177,6 +177,7 @@ func _recover(entry,hand):
 	system.occupied.erase(key)
 	if response.has("error"): return
 	system.embedded.erase(entry)
+	if game.get("projectile_attachments")!=null: game.projectile_attachments.release(entry.node)
 	if not rope.state.is_empty() and rope.state.get("bolt")==entry.node: rope.detach()
 	if released.get(key,false):
 		if not game.diagnostic_offline: await _rpc("return",{"token":str(entry.node.get_meta("ammo_token",""))})
