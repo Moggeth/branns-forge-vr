@@ -1257,8 +1257,10 @@ func _desktop_primary() -> void:
 		if target!=null and (target.has_meta("action") or target.get_meta("kind","")=="brann"):
 			_trigger(desktop_hand,true)
 			return
-		if elapsed<desktop_swing_ready: return
-		desktop_swing_ready=elapsed+0.42
+		if desktop_swing_started>=0.0 and desktop_swing_item!=item: _desktop_cancel_swing()
+		if elapsed<desktop_swing_ready or desktop_swing_started>=0.0: return
+		var swing_profile:Dictionary=DesktopWeaponPose.profile(item)
+		desktop_swing_ready=elapsed+maxf(float(swing_profile.duration),float(swing_profile.cooldown))
 		melee.clear_desktop_contact()
 		desktop_swing_started=elapsed
 		desktop_swing_item=item
@@ -1322,9 +1324,7 @@ func _desktop_input(delta):
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
 	if adventure!=null and (adventure.dying or adventure.travelling or (travel_navigation!=null and travel_navigation.hero_modal_open())):
-		desktop_swing_started=-1.0
-		desktop_swing_item=null
-		if melee!=null: melee.clear_desktop_contact()
+		_desktop_cancel_swing()
 		return
 	var distance=Vector2(rig.global_position.x-desktop_last_position.x,rig.global_position.z-desktop_last_position.z).length()
 	desktop_last_position=rig.global_position
@@ -1337,21 +1337,22 @@ func _desktop_weapon_motion(delta:float):
 	desktop_hand.transform=rest_pose
 	var item=held.get(str(desktop_hand.get_instance_id()))
 	if desktop_swing_started>=0:
-		var progress=clampf((elapsed-desktop_swing_started)/0.38,0.0,1.0)
 		if not is_instance_valid(desktop_swing_item) or item!=desktop_swing_item:
-			desktop_swing_started=-1.0
-			desktop_swing_item=null
+			_desktop_cancel_swing()
 		else:
+			var swing_profile:Dictionary=DesktopWeaponPose.profile(item)
+			var progress=clampf((elapsed-desktop_swing_started)/float(swing_profile.duration),0.0,1.0)
+			var contact_progress:float=float(swing_profile.contact)
 			desktop_hand.transform=DesktopWeaponPose.swing(item,progress,rest_pose,desktop_swing_reach)
 			if melee.desktop_contact_active(item): desktop_hand.transform=melee.desktop_contact_pose(item,rest_pose,progress)
-			if progress>=0.5 and not desktop_swing_contact:
+			if progress>=contact_progress and not desktop_swing_contact:
 				desktop_swing_contact=true
 				var hit=_ray(camera,DESKTOP_MELEE_REACH)
 				var strike_target=_owner(hit.get("collider")) if hit.has("collider") else null
 				if strike_target!=null:
 					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,DESKTOP_MELEE_REACH)
 					# Resolve at the actual centre-ray pose, once, before follow-through.
-					desktop_hand.transform=DesktopWeaponPose.swing(item,.5,rest_pose,desktop_swing_reach)
+					desktop_hand.transform=DesktopWeaponPose.swing(item,contact_progress,rest_pose,desktop_swing_reach)
 					var powered=melee._powered(item,desktop_hand)
 					var struck=melee.strike(strike_target,hit.position,hit.normal,2.4,desktop_hand,item)
 					melee.desktop_hard_contact(item,strike_target,hit.position,hit.normal,2.4,desktop_hand.transform,struck)
@@ -1362,6 +1363,13 @@ func _desktop_weapon_motion(delta:float):
 	var crossbow=siegebird.desktop_weapon(desktop_hand)
 	if crossbow!=null and _desktop_hero_has_keyboard_focus() and siegebird.extras.tethered(crossbow) and Input.is_physical_key_pressed(KEY_R):
 		siegebird.extras.reel(crossbow,delta*TAU*1.4,delta)
+
+func _desktop_cancel_swing() -> void:
+	desktop_swing_started=-1.0
+	desktop_swing_item=null
+	desktop_swing_contact=false
+	desktop_swing_ready=elapsed
+	if melee!=null: melee.clear_desktop_contact()
 
 func _desktop_melee_pose(item:Node3D,progress:float,rest:Vector3,rest_roll:float)->void:
 	var rest_pose=Transform3D(Basis(Vector3.FORWARD,rest_roll),rest)
@@ -1394,8 +1402,7 @@ func _desktop_release(throwing:bool=false)->void:
 	adventure.release(desktop_hand,true)
 	desktop_release_mode="drop"
 	adventure.motion.erase(key)
-	desktop_swing_started=-1.0
-	desktop_swing_item=null
+	_desktop_cancel_swing()
 
 func _setup_skull_basket()->void:
 	var parent:Node3D=adventure.zone_groups.forge_yard

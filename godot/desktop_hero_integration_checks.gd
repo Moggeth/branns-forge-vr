@@ -1,5 +1,6 @@
 extends RefCounted
 ## Offline check of the actual Main mouse callbacks, not only their input adapter.
+const DesktopWeaponPose = preload("res://desktop_weapon_pose.gd")
 
 static func run(game) -> void:
 	var failures: Array[String] = []
@@ -78,15 +79,47 @@ static func run(game) -> void:
 	if blade.dot(-game.camera.global_basis.z)<0.5: failures.append("desktop axe blade faces the player")
 	for tool_id in ["woodland_axe","apprentice_hammer","quarry_pick"]:
 		var tool=axe if tool_id=="woodland_axe" else game.adventure._tool_model(tool_id)
+		var profile: Dictionary = DesktopWeaponPose.profile(tool)
+		if float(profile.duration) <= 0.0 or float(profile.contact) <= 0.0 or float(profile.contact) >= 1.0 or float(profile.cooldown) < 0.0:
+			failures.append("%s has an invalid desktop swing profile" % tool_id)
+			continue
 		if tool!=axe:
 			game.add_child(tool)
 			game.grips._attach(game.desktop_hand,tool)
 		game.desktop_swing_reach=1.4
-		for phase in [0.2,0.5,0.8]:
+		for phase in [0.0,float(profile.contact),1.0]:
 			game._desktop_melee_pose(tool,phase,Vector3(0.35,-0.35,-0.55),0.0)
 			var tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
-			var expected=Vector3(0.42,0.36,-1.26) if phase==0.2 else (Vector3(0,0,-1.4) if phase==0.5 else Vector3(-0.46,-0.40,-1.26))
-			if tip.distance_to(expected)>0.02: failures.append("%s swing tip misses camera aim at phase %.1f"%[tool_id,phase])
+			if is_equal_approx(phase,float(profile.contact)) and tip.distance_to(Vector3(0,0,-1.4))>0.03:
+				failures.append("%s swing tip misses camera aim at authored contact" % tool_id)
+			if (phase==0.0 or phase==1.0) and not game.desktop_hand.transform.is_equal_approx(Transform3D(Basis.IDENTITY,Vector3(0.35,-0.35,-0.55))):
+				failures.append("%s swing does not return to its calibrated rest pose at %.1f" % [tool_id,phase])
+		game._desktop_melee_pose(tool,0.0,Vector3(0.35,-0.35,-0.55),0.0)
+		var resting_tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		var anticipation_phase:float=float({"quarry_pick":0.12,"woodland_axe":0.13,"apprentice_hammer":0.19}[tool_id])
+		game._desktop_melee_pose(tool,anticipation_phase,Vector3(0.35,-0.35,-0.55),0.0)
+		var anticipation_tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		if absf(anticipation_tip.z-resting_tip.z)>0.12:
+			failures.append("%s anticipation shoves the tip from %.3fm to %.3fm depth" % [tool_id,resting_tip.z,anticipation_tip.z])
+		if absf(game.desktop_hand.transform.basis.determinant()-1.0)>0.001:
+			failures.append("%s anticipation scales the calibrated tool" % tool_id)
+		game._desktop_melee_pose(tool,float(profile.contact)-0.015,Vector3(0.35,-0.35,-0.55),0.0)
+		var tip_before:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		game._desktop_melee_pose(tool,float(profile.contact)+0.015,Vector3(0.35,-0.35,-0.55),0.0)
+		var tip_after:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		if tip_before.distance_to(tip_after)<0.03:
+			failures.append("%s miss stalls at contact instead of following through" % tool_id)
+		var sample_step:float=0.001
+		game._desktop_melee_pose(tool,float(profile.contact)-sample_step,Vector3(0.35,-0.35,-0.55),0.0)
+		var left_tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		game._desktop_melee_pose(tool,float(profile.contact),Vector3(0.35,-0.35,-0.55),0.0)
+		var centre_tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		game._desktop_melee_pose(tool,float(profile.contact)+sample_step,Vector3(0.35,-0.35,-0.55),0.0)
+		var right_tip:Vector3=game.camera.to_local(tool.to_global(tool.get_meta("tip",Vector3.UP*0.65)))
+		var incoming_velocity:Vector3=(centre_tip-left_tip)/sample_step
+		var outgoing_velocity:Vector3=(right_tip-centre_tip)/sample_step
+		if incoming_velocity.distance_to(outgoing_velocity)>incoming_velocity.length()*0.08:
+			failures.append("%s tip velocity jumps at contact" % tool_id)
 		if tool!=axe: tool.queue_free()
 	var previous_strength:float=game.desktop_bob_strength
 	game.rig.global_position+=Vector3(0.1,0,0)
@@ -97,13 +130,22 @@ static func run(game) -> void:
 	game._desktop_primary()
 	if game.desktop_swing_started<0 or game.desktop_swing_ready<=game.elapsed: failures.append("melee click did not begin visible swing")
 	if game.desktop_swing_contact: failures.append("melee strike resolved before visible contact")
-	game.elapsed=game.desktop_swing_started+0.20
+	var first_swing_started:float=game.desktop_swing_started
+	game._desktop_primary()
+	if game.desktop_swing_started!=first_swing_started: failures.append("repeated click restarted an active melee swing")
+	var hammer_profile:Dictionary=DesktopWeaponPose.profile(hammer)
+	if not is_equal_approx(game.desktop_swing_ready-game.desktop_swing_started,maxf(float(hammer_profile.duration),float(hammer_profile.cooldown))):
+		failures.append("melee cooldown ignores authored profile")
+	game.elapsed=game.desktop_swing_started+float(hammer_profile.duration)*float(hammer_profile.contact)-0.001
+	game._desktop_weapon_motion(0.016)
+	if game.desktop_swing_contact: failures.append("melee strike resolved before authored contact")
+	game.elapsed=game.desktop_swing_started+float(hammer_profile.duration)*float(hammer_profile.contact)
 	game._desktop_weapon_motion(0.016)
 	if not game.desktop_swing_contact: failures.append("melee strike did not resolve at visible contact")
 	game.desktop_swing_started=game.elapsed
 	game.desktop_swing_contact=false
-	game.elapsed+=0.5
-	game._desktop_weapon_motion(0.5)
+	game.elapsed+=float(hammer_profile.duration)+0.1
+	game._desktop_weapon_motion(float(hammer_profile.duration)+0.1)
 	if not game.desktop_swing_contact or game.desktop_swing_started>=0: failures.append("slow frame skipped melee contact")
 	# The ray must not damage a target farther away than the visible contact tip.
 	game.grips._attach(game.desktop_hand, hammer)
@@ -126,7 +168,7 @@ static func run(game) -> void:
 	game.desktop_swing_started = -1.0
 	game.desktop_swing_ready = 0.0
 	game._desktop_primary()
-	game.elapsed = game.desktop_swing_started + 0.20
+	game.elapsed = game.desktop_swing_started + float(hammer_profile.duration)*float(hammer_profile.contact)
 	game._desktop_weapon_motion(0.016)
 	if int(dummy.get_meta("hits", 0)) != 0: failures.append("melee hit a dummy beyond the visible tip")
 	dummy.global_position = game.camera.global_position + aim_forward * (game.DESKTOP_MELEE_REACH - 0.2)
@@ -134,14 +176,24 @@ static func run(game) -> void:
 	game.desktop_swing_started = -1.0
 	game.desktop_swing_ready = 0.0
 	game._desktop_primary()
-	game.elapsed = game.desktop_swing_started + 0.20
+	game.elapsed = game.desktop_swing_started + float(hammer_profile.duration)*float(hammer_profile.contact)
 	game._desktop_weapon_motion(0.016)
 	if int(dummy.get_meta("hits", 0)) != 1: failures.append("melee missed a dummy within the visible tip")
-	game._desktop_melee_pose(hammer, 0.5, Vector3(0.35, -0.35, -0.55), 0.0)
+	game._desktop_weapon_motion(0.016)
+	if int(dummy.get_meta("hits", 0)) != 1: failures.append("melee contact damaged a dummy twice")
+	game._desktop_melee_pose(hammer, float(hammer_profile.contact), Vector3(0.35, -0.35, -0.55), 0.0)
 	var contact_tip: Vector3 = game.camera.to_local(hammer.to_global(hammer.get_meta("tip", Vector3.UP * 0.65)))
 	if contact_tip.distance_to(Vector3(0, 0, -game.desktop_swing_reach)) > 0.03:
 		failures.append("melee contact tip did not reach the damaged dummy")
-	game.desktop_swing_started = -1.0
+	game.held={key:axe}
+	game._desktop_weapon_motion(0.016)
+	if game.desktop_swing_started>=0.0 or game.desktop_swing_item!=null or game.melee.desktop_contact_active(hammer):
+		failures.append("switching tools left the previous melee swing active")
+	if game.desktop_swing_ready>game.elapsed: failures.append("switching tools kept the previous weapon's cooldown")
+	game._desktop_primary()
+	if game.desktop_swing_item!=axe or game.desktop_swing_started<0.0:
+		failures.append("newly equipped melee tool did not respond to the next click")
+	game._desktop_cancel_swing()
 	game.rig.global_position = melee_origin
 	dummy.queue_free()
 	if game._desktop_siegebird_item()==null and game._desktop_equip_siegebird(): failures.append("9 equipped an unowned crossbow")
