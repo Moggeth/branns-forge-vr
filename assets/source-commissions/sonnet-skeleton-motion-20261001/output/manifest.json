@@ -1,0 +1,664 @@
+{
+ "mossward": {
+  "triangles": 17092,
+  "sockets": {
+   "RightHand": [
+    0.308,
+    0.7073,
+    0.1365
+   ],
+   "WeaponTip": [
+    0.3502,
+    0.6874,
+    0.1637
+   ],
+   "weapon": false,
+   "added_bones": [],
+   "ankle_z": 0.0998,
+   "knee_z": 0.4196
+  },
+  "leg": {
+   "Left": {
+    "thigh": 0.3302,
+    "shin": 0.3202,
+    "ankle_height": 0.1,
+    "heel": 0.0785,
+    "toe": 0.1914
+   },
+   "Right": {
+    "thigh": 0.3302,
+    "shin": 0.3202,
+    "ankle_height": 0.1,
+    "heel": 0.0785,
+    "toe": 0.1914
+   }
+  },
+  "measure": {
+   "walk_flatfoot_slip_m_per_frame_max": 0.0015,
+   "walk_flatfoot_ankle_y_range": [
+    0.1007,
+    0.1024
+   ],
+   "attack_weapon_tip_xyz_by_phase": {
+    "0.0": [
+     0.3805,
+     0.6457,
+     0.1158
+    ],
+    "0.4": [
+     0.1241,
+     1.3595,
+     -0.7361
+    ],
+    "0.6": [
+     0.0085,
+     1.5835,
+     -0.6299
+    ],
+    "0.65": [
+     0.0022,
+     1.6023,
+     -0.6017
+    ],
+    "0.7": [
+     0.254,
+     1.1562,
+     -0.6914
+    ],
+    "0.75": [
+     0.4077,
+     0.5934,
+     0.1975
+    ],
+    "0.8": [
+     0.1002,
+     0.85,
+     0.7755
+    ],
+    "0.9": [
+     0.2791,
+     0.83,
+     0.6572
+    ],
+    "1.0": [
+     0.3805,
+     0.6429,
+     0.1119
+    ]
+   },
+   "hop_left_ankle_y_min_max": [
+    0.1,
+    0.3116
+   ],
+   "hop_left_airborne_phase": [
+    0.3,
+    0.7
+   ],
+   "hop_right_ankle_y_min_max": [
+    0.1,
+    0.3116
+   ],
+   "hop_right_airborne_phase": [
+    0.3,
+    0.7
+   ]
+  },
+  "bones": [
+   "Root",
+   "Torso",
+   "Head",
+   "LeftArm",
+   "RightArm",
+   "RightHand",
+   "WeaponTip",
+   "LeftLeg",
+   "LeftKnee",
+   "LeftFoot",
+   "RightLeg",
+   "RightKnee",
+   "RightFoot"
+  ],
+  "clips": {
+   "idle": {
+    "frames": 49,
+    "fps": 24,
+    "duration_s": 2.0,
+    "loop": true
+   },
+   "walk": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": true
+   },
+   "attack": {
+    "frames": 41,
+    "fps": 24,
+    "duration_s": 1.6667,
+    "loop": false
+   },
+   "hop_left": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "hop_right": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "turn_left": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "turn_right": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "stagger": {
+    "frames": 29,
+    "fps": 24,
+    "duration_s": 1.1667,
+    "loop": false
+   }
+  },
+  "export": {
+   "animations": [
+    "attack",
+    "hop_left",
+    "hop_right",
+    "idle",
+    "stagger",
+    "turn_left",
+    "turn_right",
+    "walk"
+   ],
+   "joints": [
+    "Root",
+    "Torso",
+    "Head",
+    "LeftArm",
+    "RightArm",
+    "RightHand",
+    "WeaponTip",
+    "LeftLeg",
+    "LeftKnee",
+    "LeftFoot",
+    "RightLeg",
+    "RightKnee",
+    "RightFoot"
+   ],
+   "meshes": [
+    "Head",
+    "LeftArm",
+    "LeftLeg",
+    "RightArm",
+    "RightLeg",
+    "Shield",
+    "Torso"
+   ],
+   "cameras": 0,
+   "lights": 0
+  },
+  "triangles_after": 17092
+ },
+ "prismwatch": {
+  "triangles": 14454,
+  "sockets": {
+   "RightHand": [
+    0.285,
+    0.674,
+    0.1296
+   ],
+   "WeaponTip": [
+    0.2872,
+    0.6185,
+    0.171
+   ],
+   "weapon": "crystal",
+   "added_bones": [
+    "LeftKnee",
+    "LeftFoot",
+    "RightKnee",
+    "RightFoot"
+   ],
+   "ankle_z": 0.095,
+   "knee_z": 0.3993
+  },
+  "leg": {
+   "Left": {
+    "thigh": 0.3162,
+    "shin": 0.3045,
+    "ankle_height": 0.095,
+    "heel": 0.0732,
+    "toe": 0.182
+   },
+   "Right": {
+    "thigh": 0.3162,
+    "shin": 0.3045,
+    "ankle_height": 0.095,
+    "heel": 0.0732,
+    "toe": 0.182
+   }
+  },
+  "measure": {
+   "walk_flatfoot_slip_m_per_frame_max": 0.0014,
+   "walk_flatfoot_ankle_y_range": [
+    0.0956,
+    0.0972
+   ],
+   "attack_weapon_tip_xyz_by_phase": {
+    "0.0": [
+     0.318,
+     0.5889,
+     0.1214
+    ],
+    "0.4": [
+     0.0827,
+     1.2982,
+     -0.7216
+    ],
+    "0.6": [
+     -0.0272,
+     1.5286,
+     -0.6079
+    ],
+    "0.65": [
+     -0.0322,
+     1.5485,
+     -0.5786
+    ],
+    "0.7": [
+     0.2038,
+     1.0902,
+     -0.6851
+    ],
+    "0.75": [
+     0.3517,
+     0.5254,
+     0.1813
+    ],
+    "0.8": [
+     0.0661,
+     0.7976,
+     0.7576
+    ],
+    "0.9": [
+     0.2251,
+     0.7733,
+     0.653
+    ],
+    "1.0": [
+     0.318,
+     0.5859,
+     0.1169
+    ]
+   },
+   "hop_left_ankle_y_min_max": [
+    0.095,
+    0.3032
+   ],
+   "hop_left_airborne_phase": [
+    0.3,
+    0.7
+   ],
+   "hop_right_ankle_y_min_max": [
+    0.095,
+    0.3032
+   ],
+   "hop_right_airborne_phase": [
+    0.3,
+    0.7
+   ]
+  },
+  "bones": [
+   "Root",
+   "Torso",
+   "Head",
+   "LeftArm",
+   "RightArm",
+   "RightHand",
+   "WeaponTip",
+   "LeftLeg",
+   "LeftKnee",
+   "LeftFoot",
+   "RightLeg",
+   "RightKnee",
+   "RightFoot"
+  ],
+  "clips": {
+   "idle": {
+    "frames": 49,
+    "fps": 24,
+    "duration_s": 2.0,
+    "loop": true
+   },
+   "walk": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": true
+   },
+   "attack": {
+    "frames": 41,
+    "fps": 24,
+    "duration_s": 1.6667,
+    "loop": false
+   },
+   "hop_left": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "hop_right": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "turn_left": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "turn_right": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "stagger": {
+    "frames": 29,
+    "fps": 24,
+    "duration_s": 1.1667,
+    "loop": false
+   }
+  },
+  "export": {
+   "animations": [
+    "attack",
+    "hop_left",
+    "hop_right",
+    "idle",
+    "stagger",
+    "turn_left",
+    "turn_right",
+    "walk"
+   ],
+   "joints": [
+    "Root",
+    "Torso",
+    "Head",
+    "LeftArm",
+    "RightArm",
+    "RightHand",
+    "WeaponTip",
+    "LeftLeg",
+    "LeftKnee",
+    "LeftFoot",
+    "RightLeg",
+    "RightKnee",
+    "RightFoot"
+   ],
+   "meshes": [
+    "Prismwatch_Head",
+    "Prismwatch_LeftArm",
+    "Prismwatch_LeftLeg",
+    "Prismwatch_RightArm",
+    "Prismwatch_RightLeg",
+    "Prismwatch_Shield",
+    "Prismwatch_Torso"
+   ],
+   "cameras": 0,
+   "lights": 0
+  },
+  "triangles_after": 14454
+ },
+ "cinderkeep": {
+  "triangles": 18454,
+  "sockets": {
+   "RightHand": [
+    0.3431,
+    0.6323,
+    0.1148
+   ],
+   "WeaponTip": [
+    0.3955,
+    0.3906,
+    0.2881
+   ],
+   "weapon": true,
+   "added_bones": [
+    "LeftKnee",
+    "LeftFoot",
+    "RightKnee",
+    "RightFoot"
+   ],
+   "ankle_z": 0.0987,
+   "knee_z": 0.415
+  },
+  "leg": {
+   "Left": {
+    "thigh": 0.3166,
+    "shin": 0.3165,
+    "ankle_height": 0.0987,
+    "heel": 0.0874,
+    "toe": 0.1897
+   },
+   "Right": {
+    "thigh": 0.3166,
+    "shin": 0.3165,
+    "ankle_height": 0.0987,
+    "heel": 0.0874,
+    "toe": 0.1897
+   }
+  },
+  "measure": {
+   "walk_flatfoot_slip_m_per_frame_max": 0.0015,
+   "walk_flatfoot_ankle_y_range": [
+    0.0995,
+    0.1013
+   ],
+   "attack_weapon_tip_xyz_by_phase": {
+    "0.0": [
+     0.4393,
+     0.3293,
+     0.2131
+    ],
+    "0.4": [
+     -0.0131,
+     1.3213,
+     -1.0234
+    ],
+    "0.6": [
+     -0.1907,
+     1.6673,
+     -0.8378
+    ],
+    "0.65": [
+     -0.205,
+     1.6962,
+     -0.7972
+    ],
+    "0.7": [
+     0.2119,
+     1.0234,
+     -0.9862
+    ],
+    "0.75": [
+     0.4696,
+     0.2614,
+     0.2976
+    ],
+    "0.8": [
+     -0.0268,
+     0.6974,
+     1.0501
+    ],
+    "0.9": [
+     0.2721,
+     0.6509,
+     0.9288
+    ],
+    "1.0": [
+     0.4393,
+     0.3246,
+     0.2035
+    ]
+   },
+   "hop_left_ankle_y_min_max": [
+    0.0987,
+    0.3083
+   ],
+   "hop_left_airborne_phase": [
+    0.3,
+    0.7
+   ],
+   "hop_right_ankle_y_min_max": [
+    0.0987,
+    0.3083
+   ],
+   "hop_right_airborne_phase": [
+    0.3,
+    0.7
+   ]
+  },
+  "bones": [
+   "Root",
+   "Torso",
+   "Head",
+   "LeftArm",
+   "RightArm",
+   "RightHand",
+   "WeaponTip",
+   "LeftLeg",
+   "LeftKnee",
+   "LeftFoot",
+   "RightLeg",
+   "RightKnee",
+   "RightFoot"
+  ],
+  "clips": {
+   "idle": {
+    "frames": 49,
+    "fps": 24,
+    "duration_s": 2.0,
+    "loop": true
+   },
+   "walk": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": true
+   },
+   "attack": {
+    "frames": 41,
+    "fps": 24,
+    "duration_s": 1.6667,
+    "loop": false
+   },
+   "hop_left": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "hop_right": {
+    "frames": 21,
+    "fps": 24,
+    "duration_s": 0.8333,
+    "loop": false
+   },
+   "turn_left": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "turn_right": {
+    "frames": 25,
+    "fps": 24,
+    "duration_s": 1.0,
+    "loop": false
+   },
+   "stagger": {
+    "frames": 29,
+    "fps": 24,
+    "duration_s": 1.1667,
+    "loop": false
+   }
+  },
+  "export": {
+   "animations": [
+    "attack",
+    "hop_left",
+    "hop_right",
+    "idle",
+    "stagger",
+    "turn_left",
+    "turn_right",
+    "walk"
+   ],
+   "joints": [
+    "Root",
+    "Torso",
+    "Head",
+    "LeftArm",
+    "RightArm",
+    "RightHand",
+    "WeaponTip",
+    "LeftLeg",
+    "LeftKnee",
+    "LeftFoot",
+    "RightLeg",
+    "RightKnee",
+    "RightFoot"
+   ],
+   "meshes": [
+    "Cinderkeep_Head",
+    "Cinderkeep_LeftArm",
+    "Cinderkeep_LeftLeg",
+    "Cinderkeep_RightArm",
+    "Cinderkeep_RightLeg",
+    "Cinderkeep_Shield",
+    "Cinderkeep_Torso"
+   ],
+   "cameras": 0,
+   "lights": 0
+  },
+  "triangles_after": 18454
+ },
+ "_conventions": {
+  "stride_m_per_cycle": 0.6,
+  "support_fraction": 0.6,
+  "walk_cycle_s": 1.0,
+  "axes": "Godot +Y up, +Z forward; Left* bones are the -X side (carry the shield)",
+  "attack_phases": {
+   "anticipation": [
+    0,
+    0.65
+   ],
+   "strike_crossing": [
+    0.65,
+    0.8
+   ],
+   "recovery": [
+    0.8,
+    1.0
+   ]
+  },
+  "hop_flight_fraction": [
+   0.25,
+   0.72
+  ],
+  "jaw": "not authored (Head is one rigid skinned mesh)"
+ }
+}

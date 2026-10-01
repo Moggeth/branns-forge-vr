@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "asset_id": "cinderkeep-motion",
+  "kind": "character",
+  "source_builder": "assets/source-commissions/sonnet-skeleton-motion-20261001/output/build_skeleton_motion.py",
+  "source_scene": "assets/source-commissions/sonnet-skeleton-motion-20261001/output/cinderkeep_rig.blend",
+  "installed_asset": "godot/guardians/rigged/cinderkeep_rig.glb",
+  "coordinate_system": {
+    "unit": "metre",
+    "up": "+Y",
+    "forward": "+Z"
+  },
+  "required_nodes": [
+    "CinderkeepRig",
+    "Cinderkeep_Shield"
+  ],
+  "limits": {
+    "max_bytes": 2097152,
+    "max_triangles": 30000,
+    "max_meshes": 10,
+    "max_materials": 40,
+    "max_images": 16,
+    "max_dimensions_m": [
+      2.5,
+      2.1,
+      2
+    ]
+  }
+}
