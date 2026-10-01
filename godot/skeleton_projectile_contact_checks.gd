@@ -24,6 +24,7 @@ class Game extends Node3D:
 	var tuning:=Tuning.new()
 	var guardians=null
 	var guardian_authored=null
+	var enemy_contacts
 	var elapsed:=0.0
 	func _owner(node: Node):
 		while node!=null and node!=self:
@@ -38,6 +39,8 @@ func _run() -> void:
 	var game:=Game.new()
 	root.add_child(game)
 	game.adventure.zone_groups[game.adventure.zone]=game
+	game.enemy_contacts=preload("res://enemy_projectile_contact.gd").new()
+	game.enemy_contacts.setup(game)
 	var system:=Siegebird.new()
 	game.add_child(system)
 	system.game=game

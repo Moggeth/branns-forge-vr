@@ -15,7 +15,6 @@ var embedded=[]
 const BOLT_LIFETIME=120.0
 const BOLT_CAP=20
 const GRAVITY=2.4
-const SkeletonContact=preload("res://skeleton_projectile_contact.gd")
 var loose=[]
 var supply:Node3D
 var sounds={}
@@ -537,59 +536,13 @@ func embed(bolt:Node3D,surface:Node3D):
 	print("BOLT_EMBED count=",embedded.size()," lifetime=",BOLT_LIFETIME)
 
 func _projectile_contact(start: Vector3,end: Vector3) -> Dictionary:
-	var space=game.get_world_3d().direct_space_state
-	var excluded: Array[RID]=[]
-	var world_hit := {}
-	# The interaction box is useful for hand targeting, but has no physical
-	# bone surface. Skip only that box and retain all scenery/shield hits.
-	for attempt in range(24):
-		var query=PhysicsRayQueryParameters3D.create(start,end,1,excluded)
-		world_hit=space.intersect_ray(query)
-		if world_hit.is_empty(): break
-		var target=game._owner(world_hit.collider)
-		if target==null or str(target.get_meta("kind",""))!="enemy" or str(target.get_meta("enemy_type",""))!="skeleton": break
-		excluded.append(world_hit.collider.get_rid())
-		world_hit={}
-	var limit=start.distance_squared_to(world_hit.position) if not world_hit.is_empty() else start.distance_squared_to(end)
-	var bone_hit := {}
-	for actor in game.scene.get("enemies",[]):
-		if not is_instance_valid(actor) or str(actor.get_meta("enemy_type",""))!="skeleton" or not actor.get_meta("alive",true): continue
-		if str(actor.get_meta("zone",game.adventure.zone))!=game.adventure.zone: continue
-		if Geometry3D.get_closest_point_to_segment(actor.global_position+Vector3.UP,start,end).distance_squared_to(actor.global_position+Vector3.UP)>4.0: continue
-		var contact := {}
-		if game.guardians!=null and game.guardians.has_method("projectile_contact"):
-			contact=game.guardians.projectile_contact(actor,start,end)
-		if contact.is_empty():
-			var rig: Dictionary=game.animation.actors.get(actor.get_instance_id(),{})
-			contact=SkeletonContact.contact(actor,rig,start,end)
-		if contact.is_empty(): continue
-		var distance=start.distance_squared_to(contact.position)
-		if distance>limit: continue
-		limit=distance
-		bone_hit={"position":contact.position,"normal":contact.normal,"collider":actor,"surface":contact.surface,"part":contact.part}
-	return bone_hit if not bone_hit.is_empty() else world_hit
+	return game.enemy_contacts.sweep(start,end)
 
 func _projectile_damage(target: Node3D, base_damage: float, headshot: bool) -> float:
-	if str(target.get_meta("enemy_type",""))!="skeleton": return base_damage
-	# The default skeleton has 66 HP. A body bolt must not one-shot it even
-	# when a live interaction profile increases the base crossbow damage.
-	if headshot:
-		return maxf(base_damage*2.0,float(target.get_meta("max_hp",66))) if str(target.get_meta("guardian_variant",""))=="" else base_damage*2.0
-	return minf(base_damage*0.35,32.0)
+	return game.enemy_contacts.damage(target,base_damage,headshot)
 
 func _fallen_bone(actor: Node3D, point: Vector3, part: String) -> Node3D:
-	var nearest: Node3D=null
-	var distance:=INF
-	for body in game.remains.bodies:
-		if not is_instance_valid(body) or int(body.get_meta("source_actor",-1))!=actor.get_instance_id(): continue
-		for piece in body.get_children():
-			if not piece is Node3D: continue
-			if part=="head" and piece.name!="Skull": continue
-			var candidate:float=piece.global_position.distance_squared_to(point)
-			if candidate<distance:
-				distance=candidate
-				nearest=piece
-	return nearest if nearest!=null else game.adventure.zone_groups.get(game.adventure.zone,game)
+	return game.enemy_contacts.fallen_surface(actor,point,part)
 
 func checks(failures:Array):
 	if _turns({"item":null})!=TURNS: failures.append("quickwind default turns changed")

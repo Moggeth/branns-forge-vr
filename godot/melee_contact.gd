@@ -50,7 +50,8 @@ func tick(delta):
 			var block=track.block
 			var desired:Vector3=current[block.region]
 			var speed=desired.distance_to(track.regions.get(block.region,desired))/maxf(delta,0.001)
-			var anchor:Vector3=block.target.to_global(block.local_point) if is_instance_valid(block.target) and block.has("local_point") else block.point
+			var surface:Node3D=block.get("surface",block.target)
+			var anchor:Vector3=surface.to_global(block.local_point) if is_instance_valid(surface) and block.has("local_point") else block.point
 			if not is_instance_valid(block.target) or not block.target.is_visible_in_tree() or (desired-anchor).dot(block.normal)>WITHDRAW_DISTANCE or desired.distance_to(anchor)>(0.10 if block.get("glance",false) else 0.32):
 				if is_instance_valid(block.target) and block.get("blade",false) and block.target.get_meta("enemy_type","")=="skeleton" and speed>1.4 and game.skeleton_structure!=null:
 					var torn=game.skeleton_structure.hit(block.target,anchor,block.normal,maxf(2.0,speed*0.8),"blade")
@@ -72,8 +73,7 @@ func tick(delta):
 			var finish:Vector3=current[region.name]
 			var length=start.distance_to(finish)
 			if length<0.0001 or length>2.5: continue
-			var query=PhysicsRayQueryParameters3D.create(start,finish,1)
-			var candidate=game.get_world_3d().direct_space_state.intersect_ray(query)
+			var candidate=game.enemy_contacts.sweep(start,finish) if game.get("enemy_contacts")!=null else game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(start,finish,1))
 			if candidate.is_empty(): continue
 			var fraction:float=start.distance_to(candidate.position)/length
 			if fraction<best_fraction:
@@ -94,7 +94,8 @@ func tick(delta):
 			if not completed or response.get("block",false) or response.get("glance",false):
 				var bite:float=float(response.get("bite",BITE_DEPTH)) if best_speed>=MIN_STRIKE_SPEED else 0.0
 				var glance:bool=bool(response.get("glance",false))
-				track.block={"target":target,"point":hit.position,"normal":hit.normal,"local_point":target.to_local(hit.position),"blade":_is_blade(item,hit.normal),"bite":bite,"region":best_region,"glance":glance}
+				var surface:Node3D=hit.get("surface",target)
+				track.block={"target":target,"surface":surface,"point":hit.position,"normal":hit.normal,"local_point":surface.to_local(hit.position),"blade":_is_blade(item,hit.normal),"bite":bite,"region":best_region,"glance":glance}
 				constrain(item,track,best_desired,hit.position+hit.normal*0.008 if glance else hit.position-hit.normal*bite)
 		for region in regions: track.regions[region.name]=item.to_global(region.local)
 		track.previous=track.regions[regions[0].name]

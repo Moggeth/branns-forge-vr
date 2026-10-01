@@ -297,7 +297,7 @@ func _flight_step(delta):
 	var finish=start+velocity*delta
 	var query=PhysicsRayQueryParameters3D.create(start,finish,1)
 	query.exclude=scored_colliders
-	var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+	var hit=game.enemy_contacts.sweep(start,finish,1,scored_colliders) if game.get("enemy_contacts")!=null else game.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		if state=="returning" and Geometry3D.get_closest_point_to_segment(destination,start,finish).distance_to(destination)<.35: _attach(caller); return
 		ring.global_position=finish

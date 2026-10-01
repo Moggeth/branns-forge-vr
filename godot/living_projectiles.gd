@@ -114,7 +114,7 @@ func _step(flight,delta):
 	for h in engine.held.values():
 		if is_instance_valid(h.entry.node): exclude.append(h.entry.node.get_rid())
 	query.exclude=exclude
-	var hit=engine.game.get_world_3d().direct_space_state.intersect_ray(query)
+	var hit=engine.game.enemy_contacts.sweep(start,finish,13,exclude) if engine.game.get("enemy_contacts")!=null else engine.game.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty(): e.node.global_position=finish; return
 	e.node.global_position=hit.position+hit.normal*.04
 	var identity=hit.collider.get_instance_id()

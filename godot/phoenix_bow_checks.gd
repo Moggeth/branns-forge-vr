@@ -115,7 +115,11 @@ static func run(game):
 	check.call(bow.shots.is_empty() and bow.embedded.size()==1,"high-speed arrow embeds in thin physics surface"); assertions+=1
 	if not bow.embedded.is_empty():
 		var embedded_arrow=bow.embedded[0].node
-		check.call(embedded_arrow.get_parent()==wall and bow.embedded[0].until-game.elapsed==150,"embedded arrow follows surface and persists"); assertions+=1
+		check.call(bow.embedded[0].surface==wall and bow.embedded[0].until-game.elapsed==150,"embedded arrow tracks actual surface and persists"); assertions+=1
+		var prior:Vector3=embedded_arrow.global_position
+		wall.position.x+=0.25
+		bow.tick(0.0)
+		check.call(embedded_arrow.global_position.distance_to(prior+Vector3.RIGHT*0.25)<0.0001,"embedded arrow moves with struck surface"); assertions+=1
 	wall.queue_free(); draw_hand.queue_free()
 	print("PHOENIX_BOW_RESULT ",JSON.stringify({"checks":assertions,"failures":failures}))
 	game.get_tree().quit(0 if failures.is_empty() else 1)

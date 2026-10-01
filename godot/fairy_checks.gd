@@ -85,7 +85,7 @@ func run():
 	fairy.drop(); check(match_item.has_meta("body") and match_item not in game.held.values(),"Match release goes through native firecraft physics")
 	# Enemies: crits are small, ghost immunity is preserved, taunts are temporary.
 	var enemy=game.scene.enemies.filter(func(e):return e.get_meta("enemy_type","")=="skeleton")[0]
-	var hp=float(enemy.get_meta("hp")); fairy.dart_hit({"collider":enemy,"position":fairy.head_position(enemy)})
+	var hp=float(enemy.get_meta("hp")); fairy.dart_hit({"collider":enemy,"position":fairy.head_position(enemy),"part":"head"})
 	check(is_equal_approx(float(enemy.get_meta("hp")),hp-fairy.cfg.critical_damage),"Precise head dart deals configured critical damage")
 	var ghost=game.firecraft.ghosts[0]; var ghost_hp=ghost.get_meta("hp",0)
 	fairy.dart_hit({"collider":ghost,"position":ghost.global_position})
@@ -93,7 +93,11 @@ func run():
 	# A dart travels through the actual existing skeleton collider, including the
 	# coarse collider front offset that otherwise makes head crits impossible.
 	enemy.reparent(game); enemy.show(); enemy.global_position=Vector3(5,9,-2)
-	fairy.avatar.global_position=fairy.head_position(enemy)+Vector3(0,0,3); fairy.orientation=Basis.IDENTITY; fairy.avatar.velocity=Vector3.ZERO
+	enemy.set_meta("zone",game.adventure.zone)
+	var skull_hit:Dictionary=_visible_skull_hit(enemy)
+	check(not skull_hit.is_empty(),"Animated skeleton exposes an actual skull triangle for the dart")
+	if skull_hit.is_empty(): skull_hit={"position":fairy.head_position(enemy)}
+	fairy.avatar.global_position=skull_hit.position+Vector3(0,0,3); fairy.orientation=Basis.IDENTITY; fairy.avatar.velocity=Vector3.ZERO
 	await physics_frame
 	game.elapsed+=1; hp=enemy.get_meta("hp"); fairy.shoot(false)
 	for i in range(25): fairy._tick_spells(.01)
@@ -131,8 +135,10 @@ func run():
 	var spot=game.ember_gallery.CENTER+Vector3(-4,.06,0)
 	check(fluid.pour(spot,"ember_gallery",2,false)>0,"Real surface accepts unlit oil for the cooperative match test")
 	fluid.tick(.1)
+	var oil_cell:int=entry.field.cell_index(spot)
+	var oil_surface:Vector3=entry.field.point(oil_cell)
 	var fresh=game.firecraft._prop("match",spot); fairy.pick_up(fresh); game.firecraft._light(fresh)
-	fairy.orientation=Basis.IDENTITY; fairy.avatar.global_position=spot+Vector3(0,.04,.07); fairy.last_zone="ember_gallery"; fairy.last_host=game.camera.global_position
+	fairy.orientation=Basis.IDENTITY; fairy.avatar.global_position=oil_surface+Vector3(-.04,.08,.07); fairy.last_zone="ember_gallery"; fairy.last_host=game.camera.global_position
 	fairy.tick(.016,idle); fluid.tick(.1)
 	check(entry.field.active_counts().flames>0 if entry.field.has_method("active_counts") else fluid.active_counts().flames>0,"Fairy-carried burning match ignites the actual shared oil")
 	fairy.drop()
@@ -155,6 +161,7 @@ func run():
 	for i in range(50):
 		game.elapsed+=.02; fairy.handheld.tick(.02); game.firecraft.tick(.02)
 	check(striking_match.get_meta("state")=="lit","Assisted match stroke lights through real striker contact")
+	game.firecraft._extinguish(striking_match)
 	fairy.drop()
 	# Primary input is owned by every held item, including non-firecraft pickups.
 	var no_shots=fairy.shots.size(); fairy.pick_up(bone); fairy.shoot(false)
@@ -239,4 +246,17 @@ func run():
 	await process_frame
 	print("FAIRY_CHECK_RESULT ",JSON.stringify({"checks":count,"failures":failures}))
 	quit(0 if failures.is_empty() else 1)
+
+func _visible_skull_hit(enemy:Node3D)->Dictionary:
+	# The animation joint marks the head's pivot, not a guaranteed point on its
+	# rendered triangles. Probe a small face grid and retain the resolver's
+	# actual visible surface hit for the physical dart's launch line.
+	var anchor:Vector3=fairy.head_position(enemy)
+	for y_offset in [0.0,.08,-.08,.16,-.16]:
+		for x_offset in [0.0,.08,-.08,.16,-.16]:
+			var center=anchor+Vector3(x_offset,y_offset,0)
+			var hit:Dictionary=game.enemy_contacts.sweep(center+Vector3.BACK,center+Vector3.FORWARD,1)
+			if hit.get("collider")==enemy and str(hit.get("part",""))=="head" and hit.get("surface") is Node3D:
+				return hit
+	return {}
 

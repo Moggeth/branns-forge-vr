@@ -2138,3 +2138,11 @@ Final coverage: 98 full-size TreeAdapter decorations plus 81 imported tree place
 - Skeleton actor checks now use measured engagement and visible weapon contact; strike entry itself must not deal automatic damage. Set the parent rig pose before camera global pose in diagnostic fixtures. Direct `--qol-smoke` without its service stalled >120 s; use `actor_timing_checks.gd -- --world-builder-check` for the isolated 10.21 s path.
 - Sonnet broad visual refinement spent 150.362 s thinking without edits. A narrow material-only brief delivered a diff/handoff in 31.135 s, though the six-turn cap prevented clean CLI completion. Verify model metadata, exact diff and native render independently; preserve unsuccessful metadata. Do not equate a source deliverable with successful wrapper completion.
 - Mining pending limits require matching bounded save-file capacity and guards before extraction/collection. Preserve valuable records while activating only nearest physical bodies; never expire loot just to enforce a physics budget.
+
+## Enemy surface queries (2026-10-01)
+
+Use the shared enemy_projectile_contact query for combat; broad physics proxies remain useful for movement and selection. Test a real visible triangle and an empty bone gap, not merely a point near the root/head joint. PrimitiveMesh ARRAY_INDEX may be Nil, so normalize it to an empty PackedInt32Array. Public exclusion arguments accept untyped Arrays and normalize RIDs internally: dynamic callers frequently supply [].
+
+Fairy checks require --weapon-inspection --experimental-fuel-combat for an isolated offline fixture. Aim dart tests at current visible skull geometry in the active zone. Carried-match ignition must center its heat on the admitted fuel cell; the old fixture missed by roughly 4 mm. Extinguish the previously successful match before testing an obstacle, or it can independently ignite the new spill. These are fixture corrections, not altered fire rules.
+
+The returning-projectile runner requires service/returning-projectile-test.cjs to construct its immutable snapshot bundle. Direct invocation without that argument does not exercise it. See ENEMY-SURFACE-CONTACT-20261001.md for current checks and performance limits.

@@ -563,11 +563,10 @@ func _tick_spells(dt):
 			shot.node.queue_free(); shots.erase(shot); continue
 		if shot.ping: shot.velocity.y-=4.0*dt
 		var from=shot.node.global_position; var to=from+shot.velocity*dt
-		var query=PhysicsRayQueryParameters3D.create(from,to,1|8); query.collide_with_areas=true
-		var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+		var hit=game.enemy_contacts.sweep(from,to,1|8,[],true)
 		if not hit.is_empty():
 			hit["direction"]=shot.velocity.normalized()
-			if shot.ping: leave_mark(hit.position,hit.normal,shot.kind,hit.collider)
+			if shot.ping: leave_mark(hit.position,hit.normal,shot.kind,hit.get("surface",hit.collider))
 			else: dart_hit(hit)
 			art.burst(hit.position,Art.COLORS[shot.kind] if shot.ping else Color("dabaff")); shot.node.queue_free(); shots.erase(shot)
 		else:
@@ -597,11 +596,8 @@ func dart_hit(hit:Dictionary):
 	if str(target.get_meta("action","")).begins_with("fairytrail:") or str(target.get_meta("action","")).begins_with("creek:"):
 		game._button(target.get_meta("action")); return
 	if target.get_meta("kind","")=="enemy":
-		# World enemy colliders are coarse boxes. Judge the aim line against the
-		# animated head, not distance from the box's protruding front surface.
-		var head_delta=head_position(target)-Vector3(hit.position)
-		var crit=head_delta.slide(Vector3(hit.get("direction",-orientation.z)).normalized()).length()<.20 and head_delta.length()<1.2
-		game.adventure.hurt_enemy(target,cfg.critical_damage if crit else cfg.dart_damage,null,-orientation.z*.1,"fairy")
+		var crit=str(hit.get("part",""))=="head"
+		game.adventure.hurt_enemy(target,cfg.critical_damage if crit else cfg.dart_damage,null,-orientation.z*.1,"fairy",hit.position)
 		target.set_meta("fairy_aggro_until",game.elapsed+5)
 		note("A tiny perfect shot!" if crit else "A little sting — keep your friend in the fight.")
 	elif target.get_meta("kind","")=="rat":

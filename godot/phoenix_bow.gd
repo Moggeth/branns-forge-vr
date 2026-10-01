@@ -212,7 +212,7 @@ func fire()->bool:
 	var wing:Node3D=wing_scene.instantiate(); game.adventure.zone_groups[game.adventure.zone].add_child(wing); wing.visible=false
 	var shot={"node":arrow,"wings":wing,"position":arrow.to_global(ARROW_TIP),"velocity":aim*_speed(draw),"curve":curve,"age":0.0,"hand":hand,"zone":game.adventure.zone,"until":game.elapsed+12.0,"damage":30+65*draw/MAX_DRAW}
 	shots.append(shot)
-	var obstructed=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(rest.global_position,shot.position,1))
+	var obstructed=game.enemy_contacts.sweep(rest.global_position,shot.position)
 	if not obstructed.is_empty():
 		shot.node.global_position=obstructed.position-shot.node.global_basis*ARROW_TIP
 		_impact(shot,obstructed)
@@ -290,6 +290,12 @@ func tick(delta:float):
 		if not is_instance_valid(entry.node) or game.elapsed>entry.until:
 			if is_instance_valid(entry.node): entry.node.queue_free()
 			embedded.erase(entry)
+		elif entry.has("surface"):
+			if not is_instance_valid(entry.surface):
+				entry.node.queue_free(); embedded.erase(entry)
+			else:
+				entry.node.global_transform=entry.surface.global_transform*entry.local
+				entry.node.visible=entry.surface.is_visible_in_tree()
 
 func _bind_magic_materials():
 	# Copy only emissive materials, once per shared source. The bow's small
@@ -348,8 +354,7 @@ func _tick_shots(delta:float):
 		for i in steps:
 			var dt=delta/steps
 			var next=FLIGHT.step(shot.position,shot.velocity,shot.curve,shot.age,dt)
-			var query=PhysicsRayQueryParameters3D.create(shot.position,next.position,1)
-			var hit=game.get_world_3d().direct_space_state.intersect_ray(query)
+			var hit=game.enemy_contacts.sweep(shot.position,next.position)
 			shot.velocity=next.velocity; shot.age=next.age
 			shot.position=next.position if hit.is_empty() else hit.position
 			var direction:Vector3=shot.velocity.normalized()
@@ -368,11 +373,14 @@ func _tick_shots(delta:float):
 
 func _impact(shot:Dictionary,hit:Dictionary):
 	var target=game._owner(hit.collider)
+	var embed_surface:Node3D=hit.get("surface",hit.collider)
 	if target!=null:
 		match str(target.get_meta("kind","")):
 			"enemy":
-				var head=str(target.get_meta("enemy_type",""))=="skeleton" and hit.position.distance_to(game.enchantments._head_position(target))<0.28
-				game.adventure.hurt_enemy(target,float(shot.damage)*(1.8 if head else 1.0),shot.hand,shot.velocity.normalized(),"headshot" if head else "projectile",hit.position)
+				var head=str(target.get_meta("enemy_type",""))=="skeleton" and str(hit.get("part",""))=="head"
+				game.adventure.hurt_enemy(target,game.enemy_contacts.damage(target,float(shot.damage),head),shot.hand,shot.velocity.normalized(),"headshot" if head else "projectile",hit.position)
+				if str(target.get_meta("enemy_type",""))=="skeleton" and not target.get_meta("alive",true):
+					embed_surface=game.enemy_contacts.fallen_surface(target,hit.position,str(hit.get("part","")))
 				if game.impact_feedback!=null: game.impact_feedback.contact(target,hit.position,hit.normal,shot.velocity.length()*0.18,"phoenix_arrow")
 			"rat": game._kill_rat(target)
 			"dummy": game._dummy_hit(target)
@@ -381,8 +389,10 @@ func _impact(shot:Dictionary,hit:Dictionary):
 				var point=Node3D.new(); point.set_meta("pointed",true)
 				game.pumpkins.impact(target,point,hit.position,hit.normal,shot.velocity); point.free()
 	shot.node.global_position+=shot.velocity.normalized()*0.035
-	if is_instance_valid(hit.collider) and hit.collider is Node3D: shot.node.reparent(hit.collider)
-	embedded.append({"node":shot.node,"until":game.elapsed+150})
+	if not is_instance_valid(embed_surface): embed_surface=game.adventure.zone_groups.get(game.adventure.zone,game)
+	var local:Transform3D=embed_surface.global_transform.affine_inverse()*shot.node.global_transform
+	shot.node.reparent(game.adventure.zone_groups.get(game.adventure.zone,game))
+	embedded.append({"node":shot.node,"until":game.elapsed+150,"surface":embed_surface,"local":local})
 	while embedded.size()>ARROW_CAP:
 		var old=embedded.pop_front()
 		if is_instance_valid(old.node): old.node.queue_free()

@@ -154,6 +154,7 @@ var guardian_authored
 var skeleton_structure
 var skeleton_pose_handoff
 var skeleton_attack_contact
+var enemy_contacts
 var remains
 var animation_lab
 var lab_mode=false
@@ -329,6 +330,8 @@ func _ready():
 	skeleton_pose_handoff.setup(self)
 	skeleton_attack_contact=preload("res://skeleton_attack_contact.gd").new()
 	skeleton_attack_contact.setup(self)
+	enemy_contacts=preload("res://enemy_projectile_contact.gd").new()
+	enemy_contacts.setup(self)
 	for enemy in scene.enemies:
 		var variant=str(enemy.get_meta("guardian_variant",""))
 		if variant!="": guardian_authored.attach(enemy,variant)
@@ -1350,7 +1353,7 @@ func _desktop_weapon_motion(delta:float):
 			if melee.desktop_contact_active(item): desktop_hand.transform=melee.desktop_contact_pose(item,rest_pose,progress)
 			if progress>=contact_progress and not desktop_swing_contact:
 				desktop_swing_contact=true
-				var hit=_ray(camera,DESKTOP_MELEE_REACH)
+				var hit=_combat_ray(camera,DESKTOP_MELEE_REACH)
 				var strike_target=_owner(hit.get("collider")) if hit.has("collider") else null
 				if strike_target!=null:
 					desktop_swing_reach=clampf(camera.global_position.distance_to(hit.position),0.8,DESKTOP_MELEE_REACH)
@@ -1584,6 +1587,10 @@ func _ray(source: Node3D, distance: float) -> Dictionary:
 	var query = PhysicsRayQueryParameters3D.create(start, start - source.global_basis.z * distance)
 	query.collide_with_areas = true
 	return get_world_3d().direct_space_state.intersect_ray(query)
+
+func _combat_ray(source: Node3D, distance: float) -> Dictionary:
+	source=aim_source(source)
+	return enemy_contacts.sweep(source.global_position,source.global_position-source.global_basis.z*distance,1,[],true)
 
 func _owner(node):
 	while node != null and node != self:
