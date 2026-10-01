@@ -1,5 +1,20 @@
 # Verification and recovery evidence — 2026-09-12
 
+## Golem impact event routing — 2026-10-01
+
+An armour-breaking pick strike formerly emitted `golem_armor` during damage
+resolution, before the exact melee impact event. The shared 65 ms contact
+deduplicator then discarded the pick event at the same point. A killing strike
+could also emit a centred `golem_shatter` burst before its exact contact. The
+golem now emits those fallback stone events only for damage without a contact
+point; armour break and defeat in the same frame coalesce into one. Projectile
+damage passes its measured hit point so the projectile's later contact owns the
+response. `golem_checks.gd` tests aimed armour/death silence and both ambient
+fallback cases. The old `stone_contacts >= 7` assertion failed after removing
+duplicates; event ownership assertions are the useful gate. Fast rerun:
+`tools/godot/Godot_v4.7.2-stable_win64_console.exe --headless --xr-mode off
+--audio-driver Dummy --path godot --script res://golem_checks.gd` (0.9 s).
+
 ## Overnight Sonnet and art-review fast path — 2026-09-29
 
 The sanitized personal Claude CLI reported `fauxgrady@gmail.com`, `claude.ai`
@@ -2097,3 +2112,11 @@ The first Sonnet tree commission hit its 480.415 s cap after producing source. R
 Habitat validation: Godot's headless Dummy renderer returns identity for MultiMesh transform readback even after writes. Assert address/hidden metadata headlessly and verify actual hiding in a native graphical fixture; do not "fix" correct art based on Dummy readback. Geometry counters must support PrimitiveMesh: Mesh.get_faces() works across primitive and ArrayMesh resources; cache counts by resource instead of calling ArrayMesh-only methods. A Godot exit code of zero does not rule out runtime script errors; inspect logs and explicit result failures.
 
 Live bank binding: do not rewrite/sample two hydrology fields across the full 512² material mask for secondary wetness visuals. It cost 189 ms initial and 15 ms locally. A separate filtered 128² bank texture reduced this to 11.4 ms initial and 0.98 ms locally, while saved paths preserve the authored mask independently. Headless Dummy ImageTexture.get_image() may also return black; assert the source Image/cache contract there, and test actual texture readback graphically. Use grayscale Color(value,value,value) for L8 uploads. Only native render readback confirms the shader-side texture.
+
+## FPS motion and measured impact recovery (2026-10-01)
+
+Do not equate passing tip-position tests with good animation: native 30 fps filmstrips revealed an early forward translation that made the weapon shrink during anticipation. Define anticipation depth relative to the actual calibrated rest tip, not the distant contact point. A guard relative to reach also moved the long axe 38.7 cm; retain a numeric anticipation-depth/no-scale regression. For arc bulges use zero endpoint derivatives (16u²(1-u)²) so the Hermite joins keep their contact velocity.
+
+Direct golem damage must not emit a generic armour-break burst before the measured material contact: the duplicate filter will suppress the better effect. The direct hit caller owns feedback; unlocated damage retains one coalesced fallback. Replace obsolete effect-count expectations with exactly-once ownership checks and audit fatal projectile paths when changing that ownership.
+
+`phoenix_bow_checks.gd` and `siegebird_checks.gd` are RefCounted runners, not SceneTree --script entrypoints; invoke the main --phoenix-bow-check / --siegebird-check flags. An incorrect direct attempt was stopped after 30 s. Native capture uses production Pose.profile directly; GDScript.has_method is not a static method. Delete only the fixture's old frame-*.png files before recapture to avoid stale trailing frames in a shorter animation. Match the visible tip to the actual surface distance and use HardContact.desktop_pose for a HIT capture, rather than a miss swing pose. Native image readback is not a framerate benchmark.
