@@ -76,6 +76,24 @@ func _run() -> void:
 			for particle in pool.particles:
 				if particle.basis.x.dot(particle.velocity.normalized()) < 0.99: failures.append("spark ribbon does not follow travel")
 	if sparks == 0: failures.append("metal point on stone has no sparks")
+	# An oblique pick stroke should throw stone across the surface in the
+	# incoming direction, while all fragments still leave the struck face.
+	for pool in full.pools.values(): pool.particles.clear()
+	game.elapsed += 0.1
+	hit.normal = Vector3.UP
+	hit.relative_velocity = Vector3(3, -3, 0)
+	full.emit_contact(hit)
+	var lateral := 0.0
+	var outward := 0.0
+	var fragments := 0
+	for pool in full.pools.values():
+		if pool.material != "stone" or pool.spec.kind != "chip": continue
+		for particle in pool.particles:
+			lateral += particle.velocity.x
+			outward += particle.velocity.y
+			fragments += 1
+	if fragments == 0 or lateral <= 0.0 or outward <= 0.0:
+		failures.append("oblique pick stroke lost its outward directional fan")
 	var peak := 0
 	var usec := 0
 	for frame in 100:

@@ -675,12 +675,14 @@ func _knife_contact(bolt,hand,delta):
 	var target=game._owner(hit.collider)
 	if target==null: return
 	var kind=str(target.get_meta("kind",""))
-	if kind=="enemy": game.adventure.hurt_enemy(target,24.0,hand)
+	if kind=="enemy": game.adventure.hurt_enemy(target,24.0,hand,Vector3.ZERO,"physical",hit.position)
 	elif kind=="dummy": game._dummy_hit(target)
 	elif kind=="rat": game._kill_rat(target)
 	else: return
 	bolt.set_meta("knife_next",game.elapsed+0.4)
 	sound("seat",hit.position)
+	if kind=="enemy" and game.impact_feedback!=null:
+		game.impact_feedback.contact(target,hit.position,hit.normal,previous.distance_to(tip)/delta,"crossbow_bolt")
 	if hand!=null: game.adventure.haptic(hand,"impact")
 
 func cable_path(draw_y:float)->Array:

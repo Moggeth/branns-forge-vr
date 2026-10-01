@@ -231,7 +231,7 @@ func strike(target,point:Vector3,normal:Vector3,speed:float,hand,item,strike_reg
 				material_response["response"] = "cleave" if result.get("detached",false) else "impact"
 			hard_surface_contact.emit(material_response)
 		elif game.impact_feedback!=null:
-			game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","")),"flesh")
+			game.impact_feedback.contact(target,point,normal,speed,str(item.get_meta("id","")))
 		elif target.get_meta("enemy_type","")=="skeleton":
 			game.remains._clack(point)
 		# The blade stops when it has spent its energy inside bone. A stronger

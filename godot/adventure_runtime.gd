@@ -870,7 +870,7 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	if game.quests!=null and not enemy.get_meta("director_spawned",false): game.quests.enemy_defeated(enemy,str(enemy.get_meta("enemy_type","skeleton")))
 	enemy.set_meta("combat_phase","dead")
 	enemy.set_meta("attack_at",0.0)
-	if str(enemy.get_meta("enemy_type",""))=="golem" and game.animation!=null and game.animation.golem_runtime!=null: game.animation.golem_runtime.defeated(enemy)
+	if str(enemy.get_meta("enemy_type",""))=="golem" and game.animation!=null and game.animation.golem_runtime!=null: game.animation.golem_runtime.defeated(enemy,impact_point)
 	game.remains.shatter(enemy,impulse)
 	enemy.visible=false
 	game._set_collisions(enemy,false)

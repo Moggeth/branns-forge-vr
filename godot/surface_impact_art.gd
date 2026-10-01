@@ -2,8 +2,8 @@ extends RefCounted
 ## Material-specific impact debris art for the MaterialImpactFeedback root.
 ## The root owns emission, ballistics, dedup, audio and marks placement.
 ## This module owns fragment silhouettes, material response and the two small
-## particle shaders (camera-facing dust, tapered ember streak). All resources
-## are built once, cached and shared: 17 meshes, 14 materials, 2 shaders.
+## particle shaders (camera-facing smooth dust puff, tapered ember streak). All resources
+## are built once, cached and shared (meshes, materials, 2 shaders).
 ##
 ## Extra (ignored-by-root) keys on layer dictionaries:
 ##   "gate": "metal_tool"   spark layers should only fire for metal-headed tools
@@ -77,10 +77,14 @@ class MB:
 static func profiles() -> Dictionary:
 	return {
 		"stone": [
-			_layer("stone shards", "chip", "stone_shard", "stone_chip", 4, 0.052, 3.4, 0.75, Color(0.66, 0.63, 0.58)),
-			_layer("stone slabs", "chip", "stone_slab", "stone_chip", 3, 0.075, 2.2, 0.8, Color(0.52, 0.5, 0.47)),
-			_layer("stone grit", "dust", "quad", "dust_chalk", 3, 0.30, 1.1, 0.9, Color(0.72, 0.69, 0.63)),
-			_layer("stone strike sparks", "spark", "streak", "spark", 2, 0.11, 5.4, 0.26, Color(1.0, 0.72, 0.34), {"gate": "metal_tool"}),
+			# Timing hierarchy (no per-layer delay in the root, so it is carried by life/speed):
+			# glint (0.15 s, fastest) > fresh shards (fast) > crust flakes > slab > dust (slow, soft, last).
+			# Cool dark weathered crust on top, warm freshly fractured faces underneath.
+			_layer("stone strike glint", "spark", "streak", "spark_glint", 2, 0.07, 4.8, 0.15, Color(1.0, 0.8, 0.46), {"gate": "metal_tool"}),
+			_layer("stone fresh shards", "chip", "stone_shard", "stone_chip", 2, 0.042, 3.9, 0.55, Color(0.94, 0.86, 0.74)),
+			_layer("stone crust flakes", "chip", "stone_flake", "stone_chip", 3, 0.058, 3.0, 0.7, Color(0.95, 0.95, 0.98)),
+			_layer("stone slabs", "chip", "stone_slab", "stone_chip", 1, 0.07, 1.9, 0.8, Color(0.5, 0.49, 0.48)),
+			_layer("stone dust", "dust", "quad", "dust_stone", 2, 0.19, 0.75, 0.5, Color(0.64, 0.62, 0.58)),
 		],
 		"wood": [
 			_layer("wood splinters", "chip", "splinter", "wood_chip", 4, 0.115, 3.0, 0.8, Color(0.86, 0.66, 0.42)),
@@ -120,7 +124,7 @@ static func mark_profile(material: String) -> Dictionary:
 ## Cheap diagnostics for the validation harness.
 static func stats() -> Dictionary:
 	var result := {"meshes": {}, "triangles": 0, "bad_windings": 0}
-	for key in ["stone_shard", "stone_slab", "splinter", "bark", "bone_chip", "bone_flake", "shaving", "pulp",
+	for key in ["stone_shard", "stone_slab", "stone_flake", "splinter", "bark", "bone_chip", "bone_flake", "shaving", "pulp",
 			"glass_shard", "streak", "mark_stone", "mark_wood", "mark_bone", "mark_metal"]:
 		var mesh: ArrayMesh = _res(key)
 		var arrays := mesh.surface_get_arrays(0)
@@ -150,7 +154,8 @@ static func _res(key: String) -> Resource:
 
 static func _make(key: String) -> Resource:
 	match key:
-		"stone_shard": return _crystal(4101, 5, Vector3(1.0, 0.62, 0.78), 0.3, 0.16, Color(0.95, 0.94, 0.92))
+		"stone_shard": return _crystal(4101, 5, Vector3(1.0, 0.55, 0.7), 0.34, 0.2, Color(1.0, 0.9, 0.76))
+		"stone_flake": return _prism(4110, 5, Vector3(1.0, 1.0, 0.58), 0.07, 0.34, Color(0.4, 0.41, 0.44), Color(0.98, 0.8, 0.56), Color(0.62, 0.58, 0.54))
 		"stone_slab": return _prism(4102, 6, Vector3(1.0, 1.0, 0.72), 0.13, 0.28, Color(0.98, 0.97, 0.94), Color(0.62, 0.6, 0.58), Color(0.8, 0.79, 0.76))
 		"bone_chip": return _crystal(4103, 5, Vector3(1.0, 0.7, 0.82), 0.2, 0.08, Color(1.0, 0.99, 0.95))
 		"bone_flake": return _prism(4104, 5, Vector3(1.0, 1.0, 0.8), 0.15, 0.2, Color(1.0, 0.99, 0.96), Color(0.8, 0.72, 0.52), Color(0.92, 0.9, 0.82))
@@ -178,7 +183,9 @@ static func _make(key: String) -> Resource:
 		"dust_sawdust": return _dust_material(0.5, 0.75, 0.9, 0.5)
 		"dust_fine": return _dust_material(0.32, 0.55, 0.6, 0.3)
 		"dust_puff": return _dust_material(0.45, 0.85, 0.5, 0.38)
-		"spark": return _spark_material()
+		"dust_stone": return _dust_material(0.9, 0.34, 0.25, 0.3)
+		"spark": return _spark_material(1.6)
+		"spark_glint": return _spark_material(1.15)
 		"mark_mat": return _mark_material(0.9, 0.0)
 		"mark_metal_mat": return _mark_material(0.32, 0.7)
 	return null
@@ -496,9 +503,10 @@ static func _dust_material(edge_softness: float, density: float, grain: float, t
 	mat.render_priority = 1
 	return mat
 
-static func _spark_material() -> ShaderMaterial:
+static func _spark_material(energy: float) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = _shader("spark")
+	mat.set_shader_parameter("energy", energy)
 	mat.render_priority = 2
 	return mat
 
@@ -524,7 +532,9 @@ static func _shader(key: String) -> Shader:
 const DUST_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled;
-// Sparse atmospheric grit: camera-facing, unlit, noise-eroded soft disc. No glow.
+// Local airy puff: camera-facing, unlit, smooth radial falloff. Shape variation is a few
+// low-order angular lobes (deterministic per instance), never per-pixel noise, so there is
+// no blocky speckle or scissored edge. Alpha reaches exactly 0 before the quad border.
 uniform float density : hint_range(0.0, 1.0) = 0.55;
 uniform float edge_softness : hint_range(0.05, 1.0) = 0.6;
 uniform float grain : hint_range(0.0, 1.0) = 0.7;
@@ -534,13 +544,6 @@ float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
 	return fract(p.x * p.y);
-}
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
-		mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 void vertex() {
 	float s = length(MODEL_MATRIX[0].xyz);
@@ -552,13 +555,22 @@ void vertex() {
 	vseed = vec2(hash21(axis.xy * 17.3 + up.z * 5.1), hash21(up.xy * 11.7 + axis.z * 3.9));
 }
 void fragment() {
-	vec2 q = UV * 2.0 - 1.0;
+	vec2 q = (UV * 2.0 - 1.0) * vec2(1.0 + (vseed.x - 0.5) * 0.3, 1.0);
 	float r = length(q);
-	float n = vnoise(q * 2.3 + vseed * 31.0) * 0.6 + vnoise(q * 5.7 + vseed * 17.0) * 0.4;
-	float shape = 1.0 - smoothstep(1.0 - edge_softness, 1.0, r + (n - 0.5) * grain);
-	shape *= shape;
-	ALBEDO = COLOR.rgb * (1.0 - tone_shade * (n - 0.25));
-	ALPHA = clamp(shape * density * COLOR.a, 0.0, 1.0);
+	float ang = atan(q.y, q.x);
+	// Two smooth lobes (2nd/3rd harmonic) give each puff its own soft, uneven outline.
+	float lobes = sin(ang * 2.0 + vseed.x * 6.2832) * 0.5 + sin(ang * 3.0 + vseed.y * 6.2832) * 0.5;
+	float rr = r * (1.0 + lobes * 0.13 * grain);
+	// Fade starts at (1 - edge_softness) and is exactly zero at 0.94: clear edge fade.
+	float body = 1.0 - smoothstep(1.0 - edge_softness, 0.94, rr);
+	float core = 1.0 - smoothstep(0.0, 0.9, rr);
+	float shape = body * body * (0.6 + 0.4 * core);
+	// Faint top-lit, bottom-shaded volume cue; edges slightly darker so it reads as particulate.
+	vec3 col = COLOR.rgb * (1.0 - tone_shade * (0.28 * smoothstep(0.2, 1.0, rr) + 0.14 * (q.y * 0.5 + 0.5)));
+	// Tiny screen-space dither hides 8-bit banding in the long soft gradient.
+	float dither = (hash21(FRAGCOORD.xy) - 0.5) * (1.5 / 255.0);
+	ALBEDO = col;
+	ALPHA = clamp(shape * density * COLOR.a + dither * step(0.002, shape), 0.0, 1.0);
 }
 """
 

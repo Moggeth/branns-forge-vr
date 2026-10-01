@@ -267,7 +267,7 @@ func tick(delta):
 			if shot.kind=="fire" and game.heat_contacts!=null: game.heat_contacts.touch(hit.position,.45,360,game.adventure.zone,"firebolt_impact",shot.node,.1)
 			var target=game._owner(hit.collider)
 			if target!=null:
-				if target.get_meta("kind","")=="enemy": game.adventure.hurt_enemy(target,shot.damage,shot.hand,Vector3.ZERO,"fire" if shot.kind=="fire" else "physical")
+				if target.get_meta("kind","")=="enemy": game.adventure.hurt_enemy(target,shot.damage,shot.hand,Vector3.ZERO,"fire" if shot.kind=="fire" else "physical",hit.position)
 				elif target.get_meta("kind","")=="dummy": game._dummy_hit(target)
 				elif target.get_meta("kind","")=="rat": game._kill_rat(target)
 				elif shot.kind=="crystal": game.adventure.interact(target,"crystal_resonator",shot.hand)

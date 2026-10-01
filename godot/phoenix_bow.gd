@@ -373,6 +373,7 @@ func _impact(shot:Dictionary,hit:Dictionary):
 			"enemy":
 				var head=str(target.get_meta("enemy_type",""))=="skeleton" and hit.position.distance_to(game.enchantments._head_position(target))<0.28
 				game.adventure.hurt_enemy(target,float(shot.damage)*(1.8 if head else 1.0),shot.hand,shot.velocity.normalized(),"headshot" if head else "projectile",hit.position)
+				if game.impact_feedback!=null: game.impact_feedback.contact(target,hit.position,hit.normal,shot.velocity.length()*0.18,"phoenix_arrow")
 			"rat": game._kill_rat(target)
 			"dummy": game._dummy_hit(target)
 			"apple": game.apples.impact(target,shot.velocity.length(),hit.position,shot.velocity)

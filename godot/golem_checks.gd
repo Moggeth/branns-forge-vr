@@ -68,8 +68,10 @@ func _run() -> void:
 		_check(exposed != null and exposed.emission_texture == imported.emission_texture, "exposed core keeps authored glow texture")
 	_check(float(enemy.get_meta("golem_stagger_until", 0.0)) > fixture.elapsed, "core strike staggers")
 	fixture.elapsed += 2.0
+	var before_aimed_break: int = fixture.impact_feedback.contacts
 	for i in 3: runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(0.7, 1.35, 0.15)))
 	_check(enemy.get_meta("golem_broken_arm_r", false), "localized armour can chip away")
+	_check(fixture.impact_feedback.contacts == before_aimed_break, "aimed armour break did not preempt exact pick contact")
 	if FileAccess.file_exists("res://assets/golem/golem.glb"):
 		_check(runtime.armor_chips.size() == 2, "shoulder and forearm become physical art chunks")
 		_check(not runtime.entries[enemy.get_instance_id()].armor_nodes.ShoulderR.visible, "damaged shoulder source closes")
@@ -104,8 +106,9 @@ func _run() -> void:
 	if FileAccess.file_exists("res://assets/golem/golem.glb"):
 		runtime.filter_hit(enemy, 18.0, pick_hand, "physical", enemy.to_global(Vector3(0.7, 1.35, 0.15)))
 	enemy.set_meta("alive", false)
-	runtime.defeated(enemy)
-	_check(fixture.impact_feedback.contacts >= 7, "stone chips and dust handle armour, slam and defeat")
+	var before_direct_death: int = fixture.impact_feedback.contacts
+	runtime.defeated(enemy, enemy.to_global(Vector3(0.7, 1.35, 0.15)))
+	_check(fixture.impact_feedback.contacts == before_direct_death, "direct-contact defeat did not preempt exact pick contact")
 	fixture.remains.shatter(enemy, Vector3.UP)
 	_check(fixture.remains.bodies.size() >= 6, "death makes modular physical rock fragments")
 	if FileAccess.file_exists("res://assets/golem/golem.glb"):
@@ -120,6 +123,16 @@ func _run() -> void:
 	adventure.register_enemy(summoned)
 	_check(float(summoned.get_meta("hp", 0)) == 110.0, "dynamic spawn receives standard golem HP")
 	_check(fixture.animation.actors.has(summoned.get_instance_id()), "dynamic spawn has animation")
+	var before_ambient: int = fixture.impact_feedback.contacts
+	runtime.filter_hit(summoned, 99.0, null, "blast", null)
+	_check(fixture.impact_feedback.contacts == before_ambient + 1, "unlocated armour break keeps stone feedback")
+	runtime.defeated(summoned)
+	_check(fixture.impact_feedback.contacts == before_ambient + 1, "same-frame ambient defeat has one stone response")
+	var unlocated_death: Node3D = WorldZones.enemy(fixture, fixture.scene, "sandstone_quarry", Vector3(6, 0, 0), "golem")
+	adventure.register_enemy(unlocated_death)
+	var before_unlocated_death: int = fixture.impact_feedback.contacts
+	runtime.defeated(unlocated_death)
+	_check(fixture.impact_feedback.contacts == before_unlocated_death + 1, "unlocated defeat without armour break keeps stone feedback")
 	if failures.is_empty():
 		print("GOLEM_CHECKS_PASS art=", runtime.entries[enemy.get_instance_id()].art, " stone_contacts=", fixture.impact_feedback.contacts)
 		quit(0)

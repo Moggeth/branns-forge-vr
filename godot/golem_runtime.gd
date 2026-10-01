@@ -26,7 +26,8 @@ func setup(owner_game, owner_animator) -> void:
 func attach(actor: Node3D, rig: Dictionary) -> void:
 	var entry := {"actor":actor, "rig":rig, "armor":{}, "armor_nodes":{}, "core":null,
 		"core_scale":Vector3.ONE, "core_intact_material":null, "core_exposed_material":null,
-		"marker":null, "mark":Vector3.ZERO, "art":false, "last_notice":-100.0}
+		"marker":null, "mark":Vector3.ZERO, "art":false, "last_notice":-100.0,
+		"unlocated_impact_at":-100.0}
 	for region in ["chest", "head", "arm_l", "arm_r", "leg_l", "leg_r"]:
 		entry.armor[region] = ARMOR_HEALTH
 	entries[actor.get_instance_id()] = entry
@@ -184,23 +185,27 @@ func filter_hit(actor: Node3D, damage: float, hand, damage_type: String, impact_
 		entry.armor[region] = maxf(0.0, armor_left - damage * (1.7 if pick else 1.0))
 		damage *= 0.82 if pick else (0.6 if damage_type == "physical" else 0.78)
 		if float(entry.armor[region]) <= 0.0:
-			_break_armor(entry, region, impact_point if aimed else actor.global_position + Vector3.UP * 1.2)
+			_break_armor(entry, region, impact_point if aimed else actor.global_position + Vector3.UP * 1.2, not aimed)
 			damage *= 1.25
 	else:
 		damage *= 1.35 if pick else 1.15
 	if pick and aimed and region in ["leg_l", "leg_r"]: _stagger(actor, 0.75)
 	return damage
 
-func _break_armor(entry: Dictionary, region: String, point: Vector3) -> void:
+func _break_armor(entry: Dictionary, region: String, point: Vector3, emit_fallback: bool) -> void:
 	var actor: Node3D = entry.actor
 	for plate_name in entry.armor_nodes:
 		if ARMOR[plate_name] == region and is_instance_valid(entry.armor_nodes[plate_name]):
 			var plate: Node3D = entry.armor_nodes[plate_name]
 			_chip_plate(actor, plate, point)
 			plate.visible = false
-	var normal := (point - actor.global_position - Vector3.UP).normalized()
-	if normal.length_squared() < 0.01: normal = Vector3.UP
-	_stone_contact(actor, point, normal, 4.0, "golem_armor")
+	# Melee and projectiles emit their measured contact after damage resolves.
+	# Only damage with no contact point needs an armour-break fallback here.
+	if emit_fallback:
+		var normal := (point - actor.global_position - Vector3.UP).normalized()
+		if normal.length_squared() < 0.01: normal = Vector3.UP
+		_stone_contact(actor, point, normal, 4.0, "golem_armor")
+		entry.unlocated_impact_at = game.elapsed
 	_stagger(actor, 0.95)
 	if game.elapsed - float(entry.last_notice) > 1.2:
 		game._notice("Golem %s armour cracks away." % region.replace("_", " "), 2)
@@ -220,10 +225,13 @@ func _stagger(actor: Node3D, seconds: float) -> void:
 	actor.set_meta("combat_progress", 0.86)
 	cancel_slam(actor)
 
-func defeated(actor: Node3D) -> void:
+func defeated(actor: Node3D, impact_point = null) -> void:
 	cancel_slam(actor)
-	_stone_contact(actor, actor.global_position + Vector3.UP * 1.25, Vector3.UP, 5.5, "golem_shatter")
 	var entry: Dictionary = entries.get(actor.get_instance_id(), {})
+	# An exact contact will emit at its actual point after this damage call.
+	# Avoid a second centred sound/burst when armour also broke this frame.
+	if not impact_point is Vector3 and (entry.is_empty() or game.elapsed - float(entry.unlocated_impact_at) > 0.065):
+		_stone_contact(actor, actor.global_position + Vector3.UP * 1.25, Vector3.UP, 5.5, "golem_shatter")
 	if not entry.is_empty():
 		# A plate already thrown from the living actor has its own bounded rigid
 		# fragment. Skip the hidden source when death scatters the remaining art.

@@ -101,6 +101,13 @@ func emit_contact(event: Dictionary) -> bool:
 	var strength := clampf(sqrt(energy) / 2.7, 0.35, 2.0)
 	var tangent: Vector3 = normal.cross(Vector3.FORWARD if absf(normal.z) < 0.85 else Vector3.RIGHT).normalized()
 	var bitangent := normal.cross(tangent).normalized()
+	var incoming: Vector3 = event.get("relative_velocity", -normal)
+	if not incoming.is_finite() or incoming.length_squared() < 0.001: incoming = -normal
+	# Preserve the sweep's tangential momentum while throwing fragments back
+	# out of the surface. A glancing blow fans forward across the stone.
+	var travel := incoming.normalized()
+	var along_surface := travel.slide(normal)
+	var fan_axis := (normal * 0.85 + along_surface * 0.75).normalized()
 	var tool: String = str(event.get("tool", ""))
 	for pool in pools.values():
 		if str(pool.material) != material: continue
@@ -112,7 +119,7 @@ func emit_contact(event: Dictionary) -> bool:
 			if pool.particles.size() >= CAPACITY:
 				dropped += 1
 				break
-			var direction: Vector3 = (normal * rng.randf_range(0.35, 1.15) + tangent * rng.randf_range(-0.8, 0.8) + bitangent * rng.randf_range(-0.8, 0.8)).normalized()
+			var direction: Vector3 = (fan_axis * rng.randf_range(0.7, 1.15) + tangent * rng.randf_range(-0.45, 0.45) + bitangent * rng.randf_range(-0.45, 0.45)).normalized()
 			var lifetime := float(spec.get("life", 0.55)) * rng.randf_range(0.85, 1.15)
 			var velocity := direction * float(spec.get("speed", 2.0)) * rng.randf_range(0.65, 1.15) * strength
 			var orientation := Basis.from_euler(Vector3(rng.randf(), rng.randf(), rng.randf()) * TAU)
@@ -196,7 +203,7 @@ func tick(delta: float) -> void:
 			var fade := clampf((float(p.life) - float(p.age)) / maxf(float(p.life) * 0.35, 0.01), 0.0, 1.0)
 			var scale: float = p.scale * (1.0 + float(p.age) * 1.2 if kind == "dust" else fade)
 			var color: Color = p.color
-			color.a = fade
+			color.a = fade * (minf(p.age / 0.06, 1.0) if kind == "dust" else 1.0)
 			pool.multi.set_instance_transform(write, Transform3D(p.basis.scaled(Vector3.ONE * scale), p.position))
 			pool.multi.set_instance_color(write, color)
 			lower = lower.min(p.position - Vector3.ONE * scale)
