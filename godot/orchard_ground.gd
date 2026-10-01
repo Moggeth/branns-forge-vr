@@ -4,11 +4,15 @@ const MASK_PATH := "res://assets/atmosphere/orchard_masks.png"
 const SURFACE_MATERIALS := "res://assets/ground-surface-kit/materials/"
 const EXTENT := 160.0
 const RESOLUTION := 512
+const BANK_RESOLUTION := 128
 const EXPOSURE_RESOLUTION := 320
 const EXPOSURE_FEATHER_M := 1.0
 static var _material: ShaderMaterial
 static var _mask_image: Image
 static var _mask_texture: ImageTexture
+static var _bank_image: Image
+static var _bank_texture: ImageTexture
+static var _bank_values := PackedByteArray()
 static var _exposure_image: Image
 static var _exposure_texture: ImageTexture
 
@@ -132,6 +136,48 @@ static func sync_paths(paths: Array) -> void:
 		_paint_segment(Vector2(float(a[0]), float(a[1])), Vector2(float(b[0]), float(b[1])))
 	_mask_texture.update(_mask_image)
 
+static func sync_bank(model: Dictionary, bounds: Rect2 = Rect2()) -> int:
+	## Rebuild once on setup, then update only the accepted hydrology region.
+	if _material == null: material()
+	var size: int = int(model.get("size", 0))
+	var step: float = float(model.get("step", 0.0))
+	var origin: Vector2 = model.get("origin", Vector2.ZERO)
+	var distances: PackedFloat32Array = model.get("river_distance", PackedFloat32Array())
+	var widths: PackedFloat32Array = model.get("river_width", PackedFloat32Array())
+	if size < 2 or step <= 0.0 or distances.size() != size * size or widths.size() != size * size:
+		push_warning("Orchard bank skipped: incompatible river fields")
+		return 0
+	var full := _bank_image == null or not bounds.has_area()
+	if _bank_image == null:
+		_bank_image = Image.create(BANK_RESOLUTION, BANK_RESOLUTION, false, Image.FORMAT_L8)
+		_bank_image.fill(Color.BLACK)
+		_bank_texture = ImageTexture.create_from_image(_bank_image)
+		_material.set_shader_parameter("bank_tex", _bank_texture)
+		_bank_values.resize(BANK_RESOLUTION * BANK_RESOLUTION)
+	var region: Rect2 = Rect2(Vector2.ONE * -EXTENT, Vector2.ONE * EXTENT * 2.0) if full else bounds.grow(step * 2.0 + 9.0)
+	if region.end.x < -EXTENT or region.end.y < -EXTENT or region.position.x > EXTENT or region.position.y > EXTENT: return 0
+	var x0 := clampi(floori((region.position.x + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION), 0, BANK_RESOLUTION - 1)
+	var x1 := clampi(ceili((region.end.x + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION), 0, BANK_RESOLUTION - 1)
+	var z0 := clampi(floori((region.position.y + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION), 0, BANK_RESOLUTION - 1)
+	var z1 := clampi(ceili((region.end.y + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION), 0, BANK_RESOLUTION - 1)
+	var changed := 0
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var point := Vector2(float(x) + 0.5, float(z) + 0.5) * (EXTENT * 2.0 / BANK_RESOLUTION) - Vector2.ONE * EXTENT
+			var distance := _height_sample(distances, size, step, origin, point)
+			var width := _height_sample(widths, size, step, origin, point)
+			var bank := 1.0 - smoothstep(0.0, 8.0, maxf(0.0, distance - width * 0.5)) if width > 0.01 else 0.0
+			var value := clampi(roundi(bank * 255.0), 0, 255)
+			var index := z * BANK_RESOLUTION + x
+			if not full and _bank_values[index] == value: continue
+			_bank_values[index] = value
+			var level := float(value) / 255.0
+			_bank_image.set_pixel(x, z, Color(level, level, level))
+			changed += 1
+	if changed > 0: _bank_texture.update(_bank_image)
+	_material.set_shader_parameter("live_bank", 1.0)
+	return changed
+
 static func add_path(a: Vector3, b: Vector3) -> void:
 	if _mask_image == null: material()
 	_paint_segment(Vector2(a.x, a.z), Vector2(b.x, b.z))
@@ -142,7 +188,21 @@ static func sample(at: Vector2) -> Color:
 	if _mask_image == null: material()
 	var x := clampi(floori((at.x + EXTENT) / (EXTENT * 2.0) * RESOLUTION), 0, RESOLUTION - 1)
 	var z := clampi(floori((at.y + EXTENT) / (EXTENT * 2.0) * RESOLUTION), 0, RESOLUTION - 1)
-	return _mask_image.get_pixel(x, z)
+	var color := _mask_image.get_pixel(x, z)
+	if _bank_image != null: color.b = _bank_sample(at)
+	return color
+
+static func _bank_sample(at: Vector2) -> float:
+	## Match the shader's filtered bank texture at local X/Z coordinates.
+	var u := clampf((at.x + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION - 0.5, 0.0, BANK_RESOLUTION - 1.0)
+	var v := clampf((at.y + EXTENT) / (EXTENT * 2.0) * BANK_RESOLUTION - 0.5, 0.0, BANK_RESOLUTION - 1.0)
+	var x0 := floori(u)
+	var z0 := floori(v)
+	var x1 := mini(x0 + 1, BANK_RESOLUTION - 1)
+	var z1 := mini(z0 + 1, BANK_RESOLUTION - 1)
+	var a := lerpf(float(_bank_values[z0 * BANK_RESOLUTION + x0]), float(_bank_values[z0 * BANK_RESOLUTION + x1]), u - x0)
+	var b := lerpf(float(_bank_values[z1 * BANK_RESOLUTION + x0]), float(_bank_values[z1 * BANK_RESOLUTION + x1]), u - x0)
+	return lerpf(a, b, v - z0) / 255.0
 
 static func _paint_segment(a: Vector2, b: Vector2) -> void:
 	var low := a.min(b) - Vector2.ONE * 5.0

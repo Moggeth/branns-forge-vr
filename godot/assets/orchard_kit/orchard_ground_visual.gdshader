@@ -32,6 +32,8 @@ uniform float use_authored_orm = 0.0;
 uniform float grass_tile_per_m = 0.23;
 uniform float soil_tile_per_m = 0.31;
 uniform sampler2D macro_mask : repeat_disable, filter_linear;   // r=path/exposed, g=leaf litter, b=damp/bank, a=disturbed
+uniform sampler2D bank_tex : repeat_disable, filter_linear;
+uniform float live_bank = 0.0;
 uniform sampler2D exposure_tex : hint_default_black, repeat_disable, filter_linear;
 uniform float rain_wetness = 0.0;
 uniform float snow_cover = 0.0;
@@ -53,6 +55,10 @@ uniform vec3 rock_band  : source_color = vec3(0.48, 0.45, 0.46);
 uniform vec3 rock_fresh : source_color = vec3(0.50, 0.46, 0.41);
 uniform vec3 gravel_col : source_color = vec3(0.47, 0.43, 0.36);
 uniform vec3 clay_col   : source_color = vec3(0.52, 0.38, 0.24);
+// rev-7 (Sonnet habitat pass 2026-10-01): warm worn-earth path core, silty bank palette. Additive uniforms only.
+uniform vec3 path_warm  : source_color = vec3(0.50, 0.35, 0.21);
+uniform vec3 path_dust  : source_color = vec3(0.58, 0.46, 0.29);
+uniform vec3 bank_silt  : source_color = vec3(0.30, 0.25, 0.17);
 uniform float texture_strength = 0.85;
 uniform float strata_scale = 2.35;
 uniform float mask_origin_x = -360.0;
@@ -112,6 +118,7 @@ void fragment() {
 	vec2 mask_warp = (vec2(noise2(at * 0.33 + 1.3), noise2(at * 0.33 + 8.1)) - 0.5) * (2.6 / 320.0)
 		+ (vec2(noise2(at * 1.4), noise2(at * 1.4 + 3.7)) - 0.5) * (0.9 / 320.0);
 	vec4 m = texture(macro_mask, clamp(uv + mask_warp, vec2(0.0), vec2(1.0)));
+	if (live_bank > 0.5) { m.b = texture(bank_tex, uv).r; }
 
 	vec2 warp = vec2(noise2(at * 0.045), noise2(at * 0.045 + 5.2)) * 9.0;
 	vec2 wp = at + warp;
@@ -215,13 +222,26 @@ void fragment() {
 	float thin_n = fbm(wp * 0.15 + 29.0);
 	float thin = smoothstep(0.60, 0.74, thin_n + (gl - 0.4) * 0.35) * (1.0 - lifted) * (1.0 - steep) * 0.42;
 	soil_amt = clamp(soil_amt + thin * (1.0 - leaf), 0.0, 1.0);
+	// rev-7 path shoulder: the mask edge is ragged with grass crowding in and bare patches reaching out, strongest
+	// mid-transition and zero in the tread core / open meadow (1 extra noise tap, no new texture reads).
+	float path_eff = path * path_keep;
+	float p_shoulder = path_eff * (1.0 - path_eff) * 4.0 * (1.0 - lifted);
+	soil_amt = clamp(soil_amt + (noise2(at * 3.4 + 9.0) - 0.5) * 0.34 * p_shoulder, 0.0, 1.0);
 	float soil_raw = smoothstep(0.3, 0.75, soil_amt);
 	float edge_zone = soil_raw * (1.0 - soil_raw) * 4.0;
 	float blade_cut = smoothstep(0.38, 0.62, gl + (fine - 0.5) * 0.5);   // 1 where a blade stands
 	soil_amt = clamp(soil_raw - edge_zone * blade_cut * 0.55 * (1.0 - steep), 0.0, 1.0);
-	vec3 colour = mix(g, s, soil_amt);
+	// rev-7 worn tread: the path core becomes sun-dried warm earth with dusty stretches and a calm, compressed grain
+	// (the raw soil texture luma drew a dark leaf-print road). Shoulders keep the ordinary darker soil, so the
+	// centre reads as the walked line and the margins as earth under turf.
+	float p_core = smoothstep(0.50, 0.92, path_eff) * (1.0 - lifted);
+	vec3 tread = mix(soil_col, path_warm, 0.7);
+	tread = mix(tread, path_dust, smoothstep(0.35, 0.78, meander) * 0.5);
+	tread *= clamp(luma(st) * 2.0, 0.80, 1.20) * mix(0.94, 1.06, fine);
+	vec3 s_path = mix(s, tread, p_core * 0.85);
+	vec3 colour = mix(g, s_path, soil_amt);
 	// a rim of darker, damper soil at the turf edge gives the transition depth instead of a flat brown fill
-	colour *= 1.0 - edge_zone * (1.0 - blade_cut) * 0.16;
+	colour *= 1.0 - edge_zone * (1.0 - blade_cut) * 0.16 * (1.0 - p_core * 0.6);
 	if (path_lift > 0.0) {
 		// tread: broad tilt tone; turf over lost tread slightly drier and trampled; rubble = fresh earth
 		// + pale stone chips; cracks thin and dark but at reduced strength (0.5)
@@ -244,6 +264,10 @@ void fragment() {
 	float scree_zone = smoothstep(0.30, 0.52, slope + edge_n * 0.4) * (1.0 - rockiness) * (1.0 - lifted);
 	float fleck = smoothstep(0.66, 0.80, noise2(at * 3.1) * 0.6 + noise2(at * 7.3) * 0.4);
 	colour = mix(colour, gravel_col * mix(0.7, 1.05, fine) * mix(0.9, 1.1, noise2(at * 1.9)), scree_zone * fleck * 0.75);
+	// rev-7 shoulder dressing (reuses fleck/clump): pale pebbles and dried leaf scatter on the margins, never the core
+	colour = mix(colour, gravel_col * mix(0.8, 1.1, fine), p_shoulder * fleck * 0.5);
+	colour = mix(colour, vec3(0.42, 0.30, 0.15) * (0.8 + 0.5 * fine), p_shoulder * smoothstep(0.55, 0.9, clump) * 0.26);
+	colour = mix(colour, colour * vec3(1.05, 1.02, 0.95), p_core * smoothstep(0.62, 0.9, meander) * 0.35);   // polished wheel-line stretches
 	float rock_lip = smoothstep(0.38, 0.55, slope + edge_n * 0.4) * (1.0 - smoothstep(0.55, 0.72, slope)) * (1.0 - lifted);
 	colour = mix(colour, moss_col * mix(0.85, 1.15, noise2(at * 0.8)), rock_lip * (0.25 + clamp(aspect, 0.0, 1.0) * 0.35));
 	colour = mix(colour, rock, rockiness);
@@ -326,21 +350,32 @@ void fragment() {
 	}
 
 	// --- riverbank: damp soil fading into gravel shelf near the water
+	// rev-7 banks, three soft zones instead of one hard shelf: (1) lush dew-green moss/clover fringe where the
+	// ground first turns damp, (2) silty brown mud that darkens gently toward the water, (3) a rounded-pebble gravel
+	// lip right at the waterline with a thin wet-silt edge. Pebbles are filled cell interiors (not crack lines).
 	float bank = smoothstep(0.30, 0.85, m.b + edge_n * 0.4);
+	float bank_far = smoothstep(0.14, 0.52, m.b + edge_n * 0.3) * (1.0 - bank);
 	vec2 pb = cells(at * 1.7);
-	vec3 shelf = mix(bank_wet, gravel_col * mix(0.55, 1.05, pb.y), smoothstep(0.6, 0.95, m.b) * smoothstep(0.02, 0.12, pb.x + 0.05));
-	shelf *= mix(1.0, luma(st) * 2.0, 0.7);
-	colour = mix(colour, shelf, bank * 0.85);
+	float pebble = smoothstep(0.03, 0.15, pb.x);
+	float lip_amt = smoothstep(0.62, 0.95, m.b + (noise2(at * 2.8 + 6.0) - 0.5) * 0.16);
+	vec3 silt = mix(bank_wet, bank_silt, smoothstep(0.35, 0.75, fine + meander * 0.4)) * mix(0.9, 1.06, clump);
+	vec3 pebbles = gravel_col * mix(0.6, 1.05, pb.y) * mix(0.8, 1.0, pebble);
+	vec3 shelf = mix(silt, pebbles, lip_amt * 0.8);
+	shelf *= mix(1.0, clamp(luma(st) * 2.0, 0.7, 1.25), 0.7);
+	shelf = mix(shelf, bank_wet * 0.8, smoothstep(0.88, 1.0, m.b) * 0.45);   // wet-silt rim at the very edge
+	vec3 fringe = mix(moss_col * vec3(1.05, 1.15, 0.85), grass_clover, 0.4 + 0.4 * fine) * mix(0.95, 1.2, meander);
+	colour = mix(colour, fringe, bank_far * 0.5 * (1.0 - lifted));
+	colour = mix(colour, shelf, bank * 0.82);
 
-	float damp = clamp(max(bank * 0.8, rain_wetness) + m.g * rain_wetness * 0.18 + fresh * 0.25, 0.0, 1.0);
-	colour *= 1.0 - damp * 0.24;
+	float damp = clamp(max(smoothstep(0.2, 0.9, m.b) * 0.72, rain_wetness) + m.g * rain_wetness * 0.18 + fresh * 0.25, 0.0, 1.0);
+	colour *= 1.0 - damp * 0.2 * vec3(1.0, 0.97, 0.94);   // dampness deepens and warms, never greys or blackens
 	float puddle = smoothstep(0.70, 0.92, m.b * 0.55 + rain_wetness * 0.58 + meander * 0.14) * (1.0 - rockiness);
 	float snow = snow_cover * smoothstep(0.2, 0.6, snow_cover * 0.8 + fine * 0.4 - slope * 0.6);
 	colour = mix(colour, vec3(0.89, 0.93, 0.94) * mix(0.92, 1.02, fine), snow);
 
 	ALBEDO = colour;
 	float rough_var = mix(0.9, 1.0, noise2(at * 1.3));
-	ROUGHNESS = mix((0.95 - rockiness * 0.1 - fresh * 0.08) * rough_var, 0.66, damp * 0.8);
+	ROUGHNESS = mix((0.95 - rockiness * 0.1 - fresh * 0.08) * rough_var, 0.72, damp * 0.75);   // rev-7: damp earth is satin, not glossy mud
 	if (use_authored_orm > 0.5) {
 		float grass_rough = texture(grass_orm, at * grass_tile_per_m).g;
 		float soil_rough = texture(soil_orm, at * soil_tile_per_m).g;
@@ -348,7 +383,7 @@ void fragment() {
 	}
 	ROUGHNESS = mix(ROUGHNESS, 0.35, puddle * 0.85);
 	ROUGHNESS = mix(ROUGHNESS, 0.82, snow);
-	SPECULAR = mix(0.30, 0.45, damp) * (1.0 - snow * 0.3);
+	SPECULAR = mix(0.30, 0.40, damp) * (1.0 - snow * 0.3);
 	// rev-6 anti-speckle: the 1.1/m micro-normal layer (0.9 m repeat) was the high-frequency sparkle at ground/RTS
 	// height. It now fades out by view distance (full under 6 m, gone past 22 m; continuous, no per-triangle jumps),
 	// the fine layer is mixed in at a lower weight, and the broad 0.28/m layer keeps a calm, quiet far ground.

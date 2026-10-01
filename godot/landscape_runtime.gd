@@ -75,6 +75,7 @@ func setup(owner_game: Node3D, orchard_root: Node3D, offline := false) -> void:
 	_rebuild_exposure_from_operations()
 	Fields.derive(model)
 	Ecology.build_fields(model)
+	Ground.sync_bank(model)
 	for cz in range((int(model.size) - 1) / CHUNK_CELLS):
 		for cx in range((int(model.size) - 1) / CHUNK_CELLS):
 			_rebuild_chunk(Vector2i(cx, cz))
@@ -364,6 +365,7 @@ func _apply_hydrology(computed: Dictionary, revision: int, bounds: Rect2) -> voi
 	var stats: Dictionary = computed.get("stats", {})
 	var dirty: Rect2 = stats.get("water_dirty", bounds)
 	var stamp := Time.get_ticks_usec()
+	Ground.sync_bank(model, dirty)
 	last_compile_stages = Compiler.settle_after_hydrology(model, dirty, water)
 	OrchardVisualKit.populate(self, model)
 	last_hydrology_ms = float(Time.get_ticks_usec() - stamp) / 1000.0
