@@ -658,6 +658,8 @@ func _enemies(delta):
 		var speed = (0.48 if type in ["boss","golem"] else 0.72)*game.tuning.value("combat.enemy_speed")
 		if type=="golem": speed*=float(enemy.get_meta("golem_move_scale",1.0))
 		if type=="skeleton": speed*=float(enemy.get_meta("skeleton_move_scale",1.0))
+		if type=="skeleton" and game.elapsed<float(enemy.get_meta("skeleton_stagger_until",0.0)): speed=0.0
+		if type=="skeleton" and enemy.get_meta("skeleton_missing_leg_l",false) and enemy.get_meta("skeleton_missing_leg_r",false): speed=0.0
 		if game.elapsed<float(enemy.get_meta("slow_until",0)): speed*=0.25
 		var knock:Vector3=enemy.get_meta("knock_velocity",Vector3.ZERO)
 		if type=="skeleton" and enemy.get_meta("alive",true):
@@ -672,11 +674,12 @@ func _enemies(delta):
 			var chase: Dictionary = _orchard_pursuit(enemy,destination)
 			heading = chase.direction if bool(chase.available) else Vector3.ZERO
 			if not bool(chase.available) or float(chase.remaining)>distance+3.0: attack_distance = INF
-		if distance>1.8 and str(enemy.get_meta("combat_phase","idle")) not in ["windup","strike"]:
+		var stop_distance: float = game.skeleton_attack_contact.engagement_distance(enemy) - 0.04 if type=="skeleton" and game.get("skeleton_attack_contact")!=null else 1.8
+		if distance>stop_distance and str(enemy.get_meta("combat_phase","idle")) not in ["windup","strike"]:
 			enemy.global_position += heading*speed*delta
 			if orchard_ground: _orchard_ground_enemy(enemy)
 		# Procedural enemy faces are authored toward local +Z, unlike Godot cameras.
-		if heading.length_squared()>0.001:
+		if heading.length_squared()>0.001 and not (type=="skeleton" and str(enemy.get_meta("combat_phase","idle"))=="strike"):
 			var turn=game.tuning.value("enemy.turn_speed")
 			enemy.rotation.y=lerp_angle(enemy.rotation.y,atan2(heading.x,heading.z),clampf(delta*turn,0,1)) if delta>0 else atan2(heading.x,heading.z)
 		if type=="boss" and distance<10 and game.elapsed>float(enemy.get_meta("wave_at",0)):
@@ -685,6 +688,7 @@ func _enemies(delta):
 		_step_attack(enemy,attack_distance,type)
 
 func _idle_wander(enemy: Node3D, delta: float, orchard_ground: bool) -> void:
+	if str(enemy.get_meta("enemy_type",""))=="skeleton" and (game.elapsed<float(enemy.get_meta("skeleton_stagger_until",0.0)) or (enemy.get_meta("skeleton_missing_leg_l",false) and enemy.get_meta("skeleton_missing_leg_r",false))): return
 	var home: Vector3 = enemy.get_meta("home", enemy.global_position)
 	var state: Dictionary = enemy.get_meta("idle_wander", {})
 	if orchard_ground and game.landscape != null:
@@ -753,9 +757,14 @@ func _orchard_ground_enemy(enemy: Node3D) -> void:
 
 func _step_attack(enemy,distance,type):
 	if not enemy.get_meta("alive",true): return
+	if type=="skeleton" and (bool(enemy.get_meta("skeleton_missing_arm_r",false)) or game.elapsed<float(enemy.get_meta("skeleton_stagger_until",0.0))):
+		enemy.set_meta("combat_phase","idle")
+		enemy.set_meta("combat_progress",0.0)
+		return
 	if type=="skeleton" and float(enemy.get_meta("skeleton_attack_scale",1.0))<=0.31: return
 	var phase=str(enemy.get_meta("combat_phase","idle"))
-	if phase=="idle" and distance<2.5:
+	var engage: float = game.skeleton_attack_contact.engagement_distance(enemy) if type=="skeleton" and game.get("skeleton_attack_contact")!=null else 2.5
+	if phase=="idle" and distance<engage:
 		enemy.set_meta("attack_fairy",enemy.get_meta("fairy_target",false))
 		enemy.set_meta("attack_started",game.elapsed)
 		enemy.set_meta("attack_windup",maxf(1.35,game.tuning.value("enemy.windup")) if type=="golem" else game.tuning.value("enemy.windup"))
@@ -786,8 +795,10 @@ func _step_attack(enemy,distance,type):
 	elif age<windup+strike+recovery:
 		phase="recovery"
 		progress=0.8+(age-windup-strike)/recovery*0.2
-	else: phase="idle"
-	if age>=windup+strike*0.5 and not enemy.get_meta("attack_damage_done",false):
+	else:
+		phase="idle"
+		progress=1.0
+	if type!="skeleton" and age>=windup+strike*0.5 and not enemy.get_meta("attack_damage_done",false):
 		enemy.set_meta("attack_damage_done",true)
 		if type=="golem" and game.animation!=null and game.animation.golem_runtime!=null:
 			game.animation.golem_runtime.slam(enemy)
@@ -798,6 +809,37 @@ func _step_attack(enemy,distance,type):
 			take_damage(float(enemy.get_meta("damage",12)),type)
 	enemy.set_meta("combat_phase",phase)
 	enemy.set_meta("combat_progress",progress)
+
+## Resolve skeleton damage after posing: the weapon sweep and displayed bones
+## must agree. Other creatures keep their own attack logic.
+func tick_skeleton_contacts() -> void:
+	if game.get("skeleton_attack_contact")==null: return
+	var actors: Array[Node3D] = []
+	for enemy in game.scene.get("enemies", []):
+		if is_instance_valid(enemy) and str(enemy.get_meta("enemy_type", ""))=="skeleton": actors.append(enemy)
+	if game.guardian_authored!=null:
+		for entry in game.guardian_authored.entries.values():
+			if is_instance_valid(entry.actor) and not actors.has(entry.actor): actors.append(entry.actor)
+	for actor in actors:
+		if not is_instance_valid(actor) or not actor.is_visible_in_tree() or not actor.get_meta("alive",true): continue
+		if not actor.has_meta("attack_started") or actor.get_meta("attack_damage_done",false): continue
+		var fairy_target: bool = bool(actor.get_meta("attack_fairy",false))
+		if fairy_target and (game.get("fairy")==null or not game.fairy.active): continue
+		var bottom: Vector3
+		var top: Vector3
+		var radius: float
+		if fairy_target:
+			bottom=game.fairy.avatar.global_position-Vector3.UP*0.06
+			top=game.fairy.avatar.global_position+Vector3.UP*0.06
+			radius=0.12
+		else:
+			top=game.camera.global_position-Vector3.UP*0.14
+			bottom=Vector3(top.x,game.rig.global_position.y+0.30,top.z)
+			radius=0.25
+		if not game.skeleton_attack_contact.contact(actor,bottom,top,radius): continue
+		actor.set_meta("attack_damage_done",true)
+		if fairy_target: game.fairy.hurt(float(actor.get_meta("damage",12)),"Skeleton caught you")
+		else: take_damage(float(actor.get_meta("damage",12)),"skeleton")
 
 func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physical",impact_point=null,tool_id=""):
 	# Awakened trees keep their original resource identity and keyed timber/seed
@@ -814,7 +856,7 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	if game.elapsed<float(enemy.get_meta("exposed_until",-100.0)) and (game.guardians==null or not game.guardians.guardians.has(enemy.get_instance_id())): damage*=1.5
 	if game.animation!=null: game.animation.hit(enemy,impulse if impulse.length()>0 else enemy.global_position-game.camera.global_position)
 	if game.guardian_authored!=null:
-		game.guardian_authored.react_to_hit(enemy,impulse if impulse.length()>0 else enemy.global_position-game.camera.global_position,clampf(float(damage)/35.0,0.15,1.0))
+		game.guardian_authored.react_to_hit(enemy,impulse if impulse.length()>0 else enemy.global_position-game.camera.global_position,clampf(float(damage)/35.0,0.15,1.0),impact_point,"arm_l" if float(damage)<=0.0 else "")
 	if str(enemy.get_meta("enemy_type",""))=="boss" and game.elapsed<float(enemy.get_meta("exposed_until",0)): damage*=2
 	var health = float(enemy.get_meta("hp",60))-damage
 	enemy.set_meta("hp",health)

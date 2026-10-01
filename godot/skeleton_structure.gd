@@ -121,6 +121,9 @@ func _is_rib(piece: Node3D) -> bool:
 
 func _detach(actor: Node3D, rig: Dictionary, part: String, homes: Array, direction: Vector3, force: float) -> RigidBody3D:
 	if homes.is_empty(): return null
+	var authored: Dictionary = {}
+	var handoff = game.get("skeleton_pose_handoff")
+	if handoff != null: authored = handoff.capture(actor, part)
 	var body := RigidBody3D.new()
 	body.name = "LooseSkeleton_" + part
 	body.collision_layer = 8
@@ -132,13 +135,23 @@ func _detach(actor: Node3D, rig: Dictionary, part: String, homes: Array, directi
 	if game.get("adventure") != null and game.adventure != null:
 		zone_parent = game.adventure.zone_groups.get(str(actor.get_meta("zone", game.adventure.zone)), game)
 	zone_parent.add_child(body)
-	body.global_transform = homes[0].piece.global_transform
+	body.global_transform = authored.get("transform", homes[0].piece.global_transform)
+	if not authored.is_empty():
+		var display := MeshInstance3D.new()
+		display.name = "AuthoredDetached_" + part
+		display.mesh = authored.mesh
+		display.material_override = authored.material_override
+		display.material_overlay = authored.material_overlay
+		body.add_child(display)
 	for home in homes:
 		var piece: Node3D = home.piece
 		if not is_instance_valid(piece): continue
 		if not home.has("template"): home["template"] = piece.duplicate()
-		piece.reparent(body, true)
-		piece.visible = true
+		if authored.is_empty():
+			piece.reparent(body, true)
+			piece.visible = true
+		else:
+			piece.queue_free()
 		home.piece = null
 		rig.pieces.erase(piece)
 	var box := _bounds(body, Transform3D.IDENTITY)
@@ -171,10 +184,10 @@ func _detach(actor: Node3D, rig: Dictionary, part: String, homes: Array, directi
 	# the knee, making the visible foot pass through enemies.
 	body.set_meta("tip", Vector3(0.0, box.position.y if part.begins_with("leg") else maxf(0.1, box.end.y), 0.0))
 	if part.begins_with("leg") and game.get("remains") != null and game.remains != null:
-		game.remains.add_articulated_leg(body,box,body.get_child(0))
+		game.remains.add_articulated_leg(body,box,body.get_child(0),not authored.is_empty(),authored.get("joints",{}))
 	var outward := direction.normalized() if direction.length_squared() > 0.001 else (point_from_actor(body, actor) + Vector3.UP * 0.4).normalized()
-	body.linear_velocity = outward * clampf(force * 0.85, 1.2, 7.0) + Vector3.UP * 0.5
-	body.angular_velocity = Vector3(1.3, 2.0, 0.8)
+	body.linear_velocity = authored.get("linear_velocity", Vector3.ZERO) + outward * clampf(force * 0.85, 1.2, 7.0) + Vector3.UP * 0.5
+	body.angular_velocity = authored.get("angular_velocity", Vector3.ZERO) + Vector3(1.3, 2.0, 0.8)
 	if game.get("remains") != null and game.remains != null:
 		body.body_entered.connect(func(other): game.remains._impact(body, other))
 		game.remains.bodies.append(body)

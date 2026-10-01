@@ -8,9 +8,13 @@ const STRIKE_BEGIN := 0.65
 const STRIKE_END := 0.8
 const SAMPLE_STEP := 0.0125
 const BLADE_RADIUS := 0.105
+const HERO_RADIUS := 0.25
+const ENGAGEMENT_MARGIN := 0.08
 
 var game
 var states := {} # actor id -> {started, progress, target_from, target_to, hit}
+var reach_cache := {} # actor id -> {distance, reach}
+var profile_reach_cache := {} # imported mesh/clip/scale signature -> {distance, reach}
 
 func setup(owner_game) -> void:
 	game = owner_game
@@ -18,10 +22,8 @@ func setup(owner_game) -> void:
 func contact(actor: Node3D, target_from: Vector3, target_to: Vector3, target_radius: float) -> bool:
 	if not is_instance_valid(actor) or not bool(actor.get_meta("alive", true)): return false
 	if bool(actor.get_meta("skeleton_missing_arm_r", false)): return false
-	var adapter = game.guardian_authored if game != null else null
-	if adapter == null: return false
-	var entry: Dictionary = adapter.entries.get(actor.get_instance_id(), {})
-	if entry.is_empty() or bool(entry.get("shattered", false)): return false
+	var source := _source(actor)
+	if source.is_empty(): return false
 	var started := float(actor.get_meta("attack_started", -1.0))
 	var current := clampf(float(actor.get_meta("combat_progress", 0.0)), 0.0, 1.0)
 	var id := actor.get_instance_id()
@@ -47,35 +49,177 @@ func contact(actor: Node3D, target_from: Vector3, target_to: Vector3, target_rad
 	count = mini(64, maxi(count, ceili(maxf(old_from.distance_to(target_from), old_to.distance_to(target_to)) / 0.10)))
 	var struck := false
 	var previous_segment := {}
-	var saved_pose := _save_pose(entry)
+	var saved_pose := _save_source(source)
 	# Contact probes must observe the unblended strike clip. _seek also advances
 	# transition age and rewrites base_pose, so freeze and restore that state.
-	entry.pose_delta = 0.0
+	if source.kind == "authored": source.entry.pose_delta = 0.0
 	for index in range(count + 1):
 		var fraction := float(index) / float(count)
 		var progress := lerpf(from_progress, to_progress, fraction)
-		adapter._seek(entry, "attack", progress)
-		var segment := _weapon_segment(entry)
+		_seek_source(source, progress)
+		var segment := _source_segment(source)
 		if segment.is_empty(): continue
 		var elapsed_fraction := clampf((progress - previous) / maxf(current - previous, 0.000001), 0.0, 1.0)
 		var moving_from := old_from.lerp(target_from, elapsed_fraction)
 		var moving_to := old_to.lerp(target_to, elapsed_fraction)
-		if _segments_close(segment.a, segment.b, moving_from, moving_to, target_radius + BLADE_RADIUS):
+		var contact_width := target_radius + BLADE_RADIUS + (0.08 if source.kind == "procedural" else 0.0)
+		if _segments_close(segment.a, segment.b, moving_from, moving_to, contact_width):
 			struck = true
 		elif not previous_segment.is_empty():
 			# Sweep both ends of the weapon between neighbouring clip samples.
-			struck = _segments_close(previous_segment.a, segment.a, moving_from, moving_to, target_radius + BLADE_RADIUS) \
-				or _segments_close(previous_segment.b, segment.b, moving_from, moving_to, target_radius + BLADE_RADIUS)
+			struck = _segments_close(previous_segment.a, segment.a, moving_from, moving_to, contact_width) \
+				or _segments_close(previous_segment.b, segment.b, moving_from, moving_to, contact_width)
 		previous_segment = segment
 		if struck: break
 	# Restore authored animation plus secondary bone personality, flinch and IK.
-	_restore_pose(entry, saved_pose)
+	_restore_source(source, saved_pose)
 	if struck and _clear_path(actor, target_from, target_to, target_radius): state.hit = true
 	else: struck = false
 	return struck
 
 func reset(actor: Node3D) -> void:
-	if is_instance_valid(actor): states.erase(actor.get_instance_id())
+	if is_instance_valid(actor):
+		states.erase(actor.get_instance_id())
+		reach_cache.erase(actor.get_instance_id())
+
+func engagement_distance(actor: Node3D) -> float:
+	# Match the root AI's stop/attack range to this rig's own visible strike.
+	# Probe a centered Hero capsule over the exact sampled weapon animation,
+	# then stand 8 cm inside the furthest confirmed hit. Cached per actor.
+	if not is_instance_valid(actor): return 0.75
+	if bool(actor.get_meta("skeleton_missing_arm_r", false)): return 0.75
+	var id := actor.get_instance_id()
+	var source := _source(actor)
+	if source.is_empty(): return 0.75
+	var profile_key := _reach_profile_key(source.entry) if source.kind == "authored" else _procedural_profile_key(source.entry)
+	if reach_cache.has(id) and str(reach_cache[id].get("key", "")) == profile_key:
+		return float(reach_cache[id].distance)
+	if profile_reach_cache.has(profile_key):
+		reach_cache[id] = profile_reach_cache[profile_key]
+		return float(reach_cache[id].distance)
+	var saved_pose := _save_source(source)
+	if source.kind == "authored": source.entry.pose_delta = 0.0
+	var reaches := 0.0
+	var prior := {}
+	for index in range(13):
+		_seek_source(source, lerpf(STRIKE_BEGIN, STRIKE_END, float(index) / 12.0))
+		var segment := _source_segment(source)
+		if segment.is_empty(): continue
+		for distance_index in range(31):
+			var distance := 0.75 + float(distance_index) * 0.03
+			var center: Vector3 = actor.global_position + actor.global_basis.z * distance
+			var bottom := center + Vector3.UP * 0.30
+			var top := center + Vector3.UP * 1.70
+			var reach := HERO_RADIUS + BLADE_RADIUS + (0.08 if source.kind == "procedural" else 0.0)
+			var touching := _segments_close(segment.a, segment.b, bottom, top, reach)
+			if not touching and not prior.is_empty():
+				touching = _segments_close(prior.a, segment.a, bottom, top, reach) \
+					or _segments_close(prior.b, segment.b, bottom, top, reach)
+			if touching: reaches = maxf(reaches, distance)
+		prior = segment
+	_restore_source(source, saved_pose)
+	var chosen := clampf(reaches - ENGAGEMENT_MARGIN, 0.75, 1.60)
+	reach_cache[id] = {"distance": chosen, "reach": reaches, "key": profile_key}
+	profile_reach_cache[profile_key] = reach_cache[id]
+	return chosen
+
+func _reach_profile_key(entry: Dictionary) -> String:
+	var mesh: MeshInstance3D = entry.part_meshes.get("arm_r")
+	var mesh_id := mesh.mesh.get_instance_id() if is_instance_valid(mesh) and mesh.mesh != null else 0
+	var player: AnimationPlayer = entry.player
+	var clip: Animation = player.get_animation(str(entry.clips.attack))
+	var clip_id := clip.get_instance_id() if clip != null else 0
+	var actor: Node3D = entry.actor
+	return "%s|%d|%d|%s|%s" % [str(entry.guardian.get("variant", "")), mesh_id, clip_id,
+		str(actor.global_transform.basis.get_scale()), str(entry.visual.scale)]
+
+func _source(actor: Node3D) -> Dictionary:
+	if game == null or str(actor.get_meta("enemy_type", "")) != "skeleton": return {}
+	if game.guardian_authored != null:
+		var authored: Dictionary = game.guardian_authored.entries.get(actor.get_instance_id(), {})
+		if not authored.is_empty():
+			if bool(authored.get("shattered", false)): return {}
+			return {"kind": "authored", "actor": actor, "entry": authored}
+	if game.animation == null: return {}
+	var rig: Dictionary = game.animation.actors.get(actor.get_instance_id(), {})
+	if rig.is_empty() or str(rig.get("type", "")) != "skeleton" or not rig.joints.has("arm_r"): return {}
+	return {"kind": "procedural", "actor": actor, "entry": rig}
+
+func _seek_source(source: Dictionary, progress: float) -> void:
+	if source.kind == "authored": game.guardian_authored._seek(source.entry, "attack", progress)
+	else: game.animation.pose(source.actor, "attack", progress)
+
+func _source_segment(source: Dictionary) -> Dictionary:
+	return _weapon_segment(source.entry) if source.kind == "authored" else _procedural_segment(source.entry)
+
+func _save_source(source: Dictionary) -> Dictionary:
+	if source.kind == "authored": return _save_pose(source.entry)
+	var rig: Dictionary = source.entry
+	var transforms := {}
+	for name in rig.joints: transforms[name] = rig.joints[name].transform
+	return {"joints": transforms, "visual": rig.visual.transform,
+		"clip": str(rig.clip), "state": str(rig.state),
+		"time": (rig.player as AnimationPlayer).current_animation_position if str(rig.clip) != "" else 0.0}
+
+func _restore_source(source: Dictionary, saved: Dictionary) -> void:
+	if source.kind == "authored":
+		_restore_pose(source.entry, saved)
+		return
+	var rig: Dictionary = source.entry
+	var player: AnimationPlayer = rig.player
+	if str(saved.clip) != "":
+		if player.current_animation != str(saved.clip):
+			player.play(str(saved.clip))
+			player.pause()
+		player.seek(float(saved.time), true)
+	else:
+		# A newly registered procedural actor has no clip yet. Do not leave a
+		# temporary reach probe as its AnimationPlayer's current animation.
+		player.stop(true)
+	for name in saved.joints: rig.joints[name].transform = saved.joints[name]
+	rig.visual.transform = saved.visual
+	rig.clip = str(saved.clip)
+	rig.state = str(saved.state)
+
+func _procedural_profile_key(rig: Dictionary) -> String:
+	var bind: Dictionary = _procedural_bind(rig)
+	var actor: Node3D = rig.actor
+	return "procedural|%s|%s|%s|%s" % [str(bind.get("a", Vector3.ZERO)), str(bind.get("b", Vector3.ZERO)),
+		str(actor.global_transform.basis.get_scale()), str(rig.visual.scale)]
+
+func _procedural_segment(rig: Dictionary) -> Dictionary:
+	var bind: Dictionary = _procedural_bind(rig)
+	if bind.is_empty(): return {}
+	var joint: Node3D = rig.joints.arm_r
+	return {"a": joint.global_transform * bind.a, "b": joint.global_transform * bind.b}
+
+func _procedural_bind(rig: Dictionary) -> Dictionary:
+	if rig.has("contact_bind_segment"): return rig.contact_bind_segment
+	var joint: Node3D = rig.joints.arm_r
+	var meshes: Array[MeshInstance3D] = []
+	_collect_meshes(joint, meshes)
+	var low := Vector3.INF
+	var high := -Vector3.INF
+	var found := false
+	for mesh in meshes:
+		if not mesh.visible or mesh.mesh == null: continue
+		var box := mesh.get_aabb()
+		for x in [box.position.x, box.end.x]:
+			for y in [box.position.y, box.end.y]:
+				for z in [box.position.z, box.end.z]:
+					var point := joint.to_local(mesh.to_global(Vector3(x, y, z)))
+					low = low.min(point)
+					high = high.max(point)
+					found = true
+	if not found: return {}
+	var center := Vector3((low.x + high.x) * 0.5, 0.0, (low.z + high.z) * 0.5)
+	rig.contact_bind_segment = {"a": center + Vector3.UP * lerpf(low.y, high.y, 0.43),
+		"b": center + Vector3.UP * low.y}
+	return rig.contact_bind_segment
+
+func _collect_meshes(node: Node, meshes: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D: meshes.append(node)
+	for child in node.get_children(): _collect_meshes(child, meshes)
 
 func _weapon_segment(entry: Dictionary) -> Dictionary:
 	var skeleton: Skeleton3D = entry.get("skeleton")

@@ -75,15 +75,21 @@ func _exit_tree() -> void:
 func setup(owner_game) -> void:
 	game = owner_game
 
-## Actual skinned guardian contact. The imported part meshes contain bind-pose
-## triangles; each rigid part follows its Skeleton3D bone pose for this query.
-## Attachments are created only after a hit so embedded shafts follow the bone.
+## Queries use the current weighted skin pose, including knees and feet.
+## Each mesh is baked only after a conservative posed bounds check, and at most
+## once per rendered frame when several bolts cross the same guardian.
+var _authored_query_frame := -1
+var _authored_query_cache := {}
 func projectile_contact(actor: Node3D, start: Vector3, finish: Vector3) -> Dictionary:
 	if game.guardian_authored==null: return {}
 	var entry: Dictionary=game.guardian_authored.entries.get(actor.get_instance_id(),{})
 	if entry.is_empty() or entry.get("shattered",false) or not entry.visual.is_visible_in_tree(): return {}
 	var skeleton: Skeleton3D=entry.get("skeleton")
 	if skeleton==null: return {}
+	var frame := Engine.get_process_frames()
+	if frame != _authored_query_frame:
+		_authored_query_frame = frame
+		_authored_query_cache.clear()
 	var best := {}
 	var best_distance := start.distance_squared_to(finish)
 	for spec in [["Head","head"],["Torso","rib"],["LeftArm","arm_l"],["RightArm","arm_r"],["LeftLeg","leg_l"],["RightLeg","leg_r"],["Shield","shield"]]:
@@ -95,16 +101,102 @@ func projectile_contact(actor: Node3D, start: Vector3, finish: Vector3) -> Dicti
 		var bone_name: String="LeftArm" if part=="shield" else spec[0]
 		var bone: int=int(entry.bones.get(bone_name,-1))
 		if bone<0: continue
-		var pose: Transform3D=skeleton.get_bone_global_pose(bone)
-		var rest: Transform3D=skeleton.get_bone_global_rest(bone)
-		var skin: Transform3D=skeleton.global_transform*pose*rest.affine_inverse()*skeleton.global_transform.affine_inverse()
-		var found: Dictionary=SkeletonContact.mesh_contact(mesh,start,finish,skin*mesh.global_transform)
+		var key := str(actor.get_instance_id())+":"+str(mesh.get_instance_id())
+		var query: Dictionary=_authored_query_cache.get(key,{})
+		if query.is_empty():
+			query={"bounds":_posed_mesh_bounds(mesh,skeleton),"surfaces":[]}
+			_authored_query_cache[key]=query
+		if query.bounds.intersects_segment(start,finish)==null: continue
+		if query.surfaces.is_empty():
+			var handoff=game.get("skeleton_pose_handoff")
+			var transient:=handoff==null
+			if handoff==null: handoff=preload("res://skeleton_pose_handoff.gd").new()
+			var baked: ArrayMesh=handoff._bake(mesh,skeleton,Transform3D.IDENTITY)
+			if transient: handoff.free()
+			for surface in range(baked.get_surface_count()):
+				query.surfaces.append({"posed":baked.surface_get_arrays(surface),"rest":mesh.mesh.surface_get_arrays(surface)})
+		var found: Dictionary=_posed_triangles_contact(query.surfaces,start,finish)
 		if found.is_empty(): continue
 		var distance:float=start.distance_squared_to(found.position)
 		if distance>=best_distance: continue
 		best_distance=distance
-		best={"position":found.position,"normal":found.normal,"part":part,"surface":_projectile_attachment(entry,bone)}
+		var follow_bone := _weighted_hit_bone(mesh,skeleton,found,bone)
+		best={"position":found.position,"normal":found.normal,"part":part,"surface":_projectile_attachment(entry,follow_bone)}
 	return best
+
+func _posed_mesh_bounds(mesh: MeshInstance3D, skeleton: Skeleton3D) -> AABB:
+	var rest: AABB=mesh.mesh.get_aabb()
+	var skin: Skin=mesh.skin
+	if skin==null: return mesh.global_transform*rest
+	var bounds:=AABB()
+	var found:=false
+	for bind in range(skin.get_bind_count()):
+		var name:=skin.get_bind_name(bind)
+		var bone:=skeleton.find_bone(name) if name!="" else skin.get_bind_bone(bind)
+		if bone<0 or bone>=skeleton.get_bone_count(): continue
+		var pose:=skeleton.global_transform*skeleton.get_bone_global_pose(bone)*skin.get_bind_pose(bind)
+		var box: AABB=pose*rest
+		bounds=bounds.merge(box) if found else box
+		found=true
+	return bounds if found else mesh.global_transform*rest
+
+func _posed_triangles_contact(surfaces: Array, start: Vector3, finish: Vector3) -> Dictionary:
+	var direction:=finish-start
+	var best_t:=1.0
+	var best:={}
+	for surface in range(surfaces.size()):
+		var vertices: PackedVector3Array=surfaces[surface].posed[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array=surfaces[surface].posed[Mesh.ARRAY_INDEX]
+		var count:=indices.size() if not indices.is_empty() else vertices.size()
+		for offset in range(0,count-2,3):
+			var a:=int(indices[offset]) if not indices.is_empty() else offset
+			var b:=int(indices[offset+1]) if not indices.is_empty() else offset+1
+			var c:=int(indices[offset+2]) if not indices.is_empty() else offset+2
+			var edge1:=vertices[b]-vertices[a]
+			var edge2:=vertices[c]-vertices[a]
+			var p:=direction.cross(edge2)
+			var determinant:=edge1.dot(p)
+			if absf(determinant)<0.000001: continue
+			var inv_det:=1.0/determinant
+			var relative:=start-vertices[a]
+			var u:=relative.dot(p)*inv_det
+			if u< -0.00001 or u>1.00001: continue
+			var q:=relative.cross(edge1)
+			var v:=direction.dot(q)*inv_det
+			if v< -0.00001 or u+v>1.00001: continue
+			var t:=edge2.dot(q)*inv_det
+			if t<0.0 or t>best_t: continue
+			best_t=t
+			best={"position":start+direction*t,"normal":edge1.cross(edge2).normalized(),
+				"surface_index":surface,"vertices":[a,b,c],"barycentric":Vector3(1.0-u-v,u,v)}
+	return best
+
+func _weighted_hit_bone(mesh: MeshInstance3D, skeleton: Skeleton3D, hit: Dictionary, fallback: int) -> int:
+	var skin: Skin=mesh.skin
+	if skin==null: return fallback
+	var rest: Array=mesh.mesh.surface_get_arrays(int(hit.surface_index))
+	var bones: PackedInt32Array=rest[Mesh.ARRAY_BONES]
+	var weights: PackedFloat32Array=rest[Mesh.ARRAY_WEIGHTS]
+	var influences:=8 if mesh.mesh.surface_get_format(int(hit.surface_index)) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS else 4
+	var scores:={}
+	for corner in range(3):
+		var vertex:int=hit.vertices[corner]
+		for influence in range(influences):
+			var slot:=vertex*influences+influence
+			if slot>=bones.size() or slot>=weights.size(): continue
+			var bind:=bones[slot]
+			if bind<0 or bind>=skin.get_bind_count(): continue
+			var bone_name:=skin.get_bind_name(bind)
+			var bone:=skeleton.find_bone(bone_name) if bone_name!="" else skin.get_bind_bone(bind)
+			if bone<0: continue
+			scores[bone]=float(scores.get(bone,0.0))+float(hit.barycentric[corner])*weights[slot]
+	var best_bone:=fallback
+	var best_weight:=0.0
+	for bone in scores:
+		if float(scores[bone])>best_weight:
+			best_bone=bone
+			best_weight=scores[bone]
+	return best_bone
 
 func _projectile_attachment(entry: Dictionary, bone: int) -> BoneAttachment3D:
 	var attachments: Dictionary=entry.get("projectile_attachments",{})

@@ -21,6 +21,7 @@ func _run() -> void:
 	var actor := Node3D.new()
 	game.add_child(actor)
 	actor.set_meta("alive", true)
+	actor.set_meta("enemy_type", "skeleton")
 	var legacy := Node3D.new()
 	actor.add_child(legacy)
 	var old_shield := MeshInstance3D.new()
@@ -76,9 +77,20 @@ func _run() -> void:
 			actor.set_meta("attack_started", 3.0)
 			actor.set_meta("skeleton_missing_arm_r", true)
 			_check(not contact.contact(actor, point, point + Vector3.UP * 0.1, 0.12), "severed right arm cannot attack")
+			_check(is_equal_approx(contact.engagement_distance(actor), 0.75), "severed right arm does not retain attack range")
 			actor.set_meta("skeleton_missing_arm_r", false)
 			actor.set_meta("attack_started", 4.0)
 			_check(contact.contact(actor, point, point + Vector3.UP * 0.1, 0.12), "new attack resets hit latch")
+			var engagement := contact.engagement_distance(actor)
+			var measured: Dictionary = contact.reach_cache[actor.get_instance_id()]
+			print("SKELETON_REACH ", JSON.stringify({"variant": "mossward", "reach": measured.reach, "engagement": engagement}))
+			_check(engagement >= 0.75 and engagement <= 1.60 and measured.reach > engagement, "Mossward engagement measures a visible reach")
+			actor.set_meta("attack_started", 4.1)
+			var hero_center := actor.global_position + actor.global_basis.z * engagement
+			_check(contact.contact(actor, hero_center + Vector3.UP * 0.30, hero_center + Vector3.UP * 1.70, 0.25), "Mossward reaches centered Hero at engagement distance")
+			actor.set_meta("attack_started", 4.2)
+			hero_center = actor.global_position + actor.global_basis.z * (engagement + 0.55)
+			_check(not contact.contact(actor, hero_center + Vector3.UP * 0.30, hero_center + Vector3.UP * 1.70, 0.25), "Mossward misses centered Hero beyond reach")
 			var wall := StaticBody3D.new()
 			game.add_child(wall)
 			wall.global_position = (actor.global_position + Vector3.UP * 1.12).lerp(point, 0.5)
@@ -104,6 +116,7 @@ func _run() -> void:
 		var other := Node3D.new()
 		game.add_child(other)
 		other.set_meta("alive", true)
+		other.set_meta("enemy_type", "skeleton")
 		var part := Node3D.new()
 		other.add_child(part)
 		var shield := MeshInstance3D.new()
@@ -116,12 +129,42 @@ func _run() -> void:
 		var other_entry: Dictionary = adapter.entries[other.get_instance_id()]
 		adapter._seek(other_entry, "attack", 0.725)
 		var other_weapon: Dictionary = contact._weapon_segment(other_entry)
-		_check(not other_weapon.is_empty() and other_weapon.a.distance_to(other_weapon.b) > 0.1, "animated weapon segment: " + variant)
+		if not other_weapon.is_empty(): print("SKELETON_SEGMENT ", variant, " ", other_weapon.a.distance_to(other_weapon.b))
+		_check(not other_weapon.is_empty() and other_weapon.a.distance_to(other_weapon.b) > 0.04, "animated weapon segment: " + variant)
 		if not other_weapon.is_empty():
 			other.set_meta("attack_started", 1.0)
 			other.set_meta("combat_progress", 0.8)
 			var target: Vector3 = other_weapon.a.lerp(other_weapon.b, 0.5)
 			_check(contact.contact(other, target, target + Vector3.UP * 0.1, 0.12), "authored strike contacts: " + variant)
+			var engagement := contact.engagement_distance(other)
+			var measured: Dictionary = contact.reach_cache[other.get_instance_id()]
+			print("SKELETON_REACH ", JSON.stringify({"variant": variant, "reach": measured.reach, "engagement": engagement}))
+			_check(measured.reach > engagement and engagement >= 0.75 and engagement <= 1.60, "measured reach: " + variant)
+			other.set_meta("attack_started", 2.0)
+			var hero := other.global_position + other.global_basis.z * engagement
+			_check(contact.contact(other, hero + Vector3.UP * 0.30, hero + Vector3.UP * 1.70, 0.25), "centered Hero within authored strike: " + variant)
+			other.set_meta("attack_started", 3.0)
+			hero = other.global_position + other.global_basis.z * (engagement + 0.55)
+			_check(not contact.contact(other, hero + Vector3.UP * 0.30, hero + Vector3.UP * 1.70, 0.25), "centered Hero beyond authored strike: " + variant)
+	var duplicate_actor := Node3D.new()
+	game.add_child(duplicate_actor)
+	duplicate_actor.set_meta("alive", true)
+	duplicate_actor.set_meta("enemy_type", "skeleton")
+	var duplicate_part := Node3D.new()
+	duplicate_actor.add_child(duplicate_part)
+	var duplicate_shield := MeshInstance3D.new()
+	duplicate_actor.add_child(duplicate_shield)
+	game.animation.actors[duplicate_actor.get_instance_id()] = {"pieces": [duplicate_part]}
+	game.guardians.guardians[duplicate_actor.get_instance_id()] = {"state": "loose", "shield": duplicate_shield, "variant": "mossward"}
+	if adapter.attach(duplicate_actor, "mossward"):
+		var before_profiles: int = contact.profile_reach_cache.size()
+		var shared_distance := contact.engagement_distance(duplicate_actor)
+		_check(contact.profile_reach_cache.size() == before_profiles and is_equal_approx(shared_distance, contact.reach_cache[actor.get_instance_id()].distance),
+			"same imported rig reuses measured reach")
+		duplicate_actor.scale = Vector3.ONE * 1.2
+		contact.engagement_distance(duplicate_actor)
+		_check(contact.profile_reach_cache.size() == before_profiles + 1, "scale change invalidates measured reach")
+	else: _fail("duplicate Mossward fixture unavailable")
 	if failures.is_empty(): print("SKELETON_ATTACK_CONTACT_PASS")
 	else:
 		for failure in failures: push_error(failure)

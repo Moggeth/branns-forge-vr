@@ -129,6 +129,8 @@ func _run() -> void:
 	_check(_foot(skeleton, bones.LeftFoot).y > 0.0, "missed terrain never snaps foot down")
 	helper.reset(entry)
 	_check(not entry.has("foot_placement"), "restore clears contacts")
+	ground.rotation = Vector3.ZERO
+	await physics_frame
 	_check_installed_rigs(stage, helper)
 	stage.queue_free()
 	if failures.is_empty():
@@ -211,11 +213,64 @@ func _check_installed_rigs(stage: Node3D, helper: RefCounted) -> void:
 		helper.apply(rig_entry, 1.0 / 60.0, true, 0.12)
 		_check(absf(_foot(rig_skeleton, int(rig_bones["LeftFoot"])).x - planted_x) < 0.03,
 			variant + " actual foot contact locks across movement")
+		rig_actor.position.x = 0.0
+		var player := _find_player(rig)
+		if player != null:
+			var idle_name := ""
+			for clip_name in player.get_animation_list():
+				if str(clip_name).to_lower() == "idle" or str(clip_name).to_lower().ends_with("/idle"):
+					idle_name = str(clip_name)
+					break
+			if idle_name != "":
+				player.play(idle_name)
+				player.pause()
+				player.seek(0.0, true)
+				var idle_ankle_y := _foot(rig_skeleton, int(rig_bones["LeftFoot"])).y
+				helper.reset(rig_entry)
+				helper.apply(rig_entry, 1.0 / 60.0, false, 0.0)
+				var corrected_y := _foot(rig_skeleton, int(rig_bones["LeftFoot"])).y
+				print("GUARDIAN_FOOT_IDLE ", variant, " ankle_before=", idle_ankle_y,
+					" after=", corrected_y, " bind_sole=", rig_rest.Left)
+				_check(absf(corrected_y - float(rig_rest.Left)) < 0.01,
+					variant + " idle ankle aligns with bind sole offset")
+				var idle_clip := player.get_animation(idle_name)
+				for fraction in [0.25, 0.5, 0.75]:
+					player.seek(float(fraction) * idle_clip.length, true)
+					var animated_y := _foot(rig_skeleton, int(rig_bones["LeftFoot"])).y
+					helper.reset(rig_entry)
+					helper.apply(rig_entry, 1.0 / 60.0, false, 0.0)
+					var grounded_y := _foot(rig_skeleton, int(rig_bones["LeftFoot"])).y
+					print("GUARDIAN_FOOT_IDLE_PHASE ", variant, " fraction=", fraction,
+						" animated=", animated_y, " grounded=", grounded_y)
+					_check(absf(grounded_y - float(rig_rest.Left)) < 0.012,
+						variant + " crouch preserves sole ground contact")
+		for side in ["Left", "Right"]:
+			var leg_mesh := _find_mesh(rig, side + "Leg")
+			if leg_mesh != null:
+				var local_bounds := leg_mesh.get_aabb()
+				print("GUARDIAN_FOOT_BIND_MESH ", variant, " ", side,
+					" local_y_min=", local_bounds.position.y,
+					" local_y_max=", local_bounds.end.y)
 		rig_actor.free()
 
 func _find_skeleton(node: Node) -> Skeleton3D:
 	if node is Skeleton3D: return node
 	for child in node.get_children():
 		var found := _find_skeleton(child)
+		if found != null: return found
+	return null
+
+func _find_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer: return node
+	for child in node.get_children():
+		var found := _find_player(child)
+		if found != null: return found
+	return null
+
+func _find_mesh(node: Node, target: String) -> MeshInstance3D:
+	if node is MeshInstance3D and (str(node.name) == target or str(node.name).ends_with("_" + target)):
+		return node
+	for child in node.get_children():
+		var found := _find_mesh(child, target)
 		if found != null: return found
 	return null

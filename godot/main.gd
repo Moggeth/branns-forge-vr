@@ -151,6 +151,8 @@ var animation
 var guardians
 var guardian_authored
 var skeleton_structure
+var skeleton_pose_handoff
+var skeleton_attack_contact
 var remains
 var animation_lab
 var lab_mode=false
@@ -321,6 +323,11 @@ func _ready():
 	guardian_authored=preload("res://guardian_authored_animation.gd").new()
 	add_child(guardian_authored)
 	guardian_authored.setup(self)
+	skeleton_pose_handoff=preload("res://skeleton_pose_handoff.gd").new()
+	add_child(skeleton_pose_handoff)
+	skeleton_pose_handoff.setup(self)
+	skeleton_attack_contact=preload("res://skeleton_attack_contact.gd").new()
+	skeleton_attack_contact.setup(self)
 	for enemy in scene.enemies:
 		var variant=str(enemy.get_meta("guardian_variant",""))
 		if variant!="": guardian_authored.attach(enemy,variant)
@@ -1082,6 +1089,7 @@ func _process(delta):
 	animation.tick(delta)
 	guardians.tick(delta)
 	guardian_authored.tick(delta)
+	adventure.tick_skeleton_contacts()
 	held_pose.refresh(self)
 	melee.tick(delta)
 	for key in held.keys():

@@ -28,14 +28,32 @@ func _bounds(node,relative:Transform3D)->AABB:
 func shatter(actor,impulse=Vector3.ZERO):
 	var rig=game.animation.actors.get(actor.get_instance_id(),{})
 	if rig.is_empty(): return
+	var handoff = game.get("skeleton_pose_handoff")
+	var authored_parts := {}
+	if handoff != null:
+		for part in ["head","arm_l","arm_r","leg_l","leg_r","rib"]:
+			authored_parts[part] = handoff.capture(actor,part)
 	if game.guardian_authored!=null: game.guardian_authored.before_shatter(actor)
 	var count=0
+	var spawned_authored := {}
 	for home in rig.homes:
 		var piece=home.piece
 		if not is_instance_valid(piece): continue
 		if not home.has("template"): home["template"]=piece.duplicate()
-		var world_pose=piece.global_transform
-		var box=_bounds(piece,Transform3D.IDENTITY)
+		var part := _part_for_home(rig,home)
+		var snapshot: Dictionary = authored_parts.get(part,{})
+		if not snapshot.is_empty() and spawned_authored.has(part):
+			piece.queue_free()
+			home.piece=null
+			continue
+		var world_pose: Transform3D = snapshot.get("transform",piece.global_transform)
+		var display: Node3D = MeshInstance3D.new() if not snapshot.is_empty() else piece
+		if not snapshot.is_empty():
+			display.name="AuthoredDetached_"+part
+			(display as MeshInstance3D).mesh=snapshot.mesh
+			(display as MeshInstance3D).material_override=snapshot.material_override
+			(display as MeshInstance3D).material_overlay=snapshot.material_overlay
+		var box=_bounds(display,Transform3D.IDENTITY)
 		if box.size.length()<0.01: continue
 		var body=RigidBody3D.new()
 		body.name="PhysicalRemains"
@@ -50,7 +68,12 @@ func shatter(actor,impulse=Vector3.ZERO):
 		body.physics_material_override.bounce=0.18
 		game.add_child(body)
 		body.global_transform=world_pose
-		piece.reparent(body)
+		if snapshot.is_empty():
+			piece.reparent(body)
+		else:
+			body.add_child(display)
+			piece.queue_free()
+			spawned_authored[part]=true
 		home.piece=null
 		var collider=CollisionShape3D.new()
 		var shape=BoxShape3D.new()
@@ -65,24 +88,33 @@ func shatter(actor,impulse=Vector3.ZERO):
 		body.set_meta("display_name",("Skeleton bone" if rig.type=="skeleton" else "Fallen "+rig.type+" piece")+" · grip / throw")
 		body.set_meta("remains",true)
 		body.set_meta("source_actor",actor.get_instance_id())
-		if rig.type=="skeleton" and home.parent==rig.joints.get("head"): tag_skull(body,actor)
+		if rig.type=="skeleton" and part=="head": tag_skull(body,actor)
+		if rig.type=="skeleton": body.set_meta("skeleton_part",part)
 		body.set_meta("born",game.elapsed)
 		body.set_meta("zone",str(actor.get_meta("zone",game.adventure.zone)))
 		body.set_meta("damage_at",0.0)
 		body.set_meta("grip_min",-box.size.y*0.3)
 		body.set_meta("grip_max",box.size.y*0.3)
-		var part_name := str(home.parent.name).to_lower()
-		body.set_meta("tip",Vector3(0,box.position.y if "leg" in part_name else maxf(0.1,box.end.y),0))
-		if rig.type == "skeleton" and "leg" in part_name: add_articulated_leg(body,box,piece)
+		body.set_meta("tip",Vector3(0,box.position.y if part.begins_with("leg") else maxf(0.1,box.end.y),0))
+		if rig.type == "skeleton" and part.begins_with("leg"): add_articulated_leg(body,box,display,not snapshot.is_empty(),snapshot.get("joints",{}))
 		var outward=(body.global_position-actor.global_position-Vector3.UP*0.8).normalized()
-		body.linear_velocity=(impulse+outward*0.8+Vector3.UP*0.4)*game.tuning.value("enemy.death_scatter")
-		body.angular_velocity=Vector3(sin(count*2.4),cos(count*1.7),sin(count))*3
+		body.linear_velocity=snapshot.get("linear_velocity",Vector3.ZERO)+(impulse+outward*0.8+Vector3.UP*0.4)*game.tuning.value("enemy.death_scatter")
+		body.angular_velocity=snapshot.get("angular_velocity",Vector3.ZERO)+Vector3(sin(count*2.4),cos(count*1.7),sin(count))*3
 		body.body_entered.connect(func(other): _impact(body,other))
 		bodies.append(body)
 		count+=1
 	rig.pieces=[]
 	print("REMAINS spawned=",count," type=",rig.type)
 	_trim()
+
+func _part_for_home(rig: Dictionary, home: Dictionary) -> String:
+	for part in ["head","arm_l","arm_r","leg_l","leg_r"]:
+		if home.parent==rig.joints.get(part): return part
+	var name := str(home.parent.name).to_lower()
+	if "leg" in name: return "leg_l" if "left" in name or name.ends_with("_l") else "leg_r"
+	if "arm" in name: return "arm_l" if "left" in name or name.ends_with("_l") else "arm_r"
+	if "head" in name: return "head"
+	return "rib"
 
 func tag_skull(body:RigidBody3D,actor:Node3D)->void:
 	# Identity is assigned only to the actor's actual detached head mesh. It
@@ -109,37 +141,43 @@ func grab(body):
 	body.linear_velocity=Vector3.ZERO
 	body.angular_velocity=Vector3.ZERO
 
-func add_articulated_leg(body: RigidBody3D, box: AABB, original: Node3D) -> void:
-	# The legacy death mesh is rigid. Replace only its detached leg display with
-	# a shaped, three-section bone that retains a springy knee and ankle when carried.
-	# Collision on the rigid body still spans the complete original leg; its
-	# swept melee tip follows the articulated foot while gripped.
-	original.visible = false
+func add_articulated_leg(body: RigidBody3D, box: AABB, original: Node3D, authored := false, joint_positions: Dictionary = {}) -> void:
+	# Preserve the authored art and bend its baked vertices at the spring joints.
+	# Legacy parts retain the three-section display. Both keep full-length body
+	# collision and a moving foot collider/tip for held melee contact.
+	if not authored: original.visible = false
 	var top := box.end.y
 	var bottom := box.position.y
 	var knee_y := lerpf(top, bottom, 0.48)
 	var ankle_y := lerpf(top, bottom, 0.87)
+	var knee_position: Vector3 = joint_positions.get("knee",Vector3(0,knee_y,0))
+	var ankle_position: Vector3 = joint_positions.get("foot",Vector3(0,ankle_y,0))
+	if authored:
+		knee_y = knee_position.y
+		ankle_y = ankle_position.y
 	var bone_mat := StandardMaterial3D.new()
 	bone_mat.albedo_color = Color("d9cfad")
 	bone_mat.roughness = 0.82
-	_bone_piece(body, "UpperLeg", Vector3(0, (top + knee_y) * 0.5, 0), top - knee_y, bone_mat)
+	if not authored: _bone_piece(body, "UpperLeg", Vector3(0, (top + knee_y) * 0.5, 0), top - knee_y, bone_mat)
 	var knee := Node3D.new()
 	knee.name = "SpringKnee"
 	body.add_child(knee)
-	knee.position.y = knee_y
-	_bone_joint(knee, Vector3.ZERO, 0.095, bone_mat)
-	_bone_piece(knee, "LowerLeg", Vector3(0, (ankle_y - knee_y) * 0.5, 0), knee_y - ankle_y, bone_mat)
+	knee.position = knee_position
+	if not authored:
+		_bone_joint(knee, Vector3.ZERO, 0.095, bone_mat)
+		_bone_piece(knee, "LowerLeg", Vector3(0, (ankle_y - knee_y) * 0.5, 0), knee_y - ankle_y, bone_mat)
 	var ankle := Node3D.new()
 	ankle.name = "SpringAnkle"
 	knee.add_child(ankle)
-	ankle.position.y = ankle_y - knee_y
-	_bone_joint(ankle, Vector3.ZERO, 0.078, bone_mat)
+	ankle.position = ankle_position - knee_position
+	if not authored: _bone_joint(ankle, Vector3.ZERO, 0.078, bone_mat)
 	var foot := MeshInstance3D.new()
 	foot.name = "ArticulatedFoot"
 	var foot_mesh := PrismMesh.new()
 	foot_mesh.size = Vector3(0.14, 0.09, 0.22)
 	foot.mesh = foot_mesh
 	foot.material_override = bone_mat
+	foot.visible = not authored
 	ankle.add_child(foot)
 	foot.position = Vector3(0, bottom - ankle_y + 0.04, 0.06)
 	for toe_index in range(3):
@@ -160,7 +198,19 @@ func add_articulated_leg(body: RigidBody3D, box: AABB, original: Node3D) -> void
 	foot_collider.shape = foot_shape
 	body.add_child(foot_collider)
 	foot_collider.transform = body.global_transform.affine_inverse() * foot.global_transform
-	leg_joints[body.get_instance_id()] = {"body":body,"knee":knee,"ankle":ankle,"foot":foot,"foot_collider":foot_collider,"angle":0.0,"speed":0.0,"last_basis":body.global_basis,"rest_tip":body.get_meta("tip")}
+	var joint := {"body":body,"knee":knee,"ankle":ankle,"foot":foot,"foot_collider":foot_collider,"angle":0.0,"speed":0.0,"last_basis":body.global_basis,"rest_tip":body.get_meta("tip")}
+	if authored and original is MeshInstance3D:
+		joint["authored_mesh"] = original
+		joint["original_surfaces"] = []
+		joint["materials"] = []
+		joint["knee_y"] = knee_y
+		joint["ankle_y"] = ankle_y
+		joint["knee_position"] = knee_position
+		joint["ankle_position"] = ankle_position
+		for surface in range(original.mesh.get_surface_count()):
+			joint.original_surfaces.append(original.mesh.surface_get_arrays(surface))
+			joint.materials.append(original.mesh.surface_get_material(surface))
+	leg_joints[body.get_instance_id()] = joint
 	body.set_meta("articulated_leg", true)
 
 func _bone_piece(parent: Node3D, label: String, pos: Vector3, height: float, material: Material) -> void:
@@ -218,9 +268,57 @@ func _tick_leg_joints(delta: float) -> void:
 		joint.angle = clampf(float(joint.angle) + float(joint.speed) * delta, -0.32, 0.48)
 		joint.knee.rotation.x = joint.angle
 		joint.ankle.rotation.x = -joint.angle * 0.7
+		if joint.has("authored_mesh") and absf(float(joint.angle) - float(joint.get("last_deform",INF))) > 0.001:
+			_deform_authored_leg(joint)
+			joint.last_deform = joint.angle
 		body.set_meta("tip", body.to_local(joint.foot.global_position))
 		var collision_pose: Transform3D = body.global_transform.affine_inverse() * joint.foot.global_transform
 		if not joint.foot_collider.transform.is_equal_approx(collision_pose): joint.foot_collider.transform = collision_pose
+
+func _deform_authored_leg(joint: Dictionary) -> void:
+	# The detached art is already baked in the exact hit pose. Rotate vertices
+	# below each joint about that pose's knee/ankle so its texture and silhouette
+	# remain intact while it flexes in the hand.
+	var source: MeshInstance3D = joint.authored_mesh
+	var output := ArrayMesh.new()
+	var knee_y: float = joint.knee_y
+	var ankle_y: float = joint.ankle_y
+	var knee_position: Vector3 = joint.knee_position
+	var ankle_position: Vector3 = joint.ankle_position
+	var knee_basis := Basis(Vector3.RIGHT, float(joint.angle))
+	var ankle_basis := Basis(Vector3.RIGHT, -float(joint.angle) * 0.7)
+	for surface in range(joint.original_surfaces.size()):
+		var arrays: Array = joint.original_surfaces[surface].duplicate(true)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]
+		for index in range(vertices.size()):
+			var point := vertices[index]
+			var rest_y := point.y
+			var normal := normals[index] if not normals.is_empty() else Vector3.ZERO
+			var tangent := Vector3(tangents[index*4],tangents[index*4+1],tangents[index*4+2]) if not tangents.is_empty() else Vector3.ZERO
+			if rest_y < ankle_y:
+				point = ankle_position + ankle_basis * (point - ankle_position)
+				if not normals.is_empty(): normal = ankle_basis * normal
+				if not tangents.is_empty(): tangent = ankle_basis * tangent
+			if rest_y < knee_y:
+				point = knee_position + knee_basis * (point - knee_position)
+				if not normals.is_empty(): normal = knee_basis * normal
+				if not tangents.is_empty(): tangent = knee_basis * tangent
+			vertices[index] = point
+			if not normals.is_empty(): normals[index] = normal.normalized()
+			if not tangents.is_empty():
+				tangent = tangent.normalized()
+				if not normals.is_empty(): tangent = (tangent - normals[index] * tangent.dot(normals[index])).normalized()
+				tangents[index*4] = tangent.x
+				tangents[index*4+1] = tangent.y
+				tangents[index*4+2] = tangent.z
+		arrays[Mesh.ARRAY_VERTEX] = vertices
+		if not normals.is_empty(): arrays[Mesh.ARRAY_NORMAL] = normals
+		if not tangents.is_empty(): arrays[Mesh.ARRAY_TANGENT] = tangents
+		output.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		if joint.materials[surface] != null: output.surface_set_material(surface,joint.materials[surface])
+	source.mesh = output
 
 func release(body,velocity,angular):
 	body.reparent(game)

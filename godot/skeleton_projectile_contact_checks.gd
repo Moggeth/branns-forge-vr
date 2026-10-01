@@ -44,7 +44,10 @@ func _run() -> void:
 	var failures:=[]
 	await system.projectile_checks(failures)
 	_authored_head_check(game,failures)
+	for variant in ["mossward","prismwatch","cinderkeep"]:
+		await _bent_leg_check(game,failures,variant)
 	_envelope_checks(game,failures)
+	await process_frame
 	print("SKELETON_PROJECTILE_RESULT ",JSON.stringify(failures))
 	quit(0 if failures.is_empty() else 5)
 
@@ -78,6 +81,98 @@ func _authored_head_check(game: Game, failures: Array) -> void:
 	if hit.get("part","")!="head" or not hit.get("surface") is BoneAttachment3D:
 		failures.append("authored guardian skull missed posed bone triangles")
 	actor.queue_free()
+
+func _bent_leg_check(game: Game, failures: Array, variant: String) -> void:
+	var actor:=Node3D.new()
+	game.add_child(actor)
+	var authored:Node=game.guardian_authored
+	var guardians:Node=game.guardians
+	var visual=(load("res://guardians/rigged/"+variant+"_rig.glb") as PackedScene).instantiate()
+	actor.add_child(visual)
+	var skeleton:Skeleton3D=authored._find_skeleton(visual)
+	var leg:MeshInstance3D=authored._find_mesh(visual,"LeftLeg")
+	var hip:int=authored._bone_index(skeleton,"LeftLeg")
+	var knee:int=authored._bone_index(skeleton,"LeftKnee")
+	var foot:int=authored._bone_index(skeleton,"LeftFoot")
+	if leg==null or hip<0 or knee<0 or foot<0:
+		failures.append(variant+" weighted lower-leg fixture unavailable")
+		return
+	var entry:={"visual":visual,"skeleton":skeleton,"shattered":false,"guardian":{"state":"dropped"},
+		"part_meshes":{"leg_l":leg},"bones":{"LeftLeg":hip,"LeftKnee":knee,"LeftFoot":foot},"shield":null}
+	authored.entries[actor.get_instance_id()]=entry
+	skeleton.set_bone_pose_rotation(knee,Quaternion(Vector3.RIGHT,0.72))
+	skeleton.force_update_all_bone_transforms()
+	var baker:Node=preload("res://skeleton_pose_handoff.gd").new()
+	var posed: ArrayMesh=baker._bake(leg,skeleton,Transform3D.IDENTITY)
+	baker.free()
+	var triangle:=_lower_leg_triangle(leg,posed,skeleton)
+	if triangle.is_empty():
+		failures.append(variant+" weighted lower-leg triangles unavailable")
+		actor.queue_free()
+		return
+	var center:Vector3=triangle.center
+	var normal:Vector3=triangle.normal
+	guardians._authored_query_frame=-1
+	var first_started:=Time.get_ticks_usec()
+	var hit:Dictionary=guardians.projectile_contact(actor,center+normal*0.035,center-normal*0.035)
+	var first_ms:float=(Time.get_ticks_usec()-first_started)*0.001
+	var cached_started:=Time.get_ticks_usec()
+	for repetition in range(10): guardians.projectile_contact(actor,center+normal*0.035,center-normal*0.035)
+	var cached_ms:float=(Time.get_ticks_usec()-cached_started)*0.0001
+	print("SKELETON_PROJECTILE_COST variant=",variant," first_ms=",snappedf(first_ms,0.001)," cached_ms_each=",snappedf(cached_ms,0.001))
+	if hit.get("part","")!="leg_l": failures.append(variant+" bent lower leg missed actual weighted triangles")
+	if guardians.projectile_contact(actor,center+Vector3.LEFT*0.45+normal*0.035,center+Vector3.LEFT*0.45-normal*0.035).get("part","")=="leg_l":
+		failures.append(variant+" empty space beside bent lower leg accepted a hit")
+	var attachment:BoneAttachment3D=hit.get("surface")
+	if attachment==null or not attachment.bone_name.begins_with("LeftKnee") and not attachment.bone_name.begins_with("LeftFoot"):
+		failures.append(variant+" embedded lower-leg bolt attached to hip instead of knee/foot")
+	else:
+		var embedded_local:Vector3=attachment.to_local(hit.position)
+		var before:Vector3=attachment.to_global(embedded_local)
+		skeleton.set_bone_pose_rotation(knee,Quaternion(Vector3.RIGHT,1.04))
+		skeleton.force_update_all_bone_transforms()
+		await process_frame
+		if attachment.to_global(embedded_local).distance_to(before)<0.01:
+			failures.append(variant+" embedded lower-leg attachment did not follow knee bend")
+	actor.set_meta("skeleton_missing_leg_l",true)
+	guardians._authored_query_frame=-1
+	if guardians.projectile_contact(actor,center+normal*0.035,center-normal*0.035).get("part","")=="leg_l":
+		failures.append(variant+" missing authored leg still accepted projectile")
+	actor.queue_free()
+
+func _lower_leg_triangle(source: MeshInstance3D, posed: ArrayMesh, skeleton: Skeleton3D) -> Dictionary:
+	var skin:Skin=source.skin
+	if skin==null: return {}
+	var lower_binds:=[]
+	for bind in range(skin.get_bind_count()):
+		var name:=skin.get_bind_name(bind)
+		if name=="": name=skeleton.get_bone_name(skin.get_bind_bone(bind))
+		if name.begins_with("LeftKnee") or name.begins_with("LeftFoot"): lower_binds.append(bind)
+	var choice:={}
+	var best_score:=0.0
+	for surface in range(posed.get_surface_count()):
+		var rest:Array=source.mesh.surface_get_arrays(surface)
+		var vertices:PackedVector3Array=posed.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		var indices:PackedInt32Array=rest[Mesh.ARRAY_INDEX]
+		var bones:PackedInt32Array=rest[Mesh.ARRAY_BONES]
+		var weights:PackedFloat32Array=rest[Mesh.ARRAY_WEIGHTS]
+		var influences:=8 if source.mesh.surface_get_format(surface) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS else 4
+		for offset in range(0,indices.size()-2,3):
+			var ids:=[int(indices[offset]),int(indices[offset+1]),int(indices[offset+2])]
+			var score:=0.0
+			for vertex in ids:
+				for influence in range(influences):
+					var slot:int=vertex*influences+influence
+					if slot<bones.size() and bones[slot] in lower_binds: score+=weights[slot]/3.0
+			if score<=best_score: continue
+			var v0:Vector3=vertices[ids[0]]
+			var v1:Vector3=vertices[ids[1]]
+			var v2:Vector3=vertices[ids[2]]
+			var normal:Vector3=(v1-v0).cross(v2-v0).normalized()
+			if normal.length_squared()<0.5: continue
+			best_score=score
+			choice={"center":(v0+v1+v2)/3.0,"normal":normal}
+	return choice if best_score>0.80 else {}
 
 func _envelope_checks(game: Node3D, failures: Array) -> void:
 	var actor:=Node3D.new()
