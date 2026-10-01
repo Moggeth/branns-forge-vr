@@ -779,8 +779,10 @@ func _reveal_scenic(key: String) -> Node3D:
 	resource.set_meta("scenic_builder_key", key)
 	var species := str(collision.get_meta("builder_species", "apple"))
 	var scale: float = float(collision.get_meta("builder_scale", 1.0))
-	var seed: int = int(collision.get_meta("builder_seed", abs(hash(key)) % 100000))
-	var tree_info: Dictionary = TreeKit.adapt_timber(resource, species, seed, {"height": 5.0 * scale})
+	# The grove batches by original seed modulo three. Rebuild that exact cached
+	# silhouette at its original height, then apply the same placement scale.
+	resource.scale = Vector3.ONE * scale
+	var tree_info: Dictionary = TreeKit.adapt_timber(resource, species, _scenic_render_seed(collision, key))
 	resource.set_meta("trunk", tree_info.trunk)
 	resource.set_meta("trunk_mesh", tree_info.trunk.mesh)
 	resource.set_meta("trunk_material", tree_info.trunk.material_override)
@@ -794,6 +796,10 @@ func _reveal_scenic(key: String) -> Node3D:
 	for worker in worker_nodes:
 		if str(worker.get_meta("job", "")) == key: worker.set_meta("job", "")
 	return resource
+
+func _scenic_render_seed(collision: CollisionShape3D, key: String) -> int:
+	var original_seed: int = int(collision.get_meta("builder_seed", abs(hash(key)) % 100000))
+	return int(collision.get_meta("builder_render_seed", posmod(original_seed, 3) + 1))
 
 func claim_scenic_log(resource: Node3D) -> bool:
 	var key := str(resource.get_meta("scenic_builder_key", ""))
@@ -1133,9 +1139,9 @@ func _restore_scenic_stump(key: String, height: float) -> void:
 	temporary.global_position = collision.global_position - Vector3.UP * trunk_height * 0.5
 	temporary.rotation.y = float(collision.get_meta("builder_rotation", 0.0))
 	var species := str(collision.get_meta("builder_species", "apple"))
-	var seed: int = int(collision.get_meta("builder_seed", abs(hash(key)) % 100000))
 	var scale: float = float(collision.get_meta("builder_scale", 1.0))
-	var tree_info: Dictionary = TreeKit.adapt_timber(temporary, species, seed, {"height": 5.0 * scale})
+	temporary.scale = Vector3.ONE * scale
+	var tree_info: Dictionary = TreeKit.adapt_timber(temporary, species, _scenic_render_seed(collision, key))
 	temporary.set_meta("trunk", tree_info.trunk)
 	var permanent := TreeFelling.new()
 	root.add_child(permanent)
@@ -1143,7 +1149,7 @@ func _restore_scenic_stump(key: String, height: float) -> void:
 	temporary.queue_free()
 
 func _clear_grove_collision(a: Vector3, b: Vector3) -> void:
-	# The authored canopy is instanced; clearing one placement removes its visible
+	# The TreeKit canopy is instanced; clearing one placement removes its visible
 	# instances and its exact trunk proxy without rebuilding the 320 m orchard.
 	var orchard_root: Node3D = game.scene.zones[ZONE].root
 	preload("res://orchard_dressing.gd").clear_path(orchard_root, a, b)

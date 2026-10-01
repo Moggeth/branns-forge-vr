@@ -142,7 +142,13 @@ func _check() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(builder.save_path))
 		builder.test_mode = true
 		view._quality(2)
-		if view.tactical_viewport.size != Vector2i(640, 400): failures.append("builder quality setting is ignored")
+		view._sync_hero_resolution()
+		var expected_half := Vector2i(view.pane_layout.rts.size * 0.5).max(Vector2i(64, 64))
+		if view.tactical_viewport.size != expected_half: failures.append("builder quality setting is ignored")
+		view._quality(0)
+		view._sync_hero_resolution()
+		var expected_full := Vector2i(view.pane_layout.rts.size).max(Vector2i(64, 64))
+		if view.tactical_viewport.size != expected_full: failures.append("builder full quality does not match its pane")
 		view.close()
 		await process_frame
 		if is_instance_valid(view): failures.append("builder window did not close cleanly")

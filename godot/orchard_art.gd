@@ -1,6 +1,6 @@
 extends RefCounted
-## Authored orchard kit adapter. GLBs are independent pieces; placement is seeded
-## and chunked so the same registry can dress later generated landscapes.
+## Static orchard kit adapter. Grove and interactive trees use native TreeKit;
+## other GLBs remain independent pieces batched by seeded placement and chunk.
 const TreeKit = preload("res://tree_kit.gd")
 const Finish = preload("res://orchard_finish.gd")
 const Foliage = preload("res://orchard_foliage.gd")
@@ -13,6 +13,8 @@ const ASSETS := ["apple_tree_mature","apple_tree_mature_b","apple_tree_mature_au
 	"wall_end_broken","path_straight","path_curve30","path_curve30_left",
 	"mountain_cliff_chunk","mountain_peak_snow"]
 const CHUNK := 64.0
+const GROVE_LOD_SWITCH := 32.0
+const GROVE_VARIANTS := 3
 static var _cache:Dictionary={}
 
 static func available(id:String)->bool:
@@ -100,90 +102,71 @@ static func _pose(at:Vector3,scale:float,yaw:float)->Dictionary:
 	return {"at":at,"scale":scale,"yaw":yaw}
 
 static func upgrade_tree_visual(tree:Node3D)->void:
-	# Keep TreeKit's trunk collider, apple reach points and fruit physics.
-	# Replace only its rendered crown with the commissioned mesh.
-	if not available("apple_tree_mature"): return
-	var id:String="apple_tree_mature_b" if int(tree.get_meta("tree_seed",0))%2==0 else "apple_tree_mature"
-	var scene:PackedScene=load(PATH+id+".glb")
-	if scene==null: return
-	var art:Node3D=scene.instantiate()
-	Finish.apply_tree(art)
-	art.name="AuthoredOrchardTree"
-	art.scale=Vector3.ONE*(float(tree.get_meta("tree_height",4.8))/4.68)
-	for node in art.find_children("*","MeshInstance3D",true,false):
-		# ShootableApples supplies the visible fruit on an interactive tree.
-		if "Fruit" in node.name: node.visible=false
-		else:
-			if "Canopy" in node.name:
-				node.material_override=Foliage.material("tree")
-				# Leaf-gap shadow twin replaces the hard hull shadow (see Foliage.shadow_material).
-				node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				var shadow:=MeshInstance3D.new()
-				shadow.name="CanopyLeafShadow"
-				shadow.mesh=node.mesh
-				shadow.material_override=Foliage.shadow_material("tree")
-				shadow.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-				shadow.visibility_range_end=85.0
-				shadow.visibility_range_end_margin=2.0
-				node.add_child(shadow)
-			node.visibility_range_end=85.0
-			node.visibility_range_end_margin=2.0
-	for child_name in ["Crown","Far","LeafCards"]:
-		var child:Node3D=tree.get_node_or_null(child_name)
-		if child!=null: child.visible=false
-	var far:MeshInstance3D=tree.get_node_or_null("Far")
-	if far!=null:
-		far.visible=true
-		far.visibility_range_begin=85.0
-		far.visibility_range_begin_margin=2.0
-	tree.add_child(art)
+	# WorldZones already builds this tree with TreeKit. Its Crown, Trunk and Far
+	# carry the native material, LOD and felling contract; leave them intact.
+	pass
 
 static func grove(root:Node3D,placements:Array,trail:Array=[])->void:
 	var root_positions := PackedVector3Array()
 	for placement in placements:
 		root_positions.append(placement.position)
 	root.set_meta("orchard_tree_positions",root_positions)
-	var authored:Dictionary={}
-	for id in ASSETS:
-		if id.begins_with("apple_tree"): authored[id]=[]
-	var fallback:Array=[]
-	var distant:Array=[]
+	var chunks:Dictionary={}
 	for tree in placements:
-		var young:bool=int(tree.seed)%7==0
-		var autumn:bool=int(tree.seed)%13==0
-		var variant_b:bool=int(tree.seed)%3==0
-		var far:bool=not trail.is_empty() and not _near_path(tree.position,trail,20.0)
-		var id:String="apple_tree_mature"
-		if young: id="apple_tree_young_lod1" if far else "apple_tree_young"
-		elif autumn and not far: id="apple_tree_mature_autumn"
-		elif variant_b: id="apple_tree_mature_b_lod1" if far else "apple_tree_mature_b"
-		elif far: id="apple_tree_mature_lod1"
-		if tree.species=="apple" and available(id):
-			authored[id].append(_pose(tree.position,tree.scale,float(tree.seed%628)/100.0))
-			distant.append(tree)
-		else: fallback.append(tree)
-	for id in authored: _emit(root,id,authored[id])
-	var far_chunks:Dictionary={}
-	for tree in distant:
-		var key:=Vector2i(floori(tree.position.x/80.0),floori(tree.position.z/80.0))
-		if not far_chunks.has(key): far_chunks[key]=[]
-		var origin:=Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)
+		var at:Vector3=tree.position
+		var key:=Vector2i(floori(at.x/CHUNK),floori(at.z/CHUNK))
+		if not chunks.has(key): chunks[key]=[]
+		var origin:=Vector3((float(key.x)+0.5)*CHUNK,0,(float(key.y)+0.5)*CHUNK)
 		var local_tree:Dictionary=tree.duplicate()
-		local_tree.position=tree.position-origin
-		far_chunks[key].append(local_tree)
-	for key in far_chunks:
-		var far_grove:Node3D=TreeKit.make_grove(far_chunks[key],{"lod":"far","variants":3,"shadows":false,"builder_addresses":true,"builder_origin":Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)})
-		far_grove.name="OrchardDistantSilhouettes_%s_%s"%[key.x,key.y]
-		far_grove.position=Vector3((float(key.x)+0.5)*80.0,0,(float(key.y)+0.5)*80.0)
-		for child in far_grove.get_children():
-			if child is GeometryInstance3D:
-				child.visibility_range_begin=90.0
-				child.visibility_range_begin_margin=4.0
-		root.add_child(far_grove)
-	if not fallback.is_empty(): root.add_child(TreeKit.make_grove(fallback,{"lod":"far","variants":3,"shadows":false,"builder_addresses":true}))
-	var authored_count:=0
-	for id in authored: authored_count+=authored[id].size()
-	print("ORCHARD_ART authored_trees=",authored_count," fallback_trees=",fallback.size())
+		local_tree.position=at-origin
+		chunks[key].append(local_tree)
+	for key in chunks:
+		var origin:=Vector3((float(key.x)+0.5)*CHUNK,0,(float(key.y)+0.5)*CHUNK)
+		var apples:Array=[]
+		var pines:Array=[]
+		for tree in chunks[key]:
+			if tree.species=="apple": apples.append(tree)
+			else: pines.append(tree)
+		if not apples.is_empty():
+			# Both LODs receive the same seeds and scales. TreeKit caches their
+			# three variant meshes; local positions keep chunk bounds small.
+			_add_grove_lod(root,apples,key,origin,"near",0.0,GROVE_LOD_SWITCH)
+			_add_grove_lod(root,apples,key,origin,"far",GROVE_LOD_SWITCH,0.0)
+		if not pines.is_empty():
+			# Preserve the prior pine FAR representation and its uncapped range.
+			_add_grove_lod(root,pines,key,origin,"far",0.0,0.0)
+	print("ORCHARD_ART tree_kit_trees=",placements.size()," chunks=",chunks.size())
+
+static func _add_grove_lod(root:Node3D,placements:Array,key:Vector2i,origin:Vector3,lod:String,begin:float,end:float)->void:
+	var grove:Node3D=TreeKit.make_grove(placements,{"lod":lod,"variants":GROVE_VARIANTS,
+		"shadows":lod=="near","builder_addresses":true,"builder_origin":origin})
+	grove.name="OrchardTreeKit_%s_%s_%s"%[lod,key.x,key.y]
+	grove.position=origin
+	for child in grove.get_children():
+		if child is GeometryInstance3D:
+			child.visibility_range_begin=begin
+			child.visibility_range_end=end
+			child.visibility_range_begin_margin=0.0
+			child.visibility_range_end_margin=0.0
+			child.visibility_range_fade_mode=GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+			if lod=="near" and child is MultiMeshInstance3D:
+				# Share the visible instance transforms so route clearing and terrain
+				# reprojection update the dappled shadow without a second pass.
+				child.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				var shadow:=MultiMeshInstance3D.new()
+				shadow.name=child.name+"Shadow"
+				shadow.multimesh=child.multimesh
+				shadow.set_meta("landscape_shared_instance_owner",child)
+				shadow.material_override=TreeKit.shadow_material()
+				shadow.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+				shadow.transform=child.transform
+				shadow.visibility_range_begin=child.visibility_range_begin
+				shadow.visibility_range_end=child.visibility_range_end
+				shadow.visibility_range_begin_margin=child.visibility_range_begin_margin
+				shadow.visibility_range_end_margin=child.visibility_range_end_margin
+				shadow.visibility_range_fade_mode=child.visibility_range_fade_mode
+				grove.add_child(shadow)
+	root.add_child(grove)
 
 static func trail(root:Node3D,points:Array,w:Script)->void:
 	# The authored trail is already painted into orchard_masks.png and remains

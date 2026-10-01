@@ -110,7 +110,10 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		if not _clear(point): continue
 		var pine: bool = str(candidate.species) == "pine"
 		var scale: float = float(candidate.scale)
-		placements.append({"species":"pine" if pine else "apple","position":point,"seed":abs(str(candidate.id).hash())%100000,"scale":scale})
+		var seed: int = abs(str(candidate.id).hash()) % 100000
+		var render_seed: int = posmod(seed, 3) + 1 # TreeKit.make_grove's cached mesh for this seed.
+		var yaw: float = float(candidate.rotation)
+		placements.append({"species":"pine" if pine else "apple","position":point,"seed":seed,"scale":scale,"yaw":yaw})
 		var collision:=CollisionShape3D.new()
 		var shape:=CylinderShape3D.new()
 		shape.radius=0.31*scale
@@ -120,8 +123,9 @@ static func populate(root:Node3D,data:Dictionary,w:Script)->void:
 		collision.set_meta("builder_timber", true)
 		collision.set_meta("builder_species", "pine" if pine else "apple")
 		collision.set_meta("builder_scale", scale)
-		collision.set_meta("builder_seed", abs(str(candidate.id).hash())%100000)
-		collision.set_meta("builder_rotation", float(candidate.rotation))
+		collision.set_meta("builder_seed", seed)
+		collision.set_meta("builder_render_seed", render_seed)
+		collision.set_meta("builder_rotation", yaw)
 		trunks.add_child(collision)
 	Art.grove(p,placements,TRAIL)
 	var natural_rocks: Array = []
