@@ -865,10 +865,11 @@ func place_bridge(local: Vector3) -> String:
 	_changed("The bridge is built. Follow the new crossing in first person.")
 	return ""
 
-func hire_worker() -> String:
+func hire_worker(free_equipment: bool = false) -> String:
 	if int(data.workers) >= 5: return "Five helpers is enough for this work site."
-	if int(data.wood) < 2: return "Need 2 lumber to equip another helper."
-	data.wood = int(data.wood) - 2
+	if not free_equipment:
+		if int(data.wood) < 2: return "Need 2 lumber to equip another helper."
+		data.wood = int(data.wood) - 2
 	data.workers = int(data.workers) + 1
 	_ensure_workers()
 	_changed("A new helper joins the work site.")

@@ -171,7 +171,7 @@ function request(value) { if(typeof value!=='string'||!/^[-a-zA-Z0-9_.:]{1,160}$
 function item(value) { if(typeof value!=='string'||!/^[-a-zA-Z0-9_.:]{1,160}$/.test(value)) throw Error('Invalid weapon id.'); return value; }
 function zone(value) { if(typeof value!=='string'||!/^[-a-zA-Z0-9_.:]{1,100}$/.test(value)) throw Error('Invalid token zone.'); return value; }
 function uuid(value,label) { if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) throw Error(`Invalid ${label} id.`); return value; }
-function position(value) { if(!value||typeof value!=='object'||!['x','y','z'].every(k=>Number.isFinite(value[k])&&Math.abs(value[k])<=1000)) throw Error('Invalid token position.'); return {x:value.x,y:value.y,z:value.z}; }
+function position(value) { if(!value||typeof value!=='object'||!['x','y','z'].every(k=>Number.isFinite(value[k])&&Math.abs(value[k])<=10000)) throw Error('Invalid token position.'); return {x:value.x,y:value.y,z:value.z}; }
 function withoutRequest(body) { const out={}; for(const [k,v] of Object.entries(body)) if(k!=='requestId') out[k]=v; return out; }
 function stable(value) { if(Array.isArray(value)) return '['+value.map(stable).join(',')+']'; if(value&&typeof value==='object') return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}'; return JSON.stringify(value); }
 

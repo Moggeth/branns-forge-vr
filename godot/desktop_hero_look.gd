@@ -59,7 +59,7 @@ func apply_motion(relative: Vector2) -> void:
 	if not enabled or not captured or rig == null or camera == null:
 		return
 	# Read the current transform so keyboard/gamepad turns and external camera changes coexist.
-	rig.rotation.y -= relative.x * sensitivity
+	rig.rotate_object_local(Vector3.UP, -relative.x * sensitivity)
 	camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -pitch_limit, pitch_limit)
 
 func _exit_tree() -> void:

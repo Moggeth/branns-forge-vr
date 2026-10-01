@@ -26,3 +26,10 @@ Use logs/work-timing.csv for measured work and docs/VERIFICATION.md for failed-s
 Delegation checkout lesson: the calling task may have a different current directory containing a staging copy of this project. Before assigning edits, identify this real Git checkout by absolute path and give that path explicitly to each worker. During the 2026-09-27 environment run two workers first edited a staging directory; their changes had to be reapplied into this repository before testing and committing. Do not assume inherited `cwd` is the target repo.
 
 WorkCodex: wrapper fails in a new non-Git directory without --skip-git-repo-check. Project work/workcodex is a copy with only that CLI flag added. It preserves the configured Azure provider, sandbox and metadata-only logging. Do not initialize Git to work around this. Unity draft delegation returned useful ideas but was not runtime-verified; always independently check generated code against service schemas and real engine behavior.
+
+### Little Orchard / God role verification (2026-10-02)
+
+- Planet is a separate native destination at (6000,0,0). World/context and workshop positions share the session contract's +/-10000 limit. Audit validators when adding distant maps; node service/planet-coordinate-test.cjs checks this. A stale +/-1000 cap invalidated context and misleadingly broke Forge/cache recovery.
+- Actual-main offline tests need --orchard-planet-check or --script res://god_role_live_checks.gd -- --orchard-planet-preview. Existing quick-cast checks need -- --world-builder-check; without it they intentionally fail to protect saves.
+- Terrain updates are incremental. Wait for dirty/preparing/morphing work to settle; fixed frame counts can inspect unbuilt colliders. Exterior ray normals must face outward (clockwise winding here). Inspect SCRIPT ERROR even with exit 0; terminate only owned diagnostics on failure.
+- Give --log-file an absolute path. Strongly retain RefCounted runners across awaits/deferred calls. Use explicit UTF-8 when writing text on Windows. Logs/captures/timings go in ignored logs/. See docs/ORCHARD-PLANET.md and docs/GOD-ROLE.md for acceptance and limitations.

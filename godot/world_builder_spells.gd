@@ -1,5 +1,7 @@
 extends RefCounted
 ## One catalogue for the map, keyboard palette, and runtime spell checks.
+const PLANET_ACTIONS := ["path", "wall", "fault", "raise", "sunder", "grove", "forest", "ring", "meteor",
+	"patrol", "duelist", "shield_patrol", "rat_swarm", "ghosts", "golem", "hire"]
 
 const ENTRIES = [
 	{"id":"path", "title":"Carve Path", "palette":"Land", "cost":"1–6 Mana", "mana":1.0, "gesture":"line", "cooldown":2.0, "description":"Draw a lasting route for the Hero and workers.", "icon":"route"},
@@ -21,14 +23,14 @@ const ENTRIES = [
 	{"id":"platform", "title":"Platform", "palette":"Construction", "cost":"4 lumber", "wood":4, "gesture":"point", "cooldown":4.0, "description":"Build a walkable elevated deck.", "icon":"platform", "implemented":false},
 	{"id":"gate", "title":"Gate", "palette":"Construction", "cost":"4 lumber", "wood":4, "gesture":"point", "cooldown":4.0, "description":"Build a passable gate.", "icon":"gate", "implemented":false},
 	{"id":"barricade", "title":"Barricade", "palette":"Construction", "cost":"2 lumber", "wood":2, "gesture":"line", "cooldown":3.0, "description":"Build a defensive obstacle.", "icon":"barricade", "implemented":false},
-	{"id":"patrol", "title":"Skeleton Patrol", "palette":"Encounters", "cost":"4 Mana", "mana":4.0, "gesture":"point", "cooldown":12.0, "regions":"all", "description":"Warn the Hero before three skeletons rise.", "icon":"skeleton"},
+	{"id":"patrol", "title":"Skeleton Squad", "palette":"Encounters", "cost":"4 Mana + 2 Essence", "mana":4.0, "gesture":"point", "cooldown":12.0, "regions":"all", "description":"Spend collected Essence to summon three skeletons.", "icon":"skeleton"},
 	{"id":"duelist", "title":"Bone Duelist", "palette":"Encounters", "cost":"3 Mana", "mana":3.0, "gesture":"point", "cooldown":10.0, "regions":"all", "description":"Call a quick lone skeleton for a close duel.", "icon":"skeleton"},
 	{"id":"shield_patrol", "title":"Shield Patrol", "palette":"Encounters", "cost":"5 Mana", "mana":5.0, "gesture":"point", "cooldown":16.0, "regions":"all", "description":"Call two shield guardians whose flanks can be exploited.", "icon":"skeleton"},
-	{"id":"rat_swarm", "title":"Rat Swarm", "palette":"Encounters", "cost":"3 Mana", "mana":3.0, "gesture":"point", "cooldown":14.0, "regions":"all", "description":"Send three real workshop rats scurrying at the Hero.", "icon":"skeleton"},
+	{"id":"rat_swarm", "title":"Rat Stream", "palette":"Encounters", "cost":"0.08 Mana per rat", "mana":0.08, "gesture":"hold", "cooldown":0.0, "regions":"all", "description":"Hold the number or left mouse to pour six rats per second. Release to stop. Defeated enemies leave Essence: sweep over it to collect.", "icon":"skeleton"},
 	{"id":"ghosts", "title":"Haunting", "palette":"Encounters", "cost":"5 Mana", "mana":5.0, "gesture":"point", "cooldown":18.0, "regions":"all", "description":"Call two ghosts; only fire can defeat them.", "icon":"skeleton"},
 	{"id":"golem", "title":"Stone Sentinel", "palette":"Encounters", "cost":"6 Mana", "mana":6.0, "gesture":"point", "cooldown":20.0, "regions":"all", "description":"Call one heavy golem with a visible warning.", "icon":"golem"},
 	{"id":"harvest", "title":"Mark Harvest", "palette":"Life", "cost":"Free", "gesture":"point", "cooldown":0.0, "description":"Assign a helper to a standing tree; delivered timber enters the stockpile.", "icon":"axe"},
-	{"id":"hire", "title":"Hire Helper", "palette":"Life", "cost":"2 lumber", "wood":2, "gesture":"button", "cooldown":0.0, "description":"Equip another lumberjack at the work site.", "icon":"worker"},
+	{"id":"hire", "title":"Summon Lumberjack", "palette":"Life", "cost":"3 Mana or 3 Essence", "mana":3.0, "regions":["orchard_highlands", "orchard_planet"], "gesture":"point", "cooldown":0.0, "description":"Call a helper beside a tree. Watch them cut it and deliver timber to your stockpile.", "icon":"worker"},
 	{"id":"calm", "title":"Calm Ent", "palette":"Life", "cost":"2 Mana", "mana":2.0, "gesture":"point", "cooldown":10.0, "description":"Calm an awakened tree for a short time.", "icon":"hand"},
 	{"id":"seed", "title":"Plant Magical Seed", "palette":"Life", "cost":"1 recovered seed", "gesture":"point", "cooldown":0.0, "description":"Plant a recovered Ent seed in valid soil; its original species survives.", "icon":"seed"}
 ]
@@ -49,6 +51,7 @@ static func entry(action: String) -> Dictionary:
 static func supports_region(action: String, zone: String) -> bool:
 	var item := entry(action)
 	if item.is_empty(): return false
+	if zone == "orchard_planet": return action in PLANET_ACTIONS
 	return (item.regions is String and item.regions == "all") or (item.regions is Array and zone in item.regions)
 
 func availability(action: String, builder: Node) -> String:
@@ -56,8 +59,12 @@ func availability(action: String, builder: Node) -> String:
 	if item.is_empty(): return "Unknown spell."
 	if not bool(item.get("implemented", true)): return "%s is not available yet." % item.title
 	if builder.game != null and not supports_region(action, str(builder.game.adventure.zone)):
+		if str(builder.game.adventure.zone) == "orchard_planet": return "%s is not yet shaped for the Orchard Planet." % item.title
 		return "%s is available in the Orchard Highlands." % item.title
 	if action == "seed" and builder.data.get("ent_seeds", []).is_empty(): return "Recover a magical seed from a fallen Ent first."
+	if builder.game != null and builder.game.get("god_role") != null:
+		if action == "patrol" and builder.game.god_role.essence() < 2: return "Collect 2 Essence from defeated enemies first."
+		if action == "hire" and builder.game.god_role.essence() >= 3: return ""
 	var remaining := float(builder.data.get("spell_cooldowns", {}).get(action, 0.0))
 	if remaining > 0.001: return "%s recharges in %.1f s." % [item.title, remaining]
 	if action == "wall" and int(builder.data.get("star_iron", 0)) >= 2: return ""

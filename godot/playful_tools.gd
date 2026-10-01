@@ -208,8 +208,14 @@ func release(hand)->bool:
 	var desktop_drop=hand==game.desktop_hand and str(game.get("desktop_release_mode"))!="throw"
 	var source=game.camera if hand==game.desktop_hand else game.aim_source(hand)
 	var tracked:Vector3=game.adventure.motion.get(_key(hand),{}).get("velocity",Vector3.ZERO)
-	velocity=Vector3.ZERO if desktop_drop else launch_velocity(tracked,-source.global_basis.z,mode,hand==game.desktop_hand,_tuned("playful.ring_toss_gain",1,.5,1.5))
+	var launch_up:Vector3=game.local_up_at(source.global_position) if game.has_method("local_up_at") else Vector3.UP
+	velocity=Vector3.ZERO if desktop_drop else launch_velocity(tracked,-source.global_basis.z,mode,hand==game.desktop_hand,_tuned("playful.ring_toss_gain",1,.5,1.5),launch_up)
 	bank=0.0 if desktop_drop else (deg_to_rad(desktop_bank) if hand==game.desktop_hand else FLIGHT.bank_angle(ring.global_basis.y,velocity))
+	if not desktop_drop and hand!=game.desktop_hand and game.adventure.zone=="orchard_planet":
+		var heading:Vector3=velocity.slide(launch_up).normalized()
+		var face:Vector3=ring.global_basis.y.normalized()
+		if face.dot(launch_up)<0.0: face=-face
+		bank=clampf(atan2(face.dot(heading.cross(launch_up)),maxf(0.01,face.dot(launch_up))),deg_to_rad(-65),deg_to_rad(65))
 	scored_colliders.clear()
 	ring.reparent(game); holder=null; state="dropped" if desktop_drop else "flying"; flight_age=0; bounce_count=0
 	if not desktop_drop: throw_id+=1
@@ -222,12 +228,12 @@ func release(hand)->bool:
 		print("PLAYFUL_TOOLS throw mode=",mode," speed=",snappedf(velocity.length(),.1))
 	return true
 
-static func launch_velocity(tracked:Vector3,forward:Vector3,power:int,desktop:bool,toss_gain:float=1.0)->Vector3:
+static func launch_velocity(tracked:Vector3,forward:Vector3,power:int,desktop:bool,toss_gain:float=1.0,local_up:Vector3=Vector3.UP)->Vector3:
 	var speed:float=SPEEDS[clampi(power,0,2)]
 	toss_gain=clampf(toss_gain,.5,1.5) if is_finite(toss_gain) else 1.0
 	# A deliberate physical toss preserves direction, including underarm throws.
 	if not desktop and tracked.length()>.65: return (tracked*(.75+speed*.09)*toss_gain).limit_length(21)
-	return ((forward.normalized()*speed+Vector3.UP*.32)*toss_gain).limit_length(21)
+	return ((forward.normalized()*speed+local_up*.32)*toss_gain).limit_length(21)
 
 func _tuned(key:String,fallback:float,minimum:float,maximum:float)->float:
 	if game==null or game.get("tuning")==null: return fallback
@@ -272,7 +278,8 @@ func _flight_step(delta):
 	if state=="dropped":
 		# The desktop drop falls in place and stays retrievable; it never enters
 		# the scoring/recall flight path or receives camera-forward launch speed.
-		velocity+=Vector3.DOWN*9.8*delta
+		var drop_down:Vector3=game.gravity_direction_at(ring.global_position) if game.has_method("gravity_direction_at") else Vector3.DOWN
+		velocity+=drop_down*9.8*delta
 		var start=ring.global_position
 		var hit=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(start,start+velocity*delta,1))
 		if hit.is_empty(): ring.global_position=start+velocity*delta
@@ -280,10 +287,10 @@ func _flight_step(delta):
 			ring.global_position=hit.position+hit.normal*.08
 			velocity=Vector3.ZERO
 			state="resting"
-		if ring.global_position.y< -12: _home()
+		if game.adventure.zone!="orchard_planet" and ring.global_position.y< -12: _home()
 		return
 	flight_age+=delta
-	if flight_age>12 or ring.global_position.y < -12: _home(); return
+	if flight_age>12 or (game.adventure.zone!="orchard_planet" and ring.global_position.y < -12): _home(); return
 	var destination=Vector3.ZERO
 	if state=="returning":
 		if not is_instance_valid(caller) or not _free_hand(caller): _home(); return
@@ -292,7 +299,14 @@ func _flight_step(delta):
 		velocity=FLIGHT.recall(velocity,destination-ring.global_position,delta,_tuned("playful.ring_recall_speed",18,4,18),_tuned("playful.ring_recall_accel",28,6,60))
 		bank=move_toward(bank,0,delta*1.5)
 	else:
-		velocity=FLIGHT.glide(velocity,bank,delta,_tuned("playful.ring_gravity",1.1,0,3),_tuned("playful.ring_curve",4.2,0,9),_tuned("playful.ring_drag",.025,0,.2))
+		if game.adventure.zone=="orchard_planet":
+			var up:Vector3=game.local_up_at(ring.global_position) if game.has_method("local_up_at") else Vector3.UP
+			var tangent:Vector3=velocity.slide(up)
+			var speed:float=tangent.length()
+			if speed>0.1: tangent=tangent.rotated(up,-sin(bank)*_tuned("playful.ring_curve",4.2,0,9)/maxf(speed,2.0)*delta)*exp(-_tuned("playful.ring_drag",.025,0,.2)*delta)
+			velocity=tangent+up*velocity.dot(up)-up*_tuned("playful.ring_gravity",1.1,0,3)*delta
+		else:
+			velocity=FLIGHT.glide(velocity,bank,delta,_tuned("playful.ring_gravity",1.1,0,3),_tuned("playful.ring_curve",4.2,0,9),_tuned("playful.ring_drag",.025,0,.2))
 	var start=ring.global_position
 	var finish=start+velocity*delta
 	var query=PhysicsRayQueryParameters3D.create(start,finish,1)
@@ -317,7 +331,8 @@ func _flight_step(delta):
 			if bounce_count>=6 or velocity.length()<1.2: state="returning"
 	if velocity.length()>.15:
 		var direction=velocity.normalized()
-		var up=Vector3.UP.rotated(direction,bank)
+		var local_up:Vector3=game.local_up_at(ring.global_position) if game.has_method("local_up_at") else Vector3.UP
+		var up=local_up.rotated(direction,bank)
 		if absf(up.dot(direction))<.98: ring.global_basis=Basis.looking_at(direction,up)
 	if flight_age>7: state="returning"
 

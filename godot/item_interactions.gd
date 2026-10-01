@@ -188,6 +188,8 @@ func pulse(point:Vector3,radius:float,damage:float,hand,color:Color):
 		if rat.global_position.distance_to(point)<radius: game._kill_rat(rat)
 
 func move_rig(displacement:Vector3)->float:
+	if game.get("orchard_planet_motion") != null and game.orchard_planet_motion.active():
+		return game.orchard_planet_motion.move(displacement)
 	var query=PhysicsShapeQueryParameters3D.new()
 	var capsule=CapsuleShape3D.new(); capsule.radius=0.20; capsule.height=1.6
 	query.shape=capsule; query.collision_mask=1

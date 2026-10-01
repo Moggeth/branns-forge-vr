@@ -16,6 +16,7 @@ var status:Label
 var hint:Label
 var cfg={"speed":5.0,"boost":2.2,"acceleration":28.0,"deceleration":34.0,"match_reach":.55,"match_scrape":.045,"camera_follow":40.0,"drag":.5,"look_sensitivity":.0026,"controller_look":2.4,"deadzone":.16,"perch_radius":.3,"dislodge_speed":1.8,"throw_gain":3.4,"throw_coast_seconds":1.6,"range":65.0,"dart_damage":4.0,"critical_damage":12.0,"render_scale":1.0,"view_distance":100.0}
 var orientation=Basis.IDENTITY
+var last_planet_up=Vector3.UP
 var third_person=false
 var acro=false
 var health=18.0
@@ -284,6 +285,18 @@ func controls(dt:float)->Dictionary:
 	return {"stick":stick,"boost":boost,"brake":brake}
 
 func turn(yaw:float,pitch:float,roll:float):
+	if _on_planet():
+		var up := _local_up(avatar.global_position)
+		if not is_instance_valid(perch) and acro:
+			orientation=(orientation*Basis(Vector3.UP,yaw)*Basis(Vector3.RIGHT,pitch)*Basis(Vector3.BACK,roll)).orthonormalized()
+		else:
+			var forward:Vector3 = -orientation.z
+			var heading:Vector3 = forward.slide(up)
+			if heading.length_squared()<0.0001: heading=game.camera.global_basis.z.slide(up)
+			heading=_tangent_heading(up,heading)
+			var angle := clampf(asin(clampf(forward.dot(up),-1.0,1.0))+pitch,-1.45,1.45)
+			orientation=(Basis(up,yaw)*Basis.looking_at(heading.normalized(),up)*Basis(Vector3.RIGHT,angle)).orthonormalized()
+		return
 	if not is_instance_valid(perch) and acro:
 		orientation=(orientation*Basis(Vector3.UP,yaw)*Basis(Vector3.RIGHT,pitch)*Basis(Vector3.BACK,roll)).orthonormalized()
 	else:
@@ -292,7 +305,7 @@ func turn(yaw:float,pitch:float,roll:float):
 func _physics_process(dt):
 	if not active or test_mode: return
 	if practice_toss>0 and is_instance_valid(practice_hand):
-		practice_hand.global_position+=(-orientation.z+Vector3.UP*.3)*5*dt; practice_toss-=dt
+		practice_hand.global_position+=(-orientation.z+_local_up(practice_hand.global_position)*.3)*5*dt; practice_toss-=dt
 	tick(minf(dt,.05),controls(dt))
 
 func tick(dt:float,control:Dictionary):
@@ -302,9 +315,11 @@ func tick(dt:float,control:Dictionary):
 	if last_zone!=game.adventure.zone or last_host.distance_to(game.camera.global_position)>12:
 		practice.stop(); launch_coast=0; practice_toss=0
 		if is_instance_valid(practice_hand): practice_hand.hide()
-		drop(last_zone); detach(Vector3.ZERO); recall=false; avatar.global_position=pocket()+Vector3.UP*.35; avatar.velocity=Vector3.ZERO; camera_position=avatar.global_position
+		drop(last_zone); detach(Vector3.ZERO); recall=false; avatar.global_position=pocket()+_local_up(pocket())*.35; avatar.velocity=Vector3.ZERO; camera_position=avatar.global_position
+		_align_to_host()
 		last_zone=game.adventure.zone; note("Together again — following your friend’s journey.")
 	last_host=game.camera.global_position
+	_align_planet_flight()
 	_tick_spells(dt)
 	for m in marks.duplicate():
 		if not is_instance_valid(m.node) or game.elapsed>=m.get("expires",0):
@@ -319,7 +334,7 @@ func tick(dt:float,control:Dictionary):
 	elif not is_instance_valid(carry): carry=null; carry_mass=0
 	if is_instance_valid(perch): _ride(dt,control)
 	elif recall:
-		var target=game.camera.global_position-game.camera.global_basis.z*.7+Vector3.UP*.15
+		var target=game.camera.global_position-game.camera.global_basis.z*.7+_local_up(game.camera.global_position)*.15
 		avatar.velocity=Flight.return_velocity(avatar.velocity,target-avatar.global_position,dt)
 		_move(dt)
 		if avatar.global_position.distance_to(target)<.45:
@@ -336,7 +351,7 @@ func tick(dt:float,control:Dictionary):
 		if not focused: avatar.velocity=avatar.velocity.move_toward(Vector3.ZERO,(0.9 if launch_coast>0 else 16.0)*dt)
 		_move(dt)
 		if avatar.global_position.distance_to(game.camera.global_position)>cfg.range: call_home()
-		if avatar.global_position.y< -12: hurt(100,"Lost in the wilds")
+		if _below_world(avatar.global_position): hurt(100,"Lost in the wilds")
 	art.basis=orientation
 	carrier.global_transform=Transform3D(orientation,avatar.global_position+orientation*Vector3(0,-.045,-.07))
 	if game.elapsed>=next_dust:
@@ -366,13 +381,49 @@ func _move(dt):
 		if before.length()>8: hurt(4,"Mind those wings!")
 
 func pocket()->Vector3:
-	return game.camera.global_position+game.camera.global_basis.x*.28-Vector3.UP*.55
+	return game.camera.global_position+game.camera.global_basis.x*.28-_local_up(game.camera.global_position)*.55
+
+func _on_planet()->bool:
+	return game!=null and game.get("adventure")!=null and game.adventure.zone=="orchard_planet" and game.get("orchard_planet")!=null
+
+func _local_up(at:Vector3)->Vector3:
+	return game.local_up_at(at) if _on_planet() and game.has_method("local_up_at") else Vector3.UP
+
+func _tangent_heading(up:Vector3,hint:Vector3)->Vector3:
+	var heading:Vector3=hint.slide(up)
+	if heading.length_squared()<0.0001: heading=Vector3.FORWARD.slide(up)
+	if heading.length_squared()<0.0001: heading=Vector3.RIGHT.slide(up)
+	return heading.normalized()
+
+func _below_world(at:Vector3)->bool:
+	if not _on_planet(): return at.y < -12.0
+	var planet=game.orchard_planet
+	var from_center:Vector3=at-planet.center
+	if from_center.length_squared()<1.0: return true
+	return from_center.length()<planet.height_at(from_center.normalized())-12.0
+
+func _align_to_host()->void:
+	var up:=_local_up(game.camera.global_position)
+	if not _on_planet():
+		orientation=Basis(Vector3.UP,game.camera.global_rotation.y)
+		last_planet_up=Vector3.UP
+		return
+	var heading:Vector3=(-game.camera.global_basis.z).slide(up)
+	orientation=Basis.looking_at(_tangent_heading(up,heading),up)
+	last_planet_up=up
+
+func _align_planet_flight()->void:
+	if not _on_planet() or not is_instance_valid(avatar): return
+	var up:=_local_up(avatar.global_position)
+	if last_planet_up.distance_squared_to(up)<0.0000000001: return
+	orientation=(Basis(Quaternion(last_planet_up,up))*orientation).orthonormalized()
+	last_planet_up=up
 
 func respawn():
 	held_heat_tip=Vector3.INF; held_heat_item=null
 	launch_coast=0; practice_toss=0; perch=null
-	health=18; invulnerable_until=game.elapsed+2; avatar.show(); lamp.show(); avatar.global_position=pocket(); avatar.velocity=Vector3.UP*.4
-	orientation=Basis(Vector3.UP,game.camera.global_rotation.y); camera_position=avatar.global_position; recall=false
+	health=18; invulnerable_until=game.elapsed+2; avatar.show(); lamp.show(); avatar.global_position=pocket(); avatar.velocity=_local_up(avatar.global_position)*.4
+	_align_to_host(); camera_position=avatar.global_position; recall=false
 	if is_instance_valid(practice_hand): offer_practice_hand()
 	art.burst(avatar.global_position,Color("cbf7e6")); note("Safe in your friend’s pocket. Ready to flutter?")
 
@@ -386,11 +437,14 @@ func hurt(amount:float,reason:String):
 
 func launch_practice():
 	if not is_instance_valid(practice_hand) or perch!=practice_hand: note("Perch on the practice hand first: F / A."); return
-	practice_toss=.2; detach(-orientation.z*9+Vector3.UP*2); launch_coast=.85; practice.record("launch"); note("Wheee! Steer or brake to take control. Home / Start + RB returns you safely.")
+	practice_toss=.2; detach(-orientation.z*9+_local_up(avatar.global_position)*2); launch_coast=.85; practice.record("launch"); note("Wheee! Steer or brake to take control. Home / Start + RB returns you safely.")
 
 func offer_practice_hand():
 	if not is_instance_valid(practice_hand): return
-	practice_hand.show(); practice_hand.global_position=avatar.global_position-orientation.z*.45-Vector3.UP*.16; practice_hand.rotation=Vector3(0,orientation.get_euler().y,PI); practice_hand.scale=Vector3.ONE*1.5
+	practice_hand.show(); practice_hand.global_position=avatar.global_position-orientation.z*.45-_local_up(avatar.global_position)*.16
+	if _on_planet(): practice_hand.global_basis=orientation*Basis(Vector3.BACK,PI)
+	else: practice_hand.rotation=Vector3(0,orientation.get_euler().y,PI)
+	practice_hand.scale=Vector3.ONE*1.5
 	note("Visible practice hand ahead: F to perch, F4 to launch, F3 to recall hand.")
 
 func clear_marks():
@@ -412,7 +466,7 @@ func call_home():
 
 func perch_or_leave():
 	if health<=0 or recall: return
-	if is_instance_valid(perch): detach(Vector3.UP*1.2); return
+	if is_instance_valid(perch): detach(_local_up(avatar.global_position)*1.2); return
 	var candidates=[]
 	for hand in game.hands:
 		if hand.get_is_active(): candidates.append(game.hand_socket(hand))
@@ -433,7 +487,12 @@ func perch_or_leave():
 func attach(target:Node3D):
 	if not is_instance_valid(target) or game.elapsed<perch_block_until: return
 	drop(); perch=target; perch_last=target.global_position; perch_velocity=Vector3.ZERO; avatar.velocity=Vector3.ZERO
-	var angles=orientation.get_euler(); angles.z=0; orientation=Basis.from_euler(angles)
+	if _on_planet():
+		var up:=_local_up(avatar.global_position)
+		var heading:Vector3=(-orientation.z).slide(up)
+		orientation=Basis.looking_at(_tangent_heading(up,heading),up)
+	else:
+		var angles=orientation.get_euler(); angles.z=0; orientation=Basis.from_euler(angles)
 	note("Perched. F / A hops off. A quick hand toss launches you!")
 	print("FAIRY_COOP perch target=",target.name)
 
@@ -451,10 +510,10 @@ func _ride(dt:float,control:Dictionary):
 		# Use the current hand flick for the launch. The smooth velocity alone
 		# lagged one frame behind, so a quick release lost most of its throw.
 		var throw_velocity=perch_velocity.lerp(velocity,0.75)
-		detach(throw_velocity*cfg.throw_gain+Vector3.UP*1.2); note("Wheee! Your wings are yours again."); return
+		detach(throw_velocity*cfg.throw_gain+_local_up(avatar.global_position)*1.2); note("Wheee! Your wings are yours again."); return
 	if riding_ring and ring.state=="home": detach(perch_velocity*.5); return
 	if control.stick.length()>.25: detach(perch_velocity+orientation*control.stick*2); return
-	var destination=perch.global_position+Vector3.UP*.12
+	var destination=perch.global_position+_local_up(perch.global_position)*.12
 	# Keep the visible feet on the perch. Only the camera is smoothed; smoothing
 	# the body here left it visibly trailing a thrown ring by almost a metre.
 	var movement=destination-avatar.global_position
@@ -561,7 +620,7 @@ func _tick_spells(dt):
 		shot.age+=dt
 		if shot.zone!=game.adventure.zone or shot.age>4:
 			shot.node.queue_free(); shots.erase(shot); continue
-		if shot.ping: shot.velocity.y-=4.0*dt
+		if shot.ping: shot.velocity+=(-_local_up(shot.node.global_position))*4.0*dt
 		var from=shot.node.global_position; var to=from+shot.velocity*dt
 		var hit=game.enemy_contacts.sweep(from,to,1|8,[],true)
 		if not hit.is_empty():
@@ -588,7 +647,7 @@ func head_position(enemy)->Vector3:
 	if game.animation!=null:
 		var actor=game.animation.actors.get(enemy.get_instance_id(),{})
 		if actor.has("joints") and actor.joints.has("head"): return actor.joints.head.global_position
-	return enemy.global_position+Vector3.UP*(1.85 if enemy.get_meta("enemy_type","") in ["golem","boss"] else 1.48)
+	return enemy.global_position+_local_up(enemy.global_position)*(1.85 if enemy.get_meta("enemy_type","") in ["golem","boss"] else 1.48)
 
 func dart_hit(hit:Dictionary):
 	var target=game._owner(hit.collider)
@@ -613,21 +672,22 @@ func reveal():
 		if not is_instance_valid(enemy) or not enemy.is_visible_in_tree() or not enemy.get_meta("alive",true): continue
 		var p=head_position(enemy)
 		if avatar.global_position.distance_to(p)>8 or not _clear(avatar.global_position,p,enemy): continue
-		var node=art.marker(game,p,Vector3.UP,2); node.scale=Vector3.ONE*.45; node.reparent(enemy)
+		var node=art.marker(game,p,_local_up(p),2); node.scale=Vector3.ONE*.45; node.reparent(enemy)
 		reveals.append({"node":node,"until":game.elapsed+5,"zone":game.adventure.zone})
 		enemy.set_meta("fairy_aggro_until",game.elapsed+5)
 	# Extension point for authored secrets; never expose harvested/disabled objects.
 	for secret in game.get_tree().get_nodes_in_group("fairy_revealable"):
 		if secret is Node3D and secret.is_visible_in_tree() and secret.global_position.distance_to(avatar.global_position)<8 and str(secret.get_meta("zone",game.adventure.zone))==game.adventure.zone:
-			var node=art.marker(game,secret.global_position,Vector3.UP,0); reveals.append({"node":node,"until":game.elapsed+5,"zone":game.adventure.zone})
+			var node=art.marker(game,secret.global_position,_local_up(secret.global_position),0); reveals.append({"node":node,"until":game.elapsed+5,"zone":game.adventure.zone})
 	if message==feedback_before: note("Faelight reveals weak points and draws attention.")
 
 func attracts(enemy)->bool:
 	return active and health>0 and enemy.is_visible_in_tree() and game.elapsed<float(enemy.get_meta("fairy_aggro_until",0)) and enemy.global_position.distance_to(avatar.global_position)<12
 
 func _camera_tick(dt):
-	var target=avatar.global_position+Vector3.UP*.04
-	var desired=target+orientation.z*1.1+Vector3.UP*.22 if third_person else target
+	var up:=_local_up(avatar.global_position)
+	var target=avatar.global_position+up*.04
+	var desired=target+orientation.z*1.1+up*.22 if third_person else target
 	if third_person:
 		var hit=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(target,desired,1))
 		if hit.has("position"): desired=hit.position+hit.normal*.08

@@ -26,7 +26,7 @@ func request(target: Node = null) -> void:
 	if busy or is_instance_valid(prompt): return
 	prompt = ConfirmationDialog.new()
 	prompt.title = "Reset World — are you sure?"
-	prompt.dialog_text = EXPLANATION
+	prompt.dialog_text = "Reset Little Orchard to its original planet?\n\nIts terrain edits, grown trees, summoned encounters and meteorites will be cleared. Your character, the original Orchard and settlement resources stay. A planet backup is kept." if game.adventure.zone == "orchard_planet" else EXPLANATION
 	prompt.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	prompt.get_label().custom_minimum_size.x = 520
 	prompt.ok_button_text = "Yes, Reset World"
@@ -67,6 +67,20 @@ func _execute() -> void:
 		game._notice("Reset World is unavailable in this offline diagnostic.", 6)
 		return
 	busy = true
+	if game.adventure.zone == "orchard_planet":
+		if game.get("god_role") != null: game.god_role.stop_rat_stream()
+		await game.adventure.travel("forge_yard")
+		if game.adventure.zone != "forge_yard" or game.adventure.travelling:
+			busy = false
+			game._notice("Planet reset paused: the Forge landing is not ready.", 10)
+			return
+		if not game.orchard_planet.reset():
+			busy = false
+			game._notice("Planet was not reset: its backup or save removal failed.", 10)
+			return
+		game._notice("Little Orchard reset. Returned to the Forge; character progress and the original Orchard are intact.", 10)
+		busy = false
+		return
 	var terrain = game.landscape
 	var builder = game.world_builder
 	var result := reset_files(paths, terrain.seed, terrain.recipe,

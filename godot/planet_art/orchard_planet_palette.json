@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "seed": 20261001,
+  "assets_root": "res://assets/zone_art/",
+  "budget": {"max_objects": 220, "max_landmark_pieces": 84, "max_clutter_instances": 136, "max_colliders": 40},
+  "sampling": {"candidates": 1000, "landmark_min_angle": 0.30, "clutter_min_angle": 0.13, "landmark_min_up_dot": 0.94, "clutter_min_up_dot": 0.85, "water_reject": 0.3, "wetland_water_reject": 0.65, "landmark_tilt_follow": 0.4},
+  "size_guard_m": {"landmark_max": 24.0, "clutter_max": 7.0, "min": 0.12},
+  "biomes": {
+    "temperate": {
+      "notes": "Cottage-garden meadow: low flower beds, planters and shrubs around one gazebo court; reads warm and domestic.",
+      "landmarks": [
+        {"name": "gazebo_court", "count": 1, "pieces": [
+          {"asset": "sky_garden/gazebo_sky.glb", "at": [0, 0], "scale": [0.9, 1.0], "collide": true, "sink": 0.05},
+          {"asset": "forge_yard/path_edge_stones.glb", "at": [5, 0], "yaw": 90, "scale": [0.9, 1.1]},
+          {"asset": "sky_garden/pillar_lantern_sky.glb", "at": [-4, 3], "scale": [0.9, 1.0]},
+          {"asset": "sky_garden/garden_arch_sky.glb", "at": [8, -2], "yaw": 80, "scale": [0.9, 1.0], "collide": true}
+        ]}
+      ],
+      "clutter_per_biome": 20, "cluster_radius_m": 5.5,
+      "clutter": [
+        {"asset": "sky_garden/flower_bed_sky_a.glb", "w": 3, "scale": [0.8, 1.2], "lift": 0.02},
+        {"asset": "sky_garden/shrub_bloom_sky_a.glb", "w": 3, "scale": [0.8, 1.2]},
+        {"asset": "sky_garden/shrub_bloom_sky_b.glb", "w": 3, "scale": [0.8, 1.2]},
+        {"asset": "sky_garden/bell_flower_sky.glb", "w": 2, "scale": [0.9, 1.3]},
+        {"asset": "forge_yard/garden_planter_b.glb", "w": 1, "scale": [0.9, 1.1]},
+        {"asset": "forge_yard/garden_bed_a.glb", "w": 1, "scale": [0.9, 1.1], "lift": 0.02},
+        {"asset": "sky_garden/waymark_sky.glb", "w": 1, "scale": [0.9, 1.0]}
+      ]
+    },
+    "forest": {
+      "notes": "Understory only (trees live elsewhere): undergrowth, mossy boulders, toadstools, timber roots and a root-arch grove.",
+      "landmarks": [
+        {"name": "root_arch_grove", "count": 2, "pieces": [
+          {"asset": "mushroom_glade/root_arch.glb", "at": [0, 0], "scale": [0.8, 1.0], "collide": true},
+          {"asset": "pinewood_ruins/timber_roots.glb", "at": [-4, 2], "yaw": 40, "scale": [0.9, 1.2]},
+          {"asset": "mushroom_glade/boulder_mossy_a.glb", "at": [4, 3], "scale": [0.9, 1.3]},
+          {"asset": "mushroom_glade/mushroom_cluster.glb", "at": [2, -3], "scale": [0.9, 1.2]}
+        ]}
+      ],
+      "clutter_per_biome": 22, "cluster_radius_m": 6.0,
+      "clutter": [
+        {"asset": "pinewood_ruins/undergrowth_clump.glb", "w": 5, "scale": [0.8, 1.3]},
+        {"asset": "mushroom_glade/boulder_mossy_b.glb", "w": 2, "scale": [0.7, 1.2]},
+        {"asset": "mushroom_glade/mushroom_cluster.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "gloamfen/fallen_log.glb", "w": 1, "scale": [0.8, 1.1]},
+        {"asset": "mushroom_glade/root_sprawl.glb", "w": 1, "scale": [0.8, 1.1]}
+      ]
+    },
+    "highland": {
+      "notes": "Windswept moor: tussock and cushion plants, cairns and banner poles, one ruined keep tower with a wall span as the RTS beacon.",
+      "landmarks": [
+        {"name": "moor_keep", "count": 1, "pieces": [
+          {"asset": "cloudbreak_keep/keep_tower.glb", "at": [0, 0], "scale": [0.55, 0.7], "collide": true, "sink": 0.2},
+          {"asset": "cloudbreak_keep/keep_wall_span.glb", "at": [7, 1], "yaw": 80, "scale": [0.6, 0.75], "collide": true, "sink": 0.1},
+          {"asset": "cloudbreak_keep/wind_banner_pole_a.glb", "at": [-4, 4], "scale": [0.8, 1.0]},
+          {"asset": "cloudbreak_keep/cairn_stack.glb", "at": [4, -5], "scale": [0.9, 1.1]}
+        ]}
+      ],
+      "clutter_per_biome": 20, "cluster_radius_m": 6.5,
+      "clutter": [
+        {"asset": "starfall_ridge/tussock.glb", "w": 4, "scale": [0.9, 1.3]},
+        {"asset": "starfall_ridge/cushion.glb", "w": 3, "scale": [0.9, 1.3]},
+        {"asset": "starfall_ridge/shrub.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "starfall_ridge/boulder_a.glb", "w": 2, "scale": [0.7, 1.3]},
+        {"asset": "cloudbreak_keep/cairn_stack.glb", "w": 1, "scale": [0.8, 1.1]},
+        {"asset": "cloudbreak_keep/wind_banner_pole_b.glb", "w": 1, "scale": [0.9, 1.0]}
+      ]
+    },
+    "alpine": {
+      "notes": "Cold crag country: tall cliff blades and shelves with scree skirts and rim rock; a watch shelter marks the high camp.",
+      "landmarks": [
+        {"name": "crag_ridge", "count": 2, "pieces": [
+          {"asset": "starfall_ridge/cliff_a.glb", "at": [0, 0], "scale": [0.8, 1.0], "collide": true, "sink": 0.4},
+          {"asset": "starfall_ridge/cliff_c.glb", "at": [6, 2], "yaw": 60, "scale": [0.7, 0.9], "collide": true, "sink": 0.4},
+          {"asset": "starfall_ridge/cliff_shelf.glb", "at": [-5, 4], "yaw": 150, "scale": [0.8, 1.0], "sink": 0.3},
+          {"asset": "starfall_ridge/scree.glb", "at": [2, -5], "scale": [0.9, 1.2]}
+        ]},
+        {"name": "high_camp", "count": 1, "pieces": [
+          {"asset": "cloudbreak_keep/watch_shelter.glb", "at": [0, 0], "scale": [0.8, 0.95], "collide": true},
+          {"asset": "cloudbreak_keep/cairn_stack.glb", "at": [4, 2], "scale": [0.9, 1.1]},
+          {"asset": "cloudbreak_keep/wind_banner_pole_a.glb", "at": [-3, -3], "scale": [0.9, 1.0]}
+        ]}
+      ],
+      "clutter_per_biome": 18, "cluster_radius_m": 6.0,
+      "clutter": [
+        {"asset": "starfall_ridge/boulder_b.glb", "w": 3, "scale": [0.7, 1.3]},
+        {"asset": "starfall_ridge/boulder_c.glb", "w": 3, "scale": [0.7, 1.3]},
+        {"asset": "starfall_ridge/scree.glb", "w": 3, "scale": [0.9, 1.3]},
+        {"asset": "cloudbreak_keep/rim_rock_cloud_a.glb", "w": 1, "scale": [0.6, 0.9]}
+      ]
+    },
+    "desert": {
+      "notes": "Sandstone quarry country: banded mesas and stacked cut slabs, a crane-and-gateway works site; warm ochre masses read at distance.",
+      "landmarks": [
+        {"name": "quarry_works", "count": 1, "pieces": [
+          {"asset": "sandstone_quarry/quarry_gateway.glb", "at": [0, 0], "scale": [0.8, 1.0], "collide": true},
+          {"asset": "sandstone_quarry/scaffold_crane.glb", "at": [-7, 3], "yaw": 30, "scale": [0.8, 1.0], "collide": true},
+          {"asset": "sandstone_quarry/cut_slab_stack.glb", "at": [5, 5], "yaw": 20, "scale": [0.9, 1.1], "collide": true},
+          {"asset": "sandstone_quarry/lantern_post.glb", "at": [3, -4], "scale": [0.9, 1.0]}
+        ]},
+        {"name": "mesa_pillars", "count": 2, "pieces": [
+          {"asset": "sandstone_quarry/strata_wall.glb", "at": [0, 0], "scale": [0.55, 0.75], "collide": true, "sink": 0.3},
+          {"asset": "sandstone_quarry/cliff_mass.glb", "at": [8, 3], "yaw": 110, "scale": [0.35, 0.5], "collide": true, "sink": 0.4},
+          {"asset": "sandstone_quarry/spoil_boulder.glb", "at": [-4, 4], "scale": [0.9, 1.3]}
+        ]}
+      ],
+      "clutter_per_biome": 18, "cluster_radius_m": 7.0,
+      "clutter": [
+        {"asset": "sandstone_quarry/spoil_boulder.glb", "w": 5, "scale": [0.6, 1.3]},
+        {"asset": "sandstone_quarry/cut_slab_stack.glb", "w": 1, "scale": [0.7, 1.0]},
+        {"asset": "starfall_ridge/scree.glb", "w": 2, "scale": [0.9, 1.3]},
+        {"asset": "starfall_ridge/boulder_a.glb", "w": 1, "scale": [0.6, 1.0]}
+      ]
+    },
+    "crystal": {
+      "notes": "Crystal garden: a tall spire flanked by large clusters; cyan/violet clusters and geode seams scattered among dark boulders so the biome glows from orbit.",
+      "landmarks": [
+        {"name": "crystal_garden", "count": 2, "pieces": [
+          {"asset": "crystal_hollow/landmark_spire.glb", "at": [0, 0], "scale": [0.6, 0.8], "collide": true, "sink": 0.2},
+          {"asset": "crystal_hollow/cluster_large.glb", "at": [5, 2], "yaw": 70, "scale": [0.8, 1.0], "collide": true},
+          {"asset": "starfall_ridge/crystal_cluster_cyan.glb", "at": [-4, 4], "yaw": 200, "scale": [0.9, 1.2]},
+          {"asset": "starfall_ridge/crystal_cluster_violet.glb", "at": [1, -5], "yaw": 310, "scale": [0.9, 1.2]},
+          {"asset": "crystal_hollow/boulders.glb", "at": [-3, -2], "scale": [0.7, 1.0]}
+        ]}
+      ],
+      "clutter_per_biome": 22, "cluster_radius_m": 6.5,
+      "clutter": [
+        {"asset": "crystal_hollow/cluster_small.glb", "w": 4, "scale": [0.8, 1.3]},
+        {"asset": "starfall_ridge/crystal_cluster_cyan.glb", "w": 2, "scale": [0.5, 0.9]},
+        {"asset": "starfall_ridge/crystal_cluster_violet.glb", "w": 2, "scale": [0.5, 0.9]},
+        {"asset": "starfall_ridge/geode_seam_a.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "starfall_ridge/geode_seam_b.glb", "w": 1, "scale": [0.8, 1.2]},
+        {"asset": "starfall_ridge/meteor_fragment_small.glb", "w": 2, "scale": [0.8, 1.3]}
+      ]
+    },
+    "wetland": {
+      "notes": "Gloamfen swamp: reeds and mud banks in drifts, glowing fungi, standing stones, a plank boardwalk to a lantern post; low and murky, no open water placed.",
+      "landmarks": [
+        {"name": "fen_standing_stones", "count": 1, "pieces": [
+          {"asset": "gloamfen/standing_stone_a.glb", "at": [0, 0], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "gloamfen/standing_stone_b.glb", "at": [5, 2], "yaw": 50, "scale": [0.9, 1.1], "collide": true},
+          {"asset": "gloamfen/pale_stone_a.glb", "at": [-4, 3], "scale": [0.9, 1.2]},
+          {"asset": "gloamfen/glow_mushroom_tall.glb", "at": [2, -3], "scale": [0.9, 1.2]}
+        ]},
+        {"name": "fen_boardwalk", "count": 1, "pieces": [
+          {"asset": "gloamfen/boardwalk_slab.glb", "at": [0, 0], "scale": [1.0, 1.0]},
+          {"asset": "gloamfen/boardwalk_link.glb", "at": [3, 0], "scale": [1.0, 1.0]},
+          {"asset": "gloamfen/boardwalk_slab.glb", "at": [6, 0], "scale": [1.0, 1.0]},
+          {"asset": "gloamfen/lantern_post.glb", "at": [7.5, 1.5], "scale": [0.9, 1.0]}
+        ]}
+      ],
+      "clutter_per_biome": 24, "cluster_radius_m": 6.5,
+      "clutter": [
+        {"asset": "gloamfen/reed_clump_a.glb", "w": 4, "scale": [0.8, 1.3], "lift": -0.03},
+        {"asset": "gloamfen/reed_clump_b.glb", "w": 4, "scale": [0.8, 1.3], "lift": -0.03},
+        {"asset": "gloamfen/reed_clump_c.glb", "w": 3, "scale": [0.8, 1.3], "lift": -0.03},
+        {"asset": "gloamfen/mud_bank_a.glb", "w": 2, "scale": [0.8, 1.2], "lift": -0.02},
+        {"asset": "gloamfen/mud_bank_b.glb", "w": 2, "scale": [0.8, 1.2], "lift": -0.02},
+        {"asset": "gloamfen/fungi_cluster_a.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "gloamfen/fungi_cluster_b.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "gloamfen/fallen_log.glb", "w": 1, "scale": [0.8, 1.0]}
+      ]
+    },
+    "magical": {
+      "notes": "Mushroom glade: tall violet toadstools in rings, glow sprouts and stepping stones around a root arch; saturated purple accents.",
+      "landmarks": [
+        {"name": "glade_ring", "count": 2, "pieces": [
+          {"asset": "mushroom_glade/root_arch.glb", "at": [0, 0], "scale": [0.8, 1.0], "collide": true},
+          {"asset": "mushroom_glade/mushroom_violet_tall.glb", "at": [5, 1], "scale": [0.9, 1.2], "collide": true},
+          {"asset": "mushroom_glade/mushroom_violet_lean.glb", "at": [-4, 3], "scale": [0.9, 1.2]},
+          {"asset": "mushroom_glade/stepping_stones.glb", "at": [0, 5], "yaw": 90, "scale": [0.9, 1.1]},
+          {"asset": "mushroom_glade/rock_cluster.glb", "at": [-3, -4], "scale": [0.8, 1.1]}
+        ]}
+      ],
+      "clutter_per_biome": 24, "cluster_radius_m": 6.0,
+      "clutter": [
+        {"asset": "mushroom_glade/mushroom_violet_squat.glb", "w": 4, "scale": [0.8, 1.3]},
+        {"asset": "mushroom_glade/mushroom_violet_lean.glb", "w": 3, "scale": [0.8, 1.2]},
+        {"asset": "mushroom_glade/mushroom_cluster.glb", "w": 3, "scale": [0.8, 1.2]},
+        {"asset": "mushroom_glade/glow_sprouts.glb", "w": 4, "scale": [0.9, 1.3]},
+        {"asset": "mushroom_glade/boulder_mossy_a.glb", "w": 1, "scale": [0.7, 1.1]}
+      ]
+    },
+    "ruins": {
+      "notes": "Ancient forecourt: a freestanding arch flanked by columns and wall runs, with paving, rubble and fallen columns trailing away; waystone marks the site.",
+      "landmarks": [
+        {"name": "arch_forecourt", "count": 2, "pieces": [
+          {"asset": "pinewood_ruins/arch.glb", "at": [0, 0], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "starfall_ridge/ruin_column.glb", "at": [-6, 2], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "starfall_ridge/ruin_column.glb", "at": [6, 2], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "pinewood_ruins/ruin_wall.glb", "at": [0, 7], "yaw": 90, "scale": [0.9, 1.1], "collide": true},
+          {"asset": "starfall_ridge/ruin_column_fallen.glb", "at": [3, -4], "yaw": 25, "scale": [0.9, 1.1]},
+          {"asset": "starfall_ridge/paving_a.glb", "at": [0, -3], "scale": [1.0, 1.1], "lift": 0.02}
+        ]},
+        {"name": "pillar_gate", "count": 1, "pieces": [
+          {"asset": "gloamfen/ruin_gate.glb", "at": [0, 0], "scale": [0.9, 1.0], "collide": true},
+          {"asset": "gloamfen/ruin_pillar_a.glb", "at": [-5, 3], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "gloamfen/ruin_pillar_b.glb", "at": [5, 3], "scale": [0.9, 1.1], "collide": true},
+          {"asset": "starfall_ridge/waystone.glb", "at": [0, -5], "scale": [0.9, 1.1]}
+        ]}
+      ],
+      "clutter_per_biome": 22, "cluster_radius_m": 6.5,
+      "clutter": [
+        {"asset": "pinewood_ruins/rubble_pile.glb", "w": 3, "scale": [0.8, 1.3]},
+        {"asset": "gloamfen/ruin_block_pile.glb", "w": 2, "scale": [0.8, 1.2]},
+        {"asset": "starfall_ridge/paving_b.glb", "w": 3, "scale": [0.9, 1.2], "lift": 0.02},
+        {"asset": "starfall_ridge/paving_a.glb", "w": 2, "scale": [0.9, 1.2], "lift": 0.02},
+        {"asset": "starfall_ridge/ruin_column_fallen.glb", "w": 1, "scale": [0.8, 1.0]},
+        {"asset": "pinewood_ruins/undergrowth_clump.glb", "w": 2, "scale": [0.7, 1.1]}
+      ]
+    }
+  },
+  "phases": {
+    "_note": "Reserved for future phase expansion. set_phase(name) stores the key; a phase may later override per-biome 'clutter_scale' or add 'extra_landmarks'. No phase currently changes output."
+  }
+}

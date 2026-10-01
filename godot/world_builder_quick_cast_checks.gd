@@ -255,14 +255,17 @@ func _run() -> void:
 	_expect(view.line_calls.is_empty() and builder.data.paths.size() == paths_before and float(builder.data.mana) == invalid_mana and view.quick_cast_key == -1, "invalid real-builder release spent Mana or left a gesture")
 	view.real_cast = false
 
-	# Hire is a button action: one key-down, no release or echo duplicate.
+	# A targeted helper needs real ground; no echo/release duplicate or off-world spend.
 	builder.data.wood = 8
+	builder.data.mana = 20.0
+	view.real_cast = true
+	view.cursor = start
 	view._select_palette("life")
 	var workers_before := int(builder.data.workers)
 	_send(view, KEY_6)
 	_send(view, KEY_6, true, true)
 	_send(view, KEY_6, false)
-	_expect(int(builder.data.workers) == workers_before + 1, "Hire Helper was missed or called twice")
+	_expect(int(builder.data.workers) == workers_before + 1, "targeted lumberjack was missed or called twice")
 	view.cursor = start
 	view._select_palette("land")
 	_send(view, KEY_1)

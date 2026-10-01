@@ -24,7 +24,7 @@ const SPECS := {
 	"awaken": {"kind":"tree", "radius":5.0},
 	"calm": {"kind":"ent", "radius":5.0},
 	"harvest": {"kind":"harvest", "radius":5.0},
-	"hire": {"kind":"instant"},
+	"hire": {"kind":"circle", "radius":2.5},
 	"seed": {"kind":"sprout", "radius":3.0},
 	"patrol": {"kind":"triad", "radius":3.0, "hero_clearance":7.0},
 	"duelist": {"kind":"encounter", "radius":2.2, "count":1, "hero_clearance":7.0},

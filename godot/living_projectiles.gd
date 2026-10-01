@@ -35,7 +35,8 @@ func launch(e,hand,measured:Vector3):
 	var cfg=e.components.returning_projectile
 	var source=engine.game.camera if hand==engine.game.get("desktop_hand") else engine.game.aim_source(hand)
 	var speed=float(cfg.get("speed",8))
-	var velocity=measured.limit_length(speed) if measured.length()>.65 else -source.global_basis.z*speed+Vector3.UP*.15
+	var local_up:Vector3=engine.game.local_up_at(source.global_position) if engine.game.has_method("local_up_at") else Vector3.UP
+	var velocity=measured.limit_length(speed) if measured.length()>.65 else -source.global_basis.z*speed+local_up*.15
 	velocity=velocity.limit_length(speed)
 	e.node.freeze=true; e.node.collision_layer=0; e.node.collision_mask=0; e.node.linear_velocity=Vector3.ZERO
 	var flight={"id":e.node.get_instance_id(),"entry":e,"hand":hand,"config":cfg,"velocity":velocity,"mode":"outbound","age":0.0,"bounces":0,"hits":{},"camera":engine.game.camera.global_position}
@@ -85,7 +86,7 @@ func tick(delta):
 		if flight.camera.distance_to(engine.game.camera.global_position)>15: _home(flight); continue
 		flight.camera=engine.game.camera.global_position
 		flight.age+=delta
-		if flight.age>16 or e.node.global_position.distance_to(e.owner.root.to_global(e.home))>100 or e.node.global_position.y < -30: _home(flight); continue
+		if flight.age>16 or e.node.global_position.distance_to(e.owner.root.to_global(e.home))>100 or (engine.game.adventure.zone!="orchard_planet" and e.node.global_position.y < -30): _home(flight); continue
 		if flight.age>=float(flight.config.get("returnAfter",3)): _return(flight)
 		var remaining=delta
 		while remaining>.00001 and flying(e):
@@ -106,7 +107,8 @@ func _step(flight,delta):
 			return
 		e.node.global_position+=difference.normalized()*minf(difference.length(),float(flight.config.get("returnSpeed",12))*delta)
 		return
-	flight.velocity+=Vector3.DOWN*float(flight.config.get("gravity",1))*delta
+	var local_down:Vector3=engine.game.gravity_direction_at(e.node.global_position) if engine.game.has_method("gravity_direction_at") else Vector3.DOWN
+	flight.velocity+=local_down*float(flight.config.get("gravity",1))*delta
 	flight.velocity=flight.velocity.limit_length(20)
 	var start:Vector3=e.node.global_position; var finish:Vector3=start+flight.velocity*delta
 	var query=PhysicsRayQueryParameters3D.create(start,finish,13)

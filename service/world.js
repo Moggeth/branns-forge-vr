@@ -94,7 +94,7 @@ class World {
     this.cooldowns.set('local',now+item.cooldown*1000);return {actions,cooldown:item.cooldown};
   }
 }
-function point(p){if(!p||!['x','y','z'].every(k=>Number.isFinite(p[k])&&Math.abs(p[k])<=1000))throw Error('Invalid position.');return {x:p.x,y:p.y,z:p.z};}
+function point(p){if(!p||!['x','y','z'].every(k=>Number.isFinite(p[k])&&Math.abs(p[k])<=10000))throw Error('Invalid position.');return {x:p.x,y:p.y,z:p.z};}
 function identifier(id){if(typeof id!=='string'||!/^[a-zA-Z0-9_.:-]{1,100}$/.test(id))throw Error('Invalid hunt identifier.');return id;}
 function targets(list){if(!Array.isArray(list))return [];if(list.length>100)throw Error('Too many targets.');return list.map(t=>({...point(t),id:identifier(t.id),alive:t.alive===true,type:['rat','dummy','enemy','skeleton','boss','guardian','golem','wisp','resource','anchor','barrier'].includes(t.type)?t.type:'dummy',enemy_type:['skeleton','boss','guardian','golem','wisp','rat'].includes(t.enemy_type)?t.enemy_type:'',resource:RESOURCES.includes(t.resource)?t.resource:'',requires:typeof t.requires==='string'?t.requires.slice(0,32):''}));}
 function interaction(value){if(!value||typeof value!=='object')return null;return {phase:['formation','ready','release','impact','activate'].includes(value.phase)?value.phase:'activate',hand:value.hand==='left'?'left':'right',squeeze:Number.isFinite(value.squeeze)?Math.max(0,Math.min(1,value.squeeze)):0,formationSeconds:Number.isFinite(value.formationSeconds)?Math.max(0,Math.min(3,value.formationSeconds)):0};}

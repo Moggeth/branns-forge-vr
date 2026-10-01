@@ -256,8 +256,9 @@ func tick(delta):
 			var gentle=props.any(func(m):return is_instance_valid(m) and m.get_meta("fire_kind")=="match" and _burning(m) and m.is_visible_in_tree() and _can_light(_tip(m).distance_to(_tip(n)),Vector3(m.get_meta("velocity",Vector3.ZERO)).length()))
 			var dwell=float(n.get_meta("dwell",0))+delta if gentle else 0.0; n.set_meta("dwell",dwell)
 			if dwell>=cfg.light_dwell: _light(n)
-		if n!=box and (n.global_position.y< -12 or (n not in game.held.values() and ((state=="spent" and game.elapsed-float(n.get_meta("born"))>35) or (kind=="match" and game.elapsed-float(n.get_meta("born"))>60)))): _remove(n)
-		elif n==box and n.global_position.y< -12:
+		var below_flat_world:bool=game.adventure.zone!="orchard_planet" and n.global_position.y< -12
+		if n!=box and (below_flat_world or (n not in game.held.values() and ((state=="spent" and game.elapsed-float(n.get_meta("born"))>35) or (kind=="match" and game.elapsed-float(n.get_meta("born"))>60)))): _remove(n)
+		elif n==box and below_flat_world:
 			if n.has_meta("body"): var body=n.get_meta("body"); n.reparent(dock); n.remove_meta("body"); body.queue_free()
 			n.transform=Transform3D.IDENTITY
 	for pool in pools.duplicate():
@@ -282,8 +283,10 @@ func _pool(pos,zone_id):
 	_sound("fire",pos)
 	while pools.size()>=4: var old=pools.pop_front(); old.node.queue_free()
 	var root=Node3D.new(); game.adventure.zone_groups[zone_id].add_child(root); root.global_position=pos
-	var ground=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(pos+Vector3.UP*0.1,pos+Vector3.DOWN*4,1))
-	if ground.has("position"): root.global_position=ground.position+Vector3.UP*0.03
+	var local_up:Vector3=game.local_up_at(pos) if game.has_method("local_up_at") else Vector3.UP
+	var ground=game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(pos+local_up*0.1,pos-local_up*4,1))
+	if ground.has("position"): root.global_position=ground.position+local_up*0.03
+	root.global_basis=Basis(Quaternion(Vector3.UP,local_up))
 	var flames=[]
 	for i in range(18):
 		var angle=i*2.39996; var radius=sqrt(float(i)/18)*cfg.fire_radius*0.8
@@ -325,8 +328,10 @@ func hurt_ghost(g,damage,damage_type):
 	g.set_meta("hp",float(g.get_meta("hp"))-damage)
 	if float(g.get_meta("hp"))>0: return
 	g.set_meta("alive",false); game._set_collisions(g,false)
+	if game.get("god_role") != null: game.god_role.on_enemy_defeated(g)
 	if game.quests!=null: game.quests.enemy_defeated(g,"ghost")
-	game._effect(g.global_position+Vector3.UP*0.8,Color("ffe3a0"),0.65,1.2)
+	var ghost_up:Vector3=g.global_basis.y.normalized() if g.get_meta("planet_actor",false) else Vector3.UP
+	game._effect(g.global_position+ghost_up*0.8,Color("ffe3a0"),0.65,1.2)
 	var tween=create_tween(); tween.tween_property(g,"scale",Vector3(0.05,1.8,0.05),0.45); tween.tween_callback(g.hide)
 	print("FIRECRAFT ghost defeated by fire")
 
@@ -334,6 +339,11 @@ func _tick_ghosts(delta,flames):
 	for g in ghosts:
 		if not g.get_meta("alive",false) or not g.is_visible_in_tree(): continue
 		var art=g.get_meta("art"); art.position.y=0.18+sin(game.elapsed*2+g.get_instance_id()%10)*0.09
+		if g.get_meta("planet_actor",false):
+			var ghost_up:Vector3=g.global_basis.y.normalized()
+			for flame in flames:
+				if (g.global_position+ghost_up*0.8).distance_to(flame)<0.6: hurt_ghost(g,70*delta,"fire")
+			continue
 		var fairy_target=game.get("fairy")!=null and game.fairy.attracts(g)
 		var player:Vector3=game.fairy.avatar.global_position if fairy_target else game.camera.global_position
 		if not fairy_target: player.y=g.global_position.y

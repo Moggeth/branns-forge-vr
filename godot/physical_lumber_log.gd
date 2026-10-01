@@ -70,7 +70,7 @@ func _physics_process(delta: float) -> void:
 		freeze = false
 		return
 	var target: Vector3 = pickup_hand.global_position
-	if pickup_desktop: target += Vector3(0, -0.38, 0)
+	if pickup_desktop: target -= pickup_hand.global_basis.y.normalized() * 0.38
 	global_position = global_position.move_toward(target, ASSIST_SPEED * delta)
 	if global_position.distance_to(target) <= 0.18: _claim()
 

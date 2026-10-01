@@ -558,17 +558,19 @@ func _draw_info() -> void:
 	if fb != "" and y + _font.get_height(f_head) <= limit:
 		var ft := _fit(fb, w, f_head, 2 if y + _font.get_height(f_head) * 2 <= limit else 1, f_head - 1)
 		_draw_fit(x, y, ft, Color(C_TEXT, 0.80))
-	# resource strip: Lumber (log) + Helpers (worker)
+	# Shared-role resource strip, using the existing compact visual vocabulary.
 	draw_line(Vector2(x, foot_y - 5 * _s), Vector2(x + w, foot_y - 5 * _s), Color(C_BRASS_DIM, 0.6), 1.0 * _s)
-	var isz := foot_h * 0.95
-	var rx := x
-	Sym.draw(self, "log", Rect2(rx, foot_y + (foot_h - isz) * 0.5, isz, isz), Color(0.78, 0.55, 0.32), 1.2 * _s)
-	var lt := "Lumber %d" % int(_state.get("wood", 0))
-	_txt(rx + isz + 6 * _s, foot_y, lt, f_foot, C_TEXT)
-	if _state.has("helpers"):
-		rx = x + w * 0.5
-		Sym.draw(self, "worker", Rect2(rx, foot_y + (foot_h - isz) * 0.5, isz, isz), C_TEAL, 1.2 * _s)
-		_txt(rx + isz + 6 * _s, foot_y, "Helpers %s" % str(_state.helpers), f_foot, C_TEXT)
+	var isz := foot_h * 0.9
+	var resources := [["mana", "Essence %d" % int(_state.get("essence", 0)), C_TEAL],
+		["log", "Lumber %d" % int(_state.get("wood", 0)), Color(0.78, 0.55, 0.32)],
+		["worker", "Helpers %s" % str(_state.get("helpers", 0)), C_TEAL]]
+	for index in resources.size():
+		var rx := x + w * float(index) / 3.0
+		Sym.draw(self, resources[index][0], Rect2(rx, foot_y + (foot_h - isz) * 0.5, isz, isz), resources[index][2], 1.2 * _s)
+		var label_width := w / 3.0 - isz - 8 * _s
+		var label := _fit(resources[index][1], label_width, f_foot, 1, f_foot - 1)
+		_draw_fit(rx + isz + 4 * _s, foot_y, label, C_TEXT)
+
 
 
 func _row(kind: String, text: String, x: float, y: float, w: float, fs: int, col: Color, icol: Color) -> float:
@@ -695,7 +697,7 @@ func _draw_cards() -> void:
 		# mana cost (icon + number); red when unaffordable
 		if float(e.mana) > 0.0 and ready and not _stacked:
 			var f_cost := _fs(12.0 if not _compact else 11.0)
-			var cs := str(int(e.mana))
+			var cs := str(int(e.mana)) if float(e.mana) == floorf(float(e.mana)) else String.num(float(e.mana), 2)
 			var ccol := C_WARN if poor else C_TEAL
 			var cw := _font.get_string_size(cs, HORIZONTAL_ALIGNMENT_LEFT, -1, f_cost).x
 			var clh := _font.get_height(f_cost)

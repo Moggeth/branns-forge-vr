@@ -8,6 +8,7 @@ const HeroPip = preload("res://world_builder_pip.gd")
 const DualLayout = preload("res://dual_view_layout.gd")
 const ViewChrome = preload("res://dual_view_chrome.gd")
 const Targeting = preload("res://world_builder_targeting.gd")
+const Spells = preload("res://world_builder_spells.gd")
 const SpellAtlas = preload("res://assets/worldbuilder/icons/spell-atlas.png")
 const LINE_ACTIONS = ["path", "sunder", "forest", "wall", "fault", "bridge", "ramp", "stairs", "boardwalk"]
 const ICON_INDICES = {"path":0,"sunder":1,"raise":2,"wall":3,"meteor":4,"fault":5,
@@ -42,6 +43,7 @@ var hero_focus := false
 var quick_cast_enabled := true
 var quick_cast_key := -1
 var quick_cast_action := ""
+var rat_stream_mouse := false
 var layout_mode := "pip"
 var split_left := "fps"
 var split_ratio := 0.5
@@ -152,12 +154,17 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 		initial_position = Window.WINDOW_INITIAL_POSITION_ABSOLUTE
 		position = preferred_window_position
 	current_zone = str(game.adventure.zone)
-	if current_zone != builder.ZONE:
+	if current_zone == "orchard_planet":
+		selected = "raise"
+		palette = "land"
+		zoom = 95.0
+	elif current_zone != builder.ZONE:
 		selected = "patrol"
 		palette = "encounters"
 		zoom = 40.0
 	var active_center: Vector3 = game.scene.zones.get(current_zone, {}).get("center", builder.center)
 	focus_point = builder.center + Vector3(19, 0, -39) if current_zone == builder.ZONE else active_center
+	if _planet_active(): _set_planet_focus(game.camera.global_position)
 	tactical_viewport = SubViewport.new()
 	tactical_viewport.name = "BuilderSharedWorld"
 	tactical_viewport.size = Vector2i(832, 520)
@@ -179,6 +186,7 @@ func setup(owner_game: Node3D, owner_builder: Node) -> void:
 	var illustrated: Node3D = preload("res://world_builder_targeting_art.gd").new()
 	set_target_visual(illustrated)
 	illustrated.setup(game)
+	illustrated.visible = not _planet_active()
 	last_target_state = {}
 	_publish_targeting()
 	size_changed.connect(_layout_ui)
@@ -232,6 +240,13 @@ func tick(delta: float) -> void:
 		tactical_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var axis := Vector3.ZERO
 	if current_zone != str(game.adventure.zone): _change_region(str(game.adventure.zone))
+	if game.get("god_role") != null and game.god_role.stream_active:
+		if has_focus() and not hero_focus:
+			var stream_point := _cursor_target()
+			game.god_role.update_rat_target(_region_origin() + stream_point if stream_point != Vector3.INF else Vector3.INF)
+		else:
+			_cancel_quick_cast()
+
 	if view_chrome != null:
 		view_chrome.update_layout(layout_mode,hero_focus,_pointer_captured(),split_ratio,pane_layout,ui_scale,quick_cast_enabled)
 	if has_focus() and not hero_focus and not (game.get("travel_navigation")!=null and game.travel_navigation.is_open_for(self)):
@@ -241,17 +256,25 @@ func tick(delta: float) -> void:
 		if Input.is_key_pressed(KEY_D): axis.x += 1
 	if axis.length_squared() > 0:
 		follow_hero = false
-		var forward := Vector3(-sin(yaw), 0, -cos(yaw))
-		var right := Vector3(cos(yaw), 0, -sin(yaw))
-		focus_point += (right * axis.x - forward * axis.z).normalized() * delta * zoom * 0.42
-		var bounds: Rect2 = game.scene.zones.get(current_zone, {}).get("bounds", Rect2(Vector2(builder.center.x-132,builder.center.z-132),Vector2(264,264)))
-		focus_point.x = clampf(focus_point.x,bounds.position.x,bounds.end.x)
-		focus_point.z = clampf(focus_point.z,bounds.position.y,bounds.end.y)
+		if _planet_active():
+			var radial: Vector3 = (focus_point - game.orchard_planet.center).normalized()
+			var tangent: Vector3 = (camera.global_basis.x * axis.x - camera.global_basis.y * axis.z).normalized()
+			var next_direction: Vector3 = (radial + tangent * delta * zoom * 0.42 / game.orchard_planet.fields.radius).normalized()
+			_set_planet_focus(game.orchard_planet.center + game.orchard_planet.fields.surface_point(next_direction))
+		else:
+			var forward := Vector3(-sin(yaw), 0, -cos(yaw))
+			var right := Vector3(cos(yaw), 0, -sin(yaw))
+			focus_point += (right * axis.x - forward * axis.z).normalized() * delta * zoom * 0.42
+			var bounds: Rect2 = game.scene.zones.get(current_zone, {}).get("bounds", Rect2(Vector2(builder.center.x-132,builder.center.z-132),Vector2(264,264)))
+			focus_point.x = clampf(focus_point.x,bounds.position.x,bounds.end.x)
+			focus_point.z = clampf(focus_point.z,bounds.position.y,bounds.end.y)
 		_position_camera()
 	elif follow_hero and is_instance_valid(game.camera):
 		var hero_at: Vector3 = game.camera.global_position
-		if focus_point.distance_to(Vector3(hero_at.x, 0, hero_at.z)) > 0.05:
-			focus_point = Vector3(hero_at.x, 0, hero_at.z)
+		var wanted: Vector3 = hero_at if _planet_active() else Vector3(hero_at.x, 0, hero_at.z)
+		if focus_point.distance_to(wanted) > 0.05:
+			if _planet_active(): _set_planet_focus(wanted)
+			else: focus_point = wanted
 			_position_camera()
 	if quick_cast_key >= 0: hovered = _cursor_target()
 	_refresh_ui()
@@ -300,9 +323,18 @@ func _position_camera() -> void:
 	var was_arriving := arrival_elapsed < ARRIVAL_SECONDS
 	var current_transform := camera.global_transform
 	var current_fov := camera.fov
-	var horizontal := cos(pitch) * zoom
-	camera.global_position = focus_point + Vector3(sin(yaw) * horizontal, sin(pitch) * zoom, cos(yaw) * horizontal)
-	camera.look_at(focus_point, Vector3.UP)
+	if _planet_active():
+		var direction := Vector3(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw)).normalized()
+		var planet = game.orchard_planet
+		focus_point = planet.center + planet.fields.surface_point(direction)
+		camera.global_position = planet.center + direction * (planet.fields.radius + zoom)
+		var north := Vector3.UP - direction * direction.y
+		if north.length_squared() < 0.0001: north = Vector3.FORWARD - direction * direction.z
+		camera.look_at(focus_point, north.normalized())
+	else:
+		var horizontal := cos(pitch) * zoom
+		camera.global_position = focus_point + Vector3(sin(yaw) * horizontal, sin(pitch) * zoom, cos(yaw) * horizontal)
+		camera.look_at(focus_point, Vector3.UP)
 	if was_arriving:
 		arrival_from = current_transform
 		arrival_to = camera.global_transform
@@ -313,6 +345,34 @@ func _position_camera() -> void:
 		camera.fov = current_fov
 	else:
 		camera.fov = 56.0
+
+func _planet_active() -> bool:
+	return current_zone == "orchard_planet" and is_instance_valid(game) and game.get("orchard_planet") != null
+
+func _preview_parent() -> Node3D:
+	if _planet_active() and is_instance_valid(game.orchard_planet.root): return game.orchard_planet.root
+	return game.adventure.zone_groups.get(current_zone, game)
+
+func _planet_action(action: String) -> String:
+	match action:
+		"meteor": return "starfall"
+		"ring": return "treering"
+		"forest": return "forestline"
+		"path", "wall", "fault", "raise", "sunder", "grove", "patrol", "duelist", "shield_patrol", "rat_swarm", "ghosts", "golem": return action
+	return ""
+
+func _set_planet_focus(world_point: Vector3) -> void:
+	if not _planet_active(): return
+	var direction: Vector3 = (world_point - game.orchard_planet.center).normalized()
+	if direction == Vector3.ZERO: direction = Vector3.UP
+	yaw = atan2(direction.x, direction.z)
+	pitch = asin(clampf(direction.y, -1.0, 1.0))
+	focus_point = game.orchard_planet.center + game.orchard_planet.fields.surface_point(direction)
+
+func _planet_tangent(direction: Vector3) -> Vector3:
+	var tangent := Vector3.UP - direction * direction.y
+	if tangent.length_squared() < 0.0001: tangent = Vector3.FORWARD - direction * direction.z
+	return tangent.normalized()
 
 func _start_arrival() -> void:
 	if not is_instance_valid(game.camera): return
@@ -603,7 +663,7 @@ func set_target_visual(visual: Node3D) -> void:
 	## Optional art module: update_targeting(targeting_state) runs on hover changes.
 	if is_instance_valid(target_visual): target_visual.queue_free()
 	target_visual = visual
-	if visual != null: game.adventure.zone_groups[current_zone].add_child(visual)
+	if visual != null: _preview_parent().add_child(visual)
 	last_target_state = {}
 	_publish_targeting()
 
@@ -722,7 +782,10 @@ func _availability(action: String) -> String:
 func _refresh_ui() -> void:
 	if status_label == null: return
 	title_label.text = str(game.scene.zones.get(current_zone,{}).get("name","Shared World")).to_upper()+" · RTS"
-	status_label.text = "%d gems · %d star iron · Tab focus · M map" % [int(builder.data.star_gems),int(builder.data.star_iron)] if top_panel.size.x < 980.0 else "Seed %d · %d earth edits · %d gems · %d star iron · %.1f ms/frame   |   WASD pan · drag orbit · wheel zoom · Tab focus" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.star_gems), int(builder.data.star_iron), frame_ms_ema]
+	if _planet_active():
+		status_label.text = "Mana %.1f · Seed %d · %d planet edits · WASD orbit · drag orbit · wheel zoom · Tab focus" % [float(builder.data.mana), int(game.orchard_planet.fields.seed), int(game.orchard_planet.fields.revision)]
+	else:
+		status_label.text = "%d gems · %d star iron · Tab focus · M map" % [int(builder.data.star_gems),int(builder.data.star_iron)] if top_panel.size.x < 980.0 else "Seed %d · %d earth edits · %d gems · %d star iron · %.1f ms/frame   |   WASD pan · drag orbit · wheel zoom · Tab focus" % [game.landscape.seed, game.landscape.operation_count(), int(builder.data.star_gems), int(builder.data.star_iron), frame_ms_ema]
 	follow_button.text = "F  Following Hero" if follow_hero else "F  Find Hero"
 	var availability := {}
 	var cooldowns := {}
@@ -743,8 +806,9 @@ func _refresh_ui() -> void:
 			words = "Route %.1f m · %.0f Mana" % [_line_start().distance_to(hovered), cost]
 		elif selected == "awaken" and str(plan.get("risk", "")) != "": words = str(plan.risk)
 	command_panel.update_state({"mana":float(builder.data.mana),"max_mana":20.0,
+		"essence":int(builder.data.get("god_essence", 0)),
 		"wood":int(builder.data.wood),"selected":selected,"palette":palette,"spell_cost":cost,
-		"feedback":words,"seed":game.landscape.seed,"helpers":int(builder.data.workers),
+		"feedback":words,"seed":game.orchard_planet.fields.seed if _planet_active() else game.landscape.seed,"helpers":game.god_workers.active_workers() if _planet_active() else int(builder.data.workers),
 		"availability":availability,"cooldowns":cooldowns,"regen":game.tuning.value("worldbuilder.mana_regen_multiplier")})
 
 func select_action(action: String) -> void:
@@ -753,7 +817,7 @@ func select_action(action: String) -> void:
 	if entry.is_empty() or not Targeting.is_targetable(entry):
 		show_error("This action is not available yet.")
 		return
-	if action == "hire":
+	if action == "hire" and game.get("god_role") == null:
 		var hire_problem := _availability(action)
 		if hire_problem != "": show_error(hire_problem)
 		else:
@@ -770,7 +834,8 @@ func select_action(action: String) -> void:
 	_refresh_ui()
 
 func _gesture(action: String) -> String:
-	if action == "hire": return "Acts instantly at the work site."
+	if action == "rat_swarm": return "Hold its number or left mouse at the cursor. Release to stop."
+	if action == "hire": return "Point beside a tree to summon a lumberjack."
 	if quick_cast_enabled:
 		return "Hold its number to start a line; release to cast. Or click/drag." if action in LINE_ACTIONS else "Press its number to cast under the cursor. Or click a place."
 	return "Choose two endpoints or drag a line." if action in LINE_ACTIONS else "Click a place in the world."
@@ -834,21 +899,21 @@ func _build_preview() -> void:
 	preview_invalid = _preview_material(Color("ed8065"))
 	marker.material_override = preview_valid
 	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[current_zone].add_child(marker)
+	_preview_parent().add_child(marker)
 	marker.visible = false
 	route_preview = MeshInstance3D.new()
 	route_preview.name = "SurveyRoutePreview"
 	route_preview.mesh = BoxMesh.new()
 	route_preview.material_override = preview_valid
 	route_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[current_zone].add_child(route_preview)
+	_preview_parent().add_child(route_preview)
 	route_preview.visible = false
 	preview_boundary = MeshInstance3D.new()
 	preview_boundary.name = "SurveyFootprint"
 	preview_boundary.mesh = ImmediateMesh.new()
 	preview_boundary.material_override = preview_valid
 	preview_boundary.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	game.adventure.zone_groups[current_zone].add_child(preview_boundary)
+	_preview_parent().add_child(preview_boundary)
 	preview_boundary.visible = false
 
 func _preview_material(color: Color) -> StandardMaterial3D:
@@ -865,6 +930,26 @@ func _line_start() -> Vector3:
 
 func _preview_plan() -> Dictionary:
 	if selected == "": return {}
+	if _planet_active():
+		var plan: Dictionary = Targeting.spec(selected)
+		var reason := _availability(selected)
+		plan["id"] = selected
+		plan["reason"] = reason
+		plan["valid"] = reason == ""
+		if hovered == Vector3.INF: return plan
+		var begin: Vector3 = _line_start()
+		var action := _planet_action(selected)
+		if action == "": return plan
+		var world_start := _region_origin() + begin if begin != Vector3.INF else Vector3.INF
+		var result: Dictionary = game.orchard_planet.preview(action, _region_origin() + hovered, world_start)
+		if not result.get("ok", false):
+			plan["reason"] = str(result.get("error", "This spell cannot reach that surface."))
+			plan["valid"] = false
+		else:
+			for key in ["position", "normal", "radius", "length", "direction", "axis"]:
+				if result.has(key): plan[key] = result[key]
+			if selected in LINE_ACTIONS: plan["stage"] = "start" if begin == Vector3.INF else "end"
+		return plan
 	return Targeting.plan(selected, _line_start(), hovered, builder, game, _availability(selected), current_zone)
 
 func targeting_state() -> Dictionary:
@@ -883,7 +968,7 @@ func targeting_state() -> Dictionary:
 		if state.has(key): footprint[key] = state[key]
 	state["footprint"] = footprint
 	state["selected"] = selected
-	state["terrain_revision"] = game.landscape.world_revision
+	state["terrain_revision"] = game.orchard_planet.fields.revision if _planet_active() else game.landscape.world_revision
 	return state
 
 func _publish_targeting() -> void:
@@ -891,10 +976,14 @@ func _publish_targeting() -> void:
 	if state == last_target_state: return
 	last_target_state = state.duplicate(true)
 	targeting_changed.emit(state)
-	if is_instance_valid(target_visual) and target_visual.has_method("update_targeting"):
+	if not _planet_active() and is_instance_valid(target_visual) and target_visual.has_method("update_targeting"):
 		target_visual.call("update_targeting", state)
 
 func _ground_preview(local: Vector3) -> Vector3:
+	if _planet_active():
+		var direction := local.normalized()
+		if direction == Vector3.ZERO: return game.orchard_planet.center
+		return game.orchard_planet.center + game.orchard_planet.fields.surface_point(direction) + game.orchard_planet.fields.normal_at(direction) * 0.18
 	if current_zone == builder.ZONE:
 		return builder.center + Vector3(local.x, game.landscape.height_at(Vector2(local.x,local.z)) + 0.18,local.z)
 	var world_point := _region_origin() + local
@@ -909,6 +998,19 @@ func _boundary_line(mesh: ImmediateMesh, a: Vector3, b: Vector3) -> void:
 	mesh.surface_add_vertex(b)
 
 func _preview_circle(mesh: ImmediateMesh, point: Vector3, radius: float, segments: int = 48) -> void:
+	if _planet_active():
+		var direction := point.normalized()
+		var east := direction.cross(Vector3.UP).normalized()
+		if east.length_squared() < 0.0001: east = direction.cross(Vector3.RIGHT).normalized()
+		var north := east.cross(direction).normalized()
+		var angle: float = radius / game.orchard_planet.fields.radius
+		for i in segments:
+			var theta_a := TAU * float(i) / float(segments)
+			var theta_b := TAU * float(i + 1) / float(segments)
+			var a: Vector3 = (direction * cos(angle) + (east * cos(theta_a) + north * sin(theta_a)) * sin(angle)).normalized()
+			var b: Vector3 = (direction * cos(angle) + (east * cos(theta_b) + north * sin(theta_b)) * sin(angle)).normalized()
+			_boundary_line(mesh, _ground_preview(a), _ground_preview(b))
+		return
 	for i in segments:
 		var a := point + Vector3(cos(TAU * i / segments), 0, sin(TAU * i / segments)) * radius
 		var b := point + Vector3(cos(TAU * (i + 1) / segments), 0, sin(TAU * (i + 1) / segments)) * radius
@@ -925,7 +1027,7 @@ func _update_preview() -> void:
 	_publish_targeting()
 	var spec: Dictionary = last_target_state.get("footprint", {})
 	var showing := hovered != Vector3.INF and selected != "" and not spec.is_empty() and str(spec.kind) != "instant"
-	var art_active := is_instance_valid(target_visual) and target_visual.has_method("update_targeting")
+	var art_active := not _planet_active() and is_instance_valid(target_visual) and target_visual.has_method("update_targeting")
 	marker.visible = showing and not art_active
 	preview_boundary.visible = showing and not art_active
 	route_preview.visible = false
@@ -942,6 +1044,18 @@ func _update_preview() -> void:
 	marker.material_override = skin
 	preview_boundary.material_override = skin
 	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	if _planet_active():
+		marker.global_basis = Basis.looking_at(_planet_tangent(hovered.normalized()), game.orchard_planet.fields.normal_at(hovered.normalized()))
+		var planet_start := _line_start()
+		if selected in LINE_ACTIONS and planet_start != Vector3.INF:
+			var a_dir := planet_start.normalized()
+			var b_dir := hovered.normalized()
+			for index in 32:
+				_boundary_line(mesh, _ground_preview(a_dir.slerp(b_dir, float(index) / 32.0)), _ground_preview(a_dir.slerp(b_dir, float(index + 1) / 32.0)))
+			_preview_circle(mesh, planet_start, 0.7, 20)
+		_preview_circle(mesh, hovered, float(plan.get("radius", spec.get("radius", 2.0))))
+		mesh.surface_end()
+		return
 	var start := _line_start()
 	if selected in LINE_ACTIONS and start != Vector3.INF:
 		var direction := Vector2(hovered.x - start.x, hovered.z - start.z).normalized()
@@ -1014,8 +1128,21 @@ func _world_at(screen: Vector2) -> Vector3:
 	var scaled: Vector2 = (screen-content.position)*Vector2(tactical_viewport.size)/content.size
 	var origin := camera.project_ray_origin(scaled)
 	var direction := camera.project_ray_normal(scaled)
+	var hit := {}
+	if _planet_active():
+		var excluded: Array[RID] = []
+		for attempt in 32:
+			var sphere_query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 700.0, 1, excluded)
+			hit = game.get_world_3d().direct_space_state.intersect_ray(sphere_query)
+			if hit.is_empty(): break
+			if game.orchard_planet.terrain.is_ancestor_of(hit.collider): break
+			excluded.append(hit.collider.get_rid())
+		if hit.is_empty() or not game.orchard_planet.terrain.is_ancestor_of(hit.collider): return Vector3.INF
+		var radial: Vector3 = (hit.position - game.orchard_planet.center).normalized()
+		if hit.normal.dot(radial) < 0.35: return Vector3.INF
+		return hit.position - game.orchard_planet.center
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 700.0, 1)
-	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+	hit = game.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty(): return Vector3.INF
 	if hit.normal.y < 0.4: return Vector3.INF
 	var origin_center := _region_origin()
@@ -1028,6 +1155,18 @@ func _act(local: Vector3) -> void:
 	var available := _availability(selected)
 	if available != "": show_error(available); return
 	var result := ""
+	if game.get("god_role") != null and selected in ["rat_swarm", "patrol", "hire"]:
+		var response: Dictionary
+		match selected:
+			"rat_swarm":
+				response = game.god_role.start_rat_stream(_region_origin() + local, current_zone)
+				rat_stream_mouse = bool(response.get("ok", false))
+			"patrol": response = game.god_role.cast_skeleton(_region_origin() + local, current_zone)
+			"hire": response = game.god_role.cast_workers(_region_origin() + local, current_zone)
+		if not response.get("ok", false): show_error(str(response.get("error", "Could not cast.")))
+		else: _say("Rat Stream · release to stop." if selected == "rat_swarm" else "Summoned into the shared world.")
+		_refresh_ui()
+		return
 	if selected in LINE_ACTIONS:
 		if first_point == Vector3.INF:
 			first_point = local
@@ -1036,7 +1175,9 @@ func _act(local: Vector3) -> void:
 		result = _cast_line(first_point,local)
 		if result == "": first_point = Vector3.INF
 	else:
-		if selected in ["patrol","duelist","shield_patrol","rat_swarm","ghosts","golem"]:
+		if _planet_active():
+			result = _planet_cast(selected, local)
+		elif selected in ["patrol","duelist","shield_patrol","rat_swarm","ghosts","golem"]:
 			result = builder.summon_encounter(selected,_region_origin()+local,current_zone)
 		else:
 			match selected:
@@ -1056,6 +1197,7 @@ func _act(local: Vector3) -> void:
 	_refresh_ui()
 
 func _cast_line(a: Vector3,b: Vector3) -> String:
+	if _planet_active(): return _planet_cast(selected, b, a)
 	match selected:
 		"path": return builder.carve_path(a,b)
 		"sunder": return builder.cast_sunder(a,b)
@@ -1064,6 +1206,24 @@ func _cast_line(a: Vector3,b: Vector3) -> String:
 		"fault": return builder.cast_prism_fault(a,b)
 		"bridge","ramp","stairs","boardwalk": return builder.construct(selected,a,b)
 	return "Unknown line spell."
+
+func _planet_cast(action: String, local: Vector3, start: Vector3 = Vector3.INF) -> String:
+	var mapped := _planet_action(action)
+	if mapped == "": return "This action is not yet available on the Orchard Planet."
+	var ready: String = builder.spells.begin(action, builder)
+	if ready != "": return ready
+	var world_start := _region_origin() + start if start != Vector3.INF else Vector3.INF
+	var cast_result: Dictionary = game.orchard_planet.cast(mapped, _region_origin() + local, world_start)
+	if not cast_result.get("ok", false): return str(cast_result.get("error", "The planet spell failed."))
+	var item := Spells.entry(action)
+	if action == "wall" and int(builder.data.get("star_iron", 0)) >= 2:
+		builder.data.star_iron -= 2
+	else:
+		builder.data.mana = maxf(0.0, float(builder.data.mana) - float(item.get("mana", 0.0)))
+	if int(item.get("gems", 0)) > 0: builder.data.star_gems -= int(item.gems)
+	builder.spells.success(action, builder)
+	builder._changed("%s shaped the Orchard Planet." % item.title)
+	return ""
 
 func _input(event: InputEvent) -> void:
 	if not visible or not has_focus() or returning_to_hero: return
@@ -1085,6 +1245,8 @@ func _cursor_target() -> Vector3:
 	return _world_at(get_mouse_position())
 
 func _cancel_quick_cast() -> void:
+	rat_stream_mouse = false
+	if is_instance_valid(game) and game.get("god_role") != null: game.god_role.stop_rat_stream()
 	var armed := quick_cast_key >= 0
 	quick_cast_key = -1
 	quick_cast_action = ""
@@ -1134,6 +1296,14 @@ func _quick_cast_input(event: InputEventKey) -> bool:
 		spell_drag_start = Vector3.INF
 		_say("Start set · hold the key to aim, release to cast. Esc cancels.")
 		_refresh_ui()
+	elif action == "rat_swarm" and game.get("god_role") != null:
+		quick_cast_key = code
+		quick_cast_action = action
+		var response: Dictionary = game.god_role.start_rat_stream(_region_origin() + hovered, current_zone)
+		if not response.get("ok", false):
+			_cancel_quick_cast()
+			show_error(str(response.get("error", "Could not start Rat Stream.")))
+		else: _say("Rat Stream · release the number to stop.")
 	else:
 		_act(hovered)
 	_update_preview()
@@ -1141,6 +1311,10 @@ func _quick_cast_input(event: InputEventKey) -> bool:
 
 func _route_input(event: InputEvent) -> void:
 	# Separate native focus gating from save-free, unfocusable UI verification.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and rat_stream_mouse:
+		_cancel_quick_cast()
+		set_input_as_handled()
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]: _cancel_quick_cast()
 	if event is InputEventKey and event.pressed and not event.echo:
 		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
@@ -1209,7 +1383,7 @@ func _route_input(event: InputEvent) -> void:
 			elif not event.pressed and spell_drag_start != Vector3.INF:
 				var start := first_point if first_point != Vector3.INF else spell_drag_start
 				spell_drag_start = Vector3.INF
-				if location != Vector3.INF and Vector2(start.x,start.z).distance_to(Vector2(location.x,location.z)) >= 3.0:
+				if location != Vector3.INF and _line_distance(start, location) >= 3.0:
 					var result := _cast_line(start,location)
 					if result == "": first_point = Vector3.INF
 					else: first_point = start
@@ -1230,12 +1404,16 @@ func _route_input(event: InputEvent) -> void:
 			set_input_as_handled()
 			return
 		hovered = _world_at(event.position)
+		if game.get("god_role") != null:
+			if hovered != Vector3.INF and not dragging:
+				game.god_role.collect_near(_region_origin() + hovered)
+			game.god_role.update_rat_target(_region_origin() + hovered if hovered != Vector3.INF else Vector3.INF)
 		if dragging:
 			follow_hero = false
 			var movement: Vector2 = event.position - last_mouse
 			last_mouse = event.position
 			yaw -= movement.x * 0.006
-			pitch = clampf(pitch + movement.y * 0.004,0.42,1.36)
+			pitch = clampf(pitch + movement.y * 0.004, -PI * 0.5 if _planet_active() else 0.42, PI * 0.5 if _planet_active() else 1.36)
 			_position_camera()
 			set_input_as_handled()
 
@@ -1253,19 +1431,31 @@ func _hero_point(point: Vector2) -> bool:
 	return true
 
 func _region_origin() -> Vector3:
+	if _planet_active(): return game.orchard_planet.center
 	if game.get("scene") is Dictionary: return game.scene.zones.get(current_zone,{}).get("center",builder.center)
 	return builder.center
+
+func _line_distance(a: Vector3, b: Vector3) -> float:
+	if _planet_active():
+		return game.orchard_planet.fields.radius * acos(clampf(a.normalized().dot(b.normalized()), -1.0, 1.0))
+	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 
 func _change_region(zone: String) -> void:
 	_cancel_quick_cast()
 	current_zone = zone
 	focus_point = _region_origin()
 	first_point = Vector3.INF; spell_drag_start = Vector3.INF; hovered = Vector3.INF
-	if zone != builder.ZONE:
+	if _planet_active():
+		zoom = 95.0
+		selected = "raise"
+		palette = "land"
+		_set_planet_focus(game.camera.global_position)
+	elif zone != builder.ZONE:
 		zoom = 40.0
 		_select_palette("encounters")
 	for visual in [marker,route_preview,preview_boundary,target_visual]:
-		if is_instance_valid(visual) and game.adventure.zone_groups.has(zone): visual.reparent(game.adventure.zone_groups[zone])
+		if is_instance_valid(visual): visual.reparent(_preview_parent())
+	if is_instance_valid(target_visual): target_visual.visible = not _planet_active()
 	last_target_state = {}
 	_position_camera()
 	_publish_targeting()

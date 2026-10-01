@@ -267,7 +267,8 @@ func _step_stream(record:Dictionary,delta:float):
 		var advance:float=float(drop.get("advance",delta))
 		drop.erase("advance")
 		drop.age+=advance
-		drop.velocity=drop.velocity*exp(-0.4*advance)+Vector3.DOWN*STREAM_GRAVITY*advance
+		var local_down:Vector3=game.gravity_direction_at(start) if game.has_method("gravity_direction_at") else Vector3.DOWN
+		drop.velocity=drop.velocity*exp(-0.4*advance)+local_down*STREAM_GRAVITY*advance
 		var finish=start+drop.velocity*advance
 		drop.travel+=finish.distance_to(start)
 		var query=PhysicsRayQueryParameters3D.create(start,finish,1)
@@ -280,7 +281,8 @@ func _step_stream(record:Dictionary,delta:float):
 			var struck=game._owner(hit.collider)
 			if struck!=null and str(struck.get_meta("kind","")) in ["enemy","rat"]:
 				_hurt(struck,drop.velocity.normalized())
-			if hit.normal.y > 0.55:
+			var impact_up:Vector3=game.local_up_at(hit.position) if game.has_method("local_up_at") else Vector3.UP
+			if hit.normal.dot(impact_up) > 0.55:
 				# Ground packets get their own cadence. A wall or enemy hit must not
 				# consume the next floor splash's chance to leave burning fuel.
 				if game.elapsed >= next_ground_patch:
@@ -307,7 +309,8 @@ func _damage_stream(record:Dictionary):
 	# impact cannot be burned through by an invisible straight cone.
 	for enemy in game.scene.rats + game.scene.get("enemies", []) + game.scene.dummies:
 		if not is_instance_valid(enemy) or not enemy.is_visible_in_tree() or not enemy.get_meta("alive",true): continue
-		var point=enemy.global_position+Vector3.UP*0.65
+		var enemy_up:Vector3=game.local_up_at(enemy.global_position) if game.has_method("local_up_at") else Vector3.UP
+		var point=enemy.global_position+enemy_up*0.65
 		for drop in record.drops:
 			if point.distance_to(drop.position)>0.42+float(drop.age)*0.18: continue
 			_hurt(enemy,drop.velocity.normalized())
@@ -325,7 +328,8 @@ func _hurt(enemy:Node3D,direction:Vector3):
 func _damage_cone(origin: Vector3, direction: Vector3, length: float):
 	for enemy in game.scene.rats + game.scene.get("enemies", []) + game.scene.dummies:
 		if not is_instance_valid(enemy) or not enemy.is_visible_in_tree() or not enemy.get_meta("alive", true): continue
-		var point = enemy.global_position + Vector3.UP * 0.7
+		var enemy_up:Vector3=game.local_up_at(enemy.global_position) if game.has_method("local_up_at") else Vector3.UP
+		var point = enemy.global_position + enemy_up * 0.7
 		var along = (point - origin).dot(direction)
 		if along < 0 or along > length + 0.5: continue
 		if point.distance_to(origin + direction * clampf(along, 0, length)) > 0.42 + along * 0.10: continue
@@ -374,7 +378,8 @@ func _ignite_surface(hit: Dictionary):
 	var kind=str(target.get_meta("kind","")) if target!=null else ""
 	# Ground impacts join the very same spreading liquid-fire simulation as a
 	# thrown Emberdew bottle, rather than showing a separate billboard patch.
-	if hit.normal.y>0.55 and kind not in ["enemy","rat"] and game.firecraft!=null and game.firecraft.fluid!=null:
+	var impact_up:Vector3=game.local_up_at(position) if game.has_method("local_up_at") else Vector3.UP
+	if game.adventure.zone!="orchard_planet" and hit.normal.dot(impact_up)>0.55 and kind not in ["enemy","rat"] and game.firecraft!=null and game.firecraft.fluid!=null:
 		if game.firecraft.fluid.pour(position,game.adventure.zone,GROUND_FUEL,true)>0:
 			game.firecraft.fluid.ignite_near(position,0.34)
 			return
@@ -392,6 +397,7 @@ func _ignite_surface(hit: Dictionary):
 	root.name = "WyrmspoutLingeringFire"
 	parent.add_child(root)
 	root.global_position = position + hit.normal * 0.025
+	root.global_basis = Basis(Quaternion(Vector3.UP, impact_up))
 	var light = OmniLight3D.new()
 	light.omni_range = 1.3
 	light.light_color = Color("ff7a2c")
@@ -435,7 +441,8 @@ func _update_patches(delta: float):
 				if enemy.get_meta("enemy_type", "") == "ghost": game.firecraft.hurt_ghost(enemy,24,"fire")
 				elif enemy.get_meta("kind", "") == "rat": game._kill_rat(enemy)
 				else: game.adventure.hurt_enemy(enemy, 7, null, Vector3.ZERO, "fire")
-			if game.elapsed >= next_player_hurt and (game.camera.global_position - Vector3.UP * 1.5).distance_to(source) < 0.6:
+			var player_up:Vector3=game.local_up_at(game.camera.global_position) if game.has_method("local_up_at") else Vector3.UP
+			if game.elapsed >= next_player_hurt and (game.camera.global_position - player_up * 1.5).distance_to(source) < 0.6:
 				next_player_hurt = game.elapsed + 1.2
 				game.adventure.take_damage(4, "Wyrmspout flame")
 

@@ -18,6 +18,16 @@ func setup(owner):
 	update_shoulder()
 func update_shoulder():
 	var camera=fairy.game.camera
+	if fairy._on_planet():
+		var up:Vector3=fairy._local_up(camera.global_position)
+		var forward:Vector3=(-camera.global_basis.z).slide(up)
+		forward=fairy._tangent_heading(up,forward)
+		shoulder.global_basis=Basis.looking_at(forward,up)
+		if fairy.game.player_avatar!=null:
+			shoulder.global_position=fairy.game.player_avatar.shoulder_position()
+		else:
+			shoulder.global_position=camera.global_position+shoulder.global_basis*Vector3(.28,-.27,.08)
+		return
 	var yaw=Basis(Vector3.UP,camera.global_rotation.y)
 	if fairy.game.player_avatar!=null:
 		shoulder.global_position=fairy.game.player_avatar.shoulder_position()
@@ -43,11 +53,11 @@ func tick(dt):
 	borrowed.light_energy=amount*.65; seed.visible=amount>0 or fairy.avatar.global_position.distance_to(shoulder.global_position)<1.5
 	seed.scale=Vector3(.036,.035,.036)*(1+.12*sin(fairy.game.elapsed*3))
 	if amount>0 and fairy.game.elapsed>last_spark:
-		last_spark=fairy.game.elapsed+.14; fairy.art.sprinkle(shoulder.global_position,Vector3.UP*.07,Color("a5e8ff"),.8)
+		last_spark=fairy.game.elapsed+.14; fairy.art.sprinkle(shoulder.global_position,fairy._local_up(shoulder.global_position)*.07,Color("a5e8ff"),.8)
 func perch_on_shoulder():
 	update_shoulder()
 	if fairy.health<=0 or fairy.recall: return
-	if fairy.perch==shoulder: fairy.detach(Vector3.UP*.5); return
+	if fairy.perch==shoulder: fairy.detach(fairy._local_up(shoulder.global_position)*.5); return
 	if fairy.avatar.global_position.distance_to(shoulder.global_position)>.8: fairy.note("Fly beside your friend's shoulder, then F / A to perch (or H / D-pad down + A)."); return
 	if not fairy._clear(fairy.avatar.global_position,shoulder.global_position): fairy.note("Come around to the open shoulder."); return
 	fairy.attach(shoulder)

@@ -207,7 +207,8 @@ func fire()->bool:
 	var curve=Vector3.ZERO
 	if not curve_state.is_empty(): aim=-curve_state.basis.z; curve=curve_state.curve
 	arrow.reparent(game.adventure.zone_groups[game.adventure.zone])
-	arrow.global_basis=Basis.looking_at(aim,Vector3.RIGHT if absf(aim.y)>0.98 else Vector3.UP)
+	var launch_up:Vector3=game.local_up_at(arrow.global_position) if game.has_method("local_up_at") else Vector3.UP
+	arrow.global_basis=Basis.looking_at(aim,Vector3.RIGHT if absf(aim.dot(launch_up))>0.98 else launch_up)
 	arrow.global_position=_nock_position()
 	var wing:Node3D=wing_scene.instantiate(); game.adventure.zone_groups[game.adventure.zone].add_child(wing); wing.visible=false
 	var shot={"node":arrow,"wings":wing,"position":arrow.to_global(ARROW_TIP),"velocity":aim*_speed(draw),"curve":curve,"age":0.0,"hand":hand,"zone":game.adventure.zone,"until":game.elapsed+12.0,"damage":30+65*draw/MAX_DRAW}
@@ -338,7 +339,8 @@ func _draw_preview():
 	var age=0.0
 	preview_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	for i in 26:
-		var next=FLIGHT.step(position,velocity,curve_state.curve,age,1.0/45.0)
+		var down:Vector3=game.gravity_direction_at(position) if game.has_method("gravity_direction_at") else Vector3.DOWN
+		var next=FLIGHT.step(position,velocity,curve_state.curve,age,1.0/45.0,down)
 		preview_mesh.surface_add_vertex(position); preview_mesh.surface_add_vertex(next.position)
 		position=next.position; velocity=next.velocity; age=next.age
 	preview_mesh.surface_end()
@@ -350,12 +352,14 @@ func _tick_shots(delta:float):
 		var steps=mini(24,maxi(1,ceili(delta*180)))
 		for i in steps:
 			var dt=delta/steps
-			var next=FLIGHT.step(shot.position,shot.velocity,shot.curve,shot.age,dt)
+			var down:Vector3=game.gravity_direction_at(shot.position) if game.has_method("gravity_direction_at") else Vector3.DOWN
+			var next=FLIGHT.step(shot.position,shot.velocity,shot.curve,shot.age,dt,down)
 			var hit=game.enemy_contacts.sweep(shot.position,next.position)
 			shot.velocity=next.velocity; shot.age=next.age
 			shot.position=next.position if hit.is_empty() else hit.position
 			var direction:Vector3=shot.velocity.normalized()
-			shot.node.global_basis=Basis.looking_at(direction,Vector3.RIGHT if absf(direction.y)>0.98 else Vector3.UP)
+			var up:Vector3=-down
+			shot.node.global_basis=Basis.looking_at(direction,Vector3.RIGHT if absf(direction.dot(up))>0.98 else up)
 			shot.node.global_position=shot.position-shot.node.global_basis*ARROW_TIP
 			if not hit.is_empty():
 				_impact(shot,hit); break
@@ -364,7 +368,7 @@ func _tick_shots(delta:float):
 			shot.wings.visible=active
 			if active:
 				shot.wings.global_position=shot.node.to_global(Vector3(0,0,-0.36))
-				shot.wings.global_basis=FLIGHT.wing_basis(shot.velocity,shot.curve,shot.age)
+				shot.wings.global_basis=FLIGHT.wing_basis(shot.velocity,shot.curve,shot.age,game.local_up_at(shot.position) if game.has_method("local_up_at") else Vector3.UP)
 				var fade=sin(PI*clampf(shot.age/FLIGHT.CURVE_SECONDS,0,1))
 				shot.wings.scale=Vector3.ONE*maxf(0.002,fade*1.1)
 

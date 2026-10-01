@@ -468,7 +468,8 @@ func tick(delta):
 		var start=shot.node.to_global(shot.node.get_meta("tip",Vector3.UP*0.35))
 		var drag=maxf(0.00001,game.tuning.value("crossbow.drag"))
 		var decay=exp(-drag*delta)
-		var terminal=Vector3.DOWN*game.tuning.value("crossbow.gravity")/drag
+		var local_down:Vector3=game.gravity_direction_at(start) if game.has_method("gravity_direction_at") else Vector3.DOWN
+		var terminal=local_down*game.tuning.value("crossbow.gravity")/drag
 		var end=start+(shot.velocity-terminal)*(1.0-decay)/drag+terminal*delta
 		if shot.get("hot",false) and game.heat_contacts!=null:
 			var steps=mini(10,maxi(1,ceili(start.distance_to(end)/.6)))
@@ -477,7 +478,8 @@ func tick(delta):
 		shot.velocity=shot.velocity*decay+terminal*(1.0-decay)
 		var hit=_projectile_contact(start,end)
 		var forward=shot.velocity.normalized()
-		shot.node.global_basis=Basis.looking_at(forward,Vector3.RIGHT if absf(forward.dot(Vector3.UP))>0.98 else Vector3.UP)*Basis(Vector3.RIGHT,Vector3.FORWARD,Vector3.UP)
+		var local_up:Vector3=-local_down
+		shot.node.global_basis=Basis.looking_at(forward,Vector3.RIGHT if absf(forward.dot(local_up))>0.98 else local_up)*Basis(Vector3.RIGHT,Vector3.FORWARD,Vector3.UP)
 		var tip=shot.node.get_meta("tip",Vector3.UP*0.35)
 		shot.node.global_position=(end if hit.is_empty() else hit.position+forward*0.045)-shot.node.global_basis*tip
 		if not hit.is_empty():

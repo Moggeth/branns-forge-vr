@@ -3,6 +3,7 @@ extends Node
 const MapPanel = preload("res://travel_map_panel.gd")
 const Guide = preload("res://resource_guide.gd")
 const REGIONS := {
+	"orchard_planet": ["A whole little world. Walk around the globe, from orchard to alpine snow, crystal and desert.", "Local gravity; RTS Raise Earth, Sunder, Tree Ring, forest growth and Starfall alter this same planet."],
 	"forge_yard": ["Brann, the Living Workshop, your collection and common goods.", "Hero pouch and donation buckets; settlement stock stays separate."],
 	"orchard_highlands": ["One shared, editable landscape. Explore the hills, stream and magical landforms.", "Fallen logs: timber. Mine Starfall veins: star gems and star iron for world-building."],
 	"sandstone_quarry": ["Mine the stone faces with Stonewhisper.", "Stone and iron for the Hero's workshop."],

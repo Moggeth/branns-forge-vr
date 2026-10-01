@@ -127,6 +127,11 @@ var fairy
 var director
 var director_local_view
 var world_builder
+var orchard_planet
+var orchard_planet_motion
+var orchard_planet_check
+var god_role
+var god_workers
 var world_reset
 var landscape
 var orchard_spell_vfx: Node3D
@@ -213,6 +218,7 @@ func _ready():
 	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--landscape-check")
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--desktop-hero-preview="): diagnostic_offline=true
+	diagnostic_offline = diagnostic_offline or OS.get_cmdline_user_args().has("--orchard-planet-check") or OS.get_cmdline_user_args().has("--orchard-planet-preview")
 	scene = SCENE.build(self)
 	scene.status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	scene.status_label.width = 610
@@ -260,6 +266,10 @@ func _ready():
 	adventure = preload("res://adventure_runtime.gd").new()
 	add_child(adventure)
 	adventure.setup(self)
+	orchard_planet = preload("res://orchard_planet_runtime.gd").new()
+	add_child(orchard_planet)
+	orchard_planet.setup(self)
+	orchard_planet_motion = preload("res://orchard_planet_motion.gd").new().setup(orchard_planet, self)
 	landscape = preload("res://landscape_runtime.gd").new()
 	landscape.setup(self, scene.zones.orchard_highlands.root, diagnostic_offline or smoke)
 	orchard_spell_vfx = preload("res://orchard_vfx/orchard_spell_vfx.gd").new()
@@ -274,6 +284,11 @@ func _ready():
 	world_builder = preload("res://world_builder_runtime.gd").new()
 	add_child(world_builder)
 	world_builder.setup(self, diagnostic_offline or smoke)
+	god_workers = preload("res://god_role_workers.gd").new()
+	god_workers.setup(self)
+	god_role = preload("res://god_role_runtime.gd").new()
+	add_child(god_role)
+	god_role.setup(self)
 	world_builder.forest_visual_event.connect(orchard_spell_vfx.accept_event)
 	orchard_atmosphere=preload("res://orchard_atmosphere.gd").new()
 	add_child(orchard_atmosphere)
@@ -403,8 +418,13 @@ func _ready():
 	world_reset=preload("res://world_reset.gd").new(); add_child(world_reset)
 	hearth_torch.create_stand(ember_gallery.court,Vector3(-3.4,1.05,5))
 	if OS.get_cmdline_user_args().has("--fairy-coop"): _start_fairy()
+	if OS.get_cmdline_user_args().has("--orchard-planet"):
+		adventure.travel.call_deferred("orchard_planet")
+	if OS.get_cmdline_user_args().has("--orchard-planet-check"):
+		orchard_planet_check = preload("res://orchard_planet_integration_checks.gd").new()
+		orchard_planet_check.run.call_deferred(self)
 	if OS.get_cmdline_user_args().has("--world-builder") or OS.get_cmdline_user_args().has("--world-builder-check"):
-		if not get_tree().root.has_meta(world_reset.BOOT_NOTICE): adventure.travel("orchard_highlands")
+		if not get_tree().root.has_meta(world_reset.BOOT_NOTICE) and not OS.get_cmdline_user_args().has("--orchard-planet"): adventure.travel("orchard_highlands")
 		if not OS.get_cmdline_user_args().has("--world-builder-check"):
 			_open_world_builder_view()
 	if OS.get_cmdline_user_args().has("--director-mode") or OS.get_cmdline_user_args().has("--director-check"):
@@ -1011,6 +1031,8 @@ func _process(delta):
 	if not smoke:
 		if vr: _xr_input()
 		elif _desktop_hero_has_keyboard_focus(): _desktop_input(delta)
+	if orchard_planet_motion != null and orchard_planet_motion.active() and not adventure.travelling:
+		orchard_planet_motion.tick(delta)
 	if not vr and not smoke: _desktop_weapon_motion(delta)
 	if not smoke and not adventure.travelling: portal_walkthrough.tick(self,delta)
 	held_pose.refresh(self)
@@ -1054,7 +1076,10 @@ func _process(delta):
 	if heat_contacts!=null: heat_contacts.tick(delta)
 	if director!=null: director.tick(delta)
 	if is_instance_valid(director_local_view): director_local_view.tick(delta)
+	if orchard_planet != null: orchard_planet.tick(delta)
 	if world_builder!=null: world_builder.tick(delta)
+	if god_role != null: god_role.tick(delta)
+	if god_workers != null: god_workers.tick(delta)
 	if mining!=null: mining.tick(delta)
 	if is_instance_valid(world_builder_view): world_builder_view.tick(delta)
 	if workshop!=null: workshop.tick(delta)
@@ -1080,6 +1105,7 @@ func _process(delta):
 	# workshop_delivery owns the strike pose and its synchronized sound/sparks.
 	for rat in scene.rats:
 		if not is_instance_valid(rat) or not rat.get_meta("alive", true): continue
+		if rat.get_meta("god_role_rat", false) or rat.get_meta("planet_actor", false): continue
 		if not rat.is_visible_in_tree(): continue
 		var home: Vector3 = rat.get_meta("home", rat.position)
 		var speed = 0.35 if elapsed < rat.get_meta("slow_until", 0.0) else 1.0
@@ -1212,7 +1238,9 @@ func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E: _grip(desktop_hand, true)
-			KEY_SPACE: desktop_locomotion.request_jump(self)
+			KEY_SPACE:
+				if orchard_planet_motion.active(): orchard_planet_motion.jump()
+				else: desktop_locomotion.request_jump(self)
 			KEY_C: siegebird.extras.desktop_toggle_reel(desktop_hand)
 			KEY_9: _desktop_equip_siegebird()
 			KEY_0: archery.equip(desktop_hand)
@@ -1329,14 +1357,15 @@ func _desktop_input(delta):
 	if Input.is_physical_key_pressed(KEY_A): movement.x -= 1
 	if Input.is_physical_key_pressed(KEY_D): movement.x += 1
 	var step = rig.basis * movement.normalized() * delta * tuning.value("locomotion.speed") * guardians.movement_multiplier()
-	desktop_locomotion.step(self,step,delta)
+	if orchard_planet_motion.active(): orchard_planet_motion.move(step)
+	else: desktop_locomotion.step(self,step,delta)
 
 func _desktop_weapon_motion(delta:float):
 	if desktop_hand==null: return
 	if adventure!=null and (adventure.dying or adventure.travelling or (travel_navigation!=null and travel_navigation.hero_modal_open())):
 		_desktop_cancel_swing()
 		return
-	var distance=Vector2(rig.global_position.x-desktop_last_position.x,rig.global_position.z-desktop_last_position.z).length()
+	var distance=rig.global_position.distance_to(desktop_last_position)
 	desktop_last_position=rig.global_position
 	var moving=not (discoveries!=null and discoveries.opened) and not qol.opened and distance>0.0001 and distance<0.25
 	var target=clampf(distance/maxf(delta,0.001)/4.0,0,1) if moving else 0.0
@@ -1491,7 +1520,7 @@ func _snap(angle):
 	tuning.history.clear()
 	adventure.motion.clear()
 	var head = camera.global_position
-	rig.rotation.y += angle
+	rig.rotate_object_local(Vector3.UP, angle)
 	var difference = head - camera.global_position
 	difference.y = 0
 	_move_to(rig.position + difference)
@@ -1523,10 +1552,11 @@ func _walk_stick(axis:Vector2,delta:float):
 	if axis.length()<0.18: return
 	var strength=clampf((axis.length()-0.18)/0.82,0,1)
 	var forward=-camera.global_basis.z
-	forward.y=0
+	var up := local_up_at(rig.global_position)
+	forward=forward.slide(up)
 	if forward.length()<0.01: forward=-rig.global_basis.z
 	forward=forward.normalized()
-	var right=forward.cross(Vector3.UP)
+	var right=forward.cross(up)
 	var direction=(right*axis.x+forward*axis.y).normalized()
 	var destination=rig.position+direction*strength*tuning.value("locomotion.speed")*guardians.movement_multiplier()*delta
 	_move_to(destination)
@@ -1543,6 +1573,9 @@ func _cancel_inactive_playful_hand(hand):
 
 func _move_to(destination: Vector3, walking: bool = true):
 	if adventure!=null and adventure.travelling: return
+	if orchard_planet_motion != null and orchard_planet_motion.active():
+		orchard_planet_motion.move(destination-rig.global_position)
+		return
 	var lateral := Vector3(camera.global_position.x-rig.global_position.x,0,camera.global_position.z-rig.global_position.z)
 	var feet := destination + lateral
 	var hit := TerrainSafety.floor_hit(self,feet,maxf(3.0,absf(destination.y-rig.global_position.y)+1.0),4.0,0.68,1)
@@ -1554,6 +1587,7 @@ func _move_to(destination: Vector3, walking: bool = true):
 		held_pose.refresh(self)
 
 func _player_capsule_clear(feet: Vector3) -> bool:
+	if orchard_planet_motion != null and orchard_planet_motion.active(): return orchard_planet_motion._body_clear(feet)
 	var query = PhysicsShapeQueryParameters3D.new()
 	var capsule = CapsuleShape3D.new()
 	capsule.radius = 0.2
@@ -1567,13 +1601,27 @@ func _safe_respawn_position(preferred: Vector3) -> Vector3:
 	var result: Dictionary = respawn_recovery.find(preferred)
 	return result.get("feet", Vector3.INF)
 
+func local_up_at(world_point: Vector3) -> Vector3:
+	if orchard_planet_motion != null and orchard_planet_motion.active(): return orchard_planet_motion.surface_up(world_point)
+	return Vector3.UP
+
+func gravity_direction_at(world_point: Vector3) -> Vector3:
+	return -local_up_at(world_point)
+
 func terrain_height_at(world_point: Vector3) -> float:
 	var height:=TerrainSafety.orchard_height(self,world_point)
 	return world_point.y if not is_finite(height) else height
 
 func _teleport(source: Node3D):
 	var hit = _ray(source, 12.0)
-	if hit.is_empty() or hit.normal.y < 0.68: return
+	if hit.is_empty(): return
+	if orchard_planet_motion.active():
+		if hit.normal.dot(local_up_at(hit.position)) < 0.55: return
+		var up := local_up_at(hit.position)
+		var feet: Vector3 = hit.position+up*0.04
+		if orchard_planet_motion._body_clear(feet): orchard_planet_motion._set_feet(feet, Quaternion(rig.global_basis.y.normalized(), up))
+		return
+	if hit.normal.y < 0.68: return
 	var target = _owner(hit.collider)
 	if target == null or target.get_meta("kind", "") != "floor": return
 	var destination: Vector3 = hit.position
@@ -1955,6 +2003,7 @@ func _request(path: String, body = null) -> Dictionary:
 
 func _kill_rat(rat: Node3D):
 	if not rat.get_meta("alive", true): return
+	if god_role != null and god_role.on_enemy_defeated(rat): return
 	rat.set_meta("alive", false)
 	if quests!=null: quests.enemy_defeated(rat,"rat")
 	remains.shatter(rat)
@@ -1963,7 +2012,7 @@ func _kill_rat(rat: Node3D):
 	var id = str(rat.get_meta("id"))
 	var tail = Node3D.new()
 	add_child(tail)
-	tail.global_position = rat.global_position + Vector3.UP * 0.12
+	tail.global_position = rat.global_position + local_up_at(rat.global_position) * 0.12
 	tail.reparent(adventure.zone_groups.get(str(rat.get_meta("zone","enchanted_kitchen")),self))
 	tail.set_meta("kind", "tail")
 	tail.set_meta("id", id)
@@ -1986,6 +2035,7 @@ func _respawn(rat: Node3D):
 	await get_tree().create_timer(9.0).timeout
 	if not is_instance_valid(rat): return
 	rat.set_meta("quest_death_recorded",false)
+	rat.set_meta("god_essence_emitted", false)
 	rat.position = rat.get_meta("home")
 	rat.set_meta("id", "rat-" + str(Time.get_unix_time_from_system()) + "-" + str(rat.get_instance_id()))
 	rat.set_meta("alive", true)
@@ -2242,9 +2292,9 @@ func _adventure_smoke_test():
 	if not online: failures.append("isolated service unavailable")
 	if scene.get("zones",{}).size()<adventure.ZONES.size(): failures.append("expedition zones missing")
 	for id in adventure.ZONES:
-		adventure.travel(id)
+		await adventure.travel(id)
 		if adventure.zone!=id: failures.append("travel "+id)
-	adventure.travel("forge_yard")
+	await adventure.travel("forge_yard")
 	rig.position=Vector3(0,0,-3)
 	visiting=true
 	await _send_context()
@@ -2270,7 +2320,7 @@ func _adventure_smoke_test():
 	await _poll()
 	if int(state.get("resources",{}).get("lumber",0))<3: failures.append("axe gathering")
 	if int(state.get("resources",{}).get("stone",0))<3: failures.append("pick gathering")
-	adventure.travel("forge_yard")
+	await adventure.travel("forge_yard")
 	rig.position=Vector3(0,0,-3)
 	visiting=true
 	await adventure.upgrade()
@@ -2284,15 +2334,16 @@ func _adventure_smoke_test():
 		adventure.hurt_enemy(enemy,1000)
 		if enemy.get_meta("alive",true): failures.append("enemy defeat")
 		break
-	adventure.travel("sandstone_quarry")
+	await adventure.travel("sandstone_quarry")
 	var response=await _request("/api/vr/gather",{"id":"smoke-death-"+str(Time.get_unix_time_from_system()),"resource":"iron","amount":3})
 	await _poll()
 	await adventure.die()
 	if state.get("drop")==null: failures.append("recoverable death drop")
 	else:
 		var drop=state.drop
-		adventure.travel(str(drop.zone))
-		rig.global_position=Vector3(drop.position.x,drop.position.y,drop.position.z)
+		await adventure.travel(str(drop.zone))
+		var drop_point := Vector3(drop.position.x,drop.position.y,drop.position.z)
+		rig.global_position += drop_point-camera.global_position
 		await adventure.recover()
 		if state.get("drop")!=null: failures.append("cache recovery")
 		if int(state.get("resources",{}).get("iron",0))<3: failures.append("resources restored")
@@ -2303,7 +2354,7 @@ func _adventure_smoke_test():
 			adventure.explode(enemy.global_position,3.2,45)
 			break
 	await _smoke_collect_resource_drops("haunted_bone")
-	adventure.travel("forge_yard")
+	await adventure.travel("forge_yard")
 	rig.position=Vector3(0,0,-3)
 	visiting=true
 	await adventure.upgrade()
@@ -2313,7 +2364,7 @@ func _adventure_smoke_test():
 		adventure.interact(wall,"crystal_resonator")
 		if wall.visible: failures.append("resonator barrier")
 		break
-	adventure.travel("ember_foundry")
+	await adventure.travel("ember_foundry")
 	for enemy in scene.get("enemies",[]):
 		if str(enemy.get_meta("enemy_type",""))=="boss":
 			adventure.explode(enemy.global_position,3.2,45)
@@ -2322,7 +2373,7 @@ func _adventure_smoke_test():
 			if enemy.get_meta("alive",true): failures.append("boss combat")
 			break
 	await _smoke_collect_resource_drops("ember_core")
-	adventure.travel("forge_yard")
+	await adventure.travel("forge_yard")
 	rig.position=Vector3(0,0,-3)
 	visiting=true
 	await adventure.upgrade()
@@ -2336,23 +2387,24 @@ func _adventure_smoke_test():
 	if adventure.hp>=100: failures.append("bomb self damage")
 	# Death cache moves/merges across deaths while workshop and tools remain permanent.
 	await _request("/api/vr/gather",{"id":"smoke-second-death-"+str(Time.get_unix_time_from_system()),"resource":"apple","amount":3})
-	adventure.travel("pinewood_ruins")
+	await adventure.travel("pinewood_ruins")
 	await adventure.die()
 	var first_cache_position=adventure.cache.global_position if is_instance_valid(adventure.cache) else Vector3.ZERO
 	await _request("/api/vr/gather",{"id":"smoke-third-death-"+str(Time.get_unix_time_from_system()),"resource":"spore","amount":3})
-	adventure.travel("mushroom_glade")
+	await adventure.travel("mushroom_glade")
 	await adventure.die()
 	if not is_instance_valid(adventure.cache) or adventure.cache.global_position.distance_to(first_cache_position)<10: failures.append("cache relocation")
 	if int(state.get("tier",1))!=4: failures.append("permanent tier after death")
 	if state.get("drop")!=null:
 		var drop=state.drop
-		adventure.travel(str(drop.zone))
-		rig.global_position=Vector3(drop.position.x,drop.position.y,drop.position.z)
+		await adventure.travel(str(drop.zone))
+		var drop_point := Vector3(drop.position.x,drop.position.y,drop.position.z)
+		rig.global_position += drop_point-camera.global_position
 		await adventure.recover()
 		if int(state.get("resources",{}).get("apple",0))<3 or int(state.get("resources",{}).get("spore",0))<3: failures.append("merged cache resources")
 	# The late-loaded generated JS fixture also works far from the origin.
 	if not imported.is_empty():
-		adventure.travel("crystal_hollow")
+		await adventure.travel("crystal_hollow")
 		var center:Vector3=scene.zones.crystal_hollow.center
 		for rat in scene.rats: rat.set_meta("alive",false)
 		var rat=scene.rats[0]

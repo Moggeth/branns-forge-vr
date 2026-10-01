@@ -46,6 +46,9 @@ func impact(pos:Vector3,zone_id:String,lit:bool)->float:
 ## Container callers must subtract this result, never the attempted amount.
 func pour(pos:Vector3,zone_id:String,amount:float,lit=false)->float:
 	if not pos.is_finite() or not is_finite(amount) or amount<=0: return 0.0
+	# The liquid solver stores one world-Y height per X/Z cell. A closed globe
+	# has no such single-valued support, so callers use their local impact patch.
+	if zone_id=="orchard_planet": return 0.0
 	if zone_id!=game.adventure.zone:
 		return 0.0
 	var accepted=minf(amount,maxf(0,Field.MAX_POTION_EQUIVALENTS*Field.FUEL_PER_POTION-remaining_fuel()))

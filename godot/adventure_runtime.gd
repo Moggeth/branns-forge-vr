@@ -6,7 +6,7 @@ const Navigation = preload("res://landscape_navigation.gd")
 const IdleWander = preload("res://creature_idle_wander.gd")
 const TOOL_NAMES = {"apprentice_hammer":"Copperpot’s Promise", "woodland_axe":"Orchard’s Edge", "quarry_pick":"Stonewhisper", "bomb_glove":"Pocket Thunder", "grappling_hook":"Swallow Line", "spore_lantern":"Mooncap Lantern", "crystal_resonator":"Hollow’s Song", "ember_gauntlet":"The Last Hearth"}
 const ORDER = ["apprentice_hammer", "woodland_axe", "quarry_pick", "bomb_glove", "grappling_hook", "spore_lantern", "crystal_resonator", "ember_gauntlet"]
-const ZONES = ["forge_yard","sandstone_quarry","enchanted_kitchen","pinewood_ruins","mushroom_glade","crystal_hollow","sky_garden","ember_foundry","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep"]
+const ZONES = ["forge_yard","sandstone_quarry","enchanted_kitchen","pinewood_ruins","mushroom_glade","crystal_hollow","sky_garden","ember_foundry","orchard_highlands","gloamfen","starfall_ridge","cloudbreak_keep","orchard_planet"]
 var game
 var zone = "forge_yard"
 var selected = "bomb_glove"
@@ -149,14 +149,15 @@ func tick(delta):
 		if not is_instance_valid(entry.node):
 			thrown.remove_at(i)
 			continue
-		entry.velocity += Vector3.DOWN * delta * 9.8
 		var start: Vector3 = entry.node.global_position
+		var local_down:Vector3=game.gravity_direction_at(start) if game.has_method("gravity_direction_at") else Vector3.DOWN
+		entry.velocity += local_down * delta * 9.8
 		var end: Vector3 = start + entry.velocity*delta
 		var query = PhysicsRayQueryParameters3D.create(start,end,1)
 		var hit = game.get_world_3d().direct_space_state.intersect_ray(query)
 		entry.node.global_position = end if hit.is_empty() else hit.position + hit.normal*0.13
 		entry.node.rotation += entry.angular*delta
-		if not hit.is_empty() or entry.node.position.y < -10:
+		if not hit.is_empty() or (zone!="orchard_planet" and entry.node.position.y < -10):
 			game._set_collisions(entry.node,true)
 			var target = game._owner(hit.get("collider"))
 			if target != null and target.get_meta("kind","")=="apple" and game.apples!=null:
@@ -485,7 +486,9 @@ func explode(position:Vector3,radius:float,damage:float,hand=null,self_ratio=-1.
 		game.fairy.hurt(damage*.5,"Caught in an explosion")
 	game.bomb_art.explosion(position,radius,game.tuning.value("vfx.intensity"),game.tuning.value("vfx.duration"),int(game.tuning.value("vfx.spark_count")))
 	for enemy in game.scene.get("enemies",[]):
-		if is_instance_valid(enemy) and enemy.global_position.distance_to(position)<radius: hurt_enemy(enemy,damage,hand,(enemy.global_position-position+Vector3.UP*0.6).normalized()*3.5,damage_type)
+		if is_instance_valid(enemy) and enemy.global_position.distance_to(position)<radius:
+			var local_up:Vector3=game.local_up_at(enemy.global_position) if game.has_method("local_up_at") else Vector3.UP
+			hurt_enemy(enemy,damage,hand,(enemy.global_position-position+local_up*0.6).normalized()*3.5,damage_type)
 	for rat in game.scene.rats:
 		if rat.global_position.distance_to(position)<radius: game._kill_rat(rat)
 	for wall in game.scene.get("barriers",[]):
@@ -616,6 +619,7 @@ func gather(target,hand=null):
 
 func _enemies(delta):
 	for enemy in game.scene.get("enemies",[]):
+		if is_instance_valid(enemy) and str(enemy.get_meta("zone", "")) == "orchard_planet": continue
 		if is_instance_valid(enemy) and enemy.has_meta("ent_key") and enemy.get_meta("ent_calm", false): continue
 		if is_instance_valid(enemy) and enemy.get_meta("enemy_type","")=="ghost": continue
 		if is_instance_valid(enemy) and enemy.get_meta("director_paused",false): continue
@@ -829,12 +833,14 @@ func tick_skeleton_contacts() -> void:
 		var top: Vector3
 		var radius: float
 		if fairy_target:
-			bottom=game.fairy.avatar.global_position-Vector3.UP*0.06
-			top=game.fairy.avatar.global_position+Vector3.UP*0.06
+			var fairy_up:Vector3=game.local_up_at(game.fairy.avatar.global_position) if game.has_method("local_up_at") else Vector3.UP
+			bottom=game.fairy.avatar.global_position-fairy_up*0.06
+			top=game.fairy.avatar.global_position+fairy_up*0.06
 			radius=0.12
 		else:
-			top=game.camera.global_position-Vector3.UP*0.14
-			bottom=Vector3(top.x,game.rig.global_position.y+0.30,top.z)
+			var player_up:Vector3=game.local_up_at(game.camera.global_position) if game.has_method("local_up_at") else Vector3.UP
+			top=game.camera.global_position-player_up*0.14
+			bottom=game.rig.global_position+(top-game.rig.global_position).slide(player_up)+player_up*0.30
 			radius=0.25
 		if not game.skeleton_attack_contact.contact(actor,bottom,top,radius): continue
 		actor.set_meta("attack_damage_done",true)
@@ -867,6 +873,7 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 		game._notice("%s · %d health"%[str(enemy.get_meta("enemy_type","guardian")).capitalize(),ceili(health)],2)
 		return
 	enemy.set_meta("alive",false)
+	if game.get("god_role") != null: game.god_role.on_enemy_defeated(enemy, enemy.global_position)
 	if game.quests!=null and not enemy.get_meta("director_spawned",false): game.quests.enemy_defeated(enemy,str(enemy.get_meta("enemy_type","skeleton")))
 	enemy.set_meta("combat_phase","dead")
 	enemy.set_meta("attack_at",0.0)
@@ -881,7 +888,8 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 	for resource in loot:
 		var drop = Node3D.new()
 		game.add_child(drop)
-		drop.global_position=enemy.global_position+Vector3.UP*0.35
+		var drop_up:Vector3=game.local_up_at(enemy.global_position) if game.has_method("local_up_at") else Vector3.UP
+		drop.global_position=enemy.global_position+drop_up*0.35
 		drop.reparent(zone_groups.get(str(enemy.get_meta("zone",zone)),game))
 		drop.set_meta("kind","resource")
 		drop.set_meta("resource",resource)
@@ -905,6 +913,7 @@ func hurt_enemy(enemy,damage,hand=null,impulse=Vector3.ZERO,damage_type="physica
 			enemy.global_position=enemy.get_meta("home")
 			enemy.set_meta("hp",enemy.get_meta("max_hp",60))
 			enemy.set_meta("quest_death_recorded",false)
+			enemy.set_meta("god_essence_emitted", false)
 			enemy.set_meta("alive",true)
 			game.animation.restore(enemy)
 			if game.skeleton_structure!=null: game.skeleton_structure.reset(enemy)
@@ -962,7 +971,10 @@ func die():
 func _finish_death_recovery() -> void:
 	dying=true
 	hp=100
-	travel("forge_yard")
+	await travel("forge_yard")
+	if zone!="forge_yard":
+		game._notice("Recovery travel is still settling. Try again shortly.",8)
+		return
 	var result: Dictionary = await game.respawn_recovery.recover(game.scene.zones.forge_yard.spawn+Vector3(0,0,4))
 	if not bool(result.get("ok",false)):
 		game._notice(str(result.get("reason","Recovery is obstructed.")),8)
@@ -982,7 +994,12 @@ func _sync_cache():
 	cache=Node3D.new()
 	game.add_child(cache)
 	var position=drop.get("position",{})
-	cache.global_position=Vector3(position.get("x",0),position.get("y",0)+0.5,position.get("z",0))
+	var cache_origin:=Vector3(position.get("x",0),position.get("y",0),position.get("z",0))
+	var cache_up:=Vector3.UP
+	if str(drop.get("zone",zone))=="orchard_planet" and game.get("orchard_planet")!=null:
+		cache_up=(cache_origin-game.orchard_planet.center).normalized()
+	cache.global_position=cache_origin+cache_up*0.5
+	cache.global_basis=Basis(Quaternion(Vector3.UP,cache_up))
 	cache.reparent(zone_groups.get(str(drop.get("zone",zone)),game))
 	cache.set_meta("kind","cache")
 	cache.set_meta("drop_id",drop.get("id",""))
@@ -1035,11 +1052,18 @@ func travel(id:String):
 	arrival_serial += 1
 	var ticket := arrival_serial
 	travelling = true
+	if id == "orchard_planet":
+		game._notice("Growing the Little Orchard…", 8)
+		await game.orchard_planet.prepare_arrival()
+		if ticket != arrival_serial: return
 	var data: Dictionary = game.scene.zones[id]
 	var preferred: Vector3 = data.get("spawn",Vector3.ZERO)
 	var landing: Dictionary = {}
 	# Keep the previous supported location until startup/collider swaps are ready.
 	for attempt in 16:
+		if id == "orchard_planet":
+			landing = {"feet": preferred}
+			break
 		if ticket != arrival_serial: return
 		if game.get("respawn_recovery")!=null and game.respawn_recovery.game!=null:
 			landing = game.respawn_recovery.find(preferred)
@@ -1057,12 +1081,18 @@ func travel(id:String):
 	if previous_zone != id:
 		var leaving_visual := _portal_visual(previous_zone, id)
 		if leaving_visual != null: leaving_visual.play_entrance()
+	if game.orchard_planet_motion.active():
+		game.orchard_planet_motion.leave()
+		game.orchard_planet.leave()
 	zone=id
 	_apply_zone_environment(id)
 	game.rig.rotation=Vector3.ZERO
 	var lateral: Vector3 = game.camera.global_position-game.rig.global_position
 	lateral.y=0.0
 	game.rig.global_position=landing.feet-lateral
+	if id == "orchard_planet":
+		game.orchard_planet_motion.enter()
+		game.orchard_planet.enter()
 	if game.get("desktop_locomotion")!=null: game.desktop_locomotion.reset()
 	if game.get("portal_walkthrough")!=null: game.portal_walkthrough.reset(game)
 	game.camera.rotation.x=0

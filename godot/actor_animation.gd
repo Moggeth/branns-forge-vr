@@ -118,6 +118,9 @@ func tick(delta):
 		rig.last=actor.global_position
 		if not actor.is_visible_in_tree(): continue
 		var travelled=Vector2(difference.x,difference.z).length()
+		if game.adventure.zone=="orchard_planet":
+			var local_up:Vector3=game.local_up_at(actor.global_position) if game.has_method("local_up_at") else actor.global_basis.y.normalized()
+			travelled=difference.slide(local_up).length()
 		if travelled>0.5: travelled=0
 		rig.distance+=travelled
 		var phase=str(actor.get_meta("combat_phase","idle"))

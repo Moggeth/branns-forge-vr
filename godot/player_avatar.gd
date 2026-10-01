@@ -47,26 +47,29 @@ func setup(owner_game):
 
 func shoulder_position() -> Vector3:
 	if shoulder != null: return shoulder.global_position
-	return game.camera.global_position + Basis(Vector3.UP, game.camera.global_rotation.y) * Vector3(0.24, -0.27, 0)
+	var up:Vector3=game.local_up_at(game.camera.global_position) if game.has_method("local_up_at") else Vector3.UP
+	var forward:Vector3=(-game.camera.global_basis.z).slide(up).normalized()
+	if forward.length_squared()<0.01: forward=(-game.rig.global_basis.z).slide(up).normalized()
+	return game.camera.global_position + Basis.looking_at(forward,up) * Vector3(0.24, -0.27, 0)
 
 func _process(delta):
 	if body == null or game == null or delta <= 0: return
 	var eye = game.camera.global_position
-	var foot_y = game.rig.global_position.y
+	var up:Vector3=game.local_up_at(eye) if game.has_method("local_up_at") else Vector3.UP
+	var foot:Vector3=game.rig.global_position+(eye-game.rig.global_position).slide(up)
 	# Place the chest beneath the tracked head rather than through the view.
 	# Use head yaw only, so looking down cannot shove the torso forward.
-	var facing = -game.camera.global_basis.z
-	facing.y = 0.0
-	if facing.length_squared() < 0.01: facing = -game.rig.global_basis.z
+	var camera_forward:Vector3=-game.camera.global_basis.z
+	var facing:Vector3=camera_forward.slide(up)
+	if facing.length_squared() < 0.01: facing = (-game.rig.global_basis.z).slide(up)
 	facing = facing.normalized()
-	global_position = Vector3(eye.x, foot_y, eye.z) - facing * BODY_BACK_OFFSET
-	global_rotation = Vector3(0, game.camera.global_rotation.y, 0)
+	global_transform=Transform3D(Basis.looking_at(facing,up),foot-facing*BODY_BACK_OFFSET)
 	# Respect the tracked eye height without making every user's body a fixed
 	# 1.73 m costume. Clamp out bad runtime floor calibration.
-	var eye_height = eye.y - foot_y
+	var eye_height = (eye-foot).dot(up)
 	var body_scale = clampf(eye_height / 1.61, 0.82, 1.18)
 	scale = Vector3.ONE * body_scale
-	var speed = Vector2(eye.x - last_position.x, eye.z - last_position.z).length() / maxf(delta, 0.001)
+	var speed = (eye-last_position).slide(up).length() / maxf(delta, 0.001)
 	last_position = eye
 	if player != null:
 		var animation_name = "walk" if speed > 0.30 and speed < 8 else "idle"
@@ -74,7 +77,7 @@ func _process(delta):
 			if player.current_animation != animation_name: player.play(animation_name, 0.16)
 			player.advance(delta)
 	if head != null:
-		head.rotation.x = clampf(game.camera.global_rotation.x, -0.55, 0.55)
+		head.rotation.x = clampf(-asin(clampf(camera_forward.dot(up),-1.0,1.0)), -0.55, 0.55)
 	if not game.vr: return
 	for hand in game.hands:
 		if not hand.get_is_active(): continue

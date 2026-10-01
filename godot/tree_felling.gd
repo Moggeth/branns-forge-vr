@@ -196,7 +196,7 @@ func _drop_log() -> void:
 	var outward: Vector3 = (source.global_basis * fall_normal).normalized()
 	log.global_position = source.to_global(Vector3(0, maxf(cut_y, 0.3) + 0.30, 0)) + outward * 1.0
 	log.setup(game, source, self)
-	log.apply_central_impulse((outward + Vector3.UP * 0.25).normalized() * 1.3)
+	log.apply_central_impulse((outward + source.global_basis.y.normalized() * 0.25).normalized() * 1.3)
 
 func log_collected() -> void:
 	collected = true
