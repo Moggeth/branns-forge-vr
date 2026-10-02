@@ -102,7 +102,7 @@ def run(commission: Path, model: str, turns: int, effort: str, seconds: float) -
             metadata["outcome"] = "passed"
         elif metadata["outcome"] != "timeout":
             metadata["outcome"] = "failed"
-            metadata["reason"] = str(final.get("result", "No verified final result"))[:500]
+            metadata["reason"] = str(final.get("result") or "; ".join(final.get("errors", [])) or final.get("subtype") or "No verified final result")[:500]
     finally:
         metadata["elapsed_seconds"] = round(time.perf_counter() - started, 3)
         (commission / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
