@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +36,7 @@ process.on('unhandledRejection', error => log('unhandled_rejection', { message: 
 
 const rooms = new Map();
 const ipBuckets = new Map();
-const code = () => { const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return [...randomBytes(16)].map(byte => alphabet[byte & 31]).join(''); };
+const code = () => String(randomInt(100_000_000)).padStart(8, '0');
 const secret = () => randomBytes(32).toString('base64url');
 const safeEqual = (a, b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const send = (ws, value) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(value)); };
@@ -125,7 +125,10 @@ function handle(ws, message) {
       room.hostId = peer.id; room.peers.set(peer.id, peer); rooms.set(roomCode, room); attach(ws, room, peer);
       log('room_created', { room: roomCode }); return;
     }
-    const room = rooms.get(String(message.room || '').toUpperCase());
+    if (!bucket(ipBuckets, `join:${ws.ip}`, 40, 60_000)) return fail(ws, 'rate_limited', 'Too many join attempts. Please wait a moment.');
+    const roomCode = String(message.room || '').replace(/[\s-]/g, '');
+    if (!/^\d{8}$/.test(roomCode)) return fail(ws, 'invalid_room', 'Enter the eight-digit room code.');
+    const room = rooms.get(roomCode);
     if (!room) return fail(ws, 'room_not_found', 'Room not found or expired.');
     if (message.secret) {
       const peer = [...room.peers.values()].find(p => safeEqual(p.secret, message.secret));

@@ -51,11 +51,13 @@ try {
   const host = connect(); await once(host.ws, 'open');
   host.send({ type: 'create', name: 'Host', role: 'hero', desktop: true });
   const first = await host.wait('welcome');
-  assert.match(first.room, /^[A-HJ-NP-Z2-9]{16}$/);
+  assert.match(first.room, /^\d{8}$/);
   assert.equal(first.epoch, 1); assert.equal(first.hostId, first.peerId);
   assert.ok(first.secret.length >= 40);
   const guest = connect(); await once(guest.ws, 'open');
-  guest.send({ type: 'join', room: first.room, name: 'God', role: 'god', desktop: true });
+  guest.send({ type: 'join', room: '123456789', name: 'God', role: 'god', desktop: true });
+  assert.equal((await guest.wait('error')).code, 'invalid_room');
+  guest.send({ type: 'join', room: first.room.slice(0,4)+' '+first.room.slice(4), name: 'God', role: 'god', desktop: true });
   const joined = await guest.wait('welcome');
   assert.equal(joined.peers[0].id, first.peerId);
   assert.equal((await host.wait('peer_joined')).peer.id, joined.peerId);

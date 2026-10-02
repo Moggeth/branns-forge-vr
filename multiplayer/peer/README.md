@@ -1,5 +1,10 @@
 # Browser hosted rooms
 
+New rooms use eight numeric digits, preserving leading zeros. Join accepts spaces
+or a hyphen between digits. Codes are short invitations, not authentication;
+reconnect credentials remain separate 256-bit secrets. Creation checks collisions
+and join attempts are rate limited across sockets per source IP.
+
 `server.mjs` is a small signaling process for rooms of up to eight browsers. The first browser is the host and owns simulation. The service routes WebRTC offers, answers, and ICE candidates, appoints a new host after explicit acceptance, and never receives game commands, snapshots, or checkpoints. Browsers connect to the host using reliable WebRTC data channels. Each channel frame carries a signaling epoch; stale frames are discarded after ownership changes.
 
 Start from `multiplayer/` with `node peer/server.mjs`. Set `PEER_ORIGINS` to a comma-separated exact list of browser origins (for example, `https://forge.example.com`). It defaults to local Vite origins for development. Set `PEER_HOST` and `PEER_PORT` for the tunnel listener; defaults are `127.0.0.1:8789`. Expose `/peer/ws` through an HTTPS tunnel so remote browsers use `wss://`. `GET /peer/health` returns room/peer counts and process uptime. `GET /peer/config` returns public STUN URLs and whether a TURN relay is configured. Start and stop the process through the usual Node process manager or SIGINT/SIGTERM; shutdown closes sockets. Logs are timestamped JSON lines in `peer/logs/server.jsonl` by default, with room and peer IDs only. They are ignored by Git. `node peer/test.mjs` runs a local signaling contract check. `PEER_LOG_PATH` can redirect the log.
