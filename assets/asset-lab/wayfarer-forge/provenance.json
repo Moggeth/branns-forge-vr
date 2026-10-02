@@ -1,0 +1,39 @@
+{
+  "artist": {
+    "account": "fauxgrady@gmail.com",
+    "auth_method": "claude.ai",
+    "subscription": "pro",
+    "model": "claude-opus-5-5",
+    "verified_seconds": 424.169
+  },
+  "files": {
+    "multiplayer/public/assets/forge.glb": {
+      "bytes": 546172,
+      "sha256": "3ea914cbe66bd252a267ee8e44c8960838a2d726628d04e1e704e42067a219cb"
+    },
+    "multiplayer/public/assets/forge_lod.glb": {
+      "bytes": 263180,
+      "sha256": "6ad65fb33b987e73ab0912cdf778e125e8c08b4cd85f70b9754cdc472c6d0384"
+    },
+    "assets/asset-lab/wayfarer-forge/build_forge.py": {
+      "bytes": 34380,
+      "sha256": "61f8b450e42fb45de1d6f25d5e6c97fb87a3576d1c144bda6d451b7481e2f468"
+    },
+    "assets/asset-lab/wayfarer-forge/source.blend": {
+      "bytes": 528516,
+      "sha256": "a309b36471f50c4eeaf661dcdaa42a8391bc7cc9ccc3167fa98ede42e20adb3d"
+    }
+  },
+  "acceptance": {
+    "high_seconds": 2.921,
+    "low_seconds": 2.236,
+    "rebuild_seconds": 4.212,
+    "high_triangles": 9052,
+    "low_triangles": 2488,
+    "materials": 8,
+    "embedded_images": 4,
+    "khronos": "passed both",
+    "godot": "passed both",
+    "source_rebuild": "passed"
+  }
+}

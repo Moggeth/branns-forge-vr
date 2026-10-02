@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "asset_id": "wayfarer_forge",
+  "kind": "environment",
+  "builder": "assets/asset-lab/wayfarer-forge/build_forge.py",
+  "coordinate_system": {"unit":"metre","up":"+Y","forward":"-Z","origin":"ground centre"},
+  "required_nodes": ["Ground", "WorkPoint", "EmberSource", "CoreTarget", "SignAnchor"],
+  "limits": {"max_bytes":4194304,"max_triangles":18000,"max_meshes":22,"max_materials":8,"max_images":4},
+  "max_dimensions_m": [3.4,3.5,2.8],
+  "review_files": ["source.blend","lod.glb","front.png","three_quarter.png","overhead.png","sockets/collision.json"]
+}
