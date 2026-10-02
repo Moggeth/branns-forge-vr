@@ -13,6 +13,7 @@ import {createFirePresentation,createEmberdewModel} from './fire-presentation.js
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createVRAdventurePanel} from './vr-adventure-panel.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
 import {createWoodAudio} from './wood-audio.js';
@@ -28,7 +29,7 @@ export function terrainHeight(x, z, edits = []) {
   return height;
 }
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
@@ -123,6 +124,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const controllers = [renderer.xr.getController(0), renderer.xr.getController(1)];
   const grips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
   const controllerSources = new Map();
+  // Hero Expedition panel above the off-hand wrist. Trigger presses aimed at it are consumed before weapons see them.
+  const adventurePanel = createVRAdventurePanel({parent: scene, controllers, grips, sources: controllerSources, onAction: action => onExpeditionAction(action)});
   for (let i = 0; i < 2; i++) {
     rig.add(controllers[i], grips[i]);
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc2a17b }));
@@ -132,6 +135,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     listen(controllers[i], 'connected', event => { controllerSources.set(i, event.data); attachWeapon(); });
     listen(controllers[i], 'disconnected', () => { controllerSources.delete(i); attachWeapon(); });
     listen(controllers[i], 'selectstart', () => {
+      if (adventurePanel.handleSelectStart(i)) return;
       if (!active) return;
       if (role === 'hero') {
         const hand=controllerSources.get(i)?.handedness;
@@ -147,7 +151,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (hit) castAt(hit.point);
       }
     });
-    listen(controllers[i],'selectend',()=>{if(controllerSources.get(i)?.handedness!=='left')primaryUp();});
+    listen(controllers[i],'selectend',()=>{if(adventurePanel.handleSelectEnd(i))return;if(controllerSources.get(i)?.handedness!=='left')primaryUp();});
   }
 
   function listen(target, type, handler, options) {
@@ -572,7 +576,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (active && role === 'god') { event.preventDefault(); orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.03, 10, 70); }
   }, { passive: false });
   listen(renderer.xr, 'sessionstart', () => { clearInput(); onXRChange(true); camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); weaponAnchor.visible = false; attachWeapon(); report('VR connected. Stick to walk; trigger to strike.'); });
-  listen(renderer.xr, 'sessionend', () => { clearInput(); onXRChange(false); camera.position.set(0, 1.65, 0); attachWeapon(); resize(); report('VR session ended.'); });
+  listen(renderer.xr, 'sessionend', () => { clearInput(); adventurePanel.endSession(); onXRChange(false); camera.position.set(0, 1.65, 0); attachWeapon(); resize(); report('VR session ended.'); });
 
   function movement() {
     const x = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
@@ -632,6 +636,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
     }
     movement();
+    if (renderer.xr.isPresenting) adventurePanel.tick(renderer.xr.getCamera(), {suppressed: !active || role !== 'hero'});
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
@@ -771,8 +776,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null}};},
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null}};},
     clearControls: clearInput,
+    // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
+    setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
+    setExpeditionPointerHand(hand) { adventurePanel.setPointerHand(hand); },
     controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
@@ -795,7 +803,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction());
-      combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;orchard.dispose();
+      adventurePanel.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;orchard.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

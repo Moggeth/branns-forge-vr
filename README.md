@@ -1241,3 +1241,5 @@ Fairy throw, adventurer, and quiver pass (2026-09-26): the fairy now launches fr
 Browser fire checkpoint (2026-10-03): Wyrmspout slot7 and Emberdew slot8 share bounded ignition, wetness and damage. Controls/tests/limitations: multiplayer/IMPORT-FIRE.md. Functional verification passed; art refinement/public release pending. Parallel overnight registry: docs/CLAUDE-SPRINT-20261003.md.
 
 Browser tree/Expedition pre-release integration and acceptance: multiplayer/IMPORT-TREES-EXPEDITION.md. Editable portable art: multiplayer/assets-source/trees and resources.
+
+Browser VR Expedition wrist-panel controls and verification: multiplayer/IMPORT-VR-EXPEDITION-20261003.md. Ground-mask and mobile layout follow-ups: multiplayer/IMPORT-PRESENTATION-20261003.md.
