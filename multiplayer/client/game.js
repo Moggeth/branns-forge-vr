@@ -7,6 +7,7 @@ import {createSpellPresentation} from './spell-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent} from './world-content-view.js';
+import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
 import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
@@ -148,7 +149,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     removers.push(() => target.removeEventListener(type, handler, options));
   }
   function report(message) { if (!disposed) onStatus(message); }
-  const content = createWorldContent({scene,templates,instantiate,height:terrainHeight});
+  const content = createWorldContent({scene,templates,instantiate,height:terrainHeight,camera});
+  const enemyGround=(x,z)=>terrainHeight(x,z,snapshot.edits);
   const combat=createCombatView({scene,templates,actors,height:(x,z)=>terrainHeight(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   const fireVisual=createFirePresentation({scene,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:flaskModel,animations:[]});weaponModels.set('flask',flaskModel);
@@ -360,7 +362,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
-  for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     templates.set(name, gltf);
     if (name === 'tree') { syncTrees(); }
@@ -420,6 +422,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
+    if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
     if(!event?.position||event.fire)return;
     if(event.kind==='spell')spellVisual.play(event);
     const specialEffect={hammer_slam:'raise',pick_burst:'crystal',axe_cleave:'sunder'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
@@ -450,12 +453,17 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return {...aim,origin:origin.toArray()};
   }
   function surfaceVisible(object){for(let n=object;n;n=n.parent)if(!n.visible||n.userData.ignoreContact)return false;return true;}
+  // Every FPS/VR/projectile/physical-melee ray resolves content hits here: instanced trees have no per-tree node, and their
+  // face normals need the instance matrix, so tree ids and world normals come from content.resolveTarget.
+  function resolveHit(h){const t=content.resolveTarget?.(h);if(t?.id)return {targetId:t.id,point:t.point,normal:t.normal||[0,1,0]};let n=h.object;while(n&&!n.userData.targetId)n=n.parent;
+    return n?{targetId:n.userData.targetId,point:h.point.toArray(),normal:(h.face?.normal.clone().transformDirection(h.object.matrixWorld)||new THREE.Vector3(0,1,0)).toArray()}:null;}
+  function hitNormal(h){const t=h.object.userData.treeBatch?content.resolveTarget?.(h):null;return t?.normal?new THREE.Vector3(...t.normal):h.face?.normal.clone().transformDirection(h.object.matrixWorld)||new THREE.Vector3(0,1,0);}
   function worldContact(from,to){
     const origin=new THREE.Vector3(...from),delta=new THREE.Vector3(...to).sub(origin),length=delta.length();if(length<1e-7)return null;
     const ray=new THREE.Raycaster(origin,delta.multiplyScalar(1/length),0,length);
     const targets=[...content.targets(),ground,shrine];for(const target of targets)target.updateWorldMatrix(true,true);
     const hit=ray.intersectObjects(targets,true).find(h=>surfaceVisible(h.object));
-    if(!hit)return null;const normal=hit.face?.normal.clone().transformDirection(hit.object.matrixWorld)||new THREE.Vector3(0,1,0);
+    if(!hit)return null;const normal=hitNormal(hit);
     return {targetId:'world',part:'torso',point:hit.point.toArray(),normal:normal.toArray(),localPoint:hit.point.toArray(),localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:hit.distance};
   }
   let lastPhysicalTip=null,lastPhysicalHit=-Infinity;
@@ -464,7 +472,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const tip=modelTip(axeModel,tool,new THREE.Vector3());
     if(lastPhysicalTip){const travel=tip.distanceTo(lastPhysicalTip);if(travel>.018&&travel<1&&travel/Math.max(dt,.001)>1.15&&now-lastPhysicalHit>(SWING_PROFILES[tool]?.cooldown||.5)*1000){
       const from=lastPhysicalTip.toArray(),to=tip.toArray(),enemy=combat.segmentContacts(from,to)[0],world=worldContact(from,to);let hit=enemy;
-      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat([shrine]),true).find(v=>surfaceVisible(v.object));if(h){let n=h.object;while(n&&!n.userData.targetId)n=n.parent;hit=n?{...world,targetId:n.userData.targetId}:null;}else hit=null;}
+      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat([shrine]),true).find(v=>surfaceVisible(v.object));if(h){const r=resolveHit(h);hit=r?{...world,...r}:null;}else hit=null;}
       if(hit){lastPhysicalHit=now;unlockAudio();onAction('strike',{...hit,tool});}
     }}lastPhysicalTip=tip;
   }
@@ -475,8 +483,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const hits=raycaster.intersectObjects(targets,true).filter(h=>surfaceVisible(h.object));raycaster.far=Infinity;
     const enemy=enemies[0],world=hits[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
     if(enemyDistance<(world?.distance??Infinity))return {...enemy,distance:enemyDistance};
-    if(!world)return null;let node=world.object;while(node&&!node.userData.targetId)node=node.parent;if(!node)return null;
-    return{targetId:node.userData.targetId,point:world.point.toArray(),normal:world.face.normal.clone().transformDirection(world.object.matrixWorld).toArray(),part:'torso',distance:world.distance};
+    if(!world)return null;const resolved=resolveHit(world);if(!resolved)return null;
+    return{...resolved,part:'torso',distance:world.distance};
   }
   function primaryDown(){if(!active||role!=='hero')return;if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
@@ -640,7 +648,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
     weapons.tick();updateFireAudio(weapons.state().firing);
     const wick=axeModel?.getObjectByName('Wick');if(tool==='flask'&&wick?.material){const lit=!!snapshot.players.find(p=>p.id===playerId)?.flaskLit;wick.material.emissive?.setHex(lit?0xff5a04:0);wick.material.emissiveIntensity=lit?2:0;}
-    content.tick(now,snapshot.tick);impacts.update(dt);fireVisual.update(now,dt);
+    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
       if (animation.actions) {
@@ -657,6 +665,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
     }
     for (const mixer of mixers) mixer.update(dt);
+    // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
+    updateEnemyMotion(actors,{tick:(snapshot.tick||0)+Math.min(0.3,(now-snapshotAt)/1000)*60,dt,height:enemyGround});
     tickPhysicalMelee(now,dt);
     combat.tick(dt,isHost());
     spellVisual.setTarget(active&&role==='god'&&cursor.visible?{spell,point:hitPoint.toArray(),start:castStart?.toArray(),end:castStart?hitPoint.toArray():undefined,valid:Math.abs(hitPoint.x)<=55&&Math.abs(hitPoint.z)<=55&&(snapshot.players.find(p=>p.id===playerId)?.mana??100)>=(SPELLS.find(s=>s.id===spell)?.cost??0)}:null);

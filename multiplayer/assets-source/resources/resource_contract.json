@@ -1,0 +1,460 @@
+{
+ "kit": "brann_resource_treasure_kit",
+ "version": 1,
+ "units": "metres",
+ "up": "+Y",
+ "front": "-Z",
+ "origin": "bottom centre (rests on y=0)",
+ "vertex_colors": "COLOR_0 is a linear multiplier on base colour (AO/edge wear/moss/blush). Godot: vertex_color_use_as_albedo=true.",
+ "sockets": {
+  "Grip": "hand/attachment socket (+Y up, -Z front); centre of mass unless noted",
+  "ResourcePivot": "visual centre for spin/bob/pickup pop and floating reward display"
+ },
+ "textures": {
+  "props_albedo_a": {
+   "size": 512,
+   "quadrants": [
+    "stone",
+    "star_iron",
+    "oak",
+    "leather"
+   ]
+  },
+  "props_atlas_b": {
+   "size": 512,
+   "quadrants": [
+    "gem_glow(emissive)",
+    "iron_veins(emissive)",
+    "apple_skin(albedo)",
+    "linen(albedo)"
+   ]
+  }
+ },
+ "budgets": {
+  "triangles": 1500,
+  "materials": 3,
+  "shared_maps": 2,
+  "map_size": 512
+ },
+ "assets": {
+  "star_gem": {
+   "file_bytes": 133412,
+   "triangles": 740,
+   "materials": 2,
+   "material_names": [
+    "StarGem",
+    "Stone"
+   ],
+   "images": 2,
+   "image_uris": [],
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarGemMesh",
+    "StarGem"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.1158,
+    0.0,
+    -0.0984
+   ],
+   "bbox_max": [
+    0.1149,
+    0.2571,
+    0.0997
+   ],
+   "dimensions": [
+    0.2308,
+    0.2571,
+    0.1981
+   ],
+   "target_size_m": 0.25,
+   "target_measure": "height",
+   "measured_size_m": 0.2571,
+   "sockets": {
+    "Grip": [
+     0,
+     0.11,
+     0
+    ],
+    "ResourcePivot": [
+     0,
+     0.12,
+     0
+    ]
+   },
+   "glow_tip": [
+    0.014,
+    0.257,
+    -0.002
+   ],
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.09
+  },
+  "star_iron_nugget": {
+   "file_bytes": 139588,
+   "triangles": 1460,
+   "materials": 2,
+   "material_names": [
+    "StarIron",
+    "StarGem"
+   ],
+   "images": 2,
+   "image_uris": [],
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarIronMesh",
+    "StarIronNugget"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.1066,
+    0.0,
+    -0.0883
+   ],
+   "bbox_max": [
+    0.1094,
+    0.1288,
+    0.0769
+   ],
+   "dimensions": [
+    0.216,
+    0.1288,
+    0.1653
+   ],
+   "target_size_m": 0.22,
+   "target_measure": "max",
+   "measured_size_m": 0.216,
+   "sockets": {
+    "Grip": [
+     0,
+     0.061,
+     0
+    ],
+    "ResourcePivot": [
+     0,
+     0.061,
+     0
+    ]
+   },
+   "mass_hint_kg": 6.5,
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.07
+  },
+  "stone_chunk": {
+   "file_bytes": 83124,
+   "triangles": 1280,
+   "materials": 1,
+   "material_names": [
+    "Stone"
+   ],
+   "images": 1,
+   "image_uris": [],
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StoneChunkMesh",
+    "StoneChunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [],
+   "bbox_min": [
+    -0.1384,
+    0.0,
+    -0.107
+   ],
+   "bbox_max": [
+    0.1133,
+    0.1403,
+    0.0895
+   ],
+   "dimensions": [
+    0.2517,
+    0.1403,
+    0.1964
+   ],
+   "target_size_m": 0.25,
+   "target_measure": "max",
+   "measured_size_m": 0.2517,
+   "sockets": {
+    "Grip": [
+     0,
+     0.07,
+     0
+    ],
+    "ResourcePivot": [
+     0,
+     0.07,
+     0
+    ]
+   },
+   "mass_hint_kg": 4.0,
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.05
+  },
+  "orchard_apple": {
+   "file_bytes": 62728,
+   "triangles": 691,
+   "materials": 2,
+   "material_names": [
+    "AppleSkin",
+    "LeafStem"
+   ],
+   "images": 1,
+   "image_uris": [],
+   "nodes": [
+    "Grip",
+    "OrchardAppleMesh",
+    "ResourcePivot",
+    "OrchardApple"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [],
+   "bbox_min": [
+    -0.078,
+    0.004,
+    -0.0769
+   ],
+   "bbox_max": [
+    0.0805,
+    0.1617,
+    0.0766
+   ],
+   "dimensions": [
+    0.1585,
+    0.1577,
+    0.1534
+   ],
+   "target_size_m": 0.16,
+   "target_measure": "height",
+   "measured_size_m": 0.1577,
+   "sockets": {
+    "Grip": [
+     0,
+     0.072,
+     0
+    ],
+    "ResourcePivot": [
+     0,
+     0.075,
+     0
+    ]
+   },
+   "mass_hint_kg": 0.18,
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.03
+  },
+  "treasure_satchel": {
+   "file_bytes": 128072,
+   "triangles": 1224,
+   "materials": 3,
+   "material_names": [
+    "Leather",
+    "Linen",
+    "Brass"
+   ],
+   "images": 2,
+   "image_uris": [],
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "TreasureSatchelMesh",
+    "TreasureSatchel"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [],
+   "bbox_min": [
+    -0.2158,
+    0.0,
+    -0.1935
+   ],
+   "bbox_max": [
+    0.193,
+    0.3819,
+    0.1773
+   ],
+   "dimensions": [
+    0.4089,
+    0.3819,
+    0.3708
+   ],
+   "target_size_m": 0.4,
+   "target_measure": "max",
+   "measured_size_m": 0.4089,
+   "sockets": {
+    "Grip": [
+     0,
+     0.319,
+     0
+    ],
+    "ResourcePivot": [
+     0,
+     0.181,
+     0
+    ]
+   },
+   "grip_note": "Grip at tied neck (hand closes round cord)",
+   "mass_hint_kg": 2.2,
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.04
+  },
+  "reward_coffer": {
+   "file_bytes": 190912,
+   "triangles": 1602,
+   "materials": 2,
+   "material_names": [
+    "Oak",
+    "Brass"
+   ],
+   "images": 1,
+   "image_uris": [],
+   "nodes": [
+    "CofferBodyMesh",
+    "Grip",
+    "CofferLidMesh",
+    "LidHinge",
+    "ResourcePivot",
+    "RewardCoffer"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "extensions_used": [],
+   "bbox_min": [
+    -0.3201,
+    0.0,
+    -0.2049
+   ],
+   "bbox_max": [
+    0.3201,
+    0.414,
+    0.2044
+   ],
+   "dimensions": [
+    0.6403,
+    0.414,
+    0.4093
+   ],
+   "target_size_m": 0.65,
+   "target_measure": "max",
+   "measured_size_m": 0.6403,
+   "sockets": {
+    "Grip": [
+     0,
+     0.408,
+     -0.02
+    ],
+    "ResourcePivot": [
+     0,
+     0.204,
+     0
+    ]
+   },
+   "lid_hinge": [
+    0,
+    0.29,
+    0.19
+   ],
+   "lid_open_axis": "rotate LidHinge about its local +X (glTF/Godot right-handed); positive angle lifts the front, ~1.9 rad fully open",
+   "loot_anchor": [
+    0,
+    0.07,
+    0
+   ],
+   "grip_note": "Grip on lid crown (two-hand lift / RTS selection)",
+   "mass_hint_kg": 14,
+   "budget_ok": {
+    "triangles": true,
+    "materials": true,
+    "no_camera_light": true,
+    "embedded": true
+   },
+   "build_s": 0.05
+  }
+ },
+ "timings": {
+  "texture_albedo_a_s": 0.06,
+  "texture_atlas_b_s": 0.04,
+  "materials_s": 0.001,
+  "asset_star_gem_s": 0.09,
+  "asset_star_iron_nugget_s": 0.07,
+  "asset_stone_chunk_s": 0.05,
+  "asset_orchard_apple_s": 0.03,
+  "asset_treasure_satchel_s": 0.04,
+  "asset_reward_coffer_s": 0.05,
+  "render_s": 8.4
+ }
+}

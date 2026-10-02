@@ -7,9 +7,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14110e">
+  <meta name="color-scheme" content="dark">
   <title>Brann’s Forge</title>
   <link rel="stylesheet" href="./lobby.css">
   <link rel="stylesheet" href="./combat-hud.css">
+  <!-- Refinement layer: loads last, only adds/overrides. Safe to remove to roll back. -->
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body data-phase="lobby" data-role="hero">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -50,6 +53,31 @@
   </defs>
 </svg>
 
+<!-- ===== Shared HUD icon sprite (moved out of .hud-bottom; ids unchanged) ===== -->
+<svg class="bf-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+  <defs>
+    <symbol id="bfi-axe" viewBox="0 0 24 24"><path d="M6 21 17 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M13 3c4 0 7 3 7 7l-3 1-5-5z" fill="currentColor"/></symbol>
+    <symbol id="bfi-pick" viewBox="0 0 24 24"><path d="M7 20 15 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M4 7c5-4 11-4 16 0l-2 1c-4-2-8-2-12 0z" fill="currentColor"/></symbol>
+    <symbol id="bfi-hammer" viewBox="0 0 24 24"><path d="M8 21 14 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><rect x="9" y="3" width="11" height="7" rx="1.5" transform="rotate(30 14.5 6.5)" fill="currentColor"/><circle cx="18.5" cy="3.5" r="1.6" fill="currentColor" opacity=".7"/></symbol>
+    <symbol id="bfi-crossbow" viewBox="0 0 24 24"><path d="M3 9q9-7 18 0" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 5v16M3 9l9 4 9-4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 2l2 3h-4z" fill="currentColor"/></symbol>
+    <symbol id="bfi-bow" viewBox="0 0 24 24"><path d="M6 3q12 9 0 18" stroke="currentColor" stroke-width="2.2" fill="none"/><path d="M6 3v18M4 12h15" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M21 12l-3-2v4z" fill="currentColor"/></symbol>
+    <symbol id="bfi-limb" viewBox="0 0 24 24"><path d="M7 17 17 7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="6" cy="16" r="2.4" fill="currentColor"/><circle cx="8" cy="18" r="2.4" fill="currentColor"/><circle cx="16" cy="6" r="2.4" fill="currentColor"/><circle cx="18" cy="8" r="2.4" fill="currentColor"/></symbol>
+    <!-- New: original Wyrmspout (dragon-mouth nozzle with flame) and Emberdew (wicked flask) icons -->
+    <symbol id="bfi-wyrmspout" viewBox="0 0 24 24"><path d="M3 15h7l3-3h3l2 2-2 2h-2l-3 3H3z" fill="currentColor"/><path d="M18 9c2 1 3 3 2.5 5M20 6c2.5 2 3.5 5 2.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".8"/><circle cx="14.5" cy="13.2" r=".9" fill="#14110e"/></symbol>
+    <symbol id="bfi-flask" viewBox="0 0 24 24"><path d="M10 3h4v4.5l4.5 7.5a4 4 0 0 1-3.4 6H8.9a4 4 0 0 1-3.4-6L10 7.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7.2 15h9.6l1.3 2.2a2 2 0 0 1-1.8 2.8H7.7a2 2 0 0 1-1.8-2.8z" fill="currentColor"/><path d="M12 3V1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="bfi-hand" viewBox="0 0 24 24"><path d="M7 12V6a1.5 1.5 0 0 1 3 0v5V4a1.5 1.5 0 0 1 3 0v7V5a1.5 1.5 0 0 1 3 0v8l1-2a1.6 1.6 0 0 1 2.8 1.5L17 18c-1 2-3 3-5 3h-1c-3 0-5-2-5-5z" fill="currentColor"/></symbol>
+    <symbol id="bfi-bridge" viewBox="0 0 24 24"><path d="M2 16q10-10 20 0" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 16h20M7 11v5M12 9v7M17 11v5" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="bfi-star" viewBox="0 0 24 24"><path d="M12 2l2.6 6.6L21 9.5l-5 4.4 1.6 7L12 17.3 6.4 20.9 8 13.9 3 9.5l6.4-.9z" fill="currentColor"/></symbol>
+    <symbol id="bfi-grab" viewBox="0 0 24 24"><path d="M5 10a7 7 0 0 1 14 0v3a7 7 0 0 1-14 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="bfi-drop" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="bfi-throw" viewBox="0 0 24 24"><path d="M4 18q6-12 16-12" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="2 2.5"/><path d="M20 6l-5-1 2 4z" fill="currentColor"/><circle cx="5" cy="18" r="2.4" fill="currentColor"/></symbol>
+    <symbol id="bfi-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></symbol>
+    <symbol id="bfi-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="bfi-mana" viewBox="0 0 24 24"><path d="M12 2c4 6 7 9 7 13a7 7 0 0 1-14 0c0-4 3-7 7-13z" fill="currentColor"/></symbol>
+    <symbol id="bfi-flag" viewBox="0 0 24 24"><path d="M5 21V3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 4h11l-2.5 4L17 12H6z" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+
 <canvas id="world" aria-label="The world of Brann’s Forge"></canvas>
 
 <div class="atmosphere" aria-hidden="true">
@@ -74,10 +102,14 @@
       <p class="lede">Walk the land. Shape the world.<br>One shared adventure for up to eight players.</p>
     </header>
 
+    <!-- New: shown by lobby-ui.js bindConnectivity() when navigator.onLine is false -->
+    <p id="offlineNote" class="bf-banner" data-tone="warn" role="status" hidden>You appear to be offline. Saved worlds still open, but creating or joining needs a connection.</p>
+
     <form id="lobbyForm" class="lobby-form" novalidate>
       <div class="field">
         <label for="name">Your name</label>
-        <input id="name" name="name" maxlength="24" autocomplete="nickname" spellcheck="false" placeholder="Wanderer" enterkeyhint="done">
+        <input id="name" name="name" maxlength="24" autocomplete="nickname" spellcheck="false" placeholder="Wanderer" enterkeyhint="next" aria-describedby="nameHelp">
+        <p id="nameHelp" class="hint">Friends see this above your head. Leave blank to be “Wanderer”.</p>
       </div>
 
       <fieldset class="roles">
@@ -88,7 +120,8 @@
             <span class="role-body">
               <svg class="role-icon" aria-hidden="true"><use href="#i-hero"/></svg>
               <span class="role-name">Hero</span>
-              <span class="role-desc">Explore and fight · Desktop or VR</span>
+              <span class="role-desc">Explore and fight · Desktop, touch or VR</span>
+              <span class="role-detail">First person · eight weapons · chop, mine, build bridges</span>
             </span>
           </label>
           <label class="role-card">
@@ -97,9 +130,11 @@
               <svg class="role-icon" aria-hidden="true"><use href="#i-god"/></svg>
               <span class="role-name">God</span>
               <span class="role-desc">Shape the world · Strategy view</span>
+              <span class="role-detail">Overhead view · fourteen spells · raise land, summon, heal</span>
             </span>
           </label>
         </div>
+        <p class="hint role-switch-hint">You can switch role any time from the in-game Menu.</p>
       </fieldset>
 
       <div class="actions">
@@ -146,8 +181,111 @@
         </div>
       </div>
     </details>
+
+    <!-- New: first-play onboarding entry. Opens #controlsCard in place (non-modal). -->
+    <div class="howto-row">
+      <button id="howToPlay" class="btn btn-quiet btn-howto" type="button" aria-expanded="false" aria-controls="controlsCard">
+        <svg aria-hidden="true"><use href="#bfi-help"/></svg><span>How to play</span>
+      </button>
+    </div>
   </div>
 </main>
+
+<!-- ============ Controls card (single instance; lobby-ui.js moves it between the lobby card and the menu) ============ -->
+<section id="controlsCard" class="controls-card" aria-labelledby="controlsTitle" hidden>
+  <header class="controls-head">
+    <h2 id="controlsTitle">How to play</h2>
+    <button id="controlsClose" class="btn btn-quiet btn-icon" type="button" aria-label="Close how to play">✕</button>
+  </header>
+  <div class="controls-tabs" role="group" aria-label="Show controls for">
+    <button type="button" id="controlsTabDesktop" data-controls-tab="desktop" aria-controls="controlsPanelDesktop" aria-pressed="true">Keyboard &amp; mouse</button>
+    <button type="button" id="controlsTabTouch" data-controls-tab="touch" aria-controls="controlsPanelTouch" aria-pressed="false">Touch</button>
+    <button type="button" id="controlsTabVr" data-controls-tab="vr" aria-controls="controlsPanelVr" aria-pressed="false">VR headset</button>
+  </div>
+
+  <div id="controlsPanelDesktop" class="controls-panel" role="region" data-controls-panel="desktop" aria-labelledby="controlsTabDesktop">
+    <div class="controls-roles">
+      <section class="controls-role" data-for-role="hero">
+        <h3><svg aria-hidden="true"><use href="#i-hero"/></svg>Hero</h3>
+        <dl>
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Move · <kbd>Space</kbd> jump</dd>
+          <dt>Click world</dt><dd>Capture mouse to look; click again to attack</dd>
+          <dt>Hold click</dt><dd>Draw Emberwing or breathe Wyrmspout fire; release to loose</dd>
+          <dt><kbd>Q</kbd> / right-click</dt><dd>Weapon special (works while drawing)</dd>
+          <dt><kbd>1</kbd>–<kbd>8</kbd></dt><dd>Choose weapon</dd>
+          <dt><kbd>E</kbd> <kbd>B</kbd></dt><dd>Collect, eat or stow a held log · build bridge (3 wood)</dd>
+          <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>X</kbd></dt><dd>Grab a log or bone · drop · throw</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Release the mouse, then use Menu</dd>
+        </dl>
+      </section>
+      <section class="controls-role" data-for-role="god">
+        <h3><svg aria-hidden="true"><use href="#i-god"/></svg>God</h3>
+        <dl>
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Pan the view</dd>
+          <dt>Right-drag · wheel</dt><dd>Orbit and tilt · zoom</dd>
+          <dt>Click ground</dt><dd>Cast the chosen spell</dd>
+          <dt>Drag</dt><dd>Line spells (Sunder, Wall): press at start, release at end</dd>
+          <dt><kbd>1</kbd>–<kbd>0</kbd> <kbd>-</kbd> <kbd>=</kbd> <kbd>`</kbd> <kbd>T</kbd></dt><dd>Choose one of fourteen spells</dd>
+          <dt>Quick cast</dt><dd>Spell key casts at the pointer; hold and release for a line</dd>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <div id="controlsPanelTouch" class="controls-panel" role="region" data-controls-panel="touch" aria-labelledby="controlsTabTouch" hidden>
+    <div class="controls-roles">
+      <section class="controls-role" data-for-role="hero">
+        <h3><svg aria-hidden="true"><use href="#i-hero"/></svg>Hero</h3>
+        <dl>
+          <dt>Left stick</dt><dd>Move</dd>
+          <dt>Right stick or drag</dt><dd>Look around</dd>
+          <dt>Attack</dt><dd>Tap to strike; hold to draw a bow or breathe flame</dd>
+          <dt>★ Special</dt><dd>Reach it with a second thumb while holding Attack</dd>
+          <dt>Weapon bar</dt><dd>Eight weapons; swipe the bar sideways for more</dd>
+          <dt>⋯ Actions</dt><dd>Collect (stows a held log), Bridge, Grab, Drop, Throw</dd>
+        </dl>
+      </section>
+      <section class="controls-role" data-for-role="god">
+        <h3><svg aria-hidden="true"><use href="#i-god"/></svg>God</h3>
+        <dl>
+          <dt>Left stick</dt><dd>Pan · right stick orbits</dd>
+          <dt>Pinch or ＋ / −</dt><dd>Zoom</dd>
+          <dt>Tap the world</dt><dd>Place your aim (it does not cast yet)</dd>
+          <dt>Cast</dt><dd>Cast at the aim. Line spells: Cast at the start, then again at the end</dd>
+          <dt>Cancel</dt><dd>Clear the aim and return to the centre</dd>
+          <dt>Spell bar</dt><dd>Swipe to see all fourteen spells</dd>
+        </dl>
+      </section>
+    </div>
+    <p class="hint">Touch layout, look speed and left-handed sticks are in Menu → Display &amp; controls.</p>
+  </div>
+
+  <div id="controlsPanelVr" class="controls-panel" role="region" data-controls-panel="vr" aria-labelledby="controlsTabVr" hidden>
+    <div class="controls-roles">
+      <section class="controls-role" data-for-role="hero">
+        <h3><svg aria-hidden="true"><use href="#i-hero"/></svg>Hero in VR</h3>
+        <dl>
+          <dt>Left stick</dt><dd>Walk · A/X jump</dd>
+          <dt>Swing</dt><dd>Melee weapons hit with the tip</dd>
+          <dt>Right trigger</dt><dd>Fire crossbow; hold to nock and physically draw the bow</dd>
+          <dt>Left trigger</dt><dd>Weapon special; while drawing, lock the curve</dd>
+          <dt>Left grip</dt><dd>Cycle weapons (all except Bone)</dd>
+          <dt>Right grip</dt><dd>Grab or drop a bone, otherwise collect or eat</dd>
+          <dt>Right stick click</dt><dd>Build bridge · B/Y exits VR to the Menu</dd>
+        </dl>
+      </section>
+      <section class="controls-role" data-for-role="god">
+        <h3><svg aria-hidden="true"><use href="#i-god"/></svg>God</h3>
+        <p class="hint">The God view is played on a screen. VR is for Heroes.</p>
+      </section>
+    </div>
+    <p id="vrNote" class="hint vr-note">Checking whether this browser can open a VR headset…</p>
+  </div>
+
+  <footer class="controls-foot">
+    <button id="controlsDone" class="btn btn-primary" type="button">Got it</button>
+  </footer>
+</section>
 
 <!-- ============ In-game HUD ============ -->
 <div id="hud" class="hud" hidden>
@@ -177,35 +315,33 @@
     </div>
   </div>
 
+  <!-- New: Expedition objective banner. Pure view; renderObjective() in lobby-ui.js fills it.
+       Start/Restart only call integrator-supplied callbacks; no state is invented here. -->
+  <section id="objectiveBanner" class="objective" aria-labelledby="objectiveTitle" data-phase="" hidden>
+    <svg class="objective-icon" aria-hidden="true"><use href="#bfi-flag"/></svg>
+    <div class="objective-text">
+      <p class="objective-line"><strong id="objectiveTitle" class="objective-title"></strong><span id="objectivePhase" class="objective-phase"></span></p>
+      <p id="objectiveText" class="objective-goal" aria-live="polite"></p>
+      <div class="objective-progress" hidden>
+        <span class="objective-track" role="progressbar" id="objectiveProgress" aria-labelledby="objectiveTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="objectiveProgressFill" class="objective-fill"></span></span>
+        <span id="objectiveProgressText" class="objective-pct"></span>
+      </div>
+    </div>
+    <div class="objective-actions">
+      <button id="objectiveStart" class="btn btn-chip btn-objective" type="button" hidden>Start</button>
+      <button id="objectiveRestart" class="btn btn-chip" type="button" hidden>Restart</button>
+    </div>
+  </section>
+
   <div id="notices" class="notices"></div>
 
   <div class="hud-bottom">
     <p id="lookHint" class="look-hint" hidden>Click the world to look around</p>
-<!-- ===== Shared icon sprite (insert once, anywhere inside <body>) ===== -->
-<svg class="bf-sprite" aria-hidden="true" focusable="false" width="0" height="0">
-  <defs>
-    <symbol id="bfi-axe" viewBox="0 0 24 24"><path d="M6 21 17 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M13 3c4 0 7 3 7 7l-3 1-5-5z" fill="currentColor"/></symbol>
-    <symbol id="bfi-pick" viewBox="0 0 24 24"><path d="M7 20 15 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M4 7c5-4 11-4 16 0l-2 1c-4-2-8-2-12 0z" fill="currentColor"/></symbol>
-    <symbol id="bfi-hammer" viewBox="0 0 24 24"><path d="M8 21 14 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><rect x="9" y="3" width="11" height="7" rx="1.5" transform="rotate(30 14.5 6.5)" fill="currentColor"/><circle cx="18.5" cy="3.5" r="1.6" fill="currentColor" opacity=".7"/></symbol>
-    <symbol id="bfi-crossbow" viewBox="0 0 24 24"><path d="M3 9q9-7 18 0" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 5v16M3 9l9 4 9-4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 2l2 3h-4z" fill="currentColor"/></symbol>
-    <symbol id="bfi-bow" viewBox="0 0 24 24"><path d="M6 3q12 9 0 18" stroke="currentColor" stroke-width="2.2" fill="none"/><path d="M6 3v18M4 12h15" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M21 12l-3-2v4z" fill="currentColor"/></symbol>
-    <symbol id="bfi-limb" viewBox="0 0 24 24"><path d="M7 17 17 7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="6" cy="16" r="2.4" fill="currentColor"/><circle cx="8" cy="18" r="2.4" fill="currentColor"/><circle cx="16" cy="6" r="2.4" fill="currentColor"/><circle cx="18" cy="8" r="2.4" fill="currentColor"/></symbol>
-    <symbol id="bfi-hand" viewBox="0 0 24 24"><path d="M7 12V6a1.5 1.5 0 0 1 3 0v5V4a1.5 1.5 0 0 1 3 0v7V5a1.5 1.5 0 0 1 3 0v8l1-2a1.6 1.6 0 0 1 2.8 1.5L17 18c-1 2-3 3-5 3h-1c-3 0-5-2-5-5z" fill="currentColor"/></symbol>
-    <symbol id="bfi-bridge" viewBox="0 0 24 24"><path d="M2 16q10-10 20 0" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 16h20M7 11v5M12 9v7M17 11v5" stroke="currentColor" stroke-width="1.6"/></symbol>
-    <symbol id="bfi-star" viewBox="0 0 24 24"><path d="M12 2l2.6 6.6L21 9.5l-5 4.4 1.6 7L12 17.3 6.4 20.9 8 13.9 3 9.5l6.4-.9z" fill="currentColor"/></symbol>
-    <symbol id="bfi-grab" viewBox="0 0 24 24"><path d="M5 10a7 7 0 0 1 14 0v3a7 7 0 0 1-14 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="bfi-drop" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
-    <symbol id="bfi-throw" viewBox="0 0 24 24"><path d="M4 18q6-12 16-12" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="2 2.5"/><path d="M20 6l-5-1 2 4z" fill="currentColor"/><circle cx="5" cy="18" r="2.4" fill="currentColor"/></symbol>
-    <symbol id="bfi-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></symbol>
-    <symbol id="bfi-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
-    <symbol id="bfi-mana" viewBox="0 0 24 24"><path d="M12 2c4 6 7 9 7 13a7 7 0 0 1-14 0c0-4 3-7 7-13z" fill="currentColor"/></symbol>
-  </defs>
-</svg>
 
-<!-- ===== REGION 1: hero-tools (replaces the old hero bottom controls) ===== -->
+<!-- ===== REGION 1: hero-tools ===== -->
 <div class="hero-tools bf-hud bf-hero" id="heroTools" aria-label="Hero toolbar">
   <div class="bf-bar">
-    <div class="bf-equip" role="toolbar" aria-label="Equipment">
+    <div class="bf-equip" role="toolbar" aria-label="Weapons">
       <button type="button" class="bf-chip" data-equip="axe" aria-pressed="true" aria-keyshortcuts="1" title="Axe (1)">
         <svg aria-hidden="true"><use href="#bfi-axe"/></svg><span class="bf-name">Axe</span><kbd>1</kbd></button>
       <button type="button" class="bf-chip" data-equip="pick" aria-pressed="false" aria-keyshortcuts="2" title="Pick (2)">
@@ -218,8 +354,10 @@
         <svg aria-hidden="true"><use href="#bfi-bow"/></svg><span class="bf-name">Emberwing</span><kbd>5</kbd></button>
       <button type="button" class="bf-chip" data-equip="limb" aria-pressed="false" aria-keyshortcuts="6" title="Bone (6)">
         <svg aria-hidden="true"><use href="#bfi-limb"/></svg><span class="bf-name">Bone</span><kbd>6</kbd></button>
-      <button type="button" class="bf-chip" data-equip="wyrmspout" aria-pressed="false" aria-keyshortcuts="7" title="Wyrmspout (7)"><span aria-hidden="true">♨</span><span>Wyrmspout</span><kbd>7</kbd></button>
-      <button type="button" class="bf-chip" data-equip="flask" aria-pressed="false" aria-keyshortcuts="8" title="Emberdew (8)"><span aria-hidden="true">◈</span><span>Emberdew</span><kbd>8</kbd></button>
+      <button type="button" class="bf-chip bf-new" data-equip="wyrmspout" aria-pressed="false" aria-keyshortcuts="7" title="Wyrmspout (7)">
+        <svg aria-hidden="true"><use href="#bfi-wyrmspout"/></svg><span class="bf-name">Wyrmspout</span><kbd>7</kbd></button>
+      <button type="button" class="bf-chip bf-new" data-equip="flask" aria-pressed="false" aria-keyshortcuts="8" title="Emberdew (8)">
+        <svg aria-hidden="true"><use href="#bfi-flask"/></svg><span class="bf-name">Emberdew</span><kbd>8</kbd></button>
     </div>
 
     <details class="bf-drawer bf-actions-drawer">
@@ -246,30 +384,30 @@
   <details class="bf-drawer bf-help hero-help">
     <summary aria-label="How to fight"><svg aria-hidden="true"><use href="#bfi-help"/></svg></summary>
     <ul class="bf-help-list">
-      <li><b>Attack</b> — click, or hold the attack button to draw a bow.</li>
-      <li><b>Special</b> — Q, or the star button, even while drawing.</li>
-      <li><b>Weapons</b> — 1–6. Collect E · Bridge B · Grab F · Drop G · Throw X.</li>
+      <li><b>Attack</b> — click, or hold to draw Emberwing or breathe Wyrmspout fire.</li>
+      <li><b>Special</b> — Q, right-click or the star button, even while drawing.</li>
+      <li><b>Weapons</b> — 1–8. Grab F · stow a held log E · Drop G · Throw X · Collect E · Bridge B.</li>
     </ul>
   </details>
 </div>
 
-<!-- ===== REGION 2: god-help (replaces the old god bottom controls) ===== -->
+<!-- ===== REGION 2: god-help ===== -->
 <div class="god-tools bf-hud bf-god" id="godHelp" aria-label="Spellbook">
   <div class="bf-spells" role="radiogroup" aria-label="Spells">
     <button type="button" role="radio" class="bf-spell" data-school="summon" data-spell="skeleton"  aria-checked="true"  aria-keyshortcuts="1" title="Skeleton · 15 mana (1)"><kbd>1</kbd><span class="bf-name">Skeleton</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>15</span></button>
     <button type="button" role="radio" class="bf-spell" data-school="earth" data-spell="raise"     aria-checked="false" aria-keyshortcuts="2" title="Raise Earth · 12 mana (2)"><kbd>2</kbd><span class="bf-name">Raise Earth</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>12</span></button>
     <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="grove"     aria-checked="false" aria-keyshortcuts="3" title="Grove · 10 mana (3)"><kbd>3</kbd><span class="bf-name">Grove</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>10</span></button>
     <button type="button" role="radio" class="bf-spell" data-school="storm"  data-spell="starfall"  aria-checked="false" aria-keyshortcuts="4" title="Starfall · 25 mana (4)"><kbd>4</kbd><span class="bf-name">Starfall</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>25</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="sunder"    aria-checked="false" aria-keyshortcuts="5" title="Sunder · 14 mana (5)"><kbd>5</kbd><span class="bf-name">Sunder</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>14</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="wall"      aria-checked="false" aria-keyshortcuts="6" title="Wall · 14 mana (6)"><kbd>6</kbd><span class="bf-name">Wall</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>14</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="ring"      aria-checked="false" aria-keyshortcuts="7" title="Ring · 12 mana (7)"><kbd>7</kbd><span class="bf-name">Ring</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>12</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="summon" data-spell="golem"     aria-checked="false" aria-keyshortcuts="8" title="Golem · 45 mana (8)"><kbd>8</kbd><span class="bf-name">Golem</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>45</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="summon" data-spell="squad"     aria-checked="false" aria-keyshortcuts="9" title="Squad · 38 mana (9)"><kbd>9</kbd><span class="bf-name">Squad</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>38</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="crystal"   aria-checked="false" aria-keyshortcuts="0" title="Crystal · 20 mana (0)"><kbd>0</kbd><span class="bf-name">Crystal</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>20</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="lower"     aria-checked="false" aria-keyshortcuts="-" title="Lower · 12 mana (-)"><kbd>-</kbd><span class="bf-name">Lower</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>12</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="life"   data-spell="heal"      aria-checked="false" aria-keyshortcuts="=" title="Heal · 18 mana (=)"><kbd>=</kbd><span class="bf-name">Heal</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>18</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="sunder"    aria-checked="false" aria-keyshortcuts="5" title="Sunder · 14 mana · line (5)"><kbd>5</kbd><span class="bf-name">Sunder</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>14</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="wall"      aria-checked="false" aria-keyshortcuts="6" title="Wall · 14 mana · line (6)"><kbd>6</kbd><span class="bf-name">Wall</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>14</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="ring"      aria-checked="false" aria-keyshortcuts="7" title="Tree Ring · 12 mana (7)"><kbd>7</kbd><span class="bf-name">Ring</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>12</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="summon" data-spell="golem"     aria-checked="false" aria-keyshortcuts="8" title="Stone Golem · 45 mana (8)"><kbd>8</kbd><span class="bf-name">Golem</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>45</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="summon" data-spell="squad"     aria-checked="false" aria-keyshortcuts="9" title="Skeleton Squad · 38 mana (9)"><kbd>9</kbd><span class="bf-name">Squad</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>38</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="crystal"   aria-checked="false" aria-keyshortcuts="0" title="Crystal Bloom · 20 mana (0)"><kbd>0</kbd><span class="bf-name">Crystal</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>20</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="earth"  data-spell="lower"     aria-checked="false" aria-keyshortcuts="-" title="Lower Earth · 12 mana (-)"><kbd>-</kbd><span class="bf-name">Lower</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>12</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="life"   data-spell="heal"      aria-checked="false" aria-keyshortcuts="=" title="Healing Rain · 18 mana (=)"><kbd>=</kbd><span class="bf-name">Heal</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>18</span></button>
     <button type="button" role="radio" class="bf-spell" data-school="storm"  data-spell="lightning" aria-checked="false" aria-keyshortcuts="`" title="Lightning · 22 mana (`)"><kbd>`</kbd><span class="bf-name">Lightning</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>22</span></button>
-    <button type="button" role="radio" class="bf-spell" data-school="storm"  data-spell="frost"     aria-checked="false" aria-keyshortcuts="T" title="Frost · 20 mana (T)"><kbd>T</kbd><span class="bf-name">Frost</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>20</span></button>
+    <button type="button" role="radio" class="bf-spell" data-school="storm"  data-spell="frost"     aria-checked="false" aria-keyshortcuts="T" title="Frost Nova · 20 mana (T)"><kbd>T</kbd><span class="bf-name">Frost</span><span class="bf-cost"><svg aria-hidden="true"><use href="#bfi-mana"/></svg>20</span></button>
   </div>
 
   <div class="bf-sub">
@@ -279,7 +417,7 @@
       <summary aria-label="How to cast"><svg aria-hidden="true"><use href="#bfi-help"/></svg></summary>
       <ul class="bf-help-list">
         <li><b>Choose</b> a spell, then click the ground to cast.</li>
-        <li><b>Walls &amp; lines</b> — tap Cast at the start, then again at the end.</li>
+        <li><b>Sunder &amp; Wall</b> — drag a line; on touch, Cast at the start, then again at the end.</li>
         <li><b>Quick cast</b> casts at the pointer on key press; hold and release for a line.</li>
       </ul>
     </details>
@@ -320,6 +458,7 @@
           </span>
         </label>
       </div>
+      <p class="hint">Switching releases any held attack, drawn bow or pending line cast.</p>
     </fieldset>
 
     <section class="menu-section">
@@ -331,6 +470,11 @@
       </div>
     </section>
 
+    <!-- New: opens the shared #controlsCard inside this menu (focus stays inside the dialog). -->
+    <button id="menuControls" class="btn btn-secondary btn-howto" type="button" aria-expanded="false" aria-controls="controlsCard">
+      <svg aria-hidden="true"><use href="#bfi-help"/></svg><span>Controls &amp; how to play</span>
+    </button>
+
     <details class="menu-section saved">
       <summary>World saves</summary>
       <div class="saved-body">
@@ -340,8 +484,8 @@
         </div>
         <div id="resetArea" class="reset-area">
           <button id="reset" class="btn btn-danger-quiet" type="button">Reset world…</button>
-          <div id="resetConfirm" class="confirm" hidden>
-            <p><strong>Start this world over for everyone?</strong> A recovery copy is saved in this browser first.</p>
+          <div id="resetConfirm" class="confirm" role="alertdialog" aria-labelledby="resetQuestion" hidden>
+            <p id="resetQuestion"><strong>Start this world over for everyone?</strong> A recovery copy is saved in this browser first.</p>
             <div class="row">
               <button id="resetYes" class="btn btn-danger" type="button">Yes, reset the world</button>
               <button id="resetNo" class="btn btn-quiet" type="button">Keep it</button>

@@ -17,6 +17,8 @@ const config = {
   maxAgeMs: number('PEER_ROOM_MAX_AGE_MS', 8 * 60 * 60_000),
   shutdownIdleMs: Number(process.env.PEER_SHUTDOWN_IDLE_MS || 0),
   disconnectGraceMs: number('PEER_DISCONNECT_GRACE_MS', 15_000),
+  // A full room may reclaim a seat from a guest that has been offline this long.
+  evictOfflineMs: Number.isFinite(Number(process.env.PEER_EVICT_OFFLINE_MS)) && Number(process.env.PEER_EVICT_OFFLINE_MS) >= 0 ? Number(process.env.PEER_EVICT_OFFLINE_MS) : 5_000,
   offerMs: number('PEER_CONTINUE_OFFER_MS', 120_000),
   turnUrl: process.env.PEER_TURN_URL || '',
   turnSecret: process.env.PEER_TURN_SECRET || '',
@@ -83,12 +85,17 @@ function hostGone(room) {
 function onDeparture(peer, ws) {
   const room = peer.room;
   if (peer.ws !== ws || !rooms.has(room.code)) return;
-  peer.ws = null;
-  broadcast(room, { type: 'peer_left', peerId: peer.id, epoch: room.epoch });
+  peer.ws = null; peer.offlineAt = Date.now();
+  // An explicit leave releases a guest seat at once; a crash keeps it for reconnect.
+  const removed = !!peer.leaving && room.hostId !== peer.id;
+  if (removed) room.peers.delete(peer.id);
+  broadcast(room, { type: 'peer_left', peerId: peer.id, epoch: room.epoch, ...(removed ? { removed: true } : {}) });
   if (room.hostId === peer.id) {
     broadcast(room, { type: 'owner_lost', epoch: room.epoch });
     clearTimeout(room.hostGraceTimer);
-    room.hostGraceTimer = setTimeout(() => hostGone(room), config.disconnectGraceMs).unref();
+    // A host that chose to leave will not return: offer the world immediately.
+    if (peer.leaving) hostGone(room);
+    else room.hostGraceTimer = setTimeout(() => hostGone(room), config.disconnectGraceMs).unref();
   } else if (room.offer?.peerId === peer.id) nextOffer(room);
   touch(room);
   log('peer_disconnected', { room: room.code, peerId: peer.id, host: room.hostId === peer.id });
@@ -102,7 +109,7 @@ function validName(v) { return typeof v === 'string' && v.trim().length >= 1 && 
 function validRole(v) { return v === 'hero' || v === 'god'; }
 function attach(ws, room, peer) {
   if (peer.ws && peer.ws !== ws) peer.ws.close(4001, 'Session replaced');
-  peer.ws = ws; ws.peer = peer; peer.lastSeen = Date.now(); touch(room);
+  peer.ws = ws; ws.peer = peer; peer.lastSeen = Date.now(); peer.leaving = false; touch(room);
   if (room.hostId === peer.id) clearTimeout(room.hostGraceTimer);
   if (room.hostId === peer.id && !room.migrating) clearOffer(room);
   welcome(peer, room);
@@ -136,7 +143,16 @@ function handle(ws, message) {
       peer.name = message.name.trim(); peer.role = message.role; peer.desktop = message.desktop === true;
       attach(ws, room, peer); return;
     }
-    if (room.peers.size >= config.maxPeers) return fail(ws, 'room_full', 'This room has eight players.');
+    if (room.peers.size >= config.maxPeers) {
+      // Crashed or reloaded guests keep a seat; reclaim the longest-offline one for a new arrival.
+      const now = Date.now();
+      const stale = [...room.peers.values()].filter(p => p.id !== room.hostId && !p.ws && room.offer?.peerId !== p.id && now - (p.offlineAt || 0) >= config.evictOfflineMs)
+        .sort((a, b) => (a.offlineAt || 0) - (b.offlineAt || 0))[0];
+      if (!stale) return fail(ws, 'room_full', 'This room has eight players.');
+      room.peers.delete(stale.id);
+      broadcast(room, { type: 'peer_left', peerId: stale.id, epoch: room.epoch, removed: true });
+      log('peer_evicted', { room: room.code, peerId: stale.id });
+    }
     const peer = { id: secret().slice(0, 16), secret: secret(), name: message.name.trim(), role: message.role, desktop: message.desktop === true, revision: -1, ws: null, room };
     room.peers.set(peer.id, peer); attach(ws, room, peer); return;
   }
@@ -176,7 +192,7 @@ function handle(ws, message) {
     if (!room.migrating || room.offer || connected(room, room.peers.get(room.hostId))) return;
     room.tried.clear(); nextOffer(room);
   } else if (message.type === 'leave') {
-    ws.close(1000, 'Left room');
+    peer.leaving = true; ws.close(1000, 'Left room');
   } else if (message.type === 'ping') send(ws, { type: 'pong', at: message.at });
   else fail(ws, 'unknown_type', 'Unsupported message.');
 }

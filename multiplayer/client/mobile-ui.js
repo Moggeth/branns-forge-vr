@@ -128,8 +128,10 @@ function buildSettings() {
         guideBlock('Hero · touch', [
           ['Left stick', 'Move'],
           ['Right stick', 'Look (or drag the world)'],
-          ['Attack', 'Swing; impact occurs at the visible contact phase'],
-          ['Axe / Pick buttons', 'Choose the harvesting tool'],
+          ['Attack', 'Tap to swing; hold to draw Emberwing or breathe Wyrmspout fire'],
+          ['★ Special', 'Weapon special; reachable while holding Attack'],
+          ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
+          ['Actions ⋯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
           ['Collect / Eat', 'Pick up nearby loot or heal with an apple'],
           ['Bridge', 'Spend 3 wood to build ahead'],
           ['Jump', 'Jump'],
@@ -140,14 +142,14 @@ function buildSettings() {
           ['＋ / − or pinch', 'Zoom'],
           ['Tap the world', 'Aim at that spot (does not cast)'],
           ['Cast', 'Cast at aim; for a line, confirm the start and then the end'],
-          ['Cancel', 'Return to centre aim'],
+          ['Cancel', 'Clear the aim or a started line; return to centre aim'],
           ['Spell drawer', 'Choose one of fourteen spells'],
           ['Centre', 'Centre on your hero'],
         ]),
         guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1–8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw'], ['E / B', 'Collect or eat / build bridge'],
+          ['1–8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),
@@ -198,7 +200,7 @@ export function createMobileUI({ mount = true } = {}) {
   const strike = actionButton('strike', 'Attack', { cls: 'mui-primary mui-hero-only' });
   const jump = actionButton('jump', 'Jump', { cls: 'mui-secondary mui-hero-only' });
   const cast = actionButton('cast', 'Cast', { cls: 'mui-primary mui-god-only' });
-  const cancel = actionButton('cancel', 'Cancel aim', { cls: 'mui-secondary mui-god-only' });
+  const cancel = actionButton('cancel', 'Cancel aim or line', { cls: 'mui-secondary mui-god-only' });
   cancel._label.textContent = 'Cancel';
 
   const menuBtn = actionButton('menu', 'Menu', { cls: 'mui-util', showLabel: false });
@@ -257,7 +259,7 @@ export function createMobileUI({ mount = true } = {}) {
 
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';
     cast.setAttribute('aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');
-    cancel.disabled = !(god && targeting);
+    cancel.disabled = !god; // cancelAim() also clears a pending line start, which has no 'targeting' flag
     reticleLabel.textContent = god && targeting ? 'Target set' : '';
 
     for (const btn of [fsBtn, settings._fsButton]) {

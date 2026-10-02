@@ -5,6 +5,8 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const emit = (target, type, detail) => target.dispatchEvent(new CustomEvent(type, { detail }));
 const open = channel => channel?.readyState === 'open';
+// Pre-welcome rejections that no automatic retry can fix.
+const TERMINAL_JOIN_ERRORS = new Set(['room_not_found', 'room_full', 'invalid_room', 'invalid_identity', 'server_full', 'rate_limited']);
 
 export class PeerRoomConnection extends EventTarget {
   get identity() { return { room: this.room, peerId: this.peerId, role: this.role, secret: this.secret }; }
@@ -39,7 +41,7 @@ export class PeerRoomConnection extends EventTarget {
     emit(this, 'status', { state: this.reconnectAttempt ? 'reconnecting' : 'connecting' });
     let socket;
     try { socket = new WebSocket(this.url); } catch (error) { emit(this, 'error', { code: 'invalid_endpoint', message: String(error) }); return; }
-    this.socket = socket;
+    this.socket = socket; this.joined = false;
     const timeout = setTimeout(() => { if (generation === this.generation) socket.close(4000, 'Signaling timeout'); }, 12_000);
     socket.addEventListener('open', () => {
       if (generation !== this.generation) return socket.close();
@@ -50,7 +52,7 @@ export class PeerRoomConnection extends EventTarget {
       if (generation !== this.generation || typeof event.data !== 'string' || event.data.length > 64 * 1024) return;
       let message; try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === 'welcome') {
-        clearTimeout(timeout); this.reconnectAttempt = 0;
+        clearTimeout(timeout); this.reconnectAttempt = 0; this.joined = true;
         this.room = message.room; this.peerId = message.peerId; this.secret = message.secret;
         this.hostId = message.hostId; this.epoch = message.epoch; this.isHost = this.hostId === this.peerId;
         this.iceServers = this.iceServers || message.iceServers;
@@ -77,7 +79,19 @@ export class PeerRoomConnection extends EventTarget {
     socket.addEventListener('error', () => { if (generation === this.generation) emit(this, 'status', { state: 'signaling_unreachable' }); });
   }
   #handleSignal(message) {
-    if (message.type === 'error') { emit(this, 'error', message); return; }
+    if (message.type === 'error') {
+      if (!this.joined && message.code === 'invalid_secret' && this.secret) {
+        // The seat expired (offline too long or reclaimed by a full room). Join again as a new player
+        // instead of retrying a dead credential forever.
+        this.secret = '';
+        emit(this, 'status', { state: 'rejoining', reason: 'seat_expired' });
+        this.#signal({ type: 'join', room: this.room, name: this.name, role: this.role, desktop: this.desktop });
+        return;
+      }
+      emit(this, 'error', message);
+      if (!this.joined && TERMINAL_JOIN_ERRORS.has(message.code)) this.close();
+      return;
+    }
     if (message.type === 'peer_joined') {
       if (message.epoch !== this.epoch) return;
       this.roster.set(message.peer.id, message.peer);
@@ -86,6 +100,7 @@ export class PeerRoomConnection extends EventTarget {
     } else if (message.type === 'peer_left') {
       if (message.epoch !== this.epoch) return;
       const peer = this.roster.get(message.peerId); if (peer) peer.online = false;
+      if (message.removed === true && message.peerId !== this.peerId) this.roster.delete(message.peerId);
       this.#removePeer(message.peerId);
       emit(this, 'peer_left', { peerId: message.peerId }); emit(this, 'roster', { peers: [...this.roster.values()], epoch: this.epoch });
     } else if (message.type === 'signal') {
@@ -193,6 +208,7 @@ export class PeerRoomConnection extends EventTarget {
     const bytes = new Uint8Array(length); let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     let envelope; try { envelope = JSON.parse(decoder.decode(bytes)); } catch { return; }
+    if (!envelope || typeof envelope !== 'object') return;
     if (envelope.kind === 'checkpoint') {
       if (id !== this.hostId || !Number.isSafeInteger(envelope.revision) || envelope.revision < 0 || envelope.revision < this.checkpointRevision) return;
       this.checkpoint = envelope.state; this.checkpointRevision = envelope.revision;
@@ -224,7 +240,13 @@ export class PeerRoomConnection extends EventTarget {
   setCheckpoint(state, revision) {
     if (!this.isHost || !Number.isSafeInteger(revision) || revision < 0 || revision < this.checkpointRevision) return false;
     this.checkpoint = state; this.checkpointRevision = revision;
-    for (const id of this.peers.keys()) this.#sendEnvelope(id, { kind: 'checkpoint', state, revision });
+    // Only desktop peers can be offered the world, so only they need 2 Hz recovery points. Others
+    // keep a local backup at the 10 s autosave cadence instead of ~130 KB/s of unused checkpoints.
+    const now = Date.now();
+    for (const [id, peer] of this.peers) {
+      if (this.roster.get(id)?.desktop !== true && now - (peer.checkpointAt || 0) < 10_000) continue;
+      if (this.#sendEnvelope(id, { kind: 'checkpoint', state, revision })) peer.checkpointAt = now;
+    }
     return true;
   }
   continueWorld() { return this.#signal({ type: 'continue_world', epoch: this.epoch }); }
@@ -234,8 +256,10 @@ export class PeerRoomConnection extends EventTarget {
   #removePeer(id) { const peer = this.peers.get(id); if (!peer) return; peer.channel?.close(); peer.connection.close(); this.peers.delete(id); }
   #resetPeers() { for (const id of this.peers.keys()) this.#removePeer(id); }
   close() {
-    this.closed = true; ++this.generation; clearTimeout(this.reconnectTimer); this.#resetPeers();
-    this.socket?.close(); this.socket = null;
+    // Tell the room this is deliberate so it can free the seat or hand the world over immediately.
+    if (this.joined && this.socket?.readyState === WebSocket.OPEN) { try { this.socket.send(JSON.stringify({ type: 'leave' })); } catch { /* closing */ } }
+    this.closed = true; this.joined = false; ++this.generation; clearTimeout(this.reconnectTimer); this.#resetPeers();
+    this.socket?.close(1000); this.socket = null;
     emit(this, 'status', { state: 'disconnected' });
   }
 }

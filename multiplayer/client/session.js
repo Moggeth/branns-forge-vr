@@ -1,6 +1,11 @@
-import {createSimulation, loadSimulation, HZ} from '../shared/simulation.js';
+import {createSimulation, loadSimulation, HZ, MAX_PLAYERS} from '../shared/simulation.js';
 import {PeerRoomConnection} from '../peer/browser.js';
 import {makeSave, parseSave, WorldSaves} from './world-saves.js';
+import {quantizeWire} from './wire-quantize.js';
+
+// A dropped guest's hero (hp, inventory, tool, cooldowns) is parked on the host and restored if the
+// same peer id reconnects. Bounded by count and age; never written into saves.
+const PARK_MS = 120_000;
 
 // One owner for simulation scheduling, peer authority and recovery. No UI dependency.
 export class WorldSession extends EventTarget {
@@ -12,6 +17,7 @@ export class WorldSession extends EventTarget {
     this.running = false; this.worldId = crypto.randomUUID(); this.name = 'Little Orchard';
     this.accumulator = 0; this.last = 0; this.lastSave = 0; this.lastCheckpoint = 0;
     this.metrics = {steps:0, overruns:0, maxStepMs:0};
+    this.parked = new Map();
     this.listeners = [];
     const on = (type, handler) => {
       this.connection.addEventListener(type, handler);
@@ -48,7 +54,7 @@ export class WorldSession extends EventTarget {
   }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, {detail})); }
   connect(options = {}) {
-    this.stop(); this.identity = null; this.latest = null; this.sequence = 0;
+    this.stop(); this.identity = null; this.latest = null; this.sequence = 0; this.parked.clear();
     this.lastSave = 0; this.lastCheckpoint = 0;
     this.initialCheckpoint = options.save?.checkpoint || null;
     this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || 'Little Orchard';
@@ -67,9 +73,46 @@ export class WorldSession extends EventTarget {
     const roster = this.roster();
     if (!roster.some(p => (p.peerId || p.id) === this.identity.peerId)) roster.push(this.identity);
     const ids = new Set(roster.map(p => p.peerId || p.id));
-    for (const player of this.simulation.snapshot().players) if (!ids.has(player.id)) this.simulation.removePlayer(player.id);
+    const now = Date.now();
+    for (const [id, entry] of this.parked) if (now - entry.at > PARK_MS) this.parked.delete(id);
+    const leaving = this.simulation.snapshot().players.filter(player => !ids.has(player.id));
+    if (leaving.length) {
+      const saved = this.simulation.checkpoint().players;
+      for (const player of leaving) {
+        const record = saved.find(p => p.id === player.id);
+        this.simulation.removePlayer(player.id); // Releases any held part into the world first.
+        if (record) { this.parked.delete(player.id); this.parked.set(player.id, {record, at:now}); }
+      }
+      while (this.parked.size > MAX_PLAYERS) this.parked.delete(this.parked.keys().next().value);
+    }
     const existing = new Set(this.simulation.snapshot().players.map(p => p.id));
-    for (const p of roster) if (!existing.has(p.peerId || p.id)) this.simulation.addPlayer({id:p.peerId || p.id,name:p.name,role:p.role || 'hero'});
+    const returning = [];
+    for (const p of roster) {
+      const id = p.peerId || p.id;
+      if (existing.has(id)) continue;
+      if (this.parked.has(id)) returning.push(id);
+      else this.simulation.addPlayer({id,name:p.name,role:p.role || 'hero'});
+    }
+    if (returning.length) this.restoreParked(returning, roster);
+  }
+  restoreParked(ids, roster) {
+    const checkpoint = this.simulation.checkpoint();
+    for (const id of ids) {
+      const record = this.parked.get(id).record; this.parked.delete(id);
+      if (checkpoint.players.length >= MAX_PLAYERS) break;
+      const clampTick = n => Math.min(n, checkpoint.tick);
+      // removePlayer already dropped the carried pack into the world as pickups, so the hero returns empty-handed (no duplication).
+      checkpoint.players.push({...record, resources:{wood:0,stone:0,gems:0}, move:[0,0], vy:0, inputTick:clampTick(record.inputTick), attackTick:clampTick(record.attackTick),
+        castTick:clampTick(record.castTick), roleTick:clampTick(record.roleTick),
+        ...(record.specialTick !== undefined ? {specialTick:clampTick(record.specialTick)} : {})});
+    }
+    try { this.simulation = loadSimulation(checkpoint); }
+    catch { /* A record that no longer fits this world rejoins fresh rather than blocking the room. */ }
+    const present = new Set(this.simulation.snapshot().players.map(p => p.id));
+    for (const p of roster) {
+      const id = p.peerId || p.id;
+      if (ids.includes(id) && !present.has(id)) this.simulation.addPlayer({id,name:p.name,role:p.role || 'hero'});
+    }
   }
   promote(checkpoint) {
     if (!this.identity) return;
@@ -108,7 +151,7 @@ export class WorldSession extends EventTarget {
     return result;
   }
   receive({from,data}) {
-    if (!data || data.epoch !== this.connection.epoch) return;
+    if (!data || typeof data !== 'object' || data.epoch !== this.connection.epoch) return;
     if (this.simulation && data.kind === 'command' && this.roster().some(p => (p.peerId || p.id) === from)) {
       try { this.applyCommand(from,data.message); } catch { /* A malformed remote command cannot stop the host. */ }
     } else if (from === this.connection.hostId && !this.simulation) {
@@ -145,7 +188,8 @@ export class WorldSession extends EventTarget {
     if (self) this.identity.role = self.role;
     this.emit('snapshot',snapshot);
     // Exact sweep history is host-only; guests need current flight state, not16 old poses.
-    const wireSnapshot={...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)};
+    // Millimetre rounding keeps the same JSON shape; checkpoints below stay exact.
+    const wireSnapshot=quantizeWire({...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)});
     this.connection.broadcast({kind:'snapshot',epoch:this.connection.epoch,snapshot:wireSnapshot});
     const now = performance.now();
     if(force || now-this.lastCheckpoint > 500) {
@@ -170,7 +214,7 @@ export class WorldSession extends EventTarget {
   resetWorld() {
     if (!this.simulation) throw new Error('Only the current host can reset the world.');
     this.autoSave(true);
-    this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0;
+    this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
     this.simulation = createSimulation({room:this.identity.room,seed:41});
     this.reconcile(); this.publish(true);
   }

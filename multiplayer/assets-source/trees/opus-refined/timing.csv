@@ -1,0 +1,7 @@
+phase,start_epoch,end_epoch,seconds
+review_and_plan,1790953989,1790954090,101
+pass1_tree_only,1790954250,1790954255,5
+pass2_tree_only,1790954284,1790954292,8
+before_after_ready,1790953989,1790954308,319
+pass3_full_renders,1790954317,1790954330,13
+total_to_handoff,1790953989,1790954358,369

@@ -1,0 +1,139 @@
+[
+ {
+  "file": "orchard_apple.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 36683
+   }
+  ],
+  "triangles": 691,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.1606,
+  "materials": 2,
+  "double_sided": [
+   "LeafStem"
+  ],
+  "emissive": [],
+  "extensions": [],
+  "mesh_min_y_local": 0.004,
+  "bytes": 62728
+ },
+ {
+  "file": "reward_coffer.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 37852
+   }
+  ],
+  "triangles": 1602,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.3297,
+  "materials": 2,
+  "double_sided": [],
+  "emissive": [],
+  "extensions": [],
+  "mesh_min_y_local": -0.023,
+  "bytes": 190912
+ },
+ {
+  "file": "star_gem.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 36683
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes": 37852
+   }
+  ],
+  "triangles": 740,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.0,
+  "materials": 2,
+  "double_sided": [],
+  "emissive": [
+   "StarGem"
+  ],
+  "extensions": [
+   "KHR_materials_emissive_strength"
+  ],
+  "mesh_min_y_local": 0.0,
+  "bytes": 133412
+ },
+ {
+  "file": "star_iron_nugget.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 36683
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes": 37852
+   }
+  ],
+  "triangles": 1460,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.0,
+  "materials": 2,
+  "double_sided": [],
+  "emissive": [
+   "StarIron",
+   "StarGem"
+  ],
+  "extensions": [
+   "KHR_materials_emissive_strength"
+  ],
+  "mesh_min_y_local": 0.0,
+  "bytes": 139588
+ },
+ {
+  "file": "stone_chunk.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 37852
+   }
+  ],
+  "triangles": 1280,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.0,
+  "materials": 1,
+  "double_sided": [],
+  "emissive": [],
+  "extensions": [],
+  "mesh_min_y_local": 0.0,
+  "bytes": 83124
+ },
+ {
+  "file": "treasure_satchel.glb",
+  "errors": [],
+  "images": [
+   {
+    "mime": "image/jpeg",
+    "bytes": 37852
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes": 36683
+   }
+  ],
+  "triangles": 1224,
+  "winding_agrees_with_normals": 1.0,
+  "color0_white_fraction": 0.0603,
+  "materials": 3,
+  "double_sided": [],
+  "emissive": [],
+  "extensions": [],
+  "mesh_min_y_local": 0.0,
+  "bytes": 128072
+ }
+]

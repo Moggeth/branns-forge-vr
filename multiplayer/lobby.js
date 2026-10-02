@@ -4,6 +4,9 @@ import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
+import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
+import { adventureView } from './shared/adventure.js';
+import { createAdventureBanner } from './client/adventure-view.js';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -35,6 +38,7 @@ const humanize = code => String(code || '').replaceAll('_', ' ').replace(/^\w/, 
 function friendlyError(detail) {
   const code = String(detail?.code || '').toLowerCase();
   const raw = typeof detail?.message === 'string' ? detail.message : '';
+  const known = knownErrorText(code); if (known) return known;
   if (/not.?found|unknown.?room|no.?room/.test(code)) return 'We couldn’t find a world with that code. Check the digits with your friend.';
   if (code === 'inventory_full') return 'Your supplies are full. Use some before collecting more.';
   if (code === 'insufficient_resources') return 'A bridge needs 3 wood. Chop a tree, then collect its logs.';
@@ -52,7 +56,7 @@ let mobile = null, xrActive = false;
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false;
-let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false;
+let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
 const shown = {};             // cache of last rendered HUD values
@@ -89,7 +93,11 @@ if (ROOM_PATTERN.test(invited)) {
   setText($('inviteNote'), 'You’ve been invited! Pick a name and role, then join.');
 }
 
-$('lobbyForm').addEventListener('submit', event => { event.preventDefault(); joinFromForm(); });
+$('lobbyForm').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
+  joinFromForm();
+});
 $('create').addEventListener('click', () => start({create: true}));
 
 function joinFromForm() {
@@ -137,7 +145,7 @@ $('import').addEventListener('change', async event => {
     if (file.size > 2_000_000) throw new Error('World files must be smaller than 2 MB.');
     const save = parseSave(await file.text());
     start({create: true, save});
-  } catch (error) { showLobbyProblem(friendlyError({message: error?.message}) || 'That file isn’t a Brann’s Forge world.', {back: true}); }
+  } catch (error) { showLobbyProblem(error?.message ? friendlyError({message: error.message}) : 'That file isn’t a Brann’s Forge world.', {back: true}); }
 });
 
 // ---------------------------------------------------------------- lobby status panel
@@ -169,6 +177,7 @@ function setPhase(next) {
   $('lobby').hidden = next === 'game';
   $('hud').hidden = next !== 'game';
   if (next !== 'game') closeMenu(false);
+  if (next === 'game') controlsCard?.close({restoreFocus: false});
   syncActive();
 }
 function syncActive() {
@@ -184,6 +193,7 @@ function teardown() {
   const old = session; session = null;
   try { old?.dispose(); } catch (error) { console.warn('Session cleanup failed', error); }
   connected = false; playerId = null; appliedRole = null; lastSnapshot = null;
+  expeditionBanner?.element.remove(); expeditionBanner = null;
   clearNotices();
 }
 
@@ -286,7 +296,7 @@ function onStatus(detail) {
   if (connected) { for (const id of ['net','owner','waiting','continue','relay']) removeNotice(id); return; }
   if (state === 'reconnecting' || state === 'connecting') notice('net', STATUS_TEXT[state], null, 'info');
   else if (state === 'disconnected' || state === 'closed') {
-    notice('net', `${STATUS_TEXT[state]} Your progress is saved in this browser.`, {label: 'Rejoin', run: () => start({create: false, room})}, 'warn');
+    notice('net', `${STATUS_TEXT[state]} Your progress is saved in this browser.`, {label: 'Rejoin', run: () => { const code = room; setPhase('lobby'); start({create: false, room: code}); }}, 'warn');
   }
 }
 
@@ -305,6 +315,29 @@ function recordProblem(problem) {
   console.warn('[Brann’s Forge]', problem);
 }
 
+// ---------------------------------------------------------------- Forge Expedition (optional co-op run, shared/adventure.js)
+let expeditionBanner = null;
+function expeditionAction(action) {
+  const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
+  if (!session || !adv || !self) return;
+  const send = payload => session.command('adventure', payload);
+  if (action === 'start' || action === 'rematch') return void send({action: 'start'});
+  if (action === 'retry' || action === 'leave') return void send({action});
+  if (action === 'deposit') {
+    // One message per carried kind the current stage can use; the simulation takes only what is still needed.
+    const kinds = adv.stage === 'camp' ? ['wood', 'stone'] : adv.stage === 'star' ? ['gems'] : ['wood', 'stone', 'gems'];
+    const carried = kinds.filter(k => (self.resources?.[k] || 0) > 0);
+    if (!carried.length) return void toast(adv.stage === 'star' ? 'Mine star shards with the pick, then bring the gems to the forge.' : 'Gather timber or stone first, then bring it to the forge.');
+    for (const kind of carried) send({action: 'deposit', kind, amount: Math.min(99, self.resources[kind])});
+    return;
+  }
+  if (action === 'tithe') {
+    const kind = adv.stage === 'camp' ? (adv.stock.wood / Math.max(1, adv.need.wood) <= adv.stock.stone / Math.max(1, adv.need.stone) ? 'wood' : 'stone') : undefined;
+    return void send(kind ? {action, kind} : {action});
+  }
+  if (action === 'lodestar') { const star = adventureView(adv, snap, playerId).star; if (star) send({action, point: [star.x, 0, star.z]}); }
+}
+
 // ---------------------------------------------------------------- snapshots → HUD (text only, never re-rendered)
 function onSnapshot(snapshot) {
   if (!snapshot || !Array.isArray(snapshot.players)) return;
@@ -319,6 +352,7 @@ function onSnapshot(snapshot) {
     applyRoleUi(self.role);
   }
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
+  if (snapshot.adventure) try { if (!expeditionBanner) { expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction}); expeditionBanner.element.style.top = 'calc(env(safe-area-inset-top, 0px) + 66px)'; } expeditionBanner.update(adventureView(snapshot.adventure, snapshot, playerId)); } catch (error) { recordProblem(error); }
 
   const count = `${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
@@ -351,6 +385,7 @@ function applyRoleUi(role) {
   $('hudRoleUse').setAttribute('href', role === 'god' ? '#i-god' : '#i-hero');
   for (const radio of document.querySelectorAll('input[name="menuRole"]')) radio.checked = radio.value === role;
   $('vr').hidden = !(vrSupported && role === 'hero');
+  setText($('vrNote'), describeVr({supported: vrChecked ? vrSupported : null, secure: window.isSecureContext !== false, role}));
   if (role !== 'hero' && document.pointerLockElement === canvas) document.exitPointerLock?.();
   mobile?.update({active:phase === 'game' && connected && !menuOpen,role:currentRole,xr:xrActive});
   updateLookHint();
@@ -531,6 +566,7 @@ $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur()
 for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
 $('throw')?.addEventListener('click',()=>{game?.release(true);$('throw').blur();});
 $('quickCast')?.addEventListener('change',()=>game?.setQuickCast($('quickCast').checked));
+releaseFocusAfterPointer($('quickCast'));
 // ---------------------------------------------------------------- keyboard & pointer
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
@@ -575,9 +611,9 @@ try {
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
   Promise.resolve().then(() => game.canVR()).then(supported => {
-    vrSupported = !!supported;
+    vrSupported = !!supported; vrChecked = true;
     applyRoleUi(currentRole);
-  }).catch(() => { vrSupported = false; });
+  }).catch(() => { vrSupported = false; vrChecked = true; applyRoleUi(currentRole); });
 } catch (error) {
   rendererFailed = true;
   recordProblem(error);
@@ -585,6 +621,14 @@ try {
   $('create').disabled = true; $('join').disabled = true;
 }
 
+const controlsCard = bindControlsCard(document, {store,
+  role: () => phase === 'game' ? currentRole : chosenRole(),
+  scheme: () => detectControlScheme({xrPresenting: xrActive, touchMode: store.get('branns-forge.touch.mode') || 'auto', coarse: matchMedia('(any-pointer: coarse)').matches, maxTouchPoints: navigator.maxTouchPoints || 0})});
+bindConnectivity(document, window);
+// Expedition integration point: the owning module assigns these; buttons stay hidden unless canStart/canRestart.
+export const objectiveHooks = {onStart: null, onRestart: null};
+bindObjectiveActions(document, {onStart: () => objectiveHooks.onStart?.(), onRestart: () => objectiveHooks.onRestart?.()});
+export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});

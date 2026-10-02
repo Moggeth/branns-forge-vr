@@ -1,0 +1,261 @@
+/* Brann's Forge — UI refinement layer (loads after lobby.css + combat-hud.css).
+   Additive: new components (objective banner, controls card, offline banner) plus
+   targeted fixes for touch size, focus, role gating and 360px layouts.
+   No fonts, images or network requests. Remove the <link> to roll back. */
+
+:root {
+  --bf-soot: #14110e;
+  --bf-ink: rgba(20, 17, 14, .86);
+  --bf-ink-2: rgba(34, 27, 21, .92);
+  --bf-parch: #f1e4c8;
+  --bf-parch-dim: #cdbb98;
+  --bf-ember: #f08a3c;
+  --bf-ember-hot: #ffb35a;
+  --bf-gold: #e7c27a;
+  --bf-moss: #8fbf7a;
+  --bf-frost: #9cc8e8;
+  --bf-blood: #e06a55;
+  --bf-line: rgba(231, 194, 122, .28);
+  --bf-radius: 14px;
+  --bf-touch: 48px;
+  --bf-focus: 0 0 0 3px var(--bf-soot), 0 0 0 5px var(--bf-ember-hot);
+  --bf-safe-t: env(safe-area-inset-top, 0px);
+  --bf-safe-r: env(safe-area-inset-right, 0px);
+  --bf-safe-b: env(safe-area-inset-bottom, 0px);
+  --bf-safe-l: env(safe-area-inset-left, 0px);
+  --bf-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ---------- universal affordances ---------- */
+:where(button, summary, [role="radio"], input, select, .file-btn):focus-visible {
+  outline: none;
+  box-shadow: var(--bf-focus);
+}
+.file-btn:focus-within { box-shadow: var(--bf-focus); }
+:where(button)[disabled] { opacity: .45; cursor: not-allowed; filter: saturate(.4); }
+:where(.btn, .bf-chip, .bf-act, .bf-spell, .bf-special, .bf-drawer > summary, .mui-btn) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;           /* no double-tap zoom delay on controls */
+  user-select: none; -webkit-user-select: none;
+}
+@media (any-pointer: coarse) {
+  :where(.btn, .bf-chip, .bf-act, .bf-spell, .bf-special, .bf-drawer > summary, .file-btn, .controls-tabs > button) {
+    min-height: var(--bf-touch);
+    min-width: var(--bf-touch);
+  }
+}
+kbd {
+  font: 600 .7em/1 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  padding: .18em .38em; border-radius: 4px;
+  border: 1px solid var(--bf-line); border-bottom-width: 2px;
+  background: rgba(255, 255, 255, .06); color: var(--bf-parch-dim);
+}
+
+/* ---------- lobby ---------- */
+.lobby .card { max-width: min(560px, calc(100vw - 20px - var(--bf-safe-l) - var(--bf-safe-r))); }
+.lobby .hint { line-height: 1.4; }
+.role-card { position: relative; cursor: pointer; }
+.role-card .role-body { transition: transform .18s var(--bf-ease), border-color .18s, box-shadow .18s; }
+.role-card:has(input:checked) .role-body {
+  border-color: var(--bf-ember);
+  box-shadow: 0 0 0 1px var(--bf-ember), 0 8px 24px -10px rgba(240, 138, 60, .7);
+}
+.role-card:has(input:focus-visible) .role-body { box-shadow: var(--bf-focus); }
+.role-card:has(input:checked) .role-body::after {
+  content: "✓"; position: absolute; top: 8px; right: 10px;
+  font-weight: 800; color: var(--bf-ember-hot);
+}
+.role-detail {
+  display: block; margin-top: 4px;
+  font-size: .78rem; line-height: 1.35; color: var(--bf-parch-dim); opacity: .9;
+}
+.roles-compact .role-detail { display: none; }
+/* Phones: keep "Create a world" above the fold (the extra lines cost ~95px at 360×780).
+   #nameHelp stays available to screen readers through aria-describedby. */
+@media (max-width: 480px) and (max-height: 900px) {
+  .lobby .role-detail, .lobby .role-switch-hint, .lobby #nameHelp { display: none; }
+}
+.role-switch-hint { margin: 6px 0 0; font-size: .8rem; }
+#name[aria-invalid="true"], #room[aria-invalid="true"] { border-color: var(--bf-blood); box-shadow: 0 0 0 2px rgba(224, 106, 85, .35); }
+#room { font-variant-numeric: tabular-nums; letter-spacing: .12em; }
+body.lobby-busy .lobby-form { opacity: .55; filter: grayscale(.3); transition: opacity .2s; }
+#lobbyStatus.problem { border-left: 3px solid var(--bf-blood); }
+#lobbyStatus.busy { border-left: 3px solid var(--bf-ember); }
+
+.bf-banner {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 10px;
+  font-size: .88rem; line-height: 1.4;
+  background: rgba(240, 138, 60, .12); border: 1px solid rgba(240, 138, 60, .45); color: var(--bf-parch);
+}
+.bf-banner[data-tone="warn"]::before { content: "⚠ "; color: var(--bf-ember-hot); }
+
+.howto-row { display: flex; justify-content: center; margin-top: 10px; }
+.btn-howto { display: inline-flex; align-items: center; gap: 8px; }
+.btn-howto svg { width: 20px; height: 20px; flex: none; }
+body.first-play #howToPlay { color: var(--bf-ember-hot); border-color: var(--bf-ember); animation: bf-beckon 2.4s var(--bf-ease) 3; }
+@keyframes bf-beckon { 0%, 100% { box-shadow: 0 0 0 0 rgba(240, 138, 60, 0); } 50% { box-shadow: 0 0 0 6px rgba(240, 138, 60, .25); } }
+
+/* ---------- controls card (lobby inline, or inside the menu dialog) ---------- */
+.controls-card {
+  margin-top: 12px; padding: 14px; border-radius: var(--bf-radius);
+  background: var(--bf-ink-2); border: 1px solid var(--bf-line);
+  color: var(--bf-parch);
+}
+.controls-card[hidden] { display: none; }
+.controls-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.controls-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: .02em; }
+.controls-head h2:focus { outline: none; }
+.btn-icon { width: var(--bf-touch); height: var(--bf-touch); padding: 0; display: inline-grid; place-items: center; font-size: 1.1rem; }
+.controls-tabs {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  margin: 10px 0; padding: 4px; border-radius: 12px; background: rgba(0, 0, 0, .28);
+}
+.controls-tabs > button {
+  min-height: 44px; padding: 6px 4px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--bf-parch-dim); font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer;
+}
+.controls-tabs > button[aria-pressed="true"] { background: var(--bf-ember); color: var(--bf-soot); }
+.controls-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.controls-role { padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, .22); border: 1px solid transparent; }
+.controls-card[data-active-role="hero"] .controls-role[data-for-role="hero"],
+.controls-card[data-active-role="god"] .controls-role[data-for-role="god"] { border-color: var(--bf-ember); }
+.controls-role h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: .95rem; color: var(--bf-gold); }
+.controls-role h3 svg { width: 22px; height: 22px; }
+.controls-role dl { display: grid; grid-template-columns: minmax(84px, auto) 1fr; gap: 5px 10px; margin: 0; font-size: .84rem; line-height: 1.35; }
+.controls-role dt { color: var(--bf-parch); font-weight: 600; }
+.controls-role dd { margin: 0; color: var(--bf-parch-dim); }
+.controls-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.vr-note { margin: 8px 0 0; }
+@media (max-width: 400px) {
+  .controls-role dl { grid-template-columns: 1fr; gap: 2px; }
+  .controls-role dd { margin-bottom: 6px; }
+}
+
+/* ---------- objective banner (Expedition) ---------- */
+.objective {
+  position: absolute; z-index: 3;
+  top: calc(var(--bf-safe-t) + 80px); left: 50%; transform: translateX(-50%);
+  width: min(440px, calc(100vw - 20px - var(--bf-safe-l) - var(--bf-safe-r)));
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 12px; border-radius: 12px;
+  background: var(--bf-ink); border: 1px solid var(--bf-line);
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, .7);
+  color: var(--bf-parch); pointer-events: auto;
+}
+.objective[hidden] { display: none; }
+.objective-icon { width: 22px; height: 22px; flex: none; color: var(--bf-ember-hot); }
+.objective-text { flex: 1; min-width: 0; }
+.objective-line { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: .86rem; }
+.objective-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bf-gold); }
+.objective-phase {
+  flex: none; padding: 1px 7px; border-radius: 99px; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  background: rgba(255, 255, 255, .08); color: var(--bf-parch-dim);
+}
+.objective-phase:empty { display: none; }
+.objective[data-phase="active"] .objective-phase, .objective[data-phase="running"] .objective-phase { background: rgba(240, 138, 60, .22); color: var(--bf-ember-hot); }
+.objective[data-phase="complete"] .objective-phase, .objective[data-phase="won"] .objective-phase { background: rgba(143, 191, 122, .2); color: var(--bf-moss); }
+.objective[data-phase="failed"] .objective-phase, .objective[data-phase="lost"] .objective-phase { background: rgba(224, 106, 85, .2); color: var(--bf-blood); }
+.objective-goal { margin: 2px 0 0; font-size: .8rem; line-height: 1.3; color: var(--bf-parch-dim);
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.objective-progress { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.objective-progress[hidden] { display: none; }
+.objective-track { position: relative; flex: 1; height: 6px; border-radius: 99px; overflow: hidden; background: rgba(255, 255, 255, .1); }
+.objective-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--bf-ember), var(--bf-gold)); transition: transform .3s var(--bf-ease); }
+.objective-pct { font-size: .72rem; font-variant-numeric: tabular-nums; color: var(--bf-parch-dim); }
+.objective-actions { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.objective-actions:not(:has(button:not([hidden]))) { display: none; }
+.btn-objective { background: var(--bf-ember); color: var(--bf-soot); font-weight: 700; }
+/* lobby.css puts .notices at top:84px; slide them under the banner while it is shown. */
+body:has(#objectiveBanner:not([hidden])) .notices { margin-top: 74px; }
+body.touch-controls-active .objective { top: calc(var(--bf-safe-t) + 58px); width: min(420px, calc(100vw - 20px)); }
+/* Portrait touch: lobby.css pins hero-tools at top:112px (≤600px), so the banner sits beneath them;
+   God's spell bar lives at the bottom, so the banner can take the 112px slot. */
+@media (max-width: 600px) and (orientation: portrait) {
+  body.touch-controls-active[data-role="hero"] .objective { top: calc(var(--bf-safe-t) + 208px); }
+  body.touch-controls-active[data-role="god"] .objective { top: calc(var(--bf-safe-t) + 112px); }
+  body.touch-controls-active .objective-goal { -webkit-line-clamp: 1; line-clamp: 1; }
+  /* pre-existing overlap: mobile-ui.css put notices at 64px, behind the hero tools (112–200px) */
+  body.touch-controls-active[data-role="hero"] .notices { top: calc(var(--bf-safe-t) + 208px); }
+  body.touch-controls-active:has(#objectiveBanner:not([hidden])) .notices { margin-top: 90px; }
+  body.touch-controls-active[data-role="god"]:has(#objectiveBanner:not([hidden])) .notices { top: calc(var(--bf-safe-t) + 112px); }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  body .objective, body.touch-controls-active .objective { top: calc(var(--bf-safe-t) + 58px); width: min(400px, 52vw); padding: 5px 8px; }
+  .objective-goal { -webkit-line-clamp: 1; line-clamp: 1; }
+}
+
+/* ---------- role gating (only the active role's tools; keeps view space large) ---------- */
+body[data-role="god"] .bf-hero,
+body[data-role="hero"] .bf-god { display: none !important; }
+body.xr .hud-bottom { display: none; }   /* VR draws its own controls; free the canvas */
+
+/* ---------- hero weapon bar: eight weapons fit 360px via snap-scroll ---------- */
+.bf-equip {
+  display: flex; gap: 4px; max-width: 100%;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+}
+.bf-equip::-webkit-scrollbar, .bf-spells::-webkit-scrollbar { display: none; }
+.bf-chip { scroll-snap-align: start; flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bf-chip svg, .bf-act svg, .bf-special svg { width: 22px; height: 22px; }
+/* selected weapon/spell styling is left to combat-hud.css (gold fill reads strongest; checked in preview) */
+.bf-chip.bf-new::after {   /* tiny "new" spark for the two newest weapons; purely decorative */
+  content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--bf-ember-hot); box-shadow: 0 0 6px var(--bf-ember);
+}
+.bf-chip { position: relative; }
+.bf-special { min-width: 56px; min-height: 56px; }
+.bf-hint { min-height: 1.3em; }
+
+/* ---------- god spell bar ---------- */
+.bf-spells {
+  display: flex; gap: 4px; max-width: 100%;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+}
+.bf-spell { flex: none; scroll-snap-align: start; position: relative; }
+.bf-spell[data-school="earth"]  { --school: #c9a46a; }
+.bf-spell[data-school="summon"] { --school: #b59ad8; }
+.bf-spell[data-school="storm"]  { --school: var(--bf-frost); }
+.bf-spell[data-school="life"]   { --school: var(--bf-moss); }
+.bf-spell::before { content: ""; position: absolute; left: 6px; right: 6px; top: 0; height: 2px; border-radius: 2px; background: var(--school, var(--bf-gold)); opacity: .8; }
+.bf-toggle { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.bf-toggle:has(input:focus-visible) .bf-switch { box-shadow: var(--bf-focus); }
+
+/* ---------- touch layout ---------- */
+body.touch-controls-active .bf-chip kbd,
+body.touch-controls-active .bf-act kbd,
+body.touch-controls-active .bf-special kbd,
+body.touch-controls-active .bf-spell kbd { display: none; }
+body.touch-controls-active .bf-chip { min-width: 52px; padding: 4px 6px; }
+body.touch-controls-active .bf-chip .bf-name,
+body.touch-controls-active .bf-spell .bf-name { font-size: .66rem; line-height: 1.1; }
+body.touch-controls-active .bf-help { display: none; }   /* the controls card in Menu replaces it */
+@media (max-width: 400px) {
+  body.touch-controls-active .bf-sub .bf-hint { font-size: .72rem; }
+  .hud-room .btn-chip { padding-inline: 10px; }
+}
+
+/* ---------- notices / toast ---------- */
+.notice { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.notice p { flex: 1 1 200px; margin: 0; }
+.notice[data-tone="warn"] { border-left: 3px solid var(--bf-blood); }
+.notice[data-tone="action"] { border-left: 3px solid var(--bf-ember); }
+.notice[data-tone="info"] { border-left: 3px solid var(--bf-frost); }
+.notice .btn { min-height: 44px; }
+.toast { max-width: min(520px, calc(100vw - 24px)); }
+
+/* ---------- menu ---------- */
+.menu-card .btn-howto { justify-content: center; }
+.confirm[role="alertdialog"] { border-left: 3px solid var(--bf-blood); padding-left: 10px; }
+.btn-leave { color: var(--bf-parch-dim); }
+
+/* ---------- motion & contrast ---------- */
+@media (prefers-reduced-motion: reduce) {
+  body.first-play #howToPlay { animation: none; }
+  .objective-fill, .role-card .role-body { transition: none; }
+}
+@media (forced-colors: active) {
+  .bf-chip[aria-pressed="true"], .bf-spell[aria-checked="true"], .controls-tabs > button[aria-pressed="true"] { outline: 2px solid Highlight; }
+}

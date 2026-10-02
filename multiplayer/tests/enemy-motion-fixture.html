@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Standalone review fixture. Copy to multiplayer/tests/ next to the other
+     *-playtest.html files and open through the Vite dev server. It uses the
+     real /assets/skeleton.glb + golem.glb, prepareAsset() and the same clip
+     selection rule as game.js. Not captured/verified by this commission. -->
+<html><head><meta charset="utf-8"><title>Enemy motion fixture</title>
+<style>body{margin:0;background:#1c2024;color:#ddd;font:13px system-ui}#ui{position:fixed;top:8px;left:8px;display:flex;gap:6px;flex-wrap:wrap}button{background:#334;color:#eee;border:1px solid #556;padding:5px 9px;border-radius:4px}#hud{position:fixed;bottom:8px;left:8px}</style></head>
+<body><div id="ui"><button id="attack">Attack</button><button id="hitHead">Hit head</button><button id="hitArm">Hit right arm</button><button id="hitTorso">Hit torso (from left)</button><button id="legL">Toggle left leg</button><button id="walk">Toggle walk</button><button id="layer">Toggle layer</button></div><div id="hud"></div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import {applyEnemyMotion, noteEnemyHit} from '../client/enemy-motion.js';
+const renderer = new THREE.WebGLRenderer({antialias: true}); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, .05, 100);
+scene.add(new THREE.HemisphereLight(0xdde8ff, 0x403020, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(3, 6, 2); scene.add(sun);
+const height = (x, z) => .22 * Math.sin(.8 * x) + .18 * Math.cos(.6 * z) + .06 * x;
+const ground = new THREE.PlaneGeometry(24, 24, 96, 96); ground.rotateX(-Math.PI / 2);
+const p = ground.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, height(p.getX(i), p.getZ(i))); ground.computeVertexNormals();
+scene.add(new THREE.Mesh(ground, new THREE.MeshStandardMaterial({color: 0x56704a, roughness: 1, wireframe: false})));
+const loader = new GLTFLoader(), load = n => new Promise((ok, no) => loader.load(`/assets/${n}.glb`, ok, undefined, no));
+const [sk, go] = await Promise.all([load('skeleton'), load('golem')]);
+const actors = [];
+function spawn(template, kind, h, id, x) {
+  const {visual, model} = prepareAsset(template, kind, h), root = new THREE.Group(); root.add(visual); scene.add(root);
+  const mixer = new THREE.AnimationMixer(model), find = n => template.animations.find(a => a.name.toLowerCase().includes(n));
+  const actions = {idle: mixer.clipAction(find('idle') || template.animations[0]), walk: mixer.clipAction(find('walk') || find('idle'))};
+  for (const n of ['attack', 'stagger']) { const c = find(n); if (c) { actions[n] = mixer.clipAction(c); actions[n].setLoop(THREE.LoopOnce, 1); actions[n].clampWhenFinished = true; } }
+  actions.idle.play();
+  const entry = {root, visual, enemy: true, data: {id, kind, attackTick: -1000, missingParts: [], yaw: 0}, mixer, actions, motion: 'idle', x0: x};
+  actors.push(entry); return entry;
+}
+spawn(sk, 'skeleton', 1.7, 'e1', -1.2); spawn(go, 'golem', 2.8, 'e2', 1.6);
+let tick = 0, walking = false, layer = true, acc = 0;
+const hit = (part, normal) => { for (const e of actors) { e.data.hurtTick = tick; noteEnemyHit(e, {part, normal, tick}); } };
+document.getElementById('attack').onclick = () => actors.forEach(e => e.data.attackTick = tick);
+document.getElementById('hitHead').onclick = () => hit('head', [0, 0, -1]);
+document.getElementById('hitArm').onclick = () => hit('rightArm', [0, 0, -1]);
+document.getElementById('hitTorso').onclick = () => hit('torso', [-1, 0, 0]);
+document.getElementById('legL').onclick = () => actors.forEach(e => e.data.missingParts = e.data.missingParts.includes('leftLeg') ? [] : ['leftLeg']);
+document.getElementById('walk').onclick = () => walking = !walking;
+document.getElementById('layer').onclick = () => layer = !layer;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(.05, clock.getDelta()); acc += dt * 60; const whole = Math.floor(acc); tick += whole; acc -= whole;
+  for (const e of actors) {
+    const r = e.root, speed = e.data.kind === 'golem' ? 1.25 : 2;
+    if (walking) { r.position.z = ((r.position.z - speed * dt + 8) % 16) - 8; } r.position.x = e.x0; r.position.y = height(r.position.x, r.position.z);
+    const age = tick - (e.data.hurtTick ?? -1000), attackAge = tick - e.data.attackTick;
+    const motion = age < 22 && e.actions.stagger ? 'stagger' : attackAge < 28 && e.actions.attack ? 'attack' : walking ? 'walk' : 'idle';
+    if (motion !== e.motion) { e.actions[e.motion].fadeOut(.18); e.actions[motion].reset().fadeIn(.18).play(); e.motion = motion; }
+    e.mixer.update(dt);
+    if (layer) applyEnemyMotion(e, {tick: tick + acc, dt, height});
+  }
+  const focus = actors[0].root.position; camera.position.set(focus.x + 3.2, focus.y + 1.6, focus.z + 3.4); camera.lookAt(focus.x + 1, focus.y + 1, focus.z);
+  document.getElementById('hud').textContent = `tick ${tick} layer ${layer ? 'ON' : 'OFF'} walk ${walking}`;
+  renderer.render(scene, camera);
+});
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script></body></html>

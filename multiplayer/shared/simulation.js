@@ -4,6 +4,8 @@ import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
 import {TOOLS,PARTS,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
+import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
+import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs} from './trees.js';
 export const HZ = 60;
 export const MAX_PLAYERS = 8;
 const BOUND = 55, MAX_WORLD = 64;
@@ -63,7 +65,7 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[])].map(x=>x.id);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[])].map(x=>x.id);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
 function damageEnemy(state, enemy, amount, events) {
@@ -75,7 +77,7 @@ function damageHero(state, hero, amount, events) {
   events.push(event('hit', hero.position, hero.id));
   if (hero.hp <= 0) {
     events.push(event('death', hero.position, hero.id));
-    releaseHeld(state,hero,[0,0,0]);
+    releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
     hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];
   }
 }
@@ -84,13 +86,25 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
   return {version: 1, contentVersion: 3, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
   const fireContext={nextId,terrainHeight,damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
   const combatContext={nextId,terrainHeight,fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext)};
   const player = id => state.players.find(p => p.id === id);
+  // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
+  const treeIndex = createTreeIndex();
+  const addPickup = (kind,x,z,amount) => { if (state.pickups.length >= 256) return null; const idNew=nextId(state,'p'); state.pickups.push({id:idNew,kind,x,z,y:terrainHeight(state,x,z),amount}); return idNew; };
+  const treeContext = {terrainHeight, nextId, makePickup: addPickup};
+  // A leaving player's pack falls where they stood (gems first: star shards are finite) in <=10-unit pickups, at most 24,
+  // so a Hero who leaves mid-expedition cannot strand the team. Parked reconnect records rejoin with an empty pack (no duplicates).
+  const dropCarried = p => { let slot = 0; for (const kind of ['gems','stone','wood']) { while ((p.resources?.[kind] | 0) > 0 && slot < 24) {
+    const n = Math.min(10, p.resources[kind]), a = slot * 2.39996, r = .7 + .25 * (slot % 3);
+    if (!addPickup(kind, clamp(p.position[0] + Math.cos(a) * r, -BOUND, BOUND), clamp(p.position[2] + Math.sin(a) * r, -BOUND, BOUND), n)) return;
+    p.resources[kind] -= n; slot++; } } };
+  // Optional Forge Expedition (shared/adventure.js): command results since the last step feed its deed tracking.
+  const adventureEvents = [], adventureContext = {createEnemy, terrainHeight};
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
       if (!validId(id) || player(id)) return fail('invalid_player');
@@ -104,11 +118,26 @@ function instantiate(state) {
     },
     removePlayer(id) {
       const p = player(id); if (!p) return fail('not_joined');
-      releaseHeld(state,p,[0,0,0]);
+      releaseHeld(state,p,[0,0,0]); releaseLog(state,p); dropCarried(p);
       state.players.splice(state.players.indexOf(p), 1);
       return ok([event('leave', p.position, id)]);
     },
     command(id, message) {
+      const p = player(id);
+      if (p && message?.type === 'adventure') {
+        const r = adventureAction(state.adventure, id, message, state);
+        if (safeSeq(message.seq) && message.seq > p.seq) p.seq = message.seq; // one monotonic sequence per player across sim and expedition
+        if (!r.ok) return fail(r.code);
+        applyAdventureIntents(state, r.intents, adventureContext); return ok(r.events);
+      }
+      const gate = p && message?.type === 'cast' && p.role === 'god' && safeSeq(message.seq) && message.seq > p.seq ? adventureCastGate(state.adventure, id, message, state) : null;
+      if (gate && !gate.ok) { p.seq = message.seq; return fail(gate.code); }
+      const result = api.baseCommand(id, message, p);
+      if (gate && !result.ok) adventureCastRefund(state.adventure, gate);
+      if (result.events?.length && adventureEvents.length < 256) adventureEvents.push(...result.events);
+      return result;
+    },
+    baseCommand(id, message) {
       const p = player(id);
       if (!p) return fail('not_joined');
       if (!message || typeof message !== 'object') return fail('invalid_message');
@@ -116,7 +145,7 @@ function instantiate(state) {
         if (!['hero', 'god'].includes(message.role)) return fail('invalid_role');
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
-          releaseHeld(state,p,[0,0,0]);
+          releaseHeld(state,p,[0,0,0]); releaseLog(state,p);
           p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
@@ -148,6 +177,8 @@ function instantiate(state) {
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           p.tool = message.tool; return ok();
         }
+        // Held logs own grab/release/stow first; a full hand blocks swings until the log is dropped or stowed.
+        const logResult=logAction(state,p,message);if(logResult)return logResult;
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const candidates = state.pickups.map(q => [q, Math.hypot(p.position[0]-q.x,p.position[2]-q.z,p.position[1]-terrainHeight(state,q.x,q.z))]).filter(q => q[1] <= 2.5).sort((a,b)=>a[1]-b[1]);
@@ -186,10 +217,10 @@ function instantiate(state) {
         const tree = worldTrees(state).find(t => t.id === message.targetId);
         const ore = state.deposits.find(d => d.id === message.targetId);
         if (supplied && tree) {
-          if (requestedTool !== 'axe' || !targetOK({x:tree.x,z:tree.z,y:terrainHeight(state,tree.x,tree.z)}) || Math.hypot(message.point[0]-tree.x,message.point[2]-tree.z)>.9 || message.point[1] < terrainHeight(state,tree.x,tree.z)-.2 || message.point[1] > terrainHeight(state,tree.x,tree.z)+tree.height+.2) return ok();
-          let h=state.harvestedTrees.find(t=>t.id===tree.id); if(!h&&state.harvestedTrees.length>=256)return fail('world_limit');if((h?.cuts||0)===2&&state.pickups.length>=256)return fail('world_limit'); if (h?.felledTick) return ok(); if (!h) { h={id:tree.id,cuts:0,cutHeight:message.point[1],felledTick:0,fallYaw:0}; state.harvestedTrees.push(h); }
-          if(Math.abs(h.cutHeight-message.point[1])>.35){h.cuts=0;h.cutHeight=message.point[1];} h.cuts++; events.push({...event('wood_hit',message.point,tree.id),material:'wood',normal:[...message.normal]});
-          if (h.cuts >= 3) { h.felledTick=state.tick; h.fallYaw=p.yaw; makePickup('wood',tree.x,tree.z,3); events.push(event('tree_fell',[tree.x,terrainHeight(state,tree.x,tree.z),tree.z],tree.id)); } return ok(events);
+          if (requestedTool !== 'axe' || !targetOK({x:tree.x,z:tree.z,y:terrainHeight(state,tree.x,tree.z)})) return ok();
+          // Persisted notch at the struck height/side; third cut hinges the upper section (shared/trees.js).
+          const chop=chopTree(state,tree,message.point,message.normal,{terrainHeight:(x,z)=>terrainHeight(state,x,z)});
+          return chop.code?fail(chop.code):ok(chop.events);
         }
         if (supplied && ore) {
           if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:terrainHeight(state,ore.x,ore.z)}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-terrainHeight(state,ore.x,ore.z))>2) return ok();
@@ -260,6 +291,7 @@ function instantiate(state) {
       const events = [];
       let forgeY=terrainHeight(state,0,0,false);
       if (state.shrine.hp === 0 && state.tick >= state.shrine.disabledUntil) state.shrine.hp = 100;
+      treeIndex.update(state); const treeCuts=new Map(state.harvestedTrees.map(h=>[h.id,h]));
       for (const p of state.players) {
         p.mana = Math.min(100, p.mana + 3 / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
@@ -268,7 +300,7 @@ function instantiate(state) {
           p.position[2] = clamp(p.position[2] + p.move[1] * 5 / HZ, -BOUND, BOUND);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero')resolveForge(p.position,forgeY);
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));}
         const floor = p.role==='hero'?forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
       }
@@ -322,6 +354,10 @@ function instantiate(state) {
       }
       stepCombat(state,combatContext,events);
       stepFire(state,fireContext,events);
+      stepTrees(state,treeContext,treeIndex,events);
+      const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
+      if (expedition.intents.length) applyAdventureIntents(state, expedition.intents, adventureContext);
+      events.push(...expedition.events);
       return events;
     },
     projectileContact(message){return projectileContact(state,message,combatContext);},
@@ -332,10 +368,12 @@ function instantiate(state) {
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
-        fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,
+        fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,adventure:state.adventure,
         contentVersion: 4, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
+    adventureWorld() { return state; },
+    applyAdventure(intents) { return applyAdventureIntents(state, intents, adventureContext); },
   };
   return api;
 }
@@ -396,13 +434,13 @@ export function loadSimulation(saved) {
   for (const g of saved.groves) {
     if (!record(g) || !unique(g.id) || !validXZ(g) || (g.kind !== undefined && g.kind !== 'ring')) throw Error('Invalid simulation grove');
   }
-  const harvestIds=new Set(); const treeIds=new Set(worldTrees(saved).map(t=>t.id));
-  for(const h of harvested){if(harvestIds.has(h.id)||!treeIds.has(h.id))throw Error('Invalid harvested tree identity');harvestIds.add(h.id);}
-  for (const h of harvested) if (!record(h) || !validId(h.id) || !Number.isInteger(h.cuts) || h.cuts < 1 || h.cuts > 3 || !finite(h.cutHeight) || Math.abs(h.cutHeight)>200 || !validTick(h.felledTick,saved.tick,0) || (h.cuts===3)!==(h.felledTick>0) || !finite(h.fallYaw) || Math.abs(h.fallYaw)>Math.PI+.000001) throw Error('Invalid harvested tree');
+  const treeIds=new Set(worldTrees(saved).map(t=>t.id));
+  const harvestedTrees=restoreHarvested({...saved,harvestedTrees:harvested},treeIds); // strict; legacy felled trees count as landed (wood already awarded)
   const contentIds = new Set([...ids, 'shrine', ...treeIds, ...saved.pendingStarfalls.map(p=>p.id)]);
   for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !['stone','meteor'].includes(d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > (d.kind==='meteor'?5:3) || d.maxHits !== (d.kind==='meteor'?5:3) || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
   for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || !['wood','stone','gems','apple'].includes(q.kind) || !validXZ(q) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
+  const looseLogs=restoreLogs(saved,contentIds);
   for (const pending of saved.pendingStarfalls) {
     if (!record(pending) || !unique(pending.id) || !validXZ(pending) || pending.radius !== 5 ||
         !validTick(pending.impactTick, saved.tick, saved.tick + 1, 48) || pending.impactTick <= saved.tick)
@@ -427,7 +465,8 @@ export function loadSimulation(saved) {
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   state.edits = copy(saved.edits); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);
-  state.harvestedTrees = harvested.map(({id,cuts,cutHeight,felledTick,fallYaw})=>({id,cuts,cutHeight,felledTick,fallYaw}));
+  state.harvestedTrees = harvestedTrees; state.looseLogs = looseLogs;
+  if (saved.adventure !== undefined) { const restored = restoreAdventure(saved.adventure); if (!restored.ok) throw Error('Invalid expedition: ' + restored.code); state.adventure = restored.adventure; }
   state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted})=>({id,x,z,kind,hits,maxHits,depleted}));
   state.pickups = pickups.map(({id,kind,x,z,y,amount})=>({id,kind,x,z,y,amount}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));

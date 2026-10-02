@@ -10,13 +10,19 @@ assert.equal(sim.command('h',{type:'action',seq:2,action:'strike',targetId:tree.
 assert.equal(sim.command('h',{type:'action',seq:3,action:'equip',tool:'axe'}).ok,true);
 for(let t=0;t<29;t++)sim.step();
 for(let i=0;i<3;i++){ if(i) for(let t=0;t<27;t++)sim.step(); assert.ok(sim.command('h',{type:'action',seq:4+i,action:'strike',targetId:tree.id,point:[tree.x,1,tree.z],normal:[0,1,0]}).ok); }
-assert.equal(sim.snapshot().harvestedTrees[0].cuts,3); assert.equal(sim.snapshot().pickups.filter(p=>p.kind==='wood').length,1);
-// Interaction is explicit and range-bound.
-assert.equal(sim.command('h',{type:'action',seq:7,action:'interact'}).events[0].kind,'pickup');
+assert.equal(sim.snapshot().harvestedTrees[0].cuts,3); assert.equal(sim.snapshot().pickups.filter(p=>p.kind==='wood').length,0,'timber arrives as physical logs after landing, not an instant pickup');
+for(let t=0;t<600&&!sim.snapshot().harvestedTrees[0].landed;t++)sim.step();
+assert.equal(sim.snapshot().looseLogs.length,3);
+// Interaction is explicit and range-bound: walk to a log, grab it, then stow it.
+state=sim.checkpoint(); const log=state.looseLogs[0]; state.players[0].position=[log.position[0],terrainHeight(state,log.position[0],log.position[2]+1.2),log.position[2]+1.2]; sim=loadSimulation(state);
+sim.command('h',{type:'action',seq:7,action:'interact'});assert.equal(sim.snapshot().looseLogs.length,3,'no proximity auto-collect of logs');assert.equal(sim.snapshot().players[0].resources.wood,0);
+assert.equal(sim.command('h',{type:'action',seq:8,action:'grab',id:log.id}).ok,true);
+assert.equal(sim.command('h',{type:'action',seq:9,action:'interact'}).events[0].kind,'pickup');
+assert.equal(sim.snapshot().players[0].resources.wood,1);
 state=sim.checkpoint(); const ore=state.deposits[0]; state.players[0].position=[ore.x,terrainHeight(state,ore.x,ore.z),ore.z+1]; state.players[0].yaw=0; sim=loadSimulation(state);
-assert.equal(sim.command('h',{type:'action',seq:8,action:'equip',tool:'pick'}).ok,true);
+assert.equal(sim.command('h',{type:'action',seq:10,action:'equip',tool:'pick'}).ok,true);
 for(let t=0;t<29;t++)sim.step();
-for(let i=0;i<3;i++){if(i)for(let t=0;t<29;t++)sim.step(); const r=sim.command('h',{type:'action',seq:9+i,action:'strike',targetId:ore.id,tool:'pick',point:[ore.x,0,ore.z],normal:[0,1,0]}); assert.equal(r.ok,true);}
+for(let i=0;i<3;i++){if(i)for(let t=0;t<29;t++)sim.step(); const r=sim.command('h',{type:'action',seq:11+i,action:'strike',targetId:ore.id,tool:'pick',point:[ore.x,0,ore.z],normal:[0,1,0]}); assert.equal(r.ok,true);}
 assert.equal(sim.snapshot().deposits[0].depleted,true); assert.equal(sim.snapshot().pickups.filter(p=>p.kind==='stone').length,1);
 assert.deepEqual(loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))).snapshot(),sim.snapshot());
 console.log('world-content: pass');
