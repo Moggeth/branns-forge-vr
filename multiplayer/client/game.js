@@ -147,6 +147,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     listen(controllers[i], 'connected', event => { controllerSources.set(i, event.data); attachWeapon(); });
     listen(controllers[i], 'disconnected', () => { controllerSources.delete(i); attachWeapon(); });
     listen(controllers[i], 'selectstart', () => {
+      if (active) unlockAudio();
       if (adventurePanel.handleSelectStart(i)) return;
       if (!active) return;
       if (role === 'hero') {
@@ -534,7 +535,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!world)return null;const resolved=resolveHit(world);if(!resolved)return null;
     return{...resolved,part:'torso',distance:world.distance};
   }
-  function primaryDown(){if(!active||role!=='hero')return;if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
+  function primaryDown(){if(!active||role!=='hero')return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
   function grab(){if(!active||role!=='hero')return;const aim=weaponAim();const id=content.grabTarget?.(aim.origin,aim.direction,3)||combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
   function release(throwIt=false){if(active&&role==='hero')onAction('release',{throw:throwIt,direction:weaponAim().direction});}
@@ -561,8 +562,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else zeroInputTimer = setTimeout(() => { if (!disposed) sendInput(performance.now(), true); }, 51 - (now - sentAt));
     }
   }
+  // Prime both sound banks on the first game gesture, before the first physical impact.
+  listen(window, 'pointerdown', () => { if (active) unlockAudio(); });
   listen(window, 'keydown', event => {
     if (!active || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return;
+    unlockAudio();
     if (role === 'god' && event.code === 'Escape') { cancelCast(); return; }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
