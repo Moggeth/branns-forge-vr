@@ -402,6 +402,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return hit;
   }
   function isLineSpell(){return spell==='sunder'||spell==='wall';}
+  function cancelCast() { castStart = null; quickKey = null; }
   function castAt(point,finish=false) {
     if (!active || role !== 'god') return;
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
@@ -539,13 +540,20 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   listen(window, 'keydown', event => {
     if (!active || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return;
+    if (role === 'god' && event.code === 'Escape') { cancelCast(); return; }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
     if (role === 'hero' && !event.repeat) {const slot=Number(event.code.replace('Digit',''))-1;if(slot>=0&&slot<equipment.length)equip(equipment[slot]);if(event.code==='KeyE')onAction('interact');if(event.code==='KeyB')onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')weapons.special();}
     if(role==='god'&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
-  listen(window,'keyup',event=>{keys.delete(event.code);if(event.code===quickKey&&castStart&&active){castAt(hitPoint,true);}});
+  listen(window,'keyup',event=>{
+    keys.delete(event.code);
+    if(event.code===quickKey){
+      if(castStart&&active&&role==='god'&&cursor.visible)castAt(hitPoint,true);
+      else cancelCast();
+    }
+  });
   listen(window, 'blur', clearInput);
   listen(document, 'visibilitychange', () => { if (document.hidden) clearInput(); });
   listen(document, 'pointerlockchange', () => { if (document.pointerLockElement !== canvas) clearInput(); });
@@ -557,11 +565,20 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (document.pointerLockElement !== canvas) { void capturePointer(); return; }
       if (event.button === 0) primaryDown();if(event.button===2)weapons.special();
     } else {
-      if (event.button === 2) rightDrag = true;
-      if (event.button === 0) { const hit = pointerHit(event); if (hit) castAt(hit.point); }
+      if (event.button === 2) { cancelCast(); rightDrag = true; }
+      if (event.button === 0 && !quickKey) { const hit = pointerHit(event); if (hit) castAt(hit.point); }
     }
   });
-  listen(window,'pointerup',event=>{rightDrag=false;if(event.button===0){if(role==='hero')primaryUp();else if(castStart&&!touchEnabled)castAt(hitPoint,true);}});
+  listen(window,'pointerup',event=>{
+    rightDrag=false;
+    if(event.button===0){
+      if(role==='hero')primaryUp();
+      else if(castStart&&!touchEnabled&&!quickKey){
+        const hit=event.target===canvas?pointerHit(event):null;
+        if(hit)castAt(hit.point,true);else cancelCast();
+      }
+    }
+  });
   listen(window, 'pointermove', event => {
     if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero' && document.pointerLockElement === canvas) {
@@ -570,6 +587,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     } else if (role === 'god' && !renderer.xr.isPresenting) {
       if (rightDrag) { orbitYaw -= event.movementX * 0.004; orbitTilt = THREE.MathUtils.clamp(orbitTilt + event.movementY * 0.003, 0.35, 1.35); }
       if (event.target === canvas) { const hit = pointerHit(event); cursor.visible = !!hit; if (hit) cursor.position.copy(hit.point).add(new THREE.Vector3(0, 0.08, 0)); }
+      else cursor.visible = false;
     }
   });
   listen(canvas, 'wheel', event => {
@@ -753,8 +771,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (role === 'god') { pan.copy(localPosition); if (document.pointerLockElement === canvas) document.exitPointerLock(); }
       report(role === 'god' ? 'God: WASD pan, right-drag orbit, wheel zoom, click to cast.' : 'Hero: click to look, WASD move, Space jump, click strike.');
     },
-    setSpell(next) { spell = next;castStart=null; },
-    setQuickCast(value){quickCast=!!value;castStart=null;},
+    setSpell(next) { spell = next;cancelCast(); },
+    setQuickCast(value){quickCast=!!value;cancelCast();},
     setTouchEnabled(value) { if (touchEnabled !== !!value) {clearInput(); touchEnabled = !!value; fixedAim = null; aimTerrain = null; cursor.visible = false;} },
     setTouchAxes(side, x, y) {
       if (!active || !touchEnabled || renderer.xr.isPresenting || !touchAxes[side]) return;
