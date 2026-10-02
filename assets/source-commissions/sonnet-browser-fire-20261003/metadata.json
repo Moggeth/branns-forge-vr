@@ -1,0 +1,16 @@
+{
+  "account": "fauxgrady@gmail.com",
+  "auth_method": "claude.ai",
+  "subscription": "pro",
+  "requested_model": "claude-sonnet-5-5",
+  "time_cap_seconds": 540.0,
+  "output": "C:\\Users\\mog\\OneDrive\\Documents\\Coding\\Personal\\Python\\things_are_different_now\\branns-forge-vr\\work\\sonnet-browser-fire-20261003",
+  "outcome": "passed",
+  "pid": 20560,
+  "exit_code": 0,
+  "actual_model": "claude-sonnet-5-5",
+  "canonical_model": "claude-sonnet-5-5",
+  "model_verified": true,
+  "final_verified": true,
+  "elapsed_seconds": 318.32
+}
