@@ -224,7 +224,7 @@ function teardown() {
   const old = session; session = null;
   try { old?.dispose(); } catch (error) { console.warn('Session cleanup failed', error); }
   connected = false; playerId = null; appliedRole = null; lastSnapshot = null;
-  expeditionBanner?.element.remove(); expeditionBanner = null; game?.setExpedition(null);
+  expeditionBanner?.destroy(); expeditionBanner = null; game?.setExpedition(null);
   clearNotices();
 }
 
@@ -398,8 +398,8 @@ function onSnapshot(snapshot) {
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
   if (snapshot.adventure) try {
     const view = adventureView(snapshot.adventure, snapshot, playerId);
-    if (!expeditionBanner) { expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction}); expeditionBanner.element.style.top = 'calc(var(--hud-header-bottom, 56px) + 10px)'; }
-    expeditionBanner.update(view);
+    if (!expeditionBanner) expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction});
+    expeditionBanner.update(view, {held: self?.resources, mana: self?.mana});
     // DOM is invisible in WebXR: the same view drives the in-world wrist panel (it repaints only when its model changes).
     if (xrActive) game.setExpedition(view, snapshot, playerId);
   } catch (error) { recordProblem(error); }

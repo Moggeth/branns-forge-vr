@@ -191,3 +191,11 @@ Stone, bone, metal, armour fracture and ore rewards use 13 deterministic spatial
 ## Expedition world presentation (2026-10-03)
 
 client/expedition-presentation.js consumes snapshot.adventure and the same terrain height as gameplay. Delivered supplies visibly accumulate beside the forge; rune progress, star-site beacon and encounter countdown rings follow authoritative state. Optional Expedition actions are unchanged. Idle costs zero visible draws; hard limits are10renderables,64sparks,8warnings. All nodes ignore contact/raycast. Materials are precompiled with startup spell shaders; disposal is owned by the module. Regression: node tests/expedition-presentation.test.mjs. Desktop actual tree-to-forge delivery captured in the sprint record; physical headset comfort remains to be assessed.
+
+## Compact objectives and VR input ownership (2026-10-03)
+
+The Expedition card starts collapsed in a corner; open its heading for the full objective list and secondary actions. Progress, the next role-specific step, and incoming encounter warnings remain visible. Leave requires confirmation. Expansion preference is stored locally; updates preserve focused controls. Hero delivery shows carried resources; God aid shows actual mana requirements. Short landscape touch mode uses a 47px row. Mobile objective drawers intentionally take pointer priority over thumb pads when expanded, and the menu stays above both.
+
+Opus design is integrated in client/adventure-view.js and expedition-hud.css. Legacy mobile banner rules explicitly exclude this new card. Test node tests/expedition-hud.mjs and node tests/vr-adventure-panel.mjs. Root browser evidence covers 27 stage/viewport fixtures, real Hero/God controls, 320/360/640/960/1280 layouts, Leave/Stay, and Tithe. A fixture is not an end-to-end campaign victory test.
+
+VR hand mapping and trigger ownership are centralized in client/vr-input-policy.js; full mapping and single-controller limits are in ../docs/VR-CONTROLS.md. Left-stick click now interacts/stows. Controller disconnection, menu and equipment changes cancel pending inputs rather than firing a late release. Test node tests/vr-input-policy.mjs. Physical headset, phone and cross-network acceptance remain outstanding.

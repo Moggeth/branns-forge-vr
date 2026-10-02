@@ -1,0 +1,173 @@
+/* Compact Forge Expedition HUD (client/adventure-view.js createAdventureBanner). Scoped to .xhud; loads after styles.css.
+   Corner card in Warcraft III proportions: stage, next step and progress sit in the top-left corner under the header,
+   leaving the central forge/combat view clear. Collapsed by default; the head toggles the full objective list. */
+.hud > .xhud {
+  --xhud-tone: #e0a64a;
+  position: absolute; z-index: 4; pointer-events: auto;
+  top: calc(var(--hud-header-bottom, 56px) + 8px); left: max(10px, env(safe-area-inset-left));
+  width: min(288px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: calc(100dvh - var(--hud-header-bottom, 56px) - 24px); overflow-y: auto; overscroll-behavior: contain;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 0 8px 8px;
+  color: var(--parchment, #f2e6cd); font: 13px/1.3 var(--sans, system-ui, sans-serif);
+  background: linear-gradient(180deg, rgba(30, 24, 18, .9), rgba(16, 13, 10, .84));
+  border: 1px solid rgba(201, 164, 92, .38); border-top: 2px solid var(--xhud-tone);
+  border-radius: 10px; box-shadow: 0 8px 22px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(236, 210, 154, .08);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.xhud [hidden] { display: none !important; }
+.xhud svg { flex: none; }
+.xhud-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Head = one 44px toggle: stage glyph, title, role, timer, chevron. */
+.xhud-toggle {
+  display: flex; align-items: center; gap: 6px; width: calc(100% + 16px); min-height: 44px; margin: 0 -8px; padding: 4px 8px 2px 10px;
+  border: 0; border-radius: 9px 9px 0 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  touch-action: manipulation;
+}
+.xhud-toggle:hover { background: rgba(201, 164, 92, .08); }
+.xhud-stage-icon { display: grid; color: var(--xhud-tone); }
+.xhud-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 14px/1.2 var(--serif, Georgia, serif); color: var(--brass-hi, #ecd29a); letter-spacing: .01em; }
+.xhud-role { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px 1px 4px; border-radius: 99px;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ember-hi, #ffb067);
+  background: rgba(232, 105, 43, .14); border: 1px solid rgba(232, 105, 43, .35); }
+.xhud[data-role="god"] .xhud-role { color: #b9d8ff; background: rgba(127, 182, 232, .14); border-color: rgba(127, 182, 232, .4); }
+.xhud-timer { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted, #b9aa8e); }
+.xhud-timer:empty { display: none; }
+.xhud-chevron { display: grid; color: var(--brass, #c9a45c); transition: transform .18s ease; }
+.xhud[data-expanded="true"] .xhud-chevron { transform: rotate(180deg); }
+
+.xhud-next { margin: 0; padding: 0 2px; font-size: 12.5px; color: var(--parchment, #f2e6cd); }
+
+/* Collapsed progress chips + the single obvious action. */
+.xhud-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.xhud-chips { display: flex; gap: 4px; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.xhud-chip { position: relative; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px 4px 4px; border-radius: 6px;
+  background: rgba(255, 240, 210, .06); border: 1px solid rgba(201, 164, 92, .2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.xhud-chip-icon { display: grid; color: var(--xhud-tone); }
+.xhud-chip[data-mine="false"] { opacity: .78; }
+.xhud-chip[data-done="true"] .xhud-chip-icon, .xhud-chip[data-done="true"] .xhud-chip-num { color: #9be38a; }
+.xhud-chip-bar { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.xhud-chip-bar > span { position: absolute; inset: 0; transform-origin: left; background: var(--xhud-tone); transition: transform .3s ease; }
+.xhud-chip[data-done="true"] .xhud-chip-bar { display: none; }
+
+.xhud-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; max-width: 100%; }
+.xhud-btn-short { display: none; }
+.xhud[data-expanded="true"] .xhud-actions { width: 100%; }
+.xhud-btn {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 44px; min-width: 44px; padding: 4px 10px;
+  border-radius: 8px; border: 1px solid rgba(201, 164, 92, .5); background: rgba(201, 164, 92, .1);
+  color: var(--brass-hi, #ecd29a); font: 600 12.5px/1.15 var(--sans, system-ui, sans-serif); cursor: pointer; touch-action: manipulation; text-align: left;
+  flex: none; max-width: 100%;
+}
+.xhud-btn:hover { background: rgba(201, 164, 92, .2); border-color: var(--brass, #c9a45c); }
+.xhud-btn > svg { color: var(--xhud-tone); }
+.xhud-btn-label { white-space: nowrap; }
+.xhud-btn-note { font-weight: 500; font-size: 10.5px; color: var(--muted, #b9aa8e); }
+.xhud-btn-note:empty { display: none; }
+.xhud-btn:has(.xhud-btn-note:not(:empty)) { display: inline-grid; grid-template-columns: auto 1fr; column-gap: 5px; }
+.xhud-btn:has(.xhud-btn-note:not(:empty)) > svg { grid-row: span 2; }
+.xhud-primary { color: #2a1606; background: linear-gradient(180deg, var(--brass-hi, #ecd29a), var(--brass, #c9a45c)); border-color: var(--brass-hi, #ecd29a); }
+.xhud-primary:hover { background: linear-gradient(180deg, #fff0c8, var(--brass-hi, #ecd29a)); }
+.xhud-primary > svg { color: #5a2a0a; }
+.xhud-primary .xhud-btn-note { color: #4a3214; }
+.xhud-btn[data-empty="true"].xhud-primary { color: var(--brass-hi, #ecd29a); background: rgba(201, 164, 92, .1); border-color: rgba(201, 164, 92, .5); }
+.xhud-btn[data-empty="true"] .xhud-btn-note { color: var(--muted, #b9aa8e); }
+.xhud-quiet { color: var(--muted, #b9aa8e); border-color: rgba(201, 164, 92, .25); background: transparent; }
+.xhud-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; filter: saturate(.4); }
+.xhud-btn[data-busy="true"] { cursor: progress; }
+.xhud-btn[data-busy="true"] > svg { animation: xhud-busy .9s linear infinite; }
+@keyframes xhud-busy { to { transform: rotate(360deg); } }
+.xhud-danger { color: #fff1ea; background: rgba(224, 86, 63, .32); border-color: rgba(224, 86, 63, .7); }
+.xhud :is(button):focus-visible { outline: none; box-shadow: 0 0 0 2px #14110e, 0 0 0 4px var(--ember-hi, #ffb067); }
+.xhud-toggle:focus-visible { box-shadow: inset 0 0 0 2px var(--ember-hi, #ffb067); }
+
+/* Authoritative telegraphs: always visible, even collapsed. */
+.xhud-alerts { display: grid; gap: 3px; }
+.xhud-alert { display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 8px; border-radius: 7px;
+  color: #ffcf7a; font-weight: 600; font-size: 12.5px; background: rgba(120, 60, 10, .35); border: 1px solid rgba(255, 207, 122, .45);
+  animation: xhud-warn 1.6s ease-in-out infinite; }
+.xhud-alert > svg { fill: currentColor; }
+.xhud-alert-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.xhud-alert-time { font-variant-numeric: tabular-nums; }
+@keyframes xhud-warn { 50% { border-color: rgba(255, 207, 122, .9); box-shadow: 0 0 10px rgba(255, 160, 60, .35); } }
+
+/* Expanded detail. */
+.xhud-body { display: grid; gap: 5px; padding-top: 4px; border-top: 1px solid rgba(201, 164, 92, .18); }
+.xhud-track { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.xhud-track li { flex: 1; padding: 2px 4px; text-align: center; border-radius: 4px; color: var(--muted, #b9aa8e); background: rgba(255, 255, 255, .04); }
+.xhud-track li[data-state="now"] { color: #2a1606; background: var(--xhud-tone); font-weight: 700; }
+.xhud-track li[data-state="done"] { color: #9be38a; }
+.xhud-notice { margin: 0; font-size: 12px; color: var(--muted, #b9aa8e); font-style: italic; }
+.xhud-goals { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.xhud-goal { position: relative; display: grid; grid-template-columns: 18px 1fr auto auto; align-items: center; gap: 5px; padding-bottom: 3px; }
+.xhud-goal-icon { display: grid; color: var(--xhud-tone); }
+.xhud-goal[data-done="true"] .xhud-goal-icon, .xhud-goal[data-done="true"] .xhud-goal-num { color: #9be38a; }
+.xhud-goal-label { min-width: 0; }
+.xhud-goal-who { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted, #b9aa8e); }
+.xhud-goal-who:empty { display: none; }
+.xhud-goal[data-mine="true"] .xhud-goal-who { color: var(--ember-hi, #ffb067); }
+.xhud[data-role="god"] .xhud-goal[data-mine="true"] .xhud-goal-who { color: #b9d8ff; }
+.xhud-goal-num { font-variant-numeric: tabular-nums; }
+.xhud-goal .xhud-chip-bar { left: 23px; right: 0; bottom: 0; }
+.xhud-optional { opacity: .62; font-size: 11.5px; }
+.xhud-optional .xhud-goal { grid-template-columns: 16px 1fr auto auto; }
+.xhud-facts { margin: 0; font-size: 11.5px; color: var(--muted, #b9aa8e); }
+
+.xhud-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px; border-radius: 8px;
+  border: 1px solid rgba(224, 86, 63, .5); background: rgba(60, 18, 10, .45); }
+.xhud-confirm p { flex: 1 1 100%; margin: 0; font-size: 12px; }
+
+/* 1280+ desktop: a touch wider, still a corner card. */
+@media (min-width: 1200px) { .hud > .xhud { width: 320px; } }
+/* Portrait touch (≤600px): lobby.css pins hero tools at top:112px; sit beneath them (same slot styles.css used). */
+@media (max-width: 600px) and (orientation: portrait) {
+  body.touch-controls-active[data-role="hero"] .hud > .xhud { top: calc(env(safe-area-inset-top, 0px) + 208px); }
+  .hud > .xhud { width: min(340px, calc(100vw - 20px)); }
+}
+/* Short landscape phones (640x360): one 44px row in the free top-right corner beside the player card
+   (the room chips wrap to a second header row there). Stage glyph + timer + progress + the one action;
+   the next-step sentence and full list appear when expanded. Hero tools, Special and sticks stay unobstructed. */
+@media (orientation: landscape) and (max-height: 430px) {
+  /* right: 80px keeps the touch Special orb (combat-hud.css right:14px, ~96px with glow) free. */
+  .hud > .xhud { top: max(10px, env(safe-area-inset-top)); left: auto; right: calc(116px + env(safe-area-inset-right));
+    width: min(340px, calc(100vw - 416px - env(safe-area-inset-left))); max-height: calc(100dvh - 20px);
+    grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 4px; padding: 0 4px 0 0; }
+  .xhud-toggle { width: auto; margin: 0; padding: 0 4px 0 8px; gap: 4px; border-radius: 9px 0 0 9px; }
+  .xhud-title, .xhud-role, .xhud-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .xhud-next, .xhud-alerts, .xhud-body, .xhud-confirm { grid-column: 1 / -1; }
+  .xhud-next { display: none; }
+  .xhud[data-expanded="true"] .xhud-next { display: block; }
+  .xhud[data-expanded="true"] { padding-bottom: 6px; }
+  .xhud-row { flex-wrap: nowrap; grid-column: 2; grid-row: 1; min-width: 0; }
+  .xhud[data-expanded="false"] .xhud-actions { flex-wrap: nowrap; gap: 3px; }
+  .xhud[data-expanded="false"] .xhud-btn { gap: 3px; font-size: 11px; }
+  .xhud[data-expanded="false"] .xhud-btn > svg { display: none; }
+  .xhud-chips { flex-wrap: nowrap; flex: 1 1 0; overflow: hidden; }
+  .xhud-btn-note { display: none; }
+  .xhud[data-expanded="false"] .xhud-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .xhud[data-expanded="false"] .xhud-btn-short { display: inline; }
+  .xhud[data-expanded="false"] .xhud-btn { display: inline-flex; }
+  .xhud-chip { padding: 2px 4px 4px 3px; }
+  .xhud[data-expanded="false"] .xhud-btn { padding: 4px 5px; }
+}
+body.xr .hud > .xhud { display: none; } /* WebXR uses the wrist panel */
+@media (prefers-reduced-motion: reduce) {
+  .xhud *, .xhud *::before, .xhud *::after { animation: none !important; transition: none !important; }
+  .xhud-alert { border-color: rgba(255, 207, 122, .9); }
+}
+@media (forced-colors: active) {
+  .hud > .xhud, .xhud-btn, .xhud-alert, .xhud-chip { border: 1px solid CanvasText; }
+  .xhud-chip-bar > span { background: Highlight; }
+}
+
+/* Real touch chrome reserves the top for party status and the mobile utility row. */
+@media (orientation: landscape) and (max-height: 430px) {
+  body.touch-controls-active .hud > .xhud { top: calc(env(safe-area-inset-top, 0px) + 120px); width: min(340px, 46vw); max-height: calc(100dvh - 140px); }
+}
+
+/* An intentionally opened objective drawer/confirmation must win hit testing over thumb pads beneath it. */
+body.touch-controls-active .hud:has(.xhud[data-expanded="true"], .xhud-confirm:not([hidden])) { z-index: 7; }
+
+@media (max-width: 340px) and (orientation: portrait) { .hud > .xhud { padding-bottom: 4px; } }

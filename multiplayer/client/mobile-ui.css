@@ -284,14 +284,14 @@ body.touch-controls-active .bf-actions { z-index: 8; }
 }
 
 /* The Expedition banner is also interactive: reserve its own scrollable space. */
-body.touch-controls-active .expedition-banner { max-height: 28dvh; overflow-y: auto; box-sizing: border-box; }
-body.touch-controls-active .expedition-banner button { min-height: 44px !important; }
-body.xr .expedition-banner { display: none; }
+body.touch-controls-active .expedition-banner:not(.xhud) { max-height: 28dvh; overflow-y: auto; box-sizing: border-box; }
+body.touch-controls-active .expedition-banner:not(.xhud) button { min-height: 44px !important; }
+body.xr .expedition-banner:not(.xhud) { display: none; }
 @media (orientation: portrait) {
-  body.touch-controls-active .expedition-banner { top: calc(env(safe-area-inset-top, 0px) + 220px) !important; }
+  body.touch-controls-active .expedition-banner:not(.xhud) { top: calc(env(safe-area-inset-top, 0px) + 220px) !important; }
 }
 @media (orientation: landscape) {
-  body.touch-controls-active .expedition-banner { top: calc(env(safe-area-inset-top, 0px) + 120px) !important; max-height: 26dvh; min-width: 0 !important; width: min(340px, 46vw); }
+  body.touch-controls-active .expedition-banner:not(.xhud) { top: calc(env(safe-area-inset-top, 0px) + 120px) !important; max-height: 26dvh; min-width: 0 !important; width: min(340px, 46vw); }
 }
 /* Grid children must be allowed to shrink below their equipment row's intrinsic width. */
 body.touch-controls-active .hud-bottom { grid-template-columns: minmax(0, 1fr); }
