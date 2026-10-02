@@ -199,3 +199,6 @@ The Expedition card starts collapsed in a corner; open its heading for the full 
 Opus design is integrated in client/adventure-view.js and expedition-hud.css. Legacy mobile banner rules explicitly exclude this new card. Test node tests/expedition-hud.mjs and node tests/vr-adventure-panel.mjs. Root browser evidence covers 27 stage/viewport fixtures, real Hero/God controls, 320/360/640/960/1280 layouts, Leave/Stay, and Tithe. A fixture is not an end-to-end campaign victory test.
 
 VR hand mapping and trigger ownership are centralized in client/vr-input-policy.js; full mapping and single-controller limits are in ../docs/VR-CONTROLS.md. Left-stick click now interacts/stows. Controller disconnection, menu and equipment changes cancel pending inputs rather than firing a late release. Test node tests/vr-input-policy.mjs. Physical headset, phone and cross-network acceptance remain outstanding.
+
+### Contextual harvesting hints
+Heroes receive a small read-only aim cue for trees, ore and loose logs, plus held-log, nearby pickup and forge-delivery guidance. Labels follow desktop/touch controls; menus, God view and XR hide the DOM cue. Probing is capped at 10 Hz with terrain occlusion and short target hysteresis. Tests: `node tests/interaction-cue.test.mjs` and `node tests/interaction-cue-view.test.mjs`. Physical headset cues remain separate from this DOM feature.

@@ -8,6 +8,7 @@ import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.j
 import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
 import { adventureView } from './shared/adventure.js';
 import { createAdventureBanner } from './client/adventure-view.js';
+import { createInteractionCueController } from './client/interaction-cue-controller.js';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -212,6 +213,7 @@ function setPhase(next) {
   syncActive();
 }
 function syncActive() {
+  if (phase !== 'game' || !connected || menuOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
   game?.setActive(phase === 'game' && connected && !menuOpen);
   mobile?.update({active:phase === 'game' && connected && !menuOpen,role:currentRole,xr:xrActive});
   updateLookHint();
@@ -225,6 +227,7 @@ function teardown() {
   try { old?.dispose(); } catch (error) { console.warn('Session cleanup failed', error); }
   connected = false; playerId = null; appliedRole = null; lastSnapshot = null;
   expeditionBanner?.destroy(); expeditionBanner = null; game?.setExpedition(null);
+  interactionCue?.reset();
   clearNotices();
 }
 
@@ -350,6 +353,7 @@ function recordProblem(problem) {
 
 // ---------------------------------------------------------------- Forge Expedition (optional co-op run, shared/adventure.js)
 let expeditionBanner = null;
+let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
 function expeditionAction(action) {
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
   if (!session || !adv || !self) return;
@@ -657,6 +661,7 @@ try {
     onXRChange: value => { xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,
     onExpeditionAction: expeditionAction,
+    onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud')); interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen); },
   });
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
   mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint});

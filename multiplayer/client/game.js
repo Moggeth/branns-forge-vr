@@ -33,7 +33,7 @@ export function terrainHeight(x, z, edits = []) {
   return height;
 }
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
@@ -553,6 +553,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!world)return null;const resolved=resolveHit(world);if(!resolved)return null;
     return{...resolved,part:'torso',distance:world.distance};
   }
+  // Contextual cue probe (interaction-cue-controller.js), ~10 Hz: the same aim, visible-surface filter and target set as
+  // contactRay (minus the 51k-triangle ground; the cue model marches analytic terrain instead), extended to 8 m so it
+  // can say "move closer". Read-only: never strikes, grabs or mutates the snapshot.
+  let cueAt=-Infinity;
+  function aimProbe(){
+    const aim=weaponAim(),from=new THREE.Vector3(...aim.origin),direction=new THREE.Vector3(...aim.direction),to=from.clone().addScaledVector(direction,8);
+    const enemy=(combat.segmentContacts(from.toArray(),to.toArray())||[])[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
+    raycaster.set(from,direction);raycaster.far=8;const h=raycaster.intersectObjects(content.targets().concat([shrine]),true).find(v=>surfaceVisible(v.object));raycaster.far=Infinity;
+    const r=h&&h.distance<enemyDistance?resolveHit(h):null;
+    const hit=r?{targetId:r.targetId,point:r.point,distance:h.distance}:enemy?{targetId:enemy.targetId,point:enemy.point,distance:enemyDistance}:null;
+    return {...aim,yaw,hit};
+  }
   function primaryDown(){if(!active||role!=='hero')return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
   function grab(pressIndex){if(!active||role!=='hero')return;const aim=weaponAim(pressIndex);const id=content.grabTarget?.(aim.origin,aim.direction,3)||combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
@@ -741,6 +753,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);updateFireAudio(weaponState.firing);
     const wick=axeModel?.getObjectByName('Wick');if(tool==='flask'&&wick?.material){const lit=!!snapshot.players.find(p=>p.id===playerId)?.flaskLit;wick.material.emissive?.setHex(lit?0xff5a04:0);wick.material.emissiveIntensity=lit?2:0;}
     content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    if(onAimProbe&&now-cueAt>=100){cueAt=now;const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
       if (animation.actions) {
