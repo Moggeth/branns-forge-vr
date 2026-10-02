@@ -78,3 +78,17 @@ Sunder/Wall are initial point-targeted short formations, not the full native
 freehand spline operators. VR uses pointer-trigger strikes, not velocity-based
 physical swing contacts. Imported content saves are compatible with older base
 worlds, but all room participants should refresh before playing this release.
+
+
+## Published acceptance
+
+Code commit `617d48f`, private origin/main. Production deployment
+`dpl_1U57uPR896XPv7zhd3ov8Cwnhnas` READY at
+https://branns-forge-multiplayer.vercel.app (9.7157121 s build/publish).
+Anonymous page, pick/bridge GLBs and meadow PNG returned HTTP 200. Two public
+browser peers joined one room as Hero and God, both showing 2/8; Tree Ring
+replicated one grove and Sunder replicated three edits. Both reported no problem.
+Hero equipped Stonewhisper and its authored material rendered successfully.
+Final Node/signaling regression run: 2.2367092 seconds. Inspection, integration,
+real-contact debugging and local acceptance interval: 2,239 seconds, including
+waits/repeated strategies; detailed timings in ignored logs/work-timing.csv.
