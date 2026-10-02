@@ -27,3 +27,8 @@ Browser: existing Playwright setup in tests/README, `browser-starting-world.mjs`
 
 ## Lessons
 Adding default pickups changes total-loot baselines: isolated meteor reward fixtures clear initial pickups before measuring six-gem payout. Tree index cache keys must include the landmark layout flag when reusing the same seed across old/new saves. Read scripts with rg --files before invoking; cue tests are named interaction-cue.test.mjs. Preserve UTF-8 for all edited browser source (legacy root README is not wholly UTF-8).
+
+## Release acceptance
+Code 5bc5b80 pushed to private origin/main. Production dpl_5oMaST56hUXB8DzcqG5zwSgskouf is READY at https://branns-forge-multiplayer.vercel.app. Full build 0.324s; deploy 12.8165s. Public two-browser Hero/God acceptance 12.169s: same room 93938395, shared landmark flag, Hero expedition start replicated, God Raise Earth replicated, zero console errors. Test room is ephemeral; players should create their own new world. Public real-touch salvage and button reachability passed in 10.100s. Actual FPS and elevated captures inspected under logs/browser-acceptance/captures. Final local mining/layout 10.496s. Physical phone/headset and separate-network acceptance remain unverified.
+
+Docs/test follow-up does not require redeployment; runtime files are unchanged. Original peer8789/tunnel preserved; overnight automation remains paused. No Claude generation after weekly reset. Work began 22:53:15 UTC; acceptance completed by 23:23:28 UTC.
