@@ -172,3 +172,5 @@ should split it so room selection does not wait for the renderer/assets. Do not 
 raising the chunk-size threshold.
 
 Browser import orientation and review: [ORIENTATION.md](ORIENTATION.md).
+
+Selective native migration decisions: [curation report](../docs/browser-migration/README.md) and complete file/catalogue register.

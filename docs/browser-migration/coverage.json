@@ -1,0 +1,14 @@
+{
+  "source_files": 3088,
+  "glb_files": 329,
+  "catalogued_weapons": 20,
+  "records": 3154,
+  "decisions": {
+    "CANDIDATE": 82,
+    "DEFER": 425,
+    "DEPENDENCY-ONLY": 789,
+    "EXCLUDE": 1504,
+    "REBUILD": 102,
+    "TOOLING": 252
+  }
+}

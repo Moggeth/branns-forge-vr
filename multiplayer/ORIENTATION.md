@@ -31,3 +31,11 @@ Do not infer a quaternion's yaw by adding to its decomposed Euler Y.
 Discovery lesson: PowerShell does not expand positional `godot/skeleton*` arguments to rg;
 use `rg -g` or discover actual paths first. Do not guess test filenames (there is no
 peer/test-simulation.mjs); list tests before selecting. No native assets were changed.
+
+Browser orientation follow-up (2026-10-02): commit f75eeb0 deployed as
+`dpl_rgD8Mpn4b3aeMEkVUmDHHxEuByDZ`, production alias verified by creating an
+isolated God room, summoning a skeleton, switching to Hero, and inspecting the
+face/shield and held blade. Test room was left afterward. Six actual-GLB checks,
+15 heading comparisons plus socket tests, simulation and touch tests passed.
+Inspection/edit/visual-validation interval: 611 seconds by UTC tool clock;
+production build/deploy: 7.780323 seconds. Native/headset acceptance remains separate.
