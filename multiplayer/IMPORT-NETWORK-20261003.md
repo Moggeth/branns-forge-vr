@@ -1,0 +1,13 @@
+# Browser networking checkpoint (pre-release)
+
+Versioned per-peer delta snapshots now negotiate with compatible clients and fall back to complete snapshots for older clients. Missing bases, corrupted frames, resets and host migration request/rebuild keyframes. Saves/checkpoints stay complete and unquantized. Simulation remains60Hz; snapshots20Hz.
+
+Reloaded clients seed a monotonic command counter and adopt host-provided sequence floors without lowering host replay protection. This prevents the previous12-30second input rejection. The host parks only resources that could not be dropped because of pickup limits; a returning player cannot duplicate the dropped pack.
+
+Verification: Opus5.5 personal Claude.ai commission871.981seconds. Real Chromium WebRTC, seven contexts: zero console errors in final runs; reload movement2-59ms afterchannelopen, zero duplicate errors; patched client under legacyhost32-204ms. Channel reopening itself remainsvariable33ms-2.6seconds. Earliercodecstudy39checks passed; default3player wire17.1vs50.3KB/s. Separate8player syntheticload75-85% snapshottraffic reduction. These are LAN/loopback results, NOT internet/TURN/physicalQuest acceptance.
+
+Root independently reran session-reload7, state-codec9, session4, expedition-persistence and expedition-integration on the actual checkout: allpass,2.602seconds includingcopy. Exact tree/adventure/fire snapshotroundtrip verified; loose-log coverage comes from existingExpedition playtest, not the codecfixture which hadnotyetlandedthetree.
+
+Commands from multiplayer/: node tests/session-reload.mjs; node tests/state-codec.mjs; node tests/session.mjs; node tests/expedition-persistence.mjs. Browser repro source/results retained in ignored work/opus-network-finalize-20261003/harness and logs; ownedhelperports5193/8800wereclosed. Originalpeer8789/tunnelunchanged. Deployandpublicverificationremainpendingwiththelargerrelease.
+
+Limitations: oldunpatchedclients still flood when they reload. Parked undropped resources are memory-only and expire120seconds; fullpickup-cap/worldownership loss can still lose those resources. NoTURNguarantee oralways-oncloudhost. Hashchecks detectcorruption, not hostileauthenticatedhosts. Do not claim publication from thiscommit.
