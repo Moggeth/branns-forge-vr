@@ -230,7 +230,9 @@ function start(attempt) {
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
   next.addEventListener('saved', mine(() => {}));
-  next.addEventListener('owner_lost', mine(() => notice('owner', 'The host left. Your world is safe — a recovery copy is saved in this browser.', null, 'info')));
+  next.addEventListener('owner_lost', mine(detail => notice('owner', detail.recoverySaved
+    ? 'The host left. A recovery copy is saved in this browser.'
+    : 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, detail.recoverySaved ? 'info' : 'warn')));
   next.addEventListener('continue_world_offer', mine(() => {
     removeNotice('waiting');
     notice('continue', 'The host has gone. You can keep this world running from your computer.', {label: 'Continue world here', run: () => { try { session?.continueWorld(); } catch (e) { onSessionError({message: e?.message}); } removeNotice('continue'); }}, 'action');

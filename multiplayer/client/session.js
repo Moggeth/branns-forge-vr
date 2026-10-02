@@ -68,7 +68,9 @@ export class WorldSession extends EventTarget {
       if (this.latest) this.autoSave();
     });
     for (const type of ['owner_lost','continue_world_offer']) on(type, ({detail}) => {
-      this.simulation = null; this.autoSave(true); this.emit(type, detail);
+      this.simulation = null;
+      const recoverySaved = this.autoSave(true);
+      this.emit(type, {...detail, recoverySaved});
     });
     for (const type of ['continue_offer_expired','world_waiting','peer_connection_state']) on(type,({detail})=>this.emit(type,detail));
     on('status', ({detail}) => {
@@ -268,9 +270,9 @@ export class WorldSession extends EventTarget {
     }
   }
   autoSave(force = false) {
-    if(!this.latest || (!force && Date.now()-this.lastSave < 10000)) return;
-    try { this.saves.put(this.exportSave()); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); }
-    catch(error) { this.lastSave = Date.now(); this.emit('error',{code:'save_failed',message:error.message}); }
+    if(!this.latest || (!force && Date.now()-this.lastSave < 10000)) return false;
+    try { this.saves.put(this.exportSave()); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); return true; }
+    catch(error) { this.lastSave = Date.now(); this.emit('error',{code:'save_failed',message:error.message}); return false; }
   }
   exportSave() { return makeSave(this.simulation?.checkpoint() || this.latest,{id:this.worldId,name:this.name}); }
   importSave(text) { const save = parseSave(text); loadSimulation(save.checkpoint); return this.saves.put(save); }

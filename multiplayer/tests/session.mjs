@@ -72,3 +72,24 @@ test('reset starts fresh but checkpoint revisions keep increasing',()=>{
     assert.equal(s.saves.list().length,2);
   }finally{s.dispose();}
 });
+
+test('host departure reports recovery storage success truthfully and retains memory on failure',()=>{
+  const connection=new FakeConnection(),backing=storage();let full=false;
+  const s=new WorldSession({connection,storage:{getItem:k=>backing.getItem(k),setItem:(k,v)=>{if(full)throw new Error('QuotaExceededError');backing.setItem(k,v);}}});
+  const notices=[],errors=[];
+  s.addEventListener('owner_lost',event=>notices.push(event.detail));
+  s.addEventListener('error',event=>errors.push(event.detail));
+  try {
+    s.connect();s.command('cast',{spell:'raise',point:[10,0,10]});s.publish(true);
+    const checkpoint=s.exportSave().checkpoint;
+    full=true;connection.emit('owner_lost',{epoch:2});
+    assert.equal(notices.at(-1).recoverySaved,false);
+    assert.equal(errors.at(-1).code,'save_failed');
+    assert.deepEqual(s.exportSave().checkpoint,checkpoint,'download remains possible from memory');
+    full=false;connection.emit('owner_lost',{epoch:2});
+    assert.equal(notices.at(-1).recoverySaved,true);
+    assert.equal(s.saves.list()[0].checkpoint.edits.length,1);
+    s.latest=null;connection.emit('owner_lost',{epoch:2});
+    assert.equal(notices.at(-1).recoverySaved,false,'no checkpoint is not a successful recovery');
+  } finally {full=false;s.dispose();}
+});
