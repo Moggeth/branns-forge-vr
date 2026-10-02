@@ -1,0 +1,649 @@
+{
+ "kit": "brann_meteor_geology_kit",
+ "version": 1,
+ "units": "metres",
+ "up": "+Y",
+ "front": "-Z",
+ "origin": "bottom centre (rests on y=0)",
+ "runtime_templates": {
+  "meteor": "deposit kind meteor, normalised to 1.5 m tall by world-content-view authored()",
+  "boulder": "deposit kind stone, normalised to 1.2 m tall",
+  "boulder_b": "optional variant of boulder",
+  "boulder_c": "optional variant of boulder"
+ },
+ "materials": [
+  "GeoRock",
+  "GeoInterior",
+  "GeoStarGem",
+  "GeoSeam"
+ ],
+ "textures": {
+  "geo_albedo": 1024,
+  "geo_normal": 512
+ },
+ "assets": {
+  "meteor": {
+   "file_bytes": 949416,
+   "triangles": 5800,
+   "materials": 4,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior",
+    "GeoStarGem",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "MeteorMesh",
+    "ResourcePivot",
+    "Meteor"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -1.1644,
+    0.0,
+    -1.1316
+   ],
+   "bbox_max": [
+    1.0164,
+    1.587,
+    1.0771
+   ],
+   "dimensions": [
+    2.1808,
+    1.587,
+    2.2087
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.36
+  },
+  "meteor_lod": {
+   "file_bytes": 406096,
+   "triangles": 1480,
+   "materials": 4,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior",
+    "GeoStarGem",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "MeteorMeshLOD",
+    "ResourcePivot",
+    "meteor_lod_root"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.9945,
+    0.0,
+    -1.1291
+   ],
+   "bbox_max": [
+    1.102,
+    1.5359,
+    0.9323
+   ],
+   "dimensions": [
+    2.0965,
+    1.5359,
+    2.0614
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.22
+  },
+  "meteor_worked1": {
+   "file_bytes": 954360,
+   "triangles": 5880,
+   "materials": 4,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior",
+    "GeoStarGem",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "MeteorMesh.001",
+    "ResourcePivot",
+    "meteor_worked1_root"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -1.1095,
+    0.0,
+    -1.1728
+   ],
+   "bbox_max": [
+    1.0164,
+    1.5447,
+    1.0771
+   ],
+   "dimensions": [
+    2.1259,
+    1.5447,
+    2.25
+   ],
+   "lod": false,
+   "stage": 1,
+   "build_s": 0.29
+  },
+  "meteor_worked2": {
+   "file_bytes": 875164,
+   "triangles": 5960,
+   "materials": 4,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior",
+    "GeoStarGem",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "MeteorMesh.002",
+    "ResourcePivot",
+    "meteor_worked2_root"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -1.1095,
+    0.0,
+    -1.1277
+   ],
+   "bbox_max": [
+    1.0421,
+    1.6488,
+    1.0771
+   ],
+   "dimensions": [
+    2.1516,
+    1.6488,
+    2.2048
+   ],
+   "lod": false,
+   "stage": 2,
+   "build_s": 0.28
+  },
+  "boulder": {
+   "file_bytes": 825860,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderMesh",
+    "Grip",
+    "ResourcePivot",
+    "Boulder"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.9553,
+    0.0,
+    -0.7748
+   ],
+   "bbox_max": [
+    0.9469,
+    1.1208,
+    0.7739
+   ],
+   "dimensions": [
+    1.9022,
+    1.1208,
+    1.5487
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.17
+  },
+  "boulder_lod": {
+   "file_bytes": 366748,
+   "triangles": 1280,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderMeshLOD",
+    "Grip",
+    "ResourcePivot",
+    "boulder_lod_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.9162,
+    0.0,
+    -0.7593
+   ],
+   "bbox_max": [
+    0.9469,
+    1.1208,
+    0.7724
+   ],
+   "dimensions": [
+    1.8631,
+    1.1208,
+    1.5318
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.1
+  },
+  "boulder_worked1": {
+   "file_bytes": 783832,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderMesh.001",
+    "Grip",
+    "ResourcePivot",
+    "boulder_worked1_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.8697,
+    0.0,
+    -0.7748
+   ],
+   "bbox_max": [
+    0.9469,
+    1.1208,
+    0.7739
+   ],
+   "dimensions": [
+    1.8166,
+    1.1208,
+    1.5487
+   ],
+   "lod": false,
+   "stage": 1,
+   "build_s": 0.17
+  },
+  "boulder_worked2": {
+   "file_bytes": 767932,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderMesh.002",
+    "Grip",
+    "ResourcePivot",
+    "boulder_worked2_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.8697,
+    0.0,
+    -0.7748
+   ],
+   "bbox_max": [
+    0.9067,
+    1.1208,
+    0.7739
+   ],
+   "dimensions": [
+    1.7764,
+    1.1208,
+    1.5487
+   ],
+   "lod": false,
+   "stage": 2,
+   "build_s": 0.18
+  },
+  "boulder_b": {
+   "file_bytes": 741920,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderBMesh",
+    "Grip",
+    "ResourcePivot",
+    "BoulderB"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.7257,
+    0.0,
+    -0.6232
+   ],
+   "bbox_max": [
+    0.6556,
+    1.2071,
+    0.6432
+   ],
+   "dimensions": [
+    1.3813,
+    1.2071,
+    1.2664
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.17
+  },
+  "boulder_b_lod": {
+   "file_bytes": 353352,
+   "triangles": 1280,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderBMeshLOD",
+    "Grip",
+    "ResourcePivot",
+    "boulder_b_lod_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.7018,
+    0.0,
+    -0.6232
+   ],
+   "bbox_max": [
+    0.6552,
+    1.2033,
+    0.631
+   ],
+   "dimensions": [
+    1.3571,
+    1.2033,
+    1.2542
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.11
+  },
+  "boulder_c": {
+   "file_bytes": 762512,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderCMesh",
+    "Grip",
+    "ResourcePivot",
+    "BoulderC"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -1.0078,
+    0.0,
+    -0.8271
+   ],
+   "bbox_max": [
+    0.9773,
+    1.1771,
+    0.7391
+   ],
+   "dimensions": [
+    1.985,
+    1.1771,
+    1.5662
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.2
+  },
+  "boulder_c_lod": {
+   "file_bytes": 356252,
+   "triangles": 1280,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderCMeshLOD",
+    "Grip",
+    "ResourcePivot",
+    "boulder_c_lod_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.9952,
+    0.0,
+    -0.8258
+   ],
+   "bbox_max": [
+    0.9515,
+    1.1771,
+    0.7301
+   ],
+   "dimensions": [
+    1.9467,
+    1.1771,
+    1.5559
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.12
+  },
+  "star_gem_meteoric": {
+   "file_bytes": 257028,
+   "triangles": 440,
+   "materials": 3,
+   "material_names": [
+    "GeoRock",
+    "GeoStarGem",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarGemMeteoricMesh",
+    "StarGemMeteoric"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.1122,
+    0.0,
+    -0.0869
+   ],
+   "bbox_max": [
+    0.1072,
+    0.2773,
+    0.0886
+   ],
+   "dimensions": [
+    0.2194,
+    0.2773,
+    0.1755
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.18
+  },
+  "star_gem_meteoric_lod": {
+   "file_bytes": 217812,
+   "triangles": 160,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoStarGem"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarGemMeteoricMeshLOD",
+    "star_gem_meteoric_lod_root"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.1122,
+    0.0,
+    -0.0869
+   ],
+   "bbox_max": [
+    0.1072,
+    0.2773,
+    0.0838
+   ],
+   "dimensions": [
+    0.2194,
+    0.2773,
+    0.1706
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.12
+  },
+  "star_iron_ore": {
+   "file_bytes": 333668,
+   "triangles": 1280,
+   "materials": 3,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior",
+    "GeoSeam"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarIronOreMesh",
+    "StarIronOre"
+   ],
+   "extensions_used": [
+    "KHR_materials_emissive_strength"
+   ],
+   "bbox_min": [
+    -0.0928,
+    0.0,
+    -0.0908
+   ],
+   "bbox_max": [
+    0.1112,
+    0.1145,
+    0.0804
+   ],
+   "dimensions": [
+    0.204,
+    0.1145,
+    0.1712
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.18
+  },
+  "star_iron_ore_lod": {
+   "file_bytes": 236368,
+   "triangles": 320,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StarIronOreMeshLOD",
+    "star_iron_ore_lod_root"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.0911,
+    0.0,
+    -0.0904
+   ],
+   "bbox_max": [
+    0.1094,
+    0.1145,
+    0.0799
+   ],
+   "dimensions": [
+    0.2005,
+    0.1145,
+    0.1703
+   ],
+   "lod": true,
+   "stage": 0,
+   "build_s": 0.09
+  },
+  "stone_chips": {
+   "file_bytes": 232040,
+   "triangles": 240,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "Grip",
+    "ResourcePivot",
+    "StoneChipsMesh",
+    "StoneChips"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.0782,
+    0.0,
+    -0.0357
+   ],
+   "bbox_max": [
+    0.1033,
+    0.0437,
+    0.0732
+   ],
+   "dimensions": [
+    0.1815,
+    0.0437,
+    0.1088
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.11
+  }
+ },
+ "timings": {
+  "textures_s": 0.67,
+  "render_s": 49.7
+ }
+}
