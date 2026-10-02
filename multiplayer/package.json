@@ -11,9 +11,17 @@
     "test": "node tests/run.mjs",
     "test:load": "node tests/load.mjs",
     "test:network": "node tests/network.mjs",
-    "test:gateway": "node tests/gateway.mjs"
+    "test:gateway": "node tests/gateway.mjs",
+    "prebuild": "node tests/asset-dependencies.mjs"
   },
-  "dependencies": {"three": "0.186.1", "ws": "8.22.0"},
-  "devDependencies": {"vite": "8.3.2"},
-  "engines": {"node": ">=22.12.0"}
+  "dependencies": {
+    "three": "0.186.1",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }

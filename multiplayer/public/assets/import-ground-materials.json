@@ -1,0 +1,82 @@
+[
+  {
+    "file": "prop_atlas_albedo.png",
+    "source": "godot/assets/ground-surface-kit/materials/prop_atlas_albedo.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "bytes": 1479740,
+    "sha256": "c0cc65f568cdf3482f98fefa6b0482c82c1c1fcba480948307cf9456540e5923"
+  },
+  {
+    "file": "prop_atlas_normal.png",
+    "source": "godot/assets/ground-surface-kit/materials/prop_atlas_normal.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "bytes": 2466595,
+    "sha256": "6f2243de0691221cf6decb433ef0ab9038ad6b9a8b703ff24450d830737d6534"
+  },
+  {
+    "file": "prop_atlas_orm.png",
+    "source": "godot/assets/ground-surface-kit/materials/prop_atlas_orm.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "bytes": 1397796,
+    "sha256": "ae45cdee49891bd858b9b366f7d48e6852e1eda13098df61701b842d856a16af"
+  },
+  {
+    "file": "broadleaf_plant.glb",
+    "source": "godot/assets/ground-surface-kit/props/broadleaf_plant.glb",
+    "sha256": "b3e2380c4b6ba6702f0daaacf2902a47b266b4a6240aa42354c8097a3ec1edfb"
+  },
+  {
+    "file": "fallen_branch.glb",
+    "source": "godot/assets/ground-surface-kit/props/fallen_branch.glb",
+    "sha256": "1da6a8d6889c1f17207f5739de0bf0595366fb7e5bc8c06c6dd2f57296ab402b"
+  },
+  {
+    "file": "fern_delicate.glb",
+    "source": "godot/assets/ground-surface-kit/props/fern_delicate.glb",
+    "sha256": "0392b8ea0fb96ac7ba20a0334c869c77ed8c10d22a0dfc3ea79caffc9e10e7a6"
+  },
+  {
+    "file": "grass_tuft.glb",
+    "source": "godot/assets/ground-surface-kit/props/grass_tuft.glb",
+    "sha256": "8c2a78c2d208eae8a6e5cfb66860c3536b99a267d17101a89b3909cc1e9c7904"
+  },
+  {
+    "file": "leaf_litter.glb",
+    "source": "godot/assets/ground-surface-kit/props/leaf_litter.glb",
+    "sha256": "f3cf3a38d02382c1637519e59e567fe6f8c0c564e1f376d65e5904d0d16c0289"
+  },
+  {
+    "file": "meadow_flowers.glb",
+    "source": "godot/assets/ground-surface-kit/props/meadow_flowers.glb",
+    "sha256": "eb640fae0bc0c99bb9d9392653b73d81840be59537929183ccbc2ff6c6796ad7"
+  },
+  {
+    "file": "mushroom_cluster.glb",
+    "source": "godot/assets/ground-surface-kit/props/mushroom_cluster.glb",
+    "sha256": "6e914f68ee7bfee10c8ca797b9bff86e59c7583a608ac1ad989c9e4942c3c0aa"
+  },
+  {
+    "file": "pebble_scatter.glb",
+    "source": "godot/assets/ground-surface-kit/props/pebble_scatter.glb",
+    "sha256": "83dd22ea92a92d3cb443692bbf4af4068e1b69d5d2183433de7be529c68d6e51"
+  },
+  {
+    "file": "river_stones.glb",
+    "source": "godot/assets/ground-surface-kit/props/river_stones.glb",
+    "sha256": "cde47e4c3ec6d5d54923b31cee3a993c40be9ac8e8fb8efcd03c8f72fb5800cf"
+  },
+  {
+    "file": "root_tangle.glb",
+    "source": "godot/assets/ground-surface-kit/props/root_tangle.glb",
+    "sha256": "9b7016732434ded870632a041a19cbf87b8d4ccae52d620dc1ddbbb397c33aae"
+  }
+]

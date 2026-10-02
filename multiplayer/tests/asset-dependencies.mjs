@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import {readFileSync,readdirSync,existsSync} from 'node:fs';import {resolve,dirname,sep} from 'node:path';
+const root=resolve(import.meta.dirname,'../public/assets');let checked=0;
+for(const name of readdirSync(root).filter(n=>n.endsWith('.glb'))){const b=readFileSync(resolve(root,name)),doc=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)));for(const entry of [...doc.images||[],...doc.buffers||[]]){if(!entry.uri||entry.uri.startsWith('data:'))continue;assert.ok(!/^[a-z]+:/i.test(entry.uri),name+' must not depend on external hosting');const path=resolve(root,entry.uri);assert.ok(path.startsWith(root+sep)&&existsSync(path),`${name}: missing bundled ${entry.uri}`);checked++;}}
+console.log(`asset-dependencies: all browser GLBs resolve; ${checked} packaged texture references`);
