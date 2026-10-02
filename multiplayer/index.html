@@ -10,6 +10,7 @@
   <meta name="color-scheme" content="dark">
   <title>Brann’s Forge</title>
   <link rel="stylesheet" href="./lobby.css">
+  <link rel="stylesheet" href="./saved-worlds-chooser.css">
   <link rel="stylesheet" href="./combat-hud.css">
   <!-- Refinement layer: loads last, only adds/overrides. Safe to remove to roll back. -->
   <link rel="stylesheet" href="./styles.css">
@@ -179,6 +180,8 @@
             <input id="import" type="file" accept=".json,application/json">
           </label>
         </div>
+        <!-- Saved-world chooser (saved-worlds-chooser.js): pick any of up to eight local saves, then Resume or Download. -->
+        <div id="savedWorldChooser"></div>
       </div>
     </details>
 

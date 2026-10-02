@@ -4,6 +4,7 @@ import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
+import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.js';
 import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
 import { adventureView } from './shared/adventure.js';
 import { createAdventureBanner } from './client/adventure-view.js';
@@ -119,12 +120,29 @@ function joinFromForm() {
 }
 
 // ---------------------------------------------------------------- saved worlds (lobby)
+// Fresh read at action time: the chooser only holds {id,name,savedAt}, never a possibly stale checkpoint.
+const findSave = id => new WorldSaves().list().find(save => save.id === id) || null;
+const savedChooser = createSavedWorldsChooser($('savedWorldChooser'), {
+  showEmpty: false,   // #savedSummary already explains empty and unreadable storage
+  onResume(id) {
+    const save = findSave(id);   // a throw here becomes the chooser's polite, retryable message
+    if (!save) { savedChooser.finish(); refreshSavedWorlds(); return; }   // vanished: newest is selected, nothing launches
+    start({create: true, save, fromChooser: true});
+  },
+  onDownload(id) {
+    const save = findSave(id);
+    if (!save) { refreshSavedWorlds(); return; }
+    downloadSave(save);
+  },
+});
+
 function refreshSavedWorlds() {
   const summary = $('savedSummary'), resume = $('resume');
   resume.hidden = true;
   let latest = null;
-  try { latest = new WorldSaves().list()[0] || null; }
+  try { const saves = new WorldSaves().list(); savedChooser.setSaves(saves); latest = saves[0] || null; }
   catch (error) {
+    savedChooser.setUnavailable();
     setText(summary, friendlyError({message: error?.message}) + ' You can still open a world file.');
     return;
   }
@@ -132,7 +150,7 @@ function refreshSavedWorlds() {
   const when = new Date(latest.savedAt);
   const stamp = isNaN(when) ? '' : ` · saved ${when.toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'})}`;
   setText(summary, `${latest.name}${stamp}`);
-  setText(resume, `Resume ${latest.name}`);
+  setText(resume, 'Resume latest');
   resume.hidden = false;
 }
 $('savedWorlds').addEventListener('toggle', () => { if ($('savedWorlds').open) refreshSavedWorlds(); });
@@ -167,14 +185,19 @@ function showLobbyStatus(text, {busy = false, retry = false, back = false, cance
   $('statusCancel').hidden = !cancel;
   body.classList.toggle('lobby-busy', busy);
   $('lobbyForm').inert = busy;
+  $('savedWorlds').inert = busy;   // no second Resume/import/download while a world is opening
 }
 function showLobbyProblem(text, {retry = false, back = true} = {}) {
   showLobbyStatus(text, {retry, back});
   ($('statusRetry').hidden ? $('statusBack') : $('statusRetry')).focus({preventScroll: true});
 }
-function hideLobbyStatus() { $('lobbyStatus').hidden = true; body.classList.remove('lobby-busy'); $('lobbyForm').inert = false; }
+function hideLobbyStatus() { $('lobbyStatus').hidden = true; body.classList.remove('lobby-busy'); $('lobbyForm').inert = false; $('savedWorlds').inert = false; savedChooser.finish(); }
 $('statusRetry').addEventListener('click', () => { if (lastAttempt) start(lastAttempt); });
-$('statusBack').addEventListener('click', () => { hideLobbyStatus(); (lastAttempt?.create === false ? roomInput : $('create')).focus(); });
+$('statusBack').addEventListener('click', () => {
+  hideLobbyStatus();
+  if (lastAttempt?.fromChooser) savedChooser.focus({action: true});   // selection was kept; Resume selected retries
+  else (lastAttempt?.create === false ? roomInput : $('create')).focus();
+});
 $('statusCancel').addEventListener('click', () => { teardown(); hideLobbyStatus(); setPhase('lobby'); });
 
 // ---------------------------------------------------------------- phases
@@ -184,6 +207,7 @@ function setPhase(next) {
   $('lobby').hidden = next === 'game';
   $('hud').hidden = next !== 'game';
   if (next !== 'game') closeMenu(false);
+  if (next === 'lobby' && $('savedWorlds').open) refreshSavedWorlds();   // autosaves/reset copies made while playing
   if (next === 'game') controlsCard?.close({restoreFocus: false});
   syncActive();
 }
