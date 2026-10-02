@@ -1,0 +1,137 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor, updateGolemPose} from '../client/combat-view.js';
+import {assetBasis, ASSET_POSES, prepareAsset, weaponTip, weaponForward, updateWeaponPresentation} from '../client/asset-pose.js';
+
+const started = performance.now();
+const material = new THREE.MeshBasicMaterial({side: THREE.DoubleSide});
+const root = new THREE.Group(), leg = new THREE.Bone(), knee = new THREE.Bone(), foot = new THREE.Bone();
+leg.name = 'LeftLeg'; knee.name = 'LeftKnee'; foot.name = 'LeftFoot';
+leg.position.set(0, 1, 0); knee.position.y = -.4; foot.position.y = -.4;
+root.add(leg); leg.add(knee); knee.add(foot);
+// Three disjoint triangles: genuine surface gaps must remain empty.
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.Float32BufferAttribute([-.1, .9, 0, .1, .9, 0, 0, 1.1, 0, -.1, .5, 0, .1, .5, 0, 0, .7, 0, -.1, .1, 0, .1, .1, 0, 0, .3, 0], 3));
+geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(Array.from({length: 9}, (_, i) => [Math.floor(i / 3), 0, 0, 0]).flat(), 4));
+geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(Array.from({length: 9}, () => [1, 0, 0, 0]).flat(), 4));
+geometry.computeVertexNormals();
+const mesh = new THREE.SkinnedMesh(geometry, material); root.add(mesh); root.updateMatrixWorld(true); mesh.bind(new THREE.Skeleton([leg, knee, foot]));
+assert.equal(segmentSurfaceContacts(root, [0, .4, 1], [0, .4, -1], 'test').length, 0, 'bone gap is a miss');
+let hit = segmentSurfaceContacts(root, [0, .18, 1], [0, .18, -1], 'test')[0];
+assert.equal(hit.boneName, 'LeftFoot'); assert.equal(hit.part, 'leftLeg');
+const embed = new THREE.Object3D(); foot.add(embed); embed.position.fromArray(hit.localPoint);
+const before = embed.getWorldPosition(new THREE.Vector3()); knee.rotation.z = .4; root.updateMatrixWorld(true);
+assert.ok(before.distanceTo(embed.getWorldPosition(new THREE.Vector3())) > .1, 'embed follows animated knee/foot');
+hit = segmentSurfaceContacts(root, [0, .98, 1], [0, .98, -1], 'test')[0]; assert.equal(hit.boneName, 'LeftLeg');
+const detached = snapshotDetachedPart(root, 'leftLeg');
+assert.equal(detached.children.filter(n => n.isMesh).reduce((n, m) => n + m.geometry.attributes.position.count, 0), 9, 'whole leg includes thigh/knee/foot');
+const frozenFoot = detached.getObjectByName('LeftFoot');
+const frozenPoint = frozenFoot.localToWorld(embed.position.clone());
+assert.ok(frozenPoint.distanceTo(embed.getWorldPosition(new THREE.Vector3())) < 1e-6, 'bone local point transfers without snapping');
+maskMissingParts(root, ['leftLeg']);
+assert.equal(segmentSurfaceContacts(root, [0, .98, 1], [0, .98, -1], 'test').length, 0, 'detached surface no longer hittable');
+assert.equal(geometry.index, null, 'shared source geometry unchanged');
+maskMissingParts(root, []); assert.equal(mesh.geometry, geometry);
+
+// Actual shipped animated skeleton: complete leg and material topology survive.
+const bytes = readFileSync(new URL('../public/assets/skeleton.glb', import.meta.url));
+const template = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+const skeleton = prepareAsset(template, 'skeleton').visual;
+const actualLeg = snapshotDetachedPart(skeleton, 'leftLeg');
+const bounds = new THREE.Box3().setFromObject(actualLeg), size = bounds.getSize(new THREE.Vector3());
+assert.ok(size.y > .55, `actual detached leg includes foot; height=${size.y}`);
+assert.ok(actualLeg.children.some(n => n.isMesh && n.material), 'authored materials preserved');
+assert.ok(actualLeg.getObjectByName('LeftFoot'), 'actual lower limb attachment retained');
+
+// Load native geometry without decoding raster textures in this Node test.
+async function geometryTemplate(name) {
+  const bytes = readFileSync(new URL(`../public/assets/${name}.glb`, import.meta.url));
+  const length = bytes.readUInt32LE(12), json = JSON.parse(bytes.subarray(20, 20 + length).toString());
+  const bin = bytes.subarray(28 + length, 28 + length + json.buffers[0].byteLength);
+  json.buffers[0].uri = `data:application/octet-stream;base64,${bin.toString('base64')}`;
+  delete json.images; delete json.textures; delete json.materials;
+  for (const mesh of json.meshes) for (const primitive of mesh.primitives) delete primitive.material;
+  globalThis.ProgressEvent ||= class ProgressEvent { constructor(type, values) { this.type = type; Object.assign(this, values); } };
+  return new GLTFLoader().parseAsync(JSON.stringify(json), '');
+}
+const golem = prepareAsset(await geometryTemplate('golem'), 'golem', 2.8).visual, golemRoot = new THREE.Group(); golemRoot.add(golem);
+golemRoot.updateWorldMatrix(true, true);
+const golemPartPoses = capturePartPoses(golem);
+assert.ok(golemPartPoses.leftArm.position[0] < 0 && golemPartPoses.rightArm.position[0] > 0, 'native golem named sides survive canonical conversion');
+updateGolemArmor(golem, 2); assert.equal(golem.getObjectByName('ForearmL').visible, false); assert.equal(golem.getObjectByName('ShoulderL').visible, true);
+updateGolemArmor(golem, 0); assert.equal(golem.getObjectByName('ChestPlate').visible, false); assert.equal(golem.getObjectByName('ShoulderR').visible, false);
+const golemArm = snapshotDetachedPart(golem, 'leftArm');
+assert.ok(golemArm.children.some(n => n.name.includes('ForearmHandL')), 'complete borrowed arm includes authored hand');
+assert.ok(!golemArm.children.some(n => n.name === 'ShoulderL:detached'), 'broken armor is absent from loose piece');
+const golemEntry = {root: golemRoot, visual: golem, data: {attackTick: -1000}};
+updateGolemPose(golemEntry, .016, 0, 0); golemRoot.position.z += .1; updateGolemPose(golemEntry, .016, 0, .016);
+assert.ok(Math.abs(golem.getObjectByName('ArmL').rotation.x) > .01, 'native gait moves actual modular golem arm');
+golemEntry.data.attackTick = 0; updateGolemPose(golemEntry, .016, 30, .5);
+assert.ok(golem.getObjectByName('ArmL').rotation.x < -1, 'native two-arm attack windup');
+maskMissingParts(golem, ['leftLeg']); let missingTriangles = 0; golem.getObjectByName('LegL').traverse(n => { if (n.isMesh) missingTriangles += n.geometry.index?.count || 0; });
+assert.equal(missingTriangles, 0, 'golem named modular leg is removed');
+const bowTemplate = await geometryTemplate('bow'), actualArrow = await geometryTemplate('arrow');
+const bow = prepareAsset(bowTemplate, 'bow').visual;
+updateWeaponPresentation(bow, 'bow', {draw: 1, templates: new Map([['arrow', actualArrow]])});
+assert.ok(weaponTip(bow, 'bow').distanceTo(bow.userData.nockedArrow.getWorldPosition(new THREE.Vector3())) < 1e-6, 'launch is actual drawn arrow tip');
+assert.ok(weaponForward(bow, 'bow').distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-6, 'actual weapon forward agrees with canonical shot direction');
+const rigidRoot = new THREE.Group(), rigidArm = new THREE.Group(); rigidArm.name = 'ArmL'; rigidRoot.scale.setScalar(1.7); rigidRoot.add(rigidArm);
+rigidArm.add(new THREE.Mesh(new THREE.BoxGeometry(.2, .6, .2), material));
+const rigidHit = segmentSurfaceContacts(rigidRoot, [0, 0, 1], [0, 0, -1], 'rigid')[0];
+assert.equal(rigidHit.boneName, 'ArmL', 'rigid modular hits preserve their exact scaled attachment frame too');
+const rigidLoose = snapshotDetachedPart(rigidRoot, 'leftArm');
+const rigidOriginal = rigidArm.localToWorld(new THREE.Vector3(...rigidHit.localPoint));
+assert.ok(rigidLoose.getObjectByName(rigidHit.boneName).localToWorld(new THREE.Vector3(...rigidHit.localPoint)).distanceTo(rigidOriginal) < 1e-6, 'scaled rigid golem attachment survives detachment');
+
+for (const name of ['crossbow', 'bow', 'arrow', 'hammer', 'golem']) {
+  const pose = ASSET_POSES[name], q = assetBasis(pose);
+  assert.ok(new THREE.Vector3(...pose.forward).applyQuaternion(q).distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-6, `${name} canonical forward`);
+  assert.ok(new THREE.Vector3(...pose.up).applyQuaternion(q).distanceTo(new THREE.Vector3(0, 1, 0)) < 1e-6, `${name} canonical up`);
+}
+const arrowTemplate = {scene: new THREE.Group(), animations: []};
+arrowTemplate.scene.add(new THREE.Mesh(new THREE.BoxGeometry(.02, .02, .78), material));
+const tip = new THREE.Object3D(); tip.name = 'ArrowTip'; tip.position.z = -.39; arrowTemplate.scene.add(tip);
+const scene = new THREE.Scene(); scene.add(root);
+const actor = {visual: root, root, enemy: true, data: {id: 'test'}};
+const reports = [];
+const view = createCombatView({scene, templates: new Map([['arrow', arrowTemplate]]), actors: new Map([['e:test', actor]]), onContact: h => reports.push(h)});
+const snapshot = {enemies: [{id: 'test', missingParts: []}], projectiles: [{id: 'p', kind: 'arrow', previousPosition: [0, .98, 1], position: [0, .98, -1], velocity: [0, 0, -20]}]};
+view.sync(snapshot); view.tick(.016, false); assert.equal(reports.length, 0, 'guest cannot report contact');
+view.tick(.016, true); view.tick(.016, true); assert.equal(reports.length, 1, 'host reports contact once');
+const footImpact = {id: 'embed', kind: 'arrow', targetId: 'test', part: 'leftLeg', boneName: 'LeftFoot', localPoint: [0, 0, 0], localQuaternion: [0, 0, 0, 1]};
+root.scale.setScalar(1.4); root.updateWorldMatrix(true, true);
+view.sync({enemies: [{id: 'test', missingParts: []}], embeds: [footImpact]});
+const embedded = view.embeds.get('embed'), embeddedPosition = embedded.getWorldPosition(new THREE.Vector3());
+const pose = capturePartPoses(root).leftLeg;
+view.sync({enemies: [{id: 'test', missingParts: ['leftLeg']}], detachedParts: [{id: 'loose', sourceId: 'test', part: 'leftLeg', kind: 'skeleton', position: pose.position, quaternion: pose.quaternion}], embeds: [{...footImpact, targetId: 'loose'}]});
+assert.equal(view.embeds.get('embed'), embedded, 'same projectile object transfers');
+assert.ok(embeddedPosition.distanceTo(embedded.getWorldPosition(new THREE.Vector3())) < 1e-6, 'view transfer preserves exact world impact');
+assert.ok(embedded.getWorldScale(new THREE.Vector3()).distanceTo(new THREE.Vector3(1, 1, 1)) < 1e-6, 'actor normalization does not resize embedded projectile');
+let arrowVertices = 0; embedded.traverse(n => { if (n.isMesh) arrowVertices += n.geometry.index?.count ?? n.geometry.attributes.position.count; });
+assert.ok(arrowVertices > 0, 'masking limb does not mask the embedded arrow');
+assert.ok(view.detached.get('loose').children.filter(n => n.isMesh).every(n => n.geometry.groups.length <= 1), 'same-material triangles share a draw call');
+view.dispose();
+const wallScene = new THREE.Scene(), enemyRoot = new THREE.Group();
+const target = new THREE.Mesh(new THREE.BoxGeometry(.4, .4, .4), material); target.name = 'Head'; enemyRoot.add(target); wallScene.add(enemyRoot);
+let wallEnabled = true, wallQueries = 0;
+const trailReports = [];
+const worldView = createCombatView({scene: wallScene, templates: new Map([['arrow', arrowTemplate]]), actors: new Map([['e:target', {enemy: true, visual: enemyRoot, data: {id: 'target'}}]]), onContact: h => trailReports.push(h), worldContact: (from, to) => {
+  wallQueries++;
+  if (!wallEnabled || from[2] < 1 || to[2] > 1) return null;
+  return {targetId: 'world', part: 'torso', point: [0, 0, 1], normal: [0, 0, 1], localPoint: [0, 0, 1], localQuaternion: [0, 0, 0, 1], distance: from[2] - 1};
+}});
+const trailShot = {id: 'trail', kind: 'arrow', position: [0, 0, -2], previousPosition: [0, 0, -1], velocity: [0, 0, -30], trail: [[0, 0, 2], [0, 0, .75], [0, 0, -1], [0, 0, -2]]};
+worldView.sync({enemies: [{id: 'target'}], projectiles: [trailShot]}); worldView.tick(.016, true);
+assert.equal(trailReports[0].targetId, 'world', 'earlier world surface blocks enemy behind it');
+wallEnabled = false;
+worldView.sync({enemies: [{id: 'target'}], projectiles: [{...trailShot, id: 'trail2'}]}); worldView.tick(.016, true);
+assert.equal(trailReports[1].targetId, 'target', 'sweeps intermediate snapshot path, not only final physics segment');
+worldView.sync({enemies: [], projectiles: [{...trailShot, id: 'miss', position: [5, 0, -2], previousPosition: [5, 0, -1], trail: [[5, 0, -1], [5, 0, -2]]}]});
+worldView.tick(.016, true); const queries = wallQueries; worldView.tick(.016, true);
+assert.equal(wallQueries, queries, 'previously checked trail is not replayed against moving enemies');
+worldView.sync({enemies: [], embeds: [{id: 'wallEmbed', kind: 'arrow', targetId: 'world', part: 'torso', localPoint: [0, 0, 1], localQuaternion: [0, 0, 0, 1]}]});
+assert.equal(worldView.embeds.get('wallEmbed').parent, wallScene, 'world embed stays attached to world');
+worldView.dispose();
+console.log(`combat-view: gaps, animated bone identity, frozen handoff, complete native leg, source isolation, canonical axes and host-only reporting passed (${((performance.now() - started) / 1000).toFixed(3)}s)`);

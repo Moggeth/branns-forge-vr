@@ -4,6 +4,8 @@ import * as T from 'three';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const smooth=(a,b,t)=>{const u=T.MathUtils.clamp((t-a)/(b-a),0,1);return u*u*(3-2*u);};
 export const SWING_PROFILES={
+ hammer:{duration:.54,cooldown:.65,a:.21,f:.72,wind:V(.38,.52,.22),follow:V(-.19,-.34,.08),push:.95,through:.12,bulge:.06,lag:.08,cant:.22,pre:.05,lead:1.2,wrist:[V(),V(.10,-.02,.16),V(-.08,.04,-.02),V(-.13,.04,-.12),V()]},
+ limb:{duration:.48,cooldown:.58,a:.14,f:.72,wind:V(.38,.38,.14),follow:V(-.40,-.34,.14),push:1.1,through:.5,bulge:.04,lag:.04,cant:.32,pre:.05,lead:1.6,wrist:[V(),V(.05,-.03,.22),V(-.08,.05,-.02),V(-.07,.05,-.20),V()]},
  axe:{duration:.38,cooldown:.46,a:.13,f:.76,wind:V(.40,.34,.14),follow:V(-.45,-.36,.20),push:1.15,through:.85,bulge:.05,lag:.04,cant:.32,pre:.06,lead:1.6,wrist:[V(),V(.04,-.03,.26),V(-.09,.06,-.03),V(-.06,.05,-.24),V()]},
  pick:{duration:.40,cooldown:.48,a:.12,f:.64,wind:V(.27,.40,.10),follow:V(-.15,-.22,.27),push:1.3,through:.22,bulge:.03,lag:.025,cant:.42,pre:.04,lead:1.8,wrist:[V(),V(.09,-.02,.15),V(-.13,.04,-.02),V(.10,.03,-.12),V()]},
 };

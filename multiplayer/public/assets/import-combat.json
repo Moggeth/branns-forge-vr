@@ -1,0 +1,50 @@
+[
+  {
+    "name": "crossbow.glb",
+    "source": "godot/assets/siegebird/siegebird.glb",
+    "bytes": 3463632,
+    "sha256": "ba8e9135db2c7d1ed880260c11da664828a3e7320d0ed901c980540040ef27a2",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  },
+  {
+    "name": "bow.glb",
+    "source": "godot/weapons/emberwing/bow.glb",
+    "bytes": 1459448,
+    "sha256": "28de7a0bda22f15cfde2e3934ca90069697390db8c546d1f2ee5117bc5c821af",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  },
+  {
+    "name": "arrow.glb",
+    "source": "godot/weapons/emberwing/arrow.glb",
+    "bytes": 101448,
+    "sha256": "15239b5207a7cee1b47ee98b64f2920f6fa294a0335b1f547b1233517292a23c",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  },
+  {
+    "name": "wings.glb",
+    "source": "godot/weapons/emberwing/wings.glb",
+    "bytes": 91080,
+    "sha256": "9496651cf34746f74aea635ed52273f89e670e7d84366c37208d71889008bfc7",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  },
+  {
+    "name": "golem.glb",
+    "source": "godot/assets/golem/golem.glb",
+    "bytes": 17145728,
+    "sha256": "f265ece35e0e905dee8514ac3e6f0e5c9809c80361e8060439cba164f406778e",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  },
+  {
+    "name": "hammer.glb",
+    "source": "service/data/forge-assets/74a031c1-7001-4518-8ae8-ace3dce4d027/model.glb",
+    "bytes": 782048,
+    "sha256": "16acc3c38fec3d13a6dd69d9606db8a93422c219c489951ce7f2c35ccb2f8625",
+    "textures": "embedded",
+    "reuse": "Existing native authored art; no new art generation"
+  }
+]
