@@ -53,7 +53,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const aimCamera = new THREE.Matrix4();
   let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), templates = new Map(), warnings = new Map();
-  const heroView = createHeroView(), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
+  const heroView = createHeroView({resolveWeapon: remoteWeapon, onWarning: report}), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3();
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
   const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster(), hitPoint = new THREE.Vector3();
@@ -288,6 +288,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
     return wrapper;
   }
+  const WEAPON_HEIGHTS = {axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4};
+  // Remote Hero equipment: a canonical clone of an already-loaded template (shared geometry/materials); hero-view poses it
+  // in the WeaponGrip socket with the local XR contract. null while loading; hero-view retries and never disposes templates.
+  function remoteWeapon(name) {
+    if (!templates.has(name)) return null;
+    const visual = instantiate(name, WEAPON_HEIGHTS[name]);
+    if (visual && name === 'flask') { const m = visual.children[0].children[0]; m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1); } // template root is the live local flask
+    return visual;
+  }
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
     const model = instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7);
@@ -446,7 +455,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (name === 'tree') { syncTrees(); }
     if (name === 'skeleton'||name==='golem') for (const entry of actors.values()) upgradeActor(entry);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout'].includes(name)) {
-      const model = instantiate(name, ({axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4})[name]);weaponModels.set(name,model);
+      const model = instantiate(name, WEAPON_HEIGHTS[name]);weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
     } else content.reload();
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
@@ -507,6 +516,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     feedback.handleEvent(event);
     expedition.handleEvent(event);
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
+    if(event?.by!==undefined&&event.by!==playerId){const a=actors.get(`p:${event.by}`);if(a?.visual.userData.hero)heroView.event(a.visual,event,a.data);} // attributed result -> remote swing/recoil
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
