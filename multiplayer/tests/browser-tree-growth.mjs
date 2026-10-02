@@ -1,0 +1,10 @@
+import {launch,enterWorld,record,save,sleep,shot,BASE} from './browser-acceptance-lib.mjs';
+const {browser,page}=await launch();try{
+ await enterWorld(page,{role:'god',name:'Grower'});await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics().world.missingAssets.length===0);
+ const before=await page.evaluate(()=>document.querySelector('#world').brannDiagnostics().world);
+ await page.locator('[data-spell="grove"]').click();await page.mouse.click(820,410);
+ await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics().world.growing>0);record('new-grove-growing','pass',await page.evaluate(()=>document.querySelector('#world').brannDiagnostics().world));
+ await shot(page,'tree-growth-early');await sleep(420);await shot(page,'tree-growth-foliage');await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics().world.growing===0);
+ const mature=await page.evaluate(()=>document.querySelector('#world').brannDiagnostics().world);if(mature.trees<=before.trees)throw Error('No new trees');record('mature-growth-drained','pass',mature);await shot(page,'tree-growth-mature');
+ const room=(await page.locator('#hudRoom').textContent()).trim(),c=await browser.newContext(),guest=await c.newPage(),errors=[];guest.on('pageerror',e=>errors.push(e.message));await guest.goto(BASE+'/?acceptanceProbe&room='+room);await guest.fill('#name','Late guest');await guest.locator('#join').click();await guest.waitForFunction(()=>window.brannHarness?.state().phase==='game');await guest.waitForFunction(n=>document.querySelector('#world').brannDiagnostics().world.trees===n,mature.trees);const late=await guest.evaluate(()=>document.querySelector('#world').brannDiagnostics().world);if(late.growing!==0)throw Error('Late join replayed growth');record('late-join-mature','pass',{trees:late.trees,growing:late.growing});await c.close();record('errors',page.errors.length+errors.length?'fail':'pass',{errors:[...page.errors,...errors]});if(page.errors.length+errors.length)process.exitCode=1;
+}catch(e){record('exception','fail',{message:e.message});process.exitCode=1;}finally{save('tree-growth-live');await browser.close();}

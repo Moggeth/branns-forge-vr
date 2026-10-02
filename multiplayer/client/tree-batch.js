@@ -25,18 +25,22 @@ export function createTreeBatches({group, minCapacity = 64}) {
   b.trunks = b.meshes.filter(m => m.userData.part === 'Trunk'); b.dirtyMin = 0; b.dirtyMax = b.ids.length - 1;
  }
  const touch = (b, i) => { if (i < b.dirtyMin) b.dirtyMin = i; if (i > b.dirtyMax) b.dirtyMax = i; };
- function write(b, i, root) { root.toArray(b.roots, i*16); for (let k = 0; k < b.meshes.length; k++) tmp.multiplyMatrices(root, b.parts[k].matrix).toArray(b.meshes[k].instanceMatrix.array, i*16); writes++; touch(b, i); }
+ // local (optional): {partName: Matrix4} applied between the root and the authored part matrix (cosmetic staged growth).
+ // roots[] always keeps the plain mature root, so rootOf()/anchors never see transient growth.
+ function write(b, i, root, local) { root.toArray(b.roots, i*16); for (let k = 0; k < b.meshes.length; k++) { const p = b.parts[k], l = local?.[p.part];
+   (l ? tmp.multiplyMatrices(root, l).multiply(p.matrix) : tmp.multiplyMatrices(root, p.matrix)).toArray(b.meshes[k].instanceMatrix.array, i*16); } writes++; touch(b, i); }
  function remove(id) {
   const w = where.get(id); if (!w) return false; const b = w.batch, i = w.slot, last = b.ids.length - 1; where.delete(id);
   if (i !== last) { const moved = b.ids[last]; b.ids[i] = moved; where.get(moved).slot = i; b.roots.copyWithin(i*16, last*16, last*16 + 16);
    for (const im of b.meshes) im.instanceMatrix.array.copyWithin(i*16, last*16, last*16 + 16); touch(b, i); moves++; }
   b.ids.pop(); for (const im of b.meshes) im.count = b.ids.length; b.bounds = true; return true;
  }
- /** Add or update one intact tree. root: Tree-root matrix (trunk axis at ground, uniform scale). */
- function place(id, variant, level, kit, root) {
+ /** Add or update one intact tree. root: Tree-root matrix (trunk axis at ground, uniform scale). local: optional
+  *  per-part-name Matrix4 map (tree-growth.js); omit for the exact mature authored shape. */
+ function place(id, variant, level, kit, root, local = null) {
   let w = where.get(id); if (w && w.batch.key !== keyOf(variant, level)) { remove(id); w = null; }
   if (!w) { const b = batch(variant, level, kit); if (b.ids.length >= b.capacity) grow(b); w = {batch: b, slot: b.ids.length}; b.ids.push(id); where.set(id, w); for (const im of b.meshes) im.count = b.ids.length; }
-  write(w.batch, w.slot, root); w.batch.bounds = true;
+  write(w.batch, w.slot, root, local); w.batch.bounds = true;
  }
  function flush() { // one contiguous update range per batch (bounded upload); lazily recomputed bounds for culling/raycast
   for (const b of batches.values()) { if (b.dirtyMax >= b.dirtyMin) { for (const im of b.meshes) { const a = im.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(b.dirtyMin*16, (b.dirtyMax - b.dirtyMin + 1)*16); a.needsUpdate = true; } b.dirtyMin = Infinity; b.dirtyMax = -1; }

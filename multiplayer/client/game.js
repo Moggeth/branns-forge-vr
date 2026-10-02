@@ -372,7 +372,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       actors.delete(key);
     }
   }
-  function syncTrees() { content.sync(snapshot); }
+  function syncTrees() { if(initialized)content.sync(snapshot); } // only a real joined snapshot establishes existing trees
   function syncWorldSignals() {
     const anchor = snapshot.shrine;
     shrine.visible = !!anchor;

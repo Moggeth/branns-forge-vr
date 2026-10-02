@@ -7,6 +7,7 @@ import {createTreeBatches} from './tree-batch.js';
 import {worldTrees} from '../shared/world-content.js';
 import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector} from '../shared/trees.js';
 import {bakeTriangles, buildNotch, buildFelled, toGeometry, fitEndcapUV} from './tree-carve.js';
+import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} from './tree-growth.js';
 
 const PARTS = ['Trunk', 'Roots', 'Branches', 'Leaves', 'Fruit'];
 const meshesUnder = node => { const out = []; node?.traverse(c => { if (c.isMesh) out.push(c); }); return out; };
@@ -76,11 +77,13 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   if (!chips) return; for (let i = 0; i < 7; i++) { if (chips.list.length >= chips.mesh.instanceMatrix.count) chips.list.shift(); const a = (i - 3)*.32, side = [dir[0]*Math.cos(a) - dir[2]*Math.sin(a), dir[2]*Math.cos(a) + dir[0]*Math.sin(a)];
    chips.list.push({start: now, p: [...p], v: [side[0]*(1.6 + (i % 3)*.5), 1.4 + (i % 4)*.45, side[1]*(1.6 + (i % 3)*.5)], spin: 6 + i*1.7}); }
  }
- const growScale = (born, now) => { const g = Math.min(1, Math.max(0, (now - born)/1400)); return g >= 1 ? 1 : Math.max(.01, g*g*(3 - 2*g)); };
  const lodFor = (r, d) => !!r.kit.lod && (r.lod ? d > lodDistance - 2 : d > lodDistance + 2); // +/-2 m hysteresis
- function placeIntact(r, grow = growScale(r.born, clock)) { // Tree root origin = trunk axis at (x, floor, z); never recentred by bounds
-  rootM.compose(rootP.set(r.tree.x, r.floor, r.tree.z), noRot, rootS.setScalar(r.scale*grow)); const v = VARIANTS[r.tree.variant] || 'tree';
-  batches.place(r.tree.id, v, r.lod ? 'lod' : 'full', r.lod ? r.kit.lod : r.kit, rootM); if (grow < 1) growing.add(r.tree.id); else growing.delete(r.tree.id);
+ const growLocal = {};
+ function placeIntact(r, g = growthProgress(r.born, clock)) { // Tree root origin = trunk axis at (x, floor, z); never recentred by bounds
+  // Staged growth (sapling -> branches -> foliage -> settle) is per-part and cosmetic; the root stays the mature root.
+  rootM.compose(rootP.set(r.tree.x, r.floor, r.tree.z), noRot, rootS.setScalar(r.scale)); const v = VARIANTS[r.tree.variant] || 'tree', kit = r.lod ? r.kit.lod : r.kit;
+  const local = g < 1 ? growthMatrices(growthProfile(kit), growthPose(g, r.seed ??= growthSeed(r.tree.id)), growLocal) : null;
+  batches.place(r.tree.id, v, r.lod ? 'lod' : 'full', kit, rootM, local); if (g < 1) growing.add(r.tree.id); else growing.delete(r.tree.id);
  }
  function demote(id) { const e = trees.get(id); if (!e) return; destroy(e); trees.delete(id); }
  function sync(s) {
@@ -101,7 +104,8 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
    }
    if (!e) { // first harvest record: de-instance only this tree; its cut-geometry entity takes over at the same transform
     const root = new T.Group(); root.name = t.id; const full = partsGroup(kit, t.id); root.add(full.g); group.add(root);
-    e = {tree: t, kit, root, full, born: r ? r.born : -1e9, key: '', cuts: 0, synced: !!r?.synced}; trees.set(t.id, e);
+    // harvesting interrupts growth: the entity is always the exact mature authored shape (notch/fall math assumes it)
+    e = {tree: t, kit, root, full, born: -1e9, key: '', cuts: 0, synced: !!r?.synced}; trees.set(t.id, e);
     if (r) { batches.remove(t.id); intact.delete(t.id); growing.delete(t.id); }
    }
    e.tree = t; e.floor = floor; e.root.position.set(t.x, e.floor, t.z); e.scale = sc; // Tree root origin = trunk axis at ground: never recentre by bounds
@@ -137,7 +141,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   if (cam) updateLod(cam);
   batches.flush();
   for (const e of trees.values()) { // individual (wounded/felled) trees only: always the full authored mesh, as before
-   e.root.scale.setScalar(e.scale*growScale(e.born, now));
+   e.root.scale.setScalar(e.scale);
    if (e.recoil) { const k = (now - e.recoil.start)/260; if (k >= 1) { e.recoil = null; e.root.quaternion.identity(); } else e.root.quaternion.setFromAxisAngle(e.recoil.axis, -(.006 + .004*e.recoil.cuts)*Math.sin(k*Math.PI)*(1 - k)); }
    if (e.felled && last) { const cut = e.felled.cut, f = treeFall(e.tree, cut, simTick, e.floor, ground); e.felled.pivot.quaternion.setFromAxisAngle(e.felled.axis, f.angle); }
   }

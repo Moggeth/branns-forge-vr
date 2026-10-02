@@ -1,0 +1,34 @@
+import {launch,enterWorld,record,save,sleep,shot} from './browser-acceptance-lib.mjs';
+const {browser,page}=await launch({touch:true,viewport:{width:844,height:600}});const cd=await page.context().newCDPSession(page);
+const touch=async(type,pts)=>cd.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([x,y,id=1])=>({x,y,id,radiusX:1,radiusY:1,force:1}))});
+const snap=()=>page.evaluate(()=>window.brannHarness.snapshot());
+const cast=()=>page.locator('[data-touch-action="cast"]');
+try{
+ await enterWorld(page,{role:'god',name:'Touch God'});await page.locator('#quickCast').check();await page.locator('[data-spell="skeleton"]').tap();
+ await page.waitForFunction(()=>document.querySelector('[data-touch-action="cast"]').hidden);
+ let s=await snap();await page.touchscreen.tap(440,260);await page.waitForFunction(n=>window.brannHarness.snapshot().enemies.length===n+1,s.enemies.length);record('quick-tap-skeleton','pass');await sleep(800);
+ await page.locator('[data-spell="sunder"]').tap();let before=await page.evaluate(()=>window.brannHarness.controls());s=await snap();
+ await touch('touchStart',[[350,260]]);await touch('touchMove',[[390,270]]);await sleep(120);
+ const during=await page.evaluate(()=>window.brannHarness.controls());if(!during.castStart||during.orbitYaw!==before.orbitYaw)throw Error('Line drag orbited or lost start');
+ await touch('touchMove',[[430,280]]);record('line-pose','info',await page.evaluate(()=>window.brannHarness.controls()));await touch('touchEnd',[]);await page.waitForFunction(n=>window.brannHarness.snapshot().edits.length>n,s.edits.length);record('quick-drag-sunder','pass');await sleep(800);
+ await page.locator('#quickCast').uncheck();await page.locator('[data-spell="wall"]').tap();s=await snap();await touch('touchStart',[[340,270]]);await touch('touchMove',[[420,285]]);await touch('touchEnd',[]);await sleep(180);if((await snap()).edits.length!==s.edits.length)throw Error('Normal drag cast before confirm');await cast().tap();await page.waitForFunction(n=>window.brannHarness.snapshot().edits.length>n,s.edits.length);record('normal-drag-confirm','pass');
+ await page.locator('#quickCast').check();await page.locator('[data-spell="raise"]').tap();s=await snap();before=await page.evaluate(()=>window.brannHarness.controls());
+ await touch('touchStart',[[350,260]]);await touch('touchStart',[[350,260],[480,260,2]]);await touch('touchMove',[[320,260],[510,260,2]]);await touch('touchEnd',[]);await sleep(220);let after=await page.evaluate(()=>window.brannHarness.controls());if(after.orbitRadius===before.orbitRadius||(await snap()).edits.length!==s.edits.length)throw Error('Pinch cast or failed zoom');record('pinch-no-cast','pass');
+ await page.locator('[data-spell="sunder"]').tap();s=await snap();await touch('touchStart',[[350,260]]);await touch('touchMove',[[470,280]]);await touch('touchCancel',[]);await sleep(180);if((await snap()).edits.length!==s.edits.length||(await page.evaluate(()=>window.brannHarness.controls())).castStart)throw Error('Cancelled line survived');record('cancel-no-cast','pass');
+ await shot(page,'touch-quick-line');await page.setViewportSize({width:390,height:844});await sleep(180);await shot(page,'touch-portrait');
+ await page.locator('[data-touch-action="menu"]').tap();await page.check('input[name="menuRole"][value="hero"]',{force:true});await page.locator('#resumePlay').tap();
+ const left=await page.locator('[data-stick="left"]').boundingBox(),right=await page.locator('[data-stick="right"]').boundingBox();const ax=left.x+left.width/2,ay=left.y+left.height/2,bx=right.x+right.width/2,by=right.y+right.height/2;
+ s=await snap();const id=await page.evaluate(()=>window.brannHarness.state().playerId),p=s.players.find(p=>p.id===id);before=await page.evaluate(()=>window.brannHarness.controls());
+ await touch('touchStart',[[ax,ay-30]]);await touch('touchStart',[[ax,ay-30],[bx+25,by,2]]);await sleep(400);await touch('touchEnd',[]);await sleep(120);after=await page.evaluate(()=>window.brannHarness.controls());const q=(await snap()).players.find(p=>p.id===id);if(Math.hypot(p.position[0]-q.position[0],p.position[2]-q.position[2])<.25||Math.abs(after.yaw-before.yaw)<.1)throw Error('Dual thumbs failed');record('hero-two-thumbs','pass');
+ await page.locator('[data-touch-action="jump"]').tap();await page.waitForFunction(({id,y})=>window.brannHarness.snapshot().players.find(p=>p.id===id).position[1]>y+.2,{id,y:q.position[1]});record('touch-jump','pass');
+ before=await page.evaluate(()=>window.brannHarness.controls());await page.locator('[data-touch-action="strike"]').tap();await sleep(100);after=await page.evaluate(()=>window.brannHarness.controls());if(!(after.swingAt>before.swingAt))throw Error('Touch attack failed');record('touch-attack','pass');
+ await page.locator('[data-equip="bow"]').tap();await page.waitForFunction(()=>window.brannHarness.controls().weapon.tool==='bow');
+ const attack=await page.locator('[data-touch-action="strike"]').boundingBox(),sx=attack.x+attack.width/2,sy=attack.y+attack.height/2;
+ await touch('touchStart',[[sx,sy]]);await sleep(250);
+ const special=await page.locator('#special').boundingBox(),qx=special.x+special.width/2,qy=special.y+special.height/2;
+ await touch('touchStart',[[sx,sy],[qx,qy,2]]);await touch('touchEnd',[[qx,qy,2]]);await sleep(100);
+ let bow=await page.evaluate(()=>window.brannHarness.controls().weapon);if(!bow.drawing||!bow.curved)throw Error('Second finger ended bow draw or failed curve');
+ await touch('touchEnd',[]);await sleep(80);bow=await page.evaluate(()=>window.brannHarness.controls().weapon);if(bow.drawing||bow.recoil<=0)throw Error('Bow release failed');record('bow-two-finger-special-release','pass');
+ await touch('touchStart',[[sx,sy]]);await sleep(100);await touch('touchCancel',[]);bow=await page.evaluate(()=>window.brannHarness.controls().weapon);if(bow.drawing)throw Error('Cancelled bow still drawing');record('bow-cancel','pass');
+ record('errors',page.errors.length?'fail':'pass',{errors:page.errors});if(page.errors.length)process.exitCode=1;
+}catch(e){record('exception','fail',{message:e.message,state:await page.evaluate(()=>({controls:window.brannHarness?.controls(),state:window.brannHarness?.state(),text:document.body.innerText.slice(-2500)}))});process.exitCode=1;}finally{save('touch-casting');await browser.close();}

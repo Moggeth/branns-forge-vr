@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>tree growth stages</title>
+<style>html,body{margin:0;background:#1d2328;color:#ddd;font:12px sans-serif}canvas{display:block}#l{position:absolute;left:0;top:0;width:100%;pointer-events:none}#l span{position:absolute;color:#fff;text-shadow:0 0 3px #000}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<div id="l"></div><pre id="err" style="position:absolute;bottom:0;color:#f88"></pre><script>addEventListener("error",e=>document.getElementById("err").textContent+=e.message+"\n");addEventListener("unhandledrejection",e=>document.getElementById("err").textContent+=(e.reason&&e.reason.stack||e.reason)+"\n");</script>
+<script type="module">
+// Fixture: real createTreeView + authored GLBs. A ring grove is planted after the first sync (so it grows), then each
+// tile is a separate view ticked to one stage. Rows: ground eye-level, RTS overhead. ?mode=old shows the old uniform scale.
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createTreeView} from '/client/tree-view.js';
+const q = new URLSearchParams(location.search), stages = (q.get('stages') || '100,300,600,900,1400').split(',').map(Number), W = 300, H = 300;
+const renderer = new T.WebGLRenderer({antialias: true, preserveDrawingBuffer: true}); renderer.setSize(W*stages.length, H*3); renderer.setScissorTest(true); document.body.prepend(renderer.domElement);
+renderer.outputColorSpace = T.SRGBColorSpace;
+const loader = new GLTFLoader(), templates = new Map();
+for (const n of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod']) templates.set(n, await loader.loadAsync(`/assets/${n}.glb`));
+const fresh = () => ({seed: 7, tick: 100, groves: [], harvestedTrees: [], looseLogs: [], players: []}), grove = {id: 'g1', kind: 'ring', x: 0, z: -70}, GZ = -70, rows = ['ground', 'RTS', 'close'];
+const label = (x, y, t) => { const s = document.createElement('span'); s.style.left = x + 'px'; s.style.top = y + 'px'; s.textContent = t; document.getElementById('l').append(s); };
+function stage(ms, row) { const rts = row === 'RTS';
+ const scene = new T.Scene(); scene.background = new T.Color(rts ? 0x8fa7b8 : 0xa9c3d6); scene.add(new T.HemisphereLight(0xdfefff, 0x4a3b2a, 1.4)); const sun = new T.DirectionalLight(0xfff1d6, 2.2); sun.position.set(6, 10, 4); scene.add(sun);
+ const g = new T.Mesh(new T.CircleGeometry(40, 48).rotateX(-Math.PI/2).translate(0, 0, GZ), new T.MeshStandardMaterial({color: 0x5d6b3a, roughness: 1})); scene.add(g);
+ const cam = new T.PerspectiveCamera(rts ? 40 : 55, W/H, .1, 200); if (rts) { cam.position.set(0, 22, GZ + 15); cam.lookAt(0, 0, GZ); } else if (row === 'ground') { cam.position.set(0, 1.6, GZ + 15); cam.lookAt(0, 3.2, GZ); } else { cam.position.set(7.5, 1.6, GZ + 6.5); cam.lookAt(4, 2.8, GZ); }
+ scene.add(cam); cam.updateMatrixWorld(true);
+ const view = createTreeView({scene, templates, height: () => 0, camera: cam}), s = fresh(); view.sync(s); view.tick(0, 100); s.groves.push(grove); view.tick(1000, 100); view.sync(s); view.tick(1000 + ms, 100);
+ return {scene, cam, view};
+}
+stages.forEach((ms, i) => rows.forEach((row, r) => { const {scene, cam, view} = stage(ms, row); renderer.setViewport(i*W, (2 - r)*H, W, H); renderer.setScissor(i*W, (2 - r)*H, W, H); renderer.render(scene, cam);
+ label(i*W + 6, r*H + 4, `${(ms/1000).toFixed(1)} s ${row} growing=${view.stats().growing}`); view.dispose(); }));
+document.title = 'done';
+</script>
