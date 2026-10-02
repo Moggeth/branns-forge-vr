@@ -522,6 +522,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
+    if(event.kind==='respawn'&&event.id===playerId){clearInput();localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     feedback.handleEvent(event);
     expedition.handleEvent(event);
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}

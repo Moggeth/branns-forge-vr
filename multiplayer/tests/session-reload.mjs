@@ -148,11 +148,12 @@ test('pickup cap full: undropped gems return with the hero (never lost, never do
   const {r, hostLink, host} = room();
   const g = join(r, 'two');
   const w = host.simulation.adventureWorld();
+  const existingGems = w.pickups.filter(q => q.kind === 'gems').reduce((a, q) => a + q.amount, 0);
   while (w.pickups.length < 255) w.pickups.push({id: `fill${w.pickups.length}`, kind: 'wood', x: 0, z: 0, y: 0, amount: 1});
   const p = hostPlayer(host, 'two'); p.resources = {wood: 0, stone: 0, gems: 25}; p.role = 'god';
   r.roster.get('two').online = false; hostLink.emit('peer_left', {peerId: 'two'});
   const dropped = w.pickups.filter(q => q.kind === 'gems').reduce((a, q) => a + q.amount, 0);
-  assert.equal(dropped, 10);
+  assert.equal(dropped - existingGems, 10);
   r.roster.get('two').online = true; hostLink.emit('peer_joined', {id: 'two'});
   const back = hostPlayer(host, 'two');
   assert.equal(back.resources.gems, 15); assert.equal(back.role, 'god');

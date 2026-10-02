@@ -136,6 +136,7 @@ export class WorldSession extends EventTarget {
       // removePlayer already dropped the carried pack into the world as pickups; record.resources is only the undropped rest.
       checkpoint.players.push({...record, move:[0,0], vy:0, inputTick:clampTick(record.inputTick), attackTick:clampTick(record.attackTick),
         castTick:clampTick(record.castTick), roleTick:clampTick(record.roleTick),
+        ...(record.protectedUntil!==undefined?{protectedUntil:Math.min(record.protectedUntil,checkpoint.tick+180)}:{}),
         ...(record.specialTick !== undefined ? {specialTick:clampTick(record.specialTick)} : {})});
     }
     try { this.simulation = loadSimulation(checkpoint); }

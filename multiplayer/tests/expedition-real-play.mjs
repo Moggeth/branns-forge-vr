@@ -30,6 +30,7 @@ class Room {
     this.lines = []; this.counts = {}; this.milestones = []; this.wall0 = performance.now();
     this.ledger = {}; this.stageDeposits = {wood: 0, stone: 0, gems: 0}; this.notPlaytested = [];
     this.logsBorn = 0; this.logsStowed = 0; this.oreYield = {stone: 0, gems: 0}; this.pickedUp = {stone: 0, gems: 0, wood: 0};
+    for(const q of this.S.pickups) if(q.kind in this.oreYield)this.oreYield[q.kind]+=q.amount;
     this.prevStage = 'idle'; this.prevAdv = null; this.reloads = 0;
   }
   get S() { return this.game.adventureWorld(); } // read-only live view
@@ -45,6 +46,10 @@ class Room {
       if (e.kind === 'tree_land') this.logsBorn += e.logs;
       if (e.kind === 'death' && this.ledger[e.id]) { this.heroDeaths = (this.heroDeaths || 0) + 1; this.write({heroDeath: e.id, at: e.position}); }
       if (e.kind === 'adventure_deposit') { this.ledger[e.id][e.resource] -= e.amount; this.stageDeposits[e.resource] += e.amount; }
+      if(e.kind==='party_reward'||e.kind==='adventure_reward')for(const p of this.S.players)for(const k of ['wood','stone','gems']){
+        const amount=e.kind==='adventure_reward'?(e[k]||0):(k==='wood'&&e.stage==='rekindle'?3:0);
+        this.ledger[p.id][k]=Math.min(999,this.ledger[p.id][k]+amount);
+      }
       if (e.kind === 'adventure_stage') { this.mark(`stage:${e.stage}`); this.stageDeposits = {wood: 0, stone: 0, gems: 0}; }
       if (LOGGED.has(e.kind)) this.write({event: e.kind, source, id: e.id, ...(e.stage ? {stage: e.stage} : {}), ...(e.resource ? {resource: e.resource, amount: e.amount} : {}), ...(e.spell ? {spell: e.spell, phase: e.phase} : {})});
     }

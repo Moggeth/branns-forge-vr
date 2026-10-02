@@ -256,7 +256,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));

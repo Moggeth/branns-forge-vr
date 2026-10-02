@@ -2,8 +2,8 @@ import layout from './starting-layout.json' with {type:'json'};
 export const STARTING_SITES=layout.sites;
 export const STARTING_PATHS=layout.paths;
 const boxes=STARTING_SITES.flatMap(s=>s.footprints.map(b=>({...b,c:Math.cos(b.rotY),s:Math.sin(b.rotY)})));
-export function resolveStartingWorld(position,height,radius=.28){
- const nearby=boxes.filter(b=>Math.hypot(position[0]-b.x,position[2]-b.z)<Math.hypot(b.w,b.d)+radius+1&&position[1]<height(b.x,b.z)+b.h&&position[1]+1.65>height(b.x,b.z)-.2);
+export function resolveStartingWorld(position,height,radius=.28,bodyHeight=1.65){
+ const nearby=boxes.filter(b=>Math.hypot(position[0]-b.x,position[2]-b.z)<Math.hypot(b.w,b.d)+radius+1&&position[1]<height(b.x,b.z)+b.h&&position[1]+bodyHeight>height(b.x,b.z)-.2);
  const local=(x,z,b)=>[(x-b.x)*b.c-(z-b.z)*b.s,(x-b.x)*b.s+(z-b.z)*b.c];
  const blocked=(x,z)=>nearby.some(b=>{const [u,v]=local(x,z,b);return Math.abs(u)<b.w/2+radius&&Math.abs(v)<b.d/2+radius;});
  if(!blocked(position[0],position[2]))return position;

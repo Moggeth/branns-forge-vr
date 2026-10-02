@@ -1,3 +1,4 @@
+import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld} from './starting-world.js';
 import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
@@ -53,11 +54,16 @@ export function terrainHeight(state, x, z, includeBridges = true) {
 
 function spawn(state, ignored = '') {
   let best = [0, 0, 8], clearance = -1;
+  const trees=createTreeIndex();trees.update(state);const cuts=new Map(state.harvestedTrees.map(h=>[h.id,h])),forgeY=terrainHeight(state,0,0,false);
   for (let i = 0; i < 128; i++) {
     const theta = i * 2.3999632297, radius = 2.8 * Math.sqrt(i);
     const candidate = [clamp(Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(8 + Math.sin(theta) * radius, -BOUND, BOUND)];
+    candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
+    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));
+    if(candidate.some((v,k)=>k!==1&&Math.abs(v)>BOUND))continue;
     const others = [...state.players.filter(p => p.role === 'hero' && p.id !== ignored), ...state.enemies];
-    const space = others.length ? Math.min(...others.map(p => distance(candidate, p.position))) : 10000;
+    const hazards=state.fireCells.filter(c=>c.burning);
+    const space = Math.min(10000,...others.map(p => distance(candidate, p.position)),...hazards.map(c=>Math.hypot(candidate[0]-c.x,candidate[2]-c.z)));
     if (space > clearance) { best = candidate; clearance = space; }
     if (space >= 2.5) break;
   }
@@ -75,12 +81,14 @@ function damageEnemy(state, enemy, amount, events) {
 
 }
 function damageHero(state, hero, amount, events) {
+  if((hero.protectedUntil??0)>state.tick)return;
   hero.hp -= amount;
   events.push(event('hit', hero.position, hero.id));
   if (hero.hp <= 0) {
     events.push(event('death', hero.position, hero.id));
     releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
-    hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];
+    hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0]; hero.protectedUntil=state.tick+180;
+    events.push({...event('respawn',hero.position,hero.id),protectedUntil:hero.protectedUntil});
   }
 }
 
@@ -329,43 +337,11 @@ function instantiate(state) {
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
-      for (const enemy of state.enemies) {
-        if (enemy.meteorBorn && state.tick-enemy.unfurlTick<90) continue;
-        const targets = state.players.filter(p => p.role === 'hero');
-        if (!targets.length) continue;
-        targets.sort((a, b) => distance(enemy.position, a.position) - distance(enemy.position, b.position));
-        const target = targets[0], d = distance(enemy.position, target.position);
-        const dx = target.position[0] - enemy.position[0], dz = target.position[2] - enemy.position[2];
-        if (d > 0.0001) {
-          enemy.yaw = Math.atan2(-dx, -dz);
-          if (d > 1.5) {
-            const legs=enemy.missingParts.filter(p=>p.endsWith('Leg')).length;
-            const speed=(enemy.kind==='golem'?1.25:2)*(legs===2?.2:legs===1?.55:1)*(enemy.slowUntil>state.tick?.35:1);
-            const stride = Math.min(speed / HZ, d - 1.5);
-            enemy.position[0] = clamp(enemy.position[0] + dx / d * stride, -BOUND, BOUND);
-            enemy.position[2] = clamp(enemy.position[2] + dz / d * stride, -BOUND, BOUND);
-          }
-        }
-        // Keep enemies out of the hero's camera, including at the world edge.
-        for (const hero of targets) {
-          const gap = distance(enemy.position, hero.position);
-          if (gap < 1 && Math.abs(enemy.position[1] - hero.position[1]) <= 2.5) {
-            const ux = gap > 0.001 ? (enemy.position[0] - hero.position[0]) / gap : 1;
-            const uz = gap > 0.001 ? (enemy.position[2] - hero.position[2]) / gap : 0;
-            enemy.position[0] = clamp(hero.position[0] + ux, -BOUND, BOUND);
-            enemy.position[2] = clamp(hero.position[2] + uz, -BOUND, BOUND);
-          }
-        }
-        resolveForge(enemy.position,forgeY,enemy.kind==='golem'?.42:.28);if(state.landmarks)resolveStartingWorld(enemy.position,(x,z)=>terrainHeight(state,x,z),enemy.kind==='golem'?.42:.28);
-        enemy.position[1] = forgeFloor(enemy.position[0],enemy.position[2],forgeY,terrainHeight(state, enemy.position[0], enemy.position[2]));
-        if (d < 1.8 && state.tick - enemy.attackTick > 60) {
-          enemy.attackTick = state.tick; // Wind-up precedes the actual strike.
-        }
-        if(state.tick-enemy.attackTick===18 && d<2 && Math.abs(enemy.position[1]-target.position[1])<2 && state.tick-(enemy.hurtTick??-1000)>18){
-          const arms=enemy.missingParts.filter(p=>p.endsWith('Arm')).length;
-          damageHero(state,target,(enemy.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1),events);
-        }
-      }
+      stepEnemies(state,{
+        ground:(x,z)=>forgeFloor(x,z,forgeY,terrainHeight(state,x,z)),
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);return position;},
+        damageHero,events
+      });
       flushMeteorRewards(state,terrainHeight);
       stepCombat(state,combatContext,events);
       stepFire(state,fireContext,events);
@@ -378,8 +354,8 @@ function instantiate(state) {
     projectileContact(message){return projectileContact(state,message,combatContext);},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, head, hands}) =>
-          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit, ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, protectedUntil,head, hands}) =>
+          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -428,6 +404,7 @@ export function loadSimulation(saved) {
         !validTick(p.castTick, saved.tick) || !validTick(p.roleTick, saved.tick) ||
         !Number.isSafeInteger(p.seq) || p.seq < 0 ||
         (p.tool !== undefined && !TOOLS.includes(p.tool)) ||
+        (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
         (p.resources !== undefined && (!record(p.resources) || !['wood','stone','gems'].every(k => Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
         (p.head !== undefined && !pose(p.head)) ||
@@ -436,7 +413,7 @@ export function loadSimulation(saved) {
   }
   for (const e of saved.enemies) {
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        !finite(e.hp) || e.hp <= 0 || e.hp > (e.kind==='golem'?320:100) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true))
+        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > (e.kind==='golem'?320:100) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
@@ -477,9 +454,9 @@ export function loadSimulation(saved) {
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy, inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
-    heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
+    ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick}) => ({id, position, yaw, hp, attackTick,...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick}) => ({id, position, yaw, hp, attackTick,...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   state.edits = copy(saved.edits); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);

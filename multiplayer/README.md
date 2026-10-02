@@ -245,3 +245,9 @@ On touch, tap a visible enemy to aim and swing; tap a tree with the axe or ore/g
 Press **Start Expedition**: gather and Deliver to the Forge, recover the fallen star, then defend and rekindle the Forge through three waves. Milestones restore the party; victory grants six wood/four stone/three gems each and full health/mana. Gods contribute through terrain/planting, bounded tithe and combat spells, including solo play.
 
 [Implementation, tests and timings](../docs/FRIENDS-STARTING-WORLD-20261003.md).
+
+## Combat and recovery
+
+Enemy melee commits to a target and direction during the wind-up. Dodge aside or retreat before the strike; a stagger or solid cover interrupts damage. Crowds separate and steer around nearby trunks and structures. Death grants three seconds of protection, clears a held attack and resets the camera at the new spawn. These rules apply to existing saves after refreshing the host's game.
+
+[Combat verification, limits and timings](../docs/COMBAT-QUALITY-20261003.md).

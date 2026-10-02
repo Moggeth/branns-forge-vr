@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import {launch,record,save,shot,sleep,me,BASE} from './browser-acceptance-lib.mjs';
+import {createSimulation,terrainHeight} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
+import {makeSave} from '../client/world-saves.js';
+const {browser,page}=await launch({touch:true,viewport:{width:960,height:600}});
+const cd=await page.context().newCDPSession(page);
+const sim=createSimulation({seed:17}),w=sim.adventureWorld();
+w.enemies=[createEnemy('combat-review',[0,terrainHeight(w,0,4),4],'golem')];
+try{
+ await page.goto(`${BASE}/?acceptanceProbe`,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.brannHarness);
+ await page.fill('#name','Combat quality');
+ await page.check('input[name="role"][value="hero"]',{force:true});
+ await page.locator('#import').setInputFiles({name:'combat-review.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(makeSave(sim.checkpoint())))});
+ await page.waitForFunction(()=>window.brannHarness.snapshot()?.players.length);
+ await page.waitForFunction(()=>{const s=window.brannHarness.snapshot(),e=s.enemies[0];return e&&s.tick-e.attackTick>=0&&s.tick-e.attackTick<5;},null,{timeout:20000,polling:10});
+ const before=await me(page),tick=before.s.enemies[0].attackTick,yaw=before.s.enemies[0].yaw,hp=before.self.hp;
+ const pad=await page.locator('[data-stick="left"]').boundingBox();
+ const x=pad.x+pad.width/2,y=pad.y+pad.height/2;
+ await cd.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1}]});
+ await cd.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+30,y:y+45,id:1}]});
+ await sleep(420);
+ await cd.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+ const after=await me(page);
+ assert.equal(after.s.enemies[0].attackTick,tick);
+ assert.equal(after.s.enemies[0].yaw,yaw);
+ assert.equal(after.self.hp,hp);
+ assert.ok(Math.hypot(after.self.position[0]-before.self.position[0],after.self.position[2]-before.self.position[2])>.7);
+ record('touch-dodge-avoids-committed-attack','pass',{before:before.self.position,after:after.self.position});
+ await shot(page,'combat-dodge');
+ await page.locator('[data-equip="bow"]').tap();
+ const attack=await page.locator('[data-touch-action="strike"]').boundingBox();
+ await cd.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:attack.x+attack.width/2,y:attack.y+attack.height/2,id:2}]});
+ await page.waitForFunction(()=>window.brannHarness.controls().weapon.drawing);
+ await page.waitForFunction(()=>{const s=window.brannHarness.snapshot(),id=window.brannHarness.state().playerId;return s.players.find(p=>p.id===id)?.protectedUntil>s.tick;},null,{timeout:25000,polling:10});
+ await sleep(100);
+ assert.equal((await page.evaluate(()=>window.brannHarness.controls())).weapon.drawing,false);
+ const revived=await me(page);assert.equal(revived.self.hp,100);
+ await cd.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+ await sleep(600);assert.equal((await me(page)).self.hp,100);
+ record('respawn-cancels-held-bow-and-protects-player','pass',{position:revived.self.position});
+ await shot(page,'combat-respawn');
+ assert.deepEqual(page.errors,[]);record('console','pass');
+}catch(e){record('exception','fail',{message:e.message,state:await page.evaluate(()=>({state:window.brannHarness?.state(),controls:window.brannHarness?.controls(),snapshot:window.brannHarness?.snapshot()}))});await shot(page,'combat-quality-failure');process.exitCode=1;}
+finally{save('combat-quality');await browser.close();}
