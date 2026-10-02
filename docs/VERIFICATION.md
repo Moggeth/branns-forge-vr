@@ -2170,3 +2170,22 @@ A shared registry must unregister recovered bolts, or its final tick will drag a
 ## Browser audit handoff recovery (2026-10-02)
 
 README.md contains legacy mixed encoding (including a raw 0xB7 byte), so a strict UTF-8 read failed before writing. Prepend new ASCII handoff text to existing bytes; do not decode/re-encode the whole file or replace invalid bytes as an incidental cleanup. Native rg does not accept PowerShell -ErrorAction; use explicit existing paths discovered with rg --files. The failed read left README unchanged; the feasibility report and inventory were committed separately.
+
+
+### Browser connected import — 2026-10-02
+
+- Ported native axe/pick trajectory; regression evidence belongs in
+  multiplayer/tests/weapon-motion.mjs and multiplayer/IMPORT-WAVE-1.md.
+- Tree raycast initially missed a visibly nearby trunk: bounds-centering an
+  asymmetric canopy shifted the trunk away from its logical location. Preserve
+  authored trunk origin, then verify the actual GLB contact with the gameplay
+  fixture. Do not widen hitboxes to disguise pivot mistakes.
+- Python default Windows encoding wrote a new middle dot as cp1252 B7, causing
+  Vite's index.html invalid-UTF8 error. Always explicit encoding='utf-8'. Preserve
+  original line endings; avoid rewriting unrelated content to fix one byte.
+- Native GLB -colonly nodes are engine import directives, not renderable bridge
+  geometry. Remove them in the browser adapter. Preserve authored deck Y=0 and
+  match gameplay span/width instead of normalizing complete parapet bounds.
+- Instanced clutter must update only when terrain/seed changes, not at the 20 Hz
+  snapshot cadence. Stress test includes maximum imported persistent content;
+  CPU results do not imply an eight-headset GPU performance guarantee.

@@ -39,3 +39,12 @@ face/shield and held blade. Test room was left afterward. Six actual-GLB checks,
 15 heading comparisons plus socket tests, simulation and touch tests passed.
 Inspection/edit/visual-validation interval: 611 seconds by UTC tool clock;
 production build/deploy: 7.780323 seconds. Native/headset acceptance remains separate.
+
+
+## Native motion import
+
+`client/weapon-motion.js` now ports the installed native axe/pick tip trajectory.
+`tests/weapon-motion.mjs` validates actual working-tip contact, direction and
+phase continuity, not just idle forward axes. Tree origin is the authored trunk
+(0, bottom, 0), never canopy bounds center. Stonewhisper uses +X striking direction
+converted to canonical -Z; grip and tip sockets remain separate from FPS placement.

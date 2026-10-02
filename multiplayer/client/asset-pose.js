@@ -5,8 +5,11 @@ import {clone} from 'three/addons/utils/SkeletonUtils.js';
 // authored facts, never inferred from a bounding box or camera angle.
 export const ASSET_POSES = Object.freeze({
   skeleton: {forward: [0, 0, 1], up: [0, 1, 0], pivot: 'feet', height: 1.7},
+  pick: {forward: [1, 0, 0], up: [0, 1, 0], pivot: 'Grip', height: .75},
   axe: {forward: [1, 0, 0], up: [0, 1, 0], pivot: 'Grip_Center', height: 0.7},
-  tree: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'bounds', height: 4},
+  tree_b: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
+  tree_young: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
+  tree: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
 });
 
 export function assetBasis(contract) {
@@ -52,9 +55,9 @@ export function prepareAsset(template, name, height = ASSET_POSES[name]?.height)
 
 // Separate presentation transforms from the canonical asset basis. Both XR
 // hands use the same unmirrored model; gripSpace is the attachment origin.
-export function setWeaponGrip(visual, xr = false) {
+export function setWeaponGrip(visual, xr = false, tool = 'axe') {
   visual.position.set(0, 0, 0);
-  visual.quaternion.copy(assetBasis(ASSET_POSES.axe));
+  visual.quaternion.copy(assetBasis(ASSET_POSES[tool]));
   if (xr) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));
 }
 

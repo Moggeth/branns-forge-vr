@@ -141,6 +141,7 @@
     next.addEventListener('error', ({detail}) => { if (connection === next) showError(`${detail.code}: ${detail.message}`); });
     next.addEventListener('event', ({detail}) => {
       if (connection !== next) return;
+      game.handleEvent(detail);
       lastEvent = {kind: detail.kind, id: detail.id, position: detail.position};
       element('event').textContent = `${detail.kind} at ${(detail.position || []).map(value => Number(value).toFixed(1)).join(', ')}`;
     });
@@ -150,7 +151,7 @@
   try {
     game = createGame({
       canvas,
-      onAction: action => connection?.command('action', {action}),
+      onAction: (action, details = {}) => connection?.command('action', {action, ...details}),
       onCast: (spell, point) => connection?.command('cast', {spell, point}),
       onInput: input => { if (connection?.command('input', input)) inputs++; },
       onStatus: status => { element('rendererStatus').textContent = status; },

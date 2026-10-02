@@ -1,0 +1,164 @@
+[
+  {
+    "file": "pick.glb",
+    "source": "godot/weapons/stonewhisper.glb",
+    "bytes": 151500,
+    "sha256": "e2e017c60f68a2d5e5c559823dcbfd6f6c6c046b149ac7dd1a863970deabd55c"
+  },
+  {
+    "file": "boulder.glb",
+    "source": "godot/assets/landscape/geo_boulder_mossy_a.glb",
+    "bytes": 37292,
+    "sha256": "ac50acb0892f7f147390fbc1ebea7839b3e9b90568925140b883a37e73b5cd1d"
+  },
+  {
+    "file": "meteor.glb",
+    "source": "godot/assets/landscape/geo_boulder_split_b.glb",
+    "bytes": 71900,
+    "sha256": "fb7af8d2d5c8259e593e34feba2ca4bb8f2091a54c7014b1c54834f8c7284ffa"
+  },
+  {
+    "file": "bank.glb",
+    "source": "godot/assets/landscape/geo_outcrop_bank_straight.glb",
+    "bytes": 37188,
+    "sha256": "0685d4f3d0dd189c31eeca25cc42cfa773284573efac776a2153caa97aa894b1"
+  },
+  {
+    "file": "ridge.glb",
+    "source": "godot/assets/landscape/geo_outcrop_ridge_tall.glb",
+    "bytes": 37188,
+    "sha256": "c738c827c8159eb5dc2f5fc001343c6a06f43432166b11c501ffc6592a153732"
+  },
+  {
+    "file": "roots.glb",
+    "source": "godot/assets/landscape/geo_earth_rupture_roots.glb",
+    "bytes": 156536,
+    "sha256": "64f0bdd76a8267f5dd40b73d1c97f1ba691d8031c85a15c0c680939540d785f9"
+  },
+  {
+    "file": "log.glb",
+    "source": "godot/assets/tree_cutting/log_y.glb",
+    "bytes": 742160,
+    "sha256": "a50a6b6fb6433eccf164d723268d1f36a73f3569276653ae1d90461a8ba3680d"
+  },
+  {
+    "file": "endcap.glb",
+    "source": "godot/assets/tree_cutting/cut_endcap.glb",
+    "bytes": 723024,
+    "sha256": "c9b3e09937c0955df052565eb896d0a52c01c37c5a2f07e0473048c1074647a7"
+  },
+  {
+    "file": "cut1.glb",
+    "source": "godot/assets/tree_cutting/cut_wedge_1.glb",
+    "bytes": 717016,
+    "sha256": "6dd6ba91ebb90162b2d1dc2b72bb5ac6ca45d71971039efd9abe55de94b3cc98"
+  },
+  {
+    "file": "cut2.glb",
+    "source": "godot/assets/tree_cutting/cut_wedge_2.glb",
+    "bytes": 717012,
+    "sha256": "87ae001c45ea429561434f9ccff768081abddd45b88b818ab56a1612f63e5709"
+  },
+  {
+    "file": "chip.glb",
+    "source": "godot/assets/tree_cutting/chip_a.glb",
+    "bytes": 712724,
+    "sha256": "870966dd927e0869ea367bd69bd8806f005a4395168bdb88c5db465f2f9f1acc"
+  },
+  {
+    "file": "grass_tuft.glb",
+    "source": "godot/assets/ground-surface-kit/props/grass_tuft.glb",
+    "bytes": 22600,
+    "sha256": "17c8402ccc0f847a0c8663714e8316a57ec560f2223807040486a1595dcbc27e"
+  },
+  {
+    "file": "meadow_flowers.glb",
+    "source": "godot/assets/ground-surface-kit/props/meadow_flowers.glb",
+    "bytes": 33328,
+    "sha256": "b1653c4b281760d9e14ad09ed1165a5ae1f71d23610b63dbb9020ed904278171"
+  },
+  {
+    "file": "fern_delicate.glb",
+    "source": "godot/assets/ground-surface-kit/props/fern_delicate.glb",
+    "bytes": 32044,
+    "sha256": "feaef919671b32295ce9c94c3b02d7d7d151cd662096fc25478fd24d70a0130d"
+  },
+  {
+    "file": "leaf_litter.glb",
+    "source": "godot/assets/ground-surface-kit/props/leaf_litter.glb",
+    "bytes": 24664,
+    "sha256": "757fce246feec4e05a53c7863ee04d062a49ceb17317a1f5b1d40ae1417af8d2"
+  },
+  {
+    "file": "pebble_scatter.glb",
+    "source": "godot/assets/ground-surface-kit/props/pebble_scatter.glb",
+    "bytes": 34400,
+    "sha256": "b541a3f9de3ceb0a2bf6c686f11677695944814e06093d531c8d8e5e948931d2"
+  },
+  {
+    "file": "mushroom_cluster.glb",
+    "source": "godot/assets/ground-surface-kit/props/mushroom_cluster.glb",
+    "bytes": 46588,
+    "sha256": "1809bf3d7a56d48882b1f53974b6f34c87bd3372cd1dd350c7517d65ddad3dd0"
+  },
+  {
+    "file": "fallen_branch.glb",
+    "source": "godot/assets/ground-surface-kit/props/fallen_branch.glb",
+    "bytes": 22900,
+    "sha256": "8e8890169626f619196081dcd88426be0aeb0a81ce89fd1f9ef0be6b5045db24"
+  },
+  {
+    "file": "broadleaf_plant.glb",
+    "source": "godot/assets/ground-surface-kit/props/broadleaf_plant.glb",
+    "bytes": 25340,
+    "sha256": "951afc3bb150903acedbcdd78c460ca74182b6b2377ddbcb81d9e35985111cb2"
+  },
+  {
+    "file": "river_stones.glb",
+    "source": "godot/assets/ground-surface-kit/props/river_stones.glb",
+    "bytes": 26152,
+    "sha256": "fc760e1a679419f2fd283e312b0f39d814e50c59b53aec128233818dc5d45f3e"
+  },
+  {
+    "file": "root_tangle.glb",
+    "source": "godot/assets/ground-surface-kit/props/root_tangle.glb",
+    "bytes": 30136,
+    "sha256": "19ba110a6d3943f173859218a6effbbbcb5324a386a90bd179969e3d8cde98f5"
+  },
+  {
+    "file": "meadow_albedo.png",
+    "source": "godot/assets/ground-surface-kit/materials/meadow_albedo.png",
+    "bytes": 1820707,
+    "sha256": "7186562dd666544986060c177e54721042d3a0346b70d3312ee04230718b8de9"
+  },
+  {
+    "file": "meadow_normal.png",
+    "source": "godot/assets/ground-surface-kit/materials/meadow_normal.png",
+    "bytes": 3106530,
+    "sha256": "94af013da7576e361a15d11ef79099b1287f5c4ae3e07cba2bd83ee210fbbcd3"
+  },
+  {
+    "file": "meadow_orm.png",
+    "source": "godot/assets/ground-surface-kit/materials/meadow_orm.png",
+    "bytes": 1944622,
+    "sha256": "3b7204d61f54414c9bfc6933ce7407ad958ee6cfef0e1769fab87ccd537cd729"
+  },
+  {
+    "file": "bridge.glb",
+    "source": "godot/assets/worldbuilder/orchard_bridge.glb",
+    "bytes": 590156,
+    "sha256": "99cbcb081a212efad184c98ba4c75938150f5ec54c1eb4bfe86ee767fc0b17c8"
+  },
+  {
+    "file": "tree_b.glb",
+    "source": "godot/assets/orchard/apple_tree_mature_b_lod1.glb",
+    "bytes": 43400,
+    "sha256": "32dd281fa02230d570a733bb444baf9a3401b06351a45ccd8c147c6a2520e34f"
+  },
+  {
+    "file": "tree_young.glb",
+    "source": "godot/assets/orchard/apple_tree_young_lod1.glb",
+    "bytes": 23192,
+    "sha256": "3bba05bbbb889298e5fd31cc65a44babe714146ecff3f41718109a0653f0cb61"
+  }
+]

@@ -13,10 +13,12 @@ running while a menu is open. Save/resume/import live in secondary sections.
 
 The current browser-hosted route uses **8 players, fixed 60 Hz simulation and
 20 Hz snapshots**, with rendering at the device's refresh rate. It reuses the
-native tree/skeleton/axe assets in a small shared clearing. Gods spend mana on
-skeletons, raised earth, groves and a telegraphed meteor. Heroes can interrupt
-God spells by damaging the shrine. Full native combat, buildings, inventory,
-world generation and progression are not yet ported.
+native corrected axe/pick motion and authored tree, skeleton, geology, ground,
+cutting and bridge assets. Heroes chop trees, collect wood, build bridges, mine
+stone/Starfall meteorites and collect healing apples. Gods have seven spells:
+skeleton, raise, grove, Starfall, Sunder, Wall and Tree Ring. Heroes can interrupt
+God spells by damaging the shrine. See [IMPORT-WAVE-1.md](IMPORT-WAVE-1.md) for the
+exact imported systems, controls, verification and remaining native-only work.
 
 The current host can reset (confirmation + pre-reset recovery save). If they
 leave, the world pauses for a reconnect grace period, then an eligible desktop
@@ -45,7 +47,7 @@ Physical headset and separate-household acceptance are still pending.
 
 Phones/tablets automatically show two thumb sticks. Hero: Move / Look, Attack,
 Jump. God: Pan / Orbit-and-tilt, zoom buttons or pinch, Centre, tap the ground to
-aim, then Cast; Cancel returns to centre aim. All four spells stay in the tray.
+aim, then Cast; Cancel returns to centre aim. All seven spells stay in the tray. Hero equipment, Collect/Eat and Bridge buttons remain accessible above the sticks.
 Portrait and landscape are supported, including swapped sticks for left-handed
 play. Menu → Display & controls changes sensitivity and Automatic/Always on/Off.
 The same menu retains role switching, invites, backups, host reset and leaving;

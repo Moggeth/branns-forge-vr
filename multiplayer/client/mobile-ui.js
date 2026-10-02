@@ -128,7 +128,10 @@ function buildSettings() {
         guideBlock('Hero · touch', [
           ['Left stick', 'Move'],
           ['Right stick', 'Look (or drag the world)'],
-          ['Attack', 'Swing'],
+          ['Attack', 'Swing; impact occurs at the visible contact phase'],
+          ['Axe / Pick buttons', 'Choose the harvesting tool'],
+          ['Collect / Eat', 'Pick up nearby loot or heal with an apple'],
+          ['Bridge', 'Spend 3 wood to build ahead'],
           ['Jump', 'Jump'],
         ]),
         guideBlock('God · touch', [
@@ -158,6 +161,9 @@ function buildSettings() {
           ['Left stick', 'Move'],
           ['Trigger', 'Strike'],
           ['Primary face button (A/X)', 'Jump'],
+          ['Left squeeze', 'Switch axe / pick'],
+          ['Right squeeze', 'Collect / eat nearby pickup'],
+          ['Right stick click', 'Build bridge (3 wood)'],
           ['Secondary face button (B/Y)', 'Exit VR and open Menu'],
         ]),
         guideBlock('Menu', [

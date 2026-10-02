@@ -35,6 +35,8 @@ function friendlyError(detail) {
   const code = String(detail?.code || '').toLowerCase();
   const raw = typeof detail?.message === 'string' ? detail.message : '';
   if (/not.?found|unknown.?room|no.?room/.test(code)) return 'We couldn’t find a world with that code. Check the digits with your friend.';
+  if (code === 'inventory_full') return 'Your supplies are full. Use some before collecting more.';
+  if (code === 'insufficient_resources') return 'A bridge needs 3 wood. Chop a tree, then collect its logs.';
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/rate|busy|limit/.test(code)) return 'The forge is busy right now. Wait a moment and try again.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
@@ -205,7 +207,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
@@ -320,6 +322,8 @@ function onSnapshot(snapshot) {
   const count = `${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
+    setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
+    for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -512,6 +516,9 @@ function chooseSpell(next) {
 }
 for (const button of document.querySelectorAll('[data-spell]')) button.addEventListener('click', () => { chooseSpell(button.dataset.spell); button.blur(); });
 
+for(const button of document.querySelectorAll('[data-equip]'))button.addEventListener('click',()=>{game?.equip(button.dataset.equip);button.blur();});
+$('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
+$('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
 // ---------------------------------------------------------------- keyboard & pointer
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
@@ -522,8 +529,8 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
     if (isTyping(event.target) || menuOpen || phase !== 'game') event.stopPropagation();
     return;
   }
-  if (type === 'keydown' && currentRole === 'god' && !event.repeat && /^[1-4]$/.test(event.key)) {
-    chooseSpell(['skeleton', 'raise', 'grove', 'starfall'][Number(event.key) - 1]);
+  if (type === 'keydown' && currentRole === 'god' && !event.repeat && /^[1-7]$/.test(event.key)) {
+    chooseSpell(['skeleton', 'raise', 'grove', 'starfall','sunder','wall','ring'][Number(event.key) - 1]);
   }
 }, true);
 
@@ -545,7 +552,7 @@ window.addEventListener('unhandledrejection', event => { recordProblem(event.rea
 try {
   game = createGame({
     canvas,
-    onAction: action => session?.command('action', {action}),
+    onAction: (action, details = {}) => session?.command('action', {action, ...details}),
     onCast: (chosen, point) => session?.command('cast', {spell: chosen, point}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onStatus: status => { rendererStatus = String(status); },
