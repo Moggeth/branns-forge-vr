@@ -46,9 +46,13 @@ float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * 
 float fbm(vec2 p){ return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }
 `;
 
+// Colour note: these ShaderMaterials deliberately omit <tonemapping_fragment>/<colorspace_fragment>,
+// so every value below is display-referred. The canvas framebuffer is not sRGB, so additive layers
+// blend in encoded space; encoding each layer first would push stacked tongues to white.
+// Exception: FUEL_FRAG is a single non-additive surface and keeps the root fix that tone-maps/encodes it like the scene.
 const TONGUE_VERT = `
 attribute vec3 iPos; attribute vec3 iDir; attribute vec4 iP;
-uniform float uTime; uniform float uBend;
+uniform float uTime; uniform float uBend; uniform float uRound;
 varying vec2 vUv; varying float vA; varying float vS;
 void main(){
   vUv = uv; vA = iP.w; vS = iP.z;
@@ -57,25 +61,43 @@ void main(){
   vec3 side = cross(A, cameraPosition - iPos);
   float sl = length(side);
   side = sl > 1e-4 ? side / sl : vec3(1.0, 0.0, 0.0);
-  float bend = sin(uTime * 9.0 + iP.z * 40.0 + v * 5.0) * uBend * v * v * iP.x;
-  float w = iP.y * pow(1.0 - v, 1.05) * (0.65 + 0.35 * smoothstep(0.0, 0.3, v));
-  vec3 wp = iPos + A * (iP.x * v) + side * (u * 2.0 * w + bend);
+  // two-frequency sway: the root stays planted, the tip whips in an S-curve
+  float bend = (sin(uTime * 9.0 + iP.z * 40.0 + v * 5.0) * v * v
+             + 0.45 * sin(uTime * 5.3 + iP.z * 23.0 - v * 3.0) * v) * uBend * iP.x;
+  // flames (uRound=1): teardrop with a rounded root, widest in the lower third; embers keep the streak
+  float streak = pow(1.0 - v, 1.05) * (0.65 + 0.35 * smoothstep(0.0, 0.3, v));
+  float tear = 0.85 * pow(sin(3.14159 * pow(v, 0.6)), 0.85);
+  float w = iP.y * mix(streak, tear, uRound);
+  vec3 wp = iPos + A * (iP.x * (v - 0.08 * uRound)) + side * (u * 2.0 * w + bend);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
 
+// Premultiplied "additive with occlusion": rgb is emitted light, alpha is how much the
+// tongue hides what is behind it (blend ONE, ONE_MINUS_SRC_ALPHA). Stacked tongues converge to
+// emission/occlusion, so dense fires saturate to orange-gold instead of clipping to white.
 const FLAME_FRAG = `
 uniform float uTime;
 varying vec2 vUv; varying float vA; varying float vS;
+${NOISE_GLSL}
 void main(){
   float v = vUv.y;
-  float across = abs(vUv.x - 0.5) * 2.0;
-  float lick = sin(v * 11.0 - uTime * 13.0 + vS * 50.0) * 0.5 + 0.5;
-  float m = 1.0 - smoothstep(0.5, 1.0, across + 0.18 * lick * v);
-  float h = (1.0 - across) * (1.0 - v * 0.85) + 0.12 * lick * (1.0 - v);
-  vec3 c = mix(vec3(0.75, 0.07, 0.01), vec3(1.0, 0.5, 0.07), smoothstep(0.08, 0.42, h));
-  c = mix(c, vec3(1.0, 0.93, 0.62), smoothstep(0.55, 0.92, h));
-  float a = m * smoothstep(0.0, 0.12, v) * (1.0 - pow(v, 1.4)) * vA;
-  gl_FragColor = vec4(c * 1.25, a);
+  float x = (vUv.x - 0.5) * 2.0;
+  vec2 np = vec2(x * 0.9 + vS * 31.0, v * 1.6 - uTime * 2.4 - vS * 7.0);   // turbulence rises faster than the tongue
+  float n = fbm(np * 2.2);
+  float n2 = vnoise(np * 5.3 + 11.0);
+  float r = abs(x + (n - 0.5) * 0.7 * v);                                  // lateral warp grows toward the tip
+  float lat = 1.0 - smoothstep(0.25, 1.0, r);
+  float d = lat * pow(1.0 - v, 0.55) * (0.6 + 0.8 * mix(n, n2, 0.35));    // density; tips tear into wisps
+  float body = smoothstep(0.12, 0.5, d);
+  float k = body * vA * smoothstep(0.0, 0.12, v);                          // root fix: no hard edge where the tongue meets ground
+  if (k < 0.004) discard;
+  float T = clamp(d * 1.15 - v * 0.25, 0.0, 1.0);                          // temperature
+  vec3 c = mix(vec3(0.30, 0.04, 0.01), vec3(0.95, 0.30, 0.04), smoothstep(0.18, 0.5, T)); // sooty red -> orange
+  c = mix(c, vec3(1.0, 0.62, 0.20), smoothstep(0.55, 0.9, T));                            // gold core, never white
+  c += vec3(0.0, 0.03, 0.2) * (1.0 - smoothstep(0.0, 0.14, v)) * lat;                      // faint blue root
+  float e = k * (0.25 + 0.45 * T * T);
+  float occ = k * (0.22 + 0.25 * (1.0 - T) * smoothstep(0.1, 0.7, v));     // cool sooty fringe reads as depth
+  gl_FragColor = vec4(c * e, occ);
 }`;
 
 const EMBER_FRAG = `
@@ -84,20 +106,20 @@ varying vec2 vUv; varying float vA; varying float vS;
 void main(){
   float across = abs(vUv.x - 0.5) * 2.0;
   float a = (1.0 - across * across) * pow(1.0 - vUv.y, 0.7) * vA;
-  a *= 0.75 + 0.25 * sin(uTime * 31.0 + vS * 100.0);
-  vec3 c = mix(vec3(1.0, 0.4, 0.06), vec3(1.0, 0.86, 0.45), (1.0 - vUv.y) * 0.8);
-  gl_FragColor = vec4(c * 1.4, a);
+  a *= 0.7 + 0.3 * sin(uTime * 31.0 + vS * 100.0);
+  vec3 c = mix(vec3(0.8, 0.16, 0.02), vec3(1.0, 0.55, 0.12), (1.0 - vUv.y) * 0.9);   // hot head, cooling red tail
+  gl_FragColor = vec4(c * 1.1, a);
 }`;
 
 const SMOKE_VERT = `
 attribute vec3 iPos; attribute vec4 iP;
 uniform float uTime;
-varying vec2 vUv; varying float vA; varying float vS;
+varying vec2 vUv; varying float vA; varying float vS; varying float vZ;
 void main(){
-  vUv = uv; vA = iP.w; vS = iP.y;
+  vUv = uv; vA = iP.w; vS = iP.z; vZ = iP.x;   // seed lives in iP.z (iP.y is the unused width slot)
   vec3 r = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 u = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-  float ang = iP.y * 6.283 + uTime * 0.15 * (iP.y - 0.5);
+  float ang = iP.z * 6.283 + uTime * 0.15 * (iP.z - 0.5);
   float c = cos(ang), s = sin(ang);
   vec2 q = (uv - 0.5) * 2.0 * iP.x;
   q = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
@@ -106,13 +128,16 @@ void main(){
 
 const SMOKE_FRAG = `
 uniform float uTime;
-varying vec2 vUv; varying float vA; varying float vS;
+varying vec2 vUv; varying float vA; varying float vS; varying float vZ;
 ${NOISE_GLSL}
 void main(){
-  float d = length(vUv - 0.5) * 2.0;
-  float n = vnoise(vUv * 3.0 + vS * 10.0 + uTime * 0.1);
-  float a = smoothstep(1.0, 0.15, d + (n - 0.5) * 0.55) * vA;
-  vec3 col = mix(vec3(0.085, 0.07, 0.065), vec3(0.3, 0.14, 0.06), (1.0 - vUv.y) * 0.35);
+  vec2 p = vUv - 0.5;
+  float d = length(p) * 2.0;
+  float n = fbm(vUv * 2.6 + vS * 10.0 + vec2(0.0, -uTime * 0.12));          // billowing lobes
+  float a = smoothstep(1.0, 0.2, d + (n - 0.5) * 0.8) * vA * (0.55 + 0.6 * n);
+  float young = 1.0 - smoothstep(0.12, 0.4, vZ);                             // fresh puffs are fire-lit from below
+  vec3 col = mix(vec3(0.045, 0.04, 0.037), vec3(0.11, 0.095, 0.085), n);     // cool grey-brown soot
+  col = mix(col, vec3(0.32, 0.12, 0.035), young * (0.5 - p.y) * 0.55);
   gl_FragColor = vec4(col, a);
 }`;
 
@@ -127,27 +152,39 @@ varying vec3 vW; varying vec4 vF;
 ${NOISE_GLSL}
 void main(){
   vec2 p = vW.xz;
-  float e = vF.x + (fbm(p * 6.0 + 3.1) - 0.5) * 0.3;     // irregular, world-aligned meniscus edge
+  float e = vF.x + (fbm(p * 6.0 + 3.1) - 0.5) * 0.3;     // irregular, world-aligned meniscus edge (threshold unchanged)
   float a = smoothstep(0.22, 0.34, e);
   if (a < 0.01) discard;
-  vec2 fl = vec2(0.03, 0.018) * uTime;                    // slow flow
-  float n1 = fbm(p * 5.0 + fl), n2 = fbm(p * 5.0 + vec2(0.07, 0.0) + fl), n3 = fbm(p * 5.0 + vec2(0.0, 0.07) + fl);
-  vec2 ng = vec2(n2 - n1, n3 - n1) * (0.15 / 0.07);
-  float rimW = 1.0 - smoothstep(0.3, 0.75, e);
-  vec3 N = normalize(vec3(-(vF.y * (0.4 + 1.8 * rimW)) - ng.x, 1.0, -(vF.z * (0.4 + 1.8 * rimW)) - ng.y));
+  float th = smoothstep(0.26, 0.85, e);                   // apparent depth: thin film at the rim, deep pool inside
+  vec2 fl = vec2(0.03, 0.018) * uTime;                    // slow, viscous drift
+  float n1 = fbm(p * 4.0 + fl), n2 = fbm(p * 4.0 + vec2(0.06, 0.0) + fl), n3 = fbm(p * 4.0 + vec2(0.0, 0.06) + fl);
+  vec2 ng = vec2(n2 - n1, n3 - n1) * (0.10 / 0.06);       // broad, low swells (oil, not water ripples)
+  float rimW = 1.0 - th;
+  vec3 N = normalize(vec3(-(vF.y * (0.35 + 1.6 * rimW)) - ng.x, 1.0, -(vF.z * (0.35 + 1.6 * rimW)) - ng.y));
   vec3 V = normalize(cameraPosition - vW);
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 col = mix(vec3(0.10, 0.034, 0.008), vec3(0.30, 0.105, 0.02), fbm(p * 2.0 + fl * 3.0));
-  vec3 pearl = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + fres * 0.8 + n1 * 0.6));
-  col += pearl * vec3(0.55, 0.38, 0.5) * fres * 0.22;
-  vec3 H = normalize(normalize(uLightDir) + V);
-  col += vec3(1.0, 0.82, 0.55) * pow(max(dot(N, H), 0.0), 70.0) * 0.85;
-  col += vec3(0.9, 0.6, 0.35) * fres * 0.3;
-  col += vec3(1.0, 0.55, 0.15) * pow(abs(sin((n1 + n2) * 14.0 + uTime * 0.4)), 14.0) * 0.07;   // refractive streaks
-  col += vec3(0.55, 0.25, 0.07) * smoothstep(0.34, 0.4, e) * (1.0 - smoothstep(0.4, 0.56, e)) * 0.35; // rim
+  vec3 L = normalize(uLightDir);
+  float NV = max(dot(N, V), 0.0);
+  float F = 0.045 + 0.955 * pow(1.0 - NV, 5.0);          // Schlick, oil-like F0
+  // amber absorption: honey-gold and see-through where thin, dark resin where deep
+  vec3 body = mix(vec3(0.72, 0.40, 0.08), vec3(0.24, 0.09, 0.015), th) * (0.85 + 0.3 * fbm(p * 1.7 + fl * 2.0));
+  body *= 0.8 + 0.25 * max(dot(N, L), 0.0);
+  // warm sky reflection under the scene's 0.55 environment, tinted by thin-film interference
+  vec3 R = reflect(-V, N);
+  vec3 env = mix(vec3(0.6, 0.55, 0.48), vec3(0.45, 0.52, 0.62), clamp(R.y, 0.0, 1.0)) * 0.42;
+  float film = rimW * 0.35 + n1 * 0.9 + (1.0 - NV) * 0.6;   // weak rim term: no rainbow ring at the edge
+  vec3 irid = 0.5 + 0.5 * cos(6.2832 * (film + vec3(0.0, 0.33, 0.67)));
+  vec3 col = body * (1.0 - F) + env * mix(vec3(1.0), irid * 1.4, 0.3) * F;
+  col += irid * vec3(0.5, 0.42, 0.5) * 0.05 * (1.0 - 0.5 * th);         // faint pearl sheen, visible even top-down
+  vec3 H = normalize(L + V);
+  float NH = max(dot(N, H), 0.0);
+  col += vec3(1.0, 0.9, 0.72) * (pow(NH, 220.0) * 1.1 + pow(NH, 28.0) * 0.08); // tight wet glint + soft lobe
+  col += vec3(0.9, 0.55, 0.18) * pow(abs(sin((n1 + n2) * 9.0 + uTime * 0.25)), 30.0) * 0.06; // slick smears
+  col = mix(col * 0.55, col, smoothstep(0.24, 0.3, e));                  // darker wet contact line
+  col += vec3(0.75, 0.5, 0.22) * smoothstep(0.3, 0.36, e) * (1.0 - smoothstep(0.36, 0.5, e)) * 0.22; // meniscus
   float glow = vF.w * (0.4 + 0.6 * fbm(p * 8.0 - vec2(0.0, uTime * 0.8)));
-  col += vec3(1.0, 0.33, 0.04) * glow * 0.9;
-  gl_FragColor = vec4(col, a * 0.93);
+  col = mix(col, col * vec3(1.1, 0.72, 0.45), clamp(vF.w, 0.0, 1.0) * 0.5);  // heat cooks the film darker
+  col += vec3(0.9, 0.28, 0.04) * glow * glow * 0.28;                     // restrained ember underglow
+  gl_FragColor = vec4(col, a * mix(0.8, 0.96, th));
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -198,8 +235,9 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
   const flameGeo = instGeo(tongueBase, flameBuf, true);
   const emberGeo = instGeo(tongueBase, emberBuf, true);
   const smokeGeo = instGeo(makeQuadBase(), smokeBuf, false);
-  const flameMat = mkMat(TONGUE_VERT, FLAME_FRAG, { uTime, uBend: { value: 0.2 } }, THREE.AdditiveBlending);
-  const emberMat = mkMat(TONGUE_VERT, EMBER_FRAG, { uTime, uBend: { value: 0 } }, THREE.AdditiveBlending);
+  const flameMat = mkMat(TONGUE_VERT, FLAME_FRAG, { uTime, uBend: { value: 0.2 }, uRound: { value: 1 } }, THREE.CustomBlending,
+    { blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor });
+  const emberMat = mkMat(TONGUE_VERT, EMBER_FRAG, { uTime, uBend: { value: 0 }, uRound: { value: 0 } }, THREE.AdditiveBlending);
   const smokeMat = mkMat(SMOKE_VERT, SMOKE_FRAG, { uTime }, THREE.NormalBlending);
   const layer = (geo, mat, order) => {
     const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = order; m.visible = false;
@@ -321,7 +359,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
   // ----- lights -----
   const lights = [];
   for (let i = 0; i < MAX_LIGHTS; i++) {
-    const l = new THREE.PointLight(0xff8f45, 0, 4, 2); l.castShadow = false; l.name = 'FireLight' + i; group.add(l);
+    const l = new THREE.PointLight(0xff8236, 0, 4, 2); l.castShadow = false; l.name = 'FireLight' + i; group.add(l);
     lights.push({ l, key: -1, score: 0, tx: 0, ty: 0, tz: 0, ti: 0, td: 4, on: false });
   }
   const cand = { n: 0, key: new Float64Array(MAX_CANDS), score: new Float32Array(MAX_CANDS), x: new Float32Array(MAX_CANDS), y: new Float32Array(MAX_CANDS), z: new Float32Array(MAX_CANDS), used: new Uint8Array(MAX_CANDS), w: new Float32Array(MAX_CANDS), sx: new Float32Array(MAX_CANDS), sy: new Float32Array(MAX_CANDS), sz: new Float32Array(MAX_CANDS) };
@@ -521,7 +559,8 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     const kp = 1 - Math.exp(-dt * 9), ki = 1 - Math.exp(-dt * 7);
     for (let k = 0; k < MAX_LIGHTS; k++) {
       const L = lights[k], l = L.l;
-      const fl = 0.9 + 0.1 * Math.sin(t * 19 + k * 2.1) * Math.sin(t * 7.3 + k);
+      // three incommensurate rates: slow breathing, gutter, fast crackle (bounded 0.76..1.0)
+      const fl = 0.88 + 0.06 * Math.sin(t * 2.3 + k * 1.7) + 0.04 * Math.sin(t * 11.3 + k * 2.1) + 0.02 * Math.sin(t * 23.7 + k * 5.3) * Math.sin(t * 3.1 + k);
       const ti = q > 0 ? L.ti * fl : 0;
       l.position.x += (L.tx - l.position.x) * kp; l.position.y += (L.ty - l.position.y) * kp; l.position.z += (L.tz - l.position.z) * kp;
       l.intensity += (ti - l.intensity) * ki; l.distance += (L.td - l.distance) * ki;
@@ -574,8 +613,10 @@ export function createEmberdewModel() {
   const glassProfile = [[0, -0.09], [0.020, -0.089], [0.034, -0.078], [0.041, -0.056], [0.041, -0.03], [0.037, -0.006], [0.030, 0.016], [0.021, 0.036], [0.0165, 0.050], [0.0165, 0.064], [0.0205, 0.068], [0.0205, 0.074]];
   const lathe = (pts, s = seg) => G(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), s));
 
-  const glassMat = M(new THREE.MeshPhysicalMaterial({ color: 0xffe2b0, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.28, clearcoat: 1, clearcoatRoughness: 0.05, depthWrite: false }));
-  const liquidMat = M(new THREE.MeshPhysicalMaterial({ color: 0x7a3208, roughness: 0.25, metalness: 0.1, emissive: 0xff5a10, emissiveIntensity: 0.28, clearcoat: 0.8, iridescence: 0.35, sheen: 0.5, sheenColor: new THREE.Color(0xffb070) }));
+  // subtle glass: thin tinted shell, softened clearcoat and environment so the amber inside reads first
+  const glassMat = M(new THREE.MeshPhysicalMaterial({ color: 0xfff0d8, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.22, clearcoat: 0.5, clearcoatRoughness: 0.08, specularIntensity: 0.7, envMapIntensity: 0.6, depthWrite: false }));
+  // slippery amber: low ember emissive, strong wet clearcoat, thin-film pearl instead of orange glow
+  const liquidMat = M(new THREE.MeshPhysicalMaterial({ color: 0x8c3f0a, roughness: 0.18, metalness: 0, emissive: 0x6a2004, emissiveIntensity: 0.18, clearcoat: 1, clearcoatRoughness: 0.06, iridescence: 0.55, iridescenceIOR: 1.4, iridescenceThicknessRange: [220, 520], sheen: 0.25, sheenRoughness: 0.4, sheenColor: new THREE.Color(0xffc27a) }));
   const leatherMat = M(new THREE.MeshStandardMaterial({ color: 0x4a2a17, roughness: 0.85, metalness: 0 }));
   const copperMat = M(new THREE.MeshStandardMaterial({ color: 0xb8602e, roughness: 0.38, metalness: 0.9 }));
   const wickMat = M(new THREE.MeshStandardMaterial({ color: 0xd9c9a0, roughness: 0.95, emissive: 0x401400, emissiveIntensity: 0.4 }));

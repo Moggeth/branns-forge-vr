@@ -14,6 +14,9 @@ import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
+import {createOrchardPresentation} from './orchard-presentation.js';
+import {createWoodAudio} from './wood-audio.js';
+import {worldTrees} from '../shared/world-content.js';
 
 // Keep in step with the authoritative Godot server surface.
 export function terrainHeight(x, z, edits = []) {
@@ -78,8 +81,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   groundGeometry.rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(groundGeometry, new THREE.MeshStandardMaterial({ color: 0x667b43, roughness: 1, metalness: 0 }));
   scene.add(ground);
-  const textureLoader = new THREE.TextureLoader();
-  for (const [file,slot] of [['meadow_albedo','map'],['meadow_normal','normalMap'],['meadow_orm','roughnessMap']]) textureLoader.load(`/assets/${file}.png`, texture => {if(disposed){texture.dispose();return;}texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(40,40);texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());if(slot==='map')texture.colorSpace=THREE.SRGBColorSpace;ground.material[slot]=texture;ground.material.color.setHex(0xffffff);ground.material.normalScale.set(.55,.55);ground.material.needsUpdate=true;});
+  // World-space orchard ground/sky/lighting. It owns the meadow textures (no separate loader) and reads the same
+  // authoritative surface as the ground mesh; it never changes heights, collision or raycast targets.
+  const orchard = createOrchardPresentation({scene, renderer, ground, sun, camera, height: (x, z) => terrainHeight(x, z, snapshot.edits),
+    quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
+  let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
   cursor.visible = false;cursor.layers.set(31);
@@ -199,6 +205,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     groundGeometry.computeVertexNormals();
     groundGeometry.computeBoundingSphere();
     groundGeometry.computeBoundingBox();
+    orchard.groundChanged({edits: snapshot.edits}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
+  }
+  // Stone/canopy channels follow the world's tree set (seed + groves) and live deposits. A full mask bake measured
+  // 0.3-0.75 s in headless SwiftShader, so it runs only when that set changes (grove cast, deposit depleted), never per chop.
+  function syncOrchardContent() {
+    const trees = worldTrees(snapshot), deposits = Array.isArray(snapshot.deposits) ? snapshot.deposits : null;
+    const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.id).join() + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();
+    if (key === orchardContentKey) return; orchardContentKey = key;
+    orchard.groundChanged(deposits ? {trees, deposits} : {trees});
   }
   function basicActor(enemy, god) {
     const group = new THREE.Group();
@@ -357,13 +372,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const loader = new GLTFLoader();
   for (const name of ['forge','forge_lod']) loader.load(`/assets/${name}.glb`, gltf => {
     if(disposed){disposeResources(gltf.scene);return;}
-    forge.install(gltf,name==='forge_lod');
+    forge.install(gltf,name==='forge_lod');orchard.enableShadowCasting(gltf.scene);
     shrineBase.visible=false;shrineCore.visible=false;
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
   for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
+    if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     templates.set(name, gltf);
     if (name === 'tree') { syncTrees(); }
     if (name === 'skeleton'||name==='golem') for (const entry of actors.values()) upgradeActor(entry);
@@ -409,8 +425,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return cursor.visible;
   }
   const impacts=createImpactPresentation({scene,camera,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
-  let audioContext=null;let lastSound=0;
-  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();}catch{}}
+  let audioContext=null;let lastSound=0;let woodAudio=null;
+  // Wood kit shares this one context (bounded 16-voice pool); it is created only inside the existing gesture unlock.
+  const ear={position:[0,0,0],forward:[0,0,-1],up:[0,1,0]},earVector=new THREE.Vector3(),earQuaternion=new THREE.Quaternion();
+  function listenerPose(){camera.getWorldPosition(earVector);earVector.toArray(ear.position);camera.getWorldDirection(earVector);earVector.toArray(ear.forward);earVector.set(0,1,0).applyQuaternion(camera.getWorldQuaternion(earQuaternion)).toArray(ear.up);return ear;}
+  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
   let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
@@ -424,13 +443,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function handleEvent(event){
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
     if(!event?.position||event.fire)return;
+    const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());
     if(event.kind==='spell')spellVisual.play(event);
     const specialEffect={hammer_slam:'raise',pick_burst:'crystal',axe_cleave:'sunder'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
     const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
     const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
     const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
     if(isImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed});}
-    const now=performance.now();if(audioContext&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
+    const now=performance.now();if(audioContext&&!woodSound&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
     for(const source of controllerSources.values())source.gamepad?.hapticActuators?.[0]?.pulse(.25,35).catch(()=>{});
   }
   function equipVisual(next) {
@@ -621,7 +641,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const forgeY=terrainHeight(0,0,snapshot.edits);
       const groundY = forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(snapshot, localPosition.x, localPosition.z));
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
+      if (!grounded && localPosition.y <= groundY && verticalSpeed < -4) orchard.contact(localPosition.x, localPosition.z, {strength: 1.5}); // landing dust (presentation only)
       if (grounded || localPosition.y <= groundY) { localPosition.y = groundY; verticalSpeed = 0; grounded = true; }
+      if (grounded && (stepDistance += move.length() * dt * 5) > .75) { stepDistance = 0; orchard.contact(localPosition.x, localPosition.z, {strength: .6}); }
       const amount = 1 - Math.exp(-dt * 8);
       localPosition.addScaledVector(correction, amount);
       correction.multiplyScalar(1 - amount);
@@ -648,7 +670,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
     weapons.tick();updateFireAudio(weapons.state().firing);
     const wick=axeModel?.getObjectByName('Wick');if(tool==='flask'&&wick?.material){const lit=!!snapshot.players.find(p=>p.id===playerId)?.flaskLit;wick.material.emissive?.setHex(lit?0xff5a04:0);wick.material.emissiveIntensity=lit?2:0;}
-    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);
+    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);woodAudio?.tick(listenerPose());
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
       if (animation.actions) {
@@ -683,6 +705,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       shrineBar.quaternion.copy(shrineBarBack.quaternion);
       shrineCore.rotation.y += dt * 0.7;
     }
+    orchard.update(dt, camera);
     renderer.render(scene, camera);
   }
   function disposeResources(root) {
@@ -697,7 +720,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   rebuildGround(); resize(); renderer.setAnimationLoop(frame);
   report(`World renderer ready (${Math.round(performance.now() - started)} ms).`);
-  return {
+  // Read-only presentation evidence for browser QA (no input, state or credentials).
+  Object.defineProperty(canvas, 'brannDiagnostics', {configurable: true, value: () => disposed ? null : api.diagnostics()});
+  const api = {
     applySnapshot(next, id) {
       if (disposed) return;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
@@ -714,7 +739,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         // Grounded height follows the same live terrain function as the server.
         if (grounded) localPosition.y = authoritative.y;
       }
-      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);
+      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();
 
     },
     setRole(next) {
@@ -746,7 +771,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null}};},
     clearControls: clearInput,
     controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
@@ -770,11 +795,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction());
-      combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();
+      combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;orchard.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
       renderer.dispose(); actors.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
     },
   };
+  return api;
 }

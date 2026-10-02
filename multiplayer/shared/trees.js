@@ -83,7 +83,8 @@ export function chopTree(state, tree, point, normal, ctx) {
  else if (Math.abs(h.cutHeight - point[1]) > TREE_LIMITS.notchTolerance) return {events: [glance]}; // the persisted wound stays
  h.cuts++;
  const events = [{kind: 'wood_hit', position: [...point], id: tree.id, material: 'wood', normal: [...normal], cuts: h.cuts}];
- if (h.cuts >= 3) { h.cuts = 3; h.felledTick = Math.max(1, state.tick); h.landed = false; events.push({kind: 'tree_fell', position: [tree.x, floor, tree.z], id: tree.id, yaw: h.fallYaw}); }
+ if (h.cuts >= 3) { h.cuts = 3; h.felledTick = Math.max(1, state.tick); h.landed = false; events.push({kind: 'tree_fell', position: [tree.x, floor, tree.z], id: tree.id, yaw: h.fallYaw,
+  landTicks: treeFall(tree, h, h.felledTick, floor, ctx.terrainHeight).landTicks}); } // exact touchdown tick for presentation (audio), pure + cached
  return {events};
 }
 
