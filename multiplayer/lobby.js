@@ -352,6 +352,17 @@ function onSnapshot(snapshot) {
   lastSnapshot = snapshot; snapshots++;
   if (snapshots === 1) removeNotice('loading');
   const self = snapshot.players.find(player => player.id === playerId);
+  if (self) {
+    const waitSeconds = Number.isFinite(self.roleTick) ? Math.max(0, Math.ceil((120 - (snapshot.tick - self.roleTick)) / 60)) : 0;
+    for (const radio of document.querySelectorAll('input[name="menuRole"]')) {
+      // Selection reflects the accepted role, including rejected/late commands.
+      radio.checked = radio.value === self.role;
+      radio.disabled = radio.value !== self.role && waitSeconds > 0;
+    }
+    setText($('roleSwitchHint'), waitSeconds > 0
+      ? `You can switch roles again in ${waitSeconds} second${waitSeconds === 1 ? '' : 's'}.`
+      : 'Switching releases any held attack, drawn bow or pending line cast.');
+  }
   if (self && self.role && self.role !== appliedRole) {
     appliedRole = self.role; currentRole = self.role;
     if (session?.identity) session.identity.role = self.role;
