@@ -12,6 +12,13 @@ import { createAdventureBanner } from './client/adventure-view.js';
 const $ = id => document.getElementById(id);
 const body = document.body;
 const canvas = $('world');
+// Header controls wrap as room state and viewport width change.
+const hudHeader = document.querySelector('.hud-top');
+const hudHeaderObserver = new ResizeObserver(() => {
+  const bottom = Math.ceil(hudHeader.getBoundingClientRect().bottom);
+  if (bottom > 0) $('hud').style.setProperty('--hud-header-bottom', `${bottom}px`);
+});
+hudHeaderObserver.observe(hudHeader);
 const NAME_KEY = 'branns-forge.player-name';
 const ROLE_KEY = 'branns-forge.player-role';
 const JOIN_TIMEOUT_MS = 15000;
@@ -354,7 +361,7 @@ function onSnapshot(snapshot) {
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
   if (snapshot.adventure) try {
     const view = adventureView(snapshot.adventure, snapshot, playerId);
-    if (!expeditionBanner) { expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction}); expeditionBanner.element.style.top = 'calc(env(safe-area-inset-top, 0px) + 66px)'; }
+    if (!expeditionBanner) { expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction}); expeditionBanner.element.style.top = 'calc(var(--hud-header-bottom, 56px) + 10px)'; }
     expeditionBanner.update(view);
     // DOM is invisible in WebXR: the same view drives the in-world wrist panel (it repaints only when its model changes).
     if (xrActive) game.setExpedition(view, snapshot, playerId);
@@ -642,7 +649,7 @@ applyRoleUi(chosenRole());
 setPhase('lobby');
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
