@@ -92,3 +92,13 @@ Codex owns integration, behaviour, tests and deployment. No API-billed fallback.
   timestamp rather than assuming a fabricated `swing` event exists.
 - Use an isolated compiled-output deployment from OS temp per PEER-PLAYTEST.md.
   The diagnostic HTML is deliberately excluded from public deployment.
+
+## Published acceptance
+
+Deployment `dpl_5bdMqbqC6aezrWR5zEhyh2w2Nszb` is READY at
+https://branns-forge-multiplayer.vercel.app . Build/deployment took 9.0205658 s.
+Anonymous page HTTP 200, standalone manifest and healthy signaling verified in
+0.6944466 s. A public God host and Hero guest joined the same eight-digit room;
+God touch Cast produced one Raise edit visible in the Hero's received snapshot
+(2/8 players, no recorded error). Both roles exposed their correct touch controls.
+This is two browser clients, not a claim of testing actual phone hardware.

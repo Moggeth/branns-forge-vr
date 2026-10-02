@@ -112,3 +112,11 @@ No project access protections, billing plan or Git author settings were changed.
 Browser Vercel login was a different personal account from CLI; do not alter its
 GitHub connections to solve a CLI deployment issue. `gh api user/emails` also
 lacks scope here; do not repeatedly request it or broaden scopes unnecessarily.
+
+
+Mobile update: see MOBILE-CONTROLS.md. Production deployment
+`dpl_5bdMqbqC6aezrWR5zEhyh2w2Nszb` adds Hero/God twin-thumb controls, all browser
+MVP actions, fullscreen and standalone metadata. Twelve Node regressions and
+thirteen synthetic real-renderer input assertions passed; physical phones remain
+pending. No signaling restart was needed. The compiled-only deploy now includes
+manifest.webmanifest, and still excludes tests/mobile-playtest.html.
