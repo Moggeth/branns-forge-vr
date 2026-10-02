@@ -1,6 +1,6 @@
 # Claude art sprint — 3 October 2026
 
-Authorised by user: use existing personal Claude allowance before Saturday 09:00 Sydney, Sonnet 5.5 for mileage, Opus 5.5 for staples. No paid extra usage. One Claude commission at a time. User accepts reaching100%; useful finished outcomes remain the objective.
+Authorised by user: use existing personal Claude allowance before Saturday 09:00 Sydney, Sonnet 5.5 for mileage, Opus 5.5 for staples. No paid extra usage. Latest user instruction supersedes serial-only: run multiple isolated Opus5.5 commissions in parallel. User accepts reaching100%; useful finished outcomes remain the objective.
 
 Deadline2026-10-02T23:00Z (09:00 Sydney Oct3); stop new commissions22:00Z, verification checkpoint22:45Z. User screenshot baseline: weekly64% used, session34% used, session resets01:50 local, weekly09:00. These are screenshot evidence, not live sampled API figures. Stop weekly-reset dispatch; five-hour reset may allow continuation before09:00. Do not redeem credits.
 
@@ -11,7 +11,7 @@ Deadline2026-10-02T23:00Z (09:00 Sydney Oct3); stop new commissions22:00Z, verif
 4. READY Sonnet: shared fire/flamethrower/liquid browser presentation and reusable assets, using existing native strongest art. Coordinate authoritative bounded ignition/damage/state import; do not ship purely cosmetic fake mechanics. If time short finish asset kit isolated with preview rather than half-integrate simulation.
 5. READY Sonnet: retained native scene props/environment library visual consistency and LOD pass, constrained to reused assets, verified material/normal/orientation; improve meaningful old-new migration gaps. Avoid inventing broad new gameplay.
 
-Each commission: source ownership, concrete output first, timecap, exact account/model metadata, measured duration, review then integrate. No new agent threads needed. Prior agents combat_sim/combat_view ownfiles finished; coordinate if reused.
+Each commission: source ownership, concrete output first, timecap, exact account/model metadata, measured duration, review then integrate. Use bounded existing integration agent; prefer Claude delegation to conserve Codex allowance. Prior agents combat_sim/combat_view ownfiles finished; coordinate if reused.
 
 ## Lessons / current evidence
 Two initial Sonnet high-effort VFX commissions hit600s without output: first excessive environmental exploration, second prolonged reasoning. Retry medium effort with short write-first brief, no tools/environment exploration; root does browser verification. Preserve attempt logs in isolated work, do not duplicate high-effort same strategy. Actual model verified Sonnet5.5/personal pro, all three final outputs verified and integrated. Successful spell commission585.55s; HUD120.899s; impact136.370s.
@@ -29,3 +29,25 @@ Release complete: wave2 public deployment dpl_2kUofacac5mLMbBhpQS4o1t1AJTa READY
 Heartbeat2026-10-02T14:07Z: queue3 delivered Wayfarer’s Forge; Opus personalPro exact5.5 verified424.169s. Asset kit276bd6a pushed privateorigin/main;9,052/2,488tris,546/263KB,self-containedtextures,editableBlend,5sockets,8collisionboxes. Full rebuild byte-identical; Khronos and Godot pass. Browser integration reviewed from ground/RTS with live surface-hit damage, power dimming, distanceLOD and safe character blocking. Current integration/release checkpoint follows in Git. No Claude commission remains active. Next useful commission queue4: Sonnet shared fire/liquid/flamethrower art plus bounded authoritative mechanics. Keep it scoped; inspect native retained implementation first, then write-first isolated art commission. No new UI needed unless integration calls for one. Screenshot allowance64%used is still the latest supported weekly evidence; do not fabricate livepercentage. Deadline/serial/personal-subscription requirements unchanged.
 
 Queue3 release complete: integration3b04d50 pushed privateorigin/main. Deployment dpl_5W2ZbAYNif2eGCRTChvCvP6mcUzm READY (13.424s). Public room74336325 Hero joined and forge visible, bothGLBs HTTP200; QA room closed. LocalVite session27870 stopped; no owned Claude/Vite/browser QA left running. Existing signalling/tunnel left intact. Next heartbeat queue4.
+
+
+## LIVE OVERRIDE / dispatch registry — 2026-10-02 ~15:02UTC
+
+User upgraded personal Claude Pro5x and supplied screenshot **0%used /100%weeklyavailable**, weekly resets09:00Sydney. They explicitly request many **parallel Opus5.5** calls, a great core loop for all playtypes, review everybutton/UI, and useful progress overnight. This overrides historical serial-only text above and in old heartbeat payloads. Subscriptiononly/noAPI/noextrausage remains. They authorise using the next five-hour window too before09:00weeklycutoff. Do NOT redeem Codex resetcredits: noauthorisation. Codex tool verified92%used (8%left), resetsAt1791065773; conserve coordinator context. Screenshot is evidence atsuppliedtime, notliveClaudeutilisation. No promise of exactly100%.
+
+Existing automation updated throughapp, every20min, sameID. End23:00UTC, newcommissioncutoff22:00, integrationbuffer22:45. Do not duplicate ongoing work. Six25min/45turn Opus HIGH commissions dispatched using scripts/claude_commission.py; eachauthverifiedpersonal claude.ai beforegeneration, finalexactmodelmetadata required. Allfoldersunderwork/; noagentcaneditactivecheckout orpublish. Root owns integration.
+
+|Folder work/opus-…-20261003|Exec session|Ownership / concrete result|
+|---|---:|---|
+|core-loop|31489|newshared/adventure.js, tests, viewmodel; optionalForgeExpedition prepare/recoverstar/defend-rekindle, allroles solo/co-op; centralintegrationhooks only|
+|controls-ui|95038|OpusUI design, index/styles/helpers + everybuttonaudit; preserveDOMIDs, mobile-first, role/inputclarity|
+|orchard-presentation|83204|newground/lighting/atmosphere module +shaderfixture; nofakephysicalterrain|
+|tree-experience|29138|treecutgeometry/hingefall/LOD/logs strictsharedstate +Sonnetassetreview; noactivegame/simulationedits|
+|network-acceptance|27701|readcopiednetwork/session/peer/save, actualreprotests andup to3 boundedfixes; nohostingwrites|
+|enemy-character|48076|skeleton/golem pose/feedback modules, actualrig inspection, footplant/recoil/telegraphs; integrationhooks only|
+
+Currentintegrationagent /root/finish_browser_fire owns activeclient/game.js,weapon-controller,asset-pose,lobby/indexmobile functionalchanges andfire tests. It must nottouch world-content-view orsimulation. Root alreadywiredfire insharedsimulation, sharedfire.js/combat.js areuncommitted. Fireartist complete Sonnet530? Correction:fire318.320s; SonnetTREE530.606s, personalProexactmodelpassed. Treeassets inwork/sonnet-browser-trees-20261003 with GLBs, Blender source,builder,realrenders,contract. Mature9543tris/LOD2447; variants8500/2172and7511/1897; log496tris,cap256. Initialtreeartist honestcanopystilldense; Opusreviewincluded.
+
+Root starter treephysicsmodule copiedto work/opus-tree-experience-20261003/starter-trees.js; unintegrated and unverified. Prefer commissionfinal version aftertests; don'tshipstarter. No treechangescentralruntimeyet. Commissioncopyreferences maypredatefinalfireUI additions: merge carefully preserveWyrmspout/Emberdew and8equipmentcontrols.
+
+Pending fireacceptance: newmodule sharedfire andSonnetfirevisuals, nativeWyrmspoutpacked2.09MB; authoritativethermalcells, fuel/flameprojectiles, forge/Starfall/lightningignition, frost/healquench. Agentmustverify tests+browse beforecommitdeploy. Lastgoodlivecommit25ce069forge. Do notdeploytree/core/UI output untested. Nextheartbeatfirst inspectmetadata andactualactivePIDs/sessionstatus; finishescanbereviewedandintegrated whileothersrun. Replenish finishedowner withspecificusefulfollow-up (notblanketmoretokens), protecttimebuffers. Persisthandoff beforepersonalCodexlimit.
