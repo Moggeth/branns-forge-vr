@@ -41,6 +41,29 @@ The Opus 5.5 lobby commission completed on the verified personal Pro subscriptio
 in 348.176 seconds; Codex integrated and verified the real network behavior.
 Physical headset and separate-household acceptance are still pending.
 
+## Mobile controls
+
+Phones/tablets automatically show two thumb sticks. Hero: Move / Look, Attack,
+Jump. God: Pan / Orbit-and-tilt, zoom buttons or pinch, Centre, tap the ground to
+aim, then Cast; Cancel returns to centre aim. All four spells stay in the tray.
+Portrait and landscape are supported, including swapped sticks for left-handed
+play. Menu → Display & controls changes sensitivity and Automatic/Always on/Off.
+The same menu retains role switching, invites, backups, host reset and leaving;
+world import/resume/create/join remain on the lobby.
+
+Full screen is in the touch toolbar and the menu. It uses the actual browser API,
+shows an exit state and respects permission denial. Unsupported browsers explain
+Add to Home Screen; the manifest and iOS standalone metadata enable an app-like
+launch where supported. There is no offline multiplayer promise or forced
+orientation lock. Browser API support varies; physical phone testing is pending.
+
+Desktop mappings remain; right-drag now tilts the God camera too. On standard
+WebXR controllers, primary A/X jumps and secondary B/Y exits VR into the menu;
+left stick moves and trigger strikes. Controllers without those buttons retain
+the browser/system exit path. Physical headset verification is still pending.
+
+See [MOBILE-CONTROLS.md](MOBILE-CONTROLS.md) for the complete mapping and acceptance.
+
 ## Earlier dedicated-server proof (separate, not deployed)
 
 The original dedicated-server route below remains available for local verification.

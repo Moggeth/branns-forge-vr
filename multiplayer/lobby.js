@@ -1,3 +1,5 @@
+import { createMobileControls } from './client/mobile-controls.js';
+import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
@@ -43,6 +45,7 @@ function friendlyError(detail) {
 }
 
 // ---------------------------------------------------------------- state
+let mobile = null, xrActive = false;
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false;
@@ -167,6 +170,7 @@ function setPhase(next) {
 }
 function syncActive() {
   game?.setActive(phase === 'game' && connected && !menuOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen,role:currentRole,xr:xrActive});
   updateLookHint();
 }
 
@@ -342,6 +346,7 @@ function applyRoleUi(role) {
   for (const radio of document.querySelectorAll('input[name="menuRole"]')) radio.checked = radio.value === role;
   $('vr').hidden = !(vrSupported && role === 'hero');
   if (role !== 'hero' && document.pointerLockElement === canvas) document.exitPointerLock?.();
+  mobile?.update({active:phase === 'game' && connected && !menuOpen,role:currentRole,xr:xrActive});
   updateLookHint();
 }
 
@@ -444,7 +449,7 @@ $('resumePlay').addEventListener('click', () => closeMenu());
 $('menu').addEventListener('click', event => { if (event.target === $('menu')) closeMenu(); });
 function trapMenuFocus(event) {
   if (event.key !== 'Tab') return;
-  const focusable = [...$('menu').querySelectorAll('button,input,summary,a[href]')].filter(el => !el.disabled && el.getClientRects().length);
+  const focusable = [...$('menu').querySelectorAll('button,input,select,summary,a[href]')].filter(el => !el.disabled && el.getClientRects().length);
   const first = focusable[0], last = focusable.at(-1);
   if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
   else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
@@ -525,7 +530,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
 // game.js owns the canvas pointer-lock gesture; duplicate requests can race.
 document.addEventListener('pointerlockchange', updateLookHint);
 function updateLookHint() {
-  $('lookHint').hidden = !(phase === 'game' && connected && !menuOpen && currentRole === 'hero' && document.pointerLockElement !== canvas && !body.classList.contains('xr'));
+  $('lookHint').hidden = !(phase === 'game' && connected && !menuOpen && currentRole === 'hero' && document.pointerLockElement !== canvas && !xrActive && !mobile?.enabled);
 }
 
 $('vr').addEventListener('click', async () => {
@@ -544,7 +549,10 @@ try {
     onCast: (chosen, point) => session?.command('cast', {spell: chosen, point}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onStatus: status => { rendererStatus = String(status); },
+    onXRChange: value => { xrActive = value; body.classList.toggle('xr',value); syncActive(); },
+    onMenu: openMenu,
   });
+  mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint});
   rendererReady = true;
   game.setActive(false);
   game.setSpell(spell);
@@ -563,10 +571,11 @@ applyRoleUi(chosenRole());
 setPhase('lobby');
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
-  state: () => ({phase, connected, menuOpen, controlsActive: phase === 'game' && connected && !menuOpen, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  state: () => ({phase, connected, menuOpen, controlsActive: phase === 'game' && connected && !menuOpen, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });

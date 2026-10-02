@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><title>Mobile controls acceptance fixture</title>
+<style>body{margin:0;background:#252525;color:white;font:14px system-ui}nav{height:42px;display:flex;gap:10px;align-items:center;padding:0 12px}iframe{display:block;border:0;margin:0 auto;width:360px;height:640px}button{padding:6px}#result{white-space:pre-wrap;margin:8px}</style>
+<nav><button id="portrait">360 × 640</button><button id="landscape">640 × 360</button><button id="wide">844 × 390</button><button id="run">Run synthetic input checks</button><button id="god">God</button><button id="hero">Hero</button></nav><iframe id="game" src="/" allow="fullscreen; xr-spatial-tracking"></iframe><pre id="result">Local fixture only. Synthetic pointer checks do not replace a physical phone test.</pre>
+<script type="module">
+const frame=document.querySelector('iframe'), result=document.querySelector('#result');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const win=()=>frame.contentWindow, doc=()=>frame.contentDocument;
+const state=()=>win().brannHarness.state(), snapshot=()=>win().brannHarness.snapshot();
+const player=()=>snapshot().players.find(p=>p.id===state().playerId);
+async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(100);}throw Error('Timed out');}
+async function role(value){doc().querySelector('[data-touch-action="menu"]').click();const r=doc().querySelector(`[name="menuRole"][value="${value}"]`);r.checked=true;r.dispatchEvent(new (win().Event)('change',{bubbles:true}));await until(()=>state().role===value);doc().querySelector('#resumePlay').click();}
+async function start(){await until(()=>!!win().brannHarness);if(state().phase!=='game'){doc().querySelector('#name').value='Mobile QA';doc().querySelector('#create').click();await until(()=>state().connected&&!!snapshot());}doc().querySelector('#menuButton').click();const select=doc().querySelector('#touchMode');select.value='on';select.dispatchEvent(new (win().Event)('change',{bubbles:true}));doc().querySelector('#resumePlay').click();}
+for(const [id,w,h] of [['portrait',360,640],['landscape',640,360],['wide',844,390]])document.querySelector('#'+id).onclick=()=>{frame.style.width=w+'px';frame.style.height=h+'px';};
+document.querySelector('#god').onclick=()=>role('god');document.querySelector('#hero').onclick=()=>role('hero');
+frame.onload=()=>start().catch(e=>result.textContent=e.stack);
+function pointer(el,type,id,x,y){el.dispatchEvent(new (win().PointerEvent)(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',clientX:x,clientY:y,button:0}));}
+const center=el=>{const b=el.getBoundingClientRect();return{x:b.x+b.width/2,y:b.y+b.height/2};};
+const button=action=>doc().querySelector(`[data-touch-action="${action}"]`);
+function check(ok,message){if(!ok)throw Error(message);result.textContent+='\nPASS '+message;}
+document.querySelector('#run').onclick=async()=>{
+ const began=performance.now();result.textContent='Running synthetic events against real input and multiplayer simulation…';
+ // Synthetic pointers have no native capture. Shim only this local test frame,
+ // restoring originals in finally; production handlers retain native capture.
+ const prototype=win().Element.prototype, originals=['setPointerCapture','releasePointerCapture','hasPointerCapture'].map(k=>[k,prototype[k]]);
+ prototype.setPointerCapture=()=>{};prototype.releasePointerCapture=()=>{};prototype.hasPointerCapture=()=>false;
+ try{
+ await start();await role('hero');await sleep(100);
+ const left=doc().querySelector('[data-stick="left"]'),right=doc().querySelector('[data-stick="right"]'),a=center(left),b=center(right);
+ const initial=player().position.slice(),yaw=player().yaw;
+ pointer(left,'pointerdown',1,a.x,a.y-35);pointer(right,'pointerdown',2,b.x+25,b.y);await sleep(450);pointer(right,'pointerup',2,b.x+25,b.y);await sleep(300);pointer(left,'pointerup',1,a.x,a.y-35);await sleep(150);
+ check(Math.hypot(player().position[0]-initial[0],player().position[2]-initial[2])>1,'simultaneous move + look reaches authoritative simulation');
+ check(Math.abs(player().yaw-yaw)>.2,'look stick changes heading');
+ const y=player().position[1];button('jump').click();await sleep(200);check(player().position[1]>y+.25,'Jump produces a real jump');await sleep(850);
+ const swing=win().brannHarness.controls().swingAt;button('strike').click();await sleep(100);check(win().brannHarness.controls().swingAt>swing,'Attack starts a weapon swing');
+ pointer(left,'pointerdown',3,a.x,a.y-35);await sleep(150);pointer(left,'pointercancel',3,a.x,a.y-35);await sleep(160);const stop=player().position.slice();await sleep(220);check(Math.hypot(player().position[0]-stop[0],player().position[2]-stop[2])<.03,'cancelled pointer stops motion');
+ pointer(left,'pointerdown',4,a.x,a.y-35);await sleep(100);button('menu').click();await sleep(150);const parked=player().position.slice();await sleep(180);check(!state().controlsActive&&Math.hypot(player().position[0]-parked[0],player().position[2]-parked[2])<.03,'menu clears held movement');doc().querySelector('#resumePlay').click();
+ await role('god');const canvas=doc().querySelector('#world'),c=center(canvas),edits=snapshot().edits.length;
+ pointer(canvas,'pointerdown',5,c.x,c.y);pointer(canvas,'pointerup',5,c.x,c.y);await sleep(100);check(snapshot().edits.length===edits&&!button('cancel').disabled,'tap sets aim without casting');
+ doc().querySelector('[data-spell="raise"]').click();button('cast').click();await sleep(180);check(snapshot().edits.length===edits+1,'Cast commits selected spell');button('cancel').click();check(button('cancel').disabled,'Cancel restores centre aim');
+ const zoom=win().brannHarness.controls().orbitRadius;button('zoom-in').click();check(win().brannHarness.controls().orbitRadius<zoom,'Zoom in changes camera radius');button('zoom-out').click();check(win().brannHarness.controls().orbitRadius===zoom,'Zoom out reverses the step');
+ const cam=win().brannHarness.controls();const r=center(right);pointer(right,'pointerdown',7,r.x+24,r.y+20);await sleep(250);pointer(right,'pointerup',7,r.x+24,r.y+20);const turned=win().brannHarness.controls();check(Math.abs(turned.orbitYaw-cam.orbitYaw)>.1&&Math.abs(turned.orbitTilt-cam.orbitTilt)>.05,'God orbit stick rotates and tilts');
+ button('menu').click();const lh=doc().querySelector('#touchLeftHanded');lh.checked=true;lh.dispatchEvent(new (win().Event)('change',{bubbles:true}));doc().querySelector('#resumePlay').click();check(center(left).x>center(right).x,'left-handed setting swaps physical stick positions');
+ result.textContent+='\nDONE '+((performance.now()-began)/1000).toFixed(3)+' seconds';
+ }catch(e){result.textContent+='\nFAIL '+e.stack;}finally{for(const[k,v]of originals)prototype[k]=v;}
+};
+</script>

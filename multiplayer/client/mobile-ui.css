@@ -1,0 +1,268 @@
+/* Brann's Forge — mobile touch HUD.
+   Everything is scoped to .mui-* nodes or body.touch-controls-active so the
+   desktop lobby/HUD is untouched. Uses lobby.css custom properties. */
+
+.mui-root {
+  --mui-safe-t: env(safe-area-inset-top, 0px);
+  --mui-safe-r: env(safe-area-inset-right, 0px);
+  --mui-safe-b: env(safe-area-inset-bottom, 0px);
+  --mui-safe-l: env(safe-area-inset-left, 0px);
+  --mui-edge: 14px;
+  --mui-stick: clamp(112px, 30vmin, 156px);
+  --mui-knob: calc(var(--mui-stick) * .42);
+  --mui-travel: calc((var(--mui-stick) - var(--mui-knob)) / 2);
+  --mui-primary: 66px;
+  --mui-secondary: 52px;
+  --mui-util: 44px;
+  --mui-glass: rgba(16, 13, 10, .58);
+  --mui-ring: rgba(201, 164, 92, .38);
+
+  position: fixed; inset: 0; z-index: 6; /* above .hud (5), below menu (10) */
+  pointer-events: none;
+  font-family: var(--sans);
+  color: var(--brass-hi);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mui-root[hidden] { display: none !important; }
+.mui-root button, .mui-stick { pointer-events: auto; }
+
+.mui-root[data-role="hero"] .mui-god-only,
+.mui-root[data-role="god"] .mui-hero-only { display: none !important; }
+
+.mui-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ------------------------------------------------------------ sticks */
+.mui-stick {
+  position: absolute;
+  bottom: calc(var(--mui-safe-b) + var(--mui-edge));
+  width: var(--mui-stick); height: var(--mui-stick);
+  border-radius: 50%;
+  touch-action: none;
+  --kx: 0; --ky: 0;
+}
+.mui-stick-left  { left:  calc(var(--mui-safe-l) + var(--mui-edge)); }
+.mui-stick-right { right: calc(var(--mui-safe-r) + var(--mui-edge)); }
+.mui-root[data-left-handed="true"] .mui-stick-left  { left: auto;  right: calc(var(--mui-safe-r) + var(--mui-edge)); }
+.mui-root[data-left-handed="true"] .mui-stick-right { right: auto; left:  calc(var(--mui-safe-l) + var(--mui-edge)); }
+
+.mui-stick-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(16, 13, 10, .18), rgba(16, 13, 10, .46) 78%, rgba(16, 13, 10, .55));
+  border: 1.5px solid var(--mui-ring);
+  box-shadow: inset 0 0 0 6px rgba(201, 164, 92, .06), 0 6px 22px rgba(0, 0, 0, .3);
+  transition: border-color .15s, box-shadow .15s;
+}
+.mui-stick-tick { position: absolute; width: 6px; height: 6px; border-top: 1.5px solid rgba(236, 210, 154, .45); border-left: 1.5px solid rgba(236, 210, 154, .45); }
+.t-n { top: 9px; left: 50%; transform: translateX(-50%) rotate(45deg); }
+.t-e { right: 9px; top: 50%; transform: translateY(-50%) rotate(135deg); }
+.t-s { bottom: 9px; left: 50%; transform: translateX(-50%) rotate(225deg); }
+.t-w { left: 9px; top: 50%; transform: translateY(-50%) rotate(-45deg); }
+
+.mui-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: var(--mui-knob); height: var(--mui-knob); margin: calc(var(--mui-knob) / -2) 0 0 calc(var(--mui-knob) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(236, 210, 154, .5), rgba(138, 106, 51, .45) 60%, rgba(40, 30, 20, .6));
+  border: 1.5px solid rgba(236, 210, 154, .6);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 240, 210, .35);
+  transform: translate(calc(var(--kx) * var(--mui-travel)), calc(var(--ky) * var(--mui-travel)));
+  will-change: transform;
+}
+.mui-stick.is-active .mui-stick-ring { border-color: var(--brass); box-shadow: inset 0 0 0 6px rgba(232, 105, 43, .1), 0 0 0 4px rgba(232, 105, 43, .14); }
+.mui-stick.is-active .mui-knob { border-color: var(--brass-hi); }
+.mui-stick-caption {
+  position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%);
+  font: 600 .64rem/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: rgba(236, 210, 154, .62);
+  text-shadow: 0 1px 3px #000; pointer-events: none;
+}
+
+/* ------------------------------------------------------------ buttons */
+.mui-btn {
+  appearance: none; -webkit-appearance: none; margin: 0; padding: 0;
+  display: inline-grid; place-items: center; align-content: center; gap: 1px;
+  border-radius: 50%; border: 1.5px solid var(--mui-ring);
+  background: var(--mui-glass); color: var(--brass-hi);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  touch-action: manipulation; cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s, opacity .15s;
+}
+.mui-btn:focus-visible { outline: 3px solid var(--brass-hi); outline-offset: 2px; }
+.mui-btn:active, .mui-btn.is-held { transform: scale(.94); background: rgba(232, 105, 43, .32); border-color: var(--ember-hi); }
+.mui-btn:disabled { opacity: .38; cursor: default; }
+.mui-btn-label { font: 700 .6rem/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
+
+.mui-primary { width: var(--mui-primary); height: var(--mui-primary); }
+.mui-primary .mui-icon { width: 28px; height: 28px; }
+.mui-primary:not(:disabled) {
+  color: #fff3dc; border-color: rgba(255, 176, 103, .7);
+  background: radial-gradient(circle at 50% 30%, rgba(232, 105, 43, .55), rgba(90, 36, 14, .62) 70%);
+}
+.mui-secondary { width: var(--mui-secondary); height: var(--mui-secondary); }
+.mui-secondary .mui-icon { width: 22px; height: 22px; }
+.mui-secondary .mui-btn-label { font-size: .54rem; }
+.mui-util { width: var(--mui-util); height: var(--mui-util); border-radius: 12px; }
+.mui-util .mui-icon { width: 22px; height: 22px; }
+.mui-util[data-touch-action="menu"] {
+  color: #2a1606; border-color: var(--brass-hi);
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
+}
+.mui-fs[aria-pressed="true"] { border-color: var(--brass); background: rgba(201, 164, 92, .22); }
+
+/* Action cluster: above the right (look/orbit) stick, Jump/Cancel offset inward. */
+.mui-actions {
+  position: absolute;
+  right: calc(var(--mui-safe-r) + var(--mui-edge));
+  bottom: calc(var(--mui-safe-b) + var(--mui-edge) + var(--mui-stick) + 14px);
+  width: var(--mui-stick);
+  display: flex; align-items: flex-end; justify-content: center; gap: 12px;
+  pointer-events: none;
+}
+.mui-actions .mui-secondary { margin-bottom: 4px; }
+.mui-root[data-left-handed="true"] .mui-actions { right: auto; left: calc(var(--mui-safe-l) + var(--mui-edge)); flex-direction: row-reverse; }
+
+/* Utility column: Menu, Full screen, God zoom/centre. Top-right, below the HUD bar. */
+.mui-util-bar {
+  position: absolute;
+  top: calc(var(--mui-safe-t) + 68px);
+  right: calc(var(--mui-safe-r) + 10px);
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.mui-util-bar [data-touch-action="zoom-in"] { margin-top: 6px; }
+
+/* ------------------------------------------------------------ reticle */
+.mui-reticle {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none;
+}
+.mui-reticle-ring, .mui-reticle-dot { position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); }
+.mui-reticle-dot { width: 4px; height: 4px; background: var(--parchment); box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
+.mui-reticle-ring {
+  width: 22px; height: 22px; border: 1.5px solid rgba(236, 210, 154, .7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(0, 0, 0, .25);
+}
+.mui-root[data-role="hero"] .mui-reticle-ring { width: 16px; height: 16px; border-color: rgba(236, 210, 154, .5); }
+.mui-root[data-role="god"] .mui-reticle-ring { width: 30px; height: 30px; border-style: dashed; }
+/* When a world point is targeted, the centre aim recedes; Codex draws the world marker. */
+.mui-root[data-targeting="true"] .mui-reticle-ring { opacity: .3; }
+.mui-root[data-targeting="true"] .mui-reticle-dot { opacity: .3; }
+.mui-reticle-label {
+  position: absolute; left: 0; top: 24px; transform: translateX(-50%); white-space: nowrap;
+  font: 700 .62rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ember-hi);
+  text-shadow: 0 1px 3px #000;
+}
+.mui-reticle-label:empty { display: none; }
+
+/* ------------------------------------------------------------ existing HUD while touch is active */
+body.touch-controls-active { overscroll-behavior: none; }
+body.touch-controls-active #world { touch-action: none; } /* canvas only — page zoom stays enabled elsewhere */
+body.touch-controls-active .hero-help,
+body.touch-controls-active .god-help,
+body.touch-controls-active .look-hint,
+body.touch-controls-active #copyCode,
+body.touch-controls-active #copyInvite,
+body.touch-controls-active #menuButton { display: none !important; } /* all available in Menu / touch Menu button */
+body.touch-controls-active .hud-top { padding-right: calc(max(10px, env(safe-area-inset-right)) + 0px); }
+body.touch-controls-active .hud-self { padding: 6px 10px 6px 8px; gap: 8px; }
+body.touch-controls-active .hud-role-icon { width: 26px; height: 26px; }
+body.touch-controls-active .room-chip { padding: 6px 10px; }
+body.touch-controls-active .room-players { display: none; }
+body.touch-controls-active .notices { top: calc(env(safe-area-inset-top, 0px) + 64px); width: min(520px, calc(100% - 84px)); }
+
+/* Spell tray: lower centre, always above the stick layer. Portrait stacks it over the sticks. */
+body.touch-controls-active .hud-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px + clamp(112px, 30vmin, 156px) + 66px + 34px);
+  padding-left: calc(env(safe-area-inset-left, 0px) + 8px);
+  padding-right: calc(env(safe-area-inset-right, 0px) + 8px);
+}
+body.touch-controls-active .hud-bottom .spell-tray { gap: 4px; padding: 4px; }
+body.touch-controls-active .hud-bottom .spell { width: 64px; min-height: 58px; padding: 6px 2px 4px; }
+body.touch-controls-active .hud-bottom .spell kbd { display: none; }
+body.touch-controls-active .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(112px, 30vmin, 156px) + 150px); }
+
+@media (orientation: landscape) {
+  /* Landscape: the tray fits between the sticks at their level — keeps the centre clear. */
+  body.touch-controls-active .hud-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    left: calc(env(safe-area-inset-left, 0px) + clamp(112px, 30vmin, 156px) + 24px);
+    right: calc(env(safe-area-inset-right, 0px) + clamp(112px, 30vmin, 156px) + 24px);
+  }
+  body.touch-controls-active .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  .mui-root { --mui-stick: clamp(104px, 30vmin, 132px); --mui-primary: 58px; --mui-secondary: 46px; --mui-edge: 10px; }
+  .mui-util-bar { top: calc(var(--mui-safe-t) + 10px); right: auto; left: 50%; transform: translateX(-50%); flex-direction: row; }
+  .mui-util-bar [data-touch-action="zoom-in"] { margin-top: 0; margin-left: 6px; }
+  /* Short landscape: HUD bar and util bar share the top; push util to the right edge instead of centre if the bar is narrow. */
+  body.touch-controls-active .hud-top { padding-top: max(6px, env(safe-area-inset-top)); }
+  body.touch-controls-active .meters { min-width: 88px; }
+  body.touch-controls-active .hud-bottom .spell { width: 54px; min-height: 50px; font-size: .64rem; }
+  body.touch-controls-active .hud-bottom .spell svg { width: 24px; height: 24px; }
+  body.touch-controls-active .notices { top: calc(env(safe-area-inset-top, 0px) + 60px); }
+}
+@media (orientation: landscape) and (max-height: 430px) and (max-width: 740px) {
+  .mui-util-bar { left: auto; right: calc(var(--mui-safe-r) + 8px); top: calc(var(--mui-safe-t) + 60px); transform: none; flex-direction: column; gap: 6px; }
+  .mui-util-bar [data-touch-action="zoom-in"] { margin: 4px 0 0; }
+}
+@media (orientation: portrait) and (max-width: 400px) {
+  .mui-root { --mui-edge: 12px; }
+  body.touch-controls-active .hud-bottom .spell { width: 60px; }
+  body.touch-controls-active .hud-top { gap: 6px; }
+}
+
+/* ------------------------------------------------------------ menu while in game */
+body.touch-controls-active .menu-backdrop {
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+@media (max-width: 480px), (max-height: 480px) {
+  body.touch-controls-active .menu-card { padding: 20px 16px; gap: 14px; }
+  body.touch-controls-active .menu-head h2 { font-size: 1.6rem; }
+}
+
+/* ------------------------------------------------------------ settings section (lives inside the menu card) */
+.mui-settings { display: grid; gap: 10px; }
+.mui-settings h3 { margin: 0; }
+.mui-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.mui-setting-row > label, .mui-check > span { color: var(--text); font-size: .95rem; }
+.mui-fs-row .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.mui-fs-row .mui-icon { width: 20px; height: 20px; }
+.mui-fs-setting[aria-pressed="true"] { border-color: var(--brass); background: rgba(201, 164, 92, .22); }
+.mui-fs-note { margin: 0; }
+.mui-select {
+  min-height: 44px; min-width: 9.5em; padding: 0 12px; border-radius: 10px; font: inherit; font-size: .95rem;
+  color: var(--brass-hi); background: rgba(16, 13, 10, .7); border: 1px solid rgba(201, 164, 92, .45);
+}
+.mui-range-wrap { display: flex; align-items: center; gap: 10px; flex: 1 1 140px; max-width: 220px; }
+.mui-range-wrap input[type="range"] { flex: 1; min-height: 44px; accent-color: var(--ember); }
+.mui-sens-value { min-width: 3.2ch; font-variant-numeric: tabular-nums; color: var(--brass-hi); font-weight: 600; text-align: right; }
+.mui-check { cursor: pointer; }
+.mui-check input { width: 24px; height: 24px; accent-color: var(--ember); margin: 0; }
+.mui-select:focus-visible, .mui-range-wrap input:focus-visible, .mui-check input:focus-visible { outline: 3px solid var(--brass-hi); outline-offset: 2px; }
+
+.mui-guide summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--brass-hi); font-size: .95rem; }
+.mui-guide-body { display: grid; gap: 12px; padding-top: 4px; }
+.mui-guide-block h4 { margin: 0 0 4px; font: 700 .72rem/1.2 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--brass); }
+.mui-guide-list { display: grid; grid-template-columns: minmax(7.5em, auto) 1fr; gap: 3px 12px; margin: 0; font-size: .84rem; }
+.mui-guide-list dt { color: var(--parchment); font-weight: 600; }
+.mui-guide-list dd { margin: 0; color: var(--muted); }
+.mui-guide-note { margin: 0; font-size: .8rem; }
+@media (max-width: 360px) { .mui-guide-list { grid-template-columns: 1fr; } .mui-guide-list dd { margin-bottom: 4px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mui-btn, .mui-stick-ring { transition: none; }
+}
+
+/* Integration review: a vertical utility column collided with Cast and Orbit
+   at 640x360. Reserve a second, centered top row in all short landscapes. */
+@media (orientation: landscape) and (max-height: 430px) {
+  .mui-util-bar { top: calc(var(--mui-safe-t) + 68px); left: 50%; right: auto; transform: translateX(-50%); flex-direction: row; gap: 6px; }
+  .mui-util-bar [data-touch-action="zoom-in"] { margin: 0 0 0 6px; }
+}
+.mui-range-wrap { min-width: 0; }
+.mui-range-wrap input[type="range"] { min-width: 0; width: 100%; }
+@media (max-width: 480px), (max-height: 480px) {
+  .menu-card:has(.mui-settings) { padding: 20px 16px; gap: 14px; }
+}

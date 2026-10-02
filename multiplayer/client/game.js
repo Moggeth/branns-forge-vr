@@ -12,15 +12,19 @@ export function terrainHeight(x, z, edits = []) {
   return height;
 }
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
   let yaw = 0, pitch = 0, jumpPending = false, verticalSpeed = 0, grounded = true;
   let previous = performance.now(), sentAt = -Infinity, snapshotAt = 0, initialized = false, swingAt = -Infinity;
-  let terrainSignature = '', groveSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38;
+  let terrainSignature = '', groveSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38, orbitTilt = 0.9;
   let zeroInputTimer = null;
-  let axeModel = null;
+  let axeModel = null, touchEnabled = false, fixedAim = null;
+  const touchAxes = {left: {x: 0, y: 0}, right: {x: 0, y: 0}};
+  const xrButtons = new Map();
+  const aimCamera = new THREE.Matrix4();
+  let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), trees = new Map(), templates = new Map(), warnings = new Map();
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3();
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
@@ -137,6 +141,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
+    weaponAnchor.position.x = 0.33 * Math.min(1, camera.aspect / 0.9);
     camera.updateProjectionMatrix();
   }
   const resizeObserver = new ResizeObserver(resize);
@@ -360,15 +365,37 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
     onCast(spell, [x, terrainHeight(x, z, snapshot.edits), z]);
   }
+  function lookBy(dx, dy) {
+    if (!active || renderer.xr.isPresenting) return;
+    if (role === 'hero') { yaw -= dx; pitch = THREE.MathUtils.clamp(pitch - dy, -1.48, 1.48); }
+    else { orbitYaw -= dx; orbitTilt = THREE.MathUtils.clamp(orbitTilt + dy, 0.35, 1.35); }
+  }
+  function updateTouchAim() {
+    if (fixedAim) { hitPoint.copy(fixedAim); hitPoint.y = terrainHeight(hitPoint.x, hitPoint.z, snapshot.edits); cursor.visible = true; }
+    else {
+      camera.updateMatrixWorld();
+      // Stationary touch targeting must not raycast 51k terrain triangles each frame.
+      if (aimTerrain === terrainSignature && aimCamera.equals(camera.matrixWorld)) return cursor.visible;
+      aimTerrain = terrainSignature; aimCamera.copy(camera.matrixWorld);
+      raycaster.setFromCamera(pointer.set(0, 0), camera);
+      const hit = raycaster.intersectObject(ground)[0];
+      cursor.visible = !!hit; if (hit) hitPoint.copy(hit.point);
+    }
+    if (cursor.visible) cursor.position.copy(hitPoint).addScaledVector(THREE.Object3D.DEFAULT_UP, 0.08);
+    return cursor.visible;
+  }
   function strike() {
-    if (!active || role !== 'hero' || performance.now() - swingAt < 300) return;
+    if (!active || role !== 'hero' || performance.now() - swingAt < 450) return;
     swingAt = performance.now();
     onAction('strike');
   }
   function clearInput() {
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
-    clearTimeout(zeroInputTimer);
+    for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
+    xrButtons.clear();
+    // Repeated cleanup after setActive(false) must retain the queued stop packet.
     if (active) {
+      clearTimeout(zeroInputTimer);
       const now = performance.now();
       if (now - sentAt >= 50) sendInput(now, true);
       else zeroInputTimer = setTimeout(() => { if (!disposed) sendInput(performance.now(), true); }, 51 - (now - sentAt));
@@ -391,7 +418,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   listen(document, 'pointerlockerror', () => report('Mouse capture was blocked. Click the canvas again, or check browser permissions. Esc releases capture.'));
   listen(canvas, 'contextmenu', event => event.preventDefault());
   listen(canvas, 'pointerdown', event => {
-    if (!active) return;
+    if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero') {
       if (document.pointerLockElement !== canvas) { void capturePointer(); return; }
       if (event.button === 0) strike();
@@ -402,29 +429,37 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   });
   listen(window, 'pointerup', () => { rightDrag = false; });
   listen(window, 'pointermove', event => {
-    if (!active) return;
+    if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero' && document.pointerLockElement === canvas) {
       yaw -= event.movementX * 0.0022;
       pitch = THREE.MathUtils.clamp(pitch - event.movementY * 0.0022, -1.48, 1.48);
     } else if (role === 'god' && !renderer.xr.isPresenting) {
-      if (rightDrag) orbitYaw -= event.movementX * 0.004;
+      if (rightDrag) { orbitYaw -= event.movementX * 0.004; orbitTilt = THREE.MathUtils.clamp(orbitTilt + event.movementY * 0.003, 0.35, 1.35); }
       if (event.target === canvas) { const hit = pointerHit(event); cursor.visible = !!hit; if (hit) cursor.position.copy(hit.point).add(new THREE.Vector3(0, 0.08, 0)); }
     }
   });
   listen(canvas, 'wheel', event => {
     if (active && role === 'god') { event.preventDefault(); orbitRadius = THREE.MathUtils.clamp(orbitRadius + event.deltaY * 0.03, 10, 70); }
   }, { passive: false });
-  listen(renderer.xr, 'sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); weaponAnchor.visible = false; attachWeapon(); report('VR connected. Stick to walk; trigger to strike.'); });
-  listen(renderer.xr, 'sessionend', () => { camera.position.set(0, 1.65, 0); attachWeapon(); resize(); report('VR session ended.'); });
+  listen(renderer.xr, 'sessionstart', () => { clearInput(); onXRChange(true); camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); weaponAnchor.visible = false; attachWeapon(); report('VR connected. Stick to walk; trigger to strike.'); });
+  listen(renderer.xr, 'sessionend', () => { clearInput(); onXRChange(false); camera.position.set(0, 1.65, 0); attachWeapon(); resize(); report('VR session ended.'); });
 
   function movement() {
     const x = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
     const z = Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
-    let axisX = x, axisZ = z;
+    let axisX = x + touchAxes.left.x, axisZ = z + touchAxes.left.y;
     if (renderer.xr.isPresenting) {
       const xrCamera = renderer.xr.getCamera();
       xrCamera.getWorldDirection(forward);
       yaw = Math.atan2(-forward.x, -forward.z);
+      for (const [index, source] of controllerSources) {
+        const pressed = source.gamepad?.buttons[4]?.pressed || false;
+        const menu = source.gamepad?.buttons[5]?.pressed || false;
+        const previous = xrButtons.get(index) || {};
+        if (active && pressed && !previous.jump && role === 'hero') jumpPending = true;
+        if (active && menu && !previous.menu) { void renderer.xr.getSession()?.end().then(onMenu); }
+        xrButtons.set(index, {jump: pressed, menu});
+      }
       for (const source of controllerSources.values()) if (source.gamepad && source.handedness !== 'right') {
         const axes = source.gamepad.axes;
         const sx = axes.length >= 4 ? axes[2] : axes[0] || 0;
@@ -460,6 +495,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (disposed) return;
     const dt = Math.min((now - previous) / 1000, 0.05);
     previous = now;
+    if (active && !renderer.xr.isPresenting) {
+      lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
+    }
     movement();
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
@@ -479,12 +517,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       pan.addScaledVector(move, dt * 18);
       pan.x = THREE.MathUtils.clamp(pan.x, -45, 45); pan.z = THREE.MathUtils.clamp(pan.z, -45, 45);
       rig.position.set(0, 0, 0);
-      camera.position.set(pan.x + Math.sin(orbitYaw) * orbitRadius * 0.6, orbitRadius * 0.8 + 5, pan.z + Math.cos(orbitYaw) * orbitRadius * 0.6);
+      camera.position.set(pan.x + Math.sin(orbitYaw) * orbitRadius * Math.cos(orbitTilt), terrainHeight(pan.x, pan.z, snapshot.edits) + orbitRadius * Math.sin(orbitTilt) + 3, pan.z + Math.cos(orbitYaw) * orbitRadius * Math.cos(orbitTilt));
       camera.lookAt(pan.x, terrainHeight(pan.x, pan.z, snapshot.edits), pan.z);
     } else {
       rig.position.copy(localPosition);
       if (!renderer.xr.isPresenting) { camera.position.set(0, 1.65, 0); camera.rotation.set(pitch, yaw, 0, 'YXZ'); }
     }
+    if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active;
     if (axeModel) axeModel.visible = role === 'hero' && active;
     const swing = Math.max(0, 1 - (now - swingAt) / 360);
@@ -552,11 +591,31 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     },
     setRole(next) {
       if (next !== 'hero' && next !== 'god') return;
-      clearInput(); role = next; cursor.visible = false; correction.set(0, 0, 0);
+      clearInput(); role = next; fixedAim = null; aimTerrain = null; cursor.visible = false; correction.set(0, 0, 0);
       if (role === 'god') { pan.copy(localPosition); if (document.pointerLockElement === canvas) document.exitPointerLock(); }
       report(role === 'god' ? 'God: WASD pan, right-drag orbit, wheel zoom, click to cast.' : 'Hero: click to look, WASD move, Space jump, click strike.');
     },
     setSpell(next) { spell = next; },
+    setTouchEnabled(value) { if (touchEnabled !== !!value) {clearInput(); touchEnabled = !!value; fixedAim = null; aimTerrain = null; cursor.visible = false;} },
+    setTouchAxes(side, x, y) {
+      if (!active || !touchEnabled || renderer.xr.isPresenting || !touchAxes[side]) return;
+      touchAxes[side].x = THREE.MathUtils.clamp(Number.isFinite(x) ? x : 0, side === 'right' ? -2 : -1, side === 'right' ? 2 : 1);
+      touchAxes[side].y = THREE.MathUtils.clamp(Number.isFinite(y) ? y : 0, side === 'right' ? -2 : -1, side === 'right' ? 2 : 1);
+    },
+    lookByPixels(x, y) { lookBy(x * 0.003, y * 0.003); },
+    zoomBy(amount) { if (active && role === 'god') orbitRadius = THREE.MathUtils.clamp(orbitRadius + amount, 10, 70); },
+    aimAt(x, y) {
+      if (!active || role !== 'god') return false;
+      camera.updateMatrixWorld(); const hit = pointerHit({clientX:x, clientY:y});
+      fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; updateTouchAim(); return !!hit;
+    },
+    cancelAim() { fixedAim = null; aimTerrain = null; if (active && role === 'god') updateTouchAim(); },
+    castAim() { if (active && role === 'god' && updateTouchAim()) castAt(hitPoint); },
+    centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
+    jump() { if (active && role === 'hero') jumpPending = true; },
+    strike,
+    clearControls: clearInput,
+    controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');
