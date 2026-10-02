@@ -1,9 +1,10 @@
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
+import {SPELL_COST as COST} from './spells.js';
+import {TOOLS,PARTS,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 export const HZ = 60;
 export const MAX_PLAYERS = 8;
 const BOUND = 55, MAX_WORLD = 64;
-const COST = {skeleton: 15, raise: 12, grove: 10, starfall: 25, sunder: 14, wall: 14, ring: 12};
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
@@ -60,35 +61,32 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges].map(x=>x.id);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts].map(x=>x.id);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
 function damageEnemy(state, enemy, amount, events) {
-  enemy.hp -= amount;
-  enemy.hurtTick = state.tick;
-  events.push(event('hit', enemy.position, enemy.id));
-  if (enemy.hp <= 0) {
-    events.push(event('death', enemy.position, enemy.id));
-    state.enemies.splice(state.enemies.indexOf(enemy), 1);
-  }
+  return hitEnemyPart(state,enemy,'torso',amount,null,{nextId,terrainHeight},events);
+
 }
 function damageHero(state, hero, amount, events) {
   hero.hp -= amount;
   events.push(event('hit', hero.position, hero.id));
   if (hero.hp <= 0) {
     events.push(event('death', hero.position, hero.id));
+    releaseHeld(state,hero,[0,0,0]);
     hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];
   }
 }
 
 function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
-  return {version: 1, contentVersion: 2, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
+  return {version: 1, contentVersion: 3, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    projectiles: [], embeds: [], detachedParts: [], pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
+  const combatContext={nextId,terrainHeight};
   const player = id => state.players.find(p => p.id === id);
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
@@ -103,6 +101,7 @@ function instantiate(state) {
     },
     removePlayer(id) {
       const p = player(id); if (!p) return fail('not_joined');
+      releaseHeld(state,p,[0,0,0]);
       state.players.splice(state.players.indexOf(p), 1);
       return ok([event('leave', p.position, id)]);
     },
@@ -114,6 +113,7 @@ function instantiate(state) {
         if (!['hero', 'god'].includes(message.role)) return fail('invalid_role');
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
+          releaseHeld(state,p,[0,0,0]);
           p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
@@ -141,9 +141,11 @@ function instantiate(state) {
       if (message.type === 'action') {
         if (p.role !== 'hero') return fail('invalid_action');
         if (message.action === 'equip') {
-          if (!['axe','pick'].includes(message.tool)) return fail('invalid_action');
+          if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
+          if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           p.tool = message.tool; return ok();
         }
+        const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const candidates = state.pickups.map(q => [q, Math.hypot(p.position[0]-q.x,p.position[2]-q.z,p.position[1]-terrainHeight(state,q.x,q.z))]).filter(q => q[1] <= 2.5).sort((a,b)=>a[1]-b[1]);
           if (!candidates.length) return ok(); const q = candidates[0][0];
@@ -163,9 +165,9 @@ function instantiate(state) {
         const supplied = message.targetId !== undefined;
         if (supplied && (!validId(message.targetId) || !validPoint(message.point) || !Array.isArray(message.normal) || message.normal.length !== 3 || !message.normal.every(finite) || Math.abs(Math.hypot(...message.normal)-1)>.02)) return fail('invalid_action');
         const requestedTool = message.tool === undefined ? p.tool : message.tool;
-        if (!['axe','pick'].includes(requestedTool) || requestedTool !== p.tool) return fail('invalid_action');
+        if (!['axe','pick','hammer','limb'].includes(requestedTool) || requestedTool !== p.tool) return fail('invalid_action');
         // 27 ticks is the legacy .45 s cadence; pick is the requested .48 s (29 ticks).
-        const cooldown = requestedTool === 'axe' ? 27 : 29;
+        const cooldown = {axe:27,pick:29,hammer:40,limb:32}[requestedTool];
         if (state.tick - p.attackTick < cooldown) return fail('cooldown');
         p.attackTick = state.tick;
         const facing = [-Math.sin(p.yaw), -Math.cos(p.yaw)];
@@ -194,7 +196,7 @@ function instantiate(state) {
         }
         if (supplied) {
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
-          if(hitEnemy && inReach(hitEnemy)<Infinity && Math.hypot(message.point[0]-hitEnemy.position[0],message.point[2]-hitEnemy.position[2])<1 && message.point[1]>=hitEnemy.position[1]-.2 && message.point[1]<=hitEnemy.position[1]+2.1)damageEnemy(state,hitEnemy,34,events);
+          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool},combatContext,events);
           else if(message.targetId==='shrine' && inReach(state.shrine)<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
           return ok(events); // No fallback to another target when a precise surface missed.
         }
@@ -212,29 +214,38 @@ function instantiate(state) {
       }
       if (p.role !== 'god') return fail('role_required');
       const spell = message.spell, point = message.point;
+      const line=spell==='sunder'||spell==='wall';
+      if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
+      const lineCount=line&&message.start?Math.ceil(distance(message.start,message.end)/2.5)+1:3;
       if (!Object.hasOwn(COST, spell) || !validPoint(point)) return fail('invalid_cast');
       if ((spell==='grove'||spell==='ring')&&(Math.abs(point[0])>51||Math.abs(point[2])>51)) return fail('outside_world');
       if (state.shrine.hp <= 0) return fail('shrine_disabled');
       if (state.tick - p.castTick < 45) return fail('cooldown');
       if (p.mana < COST[spell]) return fail('insufficient_mana');
-      if ((spell === 'skeleton' && state.enemies.length >= MAX_WORLD) ||
+      if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           ((spell === 'grove' || spell === 'ring') && state.groves.length >= MAX_WORLD) ||
-          ((spell === 'raise' || spell === 'sunder' || spell === 'wall') && state.edits.length + state.pendingStarfalls.length + (spell==='raise'?1:3) > MAX_WORLD) ||
+          (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
           (spell === 'starfall' && (state.pendingStarfalls.length >= 8 || state.deposits.length+state.pendingStarfalls.length>=80))) return fail('world_limit');
       p.mana -= COST[spell]; p.castTick = state.tick;
       const idNew = nextId(state, spell[0]);
       const x = point[0], z = point[2], at = [x, terrainHeight(state, x, z), z], events = [event('cast', at, idNew)];
-      if (spell === 'skeleton') state.enemies.push({id: idNew, position: at, yaw: 0, hp: 100, attackTick: -1000});
+      events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start:message.start||[x-3,at[1],z],end:message.end||[x+3,at[1],z]}:{})});
+      if (spell === 'skeleton'||spell==='golem') state.enemies.push(createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'));
+      if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-BOUND,BOUND),sz=clamp(z+(i<2?-1:1)*1.4,-BOUND,BOUND);state.enemies.push(createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]));}
+      if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+      if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
+      if(spell==='lightning')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=3)damageEnemy(state,enemy,80,events);
+      if(spell==='frost')for(const enemy of state.enemies)if(distance(enemy.position,at)<=7)enemy.slowUntil=state.tick+300;
       if (spell === 'grove' || spell === 'ring') state.groves.push({id: idNew, x, z, ...(spell === 'ring' ? {kind:'ring'} : {})});
-      if (spell === 'raise') {
-        state.edits.push({id: idNew, kind: 'raise', x, z, radius: 6, height: 2});
+      if (spell === 'raise'||spell==='lower') {
+        state.edits.push({id: idNew, kind: spell, x, z, radius: 6, height: spell==='raise'?2:-2});
         liftActors(state);
       }
       if (spell === 'starfall') state.pendingStarfalls.push({id: idNew, x, z, radius: 5, impactTick: state.tick + 48});
       if (spell === 'sunder' || spell === 'wall') {
         const dx = x-p.position[0], dz = z-p.position[2], d=Math.hypot(dx,dz), ux=d>.001?dx/d:-Math.sin(p.yaw), uz=d>.001?dz/d:-Math.cos(p.yaw);
-        for (let i=-1;i<=1;i++) state.edits.push({id:`${idNew}_${i+1}`,kind:spell,x:clamp(x+uz*i*3,-BOUND,BOUND),z:clamp(z-ux*i*3,-BOUND,BOUND),radius:2.5,height:spell==='wall'?1.5:-1.5});
+        for (let i=0;i<lineCount;i++) state.edits.push({id:`${idNew}_${i}`,kind:spell,x:message.start?message.start[0]+(message.end[0]-message.start[0])*i/(lineCount-1):clamp(x+uz*(i-1)*3,-BOUND,BOUND),z:message.start?message.start[2]+(message.end[2]-message.start[2])*i/(lineCount-1):clamp(z-ux*(i-1)*3,-BOUND,BOUND),radius:2.5,height:spell==='wall'?1.5:-1.5});
         liftActors(state);
       }
       return ok(events);
@@ -262,7 +273,7 @@ function instantiate(state) {
         for (const p of state.players) if (p.role === 'hero' && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
         if (state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
-        liftActors(state); events.push(event('cast', at, pending.id));
+        liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       for (const enemy of state.enemies) {
         const targets = state.players.filter(p => p.role === 'hero');
@@ -273,7 +284,9 @@ function instantiate(state) {
         if (d > 0.0001) {
           enemy.yaw = Math.atan2(-dx, -dz);
           if (d > 1.5) {
-            const stride = Math.min(2 / HZ, d - 1.5);
+            const legs=enemy.missingParts.filter(p=>p.endsWith('Leg')).length;
+            const speed=(enemy.kind==='golem'?1.25:2)*(legs===2?.2:legs===1?.55:1)*(enemy.slowUntil>state.tick?.35:1);
+            const stride = Math.min(speed / HZ, d - 1.5);
             enemy.position[0] = clamp(enemy.position[0] + dx / d * stride, -BOUND, BOUND);
             enemy.position[2] = clamp(enemy.position[2] + dz / d * stride, -BOUND, BOUND);
           }
@@ -293,19 +306,22 @@ function instantiate(state) {
           enemy.attackTick = state.tick; // Wind-up precedes the actual strike.
         }
         if(state.tick-enemy.attackTick===18 && d<2 && Math.abs(enemy.position[1]-target.position[1])<2 && state.tick-(enemy.hurtTick??-1000)>18){
-          damageHero(state,target,10,events);
+          const arms=enemy.missingParts.filter(p=>p.endsWith('Arm')).length;
+          damageHero(state,target,(enemy.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1),events);
         }
       }
+      stepCombat(state,combatContext,events);
       return events;
     },
+    projectileContact(message){return projectileContact(state,message,combatContext);},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
         players: state.players.map(({id, name, role, position, yaw, hp, mana, tool, resources, head, hands}) =>
           ({id, name, role, position, yaw, hp, mana, tool, resources, ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
-        enemies: state.enemies.map(({id, position, yaw, hp, attackTick, hurtTick}) => ({id, position, yaw, hp, attackTick, ...(hurtTick !== undefined ? {hurtTick} : {})})),
+        enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
-        contentVersion: 2, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
+        contentVersion: 3, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
   };
@@ -346,7 +362,8 @@ export function loadSimulation(saved) {
         !validTick(p.inputTick, saved.tick) || !validTick(p.attackTick, saved.tick) ||
         !validTick(p.castTick, saved.tick) || !validTick(p.roleTick, saved.tick) ||
         !Number.isSafeInteger(p.seq) || p.seq < 0 ||
-        (p.tool !== undefined && !['axe','pick'].includes(p.tool)) ||
+        (p.tool !== undefined && !TOOLS.includes(p.tool)) ||
+        (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
         (p.resources !== undefined && (!record(p.resources) || !['wood','stone','gems'].every(k => Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
         (p.head !== undefined && !pose(p.head)) ||
         (p.hands !== undefined && (!Array.isArray(p.hands) || p.hands.length > 2 || !p.hands.every(h => pose(h)))))
@@ -354,12 +371,12 @@ export function loadSimulation(saved) {
   }
   for (const e of saved.enemies) {
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        !finite(e.hp) || e.hp <= 0 || e.hp > 100 || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)))
+        !finite(e.hp) || e.hp <= 0 || e.hp > (e.kind==='golem'?320:100) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
     if (!record(e) || !unique(e.id) || !validXZ(e) ||
-        !((e.kind === 'raise' && e.radius === 6 && e.height === 2) ||
+        !((e.kind === 'raise' && e.radius === 6 && e.height === 2) || (e.kind === 'lower' && e.radius === 6 && e.height === -2) ||
           (e.kind === 'starfall' && e.radius === 5 && e.height === -1) ||
           (e.kind === 'sunder' && e.radius === 2.5 && e.height === -1.5) || (e.kind === 'wall' && e.radius === 2.5 && e.height === 1.5)))
       throw Error('Invalid simulation edit');
@@ -379,6 +396,7 @@ export function loadSimulation(saved) {
         !validTick(pending.impactTick, saved.tick, saved.tick + 1, 48) || pending.impactTick <= saved.tick)
       throw Error('Invalid simulation Starfall');
   }
+  validateCombat(saved,contentIds);
   const shrine = saved.shrine;
   if (!record(shrine) || !validPosition(shrine.position) || shrine.position[0] !== 0 || shrine.position[2] !== 0 ||
       shrine.position[1] !== baseHeight(0, 0) || shrine.maxHp !== 100 || !finite(shrine.hp) ||
@@ -391,8 +409,9 @@ export function loadSimulation(saved) {
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy, inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
-    ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick}) => ({id, position, yaw, hp, attackTick, ...(hurtTick !== undefined ? {hurtTick} : {})}));
+    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick,kind,parts,missingParts,slowUntil,armor}) => ({id, position, yaw, hp, attackTick,kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
+  Object.assign(state,restoreCombat(saved));
   state.edits = copy(saved.edits); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);
   state.harvestedTrees = harvested.map(({id,cuts,cutHeight,felledTick,fallYaw})=>({id,cuts,cutHeight,felledTick,fallYaw}));

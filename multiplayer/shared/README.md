@@ -22,3 +22,11 @@ The snapshot retains the v1 `tick,time,seed,room,players,enemies,edits,groves,ma
 World limits are eight players, 64 enemies, 64 groves, 64 combined edits and pending Starfalls, and eight concurrent Starfall warnings. Input expires after 18 ticks (300 ms). Hero movement speed is 5 m/s; enemy speed is 2 m/s. God input may update yaw and tracked poses, but cannot move the authoritative root. Client head and hand poses are local offsets only, each within 2.5 m and a normalized quaternion. Terrain uses the contract's base height and radial smoothstep edit formula.
 
 Run `node tests/simulation.mjs` from `multiplayer/` to check tick timing, replay from JSON checkpoints, input and pose validation, capacity, damage, and respawn. The simulation has no runtime logging; the host should log room lifecycle, checkpoint failures, and fatal errors without recording tokens or raw input.
+
+
+## Combat import (content version 3)
+`combat.js` owns 60Hz arrow/bolt flight, six anatomical parts, bounded embedded and detached pieces, spring-held/drop/throw state, weapon specials and golem armour. `spells.js` is the shared fourteen-spell catalogue. Old content-version2 saves migrate with empty combat arrays; new fields are strictly validated and copied by whitelist.
+
+The host renderer reports actual animated model contacts through `WorldSession.projectileContact`. Peer commands cannot submit projectile damage. Reports must match a recent fixed-step trajectory and plausible part position. The renderer supplies local bone position/rotation and complete visible part bounds. This is trusted-browser-host authority, not anti-cheat against a malicious host. Outgoing20Hz snapshots omit host-only16-sample trajectory histories; recovery checkpoints retain them.
+
+Detached pieces currently behave as individual rigid pieces with spring-held motion and terrain collision bounds; articulated knee/ankle ragdolls are not yet imported. Late join restores detached models from their source resting pose. Ore drops remain collectible resources. CPU stress test: `node tests/combat-performance.mjs`; mesh tests: `node tests/combat-view.mjs`; session boundary: `node tests/combat-session.mjs`.

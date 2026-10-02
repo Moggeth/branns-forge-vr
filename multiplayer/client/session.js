@@ -97,6 +97,16 @@ export class WorldSession extends EventTarget {
     }
     for (const event of result.events || []) this.event(event);
   }
+  projectileContact(hit) {
+    // Geometry contacts originate only in this host's renderer. They never enter
+    // the peer command route, including contacts for arrows fired by a guest.
+    if (!this.running || !this.simulation || !this.identity || this.connection.hostId !== this.identity.peerId)
+      return {ok:false,code:'host_required',events:[]};
+    const result = this.simulation.projectileContact(hit);
+    for (const event of result.events || []) this.event(event);
+    // The normal 20 Hz publication carries the resulting embed/detached state.
+    return result;
+  }
   receive({from,data}) {
     if (!data || data.epoch !== this.connection.epoch) return;
     if (this.simulation && data.kind === 'command' && this.roster().some(p => (p.peerId || p.id) === from)) {
@@ -134,7 +144,9 @@ export class WorldSession extends EventTarget {
     const self = snapshot.players.find(p => p.id === this.identity?.peerId);
     if (self) this.identity.role = self.role;
     this.emit('snapshot',snapshot);
-    this.connection.broadcast({kind:'snapshot',epoch:this.connection.epoch,snapshot});
+    // Exact sweep history is host-only; guests need current flight state, not16 old poses.
+    const wireSnapshot={...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)};
+    this.connection.broadcast({kind:'snapshot',epoch:this.connection.epoch,snapshot:wireSnapshot});
     const now = performance.now();
     if(force || now-this.lastCheckpoint > 500) {
       this.latest = this.simulation.checkpoint();
