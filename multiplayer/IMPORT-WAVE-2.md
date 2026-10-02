@@ -40,3 +40,6 @@ All three commissions verified personal fauxgrady@gmail.com, claude.ai Pro, clea
 - Sonnet claude-sonnet-5-5 impact kit: 136.370 s; integrated exact material/normal events, tested deterministic pools/expiry/disposal and actual golem scene.
 
 Source/metadata retained under work/sonnet-browser-spells-20261002, work/opus-browser-combat-hud-20261002, work/sonnet-browser-impact-kit-20261002 (ignored commission logs); accepted implementation is tracked in client/. Timings logs/work-timing.csv. Local fixture only needs npm run dev, and mobile fixture additionally needs the peer service. Stop only the owned Vite process, never the user's peer/tunnel.
+
+## Published checkpoint
+Production deployment dpl_2kUofacac5mLMbBhpQS4o1t1AJTa is READY at https://branns-forge-multiplayer.vercel.app (build/deploy16.079s). Public same-machine clients joined room56989080 as God/Hero (2of8); God summoned a golem, Hero received gameplay damage, and native Emberwing equipped/rendered on the guest. Diagnostic tabs were then closed. Real separate-network/phone/headset checks remain outstanding. Commits39eaa19,44332c7,e3cd1b7,03ae44b pushed to private origin/main.
