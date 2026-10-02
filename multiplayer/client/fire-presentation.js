@@ -565,7 +565,9 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
       l.position.x += (L.tx - l.position.x) * kp; l.position.y += (L.ty - l.position.y) * kp; l.position.z += (L.tz - l.position.z) * kp;
       l.intensity += (ti - l.intensity) * ki; l.distance += (L.td - l.distance) * ki;
       if (l.intensity < 0.01) { l.intensity = 0; L.on = false; } else L.on = true;
-      l.visible = l.intensity > 0;
+      // Keep the light count stable: visibility changes recompile every lit material.
+      // Zero intensity already extinguishes the light; three non-shadowed lights are our fixed budget.
+      l.visible = true;
     }
   }
   function commit(mesh, geo, buf, withDir) {
