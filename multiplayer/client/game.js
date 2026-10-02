@@ -208,7 +208,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     orchard.groundChanged({edits: snapshot.edits}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
   }
   // Stone/canopy channels follow the world's tree set (seed + groves) and live deposits. A full mask bake measured
-  // 0.3-0.75 s in headless SwiftShader, so it runs only when that set changes (grove cast, deposit depleted), never per chop.
+  // 0.3-0.75 s in headless SwiftShader; ecosystem changes now rebuild in bounded frame slices, never per chop.
   function syncOrchardContent() {
     const trees = worldTrees(snapshot), deposits = Array.isArray(snapshot.deposits) ? snapshot.deposits : null;
     const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.id).join() + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();

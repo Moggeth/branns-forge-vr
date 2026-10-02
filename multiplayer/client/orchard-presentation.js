@@ -84,6 +84,27 @@ export function bakeSurfaceMask(ctx = {}, size = 160, half = GROUND_HALF, out = 
   return out;
 }
 
+// Keep the previous complete texture visible while ecosystem changes rebuild in bounded slices.
+export function createSurfaceMaskJob(ctx, size, half = GROUND_HALF) {
+  const data = new Uint8Array(size * size * 4), step = half * 2 / size;
+  let cursor = 0, cpuMs = 0;
+  return {data, get done() { return cursor === size * size; }, get cpuMs() { return cpuMs; },
+    step(budgetMs = 1.5, maxSamples = 512) {
+      const start = performance.now(), end = Math.min(size * size, cursor + maxSamples);
+      while (cursor < end) {
+        const i = cursor % size, j = Math.floor(cursor / size);
+        const s = surfaceSample(-half + (i + .5) * step, -half + (j + .5) * step, ctx), o = cursor * 4;
+        data[o] = s.wear * 255 + .5; data[o+1] = s.disturbed * 255 + .5;
+        data[o+2] = s.stone * 255 + .5; data[o+3] = s.shade * 255 + .5;
+        cursor++;
+        if (cursor % 16 === 0 && performance.now() - start >= budgetMs) break;
+      }
+      cpuMs += performance.now() - start;
+      return cursor === size * size;
+    },
+  };
+}
+
 // Edit-only rebake: rewrites just the disturbed (G) channel; static wear/stone/shade stay cached.
 export function bakeDisturbedChannel(edits = [], size = 160, half = GROUND_HALF, out) {
   const step = half * 2 / size;
@@ -388,6 +409,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   U.orchardMask.value = mask; owned.push(mask);
   const ctx = {edits, deposits: deposits || ORCHARD_LAYOUT.deposits, trees: trees || ORCHARD_LAYOUT.trees};
   let lastBakeMs = 0, bakes = 0, signature = '', staticSignature = '', lastBakeKind = '';
+  let maskJob = null;
 
   const anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   const setTex = (slot, tex, srgb) => { if (!tex) return; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 1); tex.offset.set(0, 0); tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; tex.anisotropy = anisotropy; tex.needsUpdate = true; const old = U[slot].value; U[slot].value = tex; if (old && old.isDataTexture && old.image?.width === 1) old.dispose(); };
@@ -449,6 +471,14 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     if (sig === signature && !next.force) return false; signature = sig;
     const t0 = performance.now();
     if (staticSig === staticSignature && !next.force) { bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData); lastBakeKind = 'edits'; }
+    else if (bakes) {
+      maskJob = createSurfaceMaskJob({...ctx}, cfg.mask);
+      staticSignature = staticSig; lastBakeKind = 'queued';
+      // Newer ecosystem requests replace unfinished work; edit shading remains immediately responsive.
+      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData);
+      mask.needsUpdate = true; skirt.rebuild();
+      return true;
+    }
     else { bakeSurfaceMask(ctx, cfg.mask, GROUND_HALF, maskData); staticSignature = staticSig; lastBakeKind = 'full'; }
     mask.needsUpdate = true; skirt.rebuild();
     lastBakeMs = performance.now() - t0; bakes++; return true;
@@ -461,6 +491,12 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     if (material.color.getHex() !== 0xffffff) material.color.setHex(0xffffff);
   }
   function update(dt = 0, viewCamera = camera) {
+    if (maskJob && maskJob.step()) {
+      maskData.set(maskJob.data);
+      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData);
+      lastBakeMs = maskJob.cpuMs; lastBakeKind = 'full'; bakes++;
+      mask.needsUpdate = true; maskJob = null;
+    }
     adoptLegacyMaps();
     if (viewCamera) {
       viewCamera.getWorldPosition(camPos); viewCamera.getWorldDirection(camDir);
@@ -487,10 +523,10 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   function stats() {
     const tris = m => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
     return {version: ORCHARD_PRESENTATION_VERSION, quality: q, shaderPatched: report.patched, shaderMissing: report.missing.slice(), maskSize: cfg.mask, maskBakeMs: +lastBakeMs.toFixed(3), maskBakeKind: lastBakeKind, maskBakes: bakes,
-      addedDrawCalls: 3 + (puffs.live() ? 1 : 0), addedTriangles: {sky: tris(sky), skirt: tris(skirt.mesh), backdrop: tris(backdrop)}, shadowMapSize: sun.castShadow ? sun.shadow.mapSize.x : 0, shadowExtent, pendingTextures: pending, puffs: puffs.live()};
+      maskPending: !!maskJob, addedDrawCalls: 3 + (puffs.live() ? 1 : 0), addedTriangles: {sky: tris(sky), skirt: tris(skirt.mesh), backdrop: tris(backdrop)}, shadowMapSize: sun.castShadow ? sun.shadow.mapSize.x : 0, shadowExtent, pendingTextures: pending, puffs: puffs.live()};
   }
   function dispose() {
-    if (disposed) return; disposed = true;
+    if (disposed) return; disposed = true; maskJob = null;
     for (const o of [sky, skirt.mesh, backdrop]) { scene.remove(o); o.geometry.dispose(); if (o.material !== material) o.material.dispose(); }
     puffs.dispose(); if (addedTarget) scene.remove(sun.target);
     for (const u of Object.values(U)) if (u.value?.isTexture && u.value.image?.width === 1) u.value.dispose();

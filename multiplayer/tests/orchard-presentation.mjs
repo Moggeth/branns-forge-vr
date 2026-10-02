@@ -73,11 +73,40 @@ test('budgets: draw calls, triangles, shadow map, mask bake time', () => {
   assert.equal(p.stats().maskBakeKind, 'edits', 'edit-only changes skip the static channels');
   const full = O.bakeSurfaceMask({edits: state.edits}, 192), inc = O.bakeSurfaceMask({edits: []}, 192); O.bakeDisturbedChannel(state.edits, 192, O.GROUND_HALF, inc);
   let maxDiff = 0; for (let i = 0; i < full.length; i++) maxDiff = Math.max(maxDiff, Math.abs(full[i] - inc[i])); assert.ok(maxDiff <= 1, `incremental == full bake (max diff ${maxDiff})`);
-  p.groundChanged({deposits: [{x: 5, z: 5, depleted: true}]}); fullMs = p.stats().maskBakeMs; assert.equal(p.stats().maskBakeKind, 'full');
+  p.groundChanged({deposits: [{x: 5, z: 5, depleted: true}]});
+  assert.equal(p.stats().maskPending, true); assert.equal(p.stats().maskBakeKind, 'queued');
+  for (let i = 0; i < 4096 && p.stats().maskPending; i++) p.update(1 / 60);
+  assert.equal(p.stats().maskPending, false); fullMs = p.stats().maskBakeMs; assert.equal(p.stats().maskBakeKind, 'full');
   assert.ok(median < 120, `median bake ${median} ms`);
   p.dispose();
   return `tris=${JSON.stringify(s.addedTriangles)} drawCalls=${s.addedDrawCalls} mask=${s.maskSize}^2 edit-bake median=${median.toFixed(2)}ms max=${times[6].toFixed(2)}ms full=${fullMs.toFixed(1)}ms (Node, this machine)`;
 });
+
+test('incremental ecosystem bake equals full bake with bounded sample work', () => {
+  const trees = Array.from({length: 535}, (_, i) => ({x: (i * 17 % 110) - 55, z: (i * 31 % 110) - 55}));
+  const ctx = {trees, deposits: [{x: 9, z: 7}], edits: [{x: -12, z: 8, radius: 4, height: -2}]};
+  const job = O.createSurfaceMaskJob(ctx, 192);
+  assert.equal(job.step(Infinity, 16), false);
+  assert.deepEqual(job.data.slice(64), new Uint8Array(job.data.length - 64), 'only requested samples touched');
+  let frames = 1, maxMs = 0;
+  while (!job.done && frames < 4096) { const t = performance.now(); job.step(); maxMs = Math.max(maxMs, performance.now() - t); frames++; }
+  assert.equal(job.done, true); assert.ok(frames >= 72, 'no monolithic runtime bake');
+  assert.deepEqual(job.data, O.bakeSurfaceMask(ctx, 192));
+  return `${frames} slices; max=${maxMs.toFixed(2)}ms totalCPU=${job.cpuMs.toFixed(2)}ms`;
+});
+test('new ecosystem request replaces pending bake and preserves newest terrain edit', () => {
+  const {p, state} = fixture();
+  p.groundChanged({trees: [{x: 2, z: 3}]}); p.update(1/60);
+  const trees = [{x: -20, z: 3}], deposits = [{x: 15, z: 8}];
+  p.groundChanged({trees, deposits});
+  state.edits = [{x: 35, z: 30, radius: 5, height: -3}]; p.groundChanged({edits: state.edits});
+  for (let i = 0; i < 4096 && p.stats().maskPending; i++) p.update(1/60);
+  assert.equal(p.stats().maskPending, false);
+  const mask = p.material.userData.orchardUniforms.orchardMask.value.image.data;
+  assert.deepEqual(mask, O.bakeSurfaceMask({trees, deposits, edits: state.edits}, p.stats().maskSize));
+  p.groundChanged({trees: []}); p.dispose(); assert.equal(p.stats().maskPending, false);
+});
+
 test('low quality: shadows off unless explicitly requested', () => {
   const a = fixture({quality: 'low'}); assert.equal(a.p.stats().shadowMapSize, 0); assert.equal(a.renderer.shadowMap.enabled, false); a.p.dispose();
   const b = fixture({quality: 'low', shadows: true}); assert.equal(b.p.stats().shadowMapSize, 1024); b.p.dispose();
