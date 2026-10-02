@@ -1,0 +1,74 @@
+{
+ "kit": "brann_meteor_geology_kit",
+ "version": 2,
+ "scope": "boulder only (v2 fractured silhouette); meteor and other kit assets unchanged",
+ "units": "metres",
+ "up": "+Y",
+ "front": "-Z",
+ "origin": "bottom centre (rests on y=0)",
+ "runtime_templates": {
+  "meteor": "deposit kind meteor, normalised to 1.5 m tall by world-content-view authored()",
+  "boulder": "deposit kind stone, normalised to 1.2 m tall",
+  "boulder_b": "optional variant of boulder",
+  "boulder_c": "optional variant of boulder"
+ },
+ "materials": [
+  "GeoRock",
+  "GeoInterior",
+  "GeoStarGem",
+  "GeoSeam"
+ ],
+ "textures": {
+  "geo_albedo": 1024,
+  "geo_normal": 512
+ },
+ "assets": {
+  "boulder": {
+   "file_bytes": 663896,
+   "triangles": 5120,
+   "materials": 2,
+   "material_names": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "images": 2,
+   "nodes": [
+    "BoulderMesh",
+    "Grip",
+    "ResourcePivot",
+    "Boulder"
+   ],
+   "extensions_used": [],
+   "bbox_min": [
+    -0.8561,
+    0.0,
+    -0.7886
+   ],
+   "bbox_max": [
+    0.936,
+    1.164,
+    0.7646
+   ],
+   "dimensions": [
+    1.7921,
+    1.164,
+    1.5532
+   ],
+   "lod": false,
+   "stage": 0,
+   "build_s": 0.25,
+   "validation": {
+    "non_manifold_edges": 0,
+    "degenerate_faces": 0,
+    "signed_volume_m3": 1.4822,
+    "shells": 1,
+    "outward_face_fraction": 1.0,
+    "passed": true
+   }
+  }
+ },
+ "timings": {
+  "textures_s": 0.67,
+  "render_s": 26.2
+ }
+}

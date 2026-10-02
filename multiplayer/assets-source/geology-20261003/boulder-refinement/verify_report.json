@@ -1,0 +1,55 @@
+{
+ "all_ok": true,
+ "glb_total_bytes": 663896,
+ "texture_png_bytes": {
+  "geo_albedo.png": 1204007,
+  "geo_normal.png": 675784
+ },
+ "assets": {
+  "boulder": {
+   "file": "boulder.glb",
+   "bytes": 663896,
+   "color0_mean": [
+    0.707,
+    0.679,
+    0.639
+   ],
+   "color0_white_fraction": 0.005,
+   "triangles": 5120,
+   "materials": [
+    "GeoRock",
+    "GeoInterior"
+   ],
+   "nodes": [
+    "BoulderMesh",
+    "Grip",
+    "ResourcePivot",
+    "Boulder"
+   ],
+   "bbox_min": [
+    -0.8561,
+    0.0,
+    -0.7886
+   ],
+   "bbox_max": [
+    0.936,
+    1.164,
+    0.7646
+   ],
+   "open_or_nonmanifold_edges": 0,
+   "inconsistent_winding_edges": 0,
+   "pieces": 1,
+   "min_piece_volume_m3": 1.4822248,
+   "normal_winding_agreement": 1.0,
+   "rays": {
+    "front_face_hits": 96,
+    "back_face_hits": 0,
+    "misses": 0,
+    "max_horizontal_hit_radius_runtime_m": 0.872,
+    "runtime_scale": 1.0309
+   },
+   "ok": true,
+   "fails": []
+  }
+ }
+}
