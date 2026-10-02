@@ -142,3 +142,18 @@ Ready queue after19:40UTC (verify personal subscription/exact Opus5.5 before eac
 3. Visual/performance review should use actual current captures and measured remaining first-use116ms peak; don't regenerate completed trees or rerun all passed acceptance tests merely to consume allowance.
 
 Next independent root work until reset: profile remaining first-use spell/frame peak; validate quick point-cast and menu keyboard focus/modal behavior if evidence warrants; prepare exact isolated inputs for queued commissions. No UI redesign by root while Claude is limited. Stop new commissions22:00UTC, integration22:45UTC, sprint ends23:00UTC.
+
+## Heartbeat 17:52-18:00 UTC — first-cast hitch reduced, LIVE
+
+Live source8e6423e, deployment dpl_31TT4GgXj561D62e4e6zQapW3y42 /o2khd1d0k. Build268ms, full build/deploy11.796s. Public alias verified with actual Starfall click and CPU/frame trace; no page errors and no frames over30ms in that trace. Previous c9a6a5d deployment remains available if rollback needed.
+
+Profiling rather than speculative optimisation:
+- Fresh hosted baseline:191.425ms sampled getProgramInfoLog shader compilation; slow frames75/108.4/191.7/183.2ms.
+- First attempt precompiled only meteor GLB on load: still222.724ms compilation and124.9ms peak. Asset material alone was not the complete cause.
+- Successful change prepares detached spell representatives sharing the actual cached materials and pooled geometry, against the real scene environment/lights via Three.compileAsync(object,camera,targetScene), followed by existing hidden scene shaders. Nothing is added to the world or simulated. Temporary ribbon geometry cleaned on success/failure; post-disposal continuation guarded. Meteor load also prepares its materials before first impact.
+- Local CPU trace: no compilation in top20 costs, no frames over30ms. Independent four-cast Raise/Grove/Sunder/Starfall check:143 pending-ground frames median8.3ms/max24.9ms (13.662s harness), zero errors. Actual hosted fresh-context Starfall trace also no frames over30ms. These are same desktop browser observations, not a universal FPS/HMD/GPUtime claim. Compilation work moves to loading and can still occur before warming finishes.
+- Existing14spell finite-geometry/burst-budget/expiry/disposal suite passed; new mock-compiler test verifies no fake events/particles and cleanup through success/failure. Browser profiles in logs/spell-profile-{1752,1755-meteor,1758-warm,1800-hosted-warm}.json and paired frame files. Harness work/root-gameplay-acceptance-1652/profile-current.mjs; PROFILE_TAG avoids overwriting baseline.
+
+Timing: inspection/fetch2.227s, initial discovery0.211s, local helper starts each10.003s tool wait (Vite ready134ms), code inspection chunks0.137-0.189s, fourcast harness13.662s, compile tests included preceding tool invocation; build/deploy11.796s. Owned foreground QA sessions25245/68532 stopped0.012/0.013s. Original8789/tunnel untouched. All completed code committed/pushedprivateorigin/main. No Claude dispatch; limit until19:40UTC and entire sprint cutoff23:00UTC remain.
+
+Next useful root queue: recovery-selector and material-audio isolated inputs ready for Opus after19:40 (do not commission early); remaining menu keyboard focus and quick point-cast acceptance; inspect current unfinished import/backlog for genuinely useful next milestone, avoiding repeated passed tests or cosmetic code changes. Current tree/fire/Expedition integration remains preserved. No need to resume obsolete presentation-finish copied baseline: its useful retained output is already integrated and independently repaired in main.
