@@ -15,13 +15,13 @@ export function terrainHeight(x, z, edits = []) {
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
-  let snapshot = { players: [], enemies: [], edits: [], groves: [] };
+  let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
   let yaw = 0, pitch = 0, jumpPending = false, verticalSpeed = 0, grounded = true;
   let previous = performance.now(), sentAt = -Infinity, snapshotAt = 0, initialized = false, swingAt = -Infinity;
   let terrainSignature = '', groveSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38;
   let zeroInputTimer = null;
   let axeModel = null;
-  const keys = new Set(), removers = [], actors = new Map(), trees = new Map(), templates = new Map();
+  const keys = new Set(), removers = [], actors = new Map(), trees = new Map(), templates = new Map(), warnings = new Map();
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3();
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
   const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster(), hitPoint = new THREE.Vector3();
@@ -53,6 +53,26 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   cursor.rotation.x = -Math.PI / 2;
   cursor.visible = false;
   scene.add(cursor);
+  // The power anchor is a physical strike target at the authoritative shrine point.
+  const shrine = new THREE.Group();
+  const shrineBase = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.92, 0.42, 12),
+    new THREE.MeshStandardMaterial({ color: 0x554b65, metalness: 0.35, roughness: 0.6 }));
+  shrineBase.position.y = 0.21;
+  shrine.add(shrineBase);
+  const shrineCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.48),
+    new THREE.MeshStandardMaterial({ color: 0x69dddb, emissive: 0x2a8c98, emissiveIntensity: 1.2, metalness: 0.35 }));
+  shrineCore.position.y = 1.2;
+  shrine.add(shrineCore);
+  const shrineBarBack = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.11, 0.055),
+    new THREE.MeshBasicMaterial({ color: 0x292330, depthTest: false }));
+  shrineBarBack.position.set(0, 2.05, 0);
+  shrine.add(shrineBarBack);
+  const shrineBar = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.075, 0.065),
+    new THREE.MeshBasicMaterial({ color: 0x7bf2cd, depthTest: false }));
+  shrineBar.position.set(0, 2.05, 0.005);
+  shrine.add(shrineBar);
+  shrine.visible = false;
+  scene.add(shrine);
   const weaponAnchor = new THREE.Group();
   weaponAnchor.position.set(0.33, -0.38, -0.48);
   weaponAnchor.rotation.set(-0.2, -0.45, 0.12);
@@ -256,6 +276,57 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const ids = new Set(points.map(point => point.id));
     for (const [id, tree] of trees) if (!ids.has(id)) { scene.remove(tree); trees.delete(id); }
   }
+  function syncWorldSignals() {
+    const anchor = snapshot.shrine;
+    shrine.visible = !!anchor;
+    if (anchor) {
+      shrine.position.set(anchor.position[0], terrainHeight(anchor.position[0], anchor.position[2], snapshot.edits), anchor.position[2]);
+      const health = THREE.MathUtils.clamp(anchor.hp / Math.max(1, anchor.maxHp), 0, 1);
+      shrineBar.scale.x = Math.max(0.001, health);
+      shrineBar.position.x = -(1 - health) * 0.51;
+      shrineBar.material.color.setHex(health ? 0x7bf2cd : 0xf17b6f);
+      shrineCore.material.color.setHex(health ? 0x69dddb : 0x766071);
+      shrineCore.material.emissive.setHex(health ? 0x2a8c98 : 0x4b1828);
+      shrineCore.scale.setScalar(health ? 1 : 0.68);
+    }
+    const present = new Set();
+    for (const pending of snapshot.pendingStarfalls) {
+      present.add(pending.id);
+      let warning = warnings.get(pending.id);
+      if (!warning) {
+        const group = new THREE.Group();
+        const ring = new THREE.LineLoop(new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: 0xff5d48, transparent: true, opacity: 0.95, depthTest: false }));
+        const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 64),
+          new THREE.MeshBasicMaterial({ color: 0xe84d40, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
+        fill.rotation.x = -Math.PI / 2;
+        group.add(fill, ring);
+        scene.add(group);
+        warning = { group, ring, fill, lastTerrain: '' };
+        warnings.set(pending.id, warning);
+      }
+      const terrain = JSON.stringify(snapshot.edits);
+      if (warning.x !== pending.x || warning.z !== pending.z || warning.radius !== pending.radius || warning.lastTerrain !== terrain) {
+        warning.x = pending.x; warning.z = pending.z; warning.radius = pending.radius; warning.lastTerrain = terrain;
+        const vertices = [];
+        for (let i = 0; i < 64; i++) {
+          const angle = i * Math.PI * 2 / 64;
+          const x = pending.x + Math.cos(angle) * pending.radius, z = pending.z + Math.sin(angle) * pending.radius;
+          vertices.push(x - pending.x, terrainHeight(x, z, snapshot.edits) + 0.14, z - pending.z);
+        }
+        warning.ring.geometry.dispose();
+        warning.ring.geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        warning.fill.geometry.dispose();
+        warning.fill.geometry = new THREE.CircleGeometry(pending.radius, 64);
+      }
+      warning.group.position.set(pending.x, 0, pending.z);
+      warning.fill.position.y = terrainHeight(pending.x, pending.z, snapshot.edits) + 0.10;
+      warning.impactTick = pending.impactTick;
+    }
+    for (const [id, warning] of warnings) if (!present.has(id)) {
+      scene.remove(warning.group); disposeResources(warning.group); warnings.delete(id);
+    }
+  }
   const loader = new GLTFLoader();
   for (const name of ['tree', 'skeleton', 'axe']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
@@ -308,6 +379,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
+    if (role === 'god' && !event.repeat) {
+      const quickSpell = {Digit1: 'skeleton', Digit2: 'raise', Digit3: 'grove', Digit4: 'starfall'}[event.code];
+      if (quickSpell) { spell = quickSpell; report(`God spell: ${quickSpell}. Click the ground to cast.`); }
+    }
   });
   listen(window, 'keyup', event => keys.delete(event.code));
   listen(window, 'blur', clearInput);
@@ -430,6 +505,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
     }
     for (const mixer of mixers) mixer.update(dt);
+    const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
+    for (const warning of warnings.values()) {
+      const remaining = Math.max(0, warning.impactTick - estimatedTick);
+      const urgency = 1 - Math.min(1, remaining / 48);
+      warning.ring.material.opacity = 0.65 + 0.35 * Math.sin(now * (0.011 + urgency * 0.018)) ** 2;
+      warning.fill.material.opacity = 0.12 + urgency * 0.18;
+    }
+    if (shrine.visible) {
+      shrineBarBack.quaternion.copy(camera.getWorldQuaternion(poseQuaternion));
+      shrineBar.quaternion.copy(shrineBarBack.quaternion);
+      shrineCore.rotation.y += dt * 0.7;
+    }
     renderer.render(scene, camera);
   }
   function disposeResources(root) {
@@ -447,7 +534,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   return {
     applySnapshot(next, id) {
       if (disposed) return;
-      snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [] };
+      snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
       playerId = id; snapshotAt = performance.now();
       const self = snapshot.players.find(player => player.id === playerId);
       if (self) {
@@ -460,7 +547,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         // Grounded height follows the same live terrain function as the server.
         if (grounded) localPosition.y = authoritative.y;
       }
-      rebuildGround(); syncActors(); syncTrees();
+      rebuildGround(); syncActors(); syncTrees(); syncWorldSignals();
       for (const tree of trees.values()) tree.position.y = terrainHeight(tree.position.x, tree.position.z, snapshot.edits);
     },
     setRole(next) {
@@ -493,7 +580,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       mixers.forEach(mixer => mixer.stopAllAction());
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
-      renderer.dispose(); actors.clear(); trees.clear(); templates.clear(); controllerSources.clear();
+      renderer.dispose(); actors.clear(); trees.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
     },
   };
 }
