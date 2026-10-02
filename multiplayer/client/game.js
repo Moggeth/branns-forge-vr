@@ -91,7 +91,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // World-space orchard ground/sky/lighting. It owns the meadow textures (no separate loader) and reads the same
   // authoritative surface as the ground mesh; it never changes heights, collision or raycast targets.
   const orchard = createOrchardPresentation({scene, renderer, ground, sun, camera, height: (x, z) => terrainHeight(x, z, snapshot.edits),
-    quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
+    baseHeight: (x,z) => terrainHeight(x,z,[]), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
   let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;

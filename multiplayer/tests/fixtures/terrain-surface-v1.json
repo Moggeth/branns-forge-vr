@@ -1,0 +1,36 @@
+{
+  "mask": "a538cf2bd088e1c12fa9deb10ffa9cd851a124192ccbffe1c12315eee44ec698",
+  "disturbed": "00b7a111ac40bd3775d6dad7648a6f7d043f1ec205bce341a9585e6dfadba41c",
+  "classification": {
+    "material": "stone",
+    "slope": 0.23742883746511656,
+    "dry": 1,
+    "wear": 0,
+    "disturbed": 1,
+    "stone": 0,
+    "shade": 0,
+    "tint": [
+      0.55,
+      0.53,
+      0.5
+    ]
+  },
+  "exports": [
+    "DAYLIGHT",
+    "GROUND_HALF",
+    "ORCHARD_LAYOUT",
+    "ORCHARD_PRESENTATION_VERSION",
+    "SHADER_ANCHORS",
+    "WALK_BOUND",
+    "bakeDisturbedChannel",
+    "bakeSurfaceMask",
+    "classifySurface",
+    "createOrchardGroundMaterial",
+    "createOrchardPresentation",
+    "createSurfaceMaskJob",
+    "dryness",
+    "hash2",
+    "surfaceSample",
+    "valueNoise"
+  ]
+}

@@ -2,9 +2,12 @@
 // hazy sky, far-only silhouette backdrop and a fixed-budget follow shadow.
 // Presentation only: never changes terrain height, collision, raycast targets or gameplay.
 // World height is always the caller's authoritative height(x, z) function.
+// v2: strata/wet-floor/ejecta on freshly deformed ground from a bounded, presentation-only deformation field,
+// plus authored bank/edge breakup and planar bedrock for exposed stone. No extra draws, lights or geometry.
 import * as THREE from 'three';
+import {createDeformationField} from './terrain-deformation-field.js';
 
-export const ORCHARD_PRESENTATION_VERSION = 1;
+export const ORCHARD_PRESENTATION_VERSION = 2;
 export const WALK_BOUND = 55;
 export const GROUND_HALF = 60;
 
@@ -29,7 +32,10 @@ export const DAYLIGHT = Object.freeze({
   noon: {sun: 0xfff1d6, sunI: 3.0, elev: 58, azim: -140, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5},
   dusk: {sun: 0xff9a5c, sunI: 2.1, elev: 9, azim: -105, hemiSky: 0x9aa3c0, hemiGround: 0x4f3d2c, hemiI: .75, zenith: 0x4f6390, horizon: 0xf2a877, haze: 0xd99b78, hill: 0x4e4f5e, exposure: 1.08, env: .3},
 });
-const QUALITY = {high: {mask: 192, shadow: 1024, detail: 2}, medium: {mask: 160, shadow: 1024, detail: 2}, low: {mask: 128, shadow: 0, detail: 1}};
+// strata: 0 off, 1 single-axis strata + soil floors, 2 triplanar strata + planar bedrock. deform = field texels per side.
+const QUALITY = {high: {mask: 192, shadow: 1024, detail: 2, strata: 2, deform: 384}, medium: {mask: 160, shadow: 1024, detail: 2, strata: 2, deform: 256}, low: {mask: 128, shadow: 0, detail: 1, strata: 1, deform: 192}};
+export const TERRAIN_FEATURES = Object.freeze({strata: 1, wet: 1, ejecta: 1, edges: 1});
+export const DEFORM_JOB_BUDGET_MS = 1.5; // shared by mask + deformation jobs per frame
 
 // ---------- deterministic noise (identical integer hash in JS and GLSL) ----------
 export function hash2(ix, iz) {
@@ -145,6 +151,8 @@ uniform sampler2D orchardGrassMap, orchardGrassNormal, orchardGrassOrm, orchardS
 uniform vec4 orchardMaskRect;
 uniform vec3 orchardDryTint, orchardLushTint, orchardWornTint, orchardStoneTint;
 uniform float orchardGrassTile, orchardSoilTile, orchardNormalStrength;
+uniform sampler2D orchardStrataMap, orchardStrataNormal, orchardDeform;
+uniform vec4 orchardFeatures; // strata, wet, ejecta, edges (0..1)
 varying vec3 vOrchardWorld;
 varying vec3 vOrchardNormal;
 ${GLSL_NOISE}
@@ -162,9 +170,9 @@ vec4 oMask = texture2D(orchardMask, clamp(oMaskUv + oWarp * 0.35 * orchardMaskRe
 const mat2 oRot = mat2(0.8, -0.6, 0.6, 0.8);
 vec2 oUvA = oXZ * vec2(1.0, -1.0) / orchardGrassTile;
 vec2 oUvB = oRot * (oXZ * vec2(1.0, -1.0)) / (orchardGrassTile * 2.63) + 0.37;
-vec4 oGA = texture2D(orchardGrassMap, oUvA);
+vec4 oGA = texture2D(orchardGrassMap, oUvA, 0.7); // v3: slight mip bias softens per-blade speckle
 #if ORCHARD_DETAIL > 1
-vec4 oGB = texture2D(orchardGrassMap, oUvB);
+vec4 oGB = texture2D(orchardGrassMap, oUvB, 0.7);
 float oAB = clamp((orchardNoise(oXZ * 0.085) - 0.5) * 3.0 + (dot(oGB.rgb, vec3(0.33)) - dot(oGA.rgb, vec3(0.33))) * 4.0 + 0.5, 0.0, 1.0);
 #else
 vec4 oGB = oGA; float oAB = 0.0;
@@ -173,14 +181,14 @@ vec3 oGrass = mix(oGA.rgb, oGB.rgb, oAB);
 // Tile-average (linear) of meadow_albedo; compress its baked blotches more with distance so RTS views show
 // macro drifts instead of a repeating 3 m pattern. Near the feet the texture keeps most of its detail.
 const vec3 oGrassAvg = vec3(0.069, 0.150, 0.015);
-oGrass = oGrassAvg + (oGrass - oGrassAvg) * mix(0.7, 0.32, smoothstep(10.0, 55.0, oDist));
+oGrass = oGrassAvg + (oGrass - oGrassAvg) * mix(0.5, 0.26, smoothstep(6.0, 45.0, oDist)); // v3: tamer fine stipple
 float oL = dot(oGrass, vec3(0.2126, 0.7152, 0.0722));
 float oDry = orchardDry(oXZ);
 float oMacro = orchardNoise(oXZ * 0.018 + 3.0);
 // Warm grade: lush pockets under canopies, straw-gold in dry drifts; luminance-preserving tints.
 oGrass = mix(oGrass * orchardLushTint, oL * orchardDryTint, oDry * 0.62);
 oGrass *= mix(vec3(1.0), vec3(0.72, 0.85, 0.6), oMask.a * 0.6);
-oGrass *= 0.9 + 0.2 * oMacro;
+oGrass *= 0.84 + 0.3 * oMacro + 0.14 * (orchardNoise(oXZ * 0.055 - 7.0) - 0.5); // v3: broad colour drift carries variation
 // Trampled fringe: shorter, paler grass around wear before bare earth appears.
 oGrass = mix(oGrass, oL * orchardWornTint * 1.25, smoothstep(0.08, 0.45, oMask.r) * 0.55);
 vec2 oUvS = oXZ * vec2(1.0, -1.0) / orchardSoilTile;
@@ -188,55 +196,132 @@ vec3 oSoil = texture2D(orchardSoilMap, oUvS).rgb;
 vec4 oSoilN = texture2D(orchardSoilNormal, oUvS);
 vec4 oStoneN = texture2D(orchardSoilNormal, oUvS * 0.43 + 0.21);
 vec3 oStone = texture2D(orchardSoilMap, oUvS * 0.43 + 0.21).rgb;
-oStone = mix(vec3(dot(oStone, vec3(0.33))), oStone, 0.35) * orchardStoneTint * (0.75 + 0.5 * oStoneN.b);
+oStone = mix(vec3(dot(oStone, vec3(0.33))), oStone, 0.45) * orchardStoneTint * (0.72 + 0.3 * oStoneN.b); // v3: less pale, less speckled
 vec3 oDisturbedSoil = oSoil * vec3(0.72, 0.62, 0.52);
 // Height-aware layer weights: grass clumps (bright texels) poke through path edges; pebbles poke through grass.
 float oGrassH = oL * 3.0;
-float oSoilW = smoothstep(0.35, 0.8, oMask.r + (oSoilN.b - oGrassH) * 0.35 + (oWarp.x * 0.25));
+// Edge breakup (v2): a mid-frequency fray so path/bank borders bite into the turf in lobes, not a soft noise halo.
+float oFray = (orchardNoise(oXZ * 3.1 + 7.1) - 0.5) * 0.7 + (orchardNoise(oXZ * 9.7 - 2.3) - 0.5) * 0.3;
+float oSoilW = smoothstep(0.35, 0.8, oMask.r + (oSoilN.b - oGrassH) * 0.35 + (oWarp.x * 0.25) + oFray * 0.3 * orchardFeatures.w);
 oSoilW = max(oSoilW, smoothstep(0.06, 0.14, oSlope + (oSoilN.b - 0.5) * 0.06));
-float oDistW = smoothstep(0.25, 0.65, oMask.g + (oSoilN.b - 0.5) * 0.4);
+float oDistW = smoothstep(0.25, 0.65, oMask.g + (oSoilN.b - 0.5) * 0.4 + oFray * 0.25 * orchardFeatures.w);
 float oStoneW = max(smoothstep(0.35, 0.7, oMask.b + (oStoneN.b - 0.5) * 0.7), smoothstep(0.16, 0.26, oSlope + (oStoneN.b - 0.5) * 0.08));
 vec3 oAlbedo = mix(oGrass, oSoil, oSoilW);
 oAlbedo = mix(oAlbedo, oDisturbedSoil, oDistW);
-oAlbedo = mix(oAlbedo, oStone, oStoneW);
+// Turf lip: soil darkens where it meets grass (root shadow/overhang), selling a shallow bank rather than a decal.
+oAlbedo *= 1.0 - 0.22 * orchardFeatures.w * oSoilW * (1.0 - oSoilW) * 4.0 * (1.0 - oStoneW);
+vec3 oStrataPert = vec3(0.0);
+float oDef = 0.0, oFaceW = 0.0, oFloorW = 0.0, oWet = 0.0, oPuddle = 0.0, oEject = 0.0, oRockW = 0.0, oStrataRough = 0.9;
+#if ORCHARD_STRATA > 0
+// ---- freshly deformed ground: strata faces, churned floors, wet hollows, thrown soil ----
+vec4 oDf = texture2D(orchardDeform, clamp(oMaskUv, 0.0, 1.0)) * oInside; // R base, G displacement, B raise peak, A ejecta
+oDef = smoothstep(0.025, 0.16, abs(oDf.g));
+// Depth below the undeformed surface, exact on the rendered mesh (base is smooth, world Y is per-fragment).
+float oCutDepth = oDf.r - vOrchardWorld.y;
+// Raised ground: flanks expose the core by distance below the crest, compressed so mounds read loam/subsoil with rock only low on steep walls.
+float oDepth = oDf.g < 0.0 ? oCutDepth : (oDf.b - (vOrchardWorld.y - oDf.r)) * 0.7;
+float oSD = max(0.015, oDepth + (orchardNoise(oXZ * 0.9 + 3.3) - 0.5) * 0.16 + (orchardNoise(oXZ * 3.7) - 0.5) * 0.05);
+float oV = oSD < 1.6 ? oSD / 3.2 : 0.5 + fract((oSD - 1.6) / 1.6) * 0.5;
+vec2 oSDd = vec2(dFdx(oSD), dFdy(oSD)) / 3.2;
+vec2 oXd = dFdx(oXZ) * 0.25, oYd = dFdy(oXZ) * 0.25;
+// Planar bedrock (periodic lower half of the kit), rotated + warped so floors/outcrops never show the 4 x 1.6 m grid.
+vec2 oRP = oRot * oXZ + oWarp * 0.9;
+vec2 oUvR = vec2(oRP.x * 0.25, 0.5 - fract(oRP.y / 1.6) * 0.5);
+vec2 oRx = vec2(dFdx(oRP.x) * 0.25, -dFdx(oRP.y) / 3.2), oRy = vec2(dFdy(oRP.x) * 0.25, -dFdy(oRP.y) / 3.2);
+if (oDef > 0.001) {
+  vec2 oW2 = pow(abs(oN.xz) + 1e-4, vec2(4.0)); oW2 /= oW2.x + oW2.y;
+#if ORCHARD_STRATA > 1
+  vec2 oUvX = vec2(oXZ.y * 0.25, 1.0 - oV), oUvZ = vec2(oXZ.x * 0.25 + 0.31, 1.0 - oV);
+  vec3 oCx = textureGrad(orchardStrataMap, oUvX, vec2(oXd.y, -oSDd.x), vec2(oYd.y, -oSDd.y)).rgb;
+  vec3 oCz = textureGrad(orchardStrataMap, oUvZ, vec2(oXd.x, -oSDd.x), vec2(oYd.x, -oSDd.y)).rgb;
+  vec3 oNx = textureGrad(orchardStrataNormal, oUvX, vec2(oXd.y, -oSDd.x), vec2(oYd.y, -oSDd.y)).rgb;
+  vec3 oNz = textureGrad(orchardStrataNormal, oUvZ, vec2(oXd.x, -oSDd.x), vec2(oYd.x, -oSDd.y)).rgb;
+  vec3 oFaceCol = oCx * oW2.x + oCz * oW2.y; float oFaceH = oNx.b * oW2.x + oNz.b * oW2.y;
+  vec3 oFacePert = oW2.x * vec3(0.0, oNx.g * 2.0 - 1.0, oNx.r * 2.0 - 1.0) + oW2.y * vec3(oNz.r * 2.0 - 1.0, oNz.g * 2.0 - 1.0, 0.0);
+#else
+  bool oAxisX = abs(oN.x) > abs(oN.z);
+  vec2 oUv1 = vec2((oAxisX ? oXZ.y : oXZ.x) * 0.25, 1.0 - oV), oG1 = vec2(oAxisX ? oXd.y : oXd.x, -oSDd.x), oG2 = vec2(oAxisX ? oYd.y : oYd.x, -oSDd.y);
+  vec3 oFaceCol = textureGrad(orchardStrataMap, oUv1, oG1, oG2).rgb; vec3 oN1 = textureGrad(orchardStrataNormal, oUv1, oG1, oG2).rgb; float oFaceH = oN1.b;
+  vec3 oFacePert = oAxisX ? vec3(0.0, oN1.g * 2.0 - 1.0, oN1.r * 2.0 - 1.0) : vec3(oN1.r * 2.0 - 1.0, oN1.g * 2.0 - 1.0, 0.0);
+#endif
+  // Faces: strata appear where the cut/raise is steep; hard horizons (high texel height) hold steeper than loam.
+  float oSod = oDf.g > 0.0 ? smoothstep(0.5, 0.68, orchardNoise(oXZ * 1.6 + 4.0) + 0.45 * (1.0 - smoothstep(0.04, 0.16, oSlope)) - oDepth * 0.15) : 0.0;
+  oFaceW = orchardFeatures.x * oDef * smoothstep(0.035, 0.12, oSlope + (oFaceH - 0.5) * 0.06 + oFray * 0.05) * (1.0 - oSod);
+  // Floors of cuts: horizon colour (blurred strata row) carried by the soil micro-texture; bedrock when deep.
+  vec3 oLayer = textureLod(orchardStrataMap, vec2(0.37, 1.0 - oV), 5.0).rgb;
+  vec3 oFloorCol = oLayer * oSoil * vec3(4.2, 7.4, 15.0) * 0.62; // v3: floor horizons sit with the walls, no pale clay ring
+#if ORCHARD_STRATA > 1
+  vec3 oRockC = textureGrad(orchardStrataMap, oUvR, oRx, oRy).rgb; vec3 oRockN = textureGrad(orchardStrataNormal, oUvR, oRx, oRy).rgb;
+#else
+  vec3 oRockC = oStone; vec3 oRockN = vec3(oStoneN.rg, oStoneN.b);
+#endif
+  oRockW = smoothstep(1.35, 1.75, oCutDepth + (oRockN.b - 0.5) * 0.5) * step(oDf.g, 0.0);
+  oFloorCol = mix(oFloorCol, oRockC * vec3(0.76, 0.74, 0.72), oRockW); // v3: bedrock floor no longer a pale glowing disc
+  oFloorW = orchardFeatures.x * oDef * step(oDf.g, 0.0) * smoothstep(0.08, 0.3, oCutDepth + oFray * 0.1) * (1.0 - oFaceW);
+  vec3 oStrataCol = mix(oFaceCol, oFloorCol, oFloorW / max(1e-3, oFaceW + oFloorW));
+  oAlbedo = mix(oAlbedo, oStrataCol, clamp(oFaceW + oFloorW, 0.0, 1.0));
+  oStrataPert = oFaceW * oFacePert * 0.85 +oFloorW * oRockW * vec3(oRockN.r * 2.0 - 1.0, 0.0, oRockN.g * 2.0 - 1.0);
+  oStrataRough = mix(mix(0.94, 0.88, smoothstep(0.45, 0.65, oSD)), mix(0.78, 0.66, smoothstep(1.3, 1.7, oSD)), smoothstep(0.95, 1.15, oSD));
+  // Water gathers on flat cut floors; deepest flats pond into small glossy puddles (no extra lights or draws).
+  oWet = orchardFeatures.y * oDef * step(oDf.g, 0.0) * smoothstep(0.18, 0.8, oCutDepth) * smoothstep(0.9, 0.99, oN.y);
+  oPuddle = oWet * smoothstep(0.6, 0.78, orchardNoise(oXZ * 0.7 + 9.0) * 0.6 + oSoilN.b * 0.25 + (oCutDepth - 1.0) * 0.35) * smoothstep(0.975, 0.997, oN.y);
+  oAlbedo *= mix(1.0, 0.52, oWet) * mix(1.0, 0.55, oPuddle);
+}
+// Thrown soil outside cuts: clods biased by soil height so they read as lumps, plus a darkened, flattened grass ring.
+oEject = orchardFeatures.z * oDf.a * smoothstep(0.42, 0.62, orchardNoise(oXZ * 2.6 + 1.0) * 0.55 + oSoilN.b * 0.55 - (1.0 - oDf.a) * 0.3);
+oAlbedo = mix(oAlbedo * mix(1.0, 0.78, orchardFeatures.z * oDf.a), oDisturbedSoil * (0.55 + 0.6 * oSoilN.b), oEject);
+#endif
+// Exposed stone: planar bedrock from the strata kit breaks the soil-texture-as-stone look on outcrops/steep slopes.
+#if ORCHARD_STRATA > 1
+if (oStoneW > 0.001) { vec3 oBed = textureGrad(orchardStrataMap, oUvR, oRx, oRy).rgb; oStone = mix(oStone, oBed * vec3(1.02, 1.0, 0.97), 0.55); }
+#endif
+oAlbedo = mix(oAlbedo, oStone, oStoneW * (1.0 - oFaceW - oFloorW * 0.8));
 vec4 oOrm = texture2D(orchardGrassOrm, oUvA);
-float oBare = max(max(oSoilW, oDistW), oStoneW);
-oAlbedo *= mix(mix(1.0, oOrm.r, 0.55), 0.8 + 0.4 * oSoilN.b, oBare);
+float oBare = max(max(max(oSoilW, oDistW), oStoneW), oFaceW + oFloorW);
+oAlbedo *= mix(mix(1.0, oOrm.r, 0.28), 0.88 + 0.24 * oSoilN.b, max(max(oSoilW, oDistW), oStoneW) * (1.0 - oFaceW - oFloorW));
 diffuseColor.rgb *= oAlbedo;
 `;
 const FRAG_ROUGH = /* glsl */`
 float roughnessFactor = roughness * mix(oOrm.g, mix(0.96, 0.84, oDistW), oSoilW) ;
-roughnessFactor = mix(roughnessFactor, 0.72, oStoneW);
+roughnessFactor = mix(roughnessFactor, 0.82, oStoneW);
+roughnessFactor = max(roughnessFactor, 0.86); // v3: matte dry ground kills grazing-sun glitter
+roughnessFactor = mix(roughnessFactor, oStrataRough, clamp(oFaceW + oFloorW, 0.0, 1.0));
+roughnessFactor = mix(roughnessFactor, 0.55, oWet); // v3: damp sheen, not a grazing glare strip
+roughnessFactor = mix(roughnessFactor, 0.07, oPuddle);
 `;
 const FRAG_NORMAL = /* glsl */`
 {
-  vec3 oNA = texture2D(orchardGrassNormal, oUvA).xyz * 2.0 - 1.0;
+  vec3 oNA = texture2D(orchardGrassNormal, oUvA, 1.0).xyz * 2.0 - 1.0; // v3: +1 mip bias = softer blade relief
 #if ORCHARD_DETAIL > 1
-  vec3 oNB = texture2D(orchardGrassNormal, oUvB).xyz * 2.0 - 1.0;
+  vec3 oNB = texture2D(orchardGrassNormal, oUvB, 1.0).xyz * 2.0 - 1.0;
   oNB.xy = oNB.xy * oRot; // undo the UV rotation so the perturbation stays world-aligned
   vec3 oNG = normalize(mix(oNA, oNB, oAB));
 #else
   vec3 oNG = oNA;
 #endif
-  vec3 oNS = vec3(oSoilN.xy * 2.0 - 1.0, 0.0); oNS.z = sqrt(max(0.0, 1.0 - dot(oNS.xy, oNS.xy)));
-  vec3 oNT = vec3(oStoneN.xy * 2.0 - 1.0, 0.0); oNT.z = sqrt(max(0.0, 1.0 - dot(oNT.xy, oNT.xy)));
-  vec3 oTn = normalize(mix(mix(oNG * vec3(0.6, 0.6, 1.0), oNS, oSoilW), oNT * vec3(1.4, 1.4, 1.0), oStoneW));
+  vec3 oNS = vec3((oSoilN.xy * 2.0 - 1.0) * 0.5, 0.0); oNS.z = sqrt(max(0.0, 1.0 - dot(oNS.xy, oNS.xy)));
+  vec3 oNT = vec3((oStoneN.xy * 2.0 - 1.0) * 0.6, 0.0); oNT.z = sqrt(max(0.0, 1.0 - dot(oNT.xy, oNT.xy)));
+  vec3 oTn = normalize(mix(mix(oNG * vec3(0.3, 0.3, 1.0), oNS, oSoilW), oNT, oStoneW));
   // Fade micro relief with distance (anti-shimmer for RTS/VR) without moving with the camera.
-  oTn.xy *= orchardNormalStrength * mix(1.0, 0.35, smoothstep(18.0, 70.0, oDist));
+  oTn.xy *= orchardNormalStrength * mix(1.0, 0.25, smoothstep(6.0, 40.0, oDist));
   vec3 oT = normalize(vec3(1.0, 0.0, 0.0) - oN * oN.x);
   vec3 oB = cross(oN, oT);
   vec3 oPW = normalize(oT * oTn.x + oB * oTn.y + oN * oTn.z);
+  // Strata relief (world-space, already tangent to the projected face); puddles flatten to the mesh normal.
+  float oFade = mix(0.75, 0.3, smoothstep(8.0, 45.0, oDist));
+  oPW = normalize(mix(oPW, oN, clamp(oFaceW + oFloorW * oRockW, 0.0, 1.0) * 0.85) + oStrataPert * orchardNormalStrength * oFade);
+  oPW = normalize(mix(oPW, oN, oPuddle));
   normal = normalize((viewMatrix * vec4(oPW, 0.0)).xyz);
 }
 `;
 
-function patchShader(shader, detail, report) {
+function patchShader(shader, detail, report, strata = 0) {
   const v = shader.vertexShader, f = shader.fragmentShader;
   report.missing = [...SHADER_ANCHORS.vertex.filter(a => !v.includes(a)), ...SHADER_ANCHORS.fragment.filter(a => !f.includes(a))];
   if (report.missing.length) { report.patched = false; return shader; } // leave stock material rather than produce a broken program
   shader.vertexShader = v.replace('#include <common>', '#include <common>\nvarying vec3 vOrchardWorld;\nvarying vec3 vOrchardNormal;')
     .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvOrchardWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvOrchardNormal = normalize(mat3(modelMatrix) * objectNormal);');
-  shader.fragmentShader = `#define ORCHARD_DETAIL ${detail}\n` + f.replace('#include <common>', '#include <common>\n' + FRAG_PARS)
+  shader.fragmentShader = `#define ORCHARD_DETAIL ${detail}\n#define ORCHARD_STRATA ${strata}\n` + f.replace('#include <common>', '#include <common>\n' + FRAG_PARS)
     .replace('#include <map_fragment>', FRAG_ALBEDO).replace('#include <roughnessmap_fragment>', FRAG_ROUGH).replace('#include <normal_fragment_maps>', FRAG_NORMAL);
   report.patched = true;
   return shader;
@@ -248,8 +333,9 @@ function flatTexture(rgb, colorSpace = THREE.NoColorSpace) {
 }
 
 // Ground material. Uses custom uniforms (not .map) so stock UV-repeat textures cannot double-apply.
-export function createOrchardGroundMaterial({quality = 'high', report = {}} = {}) {
-  const detail = (QUALITY[quality] || QUALITY.high).detail;
+export function createOrchardGroundMaterial({quality = 'high', report = {}, strata} = {}) {
+  const detail = (QUALITY[quality] || QUALITY.high).detail, strataLevel = strata ?? (QUALITY[quality] || QUALITY.high).strata;
+  const deformBlank = new THREE.DataTexture(new Uint16Array(4), 1, 1, THREE.RGBAFormat, THREE.HalfFloatType); deformBlank.needsUpdate = true;
   const material = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1, metalness: 0});
   const uniforms = {
     orchardGrassMap: {value: flatTexture([74, 108, 32], THREE.SRGBColorSpace)},
@@ -264,9 +350,14 @@ export function createOrchardGroundMaterial({quality = 'high', report = {}} = {}
     orchardWornTint: {value: new THREE.Vector3(1.25, 1.05, .62)},
     orchardStoneTint: {value: new THREE.Vector3(.95, .93, .9)},
     orchardGrassTile: {value: 3.0}, orchardSoilTile: {value: 2.2}, orchardNormalStrength: {value: 1.0},
+    orchardStrataMap: {value: flatTexture([96, 70, 46], THREE.SRGBColorSpace)},
+    orchardStrataNormal: {value: flatTexture([128, 128, 128])},
+    orchardDeform: {value: deformBlank},
+    orchardFeatures: {value: new THREE.Vector4(TERRAIN_FEATURES.strata, TERRAIN_FEATURES.wet, TERRAIN_FEATURES.ejecta, TERRAIN_FEATURES.edges)},
   };
-  material.onBeforeCompile = shader => { Object.assign(shader.uniforms, uniforms); patchShader(shader, detail, report); };
-  material.customProgramCacheKey = () => `orchard-ground-v${ORCHARD_PRESENTATION_VERSION}-d${detail}`;
+  material.onBeforeCompile = shader => { Object.assign(shader.uniforms, uniforms); patchShader(shader, detail, report, strataLevel); };
+  material.customProgramCacheKey = () => `orchard-ground-v${ORCHARD_PRESENTATION_VERSION}-d${detail}-s${strataLevel}`;
+  material.userData.orchardStrata = strataLevel;
   material.userData.orchardUniforms = uniforms;
   return material;
 }
@@ -392,17 +483,31 @@ function createContactPuffs(scene, max = 48) {
 }
 
 // ---------- public entry ----------
-export function createOrchardPresentation({scene, renderer, ground, sun, hemisphere = null, height, camera = null, quality = 'high', daylight = 'golden', assetBase = '/assets/', textures = null, loadTextures = true, edits = [], deposits = null, trees = null, shadows = undefined}) {
+export function createOrchardPresentation({scene, renderer, ground, sun, hemisphere = null, height, camera = null, quality = 'high', daylight = 'golden', assetBase = '/assets/', textures = null, loadTextures = true, edits = [], deposits = null, trees = null, shadows = undefined, baseHeight = null, deformation = true, features = null}) {
   if (!scene || !ground || !sun || typeof height !== 'function') throw new Error('createOrchardPresentation requires scene, ground, sun and height(x, z)');
   const q = QUALITY[quality] ? quality : 'high', cfg = QUALITY[q];
+  // Deformation strata need the caller's authoritative undeformed surface; without it the v1 look is kept exactly.
+  const deformOn = deformation !== false && typeof baseHeight === 'function' && cfg.strata > 0;
   hemisphere = hemisphere || scene.children.find(o => o.isHemisphereLight) || null;
   const report = {patched: false, missing: []};
   const saved = {background: scene.background, fog: scene.fog, envI: scene.environmentIntensity, material: ground.material, receive: ground.receiveShadow,
     sunColor: sun.color.clone(), sunI: sun.intensity, sunPos: sun.position.clone(), cast: sun.castShadow, exposure: renderer?.toneMappingExposure, shadowEnabled: renderer?.shadowMap?.enabled, shadowType: renderer?.shadowMap?.type,
     hemi: hemisphere && {sky: hemisphere.color.clone(), ground: hemisphere.groundColor.clone(), i: hemisphere.intensity}};
-  const material = createOrchardGroundMaterial({quality: q, report}), U = material.userData.orchardUniforms;
+  const material = createOrchardGroundMaterial({quality: q, report, strata: deformOn ? cfg.strata : 0}), U = material.userData.orchardUniforms;
   ground.material = material;
   const owned = []; // textures we created
+  let field = null, deformTex = null, deformUploads = 0, deformReason = deformOn ? '' : deformation === false ? 'disabled' : typeof baseHeight !== 'function' ? 'no baseHeight' : 'quality';
+  if (deformOn) {
+    field = createDeformationField({size: cfg.deform, half: GROUND_HALF, height, baseHeight});
+    deformTex = new THREE.DataTexture(field.data, cfg.deform, cfg.deform, THREE.RGBAFormat, THREE.HalfFloatType);
+    deformTex.magFilter = deformTex.minFilter = THREE.LinearFilter; deformTex.wrapS = deformTex.wrapT = THREE.ClampToEdgeWrapping; deformTex.colorSpace = THREE.NoColorSpace; deformTex.needsUpdate = true;
+    U.orchardDeform.value.dispose(); U.orchardDeform.value = deformTex; owned.push(deformTex);
+  }
+  function setFeatures(next = {}) {
+    const f = {...TERRAIN_FEATURES, ...(features || {}), ...next}; features = f;
+    U.orchardFeatures.value.set(+f.strata, +f.wet, +f.ejecta, +f.edges); return {...f};
+  }
+  setFeatures();
   // Mask texture (CPU-baked, rebuilt only on groundChanged).
   const maskData = new Uint8Array(cfg.mask * cfg.mask * 4);
   const mask = new THREE.DataTexture(maskData, cfg.mask, cfg.mask, THREE.RGBAFormat); mask.magFilter = THREE.LinearFilter; mask.minFilter = THREE.LinearFilter; mask.colorSpace = THREE.NoColorSpace; mask.wrapS = mask.wrapT = THREE.ClampToEdgeWrapping;
@@ -414,6 +519,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   const anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   const setTex = (slot, tex, srgb) => { if (!tex) return; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 1); tex.offset.set(0, 0); tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; tex.anisotropy = anisotropy; tex.needsUpdate = true; const old = U[slot].value; U[slot].value = tex; if (old && old.isDataTexture && old.image?.width === 1) old.dispose(); };
   const textureSlots = {meadow_albedo: ['orchardGrassMap', true], meadow_normal: ['orchardGrassNormal', false], meadow_orm: ['orchardGrassOrm', false], orchard_soil_albedo: ['orchardSoilMap', true], orchard_soil_normal: ['orchardSoilNormal', false]};
+  if (material.userData.orchardStrata > 0) Object.assign(textureSlots, {terrain_strata_albedo: ['orchardStrataMap', true], terrain_strata_normal: ['orchardStrataNormal', false]});
   let disposed = false, pending = 0;
   if (textures) for (const [name, tex] of Object.entries(textures)) if (textureSlots[name]) setTex(textureSlots[name][0], tex, textureSlots[name][1]);
   if (loadTextures && !textures && typeof document !== 'undefined') {
@@ -469,6 +575,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     if (next.edits) ctx.edits = next.edits; if (next.deposits) ctx.deposits = next.deposits; if (next.trees) ctx.trees = next.trees;
     const staticSig = JSON.stringify([ctx.deposits, ctx.trees]), sig = staticSig + JSON.stringify(ctx.edits);
     if (sig === signature && !next.force) return false; signature = sig;
+    field?.setEdits(ctx.edits); // queues dirty rects only; drained under the frame budget in update()
     const t0 = performance.now();
     if (staticSig === staticSignature && !next.force) { bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData); lastBakeKind = 'edits'; }
     else if (bakes) {
@@ -491,12 +598,15 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     if (material.color.getHex() !== 0xffffff) material.color.setHex(0xffffff);
   }
   function update(dt = 0, viewCamera = camera) {
+    const jobStart = performance.now();
     if (maskJob && maskJob.step()) {
       maskData.set(maskJob.data);
       bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData);
       lastBakeMs = maskJob.cpuMs; lastBakeKind = 'full'; bakes++;
       mask.needsUpdate = true; maskJob = null;
     }
+    // Deformation texels share what is left of the per-frame job budget (always some progress: >= .25 ms).
+    if (field?.pending && field.step(Math.max(.25, DEFORM_JOB_BUDGET_MS - (performance.now() - jobStart)))) { deformTex.needsUpdate = true; deformUploads++; }
     adoptLegacyMaps();
     if (viewCamera) {
       viewCamera.getWorldPosition(camPos); viewCamera.getWorldDirection(camDir);
@@ -523,10 +633,12 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   function stats() {
     const tris = m => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
     return {version: ORCHARD_PRESENTATION_VERSION, quality: q, shaderPatched: report.patched, shaderMissing: report.missing.slice(), maskSize: cfg.mask, maskBakeMs: +lastBakeMs.toFixed(3), maskBakeKind: lastBakeKind, maskBakes: bakes,
-      maskPending: !!maskJob, addedDrawCalls: 3 + (puffs.live() ? 1 : 0), addedTriangles: {sky: tris(sky), skirt: tris(skirt.mesh), backdrop: tris(backdrop)}, shadowMapSize: sun.castShadow ? sun.shadow.mapSize.x : 0, shadowExtent, pendingTextures: pending, puffs: puffs.live()};
+      maskPending: !!maskJob, addedDrawCalls: 3 + (puffs.live() ? 1 : 0), addedTriangles: {sky: tris(sky), skirt: tris(skirt.mesh), backdrop: tris(backdrop)}, shadowMapSize: sun.castShadow ? sun.shadow.mapSize.x : 0, shadowExtent, pendingTextures: pending, puffs: puffs.live(),
+      deformation: {enabled: !!field, reason: deformReason, strata: material.userData.orchardStrata, size: field ? field.size : 0, pending: !!field?.pending, queuedRects: field?.queuedRects || 0,
+        lastStepMs: field ? +field.lastStepMs.toFixed(3) : 0, maxStepMs: field ? +field.maxStepMs.toFixed(3) : 0, cpuMs: field ? +field.cpuMs.toFixed(3) : 0, texels: field?.texelsDone || 0, uploads: deformUploads, features: {...features}}};
   }
   function dispose() {
-    if (disposed) return; disposed = true; maskJob = null;
+    if (disposed) return; disposed = true; maskJob = null; field = null;
     for (const o of [sky, skirt.mesh, backdrop]) { scene.remove(o); o.geometry.dispose(); if (o.material !== material) o.material.dispose(); }
     puffs.dispose(); if (addedTarget) scene.remove(sun.target);
     for (const u of Object.values(U)) if (u.value?.isTexture && u.value.image?.width === 1) u.value.dispose();
@@ -542,5 +654,6 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
 
   if (sun.castShadow) setShadowExtent(20);
   setDaylight(daylight); groundChanged({force: true});
-  return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh}};
+  return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
+    flushDeformation() { if (field?.pending) { field.flush(); deformTex.needsUpdate = true; deformUploads++; } }}; // loading screens/tests only
 }
