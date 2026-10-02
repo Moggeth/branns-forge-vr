@@ -2206,3 +2206,5 @@ Movement tests0.00585s: work area accessible, terrain-aware18cmplinth, overlappi
 QA fixture initially called guessed updateSnapshot and failed visibly; corrected to existing applySnapshot API. Use an existing actual-renderer fixture as the contract reference rather than inventing method names. Do not mistake an asset-only render for gameplay acceptance. VR physical world-contact target lists must include the forge as well as scenery.
 
 Raised-anchor regression passed after two valid Raise Earth operations, including four hits and480tick recovery. Initial synthetic4m/radius5edit fixture correctly failed save validation; use supported spell parameters (two2m/radius6edits) instead of loosening validation. Forge base elevation deliberately ignores bridge decks, matching visible earth placement.
+
+Forge release: dpl_5W2ZbAYNif2eGCRTChvCvP6mcUzm READY in13.424s; public room74336325 created, actual textured forge visible from spawn, bothGLBsHTTP200 in.188s. Owned browser and Vite stopped after verification. Private origin/main checkpoints276bd6a asset /3b04d50 integration.
