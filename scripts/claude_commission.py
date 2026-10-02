@@ -68,7 +68,7 @@ def run(commission: Path, model: str, turns: int, effort: str, seconds: float) -
     started = time.perf_counter()
     metadata = {"account": identity["email"], "auth_method": identity["authMethod"],
                 "subscription": identity["subscriptionType"], "requested_model": model,
-                "time_cap_seconds": seconds, "output": str(commission), "outcome": "failed"}
+                "time_cap_seconds": seconds, "output": str(commission), "outcome": "running"}
     try:
         with (commission / "commission.jsonl").open("w", encoding="utf-8") as log:
             process = subprocess.Popen([exe, "--print", "--model", model, "--effort", effort,
@@ -77,6 +77,9 @@ def run(commission: Path, model: str, turns: int, effort: str, seconds: float) -
                 cwd=commission, env=env, stdin=subprocess.PIPE, stdout=log, stderr=log,
                 text=True, encoding="utf-8", **kwargs)
             metadata["pid"] = process.pid
+            # A later coordinator can identify the exact owned process without
+            # opening raw model streams or starting a duplicate commission.
+            (commission / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
             try:
                 process.communicate(brief.read_text(encoding="utf-8-sig"), timeout=seconds)
             except subprocess.TimeoutExpired:
@@ -98,6 +101,7 @@ def run(commission: Path, model: str, turns: int, effort: str, seconds: float) -
         if process.returncode == 0 and metadata["model_verified"] and metadata["final_verified"]:
             metadata["outcome"] = "passed"
         elif metadata["outcome"] != "timeout":
+            metadata["outcome"] = "failed"
             metadata["reason"] = str(final.get("result", "No verified final result"))[:500]
     finally:
         metadata["elapsed_seconds"] = round(time.perf_counter() - started, 3)
