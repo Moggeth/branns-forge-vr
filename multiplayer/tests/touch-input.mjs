@@ -42,10 +42,10 @@ test('inactive controls ignore touches and Hero tap does not auto-attack',()=>{
 });
 
 function castingRig({line=false,quick=true}={}){
- const canvas=new Surface(),calls=[];let revision=0,start=false,active=true;
+ const canvas=new Surface(),calls=[];let revision=0,start=false,active=true,target=false;
  const game={touchCastState:()=>({line,quick,revision,start}),aimAt:(x,y)=>{calls.push(['aim',x,y]);return x>=0;},beginAimLine:()=>{start=true;calls.push(['start']);},castAim:()=>{calls.push(['cast']);start=false;},cancelAim:()=>{calls.push(['cancel']);start=false;revision++;},lookByPixels:(...p)=>calls.push(['look',...p]),zoomBy:z=>calls.push(['zoom',z])};
- const control=bindWorldTouch(canvas,game,{enabled:()=>active,role:()=> 'god',sensitivity:()=>1});
- return {canvas,calls,control,change:()=>revision++,disable:()=>active=false};
+ const control=bindWorldTouch(canvas,game,{enabled:()=>active,role:()=> 'god',sensitivity:()=>1,onTarget:value=>target=value});
+ return {canvas,calls,control,get target(){return target;},change:()=>revision++,disable:()=>active=false};
 }
 test('quick point tap casts once on release; orbit and pinch never cast',()=>{
  const {canvas:c,calls,control}=castingRig();c.send('pointerdown',1,20,20);assert.equal(calls.length,0);c.send('pointerup',1,20,20);assert.deepEqual(calls,[['aim',20,20],['cast']]);
@@ -63,7 +63,7 @@ test('line cancellation, pinch, invalid endpoints and changed spell cannot fire'
  for(const why of ['pointercancel','lostpointercapture','pinch','invalid','changed','disabled','reset']){
   const r=castingRig({line:true}),c=r.canvas;c.send('pointerdown',1,20,20);c.send('pointermove',1,70,40);
   if(why==='pinch'){c.send('pointerdown',2,90,40);c.send('pointerup',2,90,40);}else if(why==='changed')r.change();else if(why==='disabled')r.disable();else if(why==='reset')r.control.reset();else if(why.startsWith('pointer')||why==='lostpointercapture')c.send(why,1,70,40);
-  c.send('pointerup',1,why==='invalid'?-1:70,40);assert.equal(r.calls.some(x=>x[0]==='cast'),false,why);r.control.dispose();
+  c.send('pointerup',1,why==='invalid'?-1:70,40);assert.equal(r.calls.some(x=>x[0]==='cast'),false,why);assert.equal(r.target,false,'cancelled target hint: '+why);r.control.dispose();
  }
 });
 

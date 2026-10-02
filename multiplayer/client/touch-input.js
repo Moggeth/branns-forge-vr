@@ -39,9 +39,9 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
   const current = () => game.touchCastState?.() || {line:false,quick:false,revision:0};
   const valid = p => enabled() && role()===p.role && current().revision===p.cast.revision;
   const onWorld = e => !canvas.ownerDocument?.elementFromPoint || canvas.ownerDocument.elementFromPoint(e.clientX,e.clientY)===canvas;
-  function cancelLine() { if ([...points.values()].some(p=>p.lineStarted)) game.cancelAim?.(); }
+  function cancelLine() { if ([...points.values()].some(p=>p.lineStarted)) { game.cancelAim?.(); onTarget(false); } }
   function reset() {
-    cancelLine(); const ids=[...points.keys()];points.clear();pinch=null;
+    cancelLine(); onTarget(false); const ids=[...points.keys()];points.clear();pinch=null;
     for(const id of ids)if(canvas.hasPointerCapture?.(id))canvas.releasePointerCapture(id);
   }
   on('pointerdown', e => {
@@ -74,8 +74,8 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
       if(accept&&(p.cast.line||!p.moved)){
         const hit=game.aimAt(e.clientX,e.clientY);onTarget(hit);
         if(hit&&p.cast.quick&&(!p.cast.line||p.moved||p.hadStart))game.castAim();
-        else if(!hit&&p.lineStarted)game.cancelAim?.();
-      }else if(p.lineStarted)game.cancelAim?.();
+        else if(!hit&&p.lineStarted){game.cancelAim?.();onTarget(false);}
+      }else if(p.lineStarted){game.cancelAim?.();onTarget(false);}
     }
     if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);
   });
