@@ -1,0 +1,2 @@
+import {launch,BASE,record,shot,save} from './browser-acceptance-lib.mjs';
+const {browser,page}=await launch({viewport:{width:800,height:450}});try{await page.goto(`${BASE}/tests/skeleton-performance.html`);await page.waitForFunction(()=>window.ready,null,{timeout:60000});record('skeleton-browser-performance','pass',{...await page.evaluate(()=>window.result),capture:await shot(page,'skeleton-performance'),errors:page.errors});save('skeleton-performance');if(page.errors.length)process.exitCode=1;}finally{await browser.close();}

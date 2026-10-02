@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Skeleton performance fixture</title><style>body{margin:0;background:#9cab9d}canvas{display:block}</style><script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import {createCombatView} from '../client/combat-view.js';
+import {updateEnemyMotion} from '../client/enemy-motion.js';
+const scene=new T.Scene();scene.background=new T.Color('#9cab9d');const renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(800,450);renderer.shadowMap.enabled=true;document.body.append(renderer.domElement);
+const camera=new T.PerspectiveCamera(52,800/450,.1,80);camera.position.set(0,6,20);camera.lookAt(0,1,0);scene.add(new T.HemisphereLight(0xd2e7ff,0x665546,2));const sun=new T.DirectionalLight(0xffe9cc,3);sun.position.set(-10,18,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-16,right:16,top:16,bottom:-16,far:60});scene.add(sun);
+const floor=new T.Mesh(new T.PlaneGeometry(40,40),new T.MeshStandardMaterial({color:0x6f864b}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+const template=await new GLTFLoader().loadAsync('/assets/skeleton.glb'),actors=new Map(),mixers=[];
+for(let i=0;i<32;i++){const root=new T.Group(),{visual,model}=prepareAsset(template,'skeleton');root.position.set((i%8-3.5)*2.4,0,(Math.floor(i/8)-1.5)*3);root.add(visual);scene.add(root);visual.traverse(n=>{if(n.isMesh)n.castShadow=true;});const mixer=new T.AnimationMixer(model);mixer.clipAction(template.animations.find(a=>/walk/i.test(a.name))).play();mixers.push(mixer);actors.set(`e:${i}`,{root,visual,enemy:true,data:{id:String(i),kind:'skeleton',attackTick:-1000}});}
+const combat=createCombatView({scene,actors,templates:new Map()});const cpu=[];for(let f=0;f<120;f++){for(const m of mixers)m.update(1/60);updateEnemyMotion(actors,{tick:f,dt:1/60,height:()=>0});combat.tick(1/60);const start=performance.now();combat.segmentContacts([30,1,30],[30,1,22],{includePartPoses:false});cpu.push(performance.now()-start);renderer.render(scene,camera);if(f%10===0)await new Promise(requestAnimationFrame);}
+const all={...renderer.info.render};let i=0;for(const a of actors.values()){const cast=i++<8;a.visual.traverse(n=>{if(n.isMesh)n.castShadow=cast;});}renderer.render(scene,camera);const capped={...renderer.info.render};cpu.sort((a,b)=>a-b);window.result={all,capped,cpuMeanMs:cpu.reduce((a,b)=>a+b,0)/cpu.length,cpuP95Ms:cpu[114],actors:32};window.ready=true;
+</script>

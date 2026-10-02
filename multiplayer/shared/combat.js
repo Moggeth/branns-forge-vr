@@ -1,3 +1,4 @@
+import {queueMeteorReward} from './resources.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask']);
@@ -29,7 +30,7 @@ function detach(state,enemy,part,hit,ctx,events){
   events.push({kind:'detach',position:[...d.position],id:d.id,sourceId:enemy.id,part});return d;
 }
 export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=false}={}) {
-  if(!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
+  if(!state.enemies.includes(enemy)||!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
   if(enemy.kind==='golem'&&(enemy.armor??3)>0){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
   const headshot=projectile&&part==='head'&&enemy.kind!=='golem';
@@ -39,7 +40,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+  if(enemy.hp<=0){if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
 function segmentDistance(p,a,b){const d=b.map((n,i)=>n-a[i]),l=d.reduce((n,v)=>n+v*v,0),t=l?clamp(p.reduce((n,v,i)=>n+(v-a[i])*d[i],0)/l,0,1):0;return dist(p,a.map((n,i)=>n+d[i]*t));}

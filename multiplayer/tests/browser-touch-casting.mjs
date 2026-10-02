@@ -24,6 +24,12 @@ try{
  before=await page.evaluate(()=>window.brannHarness.controls());await page.locator('[data-touch-action="strike"]').tap();await sleep(100);after=await page.evaluate(()=>window.brannHarness.controls());if(!(after.swingAt>before.swingAt))throw Error('Touch attack failed');record('touch-attack','pass');
  await page.locator('[data-equip="bow"]').tap();await page.waitForFunction(()=>window.brannHarness.controls().weapon.tool==='bow');
  const attack=await page.locator('[data-touch-action="strike"]').boundingBox(),sx=attack.x+attack.width/2,sy=attack.y+attack.height/2;
+ // Move first, then hold Attack with a second finger; releasing Move must preserve the draw.
+ await touch('touchStart',[[ax,ay-30]]);await touch('touchStart',[[ax,ay-30],[sx,sy,2]]);await sleep(300);
+ await touch('touchEnd',[[ax,ay-30]]);await sleep(180);
+ await page.setViewportSize({width:390,height:800});await sleep(80);
+ if(!(await page.evaluate(()=>window.brannHarness.controls().weapon)).drawing)throw Error('Releasing movement cancelled held bow');
+ await touch('touchEnd',[[sx,sy,2]]);await sleep(140);record('bow-holds-through-movement-release','pass');await page.setViewportSize({width:390,height:844});await sleep(100);
  await touch('touchStart',[[sx,sy]]);await sleep(250);
  const special=await page.locator('#special').boundingBox(),qx=special.x+special.width/2,qy=special.y+special.height/2;
  await touch('touchStart',[[sx,sy],[qx,qy,2]]);await touch('touchEnd',[[qx,qy,2]]);await sleep(100);

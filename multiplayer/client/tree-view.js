@@ -176,6 +176,6 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function reload(next = templates) { templates = next; clearAll(); for (const m of ownedMaterials) m.dispose(); ownedMaterials.clear(); initialized = false; buildKits(); if (last) sync(last); }
  function dispose() { clearAll(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
  buildKits();
- return {sync, tick, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
+ return {sync, tick, collectibleTargets:()=>logs||[], collectibleId:hit=>logs?.includes(hit.object)?last?.looseLogs?.[hit.instanceId]?.id:null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
   entity: id => trees.get(id) || null, intactTree: id => intact.get(id) || null};
 }

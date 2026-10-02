@@ -48,7 +48,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
  // simTick may be fractional (interpolated render tick); tree falls are pure functions of it so every client agrees.
  function tick(now,simTick=last?.tick??0){treeView.tick(now,simTick);
   for(const e of objects.values())if(e.data.type==='pickup'){e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007;}}
- return {sync,tick,targets:()=>treeView.targets().concat([...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
+ return {sync,tick,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat([...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
   // Raycast hit -> {id, point, normal (world), instanced}: instanced tree batches map instanceId to the tree id; deposits/entities use userData.targetId.
   resolveTarget(hit){const t=treeView.resolveTarget(hit);if(t)return t;let n=hit?.object;while(n&&!n.userData.targetId)n=n.parent;if(!n)return null;
    return {id:n.userData.targetId,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:false};},

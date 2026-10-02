@@ -15,6 +15,7 @@
   <!-- Refinement layer: loads last, only adds/overrides. Safe to remove to roll back. -->
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./expedition-hud.css">
+  <link id="compactStyles" rel="stylesheet" href="./mobile-compact.css">
 </head>
 <body data-phase="lobby" data-role="hero">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -513,6 +514,14 @@
       </dl>
     </details>
 
+    <section id="resourceUses" data-mc-page="supplies" aria-label="Use supplies">
+      <h3>Put supplies to work</h3><p id="supplyCount" class="hint"></p>
+      <div class="resource-spends">
+      <button type="button" class="btn btn-quiet" data-resource-use="wood"></button>
+      <button type="button" class="btn btn-quiet" data-resource-use="stone"></button>
+      <button type="button" class="btn btn-quiet" data-resource-use="gems"></button>
+      </div><p class="hint">Use wood for bridges, or deliver wood, stone and gems to the Forge Expedition. Apples restore health. Bones can be held and swung.</p>
+    </section>
     <button id="leave" class="btn btn-quiet btn-leave" type="button">Leave world</button>
   </section>
 </div>

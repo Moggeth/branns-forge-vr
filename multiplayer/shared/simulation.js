@@ -2,6 +2,7 @@ import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './f
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
+import {useResource, collectTarget, meteorAwakens, flushMeteorRewards} from './resources.js';
 import {TOOLS,PARTS,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
@@ -65,7 +66,7 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[])].map(x=>x.id);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[])].map(x=>x.id);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
 function damageEnemy(state, enemy, amount, events) {
@@ -86,7 +87,7 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
   return {version: 1, contentVersion: 3, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
@@ -176,6 +177,8 @@ function instantiate(state) {
         return ok();
       }
       if (message.type === 'action') {
+        if (message.action === 'useResource') return useResource(state,p,message);
+        if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (p.role !== 'hero') return fail('invalid_action');
         if (message.action === 'equip') {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
@@ -316,12 +319,15 @@ function instantiate(state) {
         for (const e of [...state.enemies]) if (distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
         for (const p of state.players) if (p.role === 'hero' && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
-        if (state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+        const awakens = meteorAwakens(state.seed,pending.id) && state.enemies.length < MAX_WORLD;
+        if (!awakens && state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
         addFuel(state,at,2,.35,true);applyHeat(state,at,5,1,fireContext);
+        if (awakens) { const enemy=createEnemy(`${pending.id}_creature`,[pending.x,terrainHeight(state,pending.x,pending.z),pending.z],'golem'); Object.assign(enemy,{meteorBorn:true,unfurlTick:state.tick}); state.enemies.push(enemy); events.push({kind:'meteor_unfurl',id:enemy.id,position:[...enemy.position],tick:state.tick}); }
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       for (const enemy of state.enemies) {
+        if (enemy.meteorBorn && state.tick-enemy.unfurlTick<90) continue;
         const targets = state.players.filter(p => p.role === 'hero');
         if (!targets.length) continue;
         targets.sort((a, b) => distance(enemy.position, a.position) - distance(enemy.position, b.position));
@@ -357,6 +363,7 @@ function instantiate(state) {
           damageHero(state,target,(enemy.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1),events);
         }
       }
+      flushMeteorRewards(state,terrainHeight);
       stepCombat(state,combatContext,events);
       stepFire(state,fireContext,events);
       stepTrees(state,treeContext,treeIndex,events);
@@ -426,7 +433,7 @@ export function loadSimulation(saved) {
   }
   for (const e of saved.enemies) {
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        !finite(e.hp) || e.hp <= 0 || e.hp > (e.kind==='golem'?320:100) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)))
+        !finite(e.hp) || e.hp <= 0 || e.hp > (e.kind==='golem'?320:100) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
@@ -445,6 +452,9 @@ export function loadSimulation(saved) {
   for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !['stone','meteor'].includes(d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > (d.kind==='meteor'?5:3) || d.maxHits !== (d.kind==='meteor'?5:3) || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
   for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || !['wood','stone','gems','apple'].includes(q.kind) || !validXZ(q) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
+  const meteorRewards=saved.meteorRewards??[];
+  if(!Array.isArray(meteorRewards)||meteorRewards.length>64)throw Error('Invalid meteor rewards');
+  for(const r of meteorRewards)if(!record(r)||!validId(r.id)||contentIds.has(r.id)||!validXZ(r)||r.amount!==6)throw Error('Invalid meteor reward');else contentIds.add(r.id);
   const looseLogs=restoreLogs(saved,contentIds);
   for (const pending of saved.pendingStarfalls) {
     if (!record(pending) || !unique(pending.id) || !validXZ(pending) || pending.radius !== 5 ||
@@ -466,13 +476,14 @@ export function loadSimulation(saved) {
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
     heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick,kind,parts,missingParts,slowUntil,armor}) => ({id, position, yaw, hp, attackTick,kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick}) => ({id, position, yaw, hp, attackTick,...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   state.edits = copy(saved.edits); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);
   state.harvestedTrees = harvestedTrees; state.looseLogs = looseLogs;
   if (saved.adventure !== undefined) { const restored = restoreAdventure(saved.adventure); if (!restored.ok) throw Error('Invalid expedition: ' + restored.code); state.adventure = restored.adventure; }
   state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted})=>({id,x,z,kind,hits,maxHits,depleted}));
+  state.meteorRewards=copy(meteorRewards);
   state.pickups = pickups.map(({id,kind,x,z,y,amount})=>({id,kind,x,z,y,amount}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
   state.shrine = copy(saved.shrine); // Includes break/restore timer.

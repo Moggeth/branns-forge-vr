@@ -1,3 +1,5 @@
+import {createMenuTabs} from './mobile-compact.js';
+import {RESOURCE_RECIPES} from './shared/resources.js';
 import {SPELLS} from './shared/spells.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
@@ -50,7 +52,9 @@ function friendlyError(detail) {
   const known = knownErrorText(code); if (known) return known;
   if (/not.?found|unknown.?room|no.?room/.test(code)) return 'We couldn’t find a world with that code. Check the digits with your friend.';
   if (code === 'inventory_full') return 'Your supplies are full. Use some before collecting more.';
-  if (code === 'insufficient_resources') return 'A bridge needs 3 wood. Chop a tree, then collect its logs.';
+  if (code === 'insufficient_resources') return 'Not enough supplies. Check the cost, then collect more.';
+  if (code === 'not_needed') return 'Already fully restored � no supplies were used.';
+  if (code === 'out_of_reach') return 'Move closer to collect that item.';
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/rate|busy|limit/.test(code)) return 'The forge is busy right now. Wait a moment and try again.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
@@ -383,6 +387,8 @@ function onSnapshot(snapshot) {
   if (snapshots === 1) removeNotice('loading');
   const self = snapshot.players.find(player => player.id === playerId);
   if (self) {
+    setText($('supplyCount'),`Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
+    for(const b of document.querySelectorAll('[data-resource-use]')){const kind=b.dataset.resourceUse,r=RESOURCE_RECIPES[kind];setText(b,`${r[self.role]} · ${r.cost} ${kind}`);b.disabled=(self.resources?.[kind]||0)<r.cost;}
     const waitSeconds = Number.isFinite(self.roleTick) ? Math.max(0, Math.ceil((120 - (snapshot.tick - self.roleTick)) / 60)) : 0;
     for (const radio of document.querySelectorAll('input[name="menuRole"]')) {
       // Selection reflects the accepted role, including rejected/late commands.
@@ -542,7 +548,9 @@ function closeMenu(focusCanvas = true) {
 }
 $('menuButton').addEventListener('click', openMenu);
 $('resumePlay').addEventListener('click', () => closeMenu());
-$('menu').addEventListener('click', event => { if (event.target === $('menu')) closeMenu(); });
+let menuBackdropPointer = false;
+$('menu').addEventListener('pointerdown', event => { menuBackdropPointer = event.target === $('menu'); });
+$('menu').addEventListener('click', event => { if (event.target === $('menu') && menuBackdropPointer) closeMenu(); menuBackdropPointer = false; });
 function trapMenuFocus(event) {
   if (event.key !== 'Tab') return;
   const focusable = [...$('menu').querySelectorAll('button,input,select,summary,a[href]')].filter(el => !el.disabled && el.getClientRects().length);
@@ -617,6 +625,7 @@ document.querySelector('.bf-spells')?.addEventListener('keydown',event=>{
 });
 
 for(const button of document.querySelectorAll('[data-equip]'))button.addEventListener('click',()=>{game?.equip(button.dataset.equip);button.blur();});
+for(const button of document.querySelectorAll('[data-resource-use]'))button.addEventListener('click',()=>session?.command('action',{action:'useResource',kind:button.dataset.resourceUse}));
 $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
 for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
@@ -666,6 +675,8 @@ try {
   });
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
   mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint});
+  document.head.append($('compactStyles'));
+  createMenuTabs();
   rendererReady = true;
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);

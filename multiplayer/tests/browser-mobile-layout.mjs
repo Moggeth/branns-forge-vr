@@ -1,0 +1,9 @@
+import {launch,enterWorld,record,save,shot,BASE,sleep} from './browser-acceptance-lib.mjs';
+const {browser,page}=await launch({touch:true,viewport:{width:390,height:650}});
+async function fits(selector,id){const m=await page.locator(selector).evaluate(e=>({height:e.clientHeight,scroll:e.scrollHeight,width:e.clientWidth,scrollWidth:e.scrollWidth,rect:{bottom:e.getBoundingClientRect().bottom,top:e.getBoundingClientRect().top},viewport:innerHeight}));record(id,m.scroll<=m.height+2&&m.scrollWidth<=m.width+2&&m.rect.bottom<=m.viewport+2?'pass':'fail',m);if(m.scroll>m.height+2||m.scrollWidth>m.width+2||m.rect.bottom>m.viewport+2)throw Error(id+' overflow');}
+try{
+ for(const size of [{width:390,height:650},{width:844,height:340}]){await page.setViewportSize(size);await page.goto(BASE+'/?acceptanceProbe');await page.waitForFunction(()=>window.brannHarness);await sleep(200);await fits('#lobby','lobby-'+size.width);await shot(page,'compact-lobby-'+size.width);}
+ await page.setViewportSize({width:390,height:650});await enterWorld(page,{role:'hero',name:'Compact QA'});
+ for(const size of [{width:390,height:650},{width:844,height:340}]){await page.setViewportSize(size);await sleep(180);await shot(page,'compact-hero-'+size.width);await page.locator('[data-touch-action="menu"]').tap();for(const tab of ['play','controls','world','supplies']){await page.locator('[data-mc-tab="'+tab+'"]').tap();await fits('#menu .menu-card','menu-'+tab+'-'+size.width);await shot(page,'compact-menu-'+tab+'-'+size.width);}await page.locator('#resumePlay').tap();}
+ record('errors',page.errors.length?'fail':'pass',{errors:page.errors});if(page.errors.length)process.exitCode=1;
+}catch(e){record('exception','fail',{message:e.message});await shot(page,'compact-failure');process.exitCode=1;}finally{save('mobile-layout');await browser.close();}

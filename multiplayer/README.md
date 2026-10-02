@@ -223,3 +223,15 @@ Checks: `node tests/tree-growth.mjs` and `node tests/tree-integration.mjs`. Reus
 
 
 Boulder refinement: the installed boulder now uses the angular fractured silhouette in `assets-source/geology-20261003/boulder-refinement/`, which supersedes the original builder for this one runtime asset. Same closed single shell, 5120 triangles and two materials; 663896 bytes. Other generated variants remain original and are not runtime swaps. The meteor is unchanged.
+
+## Mobile, meteor and skeleton pass — 2026-10-03
+
+Phone lobby and Menu fit portrait/landscape without scrolling. Menu has Play, Controls, World and Supplies tabs; expanded help/recovery lists remain secondary content. Collapsed quests occupy one row; fullscreen/menu share the top-right utility dock.
+
+Tap visible loose gems, stone, apples, logs or bones within reach to collect. Raw deposits and trees still require tools. Quick cast uses taps for point spells and drag release for line spells. Bow draw survives releasing the movement finger and small browser-toolbar resizes.
+
+Starfall deterministically awakens a meteor golem 25% of the time. It unfolds and fights; killing it pays six gems, triple the normal reward. Outcomes and overflow rewards survive saves.
+
+Menu → Supplies: three wood bandages a Hero (+35 health) or mends the Forge for a God (+20); two stone repairs +35 Forge integrity (Heroes within five metres); one gem rekindles a Hero (+35 health, ready eligible special, cool weapon) or restores +40 God mana. No benefit means no consumption. Bridges and Expedition deposits remain available.
+
+Skeleton broad-phase uses conservative bone bounds; exact animated triangles and embedded arrows remain intact. Nearby enemy shadow casters cap at four touch/eight desktop. See [performance evidence](../docs/SKELETON-CONTACT-PERFORMANCE.md) and [mobile/meteor handoff](../docs/MOBILE-METEOR-PASS-20261003.md).

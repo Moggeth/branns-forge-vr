@@ -1,3 +1,5 @@
+import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
+import {createMeteorCreaturePresentation} from './meteor-creature.js';
 import {SPELLS} from '../shared/spells.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -191,7 +193,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function report(message) { if (!disposed) onStatus(message); }
   const content = createWorldContent({scene,templates,instantiate,height:terrainHeight,camera});
   const enemyGround=(x,z)=>terrainHeight(x,z,snapshot.edits);
-  const combat=createCombatView({scene,templates,actors,height:(x,z)=>terrainHeight(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const enemyShadows=createEnemyShadowBudget({range:18});
+  const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
+  const combat=createCombatView({scene,templates,actors,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,(snapshot.tick||0)+Math.min(3,Math.max(0,performance.now()-snapshotAt)*.06));},height:(x,z)=>terrainHeight(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
   const fireVisual=createFirePresentation({scene,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:flaskModel,animations:[]});weaponModels.set('flask',flaskModel);
@@ -361,7 +365,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       }
     }
     for (const [key, entry] of actors) if (!present.has(key)) {
-      scene.remove(entry.root);
+      meteorCreatures.remove(entry);scene.remove(entry.root);
       if (entry.visual.userData.mixer) {
         const mixer = entry.visual.userData.mixer;
         mixer.stopAllAction(); mixer.uncacheRoot(mixer.getRoot()); mixers.delete(mixer);
@@ -447,6 +451,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     templates.set(name, gltf);
+    if(name==='golem'||name==='meteor')meteorCreatures.setAssets({[name]:gltf});
     // Meteor materials otherwise compile for the first time during impact.
     // Prepare the loaded asset against the real lighting without adding it to the world.
     if (name === 'meteor') renderer.compileAsync(gltf.scene, camera, scene).catch(error => {
@@ -592,11 +597,27 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let cueAt=-Infinity;
   function aimProbe(){
     const aim=weaponAim(),from=new THREE.Vector3(...aim.origin),direction=new THREE.Vector3(...aim.direction),to=from.clone().addScaledVector(direction,8);
-    const enemy=(combat.segmentContacts(from.toArray(),to.toArray())||[])[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
+    const enemy=(combat.segmentContacts(from.toArray(),to.toArray(),{includePartPoses:false})||[])[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
     raycaster.set(from,direction);raycaster.far=8;const h=raycaster.intersectObjects(content.targets().concat([shrine]),true).find(v=>surfaceVisible(v.object));raycaster.far=Infinity;
     const r=h&&h.distance<enemyDistance?resolveHit(h):null;
     const hit=r?{targetId:r.targetId,point:r.point,distance:h.distance}:enemy?{targetId:enemy.targetId,point:enemy.point,distance:enemyDistance}:null;
     return {...aim,yaw,hit};
+  }
+  // Explicit finger target: only loose collectibles. Mining and combat still require a tool swing.
+  function collectAt(x,y){
+    if(!active||role!=='hero'||renderer.xr.isPresenting||weapons.state().drawing||weapons.state().firing)return false;
+    const rect=canvas.getBoundingClientRect();camera.updateMatrixWorld();
+    pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);raycaster.far=4;
+    const targets=[...content.collectibleTargets(),...combat.detached.values(),...content.targets(),ground,shrine];
+    for(const t of targets)t.updateWorldMatrix(true,true);
+    const hits=raycaster.intersectObjects(targets,true).filter(h=>surfaceVisible(h.object));raycaster.far=Infinity;
+    const first=hits[0];if(!first)return false;
+    let id=content.collectibleId(first);if(!id){let n=first.object;while(n&&!n.userData.targetId)n=n.parent;id=n?.userData.targetId;}
+    const collectible=(snapshot.pickups||[]).some(p=>p.id===id)||(snapshot.looseLogs||[]).some(p=>p.id===id&&!p.heldBy)||(snapshot.detachedParts||[]).some(p=>p.id===id&&!p.heldBy);
+    if(!collectible)return false;
+    const from=raycaster.ray.origin,to=first.point;
+    const enemy=combat.segmentContacts(from.toArray(),to.toArray(),{includePartPoses:false})[0];if(enemy)return false;
+    onAction('collectTarget',{targetId:id});return true;
   }
   function primaryDown(){if(!active||role!=='hero')return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
@@ -804,11 +825,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
+    for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
     for (const mixer of mixers) mixer.update(dt);
     // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
     updateEnemyMotion(actors,{tick:(snapshot.tick||0)+Math.min(0.3,(now-snapshotAt)/1000)*60,dt,height:enemyGround});
     tickPhysicalMelee(now,dt);
     combat.tick(dt,isHost());
+    enemyShadows.update(actors,role==='god'?pan:localPosition,now,{maxCasters:touchEnabled?4:8});
     spellVisual.setTarget(active&&role==='god'&&cursor.visible?{spell,point:hitPoint.toArray(),start:castStart?.toArray(),end:castStart?hitPoint.toArray():undefined,valid:(!castStart||(castStart.distanceTo(hitPoint)>=.5&&castStart.distanceTo(hitPoint)<=18))&&Math.abs(hitPoint.x)<=55&&Math.abs(hitPoint.z)<=55&&(snapshot.players.find(p=>p.id===playerId)?.mana??100)>=(SPELLS.find(s=>s.id===spell)?.cost??0)}:null);
     spellVisual.update(now,dt);
     const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
@@ -893,11 +916,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     castAim() { if (active && role === 'god' && updateTouchAim()) castAt(hitPoint); },
     centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
     jump() { if (active && role === 'hero') jumpPending = true; },
-    strike, equip, primaryDown,primaryUp,grab,release,special(){if(active&&role==='hero')weapons.special();},weaponState:()=>({tool,...weapons.state()}),
+    strike, equip, primaryDown,primaryUp,collectAt,grab,release,special(){if(active&&role==='hero')weapons.special();},weaponState:()=>({tool,...weapons.state()}),
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -913,6 +936,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     },
     setActive(value) {
       if (disposed) return;
+      if(active===!!value)return;
       clearInput(); active = !!value;
       if (!active && document.pointerLockElement === canvas) document.exitPointerLock();
     },
@@ -924,7 +948,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); heroView.dispose();
-      feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();
+      meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

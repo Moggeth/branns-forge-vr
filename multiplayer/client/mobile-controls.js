@@ -20,6 +20,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     ui.setStick(side,x,y); game.setTouchAxes(side,x*(side==='right'?sensitivity:1),y*(side==='right'?sensitivity:1));
   }, () => enabled && state.active && !state.xr));
   const actionPointers=new Map();
+  ui.buttons.strike.style.touchAction='none'; // held trigger cannot become browser scroll/pinch
   const actionButtons=[...document.querySelectorAll('[data-equip],[data-spell],#special,#grab,#drop,#throw,#collect,#bridge')].map(b=>bindTouchButton(b,()=>enabled&&state.active&&!state.xr));
   const worldTouch = bindWorldTouch(canvas,game,{enabled:()=>enabled&&state.active&&!state.xr, role:()=>state.role, sensitivity:()=>sensitivity,onTarget:valid=>{target=valid;render();}});
   function reset() {actionButtons.forEach(b=>b.reset());actionPointers.clear();attackPointer=null;sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
@@ -74,7 +75,11 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   listen(sensitivityInput,'input',()=>{sensitivity=Number(sensitivityInput.value);save('sensitivity',String(sensitivity));});
   listen(handInput,'change',()=>{reset();leftHanded=handInput.checked;save('leftHanded',String(leftHanded));render();});
   listen(coarse,'change',()=>{reset();render();});listen(app,'change',render);
-  listen(window,'blur',reset);listen(window,'resize',reset);
+  listen(window,'blur',reset);
+  // Phone browser chrome changes viewport height while fingers remain down. Preserve their ownership;
+  // only a genuine rotation/large layout change cancels controls.
+  let viewportWidth=window.innerWidth,viewportHeight=window.innerHeight;
+  listen(window,'resize',()=>{const w=window.innerWidth,h=window.innerHeight;if(Math.abs(w-viewportWidth)>40||Math.abs(h-viewportHeight)>Math.max(150,viewportHeight*.3))reset();viewportWidth=w;viewportHeight=h;});
   listen(document,'visibilitychange',()=>{if(document.hidden)reset();});
   listen(document,'fullscreenchange',()=>{reset();render();});listen(document,'webkitfullscreenchange',()=>{reset();render();});
   render();

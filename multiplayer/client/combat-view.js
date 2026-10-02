@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import {prepareAsset, prepareProjectile} from './asset-pose.js';
+import {updateSkinBounds} from './skin-bounds.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
 const forward = new THREE.Vector3(0, 0, -1);
 const geometryRecords = new WeakMap();
+const sharedTriangleRecords = new WeakMap();
 const golemPoses = new WeakMap();
 
 export function updateGolemArmor(root, armor = 3) {
@@ -96,14 +98,24 @@ function recordGeometry(mesh) {
   let record = geometryRecords.get(mesh);
   if (record) return record;
   const geometry = mesh.geometry;
-  const indices = geometry.index ? Array.from(geometry.index.array) : Array.from({length: geometry.attributes.position.count}, (_, i) => i);
-  const triangles = [];
-  for (let i = 0; i < indices.length; i += 3) {
-    const ids = indices.slice(i, i + 3), bone = triangleBone(mesh, ids);
-    const group = geometry.groups.find(g => i >= g.start && i < g.start + g.count);
-    triangles.push({ids, part: bone ? canonicalPart(bone.name) : namedPart(mesh), materialIndex: group?.materialIndex || 0});
+  const layout = mesh.isSkinnedMesh ? mesh.skeleton.bones.map(b=>b.name).join('|') : namedPart(mesh);
+  let layouts = sharedTriangleRecords.get(geometry);
+  if (!layouts) sharedTriangleRecords.set(geometry, layouts = new Map());
+  let topology = layouts.get(layout);
+  if (!topology) {
+    const indices = geometry.index ? geometry.index.array : Array.from({length: geometry.attributes.position.count}, (_, i) => i);
+    const triangles = [], unique = Object.fromEntries(PARTS.map(part=>[part,new Set()]));
+    for (let i = 0; i < indices.length; i += 3) {
+      const ids = [indices[i],indices[i+1],indices[i+2]], bone = triangleBone(mesh, ids);
+      const group = geometry.groups.find(g => i >= g.start && i < g.start + g.count);
+      const part = bone ? canonicalPart(bone.name) : namedPart(mesh);
+      triangles.push({ids, part, materialIndex: group?.materialIndex || 0});
+      for (const id of ids) unique[part].add(id);
+    }
+    topology = {triangles, partIndices:Object.fromEntries(PARTS.map(part=>[part,[...unique[part]]]))};
+    layouts.set(layout, topology);
   }
-  record = {original: geometry, triangles, signature: '', owned: null}; geometryRecords.set(mesh, record);
+  record = {original: geometry, ...topology, signature: '', owned: null}; geometryRecords.set(mesh, record);
   return record;
 }
 
@@ -125,15 +137,15 @@ function prepareSurfaceCache(root) {
     if (!mesh.isMesh || !isVisible(mesh, root)) return;
     let box;
     if (mesh.isSkinnedMesh) {
-      mesh.skeleton.update(); mesh.computeBoundingBox();
+      mesh.skeleton.update(); updateSkinBounds(mesh);
       mesh.boundingSphere ||= new THREE.Sphere(); mesh.boundingBox.getBoundingSphere(mesh.boundingSphere); box = mesh.boundingBox;
-    } else { mesh.geometry.computeBoundingBox(); box = mesh.geometry.boundingBox; }
+    } else { if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox(); box = mesh.geometry.boundingBox; }
     bounds.union(box.clone().applyMatrix4(mesh.matrixWorld)); meshes.push(mesh);
   });
   return {meshes, bounds};
 }
 
-export function segmentSurfaceContacts(root, from, to, targetId, prepared) {
+export function segmentSurfaceContacts(root, from, to, targetId, prepared, {includePartPoses = true} = {}) {
   const origin = new THREE.Vector3().fromArray(from), end = new THREE.Vector3().fromArray(to);
   const delta = end.sub(origin), length = delta.length();
   if (length < 1e-8) return [];
@@ -141,7 +153,7 @@ export function segmentSurfaceContacts(root, from, to, targetId, prepared) {
   const cache = prepared || prepareSurfaceCache(root);
   if (!ray.ray.intersectsBox(cache.bounds)) return [];
   const intersections = ray.intersectObjects(cache.meshes, false);
-  const partPoses = intersections.length && !root.userData.detachedPart ? (cache.partPoses ||= capturePartPoses(root)) : undefined;
+  const partPoses = includePartPoses && intersections.length && !root.userData.detachedPart ? (cache.partPoses ||= capturePartPoses(root)) : undefined;
   return intersections.map(hit => {
     const mesh = hit.object, ids = [hit.face.a, hit.face.b, hit.face.c];
     const vertices = ids.map(i => mesh.getVertexPosition(i, new THREE.Vector3()));
@@ -173,8 +185,9 @@ export function capturePartPoses(root) {
   root.traverse(mesh => {
     if (!mesh.isMesh || !isVisible(mesh, root)) return;
     const record = recordGeometry(mesh);
-    for (const triangle of record.triangles) for (const index of triangle.ids) {
-      bounds[triangle.part].expandByPoint(mesh.getVertexPosition(index, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse[triangle.part]));
+    const point = new THREE.Vector3();
+    for (const part of PARTS) for (const index of record.partIndices[part]) {
+      bounds[part].expandByPoint(mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse[part]));
     }
   });
   for (const part of PARTS) if (!bounds[part].isEmpty()) poses[part].localBounds = {min: bounds[part].min.toArray(), max: bounds[part].max.toArray()};
@@ -227,6 +240,8 @@ export function maskMissingParts(root, missing = []) {
   const signature = [...missing].sort().join(',');
   root.traverse(mesh => {
     if (!mesh.isMesh || !isVisible(mesh, root)) return;
+    // An untouched enemy needs no expensive per-triangle dismemberment map.
+    if (!missing.length && !geometryRecords.has(mesh)) return;
     const record = recordGeometry(mesh);
     if (record.signature === signature) return;
     record.owned?.dispose(); record.owned = null;
@@ -243,7 +258,7 @@ export function maskMissingParts(root, missing = []) {
   });
 }
 
-export function createCombatView({scene, templates, actors, onContact = () => {}, worldContact = () => null, height = () => 0}) {
+export function createCombatView({scene, templates, actors, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const surfaceCaches = new WeakMap();
   function surface(root) {
@@ -329,12 +344,12 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
     }
     for (const [id] of embeds) if (!(next.embeds || []).some(p => p.id === id)) remove(embeds, id);
   }
-  function segmentContacts(from, to, {excludeId} = {}) {
+  function segmentContacts(from, to, {excludeId, includePartPoses = true} = {}) {
     const contacts = [];
     for (const entry of actors.values()) if (entry.enemy && entry.data?.id !== excludeId && !entry.visual.userData.placeholder) {
-      contacts.push(...segmentSurfaceContacts(entry.visual, from, to, entry.data.id, surface(entry.visual)));
+      contacts.push(...segmentSurfaceContacts(entry.visual, from, to, entry.data.id, surface(entry.visual), {includePartPoses}));
     }
-    for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node)));
+    for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node), {includePartPoses}));
     return contacts.sort((a, b) => a.distance - b.distance);
   }
   function tick(dt, isHost = false) {
@@ -352,6 +367,7 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
       node.position.lerpVectors(pose.from, pose.position, alpha); node.quaternion.slerpQuaternions(pose.fromQuaternion, pose.quaternion, alpha);
     }
     for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, snapshot.tick || 0, elapsed);
+    beforeContacts();
     contactRevision++;
     if (!isHost) return;
     for (const data of snapshot.projectiles || []) {
