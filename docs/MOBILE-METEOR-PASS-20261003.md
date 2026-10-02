@@ -23,3 +23,8 @@ Portrait 390×650 and landscape 844×340 lobby/all four menu pages fit. Real tou
 Commands: node multiplayer/tests/meteor-resources.mjs; meteor-creature.mjs; skin-bounds.mjs; enemy-shadow-budget.mjs in same directory. Browser suites: browser-mobile-layout.mjs, browser-touch-casting.mjs, browser-touch-resources.mjs using existing acceptance helper/environment. Root QA on 5188/8799; preserve original 8789 peer/tunnel.
 
 Production build caught one cp1252 em dash in the newly added lobby error message (1.077 s); the engineering build excludes lobby.js and did not catch it. Repaired only the invalid byte span, preserving existing UTF-8. Production build is mandatory before deployment.
+## Hosted release
+
+Public source 7949df5 (feature eb602f5), deployment dpl_F8XENoBANc58i1qd4toxh2sJQGZm. Build/deploy 12.451 s (production compile 0.362 s); public portrait/landscape lobby and all tabs 13.804 s; public quick-cast/two-thumb/bow regression 10.639 s; public pickup/unfurl 10.694 s. Expanded public resource suite 10.854 s also proves raw ore cannot be mined by a tap and Menu gem spending really restores God mana. No browser errors. Final styled button layout rerun 8.462 s. Feature commit/push 2.775 s, encoding repair/build/commit/push 3.337 s. Public URL: https://branns-forge-multiplayer.vercel.app . Refresh all party clients before starting a new room so its authoritative host runs the new simulation.
+
+Root-only QA ports 5188/8799 are shut down after verification; original 8789 peer/tunnel remain. No further Claude commissions. Existing overnight automation remains paused; do not restart after reset without a new request.
