@@ -53,7 +53,7 @@ function friendlyError(detail) {
   if (/not.?found|unknown.?room|no.?room/.test(code)) return 'We couldn’t find a world with that code. Check the digits with your friend.';
   if (code === 'inventory_full') return 'Your supplies are full. Use some before collecting more.';
   if (code === 'insufficient_resources') return 'Not enough supplies. Check the cost, then collect more.';
-  if (code === 'not_needed') return 'Already fully restored � no supplies were used.';
+  if (code === 'not_needed') return 'Already fully restored — no supplies were used.';
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/rate|busy|limit/.test(code)) return 'The forge is busy right now. Wait a moment and try again.';
