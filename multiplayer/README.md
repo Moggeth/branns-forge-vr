@@ -173,3 +173,10 @@ raising the chunk-size threshold.
 Browser import orientation and review: [ORIENTATION.md](ORIENTATION.md).
 
 Selective native migration decisions: [curation report](../docs/browser-migration/README.md) and complete file/catalogue register.
+
+### Wayfarer’s Forge landmark
+The shared world power anchor now uses Opus 5.5’s portable forge kit. Walk toward the forge from spawn; its open working face points toward you. Its existing shared health still interrupts God casting for eight seconds when depleted. This is not a crafting menu. Artist-authored character collision boxes, a walkable low plinth, and a 24 m visual LOD are shared across host simulation and client prediction. Diagnostic `game.diagnostics().forge` reports asset count, active LOD and power.
+
+Source/axes/sockets/rebuild: `../assets/asset-lab/wayfarer-forge/HANDOFF.md`. Rebuild via `python scripts/asset_lab.py build assets/asset-lab/wayfarer-forge/asset.json` from repository root. Both GLBs embed textures and import into Godot; native scene placement is not changed. Collision metadata is mirrored in `shared/forge-layout.json`; `node tests/forge.mjs` checks source parity, accessibility, overlapping-box escape and sustained movement. `npm run dev`, then `/tests/forge-playtest.html` opens the actual game renderer for ground/RTS/LOD, surface strikes, and power-off review. Browser failures appear in the fixture’s error field. The fixture is local QA and is not shipped in production.
+
+Limitations: coarse character boxes, no new crafting, no hearth particle simulation yet, no physical headset acceptance. Enemy collision is respected, but this pass does not add obstacle-routing AI.

@@ -7,6 +7,8 @@ import {createSpellPresentation} from './spell-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent} from './world-content-view.js';
+import {createForgeView} from './forge-view.js';
+import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
@@ -81,7 +83,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   cursor.visible = false;cursor.layers.set(31);
   scene.add(cursor);
   // The power anchor is a physical strike target at the authoritative shrine point.
-  const shrine = new THREE.Group();
+  const forge = createForgeView();
+  const shrine = forge.root;
   const shrineBase = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.92, 0.42, 12),
     new THREE.MeshStandardMaterial({ color: 0x554b65, metalness: 0.35, roughness: 0.6 }));
   shrineBase.position.y = 0.21;
@@ -304,6 +307,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       shrineCore.material.color.setHex(health ? 0x69dddb : 0x766071);
       shrineCore.material.emissive.setHex(health ? 0x2a8c98 : 0x4b1828);
       shrineCore.scale.setScalar(health ? 1 : 0.68);
+      forge.sync(anchor, shrine.position.y);
     }
     const present = new Set();
     for (const pending of snapshot.pendingStarfalls) {
@@ -345,6 +349,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
   }
   const loader = new GLTFLoader();
+  for (const name of ['forge','forge_lod']) loader.load(`/assets/${name}.glb`, gltf => {
+    if(disposed){disposeResources(gltf.scene);return;}
+    forge.install(gltf,name==='forge_lod');
+    shrineBase.visible=false;shrineCore.visible=false;
+    shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
+    syncWorldSignals();
+  },undefined,()=>report('Could not load the forge; reload to retry.'));
   for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     templates.set(name, gltf);
@@ -439,7 +450,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const tip=modelTip(axeModel,tool,new THREE.Vector3());
     if(lastPhysicalTip){const travel=tip.distanceTo(lastPhysicalTip);if(travel>.018&&travel<1&&travel/Math.max(dt,.001)>1.15&&now-lastPhysicalHit>(SWING_PROFILES[tool]?.cooldown||.5)*1000){
       const from=lastPhysicalTip.toArray(),to=tip.toArray(),enemy=combat.segmentContacts(from,to)[0],world=worldContact(from,to);let hit=enemy;
-      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets(),true).find(v=>surfaceVisible(v.object));if(h){let n=h.object;while(n&&!n.userData.targetId)n=n.parent;hit=n?{...world,targetId:n.userData.targetId}:null;}else hit=null;}
+      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat([shrine]),true).find(v=>surfaceVisible(v.object));if(h){let n=h.object;while(n&&!n.userData.targetId)n=n.parent;hit=n?{...world,targetId:n.userData.targetId}:null;}else hit=null;}
       if(hit){lastPhysicalHit=now;unlockAudio();onAction('strike',{...hit,tool});}
     }}lastPhysicalTip=tip;
   }
@@ -585,13 +596,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       localPosition.addScaledVector(move, dt * 5);
       localPosition.x = THREE.MathUtils.clamp(localPosition.x, -55, 55);
       localPosition.z = THREE.MathUtils.clamp(localPosition.z, -55, 55);
-      const groundY = simulationHeight(snapshot, localPosition.x, localPosition.z);
+      const forgeY=terrainHeight(0,0,snapshot.edits);
+      const groundY = forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(snapshot, localPosition.x, localPosition.z));
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
       if (grounded || localPosition.y <= groundY) { localPosition.y = groundY; verticalSpeed = 0; grounded = true; }
       const amount = 1 - Math.exp(-dt * 8);
       localPosition.addScaledVector(correction, amount);
       correction.multiplyScalar(1 - amount);
       localPosition.y = Math.max(localPosition.y, groundY);
+      localPosition.fromArray(resolveForge(localPosition.toArray(),forgeY));
     }
     if (role === 'god' && !renderer.xr.isPresenting) {
       pan.addScaledVector(move, dt * 18);
@@ -669,7 +682,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         const authoritative = new THREE.Vector3().fromArray(self.position);
         if (!initialized || authoritative.distanceTo(localPosition) > 4) {
           localPosition.copy(authoritative); correction.set(0, 0, 0); initialized = true;
-          verticalSpeed = 0; grounded = authoritative.y <= simulationHeight(snapshot, authoritative.x, authoritative.z) + 0.05;
+          verticalSpeed = 0; grounded = authoritative.y <= forgeFloor(authoritative.x,authoritative.z,terrainHeight(0,0,snapshot.edits),simulationHeight(snapshot,authoritative.x,authoritative.z)) + 0.05;
         }
         else correction.copy(authoritative).sub(localPosition);
         // Grounded height follows the same live terrain function as the server.
@@ -707,7 +720,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
     clearControls: clearInput,
     controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },

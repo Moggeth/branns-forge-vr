@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forge acceptance</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:15px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:10px}button{padding:10px;margin:3px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}</style>
+<header>Wayfarer's Forge — actual game renderer <button id="hero">Ground view</button><button id="god">RTS view</button><button id="close">Work point</button><button id="strike">Strike actual surface</button><button id="power">Toggle power for inspection</button><div id="status"></div><div id="stats"></div><div id="error"></div></header><canvas id="world" aria-label="Forge review world"></canvas>
+<script type="module">
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+const $=id=>document.getElementById(id);let sim=createSimulation({room:'FORGE_REVIEW'}),seq=0,role='hero';
+sim.addPlayer({id:'hero',name:'Reviewer'});sim.addPlayer({id:'god',name:'God',role:'god'});
+let save=sim.checkpoint();save.players[0].position=[.3,terrainHeight(save,.3,5),5];sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=JSON.stringify(r);},onInput:input=>sim.command('hero',{type:'input',seq:++seq,...input})});
+function publish(){game.applySnapshot(sim.snapshot(),role==='god'?'god':'hero');}
+publish();game.setRole('hero');game.setActive(true);
+$('hero').onclick=()=>{role='hero';publish();game.setRole(role);};$('god').onclick=()=>{role='god';publish();game.setRole(role);game.centerView();};
+$('close').onclick=()=>{const s=sim.checkpoint();s.players[0].position=[.35,.18,1.4];sim=loadSimulation(s);game.setActive(false);publish();game.setActive(true);role='hero';game.setRole(role);};
+$('strike').onclick=()=>game.strike();$('power').onclick=()=>{const s=sim.checkpoint();s.shrine.hp=s.shrine.hp?0:100;s.shrine.disabledUntil=s.tick+480;sim=loadSimulation(s);publish();};
+setInterval(()=>{for(const e of sim.step())game.handleEvent(e);publish();$('stats').textContent=`Power ${sim.snapshot().shrine.hp}/100 | `+JSON.stringify(game.diagnostics());},1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>

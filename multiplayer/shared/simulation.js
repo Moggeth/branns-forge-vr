@@ -2,6 +2,7 @@
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
 import {TOOLS,PARTS,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
+import {forgeFloor,resolveForge} from './forge-collision.js';
 export const HZ = 60;
 export const MAX_PLAYERS = 8;
 const BOUND = 55, MAX_WORLD = 64;
@@ -31,13 +32,13 @@ function pose(value) {
 }
 
 function baseHeight(x, z) { return 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07); }
-export function terrainHeight(state, x, z) {
+export function terrainHeight(state, x, z, includeBridges = true) {
   let y = baseHeight(x, z);
   for (const edit of state.edits) {
     const t = clamp(1 - Math.hypot(x - edit.x, z - edit.z) / edit.radius, 0, 1);
     y += edit.height * t * t * (3 - 2 * t);
   }
-  for (const bridge of state.bridges || []) {
+  for (const bridge of includeBridges ? (state.bridges || []) : []) {
     const dx = x - bridge.x, dz = z - bridge.z, forward = -Math.sin(bridge.yaw) * dx - Math.cos(bridge.yaw) * dz;
     const side = Math.cos(bridge.yaw) * dx - Math.sin(bridge.yaw) * dz;
     if (Math.abs(forward) <= 2.5 && Math.abs(side) <= .8) y = Math.max(y, bridge.y);
@@ -197,12 +198,12 @@ function instantiate(state) {
         if (supplied) {
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
           if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool},combatContext,events);
-          else if(message.targetId==='shrine' && inReach(state.shrine)<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
+          else if(message.targetId==='shrine' && inReach({position:[0,terrainHeight(state,0,0,false),0]})<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
           return ok(events); // No fallback to another target when a precise surface missed.
         }
         const enemy = state.enemies.map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
         if (enemy && Number.isFinite(enemy[1])) damageEnemy(state, enemy[0], 34, events);
-        else if (state.shrine.hp > 0 && inReach(state.shrine) < Infinity) {
+        else if (state.shrine.hp > 0 && inReach({position:[0,terrainHeight(state,0,0,false),0]}) < Infinity) {
           state.shrine.hp = Math.max(0, state.shrine.hp - 25);
           events.push(event('hit', state.shrine.position, 'shrine'));
           if (!state.shrine.hp) {
@@ -253,6 +254,7 @@ function instantiate(state) {
     step() {
       state.tick++;
       const events = [];
+      let forgeY=terrainHeight(state,0,0,false);
       if (state.shrine.hp === 0 && state.tick >= state.shrine.disabledUntil) state.shrine.hp = 100;
       for (const p of state.players) {
         p.mana = Math.min(100, p.mana + 3 / HZ);
@@ -262,7 +264,8 @@ function instantiate(state) {
           p.position[2] = clamp(p.position[2] + p.move[1] * 5 / HZ, -BOUND, BOUND);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        const floor = terrainHeight(state, p.position[0], p.position[2]);
+        if(p.role==='hero')resolveForge(p.position,forgeY);
+        const floor = p.role==='hero'?forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
       }
       for (const pending of [...state.pendingStarfalls]) {
@@ -275,6 +278,7 @@ function instantiate(state) {
         if (state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
+      forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       for (const enemy of state.enemies) {
         const targets = state.players.filter(p => p.role === 'hero');
         if (!targets.length) continue;
@@ -301,7 +305,8 @@ function instantiate(state) {
             enemy.position[2] = clamp(hero.position[2] + uz, -BOUND, BOUND);
           }
         }
-        enemy.position[1] = terrainHeight(state, enemy.position[0], enemy.position[2]);
+        resolveForge(enemy.position,forgeY,enemy.kind==='golem'?.42:.28);
+        enemy.position[1] = forgeFloor(enemy.position[0],enemy.position[2],forgeY,terrainHeight(state, enemy.position[0], enemy.position[2]));
         if (d < 1.8 && state.tick - enemy.attackTick > 60) {
           enemy.attackTick = state.tick; // Wind-up precedes the actual strike.
         }
