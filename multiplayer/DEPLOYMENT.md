@@ -1,6 +1,8 @@
 # Multiplayer proof packaging
 
-Prepared deployment files only: nothing was provisioned, uploaded or deployed.
+The active Vercel/browser-hosted preview is documented in [PEER-PLAYTEST.md](PEER-PLAYTEST.md).
+The remaining instructions concern the earlier dedicated-server route: an empty
+Fly app was provisioned, but no machine, volume or container was deployed.
 Use one Linux amd64 container containing the Node gateway, the Godot simulation
 and built browser files. The gateway owns Godot's lifecycle. Browser source must
 include the final approved `index.html` before building; an incomplete frontend

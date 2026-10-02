@@ -1,0 +1,14 @@
+node_modules/
+.env*
+server/
+state/
+logs/
+tests/
+dist-check/
+Dockerfile
+fly.toml
+gateway.mjs
+.dockerignore
+DEPLOYMENT.md
+README.md
+CONTRACT.md

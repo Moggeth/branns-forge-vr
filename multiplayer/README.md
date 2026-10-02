@@ -1,10 +1,48 @@
 # Browser multiplayer proof
 
-Status (2026-10-02): locally working network/renderer proof; **not deployed**.
-Vercel requires reauthentication. An always-online container account has not been
-selected. Claude CLI is signed out, so the required Opus 5.5 lobby design has not
-been commissioned. The engineering harness is available for local verification;
-it is not the finished player-facing lobby. There is deliberately no production
+## Live eight-player peer preview — 2026-10-02
+
+Open https://branns-forge-multiplayer.vercel.app . Choose Hero (FPS, or Enter VR
+on a supported headset) or God (RTS), then Create room. Send the room code or
+room link to a friend; they select their role and Join room. No account needed.
+This is the existing engineering harness, not the commissioned product lobby.
+
+The current browser-hosted route uses **8 players, fixed 60 Hz simulation and
+20 Hz snapshots**, with rendering at the device's refresh rate. It reuses the
+native tree/skeleton/axe assets in a small shared clearing. Gods spend mana on
+skeletons, raised earth, groves and a telegraphed meteor. Heroes can interrupt
+God spells by damaging the shrine. Full native combat, buildings, inventory,
+world generation and progression are not yet ported.
+
+The current host can reset (confirmation + pre-reset recovery save). If they
+leave, the world pauses for a reconnect grace period, then an eligible desktop
+peer with the latest checkpoint gets an explicit Continue world offer. This
+transfers room authority; it does not measure which device has the best network.
+No acceptance means a paused world and a downloadable recovery checkpoint.
+Local autosaves retain up to eight worlds; Resume/import creates a fresh room
+from that saved state. Browser storage is not cloud backup; download important
+saves. Continuations are independent copies, with no account-based ownership or
+automatic conflict merging yet.
+
+Vercel hosts only public compiled assets. A Cloudflare **temporary Quick Tunnel**
+connects signaling to this PC. The PC and both processes must remain running.
+WebRTC carries simulation state between players. A TURN relay is not configured:
+some pairs of home/mobile/work networks may fail to connect. This is a friend
+playtest, not an always-available or broadly scalable production service.
+
+See [peer/README.md](peer/README.md) for lifecycle/configuration and
+[PEER-PLAYTEST.md](PEER-PLAYTEST.md) for deployment and verification.
+
+The new lobby commission is blocked: cleaned Claude CLI auth reports the work
+account, not the required personal subscription. No Claude generation was sent.
+Physical headset and separate-household acceptance are still pending.
+
+## Earlier dedicated-server proof (separate, not deployed)
+
+The original dedicated-server route below remains available for local verification.
+Vercel is now authenticated; an empty Fly app exists but no machine/volume was
+deployed or paid hosting started. The required Opus lobby design has not been
+commissioned. There is deliberately no production
 `index.html` yet; `npm run build` and the release Docker build remain gated on it.
 
 This is a small independent shared clearing, not a port of the full native game.
