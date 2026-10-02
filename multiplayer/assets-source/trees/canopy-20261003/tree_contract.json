@@ -1,0 +1,898 @@
+{
+ "units": "metres",
+ "up": "+Y",
+ "front": "-Z",
+ "origin": "exact trunk axis at ground centre (Tree) / midpoint (Log) / disc centre (EndCap)",
+ "vertex_colors": "COLOR_0 is a linear multiplier on albedo (shade/AO/moss/warm tint). Godot: vertex_color_use_as_albedo=true. Do not treat as white.",
+ "trees": {
+  "tree": {
+   "file_bytes": 460456,
+   "triangles": 9213,
+   "meshes": 5,
+   "materials": 3,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Fruit",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Fruit",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Fruit",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -2.96,
+    -0.208,
+    -2.332
+   ],
+   "bbox_max": [
+    3.248,
+    6.0,
+    2.391
+   ],
+   "trunk_samples": [
+    {
+     "y": -0.1,
+     "radius_mean": 0.42,
+     "radius_min": 0.3976,
+     "radius_max": 0.4454,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.0,
+     "radius_mean": 0.42,
+     "radius_min": 0.3985,
+     "radius_max": 0.4453,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.12,
+     "radius_mean": 0.3688,
+     "radius_min": 0.3486,
+     "radius_max": 0.3906,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.3,
+     "radius_mean": 0.2745,
+     "radius_min": 0.2583,
+     "radius_max": 0.2899,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.6,
+     "radius_mean": 0.2658,
+     "radius_min": 0.2491,
+     "radius_max": 0.2788,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.0,
+     "radius_mean": 0.2541,
+     "radius_min": 0.2385,
+     "radius_max": 0.2687,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.4,
+     "radius_mean": 0.2425,
+     "radius_min": 0.2298,
+     "radius_max": 0.2569,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.8,
+     "radius_mean": 0.2308,
+     "radius_min": 0.217,
+     "radius_max": 0.2435,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.0,
+     "radius_mean": 0.225,
+     "radius_min": 0.2109,
+     "radius_max": 0.2362,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.367,
+     "radius_mean": 0.204,
+     "radius_min": 0.1912,
+     "radius_max": 0.2153,
+     "axis_x": -0.0104,
+     "axis_z": 0.0087
+    },
+    {
+     "y": 2.733,
+     "radius_mean": 0.183,
+     "radius_min": 0.1727,
+     "radius_max": 0.1938,
+     "axis_x": -0.0181,
+     "axis_z": 0.0195
+    },
+    {
+     "y": 3.1,
+     "radius_mean": 0.162,
+     "radius_min": 0.1527,
+     "radius_max": 0.1712,
+     "axis_x": -0.0175,
+     "axis_z": 0.0286
+    }
+   ],
+   "trunk_contour_max_deviation": 0.0628,
+   "empties": {
+    "Ground": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "CutGuide": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "Crown": [
+     0.17,
+     4.53,
+     0.139
+    ],
+    "FallTip": [
+     0.189,
+     6.0,
+     -0.074
+    ]
+   },
+   "first_branch_start_y": 2.514,
+   "canopy_bounds": {
+    "min": [
+     -2.96,
+     3.298,
+     -2.332
+    ],
+    "max": [
+     3.248,
+     6.0,
+     2.391
+    ]
+   },
+   "lod_ratio": 0.218
+  },
+  "tree_lod": {
+   "file_bytes": 175336,
+   "triangles": 2007,
+   "meshes": 4,
+   "materials": 2,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -3.029,
+    -0.206,
+    -2.325
+   ],
+   "bbox_max": [
+    3.32,
+    5.999,
+    2.377
+   ],
+   "canopy_bounds": {
+    "min": [
+     -3.029,
+     3.31,
+     -2.325
+    ],
+    "max": [
+     3.32,
+     5.999,
+     2.377
+    ]
+   }
+  },
+  "tree_b": {
+   "file_bytes": 418600,
+   "triangles": 8092,
+   "meshes": 5,
+   "materials": 3,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Fruit",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Fruit",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Fruit",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -2.061,
+    -0.208,
+    -2.144
+   ],
+   "bbox_max": [
+    3.266,
+    6.3,
+    4.228
+   ],
+   "trunk_samples": [
+    {
+     "y": -0.1,
+     "radius_mean": 0.4,
+     "radius_min": 0.3787,
+     "radius_max": 0.4242,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.0,
+     "radius_mean": 0.4,
+     "radius_min": 0.3795,
+     "radius_max": 0.424,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.12,
+     "radius_mean": 0.3494,
+     "radius_min": 0.3303,
+     "radius_max": 0.37,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.3,
+     "radius_mean": 0.2562,
+     "radius_min": 0.2411,
+     "radius_max": 0.2706,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.6,
+     "radius_mean": 0.248,
+     "radius_min": 0.2325,
+     "radius_max": 0.2602,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.0,
+     "radius_mean": 0.2372,
+     "radius_min": 0.2226,
+     "radius_max": 0.2508,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.4,
+     "radius_mean": 0.2263,
+     "radius_min": 0.2145,
+     "radius_max": 0.2398,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.8,
+     "radius_mean": 0.2154,
+     "radius_min": 0.2025,
+     "radius_max": 0.2272,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.0,
+     "radius_mean": 0.21,
+     "radius_min": 0.1968,
+     "radius_max": 0.2205,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.3,
+     "radius_mean": 0.1904,
+     "radius_min": 0.1784,
+     "radius_max": 0.2007,
+     "axis_x": -0.0089,
+     "axis_z": -0.0076
+    },
+    {
+     "y": 2.6,
+     "radius_mean": 0.1708,
+     "radius_min": 0.1607,
+     "radius_max": 0.1808,
+     "axis_x": -0.0021,
+     "axis_z": -0.0036
+    },
+    {
+     "y": 2.9,
+     "radius_mean": 0.1512,
+     "radius_min": 0.1434,
+     "radius_max": 0.1601,
+     "axis_x": 0.024,
+     "axis_z": 0.0132
+    }
+   ],
+   "trunk_contour_max_deviation": 0.0632,
+   "empties": {
+    "Ground": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "CutGuide": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "Crown": [
+     0.092,
+     4.426,
+     0.791
+    ],
+    "FallTip": [
+     0.704,
+     6.3,
+     0.408
+    ]
+   },
+   "first_branch_start_y": 2.418,
+   "canopy_bounds": {
+    "min": [
+     -2.061,
+     3.159,
+     -2.144
+    ],
+    "max": [
+     3.257,
+     6.3,
+     4.228
+    ]
+   },
+   "lod_ratio": 0.219
+  },
+  "tree_b_lod": {
+   "file_bytes": 164348,
+   "triangles": 1772,
+   "meshes": 4,
+   "materials": 2,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -2.09,
+    -0.206,
+    -2.155
+   ],
+   "bbox_max": [
+    3.304,
+    6.313,
+    4.257
+   ],
+   "canopy_bounds": {
+    "min": [
+     -2.09,
+     3.158,
+     -2.155
+    ],
+    "max": [
+     3.304,
+     6.313,
+     4.257
+    ]
+   }
+  },
+  "tree_young": {
+   "file_bytes": 367344,
+   "triangles": 6933,
+   "meshes": 5,
+   "materials": 3,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Fruit",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Fruit",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Fruit",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -1.318,
+    -0.208,
+    -1.327
+   ],
+   "bbox_max": [
+    1.472,
+    4.1,
+    2.087
+   ],
+   "trunk_samples": [
+    {
+     "y": -0.1,
+     "radius_mean": 0.19,
+     "radius_min": 0.1799,
+     "radius_max": 0.2015,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.0,
+     "radius_mean": 0.19,
+     "radius_min": 0.1803,
+     "radius_max": 0.2014,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.12,
+     "radius_mean": 0.1682,
+     "radius_min": 0.159,
+     "radius_max": 0.1781,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.3,
+     "radius_mean": 0.1281,
+     "radius_min": 0.1206,
+     "radius_max": 0.1353,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 0.6,
+     "radius_mean": 0.124,
+     "radius_min": 0.1162,
+     "radius_max": 0.1301,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.0,
+     "radius_mean": 0.1186,
+     "radius_min": 0.1113,
+     "radius_max": 0.1254,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.4,
+     "radius_mean": 0.1132,
+     "radius_min": 0.1072,
+     "radius_max": 0.1199,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 1.8,
+     "radius_mean": 0.1077,
+     "radius_min": 0.1012,
+     "radius_max": 0.1136,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.0,
+     "radius_mean": 0.105,
+     "radius_min": 0.0984,
+     "radius_max": 0.1102,
+     "axis_x": 0.0,
+     "axis_z": 0.0
+    },
+    {
+     "y": 2.133,
+     "radius_mean": 0.0952,
+     "radius_min": 0.0892,
+     "radius_max": 0.0999,
+     "axis_x": 0.005,
+     "axis_z": -0.0041
+    },
+    {
+     "y": 2.267,
+     "radius_mean": 0.0854,
+     "radius_min": 0.08,
+     "radius_max": 0.09,
+     "axis_x": 0.0093,
+     "axis_z": -0.008
+    },
+    {
+     "y": 2.4,
+     "radius_mean": 0.0756,
+     "radius_min": 0.0709,
+     "radius_max": 0.0798,
+     "axis_x": 0.0118,
+     "axis_z": -0.0106
+    }
+   ],
+   "trunk_contour_max_deviation": 0.0635,
+   "empties": {
+    "Ground": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "CutGuide": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "Crown": [
+     0.025,
+     3.255,
+     0.29
+    ],
+    "FallTip": [
+     0.035,
+     4.1,
+     0.069
+    ]
+   },
+   "first_branch_start_y": 2.255,
+   "canopy_bounds": {
+    "min": [
+     -1.318,
+     2.626,
+     -1.327
+    ],
+    "max": [
+     1.472,
+     4.1,
+     2.087
+    ]
+   },
+   "lod_ratio": 0.222
+  },
+  "tree_young_lod": {
+   "file_bytes": 153000,
+   "triangles": 1537,
+   "meshes": 4,
+   "materials": 2,
+   "images": 2,
+   "nodes": [
+    "Branches",
+    "Crown",
+    "CutGuide",
+    "FallTip",
+    "Ground",
+    "Leaves",
+    "Roots",
+    "Trunk",
+    "Tree"
+   ],
+   "mesh_names": [
+    "Branches",
+    "Leaves",
+    "Roots",
+    "Trunk"
+   ],
+   "attributes": [
+    "COLOR_0",
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+   ],
+   "cameras": 0,
+   "lights": false,
+   "material_names": [
+    "Bark",
+    "Leaves"
+   ],
+   "bbox_min": [
+    -1.331,
+    -0.208,
+    -1.355
+   ],
+   "bbox_max": [
+    1.443,
+    4.103,
+    2.132
+   ],
+   "canopy_bounds": {
+    "min": [
+     -1.331,
+     2.621,
+     -1.355
+    ],
+    "max": [
+     1.443,
+     4.103,
+     2.132
+    ]
+   }
+  }
+ },
+ "textures": {
+  "bark": {
+   "file": "textures/bark.png",
+   "size": 512
+  },
+  "leaf": {
+   "file": "textures/leaf.png",
+   "size": 512
+  },
+  "endgrain": {
+   "file": "textures/endgrain.png",
+   "size": 512
+  }
+ },
+ "log": {
+  "file_bytes": 93600,
+  "triangles": 496,
+  "meshes": 1,
+  "materials": 2,
+  "images": 2,
+  "nodes": [
+   "Grip",
+   "LogMesh",
+   "Log"
+  ],
+  "mesh_names": [
+   "LogMesh"
+  ],
+  "attributes": [
+   "COLOR_0",
+   "NORMAL",
+   "POSITION",
+   "TEXCOORD_0"
+  ],
+  "cameras": 0,
+  "lights": false,
+  "material_names": [
+   "Bark",
+   "EndGrain"
+  ],
+  "bbox_min": [
+   -0.186,
+   -0.562,
+   -0.199
+  ],
+  "bbox_max": [
+   0.172,
+   0.562,
+   0.191
+  ],
+  "length_m": 1.1,
+  "diameter_m": 0.32,
+  "longitudinal_axis": "+Y",
+  "grip_node": "Grip"
+ },
+ "endcap": {
+  "file_bytes": 60828,
+  "triangles": 256,
+  "meshes": 1,
+  "materials": 1,
+  "images": 1,
+  "nodes": [
+   "EndCapMesh",
+   "EndCap"
+  ],
+  "mesh_names": [
+   "EndCapMesh"
+  ],
+  "attributes": [
+   "COLOR_0",
+   "NORMAL",
+   "POSITION",
+   "TEXCOORD_0"
+  ],
+  "cameras": 0,
+  "lights": false,
+  "material_names": [
+   "EndGrain"
+  ],
+  "bbox_min": [
+   -0.982,
+   -0.014,
+   -0.995
+  ],
+  "bbox_max": [
+   0.997,
+   0.014,
+   0.995
+  ],
+  "radius_m": 1.0,
+  "thickness_m": 0.025,
+  "top": "+Y",
+  "note": "scale XZ to trunk radius; texture circle edge carries bark rim"
+ },
+ "trunk_contract": {
+  "sides": 12,
+  "rings": "horizontal, regular 12-gon, vertices on fixed angles 30deg*j so lower trunk lines are vertical; mesh is linear between rings",
+  "concentric_below_m": 2.0,
+  "contour_max_deviation_note": "radius per vertex = nominal*(1+/-<=6.5%)",
+  "cut_range_m": [
+   0.4,
+   1.6
+  ],
+  "root_flare_m": 0.3,
+  "trunk_mesh": "Trunk (y -0.1 buried to fork height); roots mesh separate, preserved as stump",
+  "note": "Trunk is a hollow surface shell with no interior geometry; no bottom cap (buried), small top cap at fork hidden by Branches."
+ },
+ "palette_presets": {
+  "orchard_summer": {
+   "note": "authored default; identity",
+   "Leaves": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "Bark": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "Fruit": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  "late_summer_gold": {
+   "note": "warm harvest light; riper fruit",
+   "Leaves": [
+    1.16,
+    1.04,
+    0.66
+   ],
+   "Bark": [
+    1.06,
+    0.98,
+    0.88
+   ],
+   "Fruit": [
+    1.05,
+    1.1,
+    0.8
+   ]
+  },
+  "highland_cool": {
+   "note": "cool blue-green upland orchard; greener apples",
+   "Leaves": [
+    0.78,
+    0.98,
+    1.06
+   ],
+   "Bark": [
+    0.9,
+    0.92,
+    0.96
+   ],
+   "Fruit": [
+    0.8,
+    1.45,
+    0.75
+   ]
+  }
+ }
+}

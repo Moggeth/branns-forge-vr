@@ -312,3 +312,9 @@ Magic staple commission passed987.833s with personal claude.ai exactOpus5.5. Roo
 Concretevisualgap: Sunderplates read asrectangularpavingslabs; meteorhead remainsglowingball. New bounded Opusfollowup work/opus-sprint-magic-refinement-20261003 PID76516/session41928,25min60turns started~21:15UTC. Freshcleanedpersonalclaude.ai/pro andactualinitclaude-opus-5-5 rootverified. Ownisolatedcopyonly; irregulargeologicalwedges anddistinctdarkmeteorcore, preserveallAPI/budgets. This is refinementofcompletedlane, notduplicateactivework. Test+metadata1.390s, dispatch10.005s; baselineintegration1.340s.
 
 Tree nowpassed1177.205s andgeology1123.995s, finalexactmodelverified; rootacceptancenext. Character/terrainstillrunning. Contextualcue defa0b0 pushedprivateorigin/main3.085s. Publicstillfe7fd35; rootQA52567/87885alive.
+
+## 21:18 UTC - tree art integrated and actual harvest re-verified
+
+All8newtree/log/endcap GLBs validate0errors0warnings. Root byte-comparedall6treehigh/LODs: everyTrunk/Roots accessor, criticalnodehierarchy/transforms/FallTip identical; onlyunusedCrown centroid changes. Sourcebuilder,packedBlend,contract andcutreport preservedunder multiplayer/assets-source/trees/canopy-20261003. Renderables/materialcounts unchanged, hightris slightlyreduced; no new physicsorwindcode. Existingtreeintegration+landingchecks pass. Actualbrowser22.496s repeated3cutsat1.151m,hingefall,3logs,grab/drop/throw/stow,3timberdeliveryandcuebehavior withzeroerrors. Root inspectedgroundcut2andRTS captures. NoHMDclaim. Shader/silhouette appearance accepted asincrementalcanopyimprovement; youngtrunkremainslongduepreservedcutcontract.
+
+Spellbaselinefe2637d pushedprivateorigin/main; commit/pushplusGLBcontractvalidation2.434s. Geologyindependent17assetnormal/closure/raycast+Khronoschecks0.948s allpass, all0backfacehits; rootreviewedfinalcloseups. Geologyassetintegrationnext. RootQA52567/87885stillactive, publicfe7fd35.

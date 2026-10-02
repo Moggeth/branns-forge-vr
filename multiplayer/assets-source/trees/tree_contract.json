@@ -6,8 +6,8 @@
  "vertex_colors": "COLOR_0 is a linear multiplier on albedo (shade/AO/moss/warm tint). Godot: vertex_color_use_as_albedo=true. Do not treat as white.",
  "trees": {
   "tree": {
-   "file_bytes": 465084,
-   "triangles": 9295,
+   "file_bytes": 460456,
+   "triangles": 9213,
    "meshes": 5,
    "materials": 3,
    "images": 2,
@@ -44,14 +44,14 @@
     "Leaves"
    ],
    "bbox_min": [
-    -2.652,
+    -2.96,
     -0.208,
-    -2.321
+    -2.332
    ],
    "bbox_max": [
-    3.074,
+    3.248,
     6.0,
-    2.393
+    2.391
    ],
    "trunk_samples": [
     {
@@ -164,9 +164,9 @@
      0.0
     ],
     "Crown": [
-     0.105,
-     4.645,
-     0.162
+     0.17,
+     4.53,
+     0.139
     ],
     "FallTip": [
      0.189,
@@ -177,20 +177,20 @@
    "first_branch_start_y": 2.514,
    "canopy_bounds": {
     "min": [
-     -2.652,
-     3.373,
-     -2.321
+     -2.96,
+     3.298,
+     -2.332
     ],
     "max": [
-     3.074,
+     3.248,
      6.0,
-     2.393
+     2.391
     ]
    },
-   "lod_ratio": 0.216
+   "lod_ratio": 0.218
   },
   "tree_lod": {
-   "file_bytes": 168604,
+   "file_bytes": 175336,
    "triangles": 2007,
    "meshes": 4,
    "materials": 2,
@@ -225,31 +225,31 @@
     "Leaves"
    ],
    "bbox_min": [
-    -2.737,
+    -3.029,
     -0.206,
-    -2.404
+    -2.325
    ],
    "bbox_max": [
-    3.157,
-    5.967,
-    2.47
+    3.32,
+    5.999,
+    2.377
    ],
    "canopy_bounds": {
     "min": [
-     -2.737,
-     3.364,
-     -2.404
+     -3.029,
+     3.31,
+     -2.325
     ],
     "max": [
-     3.157,
-     5.967,
-     2.47
+     3.32,
+     5.999,
+     2.377
     ]
    }
   },
   "tree_b": {
-   "file_bytes": 417360,
-   "triangles": 8128,
+   "file_bytes": 418600,
+   "triangles": 8092,
    "meshes": 5,
    "materials": 3,
    "images": 2,
@@ -286,14 +286,14 @@
     "Leaves"
    ],
    "bbox_min": [
-    -2.142,
+    -2.061,
     -0.208,
-    -2.196
+    -2.144
    ],
    "bbox_max": [
-    3.64,
+    3.266,
     6.3,
-    4.045
+    4.228
    ],
    "trunk_samples": [
     {
@@ -406,9 +406,9 @@
      0.0
     ],
     "Crown": [
-     0.432,
-     4.59,
-     0.703
+     0.092,
+     4.426,
+     0.791
     ],
     "FallTip": [
      0.704,
@@ -419,20 +419,20 @@
    "first_branch_start_y": 2.418,
    "canopy_bounds": {
     "min": [
-     -2.142,
-     3.141,
-     -2.196
+     -2.061,
+     3.159,
+     -2.144
     ],
     "max": [
-     3.64,
+     3.257,
      6.3,
-     4.045
+     4.228
     ]
    },
-   "lod_ratio": 0.218
+   "lod_ratio": 0.219
   },
   "tree_b_lod": {
-   "file_bytes": 157348,
+   "file_bytes": 164348,
    "triangles": 1772,
    "meshes": 4,
    "materials": 2,
@@ -467,31 +467,31 @@
     "Leaves"
    ],
    "bbox_min": [
-    -1.872,
+    -2.09,
     -0.206,
-    -2.263
+    -2.155
    ],
    "bbox_max": [
-    3.762,
-    6.294,
-    4.14
+    3.304,
+    6.313,
+    4.257
    ],
    "canopy_bounds": {
     "min": [
-     -1.872,
-     3.186,
-     -2.263
+     -2.09,
+     3.158,
+     -2.155
     ],
     "max": [
-     3.762,
-     6.294,
-     4.14
+     3.304,
+     6.313,
+     4.257
     ]
    }
   },
   "tree_young": {
-   "file_bytes": 372392,
-   "triangles": 7005,
+   "file_bytes": 367344,
+   "triangles": 6933,
    "meshes": 5,
    "materials": 3,
    "images": 2,
@@ -528,14 +528,14 @@
     "Leaves"
    ],
    "bbox_min": [
-    -1.488,
+    -1.318,
     -0.208,
-    -1.367
+    -1.327
    ],
    "bbox_max": [
-    1.405,
+    1.472,
     4.1,
-    1.888
+    2.087
    ],
    "trunk_samples": [
     {
@@ -648,9 +648,9 @@
      0.0
     ],
     "Crown": [
-     -0.027,
-     3.316,
-     0.096
+     0.025,
+     3.255,
+     0.29
     ],
     "FallTip": [
      0.035,
@@ -661,20 +661,20 @@
    "first_branch_start_y": 2.255,
    "canopy_bounds": {
     "min": [
-     -1.488,
-     2.667,
-     -1.367
+     -1.318,
+     2.626,
+     -1.327
     ],
     "max": [
-     1.405,
+     1.472,
      4.1,
-     1.888
+     2.087
     ]
    },
-   "lod_ratio": 0.219
+   "lod_ratio": 0.222
   },
   "tree_young_lod": {
-   "file_bytes": 144860,
+   "file_bytes": 153000,
    "triangles": 1537,
    "meshes": 4,
    "materials": 2,
@@ -709,25 +709,25 @@
     "Leaves"
    ],
    "bbox_min": [
-    -1.49,
+    -1.331,
     -0.208,
-    -1.434
+    -1.355
    ],
    "bbox_max": [
-    1.454,
-    4.09,
-    1.949
+    1.443,
+    4.103,
+    2.132
    ],
    "canopy_bounds": {
     "min": [
-     -1.49,
-     2.682,
-     -1.434
+     -1.331,
+     2.621,
+     -1.355
     ],
     "max": [
-     1.454,
-     4.09,
-     1.949
+     1.443,
+     4.103,
+     2.132
     ]
    }
   }
@@ -747,7 +747,7 @@
   }
  },
  "log": {
-  "file_bytes": 74796,
+  "file_bytes": 93600,
   "triangles": 496,
   "meshes": 1,
   "materials": 2,
@@ -788,7 +788,7 @@
   "grip_node": "Grip"
  },
  "endcap": {
-  "file_bytes": 43788,
+  "file_bytes": 60828,
   "triangles": 256,
   "meshes": 1,
   "materials": 1,
@@ -838,5 +838,61 @@
   "root_flare_m": 0.3,
   "trunk_mesh": "Trunk (y -0.1 buried to fork height); roots mesh separate, preserved as stump",
   "note": "Trunk is a hollow surface shell with no interior geometry; no bottom cap (buried), small top cap at fork hidden by Branches."
+ },
+ "palette_presets": {
+  "orchard_summer": {
+   "note": "authored default; identity",
+   "Leaves": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "Bark": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "Fruit": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  "late_summer_gold": {
+   "note": "warm harvest light; riper fruit",
+   "Leaves": [
+    1.16,
+    1.04,
+    0.66
+   ],
+   "Bark": [
+    1.06,
+    0.98,
+    0.88
+   ],
+   "Fruit": [
+    1.05,
+    1.1,
+    0.8
+   ]
+  },
+  "highland_cool": {
+   "note": "cool blue-green upland orchard; greener apples",
+   "Leaves": [
+    0.78,
+    0.98,
+    1.06
+   ],
+   "Bark": [
+    0.9,
+    0.92,
+    0.96
+   ],
+   "Fruit": [
+    0.8,
+    1.45,
+    0.75
+   ]
+  }
  }
 }

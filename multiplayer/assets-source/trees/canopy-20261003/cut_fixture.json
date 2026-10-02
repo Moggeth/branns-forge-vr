@@ -1,0 +1,438 @@
+{
+ "old": "out_legacy",
+ "new": "out",
+ "variants": {
+  "tree": {
+   "identicalCarving": true,
+   "canopyClearOfCutRange": true,
+   "old": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "469c0d0f04320754"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "491362df72f867f0"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "36f2960886e5f042"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "8c0af4d3e9082997"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "823db7c30ba29c6c"
+     },
+     "stumpWood": {
+      "tris": 20,
+      "hash": "d6d4b6c9cdbbe851"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "9dd4839b0cb9a7fa"
+     },
+     "topWood": {
+      "tris": 20,
+      "hash": "1e33bf59b691a7f0"
+     },
+     "hinge": [
+      -0.1637,
+      1,
+      -0.19435
+     ],
+     "angles": [
+      0,
+      0.0353,
+      0.0524,
+      1.64
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.2541,
+    "contractRadiusAt1m": 0.2541,
+    "lowestAboveTrunk": {
+     "Branches": 2.415804624557495,
+     "Leaves": 3.373164176940918,
+     "Fruit": 3.2199273109436035
+    }
+   },
+   "new": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "469c0d0f04320754"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "491362df72f867f0"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "36f2960886e5f042"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "8c0af4d3e9082997"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "823db7c30ba29c6c"
+     },
+     "stumpWood": {
+      "tris": 20,
+      "hash": "d6d4b6c9cdbbe851"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "9dd4839b0cb9a7fa"
+     },
+     "topWood": {
+      "tris": 20,
+      "hash": "1e33bf59b691a7f0"
+     },
+     "hinge": [
+      -0.1637,
+      1,
+      -0.19435
+     ],
+     "angles": [
+      0,
+      0.0353,
+      0.0524,
+      1.64
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.2541,
+    "contractRadiusAt1m": 0.2541,
+    "lowestAboveTrunk": {
+     "Branches": 2.3844432830810547,
+     "Leaves": 3.297574043273926,
+     "Fruit": 3.572033166885376
+    }
+   }
+  },
+  "tree_b": {
+   "identicalCarving": true,
+   "canopyClearOfCutRange": true,
+   "old": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "5b55ab36c436feb8"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "c1872cfd9768760d"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "fab6c196df49d257"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "51a3f9bb8709ad3f"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "b26a34c5e88759ca"
+     },
+     "stumpWood": {
+      "tris": 20,
+      "hash": "5573eb27d36cc073"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "1db57471cebebfb3"
+     },
+     "topWood": {
+      "tris": 20,
+      "hash": "e5771dfe60d5a0dd"
+     },
+     "hinge": [
+      -0.15281,
+      1,
+      -0.18142
+     ],
+     "angles": [
+      0,
+      0.035,
+      0.0511,
+      1.625
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.2372,
+    "contractRadiusAt1m": 0.2372,
+    "lowestAboveTrunk": {
+     "Branches": 2.3159565925598145,
+     "Leaves": 3.1411244869232178,
+     "Fruit": 3.232834577560425
+    }
+   },
+   "new": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "5b55ab36c436feb8"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "c1872cfd9768760d"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "fab6c196df49d257"
+     },
+     "wood": {
+      "tris": 20,
+      "hash": "51a3f9bb8709ad3f"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "b26a34c5e88759ca"
+     },
+     "stumpWood": {
+      "tris": 20,
+      "hash": "5573eb27d36cc073"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "1db57471cebebfb3"
+     },
+     "topWood": {
+      "tris": 20,
+      "hash": "e5771dfe60d5a0dd"
+     },
+     "hinge": [
+      -0.15281,
+      1,
+      -0.18142
+     ],
+     "angles": [
+      0,
+      0.035,
+      0.0511,
+      1.625
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.2372,
+    "contractRadiusAt1m": 0.2372,
+    "lowestAboveTrunk": {
+     "Branches": 2.2833149433135986,
+     "Leaves": 3.158818006515503,
+     "Fruit": 3.347612142562866
+    }
+   }
+  },
+  "tree_young": {
+   "identicalCarving": true,
+   "canopyClearOfCutRange": true,
+   "old": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "e0b0e5c198f4cc50"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "484edcab1502dfbd"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "7188bc55eac64c2c"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "752da25fc4f00fb6"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "d99a82a14287b87a"
+     },
+     "stumpWood": {
+      "tris": 21,
+      "hash": "b943b94d501a5bf4"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "2c86b3373fdc5267"
+     },
+     "topWood": {
+      "tris": 22,
+      "hash": "8c36977b82094105"
+     },
+     "hinge": [
+      -0.0764,
+      1,
+      -0.09071
+     ],
+     "angles": [
+      0,
+      0.0387,
+      0.0688,
+      1.745
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.1186,
+    "contractRadiusAt1m": 0.1186,
+    "lowestAboveTrunk": {
+     "Branches": 2.146348237991333,
+     "Leaves": 2.667215585708618,
+     "Fruit": 2.5382516384124756
+    }
+   },
+   "new": {
+    "cut1": {
+     "bark": {
+      "tris": 358,
+      "hash": "e0b0e5c198f4cc50"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "484edcab1502dfbd"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut2": {
+     "bark": {
+      "tris": 358,
+      "hash": "7188bc55eac64c2c"
+     },
+     "wood": {
+      "tris": 22,
+      "hash": "752da25fc4f00fb6"
+     },
+     "openEdges": 14,
+     "flipped": 0,
+     "badNormal": 0
+    },
+    "cut3": {
+     "stumpBark": {
+      "tris": 164,
+      "hash": "d99a82a14287b87a"
+     },
+     "stumpWood": {
+      "tris": 21,
+      "hash": "b943b94d501a5bf4"
+     },
+     "topBark": {
+      "tris": 194,
+      "hash": "2c86b3373fdc5267"
+     },
+     "topWood": {
+      "tris": 22,
+      "hash": "8c36977b82094105"
+     },
+     "hinge": [
+      -0.0764,
+      1,
+      -0.09071
+     ],
+     "angles": [
+      0,
+      0.0387,
+      0.0688,
+      1.745
+     ],
+     "phases": [
+      "falling",
+      "falling",
+      "falling",
+      "down"
+     ]
+    },
+    "trunkRingAt1m": 0.1186,
+    "contractRadiusAt1m": 0.1186,
+    "lowestAboveTrunk": {
+     "Branches": 2.146348237991333,
+     "Leaves": 2.6259894371032715,
+     "Fruit": 2.671844720840454
+    }
+   }
+  }
+ }
+}

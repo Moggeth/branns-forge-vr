@@ -202,3 +202,5 @@ VR hand mapping and trigger ownership are centralized in client/vr-input-policy.
 
 ### Contextual harvesting hints
 Heroes receive a small read-only aim cue for trees, ore and loose logs, plus held-log, nearby pickup and forge-delivery guidance. Labels follow desktop/touch controls; menus, God view and XR hide the DOM cue. Probing is capped at 10 Hz with terrain occlusion and short target hysteresis. Tests: `node tests/interaction-cue.test.mjs` and `node tests/interaction-cue-view.test.mjs`. Physical headset cues remain separate from this DOM feature.
+
+Tree art uses the canopy-20261003 kit (`assets-source/trees/canopy-20261003/`). Its builder and packed Blender source preserve exact shipped trunk/root topology, cut guides and fall tips; new lobed leaf shells, twig collars, bark and end grain retain existing instancing, LOD, wind and harvesting.
