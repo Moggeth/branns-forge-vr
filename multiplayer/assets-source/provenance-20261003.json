@@ -1,0 +1,41 @@
+[
+  {
+    "account": "fauxgrady@gmail.com",
+    "auth_method": "claude.ai",
+    "subscription": "pro",
+    "requested_model": "claude-sonnet-5-5",
+    "actual_model": "claude-sonnet-5-5",
+    "canonical_model": "claude-sonnet-5-5",
+    "model_verified": true,
+    "final_verified": true,
+    "elapsed_seconds": 530.606,
+    "outcome": "passed",
+    "commission": "sonnet-browser-trees-20261003"
+  },
+  {
+    "account": "fauxgrady@gmail.com",
+    "auth_method": "claude.ai",
+    "subscription": "pro",
+    "requested_model": "claude-opus-5-5",
+    "actual_model": "claude-opus-5-5",
+    "canonical_model": "claude-opus-5-5",
+    "model_verified": true,
+    "final_verified": true,
+    "elapsed_seconds": 417.952,
+    "outcome": "passed",
+    "commission": "opus-tree-art-refinement-20261003"
+  },
+  {
+    "account": "fauxgrady@gmail.com",
+    "auth_method": "claude.ai",
+    "subscription": "pro",
+    "requested_model": "claude-opus-5-5",
+    "actual_model": "claude-opus-5-5",
+    "canonical_model": "claude-opus-5-5",
+    "model_verified": true,
+    "final_verified": true,
+    "elapsed_seconds": 582.19,
+    "outcome": "passed",
+    "commission": "opus-resource-treasures-20261003"
+  }
+]
