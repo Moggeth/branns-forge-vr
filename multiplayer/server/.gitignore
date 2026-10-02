@@ -1,0 +1,4 @@
+.godot/
+worlds/
+*.tmp
+*.jsonl

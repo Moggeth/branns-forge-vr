@@ -1,0 +1,16 @@
+.git
+node_modules
+dist
+dist-check
+logs
+state
+worlds
+server/.godot
+server/worlds
+tests
+.env
+.env.*
+*.log
+*.jsonl
+*.tmp
+DEPLOYMENT.md

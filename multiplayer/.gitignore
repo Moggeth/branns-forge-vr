@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-check/
+.vercel/
+.env*
+!.env.example
+server/.godot/
+state/
+logs/

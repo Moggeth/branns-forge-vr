@@ -1,0 +1,17 @@
+[
+  {
+    "name": "axe.glb",
+    "bytes": 4812892,
+    "sha256": "53e4a9290ce74957d068e2833f1d152dac2179f3d9f72d695a5dc663730f8171"
+  },
+  {
+    "name": "skeleton.glb",
+    "bytes": 812528,
+    "sha256": "75fbc1e4dfb00e2ccdb2a4570ce9f7990a9b1dcc58f8869ab3dc2472e23f9275"
+  },
+  {
+    "name": "tree.glb",
+    "bytes": 43396,
+    "sha256": "fd8bad9c65c16ff82fb4d7aef864cd5415c257f5e72abe0f5f97bf97e9411e09"
+  }
+]

@@ -1,0 +1,11 @@
+config_version=5
+
+[application]
+config/name="Branns Multiplayer Proof Server"
+run/main_scene="res://main.tscn"
+
+[physics]
+common/physics_ticks_per_second=30
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
