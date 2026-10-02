@@ -105,6 +105,24 @@ func _run() -> void:
 	wider.size = Vector3(2.4, 0.4, 0.2)
 	tail.mesh = wider
 	_check(contact.sweep(Vector3(11, 0.5, 1), Vector3(11, 0.5, -1)).get("collider") == long_actor, "replacement model bounds remained stale")
+	# Mutating an existing mesh resource must invalidate its cached triangles too.
+	wider.size = Vector3(4.4, 0.4, 0.2)
+	_check(contact.sweep(Vector3(12, 0.5, 1), Vector3(12, 0.5, -1)).get("collider") == long_actor, "in-place expanded mesh retained old triangles")
+	wider.size = Vector3(2.4, 0.4, 1.2)
+	var resized_hit := contact.sweep(Vector3(10, 0.5, 1), Vector3(10, 0.5, -1))
+	_check(not resized_hit.is_empty() and absf(float(resized_hit.get("position", Vector3.ZERO).z) - 0.6) < 0.001, "in-place depth change retained old impact surface")
+	var connections := wider.changed.get_connections().size()
+	for revision in range(8):
+		wider.size.z = 0.4 + revision * 0.1
+		var changed_hit := contact.sweep(Vector3(10, 0.5, 1), Vector3(10, 0.5, -1))
+		_check(not changed_hit.is_empty() and absf(float(changed_hit.get("position", Vector3.ZERO).z) - wider.size.z * 0.5) < 0.001, "repeated mesh edit lost invalidation")
+	_check(wider.changed.get_connections().size() == connections, "mesh edits accumulated invalidation listeners")
+	var temporary_contact = Contact.new()
+	temporary_contact._arrays(wider)
+	var weak_contact: WeakRef = weakref(temporary_contact)
+	temporary_contact = null
+	_check(weak_contact.get_ref() == null, "mesh invalidation listener retained retired contact manager")
+	_check(wider.changed.get_connections().size() == connections, "retired contact manager left invalidation listeners")
 	var boss := _actor(game, "enemy", Vector3(20, 0, 0))
 	boss.scale = Vector3.ONE * 6.0
 	_box(boss, "Body", Vector3(2, 0.5, 0), Vector3(1, 1, 1))

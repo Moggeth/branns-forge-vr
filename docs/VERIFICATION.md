@@ -1,5 +1,19 @@
 # Verification and recovery evidence — 2026-09-12
 
+## Mutable enemy surface geometry — 2026-10-02
+
+Mesh resource identity does not imply immutable triangles. Cached enemy contact
+arrays stayed stale when a BoxMesh expanded or changed depth in place: rays
+missed newly visible geometry or stopped at its previous surface. The cache now
+uses one-shot Mesh.changed invalidation and rebuilds on the next query. Repeated
+edits keep a bounded listener count, and disposing a contact manager releases
+its listeners. Two failing repros passed after the fix; contact checks took
+0.456 s and the existing articulated-arrow/death-handoff checks 0.269 s.
+Run enemy_projectile_contact_checks.gd and projectile_attachment_checks.gd
+with headless Godot, XR off and Dummy audio. Test WeakRef variables require
+an explicit type because Variant inference warnings are errors in this project.
+Detailed measured steps: logs/combat-contact-work-timing-20261002.csv.
+
 ## Golem impact event routing — 2026-10-01
 
 An armour-breaking pick strike formerly emitted `golem_armor` during damage

@@ -278,7 +278,14 @@ func _arrays(resource: Mesh) -> Array:
 		if not resource is ArrayMesh or resource.surface_get_primitive_type(index) == Mesh.PRIMITIVE_TRIANGLES:
 			result.append(resource.surface_get_arrays(index))
 	_surface_arrays[id] = {"mesh": weakref(resource), "arrays": result}
+	# Resource identity survives in-place edits (including equal-bounds edits).
+	# A one-shot connection drops the stale arrays without retaining the mesh;
+	# the next query rebuilds and registers exactly one fresh invalidation.
+	resource.changed.connect(_invalidate_arrays.bind(id), CONNECT_ONE_SHOT)
 	return result
+
+func _invalidate_arrays(id: int) -> void:
+	_surface_arrays.erase(id)
 
 func _triangles(surfaces: Array, start: Vector3, finish: Vector3, transform: Transform3D) -> Dictionary:
 	var inverse := transform.affine_inverse()
