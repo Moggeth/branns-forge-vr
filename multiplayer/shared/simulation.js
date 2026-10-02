@@ -135,6 +135,9 @@ function instantiate(state) {
       const gate = p && message?.type === 'cast' && p.role === 'god' && safeSeq(message.seq) && message.seq > p.seq ? adventureCastGate(state.adventure, id, message, state) : null;
       if (gate && !gate.ok) { p.seq = message.seq; return fail(gate.code); }
       const result = api.baseCommand(id, message, p);
+      // Optional attribution: events caused by a player's action name that player (public id) so clients
+      // can scope physical feedback. Never overwrites; older clients ignore it.
+      if (result.ok && message?.type === 'action') for (const e of result.events || []) if (e && e.by === undefined) e.by = id;
       if (gate && !result.ok) adventureCastRefund(state.adventure, gate);
       if (result.events?.length && adventureEvents.length < 256) adventureEvents.push(...result.events);
       return result;

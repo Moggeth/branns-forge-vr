@@ -55,7 +55,7 @@ export function projectileContact(state,m,ctx){
   if(['flame','fuel'].includes(shot.kind))return ok(ctx.fireContact(state,shot,m));
   if(state.embeds.length>=COMBAT_LIMITS.embeds)state.embeds.shift();
   state.embeds.push({id:shot.id,kind:shot.kind,targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.boneName?{boneName:m.boneName}:{})});
-  const events=[{kind:'embed',id:shot.id,position:[...m.point],targetId:m.targetId,impact:!enemy,normal:[...m.normal],material:detached?.kind==='skeleton'?'bone':'stone'}];
+  const events=[{kind:'embed',id:shot.id,ownerId:shot.ownerId,position:[...m.point],targetId:m.targetId,impact:!enemy,normal:[...m.normal],material:detached?.kind==='skeleton'?'bone':'stone'}];
   if(enemy)hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?48:38,m,ctx,events,{projectile:true});
   return ok(events);
 }

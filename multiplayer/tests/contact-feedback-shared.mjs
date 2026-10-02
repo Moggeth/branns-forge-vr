@@ -1,0 +1,35 @@
+// Requires the proposed shared-attribution patch (by + embed ownerId). Run from the multiplayer root after integration.
+import assert from 'node:assert/strict';
+import {createSimulation} from '../shared/simulation.js';
+import {createContactFeedback} from '../client/contact-feedback.js';
+
+const started = performance.now();
+const sim = createSimulation();
+assert.ok(sim.addPlayer({id: 'me'}).ok && sim.addPlayer({id: 'peer'}).ok);
+const at = id => sim.snapshot().players.find(p => p.id === id).position;
+let seq = {me: 0, peer: 0};
+const act = (id, extra) => sim.command(id, {type: 'action', seq: ++seq[id], ...extra});
+assert.ok(act('me', {action: 'equip', tool: 'bow'}).ok); assert.ok(act('peer', {action: 'equip', tool: 'crossbow'}).ok);
+const shot = id => { const p = at(id), r = act(id, {action: 'fire', origin: [p[0], p[1] + 1, p[2]], direction: [0, 0, -1], draw: 1}); assert.ok(r.ok, r.code); return r.events[0]; };
+const mine = shot('me'), theirs = shot('peer');
+assert.equal(mine.by, 'me'); assert.equal(theirs.by, 'peer');
+assert.equal(sim.addPlayer({id: 'late'}).events[0].by, undefined, 'non-action events stay unstamped');
+const log = [];
+const sources = ['left', 'right'].map(handedness => ({handedness, gamepad: {hapticActuators: [{pulse: (a, d) => { log.push({handedness, a, d}); return Promise.resolve(true); }}]}}));
+let now = 0;
+const fb = createContactFeedback({sources: () => sources, playerId: () => 'me', tool: () => 'bow', clock: () => now, schedule: () => 0, cancel: () => {}});
+for (let i = 0; i < 3; i++) for (const e of sim.step()) fb.handleEvent(e);
+fb.sync(sim.snapshot(), 'me');
+assert.equal(fb.handleEvent(theirs).owner, 'remote', 'peer shoot stamped remote');
+assert.equal(fb.handleEvent(mine).owner, 'local', 'own shoot stamped local (no pulse: release is input-driven)');
+assert.equal(log.length, 0, 'broadcast shoot never pulses');
+const contact = q => { const s = sim.snapshot().projectiles.find(p => p.id === q.id), point = s.trail.at(-1);
+  return sim.projectileContact({projectileId: q.id, targetId: 'world', part: 'torso', point, normal: [0, 0, 1], localPoint: point, localQuaternion: [0, 0, 0, 1]}); };
+const ce = contact(theirs), me2 = contact(mine);
+assert.ok(ce.ok && me2.ok, `${ce.code} ${me2.code}`);
+assert.equal(ce.events[0].ownerId, 'peer'); assert.equal(me2.events[0].ownerId, 'me');
+now += 1000;
+assert.equal(fb.handleEvent(ce.events[0]).owner, 'remote', 'peer embed is remote by ownerId');
+assert.equal(fb.handleEvent(me2.events[0]).owner, 'local', 'own embed is local by ownerId');
+assert.equal(log.length, 0, 'world embed does not fake a hand impact');
+console.log(`contact-feedback-shared: by/ownerId attribution through real simulation pass (${(performance.now() - started).toFixed(1)} ms)`);
