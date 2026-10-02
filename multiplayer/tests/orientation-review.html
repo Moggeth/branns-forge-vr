@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Browser orientation inspection</title>
+<style>body{background:#20272c;color:white;font:16px system-ui;margin:20px}main{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}canvas{width:100%;aspect-ratio:1}p{margin:6px}</style>
+<h1>Actual browser assets · orientation inspection</h1><p id="status">Loading assets…</p><main></main>
+<script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset,assetBasis,ASSET_POSES,setWeaponGrip,FPS_WEAPON_POSE} from '../client/asset-pose.js';
+const loader=new GLTFLoader();const [sk,ax]=await Promise.all(['skeleton','axe'].map(n=>loader.loadAsync('/assets/'+n+'.glb')));
+let count=0;function check(ok,msg){if(!ok)throw Error(msg);count++;}
+for(const n of ['skeleton','axe']) {let c=ASSET_POSES[n];check(new T.Vector3(...c.forward).applyQuaternion(assetBasis(c)).distanceTo(new T.Vector3(0,0,-1))<1e-6,n+' forward');}
+function card(label,asset,eye,target,fps=false){const box=document.createElement('section');box.innerHTML='<p>'+label+'</p>';const canvas=document.createElement('canvas');box.append(canvas);document.querySelector('main').append(box);const r=new T.WebGLRenderer({canvas,antialias:true});r.setSize(420,420,false);r.setPixelRatio(1);r.outputColorSpace=T.SRGBColorSpace; r.toneMapping=T.ACESFilmicToneMapping;const s=new T.Scene();s.background=new T.Color('#73818a');s.add(new T.HemisphereLight(0xe4ecff,0x675239,2));const l=new T.DirectionalLight(0xffffff,3);l.position.set(-3,5,-5);s.add(l);const c=new T.PerspectiveCamera(fps?70:40,1,.02,100);c.position.fromArray(eye);c.lookAt(...target);s.add(c);
+if(fps){let a=new T.Group();a.position.fromArray(FPS_WEAPON_POSE.position);a.rotation.fromArray(FPS_WEAPON_POSE.rotation);c.add(a);a.add(asset);}else{s.add(asset);s.add(new T.GridHelper(4,16));s.add(new T.ArrowHelper(new T.Vector3(0,0,-1),new T.Vector3(0,.04,0),1,0xffbf45));}r.render(s,c);}
+let {visual:v,model:m}=prepareAsset(sk,'skeleton');card('Skeleton · front (faces −Z)',v,[0,1.1,-3.4],[0,.85,0]);
+({visual:v,model:m}=prepareAsset(sk,'skeleton'));let mix=new T.AnimationMixer(m);mix.clipAction(sk.animations.find(a=>a.name==='walk')).play();mix.update(.3);check(v.quaternion.angleTo(assetBasis(ASSET_POSES.skeleton))<1e-6,'animation preserves basis');card('Skeleton · walking / three-quarter',v,[-2,1.2,-3],[0,.85,0]);
+({visual:v}=prepareAsset(sk,'skeleton'));let heading=new T.Group();heading.rotation.y=Math.PI/2;heading.add(v);card('Skeleton · heading −X',heading,[-3,1.2,-2],[0,.85,0]);
+({visual:v}=prepareAsset(ax,'axe'));v.updateWorldMatrix(true,true);check(v.getObjectByName('Grip_Center').getWorldPosition(new T.Vector3()).length()<1e-6,'grip origin');let edge=v.getObjectByName('CuttingEdge_Mid').getWorldPosition(new T.Vector3()),poll=v.getObjectByName('Poll_Face').getWorldPosition(new T.Vector3());check(edge.z<poll.z,'visible blade ahead of poll');card('Axe · cutting edge follows gold forward arrow',v,[-1,.7,-1],[0,.25,-.1]);
+({visual:v}=prepareAsset(ax,'axe'));card('Axe · actual FPS idle attachment',v,[0,0,0],[0,0,-1],true);
+({visual:v}=prepareAsset(ax,'axe'));setWeaponGrip(v,true);v.updateWorldMatrix(true,true);check(v.getObjectByName('Grip_Center').getWorldPosition(new T.Vector3()).length()<1e-6,'XR grip origin');card('Axe · XR grip-space (unmirrored)',v,[-1,.7,-1],[0,.2,-.1]);
+document.querySelector('#status').textContent=count+' actual-asset checks passed · physical headset acceptance still required';
+</script>

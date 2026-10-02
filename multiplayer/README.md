@@ -170,3 +170,5 @@ build completed in 0.739 s (141 ms compiler time); Three.js makes the single bun
 about 650 kB / 166 kB gzip. The current lobby still statically imports the renderer; a future loading pass
 should split it so room selection does not wait for the renderer/assets. Do not hide the warning by only
 raising the chunk-size threshold.
+
+Browser import orientation and review: [ORIENTATION.md](ORIENTATION.md).

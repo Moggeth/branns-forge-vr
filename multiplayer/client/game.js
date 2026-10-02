@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE} from './asset-pose.js';
 
 // Keep in step with the authoritative Godot server surface.
 export function terrainHeight(x, z, edits = []) {
@@ -78,8 +78,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   shrine.visible = false;
   scene.add(shrine);
   const weaponAnchor = new THREE.Group();
-  weaponAnchor.position.set(0.33, -0.38, -0.48);
-  weaponAnchor.rotation.set(-0.2, -0.45, 0.12);
+  weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position);
+  weaponAnchor.rotation.fromArray(FPS_WEAPON_POSE.rotation);
   camera.add(weaponAnchor);
   const axePlaceholder = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.05), new THREE.MeshStandardMaterial({ color: 0x67462e }));
   weaponAnchor.add(axePlaceholder);
@@ -119,13 +119,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (renderer.xr.isPresenting && selected) {
       const [index, source] = selected;
       (source.gripSpace ? grips[index] : controllers[index]).add(axeModel);
-      axeModel.position.set(0, 0, 0);
-      // Authored +Y haft, +X cutting edge; Grip_Center stays at the tracked grip.
-      axeModel.rotation.set(-Math.PI / 4, 0, 0);
+      setWeaponGrip(axeModel, true);
     } else {
       weaponAnchor.add(axeModel);
-      axeModel.position.set(0, 0, 0);
-      axeModel.rotation.set(0, 0, 0);
+      setWeaponGrip(axeModel);
     }
   }
   async function capturePointer() {
@@ -178,14 +175,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function instantiate(name, height) {
     const template = templates.get(name);
     if (!template) return null;
-    const model = cloneSkeleton(template.scene);
-    const bounds = new THREE.Box3().setFromObject(model);
-    const size = bounds.getSize(new THREE.Vector3());
-    const factor = height / Math.max(size.y, 0.01);
-    model.scale.multiplyScalar(factor);
-    model.position.set(-(bounds.min.x + bounds.max.x) * 0.5 * factor, -bounds.min.y * factor, -(bounds.min.z + bounds.max.z) * 0.5 * factor);
-    const wrapper = new THREE.Group();
-    wrapper.add(model);
+    const {visual: wrapper, model} = prepareAsset(template, name, height);
     if (template.animations.length && name === 'skeleton') {
       const mixer = new THREE.AnimationMixer(model);
       const idle = template.animations.find(item => /idle/i.test(item.name)) || template.animations[0];
@@ -342,12 +332,6 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       weaponAnchor.remove(axePlaceholder);
       axePlaceholder.geometry.dispose(); axePlaceholder.material.dispose();
       axeModel = instantiate('axe', 0.7);
-      const grip = axeModel.getObjectByName('Grip_Center');
-      if (grip) {
-        axeModel.updateWorldMatrix(true, true);
-        const offset = axeModel.worldToLocal(grip.getWorldPosition(new THREE.Vector3()));
-        axeModel.children[0].position.sub(offset);
-      }
       attachWeapon();
     }
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
