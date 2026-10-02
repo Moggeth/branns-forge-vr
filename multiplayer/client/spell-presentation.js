@@ -1,13 +1,21 @@
 // Spell presentation: ground-conforming reticles and fantasy RTS/VR spell effects.
-// Y-up metres. Pooled geometry/materials, 512 particle slots, 32 event groups, 5 s effect cap.
+// Y-up metres. Pooled geometry/materials, 512 particle slots, 160 pooled kinematic
+// rock/slab instances (2 draws), 32 event groups, 5 s effect cap. No lights are created.
+// Options beyond the original contract are optional: quality 'high'|'medium'|'low'
+// (default 'high' = original behaviour budget) and reducedMotion (default false).
 import * as THREE from 'three';
 
 const TAU = Math.PI * 2, MAX_EVENTS = 32, MAX_LIFE = 5, LAUNCH = 0.8;
 const CAPS = { dust: 224, glow: 96, shard: 112, leaf: 80 }; // 512 particles in total
+const KCAPS = { slab: 64, rock: 96 }; // pooled kinematic instances, one draw each
+const QUALITY = { // n: particle emission scale, k: kinematic piece scale, b: secondary strips (branches/sub-roots)
+  high: { n: 1, k: 1, b: 1 }, medium: { n: 0.6, k: 0.75, b: 0.6 }, low: { n: 0.35, k: 0.5, b: 0 } };
 const PAL = { gold: 0xffc857, amber: 0xff8f2e, ember: 0xff4a1f, teal: 0x37e0c8, deepTeal: 0x0f7f86, purple: 0x9b6bff, violet: 0x4d2a8f,
   bone: 0xf2e8c9, earth: 0x7b5b3a, stone: 0x8d8a84, slate: 0x55525a, leaf: 0x73d96b, moss: 0x2f7a3e, ice: 0xc4f1ff, mint: 0x9ff7c8,
-  bolt: 0xcfeaff, bad: 0xd24a4a, badDark: 0x6b2a2a, dust: 0xc9b48f };
+  bolt: 0xcfeaff, bad: 0xd24a4a, badDark: 0x6b2a2a, dust: 0xc9b48f,
+  soil: 0x4a3423, loam: 0x5e4430, gouge: 0x1c1310, char: 0x140d0b, bark: 0x3d2b1d, barkHi: 0x6a4a2c, smoke: 0x8a7f74, clay: 0x9a7350, cinder: 0x2b2420, ash: 0x6e645b };
 const UP = new THREE.Vector3(0, 1, 0), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), QI = new THREE.Quaternion(), V = new THREE.Vector3();
+const EU = new THREE.Euler(), QT = new THREE.Quaternion(), P3 = [0, 0, 0];
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
 const sstep = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
 const easeOut = (t) => 1 - (1 - clamp(t)) ** 3;
@@ -40,9 +48,10 @@ function softTexture() {
 }
 
 // ---------- ribbon: camera-independent strip, ground conforming when gh is set ----------
+// wm/am are per-vertex width/alpha multipliers (used by packed strips and travelling fracture fronts).
 class Ribbon {
   constructor(n, mat, gh) {
-    this.n = n; this.gh = gh; this.side = null; this.p = new Float32Array(n * 3);
+    this.n = n; this.gh = gh; this.side = null; this.p = new Float32Array(n * 3); this.wm = new Float32Array(n).fill(1); this.am = new Float32Array(n).fill(1);
     const g = (this.geo = new THREE.BufferGeometry());
     this.pos = new THREE.BufferAttribute(new Float32Array(n * 6), 3).setUsage(THREE.DynamicDrawUsage);
     this.at = new THREE.BufferAttribute(new Float32Array(n * 6), 3).setUsage(THREE.DynamicDrawUsage);
@@ -52,12 +61,12 @@ class Ribbon {
   }
   set(i, x, y, z) { const p = this.p; p[i * 3] = x; p[i * 3 + 1] = y; p[i * 3 + 2] = z; }
   commit(width, reveal = 1, fade = 1, taper = 1) {
-    const { n, p, pos, at, side, gh } = this;
+    const { n, p, pos, at, side, gh, wm, am } = this;
     for (let i = 0; i < n; i++) {
       const a = Math.max(i - 1, 0) * 3, b = Math.min(i + 1, n - 1) * 3; let sx, sz;
       if (side) [sx, sz] = side;
       else { sx = -(p[b + 2] - p[a + 2]); sz = p[b] - p[a]; const l = Math.hypot(sx, sz); if (l < 1e-5) { sx = 1; sz = 0; } else { sx /= l; sz /= l; } }
-      const u = i / (n - 1), w = width * 0.5 * (taper ? 0.25 + 0.75 * Math.sin(Math.PI * u) : 1), al = fade * clamp((reveal * 1.1 - u) * 10);
+      const u = i / (n - 1), w = width * 0.5 * wm[i] * (taper ? 0.25 + 0.75 * Math.sin(Math.PI * u) : 1), al = fade * am[i] * clamp((reveal * 1.1 - u) * 10);
       const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2], k = i * 2;
       let yl = y, yr = y;
       if (gh) { const h0 = gh(x, z); yl = y + gh(x + sx * w, z + sz * w) - h0; yr = y + gh(x - sx * w, z - sz * w) - h0; }
@@ -82,7 +91,7 @@ class PointPool {
   }
   emit(p) {
     const i = this.n, s = this.s[i]; this.n = (i + 1) % this.cap;
-    Object.assign(s, { live: true, age: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 1, size: 0.5, grow: 1, alpha: 0.5, grav: 0, drag: 1 }, p);
+    Object.assign(s, { live: true, age: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 1, size: 0.5, grow: 1, alpha: 0.5, grav: 0, drag: 1, floor: -Infinity }, p);
     this.c.set(p.color ?? 0xffffff); this.C.setXYZ(i, this.c.r, this.c.g, this.c.b); this.C.needsUpdate = true;
   }
   update(dt) {
@@ -91,11 +100,13 @@ class PointPool {
       const s = this.s[i]; if (!s.live) continue; any = true; s.age += dt; const u = s.age / s.life;
       if (u >= 1) { s.live = false; this.A.setXY(i, 0, 0); continue; }
       const k = Math.exp(-s.drag * dt); s.vy -= s.grav * dt; s.vx *= k; s.vz *= k; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+      if (s.y < s.floor) { s.y = s.floor; s.vy = 0; } // falling glowing ejecta rest on the surface instead of sinking
       this.P.setXYZ(i, s.x, s.y, s.z); this.A.setXY(i, s.size * (1 + s.grow * u), s.alpha * sstep(0, 0.1, u) * (1 - sstep(0.4, 1, u)));
     }
     if (any) this.P.needsUpdate = this.A.needsUpdate = true;
   }
   live() { return this.s.reduce((n, s) => n + (s.live ? 1 : 0), 0); }
+  clear() { for (let i = 0; i < this.cap; i++) { this.s[i].live = false; this.A.setXY(i, 0, 0); } this.A.needsUpdate = true; }
   dispose() { this.geo.dispose(); this.mat.dispose(); }
 }
 
@@ -107,9 +118,9 @@ class InstPool { // instanced shards/leaves with ground settling and optional or
     this.s = Array.from({ length: cap }, () => ({ live: false, q: new THREE.Quaternion(), ax: new THREE.Vector3() }));
   }
   emit(p) {
-    const i = this.n, s = this.s[i]; this.n = (i + 1) % this.cap;
+    const i = this.n, s = this.s[i], R = p.R || Math.random; this.n = (i + 1) % this.cap;
     Object.assign(s, { live: true, age: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 1, size: 0.2, sy: 1, grav: 9, drag: 0, spin: 4, settle: true, orb: null }, p);
-    s.ax.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(); s.q.setFromAxisAngle(s.ax, Math.random() * TAU);
+    s.ax.set(R() - 0.5, R() - 0.5, R() - 0.5).normalize(); s.q.setFromAxisAngle(s.ax, R() * TAU);
     this.mesh.setColorAt(i, this.c.set(p.color ?? 0xffffff)); this.mesh.instanceColor.needsUpdate = true;
   }
   update(dt) {
@@ -131,6 +142,22 @@ class InstPool { // instanced shards/leaves with ground settling and optional or
     if (any) m.instanceMatrix.needsUpdate = true;
   }
   live() { return this.s.reduce((n, s) => n + (s.live ? 1 : 0), 0); }
+  clear() { for (let i = 0; i < this.cap; i++) { this.s[i].live = false; this.mesh.setMatrixAt(i, ZERO); } this.mesh.instanceMatrix.needsUpdate = true; }
+  dispose() { this.mesh.dispose(); }
+}
+
+class KinPool { // event-owned, script-posed instances (rock clods, fracture plates, crater rims); slots return on event end
+  constructor(geo, mat, cap) {
+    this.cap = cap; this.free = []; for (let i = cap - 1; i >= 0; i--) this.free.push(i); this.o = new THREE.Object3D(); this.c = new THREE.Color(); this.dirty = false;
+    const m = (this.mesh = new THREE.InstancedMesh(geo, mat, cap)); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < cap; i++) { m.setMatrixAt(i, ZERO); m.setColorAt(i, this.c.set(0xffffff)); }
+  }
+  claim(ev, col) { const i = this.free.pop(); if (i === undefined) return -1; ev.kin.push([this, i]); this.mesh.setColorAt(i, this.c.set(col)); this.mesh.instanceColor.needsUpdate = true; return i; }
+  put(i, x, y, z, q, sx, sy, sz) { if (i < 0) return; const o = this.o; o.position.set(x, y, z); o.quaternion.copy(q); o.scale.set(Math.max(sx, 1e-4), Math.max(sy, 1e-4), Math.max(sz, 1e-4)); o.updateMatrix(); this.mesh.setMatrixAt(i, o.matrix); this.dirty = true; }
+  hide(i) { if (i < 0) return; this.mesh.setMatrixAt(i, ZERO); this.dirty = true; }
+  release(i) { if (i < 0) return; this.hide(i); this.free.push(i); }
+  flush() { if (this.dirty) { this.mesh.instanceMatrix.needsUpdate = true; this.dirty = false; } }
+  live() { return this.cap - this.free.length; }
   dispose() { this.mesh.dispose(); }
 }
 
@@ -162,10 +189,14 @@ const RET = {
   frost: { c: [PAL.ice, PAL.teal], r: 3.4, p: () => [[circ(1, 48), 0.06, 0.1, 8], [flake(), 0.06, 0.15, 0], [circ(0.5, 6), 0.06, -0.4, 0]] },
 };
 
-export function createSpellPresentation({ scene, height, pointScale = 720, tickSeconds = 0.05 }) {
+export function createSpellPresentation({ scene, height, pointScale = 720, tickSeconds = 0.05, quality = 'high', reducedMotion = false }) {
   const H = (x, z) => { const h = height ? height(x, z) : 0; return Number.isFinite(h) ? h : 0; };
   const root = new THREE.Group(); root.name = 'SpellPresentation'; scene.add(root);
   const TIME = { value: 0 }; let clock = 0, disposed = false;
+  let Q = QUALITY[quality] || QUALITY.high, qName = QUALITY[quality] ? quality : 'high', RM = !!reducedMotion;
+  const M = () => (RM ? { shake: 0, flick: 0, spin: 0.35, swirl: 0.45, flash: 0.4 } : { shake: 1, flick: 1, spin: 1, swirl: 1, flash: 1 });
+  let MO = M();
+  const qn = (n) => Math.max(1, Math.round(n * Q.n)), qk = (n, min = 1) => Math.max(min, Math.round(n * Q.k)), qb = (n) => Math.round(n * Q.b);
   const cache = new Map(), pool = (k, f) => { let v = cache.get(k); if (!v) cache.set(k, (v = f())); return v; };
   const ribMat = (c1, c2, dash = 0, flow = 1, add = true) => pool(`r${c1}.${c2}.${dash}.${flow}.${add}`, () => new THREE.ShaderMaterial({
     uniforms: { c1: { value: new THREE.Color(c1) }, c2: { value: new THREE.Color(c2) }, t: TIME, dash: { value: dash }, flow: { value: flow } },
@@ -177,9 +208,15 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const core = new THREE.IcosahedronGeometry(1, 1), cp = core.attributes.position; // lumpy meteor, deformed by position so faces stay welded
   for (let i = 0; i < cp.count; i++) { const x = cp.getX(i), y = cp.getY(i), z = cp.getZ(i), k = 0.82 + 0.3 * Math.abs(Math.sin(x * 7.1 + y * 5.3 + z * 3.7)); cp.setXYZ(i, x * k, y * k, z * k * 1.4); }
   core.computeVertexNormals();
+  const clod = new THREE.IcosahedronGeometry(1, 0), kp = clod.attributes.position; // faceted soil/rock clod, deterministic lumps
+  for (let i = 0; i < kp.count; i++) { const x = kp.getX(i), y = kp.getY(i), z = kp.getZ(i), k = 0.78 + 0.32 * Math.abs(Math.sin(x * 4.3 + y * 6.1 + z * 2.9)); kp.setXYZ(i, x * k, y * k * 0.82, z * k); }
+  clod.computeVertexNormals();
+  const plate = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1), pp = plate.attributes.position; // torn ground plate: bevel-less box with a skewed broken edge
+  for (let i = 0; i < pp.count; i++) { const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i); if (y > 0) pp.setXYZ(i, x * (0.92 + 0.08 * Math.sign(z)), y, z + 0.06 * Math.sin(x * 9)); }
+  plate.computeVertexNormals();
   const leafShape = new THREE.Shape(); leafShape.moveTo(0, -0.5); leafShape.quadraticCurveTo(0.5, -0.1, 0, 0.5); leafShape.quadraticCurveTo(-0.5, -0.1, 0, -0.5);
   const G = {
-    bone: new THREE.CylinderGeometry(0.045, 0.07, 1, 6), slab: new THREE.BoxGeometry(1, 1, 1), rock: new THREE.DodecahedronGeometry(1, 0), core,
+    bone: new THREE.CylinderGeometry(0.045, 0.07, 1, 6), slab: new THREE.BoxGeometry(1, 1, 1), rock: new THREE.DodecahedronGeometry(1, 0), core, clod, plate,
     crystal: new THREE.LatheGeometry([[0, 0], [0.26, 0], [0.2, 0.72], [0, 1]].map(([x, y]) => new THREE.Vector2(x, y)), 6),
     disc: new THREE.RingGeometry(0.2, 1, 40).rotateX(-Math.PI / 2), flame: new THREE.ConeGeometry(0.55, 3.2, 8, 1, true).translate(0, 1.6, 0),
     shard: new THREE.OctahedronGeometry(1, 0).scale(0.35, 1, 0.35), leaf: new THREE.ShapeGeometry(leafShape).scale(0.35, 0.35, 1),
@@ -188,7 +225,10 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const dust = new PointPool(CAPS.dust, false, tex, pointScale), glow = new PointPool(CAPS.glow, true, tex, pointScale);
   const shards = new InstPool(G.shard, new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true, emissive: 0x201814 }), CAPS.shard, H);
   const leaves = new InstPool(G.leaf, new THREE.MeshStandardMaterial({ roughness: 0.8, side: THREE.DoubleSide, emissive: 0x10240c }), CAPS.leaf, H);
-  const pools = [dust, glow, shards, leaves]; root.add(dust.obj, glow.obj, shards.mesh, leaves.mesh);
+  // Same material parameters as the shard pool so the instanced-standard program is shared (no new shader variant).
+  const kinMat = new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true, emissive: 0x201814 });
+  const slabs = new KinPool(G.plate, kinMat, KCAPS.slab), rocks = new KinPool(G.clod, kinMat, KCAPS.rock), kins = [slabs, rocks];
+  const pools = [dust, glow, shards, leaves]; root.add(dust.obj, glow.obj, shards.mesh, leaves.mesh, slabs.mesh, rocks.mesh);
   async function prepareShaders(renderer, camera, targetScene) {
     // Representatives share the real cached materials. This group is never
     // attached/rendered and never emits a spell or modifies authoritative state.
@@ -196,7 +236,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     const ribbon = new Ribbon(2, ribMat(PAL.amber, PAL.gold), H);
     preview.add(ribbon.mesh, new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)),
       new THREE.Mesh(G.disc, glowMat(PAL.amber)));
-    root.traverse(node => { if (node.isMesh || node.isPoints) preview.add(node.clone(false)); });
+    root.traverse(node => { if (node.isMesh || node.isPoints) { const k = node.clone(false); k.visible = true; preview.add(k); } }); // pooled meshes may be hidden while idle
     try { await renderer.compileAsync(preview, camera, targetScene); }
     finally { ribbon.dispose(); preview.clear(); }
   }
@@ -218,56 +258,110 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const gLine = (rb, ax, az, bx, bz, lift = 0.1) => { for (let i = 0; i < rb.n; i++) { const u = i / (rb.n - 1), x = lp(ax, bx, u), z = lp(az, bz, u); rb.set(i, x, H(x, z) + lift, z); } };
 
   // particle recipes (c.R is the event's deterministic random source)
-  const puff = (c, x, z, n, spd, sz, col, al = 0.5, life = 1.5) => { for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * (0.35 + c.R()); dust.emit({ x, y: H(x, z) + 0.15, z, vx: Math.cos(a) * s, vy: 0.4 + c.R() * 1.4, vz: Math.sin(a) * s, life: life * (0.7 + c.R() * 0.6), size: sz * (0.6 + c.R()), grow: 1.6, color: col, alpha: al, grav: -0.3, drag: 1.8 }); } };
-  const debris = (c, x, z, n, spd, sz, cols, up = 5) => { for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * (0.3 + c.R()); shards.emit({ x, y: H(x, z) + 0.1, z, vx: Math.cos(a) * s, vy: up * (0.5 + c.R()), vz: Math.sin(a) * s, life: 2 + c.R() * 1.2, size: sz * (0.6 + c.R() * 0.9), sy: 1 + c.R() * 1.5, color: cols[i % cols.length], grav: 14, drag: 0.3 }); } };
-  const sparks = (c, x, y, z, n, spd, col, sz = 0.2, life = 1) => { for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * c.R(); glow.emit({ x, y, z, vx: Math.cos(a) * s, vy: spd * (0.2 + c.R()), vz: Math.sin(a) * s, life: life * (0.6 + c.R() * 0.8), size: sz * (0.5 + c.R()), grow: -0.4, color: col, alpha: 0.9, grav: 4, drag: 1 }); } };
+  const puff = (c, x, z, n, spd, sz, col, al = 0.5, life = 1.5) => { n = qn(n); for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * (0.35 + c.R()); dust.emit({ x, y: H(x, z) + 0.15, z, vx: Math.cos(a) * s, vy: 0.4 + c.R() * 1.4, vz: Math.sin(a) * s, life: life * (0.7 + c.R() * 0.6), size: sz * (0.6 + c.R()), grow: 1.6, color: col, alpha: al, grav: -0.3, drag: 1.8 }); } };
+  const debris = (c, x, z, n, spd, sz, cols, up = 5) => { n = qn(n); for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * (0.3 + c.R()); shards.emit({ R: c.R, x, y: H(x, z) + 0.1, z, vx: Math.cos(a) * s, vy: up * (0.5 + c.R()), vz: Math.sin(a) * s, life: 2 + c.R() * 1.2, size: sz * (0.6 + c.R() * 0.9), sy: 1 + c.R() * 1.5, color: cols[i % cols.length], grav: 14, drag: 0.3, spin: 4 * MO.spin }); } };
+  const sparks = (c, x, y, z, n, spd, col, sz = 0.2, life = 1) => { n = qn(n); for (let i = 0; i < n; i++) { const a = c.R() * TAU, s = spd * c.R(); glow.emit({ x, y, z, vx: Math.cos(a) * s, vy: spd * (0.2 + c.R()), vz: Math.sin(a) * s, life: life * (0.6 + c.R() * 0.8), size: sz * (0.5 + c.R()), grow: -0.4, color: col, alpha: 0.9, grav: 4, drag: 1, floor: H(x, z) + 0.05 }); } };
   const motes = (c, x, z, r, col, sz = 0.2, rise = 1.2) => { const a = c.R() * TAU, q = r * c.R(), px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q; glow.emit({ x: px, y: H(px, pz) + 0.2, z: pz, vy: rise * (0.6 + c.R()), life: 1.4, size: sz, grow: -0.3, color: col, alpha: 0.8, drag: 0.5 }); };
+  // Surface-attached directional dust: born on the terrain at (x,z), driven along (dx,dz) with a low billow.
+  const dustDir = (c, x, z, dx, dz, spd, sz, col, al = 0.45, life = 1.8, spread = 0.35, lift = 0.5) => {
+    const a = Math.atan2(dz, dx) + (c.R() - 0.5) * 2 * spread, s = spd * (0.55 + c.R() * 0.7);
+    dust.emit({ x, y: H(x, z) + 0.12, z, vx: Math.cos(a) * s, vy: lift * (0.4 + c.R()), vz: Math.sin(a) * s, life: life * (0.75 + c.R() * 0.5), size: sz * (0.7 + c.R() * 0.6), grow: 1.8, color: col, alpha: al, grav: -0.12, drag: 1.7 });
+  };
+  // Ballistic ejecta that lands on the real terrain at distance d along angle a after flight time T.
+  const ejecta = (c, x, z, a, d, T, sz, col, sy = 1.4) => {
+    const tx = x + Math.cos(a) * d, tz = z + Math.sin(a) * d, y0 = H(x, z) + 0.2, dh = H(tx, tz) - y0, g = 14;
+    shards.emit({ R: c.R, x, y: y0, z, vx: (tx - x) / T, vy: (dh + 0.5 * g * T * T) / T, vz: (tz - z) / T, life: T + 1.4 + c.R() * 0.8, size: sz, sy, color: col, grav: g, drag: 0, spin: (3 + c.R() * 5) * MO.spin });
+  };
 
   // ---------- events ----------
   const events = new Map(), recent = new Map();
   const mk = (ev, n, mat, gh = H) => { const r = new Ribbon(n, mat, gh); ev.g.add(r.mesh); ev.rib.push(r); return r; };
   const mesh = (ev, geo, mat) => { const m = new THREE.Mesh(geo, mat); ev.g.add(m); return m; };
   const own = (ev, geo, col) => { const mat = glowMat(col).clone(); ev.own.push(mat); return mesh(ev, geo, mat); };
-  function kill(key) { const ev = events.get(key); if (!ev) return; root.remove(ev.g); ev.rib.forEach((r) => r.dispose()); ev.own.forEach((m) => m.dispose()); events.delete(key); }
+  // Packed strips: k independent ground strands of m points in ONE ribbon (one draw). Zero-alpha join vertices separate strands.
+  const strips = (ev, k, m, mat, gh = H) => ({ rb: k > 0 ? mk(ev, k * (m + 2), mat, gh) : null, k, m });
+  const strand = (S, j, rv, alpha, wfn, pfn) => { // rv: grown fraction; pfn(s, out) writes the point at path parameter s into out
+    const rb = S.rb, m = S.m, o = j * (m + 2), on = rv > 0.002;
+    for (let i = 0; i < m; i++) { const s = Math.min(i / (m - 1), rv); pfn(s, P3); rb.set(o + 1 + i, P3[0], P3[1], P3[2]); rb.am[o + 1 + i] = on ? alpha : 0; rb.wm[o + 1 + i] = on ? wfn(s / rv) : 0; }
+    const p = rb.p; for (let q = 0; q < 3; q++) { p[o * 3 + q] = p[(o + 1) * 3 + q]; p[(o + m + 1) * 3 + q] = p[(o + m) * 3 + q]; } rb.am[o] = rb.am[o + m + 1] = 0; rb.wm[o] = rb.wm[o + m + 1] = 0;
+  };
+  function kill(key) { const ev = events.get(key); if (!ev) return; root.remove(ev.g); ev.rib.forEach((r) => r.dispose()); ev.own.forEach((m) => m.dispose()); ev.kin.forEach(([p, i]) => p.release(i)); ev.kin.length = 0; events.delete(key); }
   function startEvent(key, persist, build, c) {
     if (disposed || events.has(key) || recent.has(key)) return null;
     if (events.size >= MAX_EVENTS) kill(events.keys().next().value);
-    const ev = { key, age: 0, dur: 2, g: new THREE.Group(), rib: [], own: [], fx: [], persist, closing: -1 }; root.add(ev.g); events.set(key, ev);
+    const ev = { key, age: 0, dur: 2, g: new THREE.Group(), rib: [], own: [], fx: [], kin: [], persist, closing: -1 }; root.add(ev.g); events.set(key, ev);
     build(ev, c); ev.dur = Math.min(ev.dur, MAX_LIFE); if (!persist) recent.set(key, clock + ev.dur + 8); return ev;
   }
   const pulse = (ev, c, mat, r0, r1, t0, t1, w = 0.4, x = c.x, z = c.z) => { // expanding/contracting ground ring
     const rb = mk(ev, 56, mat);
     ev.fx.push((age) => { const u = (age - t0) / (t1 - t0); rb.mesh.visible = u >= 0 && u <= 1; if (!rb.mesh.visible) return; gRing(rb, x, z, lp(r0, r1, easeOut(u)), age, 0.08, 0.04, age * 5); rb.commit(w * (1 - 0.5 * u), 1, 1 - u); });
   };
+  // Ground annulus (scorch/soil/moss) that spreads then fades. Split into <=0.9 m concentric bands packed in ONE ribbon
+  // so every band hugs the terrain (a single wide strip lets bumps poke through and leaves holes).
+  const decal = (ev, c, mat, rIn, rOut, alpha, t0, t1, tEnd, x = c.x, z = c.z, wob = 0.08, ph = 0) => {
+    const nb = Math.max(1, Math.ceil((rOut - rIn) / 0.9)), S = strips(ev, nb, 56, mat); S.rb.mesh.renderOrder = 1; let bw = 0.1;
+    ev.fx.push((age) => {
+      const g = easeOut((age - t0) / (t1 - t0)), f = alpha * g * (1 - sstep(tEnd - 0.7, tEnd, age)); S.rb.mesh.visible = f > 0.005; if (!S.rb.mesh.visible) return;
+      const ro = lp(rIn + 0.05, rOut, g); bw = (ro - rIn) / nb;
+      for (let j = 0; j < nb; j++) { const rc = rIn + bw * (j + 0.5); strand(S, j, 1, f, () => 1, (s, o) => { const a = ph + TAU * s, q = rc * (1 + wob * Math.sin(a * 7 + ph * 3)), px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q; o[0] = px; o[1] = H(px, pz) + 0.07; o[2] = pz; }); }
+      S.rb.commit(bw * 1.38, 1, 1, 0); // smoothstep edges (.45..1 of half-width) are symmetric: 1.38x spacing sums neighbouring bands to ~flat coverage
+    });
+  };
   const amberM = () => ribMat(PAL.amber, PAL.gold, 0, 1.5), purpleM = () => ribMat(PAL.purple, PAL.teal, 0, 1), tealM = () => ribMat(PAL.teal, PAL.purple, 0, 1), greenM = () => ribMat(PAL.leaf, PAL.gold, 0, 1);
+  const gougeM = () => ribMat(PAL.gouge, PAL.char, 0, 0, false), soilM = () => ribMat(PAL.soil, PAL.loam, 0, 0.3, false), barkM = () => ribMat(PAL.bark, PAL.barkHi, 0, 0.6, false);
+  const moltenM = () => ribMat(PAL.ember, PAL.gold, 0, 2.2), veinM = () => ribMat(PAL.leaf, PAL.gold, 0, 1.6);
+  const qRock = (q, rx, ry, rz) => q.setFromEuler(EU.set(rx, ry, rz, 'XYZ'));
 
   const summon = (ev, c, x, z, sc, t0) => { // bone/rock helix with ribs thrusting from the ground
     const R = c.R, hx = mk(ev, 44, ribMat(PAL.bone, PAL.purple, 0, 1.4), null), bones = []; let acc = 0, burst = false;
     for (let i = 0; i < 6; i++) bones.push({ m: mesh(ev, G.bone, solid(PAL.bone, PAL.violet, 0.35)), a: (i / 6) * TAU + R() * 0.4 });
     pulse(ev, c, purpleM(), 0.3 * sc, 1.6 * sc, t0, t0 + 0.9, 0.35 * sc, x, z);
+    decal(ev, c, soilM(), 0.15 * sc, 1.25 * sc, 0.5, t0, t0 + 0.4, t0 + 2.2, x, z);
     ev.fx.push((age, dt) => {
       const t = age - t0, on = t >= 0 && t < 1.9; hx.mesh.visible = on; bones.forEach((b) => (b.m.visible = on)); if (!on) return;
-      if (!burst) { burst = true; puff(c, x, z, 10, 2.2 * sc, 0.9 * sc, PAL.dust); debris(c, x, z, 8, 3.5 * sc, 0.12 * sc, [PAL.bone, PAL.slate], 4); }
+      if (!burst) { burst = true; for (let i = 0; i < qn(10); i++) { const a = R() * TAU; dustDir(c, x + Math.cos(a) * 0.6 * sc, z + Math.sin(a) * 0.6 * sc, Math.cos(a), Math.sin(a), 2.2 * sc, 0.9 * sc, PAL.dust, 0.45); } debris(c, x, z, 8, 3.5 * sc, 0.12 * sc, [PAL.bone, PAL.slate], 4); }
       const grow = sstep(0, 0.7, t), fade = 1 - sstep(1.4, 1.9, t), gy = H(x, z);
-      for (let i = 0; i < 44; i++) { const u = i / 43, a = u * TAU * 2.2 + age * 3, r = (0.95 - 0.5 * u) * sc; hx.set(i, x + Math.cos(a) * r, gy + 0.1 + u * 2.3 * sc * grow, z + Math.sin(a) * r); }
+      for (let i = 0; i < 44; i++) { const u = i / 43, a = u * TAU * 2.2 + age * 3 * MO.swirl, r = (0.95 - 0.5 * u) * sc; hx.set(i, x + Math.cos(a) * r, gy + 0.1 + u * 2.3 * sc * grow, z + Math.sin(a) * r); }
       hx.commit(0.16 * sc, grow, fade);
       for (const b of bones) {
         const len = (0.9 + 0.4 * Math.sin(b.a * 3)) * sc * backOut(t / 0.8) * (1 - sstep(1.4, 1.9, t)), bx = x + Math.cos(b.a) * 0.95 * sc, bz = z + Math.sin(b.a) * 0.95 * sc;
         V.set(-Math.cos(b.a) * 0.45, 1, -Math.sin(b.a) * 0.45).normalize();
         b.m.position.set(bx, H(bx, bz) - 0.05, bz).addScaledVector(V, len / 2); b.m.quaternion.setFromUnitVectors(UP, V); b.m.scale.set(sc, Math.max(len, 0.001), sc);
       }
-      acc += dt * (t < 1.2 ? 18 : 0);
-      while (acc >= 1) { acc--; shards.emit({ orb: { cx: x, cz: z, a: R() * TAU, r: 1.1 * sc, w: 3.2, dr: -0.35 * sc }, y: gy + 0.1, vy: 1.1 + R(), grav: 0, life: 1, size: 0.07 * sc, color: R() < 0.5 ? PAL.bone : PAL.purple, spin: 7, settle: false }); }
+      acc += dt * (t < 1.2 ? 18 * Q.n : 0);
+      while (acc >= 1) { acc--; shards.emit({ R, orb: { cx: x, cz: z, a: R() * TAU, r: 1.1 * sc, w: 3.2 * MO.swirl, dr: -0.35 * sc }, y: gy + 0.1, vy: 1.1 + R(), grav: 0, life: 1, size: 0.07 * sc, color: R() < 0.5 ? PAL.bone : PAL.purple, spin: 7 * MO.spin, settle: false }); }
     });
   };
-  const roots = (ev, c, n, radius, t1) => { // ground roots spiralling outward
-    const R = c.R, list = Array.from({ length: n }, (_, k) => ({ rb: mk(ev, 30, greenM()), a0: (k / n) * TAU + R() * 0.3, dir: k % 2 ? -1 : 1, len: 0.8 + R() * 0.2, w: 0.14 + R() * 0.1 }));
-    ev.fx.push((age) => { const rv = easeOut(age / t1), fade = 1 - sstep(ev.dur - 0.8, ev.dur, age); for (const p of list) { for (let i = 0; i < 30; i++) { const u = i / 29, a = p.a0 + p.dir * 1.3 * u + Math.sin(u * 9 + p.a0) * 0.12, r = radius * p.len * u, x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r; p.rb.set(i, x, H(x, z) + 0.1, z); } p.rb.commit(p.w, rv, fade); } });
+
+  // Living roots: staggered main roots + forking sub-roots, bark strands (normal blend) with a glowing sap vein, tip motes and sprouts.
+  const groveRoots = (ev, c, n, radius, start, grow, opt = {}) => {
+    const R = c.R, nb = opt.branches ?? qb(n), list = [];
+    const order = Array.from({ length: n }, (_, k) => k); for (let k = n - 1; k > 0; k--) { const j = (R() * (k + 1)) | 0; [order[k], order[j]] = [order[j], order[k]]; }
+    for (let k = 0; k < n; k++) { const t0 = start + order[k] * (grow * 0.32) + R() * 0.08; list.push({ a0: (k / n) * TAU + R() * 0.45, dir: R() < 0.5 ? -1 : 1, curl: 0.6 + R() * 0.8, len: radius * (0.72 + R() * 0.3), w: 0.28 + R() * 0.14, t0, T: grow * (0.8 + R() * 0.4), r0: 0.25, sprouted: false, motes: 0 }); }
+    for (let k = 0; k < nb; k++) { const p = list[k % n], s0 = 0.35 + R() * 0.3; list.push({ parent: p, s0, a0: 0, dir: -p.dir, curl: 0.9 + R() * 0.8, len: p.len * (0.35 + R() * 0.2), w: p.w * 0.55, t0: p.t0 + p.T * s0, T: grow * 0.6, sprouted: false, motes: 0 }); }
+    const bark = strips(ev, list.length, 14, barkM()), vein = strips(ev, n, 14, veinM()); if (vein.rb) vein.rb.mesh.renderOrder = 3;
+    const path = (p) => {
+      if (p.parent) { const q = p.parent, ps = [0, 0, 0]; pathOf(q)(p.s0, ps); const ba = q.a0 + q.dir * q.curl * p.s0 + p.dir * 0.9; return (s, o) => { const a = ba + p.dir * p.curl * s * 0.6 + Math.sin(s * 7 + p.len) * 0.1, r = p.len * s, x = ps[0] + Math.cos(a) * r, z = ps[2] + Math.sin(a) * r; o[0] = x; o[1] = H(x, z) + 0.06; o[2] = z; }; }
+      return (s, o) => { const a = p.a0 + p.dir * p.curl * s + Math.sin(s * 9 + p.a0) * 0.1, r = p.r0 + (p.len - p.r0) * s, x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r; o[0] = x; o[1] = H(x, z) + 0.06; o[2] = z; };
+    };
+    const pathOf = (p) => p.fn || (p.fn = path(p)); list.forEach(pathOf);
+    const tip = [0, 0, 0];
+    ev.fx.push((age, dt) => {
+      const fade = 1 - sstep(ev.dur - 0.8, ev.dur, age);
+      list.forEach((p, j) => {
+        const rv = easeOut((age - p.t0) / p.T), bw = p.w * (1 + 0.25 * Math.sin(age * 6 - j) * MO.shake * (rv < 1 ? 1 : 0));
+        strand(bark, j, rv, fade, (u) => 1.35 * bw * (1 - 0.8 * u) * (u < 0.06 ? 0.4 + u * 10 : 1) / 0.28, p.fn);
+        if (j < n && vein.rb) strand(vein, j, rv, fade * (0.55 + 0.45 * (1 - sstep(p.t0 + p.T, p.t0 + p.T + 1, age))), (u) => p.w * 0.45 * (1 - 0.85 * u) / 0.12, p.fn);
+        if (rv > 0.02 && rv < 1) { p.motes += dt * 7 * Q.n; while (p.motes >= 1) { p.motes--; p.fn(rv, tip); glow.emit({ x: tip[0], y: tip[1] + 0.12, z: tip[2], vx: (R() - 0.5) * 0.4, vy: 0.5 + R() * 0.9, vz: (R() - 0.5) * 0.4, life: 1.1, size: 0.2 + R() * 0.12, grow: -0.4, color: R() < 0.55 ? PAL.gold : PAL.mint, alpha: 0.85, drag: 0.8 }); if (R() < 0.35) dust.emit({ x: tip[0], y: tip[1] + 0.05, z: tip[2], vy: 0.25, life: 1.2, size: 0.45, grow: 1.4, color: PAL.loam, alpha: 0.35, drag: 2 }); } }
+        if (rv >= 1 && !p.sprouted) { p.sprouted = true; p.fn(1, tip); const ns = p.parent ? 1 : qn(3); for (let i = 0; i < ns; i++) leaves.emit({ R, x: tip[0] + (R() - 0.5) * 0.3, y: tip[1] + 0.12, z: tip[2] + (R() - 0.5) * 0.3, vy: 0.35 + R() * 0.3, grav: 0, drag: 3, life: ev.dur - age + 0.2, size: 0.4 + R() * 0.2, color: R() < 0.25 ? PAL.gold : R() < 0.6 ? PAL.leaf : PAL.moss, spin: 0.6 * MO.spin, settle: false }); }
+      });
+      bark.rb?.commit(0.28, 1, 1, 0); vein.rb?.commit(0.12, 1, 1, 0);
+    });
   };
-  const leafSwirl = (ev, c, r0, r1, w, until, rate) => { let acc = 0; ev.fx.push((age, dt) => { if (age > until) return; acc += dt * rate; while (acc >= 1) { acc--; leaves.emit({ orb: { cx: c.x, cz: c.z, a: c.R() * TAU, r: lp(r0, r1, c.R()), w, dr: 0.25 }, y: c.y + 0.2, vy: 0.9 + c.R(), grav: 0, life: 1.9, size: 0.3, color: c.R() < 0.3 ? PAL.gold : c.R() < 0.6 ? PAL.leaf : PAL.moss, spin: 3, settle: false }); } if (c.R() < dt * 8) motes(c, c.x, c.z, r1, PAL.gold, 0.18); }); };
-  const chunks = (ev, c, n, r0, r1, dir) => { // raise (dir 1) / lower (dir -1) earth chunks
-    const R = c.R, list = Array.from({ length: n }, () => ({ m: mesh(ev, G.rock, solid(R() < 0.5 ? PAL.earth : PAL.stone, PAL.amber, 0.1)), a: R() * TAU, r: lp(r0, r1, R()), s: 0.22 + R() * 0.3, d: R() * 0.35, h: 0.4 + R() * 0.7, rot: R() * 4 }));
-    ev.fx.push((age) => { for (const p of list) { const t = age - p.d, up = dir > 0 ? backOut(t / 0.55) * (1 - sstep(1.8, 2.4, age)) : 1 - sstep(p.d, p.d + 0.9, age), x = c.x + Math.cos(p.a) * p.r, z = c.z + Math.sin(p.a) * p.r; p.m.visible = t > 0 && up > 0.01; p.m.position.set(x, H(x, z) + (dir > 0 ? p.h * up * 0.5 + Math.sin(age * 2 + p.rot) * 0.04 : 0.3 - (1 - up) * 1.2), z); p.m.rotation.set(p.rot + age * 0.4 * dir, p.rot * 2, 0); p.m.scale.set(p.s * (dir > 0 ? up : 1), p.s * 0.8, p.s); } });
+  const leafSwirl = (ev, c, r0, r1, w, until, rate, from = 0) => { let acc = 0; ev.fx.push((age, dt) => { if (age > until || age < from) return; acc += dt * rate * Q.n; while (acc >= 1) { acc--; leaves.emit({ R: c.R, orb: { cx: c.x, cz: c.z, a: c.R() * TAU, r: lp(r0, r1, c.R()), w: w * MO.swirl, dr: 0.25 }, y: c.y + 0.2, vy: 0.9 + c.R(), grav: 0, life: 1.9, size: 0.3, color: c.R() < 0.3 ? PAL.gold : c.R() < 0.6 ? PAL.leaf : PAL.moss, spin: 3 * MO.spin, settle: false }); } if (c.R() < dt * 8 * Q.n) motes(c, c.x, c.z, r1, PAL.gold, 0.18); }); };
+  const chunks = (ev, c, n, r0, r1, dir) => { // lower (dir -1) / legacy raise chunks, now pooled kinematic clods
+    const R = c.R, list = Array.from({ length: qk(n, 3) }, () => ({ i: rocks.claim(ev, R() < 0.5 ? PAL.earth : PAL.stone), a: R() * TAU, r: lp(r0, r1, R()), s: 0.22 + R() * 0.3, d: R() * 0.35, h: 0.4 + R() * 0.7, rot: R() * 4 }));
+    ev.fx.push((age) => { for (const p of list) { const t = age - p.d, up = dir > 0 ? backOut(t / 0.55) * (1 - sstep(1.8, 2.4, age)) : 1 - sstep(p.d, p.d + 0.9, age), x = c.x + Math.cos(p.a) * p.r, z = c.z + Math.sin(p.a) * p.r; if (!(t > 0 && up > 0.01)) { rocks.hide(p.i); continue; } qRock(QT, p.rot + age * 0.4 * dir * MO.spin, p.rot * 2, 0); rocks.put(p.i, x, H(x, z) + (dir > 0 ? p.h * up * 0.5 : 0.3 - (1 - up) * 1.2), z, QT, p.s * (dir > 0 ? up : 1), p.s * 0.8, p.s); } });
   };
 
   const FX = {
@@ -276,88 +370,184 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     golem(ev, c) {
       ev.dur = 3.2; const { x, z, R } = c, gy = c.y, ring = mk(ev, 64, ribMat(PAL.gold, PAL.ember, 0, 1.5));
       const parts = [[-0.36, 0, 0.42, 0.9, 0.46], [0.36, 0, 0.42, 0.9, 0.46], [0, 0.9, 1.2, 1, 0.7], [0, 1.95, 0.52, 0.46, 0.5], [-0.88, 0.95, 0.36, 0.95, 0.42], [0.88, 0.95, 0.36, 0.95, 0.42]].map(([px, py, w, h, d], i) => {
-        const a = R() * TAU, r = 2.2 + R(); return { m: mesh(ev, i === 3 ? G.rock : G.slab, solid(i === 3 ? PAL.earth : PAL.stone, PAL.amber, 0.12)), px, py, w, h, d, sx: x + Math.cos(a) * r, sz: z + Math.sin(a) * r, q: new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * 6, R() * 6, R() * 6)), t0: 0.15 + i * 0.17, landed: false };
+        const a = R() * TAU, r = 2.2 + R(); return { m: mesh(ev, i === 3 ? G.rock : G.slab, solid(i === 3 ? PAL.earth : PAL.stone, PAL.amber, 0.12)), px, py, w, h, d, sx: x + Math.cos(a) * r, sz: z + Math.sin(a) * r, q: new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * 6, R() * 6, R() * 6)), t0: 0.15 + i * 0.17, landed: false, dug: false };
       });
       pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1.2), 0.5, 3, 0, 1.1, 0.4); pulse(ev, c, ribMat(PAL.amber, PAL.ember, 0, 1), 0.5, 2.2, 1.6, 2.5, 0.35);
+      decal(ev, c, soilM(), 0.2, 1.6, 0.45, 0.1, 0.6, 3.2);
       ev.fx.push((age) => {
         const k = 1 - sstep(2.4, 3, age); gRing(ring, x, z, 1.5 + 0.3 * Math.sin(age * 2), age, 0.1, 0.14, age * 3); ring.commit(0.2, easeOut(age / 0.8), k * sstep(0, 0.3, age));
         for (const p of parts) {
           const u = clamp((age - p.t0) / 0.9), e = easeOut(u), fx = x + p.px, fy = gy + p.py + p.h / 2;
           p.m.visible = u > 0 && k > 0.01; if (!p.m.visible) continue;
+          if (!p.dug) { p.dug = true; const dx = x - p.sx, dz = z - p.sz; for (let i = 0; i < qn(4); i++) dustDir(c, p.sx, p.sz, dx, dz, 1.6, 0.7, PAL.dust, 0.4, 1.4, 0.6); debris(c, p.sx, p.sz, 2, 1.5, 0.1, [PAL.earth], 3); }
           p.m.position.set(lp(p.sx, fx, e), lp(H(p.sx, p.sz) - 0.4, fy, e) + Math.sin(u * Math.PI) * 1.4, lp(p.sz, z, e)); p.m.quaternion.slerpQuaternions(p.q, QI, e); p.m.scale.set(p.w * k, p.h * k, p.d * k);
-          if (u >= 1 && !p.landed) { p.landed = true; puff(c, fx, z, 4, 1.8, 0.7, PAL.dust, 0.45); debris(c, fx, z, 2, 2, 0.1, [PAL.stone], 3); }
+          if (u >= 1 && !p.landed) { p.landed = true; for (let i = 0; i < qn(5); i++) { const a = R() * TAU; dustDir(c, fx, z, Math.cos(a), Math.sin(a), 1.8, 0.7, PAL.dust, 0.45, 1.5, 0.3, 0.3); } debris(c, fx, z, 2, 2, 0.1, [PAL.stone], 3); }
         }
         if (age > 2.4 && age < 3) puff(c, x + (R() - 0.5) * 1.5, z, 1, 1.5, 1, PAL.dust, 0.4);
       });
     },
-    raise(ev, c) { ev.dur = 2.4; pulse(ev, c, amberM(), 0.3, 2.6, 0, 0.8, 0.45); pulse(ev, c, ribMat(PAL.gold, PAL.earth, 0, 1), 0.3, 1.8, 0.2, 1.0, 0.3); chunks(ev, c, 9, 0.2, 1.8, 1); puff(c, c.x, c.z, 18, 3, 1, PAL.dust, 0.55); debris(c, c.x, c.z, 14, 4, 0.16, [PAL.earth, PAL.stone, PAL.gold], 8); },
-    lower(ev, c) {
-      ev.dur = 2.4; pulse(ev, c, purpleM(), 2.8, 0.3, 0, 0.9, 0.4); pulse(ev, c, tealM(), 2.2, 0.2, 0.4, 1.3, 0.3); chunks(ev, c, 9, 0.2, 1.8, -1); puff(c, c.x, c.z, 14, 2.2, 1, PAL.dust, 0.5);
-      for (let i = 0; i < 16; i++) shards.emit({ orb: { cx: c.x, cz: c.z, a: c.R() * TAU, r: 1.2 + c.R() * 1.2, w: 1.2, dr: -1.1 }, y: c.y + 0.4 + c.R() * 0.6, vy: -0.4, grav: 0, life: 1.4, size: 0.12, color: i % 2 ? PAL.purple : PAL.earth, settle: false });
-    },
-    sunder(ev, c) {
-      ev.dur = 3.2; const { ax, az, bx, bz, len, ang, R } = c, n = Math.min(110, Math.max(24, Math.ceil(len / 0.45))), jit = Float32Array.from({ length: n }, () => R() * 2 - 1);
-      const nx = -Math.sin(ang), nz = Math.cos(ang), np = Math.min(14, Math.max(4, Math.ceil(len / 1.1))), pl = [];
-      const dark = mk(ev, n, ribMat(PAL.slate, 0x120d16, 0, 0, false)), heat = mk(ev, n, ribMat(PAL.ember, PAL.gold, 0, 2.2)); dark.mesh.renderOrder = 1; let acc = 0;
-      for (const s of [-1, 1]) for (let k = 0; k < np; k++) { const m = mesh(ev, G.slab, solid([PAL.earth, PAL.stone, 0x6b5a49, PAL.slate][(k + (s > 0 ? 1 : 0)) % 4], PAL.ember, 0.08)); m.rotation.order = 'YXZ'; pl.push({ s, u: (k + 0.5) / np, m, w: 0.35 + R() * 0.5, tilt: 0.35 + R() * 0.45 }); }
+    // RAISE EARTH: ground shudders (soil decal + radial fissures), clods churn up from below in a spiral and heap into a mound,
+    // a crown of soil is flung up, loose rocks tumble down the flanks and a low dust skirt rolls outward over the terrain.
+    raise(ev, c) {
+      ev.dur = 2.9; const { x, z, R } = c, r = c.radius ?? 2.4;
+      pulse(ev, c, amberM(), 0.3, r * 1.1, 0, 0.7, 0.32);
+      decal(ev, c, soilM(), 0.1, r * 1.05, 0.62, 0, 0.45, 2.9, x, z, 0.1, R() * 6);
+      const nf = qk(8, 4), fis = strips(ev, nf, 10, gougeM()), fl = Array.from({ length: nf }, (_, k) => ({ a: (k / nf) * TAU + R() * 0.5, L: r * (0.85 + R() * 0.45), t0: R() * 0.12, j: Array.from({ length: 10 }, () => (R() - 0.5) * 0.5) }));
+      const clods = Array.from({ length: qk(22, 8) }, (_, k) => { const r0 = r * (0.3 + 0.75 * Math.sqrt(R())), s = 0.22 + R() * 0.24 + (1 - r0 / r) * 0.18; return { i: rocks.claim(ev, [PAL.soil, PAL.loam, PAL.earth, PAL.clay, PAL.stone][k % 5]), a0: R() * TAU, r0, s, d: 0.05 + (r0 / r) * 0.22 + R() * 0.12, w: (k % 2 ? 1 : -1) * (0.7 + R() * 0.6), rx: R() * 6, ry: R() * 6, sp: 2 + R() * 3, settle: 0.85 + R() * 0.3 }; });
+      const cores = Array.from({ length: qk(3, 2) }, (_, k) => ({ i: rocks.claim(ev, k ? PAL.stone : PAL.slate), a: R() * TAU, o: k ? 0.35 + R() * 0.25 : 0, s: 0.55 + R() * 0.2, t0: 0.16 + k * 0.08, rx: R() * 3, ry: R() * 6 }));
+      const mound = (rr, age) => 1.35 * Math.max(0, 1 - rr / r) ** 1.3 * backOut((age - 0.12) / 0.8) * (1 - 0.15 * sstep(1.4, 2.2, age));
+      let crown = false, accT = 0, accS = 0, accC = 0;
       ev.fx.push((age, dt) => {
-        const rv = easeOut(age / 1.2), fade = 1 - sstep(2.3, 3.2, age), hp = 0.75 + 0.25 * Math.sin(age * 9);
-        for (const rb of [dark, heat]) for (let i = 0; i < n; i++) { const u = i / (n - 1), o = jit[i] * 0.38 * Math.min(1, u * 6, (1 - u) * 6), x = lp(ax, bx, u) + nx * o, z = lp(az, bz, u) + nz * o; rb.set(i, x, H(x, z) + 0.1, z); }
-        dark.commit(0.9 + 0.5 * rv, rv, fade * 0.85); heat.commit(0.28 + 0.2 * hp, rv, fade * hp * (1 - sstep(1.2, 2.6, age) * 0.6));
-        for (const p of pl) {
-          const r = clamp((rv * 1.05 - p.u) * 7), k = r * fade; p.m.visible = k > 0.01; if (!p.m.visible) continue;
-          const x = lp(ax, bx, p.u) + nx * p.s * (0.55 + p.w * 0.3), z = lp(az, bz, p.u) + nz * p.s * (0.55 + p.w * 0.3), h = (0.5 + p.w) * k;
-          p.m.rotation.set(p.tilt * p.s * r, -ang, 0); p.m.scale.set((len / np) * 0.95, h, p.w); p.m.position.set(x, H(x, z) + h * 0.35, z);
+        const fade = 1 - sstep(ev.dur - 0.6, ev.dur, age), sink = sstep(ev.dur - 0.7, ev.dur, age), shake = MO.shake * 0.04 * (1 - sstep(0.2, 1.1, age));
+        fl.forEach((f, j) => { const rv = easeOut((age - f.t0) / 0.35); strand(fis, j, rv, 0.85 * fade, (u) => 0.22 * (1 - 0.85 * u) / 0.2, (s, o) => { const i = Math.min(9, Math.floor(s * 9)), a = f.a + f.j[i] * 0.25, q = 0.25 + (f.L - 0.25) * s, px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q; o[0] = px; o[1] = H(px, pz) + 0.07; o[2] = pz; }); });
+        fis.rb.commit(0.2, 1, 1, 0);
+        for (const p of clods) {
+          const tp = age - p.d; if (tp <= 0) { rocks.hide(p.i); continue; }
+          const em = sstep(0, 0.4, tp), churn = p.w * (1 - Math.exp(-tp * 2.2)) * MO.swirl, rr = p.r0 * (1 - 0.32 * sstep(0.05, 1.3, tp)), a = p.a0 + churn, px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr;
+          const top = mound(rr, age) * p.settle, y = H(px, pz) - p.s + em * (p.s * 0.7 + top) - sink * (p.s + top + 0.2) + Math.sin(age * 31 + p.rx) * shake, spin = p.sp * Math.min(tp, 1.2) * MO.spin;
+          qRock(QT, p.rx + spin, p.ry + spin * 0.6, 0); rocks.put(p.i, px, y, pz, QT, p.s * (1 - sink * 0.6), p.s * 0.85, p.s);
         }
-        acc += dt * (age < 1.3 ? 26 : 0);
-        while (acc >= 1) { acc--; const u = Math.min(1, rv), x = lp(ax, bx, u), z = lp(az, bz, u); puff(c, x, z, 1, 1.5, 0.7, PAL.dust, 0.5, 1.6); if (R() < 0.5) debris(c, x, z, 1, 3, 0.12, [PAL.stone, PAL.earth], 5); }
+        for (const p of cores) { const t = backOut((age - p.t0) / 0.6), px = x + Math.cos(p.a) * p.o, pz = z + Math.sin(p.a) * p.o; if (t <= 0.01) { rocks.hide(p.i); continue; } qRock(QT, p.rx + age * 0.3 * MO.spin, p.ry, 0.2); rocks.put(p.i, px, H(px, pz) - p.s * 0.5 + t * (mound(p.o, age) * 0.8 + p.s * 0.2) - sink * (p.s + 1), pz, QT, p.s * (1 - sink * 0.5), p.s * 0.9 * t, p.s); }
+        if (!crown && age > 0.14) { crown = true; for (let i = 0; i < qn(12); i++) { const a = R() * TAU, s = 0.6 + R() * 1.2; dust.emit({ x: x + Math.cos(a) * 0.4, y: H(x, z) + 0.4, z: z + Math.sin(a) * 0.4, vx: Math.cos(a) * s, vy: 2.4 + R() * 2.2, vz: Math.sin(a) * s, life: 1.3, size: 0.5 + R() * 0.4, grow: 0.8, color: R() < 0.5 ? PAL.clay : PAL.earth, alpha: 0.55, grav: 5, drag: 0.6 }); } for (let i = 0; i < qn(16); i++) ejecta(c, x, z, R() * TAU, r * (0.7 + R() * 0.7), 0.55 + R() * 0.35, 0.09 + R() * 0.08, [PAL.soil, PAL.earth, PAL.stone, PAL.clay][i % 4]); }
+        if (age > 0.1 && age < 0.75) { accS += dt * 70 * Q.n; while (accS >= 1) { accS--; const a = R() * TAU, q = r * (0.8 + 0.25 * R()); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 2.6, 1.1, R() < 0.6 ? PAL.dust : PAL.clay, 0.42, 1.7, 0.25, 0.35); } }
+        if (age > 0.45 && age < 1.7) { accT += dt * 11 * Q.n; while (accT >= 1) { accT--; const a = R() * TAU, q = r * 0.15 * R(), px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q, top = H(px, pz) + mound(q, age); shards.emit({ R, x: px, y: top, z: pz, vx: Math.cos(a) * (1.4 + R() * 1.2), vy: 0.6 + R() * 0.8, vz: Math.sin(a) * (1.4 + R() * 1.2), life: 1.6 + R() * 0.6, size: 0.1 + R() * 0.1, sy: 1.1, color: R() < 0.5 ? PAL.stone : PAL.loam, grav: 12, drag: 0.4, spin: 6 * MO.spin }); } }
+        if (age < 1.9) { accC += dt * 14 * Q.n; while (accC >= 1) { accC--; const a = R() * TAU, q = r * 0.7 * R(); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 0.6, 0.8, PAL.loam, 0.3, 1.5, 1, 0.8); } }
+      });
+    },
+    lower(ev, c) {
+      ev.dur = 2.4; pulse(ev, c, purpleM(), 2.8, 0.3, 0, 0.9, 0.4); pulse(ev, c, tealM(), 2.2, 0.2, 0.4, 1.3, 0.3); chunks(ev, c, 9, 0.2, 1.8, -1);
+      decal(ev, c, gougeM(), 0.1, 2.0, 0.5, 0.2, 1.2, 2.4);
+      for (let i = 0; i < qn(14); i++) { const a = c.R() * TAU, q = 2.2 + c.R() * 0.4; dustDir(c, c.x + Math.cos(a) * q, c.z + Math.sin(a) * q, -Math.cos(a), -Math.sin(a), 1.8, 1, PAL.dust, 0.42, 1.6, 0.2, 0.25); }
+      for (let i = 0; i < qn(16); i++) shards.emit({ R: c.R, orb: { cx: c.x, cz: c.z, a: c.R() * TAU, r: 1.2 + c.R() * 1.2, w: 1.2 * MO.swirl, dr: -1.1 }, y: c.y + 0.4 + c.R() * 0.6, vy: -0.4, grav: 0, life: 1.4, size: 0.12, color: i % 2 ? PAL.purple : PAL.earth, settle: false, spin: 4 * MO.spin });
+    },
+    // SUNDER: a fracture front races lengthwise from start to end. Behind it the gouge widens, a molten seam cools, side
+    // cracks fork off, ground plates heave up on their outer hinges and settle; dust is thrown outward and forward off the front.
+    sunder(ev, c) {
+      const { ax, az, bx, bz, len, ang, R } = c, dx = Math.cos(ang), dz = Math.sin(ang), nx = -dz, nz = dx;
+      const T = clamp(0.4 + len * 0.07, 0.55, 1.5), t0 = 0.06; ev.dur = T + 2.5;
+      const n = Math.min(110, Math.max(24, Math.ceil(len / 0.4))), jit = Float32Array.from({ length: n }, () => R() * 2 - 1);
+      const env = (u) => Math.min(1, u * 6, (1 - u) * 6), off = (u) => { const f = u * (n - 1), i = Math.min(n - 2, Math.floor(f)), k = f - i; return lp(jit[i], jit[i + 1], k * k * (3 - 2 * k)) * 0.34 * env(u); };
+      const at = (u, o) => { const w = off(u); o[0] = lp(ax, bx, u) + nx * w; o[2] = lp(az, bz, u) + nz * w; o[1] = H(o[0], o[2]) + 0.09; return o; };
+      const lip = mk(ev, n, soilM()), dark = mk(ev, n, gougeM()), heat = mk(ev, n, moltenM()); lip.mesh.renderOrder = 0; dark.mesh.renderOrder = 1;
+      const nbr = qb(10), br = strips(ev, nbr, 8, gougeM()), bl = Array.from({ length: nbr }, (_, k) => { const s = k % 2 ? 1 : -1, th = (0.55 + R() * 0.6) * s; return { u: clamp((k + 0.5) / nbr + (R() - 0.5) * 0.06, 0.05, 0.95), dxb: dx * Math.cos(th) + nx * Math.sin(th), dzb: dz * Math.cos(th) + nz * Math.sin(th), L: 0.6 + R() * 0.9 + len * 0.03, j: Array.from({ length: 8 }, () => (R() - 0.5) * 0.35) }; });
+      const np = qk(Math.min(13, Math.max(4, Math.ceil(len / 0.95))), 3), pl = [];
+      for (const s of [-1, 1]) for (let k = 0; k < np; k++) pl.push({ s, u: (k + 0.5 + (R() - 0.5) * 0.3) / np, i: slabs.claim(ev, [PAL.earth, PAL.loam, 0x6b5a49, PAL.stone, PAL.soil][(k * 2 + (s > 0 ? 1 : 0)) % 5]), w: 0.45 + R() * 0.45, th: 0.18 + R() * 0.12, tilt: 0.3 + R() * 0.4, d: R() * 0.07, yaw: (R() - 0.5) * 0.25, lift: 0.08 + R() * 0.12 });
+      const rest = 0.55 + R() * 0.15; let accD = 0, accB = 0, accE = 0, done = false; const fp = [0, 0, 0], q2 = new THREE.Quaternion();
+      ev.fx.push((age, dt) => {
+        const front = clamp((age - t0) / T), fade = 1 - sstep(ev.dur - 1.0, ev.dur, age), cool = 1 - 0.75 * sstep(T, T + 1.6, age), hp = MO.flick ? 0.8 + 0.2 * Math.sin(age * 11) : 0.9;
+        for (let i = 0; i < n; i++) {
+          const u = i / (n - 1), behind = front - u, open = behind > 0 ? easeOut(behind * len / 1.1) : 0; at(u, fp);
+          lip.set(i, fp[0], fp[1], fp[2]); dark.set(i, fp[0], fp[1], fp[2]); heat.set(i, fp[0], fp[1] + 0.01, fp[2]);
+          lip.wm[i] = open * (1 + 0.25 * jit[(i * 7) % n]); lip.am[i] = open > 0 ? 1 : 0;
+          dark.wm[i] = open * (0.75 + 0.25 * Math.abs(jit[i])); dark.am[i] = open > 0 ? 1 : 0;
+          heat.wm[i] = open * (0.5 + 0.5 * Math.exp(-behind * len / 1.4)); heat.am[i] = open > 0 ? hp * (0.25 + 0.75 * Math.exp(-behind * len / 2)) * cool : 0;
+        }
+        lip.commit(1.9, 1, fade * 0.7, 0); dark.commit(0.62, 1, fade * 0.92, 0); heat.commit(0.26, 1, fade, 0);
+        bl.forEach((b, j) => { const rv = easeOut((front - b.u) * len / 1.2); at(b.u, fp); const x0 = fp[0], z0 = fp[2]; strand(br, j, rv, fade * 0.85, (u2) => 0.17 * (1 - 0.85 * u2) / 0.18, (s, o) => { const i = Math.min(7, Math.floor(s * 7)), q = b.L * s, px = x0 + b.dxb * q + nx * b.j[i] * s, pz = z0 + b.dzb * q + nz * b.j[i] * s; o[0] = px; o[1] = H(px, pz) + 0.08; o[2] = pz; }); });
+        br.rb?.commit(0.18, 1, 1, 0);
+        for (const p of pl) {
+          const tp = age - t0 - T * p.u - p.d; if (tp <= 0) { slabs.hide(p.i); continue; }
+          const heave = backOut(tp / 0.32), settle = lp(1, rest, sstep(0.35, 1.2, tp)), sink = sstep(ev.dur - 0.9, ev.dur, age), jolt = MO.shake * 0.05 * Math.sin(tp * 40) * (1 - sstep(0, 0.4, tp));
+          const tilt = p.tilt * heave * settle * (1 - sink), L = (len / np) * 0.92, hw = p.w * 0.5, cxu = lp(ax, bx, p.u), czu = lp(az, bz, p.u), w0 = off(p.u), dist = 0.3 * heave + hw + Math.abs(w0) * 0.2;
+          const x = cxu + nx * (w0 + p.s * dist), z = czu + nz * (w0 + p.s * dist), y = H(x, z) - p.th * 0.45 + Math.sin(tilt) * hw + p.lift * heave * (1 - sink) + jolt - sink * 0.35;
+          q2.setFromEuler(EU.set(0, -ang + p.yaw, 0, 'YXZ')); QT.setFromAxisAngle(V.set(1, 0, 0), p.s * tilt); q2.multiply(QT); // inner edge lifts, outer edge hinges on the ground
+          slabs.put(p.i, x, y, z, q2, L, p.th, p.w * (1 - sink * 0.3));
+        }
+        if (front > 0 && front < 1) {
+          at(front, fp); const fx = fp[0], fz = fp[2];
+          accD += dt * 46 * Q.n; while (accD >= 1) { accD--; const s = R() < 0.5 ? -1 : 1; dustDir(c, fx + nx * s * 0.3, fz + nz * s * 0.3, nx * s * 1.4 + dx * 0.8, nz * s * 1.4 + dz * 0.8, 2.6, 1.05, R() < 0.55 ? PAL.dust : PAL.clay, 0.5, 1.9, 0.3, 0.7); }
+          accB += dt * 16 * Q.n; while (accB >= 1) { accB--; const s = R() < 0.5 ? -1 : 1, a = Math.atan2(nz * s * 1.6 + dz * 0.6, nx * s * 1.6 + dx * 0.6); ejecta(c, fx, fz, a + (R() - 0.5) * 0.6, 0.9 + R() * 1.8, 0.45 + R() * 0.35, 0.09 + R() * 0.09, [PAL.stone, PAL.earth, PAL.loam][(R() * 3) | 0]); }
+          if (R() < dt * 30 * Q.n) glow.emit({ x: fx, y: H(fx, fz) + 0.15, z: fz, vx: dx * 1.5, vy: 0.6 + R(), vz: dz * 1.5, life: 0.4, size: 0.55, grow: -0.6, color: R() < 0.5 ? PAL.gold : PAL.amber, alpha: 0.9, drag: 2 });
+        }
+        if (front >= 1 && !done) { done = true; at(1, fp); for (let i = 0; i < qn(8); i++) dustDir(c, fp[0], fp[2], dx + (R() - 0.5), dz + (R() - 0.5), 2.2, 1.2, PAL.dust, 0.5, 1.8, 0.5, 0.5); debris(c, fp[0], fp[2], 5, 2.2, 0.12, [PAL.stone, PAL.earth], 5); }
+        if (age > t0 + 0.2 && age < T + 1.6) { accE += dt * 9 * Q.n; while (accE >= 1) { accE--; at(R() * front, fp); glow.emit({ x: fp[0], y: fp[1] + 0.08, z: fp[2], vx: (R() - 0.5) * 0.3, vy: 0.5 + R() * 0.8, vz: (R() - 0.5) * 0.3, life: 1.2, size: 0.14 + R() * 0.1, grow: -0.5, color: R() < 0.6 ? PAL.ember : PAL.amber, alpha: 0.85, drag: 0.6 }); if (R() < 0.4) dust.emit({ x: fp[0], y: fp[1] + 0.1, z: fp[2], vy: 0.4 + R() * 0.3, life: 1.8, size: 0.6, grow: 1.6, color: PAL.smoke, alpha: 0.24, grav: -0.15, drag: 1 }); } }
       });
     },
     wall(ev, c) {
       ev.dur = 3.4; const { ax, az, bx, bz, len, ang, R } = c, N = Math.max(3, Math.ceil(len / 1.3)), segL = len / N;
       const pl = Array.from({ length: N }, (_, k) => { const u = (k + 0.5) / N; return { m: mesh(ev, G.slab, solid(k % 2 ? PAL.stone : 0x9a968c, PAL.gold, 0.08)), x: lp(ax, bx, u), z: lp(az, bz, u), h: 1.7 + R() * 0.7, t0: 0.12 + u, puffed: false }; });
-      const trim = mk(ev, Math.min(100, Math.ceil(len / 0.5) + 2), ribMat(PAL.gold, PAL.amber, 6, 1.2));
+      const trim = mk(ev, Math.min(100, Math.ceil(len / 0.5) + 2), ribMat(PAL.gold, PAL.amber, 6, 1.2)), scar = mk(ev, Math.min(100, Math.ceil(len / 0.5) + 2), soilM()); scar.mesh.renderOrder = 1;
+      const nx = -Math.sin(ang), nz = Math.cos(ang);
       ev.fx.push((age) => {
-        const sink = 1 - sstep(2.7, 3.4, age); gLine(trim, ax, az, bx, bz, 0.12); trim.commit(0.35, sstep(0, 1.1, age), sink * (0.75 + 0.25 * Math.sin(age * 8)));
+        const sink = 1 - sstep(2.7, 3.4, age); gLine(trim, ax, az, bx, bz, 0.12); trim.commit(0.35, sstep(0, 1.1, age), sink * (0.75 + 0.25 * Math.sin(age * 8) * MO.flick));
+        gLine(scar, ax, az, bx, bz, 0.06); scar.commit(1.5, sstep(0, 1.15, age), sink * 0.6, 0);
         for (const p of pl) {
           const t = age - p.t0, rise = backOut(t / 0.55) * sink; p.m.visible = t > 0 && rise > 0.01; if (!p.m.visible) continue;
           p.m.rotation.set(0, -ang, 0); p.m.scale.set(segL * 0.96, p.h * rise, 0.55); p.m.position.set(p.x, H(p.x, p.z) + (p.h * rise) / 2 - 0.1, p.z);
-          if (!p.puffed) { p.puffed = true; puff(c, p.x, p.z, 5, 1.6, 0.6, PAL.dust, 0.45); debris(c, p.x, p.z, 3, 2.5, 0.1, [PAL.stone], 4); }
+          if (!p.puffed) { p.puffed = true; for (let i = 0; i < qn(6); i++) { const s = i % 2 ? 1 : -1; dustDir(c, p.x + nx * s * 0.4, p.z + nz * s * 0.4, nx * s, nz * s, 1.8, 0.7, PAL.dust, 0.45, 1.5, 0.5, 0.4); } debris(c, p.x, p.z, 3, 2.5, 0.1, [PAL.stone], 4); }
         }
       });
     },
-    grove(ev, c) { ev.dur = 3.4; const r = c.radius ?? 3.5; pulse(ev, c, greenM(), 0.3, r, 0, 1, 0.4); roots(ev, c, 7, r, 1.2); leafSwirl(ev, c, 0.5, r, 2.2, 2.2, 20); puff(c, c.x, c.z, 8, 1.8, 0.8, PAL.dust, 0.35); },
-    ring(ev, c) {
-      ev.dur = 3.4; const r = c.radius ?? 4, R = c.R, band = [0, 1].map((i) => mk(ev, 72, i ? ribMat(PAL.leaf, PAL.gold, 0, 1) : tealM())), N = 12;
-      const st = Array.from({ length: N }, (_, k) => ({ m: mesh(ev, G.rock, solid(PAL.stone, PAL.deepTeal, 0.3)), a: (k / N) * TAU, h: 0.9 + R() * 0.7, t0: 0.2 + (k / N) * 0.7 }));
-      ev.fx.push((age) => {
-        const rv = easeOut(age / 1.1), fade = 1 - sstep(2.6, 3.4, age); band.forEach((rb, i) => { gRing(rb, c.x, c.z, r * (1 - i * 0.08), age * (i ? -0.4 : 0.4), 0.1, 0.06, age * 3 + i); rb.commit(0.3 - i * 0.08, rv, fade); });
-        for (const s of st) { const t = backOut((age - s.t0) / 0.6) * fade, x = c.x + Math.cos(s.a) * r, z = c.z + Math.sin(s.a) * r; s.m.visible = t > 0.01; s.m.position.set(x, H(x, z) + s.h * t * 0.45, z); s.m.scale.set(0.3, s.h * t * 0.6, 0.3); s.m.rotation.y = s.a; }
-      });
-      roots(ev, c, 6, r, 1.2); leafSwirl(ev, c, r * 0.85, r * 1.05, 1.4, 2.4, 18); pulse(ev, c, tealM(), 0.5, r * 1.1, 0, 1, 0.35);
+    // GROVE: roots break the soil one after another, fork, and sprout leaves at their tips while sap motes chase the growth.
+    grove(ev, c) {
+      ev.dur = 3.6; const r = c.radius ?? 3.5; pulse(ev, c, greenM(), 0.3, r, 0, 1, 0.3);
+      decal(ev, c, ribMat(PAL.moss, 0x3d6b2a, 0, 0.4, false), 0.2, r * 0.95, 0.22, 0.15, 1.6, 3.6, c.x, c.z, 0.12, c.R() * 6);
+      decal(ev, c, soilM(), 0.05, 0.9, 0.55, 0, 0.3, 3.6);
+      groveRoots(ev, c, qk(7, 4), r, 0.05, 0.95); leafSwirl(ev, c, 0.4, r * 0.7, 1.4, 2.6, 12, 0.6);
+      for (let i = 0; i < qn(10); i++) { const a = c.R() * TAU; dustDir(c, c.x + Math.cos(a) * 0.5, c.z + Math.sin(a) * 0.5, Math.cos(a), Math.sin(a), 1.4, 0.75, PAL.clay, 0.25, 1.4, 0.3, 0.4); }
     },
+    // TREE RING: standing stones heave up one after another around the circle; roots knit each stone to the next.
+    ring(ev, c) {
+      ev.dur = 3.6; const r = c.radius ?? 4, R = c.R, band = [0, 1].map((i) => mk(ev, 72, i ? ribMat(PAL.leaf, PAL.gold, 0, 1) : tealM())), N = qk(12, 6);
+      const st = Array.from({ length: N }, (_, k) => ({ i: rocks.claim(ev, k % 3 ? PAL.stone : PAL.slate), a: (k / N) * TAU + (R() - 0.5) * 0.12, h: 0.9 + R() * 0.7, t0: 0.2 + (k / N) * 0.9, rx: (R() - 0.5) * 0.25, ry: R() * 6, burst: false }));
+      const knit = strips(ev, N, 10, barkM()), glowK = strips(ev, N, 10, ribMat(PAL.teal, PAL.leaf, 0, 1.4)); glowK.rb.mesh.renderOrder = 3;
+      decal(ev, c, ribMat(PAL.moss, PAL.deepTeal, 0, 0.4, false), r * 0.82, r * 1.18, 0.4, 0.1, 1.2, 3.6);
+      ev.fx.push((age) => {
+        const rv = easeOut(age / 1.1), fade = 1 - sstep(2.8, 3.6, age); band.forEach((rb, i) => { gRing(rb, c.x, c.z, r * (1 - i * 0.08), age * (i ? -0.4 : 0.4) * MO.swirl, 0.1, 0.06, age * 3 + i); rb.commit(0.26 - i * 0.08, rv, fade * 0.8); });
+        st.forEach((s, k) => {
+          const t = backOut((age - s.t0) / 0.5) * fade, x = c.x + Math.cos(s.a) * r, z = c.z + Math.sin(s.a) * r;
+          if (age > s.t0 && !s.burst) { s.burst = true; for (let i = 0; i < qn(3); i++) dustDir(c, x, z, Math.cos(s.a + (i - 1) * 1.6), Math.sin(s.a + (i - 1) * 1.6), 1.4, 0.7, PAL.dust, 0.4, 1.3, 0.4, 0.4); debris(c, x, z, 2, 1.6, 0.09, [PAL.soil, PAL.stone], 4); sparks(c, x, H(x, z) + 0.6, z, 2, 1.2, PAL.teal, 0.2, 1.1); }
+          if (t <= 0.01) rocks.hide(s.i); else { qRock(QT, s.rx, s.ry, s.rx * 0.5); rocks.put(s.i, x, H(x, z) - 0.15 + s.h * t * 0.42, z, QT, 0.34, s.h * t * 0.62, 0.3); }
+          const b = st[(k + 1) % N], a1 = b.a < s.a ? b.a + TAU : b.a, kr = easeOut((age - s.t0 - 0.35) / 0.45);
+          const pf = (q, o) => { const a = lp(s.a, a1, q), rr = r * (1 - 0.06 * Math.sin(q * Math.PI)) + Math.sin(q * 17 + k) * 0.06, px = c.x + Math.cos(a) * rr, pz = c.z + Math.sin(a) * rr; o[0] = px; o[1] = H(px, pz) + 0.07; o[2] = pz; };
+          strand(knit, k, kr, fade * 0.95, (u) => 0.85 + 0.15 * Math.sin(u * 9), pf); strand(glowK, k, kr, fade * 0.7, () => 1, pf);
+        });
+        knit.rb.commit(0.2, 1, 1, 0); glowK.rb.commit(0.07, 1, 1, 0);
+      });
+      groveRoots(ev, c, qk(6, 3), r * 0.85, 0.15, 1.0, { branches: qb(3) }); leafSwirl(ev, c, r * 0.85, r * 1.05, 1.4, 2.4, 14); pulse(ev, c, tealM(), 0.5, r * 1.1, 0, 1, 0.3);
+    },
+    // STARFALL: approach (meteor + trail, ground target tightens and wind lifts dust), impact (attached flash disc, shockwave,
+    // crater rim burst, terrain-landing ejecta, outward dust wall), settling (molten fissures cool, smoke column, embers, rim sinks).
     starfall(ev, c) {
-      const { x, z, R } = c, gy = c.y, fl = c.flight ?? LAUNCH, r = c.radius ?? 4; ev.dur = fl + 2.6;
+      const { x, z, R } = c, gy = c.y, fl = c.flight ?? LAUNCH, r = c.radius ?? 4; ev.dur = fl + 3.4;
       const da = R() * TAU, S = new THREE.Vector3(x + Math.cos(da) * 10, gy + 36, z + Math.sin(da) * 10), T = new THREE.Vector3(x, gy + 0.4, z);
       const back = S.clone().sub(T).normalize(), grp = new THREE.Group(); ev.g.add(grp); grp.quaternion.setFromUnitVectors(UP, back);
-      const rock = new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)); grp.add(rock);
-      const f1 = own(ev, G.flame, PAL.amber), f2 = own(ev, G.flame, PAL.gold); f2.scale.setScalar(0.55); grp.add(f1, f2);
+      const rock = new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)); rock.scale.setScalar(0.8); grp.add(rock);
+      const f1 = own(ev, G.flame, PAL.amber), f2 = own(ev, G.flame, PAL.gold); f2.scale.setScalar(0.55); f1.material.opacity = 0.4; f2.material.opacity = 0.65; grp.add(f1, f2);
       const hist = Array.from({ length: 22 }, () => S.clone()), tr = [mk(ev, 22, ribMat(PAL.amber, PAL.ember, 0, 2), null), mk(ev, 22, ribMat(PAL.gold, PAL.amber, 0, 2), null)]; tr[1].side = [Math.cos(da), Math.sin(da)];
-      const flash = own(ev, G.disc, PAL.gold), crater = mk(ev, 72, ribMat(PAL.ember, PAL.gold, 0, 1.4)), cpts = dens(star(9, 1, 0.45), r, r, 0.4);
-      const cr2 = mk(ev, cpts.length, ribMat(PAL.ember, PAL.gold, 0, 1.4)); ev.g.remove(crater.mesh); ev.rib.splice(ev.rib.indexOf(crater), 1).forEach((q) => q.dispose());
-      pulse(ev, c, amberM(), 0.5, r * 1.7, fl, fl + 0.9, 0.8); pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1), 0.3, r * 1.1, fl + 0.1, fl + 0.8, 0.4);
-      flash.visible = false; let hit = false, acc = 0;
+      const flash = own(ev, G.disc, PAL.gold), target = mk(ev, 64, ribMat(PAL.ember, PAL.gold, 5, 2));
+      decal(ev, c, gougeM(), 0.05, r * 0.68, 0.8, fl, fl + 0.25, ev.dur, x, z, 0.07, R() * 6);
+      decal(ev, c, soilM(), r * 0.55, r * 1.2, 0.36, fl + 0.05, fl + 0.6, ev.dur, x, z, 0.05, R() * 6);
+      const nm = qk(10, 5), mol = strips(ev, nm, 10, moltenM()), ml = Array.from({ length: nm }, (_, k) => ({ a: (k / nm) * TAU + R() * 0.4, L: r * (0.75 + R() * 0.5), j: Array.from({ length: 10 }, () => (R() - 0.5) * 0.4), d: R() * 0.12 }));
+      const rim = Array.from({ length: qk(16, 7) }, (_, k, a = (k / 16) * TAU + R() * 0.3) => ({ i: rocks.claim(ev, [PAL.cinder, PAL.slate, PAL.stone, PAL.earth][k % 4]), a, q: r * (0.5 + R() * 0.16), s: 0.3 + R() * 0.3, d: R() * 0.08, rx: R() * 6, sp: 0.4 + R() * 0.4 }));
+      pulse(ev, c, amberM(), 0.5, r * 1.8, fl, fl + 0.8, 0.9); pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1), 0.3, r * 1.1, fl + 0.08, fl + 0.7, 0.4);
+      flash.visible = false; let hit = false, acc = 0, accW = 0, accD = 0, accS = 0, accE = 0;
       ev.fx.push((age, dt) => {
+        const tFade = 1 - sstep(ev.dur - 0.7, ev.dur, age);
         if (age < fl) {
-          const e = Math.pow(age / fl, 1.4); V.copy(S).lerp(T, e); grp.position.copy(V); const last = hist.pop(); last.copy(V); hist.unshift(last); rock.rotation.x += dt * 6;
+          const e = Math.pow(age / fl, 1.4); V.copy(S).lerp(T, e); grp.position.copy(V); const last = hist.pop(); last.copy(V); hist.unshift(last); rock.rotation.x += dt * 6 * MO.spin;
           for (const rb of tr) { hist.forEach((h, i) => rb.set(i, h.x, h.y, h.z)); rb.commit(1.1, 1, 1, 1); }
-          acc += dt * 40; while (acc >= 1) { acc--; sparks(c, V.x, V.y, V.z, 1, 2, PAL.amber, 0.3, 0.6); }
+          glow.emit({ x: V.x - back.x * 0.6, y: V.y - back.y * 0.6, z: V.z - back.z * 0.6, life: 0.09, size: 3.4, grow: 0.4, color: PAL.gold, alpha: 0.55 }); // soft corona riding the head (pooled, 1 slot/frame)
+          acc += dt * 40 * Q.n; while (acc >= 1) { acc--; glow.emit({ x: V.x, y: V.y, z: V.z, vx: back.x * 6 + (R() - 0.5) * 3, vy: back.y * 6 + (R() - 0.5) * 3, vz: back.z * 6 + (R() - 0.5) * 3, life: 0.5, size: 0.35, grow: -0.5, color: R() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.9, grav: 3, drag: 2 }); }
+          gRing(target, x, z, lp(r * 1.05, r * 0.3, e), -age * 2 * MO.swirl, 0.1, 0.03, 0); target.commit(0.22 + 0.3 * e, 1, 0.3 + 0.7 * e);
+          if (e > 0.55) { accW += dt * 40 * Q.n; while (accW >= 1) { accW--; const a = R() * TAU, q = r * (0.25 + 0.7 * R()); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 2 + e * 2, 0.9, PAL.dust, 0.3, 1.2, 0.2, 0.3); } }
           return;
         }
-        const u = (age - fl) / 2.4;
-        if (!hit) { hit = true; grp.visible = false; tr.forEach((rb) => (rb.mesh.visible = false)); flash.visible = true; puff(c, x, z, 26, 6, 1.6, PAL.dust, 0.6, 2.2); debris(c, x, z, 30, 9, 0.2, [PAL.stone, PAL.earth, PAL.ember], 11); sparks(c, x, gy + 0.5, z, 24, 10, PAL.amber, 0.3, 1.2); }
-        flash.position.set(x, gy + 0.2, z); flash.scale.setScalar(r * (0.3 + 1.4 * easeOut(u * 2))); flash.material.opacity = 0.9 * (1 - clamp(u * 2));
-        place(cr2, cpts, x, z, r * (0.6 + 0.4 * easeOut(u * 3)), r * (0.6 + 0.4 * easeOut(u * 3)), age * 0.1, 0.1); cr2.commit(0.35, easeOut(u * 3), 1 - sstep(0.5, 1, u));
+        const tp = age - fl, u = tp / 2.4;
+        if (!hit) { hit = true; grp.visible = false; target.mesh.visible = false; tr.forEach((rb) => (rb.mesh.visible = false)); flash.visible = true;
+          for (let i = 0; i < qn(34); i++) { const a = R() * TAU; ejecta(c, x, z, a, r * (0.6 + R() * 1.3), 0.55 + R() * 0.65, 0.12 + R() * 0.16, [PAL.stone, PAL.earth, PAL.cinder, PAL.slate][i % 4]); }
+          for (let i = 0; i < qn(18); i++) { const a = R() * TAU, d = r * (0.4 + R()), Tq = 0.5 + R() * 0.5, tx = x + Math.cos(a) * d, tz = z + Math.sin(a) * d; glow.emit({ x, y: gy + 0.4, z, vx: (tx - x) / Tq, vy: (H(tx, tz) - gy + 4.5 * Tq * Tq) / Tq, vz: (tz - z) / Tq, life: Tq + 0.6, size: 0.26, grow: -0.3, color: R() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.95, grav: 9, drag: 0, floor: H(tx, tz) + 0.06 }); }
+          for (let i = 0; i < qn(10); i++) { const a = R() * TAU; dust.emit({ x, y: gy + 0.5, z, vx: Math.cos(a) * 1.2, vy: 3 + R() * 3, vz: Math.sin(a) * 1.2, life: 1.6, size: 1.2, grow: 1.4, color: PAL.ash, alpha: 0.5, grav: 2.5, drag: 1.2 }); }
+        }
+        flash.position.set(x, H(x, z) + 0.2, z); flash.scale.setScalar(r * (0.25 + 0.8 * easeOut(u * 3))); flash.material.opacity = 0.75 * MO.flash * (1 - clamp(u * 8)); flash.visible = u < 0.125; // flat disc: keep it to the first 0.3 s so it never floats over sloped craters
+        if (tp < 0.65) { accD += dt * 110 * Q.n; while (accD >= 1) { accD--; const a = R() * TAU, q = r * (0.35 + 1.5 * easeOut(tp / 0.65)); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 4.5, 1.9, R() < 0.6 ? PAL.dust : PAL.clay, 0.5, 2.4, 0.15, 0.9); } }
+        if (tp > 0.08 && tp < 2.8) { accS += dt * 12 * Q.n; while (accS >= 1) { accS--; const a = R() * TAU, q = r * 0.35 * R(), px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q; dust.emit({ x: px, y: H(px, pz) + 0.3, z: pz, vx: (R() - 0.5) * 0.6, vy: 1.4 + R() * 1.2, vz: (R() - 0.5) * 0.6, life: 2.2 + R() * 0.6, size: 1.4 + R() * 0.8, grow: 1.8, color: R() < 0.5 ? PAL.smoke : PAL.ash, alpha: 0.26 * (1 - sstep(1.2, 2.8, tp)) + 0.04, grav: -0.35, drag: 0.7 }); } }
+        if (tp > 0.2 && tp < 2.6) { accE += dt * 10 * Q.n; while (accE >= 1) { accE--; const f = ml[(R() * nm) | 0], q = f.L * R(), px = x + Math.cos(f.a) * q, pz = z + Math.sin(f.a) * q; glow.emit({ x: px, y: H(px, pz) + 0.1, z: pz, vy: 0.6 + R() * 1.2, vx: (R() - 0.5) * 0.4, vz: (R() - 0.5) * 0.4, life: 1.3, size: 0.16 + R() * 0.1, grow: -0.5, color: R() < 0.6 ? PAL.ember : PAL.amber, alpha: 0.85, drag: 0.6 }); } }
+        const coolA = (1 - sstep(0.3, 2.8, tp) * 0.8) * tFade, hp = MO.flick ? 0.85 + 0.15 * Math.sin(age * 9) : 0.92;
+        ml.forEach((f, j) => { const rv = easeOut((tp - f.d) / 0.28); strand(mol, j, rv, coolA * hp, (q) => (1 - 0.8 * q) * (0.6 + 0.4 * Math.abs(f.j[(q * 9) | 0])) / 0.3 * 0.3, (s, o) => { const i = Math.min(9, Math.floor(s * 9)), a = f.a + f.j[i] * 0.22, q = r * 0.12 + (f.L - r * 0.12) * s, px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q; o[0] = px; o[1] = H(px, pz) + 0.08; o[2] = pz; }); });
+        mol.rb.commit(0.3, 1, 1, 0);
+        const sink = sstep(ev.dur - 0.9, ev.dur, age);
+        for (const p of rim) { const t = backOut((tp - p.d) / 0.3), px = x + Math.cos(p.a) * p.q * (0.8 + 0.2 * t), pz = z + Math.sin(p.a) * p.q * (0.8 + 0.2 * t); if (t <= 0.01) { rocks.hide(p.i); continue; } EU.set(0, -p.a, 0, 'YXZ'); QT.setFromEuler(EU); q2r.setFromAxisAngle(V.set(0, 0, 1), p.sp * t); QT.multiply(q2r); rocks.put(p.i, px, H(px, pz) - p.s * 0.6 + t * p.s * 0.75 - sink * p.s * 1.2, pz, QT, p.s * 1.25, p.s * 0.75 * (1 - sink * 0.4), p.s); }
       });
     },
     crystal(ev, c) {
@@ -365,10 +555,11 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         const a = R() * TAU, r = i ? 0.5 + R() * 0.9 : 0, k = i % 2; return { m: mesh(ev, G.crystal, solid(k ? 0x8f6bff : 0x2fd9c4, k ? 0x4d2a8f : 0x127f78, 0.9)), x: c.x + Math.cos(a) * r, z: c.z + Math.sin(a) * r, h: i ? 1.1 + R() * 1.2 : 2.8, w: i ? 0.9 : 1.4, t0: i * 0.07, d: new THREE.Vector3(Math.cos(a) * 0.3 * (i ? 1 : 0), 1, Math.sin(a) * 0.3 * (i ? 1 : 0)).normalize(), puffed: false };
       });
       pulse(ev, c, tealM(), 0.3, 2.6, 0, 0.9, 0.35); pulse(ev, c, ribMat(PAL.purple, PAL.teal, 6, 1), 0.3, 1.8, 0.3, 1.4, 0.25); let acc = 0;
+      decal(ev, c, soilM(), 0.1, 1.7, 0.5, 0, 0.4, 3.6);
       ev.fx.push((age, dt) => {
         const k = 1 - sstep(3, 3.6, age);
-        for (const p of list) { const t = backOut((age - p.t0) / 0.5) * k; p.m.visible = t > 0.01; p.m.position.set(p.x, H(p.x, p.z) - 0.05, p.z); p.m.quaternion.setFromUnitVectors(UP, p.d); p.m.scale.set(p.w * t, p.h * t, p.w * t); if (age > p.t0 && !p.puffed) { p.puffed = true; debris(c, p.x, p.z, 3, 3, 0.1, [PAL.teal, PAL.purple, PAL.ice], 6); puff(c, p.x, p.z, 3, 1.2, 0.5, PAL.dust, 0.35); } }
-        acc += dt * (age < 3 ? 14 : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.6, c.R() < 0.5 ? PAL.teal : PAL.purple, 0.22, 1.5); }
+        for (const p of list) { const t = backOut((age - p.t0) / 0.5) * k; p.m.visible = t > 0.01; p.m.position.set(p.x, H(p.x, p.z) - 0.05, p.z); p.m.quaternion.setFromUnitVectors(UP, p.d); p.m.scale.set(p.w * t, p.h * t, p.w * t); if (age > p.t0 && !p.puffed) { p.puffed = true; debris(c, p.x, p.z, 3, 3, 0.1, [PAL.teal, PAL.purple, PAL.ice], 6); for (let i = 0; i < qn(3); i++) { const a = c.R() * TAU; dustDir(c, p.x, p.z, Math.cos(a), Math.sin(a), 1.2, 0.5, PAL.dust, 0.35, 1.3, 0.4, 0.4); } } }
+        acc += dt * (age < 3 ? 14 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.6, c.R() < 0.5 ? PAL.teal : PAL.purple, 0.22, 1.5); }
       });
     },
     heal(ev, c) {
@@ -376,9 +567,9 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       pulse(ev, c, ribMat(PAL.mint, PAL.gold, 0, 1), 0.3, 2.6, 0, 1, 0.35); pulse(ev, c, ribMat(PAL.gold, PAL.mint, 0, 1), 0.3, 2, 0.5, 1.5, 0.3);
       ev.fx.push((age, dt) => {
         const rv = easeOut(age / 1.2), fade = 1 - sstep(2.1, 2.8, age), gy = H(c.x, c.z);
-        for (const h of hs) { for (let i = 0; i < 36; i++) { const u = i / 35, a = u * TAU * 1.5 + h.o + age * 2.5, r = 1.1 * (1 - 0.3 * u); h.rb.set(i, c.x + Math.cos(a) * r, gy + 0.1 + u * 3, c.z + Math.sin(a) * r); } h.rb.commit(0.3, rv, fade); }
-        gRing(sigil, c.x, c.z, 1.7, age * 0.6, 0.1, 0.12, 0); sigil.commit(0.12, 1, fade * sstep(0, 0.4, age));
-        acc += dt * (age < 2.2 ? 22 : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.5, c.R() < 0.5 ? PAL.gold : PAL.mint, 0.22, 1.8); }
+        for (const h of hs) { for (let i = 0; i < 36; i++) { const u = i / 35, a = u * TAU * 1.5 + h.o + age * 2.5 * MO.swirl, r = 1.1 * (1 - 0.3 * u); h.rb.set(i, c.x + Math.cos(a) * r, gy + 0.1 + u * 3, c.z + Math.sin(a) * r); } h.rb.commit(0.3, rv, fade); }
+        gRing(sigil, c.x, c.z, 1.7, age * 0.6 * MO.swirl, 0.1, 0.12, 0); sigil.commit(0.12, 1, fade * sstep(0, 0.4, age));
+        acc += dt * (age < 2.2 ? 22 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.5, c.R() < 0.5 ? PAL.gold : PAL.mint, 0.22, 1.8); }
       });
     },
     lightning(ev, c) {
@@ -390,13 +581,13 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       let last = -1, burst = false; pulse(ev, c, ribMat(PAL.purple, PAL.bolt, 0, 2), 0.3, 2.8, 0, 0.5, 0.3);
       ev.fx.push((age) => {
         const a = 1 - sstep(0.75, 1.6, age), on = a > 0.01; [...cores, ...aura, ...forks, ...arcs].forEach((rb) => (rb.mesh.visible = on));
-        if (!burst) { burst = true; sparks(c, bot[0], bot[1] + 0.3, bot[2], 14, 7, PAL.bolt, 0.22, 0.7); puff(c, bot[0], bot[2], 6, 2.5, 0.7, PAL.dust, 0.4); }
-        if (age < 0.8 && age - last > 0.055) {
+        if (!burst) { burst = true; sparks(c, bot[0], bot[1] + 0.3, bot[2], 14, 7, PAL.bolt, 0.22, 0.7); for (let i = 0; i < qn(6); i++) { const q = c.R() * TAU; dustDir(c, bot[0], bot[2], Math.cos(q), Math.sin(q), 2.5, 0.7, PAL.dust, 0.4, 1.3, 0.4, 0.5); } }
+        if (age < 0.8 && age - last > (MO.flick ? 0.055 : 0.2)) {
           last = age; roll(cores[0], top, bot, 1.4); cores[1].p.set(cores[0].p); aura.forEach((rb) => rb.p.set(cores[0].p));
           for (const f of forks) { const k = 4 + Math.floor(R() * 14) * 3 % 18, p = cores[0].p, s0 = [p[k * 3], p[k * 3 + 1], p[k * 3 + 2]]; roll(f, s0, [s0[0] + (R() - 0.5) * 9, Math.max(bot[1], s0[1] - 8 - R() * 8), s0[2] + (R() - 0.5) * 9], 0.8); }
           arcs.forEach((rb, i) => { const ang = (i / 4) * TAU + R(); for (let j = 0; j < rb.n; j++) { const u = j / (rb.n - 1), q = u * arcLen[i], o = (R() - 0.5) * 0.5 * Math.min(1, u * 4), px = bot[0] + Math.cos(ang) * q - Math.sin(ang) * o, pz = bot[2] + Math.sin(ang) * q + Math.cos(ang) * o; rb.set(j, px, H(px, pz) + 0.1, pz); } });
         }
-        const fl = age < 0.8 ? 0.55 + 0.45 * R() : 1; cores.forEach((rb) => rb.commit(0.2, 1, a * fl)); aura.forEach((rb) => rb.commit(0.9, 1, a * fl * 0.6)); forks.forEach((rb) => rb.commit(0.14, 1, a * fl * 0.8)); arcs.forEach((rb) => rb.commit(0.14, easeOut(age / 0.2), a));
+        const fl = age < 0.8 ? (MO.flick ? 0.55 + 0.45 * R() : 0.8) : 1; cores.forEach((rb) => rb.commit(0.2, 1, a * fl)); aura.forEach((rb) => rb.commit(0.9, 1, a * fl * 0.6)); forks.forEach((rb) => rb.commit(0.14, 1, a * fl * 0.8)); arcs.forEach((rb) => rb.commit(0.14, easeOut(age / 0.2), a));
         gRing(scar, bot[0], bot[2], 1.1 + 0.5 * easeOut(age), 0, 0.05, 0.25, 3); scar.commit(0.9, 1, 0.5 * (1 - sstep(0.4, 1.9, age)));
       });
     },
@@ -404,24 +595,26 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       ev.dur = 3.8; const R = c.R, r = c.radius ?? 3, fp = dens(flake(), r, r, 0.35), fr = mk(ev, fp.length, ribMat(PAL.ice, PAL.teal, 0, 1.2)), rim = mk(ev, 64, ribMat(PAL.teal, PAL.ice, 8, 0.8));
       const sp = Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i / 2) * (TAU / 6) + (i % 2 ? 0.2 : 0), q = i % 2 ? 0.55 : 0.98; return { m: mesh(ev, G.crystal, solid(PAL.ice, PAL.deepTeal, 0.7)), x: c.x + Math.cos(a) * r * q, z: c.z + Math.sin(a) * r * q, h: (i % 2 ? 0.9 : 1.6) * (0.8 + R() * 0.5), t0: 0.5 + R() * 0.5, d: new THREE.Vector3((R() - 0.5) * 0.5, 1, (R() - 0.5) * 0.5).normalize(), puffed: false }; });
       pulse(ev, c, ribMat(PAL.ice, PAL.teal, 0, 1), 0.3, r * 1.2, 0, 1.0, 0.35); let acc = 0;
+      decal(ev, c, ribMat(0x9fd8e8, 0xe8fbff, 0, 0.3, false), 0.1, r * 1.0, 0.32, 0.1, 1.2, 3.8);
       ev.fx.push((age, dt) => {
         const rv = easeOut(age / 1.1), k = 1 - sstep(3.2, 3.8, age); place(fr, fp, c.x, c.z, r, r, 0, 0.1); fr.commit(0.14, rv, k);
-        gRing(rim, c.x, c.z, r * 1.02, age * 0.2, 0.09, 0.03, 0); rim.commit(0.1, 1, k * sstep(0, 0.5, age));
+        gRing(rim, c.x, c.z, r * 1.02, age * 0.2 * MO.swirl, 0.09, 0.03, 0); rim.commit(0.1, 1, k * sstep(0, 0.5, age));
         for (const p of sp) { const t = backOut((age - p.t0) / 0.45) * k; p.m.visible = t > 0.01; p.m.position.set(p.x, H(p.x, p.z) - 0.05, p.z); p.m.quaternion.setFromUnitVectors(UP, p.d); p.m.scale.set(0.7 * t, p.h * t, 0.7 * t); if (age > p.t0 && !p.puffed) { p.puffed = true; debris(c, p.x, p.z, 3, 2.5, 0.09, [PAL.ice, PAL.teal], 5); sparks(c, p.x, c.y + 0.4, p.z, 3, 2, PAL.ice, 0.16, 0.8); } }
-        acc += dt * (age < 3 ? 16 : 0); while (acc >= 1) { acc--; const a = R() * TAU, q = r * R(), px = c.x + Math.cos(a) * q, pz = c.z + Math.sin(a) * q; dust.emit({ x: px, y: H(px, pz) + 0.1, z: pz, vx: (R() - 0.5) * 0.5, vy: 0.3, vz: (R() - 0.5) * 0.5, life: 2, size: 0.9, grow: 1.2, color: PAL.ice, alpha: 0.28, drag: 1 }); if (R() < 0.5) motes(c, c.x, c.z, r, PAL.ice, 0.14, 0.5); }
+        acc += dt * (age < 3 ? 16 * Q.n : 0); while (acc >= 1) { acc--; const a = R() * TAU, q = r * R(), px = c.x + Math.cos(a) * q, pz = c.z + Math.sin(a) * q; dust.emit({ x: px, y: H(px, pz) + 0.1, z: pz, vx: Math.cos(a) * 0.5, vy: 0.3, vz: Math.sin(a) * 0.5, life: 2, size: 0.9, grow: 1.2, color: PAL.ice, alpha: 0.28, drag: 1 }); if (R() < 0.5) motes(c, c.x, c.z, r, PAL.ice, 0.14, 0.5); }
       });
     },
   };
+  const q2r = new THREE.Quaternion();
   const WARN = (ev, c) => { // persistent in-world starfall warning: ground rings, star, sky beacon
-    ev.info = { x: c.x, z: c.z, r: c.radius, at: c.at }; const rr = mk(ev, 64, ribMat(PAL.ember, PAL.gold, 5, 2)), st = dens(star(5, 1, 0.4), 1, 1, 0.05, 60), sr = mk(ev, st.length, ribMat(PAL.amber, PAL.ember, 0, 1));
+    ev.info = { x: c.x, z: c.z, r: c.radius, at: c.at }; const R = mulberry(hashStr(ev.key)), rr = mk(ev, 64, ribMat(PAL.ember, PAL.gold, 5, 2)), st = dens(star(5, 1, 0.4), 1, 1, 0.05, 60), sr = mk(ev, st.length, ribMat(PAL.amber, PAL.ember, 0, 1));
     const bm = [[1, 0], [0, 1]].map((s) => { const b = mk(ev, 2, ribMat(PAL.amber, PAL.gold, 0, 2), null); b.side = s; return b; }); let acc = 0;
     ev.fx.push((age, dt) => {
-      const i = ev.info, left = i.at - clock, urg = 1 - clamp(left / 4), pl = 0.5 + 0.5 * Math.sin(age * (4 + urg * 14)), gy = H(i.x, i.z);
+      const i = ev.info, left = i.at - clock, urg = 1 - clamp(left / 4), pl = MO.flick ? 0.5 + 0.5 * Math.sin(age * (4 + urg * 14)) : 0.5 + 0.5 * urg, gy = H(i.x, i.z);
       const fade = (ev.closing >= 0 ? 1 - clamp((age - (ev.closing - 0.35)) / 0.35) : 1) * sstep(0, 0.3, age);
-      gRing(rr, i.x, i.z, i.r * (1 + 0.02 * pl), age * 0.5, 0.08, 0.02, age * 3); rr.commit(0.28 + 0.2 * urg, 1, fade * (0.55 + 0.45 * pl));
-      place(sr, st, i.x, i.z, i.r * 0.8, i.r * 0.8, -age * (0.4 + urg), 0.1); sr.commit(0.12, 1, fade * (0.4 + 0.4 * urg));
+      gRing(rr, i.x, i.z, i.r * (1 + 0.02 * pl), age * 0.5 * MO.swirl, 0.08, 0.02, age * 3); rr.commit(0.28 + 0.2 * urg, 1, fade * (0.55 + 0.45 * pl));
+      place(sr, st, i.x, i.z, i.r * 0.8, i.r * 0.8, -age * (0.4 + urg) * MO.swirl, 0.1); sr.commit(0.12, 1, fade * (0.4 + 0.4 * urg));
       bm.forEach((b) => { b.set(0, i.x, gy, i.z); b.set(1, i.x, gy + 40, i.z); b.commit(0.4 + urg * 0.5, 1, fade * (0.12 + 0.2 * urg), 0); });
-      acc += dt * (3 + urg * 12); while (acc >= 1) { acc--; const a = Math.random() * TAU, px = i.x + Math.cos(a) * i.r, pz = i.z + Math.sin(a) * i.r; glow.emit({ x: px, y: H(px, pz) + 0.2, z: pz, vy: 1 + Math.random() * 1.5, life: 1.2, size: 0.25, grow: -0.4, color: Math.random() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.8 }); }
+      acc += dt * (3 + urg * 12) * Q.n; while (acc >= 1) { acc--; const a = R() * TAU, px = i.x + Math.cos(a) * i.r, pz = i.z + Math.sin(a) * i.r; glow.emit({ x: px, y: H(px, pz) + 0.2, z: pz, vy: 1 + R() * 1.5, life: 1.2, size: 0.25, grow: -0.4, color: R() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.8 }); }
     });
   };
 
@@ -484,25 +677,31 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       ret.pose.ang = w.ang; ret.pose.rad = w.rad; ret.pose.line = w.line; ret.pose.valid = w.valid;
     }
     const s = ret.pose; if (!s) return;
-    const pulseS = 1 + 0.03 * Math.sin(clock * 3), sx = s.line ? s.len : s.rad * pulseS, sz = s.line ? 1 : s.rad * pulseS, a = ret.fade * (s.valid ? 0.9 + 0.1 * Math.sin(clock * 5) : 0.55);
-    for (const p of ret.paths) { p.rb.mesh.material = s.valid ? p.good : p.bad; place(p.rb, p.pts, s.cx, s.cz, sx, sz, s.ang + p.spin * clock, 0.08); p.rb.commit(p.w, 1, a); }
-    ret.acc += w ? dt * 6 : 0;
-    while (ret.acc >= 1) { ret.acc--; const c = { R: Math.random }, d = ret.def, ang = Math.random() * TAU, q = d.line ? 0 : s.rad * (0.7 + 0.3 * Math.random()); const px = s.cx + (d.line ? (Math.random() - 0.5) * s.len * Math.cos(s.ang) : Math.cos(ang) * q), pz = s.cz + (d.line ? (Math.random() - 0.5) * s.len * Math.sin(s.ang) : Math.sin(ang) * q); glow.emit({ x: px, y: H(px, pz) + 0.15, z: pz, vy: 0.5 + Math.random() * 0.6, life: 1.2, size: 0.18, grow: -0.4, color: s.valid ? d.c[Math.random() < 0.6 ? 0 : 1] : PAL.bad, alpha: 0.7 }); void c; }
+    const pulseS = 1 + 0.03 * Math.sin(clock * 3) * MO.flick, sx = s.line ? s.len : s.rad * pulseS, sz = s.line ? 1 : s.rad * pulseS, a = ret.fade * (s.valid ? 0.9 + 0.1 * Math.sin(clock * 5) * MO.flick : 0.55);
+    for (const p of ret.paths) { p.rb.mesh.material = s.valid ? p.good : p.bad; place(p.rb, p.pts, s.cx, s.cz, sx, sz, s.ang + p.spin * clock * MO.swirl, 0.08); p.rb.commit(p.w, 1, a); }
+    ret.acc += w ? dt * 6 * Q.n : 0;
+    while (ret.acc >= 1) { ret.acc--; const d = ret.def, ang = Math.random() * TAU, q = d.line ? 0 : s.rad * (0.7 + 0.3 * Math.random()); const px = s.cx + (d.line ? (Math.random() - 0.5) * s.len * Math.cos(s.ang) : Math.cos(ang) * q), pz = s.cz + (d.line ? (Math.random() - 0.5) * s.len * Math.sin(s.ang) : Math.sin(ang) * q); glow.emit({ x: px, y: H(px, pz) + 0.15, z: pz, vy: 0.5 + Math.random() * 0.6, life: 1.2, size: 0.18, grow: -0.4, color: s.valid ? d.c[Math.random() < 0.6 ? 0 : 1] : PAL.bad, alpha: 0.7 }); }
   }
 
   function update(nowMs, dt) {
     if (disposed) return; dt = clamp(dt || 0, 0, 0.1); clock += dt; TIME.value = ((nowMs || 0) / 1000) % 1000;
     for (const ev of events.values()) { ev.age += dt; for (const f of ev.fx) f(ev.age, dt); if ((!ev.persist && ev.age >= ev.dur) || (ev.closing >= 0 && ev.age >= ev.closing)) kill(ev.key); }
     for (const [k, t] of recent) if (t < clock) recent.delete(k);
-    updateReticle(dt); pools.forEach((p) => p.update(dt));
+    updateReticle(dt); pools.forEach((p) => p.update(dt)); kins.forEach((p) => { p.flush(); p.mesh.visible = p.live() > 0; });
+  }
+  function configure({ quality: q, reducedMotion: rm } = {}) { // optional live settings; events already running keep their spawned counts
+    if (q !== undefined && QUALITY[q]) { Q = QUALITY[q]; qName = q; }
+    if (rm !== undefined) { RM = !!rm; MO = M(); }
   }
   function stats() {
     const live = { dust: dust.live(), glow: glow.live(), shards: shards.live(), leaves: leaves.live() };
-    return { events: events.size, maxEvents: MAX_EVENTS, warnings: warns.size, ribbons: [...events.values()].reduce((n, e) => n + e.rib.length, 0) + ret.paths.length, particles: { ...live, total: live.dust + live.glow + live.shards + live.leaves, budget: 512 }, pooledMaterials: cache.size, reticle: !!ret.want, recent: recent.size };
+    let draws = 0; root.traverseVisible((o) => { if (o.isMesh || o.isPoints) draws++; });
+    return { events: events.size, maxEvents: MAX_EVENTS, warnings: warns.size, ribbons: [...events.values()].reduce((n, e) => n + e.rib.length, 0) + ret.paths.length, particles: { ...live, total: live.dust + live.glow + live.shards + live.leaves, budget: 512 }, pooledMaterials: cache.size, reticle: !!ret.want, recent: recent.size,
+      kinematic: { slabs: slabs.live(), rocks: rocks.live(), budget: KCAPS.slab + KCAPS.rock }, draws, quality: qName, reducedMotion: RM };
   }
   function dispose() {
-    if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); clearRet(); pools.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose();
+    if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); clearRet(); pools.forEach((p) => p.dispose()); kins.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose(); kinMat.dispose();
     Object.values(G).forEach((g) => g.dispose()); cache.forEach((m) => m.dispose()); cache.clear(); tex.dispose(); scene.remove(root); events.clear(); recent.clear(); warns.clear(); launched.clear();
   }
-  return { setTarget, play, update, sync, dispose, stats, prepareShaders };
+  return { setTarget, play, update, sync, dispose, stats, prepareShaders, configure };
 }
