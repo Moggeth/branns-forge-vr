@@ -147,18 +147,77 @@ class InstPool { // instanced shards/leaves with ground settling and optional or
 }
 
 class KinPool { // event-owned, script-posed instances (rock clods, fracture plates, crater rims); slots return on event end
-  constructor(geo, mat, cap) {
-    this.cap = cap; this.free = []; for (let i = cap - 1; i >= 0; i--) this.free.push(i); this.o = new THREE.Object3D(); this.c = new THREE.Color(); this.dirty = false;
-    const m = (this.mesh = new THREE.InstancedMesh(geo, mat, cap)); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    for (let i = 0; i < cap; i++) { m.setMatrixAt(i, ZERO); m.setColorAt(i, this.c.set(0xffffff)); }
+  // Geometry variants share the cap: slot i lives in variant i % nv, so consecutive claims alternate silhouettes (one draw per variant in use).
+  constructor(geos, mat, cap) {
+    geos = [].concat(geos); const nv = (this.nv = geos.length), per = Math.ceil(cap / nv);
+    this.cap = cap; this.free = []; for (let i = cap - 1; i >= 0; i--) this.free.push(i); this.o = new THREE.Object3D(); this.c = new THREE.Color(); this.dirty = false; this.used = new Array(nv).fill(0);
+    this.meshes = geos.map((g) => { const m = new THREE.InstancedMesh(g, mat, per); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); for (let i = 0; i < per; i++) { m.setMatrixAt(i, ZERO); m.setColorAt(i, this.c.set(0xffffff)); } return m; });
+    this.mesh = new THREE.Group(); this.mesh.add(...this.meshes);
   }
-  claim(ev, col) { const i = this.free.pop(); if (i === undefined) return -1; ev.kin.push([this, i]); this.mesh.setColorAt(i, this.c.set(col)); this.mesh.instanceColor.needsUpdate = true; return i; }
-  put(i, x, y, z, q, sx, sy, sz) { if (i < 0) return; const o = this.o; o.position.set(x, y, z); o.quaternion.copy(q); o.scale.set(Math.max(sx, 1e-4), Math.max(sy, 1e-4), Math.max(sz, 1e-4)); o.updateMatrix(); this.mesh.setMatrixAt(i, o.matrix); this.dirty = true; }
-  hide(i) { if (i < 0) return; this.mesh.setMatrixAt(i, ZERO); this.dirty = true; }
-  release(i) { if (i < 0) return; this.hide(i); this.free.push(i); }
-  flush() { if (this.dirty) { this.mesh.instanceMatrix.needsUpdate = true; this.dirty = false; } }
+  claim(ev, col) { const i = this.free.pop(); if (i === undefined) return -1; ev.kin.push([this, i]); const m = this.meshes[i % this.nv]; this.used[i % this.nv]++; m.setColorAt((i / this.nv) | 0, this.c.set(col)); m.instanceColor.needsUpdate = true; return i; }
+  put(i, x, y, z, q, sx, sy, sz) { if (i < 0) return; const o = this.o; o.position.set(x, y, z); o.quaternion.copy(q); o.scale.set(Math.max(sx, 1e-4), Math.max(sy, 1e-4), Math.max(sz, 1e-4)); o.updateMatrix(); this.meshes[i % this.nv].setMatrixAt((i / this.nv) | 0, o.matrix); this.dirty = true; }
+  hide(i) { if (i < 0) return; this.meshes[i % this.nv].setMatrixAt((i / this.nv) | 0, ZERO); this.dirty = true; }
+  release(i) { if (i < 0) return; this.hide(i); this.used[i % this.nv]--; this.free.push(i); }
+  flush() { if (this.dirty) { for (const m of this.meshes) m.instanceMatrix.needsUpdate = true; this.dirty = false; } this.meshes.forEach((m, v) => (m.visible = this.used[v] > 0)); }
   live() { return this.cap - this.free.length; }
-  dispose() { this.mesh.dispose(); }
+  dispose() { for (const m of this.meshes) m.dispose(); }
+}
+
+// Fractured-earth wedge (shared by every instanced plate/clod): an irregular, toothy star-shaped outline extruded downward through
+// horizontal strata bands. Each band steps in raggedly and has one flat vertex colour, so turf/humus/soil/clay/rock read as sharp
+// layers on the torn faces. The underside tapers and shifts sideways (a wedge with an asymmetric hinge). Flat-shaded, ~80 triangles.
+// o: m outline points, r0/r1 alternating radii + rj jitter, ax x-stretch, taper underside scale, off underside [x,z] shift,
+// yj top roughness, rag per-band setback, top/bottom colours, bands [[yTop, colour], ...] top to bottom ending at -0.5.
+function fragGeo(seed, o) {
+  const R = mulberry(seed), m = o.m, col = new THREE.Color(), P = [], C = [];
+  const ang = Array.from({ length: m }, (_, k) => ((k + (R() - 0.5) * 0.55) / m) * TAU + o.rot), rad = ang.map((_, k) => (k % 2 ? o.r0 : o.r1) + R() * o.rj);
+  const ys = [...o.bands.map((b) => b[0]), -0.5], rings = ys.map((y, b) => {
+    const f = (0.5 - y), sc = lp(1, o.taper, f), rg = b ? o.rag : 0;
+    return ang.map((a, k) => [Math.cos(a) * 0.5 * rad[k] * sc * o.ax + o.off[0] * f + (R() - 0.5) * rg, b ? y : y + (R() - 0.5) * o.yj, Math.sin(a) * 0.5 * rad[k] * sc + o.off[1] * f + (R() - 0.5) * rg]);
+  });
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
+  const tri = (a, b, c, hex, want) => { // want: outward reference direction; flips winding so every face is front-facing outward
+    ab.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); ac.set(c[0] - a[0], c[1] - a[1], c[2] - a[2]); n.crossVectors(ab, ac);
+    if (n.x * want[0] + n.y * want[1] + n.z * want[2] < 0) [b, c] = [c, b];
+    col.set(hex); for (const p of [a, b, c]) { P.push(p[0], p[1], p[2]); C.push(col.r, col.g, col.b); }
+  };
+  const ctr = (ring) => ring.reduce((s, p) => [s[0] + p[0] / m, s[1] + p[1] / m, s[2] + p[2] / m], [0, 0, 0]);
+  const top = rings[0], bot = rings[rings.length - 1], ct = ctr(top), cb = ctr(bot);
+  for (let k = 0; k < m; k++) { const j = (k + 1) % m; tri(ct, top[k], top[j], o.top, [0, 1, 0]); tri(cb, bot[k], bot[j], o.bottom, [0, -1, 0]); }
+  for (let b = 0; b < rings.length - 1; b++) for (let k = 0; k < m; k++) {
+    const j = (k + 1) % m, A = rings[b][k], B = rings[b][j], Cc = rings[b + 1][j], D = rings[b + 1][k], w = [(A[0] + B[0]) * 0.5, 0, (A[2] + B[2]) * 0.5];
+    tri(A, B, Cc, o.bands[b][1], w); tri(A, Cc, D, o.bands[b][1], w);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
+  return g;
+}
+// Plates carry their own strata colours (instance colour is a light tint); clods keep a dark soil crust over a light body so the
+// instance colour (stone/earth/cinder) still reads as the rock while the crust/body boundary stays sharp.
+const PLATE = { m: 9, r0: 0.78, r1: 1.0, rj: 0.14, ax: 1.05, taper: 0.62, off: [0.06, 0.2], yj: 0.07, rag: 0.07, rot: 0.2, top: 0x7d8a4c, bottom: 0x4a4640,
+  bands: [[0.5, 0x3a2a1c], [0.36, 0x7d5a3a], [0.04, 0xb08a60], [-0.22, 0x9c978e]] };
+const CLOD = { m: 7, r0: 0.72, r1: 1.0, rj: 0.2, ax: 1.0, taper: 0.38, off: [0.12, -0.08], yj: 0.16, rag: 0.09, rot: 0.6, top: 0xa88a62, bottom: 0x9a948c,
+  bands: [[0.5, 0x7a5a3c], [0.3, 0xffffff], [-0.1, 0xe2dcd4]] };
+// Meteor heat shell colours (additive; black = invisible): glowing crack seams plus a heated leading face skewed to one side.
+function meteorGeo(heat) {
+  const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position, R = mulberry(0x5f3a11);
+  const planes = Array.from({ length: 4 }, () => new THREE.Vector3(R() - 0.5, R() - 0.5, R() - 0.5).normalize()), lead = new THREE.Vector3(0.38, -1, 0.22).normalize();
+  for (let i = 0; i < p.count; i++) { // lumpy, faceted, teardrop: blunt leading face (-y in the flight frame), drawn-out trailing side
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 0.8 + 0.26 * Math.abs(Math.sin(x * 5.1 + y * 3.3 + z * 6.7)) - 0.08 * Math.abs(Math.sin(x * 11 - z * 9));
+    p.setXYZ(i, x * k, y * k * (y > 0 ? 1.45 : 0.86), z * k * 0.92);
+  }
+  if (heat) {
+    const C = [], f = new THREE.Vector3(), c = new THREE.Color();
+    for (let i = 0; i < p.count; i += 3) {
+      f.set(0, 0, 0); for (let j = 0; j < 3; j++) f.x += p.getX(i + j) / 3, f.y += p.getY(i + j) / 3, f.z += p.getZ(i + j) / 3;
+      const d = f.clone().normalize(), hot = sstep(0.25, 0.97, d.dot(lead)), crack = planes.some((q, n) => Math.abs(d.dot(q)) < 0.075 + 0.02 * n);
+      if (hot > 0.02) c.setRGB(lp(0.55, 1, hot), lp(0.06, 0.78, hot * hot), lp(0.01, 0.42, hot * hot * hot)).multiplyScalar(0.25 + 0.75 * hot);
+      else c.setRGB(0, 0, 0);
+      if (crack) c.setRGB(Math.max(c.r, 0.95), Math.max(c.g, 0.32), Math.max(c.b, 0.06));
+      for (let j = 0; j < 3; j++) C.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  }
+  g.computeVertexNormals(); return g;
 }
 
 // ---------- reticle shape vocabulary (unit coordinates; line shapes use x in [-.5,.5] of length, z in metres) ----------
@@ -217,6 +276,9 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const leafShape = new THREE.Shape(); leafShape.moveTo(0, -0.5); leafShape.quadraticCurveTo(0.5, -0.1, 0, 0.5); leafShape.quadraticCurveTo(-0.5, -0.1, 0, -0.5);
   const G = {
     bone: new THREE.CylinderGeometry(0.045, 0.07, 1, 6), slab: new THREE.BoxGeometry(1, 1, 1), rock: new THREE.DodecahedronGeometry(1, 0), core, clod, plate,
+    plateA: fragGeo(0x51d3, PLATE), plateB: fragGeo(0xa77e, { ...PLATE, m: 8, r0: 0.7, taper: 0.5, off: [-0.1, 0.26], rot: 1.1 }),
+    clodA: fragGeo(0x2c61, CLOD), clodB: fragGeo(0x93f0, { ...CLOD, m: 6, r0: 0.66, taper: 0.3, off: [-0.1, 0.12], rot: 2.1 }),
+    meteor: meteorGeo(false), meteorHeat: meteorGeo(true),
     crystal: new THREE.LatheGeometry([[0, 0], [0.26, 0], [0.2, 0.72], [0, 1]].map(([x, y]) => new THREE.Vector2(x, y)), 6),
     disc: new THREE.RingGeometry(0.2, 1, 40).rotateX(-Math.PI / 2), flame: new THREE.ConeGeometry(0.55, 3.2, 8, 1, true).translate(0, 1.6, 0),
     shard: new THREE.OctahedronGeometry(1, 0).scale(0.35, 1, 0.35), leaf: new THREE.ShapeGeometry(leafShape).scale(0.35, 0.35, 1),
@@ -225,9 +287,11 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const dust = new PointPool(CAPS.dust, false, tex, pointScale), glow = new PointPool(CAPS.glow, true, tex, pointScale);
   const shards = new InstPool(G.shard, new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true, emissive: 0x201814 }), CAPS.shard, H);
   const leaves = new InstPool(G.leaf, new THREE.MeshStandardMaterial({ roughness: 0.8, side: THREE.DoubleSide, emissive: 0x10240c }), CAPS.leaf, H);
-  // Same material parameters as the shard pool so the instanced-standard program is shared (no new shader variant).
-  const kinMat = new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true, emissive: 0x201814 });
-  const slabs = new KinPool(G.plate, kinMat, KCAPS.slab), rocks = new KinPool(G.clod, kinMat, KCAPS.rock), kins = [slabs, rocks];
+  // Shard-pool parameters plus vertex colours (strata bands); one extra instanced-standard variant, warmed by prepareShaders.
+  const kinMat = new THREE.MeshStandardMaterial({ roughness: 0.82, flatShading: true, emissive: 0x201814, vertexColors: true });
+  const slabs = new KinPool([G.plateA, G.plateB], kinMat, KCAPS.slab), rocks = new KinPool([G.clodA, G.clodB], kinMat, KCAPS.rock), kins = [slabs, rocks];
+  const meteorMat = () => pool('meteorCore', () => new THREE.MeshStandardMaterial({ color: 0x2b2522, emissive: 0x3a1206, emissiveIntensity: 0.6, roughness: 0.95, metalness: 0, flatShading: true }));
+  const heatMat = () => pool('meteorHeat', () => new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   const pools = [dust, glow, shards, leaves]; root.add(dust.obj, glow.obj, shards.mesh, leaves.mesh, slabs.mesh, rocks.mesh);
   async function prepareShaders(renderer, camera, targetScene) {
     // Representatives share the real cached materials. This group is never
@@ -235,7 +299,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     const preview = new THREE.Group();
     const ribbon = new Ribbon(2, ribMat(PAL.amber, PAL.gold), H);
     preview.add(ribbon.mesh, new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)),
-      new THREE.Mesh(G.disc, glowMat(PAL.amber)));
+      new THREE.Mesh(G.disc, glowMat(PAL.amber)), new THREE.Mesh(G.meteor, meteorMat()), new THREE.Mesh(G.meteorHeat, heatMat()));
     root.traverse(node => { if (node.isMesh || node.isPoints) { const k = node.clone(false); k.visible = true; preview.add(k); } }); // pooled meshes may be hidden while idle
     try { await renderer.compileAsync(preview, camera, targetScene); }
     finally { ribbon.dispose(); preview.clear(); }
@@ -393,8 +457,8 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       pulse(ev, c, amberM(), 0.3, r * 1.1, 0, 0.7, 0.32);
       decal(ev, c, soilM(), 0.1, r * 1.05, 0.62, 0, 0.45, 2.9, x, z, 0.1, R() * 6);
       const nf = qk(8, 4), fis = strips(ev, nf, 10, gougeM()), fl = Array.from({ length: nf }, (_, k) => ({ a: (k / nf) * TAU + R() * 0.5, L: r * (0.85 + R() * 0.45), t0: R() * 0.12, j: Array.from({ length: 10 }, () => (R() - 0.5) * 0.5) }));
-      const clods = Array.from({ length: qk(22, 8) }, (_, k) => { const r0 = r * (0.3 + 0.75 * Math.sqrt(R())), s = 0.22 + R() * 0.24 + (1 - r0 / r) * 0.18; return { i: rocks.claim(ev, [PAL.soil, PAL.loam, PAL.earth, PAL.clay, PAL.stone][k % 5]), a0: R() * TAU, r0, s, d: 0.05 + (r0 / r) * 0.22 + R() * 0.12, w: (k % 2 ? 1 : -1) * (0.7 + R() * 0.6), rx: R() * 6, ry: R() * 6, sp: 2 + R() * 3, settle: 0.85 + R() * 0.3 }; });
-      const cores = Array.from({ length: qk(3, 2) }, (_, k) => ({ i: rocks.claim(ev, k ? PAL.stone : PAL.slate), a: R() * TAU, o: k ? 0.35 + R() * 0.25 : 0, s: 0.55 + R() * 0.2, t0: 0.16 + k * 0.08, rx: R() * 3, ry: R() * 6 }));
+      const clods = Array.from({ length: qk(22, 8) }, (_, k) => { const r0 = r * (0.3 + 0.75 * Math.sqrt(R())), s = 0.22 + R() * 0.24 + (1 - r0 / r) * 0.18; return { i: rocks.claim(ev, [PAL.clay, 0xb39874, PAL.stone, PAL.clay, 0xc9b28c][k % 5]), a0: R() * TAU, r0, s, d: 0.05 + (r0 / r) * 0.22 + R() * 0.12, w: (k % 2 ? 1 : -1) * (0.7 + R() * 0.6), rx: R() * 6, ry: R() * 6, sp: 2 + R() * 3, settle: 0.85 + R() * 0.3 }; });
+      const cores = Array.from({ length: qk(3, 2) }, (_, k) => ({ i: rocks.claim(ev, k ? 0xb4afa6 : PAL.stone), a: R() * TAU, o: k ? 0.35 + R() * 0.25 : 0, s: 0.55 + R() * 0.2, t0: 0.16 + k * 0.08, rx: R() * 3, ry: R() * 6 }));
       const mound = (rr, age) => 1.35 * Math.max(0, 1 - rr / r) ** 1.3 * backOut((age - 0.12) / 0.8) * (1 - 0.15 * sstep(1.4, 2.2, age));
       let crown = false, accT = 0, accS = 0, accC = 0;
       ev.fx.push((age, dt) => {
@@ -404,10 +468,14 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         for (const p of clods) {
           const tp = age - p.d; if (tp <= 0) { rocks.hide(p.i); continue; }
           const em = sstep(0, 0.4, tp), churn = p.w * (1 - Math.exp(-tp * 2.2)) * MO.swirl, rr = p.r0 * (1 - 0.32 * sstep(0.05, 1.3, tp)), a = p.a0 + churn, px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr;
-          const top = mound(rr, age) * p.settle, y = H(px, pz) - p.s + em * (p.s * 0.7 + top) - sink * (p.s + top + 0.2) + Math.sin(age * 31 + p.rx) * shake, spin = p.sp * Math.min(tp, 1.2) * MO.spin;
-          qRock(QT, p.rx + spin, p.ry + spin * 0.6, 0); rocks.put(p.i, px, y, pz, QT, p.s * (1 - sink * 0.6), p.s * 0.85, p.s);
+          const top = mound(rr, age) * p.settle, y = H(px, pz) - p.s + em * (p.s * 0.7 + top) - sink * (p.s + top + 0.2) + Math.sin(age * 31 + p.rx) * shake, tumble = (p.rx - 3) * 0.35 * (1 - sstep(0.15, 0.9, tp)) * MO.spin;
+          // upheaved wedge: crust stays up and leans outward with the mound flank; a brief churn tumble decays as it settles
+          EU.set(0, -a + (p.ry - 3) * 0.25, 0, 'YXZ'); QT.setFromEuler(EU); q2r.setFromAxisAngle(V.set(0, 0, 1), -(0.25 + 0.55 * (rr / r)) * em + tumble); QT.multiply(q2r); q2r.setFromAxisAngle(V.set(1, 0, 0), (p.sp - 3.5) * 0.12 + tumble * 0.6); QT.multiply(q2r);
+          rocks.put(p.i, px, y, pz, QT, p.s * 1.25 * (1 - sink * 0.6), p.s * 0.95, p.s * (0.8 + 0.12 * p.sp));
         }
-        for (const p of cores) { const t = backOut((age - p.t0) / 0.6), px = x + Math.cos(p.a) * p.o, pz = z + Math.sin(p.a) * p.o; if (t <= 0.01) { rocks.hide(p.i); continue; } qRock(QT, p.rx + age * 0.3 * MO.spin, p.ry, 0.2); rocks.put(p.i, px, H(px, pz) - p.s * 0.5 + t * (mound(p.o, age) * 0.8 + p.s * 0.2) - sink * (p.s + 1), pz, QT, p.s * (1 - sink * 0.5), p.s * 0.9 * t, p.s); }
+        for (const p of cores) { const t = backOut((age - p.t0) / 0.6), px = x + Math.cos(p.a) * p.o, pz = z + Math.sin(p.a) * p.o; if (t <= 0.01) { rocks.hide(p.i); continue; } // upthrust stratified wedges, leaning apart from the centre
+          EU.set(0, -p.a + p.ry * 0.2, 0, 'YXZ'); QT.setFromEuler(EU); q2r.setFromAxisAngle(V.set(0, 0, 1), -(0.18 + p.rx * 0.12) * t); QT.multiply(q2r);
+          rocks.put(p.i, px, H(px, pz) - p.s * 0.7 + t * (mound(p.o, age) * 0.75 + p.s * 0.45) - sink * (p.s + 1), pz, QT, p.s * 1.1 * (1 - sink * 0.5), p.s * 1.25 * t, p.s * 0.85); }
         if (!crown && age > 0.14) { crown = true; for (let i = 0; i < qn(12); i++) { const a = R() * TAU, s = 0.6 + R() * 1.2; dust.emit({ x: x + Math.cos(a) * 0.4, y: H(x, z) + 0.4, z: z + Math.sin(a) * 0.4, vx: Math.cos(a) * s, vy: 2.4 + R() * 2.2, vz: Math.sin(a) * s, life: 1.3, size: 0.5 + R() * 0.4, grow: 0.8, color: R() < 0.5 ? PAL.clay : PAL.earth, alpha: 0.55, grav: 5, drag: 0.6 }); } for (let i = 0; i < qn(16); i++) ejecta(c, x, z, R() * TAU, r * (0.7 + R() * 0.7), 0.55 + R() * 0.35, 0.09 + R() * 0.08, [PAL.soil, PAL.earth, PAL.stone, PAL.clay][i % 4]); }
         if (age > 0.1 && age < 0.75) { accS += dt * 70 * Q.n; while (accS >= 1) { accS--; const a = R() * TAU, q = r * (0.8 + 0.25 * R()); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 2.6, 1.1, R() < 0.6 ? PAL.dust : PAL.clay, 0.42, 1.7, 0.25, 0.35); } }
         if (age > 0.45 && age < 1.7) { accT += dt * 11 * Q.n; while (accT >= 1) { accT--; const a = R() * TAU, q = r * 0.15 * R(), px = x + Math.cos(a) * q, pz = z + Math.sin(a) * q, top = H(px, pz) + mound(q, age); shards.emit({ R, x: px, y: top, z: pz, vx: Math.cos(a) * (1.4 + R() * 1.2), vy: 0.6 + R() * 0.8, vz: Math.sin(a) * (1.4 + R() * 1.2), life: 1.6 + R() * 0.6, size: 0.1 + R() * 0.1, sy: 1.1, color: R() < 0.5 ? PAL.stone : PAL.loam, grav: 12, drag: 0.4, spin: 6 * MO.spin }); } }
@@ -431,7 +499,9 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       const lip = mk(ev, n, soilM()), dark = mk(ev, n, gougeM()), heat = mk(ev, n, moltenM()); lip.mesh.renderOrder = 0; dark.mesh.renderOrder = 1;
       const nbr = qb(10), br = strips(ev, nbr, 8, gougeM()), bl = Array.from({ length: nbr }, (_, k) => { const s = k % 2 ? 1 : -1, th = (0.55 + R() * 0.6) * s; return { u: clamp((k + 0.5) / nbr + (R() - 0.5) * 0.06, 0.05, 0.95), dxb: dx * Math.cos(th) + nx * Math.sin(th), dzb: dz * Math.cos(th) + nz * Math.sin(th), L: 0.6 + R() * 0.9 + len * 0.03, j: Array.from({ length: 8 }, () => (R() - 0.5) * 0.35) }; });
       const np = qk(Math.min(13, Math.max(4, Math.ceil(len / 0.95))), 3), pl = [];
-      for (const s of [-1, 1]) for (let k = 0; k < np; k++) pl.push({ s, u: (k + 0.5 + (R() - 0.5) * 0.3) / np, i: slabs.claim(ev, [PAL.earth, PAL.loam, 0x6b5a49, PAL.stone, PAL.soil][(k * 2 + (s > 0 ? 1 : 0)) % 5]), w: 0.45 + R() * 0.45, th: 0.18 + R() * 0.12, tilt: 0.3 + R() * 0.4, d: R() * 0.07, yaw: (R() - 0.5) * 0.25, lift: 0.08 + R() * 0.12 });
+      // The two banks are staggered (different counts and half-slot offset) with independent length/width/thickness, flip, lean and
+      // hinge pitch, so the torn wedges never pair up into matching paving slabs.
+      for (const s of [-1, 1]) { const ns = s < 0 ? np : Math.max(3, np - 1 + ((R() * 2) | 0)), sh = s < 0 ? 0 : 0.5; for (let k = 0; k < ns; k++) pl.push({ s, u: clamp((k + sh * 0.5 + 0.5 + (R() - 0.5) * 0.45) / ns, 0.03, 0.97), lm: (np / ns) * (0.7 + R() * 0.6), i: slabs.claim(ev, [0xffffff, 0xeee4d8, 0xd9d2c8, 0xf6efe2, 0xe2d6c4][(k * 2 + (s > 0 ? 1 : 0)) % 5]), w: 0.4 + R() * 0.75, th: 0.24 + R() * 0.26, tilt: 0.22 + R() * 0.75, d: R() * 0.08, yaw: (R() - 0.5) * 0.6, pitch: (R() - 0.5) * 0.42, flip: R() < 0.5, lift: 0.06 + R() * 0.16 }); }
       const rest = 0.55 + R() * 0.15; let accD = 0, accB = 0, accE = 0, done = false; const fp = [0, 0, 0], q2 = new THREE.Quaternion();
       ev.fx.push((age, dt) => {
         const front = clamp((age - t0) / T), fade = 1 - sstep(ev.dur - 1.0, ev.dur, age), cool = 1 - 0.75 * sstep(T, T + 1.6, age), hp = MO.flick ? 0.8 + 0.2 * Math.sin(age * 11) : 0.9;
@@ -448,9 +518,10 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         for (const p of pl) {
           const tp = age - t0 - T * p.u - p.d; if (tp <= 0) { slabs.hide(p.i); continue; }
           const heave = backOut(tp / 0.32), settle = lp(1, rest, sstep(0.35, 1.2, tp)), sink = sstep(ev.dur - 0.9, ev.dur, age), jolt = MO.shake * 0.05 * Math.sin(tp * 40) * (1 - sstep(0, 0.4, tp));
-          const tilt = p.tilt * heave * settle * (1 - sink), L = (len / np) * 0.92, hw = p.w * 0.5, cxu = lp(ax, bx, p.u), czu = lp(az, bz, p.u), w0 = off(p.u), dist = 0.3 * heave + hw + Math.abs(w0) * 0.2;
-          const x = cxu + nx * (w0 + p.s * dist), z = czu + nz * (w0 + p.s * dist), y = H(x, z) - p.th * 0.45 + Math.sin(tilt) * hw + p.lift * heave * (1 - sink) + jolt - sink * 0.35;
-          q2.setFromEuler(EU.set(0, -ang + p.yaw, 0, 'YXZ')); QT.setFromAxisAngle(V.set(1, 0, 0), p.s * tilt); q2.multiply(QT); // inner edge lifts, outer edge hinges on the ground
+          const tilt = p.tilt * heave * settle * (1 - sink), L = (len / np) * 0.92 * p.lm, hw = p.w * 0.5, cxu = lp(ax, bx, p.u), czu = lp(az, bz, p.u), w0 = off(p.u), dist = 0.3 * heave + hw + Math.abs(w0) * 0.2;
+          const x = cxu + nx * (w0 + p.s * dist), z = czu + nz * (w0 + p.s * dist), y = H(x, z) - p.th * 0.5 + Math.sin(tilt) * hw * 0.9 + p.lift * heave * (1 - sink) + jolt - sink * 0.4;
+          const sg = p.flip ? -p.s : p.s; q2.setFromEuler(EU.set(0, -ang + p.yaw + (p.flip ? Math.PI : 0), 0, 'YXZ')); QT.setFromAxisAngle(V.set(1, 0, 0), sg * tilt); q2.multiply(QT); // inner edge lifts, outer edge hinges on the ground
+          QT.setFromAxisAngle(V.set(0, 0, 1), p.pitch * heave * (1 - sink)); q2.multiply(QT); // uneven hinge: one end rides higher
           slabs.put(p.i, x, y, z, q2, L, p.th, p.w * (1 - sink * 0.3));
         }
         if (front > 0 && front < 1) {
@@ -512,22 +583,27 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       const { x, z, R } = c, gy = c.y, fl = c.flight ?? LAUNCH, r = c.radius ?? 4; ev.dur = fl + 3.4;
       const da = R() * TAU, S = new THREE.Vector3(x + Math.cos(da) * 10, gy + 36, z + Math.sin(da) * 10), T = new THREE.Vector3(x, gy + 0.4, z);
       const back = S.clone().sub(T).normalize(), grp = new THREE.Group(); ev.g.add(grp); grp.quaternion.setFromUnitVectors(UP, back);
-      const rock = new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)); rock.scale.setScalar(0.8); grp.add(rock);
-      const f1 = own(ev, G.flame, PAL.amber), f2 = own(ev, G.flame, PAL.gold); f2.scale.setScalar(0.55); f1.material.opacity = 0.4; f2.material.opacity = 0.65; grp.add(f1, f2);
-      const hist = Array.from({ length: 22 }, () => S.clone()), tr = [mk(ev, 22, ribMat(PAL.amber, PAL.ember, 0, 2), null), mk(ev, 22, ribMat(PAL.gold, PAL.amber, 0, 2), null)]; tr[1].side = [Math.cos(da), Math.sin(da)];
+      // Head: a dark, faceted, lit rock (teardrop: blunt leading face) wrapped in an additive heat shell whose vertex colours carry
+      // glowing crack seams and a lopsided white-hot leading face. Two meshes replace the old glowing ball + two flame cones.
+      const rock = new THREE.Mesh(G.meteor, meteorMat()), heat = new THREE.Mesh(G.meteorHeat, heatMat()), spinG = new THREE.Group();
+      rock.scale.setScalar(0.95); heat.scale.setScalar(0.95 * 1.025); spinG.add(rock, heat); grp.add(spinG); spinG.rotation.y = R() * TAU;
+      const hist = Array.from({ length: 22 }, () => S.clone()), tr = [mk(ev, 22, ribMat(PAL.ember, 0x5a1a08, 0, 2), null), mk(ev, 22, ribMat(PAL.gold, PAL.ember, 0, 2), null)]; tr[1].side = [Math.cos(da), Math.sin(da)];
       const flash = own(ev, G.disc, PAL.gold), target = mk(ev, 64, ribMat(PAL.ember, PAL.gold, 5, 2));
       decal(ev, c, gougeM(), 0.05, r * 0.68, 0.8, fl, fl + 0.25, ev.dur, x, z, 0.07, R() * 6);
       decal(ev, c, soilM(), r * 0.55, r * 1.2, 0.36, fl + 0.05, fl + 0.6, ev.dur, x, z, 0.05, R() * 6);
       const nm = qk(10, 5), mol = strips(ev, nm, 10, moltenM()), ml = Array.from({ length: nm }, (_, k) => ({ a: (k / nm) * TAU + R() * 0.4, L: r * (0.75 + R() * 0.5), j: Array.from({ length: 10 }, () => (R() - 0.5) * 0.4), d: R() * 0.12 }));
-      const rim = Array.from({ length: qk(16, 7) }, (_, k, a = (k / 16) * TAU + R() * 0.3) => ({ i: rocks.claim(ev, [PAL.cinder, PAL.slate, PAL.stone, PAL.earth][k % 4]), a, q: r * (0.5 + R() * 0.16), s: 0.3 + R() * 0.3, d: R() * 0.08, rx: R() * 6, sp: 0.4 + R() * 0.4 }));
+      const rim = Array.from({ length: qk(16, 7) }, (_, k, a = (k / 16) * TAU + R() * 0.3) => ({ i: rocks.claim(ev, [PAL.slate, PAL.stone, PAL.cinder, PAL.clay][k % 4]), a, q: r * (0.5 + R() * 0.16), s: 0.3 + R() * 0.3, d: R() * 0.08, rx: R() * 6, sp: 0.4 + R() * 0.4 }));
       pulse(ev, c, amberM(), 0.5, r * 1.8, fl, fl + 0.8, 0.9); pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1), 0.3, r * 1.1, fl + 0.08, fl + 0.7, 0.4);
       flash.visible = false; let hit = false, acc = 0, accW = 0, accD = 0, accS = 0, accE = 0;
       ev.fx.push((age, dt) => {
         const tFade = 1 - sstep(ev.dur - 0.7, ev.dur, age);
         if (age < fl) {
-          const e = Math.pow(age / fl, 1.4); V.copy(S).lerp(T, e); grp.position.copy(V); const last = hist.pop(); last.copy(V); hist.unshift(last); rock.rotation.x += dt * 6 * MO.spin;
-          for (const rb of tr) { hist.forEach((h, i) => rb.set(i, h.x, h.y, h.z)); rb.commit(1.1, 1, 1, 1); }
-          glow.emit({ x: V.x - back.x * 0.6, y: V.y - back.y * 0.6, z: V.z - back.z * 0.6, life: 0.09, size: 3.4, grow: 0.4, color: PAL.gold, alpha: 0.55 }); // soft corona riding the head (pooled, 1 slot/frame)
+          const e = Math.pow(age / fl, 1.4); V.copy(S).lerp(T, e); grp.position.copy(V); const last = hist.pop(); last.copy(V); hist.unshift(last); spinG.rotation.y += dt * 2.2 * MO.spin; // slow roll about the flight axis keeps the hot face leading
+          heat.scale.setScalar(0.95 * (1.025 + (MO.flick ? 0.012 * Math.sin(age * 37) : 0)));
+          for (const rb of tr) { hist.forEach((h, i) => rb.set(i, h.x + back.x * 0.25, h.y + back.y * 0.25, h.z + back.z * 0.25)); }
+          tr[0].commit(1.15, 1, 0.8, 1); tr[1].commit(0.42, 1, 0.9, 1);
+          glow.emit({ x: V.x - back.x * 0.75, y: V.y - back.y * 0.75, z: V.z - back.z * 0.75, life: 0.08, size: 1.5, grow: 0.3, color: PAL.amber, alpha: 0.32 }); // small heat haze just behind the head (pooled, 1 slot/frame)
+          if (R() < dt * 26 * Q.n) dust.emit({ x: V.x + back.x * 0.9, y: V.y + back.y * 0.9, z: V.z + back.z * 0.9, vx: back.x * 2 + (R() - 0.5), vy: back.y * 2 + (R() - 0.5), vz: back.z * 2 + (R() - 0.5), life: 0.9, size: 0.9, grow: 1.6, color: 0x3b3430, alpha: 0.4, drag: 1.5 }); // dark ablation smoke
           acc += dt * 40 * Q.n; while (acc >= 1) { acc--; glow.emit({ x: V.x, y: V.y, z: V.z, vx: back.x * 6 + (R() - 0.5) * 3, vy: back.y * 6 + (R() - 0.5) * 3, vz: back.z * 6 + (R() - 0.5) * 3, life: 0.5, size: 0.35, grow: -0.5, color: R() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.9, grav: 3, drag: 2 }); }
           gRing(target, x, z, lp(r * 1.05, r * 0.3, e), -age * 2 * MO.swirl, 0.1, 0.03, 0); target.commit(0.22 + 0.3 * e, 1, 0.3 + 0.7 * e);
           if (e > 0.55) { accW += dt * 40 * Q.n; while (accW >= 1) { accW--; const a = R() * TAU, q = r * (0.25 + 0.7 * R()); dustDir(c, x + Math.cos(a) * q, z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 2 + e * 2, 0.9, PAL.dust, 0.3, 1.2, 0.2, 0.3); } }
