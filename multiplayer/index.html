@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14110e">
+  <title>Brann’s Forge</title>
+  <link rel="stylesheet" href="./lobby.css">
+</head>
+<body data-phase="lobby" data-role="hero">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-hero" viewBox="0 0 64 64">
+      <path d="M14 8 L40 34 M40 34 l4 -4 M40 34 l-4 4 M44 38 l6 6 M48 48 l4 4" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M10 6 l6 1 -1 6 z" fill="currentColor"/>
+      <path d="M34 22 C34 22 44 20 54 18 C54 34 50 46 40 54 C32 48 28 40 27 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" opacity=".9"/>
+      <path d="M41 26 v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+    </symbol>
+    <symbol id="i-god" viewBox="0 0 64 64">
+      <path d="M32 4 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 z" fill="currentColor"/>
+      <path d="M20 58 C14 50 12 44 12 38 V30 a3 3 0 0 1 6 0 V36 M18 36 V25 a3 3 0 0 1 6 0 V35 M24 34 V22 a3 3 0 0 1 6 0 V34 M30 34 V24 a3 3 0 0 1 6 0 V40 C38 36 41 34 44 35 C46 36 45 39 43 41 C39 46 37 52 36 58" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="50" cy="14" r="1.6" fill="currentColor" opacity=".7"/><circle cx="14" cy="16" r="1.2" fill="currentColor" opacity=".6"/>
+    </symbol>
+    <symbol id="i-anvil" viewBox="0 0 64 64">
+      <path d="M8 22 H44 C50 22 56 20 58 16 C58 26 52 30 44 31 V34 C44 38 40 40 36 40 H30 V46 H40 V52 H14 V46 H24 V40 H22 C18 40 16 36 16 32 C11 31 8 27 8 22 Z" fill="currentColor"/>
+      <path d="M32 6 l2 6 M40 9 l-3 5 M24 9 l3 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>
+    </symbol>
+    <symbol id="i-skeleton" viewBox="0 0 64 64">
+      <path d="M32 8 C20 8 13 16 13 27 C13 34 17 38 21 40 V48 H43 V40 C47 38 51 34 51 27 C51 16 44 8 32 8 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="24" cy="28" r="5" fill="currentColor"/><circle cx="40" cy="28" r="5" fill="currentColor"/>
+      <path d="M32 34 l-3 6 h6 z" fill="currentColor"/><path d="M27 48 v6 M32 48 v6 M37 48 v6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-raise" viewBox="0 0 64 64">
+      <path d="M6 54 C16 50 22 40 32 40 C42 40 48 50 58 54 Z" fill="currentColor" opacity=".85"/>
+      <path d="M32 34 V8 M22 18 l10 -10 10 10" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16 36 V24 M48 36 V24" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".6"/>
+    </symbol>
+    <symbol id="i-grove" viewBox="0 0 64 64">
+      <path d="M32 6 C20 10 14 20 18 30 C10 34 12 46 22 46 H42 C52 46 54 34 46 30 C50 20 44 10 32 6 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M32 58 V30 M32 40 l-7 -6 M32 36 l6 -5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-starfall" viewBox="0 0 64 64">
+      <path d="M44 34 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 z" fill="currentColor"/>
+      <path d="M8 8 L34 34 M18 6 L38 26 M6 20 L26 40" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".7"/>
+    </symbol>
+  </defs>
+</svg>
+
+<canvas id="world" aria-label="The world of Brann’s Forge"></canvas>
+
+<div class="atmosphere" aria-hidden="true">
+  <div class="glow"></div>
+  <svg class="treeline" viewBox="0 0 1200 220" preserveAspectRatio="none">
+    <path d="M0 220 V150 L30 120 L45 140 L70 90 L95 135 L120 105 L140 130 L170 70 L200 128 L225 100 L250 140 L280 95 L305 130 L330 60 L360 125 L390 100 L410 140 L440 85 L470 130 L500 110 L525 145 L560 75 L590 130 L615 105 L640 140 L670 92 L700 132 L730 65 L760 128 L790 98 L815 140 L845 88 L875 130 L900 108 L930 145 L960 70 L990 128 L1020 102 L1045 140 L1075 85 L1105 132 L1130 100 L1160 138 L1200 95 V220 Z" fill="currentColor"/>
+  </svg>
+  <span class="ember" style="--x:12%;--d:9s;--delay:0s"></span>
+  <span class="ember" style="--x:28%;--d:12s;--delay:3s"></span>
+  <span class="ember" style="--x:47%;--d:10s;--delay:6s"></span>
+  <span class="ember" style="--x:63%;--d:13s;--delay:1.5s"></span>
+  <span class="ember" style="--x:78%;--d:11s;--delay:4.5s"></span>
+  <span class="ember" style="--x:90%;--d:14s;--delay:8s"></span>
+</div>
+
+<!-- ============ Welcome ============ -->
+<main id="lobby" class="lobby">
+  <div class="card">
+    <header class="masthead">
+      <svg class="crest" aria-hidden="true"><use href="#i-anvil"/></svg>
+      <h1>Brann’s Forge</h1>
+      <p class="lede">Walk the land. Shape the world.<br>One shared adventure for up to eight players.</p>
+    </header>
+
+    <form id="lobbyForm" class="lobby-form" novalidate>
+      <div class="field">
+        <label for="name">Your name</label>
+        <input id="name" name="name" maxlength="24" autocomplete="nickname" spellcheck="false" placeholder="Wanderer" enterkeyhint="done">
+      </div>
+
+      <fieldset class="roles">
+        <legend>How do you want to play?</legend>
+        <div class="role-grid">
+          <label class="role-card">
+            <input type="radio" name="role" value="hero" checked>
+            <span class="role-body">
+              <svg class="role-icon" aria-hidden="true"><use href="#i-hero"/></svg>
+              <span class="role-name">Hero</span>
+              <span class="role-desc">Explore and fight · Desktop or VR</span>
+            </span>
+          </label>
+          <label class="role-card">
+            <input type="radio" name="role" value="god">
+            <span class="role-body">
+              <svg class="role-icon" aria-hidden="true"><use href="#i-god"/></svg>
+              <span class="role-name">God</span>
+              <span class="role-desc">Shape the world · Strategy view</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <section class="create-block">
+          <button id="create" class="btn btn-primary btn-large" type="button">Create a world</button>
+          <p class="hint">Start fresh and invite friends with a code.</p>
+        </section>
+
+        <div class="divider" role="presentation"><span>or</span></div>
+
+        <section id="joinBlock" class="join-block" aria-labelledby="joinTitle">
+          <h2 id="joinTitle" class="join-title">Join a friend</h2>
+          <p id="inviteNote" class="invite-note" hidden></p>
+          <div class="join-row">
+            <label class="visually-hidden" for="room">Room code</label>
+            <input id="room" class="room-input" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" spellcheck="false" placeholder="8-digit code" aria-describedby="roomHelp" enterkeyhint="go">
+            <button id="join" class="btn btn-secondary" type="submit">Join</button>
+          </div>
+          <p id="roomHelp" class="hint">Ask your friend for the 8-digit code shown in their game.</p>
+        </section>
+      </div>
+    </form>
+
+    <div id="lobbyStatus" class="status" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <p id="lobbyStatusText"></p>
+      <div class="status-actions">
+        <button id="statusRetry" class="btn btn-secondary" type="button" hidden>Try again</button>
+        <button id="statusBack" class="btn btn-quiet" type="button" hidden>Back</button>
+        <button id="statusCancel" class="btn btn-quiet" type="button" hidden>Cancel</button>
+      </div>
+    </div>
+
+    <details id="savedWorlds" class="saved">
+      <summary>Bring back a saved world</summary>
+      <div class="saved-body">
+        <p id="savedSummary" class="hint">Worlds save automatically in this browser while you play.</p>
+        <div class="saved-actions">
+          <button id="resume" class="btn btn-secondary" type="button" hidden>Resume</button>
+          <label class="btn btn-quiet file-btn">
+            Open a world file…
+            <input id="import" type="file" accept=".json,application/json">
+          </label>
+        </div>
+      </div>
+    </details>
+  </div>
+</main>
+
+<!-- ============ In-game HUD ============ -->
+<div id="hud" class="hud" hidden>
+  <div class="hud-top">
+    <div class="hud-self" aria-live="off">
+      <svg class="hud-role-icon" aria-hidden="true"><use id="hudRoleUse" href="#i-hero"/></svg>
+      <div class="hud-self-text">
+        <span id="hudName" class="hud-name"></span>
+        <span id="hudRole" class="hud-role">Hero</span>
+      </div>
+      <div class="meters">
+        <div class="meter hp" title="Health"><span class="meter-label">HP</span><span class="meter-track"><span id="hpFill" class="meter-fill"></span></span><span id="hpText" class="meter-value">–</span></div>
+        <div class="meter mana" title="Mana"><span class="meter-label">Mana</span><span class="meter-track"><span id="manaFill" class="meter-fill"></span></span><span id="manaText" class="meter-value">–</span></div>
+      </div>
+    </div>
+
+    <div class="hud-room">
+      <div class="room-chip">
+        <span class="room-label">World</span>
+        <span id="hudRoom" class="room-code"></span>
+        <span id="hudPlayers" class="room-players"></span>
+      </div>
+      <button id="copyCode" class="btn btn-chip" type="button">Copy code</button>
+      <button id="copyInvite" class="btn btn-chip" type="button">Copy invite</button>
+      <button id="vr" class="btn btn-chip btn-vr" type="button" hidden>Enter VR</button>
+      <button id="menuButton" class="btn btn-chip btn-menu" type="button" aria-haspopup="dialog">Menu</button>
+    </div>
+  </div>
+
+  <div id="notices" class="notices"></div>
+
+  <div class="hud-bottom">
+    <p id="lookHint" class="look-hint" hidden>Click the world to look around</p>
+    <div class="help hero-help">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span>
+      <span><kbd>Space</kbd> jump</span>
+      <span><kbd>Click</kbd> swing</span>
+      <span><kbd>Esc</kbd> free cursor</span>
+    </div>
+    <div class="god-tools">
+      <div class="spell-tray" role="radiogroup" aria-label="Spell">
+        <button type="button" class="spell" data-spell="skeleton" role="radio" aria-checked="true"><svg aria-hidden="true"><use href="#i-skeleton"/></svg><span>Skeleton</span><kbd>1</kbd></button>
+        <button type="button" class="spell" data-spell="raise" role="radio" aria-checked="false"><svg aria-hidden="true"><use href="#i-raise"/></svg><span>Raise</span><kbd>2</kbd></button>
+        <button type="button" class="spell" data-spell="grove" role="radio" aria-checked="false"><svg aria-hidden="true"><use href="#i-grove"/></svg><span>Grove</span><kbd>3</kbd></button>
+        <button type="button" class="spell" data-spell="starfall" role="radio" aria-checked="false"><svg aria-hidden="true"><use href="#i-starfall"/></svg><span>Starfall</span><kbd>4</kbd></button>
+      </div>
+      <div class="help god-help">
+        <span><kbd>1</kbd>–<kbd>4</kbd> choose spell</span>
+        <span><kbd>Click</kbd> ground to cast</span>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> pan</span>
+        <span>Right-drag orbit · wheel zoom</span>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</div>
+
+<!-- ============ Pause menu ============ -->
+<div id="menu" class="menu-backdrop" hidden>
+  <section class="card menu-card" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <header class="menu-head">
+      <h2 id="menuTitle">World menu</h2>
+      <p class="hint">Your world keeps going for everyone else while this menu is open.</p>
+    </header>
+
+    <button id="resumePlay" class="btn btn-primary btn-large" type="button">Back to the world</button>
+
+    <fieldset class="roles roles-compact">
+      <legend>Play as</legend>
+      <div class="role-grid">
+        <label class="role-card">
+          <input type="radio" name="menuRole" value="hero">
+          <span class="role-body">
+            <svg class="role-icon" aria-hidden="true"><use href="#i-hero"/></svg>
+            <span class="role-name">Hero</span>
+            <span class="role-desc">Explore and fight</span>
+          </span>
+        </label>
+        <label class="role-card">
+          <input type="radio" name="menuRole" value="god">
+          <span class="role-body">
+            <svg class="role-icon" aria-hidden="true"><use href="#i-god"/></svg>
+            <span class="role-name">God</span>
+            <span class="role-desc">Shape the world</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <section class="menu-section">
+      <h3>Invite friends</h3>
+      <p class="hint">Share the code <strong id="menuRoom" class="room-code"></strong> or send the invite link.</p>
+      <div class="row">
+        <button id="menuCopyCode" class="btn btn-secondary" type="button">Copy code</button>
+        <button id="menuCopyInvite" class="btn btn-secondary" type="button">Copy invite link</button>
+      </div>
+    </section>
+
+    <details class="menu-section saved">
+      <summary>World saves</summary>
+      <div class="saved-body">
+        <p class="hint">This world saves itself in your browser every few seconds. You can also keep a copy as a file.</p>
+        <div class="row">
+          <button id="download" class="btn btn-secondary" type="button">Download a backup</button>
+        </div>
+        <div id="resetArea" class="reset-area">
+          <button id="reset" class="btn btn-danger-quiet" type="button">Reset world…</button>
+          <div id="resetConfirm" class="confirm" hidden>
+            <p><strong>Start this world over for everyone?</strong> A recovery copy is saved in this browser first.</p>
+            <div class="row">
+              <button id="resetYes" class="btn btn-danger" type="button">Yes, reset the world</button>
+              <button id="resetNo" class="btn btn-quiet" type="button">Keep it</button>
+            </div>
+          </div>
+        </div>
+        <p id="resetNote" class="hint" hidden>Only the player hosting this world can reset it.</p>
+      </div>
+    </details>
+
+    <details id="techDetails" class="menu-section tech">
+      <summary>Technical details</summary>
+      <dl class="tech-list">
+        <dt>Connection</dt><dd id="techConnection">–</dd>
+        <dt>Renderer</dt><dd id="techRenderer">–</dd>
+        <dt>World</dt><dd id="techMetrics">–</dd>
+        <dt>Last event</dt><dd id="techEvent">–</dd>
+        <dt>Last problem</dt><dd id="techError">none</dd>
+      </dl>
+    </details>
+
+    <button id="leave" class="btn btn-quiet btn-leave" type="button">Leave world</button>
+  </section>
+</div>
+
+<script type="module" src="./lobby.js"></script>
+</body>
+</html>

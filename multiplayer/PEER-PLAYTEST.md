@@ -26,8 +26,8 @@ with Ctrl+C, never all Node/Godot processes. Signaling logs:
 `multiplayer/peer/logs/server.jsonl`. Health: `/peer/health` on either local or
 tunnel HTTP origin. Server restart removes room membership; resume a local or
 downloaded save into a new room. A stopped tunnel leaves the Vercel page visible
-but prevents joining. Recover it, replace the endpoint through the harness field
-or rebuild with the new `VITE_PEER_WS_URL` and redeploy.
+but prevents joining. Recover it, rebuild with the new `VITE_PEER_WS_URL` and
+redeploy. The player-facing lobby deliberately has no endpoint field.
 
 Next durable hosting step is a named tunnel/stable hostname plus a managed
 signaling process and optional TURN. This deployment did not purchase anything.
@@ -35,11 +35,23 @@ signaling process and optional TURN. This deployment did not purchase anything.
 ## Build and deploy only public output
 
 `scripts/deploy-peer-preview.ps1 -PeerUrl wss://NEW-HOST/peer/ws` builds the
-engineering harness and publishes an isolated Vercel Build Output API directory.
+designed lobby and publishes an isolated Vercel Build Output API directory in
+the system temporary folder, outside all Git checkouts.
 It requires the existing ignored `.vercel/project.json` and authenticated
-Moggeth Vercel CLI. It uploads only compiled browser JS, the three GLBs and HTML;
+Moggeth Vercel CLI. It uploads only compiled browser JS/CSS, the three GLBs and HTML;
 no native saves, source, environment files, credentials or local services.
-The full-product `npm run build` remains separate and gated on the designed lobby.
+`npm run build` builds the lobby; `build:check` retains the diagnostic harnesses.
+
+Lobby uplift: personal Claude.ai Pro identity verified before generation,
+actual/canonical model `claude-opus-5-5`, high effort, 348.176 s. Source commission
+was isolated under work/opus-welcoming-lobby-20261002. Codex refined short-screen
+spacing, preserved leading-zero room codes, fixed formatted paste, added menu
+focus containment and ensured join timeout covers the first actual world state.
+Node regression+protocol checks passed in 2.0457 s. Browser checks covered create,
+invite join, 2/8 players, role switching, copy feedback, and narrow 360px rendering.
+Narrow rendering is not physical phone gameplay acceptance. The browser's isolated
+DOM inspection cannot access iframe contentDocument; use visual evidence rather
+than retrying that unsupported inspection surface.
 
 ## Verification and measured evidence
 
@@ -81,3 +93,22 @@ The full-product `npm run build` remains separate and gated on the designed lobb
   foreground Node launch was restored and public health rechecked. Current
   owned session/tunnel metadata is in ignored `logs/peer-live-processes.json`;
   do not claim an installed background/autostart service.
+
+## Lobby production verification — 2026-10-02
+
+Production deployment `dpl_AvhS3ymbV9LKjj2SzGGas1dbLxtH` is READY at the public
+alias. Compiled build + publication: 6.0569715 s. Anonymous HTTP 200 + signaling
+health check: 0.6333366 s. Public create returned an eight-digit room, and an
+invite joined as Hero while the host was God: both public tabs showed 2 of 8
+players and 100/100 health. The old engineering toolbar is gone.
+
+Deployment learning: staging beneath the Git worktree let the CLI infer commit
+author metadata, and Vercel blocked publication with "commit author doesn't have
+permission" despite CLI and GitHub both identifying Moggeth. The CLI waited
+without surfacing the block; `vercel inspect <deployment>` exposed the reason.
+Publish the compiled artifact from a fresh system-temporary directory using the
+existing authenticated project owner, not a folder nested inside the repository.
+No project access protections, billing plan or Git author settings were changed.
+Browser Vercel login was a different personal account from CLI; do not alter its
+GitHub connections to solve a CLI deployment issue. `gh api user/emails` also
+lacks scope here; do not repeatedly request it or broaden scopes unnecessarily.

@@ -1,4 +1,40 @@
-# Pending Opus 5.5 lobby commission
+# Opus 5.5 lobby commission
+
+## Current commission — 2026-10-02
+
+Personal sign-in is now verified: `fauxgrady@gmail.com`, `claude.ai`, Pro,
+no API key source, in the scrubbed child environment. Explicit
+`claude-opus-5-5` session metadata verified. Isolated commission:
+`work/opus-welcoming-lobby-20261002/BRIEF.md`; ownership is only index.html,
+lobby.css, lobby.js and HANDOFF.md. Codex owns integration/testing/deployment.
+The brief supersedes the older dedicated-server brief below: eight players,
+WorldSession peer transport, eight-digit invitations, icon role cards and no
+visible connection endpoint. Budget: 480 seconds, 24 turns, high effort.
+
+Sign-in lesson: `claude auth login --claudeai --email fauxgrady@gmail.com`
+prints a fresh authorization URL. Verify the authorization page visibly shows
+the personal email; finish that current flow and recheck CLI auth in the cleaned
+environment. A prior browser success page or login hint alone is not verification.
+
+## Accepted deliverable and integration
+
+Commission finished successfully in **348.176 seconds**, high effort. Metadata
+verified requested, actual and canonical `claude-opus-5-5`. The account was the
+personal Pro subscription above; no API billing or model substitution was used.
+Output: `work/opus-welcoming-lobby-20261002/{index.html,lobby.css,lobby.js,HANDOFF.md}`.
+Integrated source lives under `multiplayer/`. Codex fixed short-screen layout,
+formatted-code paste, menu focus/inert state, snapshot timeout and health bars.
+The result uses original inline SVG role icons, charcoal/brass styling, clear
+create/join actions and secondary save/menu controls. It has no endpoint input.
+
+Tests: eight session/save/simulation regressions and peer protocol checks passed;
+browser create/invite join showed two players, role switching and copy feedback.
+Desktop 1280x720 and narrow 360px layout inspected. Physical phone/headset input
+and separate-household connectivity remain unverified. See PEER-PLAYTEST.md for
+public deployment verification. Do not mistake successful authentication for a
+completed commission: retain metadata verification on every future generation.
+
+## Historical brief (superseded)
 
 2026-10-02 status: NOT SUBMITTED. Clean-environment Claude CLI reported signed
 out, authMethod none and no subscription. No generation or API spend occurred.

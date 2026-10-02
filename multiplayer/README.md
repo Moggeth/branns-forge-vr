@@ -3,9 +3,13 @@
 ## Live eight-player peer preview — 2026-10-02
 
 Open https://branns-forge-multiplayer.vercel.app . Choose Hero (FPS, or Enter VR
-on a supported headset) or God (RTS), then Create room. Send the room code or
-room link to a friend; they select their role and Join room. No account needed.
-This is the existing engineering harness, not the commissioned product lobby.
+on a supported headset) or God (RTS) using the icon cards, then Create a world.
+Copy the eight-digit room code or invite link for a friend; they select their
+role and Join. No account needed. The Opus-designed fantasy lobby replaces the
+engineering toolbar. Connection endpoints are configured at build time, never
+shown as a player input. Menu releases controls and exposes role switching,
+backup download, host-only confirmed reset and leaving. The shared world keeps
+running while a menu is open. Save/resume/import live in secondary sections.
 
 The current browser-hosted route uses **8 players, fixed 60 Hz simulation and
 20 Hz snapshots**, with rendering at the device's refresh rate. It reuses the
@@ -33,17 +37,17 @@ playtest, not an always-available or broadly scalable production service.
 See [peer/README.md](peer/README.md) for lifecycle/configuration and
 [PEER-PLAYTEST.md](PEER-PLAYTEST.md) for deployment and verification.
 
-The new lobby commission is blocked: cleaned Claude CLI auth reports the work
-account, not the required personal subscription. No Claude generation was sent.
+The Opus 5.5 lobby commission completed on the verified personal Pro subscription
+in 348.176 seconds; Codex integrated and verified the real network behavior.
 Physical headset and separate-household acceptance are still pending.
 
 ## Earlier dedicated-server proof (separate, not deployed)
 
 The original dedicated-server route below remains available for local verification.
 Vercel is now authenticated; an empty Fly app exists but no machine/volume was
-deployed or paid hosting started. The required Opus lobby design has not been
-commissioned. There is deliberately no production
-`index.html` yet; `npm run build` and the release Docker build remain gated on it.
+deployed or paid hosting started. The production index now targets peer rooms;
+the dedicated-server engineering harness remains under tests/. Do not deploy
+the old container configuration assuming the new lobby uses its protocol.
 
 This is a small independent shared clearing, not a port of the full native game.
 It does not connect to native saves, the native running game, voice services or
@@ -99,7 +103,7 @@ Tests make disposable rooms; use a dedicated instance/state directory, not a
 populated deployment. `TEST_WS_URL` chooses the server and `TEST_ORIGIN` supplies
 the exact permitted origin. Production-origin coverage adds
 `TEST_REQUIRE_ORIGIN=1`. `build:check` compiles the diagnostic page to ignored
-`dist-check/`; it does not unblock the production lobby build.
+`dist-check/`; `npm run build` separately compiles the current peer lobby.
 
 Stop the specific foreground gateway/Vite with Ctrl+C. The gateway stops only its
 owned Godot process. Never stop all Godot/Node processes. Metadata logs are in
@@ -121,12 +125,10 @@ Remote immersive VR requires HTTPS and a browser/headset combination exposing
 The user's Vive Pro 2/browser combination has not yet been tested.
 See [WebXR](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API).
 
-Next: reconnect the personal Claude subscription and verify Opus 5.5; commission
-the lobby from [the prepared brief](../docs/MULTIPLAYER-LOBBY-COMMISSION.md),
-integrate it, build the image, authenticate approved hosting, deploy, then repeat
-two-browser/32-client/WAN and headset checks against the hosted URL. Docker is not
-installed on this machine; container runtime is untested. Do not present local
-test success as hosted acceptance.
+The dedicated-server container is not deployed. Its older 32-client checks do
+not describe the current eight-player peer preview. Docker/container runtime,
+separate-household connectivity and physical headset acceptance remain unverified.
+The peer lobby commission and integration are complete; see the current status above.
 
 ## Evidence
 
@@ -135,13 +137,13 @@ results, limits and harness lessons. [server/README.md](server/README.md)
 documents persistence and lifecycle. Local browser checks verified two tabs,
 both roles, shared raised terrain and an attacking skeleton without browser
 console errors. The test browser correctly reported immersive VR unavailable.
-Player-facing UI and physical VR acceptance remain pending.
+These earlier checks used the engineering harness. Physical VR acceptance remains pending.
 
 Browser automation lessons: target this canvas by its `aria-label`, not its
 snapshot's generic role. The browser evaluate surface uses an isolated world;
 page module globals are unavailable there. Read the visible diagnostics instead
 of repeatedly trying to inspect `window.brannHarness`. A diagnostic Vite bundle
 build completed in 0.739 s (141 ms compiler time); Three.js makes the single bundle
-about 650 kB / 166 kB gzip. Split the renderer when integrating the lobby so room
-selection does not wait for the renderer/assets. Do not hide the warning by only
+about 650 kB / 166 kB gzip. The current lobby still statically imports the renderer; a future loading pass
+should split it so room selection does not wait for the renderer/assets. Do not hide the warning by only
 raising the chunk-size threshold.
