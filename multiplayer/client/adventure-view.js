@@ -31,6 +31,7 @@ export function createAdventureBanner(root, {onAction = () => {}} = {}) {
   const box = el('section', 'position:absolute;top:10px;left:50%;transform:translateX(-50%);min-width:240px;max-width:min(92vw,420px);' +
     'background:rgba(24,18,14,.82);color:#f3e7d3;font:13px/1.3 system-ui,sans-serif;border-radius:10px;padding:8px 12px;' +
     'box-shadow:0 2px 10px #0008;pointer-events:auto;user-select:none;z-index:20');
+  box.className = 'expedition-banner';
   box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite');
   root.append(box);
   let last = '';

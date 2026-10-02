@@ -266,3 +266,36 @@ body.touch-controls-active .menu-backdrop {
 @media (max-width: 480px), (max-height: 480px) {
   .menu-card:has(.mui-settings) { padding: 20px 16px; gap: 14px; }
 }
+/* Keep equipment inside its allocated column; the former fixed 760px toolbar
+   overran the two thumb sticks in landscape. Preserve the authored styling. */
+body.touch-controls-active #heroTools { width: 100%; max-width: 100%; z-index: 21; }
+body.touch-controls-active #heroTools .bf-bar { width: 100%; min-width: 0; }
+body.touch-controls-active #heroTools .bf-equip { min-width: 0; }
+.bf-actions { top: auto; bottom: calc(100% + 6px); max-height: min(50dvh, 260px); overflow-y: auto; }
+body.touch-controls-active .bf-actions { z-index: 8; }
+@media (orientation: portrait) {
+  body.touch-controls-active #heroTools { width: auto; }
+  body.touch-controls-active .bf-actions { bottom: auto; top: calc(100% + 6px); }
+}
+@media (orientation: landscape) {
+  body.touch-controls-active #heroTools {
+    position: relative; inset: auto; transform: none;
+  }
+}
+
+/* The Expedition banner is also interactive: reserve its own scrollable space. */
+body.touch-controls-active .expedition-banner { max-height: 28dvh; overflow-y: auto; box-sizing: border-box; }
+body.touch-controls-active .expedition-banner button { min-height: 44px !important; }
+body.xr .expedition-banner { display: none; }
+@media (orientation: portrait) {
+  body.touch-controls-active .expedition-banner { top: calc(env(safe-area-inset-top, 0px) + 220px) !important; }
+}
+@media (orientation: landscape) {
+  body.touch-controls-active .expedition-banner { top: calc(env(safe-area-inset-top, 0px) + 120px) !important; max-height: 26dvh; min-width: 0 !important; width: min(340px, 46vw); }
+}
+/* Grid children must be allowed to shrink below their equipment row's intrinsic width. */
+body.touch-controls-active .hud-bottom { grid-template-columns: minmax(0, 1fr); }
+body.touch-controls-active #heroTools { min-width: 0; }
+@media (orientation: landscape) {
+  body.touch-controls-active .bf-actions { grid-template-columns: repeat(3, minmax(86px, 1fr)); width: min(320px, calc(100vw - 48px)); }
+}
