@@ -278,3 +278,21 @@ Othermeasuredtoolstepsseconds: currentdiscovery0.184,auth/private1.656,fetch/dif
 Publicsource fe7fd35, deployment dpl_DkhhndoLrudxzjhjQF7UHVaBUd5y, previewjutr8h8lx; productionURLunchanged. Build302ms, verifiedrecursiveassetstage/deploy16.783s. ActualhostedcompactHUD7.049s passes5viewportscollapsed/expanded,Start/Tithe/Leavecancel/Leaveconfirm,44pxtargets,nooverflow,noerrors. Hostedtwo-context7.311s:Godtitheupdatesforge8instances;lateHerojoinsseessame8withoutreplayingburst;zeroerrors. Vr routing isunit/mockXRchecked, notphysicalHMD. Previousrollback8daec95/dpl_GM6T9uCAmidb37wsjZTWYgRCwk6c. HUDfe7fd35commit/push2.477s.
 
 OwnedQApeer8799session6306 stopped0.012s,Vite5188session25496 stopped0.013s,fixture8795session78046 stopped0.012s. Original8789peer/tunnelpreserved. AllQA browsercontextsclosed. Onlyownedcommissionstillrunning work/opus-contextual-interactions-20261003 PID13872/session68253. Inspectmetadata/HANDOFFnextheartbeat; no duplicate. AppautomationupdatedconfirmedACTIVEevery20min withcurrentowner/release andsame23:00stop. No inventedClaudeusagepercentage. Gitmainorigin/main synced beforethisdoccheckpoint; unrelatedGodotUIDsuntouched.
+
+## 20:56:48 UTC - USER PRIORITY: five parallel Opus 5.5 3D projects LIVE
+
+User explicitly demands five parallel Opus5.5 3D projects urgently asmain task. Suppliedphone screenshot06:45 showsClaude session20%used/weekly8%used,weeklyreset2h15away; evidenceonly,nolivepercentage inferred. Toolclock20:53:40 atstart and20:56:48 atverifieddispatch. Prior23:00UTCstop/newcommission22:00/integration22:45 unchanged. Parallel5newprojects startedwith40min80turncaps, high effort, firstartifact8min, baselinehandoff25min. Allfreshcleanedchildauth fauxgrady@gmail.com/claude.ai/pro; rootread actualinitclaude-opus-5-5 forEVERYjob. Subscriptiononly,noAPI/extras. Oneexistingcontextualcuejobcontinues separately. Noactiveworkduplicated.
+
+| Owned folder under work | PID | exec session | Concrete scope / next review |
+|---|---:|---:|---|
+| opus-sprint-player-character-20261003 |51736|35725|Fullymodeled/riggedHero,clips/handgrips/high-lowLOD/portableGLB+Blend,remoteavataradapter; inspectaxes,bounds,8playerbudget andactualremoteview.|
+| opus-sprint-terrain-deformation-20261003 |1952|41700|Groundmaterialdeformation/strata; boundedjobs/currentAPIheightpreserved; inspectground/elevatedSunder,shader/perfregressions.|
+| opus-sprint-magic-spectacle-20261003 |40016|21143|Sunder/Raise/Starfall/growthstaplespluskitconsistency; pooledVFX,currentAPI/dedupe/warmup; renderstagecontactsheetandactualspelltest.|
+| opus-sprint-hero-tree-canopy-20261003 |35820|47033|Canopy/branch/barkassetfamily; exactTrunkgeometry/contract/hierarchy MUSTremain; compareverticesbefore3cut/falltest.|
+| opus-sprint-mining-geology-20261003 |5460|70049|Opaqueclosedmeteors/deposits/crystals/nuggets; embeddedatlas/LOD/realvisiblecontact; normals/winding/boundsandminingcapture.|
+
+Earliercontextualcue work/opus-contextual-interactions-20261003 stillPID13872/session68253, cap20minfrom20:47. Rootonlycentralintegration. Eachnewprojectisolatedreference/specificBRIEF, read-onlynode_modulesjunction; noinstall/git/publish. BlenderCPU2threadsperartist tolimitcontention; rootserializesfinalassetvalidation. Sourcecopyincludescurrentcontracts/builders andcurrentruntime; do notoverwritecentralfilesfromstaleproposals. Allbuiltassetsstayisolateduntilreview. MainremainingUIhintjobdoesnotownnewartfiles. Fiveprojectbriefsandmetadata inignoredworkfolders, registryhere durable. NoQAservers active;original8789/tunnelpreserved.
+
+Readyqueue perlane: baselineartifact -> inspectrenderandmachinecontract -> rootintegration -> actualFPS/RTS/roleverification -> boundedcorrectionidentifiedbyreview. Do notcommissionunrelatedfiller. AutomationupdatedconfirmedACTIVEevery5min (was20) forcompletionresponsivecoordination. Checkmetadata/HANDOFFbeforeanyfurtherdispatch, don'trepeatongoingprojects.
+
+Measuredsteps: time/playbook/inventory/processinspection0.691s; contracts/assets0.218s; builderpath/sourceinventory0.223s; fivebriefs/references/junctions0.247s; allfivedispatchesparallel10.2swall (eachtool10.014s); metadataactualmodelverification0.293s. Allfive running by20:56:48UTC. Publicremainsfe7fd35/deploymentdpl_DkhhndoLrudxzjhjQF7UHVaBUd5y; noartgenerationclaimedintegratedyet.
