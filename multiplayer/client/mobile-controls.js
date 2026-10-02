@@ -20,7 +20,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     ui.setStick(side,x,y); game.setTouchAxes(side,x*(side==='right'?sensitivity:1),y*(side==='right'?sensitivity:1));
   }, () => enabled && state.active && !state.xr));
   const worldTouch = bindWorldTouch(canvas,game,{enabled:()=>enabled&&state.active&&!state.xr, role:()=>state.role, sensitivity:()=>sensitivity,onTarget:valid=>{target=valid;render();}});
-  function reset() {sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
+  function reset() {attackPointer=null;sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
   function fullscreenElement() {return document.fullscreenElement || document.webkitFullscreenElement;}
   function fullscreenSupported() {return !!((document.fullscreenEnabled && document.documentElement.requestFullscreen) || (document.webkitFullscreenEnabled && document.documentElement.webkitRequestFullscreen));}
   function render() {
@@ -48,7 +48,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     if(action==='fullscreen'){void fullscreen();return;}
     if(action==='menu'){reset();onMenu();return;}
     if(!state.active||state.xr)return;
-    if(action==='strike')game.strike();
+    if(action==='strike'&&event.detail===0){game.primaryDown();game.primaryUp();}
     if(action==='jump')game.jump();
     if(action==='cast')game.castAim();
     if(action==='cancel'){game.cancelAim();target=false;render();}
@@ -56,6 +56,10 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     if(action==='zoom-in')game.zoomBy(-4);
     if(action==='zoom-out')game.zoomBy(4);
   }
+  let attackPointer=null;
+  listen(ui.root,'pointerdown',event=>{const button=event.target.closest('[data-touch-action="strike"]');if(!button||!state.active||state.xr||attackPointer!==null)return;event.preventDefault();attackPointer=event.pointerId;button.setPointerCapture(event.pointerId);game.primaryDown();});
+  listen(ui.root,'pointerup',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.primaryUp();}});
+  listen(ui.root,'pointercancel',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.clearControls();}});
   listen(ui.root,'click',action);listen(ui.settings,'click',action);
   listen(modeInput,'change',()=>{reset();mode=modeInput.value;save('mode',mode);render();});
   listen(sensitivityInput,'input',()=>{sensitivity=Number(sensitivityInput.value);save('sensitivity',String(sensitivity));});

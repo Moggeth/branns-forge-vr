@@ -15,10 +15,7 @@ The current browser-hosted route uses **8 players, fixed 60 Hz simulation and
 20 Hz snapshots**, with rendering at the device's refresh rate. It reuses the
 native corrected axe/pick motion and authored tree, skeleton, geology, ground,
 cutting and bridge assets. Heroes chop trees, collect wood, build bridges, mine
-stone/Starfall meteorites and collect healing apples. Gods have seven spells:
-skeleton, raise, grove, Starfall, Sunder, Wall and Tree Ring. Heroes can interrupt
-God spells by damaging the shrine. See [IMPORT-WAVE-1.md](IMPORT-WAVE-1.md) for the
-exact imported systems, controls, verification and remaining native-only work.
+stone/Starfall meteorites and collect healing apples. The second wave adds native Siegebird, Emberwing curved arrows, Sunfall Sledge, golem armour, precise bone contacts, embedded arrows and usable detached bones. Gods now have fourteen spells with authored effects and quick-cast line gestures. See [IMPORT-WAVE-2.md](IMPORT-WAVE-2.md) for controls, evidence, artist provenance and remaining limitations; [IMPORT-WAVE-1.md](IMPORT-WAVE-1.md) preserves the earlier harvest/build wave. Heroes can interrupt God spells by damaging the shrine.
 
 The current host can reset (confirmation + pre-reset recovery save). If they
 leave, the world pauses for a reconnect grace period, then an eligible desktop
@@ -47,7 +44,7 @@ Physical headset and separate-household acceptance are still pending.
 
 Phones/tablets automatically show two thumb sticks. Hero: Move / Look, Attack,
 Jump. God: Pan / Orbit-and-tilt, zoom buttons or pinch, Centre, tap the ground to
-aim, then Cast; Cancel returns to centre aim. All seven spells stay in the tray. Hero equipment, Collect/Eat and Bridge buttons remain accessible above the sticks.
+aim, then Cast; Cancel returns to centre aim. All fourteen spells stay in the scrolling tray. Hero equipment, Collect/Eat and Bridge buttons remain accessible above the sticks.
 Portrait and landscape are supported, including swapped sticks for left-handed
 play. Menu → Display & controls changes sensitivity and Automatic/Always on/Off.
 The same menu retains role switching, invites, backups, host reset and leaving;

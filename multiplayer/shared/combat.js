@@ -33,10 +33,10 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(enemy.kind==='golem'&&(enemy.armor??3)>0){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
   const headshot=projectile&&part==='head'&&enemy.kind!=='golem';
-  // Skeleton body projectiles lodge without silently turning a body hit into a kill.
-  const damage=projectile&&enemy.kind!=='golem'&&part!=='head'?Math.min(amount,Math.max(0,enemy.hp-1)):amount;
-  enemy.hp-=headshot?enemy.hp:damage;
-  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part});
+  // Body hits take normal damage: one arrow cannot kill a fresh skeleton, but
+  // repeated body shots must not leave it immortal at one HP.
+  enemy.hp-=headshot?enemy.hp:amount;
+  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
   if(enemy.hp<=0){for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
@@ -54,7 +54,7 @@ export function projectileContact(state,m,ctx){
   state.projectiles.splice(state.projectiles.indexOf(shot),1);
   if(state.embeds.length>=COMBAT_LIMITS.embeds)state.embeds.shift();
   state.embeds.push({id:shot.id,kind:shot.kind,targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.boneName?{boneName:m.boneName}:{})});
-  const events=[{kind:'embed',id:shot.id,position:[...m.point]}];
+  const events=[{kind:'embed',id:shot.id,position:[...m.point],targetId:m.targetId,impact:!enemy,normal:[...m.normal],material:detached?.kind==='skeleton'?'bone':'stone'}];
   if(enemy)hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?48:38,m,ctx,events,{projectile:true});
   return ok(events);
 }

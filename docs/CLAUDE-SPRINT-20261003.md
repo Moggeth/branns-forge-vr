@@ -1,0 +1,24 @@
+# Claude art sprint — 3 October 2026
+
+Authorised by user: use existing personal Claude allowance before Saturday 09:00 Sydney, Sonnet 5.5 for mileage, Opus 5.5 for staples. No paid extra usage. One Claude commission at a time. User accepts reaching100%; useful finished outcomes remain the objective.
+
+Deadline2026-10-02T23:00Z (09:00 Sydney Oct3); stop new commissions22:00Z, verification checkpoint22:45Z. User screenshot baseline: weekly64% used, session34% used, session resets01:50 local, weekly09:00. These are screenshot evidence, not live sampled API figures. Stop weekly-reset dispatch; five-hour reset may allow continuation before09:00. Do not redeem credits.
+
+## Queue / integration owner Codex
+1. COMPLETE implementation, release verification underway: browser combat imports, native weapon poses, real model contacts/embeds/limbs/golem armor, fourteen RTS spells. Root integrates. Sonnet spell presentation isolated work/sonnet-browser-spells-20261002; Opus HUD completed work/opus-browser-combat-hud-20261002. Verify actual GLBs, runtime browser, saves/network, mobile layout; commit/deploy only after pass.
+2. COMPLETE Sonnet: reusable browser impact kit for metal/stone/bone/wood. Native physical contact supplies point/normal/energy; preserve bounded pools. Replace shared simplistic chips/sound with material-specific chinks, flakes, sparks, dust and recoil; no generic spheres. Acceptance actual pick-golem scene, deterministic unit checks, budget stats, no duplicate effects. See multiplayer/IMPORT-WAVE-2.md.
+3. READY Opus: excellent portable forge/camp landmark kit, GLB+embedded textures+low LOD+collision/socket metadata, ground/RTS silhouettes. Reuse native sources/asset pipeline; isolated commission first, native/browser compatibility documented. A high-quality staple, not geographic logic. Only integrate once visually reviewed.
+4. READY Sonnet: shared fire/flamethrower/liquid browser presentation and reusable assets, using existing native strongest art. Coordinate authoritative bounded ignition/damage/state import; do not ship purely cosmetic fake mechanics. If time short finish asset kit isolated with preview rather than half-integrate simulation.
+5. READY Sonnet: retained native scene props/environment library visual consistency and LOD pass, constrained to reused assets, verified material/normal/orientation; improve meaningful old-new migration gaps. Avoid inventing broad new gameplay.
+
+Each commission: source ownership, concrete output first, timecap, exact account/model metadata, measured duration, review then integrate. No new agent threads needed. Prior agents combat_sim/combat_view ownfiles finished; coordinate if reused.
+
+## Lessons / current evidence
+Two initial Sonnet high-effort VFX commissions hit600s without output: first excessive environmental exploration, second prolonged reasoning. Retry medium effort with short write-first brief, no tools/environment exploration; root does browser verification. Preserve attempt logs in isolated work, do not duplicate high-effort same strategy. Actual model verified Sonnet5.5/personal pro, all three final outputs verified and integrated. Successful spell commission585.55s; HUD120.899s; impact136.370s.
+Global CODEX_HOME may not be set in shell. Use explicit C:/Users/mog/.codex/automations for discovery, never empty-variable root recursion.
+
+## Existing service
+Private Moggeth/branns-forge-vr main. Live branns-forge-multiplayer.vercel.app. Peer URL wss://blackjack-meals-mia-meals.trycloudflare.com/peer/ws still PC-hosted signalling. Do not stop existingpeer/tunnel processes. No TURN guarantee. Publishing recipe multiplayer/scripts/deploy-peer-preview.ps1 stages OS temp; don't stage repository-contained output. Claude subscription CLI auth only.
+
+## Next heartbeat handoff
+Current wave acceptance and provenance: multiplayer/IMPORT-WAVE-2.md. No Claude process remains active. Root owns final deployment verification this turn; check Git/logs for release completion before continuing. Next new commission is queue3 Opus forge/camp landmark. Preserve existing personal Claude identity and serial exact-model discipline. Start with one excellent reusable camp forge GLB plus low LOD and sockets, build+render first, then expand only once reviewed. Read docs/ASSET-LAB-RD.md and reuse installed Blender pipeline. Current browser world-content-view.js has explicit scene props/instancing integration hooks. Avoid broad map changes with no finished asset.

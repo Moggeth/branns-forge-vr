@@ -1,3 +1,4 @@
+import {SPELLS} from './shared/spells.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
@@ -324,6 +325,7 @@ function onSnapshot(snapshot) {
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
+    const weaponText={axe:'Axe · click to chop · Q power cleave',pick:'Stonewhisper · click to mine · Q resonance',hammer:'Sunfall · click to strike · Q ground slam',crossbow:'Siegebird · click to fire · unlimited bolts',bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -511,14 +513,24 @@ $('techDetails').addEventListener('toggle', renderTech);
 // ---------------------------------------------------------------- spells
 function chooseSpell(next) {
   spell = next;
+  const spec=SPELLS.find(s=>s.id===next);if($('spellHint')&&spec)setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?'Drag a line; on touch, Cast start then Cast end':'Aim, then cast'}`);
   try { game?.setSpell(next); } catch (error) { recordProblem(error); }
-  for (const button of document.querySelectorAll('[data-spell]')) button.setAttribute('aria-checked', String(button.dataset.spell === next));
+  for (const button of document.querySelectorAll('[data-spell]')) {const selected=button.dataset.spell===next;button.setAttribute('aria-checked',String(selected));button.tabIndex=selected?0:-1;}
 }
 for (const button of document.querySelectorAll('[data-spell]')) button.addEventListener('click', () => { chooseSpell(button.dataset.spell); button.blur(); });
+document.querySelector('.bf-spells')?.addEventListener('keydown',event=>{
+  const buttons=[...document.querySelectorAll('[data-spell]')],index=buttons.indexOf(event.target);
+  if(index<0||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
+  event.preventDefault();event.stopPropagation();const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(['ArrowLeft','ArrowUp'].includes(event.key)?buttons.length-1:1))%buttons.length;
+  chooseSpell(buttons[next].dataset.spell);buttons[next].focus();buttons[next].scrollIntoView({block:'nearest',inline:'nearest'});
+});
 
 for(const button of document.querySelectorAll('[data-equip]'))button.addEventListener('click',()=>{game?.equip(button.dataset.equip);button.blur();});
 $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
+for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
+$('throw')?.addEventListener('click',()=>{game?.release(true);$('throw').blur();});
+$('quickCast')?.addEventListener('change',()=>game?.setQuickCast($('quickCast').checked));
 // ---------------------------------------------------------------- keyboard & pointer
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
@@ -529,9 +541,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
     if (isTyping(event.target) || menuOpen || phase !== 'game') event.stopPropagation();
     return;
   }
-  if (type === 'keydown' && currentRole === 'god' && !event.repeat && /^[1-7]$/.test(event.key)) {
-    chooseSpell(['skeleton', 'raise', 'grove', 'starfall','sunder','wall','ring'][Number(event.key) - 1]);
-  }
+
 }, true);
 
 // game.js owns the canvas pointer-lock gesture; duplicate requests can race.
@@ -552,8 +562,9 @@ window.addEventListener('unhandledrejection', event => { recordProblem(event.rea
 try {
   game = createGame({
     canvas,
-    onAction: (action, details = {}) => session?.command('action', {action, ...details}),
-    onCast: (chosen, point) => session?.command('cast', {spell: chosen, point}),
+    isHost, onSelection: chooseSpell,
+    onAction: (action, details = {}) => action==='projectileHit'?session?.projectileContact(details):session?.command('action', {action, ...details}),
+    onCast: (chosen, point, details={}) => session?.command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onStatus: status => { rendererStatus = String(status); },
     onXRChange: value => { xrActive = value; body.classList.toggle('xr',value); syncActive(); },
@@ -562,7 +573,7 @@ try {
   mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint});
   rendererReady = true;
   game.setActive(false);
-  game.setSpell(spell);
+  chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
   Promise.resolve().then(() => game.canVR()).then(supported => {
     vrSupported = !!supported;
     applyRoleUi(currentRole);

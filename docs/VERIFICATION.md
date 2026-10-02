@@ -2189,3 +2189,9 @@ README.md contains legacy mixed encoding (including a raw 0xB7 byte), so a stric
 - Instanced clutter must update only when terrain/seed changes, not at the 20 Hz
   snapshot cadence. Stress test includes maximum imported persistent content;
   CPU results do not imply an eight-headset GPU performance guarantee.
+
+
+### Browser combat and Claude allowance sprint — 2026-10-03
+See multiplayer/IMPORT-WAVE-2.md for tests, timing, art provenance and limitations. Posed triangle cache is per-frame and invalidated on sync/tick; don't independently reskin each ray. Scene actor IDs can be reused across reset for a different kind: replace visual/mixer when kind changes. Projectile body damage must accumulate (do not clamp every shot to leave one HP). Authoritative hit events carry contact normals/materials for directional artist effects. Touch line cancellation clears both targeting point and line start. Constrain spellbook width to its actual parent, not viewport width, because landscape reserves thumb-stick space.
+
+Claude high-effort wide exploration failed twice at600s without deliverables. Narrow medium-effort write-first Sonnet commissions succeeded (spell585.55s, material kit136.37s); Opus bounded HUD120.899s. Use isolated folders and authenticated scripts/claude_commission.py, exact model verified, no API overrides. Preserve final integration time before09:00 Sydney reset. The screenshot usage baseline is not a live percentage.

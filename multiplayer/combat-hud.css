@@ -1,0 +1,219 @@
+/* ===== Combat HUD expansion (append after existing combat-hud.css / lobby.css) =====
+   Tune via the variables below to match the lobby palette exactly. */
+:root {
+  --bf-ink: rgba(20, 15, 10, 0.78);
+  --bf-ink-solid: #1a130c;
+  --bf-edge: rgba(214, 172, 92, 0.42);
+  --bf-gold: #e2b866;
+  --bf-gold-hi: #ffd98a;
+  --bf-text: #f4e8cc;
+  --bf-dim: #b9a780;
+  --bf-mana: #7fb4ff;
+  --bf-ember: #ff8a3d;
+  --bf-radius: 10px;
+  --bf-tap: 44px;
+  --bf-special-right: 14px;     /* thumb special position on touch */
+  --bf-special-bottom: 176px;   /* sits just above the 150px right stick */
+}
+
+.bf-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.bf-hud {
+  color: var(--bf-text);
+  font: 600 13px/1.2 inherit;
+  pointer-events: none;            /* world stays clickable between controls */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(100%, 760px);
+}
+.bf-hud button, .bf-hud summary, .bf-hud label, .bf-hud .bf-resources, .bf-hud .bf-hint,
+.bf-hud details[open] > :not(summary) { pointer-events: auto; }
+
+.bf-hud svg { width: 20px; height: 20px; flex: none; }
+.bf-hud kbd {
+  font: 700 10px/1 ui-monospace, Consolas, monospace;
+  color: var(--bf-dim);
+  border: 1px solid rgba(214, 172, 92, 0.3);
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ---- shared button look ---- */
+.bf-chip, .bf-act, .bf-spell, .bf-special, .bf-drawer > summary {
+  appearance: none;
+  min-height: var(--bf-tap);
+  min-width: var(--bf-tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  color: var(--bf-text);
+  font: inherit;
+  background: linear-gradient(180deg, rgba(58, 42, 24, 0.86), var(--bf-ink));
+  border: 1px solid var(--bf-edge);
+  border-radius: var(--bf-radius);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 150, 0.12), 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color .12s, background .12s, transform .08s;
+}
+.bf-chip:hover, .bf-act:hover, .bf-spell:hover, .bf-drawer > summary:hover { border-color: var(--bf-gold); }
+.bf-chip:active, .bf-act:active, .bf-spell:active, .bf-special:active { transform: translateY(1px) scale(.97); }
+.bf-hud :focus-visible { outline: 2px solid var(--bf-gold-hi); outline-offset: 2px; }
+
+.bf-chip[aria-pressed="true"], .bf-spell[aria-checked="true"] {
+  color: #1d1408;
+  background: linear-gradient(180deg, var(--bf-gold-hi), var(--bf-gold) 60%, #a97a2c);
+  border-color: var(--bf-gold-hi);
+  box-shadow: 0 0 0 1px rgba(255, 217, 138, .35), 0 0 14px rgba(255, 190, 90, .45);
+}
+.bf-chip[aria-pressed="true"] kbd, .bf-spell[aria-checked="true"] kbd { color: #3a2a10; border-color: rgba(60, 40, 10, .4); background: rgba(255, 255, 255, .25); }
+
+/* ---- hero bar ---- */
+.bf-bar { display: flex; align-items: flex-start; gap: 6px; }
+.bf-equip {
+  display: flex; gap: 5px; flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  pointer-events: auto; padding: 2px;
+}
+.bf-equip::-webkit-scrollbar { display: none; }
+.bf-chip { flex: none; }
+
+.bf-drawer { position: relative; flex: none; }
+.bf-drawer > summary { list-style: none; }
+.bf-drawer > summary::-webkit-details-marker { display: none; }
+.bf-drawer[open] > summary { border-color: var(--bf-gold); color: var(--bf-gold-hi); }
+
+.bf-actions {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 5;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 5px;
+  width: max-content; max-width: min(320px, 86vw);
+  padding: 6px; background: var(--bf-ink); border: 1px solid var(--bf-edge); border-radius: var(--bf-radius);
+  backdrop-filter: blur(4px);
+}
+.bf-act { justify-content: flex-start; }
+.bf-act kbd { margin-left: auto; }
+
+.bf-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bf-resources:empty { display: none; }
+.bf-resources {
+  padding: 4px 8px; border-radius: 999px; background: var(--bf-ink); border: 1px solid var(--bf-edge);
+  font-size: 12px; white-space: nowrap;
+}
+.bf-hint {
+  margin: 0; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 500;
+  background: rgba(0, 0, 0, .45); color: var(--bf-text); text-shadow: 0 1px 2px #000;
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.bf-hint:empty { display: none; }
+
+.bf-special {
+  align-self: flex-start;
+  color: #fff3dc;
+  background: radial-gradient(circle at 50% 35%, #ffb062, var(--bf-ember) 45%, #7a2c0d);
+  border-color: #ffc98a;
+  box-shadow: 0 0 12px rgba(255, 138, 61, .55), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.bf-special svg { width: 22px; height: 22px; }
+.bf-special kbd { color: #ffe9c9; border-color: rgba(255, 233, 201, .4); }
+
+.bf-help > summary { padding: 4px; }
+.bf-help-list {
+  position: absolute; z-index: 5; top: calc(100% + 6px); left: 0;
+  width: min(280px, 80vw); margin: 0; padding: 8px 10px 8px 22px;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  background: var(--bf-ink); border: 1px solid var(--bf-edge); border-radius: var(--bf-radius);
+}
+.bf-help-list b { color: var(--bf-gold-hi); }
+.bf-hero > .bf-help { align-self: flex-start; }
+
+/* ---- god spellbook ---- */
+.bf-spells {
+  pointer-events: auto;
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, auto);
+  grid-auto-columns: minmax(92px, max-content); gap: 5px;
+  overflow-x: auto; scrollbar-width: thin; overscroll-behavior-x: contain; padding: 2px;
+  max-width: 100%;
+}
+.bf-spell {
+  justify-content: flex-start; padding: 3px 8px; gap: 5px;
+  border-left: 3px solid var(--bf-school, var(--bf-edge));
+  white-space: nowrap;
+}
+.bf-spell .bf-name { flex: 1 1 auto; text-align: left; }
+.bf-cost { display: inline-flex; align-items: center; gap: 1px; font-size: 11px; color: var(--bf-mana); }
+.bf-cost svg { width: 11px; height: 11px; }
+.bf-spell[aria-checked="true"] .bf-cost { color: #1b3a7a; }
+.bf-spell[data-school="summon"] { --bf-school: #9d7bd8; }
+.bf-spell[data-school="earth"]  { --bf-school: #7fae5a; }
+.bf-spell[data-school="storm"]  { --bf-school: #6fb7e8; }
+.bf-spell[data-school="life"]   { --bf-school: #f07b8f; }
+
+.bf-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--bf-tap);
+  padding: 0 10px; border-radius: var(--bf-radius); background: var(--bf-ink); border: 1px solid var(--bf-edge);
+  cursor: pointer;
+}
+.bf-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.bf-switch { width: 30px; height: 16px; border-radius: 999px; background: #3b2f20; border: 1px solid var(--bf-edge); position: relative; transition: background .15s; }
+.bf-switch::after { content: ""; position: absolute; top: 1px; left: 1px; width: 12px; height: 12px; border-radius: 50%; background: var(--bf-dim); transition: transform .15s, background .15s; }
+.bf-toggle input:checked + .bf-switch { background: #8a6222; }
+.bf-toggle input:checked + .bf-switch::after { transform: translateX(14px); background: var(--bf-gold-hi); }
+.bf-toggle input:focus-visible + .bf-switch { outline: 2px solid var(--bf-gold-hi); outline-offset: 2px; }
+.bf-god .bf-help-list { top: auto; bottom: calc(100% + 6px); left: auto; right: 0; }
+
+/* ===== Touch / small screens ===== */
+@media (pointer: coarse), (max-width: 760px) {
+  .bf-hud kbd { display: none; }           /* no keyboard on touch: reclaim space */
+  .bf-hud { font-size: 12px; }
+  .bf-chip { padding: 4px 8px; gap: 4px; }
+  .bf-actions { grid-template-columns: repeat(2, minmax(96px, 1fr)); }
+
+  /* Special: big thumb button on the right edge, above the right stick, outside drawers */
+  .bf-special {
+    position: fixed; right: var(--bf-special-right); bottom: var(--bf-special-bottom); z-index: 30;
+    width: 58px; height: 58px; padding: 0; border-radius: 50%; flex-direction: column; gap: 0;
+  }
+  .bf-special .bf-name { font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+
+  .bf-spells { grid-auto-columns: minmax(86px, max-content); }
+}
+
+/* Narrow portrait (360 wide): equipment becomes icon-first with short labels below */
+@media (max-width: 420px) {
+  .bf-chip { flex-direction: column; gap: 1px; min-width: 48px; padding: 3px 5px; }
+  .bf-chip .bf-name { font-size: 10px; }
+  .bf-actions-drawer > summary .bf-name { display: none; }
+  .bf-hint { font-size: 11px; }
+}
+
+/* Short landscape (640x360): single row, hide help + hints compress, spells one row */
+@media (max-height: 420px) and (orientation: landscape) {
+  .bf-hud { gap: 4px; }
+  .bf-chip { min-height: var(--bf-tap); padding: 2px 7px; }
+  .bf-spells { grid-template-rows: auto; }
+  .bf-hint { padding: 2px 8px; font-size: 11px; }
+  .bf-special { --bf-special-bottom: 158px; width: 50px; height: 50px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-hud * { transition: none !important; }
+}
+
+/* Integration: override legacy role/help selectors without changing the new design. */
+body[data-role="hero"] #godHelp,body[data-role="god"] #heroTools{display:none;}
+#godHelp{min-width:0;width:100%;max-width:760px;}
+#godHelp .bf-spells{min-width:0;width:100%;box-sizing:border-box;}
+.bf-hud{font-family:var(--sans);font-size:13px;font-weight:600;}
+body.touch-controls-active #heroTools{width:min(760px,calc(100vw - 80px));}
+body.touch-controls-active .bf-special{position:fixed;right:14px;bottom:250px;}
+body.touch-left-handed .bf-special{right:auto;left:14px;}
+@media(max-height:420px) and (orientation:landscape){
+  body.touch-controls-active #godHelp .bf-hint{display:none;}
+  body.touch-controls-active #godHelp .bf-sub{flex-wrap:nowrap;}
+}

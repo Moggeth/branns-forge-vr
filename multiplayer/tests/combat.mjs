@@ -18,6 +18,10 @@ assert.equal(s.snapshot().enemies[0].hp,52);
 assert.equal(s.snapshot().embeds[0].boneName,'torso');
 assert.deepEqual(loadSimulation(s.checkpoint()).snapshot(),s.snapshot());
 
+// A body shot is not a one-hit kill, but repeated body damage can finish a fight.
+let body=fixture();for(let i=0;i<3;i++){const saved=body.checkpoint();saved.players[0].attackTick=-1000;saved.enemies[0].position=[0,0,6];body=loadSimulation(saved);const bodyShot=fireAt(body,'torso',i*3+1);assert.equal(body.projectileContact(bodyShot.hit).ok,true);if(i<2)assert.ok(body.snapshot().enemies.length);}
+assert.equal(body.snapshot().enemies.length,0);assert.equal(body.snapshot().embeds.length,3);
+
 // Invalid release payloads are rejected rather than throwing out the host loop.
 assert.equal(action(s,90,'release',{direction:{x:0}}).code,'invalid_action');
 

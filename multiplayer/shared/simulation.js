@@ -185,13 +185,13 @@ function instantiate(state) {
         if (supplied && tree) {
           if (requestedTool !== 'axe' || !targetOK({x:tree.x,z:tree.z,y:terrainHeight(state,tree.x,tree.z)}) || Math.hypot(message.point[0]-tree.x,message.point[2]-tree.z)>.9 || message.point[1] < terrainHeight(state,tree.x,tree.z)-.2 || message.point[1] > terrainHeight(state,tree.x,tree.z)+tree.height+.2) return ok();
           let h=state.harvestedTrees.find(t=>t.id===tree.id); if(!h&&state.harvestedTrees.length>=256)return fail('world_limit');if((h?.cuts||0)===2&&state.pickups.length>=256)return fail('world_limit'); if (h?.felledTick) return ok(); if (!h) { h={id:tree.id,cuts:0,cutHeight:message.point[1],felledTick:0,fallYaw:0}; state.harvestedTrees.push(h); }
-          if(Math.abs(h.cutHeight-message.point[1])>.35){h.cuts=0;h.cutHeight=message.point[1];} h.cuts++; events.push(event('wood_hit',message.point,tree.id));
+          if(Math.abs(h.cutHeight-message.point[1])>.35){h.cuts=0;h.cutHeight=message.point[1];} h.cuts++; events.push({...event('wood_hit',message.point,tree.id),material:'wood',normal:[...message.normal]});
           if (h.cuts >= 3) { h.felledTick=state.tick; h.fallYaw=p.yaw; makePickup('wood',tree.x,tree.z,3); events.push(event('tree_fell',[tree.x,terrainHeight(state,tree.x,tree.z),tree.z],tree.id)); } return ok(events);
         }
         if (supplied && ore) {
           if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:terrainHeight(state,ore.x,ore.z)}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-terrainHeight(state,ore.x,ore.z))>2) return ok();
           if(ore.hits===ore.maxHits-1&&state.pickups.length>=256)return fail('world_limit');
-          ore.hits++; events.push(event('stone_hit',message.point,ore.id));
+          ore.hits++; events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
           if (ore.hits >= ore.maxHits) { ore.depleted=true; makePickup(ore.kind==='meteor'?'gems':'stone',ore.x,ore.z,ore.kind==='meteor'?2:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {

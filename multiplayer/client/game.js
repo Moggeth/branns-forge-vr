@@ -1,10 +1,15 @@
+import {SPELLS} from '../shared/spells.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {createWeaponController} from './weapon-controller.js';
+import {createCombatView} from './combat-view.js';
+import {createSpellPresentation} from './spell-presentation.js';
+import {createImpactPresentation} from './impact-presentation.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent} from './world-content-view.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE} from './asset-pose.js';
+import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 
 // Keep in step with the authoritative Godot server surface.
 export function terrainHeight(x, z, edits = []) {
@@ -16,7 +21,7 @@ export function terrainHeight(x, z, edits = []) {
   return height;
 }
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
@@ -24,6 +29,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let previous = performance.now(), sentAt = -Infinity, snapshotAt = 0, initialized = false, swingAt = -Infinity;
   let terrainSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38, orbitTilt = 0.9;
   let zeroInputTimer = null;
+  let castStart=null,quickCast=false,quickKey=null;
+  const equipment=['axe','pick','hammer','crossbow','bow','limb'];
+  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
@@ -70,7 +78,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   for (const [file,slot] of [['meadow_albedo','map'],['meadow_normal','normalMap'],['meadow_orm','roughnessMap']]) textureLoader.load(`/assets/${file}.png`, texture => {if(disposed){texture.dispose();return;}texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(40,40);texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());if(slot==='map')texture.colorSpace=THREE.SRGBColorSpace;ground.material[slot]=texture;ground.material.color.setHex(0xffffff);ground.material.normalScale.set(.55,.55);ground.material.needsUpdate=true;});
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
-  cursor.visible = false;
+  cursor.visible = false;cursor.layers.set(31);
   scene.add(cursor);
   // The power anchor is a physical strike target at the authoritative shrine point.
   const shrine = new THREE.Group();
@@ -97,7 +105,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   scene.add(shrine);
   const weaponAnchor = new THREE.Group();
   weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position);
-  weaponAnchor.rotation.fromArray(FPS_WEAPON_POSE.rotation);
+  weaponAnchor.rotation.fromArray(['bow','crossbow'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);
   camera.add(weaponAnchor);
   const axePlaceholder = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.05), new THREE.MeshStandardMaterial({ color: 0x67462e }));
   weaponAnchor.add(axePlaceholder);
@@ -114,7 +122,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     listen(controllers[i], 'disconnected', () => { controllerSources.delete(i); attachWeapon(); });
     listen(controllers[i], 'selectstart', () => {
       if (!active) return;
-      if (role === 'hero') strike();
+      if (role === 'hero') {
+        const hand=controllerSources.get(i)?.handedness;
+        if(hand==='right'&&snapshot.detachedParts?.some(p=>p.heldBy===playerId))release(true);
+        else if(tool==='bow'&&hand==='left')weapons.special();
+        else primaryDown();
+      }
       else {
         controllers[i].getWorldPosition(raycaster.ray.origin);
         controllers[i].getWorldQuaternion(poseQuaternion);
@@ -123,6 +136,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (hit) castAt(hit.point);
       }
     });
+    listen(controllers[i],'selectend',()=>{if(controllerSources.get(i)?.handedness!=='left')primaryUp();});
   }
 
   function listen(target, type, handler, options) {
@@ -131,10 +145,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function report(message) { if (!disposed) onStatus(message); }
   const content = createWorldContent({scene,templates,instantiate,height:terrainHeight});
+  const combat=createCombatView({scene,templates,actors,height:(x,z)=>terrainHeight(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const spellVisual=createSpellPresentation({scene,tickSeconds:1/60,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
+  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();onAction('fire',details);},special:()=>{const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=terrainHeight(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}});
   function attachWeapon() {
     if (!axeModel) return;
     const tracked = [...controllerSources.entries()].filter(([, source]) => source.targetRayMode === 'tracked-pointer');
-    const selected = tracked.find(([, source]) => source.handedness === 'right') || tracked[0];
+    const selected = tracked.find(([, source]) => source.handedness === (tool==='bow'?'left':'right')) || tracked[0];
     if (renderer.xr.isPresenting && selected) {
       const [index, source] = selected;
       (source.gripSpace ? grips[index] : controllers[index]).add(axeModel);
@@ -142,8 +159,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     } else {
       weaponAnchor.add(axeModel);
       setWeaponGrip(axeModel, false, tool);
-      const socket = axeModel.getObjectByName(tool === 'axe' ? 'CuttingEdge_Mid' : 'PickTipRight');
-      if (socket) { axeModel.updateWorldMatrix(true, true); socket.getWorldPosition(weaponTip); weaponAnchor.worldToLocal(weaponTip); }
+      modelTip(axeModel,tool,weaponTip); weaponAnchor.worldToLocal(weaponTip);
     }
   }
   async function capturePointer() {
@@ -197,12 +213,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const template = templates.get(name);
     if (!template) return null;
     const {visual: wrapper, model} = prepareAsset(template, name, height);
-    if (template.animations.length && name === 'skeleton') {
+    if (template.animations.length && (name === 'skeleton'||name==='golem')) {
       const mixer = new THREE.AnimationMixer(model);
       const idle = template.animations.find(item => /idle/i.test(item.name)) || template.animations[0];
       const walk = template.animations.find(item => /walk/i.test(item.name)) || idle;
       const actions = { idle: mixer.clipAction(idle), walk: mixer.clipAction(walk) };
-      for(const name of ['attack','stagger']){const clip=template.animations.find(a=>a.name===name);if(clip){actions[name]=mixer.clipAction(clip);actions[name].setLoop(THREE.LoopOnce,1);actions[name].clampWhenFinished=true;}}
+      for(const name of ['attack','stagger']){const clip=template.animations.find(a=>a.name.toLowerCase().includes(name));if(clip){actions[name]=mixer.clipAction(clip);actions[name].setLoop(THREE.LoopOnce,1);actions[name].clampWhenFinished=true;}}
       actions.idle.play();
       wrapper.userData.mixer = mixer;
       wrapper.userData.actions = actions;
@@ -213,7 +229,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
-    const model = instantiate('skeleton', 1.7);
+    const model = instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7);
     if (!model) return;
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
@@ -241,6 +257,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         scene.add(root);
         entry = { root, visual, enemy, target: new THREE.Vector3(), data };
         actors.set(key, entry);
+      }
+      if(enemy&&entry.data.kind!==data.kind){
+        const old=entry.visual,mixer=old.userData.mixer;if(mixer){mixer.stopAllAction();mixer.uncacheRoot(mixer.getRoot());mixers.delete(mixer);}
+        old.removeFromParent();old.traverse(n=>n.skeleton?.dispose());disposePlaceholder(old);
+        entry.visual=basicActor(true,false);entry.root.add(entry.visual);
       }
       entry.target.fromArray(data.position);
       entry.data = data;
@@ -314,6 +335,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         warning.fill.geometry.dispose();
         warning.fill.geometry = new THREE.CircleGeometry(pending.radius, 64);
       }
+      warning.group.visible=false; // Specialist spell presentation owns meteor warnings.
       warning.group.position.set(pending.x, 0, pending.z);
       warning.fill.position.y = terrainHeight(pending.x, pending.z, snapshot.edits) + 0.10;
       warning.impactTick = pending.impactTick;
@@ -323,13 +345,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
   }
   const loader = new GLTFLoader();
-  for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     templates.set(name, gltf);
     if (name === 'tree') { syncTrees(); }
-    if (name === 'skeleton') for (const entry of actors.values()) upgradeActor(entry);
-    if (name === 'axe' || name === 'pick') {
-      const model = instantiate(name, name === 'axe' ? .7 : .75);weaponModels.set(name,model);
+    if (name === 'skeleton'||name==='golem') for (const entry of actors.values()) upgradeActor(entry);
+    if (['axe','pick','hammer','crossbow','bow'].includes(name)) {
+      const model = instantiate(name, ({axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25})[name]);weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
     } else content.reload();
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
@@ -342,10 +364,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (hit) hitPoint.copy(hit.point);
     return hit;
   }
-  function castAt(point) {
+  function isLineSpell(){return spell==='sunder'||spell==='wall';}
+  function castAt(point,finish=false) {
     if (!active || role !== 'god') return;
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
-    onCast(spell, [x, terrainHeight(x, z, snapshot.edits), z]);
+    const at=[x,terrainHeight(x,z,snapshot.edits),z];
+    if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
+    const extra=castStart?{start:castStart.toArray(),end:at}:{};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {
     if (!active || renderer.xr.isPresenting) return;
@@ -366,39 +391,75 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (cursor.visible) cursor.position.copy(hitPoint).addScaledVector(THREE.Object3D.DEFAULT_UP, 0.08);
     return cursor.visible;
   }
-  let audioContext=null, effects=null;const fragments=[];let lastSound=0;
+  const impacts=createImpactPresentation({scene,camera,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
+  let audioContext=null;let lastSound=0;
   function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();}catch{}}
   function handleEvent(event){
     if(!event?.position)return;
-    const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death'].includes(kind))return;
-    if(kind!=='pickup'&&kind!=='build'&&templates.has('chip')){
-      if(!effects){let source;templates.get('chip').scene.traverse(c=>{if(c.isMesh&&!source)source=c;});if(source){const geometry=source.geometry.clone();geometry.computeBoundingBox();const size=geometry.boundingBox.getSize(new THREE.Vector3());geometry.center();geometry.scale(.09/Math.max(size.x,size.y,size.z),.09/Math.max(size.x,size.y,size.z),.09/Math.max(size.x,size.y,size.z));effects=new THREE.InstancedMesh(geometry,new THREE.MeshStandardMaterial({roughness:.85}),96);effects.count=0;effects.frustumCulled=false;scene.add(effects);}}
-      for(let i=0;i<12&&fragments.length<96;i++){const a=i*2.39996;fragments.push({p:new THREE.Vector3(...event.position),v:new THREE.Vector3(Math.sin(a)*1.3,1+(i%3)*.4,Math.cos(a)*1.3),life:.5+(i%4)*.12,color:new THREE.Color(kind.startsWith('wood')||kind==='tree_fell'?0xbe9360:kind==='hit'||kind==='death'?0xe3ddc4:0xadb4a9)});}
-    }
-    const now=performance.now();if(audioContext&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=kind==='stone_hit'||kind==='ore_break';osc.frequency.setValueAtTime(metallic?1500:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
+    if(event.kind==='spell')spellVisual.play(event);
+    const specialEffect={hammer_slam:'raise',pick_burst:'crystal',axe_cleave:'sunder'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
+    const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
+    const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
+    const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
+    if(isImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed});}
+    const now=performance.now();if(audioContext&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
     for(const source of controllerSources.values())source.gamepad?.hapticActuators?.[0]?.pulse(.25,35).catch(()=>{});
   }
-  function tickEffects(now,dt){if(!effects)return;const temp=new THREE.Object3D();for(let i=fragments.length-1;i>=0;i--){const f=fragments[i];f.life-=dt;if(f.life<=0){fragments.splice(i,1);continue;}f.v.y-=7*dt;f.p.addScaledVector(f.v,dt);temp.position.copy(f.p);temp.rotation.set(now*.002+i,now*.003,0);temp.scale.setScalar(Math.min(1,f.life*5));temp.updateMatrix();effects.setMatrixAt(i,temp.matrix);effects.setColorAt(i,f.color);}effects.count=fragments.length;effects.instanceMatrix.needsUpdate=true;if(effects.instanceColor)effects.instanceColor.needsUpdate=true;}
   function equipVisual(next) {
+    if(next==='limb'){axeModel?.removeFromParent();axeModel=null;tool=next;return;}
     const model=weaponModels.get(next);if(!model)return;
     axeModel?.removeFromParent();tool=next;axeModel=model;weaponAnchor.remove(axePlaceholder);attachWeapon();
   }
-  function equip(next) {if(!active||role!=='hero'||!['axe','pick'].includes(next))return;swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
-  function contactRay() {
-    camera.updateMatrixWorld(true);
-    if(renderer.xr.isPresenting){const idx=[...controllerSources.entries()].find(([,source])=>source.handedness==='right')?.[0]??0;controllers[idx].getWorldPosition(raycaster.ray.origin);controllers[idx].getWorldQuaternion(poseQuaternion);raycaster.ray.direction.set(0,0,-1).applyQuaternion(poseQuaternion);}
-    else raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-    raycaster.far=3.2;
-    const targets=content.targets().concat([...actors.values()].filter(e=>e.enemy).map(e=>e.root),[shrine,ground]);
-    for(const target of targets)target.updateMatrixWorld(true);
-    const hit=raycaster.intersectObjects(targets,true).find(h=>!h.object.userData.ignoreContact);raycaster.far=Infinity;
-    if(!hit)return null;
-    let n=hit.object;while(n&&!n.userData.targetId)n=n.parent;
-    if(!n)return null;
-    return {targetId:n.userData.targetId,point:hit.point.toArray(),normal:(hit.face?.normal.clone().transformDirection(hit.object.matrixWorld)||new THREE.Vector3(0,1,0)).toArray(),part:hit.object.name,distance:hit.distance};
+  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
+  function weaponAim(){
+    camera.updateWorldMatrix(true,false);const origin=new THREE.Vector3(),direction=new THREE.Vector3();
+    if(renderer.xr.isPresenting){const hand=tool==='bow'?'left':'right';const index=[...controllerSources.entries()].find(([,s])=>s.handedness===hand)?.[0]??0;controllers[index].getWorldPosition(origin);controllers[index].getWorldDirection(direction).negate();}
+    else {camera.getWorldPosition(origin);camera.getWorldDirection(direction);}
+    return {origin:origin.toArray(),direction:direction.normalize().toArray()};
   }
+  function projectileAim(){
+    const aim=weaponAim();if(!axeModel)return aim;
+    const origin=modelTip(axeModel,tool,new THREE.Vector3());
+    if(!renderer.xr.isPresenting){const target=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),40);aim.direction=target.sub(origin).normalize().toArray();}
+    if(renderer.xr.isPresenting)aim.direction=weaponForward(axeModel,tool,new THREE.Vector3()).toArray();
+    return {...aim,origin:origin.toArray()};
+  }
+  function surfaceVisible(object){for(let n=object;n;n=n.parent)if(!n.visible||n.userData.ignoreContact)return false;return true;}
+  function worldContact(from,to){
+    const origin=new THREE.Vector3(...from),delta=new THREE.Vector3(...to).sub(origin),length=delta.length();if(length<1e-7)return null;
+    const ray=new THREE.Raycaster(origin,delta.multiplyScalar(1/length),0,length);
+    const targets=[...content.targets(),ground,shrine];for(const target of targets)target.updateWorldMatrix(true,true);
+    const hit=ray.intersectObjects(targets,true).find(h=>surfaceVisible(h.object));
+    if(!hit)return null;const normal=hit.face?.normal.clone().transformDirection(hit.object.matrixWorld)||new THREE.Vector3(0,1,0);
+    return {targetId:'world',part:'torso',point:hit.point.toArray(),normal:normal.toArray(),localPoint:hit.point.toArray(),localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:hit.distance};
+  }
+  let lastPhysicalTip=null,lastPhysicalHit=-Infinity;
+  function tickPhysicalMelee(now,dt){
+    if(!renderer.xr.isPresenting||!active||role!=='hero'||!axeModel||!['axe','pick','hammer'].includes(tool)){lastPhysicalTip=null;return;}
+    const tip=modelTip(axeModel,tool,new THREE.Vector3());
+    if(lastPhysicalTip){const travel=tip.distanceTo(lastPhysicalTip);if(travel>.018&&travel<1&&travel/Math.max(dt,.001)>1.15&&now-lastPhysicalHit>(SWING_PROFILES[tool]?.cooldown||.5)*1000){
+      const from=lastPhysicalTip.toArray(),to=tip.toArray(),enemy=combat.segmentContacts(from,to)[0],world=worldContact(from,to);let hit=enemy;
+      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets(),true).find(v=>surfaceVisible(v.object));if(h){let n=h.object;while(n&&!n.userData.targetId)n=n.parent;hit=n?{...world,targetId:n.userData.targetId}:null;}else hit=null;}
+      if(hit){lastPhysicalHit=now;unlockAudio();onAction('strike',{...hit,tool});}
+    }}lastPhysicalTip=tip;
+  }
+  function contactRay(){
+    const aim=weaponAim(),from=new THREE.Vector3(...aim.origin),direction=new THREE.Vector3(...aim.direction),to=from.clone().addScaledVector(direction,3.2);
+    const enemies=combat.segmentContacts(from.toArray(),to.toArray())||[];
+    raycaster.set(from,direction);raycaster.far=3.2;const targets=content.targets().concat([shrine,ground]);for(const t of targets)t.updateMatrixWorld(true);
+    const hits=raycaster.intersectObjects(targets,true).filter(h=>surfaceVisible(h.object));raycaster.far=Infinity;
+    const enemy=enemies[0],world=hits[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
+    if(enemyDistance<(world?.distance??Infinity))return {...enemy,distance:enemyDistance};
+    if(!world)return null;let node=world.object;while(node&&!node.userData.targetId)node=node.parent;if(!node)return null;
+    return{targetId:node.userData.targetId,point:world.point.toArray(),normal:world.face.normal.clone().transformDirection(world.object.matrixWorld).toArray(),part:'torso',distance:world.distance};
+  }
+  function primaryDown(){if(!active||role!=='hero')return;if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
+  function primaryUp(){if(active&&role==='hero')weapons.end();}
+  function grab(){if(!active||role!=='hero')return;const aim=weaponAim();const id=combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
+  function release(throwIt=false){if(active&&role==='hero')onAction('release',{throw:throwIt,direction:weaponAim().direction});}
   function strike() {
-    const profile=SWING_PROFILES[tool];
+    if(tool==='crossbow'||tool==='bow'){primaryDown();return;}
+    const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe;
     if (!active || role !== 'hero' || performance.now() - swingAt < profile.cooldown*1000) return;
     swingAt = performance.now();swingContact=false;swingTarget=contactRay();swingReach=THREE.MathUtils.clamp(swingTarget?.distance||2.5,.6,2.8);
     swingRest={position:new THREE.Vector3(...FPS_WEAPON_POSE.position),quaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(...FPS_WEAPON_POSE.rotation))};
@@ -406,6 +467,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
+    weapons.cancel();castStart=null;quickKey=null;
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -423,13 +485,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
-    if (role === 'hero' && !event.repeat) {if(event.code==='Digit1')equip('axe');if(event.code==='Digit2')equip('pick');if(event.code==='KeyE')onAction('interact');if(event.code==='KeyB')onAction('buildBridge');}
-    if (role === 'god' && !event.repeat) {
-      const quickSpell = {Digit1: 'skeleton', Digit2: 'raise', Digit3: 'grove', Digit4: 'starfall', Digit5:'sunder', Digit6:'wall', Digit7:'ring'}[event.code];
-      if (quickSpell) { spell = quickSpell; report(`God spell: ${quickSpell}. Click the ground to cast.`); }
-    }
+    if (role === 'hero' && !event.repeat) {const slot=Number(event.code.replace('Digit',''))-1;if(slot>=0&&slot<equipment.length)equip(equipment[slot]);if(event.code==='KeyE')onAction('interact');if(event.code==='KeyB')onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')weapons.special();}
+    if(role==='god'&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
-  listen(window, 'keyup', event => keys.delete(event.code));
+  listen(window,'keyup',event=>{keys.delete(event.code);if(event.code===quickKey&&castStart&&active){castAt(hitPoint,true);}});
   listen(window, 'blur', clearInput);
   listen(document, 'visibilitychange', () => { if (document.hidden) clearInput(); });
   listen(document, 'pointerlockchange', () => { if (document.pointerLockElement !== canvas) clearInput(); });
@@ -439,13 +498,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero') {
       if (document.pointerLockElement !== canvas) { void capturePointer(); return; }
-      if (event.button === 0) strike();
+      if (event.button === 0) primaryDown();if(event.button===2)weapons.special();
     } else {
       if (event.button === 2) rightDrag = true;
       if (event.button === 0) { const hit = pointerHit(event); if (hit) castAt(hit.point); }
     }
   });
-  listen(window, 'pointerup', () => { rightDrag = false; });
+  listen(window,'pointerup',event=>{rightDrag=false;if(event.button===0){if(role==='hero')primaryUp();else if(castStart&&!touchEnabled)castAt(hitPoint,true);}});
   listen(window, 'pointermove', event => {
     if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero' && document.pointerLockElement === canvas) {
@@ -477,7 +536,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (active && pressed && !previous.jump && role === 'hero') jumpPending = true;
         if (active && menu && !previous.menu) { void renderer.xr.getSession()?.end().then(onMenu); }
         const squeeze=source.gamepad?.buttons[1]?.pressed||false,stick=source.gamepad?.buttons[3]?.pressed||false;
-        if(active&&squeeze&&!previous.squeeze&&role==='hero'){if(source.handedness==='left')equip(tool==='axe'?'pick':'axe');else onAction('interact');}
+        if(active&&squeeze&&!previous.squeeze&&role==='hero'){if(source.handedness==='left')equip(equipment[(equipment.indexOf(tool)+1)%5]);else {const held=snapshot.detachedParts?.some(p=>p.heldBy===playerId);if(held)release();else grab();}}
         if(active&&stick&&!previous.stick&&source.handedness==='right'&&role==='hero')onAction('buildBridge');
         xrButtons.set(index, {jump: pressed, menu, squeeze, stick});
       }
@@ -506,7 +565,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const input = { move: { x: role === 'hero' && !zero ? move.x : 0, z: role === 'hero' && !zero ? move.z : 0 }, yaw, jump: !zero && jumpPending };
     if (renderer.xr.isPresenting) {
       input.head = localPose(renderer.xr.getCamera());
-      input.hands = grips.filter((_, i) => controllerSources.has(i)).map(localPose);
+      input.hands = ['left','right'].map(hand=>{const i=[...controllerSources.entries()].find(([,s])=>s.handedness===hand)?.[0];return i===undefined?{position:[0,1,0],quaternion:[0,0,0,1]}:localPose(grips[i]);});
     }
     onInput(input);
     if (jumpPending && !zero && grounded && role === 'hero') { verticalSpeed = 5.5; grounded = false; }
@@ -547,11 +606,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active;
     if (axeModel) axeModel.visible = role === 'hero' && active;
-    const profile=SWING_PROFILES[tool],progress=(now-swingAt)/(profile.duration*1000);
+    const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
-    else {weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position).add(idleOffset(now/1000,move.length()));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(FPS_WEAPON_POSE.rotation);}
+    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='crossbow'?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000,move.length()));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(!swingContact&&progress>=.5){swingContact=true;const hit=contactRay();onAction('strike',hit?{...hit,tool}:{targetId:'miss',point:localPosition.toArray(),normal:[0,1,0],tool});}
-    content.tick(now);tickEffects(now,dt);
+    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
+    content.tick(now);impacts.update(dt);
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
       if (animation.actions) {
@@ -568,6 +628,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
     }
     for (const mixer of mixers) mixer.update(dt);
+    tickPhysicalMelee(now,dt);
+    combat.tick(dt,isHost());
+    spellVisual.setTarget(active&&role==='god'&&cursor.visible?{spell,point:hitPoint.toArray(),start:castStart?.toArray(),end:castStart?hitPoint.toArray():undefined,valid:Math.abs(hitPoint.x)<=55&&Math.abs(hitPoint.z)<=55&&(snapshot.players.find(p=>p.id===playerId)?.mana??100)>=(SPELLS.find(s=>s.id===spell)?.cost??0)}:null);
+    spellVisual.update(now,dt);
     const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
     for (const warning of warnings.values()) {
       const remaining = Math.max(0, warning.impactTick - estimatedTick);
@@ -611,7 +675,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         // Grounded height follows the same live terrain function as the server.
         if (grounded) localPosition.y = authoritative.y;
       }
-      rebuildGround(); syncActors(); syncTrees(); syncWorldSignals();
+      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);
 
     },
     setRole(next) {
@@ -620,7 +684,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (role === 'god') { pan.copy(localPosition); if (document.pointerLockElement === canvas) document.exitPointerLock(); }
       report(role === 'god' ? 'God: WASD pan, right-drag orbit, wheel zoom, click to cast.' : 'Hero: click to look, WASD move, Space jump, click strike.');
     },
-    setSpell(next) { spell = next; },
+    setSpell(next) { spell = next;castStart=null; },
+    setQuickCast(value){quickCast=!!value;castStart=null;},
     setTouchEnabled(value) { if (touchEnabled !== !!value) {clearInput(); touchEnabled = !!value; fixedAim = null; aimTerrain = null; cursor.visible = false;} },
     setTouchAxes(side, x, y) {
       if (!active || !touchEnabled || renderer.xr.isPresenting || !touchAxes[side]) return;
@@ -634,16 +699,17 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       camera.updateMatrixWorld(); const hit = pointerHit({clientX:x, clientY:y});
       fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; updateTouchAim(); return !!hit;
     },
-    cancelAim() { fixedAim = null; aimTerrain = null; if (active && role === 'god') updateTouchAim(); },
+    cancelAim() { fixedAim = null; aimTerrain = null; castStart=null;quickKey=null; if (active && role === 'god') updateTouchAim(); },
     castAim() { if (active && role === 'god' && updateTouchAim()) castAt(hitPoint); },
     centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
     jump() { if (active && role === 'hero') jumpPending = true; },
-    strike, equip,
+    strike, equip, primaryDown,primaryUp,grab,release,special(){if(active&&role==='hero')weapons.special();},weaponState:()=>({tool,...weapons.state()}),
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
     clearControls: clearInput,
-    controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt};},
+    controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');
@@ -665,6 +731,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction());
+      combat.dispose();spellVisual.dispose();impacts.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
