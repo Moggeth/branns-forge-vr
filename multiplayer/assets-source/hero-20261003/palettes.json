@@ -1,0 +1,4 @@
+{
+  "emberwright": {"_label": "Emberwright (default, baked into GLB)", "HeroSkin": "#d9a07a", "HeroHair": "#4a2c1c", "HeroCloth": "#9a3b2a", "HeroTrim": "#c9a25a", "HeroLeather": "#5b3a24", "HeroMetal": "#9a958a"},
+  "mosswarden": {"_label": "Mosswarden", "HeroSkin": "#a8714f", "HeroHair": "#231c18", "HeroCloth": "#3f6b4f", "HeroTrim": "#d6c8a2", "HeroLeather": "#6e4a2c", "HeroMetal": "#b08d57"}
+}

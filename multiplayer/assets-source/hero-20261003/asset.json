@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "asset_id": "hero",
+  "kind": "character",
+  "builder": "assets/asset-lab/hero/build_hero.py",
+  "coordinate_system": {"unit": "metre", "up": "+Y", "forward": "-Z", "right": "+X", "origin": "between the feet on the ground"},
+  "required_nodes": ["HeroRig", "HeroBody", "HeroHead", "HeroBody_LOD", "Head", "Hand.L", "Hand.R", "WeaponGrip"],
+  "limits": {"max_bytes": 2097152, "max_triangles": 12000, "max_materials": 6, "max_images": 0},
+  "max_dimensions_m": [0.7, 1.8, 0.5],
+  "review_files": ["hero_source.blend", "hero_lod.glb", "hero_hands.glb", "contact_sheet.png", "pose_strip.png", "face_closeup.png", "lod_compare.png", "build_report.json"],
+  "notes": "hero.glb embeds high (HeroBody+HeroHead) and low (HeroBody_LOD) meshes on one rig; max_triangles applies to the high LOD. Install path is a root decision; builder path above assumes the asset-lab convention."
+}

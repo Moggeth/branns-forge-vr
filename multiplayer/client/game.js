@@ -19,6 +19,7 @@ import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} fr
 import {createExpeditionPresentation} from './expedition-presentation.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
+import {createHeroView} from './hero-view.js';
 import {createWoodAudio} from './wood-audio.js';
 import {createMaterialAudio} from './material-audio.js';
 import {worldTrees} from '../shared/world-content.js';
@@ -52,6 +53,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const aimCamera = new THREE.Matrix4();
   let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), templates = new Map(), warnings = new Map();
+  const heroView = createHeroView(), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3();
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
   const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster(), hitPoint = new THREE.Vector3();
@@ -295,6 +297,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     entry.visual = model;
     entry.root.add(model);
   }
+  // Remote Heroes swap the placeholder for the shared hero body; Gods and the local player keep their existing visuals.
+  function upgradeHero(entry) {
+    if (entry.enemy) return;
+    const wantHero = entry.data.role === 'hero' && heroView.ready(), isHero = !!entry.visual.userData.hero;
+    if (wantHero === isHero) return;
+    const old = entry.visual, next = wantHero ? heroView.create(entry.data) : basicActor(false, entry.data.role === 'god');
+    if (!next) return;
+    if (isHero) heroView.release(old); else { entry.root.remove(old); disposePlaceholder(old); }
+    entry.visual = next; entry.root.add(next);
+  }
   function disposePlaceholder(node) {
     if (!node.userData.placeholder) return;
     const materials = new Set();
@@ -324,8 +336,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       }
       entry.target.fromArray(data.position);
       entry.data = data;
-      upgradeActor(entry);
-      if (!enemy) {
+      upgradeActor(entry); upgradeHero(entry);
+      if (!enemy && !entry.visual.userData.hero) {
         const { head, hands } = entry.visual.userData;
         head.material.color.setHex(data.role === 'god' ? 0xb4a5dd : 0x579ca6);
         if (data.head) {
@@ -345,6 +357,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         const mixer = entry.visual.userData.mixer;
         mixer.stopAllAction(); mixer.uncacheRoot(mixer.getRoot()); mixers.delete(mixer);
       }
+      heroView.release(entry.visual);
       entry.visual.traverse(child => child.skeleton?.dispose());
       disposePlaceholder(entry.visual);
       actors.delete(key);
@@ -405,6 +418,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
   }
   const loader = new GLTFLoader();
+  loader.load('/assets/hero.glb', async gltf => {
+    if (disposed) { disposeResources(gltf.scene); return; }
+    orchard.enableShadowCasting(gltf.scene);
+    try { await renderer.compileAsync(gltf.scene, camera, scene); }
+    catch (error) { disposeResources(gltf.scene); report(`Hero material preparation failed (${error.message || error}).`); return; }
+    if (disposed) { disposeResources(gltf.scene); return; }
+    heroView.install(gltf);
+    for (const entry of actors.values()) upgradeHero(entry);
+  }, undefined, error => report(`Hero model unavailable; keeping placeholders (${error.message || error}).`));
   for (const name of ['forge','forge_lod']) loader.load(`/assets/${name}.glb`, gltf => {
     if(disposed){disposeResources(gltf.scene);return;}
     forge.install(gltf,name==='forge_lod');orchard.enableShadowCasting(gltf.scene);
@@ -768,6 +790,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
       if (entry.enemy || !entry.data.head) entry.root.rotation.y = entry.data.yaw || 0;
       else entry.root.rotation.y = 0;
+      if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
     for (const mixer of mixers) mixer.update(dt);
     // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
@@ -860,7 +883,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -886,7 +909,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
-      mixers.forEach(mixer => mixer.stopAllAction());
+      mixers.forEach(mixer => mixer.stopAllAction()); heroView.dispose();
       feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);

@@ -1,0 +1,80 @@
+{
+  "triangles": {
+    "HeroHead": 2752,
+    "HeroBody": 6528,
+    "HeroBody_LOD": 1506,
+    "Glove.L": 820,
+    "Glove.R": 820
+  },
+  "high_lod_triangles": 9280,
+  "low_lod_triangles": 1506,
+  "materials": [
+    "HeroSkin",
+    "HeroHair",
+    "HeroCloth",
+    "HeroTrim",
+    "HeroLeather",
+    "HeroMetal"
+  ],
+  "bones": [
+    "Root",
+    "Hips",
+    "Spine",
+    "Chest",
+    "Neck",
+    "Skull",
+    "Cape",
+    "UpperArm.L",
+    "Forearm.L",
+    "Palm.L",
+    "UpperLeg.L",
+    "LowerLeg.L",
+    "Foot.L",
+    "UpperArm.R",
+    "Forearm.R",
+    "Palm.R",
+    "UpperLeg.R",
+    "LowerLeg.R",
+    "Foot.R"
+  ],
+  "clips": {
+    "Idle": {
+      "frames": 48,
+      "seconds": 2.0,
+      "loop": true
+    },
+    "Walk": {
+      "frames": 24,
+      "seconds": 1.0,
+      "loop": true
+    },
+    "Run": {
+      "frames": 16,
+      "seconds": 0.6667,
+      "loop": true
+    },
+    "Attack": {
+      "frames": 18,
+      "seconds": 0.75,
+      "loop": false
+    },
+    "Hit": {
+      "frames": 12,
+      "seconds": 0.5,
+      "loop": false
+    }
+  },
+  "sockets": [
+    "Head",
+    "Hand.L",
+    "Hand.R",
+    "WeaponGrip",
+    "WeaponGrip.L"
+  ],
+  "bytes": {
+    "hero.glb": 497348,
+    "hero_lod.glb": 172616,
+    "hero_hands.glb": 38660
+  },
+  "build_seconds": 0.962
+}
