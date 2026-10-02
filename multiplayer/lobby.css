@@ -291,7 +291,7 @@ input[aria-invalid="true"] { border-color: var(--danger) !important; box-shadow:
 .meter-fill { position: absolute; inset: 0; transform-origin: left; transition: transform .25s ease; border-radius: 4px; }
 .hp .meter-fill { background: linear-gradient(90deg, #a7332a, var(--danger) 60%, #ff8a6c); }
 .mana .meter-fill { background: linear-gradient(90deg, #2f5f9a, var(--mana)); }
-.meter-value { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 3ch; text-align: right; }
+.meter-value { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; min-width: 3ch; text-align: right; }
 body[data-role="hero"] .meter.mana { display: none; }
 
 .hud-room { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
@@ -411,3 +411,5 @@ body.touch-controls-active .hero-tools {position:fixed;top:85px;left:50%;transfo
 /* Keep new equipment actions clear of phone menu/fullscreen and thumb sticks. */
 @media(max-width:600px) and (orientation:portrait){body.touch-controls-active .hero-tools{top:112px;left:10px;right:66px;transform:none;max-width:none;}body.touch-controls-active .hero-tools .spell-tray{display:grid;grid-template-columns:1fr 1fr;width:100%;}body.touch-controls-active .hero-tools .btn{min-width:0;}}
 @media(max-height:500px) and (orientation:landscape){body.touch-controls-active .hero-tools{top:auto;bottom:12px;width:230px;}body.touch-controls-active .hero-tools .spell-tray{display:grid;grid-template-columns:1fr 1fr;width:100%;}body.touch-controls-active .hero-tools .btn{min-height:36px;font-size:11px;padding:6px;}}
+
+@media(max-width:480px){.hud-self .meters{min-width:110px;flex:none}.hud-self .meter{grid-template-columns:18px 35px auto;gap:4px}.hud-self .meter-track{min-width:0}.hud-self .hud-self-text{flex:1}.hud-self .meter.mana{grid-template-columns:18px 35px auto}.hud-self .meter-label{font-size:9px;letter-spacing:0}}

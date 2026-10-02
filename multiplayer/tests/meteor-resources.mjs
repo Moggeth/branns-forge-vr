@@ -5,7 +5,7 @@ import {meteorAwakens} from '../shared/resources.js';
 import {hitEnemyPart,createEnemy} from '../shared/combat.js';
 const started=performance.now();let passed=0;
 const test=(name,fn)=>{fn();passed++;console.log('PASS',name);};
-function fixture(seed=41){const s=createSimulation({seed});s.addPlayer({id:'h',role:'hero'});s.addPlayer({id:'g',role:'god'});const w=s.adventureWorld();let seq=0;return {s,w,h:w.players[0],g:w.players[1],cmd:(id,action,extra={})=>s.command(id,{type:'action',action,seq:++seq,...extra})};}
+function fixture(seed=41){const s=createSimulation({seed});s.addPlayer({id:'h',role:'hero'});s.addPlayer({id:'g',role:'god'});const w=s.adventureWorld();w.pickups=[];let seq=0;return {s,w,h:w.players[0],g:w.players[1],cmd:(id,action,extra={})=>s.command(id,{type:'action',action,seq:++seq,...extra})};}
 function strikeDead(w,e){const events=[];hitEnemyPart(w,e,'torso',1000,{tool:'pick'}, {terrainHeight,nextId:(s,p)=>`${p}${++s.idCounter}`},events);return events;}
 function cast(seed){const f=fixture(seed);assert.ok(f.s.command('g',{type:'cast',seq:1,spell:'starfall',point:[25,0,25]}).ok);const id=f.w.pendingStarfalls[0].id;for(let i=0;i<48;i++)f.s.step();return {...f,id};}
 test('Seed + operation hash is deterministic and approximately 25% over 4096 worlds',()=>{

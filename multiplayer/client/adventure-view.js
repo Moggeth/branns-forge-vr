@@ -62,7 +62,7 @@ export function nextStep(view, held = null) {
   const god = view.role === 'god';
   const can = a => view.actions.includes(a);
   switch (view.stage) {
-    case 'idle': return 'Start when your party is ready';
+    case 'idle': return 'Gather. Recover a star. Defend the forge.';
     case 'camp': {
       const wood = open('wood'), stone = open('stone');
       const deeds = view.objectives.filter(o => o.role === 'god' && !o.done && !o.waived);

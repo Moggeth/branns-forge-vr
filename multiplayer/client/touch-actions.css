@@ -1,0 +1,37 @@
+/* Contextual chip sits just above/left of the existing primary Attack thumb button (right-hand arc).
+   Adjust --ta-anchor-* to the real Attack button position at integration. */
+.ta-wrap { position: fixed; right: calc(env(safe-area-inset-right) + var(--ta-anchor-right, 24px));
+  bottom: calc(env(safe-area-inset-bottom) + var(--ta-anchor-bottom, 128px)); z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; touch-action: none; }
+.ta-chip, .ta-q { pointer-events: auto; -webkit-tap-highlight-color: transparent; user-select: none; border: 0; }
+.ta-chip { position: relative; min-width: 72px; height: 72px; padding: 0 16px 0 12px; border-radius: 36px;
+  display: flex; align-items: center; gap: 8px; color: #fff8e6; font: 600 15px/1 system-ui, sans-serif;
+  background: rgba(34, 28, 20, .82); box-shadow: 0 0 0 2px #c8933f, 0 4px 14px rgba(0,0,0,.45); }
+.ta-chip[hidden] { display: none; }
+.ta-icon { font-size: 30px; }
+.ta-chip[data-kind="attack"] { box-shadow: 0 0 0 2px #e05a3c, 0 4px 14px rgba(0,0,0,.45); }
+.ta-chip[data-kind="mine"] { box-shadow: 0 0 0 2px #7fe3ff, 0 4px 14px rgba(0,0,0,.45); }
+.ta-chip[data-kind="collect"] { box-shadow: 0 0 0 2px #9bd06a, 0 4px 14px rgba(0,0,0,.45); }
+.ta-ring { position: absolute; inset: -4px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(#ffd27a calc(var(--ta-p, 0) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0); }
+.ta-pulse { animation: ta-pulse .18s ease-out; }
+@keyframes ta-pulse { 50% { transform: scale(.92); } }
+.ta-quick { display: flex; gap: 10px; }
+.ta-q { position: relative; width: 52px; height: 52px; border-radius: 26px; font-size: 22px; color: #fff8e6;
+  background: rgba(34, 28, 20, .7); box-shadow: 0 0 0 1px rgba(200,147,63,.7); }
+.ta-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px;
+  background: #e05a3c; font: 700 11px/18px system-ui; font-style: normal; }
+@media (prefers-reduced-motion: reduce) { .ta-pulse { animation: none; } }
+
+/* Integration: compact Opus dock inside the existing touch root, clear of thumbs and utility buttons. */
+.ta-wrap {right:calc(var(--mui-safe-r) + var(--mui-edge) + var(--mui-stick) + 18px);bottom:calc(var(--mui-safe-b) + var(--mui-edge) + var(--mui-stick) + 14px);gap:6px;z-index:5;}
+.ta-quick {gap:6px;}
+.ta-q {width:44px;height:44px;font-size:17px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:manipulation;}
+.ta-q small{font:600 10px/1.2 system-ui;}
+.ta-chip {height:44px;min-width:88px;border-radius:12px;font-size:12px;touch-action:manipulation;}
+.ta-icon{font-size:20px;}
+.mui-root[data-role="god"] .ta-wrap{display:none;}
+.mui-root.is-left-handed .ta-wrap {right:auto;left:calc(var(--mui-safe-l) + var(--mui-edge) + var(--mui-stick) + 18px);align-items:flex-start;}
+@media(orientation:portrait){.ta-wrap{right:auto;left:calc(var(--mui-safe-l) + var(--mui-edge));bottom:calc(var(--mui-safe-b) + var(--mui-edge) + var(--mui-stick) + 14px);align-items:flex-start;}.mui-root.is-left-handed .ta-wrap{left:auto;right:calc(var(--mui-safe-r) + var(--mui-edge));align-items:flex-end;}}

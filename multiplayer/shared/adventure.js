@@ -60,7 +60,7 @@ function roster(world) {
 const scale = heroes => clamp(heroes, 1, 6);
 function needs(heroes) {
   const h = scale(heroes);
-  return {wood: Math.min(24, 6 + 3 * h), stone: Math.min(16, 4 + 2 * h), star: Math.min(8, 2 + 2 * Math.ceil(h / 2))};
+  return {wood: Math.min(24, 4 + 2 * h), stone: Math.min(16, 3 + h), star: Math.min(8, 2 + 2 * Math.ceil(h / 2))};
 }
 // One readable rule for God assistance: Gods may cover a quarter of a resource goal while Heroes are present,
 // or all of it when nobody can gather. It is always an explicit, mana-paid action.
@@ -121,6 +121,7 @@ function enterStage(adv, stage, world, out) {
   if (stage === 'camp') { adv.need = {...adv.need, ...needs(heroes.length), star: 0}; adv.stock = {wood: 0, stone: 0}; restockStone(adv, world, out); }
   if (stage === 'star') { adv.need.star = needs(heroes.length).star; adv.star = {charge: 0, site: mix(adv.seed, adv.run, 99) % STAR_SITES.length, landed: false}; }
   if (stage === 'rekindle') { adv.flame = heroes.length ? 25 : 40; adv.rekindled = false; adv.waveIndex = 0; }
+  if(stage==='star'||stage==='rekindle'){out.intents.push({type:'partyReward',health:20,mana:30,wood:stage==='rekindle'?3:0,stone:0,gems:0});out.events.push({kind:'party_reward',stage,health:20,mana:30});}
   phaseNotice(adv, STAGE_TITLES[stage]);
   out.events.push({kind: 'adventure_stage', stage, run: adv.run});
 }
@@ -222,9 +223,10 @@ function victory(adv, world, out) {
       if (!(p.id in adv.renown) && Object.keys(adv.renown).length >= MAX_LEDGER) delete adv.renown[Object.keys(adv.renown)[0]];
       adv.renown[p.id] = Math.min(9999, (adv.renown[p.id] || 0) + award);
     }
-    out.events.push({kind: 'adventure_reward', run: adv.run, renown: award});
+    out.intents.push({type:'partyReward',health:100,mana:100,wood:6,stone:4,gems:3});
+    out.events.push({kind: 'adventure_reward', run: adv.run, renown: award,wood:6,stone:4,gems:3});
   }
-  phaseNotice(adv, 'Victory! Start a rematch whenever the party is ready.');
+  phaseNotice(adv, 'Victory! Each player earned 6 wood, 4 stone, 3 gems and a full restore. Rematch?');
   out.events.push({kind: 'adventure_stage', stage: 'victory', run: adv.run});
 }
 
@@ -357,7 +359,8 @@ export function applyAdventureIntents(state, intents, {createEnemy, terrainHeigh
   let applied = 0; const skipped = [];
   const taken = id => [...state.enemies, ...state.deposits, ...state.edits, ...state.pickups].some(x => x.id === id);
   for (const it of intents) {
-    if (it.type === 'spawn') {
+    if(it.type==='partyReward'){for(const p of state.players){p.hp=Math.min(100,p.hp+it.health);p.mana=Math.min(100,p.mana+it.mana);for(const k of ['wood','stone','gems'])p.resources[k]=Math.min(999,p.resources[k]+it[k]);}applied++;}
+    else if (it.type === 'spawn') {
       if (state.enemies.length >= 64 || taken(it.id)) { skipped.push(it.id); continue; }
       state.enemies.push(createEnemy(it.id, [it.x, terrainHeight(state, it.x, it.z), it.z], it.kind)); applied++;
     } else if (it.type === 'deposit') {

@@ -20,7 +20,7 @@ export function createInteractionCueController(parent) {
       snapshot = latest; trees.update(latest);
       ctx.deliver = {kinds: deliverableNow(latest.adventure, self.role, self.resources), held: self.resources};
       const predicted = {...self, position: state.position || self.position, yaw: Number.isFinite(state.yaw) ? state.yaw : self.yaw};
-      presenter.render(stabilizer.push(decideCue(view, predicted, latest, aim, ctx), now));
+      const cue=stabilizer.push(decideCue(view,predicted,latest,aim,ctx),now);presenter.render(cue);return cue;
     },
     reset: hide,
     dispose() { hide(); presenter.dispose(); },

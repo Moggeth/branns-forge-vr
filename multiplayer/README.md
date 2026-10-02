@@ -235,3 +235,13 @@ Starfall deterministically awakens a meteor golem 25% of the time. It unfolds an
 Menu → Supplies: three wood bandages a Hero (+35 health) or mends the Forge for a God (+20); two stone repairs +35 Forge integrity (Heroes within five metres); one gem rekindles a Hero (+35 health, ready eligible special, cool weapon) or restores +40 God mana. No benefit means no consumption. Bridges and Expedition deposits remain available.
 
 Skeleton broad-phase uses conservative bone bounds; exact animated triangles and embedded arrows remain intact. Nearby enemy shadow casters cap at four touch/eight desktop. See [performance evidence](../docs/SKELETON-CONTACT-PERFORMANCE.md) and [mobile/meteor handoff](../docs/MOBILE-METEOR-PASS-20261003.md).
+
+## Starting meadow and friends expedition
+
+Fresh worlds include a stone sanctuary, mining outcrop and ruined watch-arch, connected by stepping stones, with ore and hidden supplies to discover. Old saves retain their layout. Dead golem chunks take two pick swings to salvage stone.
+
+On touch, tap a visible enemy to aim and swing; tap a tree with the axe or ore/golem chunk with the pick. Loose loot taps collect it. Heal, Deliver and Drop are directly accessible. Hold Draw to use Emberwing as before.
+
+Press **Start Expedition**: gather and Deliver to the Forge, recover the fallen star, then defend and rekindle the Forge through three waves. Milestones restore the party; victory grants six wood/four stone/three gems each and full health/mana. Gods contribute through terrain/planting, bounded tithe and combat spells, including solo play.
+
+[Implementation, tests and timings](../docs/FRIENDS-STARTING-WORLD-20261003.md).

@@ -128,6 +128,7 @@ function buildSettings() {
         guideBlock('Hero · touch', [
           ['Left stick', 'Move'],
           ['Right stick', 'Look (or drag the world)'],
+          ['Tap the world', 'Collect loose loot; tap an enemy to swing. Trees need the axe; ore and golem remains need the pick.'],
           ['Attack', 'Tap to swing; hold to draw Emberwing or breathe Wyrmspout fire'],
           ['★ Special', 'Weapon special; reachable while holding Attack'],
           ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
@@ -241,7 +242,7 @@ export function createMobileUI({ mount = true } = {}) {
     mountSettings(settings);
   }
 
-  const state = { visible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+  const state = { tool:'axe',visible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
 
   function render() {
     const { visible, role, fullscreen, fullscreenSupported, standalone, targeting, leftHanded } = state;
@@ -257,6 +258,8 @@ export function createMobileUI({ mount = true } = {}) {
     leftStick._caption.textContent = god ? 'Pan' : 'Move';
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
+    const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',flask:'Pour',limb:'Swing'})[state.tool]||'Attack';
+    if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
     cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';
     cast.setAttribute('aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');

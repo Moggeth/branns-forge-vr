@@ -70,7 +70,7 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
     const p=points.get(e.pointerId);if(!p)return;e.preventDefault();
     const accept=name==='pointerup'&&!p.blocked&&valid(p)&&onWorld(e);
     points.delete(e.pointerId);pinch=null;
-    if(p.role==='hero'&&accept&&!p.moved)game.collectAt?.(e.clientX,e.clientY);
+    if(p.role==='hero'&&accept&&!p.moved)(game.tapAt||game.collectAt)?.(e.clientX,e.clientY);
     if(p.role==='god'){
       if(accept&&(p.cast.line||!p.moved)){
         const hit=game.aimAt(e.clientX,e.clientY);onTarget(hit);

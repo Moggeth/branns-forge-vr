@@ -29,6 +29,19 @@ function detach(state,enemy,part,hit,ctx,events){
   for(const e of state.embeds)if(e.targetId===enemy.id&&e.part===part)e.targetId=d.id;
   events.push({kind:'detach',position:[...d.position],id:d.id,sourceId:enemy.id,part});return d;
 }
+// Actual detached rock geometry remains the target: two pick strikes salvage a chunk.
+export function mineGolemRemains(state,p,m,ctx){
+ const d=state.detachedParts.find(d=>d.id===m.targetId);
+ if(!d||d.kind!=='golem'||state.enemies.some(e=>e.id===d.sourceId))return null;
+ if(p.tool!=='pick'||d.heldBy)return {ok:false,code:d.heldBy?'hands_full':'needs_pick',events:[]};
+ const dx=d.position[0]-p.position[0],dz=d.position[2]-p.position[2],distance=Math.hypot(dx,dz);
+ if(!vec(m.point)||distance>3.2||Math.abs(d.position[1]-p.position[1])>3||dist(m.point,d.position)>1.8||(distance>.5&&(-Math.sin(p.yaw)*dx-Math.cos(p.yaw)*dz)/distance<.45))return fail('out_of_reach');
+ if((d.miningHits||0)>=1&&state.pickups.length>=256)return fail('world_limit');
+ d.miningHits=(d.miningHits||0)+1;
+ const events=[{kind:'stone_hit',id:d.id,position:[...m.point],normal:[...m.normal],material:'stone',energy:1.2}];
+ if(d.miningHits>=2){const amount=['head','torso'].includes(d.part)?2:1;state.pickups.push({id:ctx.nextId(state,'p'),kind:'stone',amount,x:d.position[0],z:d.position[2],y:ctx.terrainHeight(state,d.position[0],d.position[2])});events.push({kind:'ore_break',id:d.id,position:[...d.position],material:'stone'});removeDetached(state,d);}
+ return ok(events);
+}
 export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=false}={}) {
   if(!state.enemies.includes(enemy)||!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
   if(enemy.kind==='golem'&&(enemy.armor??3)>0){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
@@ -127,7 +140,7 @@ export function validateCombat(saved,ids){
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
   for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   const held=new Set();
-  for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
+  for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.miningHits!==undefined&&(d.kind!=='golem'||!Number.isInteger(d.miningHits)||d.miningHits<0||d.miningHits>1))||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
   for(const e of saved.embeds||[])if(!e||!unique(e.id)||!['arrow','bolt'].includes(e.kind)||!PARTS.includes(e.part)||!validContact(e)||!(e.targetId==='world'||e.targetId==='terrain'||saved.enemies.some(q=>q.id===e.targetId)||saved.detachedParts?.some(q=>q.id===e.targetId)))throw Error('Invalid embed');
   for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>3)||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=(e.kind==='golem'?120:p==='torso'?100:55)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0)))throw Error('Invalid enemy anatomy');
 }
@@ -139,6 +152,6 @@ export function restoreCombat(saved){
   return {
     projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','kind','position','previousPosition','velocity','curve','bornTick','trail','lit'])),
     embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','boneName'])),
-    detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','hitIds']),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
+    detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','hitIds','miningHits']),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
   };
 }

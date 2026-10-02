@@ -34,11 +34,16 @@ test('God tap only aims; drags, pinch and cancelled touches never cast or set a 
   calls.length=0;canvas.send('pointerdown',5,20,20);canvas.send('pointercancel',5,20,20);assert.equal(calls.length,0);
   canvas.send('pointerdown',6,20,20);controls.reset();canvas.send('pointerup',6,20,20);assert.equal(calls.length,0);controls.dispose();
 });
-test('inactive controls ignore touches and Hero tap does not auto-attack',()=>{
-  const canvas=new Surface(),calls=[];let enabled=false;
-  const control=bindWorldTouch(canvas,{aimAt:()=>calls.push('aim'),lookByPixels:()=>calls.push('look')},{enabled:()=>enabled,role:()=> 'hero',sensitivity:()=>1});
-  canvas.send('pointerdown',1,20,20);canvas.send('pointermove',1,60,20);assert.equal(calls.length,0);
-  enabled=true;canvas.send('pointerdown',2,20,20);canvas.send('pointerup',2,20,20);assert.equal(calls.length,0);control.dispose();
+test('Hero tap targets on release; inactive, drag, pinch and cancellation never attack',()=>{
+ const canvas=new Surface(),calls=[];let enabled=false;
+ const game={tapAt:(x,y)=>calls.push(['tap',x,y]),lookByPixels:()=>{}};
+ const control=bindWorldTouch(canvas,game,{enabled:()=>enabled,role:()=> 'hero',sensitivity:()=>1});
+ canvas.send('pointerdown',1,20,20);canvas.send('pointerup',1,20,20);assert.equal(calls.length,0);
+ enabled=true;canvas.send('pointerdown',2,20,20);assert.equal(calls.length,0);canvas.send('pointerup',2,20,20);assert.deepEqual(calls,[['tap',20,20]]);calls.length=0;
+ canvas.send('pointerdown',3,20,20);canvas.send('pointermove',3,70,20);canvas.send('pointerup',3,70,20);
+ canvas.send('pointerdown',4,20,20);canvas.send('pointercancel',4,20,20);canvas.send('pointerup',4,20,20);
+ canvas.send('pointerdown',5,20,20);canvas.send('pointerdown',6,60,20);canvas.send('pointerup',5,20,20);canvas.send('pointerup',6,60,20);
+ assert.equal(calls.length,0);control.dispose();
 });
 
 function castingRig({line=false,quick=true}={}){

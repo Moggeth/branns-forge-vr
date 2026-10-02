@@ -1,8 +1,18 @@
+import {mountTouchActions} from './touch-actions.js';
+import './touch-actions.css';
 import {createMobileUI} from './mobile-ui.js';
 import {bindStick, bindWorldTouch, bindTouchButton} from './touch-input.js';
 
-export function createMobileControls({game, canvas, onMenu, notify, onChange = () => {}}) {
+export function createMobileControls({game, canvas, onMenu, notify, onChange = () => {},onExpeditionAction=()=>{}}) {
   const ui = createMobileUI(), cleanups = [];
+  const direct=mountTouchActions({root:ui.root,onAction:msg=>{
+    if(!enabled||!state.active||state.xr||game.weaponState().drawing||game.weaponState().firing)return;
+    if(msg.type==='context'){game.collectTarget(msg.targetId);return;}
+    if(msg.id==='deliver')onExpeditionAction('deposit');
+    if(msg.id==='bandage')game.useResource('wood');
+    if(msg.id==='drop')game.release(false);
+  }});
+  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'}]);
   document.querySelector('.menu-card').insertBefore(ui.settings, document.getElementById('leave'));
   const coarse = matchMedia('(any-pointer: coarse)'), app = matchMedia('(display-mode: standalone)');
   let state = {active:false, role:'hero', xr:false}, mode = read('mode','auto'), sensitivity = Number(read('sensitivity','1')) || 1;
@@ -21,7 +31,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   }, () => enabled && state.active && !state.xr));
   const actionPointers=new Map();
   ui.buttons.strike.style.touchAction='none'; // held trigger cannot become browser scroll/pinch
-  const actionButtons=[...document.querySelectorAll('[data-equip],[data-spell],#special,#grab,#drop,#throw,#collect,#bridge')].map(b=>bindTouchButton(b,()=>enabled&&state.active&&!state.xr));
+  const actionButtons=[...document.querySelectorAll('[data-equip],[data-spell],#special,#grab,#drop,#throw,#collect,#bridge,.ta-q,.ta-chip')].map(b=>bindTouchButton(b,()=>enabled&&state.active&&!state.xr));
   const worldTouch = bindWorldTouch(canvas,game,{enabled:()=>enabled&&state.active&&!state.xr, role:()=>state.role, sensitivity:()=>sensitivity,onTarget:valid=>{target=valid;render();}});
   function reset() {actionButtons.forEach(b=>b.reset());actionPointers.clear();attackPointer=null;sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
   function fullscreenElement() {return document.fullscreenElement || document.webkitFullscreenElement;}
@@ -32,7 +42,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     document.body.classList.toggle('touch-left-handed',leftHanded);
     ui.root.classList.toggle('is-left-handed',leftHanded);
     game.setTouchEnabled(enabled && !state.xr);
-    ui.setState({visible:enabled&&state.active&&!state.xr,role:state.role,fullscreen:!!fullscreenElement(),fullscreenSupported:fullscreenSupported(),standalone:app.matches||!!navigator.standalone,targeting:target,leftHanded,quickCast:game.touchCastState?.().quick||false});
+    ui.setState({visible:enabled&&state.active&&!state.xr,role:state.role,fullscreen:!!fullscreenElement(),fullscreenSupported:fullscreenSupported(),standalone:app.matches||!!navigator.standalone,targeting:target,leftHanded,tool:game.weaponState()?.tool,quickCast:game.touchCastState?.().quick||false});
     displayStatus.textContent = fullscreenError; displayStatus.hidden = !fullscreenError;
     onChange(enabled);
   }
@@ -83,5 +93,5 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   listen(document,'visibilitychange',()=>{if(document.hidden)reset();});
   listen(document,'fullscreenchange',()=>{reset();render();});listen(document,'webkitfullscreenchange',()=>{reset();render();});
   render();
-  return {get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();actionButtons.forEach(b=>b.dispose());sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());ui.destroy();}};
+  return {refresh:render,setCue(cue){ui.setState({tool:game.weaponState()?.tool});direct.setContext(cue?.kind==='pickup'&&cue.state==='ready'?{kind:'collect',label:cue.action,targetId:cue.target}:null);},get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();actionButtons.forEach(b=>b.dispose());sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());direct.dispose();ui.destroy();}};
 }

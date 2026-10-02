@@ -169,7 +169,7 @@ test('mirrored rules and control names match the reference source', () => {
   assert.match(mui, /actionButton\('strike', 'Attack'/); assert.match(av, /deposit: 'Deliver'/);
   assert.match(game, /KeyE'\)onAction\('interact'\).*KeyF'\)grab\(\).*KeyG'\)release\(\).*KeyX'\)release\(true\)/);
   assert.match(vr, /hand === 'left'\) actions\.push\('interact'\)/); assert.match(vr, /edge\('squeeze'\)\) actions\.push\(hand === 'left' \? 'cycle' : 'hand'\)/);
-  assert.equal(CONTROLS.touch.collect, 'Actions › Collect');
+  assert.equal(CONTROLS.touch.collect, 'Collect');
 });
 test('cost: 48 logs + 256 pickups, 10k decisions', () => {
   const logs = Array.from({length: 48}, (_, i) => log(`log${i}`, [i % 8 - 4, .16, -10 - (i >> 3)]));

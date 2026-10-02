@@ -1,9 +1,10 @@
+import {resolveStartingWorld} from './starting-world.js';
 import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
 import {useResource, collectTarget, meteorAwakens, flushMeteorRewards} from './resources.js';
-import {TOOLS,PARTS,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
+import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs} from './trees.js';
@@ -85,7 +86,8 @@ function damageHero(state, hero, amount, events) {
 
 function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
-  return {version: 1, contentVersion: 3, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
+  return {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-21,z:11,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:22,z:18,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:24,z:20,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
+    {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
@@ -237,6 +239,7 @@ function instantiate(state) {
           if (ore.hits >= ore.maxHits) { ore.depleted=true; makePickup(ore.kind==='meteor'?'gems':'stone',ore.x,ore.z,ore.kind==='meteor'?2:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
+          const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
           if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool},combatContext,events);
           else if(message.targetId==='shrine' && inReach({position:[0,terrainHeight(state,0,0,false),0]})<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
@@ -308,7 +311,7 @@ function instantiate(state) {
           p.position[2] = clamp(p.position[2] + p.move[1] * 5 / HZ, -BOUND, BOUND);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));}
         const floor = p.role==='hero'?forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
       }
@@ -353,7 +356,7 @@ function instantiate(state) {
             enemy.position[2] = clamp(hero.position[2] + uz, -BOUND, BOUND);
           }
         }
-        resolveForge(enemy.position,forgeY,enemy.kind==='golem'?.42:.28);
+        resolveForge(enemy.position,forgeY,enemy.kind==='golem'?.42:.28);if(state.landmarks)resolveStartingWorld(enemy.position,(x,z)=>terrainHeight(state,x,z),enemy.kind==='golem'?.42:.28);
         enemy.position[1] = forgeFloor(enemy.position[0],enemy.position[2],forgeY,terrainHeight(state, enemy.position[0], enemy.position[2]));
         if (d < 1.8 && state.tick - enemy.attackTick > 60) {
           enemy.attackTick = state.tick; // Wind-up precedes the actual strike.
@@ -381,7 +384,7 @@ function instantiate(state) {
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,adventure:state.adventure,
-        contentVersion: 4, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
+        contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -486,6 +489,8 @@ export function loadSimulation(saved) {
   state.meteorRewards=copy(meteorRewards);
   state.pickups = pickups.map(({id,kind,x,z,y,amount})=>({id,kind,x,z,y,amount}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
+  if(saved.landmarks!==undefined&&typeof saved.landmarks!=='boolean')throw Error('Invalid landmark version');
+  state.landmarks=saved.landmarks===true;
   state.shrine = copy(saved.shrine); // Includes break/restore timer.
   return instantiate(state);
 }

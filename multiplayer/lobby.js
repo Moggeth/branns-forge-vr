@@ -256,7 +256,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
@@ -671,10 +671,10 @@ try {
     onXRChange: value => { xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,
     onExpeditionAction: expeditionAction,
-    onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud')); interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen); },
+    onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud')); const cue=interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen); mobile?.setCue(cue); },
   });
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
-  mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint});
+  mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:updateLookHint,onExpeditionAction:expeditionAction});
   document.head.append($('compactStyles'));
   createMenuTabs();
   rendererReady = true;

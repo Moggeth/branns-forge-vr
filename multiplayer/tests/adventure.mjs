@@ -61,7 +61,7 @@ function heroCamp(room, id) {
   room.walkToForge(id);
   assert.ok(room.act(id, {action: 'deposit', kind: 'wood', amount: 99}).ok);
   room.give(id, {wood: need.wood, stone: need.stone});
-  assert.ok(room.act(id, {action: 'deposit', kind: 'wood', amount: 99}).ok);
+  if(room.adv.stock.wood<need.wood)assert.ok(room.act(id, {action: 'deposit', kind: 'wood', amount: 99}).ok);
   assert.ok(room.act(id, {action: 'deposit', kind: 'stone', amount: 99}).ok);
 }
 
@@ -70,7 +70,7 @@ test('solo hero: three stages to victory, rewards once, rematch', () => {
   assert.equal(adventureView(r.adv, r.world(), 'h1').actions[0], 'start');
   r.tick(30); assert.equal(r.adv.stage, 'idle', 'sandbox stays free until someone starts');
   assert.ok(r.act('h1', {action: 'start'}).ok);
-  assert.deepEqual(r.adv.need, {wood: 9, stone: 6, star: 0}, 'star goal is fixed when stage II begins');
+  assert.deepEqual(r.adv.need, {wood: 6, stone: 4, star: 0}, 'star goal is fixed when stage II begins');
   // God goals are waived without a God: no deadlock.
   const camp = adventureView(r.adv, r.world(), 'h1');
   assert.ok(camp.objectives.find(o => o.id === 'shape').waived);
@@ -95,8 +95,10 @@ test('solo hero: three stages to victory, rewards once, rematch', () => {
   }
   assert.equal(r.adv.stage, 'victory');
   assert.equal(r.adv.waveIndex, 3);
+  assert.equal(r.player('h1').hp,100); assert.equal(r.player('h1').mana,100);
+  assert.ok(r.player('h1').resources.gems>=3);const loot=structuredClone(r.player('h1').resources);
   const renown = r.adv.renown.h1; assert.ok(renown >= 20);
-  r.tick(120); assert.equal(r.adv.renown.h1, renown, 'no repeated reward while idling at victory');
+  r.tick(120); assert.equal(r.adv.renown.h1, renown, 'no repeated reward while idling at victory');assert.deepEqual(r.player('h1').resources,loot,'resource rewards cannot repeat');
   assert.equal(adventureAction(r.adv, 'h1', {seq: ++r.seq.h1, action: 'retry'}, r.world()).code, 'invalid_stage');
   assert.ok(r.act('h1', {action: 'start'}).ok); assert.equal(r.adv.run, 2); assert.equal(r.adv.stage, 'camp');
   assert.equal(r.adv.renown.h1, renown, 'rematch does not grant anything by itself');
@@ -114,7 +116,7 @@ test('solo God: tithe, real lightning on guardians, lodestar, idle foes threaten
     if (r.act('g1', {action: 'tithe', kind}).ok) tithes++;
     r.tick(60);
   }
-  assert.equal(r.adv.stage, 'star'); assert.equal(tithes, 8, 'solo tithe covers 15 units at 2 per tithe');
+  assert.equal(r.adv.stage, 'star'); assert.equal(tithes, 5, 'solo tithe covers 10 units at 2 per tithe');
   assert.ok(r.until(() => r.adv.foes.some(f => f.tag === 'g' && f.seen), 60 * 20, 1));
   const site = adventureView(r.adv, r.world(), 'g1').star;
   assert.equal(r.act('g1', {action: 'lodestar', point: [site.x, 0, site.z]}).code, 'guarded');
@@ -146,7 +148,7 @@ test('role parity: God help is capped at a quarter while Heroes gather', () => {
   r.act('g1', {action: 'start'});
   let given = 0;
   for (let i = 0; i < 20; i++) { if (r.act('g1', {action: 'tithe', kind: 'wood'}).ok) given++; r.tick(130); }
-  assert.equal(given, Math.ceil((9 + 6) / 4)); assert.equal(r.adv.stock.wood, 4);
+  assert.equal(given, Math.ceil((6 + 4) / 4)); assert.equal(r.adv.stock.wood, 3);
   assert.equal(adventureView(r.adv, r.world(), 'g1').godSupportLeft, 0);
   // With a God present, the path and grove goals become real requirements.
   r.give('h1', {wood: 20, stone: 20}); r.walkToForge('h1');
@@ -175,7 +177,7 @@ test('resources are spent once; duplicates and reconnects cannot farm', () => {
   assert.equal(r.act('h1', {action: 'deposit', kind: 'wood', amount: 5}).code, 'insufficient_resources');
   assert.equal(r.adv.stock.wood, 5, 'team stock survives reconnect exactly');
   r.give('h1', {wood: 50}); r.act('h1', {action: 'deposit', kind: 'wood', amount: 50});
-  assert.equal(r.adv.stock.wood, 9); assert.equal(r.player('h1').resources.wood, 46, 'surplus is never taken');
+  assert.equal(r.adv.stock.wood, 6); assert.equal(r.player('h1').resources.wood, 49, 'surplus is never taken');
 });
 
 test('mid-stage save/restore resumes byte-identically', () => {
@@ -245,7 +247,7 @@ test('hostile payloads and corrupt saves are rejected', () => {
 
 test('caps: foes, telegraphs and ledgers stay bounded', () => {
   const r = new Room(); for (let i = 0; i < 8; i++) r.add(`h${i}`, 'hero');
-  r.act('h0', {action: 'start'}); assert.deepEqual(r.adv.need, {wood: 24, stone: 16, star: 0});
+  r.act('h0', {action: 'start'}); assert.deepEqual(r.adv.need, {wood: 16, stone: 9, star: 0});
   r.adv.stage = 'rekindle'; r.adv.elapsed = 0; r.adv.flame = 60;
   let maxFoes = 0;
   for (let t = 0; t < PACING.waves[2] + 30; t += 10) { r.adv.flame = 99; r.tick(10); maxFoes = Math.max(maxFoes, r.adv.foes.length); assert.ok(r.adv.telegraphs.length <= 8); }
@@ -262,40 +264,7 @@ test('determinism: identical inputs give identical state, empty room pauses', ()
   const e = r.adv.elapsed; r.game.removePlayer('h1'); r.tick(600); assert.equal(r.adv.elapsed, e, 'clock paused while nobody is present');
 });
 
-// Minimal DOM/canvas shims (no DOM library is installed); they check structure and wiring, not appearance.
-class Node0 { constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.style = {cssText: ''}; this.dataset = {}; this.textContent = ''; this.listeners = {}; }
-  setAttribute(k, v) { this.attrs[k] = String(v); } append(...c) { for (const x of c) { x.parent = this; this.children.push(x); } }
-  replaceChildren() { this.children = []; } addEventListener(k, f) { this.listeners[k] = f; } remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); }
-  closest(sel) { return sel.startsWith('button') && this.tag === 'button' ? this : null; }
-  all(pred, acc = []) { if (pred(this)) acc.push(this); for (const c of this.children) c.all(pred, acc); return acc; } }
-globalThis.document = {createElement: t => new Node0(t), createElementNS: (_, t) => new Node0(t)};
-globalThis.Path2D = class { constructor(d) { this.d = d; } };
-const {createAdventureBanner, drawAdventurePanel, ADVENTURE_ICONS} = await import('../client/adventure-view.js');
-
-test('view model and banner: stable data, icons, buttons, VR panel redraw only on change', () => {
-  const r = new Room(); r.add('h1', 'hero'); r.add('g1', 'god');
-  const root = new Node0('div'); const pressed = [];
-  const banner = createAdventureBanner(root, {onAction: a => pressed.push(a)});
-  assert.equal(banner.update(adventureView(r.adv, r.world(), 'h1')), true);
-  assert.equal(banner.update(adventureView(r.adv, r.world(), 'h1')), false, 'no DOM churn without change');
-  const start = banner.element.all(n => n.tag === 'button')[0];
-  assert.equal(start.dataset.action, 'start');
-  banner.element.listeners.click({target: start}); assert.deepEqual(pressed, ['start']);
-  r.act('h1', {action: 'start'});
-  const v = adventureView(r.adv, r.world(), 'g1');
-  assert.deepEqual(Object.keys(v), ['stage', 'run', 'title', 'notice', 'role', 'elapsedSeconds', 'objectives', 'telegraphs', 'flame', 'retriesLeft', 'godSupportLeft', 'challengeLeft', 'renown', 'party', 'actions', 'star']);
-  assert.deepEqual(v.objectives.map(o => o.id), ['wood', 'stone', 'shape', 'plant']);
-  assert.ok(v.actions.includes('tithe') && !v.actions.includes('deposit'));
-  assert.ok(v.objectives.every(o => ADVENTURE_ICONS[o.icon]));
-  banner.update(v);
-  assert.equal(banner.element.all(n => n.tag === 'svg').length, 5, 'header + four objective glyphs');
-  const calls = []; const ctx = new Proxy({}, {get: (_, k) => typeof k === 'string' && !['fillStyle', 'font', 'textBaseline', 'globalAlpha', 'textAlign'].includes(k) ? (...a) => calls.push(k) : undefined, set: () => true});
-  const cache = {};
-  assert.equal(drawAdventurePanel(ctx, v, 512, 256, cache), true); assert.equal(drawAdventurePanel(ctx, v, 512, 256, cache), false);
-  assert.ok(calls.filter(c => c === 'fill').length >= 4);
-  banner.destroy(); assert.equal(root.children.length, 0);
-});
-
+// Current compact HUD behavior is covered by tests/expedition-hud.mjs and vr-adventure-panel.mjs.
 test('stepAdventure cost at world caps (8 players, 64 enemies)', () => {
   const r = new Room(); for (let i = 0; i < 8; i++) r.add(`h${i}`, 'hero');
   r.act('h0', {action: 'start'}); r.adv.stage = 'rekindle'; r.adv.flame = 50;

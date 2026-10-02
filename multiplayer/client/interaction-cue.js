@@ -24,7 +24,7 @@ const KIND_WORD = {wood: 'timber', stone: 'stone', gems: 'gems'}; // adventure-v
 // objective banner Deliver (adventure-view.js SHORT), VR bindings (vr-input-policy.js, docs/VR-CONTROLS.md).
 export const CONTROLS = Object.freeze({
   desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver'},
-  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Actions › Drop', throw: 'Actions › Throw', collect: 'Actions › Collect', deliver: 'Deliver'},
+  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver'},
   xr: {strike: 'Swing', axe: 'Left grip', pick: 'Left grip', grab: 'Right grip', stow: 'Left stick click', drop: 'Right grip', throw: 'Trigger', collect: 'Left stick click', deliver: 'Wrist panel'},
 });
 
@@ -165,6 +165,8 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     if (boneHeld) return make('ore', 'busy', id, info.name, 'Drop the bone first', keys.drop);
     return make('ore', 'ready', id, info.name, 'Mine', keys.strike, info.yields, progress);
   }
+  const remains=(snapshot.detachedParts||[]).find(d=>d.id===id&&d.kind==='golem');
+  if(remains&&!snapshot.enemies.some(e=>e.id===remains.sourceId))return make('ore',tool==='pick'?'ready':'tool',id,'Golem remains',tool==='pick'?'Mine':'Needs the Pick',tool==='pick'?keys.strike:keys.pick,'Salvage stone',{done:remains.miningHits||0,total:2});
   return null; // enemies/shrine/props: combat HUD already speaks for them
 }
 
