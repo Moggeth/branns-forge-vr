@@ -385,6 +385,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     templates.set(name, gltf);
+    // Meteor materials otherwise compile for the first time during impact.
+    // Prepare the loaded asset against the real lighting without adding it to the world.
+    if (name === 'meteor') renderer.compileAsync(gltf.scene, camera, scene).catch(error => {
+      if (!disposed) report(`Meteor shader preparation: ${error.message}`);
+    });
     if (name === 'tree') { syncTrees(); }
     if (name === 'skeleton'||name==='golem') for (const entry of actors.values()) upgradeActor(entry);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout'].includes(name)) {
@@ -742,6 +747,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     geometries.forEach(value => value.dispose()); textures.forEach(value => value.dispose()); materials.forEach(value => value.dispose());
   }
   rebuildGround(); resize(); renderer.setAnimationLoop(frame);
+  void spellVisual.prepareShaders(renderer, camera, scene).then(() => {
+    if (!disposed) return renderer.compileAsync(scene, camera);
+  }).catch(error => {
+    if (!disposed) report(`Shader preparation: ${error.message}`);
+  });
   report(`World renderer ready (${Math.round(performance.now() - started)} ms).`);
   // Read-only presentation evidence for browser QA (no input, state or credentials).
   Object.defineProperty(canvas, 'brannDiagnostics', {configurable: true, value: () => disposed ? null : api.diagnostics()});

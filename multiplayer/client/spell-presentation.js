@@ -189,6 +189,17 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const shards = new InstPool(G.shard, new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true, emissive: 0x201814 }), CAPS.shard, H);
   const leaves = new InstPool(G.leaf, new THREE.MeshStandardMaterial({ roughness: 0.8, side: THREE.DoubleSide, emissive: 0x10240c }), CAPS.leaf, H);
   const pools = [dust, glow, shards, leaves]; root.add(dust.obj, glow.obj, shards.mesh, leaves.mesh);
+  async function prepareShaders(renderer, camera, targetScene) {
+    // Representatives share the real cached materials. This group is never
+    // attached/rendered and never emits a spell or modifies authoritative state.
+    const preview = new THREE.Group();
+    const ribbon = new Ribbon(2, ribMat(PAL.amber, PAL.gold), H);
+    preview.add(ribbon.mesh, new THREE.Mesh(G.core, solid(0x3a2a24, PAL.ember, 1.2)),
+      new THREE.Mesh(G.disc, glowMat(PAL.amber)));
+    root.traverse(node => { if (node.isMesh || node.isPoints) preview.add(node.clone(false)); });
+    try { await renderer.compileAsync(preview, camera, targetScene); }
+    finally { ribbon.dispose(); preview.clear(); }
+  }
 
   // ground helpers
   function dens(pts, sx, sz, sp = 0.35, cap = 160) {
@@ -493,5 +504,5 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); clearRet(); pools.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose();
     Object.values(G).forEach((g) => g.dispose()); cache.forEach((m) => m.dispose()); cache.clear(); tex.dispose(); scene.remove(root); events.clear(); recent.clear(); warns.clear(); launched.clear();
   }
-  return { setTarget, play, update, sync, dispose, stats };
+  return { setTarget, play, update, sync, dispose, stats, prepareShaders };
 }
