@@ -47,6 +47,22 @@ test('untrusted save cannot supply a broken simulation checkpoint',()=>{
   s.dispose();
 });
 
+test('reset preserves the entire live world when recovery storage is full',()=>{
+  const connection=new FakeConnection(), backing=storage();let full=false;
+  const s=new WorldSession({connection,storage:{getItem:k=>backing.getItem(k),setItem:(k,v)=>{if(full)throw new Error('QuotaExceededError');backing.setItem(k,v);}}});
+  try {
+    s.connect();s.command('cast',{spell:'raise',point:[10,0,10]});s.publish(true);
+    const before=s.simulation.checkpoint(), worldId=s.worldId, revision=connection.checkpointRevision;
+    full=true;
+    assert.throws(()=>s.resetWorld(),/storage is full/);
+    assert.deepEqual(s.simulation.checkpoint(),before);
+    assert.equal(s.worldId,worldId);assert.equal(connection.checkpointRevision,revision);
+    full=false;s.resetWorld();
+    assert.equal(s.simulation.snapshot().edits.length,0);
+    assert.ok(s.saves.list().some(save=>save.id===worldId&&save.checkpoint.edits.length===1));
+  } finally {full=false;s.dispose();}
+});
+
 test('reset starts fresh but checkpoint revisions keep increasing',()=>{
   const connection=new FakeConnection(),s=new WorldSession({connection,storage:storage()});
   try{s.connect();s.command('cast',{spell:'raise',point:[10,0,10]});s.publish(true);

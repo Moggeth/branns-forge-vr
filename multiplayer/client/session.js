@@ -280,7 +280,8 @@ export class WorldSession extends EventTarget {
   transferHost(id) { this.connection.transferHost(id); }
   resetWorld() {
     if (!this.simulation) throw new Error('Only the current host can reset the world.');
-    this.autoSave(true);
+    // A failed recovery write must abort reset; the confirmation promises a backup.
+    this.saves.put(this.exportSave());
     this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
     this.simulation = createSimulation({room:this.identity.room,seed:41}); this.codec.reset();
     this.reconcile(); this.publish(true);
