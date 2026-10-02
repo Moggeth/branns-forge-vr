@@ -10,7 +10,7 @@ const RUNNING = ['camp', 'star', 'rekindle'];
 const BOUND = 55, FORGE = [0, 0], DEPOSIT_RANGE = 9, DRAIN_RANGE = 11, HOSTILE_KEEP_OUT = 12;
 const MAX_FOES = 16, MAX_TELEGRAPHS = 8, MAX_LEDGER = 16, MAX_RETRIES = 3, STOCK_CAP = 99;
 const GATES = Object.freeze([[-24, -16], [24, -16], [0, -30], [-22, 20], [22, 20]]);
-const STAR_SITES = Object.freeze([[-30, 26], [32, 24], [-4, -38]]);
+export const STAR_SITES = Object.freeze([[-30, 26], [32, 24], [-4, -38]]);
 const SHAPE = ['raise', 'lower', 'sunder', 'wall'], PLANT = ['grove', 'ring'], SUPPORT = ['heal', 'frost', 'lightning', 'crystal', 'starfall'];
 const HOSTILE_COST = Object.freeze({skeleton: 1, squad: 4, golem: 3});
 const s = secs => Math.round(secs * HZ);
