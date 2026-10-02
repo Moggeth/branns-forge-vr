@@ -8,6 +8,7 @@ import {createImpactPresentation} from './impact-presentation.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent} from './world-content-view.js';
 import {createForgeView} from './forge-view.js';
+import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
@@ -32,7 +33,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let terrainSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38, orbitTilt = 0.9;
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null;
-  const equipment=['axe','pick','hammer','crossbow','bow','limb'];
+  const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
   const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
@@ -108,7 +109,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   scene.add(shrine);
   const weaponAnchor = new THREE.Group();
   weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position);
-  weaponAnchor.rotation.fromArray(['bow','crossbow'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);
+  weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);
   camera.add(weaponAnchor);
   const axePlaceholder = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.05), new THREE.MeshStandardMaterial({ color: 0x67462e }));
   weaponAnchor.add(axePlaceholder);
@@ -127,8 +128,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (!active) return;
       if (role === 'hero') {
         const hand=controllerSources.get(i)?.handedness;
-        if(hand==='right'&&snapshot.detachedParts?.some(p=>p.heldBy===playerId))release(true);
-        else if(tool==='bow'&&hand==='left')weapons.special();
+        if(hand==='right'&&[...(snapshot.detachedParts||[]),...(snapshot.looseLogs||[])].some(p=>p.heldBy===playerId))release(true);
+        else if(['bow','wyrmspout','flask'].includes(tool)&&hand==='left')weapons.special();
         else primaryDown();
       }
       else {
@@ -149,8 +150,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function report(message) { if (!disposed) onStatus(message); }
   const content = createWorldContent({scene,templates,instantiate,height:terrainHeight});
   const combat=createCombatView({scene,templates,actors,height:(x,z)=>terrainHeight(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const fireVisual=createFirePresentation({scene,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
+  const flaskModel=createEmberdewModel();templates.set('flask',{scene:flaskModel,animations:[]});weaponModels.set('flask',flaskModel);
   const spellVisual=createSpellPresentation({scene,tickSeconds:1/60,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
-  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();onAction('fire',details);},special:()=>{const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=terrainHeight(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}});
+  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();onAction('fire',details);},emitFlame:details=>{unlockAudio();onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0;},special:()=>{const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=terrainHeight(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}});
   function attachWeapon() {
     if (!axeModel) return;
     const tracked = [...controllerSources.entries()].filter(([, source]) => source.targetRayMode === 'tracked-pointer');
@@ -187,6 +190,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const signature = JSON.stringify(snapshot.edits);
     if (signature === terrainSignature) return;
     terrainSignature = signature;
+    fireVisual.invalidateTerrain();
     const positions = groundGeometry.attributes.position;
     for (let i = 0; i < positions.count; i++) positions.setY(i, terrainHeight(positions.getX(i), positions.getZ(i), snapshot.edits));
     positions.needsUpdate = true;
@@ -356,13 +360,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
-  for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of ['tree', 'tree_b', 'tree_young', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     templates.set(name, gltf);
     if (name === 'tree') { syncTrees(); }
     if (name === 'skeleton'||name==='golem') for (const entry of actors.values()) upgradeActor(entry);
-    if (['axe','pick','hammer','crossbow','bow'].includes(name)) {
-      const model = instantiate(name, ({axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25})[name]);weaponModels.set(name,model);
+    if (['axe','pick','hammer','crossbow','bow','wyrmspout'].includes(name)) {
+      const model = instantiate(name, ({axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4})[name]);weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
     } else content.reload();
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
@@ -405,8 +409,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const impacts=createImpactPresentation({scene,camera,height:(x,z)=>terrainHeight(x,z,snapshot.edits)});
   let audioContext=null;let lastSound=0;
   function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();}catch{}}
+  // Reuse the native authored flame loop. One quiet source per local weapon,
+  // never one source per packet; gain ramps prevent clicks on trigger release.
+  let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
+  function updateFireAudio(firing){
+    if(!audioContext)return;
+    if(firing&&!flameBuffer&&!flameLoading){flameLoading=true;fetch('/assets/wyrmspout-flame.wav').then(r=>{if(!r.ok)throw Error('Flame audio unavailable');return r.arrayBuffer();}).then(b=>audioContext.decodeAudioData(b)).then(b=>{if(!disposed)flameBuffer=b;}).catch(()=>{});}
+    if(firing&&flameBuffer&&!flameSource){flameSource=audioContext.createBufferSource();flameSource.buffer=flameBuffer;flameSource.loop=true;flameGain=audioContext.createGain();flameGain.gain.value=0;flameSource.connect(flameGain).connect(audioContext.destination);flameSource.start();}
+    if(flameGain)flameGain.gain.setTargetAtTime(firing?.16:0,audioContext.currentTime,.045);
+  }
+  function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
-    if(!event?.position)return;
+    if(!event?.position||event.fire)return;
     if(event.kind==='spell')spellVisual.play(event);
     const specialEffect={hammer_slam:'raise',pick_burst:'crystal',axe_cleave:'sunder'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
     const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
@@ -466,10 +480,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function primaryDown(){if(!active||role!=='hero')return;if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
-  function grab(){if(!active||role!=='hero')return;const aim=weaponAim();const id=combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
+  function grab(){if(!active||role!=='hero')return;const aim=weaponAim();const id=content.grabTarget?.(aim.origin,aim.direction,3)||combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
   function release(throwIt=false){if(active&&role==='hero')onAction('release',{throw:throwIt,direction:weaponAim().direction});}
   function strike() {
-    if(tool==='crossbow'||tool==='bow'){primaryDown();return;}
+    if(['crossbow','bow','wyrmspout','flask'].includes(tool)){primaryDown();return;}
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe;
     if (!active || role !== 'hero' || performance.now() - swingAt < profile.cooldown*1000) return;
     swingAt = performance.now();swingContact=false;swingTarget=contactRay();swingReach=THREE.MathUtils.clamp(swingTarget?.distance||2.5,.6,2.8);
@@ -478,7 +492,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
-    weapons.cancel();castStart=null;quickKey=null;
+    weapons.cancel();updateFireAudio(false);castStart=null;quickKey=null;
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -547,7 +561,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (active && pressed && !previous.jump && role === 'hero') jumpPending = true;
         if (active && menu && !previous.menu) { void renderer.xr.getSession()?.end().then(onMenu); }
         const squeeze=source.gamepad?.buttons[1]?.pressed||false,stick=source.gamepad?.buttons[3]?.pressed||false;
-        if(active&&squeeze&&!previous.squeeze&&role==='hero'){if(source.handedness==='left')equip(equipment[(equipment.indexOf(tool)+1)%5]);else {const held=snapshot.detachedParts?.some(p=>p.heldBy===playerId);if(held)release();else grab();}}
+        if(active&&squeeze&&!previous.squeeze&&role==='hero'){if(source.handedness==='left')equip((()=>{const choices=equipment.filter(t=>t!=='limb');return choices[(choices.indexOf(tool)+1)%choices.length];})());else {const held=[...(snapshot.detachedParts||[]),...(snapshot.looseLogs||[])].some(p=>p.heldBy===playerId);if(held)release();else grab();}}
         if(active&&stick&&!previous.stick&&source.handedness==='right'&&role==='hero')onAction('buildBridge');
         xrButtons.set(index, {jump: pressed, menu, squeeze, stick});
       }
@@ -621,10 +635,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (axeModel) axeModel.visible = role === 'hero' && active;
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
-    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='crossbow'?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000,move.length()));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
+    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:['crossbow','wyrmspout','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000,move.length()));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(!swingContact&&progress>=.5){swingContact=true;const hit=contactRay();onAction('strike',hit?{...hit,tool}:{targetId:'miss',point:localPosition.toArray(),normal:[0,1,0],tool});}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
-    content.tick(now);impacts.update(dt);
+    weapons.tick();updateFireAudio(weapons.state().firing);
+    const wick=axeModel?.getObjectByName('Wick');if(tool==='flask'&&wick?.material){const lit=!!snapshot.players.find(p=>p.id===playerId)?.flaskLit;wick.material.emissive?.setHex(lit?0xff5a04:0);wick.material.emissiveIntensity=lit?2:0;}
+    content.tick(now,snapshot.tick);impacts.update(dt);fireVisual.update(now,dt);
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
       if (animation.actions) {
@@ -688,7 +704,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         // Grounded height follows the same live terrain function as the server.
         if (grounded) localPosition.y = authoritative.y;
       }
-      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);
+      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);
 
     },
     setRole(next) {
@@ -720,7 +736,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     interact(){if(active&&role==='hero')onAction('interact');},
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
-    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
+    diagnostics(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats()};},
     clearControls: clearInput,
     controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
@@ -744,7 +760,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction());
-      combat.dispose();spellVisual.dispose();impacts.dispose();
+      combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

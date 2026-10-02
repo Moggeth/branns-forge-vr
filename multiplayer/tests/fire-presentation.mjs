@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import fs from 'node:fs';
+import {createRequire} from 'node:module';
+import {createFirePresentation,createEmberdewModel} from '../client/fire-presentation.js';
+const started=performance.now(),scene=new T.Scene(),view=createFirePresentation({scene,height:()=>0});
+const cells=Array.from({length:256},(_,i)=>({x:(i%16)*.5,z:Math.floor(i/16)*.5,fuel:.8,heat:1,burning:true}));
+const packets=Array.from({length:96},(_,i)=>({id:`q${i}`,kind:'flame',position:[i%10,1,Math.floor(i/10)],velocity:[0,0,-10],bornTick:0}));
+const s={tick:30,fireCells:cells,fireSurfaces:[],projectiles:packets};view.sync(s);
+const begin=performance.now();for(let i=0;i<600;i++)view.update(i*16.67,.01667);const ms=(performance.now()-begin)/600;
+const stats=view.stats();assert.ok(stats.instances<=768);assert.ok(stats.draws<=4);assert.equal(stats.lights,3);assert.ok(stats.fuelTriangles<=40960);const rebuilds=stats.fuelRebuilds;
+view.sync(s);assert.equal(view.stats().fuelRebuilds,rebuilds,'unchanged snapshots do not rebuild fuel');view.invalidateTerrain();view.sync(s);assert.equal(view.stats().fuelRebuilds,rebuilds+1);
+view.dispose();assert.equal(scene.children.length,0);
+const flask=createEmberdewModel();assert.ok(flask.getObjectByName('Muzzle'));assert.ok(flask.userData.stats.triangles<2000);flask.userData.dispose();
+const require=createRequire(import.meta.url),validator=require('../../assets/asset-lab/node_modules/gltf-validator');
+const result=await validator.validateBytes(new Uint8Array(fs.readFileSync(new URL('../public/assets/wyrmspout.glb',import.meta.url))));assert.equal(result.issues.numErrors,0);
+console.log(JSON.stringify({result:'pass',updateMs:ms,stats,glbErrors:result.issues.numErrors,seconds:(performance.now()-started)/1000},null,2));

@@ -15,7 +15,7 @@ try {
   Copy-Item -LiteralPath '.vercel/project.json' -Destination "$stage/.vercel/project.json"
   Copy-Item -LiteralPath 'dist/index.html' -Destination "$static/index.html"
   Copy-Item -LiteralPath 'dist/manifest.webmanifest' -Destination "$static/manifest.webmanifest"
-  Get-ChildItem 'dist/assets' -File | Where-Object { $_.Extension -in '.js','.css','.glb','.png' } | Copy-Item -Destination "$static/assets"
+  Get-ChildItem 'dist/assets' -File | Where-Object { $_.Extension -in '.js','.css','.glb','.png','.wav' } | Copy-Item -Destination "$static/assets"
   '{"version":3,"routes":[{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' | Set-Content -Encoding utf8 -LiteralPath "$stage/.vercel/output/config.json"
   npx --yes vercel@62.1.0 deploy --prebuilt --prod --yes --scope moggeths-projects --cwd $stage
   if ($LASTEXITCODE -ne 0) { throw 'Deployment failed' }

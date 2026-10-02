@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fire acceptance</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:15px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:10px}button{padding:10px;margin:3px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}</style>
+<header>Shared fire — actual game renderer <button id="hero">Ground view</button><button id="god">RTS view</button><button id="fire">Fire start</button><button id="stop">Fire stop</button><button id="flask">Toss lit Emberdew</button><button id="fuel">Spill fuel ahead</button><button id="quench">Quench</button><div id="status"></div><div id="stats"></div><div id="error"></div></header><canvas id="world" aria-label="Fire review world"></canvas>
+<script type="module">
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {addFuel,quenchFire} from '../shared/fire.js';
+const $=id=>document.getElementById(id);let sim=createSimulation({room:'FIRE_REVIEW'}),seq=0,role='hero',contacts=0;
+sim.addPlayer({id:'hero',name:'Reviewer'});sim.addPlayer({id:'god',name:'God',role:'god'});
+let save=sim.checkpoint();save.players[0].position=[10,terrainHeight(save,10,8),8];save.players[0].tool='wyrmspout';sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,onAction:(action,extra)=>{const r=action==='projectileHit'?sim.projectileContact(extra):sim.command('hero',{type:'action',seq:++seq,action,...extra});if(action==='projectileHit'&&r.ok)contacts++;for(const e of r.events||[])game.handleEvent(e);$('status').textContent=JSON.stringify(r);},onInput:input=>sim.command('hero',{type:'input',seq:++seq,...input})});
+function publish(){game.applySnapshot(sim.snapshot(),role==='god'?'god':'hero');}
+publish();game.setRole('hero');game.setActive(true);game.lookByPixels(0,210);
+$('hero').onclick=()=>{role='hero';publish();game.setRole(role);};$('god').onclick=()=>{role='god';publish();game.setRole(role);game.centerView();};
+$('fire').onclick=()=>{game.equip('wyrmspout');game.primaryDown();};$('stop').onclick=()=>game.primaryUp();
+$('flask').onclick=()=>{game.equip('flask');if(!sim.snapshot().players[0].flaskLit)game.special();game.primaryDown();game.primaryUp();};
+$('fuel').onclick=()=>{const s=sim.checkpoint();addFuel(s,[10,0,5],1.8,.8);sim=loadSimulation(s);publish();};
+$('quench').onclick=()=>{const s=sim.checkpoint();quenchFire(s,[10,0,5],10);sim=loadSimulation(s);publish();};
+setInterval(()=>{for(const e of sim.step())game.handleEvent(e);publish();$('stats').textContent=`Contacts ${contacts} | Heat ${(sim.snapshot().players[0].heat*100).toFixed(0)}% | `+JSON.stringify(game.diagnostics());},1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>

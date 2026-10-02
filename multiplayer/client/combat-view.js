@@ -258,7 +258,10 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
   function projectile(kind) {
-    const visual = prepareProjectile(templates, kind);
+    // Flame tongues are pooled by the fire presentation; collision still sweeps
+    // the same complete authoritative trail, independently of this empty group.
+    if(kind==='flame')return new THREE.Group();
+    const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual); return group;

@@ -8,6 +8,8 @@ export const ASSET_POSES = Object.freeze({
   golem: {forward: [0, 0, 1], up: [0, 1, 0], pivot: 'feet', height: 2.2},
   crossbow: {forward: [0, 1, 0], up: [0, 0, 1], pivot: 'GripAnchor', height: 1, nativeScale: 1, tip: 'BoltSeat'},
   bow: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'Grip', height: 1.48, nativeScale: 1, tip: 'ArrowGuide'},
+  wyrmspout: {forward:[0,0,-1],up:[0,1,0],pivot:'GripAnchor',height:.4,nativeScale:1,tip:'Muzzle'},
+  flask: {forward:[0,0,-1],up:[0,1,0],pivot:[0,0,0],height:.18,nativeScale:1,tip:'Muzzle'},
   arrow: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'ArrowTip', height: .78, nativeScale: 1},
   wings: {forward: [0, 0, -1], up: [0, 1, 0], pivot: [0, 0, 0], height: .5, nativeScale: 1},
   // Generated Sunfall's crimson grip runs y=.03..38 and hammer face is X.
@@ -67,7 +69,7 @@ export function prepareAsset(template, name, height = ASSET_POSES[name]?.height)
 export function setWeaponGrip(visual, xr = false, tool = 'axe') {
   visual.position.set(0, 0, 0);
   visual.quaternion.copy(assetBasis(ASSET_POSES[tool]));
-  if (xr && !['crossbow', 'bow'].includes(tool)) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));
+  if (xr && !['crossbow', 'bow', 'wyrmspout', 'flask'].includes(tool)) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));
 }
 
 export function weaponTip(visual, tool, target = new THREE.Vector3()) {

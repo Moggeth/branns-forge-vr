@@ -147,7 +147,7 @@ function buildSettings() {
         guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1–6', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw'], ['E / B', 'Collect or eat / build bridge'],
+          ['1–8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw'], ['E / B', 'Collect or eat / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),
@@ -163,7 +163,7 @@ function buildSettings() {
           ['Swing melee weapon', 'Tip collision strikes the target'],
           ['Right trigger', 'Shoot crossbow; hold bow arrow, physically draw, release; throw a held bone'], ['Left trigger while bow drawn', 'Lock initial direction; move bow to set curve'], ['Trigger with melee weapon', 'Weapon special'],
           ['Primary face button (A/X)', 'Jump'],
-          ['Left squeeze', 'Cycle five weapons'],
+          ['Left squeeze', 'Cycle seven weapons'],
           ['Right squeeze', 'Grab or drop a bone; otherwise collect / eat'],
           ['Right stick click', 'Build bridge (3 wood)'],
           ['Secondary face button (B/Y)', 'Exit VR and open Menu'],
@@ -172,7 +172,7 @@ function buildSettings() {
           ['In a world', 'Switch role, copy code or invite, download a backup, reset (host, with confirmation), leave'],
           ['Lobby', 'Import or resume a save, create or join a world'],
         ]),
-        el('p', { class: 'hint mui-guide-note', text: 'Browser preview: basic movement, swings and spells only — no weapon inventory from the full game.' }),
+        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to breathe fire; Special vents after releasing. Emberdew: Attack tosses fuel; Special toggles its wick. Left trigger performs these specials in VR.' }),
       ]),
     ]),
   ]);

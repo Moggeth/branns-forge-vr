@@ -1,3 +1,4 @@
+import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
@@ -62,7 +63,7 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts].map(x=>x.id);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[])].map(x=>x.id);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
 function damageEnemy(state, enemy, amount, events) {
@@ -83,11 +84,12 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
   return {version: 1, contentVersion: 3, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits(), pickups: [
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    projectiles: [], embeds: [], detachedParts: [], pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], pendingStarfalls: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
-  const combatContext={nextId,terrainHeight};
+  const fireContext={nextId,terrainHeight,damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
+  const combatContext={nextId,terrainHeight,fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext)};
   const player = id => state.players.find(p => p.id === id);
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
@@ -235,6 +237,8 @@ function instantiate(state) {
       if (spell === 'skeleton'||spell==='golem') state.enemies.push(createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'));
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-BOUND,BOUND),sz=clamp(z+(i<2?-1:1)*1.4,-BOUND,BOUND);state.enemies.push(createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]));}
       if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+      if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
+      if(spell==='lightning')applyHeat(state,at,3,1,fireContext);
       if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
       if(spell==='lightning')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=3)damageEnemy(state,enemy,80,events);
       if(spell==='frost')for(const enemy of state.enemies)if(distance(enemy.position,at)<=7)enemy.slowUntil=state.tick+300;
@@ -276,6 +280,7 @@ function instantiate(state) {
         for (const p of state.players) if (p.role === 'hero' && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
         if (state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+        addFuel(state,at,2,.35,true);applyHeat(state,at,5,1,fireContext);
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
@@ -316,17 +321,19 @@ function instantiate(state) {
         }
       }
       stepCombat(state,combatContext,events);
+      stepFire(state,fireContext,events);
       return events;
     },
     projectileContact(message){return projectileContact(state,message,combatContext);},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, position, yaw, hp, mana, tool, resources, head, hands}) =>
-          ({id, name, role, position, yaw, hp, mana, tool, resources, ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, head, hands}) =>
+          ({id, name, role, position, yaw, hp, mana, tool, resources, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit, ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
-        contentVersion: 3, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
+        fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,
+        contentVersion: 4, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
   };
@@ -414,9 +421,10 @@ export function loadSimulation(saved) {
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy, inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
+    heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, hurtTick,kind,parts,missingParts,slowUntil,armor}) => ({id, position, yaw, hp, attackTick,kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
-  Object.assign(state,restoreCombat(saved));
+  Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   state.edits = copy(saved.edits); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);
   state.harvestedTrees = harvested.map(({id,cuts,cutHeight,felledTick,fallYaw})=>({id,cuts,cutHeight,felledTick,fallYaw}));
