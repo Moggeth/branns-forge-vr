@@ -256,8 +256,8 @@ test('runtime wiring: panel guard runs first and lobby mirrors expeditionAction'
   const fs = await import('node:fs');
   const read = p => fs.readFileSync(new URL(p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const game = read('../client/game.js'), lobby = read('../lobby.js');
-  assert.match(game, /'selectstart', \(\) => \{\n\s+if \(adventurePanel\.handleSelectStart\(i\)\) return;\n\s+if \(!active\) return;/);
-  assert.match(game, /'selectend',\(\)=>\{if\(adventurePanel\.handleSelectEnd\(i\)\)return;/);
+  assert.match(game, /if \(adventurePanel\.handleSelectStart\(i\)\) \{ presses\.begin\(i, 'panel'\); return; \}\n\s+if \(!active\) return;/);
+  assert.match(game, /'selectend',\(\)=>\{const press=presses\.end\(i\);if\(press\?\.owner==='panel'\)adventurePanel\.handleSelectEnd\(i\);/);
   assert.match(game, /movement\(\);\n\s+if \(renderer\.xr\.isPresenting\) adventurePanel\.tick\(renderer\.xr\.getCamera\(\), \{suppressed: !active \|\| role !== 'hero'\}\);/);
   assert.match(game, /'sessionend', \(\) => \{ clearInput\(\); adventurePanel\.endSession\(\);/);
   const panelSource = read('../client/vr-adventure-panel.js');

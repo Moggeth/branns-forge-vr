@@ -15,6 +15,7 @@ import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createVRAdventurePanel} from './vr-adventure-panel.js';
+import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} from './vr-input-policy.js';
 import {createExpeditionPresentation} from './expedition-presentation.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
@@ -138,25 +139,39 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Hero Expedition panel above the off-hand wrist. Trigger presses aimed at it are consumed before weapons see them.
   const adventurePanel = createVRAdventurePanel({parent: scene, controllers, grips, sources: controllerSources, onAction: action => onExpeditionAction(action)});
+  // Each trigger press belongs to whoever took its selectstart (panel, weapon, special, throw or cast); selectend and
+  // controller loss return to that owner, so a release can never be dropped or fire with another hand/tool.
+  const presses = createPressRouter();
+  const holdingLoose = () => [...(snapshot.detachedParts||[]),...(snapshot.looseLogs||[])].some(p=>p.heldBy===playerId);
   for (let i = 0; i < 2; i++) {
     rig.add(controllers[i], grips[i]);
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc2a17b }));
     grips[i].add(hand);
     const beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -3)]), new THREE.LineBasicMaterial({ color: 0xefcd83, transparent: true, opacity: 0.45 }));
     controllers[i].add(beam);
-    listen(controllers[i], 'connected', event => { controllerSources.set(i, event.data); attachWeapon(); });
-    listen(controllers[i], 'disconnected', () => { controllerSources.delete(i); attachWeapon(); });
+    // Buttons already held at (re)connect are latched, so reconnecting while holding B/Y or grip fires nothing.
+    listen(controllers[i], 'connected', event => { controllerSources.set(i, event.data); xrButtons.set(i, buttonActions(event.data, {}, {active: false}).state); attachWeapon(); });
+    listen(controllers[i], 'disconnected', () => {
+      controllerSources.delete(i); xrButtons.delete(i);
+      const lost = presses.lose(i);
+      // A lost controller never fires a half-drawn bow or keeps a flame going; a panel press clears without activating.
+      if (lost?.owner === 'primary') { weapons.cancel(); presses.invalidate(); }
+      if (lost?.owner === 'panel') adventurePanel.handleSelectEnd(i);
+      attachWeapon();
+    });
     listen(controllers[i], 'selectstart', () => {
       if (active) unlockAudio();
-      if (adventurePanel.handleSelectStart(i)) return;
+      if (adventurePanel.handleSelectStart(i)) { presses.begin(i, 'panel'); return; }
       if (!active) return;
       if (role === 'hero') {
-        const hand=controllerSources.get(i)?.handedness;
-        if(hand==='right'&&[...(snapshot.detachedParts||[]),...(snapshot.looseLogs||[])].some(p=>p.heldBy===playerId))release(true);
-        else if(['bow','wyrmspout','flask'].includes(tool)&&hand==='left')weapons.special();
+        const kind = triggerRole({tool, hand: controllerSources.get(i)?.handedness, sources: controllerSources, holding: holdingLoose()});
+        if (presses.begin(i, kind, tool)?.owner === 'primary') weapons.cancel(); // missed selectend: drop, never fire late
+        if (kind === 'throw') release(true, i);
+        else if (kind === 'special') weapons.special();
         else primaryDown();
       }
       else {
+        presses.begin(i, 'cast');
         controllers[i].getWorldPosition(raycaster.ray.origin);
         controllers[i].getWorldQuaternion(poseQuaternion);
         raycaster.ray.direction.set(0, 0, -1).applyQuaternion(poseQuaternion);
@@ -164,7 +179,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (hit) castAt(hit.point);
       }
     });
-    listen(controllers[i],'selectend',()=>{if(adventurePanel.handleSelectEnd(i))return;if(controllerSources.get(i)?.handedness!=='left')primaryUp();});
+    listen(controllers[i],'selectend',()=>{const press=presses.end(i);if(press?.owner==='panel')adventurePanel.handleSelectEnd(i);else if(press?.owner==='primary')primaryUp();});
   }
 
   function listen(target, type, handler, options) {
@@ -487,10 +502,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const model=weaponModels.get(next);if(!model)return;
     axeModel?.removeFromParent();tool=next;axeModel=model;weaponAnchor.remove(axePlaceholder);attachWeapon();
   }
-  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
-  function weaponAim(){
+  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
+  // VR aim comes from the controller that actually holds the weapon (or that made this grab/throw press), never an
+  // assumed hand or index 0; with no usable controller it falls back to the head.
+  function weaponAim(pressIndex){
     camera.updateWorldMatrix(true,false);const origin=new THREE.Vector3(),direction=new THREE.Vector3();
-    if(renderer.xr.isPresenting){const hand=tool==='bow'?'left':'right';const index=[...controllerSources.entries()].find(([,s])=>s.handedness===hand)?.[0]??0;controllers[index].getWorldPosition(origin);controllers[index].getWorldDirection(direction).negate();}
+    const index=renderer.xr.isPresenting?aimIndex({purpose:pressIndex===undefined?'weapon':'press',tool,sources:controllerSources,weaponHand,pressIndex}):null;
+    if(index!==null&&controllers[index]){controllers[index].getWorldPosition(origin);controllers[index].getWorldDirection(direction).negate();}
     else {camera.getWorldPosition(origin);camera.getWorldDirection(direction);}
     return {origin:origin.toArray(),direction:direction.normalize().toArray()};
   }
@@ -537,8 +555,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function primaryDown(){if(!active||role!=='hero')return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function primaryUp(){if(active&&role==='hero')weapons.end();}
-  function grab(){if(!active||role!=='hero')return;const aim=weaponAim();const id=content.grabTarget?.(aim.origin,aim.direction,3)||combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
-  function release(throwIt=false){if(active&&role==='hero')onAction('release',{throw:throwIt,direction:weaponAim().direction});}
+  function grab(pressIndex){if(!active||role!=='hero')return;const aim=weaponAim(pressIndex);const id=content.grabTarget?.(aim.origin,aim.direction,3)||combat.grabTarget?.(aim.origin,aim.direction,3);if(id)onAction('grab',{id});else onAction('interact');}
+  function release(throwIt=false,pressIndex){if(active&&role==='hero')onAction('release',{throw:throwIt,direction:weaponAim(pressIndex).direction});}
   function strike() {
     if(['crossbow','bow','wyrmspout','flask'].includes(tool)){primaryDown();return;}
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe;
@@ -553,7 +571,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
-    xrButtons.clear();
+    xrButtons.clear(); presses.clear();
     // Repeated cleanup after setActive(false) must retain the queued stop packet.
     if (active) {
       clearTimeout(zeroInputTimer);
@@ -631,19 +649,21 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const xrCamera = renderer.xr.getCamera();
       xrCamera.getWorldDirection(forward);
       yaw = Math.atan2(-forward.x, -forward.z);
+      // Edge mapping lives in vr-input-policy.js buttonActions (docs/VR-CONTROLS.md); grab/drop aim from the gripping hand.
       for (const [index, source] of controllerSources) {
-        const pressed = source.gamepad?.buttons[4]?.pressed || false;
-        const menu = source.gamepad?.buttons[5]?.pressed || false;
-        const previous = xrButtons.get(index) || {};
-        if (active && pressed && !previous.jump && role === 'hero') jumpPending = true;
-        if (active && menu && !previous.menu) { void renderer.xr.getSession()?.end().then(onMenu); }
-        const squeeze=source.gamepad?.buttons[1]?.pressed||false,stick=source.gamepad?.buttons[3]?.pressed||false;
-        if(active&&squeeze&&!previous.squeeze&&role==='hero'){if(source.handedness==='left')equip((()=>{const choices=equipment.filter(t=>t!=='limb');return choices[(choices.indexOf(tool)+1)%choices.length];})());else {const held=[...(snapshot.detachedParts||[]),...(snapshot.looseLogs||[])].some(p=>p.heldBy===playerId);if(held)release();else grab();}}
-        if(active&&stick&&!previous.stick&&source.handedness==='right'&&role==='hero')onAction('buildBridge');
-        xrButtons.set(index, {jump: pressed, menu, squeeze, stick});
+        const {state, actions} = buttonActions(source, xrButtons.get(index), {active, hero: role === 'hero'});
+        xrButtons.set(index, state);
+        for (const action of actions) {
+          if (action === 'menu') { weapons.cancel(); presses.invalidate(); void renderer.xr.getSession()?.end().then(onMenu); }
+          else if (action === 'jump') jumpPending = true;
+          else if (action === 'cycle') { const choices=equipment.filter(t=>t!=='limb'); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
+          else if (action === 'hand') { if (holdingLoose()) release(false, index); else grab(index); }
+          else if (action === 'bridge') onAction('buildBridge');
+          else if (action === 'interact') onAction('interact');
+        }
       }
-      for (const source of controllerSources.values()) if (source.gamepad && source.handedness !== 'right') {
-        const axes = source.gamepad.axes;
+      for (const index of moveIndexes(controllerSources)) {
+        const axes = controllerSources.get(index).gamepad.axes;
         const sx = axes.length >= 4 ? axes[2] : axes[0] || 0;
         const sz = axes.length >= 4 ? axes[3] : axes[1] || 0;
         axisX += Math.abs(sx) > 0.14 ? sx : 0;
