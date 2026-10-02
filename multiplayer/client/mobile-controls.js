@@ -1,5 +1,5 @@
 import {createMobileUI} from './mobile-ui.js';
-import {bindStick, bindWorldTouch} from './touch-input.js';
+import {bindStick, bindWorldTouch, bindTouchButton} from './touch-input.js';
 
 export function createMobileControls({game, canvas, onMenu, notify, onChange = () => {}}) {
   const ui = createMobileUI(), cleanups = [];
@@ -19,8 +19,10 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   const sticks = ['left','right'].map(side => bindStick(ui[side+'Stick'], (x,y) => {
     ui.setStick(side,x,y); game.setTouchAxes(side,x*(side==='right'?sensitivity:1),y*(side==='right'?sensitivity:1));
   }, () => enabled && state.active && !state.xr));
+  const actionPointers=new Map();
+  const actionButtons=[...document.querySelectorAll('[data-equip],[data-spell],#special,#grab,#drop,#throw,#collect,#bridge')].map(b=>bindTouchButton(b,()=>enabled&&state.active&&!state.xr));
   const worldTouch = bindWorldTouch(canvas,game,{enabled:()=>enabled&&state.active&&!state.xr, role:()=>state.role, sensitivity:()=>sensitivity,onTarget:valid=>{target=valid;render();}});
-  function reset() {attackPointer=null;sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
+  function reset() {actionButtons.forEach(b=>b.reset());actionPointers.clear();attackPointer=null;sticks.forEach(s=>s.reset());worldTouch.reset();game.clearControls();}
   function fullscreenElement() {return document.fullscreenElement || document.webkitFullscreenElement;}
   function fullscreenSupported() {return !!((document.fullscreenEnabled && document.documentElement.requestFullscreen) || (document.webkitFullscreenEnabled && document.documentElement.webkitRequestFullscreen));}
   function render() {
@@ -29,7 +31,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     document.body.classList.toggle('touch-left-handed',leftHanded);
     ui.root.classList.toggle('is-left-handed',leftHanded);
     game.setTouchEnabled(enabled && !state.xr);
-    ui.setState({visible:enabled&&state.active&&!state.xr,role:state.role,fullscreen:!!fullscreenElement(),fullscreenSupported:fullscreenSupported(),standalone:app.matches||!!navigator.standalone,targeting:target,leftHanded});
+    ui.setState({visible:enabled&&state.active&&!state.xr,role:state.role,fullscreen:!!fullscreenElement(),fullscreenSupported:fullscreenSupported(),standalone:app.matches||!!navigator.standalone,targeting:target,leftHanded,quickCast:game.touchCastState?.().quick||false});
     displayStatus.textContent = fullscreenError; displayStatus.hidden = !fullscreenError;
     onChange(enabled);
   }
@@ -59,8 +61,15 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   let attackPointer=null;
   listen(ui.root,'pointerdown',event=>{const button=event.target.closest('[data-touch-action="strike"]');if(!button||!state.active||state.xr||attackPointer!==null)return;event.preventDefault();attackPointer=event.pointerId;button.setPointerCapture(event.pointerId);game.primaryDown();});
   listen(ui.root,'pointerup',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.primaryUp();}});
+  listen(ui.root,'lostpointercapture',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.clearControls();}});
   listen(ui.root,'pointercancel',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.clearControls();}});
-  listen(ui.root,'click',action);listen(ui.settings,'click',action);
+  // Own a button for the whole gesture: snapshot-driven label updates must not eat touch clicks.
+  for(const surface of [ui.root,ui.settings]){
+    listen(surface,'pointerdown',event=>{const button=event.target.closest('[data-touch-action]');if(!button||button.disabled||button.dataset.touchAction==='strike'||event.button!==0)return;event.preventDefault();actionPointers.set(event.pointerId,button);button.setPointerCapture?.(event.pointerId);});
+    listen(surface,'pointerup',event=>{const button=actionPointers.get(event.pointerId);if(!button)return;actionPointers.delete(event.pointerId);const r=button.getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)action({target:button,detail:1});if(button.hasPointerCapture?.(event.pointerId))button.releasePointerCapture(event.pointerId);});
+    for(const name of ['pointercancel','lostpointercapture'])listen(surface,name,event=>actionPointers.delete(event.pointerId));
+    listen(surface,'click',event=>{if(event.detail===0)action(event);});
+  }
   listen(modeInput,'change',()=>{reset();mode=modeInput.value;save('mode',mode);render();});
   listen(sensitivityInput,'input',()=>{sensitivity=Number(sensitivityInput.value);save('sensitivity',String(sensitivity));});
   listen(handInput,'change',()=>{reset();leftHanded=handInput.checked;save('leftHanded',String(leftHanded));render();});
@@ -69,5 +78,5 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   listen(document,'visibilitychange',()=>{if(document.hidden)reset();});
   listen(document,'fullscreenchange',()=>{reset();render();});listen(document,'webkitfullscreenchange',()=>{reset();render();});
   render();
-  return {get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());ui.destroy();}};
+  return {get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();actionButtons.forEach(b=>b.dispose());sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());ui.destroy();}};
 }

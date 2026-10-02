@@ -601,9 +601,10 @@ function renderTech() {
 $('techDetails').addEventListener('toggle', renderTech);
 
 // ---------------------------------------------------------------- spells
+function updateSpellHint(){const spec=SPELLS.find(s=>s.id===spell);if(!spec)return;const quick=$('quickCast')?.checked;setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?(quick?'Drag to cast; or tap two ends':'Drag to aim; touch Cast confirms'):(quick?'Tap ground to cast':'Aim, then cast')}`);}
 function chooseSpell(next) {
   spell = next;
-  const spec=SPELLS.find(s=>s.id===next);if($('spellHint')&&spec)setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?'Drag a line; on touch, Cast start then Cast end':'Aim, then cast'}`);
+  updateSpellHint();
   try { game?.setSpell(next); } catch (error) { recordProblem(error); }
   for (const button of document.querySelectorAll('[data-spell]')) {const selected=button.dataset.spell===next;button.setAttribute('aria-checked',String(selected));button.tabIndex=selected?0:-1;}
 }
@@ -620,7 +621,7 @@ $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
 for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
 $('throw')?.addEventListener('click',()=>{game?.release(true);$('throw').blur();});
-$('quickCast')?.addEventListener('change',()=>game?.setQuickCast($('quickCast').checked));
+$('quickCast')?.addEventListener('change',()=>{game?.setQuickCast($('quickCast').checked);updateSpellHint();mobile?.update({active:phase==='game'&&connected&&!menuOpen,role:currentRole,xr:xrActive});});
 releaseFocusAfterPointer($('quickCast'));
 // ---------------------------------------------------------------- keyboard & pointer
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));

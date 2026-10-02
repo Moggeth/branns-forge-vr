@@ -34,36 +34,61 @@ export function bindStick(element, onValue, enabled = () => true) {
 export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarget = () => {}}) {
   const points = new Map(), handlers = [];
   let pinch = null;
-  const on = (name, handler) => {canvas.addEventListener(name, handler, {passive: false}); handlers.push([name, handler]);};
-  const span = () => {const p = [...points.values()]; return p.length === 2 ? Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y) : null;};
+  const on = (name, fn) => {canvas.addEventListener(name, fn, {passive:false}); handlers.push([name,fn]);};
+  const span = () => {const p=[...points.values()];return p.length===2?Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y):null;};
+  const current = () => game.touchCastState?.() || {line:false,quick:false,revision:0};
+  const valid = p => enabled() && role()===p.role && current().revision===p.cast.revision;
+  const onWorld = e => !canvas.ownerDocument?.elementFromPoint || canvas.ownerDocument.elementFromPoint(e.clientX,e.clientY)===canvas;
+  function cancelLine() { if ([...points.values()].some(p=>p.lineStarted)) game.cancelAim?.(); }
   function reset() {
-    const ids = [...points.keys()]; points.clear(); pinch = null;
-    for (const id of ids) if (canvas.hasPointerCapture?.(id)) canvas.releasePointerCapture(id);
+    cancelLine(); const ids=[...points.keys()];points.clear();pinch=null;
+    for(const id of ids)if(canvas.hasPointerCapture?.(id))canvas.releasePointerCapture(id);
   }
-  on('pointerdown', event => {
-    if (!enabled() || event.pointerType === 'mouse' || points.size >= 2) return;
-    event.preventDefault();
-    points.set(event.pointerId, {x:event.clientX, y:event.clientY, startX:event.clientX, startY:event.clientY, moved:false});
-    canvas.setPointerCapture?.(event.pointerId);
-    if (points.size > 1) {for (const p of points.values()) p.moved = true; pinch = span();}
+  on('pointerdown', e => {
+    if(!enabled()||e.pointerType==='mouse'||points.size>=2)return;
+    e.preventDefault();
+    const p={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false,blocked:false,role:role(),cast:current()};
+    points.set(e.pointerId,p);canvas.setPointerCapture?.(e.pointerId);
+    if(points.size===2){cancelLine();for(const q of points.values()){q.blocked=true;q.moved=true;}pinch=span();return;}
+    if(p.role==='god'&&p.cast.line){
+      p.hadStart=!!p.cast.start; p.lineStarted=game.aimAt(e.clientX,e.clientY);
+      if(p.lineStarted){game.beginAimLine();onTarget(true);}else p.blocked=true;
+    }
   });
-  on('pointermove', event => {
-    const p = points.get(event.pointerId); if (!p) return;
-    event.preventDefault();
-    const dx = event.clientX-p.x, dy = event.clientY-p.y;
-    p.x = event.clientX; p.y = event.clientY;
-    if (Math.hypot(p.x-p.startX,p.y-p.startY) > 8) p.moved = true;
-    if (points.size === 2) {
-      const next = span();
-      if (role() === 'god' && pinch !== null) game.zoomBy((pinch-next)*0.07);
-      pinch = next;
-    } else if (p.moved) game.lookByPixels(dx*sensitivity(), dy*sensitivity());
+  on('pointermove', e => {
+    const p=points.get(e.pointerId);if(!p)return;e.preventDefault();
+    if(!enabled()||role()!==p.role){reset();return;}
+    const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+    if(Math.hypot(p.x-p.startX,p.y-p.startY)>8)p.moved=true;
+    if(points.size===2){const next=span();if(role()==='god'&&pinch!==null)game.zoomBy((pinch-next)*.07);pinch=next;return;}
+    if(p.blocked)return;
+    if(!valid(p)){p.blocked=true;return;}
+    if(p.role==='god'&&p.cast.line){onTarget(game.aimAt(p.x,p.y));return;}
+    if(p.moved)game.lookByPixels(dx*sensitivity(),dy*sensitivity());
   });
-  for (const name of ['pointerup','pointercancel','lostpointercapture']) on(name, event => {
-    const p = points.get(event.pointerId); if (!p) return;
-    points.delete(event.pointerId); pinch = null;
-    if (name === 'pointerup' && !p.moved && role() === 'god' && enabled()) onTarget(game.aimAt(event.clientX,event.clientY));
-    if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])on(name,e=>{
+    const p=points.get(e.pointerId);if(!p)return;e.preventDefault();
+    const accept=name==='pointerup'&&!p.blocked&&valid(p)&&onWorld(e);
+    points.delete(e.pointerId);pinch=null;
+    if(p.role==='god'){
+      if(accept&&(p.cast.line||!p.moved)){
+        const hit=game.aimAt(e.clientX,e.clientY);onTarget(hit);
+        if(hit&&p.cast.quick&&(!p.cast.line||p.moved||p.hadStart))game.castAim();
+        else if(!hit&&p.lineStarted)game.cancelAim?.();
+      }else if(p.lineStarted)game.cancelAim?.();
+    }
+    if(canvas.hasPointerCapture?.(e.pointerId))canvas.releasePointerCapture(e.pointerId);
   });
-  return {reset, dispose() {reset(); for(const [name,fn] of handlers) canvas.removeEventListener(name,fn);}};
+  return {reset,dispose(){reset();for(const [name,fn]of handlers)canvas.removeEventListener(name,fn);}};
+}
+// Native compatibility clicks are only reliable for the primary finger. Route touch/pen button presses explicitly,
+// keeping keyboard and mouse clicks intact, so the other thumb can use Special while Attack remains held.
+export function bindTouchButton(button, enabled = () => true) {
+ const held=new Set(),handlers=[];let activatedAt=-Infinity;
+ const on=(name,fn,capture=false)=>{button.addEventListener(name,fn,capture);handlers.push([name,fn,capture]);};
+ on('pointerdown',e=>{if(!enabled()||e.pointerType==='mouse'||button.disabled)return;e.preventDefault();held.add(e.pointerId);button.setPointerCapture?.(e.pointerId);});
+ on('pointerup',e=>{if(!held.delete(e.pointerId))return;e.preventDefault();const r=button.getBoundingClientRect();if(enabled()&&e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){activatedAt=performance.now();button.click();}if(button.hasPointerCapture?.(e.pointerId))button.releasePointerCapture(e.pointerId);});
+ for(const name of ['pointercancel','lostpointercapture'])on(name,e=>held.delete(e.pointerId));
+ on('click',e=>{if(e.detail>0&&performance.now()-activatedAt<500){e.preventDefault();e.stopImmediatePropagation();}},true);
+ return {reset(){held.clear();},dispose(){held.clear();for(const [name,fn,capture]of handlers)button.removeEventListener(name,fn,capture);}};
 }

@@ -299,3 +299,5 @@ body.touch-controls-active #heroTools { min-width: 0; }
 @media (orientation: landscape) {
   body.touch-controls-active .bf-actions { grid-template-columns: repeat(3, minmax(86px, 1fr)); width: min(320px, calc(100vw - 48px)); }
 }
+
+.mui-btn[hidden] { display: none !important; }

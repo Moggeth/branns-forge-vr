@@ -42,7 +42,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let previous = performance.now(), sentAt = -Infinity, snapshotAt = 0, initialized = false, swingAt = -Infinity;
   let terrainSignature = '', rightDrag = false, orbitYaw = 0.2, orbitRadius = 38, orbitTilt = 0.9;
   let zeroInputTimer = null;
-  let castStart=null,quickCast=false,quickKey=null;
+  let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
   const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
@@ -469,12 +469,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return hit;
   }
   function isLineSpell(){return spell==='sunder'||spell==='wall';}
-  function cancelCast() { castStart = null; quickKey = null; }
+  function cancelCast() { castStart = null; quickKey = null; castRevision++; }
   function castAt(point,finish=false) {
     if (!active || role !== 'god') return;
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
     const at=[x,terrainHeight(x,z,snapshot.edits),z];
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
+    if(castStart){const length=castStart.distanceTo(new THREE.Vector3(...at));if(length<.5||length>18){report('Draw a line between 0.5 and 18 metres.');return;}}
     const extra=castStart?{start:castStart.toArray(),end:at}:{};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {
@@ -611,7 +612,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
-    weapons.cancel();feedback.reset();updateFireAudio(false);castStart=null;quickKey=null;
+    weapons.cancel();feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -659,6 +660,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
   });
   listen(window,'pointerup',event=>{
+    if(event.pointerType!=='mouse')return; // touch buttons own their press/release; another finger must not release a held bow
     rightDrag=false;
     if(event.button===0){
       if(role==='hero')primaryUp();
@@ -807,7 +809,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     updateEnemyMotion(actors,{tick:(snapshot.tick||0)+Math.min(0.3,(now-snapshotAt)/1000)*60,dt,height:enemyGround});
     tickPhysicalMelee(now,dt);
     combat.tick(dt,isHost());
-    spellVisual.setTarget(active&&role==='god'&&cursor.visible?{spell,point:hitPoint.toArray(),start:castStart?.toArray(),end:castStart?hitPoint.toArray():undefined,valid:Math.abs(hitPoint.x)<=55&&Math.abs(hitPoint.z)<=55&&(snapshot.players.find(p=>p.id===playerId)?.mana??100)>=(SPELLS.find(s=>s.id===spell)?.cost??0)}:null);
+    spellVisual.setTarget(active&&role==='god'&&cursor.visible?{spell,point:hitPoint.toArray(),start:castStart?.toArray(),end:castStart?hitPoint.toArray():undefined,valid:(!castStart||(castStart.distanceTo(hitPoint)>=.5&&castStart.distanceTo(hitPoint)<=18))&&Math.abs(hitPoint.x)<=55&&Math.abs(hitPoint.z)<=55&&(snapshot.players.find(p=>p.id===playerId)?.mana??100)>=(SPELLS.find(s=>s.id===spell)?.cost??0)}:null);
     spellVisual.update(now,dt);
     const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
     for (const warning of warnings.values()) {
@@ -883,9 +885,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     aimAt(x, y) {
       if (!active || role !== 'god') return false;
       camera.updateMatrixWorld(); const hit = pointerHit({clientX:x, clientY:y});
-      fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; updateTouchAim(); return !!hit;
+      fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; if(hit)updateTouchAim();else cursor.visible=false; return !!hit;
     },
-    cancelAim() { fixedAim = null; aimTerrain = null; castStart=null;quickKey=null; if (active && role === 'god') updateTouchAim(); },
+    touchCastState() { return {line:isLineSpell(),quick:quickCast,revision:castRevision,start:!!castStart}; },
+    beginAimLine() { if(active&&role==='god'&&isLineSpell()&&!castStart&&cursor.visible)castStart=hitPoint.clone(); },
+    cancelAim() { fixedAim = null; aimTerrain = null; cancelCast(); if (active && role === 'god') updateTouchAim(); },
     castAim() { if (active && role === 'god' && updateTouchAim()) castAt(hitPoint); },
     centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
     jump() { if (active && role === 'hero') jumpPending = true; },
@@ -898,7 +902,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
     setExpeditionPointerHand(hand) { adventurePanel.setPointerHand(hand); },
-    controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null};},
+    controlsSnapshot() {return {yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');

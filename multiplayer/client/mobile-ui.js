@@ -140,8 +140,8 @@ function buildSettings() {
           ['Left stick', 'Pan'],
           ['Right stick', 'Orbit and tilt'],
           ['＋ / − or pinch', 'Zoom'],
-          ['Tap the world', 'Aim at that spot (does not cast)'],
-          ['Cast', 'Cast at aim; for a line, confirm the start and then the end'],
+          ['Tap the world', 'Quick cast: cast immediately. Otherwise set the aim, then press Cast.'],
+          ['Sunder / Wall', 'Drag a line (or tap its two ends). Quick cast fires on release; otherwise press Cast.'],
           ['Cancel', 'Clear the aim or a started line; return to centre aim'],
           ['Spell drawer', 'Choose one of fourteen spells'],
           ['Centre', 'Centre on your hero'],
@@ -241,7 +241,7 @@ export function createMobileUI({ mount = true } = {}) {
     mountSettings(settings);
   }
 
-  const state = { visible: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+  const state = { visible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
 
   function render() {
     const { visible, role, fullscreen, fullscreenSupported, standalone, targeting, leftHanded } = state;
@@ -257,6 +257,7 @@ export function createMobileUI({ mount = true } = {}) {
     leftStick._caption.textContent = god ? 'Pan' : 'Move';
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
+    cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';
     cast.setAttribute('aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');
     cancel.disabled = !god; // cancelAim() also clears a pending line start, which has no 'targeting' flag
