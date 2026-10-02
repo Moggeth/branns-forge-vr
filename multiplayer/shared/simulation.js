@@ -125,8 +125,10 @@ function instantiate(state) {
     command(id, message) {
       const p = player(id);
       if (p && message?.type === 'adventure') {
+        if (!safeSeq(message.seq)) return fail('invalid_sequence');
+        if (message.seq <= p.seq) return fail('duplicate_sequence');
+        p.seq = message.seq;
         const r = adventureAction(state.adventure, id, message, state);
-        if (safeSeq(message.seq) && message.seq > p.seq) p.seq = message.seq; // one monotonic sequence per player across sim and expedition
         if (!r.ok) return fail(r.code);
         applyAdventureIntents(state, r.intents, adventureContext); return ok(r.events);
       }
