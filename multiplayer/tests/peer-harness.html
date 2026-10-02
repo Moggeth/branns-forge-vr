@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brann multiplayer engineering harness</title>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body { display: flex; flex-direction: column; font: 14px sans-serif; }
+    header { padding: 8px; }
+    fieldset { margin: 4px 0; }
+    label, button { margin: 2px; }
+    canvas { display: block; width: 100%; min-height: 240px; flex: 1; }
+    #errors { color: #9c1515; white-space: pre-wrap; }
+    output { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+<header>
+  <strong>Brann’s Forge — multiplayer engineering preview</strong>
+  <fieldset>
+    <legend>Connection</legend>
+    <label>WebSocket <input id="endpoint" size="32" aria-label="WebSocket endpoint"></label>
+    <label>Name <input id="name" value="Tester" maxlength="24" size="12"></label>
+    <label>Room <input id="room" maxlength="32" size="20" autocomplete="off"></label>
+    <label>Role <select id="role"><option value="hero">Hero</option><option value="god">God</option></select></label>
+    <button id="create" type="button">Create room</button>
+    <button id="join" type="button">Join room</button>
+    <button id="continue" type="button" hidden>Continue world here</button>
+    <button id="resume" type="button">Resume last saved world</button>
+    <label>Import world <input id="import" type="file" accept=".json,application/json"></label>
+    <button id="reset" type="button">Reset world</button>
+    <button id="retry" type="button" hidden>Try hosting recovery</button>
+    <button id="save" type="button">Download recovery save</button>
+    <button id="disconnect" type="button" disabled>Disconnect</button>
+    <a id="roomLink" hidden target="_blank" rel="noopener">Open this room in another tab</a>
+  </fieldset>
+  <fieldset>
+    <legend>Controls</legend>
+    <button id="active" type="button" disabled>Deactivate controls</button>
+    <button id="capture" type="button" disabled>Capture mouse</button>
+    <span>God spell:</span>
+    <button type="button" data-spell="skeleton" aria-pressed="true">Skeleton</button>
+    <button type="button" data-spell="raise" aria-pressed="false">Raise</button>
+    <button type="button" data-spell="grove" aria-pressed="false">Grove</button>
+    <button type="button" data-spell="starfall" aria-pressed="false">Starfall</button>
+    <button id="vr" type="button" disabled>Enter VR</button>
+    <output id="vrStatus">Checking WebXR support…</output>
+  </fieldset>
+  <div>Early playtest: 8 players, browser-hosted world. Your PC connection service must stay online. FPS + VR Heroes / RTS Gods. Desktop hosting recommended. Hero: click canvas to capture, WASD / arrows walk, Space jump, click strike, Esc release. God: WASD pan, right-drag orbit, wheel zoom, click ground to cast.</div>
+  <div>Network: <output id="connectionStatus">disconnected</output> · Renderer: <output id="rendererStatus">starting</output></div>
+  <div><output id="metrics">No snapshot yet.</output></div>
+  <div>Last event: <output id="event">none</output></div>
+  <div id="errors" role="alert"></div>
+</header>
+<canvas id="world" aria-label="Multiplayer world"></canvas>
+<script type="module">
+  import { createGame } from '../client/game.js';
+  import { WorldSession } from '../client/session.js';
+  import {WorldSaves,parseSave} from '../client/world-saves.js';
+
+  const element = id => document.getElementById(id);
+  const canvas = element('world');
+  const parameters = new URLSearchParams(location.search);
+  element('room').value = parameters.get('room') || '';
+  const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  element('endpoint').value = import.meta.env.VITE_PEER_WS_URL || `${wsProtocol}//${location.hostname}${location.port === '5178' ? ':8789' : location.port ? ':' + location.port : ''}/peer/ws`;
+  let connection = null, game = null, playerId = null, connected = false, controlsActive = true, appliedRole = null;
+  let lastSnapshot = null, lastEvent = null, snapshots = 0, inputs = 0, vrSupported = false;
+  const showError = message => { element('errors').textContent = String(message); };
+  window.addEventListener('error', event => showError(event.message));
+  window.addEventListener('unhandledrejection', event => showError(event.reason?.message || event.reason));
+
+  function updateButtons() {
+    element('disconnect').disabled = !connection;
+    element('active').disabled = !connected;
+    element('capture').disabled = !connected || !controlsActive || element('role').value !== 'hero';
+    element('vr').disabled = !connected || !vrSupported;
+    element('active').textContent = controlsActive ? 'Deactivate controls' : 'Activate controls';
+    for (const button of document.querySelectorAll('[data-spell]')) button.disabled = !connected || element('role').value !== 'god';
+  }
+  function receiveSnapshot(snapshot) {
+    lastSnapshot = snapshot;
+    snapshots++;
+    const self = snapshot.players.find(player => player.id === playerId);
+    if (self) {
+      element('role').value = self.role;
+      connection.identity.role = self.role;
+      updateButtons();
+    }
+    if (self && self.role !== appliedRole) {
+      appliedRole = self.role;
+      game.setRole(self.role);
+    }
+    game.applySnapshot(snapshot, playerId);
+    const position = self?.position.map(value => Number(value).toFixed(2)).join(', ') || 'unknown';
+    element('metrics').textContent = `tick ${snapshot.tick} | players ${snapshot.players.length}/${snapshot.maxPlayers} | enemies ${snapshot.enemies.length} | edits ${snapshot.edits.length} | groves ${snapshot.groves.length} | self ${position} | HP ${Math.round(self?.hp || 0)} | mana ${Math.round(self?.mana || 0)} | snapshots ${snapshots} | inputs sent ${inputs}`;
+  }
+  function disconnect() {
+    game?.setActive(false);
+    connection?.dispose(); connection = null;
+    connected = false; playerId = null;
+    element('connectionStatus').textContent = 'disconnected';
+    updateButtons();
+  }
+  function connect(create, save = null) {
+    if (!game) return;
+    disconnect();
+    const room = create ? '' : element('room').value.trim();
+    if (!create && !room) { showError('Enter a room code to join.'); return; }
+    let endpoint;
+    try { endpoint = new URL(element('endpoint').value); if (!['ws:', 'wss:'].includes(endpoint.protocol)) throw Error(); }
+    catch { showError('Enter a valid ws:// or wss:// endpoint.'); return; }
+    showError('');
+    snapshots = 0; inputs = 0; appliedRole = null; controlsActive = true;
+    const next = connection = new WorldSession({url:endpoint.href});
+    next.addEventListener('welcome', ({detail}) => {
+      if (connection !== next) return;
+      playerId = detail.peerId;
+      element('room').value = detail.room;
+      const url = new URL(location.href);
+      url.search = ''; url.searchParams.set('room', detail.room);
+      history.replaceState(null, '', url);
+      element('roomLink').href = url.href;
+      element('roomLink').hidden = false;
+      // RoomConnection emits its snapshot separately, after this welcome.
+    });
+    next.addEventListener('status', ({detail}) => {
+      if (connection !== next) return;
+      connected = ['connected','hosting'].includes(detail.state);
+      element('connectionStatus').textContent = detail.state; if(connected)showError('');
+      game.setActive(connected && controlsActive);
+      updateButtons();
+    });
+    next.addEventListener('continue_world_offer', () => { element('continue').hidden = false; });
+    next.addEventListener('continue_offer_expired', () => { element('continue').hidden=true; });
+    next.addEventListener('world_waiting', () => { element('continue').hidden=true; element('retry').hidden=false; });
+    next.addEventListener('peer_connection_state', ({detail}) => { if(detail.state==='failed') showError('Direct connection failed. This network may need a TURN relay, which is not configured for this preview.'); });
+    next.addEventListener('owner_lost', () => showError('Host left. Recovery checkpoint preserved.'));
+    next.addEventListener('snapshot', ({detail}) => { if (connection === next) receiveSnapshot(detail); });
+    next.addEventListener('error', ({detail}) => { if (connection === next) showError(`${detail.code}: ${detail.message}`); });
+    next.addEventListener('event', ({detail}) => {
+      if (connection !== next) return;
+      lastEvent = {kind: detail.kind, id: detail.id, position: detail.position};
+      element('event').textContent = `${detail.kind} at ${(detail.position || []).map(value => Number(value).toFixed(1)).join(', ')}`;
+    });
+    try {next.connect({save, room, name: element('name').value.trim() || 'Tester', role: element('role').value, desktop:!(/OculusBrowser|Quest|Mobile/i.test(navigator.userAgent))});} catch(error) {showError(error.message);}
+    updateButtons();
+  }
+  try {
+    game = createGame({
+      canvas,
+      onAction: action => connection?.command('action', {action}),
+      onCast: (spell, point) => connection?.command('cast', {spell, point}),
+      onInput: input => { if (connection?.command('input', input)) inputs++; },
+      onStatus: status => { element('rendererStatus').textContent = status; },
+    });
+    game.canVR().then(supported => {
+      vrSupported = supported;
+      element('vrStatus').textContent = supported ? 'Immersive WebXR available.' : 'Immersive WebXR unavailable in this browser. Use HTTPS and a supported headset.';
+      updateButtons();
+    });
+  } catch (error) { showError(`Renderer startup failed: ${error.message}`); }
+
+  element('continue').onclick = () => { connection?.continueWorld(); element('continue').hidden=true; };
+  element('save').onclick = () => { try {const blob=new Blob([JSON.stringify(connection.exportSave())],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='branns-world.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch(error){showError(error.message);} };
+  element('resume').onclick=()=>{try{const save=new WorldSaves().list()[0];if(!save)throw Error('No saved world in this browser yet.');connect(true,save);}catch(error){showError(error.message);}};
+  element('import').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw Error('World file must be smaller than 2 MB.');connect(true,parseSave(await file.text()));}catch(error){showError(error.message);}};
+  element('reset').onclick=()=>{if(confirm('Reset this world? A recovery copy will be saved first.'))try{connection?.resetWorld();}catch(error){showError(error.message);}};
+  element('retry').onclick=()=>{connection?.retryWorld();element('retry').hidden=true;};
+  element('create').addEventListener('click', () => connect(true));
+  element('join').addEventListener('click', () => connect(false));
+  element('disconnect').addEventListener('click', disconnect);
+  element('role').addEventListener('change', () => { if (connected) connection.command('role',{role:element('role').value}); updateButtons(); });
+  element('active').addEventListener('click', () => { controlsActive = !controlsActive; game?.setActive(connected && controlsActive); updateButtons(); });
+  element('capture').addEventListener('click', async () => { try { await canvas.requestPointerLock(); } catch (error) { showError(error.message); } });
+  element('vr').addEventListener('click', async () => { try { await game.enterVR(); } catch (error) { showError(`VR failed: ${error.message}`); } });
+  for (const button of document.querySelectorAll('[data-spell]')) button.addEventListener('click', () => {
+    game?.setSpell(button.dataset.spell);
+    for (const choice of document.querySelectorAll('[data-spell]')) choice.setAttribute('aria-pressed', String(choice === button));
+  });
+  window.addEventListener('beforeunload', () => { game?.dispose(); connection?.dispose(); });
+  // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
+  window.brannHarness = Object.freeze({
+    state: () => ({connected, controlsActive, playerId, role: appliedRole, snapshots, inputs, lastEvent}),
+    snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
+  });
+  updateButtons();
+</script>
+</body>
+</html>
