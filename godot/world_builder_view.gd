@@ -998,23 +998,29 @@ func _boundary_line(mesh: ImmediateMesh, a: Vector3, b: Vector3) -> void:
 	mesh.surface_add_vertex(b)
 
 func _preview_circle(mesh: ImmediateMesh, point: Vector3, radius: float, segments: int = 48) -> void:
+	if segments <= 0: return
+	# Adjacent lines share an endpoint. Project it once per build; planet
+	# surface normals are expensive, and fresh builds still follow terrain edits.
 	if _planet_active():
 		var direction := point.normalized()
 		var east := direction.cross(Vector3.UP).normalized()
 		if east.length_squared() < 0.0001: east = direction.cross(Vector3.RIGHT).normalized()
 		var north := east.cross(direction).normalized()
 		var angle: float = radius / game.orchard_planet.fields.radius
+		var previous := _ground_preview((direction * cos(angle) + east * sin(angle)).normalized())
 		for i in segments:
-			var theta_a := TAU * float(i) / float(segments)
 			var theta_b := TAU * float(i + 1) / float(segments)
-			var a: Vector3 = (direction * cos(angle) + (east * cos(theta_a) + north * sin(theta_a)) * sin(angle)).normalized()
 			var b: Vector3 = (direction * cos(angle) + (east * cos(theta_b) + north * sin(theta_b)) * sin(angle)).normalized()
-			_boundary_line(mesh, _ground_preview(a), _ground_preview(b))
+			var next := _ground_preview(b)
+			_boundary_line(mesh, previous, next)
+			previous = next
 		return
+	var previous := _ground_preview(point + Vector3.RIGHT * radius)
 	for i in segments:
-		var a := point + Vector3(cos(TAU * i / segments), 0, sin(TAU * i / segments)) * radius
 		var b := point + Vector3(cos(TAU * (i + 1) / segments), 0, sin(TAU * (i + 1) / segments)) * radius
-		_boundary_line(mesh, _ground_preview(a), _ground_preview(b))
+		var next := _ground_preview(b)
+		_boundary_line(mesh, previous, next)
+		previous = next
 
 func _preview_arrow(mesh: ImmediateMesh, a: Vector3, b: Vector3, side: Vector3, width: float) -> void:
 	var direction := (b - a).normalized()
