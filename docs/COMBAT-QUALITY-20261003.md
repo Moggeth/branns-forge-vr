@@ -44,3 +44,9 @@ The CPU measurement covers simulation only, not rendering, transport, or physica
 - Starting caches are existing resources, not newly dropped loot. Conservation tests must count their baseline. Expedition inventories must also account for explicit milestone/victory reward events. Both older harness assumptions were corrected without changing gameplay to match them.
 - On PowerShell pass `-g` globs to `rg` (or discover files first); wildcard file arguments such as `multiplayer/client/touch*` are not expanded.
 - Preserve the tick-18 animation contract when changing enemy logic. Target lock, facing, cover, save/load and local input cleanup must be verified together.
+
+## Public release
+
+Code `e1819d9` pushed to private `origin/main`. Production `dpl_EpwCheS6HkxZykgpQDv1PGdScm8e` is READY at https://branns-forge-multiplayer.vercel.app. Build/deploy took 13.280 seconds. Public touch dodge, held-bow death and recovery passed in 14.234 seconds. Public two-browser Hero/God join, expedition start and shared terrain cast passed in 9.316 seconds; no browser errors. Both FPS captures inspected. These are fresh browser sessions, not physical-device acceptance.
+
+Owned peer8799 and Vite5188 stopped after verification (2.114 seconds); original peer8789 PID43880 retained. Runtime release requires the host to refresh; no world reset needed. Overnight automation remains paused. Acceptance/cleanup completed at approximately 23:45:53 UTC. Unrelated untracked Godot UID files preserved.
