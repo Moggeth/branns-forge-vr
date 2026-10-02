@@ -118,19 +118,30 @@ function isVisible(node, root) {
   return true;
 }
 
-export function segmentSurfaceContacts(root, from, to, targetId) {
+function prepareSurfaceCache(root) {
   root.updateWorldMatrix(true, true);
+  const meshes = [], bounds = new THREE.Box3();
+  root.traverse(mesh => {
+    if (!mesh.isMesh || !isVisible(mesh, root)) return;
+    let box;
+    if (mesh.isSkinnedMesh) {
+      mesh.skeleton.update(); mesh.computeBoundingBox();
+      mesh.boundingSphere ||= new THREE.Sphere(); mesh.boundingBox.getBoundingSphere(mesh.boundingSphere); box = mesh.boundingBox;
+    } else { mesh.geometry.computeBoundingBox(); box = mesh.geometry.boundingBox; }
+    bounds.union(box.clone().applyMatrix4(mesh.matrixWorld)); meshes.push(mesh);
+  });
+  return {meshes, bounds};
+}
+
+export function segmentSurfaceContacts(root, from, to, targetId, prepared) {
   const origin = new THREE.Vector3().fromArray(from), end = new THREE.Vector3().fromArray(to);
   const delta = end.sub(origin), length = delta.length();
   if (length < 1e-8) return [];
-  const direction = delta.normalize(), ray = new THREE.Raycaster(origin, direction, 0, length), meshes = [];
-  root.traverse(mesh => {
-    if (!mesh.isMesh || !isVisible(mesh, root)) return;
-    if (mesh.isSkinnedMesh) { mesh.skeleton.update(); mesh.computeBoundingSphere(); mesh.computeBoundingBox(); }
-    meshes.push(mesh);
-  });
-  const intersections = ray.intersectObjects(meshes, false);
-  const partPoses = intersections.length && !root.userData.detachedPart ? capturePartPoses(root) : undefined;
+  const direction = delta.normalize(), ray = new THREE.Raycaster(origin, direction, 0, length);
+  const cache = prepared || prepareSurfaceCache(root);
+  if (!ray.ray.intersectsBox(cache.bounds)) return [];
+  const intersections = ray.intersectObjects(cache.meshes, false);
+  const partPoses = intersections.length && !root.userData.detachedPart ? (cache.partPoses ||= capturePartPoses(root)) : undefined;
   return intersections.map(hit => {
     const mesh = hit.object, ids = [hit.face.a, hit.face.b, hit.face.c];
     const vertices = ids.map(i => mesh.getVertexPosition(i, new THREE.Vector3()));
@@ -233,7 +244,13 @@ export function maskMissingParts(root, missing = []) {
 }
 
 export function createCombatView({scene, templates, actors, onContact = () => {}, worldContact = () => null, height = () => 0}) {
-  let snapshot = {}, disposed = false, elapsed = 0;
+  let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
+  const surfaceCaches = new WeakMap();
+  function surface(root) {
+    let cache = surfaceCaches.get(root);
+    if (!cache || cache.revision !== contactRevision) { cache = prepareSurfaceCache(root); cache.revision = contactRevision; surfaceCaches.set(root, cache); }
+    return cache;
+  }
   const detached = new Map(), projectiles = new Map(), embeds = new Map(), reported = new Set(), sweptUntil = new Map();
   const actorFor = id => actors.get(`e:${id}`) || actors.get(id);
   const remove = (map, id, ownsGeometry = false) => {
@@ -247,6 +264,7 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual); return group;
   }
   function sync(next) {
+    contactRevision++;
     snapshot = next;
     for (const data of next.detachedParts || []) {
       let node = detached.get(data.id);
@@ -255,8 +273,13 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
         if (!source && templates.has(data.kind)) source = prepareAsset(templates.get(data.kind), data.kind).visual;
         if (!source || source.userData.placeholder) continue;
         node = snapshotDetachedPart(source, data.part); detached.set(data.id, node); scene.add(node);
+        node.position.fromArray(data.position); node.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);
       }
-      node.position.fromArray(data.position); node.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);
+      const targetPosition = new THREE.Vector3().fromArray(data.position), targetQuaternion = new THREE.Quaternion().fromArray(data.quaternion || [0, 0, 0, 1]);
+      const oldPose = node.userData.pose;
+      if (!oldPose || !oldPose.position.equals(targetPosition) || !oldPose.quaternion.equals(targetQuaternion)) {
+        node.userData.pose = {from: node.position.clone(), fromQuaternion: node.quaternion.clone(), position: targetPosition, quaternion: targetQuaternion, age: 0};
+      }
       node.userData.targetId = data.id; node.userData.heldBy = data.heldBy;
     }
     for (const [id] of detached) if (!(next.detachedParts || []).some(p => p.id === id)) remove(detached, id, true);
@@ -271,6 +294,7 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
       let node = projectiles.get(data.id);
       if (!node) { node = projectile(data.kind); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
       node.position.fromArray(data.position);
+      node.userData.flight = {position: new THREE.Vector3().fromArray(data.position), velocity: new THREE.Vector3().fromArray(data.velocity), age: 0};
       const velocity = new THREE.Vector3().fromArray(data.velocity);
       if (velocity.lengthSq()) node.quaternion.setFromUnitVectors(forward, velocity.normalize());
       if (data.kind === 'arrow' && templates.has('wings') && !node.userData.wings) {
@@ -305,15 +329,27 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
   function segmentContacts(from, to, {excludeId} = {}) {
     const contacts = [];
     for (const entry of actors.values()) if (entry.enemy && entry.data?.id !== excludeId && !entry.visual.userData.placeholder) {
-      contacts.push(...segmentSurfaceContacts(entry.visual, from, to, entry.data.id));
+      contacts.push(...segmentSurfaceContacts(entry.visual, from, to, entry.data.id, surface(entry.visual)));
     }
-    for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id));
+    for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node)));
     return contacts.sort((a, b) => a.distance - b.distance);
   }
   function tick(dt, isHost = false) {
     if (disposed) return;
     elapsed += dt;
+    for (const node of projectiles.values()) {
+      const flight = node.userData.flight;
+      if (!flight || !node.visible) continue;
+      flight.age = Math.min(.05, flight.age + dt);
+      node.position.copy(flight.position).addScaledVector(flight.velocity, flight.age);
+    }
+    for (const node of detached.values()) {
+      const pose = node.userData.pose; if (!pose) continue;
+      pose.age = Math.min(.05, pose.age + dt); const alpha = pose.age / .05;
+      node.position.lerpVectors(pose.from, pose.position, alpha); node.quaternion.slerpQuaternions(pose.fromQuaternion, pose.quaternion, alpha);
+    }
     for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, snapshot.tick || 0, elapsed);
+    contactRevision++;
     if (!isHost) return;
     for (const data of snapshot.projectiles || []) {
       if (reported.has(data.id)) continue;
@@ -331,7 +367,7 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
         const hits = segmentContacts(from, to, {excludeId: data.ownerId}), world = worldContact(from, to);
         if (world) hits.push({...world, distance: world.distance ?? new THREE.Vector3().fromArray(from).distanceTo(new THREE.Vector3().fromArray(world.point))});
         const hit = hits.sort((a, b) => a.distance - b.distance)[0];
-        if (hit) { reported.add(data.id); onContact({type: 'projectileHit', projectileId: data.id, ...hit}); break; }
+        if (hit) { reported.add(data.id); const visual = projectiles.get(data.id); if (visual) visual.visible = false; onContact({type: 'projectileHit', projectileId: data.id, ...hit}); break; }
       }
       sweptUntil.set(data.id, [...data.position]);
     }
@@ -339,7 +375,7 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
   function grabTarget(origin, direction, range = 3) {
     const to = new THREE.Vector3().fromArray(origin).addScaledVector(new THREE.Vector3().fromArray(direction).normalize(), range).toArray();
     const candidates = [];
-    for (const [id, node] of detached) if (!node.userData.heldBy) candidates.push(...segmentSurfaceContacts(node, origin, to, id));
+    for (const [id, node] of detached) if (!node.userData.heldBy) candidates.push(...segmentSurfaceContacts(node, origin, to, id, surface(node)));
     return candidates.sort((a, b) => a.distance - b.distance)[0]?.targetId || null;
   }
   function dispose() {
@@ -349,5 +385,5 @@ export function createCombatView({scene, templates, actors, onContact = () => {}
     for (const [id] of detached) remove(detached, id, true);
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
-  return {sync, tick, segmentContacts, grabTarget, dispose, detached, embeds};
+  return {sync, tick, segmentContacts, grabTarget, dispose, detached, embeds, projectiles};
 }
