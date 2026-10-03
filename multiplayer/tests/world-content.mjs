@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
+import {isTestingGift} from '../shared/testing-supplies.js';
 import {worldTrees} from '../shared/world-content.js';
 let sim=createSimulation({seed:9}); sim.addPlayer({id:'h'});
 let state=sim.checkpoint(), h=state.players[0], tree=worldTrees(state)[0];
@@ -10,12 +11,12 @@ assert.equal(sim.command('h',{type:'action',seq:2,action:'strike',targetId:tree.
 assert.equal(sim.command('h',{type:'action',seq:3,action:'equip',tool:'axe'}).ok,true);
 for(let t=0;t<29;t++)sim.step();
 for(let i=0;i<3;i++){ if(i) for(let t=0;t<27;t++)sim.step(); assert.ok(sim.command('h',{type:'action',seq:4+i,action:'strike',targetId:tree.id,point:[tree.x,1,tree.z],normal:[0,1,0]}).ok); }
-assert.equal(sim.snapshot().harvestedTrees[0].cuts,3); assert.equal(sim.snapshot().pickups.filter(p=>p.kind==='wood').length,0,'timber arrives as physical logs after landing, not an instant pickup');
+assert.equal(sim.snapshot().harvestedTrees[0].cuts,3); assert.equal(sim.snapshot().pickups.filter(p=>p.kind==='wood'&&!isTestingGift(p)).length,0,'timber arrives as physical logs after landing, not an instant pickup');
 for(let t=0;t<600&&!sim.snapshot().harvestedTrees[0].landed;t++)sim.step();
-assert.equal(sim.snapshot().looseLogs.length,3);
+const timber=sim.snapshot().looseLogs.length; assert.ok(timber>=2&&timber<=5,'cut-height-dependent log yield');
 // Interaction is explicit and range-bound: E collects nearby lumber directly; optional grab/stow remains supported.
 state=sim.checkpoint(); const log=state.looseLogs[0]; state.players[0].position=[log.position[0],terrainHeight(state,log.position[0],log.position[2]+1.2),log.position[2]+1.2]; sim=loadSimulation(state);
-for(let i=0;i<5;i++)sim.step();assert.equal(sim.snapshot().looseLogs.length,3,'proximity alone never collects');
+for(let i=0;i<5;i++)sim.step();assert.equal(sim.snapshot().looseLogs.length,timber,'proximity alone never collects');
 assert.equal(sim.command('h',{type:'action',seq:8,action:'grab',id:log.id}).ok,true);
 assert.equal(sim.command('h',{type:'action',seq:9,action:'interact'}).events[0].kind,'pickup');
 assert.equal(sim.snapshot().players[0].resources.wood,1);
@@ -40,8 +41,8 @@ const originalMeteors=magic.snapshot().deposits.filter(d=>d.kind==='meteor').len
 let sequence=0;for(const spell of ['sunder','wall','ring','starfall']){assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell,point:[10,0,10]}).ok,true);for(let i=0;i<60;i++)magic.step();}
 assert.equal(magic.snapshot().edits.length,7);assert.equal(worldTrees(magic.snapshot()).length,33);assert.equal(magic.snapshot().deposits.filter(d=>d.kind==='meteor').length,originalMeteors+1);
 assert.deepEqual(loadSimulation(magic.checkpoint()).snapshot(),magic.snapshot());
-assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell:'ring',point:[55,0,55]}).code,'outside_world');
-// No spend on a cast that would overflow the terrain budget.
+{const r=magic.command('g',{type:'cast',seq:++sequence,spell:'ring',point:[55,0,55]}),ring=magic.snapshot().edits.at(-1);assert.equal(r.ok,true,'mana alone refuses a cast; placement moves it');assert.ok(Math.abs(ring.x)<=51&&Math.abs(ring.z)<=51,'ring settles inside the world');}
+// A full terrain list never refuses: the oldest settled earthworks fold into the baked ground.
 let capped=magic.checkpoint();capped.edits=Array.from({length:63},(_,i)=>({id:'limit'+i,kind:'raise',x:0,z:0,radius:6,height:2}));capped.players[0].mana=100;capped=loadSimulation(capped);
-assert.equal(capped.command('g',{type:'cast',seq:++sequence,spell:'wall',point:[0,0,0]}).code,'world_limit');assert.equal(capped.snapshot().players[0].mana,100);
+assert.equal(capped.command('g',{type:'cast',seq:++sequence,spell:'wall',point:[0,0,0]}).ok,true);assert.ok(capped.snapshot().edits.length<=64&&capped.snapshot().terrainBake?.rev>0,'old edits fold into the bake');
 console.log('world-content: checkpoint validation, atomic limits and all imported spells pass');
