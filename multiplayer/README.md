@@ -328,3 +328,7 @@ Choose **Play solo** in the lobby (or **Play solo instead** after a connection f
 Regression: `node tests/solo-session.mjs` covers both roles, resource-preserving save/resume, reset and zero WebSockets. `node tests/browser-quality-solo.mjs` covers actual renderer startup, touch jump/attack, role switching, quick-cast skeleton spawn, diagnostics, disabled invites and a 390x650 lobby. Uses the existing PW_CORE/PW_CHROME/ACCEPT_BASE/BROWSER_QA_DIR harness settings.
 
 Performance evidence and remaining cold-start/GPU limitations: [Performance and quality](../docs/PERFORMANCE-QUALITY-20261003.md). The browser's canvas.brannDiagnostics().cpuTimings provides bounded rolling CPU measurements; it is not GPU timing.
+
+## Timber and stone foundations - 2026-10-03
+Cut trees lower for more Wood. The trunk separates into matching physical logs at touchdown; the canopy disperses in a brief leaf burst. In Workshop > Build, place an 8-Stone Foundation, then build Timberline or another fitting structure on top. Its six-metre tile holds the ground against earth magic while intact; destroying it releases that protection. Repair restores it. Existing saves remain supported.
+See [timber checks](../docs/CONTINUOUS-TIMBER-20261003.md) and [foundation checks](../docs/STONE-FOUNDATIONS-20261003.md).

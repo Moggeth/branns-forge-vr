@@ -165,7 +165,7 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     if (local > CUT_RANGE[1]*s + .15) return make('tree', 'aim', id, 'Tree', 'Aim lower on the trunk', '', '', progress);
     return make('tree', 'ready', id, 'Tree', 'Chop', keys.strike, '', progress);
   }
-  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0&&(b.side===(self.side||'party')||b.type==='forge'));if(building&&hit.distance<=3.2)return make('pickup','ready',id,STRUCTURES[building.type].name,STRUCTURES[building.type].use,keys.collect);
+  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0&&(b.side===(self.side||'party')||b.type==='forge'));if(building&&STRUCTURES[building.type]?.use&&hit.distance<=3.2)return make('pickup','ready',id,STRUCTURES[building.type].name,STRUCTURES[building.type].use,keys.collect);
   const ore = (snapshot.deposits || []).find(q => q.id === id);
   if (ore) {
     if (ore.depleted) return null; // depleted ores are not rendered (world-content-view.js), so never aimed

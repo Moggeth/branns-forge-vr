@@ -593,6 +593,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     const frame=terrainFrameKey(ctx.edits,ctx.terrainTick),phaseChanged=frame!==phaseKey;
     const dirty=phaseChanged?terrainDirtyEdits(phaseEdits,ctx.edits,phaseTick,ctx.terrainTick):[];
     phaseEdits=ctx.edits;phaseTick=ctx.terrainTick;phaseKey=frame;
+    if(next.foundationChanged)field?.invalidate();
     field?.setEdits(ctx.edits,ctx.terrainTick);
     if (sig === signature && !next.force) {if(phaseChanged)queueTemporalMask(dirty);return phaseChanged;} signature = sig;
     temporalMask.clear(); // queues dirty rects only; drained under the frame budget in update()
