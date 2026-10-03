@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {weaponReadiness, spellbookReadiness} from '../client/ability-readiness.js';
 const p = {attackTick:100, specialTick:100, castTick:100, mana:30};
-assert.equal(weaponReadiness(p,'axe',220).specialReady,.5);
+assert.equal(weaponReadiness(p,'axe',280).specialReady,.5);
 assert.equal(weaponReadiness(p,'pick',220).specialSeconds,2);
 assert.equal(weaponReadiness(p,'crossbow',130).attackReady,.5);
 assert.equal(weaponReadiness(p,'bow',133).attackReady,1);

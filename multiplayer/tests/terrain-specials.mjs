@@ -12,7 +12,8 @@ function fixture(tool='axe',x=10,z=10) {
 const special=(s,seq=1)=>s.command('h',{type:'action',action:'special',seq});
 const gameplay=c=>({...c,players:c.players.map(p=>({...p,seq:0}))});
 
-for(const tool of ['axe','pick']) {
+// The axe special is the cleave now (tests/axe-cleave.mjs); it makes no terrain edits.
+for(const tool of ['pick']) {
   const s=fixture(tool),before=s.snapshot(),r=special(s);
   assert.equal(r.ok,true);assert.equal(s.snapshot().edits.length,tool==='axe'?6:7);
   assert.equal(s.snapshot().deposits.length-before.deposits.length,tool==='axe'?3:7);
@@ -28,7 +29,7 @@ for(const tool of ['axe','pick']) {
 }
 
 // Reserve edits, meteor reservations and all deposits atomically.
-for(const tool of ['axe','pick'])for(const cap of ['edits','deposits']) {
+for(const tool of ['pick'])for(const cap of ['edits','deposits']) {
   let s=fixture(tool),c=s.checkpoint();
   if(cap==='edits')c.edits=Array.from({length:59},(_,i)=>({id:`e${i}`,kind:'raise',x:-30,z:-30,radius:6,height:2}));
   else c.deposits=Array.from({length:78},(_,i)=>({id:`o${i}`,kind:'stone',x:-30,z:-30,hits:0,maxHits:3,depleted:false}));
