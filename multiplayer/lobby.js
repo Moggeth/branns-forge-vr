@@ -308,7 +308,9 @@ function start(attempt) {
     notice('waiting', 'Waiting for someone to host this world again. The world is paused until then.', {label: 'Try hosting it here', run: () => { try { session?.retryWorld(); } catch (e) { onSessionError({message: e?.message}); } removeNotice('waiting'); }}, 'action');
   }));
   next.addEventListener('peer_connection_state', mine(detail => {
-    if (detail?.state === 'failed') notice('relay', 'We couldn’t link directly to another player. Some networks (school, work or mobile) block this, and this preview has no relay server to route around it. Try a home network or have that player host.', null, 'warn');
+    if (detail?.state === 'failed') notice('relay', detail.relayConfigured
+      ? 'Direct connection unavailable. Connecting through the cloud relay…'
+      : 'We couldn’t link directly to another player. This room service has no relay configured. Try a different network or have that player host.', null, detail.relayConfigured ? 'info' : 'warn');
     else if (detail?.state === 'connected') removeNotice('relay');
   }));
 
