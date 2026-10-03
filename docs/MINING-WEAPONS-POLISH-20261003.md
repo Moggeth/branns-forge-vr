@@ -143,6 +143,26 @@ browser-friends.mjs. PATCH_HUD_CSS must be unset/0 for built-output acceptance.
 Physical phone, physical headset and separate-network play are not verified.
 The public peer still depends on the original PC-hosted service/tunnel.
 
+## Published result
+
+Verified source **3e589d7** is live at
+https://branns-forge-multiplayer.vercel.app.
+Deployment dpl_5DDA3LUxC9DZBURpSZoH2fB6edZf completed in **15.240 seconds**.
+The clean source revision is included in the on-screen build tag.
+
+Anonymous production browser equipment/throw/fire/F9/label checks passed in
+**19.128 seconds**. Two independent public-site browser clients created/joined
+one room, shared an expedition and synchronized a God terrain cast in
+**12.092 seconds**. Both suites reported zero console errors. Evidence is in
+ignored logs/mining-polish-public. The integrated built-output HUD test passed
+in **19.099 seconds**, without source-CSS injection; the final restrained geode
+light browser test passed in **7.063 seconds**.
+
+Only owned local QA listeners 8799 and 5188 were stopped after verification.
+Original public peer 8789 and its tunnel were preserved. Unrelated Godot UID
+files remain untouched. Documentation-only commits after 3e589d7 do not change
+the deployed runtime and do not require another deployment.
+
 ## Lessons
 
 - Await an observable lit-state threshold, not 350 ms of wall time: software
