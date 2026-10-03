@@ -1,12 +1,14 @@
 import {SPELLS} from '../shared/spells.js';
 import {depositCapacityUsed} from '../shared/resources.js';
 import {planTerrainBake} from '../shared/terrain.js';
+import {bloomLevel} from '../shared/bloom.js';
 
 // Presentation-only explanation of authoritative cast limits. The server still
 // validates every command; this prevents a green preview promising an impossible cast.
-// Mana is the only game rule; the rest are malformed points and world capacity caps.
+// Mana is the only game rule once Bloom has unlocked a spell; the rest are malformed points and world capacity caps.
 export function spellUnavailable(world,player,id,{point,lineCount=3}={}) {
   const spec=SPELLS.find(s=>s.id===id);if(!spec||!player||player.role!=='god')return 'God role required';
+  if(bloomLevel(world.bloom)<(spec.bloom||0))return `Unlocks at Bloom ${spec.bloom}`;
   if((player.mana??0)<spec.cost)return 'Not enough mana';
   if(point&&(!Array.isArray(point)||point.length!==3||!point.every(Number.isFinite)||Math.abs(point[0])>55||Math.abs(point[2])>55||Math.abs(point[1])>1000))return 'Outside the world';
   const pending=world.pendingStarfalls?.length||0,needed=(spec.target==='line'?lineCount:1)+pending;

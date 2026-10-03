@@ -46,7 +46,7 @@ function curveFlight(curve,draw){const r=createSimulation();r.addPlayer({id:'h'}
 assert.ok(curveFlight([0,.8,0],1).position[0]<-2);assert.ok(curveFlight([0,0,0],1).position[2]<curveFlight([0,0,0],.2).position[2]);
 
 // Every tray spell has a working host command and a presentation event.
-for(const spell of SPELLS){const r=createSimulation();r.addPlayer({id:'g',role:'god'});const result=r.command('g',{type:'cast',seq:1,spell:spell.id,point:[5,0,5],...(spell.target==='line'?{start:[2,0,5],end:[8,0,5]}:{})});assert.equal(result.ok,true,spell.id);assert.ok(result.events.some(e=>e.kind==='spell'&&e.spell===spell.id),spell.id);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());advance(r,60);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());}
+for(const spell of SPELLS){const r=createSimulation();r.addPlayer({id:'g',role:'god'});r.adventureWorld().bloom=999;const result=r.command('g',{type:'cast',seq:1,spell:spell.id,point:[5,0,5],...(spell.target==='line'?{start:[2,0,5],end:[8,0,5]}:{})});assert.equal(result.ok,true,spell.id);assert.ok(result.events.some(e=>e.kind==='spell'&&e.spell===spell.id),spell.id);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());advance(r,60);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());}
 
 // New nested save fields cannot bypass caps or inject bad transforms.
 s=fixture();shot=fireAt(s,'head');s.projectileContact(shot.hit);const safe=s.checkpoint();

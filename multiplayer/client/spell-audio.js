@@ -1,4 +1,4 @@
-// Procedural WebAudio cues for the fourteen God spells and the Hero gifts they leave.
+// Procedural WebAudio cues for the God spells and the Hero gifts they leave.
 // Presentation only: no assets, no authority state. Every cue is short, layered from a
 // shared noise buffer, oscillators and filters, and fades with distance from the listener.
 const RANGE = 48;
@@ -44,10 +44,15 @@ export function createSpellAudio(context) {
     heal: (o, t) => { noise(o, t, {type: 'bandpass', f0: 3200, q: .7, attack: .5, peak: .05, release: 1.6}); chord(o, t + .2, [349, 440, 523, 698], {attack: .5, peak: .016, release: 1.4}); },
     lightning: (o, t) => { noise(o, t, {type: 'highpass', f0: 4000, f1: 1500, attack: .001, peak: .3, release: .09}); noise(o, t + .12, {type: 'lowpass', f0: 500, f1: 60, attack: .08, peak: .2, release: 1.7, offset: .4}); },
     frost: (o, t) => { [2093, 2637, 3136, 4186].forEach((f, i) => tone(o, t + i * .05, {f0: f, f1: f * 1.02, attack: .01, peak: .012, release: .9, vibrato: 11})); for (let i = 0; i < 6; i++) noise(o, t + i * .06, {type: 'highpass', f0: 6000, attack: .002, peak: .03, release: .05}); },
+    spring: (o, t) => { for (let i = 0; i < 7; i++) tone(o, t + i * .11, {f0: 600 + ((i * 5) % 7) * 90, f1: 1400 + ((i * 3) % 5) * 120, attack: .005, peak: .022, release: .14}); noise(o, t, {type: 'bandpass', f0: 900, f1: 1600, q: .8, attack: .3, peak: .04, release: 1.2}); },
+    blessing: (o, t) => { chord(o, t, [523, 659, 784, 1047], {attack: .35, peak: .018, release: 1.6, stagger: .1}); noise(o, t + .1, {type: 'highpass', f0: 4500, attack: .4, peak: .025, release: 1.2}); },
+    quake: (o, t) => { rumble(o, t, 30, 24, 2.2, .2); for (let i = 0; i < 6; i++) noise(o, t + .2 + i * .17, {type: 'bandpass', f0: 380 + 60 * (i % 3), q: 2, attack: .01, peak: .05, release: .2}); },
   };
   const GIFTS = {
     charge: (o, t) => { noise(o, t, {type: 'highpass', f0: 3500, attack: .002, peak: .1, release: .15}); tone(o, t, {type: 'sawtooth', f0: 220, f1: 880, attack: .02, peak: .03, release: .35}); },
     swift: (o, t) => { noise(o, t, {type: 'bandpass', f0: 600, f1: 3000, q: 1.5, attack: .15, peak: .06, release: .3}); tone(o, t + .1, {f0: 1568, attack: .01, peak: .015, release: .5}); },
+    blessing: (o, t) => { chord(o, t, [784, 1175, 1568], {attack: .03, peak: .02, release: .8, stagger: .06}); },
+    bloom_level: (o, t) => { chord(o, t, [392, 523, 659, 784, 1047], {attack: .2, peak: .022, release: 2.2, stagger: .16}); noise(o, t, {type: 'highpass', f0: 3200, f1: 5200, attack: .6, peak: .03, release: 1.6}); },
     charged_strike: (o, t) => { noise(o, t, {type: 'highpass', f0: 2800, attack: .001, peak: .12, release: .1}); tone(o, t, {type: 'square', f0: 1200, f1: 300, attack: .002, peak: .02, release: .18}); },
   };
   const resonance = (o, t) => chord(o, t, [880, 1320], {attack: .02, peak: .025, release: .9, stagger: .08}); // material gifts: one soft blue chime

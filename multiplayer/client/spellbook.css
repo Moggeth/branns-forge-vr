@@ -101,6 +101,7 @@
 
 .sb-legend .sb-lg-cost { color: #ff9a85; font-weight: 700; }
 .sb-card.sb-blocked { opacity: .55; border-style: dashed; }
+.sb-card.sb-locked { opacity: .4; filter: saturate(.3); }
 .sb-legend .sb-lg-cd { color: #fff3d6; font-weight: 700; }
 
 /* ---- responsive ---- */

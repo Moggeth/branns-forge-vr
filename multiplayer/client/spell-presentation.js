@@ -416,6 +416,26 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     charged_strike(ev, c) { ev.dur = .8; sparks(c, c.x, c.y + 1.1, c.z, 18, 5, PAL.bolt, 0.22, 0.45); },
     swift(ev, c) { ev.dur = 1.6; let acc = 0; pulse(ev, c, ribMat(PAL.ice, PAL.mint, 0, 1), 0.3, 2.2, 0, 0.6, 0.2);
       ev.fx.push((age, dt) => { if (age > 1) return; acc += dt * 30 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.1, c.R() < 0.6 ? PAL.ice : PAL.mint, 0.18, 2.4); } }); },
+    blessed(ev, c) { ev.dur = 1.8; sparks(c, c.x, c.y + 1.2, c.z, 22, 3, PAL.gold, 0.26, 0.9); sparks(c, c.x, c.y + 1.2, c.z, 16, 2.5, PAL.teal, 0.3, 1.1); pulse(ev, c, ribMat(PAL.gold, PAL.teal, 0, 2), 0.2, 2, 0, 0.6, 0.3); },
+    // Bloom spells (shared/bloom.js). Life Spring's lasting pool is drawn from snapshots in sync().
+    spring(ev, c) { ev.dur = 2.4; let acc = 0; const r = c.radius ?? 3;
+      pulse(ev, c, ribMat(PAL.teal, PAL.ice, 0, 1), 0.2, r, 0, 0.9, 0.35); pulse(ev, c, ribMat(PAL.mint, PAL.teal, 0, 1), 0.2, r * 0.7, 0.35, 1.3, 0.25);
+      decal(ev, c, ribMat(PAL.deepTeal, PAL.teal, 0, 0.3, false), 0.1, r * 0.85, 0.3, 0.1, 1, 2.4);
+      ev.fx.push((age, dt) => { if (age > 1.8) return; acc += dt * 34 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, r * 0.6, c.R() < 0.5 ? PAL.ice : PAL.teal, 0.2, 3); } }); },
+    blessing(ev, c) { ev.dur = 2.6; let acc = 0; const r = c.radius ?? 6, col = mk(ev, 40, ribMat(PAL.gold, PAL.teal, 0, 1.4), null), sig = mk(ev, 96, ribMat(PAL.teal, PAL.gold, 6, 1));
+      pulse(ev, c, ribMat(PAL.gold, PAL.ice, 0, 1), 0.3, r, 0, 1.1, 0.35);
+      ev.fx.push((age, dt) => { const f = 1 - sstep(1.9, 2.6, age), gy = H(c.x, c.z);
+        for (let i = 0; i < 40; i++) { const u = i / 39, a = u * TAU * 3 + age * 3 * MO.swirl, q = 0.5 + 0.4 * u; col.set(i, c.x + Math.cos(a) * q, gy + 0.2 + u * 6 * easeOut(age / 0.8), c.z + Math.sin(a) * q); }
+        col.commit(0.22, 1, f); gRing(sig, c.x, c.z, r * 0.92, -age * 0.4 * MO.swirl, 0.1, 0.06, 0); sig.commit(0.1, 1, f * sstep(0, 0.4, age));
+        acc += dt * (age < 2 ? 26 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, r * 0.9, c.R() < 0.5 ? PAL.gold : PAL.teal, 0.2, 2.2); } }); },
+    quake(ev, c) { ev.dur = 2.6; const r = c.radius ?? 8, R = c.R;
+      for (let i = 0; i < 4; i++) pulse(ev, c, ribMat(i % 2 ? PAL.dust : PAL.teal, PAL.earth, 0, 1), 0.5, r, i * 0.28, i * 0.28 + 1, 0.5 - i * 0.07);
+      decal(ev, c, ribMat(PAL.soil, PAL.loam, 0, 0.3, false), 0.4, r * 0.9, 0.35, 0.05, 0.6, 2.6, c.x, c.z, 0.16, R() * TAU);
+      let burst = false; ev.fx.push((age) => { if (burst) return; burst = true;
+        for (let i = 0; i < qn(14); i++) { const a = R() * TAU, q = r * (0.3 + 0.7 * R()); dustDir(c, c.x + Math.cos(a) * q, c.z + Math.sin(a) * q, Math.cos(a), Math.sin(a), 2.2, 0.9, PAL.dust, 0.42, 1.6, 0.4, 0.6); }
+        for (let i = 0; i < 6; i++) { const a = R() * TAU, q = r * R(); debris(c, c.x + Math.cos(a) * q, c.z + Math.sin(a) * q, 3, 1.8, 0.12, [PAL.stone, PAL.teal, PAL.earth], 4); } }); },
+    bloom_level(ev, c) { ev.dur = 3.2; let acc = 0; for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(i % 2 ? PAL.leaf : PAL.teal, PAL.mint, 0, 1), 0.5, 9 + i * 3, i * 0.35, i * 0.35 + 1.6, 0.45);
+      ev.fx.push((age, dt) => { if (age > 2.6) return; acc += dt * 40 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 7, c.R() < 0.4 ? PAL.leaf : c.R() < 0.5 ? PAL.mint : PAL.teal, 0.24, 2.6); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
     squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
@@ -654,6 +674,15 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       });
     },
   };
+  const POOL = (ev, c) => { // A lasting Life Spring: a rippling blue rim with rising motes until it dries.
+    const rim = mk(ev, 64, ribMat(PAL.teal, PAL.ice, 6, 1)), inner = mk(ev, 48, ribMat(PAL.ice, PAL.mint, 4, 0.6)); let acc = 0;
+    ev.fx.push((age, dt) => {
+      const fade = (ev.closing >= 0 ? 1 - clamp((age - (ev.closing - .6)) / .6) : 1) * sstep(0, .6, age);
+      gRing(rim, c.x, c.z, c.r, age * .25 * MO.swirl, .07, .03, age * 2); rim.commit(.09, 1, fade * .7);
+      gRing(inner, c.x, c.z, c.r * (.45 + .25 * ((age * .5) % 1)), -age * .4 * MO.swirl, .06, .02, 0); inner.commit(.06, 1, fade * .45 * (1 - ((age * .5) % 1)));
+      acc += dt * 5 * Q.n * fade; while (acc >= 1) { acc--; motes(c, c.x, c.z, c.r * .8, c.R() < .5 ? PAL.teal : PAL.ice, .16, 1.4); }
+    });
+  };
   const q2r = new THREE.Quaternion();
   const WARN = (ev, c) => { // Subtle danger outline, not a second targeting graphic.
     ev.info = { x:c.x,z:c.z,r:c.radius,at:c.at };
@@ -702,6 +731,9 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       let ev = events.get(key); if (!ev) ev = startEvent(key, true, WARN, c); if (ev) { ev.info = { x: s.x, z: s.z, r: c.radius, at }; warns.set(s.id, { x: s.x, z: s.z, radius: c.radius }); }
       if (at - clock <= LAUNCH && !launched.has(s.id)) { launched.add(s.id); play({ spell: 'starfall', position: [s.x, 0, s.z], id: s.id, radius: c.radius, flight: at - clock }); }
     }
+    const springs = new Set();
+    for (const s of snapshot.springs || []) { const key = `pool:${s.id}`; springs.add(key); if (!events.has(key)) startEvent(key, true, POOL, { x: s.x, z: s.z, r: 3, R: mulberry(hashStr(key)) }); }
+    for (const [key, ev] of events) if (key.startsWith('pool:') && !springs.has(key) && ev.closing < 0) ev.closing = ev.age + .6;
     for (const [id, w] of [...warns]) {
       if (seen.has(id)) continue; warns.delete(id); const ev = events.get(`warn:${id}`); if (ev) ev.closing = ev.age + 0.35;
       if (!launched.has(id)) play({ spell: 'starfall', position: [w.x, 0, w.z], id, radius: w.radius, phase: 'impact' });

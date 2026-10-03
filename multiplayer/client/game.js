@@ -92,7 +92,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
-  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost'};
+  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
@@ -675,10 +675,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
     if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');}
     // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
-    if(event.kind==='god_gift'||event.kind==='charged_strike'){const boon=event.kind==='charged_strike'?'charged_strike':['charge','swift'].includes(event.gift)?event.gift:'gift',mine=event.id===playerId||event.by===playerId;
+    if(event.kind==='bloom_level'){const at=event.position||[0,0,0];spellVisual.play({spell:'bloom_level',position:at,id:`bloom:${event.level}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift({...event,gift:'bloom_level',position:at},earXZ(),true);if(touchEnabled)try{navigator.vibrate?.([20,40,20,40,40]);}catch{}}
+    if(event.kind==='god_gift'||event.kind==='charged_strike'){const boon=event.kind==='charged_strike'?'charged_strike':['charge','swift'].includes(event.gift)?event.gift:event.gift==='blessing'?'blessed':'gift',mine=event.id===playerId||event.by===playerId;
       spellVisual.play({spell:boon,position:event.position,id:`${event.kind}:${event.id}:${event.gift||''}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift(event,earXZ(),mine);
-      if(mine&&renderer.xr.isPresenting)feedback.pattern?.(boon==='charge'?[{at:0,amplitude:.8,duration:60},{at:100,amplitude:.5,duration:30}]:[{at:0,amplitude:boon==='charged_strike'?.7:.3,duration:30}]);
-      else if(mine&&touchEnabled)try{navigator.vibrate?.(boon==='charge'?[60,40,30]:boon==='charged_strike'?[35]:boon==='swift'?[20,30,20]:[12]);}catch{}}
+      if(mine&&renderer.xr.isPresenting)feedback.pattern?.((boon==='charge'||boon==='blessed')?[{at:0,amplitude:.8,duration:60},{at:100,amplitude:.5,duration:30}]:[{at:0,amplitude:boon==='charged_strike'?.7:.3,duration:30}]);
+      else if(mine&&touchEnabled)try{navigator.vibrate?.(boon==='charge'||boon==='blessed'?[60,40,30]:boon==='charged_strike'?[35]:boon==='swift'?[20,30,20]:[12]);}catch{}}
     if(event.kind==='pick_burst'){wallAudio?.cast(event,listenerPose());
       // The caster feels the wave roll away from them: pulses fade as the front travels, then one crack as it blooms.
       if(event.id===playerId){const ms=(event.durationTicks||50)/.06,steps=[];for(let t=0;t<ms;t+=110)steps.push({at:t,amplitude:.55-.35*t/ms,duration:38});steps.push({at:ms+60,amplitude:.7,duration:60});feedback.pattern?.(steps);

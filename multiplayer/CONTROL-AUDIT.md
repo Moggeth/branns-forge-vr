@@ -76,7 +76,7 @@ patched (reason given) · **NEW** control added by this commission.
 
 | Control | Handler | Status |
 |---|---|---|
-| `data-spell` skeleton, raise, grove, starfall, sunder, wall, ring, golem, squad, crystal, lower, heal, lightning, frost (14) | `chooseSpell` + roving tabindex + arrow keys (game phase only) | OK. Costs, keys and kbd glyphs contract-tested against `SPELLS` and game.js `spellKeys`. School colour stripe added. FIXED D12. |
+| `data-spell` skeleton, raise, grove, starfall, sunder, wall, ring, golem, squad, crystal, lower, heal, lightning, frost, spring, blessing, quake (17) | `chooseSpell` + roving tabindex + arrow keys (game phase only) | OK. Costs, keys and kbd glyphs contract-tested against `SPELLS` and game.js `spellKeys`. School colour stripe added. FIXED D12. Spring, Blessing and Quake (Y, U, I) show locked until Bloom 1, 2 and 3. |
 | `#quickCast` checkbox | `game.setQuickCast` | FIXED D5. 44 px label hit area. |
 | Cast help (summary “How to cast”) | native | OK (text clarified). |
 

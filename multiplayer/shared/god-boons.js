@@ -7,6 +7,8 @@ export const BOONS = Object.freeze({
   charge: {hits: 3, ticks: 900, bonus: 40, strikeDamage: 25, radius: 3}, // Lightning near a Hero
   swift: {ticks: 360, speed: 1.4, radius: 7},                              // Frost Nova around a Hero
   sanctuary: {radius: 4.5, hpPerSecond: 3},                               // standing inside a Tree Ring
+  blessing: {hits: 8, ticks: 1800, heal: 20, radius: 6},                  // Blessing: a long weapon charge
+  quake: {radius: 8, heroDamage: 8, ores: ['ironOre', 'copperOre']},       // Quake shakes ore loose
   seamSpacing: 4, apples: 2, rainApples: 3,
 });
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
@@ -53,13 +55,23 @@ export function castBoons(state, caster, spell, at, ctx, {start, end} = {}) {
       if (id) gift('apple', id, [g.x + .8, ctx.terrainHeight(state, g.x + .8, g.z), g.z]);
     }
   }
+  if (spell === 'quake') BOONS.quake.ores.forEach((kind, i) => {
+    const a = i * Math.PI + 1.1, px = x + Math.cos(a) * 1.6, pz = z + Math.sin(a) * 1.6, id = addPickup(state, kind, px, pz, 1, ctx);
+    if (id) gift('ore', id, [px, ctx.terrainHeight(state, px, pz), pz], {material: kind});
+  });
   for (const hero of state.players) {
     if (hero.role !== 'hero') continue;
+    if (spell === 'quake' && flat(hero.position, at) <= BOONS.quake.radius) ctx.damageHero(state, hero, BOONS.quake.heroDamage, events);
+    if (spell === 'blessing' && flat(hero.position, at) <= BOONS.blessing.radius) {
+      hero.hp = Math.min(100, hero.hp + BOONS.blessing.heal);
+      hero.charge = {hits: Math.max(BOONS.blessing.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.blessing.ticks, hero.charge?.until || 0)};
+      gift('blessing', hero.id, [...hero.position], {hits: hero.charge.hits, until: hero.charge.until});
+    }
     if (spell === 'lightning' && flat(hero.position, at) <= BOONS.charge.radius) {
       // A near miss hurts, but the Hero's weapon drinks the charge.
       ctx.damageHero(state, hero, BOONS.charge.strikeDamage, events);
-      hero.charge = {hits: BOONS.charge.hits, until: state.tick + BOONS.charge.ticks};
-      gift('charge', hero.id, [...hero.position], {hits: BOONS.charge.hits, until: hero.charge.until});
+      hero.charge = {hits: Math.max(BOONS.charge.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.charge.ticks, hero.charge?.until || 0)};
+      gift('charge', hero.id, [...hero.position], {hits: hero.charge.hits, until: hero.charge.until});
     }
     if (spell === 'frost' && flat(hero.position, at) <= BOONS.swift.radius) {
       hero.swiftUntil = state.tick + BOONS.swift.ticks;
@@ -89,7 +101,8 @@ export function stepBoons(state) {
     if (hero.hp < 100 && rings.some(g => Math.hypot(hero.position[0] - g.x, hero.position[2] - g.z) <= BOONS.sanctuary.radius)) hero.hp = Math.min(100, hero.hp + BOONS.sanctuary.hpPerSecond / 60);
   }
 }
+const CHARGE_HITS = Math.max(BOONS.charge.hits, BOONS.blessing.hits), CHARGE_TICKS = Math.max(BOONS.charge.ticks, BOONS.blessing.ticks);
 export function validBoons(p, tick) {
-  if (p.charge !== undefined && (!p.charge || typeof p.charge !== 'object' || !Number.isSafeInteger(p.charge.hits) || p.charge.hits < 1 || p.charge.hits > BOONS.charge.hits || !Number.isSafeInteger(p.charge.until) || p.charge.until < 0 || p.charge.until > tick + BOONS.charge.ticks)) return false;
+  if (p.charge !== undefined && (!p.charge || typeof p.charge !== 'object' || !Number.isSafeInteger(p.charge.hits) || p.charge.hits < 1 || p.charge.hits > CHARGE_HITS || !Number.isSafeInteger(p.charge.until) || p.charge.until < 0 || p.charge.until > tick + CHARGE_TICKS)) return false;
   return p.swiftUntil === undefined || Number.isSafeInteger(p.swiftUntil) && p.swiftUntil >= 0 && p.swiftUntil <= tick + BOONS.swift.ticks;
 }

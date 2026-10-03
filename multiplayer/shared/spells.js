@@ -14,7 +14,12 @@ export const SPELLS = Object.freeze([
   {id:'heal',label:'Healing Rain',cost:18,target:'point',icon:'✚'},
   {id:'lightning',label:'Lightning',cost:22,target:'point',icon:'ϟ'},
   {id:'frost',label:'Frost Nova',cost:20,target:'point',icon:'❄'},
-].map(s=>Object.freeze({...s,cooldown:0})));  // Mana is the only gate on casting.
+  // Bloom spells open as the world fills with life (shared/bloom.js).
+  {id:'spring',label:'Life Spring',cost:16,target:'point',icon:'❀',bloom:1},
+  {id:'blessing',label:'Blessing',cost:20,target:'point',icon:'✦',bloom:2},
+  {id:'quake',label:'Quake',cost:24,target:'point',icon:'≋',bloom:3},
+].map(s=>Object.freeze({bloom:0,...s,cooldown:0})));  // Mana is the only gate on casting once a spell is unlocked.
+export const SPELL_BLOOM = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.bloom])));
 export const SPELL_COST = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.cost])));
 export const WEAPONS = Object.freeze([
   {id:'axe',label:'Axe',slot:1,cooldown:27}, {id:'pick',label:'Pick',slot:2,cooldown:29},
@@ -43,4 +48,5 @@ export const SPELL_TARGET_SHAPES = Object.freeze({
   sunder: { line: true, kr: 2.5, kh: -1.5 }, wall: { line: true, kr: 2.5, kh: 1.5 },
   grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
+  spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 },
 });

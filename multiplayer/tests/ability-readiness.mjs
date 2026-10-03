@@ -1,3 +1,4 @@
+import {SPELLS} from '../shared/spells.js';
 import assert from 'node:assert/strict';
 import {weaponReadiness, spellbookReadiness} from '../client/ability-readiness.js';
 const p = {attackTick:100, specialTick:100, castTick:100, mana:30};
@@ -10,7 +11,7 @@ assert.equal(weaponReadiness({...p,heat:1,overheatUntil:280},'wyrmspout',190).at
 assert.equal(weaponReadiness({...p,heat:1,overheatUntil:280},'wyrmspout',281).overheated,false);
 assert.equal(weaponReadiness({},'axe',0).specialReady,1);
 const book=spellbookReadiness(p,120,'frost');
-assert.equal(Object.keys(book.spellTicks).length,14);
+assert.equal(Object.keys(book.spellTicks).length,SPELLS.length);
 assert.ok(Object.values(book.spellTicks).every(t=>t===100));
 assert.equal(book.selected,'frost');
 console.log('ability-readiness: authoritative cooldowns, weapon switches, overheat and shared spell recovery passed');
