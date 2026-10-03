@@ -125,6 +125,13 @@ export function createContactFeedback({sources = () => [], playerId = () => null
   }
 
   return {
+    // Authored local rumble (e.g. the crystal wall wave rolling away from the caster). Steps: {at ms, amplitude, duration};
+    // each goes through the same throttle/limits as every other pulse. Returns the number of scheduled steps.
+    pattern(steps = [], hand = toolHand(tool(), weaponHand())) {
+      if (disposed || !presenting()) return 0;
+      for (const s of steps) later(s.at, () => pulse(hand, s));
+      return steps.length;
+    },
     // Real geometric contact detected locally (VR physical melee). Pulses now; registers ownership for confirmation.
     contact({targetId, point, normal, direction, speed, material, tool: used = tool(), hand} = {}) {
       if (disposed || !MELEE_TOOLS.includes(used) || used !== tool()) return false;
