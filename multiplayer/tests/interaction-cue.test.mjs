@@ -191,7 +191,11 @@ test('Timberline cue when looked at within 5 m: ammo cost, shortfall, reload, re
   c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:3,iron:1}}),s(),look(24.5),ctx());
   assert.deepEqual([c.state,c.note],['ready','2 Wood + 1 Iron per shot']);
   c=decideCue(view(),at(24.5),s({readyTick:300}),look(24.5),ctx());
-  assert.deepEqual([c.state,c.action,c.control],['busy','Reloading','']);
+  assert.deepEqual([c.state,c.action,c.control,c.note],['busy','Reloading','Hold R','Crank to wind it faster']);
+  c=decideCue(view(),at(24.5),s({operator:'p1'}),look(24.5),ctx());
+  assert.deepEqual([c.action,c.control],['Step off','E'],'the operator is told how to step off');
+  c=decideCue(view(),at(24.5),s({operator:'p2'}),look(24.5),ctx());
+  assert.deepEqual([c.state,c.action],['busy','Manned']);
   assert.equal(decideCue(view(),at(25.6),s(),look(25.6),ctx()),null);            // 5.6 m: beyond inventions.js usable
   assert.equal(decideCue(view(),at(24.5),s({side:'rivals'}),look(24.5),ctx()),null);
 });

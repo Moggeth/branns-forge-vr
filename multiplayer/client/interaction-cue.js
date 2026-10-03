@@ -29,7 +29,7 @@ const KIND_WORD = {wood: 'timber', stone: 'stone', gems: 'gems'}; // adventure-v
 // Control names exactly as visible: compact HUD chips/drawer (index.html), mobile Attack button (mobile-ui.js),
 // objective banner Deliver (adventure-view.js SHORT), VR bindings (vr-input-policy.js, docs/VR-CONTROLS.md).
 export const CONTROLS = Object.freeze({
-  desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver'},
+  desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver', crank: 'Hold R'},
   touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver'},
   xr: {strike: 'Swing', axe: 'Left grip', pick: 'Left grip', grab: 'Right grip', stow: 'Left stick click', drop: 'Right grip', throw: 'Trigger', collect: 'Left stick click', deliver: 'Wrist panel'},
 });
@@ -157,7 +157,14 @@ function structureCue(b, self, snapshot, keys, make) {
   if (!def?.use || b.side !== (self.side || 'party') || flat(p, b.position) > CUE_RULES.structureReach) return null;
   const ammo = MACHINE_AMMO[b.type];
   if (!ammo) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect);
-  if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', '');
+  // Desktop Timberlines are manned (game.js mountMachine); a loading one can be cranked by anyone beside it.
+  const manned = b.type === 'timberline' && keys === CONTROLS.desktop;
+  if (manned && b.operator === self.id) return make('pickup', 'ready', b.id, def.name, 'Step off', keys.collect, 'Click fires · hold R winds faster');
+  if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', keys.crank || '', keys.crank ? 'Crank to wind it faster' : '');
+  if (manned && b.operator) return make('pickup', 'busy', b.id, def.name, 'Manned', '');
+  // Crafted bolts on the side's rack are spent first (inventions.js fire), then raw materials.
+  const bolts = b.type === 'timberline' ? (snapshot.inventions?.bolts?.[b.side] | 0) : 0;
+  if (bolts > 0) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect, `${bolts} crafted bolt${bolts === 1 ? '' : 's'} ready`);
   // inventions.js pay: carried materials first, then the side's store when it is reachable.
   const have = snapshot.inventions?.stockpiles ? inventionAvailable(snapshot, self) : (self.resources || {});
   const cost = Object.entries(ammo).map(([k, n]) => `${n} ${materialLabel(k)}`).join(' + ');
