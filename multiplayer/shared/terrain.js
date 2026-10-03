@@ -4,28 +4,50 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 export const SUNDER_SETTLE_DISTANCE=1.1;
 export const sunderDurationTicks=length=>Math.max(36,Math.min(120,Math.ceil(length/12*60)+12));
+/** Stonewhisper crystal wall: a chain of capsule kernels (continuous crest, no saddles between segments) that rises
+ * behind a 10 m/s front, stands for one minute, then sinks back over SINK ticks. One edit per mineable segment. */
+export const PICK_WALL=Object.freeze({width:1.1,peak:2.4,rampStart:.55,rampSlope:.8,start:.9,minReach:3,maxReach:8,segment:1,maxSegments:7,
+  cap:.3,speed:10,lifetimeTicks:3600,sinkTicks:36,warnTicks:180,standing:2,launchTicks:42,launchPeak:1.6,heroLift:6.5,damage:65});
+export const pickWallDurationTicks=length=>Math.max(24,Math.ceil(length/PICK_WALL.speed*60)+10);
+const RUPTURE_DURATION={sunder:sunderDurationTicks,pick_wall:pickWallDurationTicks};
 const xz=p=>p.length===3?[p[0],p[2]]:[p[0],p[1]];
-export function createSunderRupture(id,start,end,startTick) {
+export function createSunderRupture(id,start,end,startTick,kind='sunder') {
   const a=xz(start),b=xz(end),length=Math.hypot(b[0]-a[0],b[1]-a[1]);
-  return {id,start:a,end:b,startTick,durationTicks:sunderDurationTicks(length)};
+  return {id,start:a,end:b,startTick,durationTicks:RUPTURE_DURATION[kind](length)};
 }
 export function sunderFront(rupture,tick=Infinity) {
   const length=Math.hypot(rupture.end[0]-rupture.start[0],rupture.end[1]-rupture.start[1]);
   const progress=clamp((tick-rupture.startTick)/rupture.durationTicks,0,1);
   return {length,progress,distance:progress*(length+SUNDER_SETTLE_DISTANCE),fraction:clamp(progress*(length+SUNDER_SETTLE_DISTANCE)/Math.max(.001,length),0,1)};
 }
+/** 0..1 sink of an expiring/mined crystal wall segment (1 = fully gone). */
+export function wallSink(edit,tick=Infinity) {
+  const w=edit.wall;if(!w||tick<=w.expireTick)return 0;
+  return smooth(clamp((tick-w.expireTick)/PICK_WALL.sinkTicks,0,1));
+}
 export function terrainEditScale(edit,tick=Infinity,x=edit.x,z=edit.z) {
-  const r=edit.rupture;if(!r||tick>=r.startTick+r.durationTicks)return 1;
+  const sink=edit.wall?1-wallSink(edit,tick):1;
+  const r=edit.rupture;if(!r||tick>=r.startTick+r.durationTicks)return sink;
   if(tick<=r.startTick)return 0;
   const front=sunderFront(r,tick),dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1];
   const along=clamp(((x-r.start[0])*dx+(z-r.start[1])*dz)/Math.max(.001,front.length),0,front.length);
-  return smooth(clamp((front.distance-along)/SUNDER_SETTLE_DISTANCE,0,1));
+  return smooth(clamp((front.distance-along)/SUNDER_SETTLE_DISTANCE,0,1))*sink;
 }
-export function hasActiveTerrain(edits,tick) {return edits.some(e=>e.rupture&&tick>=e.rupture.startTick&&tick<=e.rupture.startTick+e.rupture.durationTicks);}
-const editStamp=e=>`${e.id}|${e.kind}|${e.x}|${e.z}|${e.radius}|${e.height}|${e.rupture?JSON.stringify(e.rupture):''}`;
+/** Profile of a v2 crystal wall segment: height lerps h0->h1 along a->b with a smooth falloff to `width` beside it and
+ * a short `cap` past each end, so neighbours join into one crest yet a mined segment leaves a walkable breach. */
+export function wallProfile(w,x,z) {
+  const dx=w.b[0]-w.a[0],dz=w.b[1]-w.a[1],l=Math.hypot(dx,dz),ux=dx/l,uz=dz/l,px=x-w.a[0],pz=z-w.a[1];
+  const along=px*ux+pz*uz,over=along<0?-along:along>l?along-l:0,side=Math.abs(px*uz-pz*ux);
+  const t=1-Math.hypot(side,over*PICK_WALL.width/PICK_WALL.cap)/PICK_WALL.width;
+  return t<=0?0:(w.h0+(w.h1-w.h0)*clamp(along/l,0,1))*smooth(Math.min(1,t));
+}
+const sinking=(e,tick)=>e.wall&&tick>=e.wall.expireTick&&tick<=e.wall.expireTick+PICK_WALL.sinkTicks;
+export function hasActiveTerrain(edits,tick) {return edits.some(e=>e.rupture&&tick>=e.rupture.startTick&&tick<=e.rupture.startTick+e.rupture.durationTicks||sinking(e,tick));}
+const editStamp=e=>`${e.id}|${e.kind}|${e.x}|${e.z}|${e.radius}|${e.height}|${e.rupture?JSON.stringify(e.rupture):''}|${e.wall?JSON.stringify(e.wall):''}`;
 // A timestamp changes only for a kernel intersecting the moving front; kernels
 // ahead of it and permanently completed earth do not invalidate render work.
 function animationStamp(e,tick) {
+  if(e.wall&&tick>e.wall.expireTick)return 'sink'+wallSink(e,tick);
   if(!e.rupture)return '';
   const r=e.rupture,f=sunderFront(r,tick),dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1];
   const along=((e.x-r.start[0])*dx+(e.z-r.start[1])*dz)/Math.max(.001,f.length);
@@ -43,9 +65,9 @@ export function terrainDirtyEdits(previous=[],next=[],previousTick=Infinity,tick
 export function validateTerrainRupture(edit,tick) {
   const r=edit.rupture;if(r===undefined)return true;
   const pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
-  if(edit.kind!=='sunder'||!r||typeof r!=='object'||Array.isArray(r)||typeof r.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(r.id)||!pair(r.start)||!pair(r.end)||!Number.isSafeInteger(r.startTick)||r.startTick<0||r.startTick>tick)return false;
+  if(!Object.hasOwn(RUPTURE_DURATION,edit.kind)||!r||typeof r!=='object'||Array.isArray(r)||typeof r.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(r.id)||!pair(r.start)||!pair(r.end)||!Number.isSafeInteger(r.startTick)||r.startTick<0||r.startTick>tick)return false;
   const dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1],length=Math.hypot(dx,dz);
-  if(length<.5||length>18.000001||r.durationTicks!==sunderDurationTicks(length))return false;
+  if(length<.5||length>18.000001||r.durationTicks!==RUPTURE_DURATION[edit.kind](length))return false;
   const along=((edit.x-r.start[0])*dx+(edit.z-r.start[1])*dz)/(length*length),side=Math.abs((edit.x-r.start[0])*dz-(edit.z-r.start[1])*dx)/length;
   return along>=-1e-6&&along<=1+1e-6&&side<1e-5;
 }
@@ -55,7 +77,19 @@ export function validateTerrainRuptures(edits,tick) {
   return true;
 }
 const restoreRupture=r=>({id:r.id,start:[...r.start],end:[...r.end],startTick:r.startTick,durationTicks:r.durationTicks});
-export function restoreTerrainEdit(e) {return {id:e.id,kind:e.kind,x:e.x,z:e.z,radius:e.radius,height:e.height,...(e.rupture?{rupture:restoreRupture(e.rupture)}:{})};}
+const restoreWall=w=>({a:[...w.a],b:[...w.b],h0:w.h0,h1:w.h1,expireTick:w.expireTick,owner:w.owner});
+export function restoreTerrainEdit(e) {return {id:e.id,kind:e.kind,x:e.x,z:e.z,radius:e.radius,height:e.height,...(e.rupture?{rupture:restoreRupture(e.rupture)}:{}),...(e.wall?{wall:restoreWall(e.wall)}:{})};}
+/** v2 crystal wall segment: exact capsule on its cast's rupture line, bounded heights, lifetime from the cast tick. */
+export function validatePickWall(e,tick) {
+  const w=e.wall,r=e.rupture,pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
+  if(!w||typeof w!=='object'||Array.isArray(w)||!r||!pair(w.a)||!pair(w.b)||typeof w.owner!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(w.owner))return false;
+  const half=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])/2,heights=[w.h0,w.h1,e.height];
+  if(!heights.every(h=>Number.isFinite(h)&&h>0&&h<=PICK_WALL.peak)||e.height!==Math.max(w.h0,w.h1)||half<.05||half>PICK_WALL.segment)return false;
+  if(Math.abs(e.radius-(half+PICK_WALL.width))>1e-9||Math.abs(e.x-(w.a[0]+w.b[0])/2)>1e-9||Math.abs(e.z-(w.a[1]+w.b[1])/2)>1e-9)return false;
+  if(!Number.isSafeInteger(w.expireTick)||w.expireTick<r.startTick||w.expireTick>r.startTick+PICK_WALL.lifetimeTicks||(w.expireTick<r.startTick+PICK_WALL.lifetimeTicks&&w.expireTick>tick))return false;
+  const dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1],length=Math.hypot(dx,dz);
+  return [w.a,w.b].every(p=>{const along=((p[0]-r.start[0])*dx+(p[1]-r.start[1])*dz)/(length*length),side=Math.abs((p[0]-r.start[0])*dz-(p[1]-r.start[1])*dx)/length;return along>=-1e-6&&along<=1+1e-6&&side<1e-5;});
+}
 export function mountainHeight(x,z) {
   const t=clamp((Math.max(Math.abs(x),Math.abs(z))-46)/9,0,1);
   return smooth(t)*(14+2*Math.sin(x*.31+z*.17)+Math.cos(z*.43-x*.11));
@@ -98,8 +132,10 @@ export function rawTerrainHeight(state,x,z) {
     // Most kernels do not cover this vertex. Reject before the costly hypot,
     // preserving original edit order, distance calculation and floating-point sum.
     if(Math.abs(dx)>=edit.radius||Math.abs(dz)>=edit.radius)continue;
-    const t=clamp(1-Math.hypot(dx,dz)/edit.radius,0,1);if(t<=0)continue;
-    const h=edit.height*smooth(t)*terrainEditScale(edit,state.tick??Infinity,x,z);
+    let h;
+    if(edit.wall){h=wallProfile(edit.wall,x,z);if(h<=0)continue;}
+    else{const t=clamp(1-Math.hypot(dx,dz)/edit.radius,0,1);if(t<=0)continue;h=edit.height*smooth(t);}
+    h*=terrainEditScale(edit,state.tick??Infinity,x,z);
     if(edit.kind==='axe_sunder')scar+=h;
     else if(edit.kind==='pick_wall')wall=Math.max(wall,h);
     else earth+=h;
