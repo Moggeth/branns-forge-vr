@@ -97,6 +97,20 @@ stopped during migration and are no longer required by the new website build.
   the client suppresses only errors already explained by a known epoch/departure.
 - Wrangler OAuth lacks subscription-list API permission (403). Verify the actual plan
   in the dashboard rather than attempting wider credentials or assuming it is paid/free.
+- Abrupt host-tab loss now recovers in the hosted browser test (17.700 s including
+  the 15-second grace). An RTC channel can remain nominally open after its host is
+  gone: use recent received game traffic for liveness, never `readyState` alone.
+  The crash fixture must wait for the recovery checkpoint, not merely the faster
+  rendered snapshot. An abrupt crash can lose the last half-second between checkpoints.
+- Final direct outage/handoff retest: 5.994 s. The original live simulation survives
+  signaling reconnect; commands also reach the new host after handoff.
+- Public Vercel cutover build/stage/deploy: 11.615 s, source b6538e4,
+  deployment `dpl_A2R4JwqAXbkmcgkpPfCYqD6ujxLH`. Public Hero/God play: 13.350 s;
+  solo/portrait lobby with zero sockets: 6.182 s. Public forced-relay Hero/God play:
+  19.927 s, with every room socket verified on the cloud hostname. Both players saw
+  the shared Expedition and terrain edits, with no application/resource errors.
+
+Cloud Worker version at cutover: `b5842550-8296-4178-a4fb-69cd9e6b5fa9`.
 
 Use `tests/cloud-transport.mjs` with `CLOUD_WS_URL`, `ACCEPT_BASE` (local fixture server),
 `PW_CORE`, `PW_CHROME`, `BROWSER_QA_DIR`; `FORCE_RELAY=1` injects unavailable ICE.

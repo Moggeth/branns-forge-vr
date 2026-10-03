@@ -66,7 +66,9 @@ export class PeerRoomConnection extends EventTarget {
         this.relayConfigured = !!message.relayConfigured;
         this.relayTransport = message.relayTransport;
         this.roster = new Map((message.peers || []).map(peer => [peer.id, peer]));
-        for (const [id, peer] of this.peers) if (open(peer.channel) && !peer.relay && this.roster.has(id)) this.roster.get(id).online = true;
+        for (const [id, peer] of this.peers) if (open(peer.channel) && !peer.relay && this.roster.has(id)) {
+          const member = this.roster.get(id); member.signalingOnline = member.online; member.online = true;
+        }
         this.roster.set(this.peerId, { id: this.peerId, name: this.name, role: this.role, desktop: this.desktop, online: true });
         emit(this, 'welcome', { room: this.room, peerId: this.peerId, secret: this.secret, epoch: this.epoch, hostId: this.hostId, role: this.role, isHost: this.isHost, peers: [...this.roster.values()], relayConfigured: this.relayConfigured, resume });
         emit(this, 'roster', { peers: [...this.roster.values()], epoch: this.epoch });
@@ -76,6 +78,13 @@ export class PeerRoomConnection extends EventTarget {
         if (!this.isHost && this.checkpointRevision >= 0) this.#signal({ type: 'checkpoint_ready', revision: this.checkpointRevision });
         clearInterval(this.heartbeat);
         if (this.relayTransport === 'websocket') this.heartbeat = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.send('ping'); }, 30000);
+        clearInterval(this.liveness);
+        this.liveness = setInterval(() => {
+          const host = this.peers.get(this.hostId);
+          if (this.isHost || !host?.everReady || host.awaitingHost || this.#playable()) return;
+          host.awaitingHost = true;
+          emit(this, 'owner_lost', { epoch: this.epoch }); emit(this, 'status', { state: 'owner_lost' }); this.retryWorld();
+        }, 1000);
       } else this.#handleSignal(message);
     });
     socket.addEventListener('close', event => {
@@ -92,12 +101,18 @@ export class PeerRoomConnection extends EventTarget {
     });
     socket.addEventListener('error', () => { if (generation === this.generation) emit(this, 'status', { state: 'signaling_reconnecting', playable: this.#playable() }); });
   }
-  #playable() { return !!this.peerId && (this.isHost || open(this.peers.get(this.hostId)?.channel) || (!!this.peers.get(this.hostId)?.relay && this.socket?.readyState === WebSocket.OPEN)); }
+  #playable() {
+    const host = this.peers.get(this.hostId);
+    // RTC can report an open data channel for tens of seconds after a tab/device disappears.
+    // Actual recent host traffic, not that stale flag, decides whether migration is unnecessary.
+    return !!this.peerId && (this.isHost || (host && Date.now() - (host.receivedAt || 0) < 4000 &&
+      (host.relay ? this.socket?.readyState === WebSocket.OPEN : open(host.channel))));
+  }
   #handleSignal(message) {
     if (message.type === 'error') {
       // Frames already in flight during a handoff/departure must not produce error toasts.
       if (message.code === 'stale_epoch' && message.expectedEpoch === this.epoch) return;
-      if (message.code === 'peer_unavailable' && message.peerId && !this.roster.get(message.peerId)?.online) return;
+      if (message.code === 'peer_unavailable' && message.peerId && (!this.roster.get(message.peerId)?.online || this.roster.get(message.peerId)?.signalingOnline === false)) return;
       if (!this.joined && message.code === 'invalid_secret' && this.secret) {
         // The seat expired (offline too long or reclaimed by a full room). Join again as a new player
         // instead of retrying a dead credential forever.
@@ -118,7 +133,9 @@ export class PeerRoomConnection extends EventTarget {
     } else if (message.type === 'peer_left') {
       if (message.epoch !== this.epoch) return;
       const edge = this.peers.get(message.peerId);
-      if (!message.deliberate && !message.removed && !edge?.relay && open(edge?.channel)) return;
+      if (!message.deliberate && !message.removed && !edge?.relay && open(edge?.channel)) {
+        const member = this.roster.get(message.peerId); if (member) member.signalingOnline = false; return;
+      }
       const peer = this.roster.get(message.peerId); if (peer) peer.online = false;
       if (message.removed === true && message.peerId !== this.peerId) this.roster.delete(message.peerId);
       this.#removePeer(message.peerId);
@@ -145,6 +162,8 @@ export class PeerRoomConnection extends EventTarget {
         emit(this, 'status', { state: 'hosting' });
         for (const peer of this.roster.values()) if (peer.id !== this.peerId && peer.online) this.#connectPeer(peer.id, true);
       } else { emit(this, 'status', { state: 'connecting_to_host' }); }
+    } else if (message.type === 'world_waiting' && this.#playable()) {
+      return;
     } else if (message.type === 'relay_request') {
       if (message.epoch !== this.epoch || !this.roster.has(message.from) || (!this.isHost && message.from !== this.hostId)) return;
       this.#connectPeer(message.from, false);
@@ -235,6 +254,7 @@ export class PeerRoomConnection extends EventTarget {
     this.#edgeReady(id); return true;
   }
   #edgeReady(id) {
+    this.peers.get(id).everReady = true;
     emit(this, 'peer_connected', { peerId: id });
     emit(this, 'status', { state: this.isHost ? 'hosting' : 'connected', peerId: id, transport: this.peers.get(id)?.relay ? 'cloud-relay' : 'webrtc' });
     if (this.isHost && this.checkpoint) this.#sendEnvelope(id, { kind: 'checkpoint', revision: this.checkpointRevision, state: this.checkpoint });
@@ -243,6 +263,8 @@ export class PeerRoomConnection extends EventTarget {
     const peer = this.peers.get(id); if (!peer || peer.epoch !== this.epoch) return;
     let frame; try { frame = JSON.parse(typeof data === 'string' ? data : decoder.decode(data)); } catch { return; }
     if (!frame || frame.epoch !== this.epoch || !Number.isSafeInteger(frame.part) || !Number.isSafeInteger(frame.total) || frame.total < 1 || frame.total > 64 || frame.part < 0 || frame.part >= frame.total || typeof frame.body !== 'string' || frame.body.length > FRAME_BYTES * 2) return;
+    peer.receivedAt = Date.now();
+    if (peer.awaitingHost && id === this.hostId) { peer.awaitingHost = false; emit(this, 'status', { state: 'connected' }); }
     const key = String(frame.id);
     let entry = peer.pending.get(key);
     if (!entry) {
@@ -314,7 +336,7 @@ export class PeerRoomConnection extends EventTarget {
   close() {
     // Tell the room this is deliberate so it can free the seat or hand the world over immediately.
     if (this.joined && this.socket?.readyState === WebSocket.OPEN) { try { this.socket.send(JSON.stringify({ type: 'leave' })); } catch { /* closing */ } }
-    this.closed = true; this.joined = false; ++this.generation; clearTimeout(this.reconnectTimer); clearInterval(this.heartbeat); this.#resetPeers();
+    this.closed = true; this.joined = false; ++this.generation; clearTimeout(this.reconnectTimer); clearInterval(this.heartbeat); clearInterval(this.liveness); this.#resetPeers();
     this.socket?.close(1000); this.socket = null;
     emit(this, 'status', { state: 'disconnected' });
   }

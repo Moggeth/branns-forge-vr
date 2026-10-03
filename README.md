@@ -1,3 +1,5 @@
+Current browser release (2026-10-03): https://branns-forge-multiplayer.vercel.app now uses Cloudflare Workers Free for room hosting and relay fallback. The developer PC can be off. Each world's simulation remains player-hosted, with continuation offers and local recovery saves. See [cloud hosting handoff](multiplayer/cloud/README.md). Older dated notes below describe earlier milestones.
+
 Browser physical inventions (2026-10-03): permanent forge, owned storage, ore refining, twelve working structure roles and autonomous conflict. Open Menu > Manage the forge. See [implementation and checks](docs/PHYSICAL-INVENTIONS-20261003.md).
 
 Browser solo/world feedback (2026-10-03): workers, forge development and raids for solo Heroes/Gods; all 14 spells, progressive Sunder, physical creature feedback and diegetic weapon readiness. See docs/SOLO-WORLD-FEEDBACK-20261003.md for controls, checks and limitations.

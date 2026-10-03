@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {launch, BASE, record, save} from './browser-acceptance-lib.mjs';
+import {disableIce} from './no-ice-fixture.mjs';
 const endpoint = process.env.CLOUD_WS_URL || 'ws://127.0.0.1:8791/peer/cloud';
 const forcedRelay = process.env.FORCE_RELAY === '1';
 const {browser,context,page:host} = await launch();
@@ -7,19 +8,7 @@ const guest = await context.newPage();
 const routes = []; let blocked = false;
 await host.routeWebSocket('**/peer/cloud*', route => { if (blocked) route.close(); else { route.connectToServer(); routes.push(route); } });
 try {
-  if (forcedRelay) await context.addInitScript(() => {
-    // Fault injection: signaling succeeds, but no ICE edge can ever become connected.
-    window.RTCPeerConnection = class {
-      connectionState = 'connecting'; remoteDescription = null;
-      createDataChannel() { return {readyState:'connecting', close(){}, bufferedAmount:0}; }
-      async createOffer() { return {type:'offer',sdp:'test: no viable route'}; }
-      async createAnswer() { return {type:'answer',sdp:'test: no viable route'}; }
-      async setLocalDescription(d) { this.localDescription=d; }
-      async setRemoteDescription(d) { this.remoteDescription=d; }
-      async addIceCandidate() {}
-      close() {}
-    };
-  });
+  if (forcedRelay) await disableIce(context);
   for (const page of [host,guest]) { await page.goto(BASE+'/tests/transport-harness.html'); await page.waitForFunction(()=>window.makeSession); }
   await host.evaluate(url=>window.makeSession(url,{name:'Host',role:'hero',desktop:true}),endpoint);
   await host.waitForFunction(()=>window.s?.identity?.room);
@@ -30,6 +19,15 @@ try {
   await guest.evaluate(()=>window.s.command('cast',{spell:'raise',point:[10,0,10]}));
   await host.waitForFunction(()=>window.s.simulation.snapshot().edits.length>0);
   record('two-real-sessions-and-replication','pass',{room,transport:relay?'cloud-relay':'direct-rtc'});
+  if (process.env.HOST_CRASH === '1') {
+    await guest.waitForFunction(()=>window.s.connection.checkpoint?.edits.length===1);
+    await host.close();
+    await guest.waitForFunction(()=>window.events.some(e=>e.name==='continue_world_offer'),null,{timeout:25000});
+    await guest.evaluate(()=>window.s.connection.continueWorld());
+    await guest.waitForFunction(()=>window.s.simulation && window.s.connection.epoch===2);
+    assert.equal(await guest.evaluate(()=>window.s.simulation.snapshot().edits.length),1);
+    record('unexpected-host-tab-loss-recovers-checkpoint','pass');
+  } else {
   if (!forcedRelay) {
     await host.evaluate(()=>{window.oldSim=window.s.simulation;window.beforeTick=window.s.simulation.snapshot().tick;});
     blocked=true; for(const route of routes)route.close();
@@ -59,6 +57,7 @@ try {
   const tick=await guest.evaluate(()=>window.s.simulation.snapshot().tick);
   await guest.waitForFunction(t=>window.s.simulation.snapshot().tick>t+15,tick);
   record('host-transfer-and-original-host-offline','pass');
+  }
   const errors=await guest.evaluate(()=>window.events.filter(e=>e.name==='error').map(e=>e.detail)); assert.deepEqual(errors,[]);
 } catch(e) {
   record('exception','fail',{message:e.message});

@@ -1,5 +1,14 @@
 # Browser multiplayer proof
 
+## Cloud multiplayer is live - 2026-10-03
+
+[Play Brann's Forge](https://branns-forge-multiplayer.vercel.app). Vercel serves the
+game/assets; Cloudflare Workers Free hosts room codes and a relay fallback. Your
+development PC can be off. A player still hosts each world's simulation; another
+eligible desktop player can accept continuation when that host leaves. Solo needs no
+room service. Saves are local/exportable, not an always-running cloud world.
+Refresh older tabs before making a new room. [Cloud setup, free limits and checks](cloud/README.md).
+
 ## Physical inventions — 2026-10-03
 
 Open **Menu → Manage the forge**. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
@@ -88,11 +97,11 @@ from that saved state. Browser storage is not cloud backup; download important
 saves. Continuations are independent copies, with no account-based ownership or
 automatic conflict merging yet.
 
-Vercel hosts only public compiled assets. A Cloudflare **temporary Quick Tunnel**
-connects signaling to this PC. The PC and both processes must remain running.
-WebRTC carries simulation state between players. A TURN relay is not configured:
-some pairs of home/mobile/work networks may fail to connect. This is a friend
-playtest, not an always-available or broadly scalable production service.
+Vercel hosts public compiled assets. Cloudflare Workers and SQLite Durable Objects
+host signaling independently of this PC. WebRTC carries game state directly where
+possible; a bounded secure WebSocket relay covers blocked direct connections. The
+personal Workers Free plan was verified and no paid TURN service was enabled. Free
+daily capacity limits apply; this is a friends playtest, not unlimited hosting.
 
 See [peer/README.md](peer/README.md) for lifecycle/configuration and
 [PEER-PLAYTEST.md](PEER-PLAYTEST.md) for deployment and verification.

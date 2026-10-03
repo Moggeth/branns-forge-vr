@@ -2,17 +2,21 @@
 
 Public page: https://branns-forge-multiplayer.vercel.app
 
-RECOVERED 2026-10-03 16:07 Australia/Sydney: the user started the service and tunnel in two PowerShell windows. Both must remain open. The website was rebuilt and redeployed with the new endpoint, and public two-client joining/replication passed. These processes are user-owned; do not stop or restart them as QA cleanup.
+CLOUD CUTOVER 2026-10-03: the public website now uses `wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud`. The developer PC and Quick Tunnel are no longer required. See [cloud hosting handoff](cloud/README.md) for deploy, recovery, free quotas and verification. Refresh old website tabs and create a new room; old tunnel rooms are not automatically moved.
 
-Current temporary signaling URL: `wss://terry-essence-trips-minolta.trycloudflare.com/peer/ws`.
+## Historical PC/tunnel recovery (superseded by cloud hosting)
 
-The historical outage below was caused by the old tunnel disappearing; automated launch was blocked. A stable hostname and managed process remain future reliability work.
+RECOVERED 2026-10-03 16:07 Australia/Sydney: the user started the old service and tunnel in two PowerShell windows. They were deliberately left untouched during migration. They are user-owned and are no longer required by the current website.
+
+Previous temporary signaling URL: `wss://terry-essence-trips-minolta.trycloudflare.com/peer/ws`.
+
+The historical outage below was caused by the old tunnel disappearing; automated launch was blocked. The cloud service replaces that dependency.
 
 Previous temporary signaling URL:
 `wss://blackjack-meals-mia-meals.trycloudflare.com/peer/ws`.
 It changes when the Quick Tunnel restarts. Do not promise this endpoint is permanent.
 
-## Start, inspect and recover
+## Historical local-only start and recovery
 
 From `multiplayer/`, run `npm ci` once. Start:
 
@@ -35,8 +39,8 @@ downloaded save into a new room. A stopped tunnel leaves the Vercel page visible
 but prevents joining. Recover it, rebuild with the new `VITE_PEER_WS_URL` and
 redeploy. The player-facing lobby deliberately has no endpoint field.
 
-Next durable hosting step is a named tunnel/stable hostname plus a managed
-signaling process and optional TURN. This deployment did not purchase anything.
+These commands are retained for local development/history. Production now uses the
+managed cloud coordinator and WebSocket fallback; do not restore a tunnel unnecessarily.
 
 ## Build and deploy only public output
 
