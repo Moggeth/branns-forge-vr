@@ -85,7 +85,9 @@ for (let i = 0; i < 4; i++) {
   for (let t = 0; t < 27; t++) shrineRoom.step();
 }
 assert.equal(shrineRoom.snapshot().shrine.hp, 100);
-assert.equal(shrineRoom.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [0, 0, 0]}).code, 'protected_forge');
+// A grove aimed at the forge is moved to the apron edge, never refused.
+assert.equal(shrineRoom.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [0, 0, 0]}).ok, true);
+assert.ok(Math.abs(Math.hypot(shrineRoom.snapshot().groves.at(-1).x, shrineRoom.snapshot().groves.at(-1).z) - 7) < 1e-9);
 const shrineRestored = loadSimulation(JSON.parse(JSON.stringify(shrineRoom.checkpoint())));
 assert.equal(shrineRestored.snapshot().shrine.disabledUntil, 0);
 assert.equal(shrineRestored.snapshot().shrine.hp, 100);

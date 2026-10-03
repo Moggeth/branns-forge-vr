@@ -14,12 +14,13 @@ import {createStartingWorld} from './starting-world.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
-import {SPELLS} from '../shared/spells.js';
+import {SPELLS,settleCastPoint} from '../shared/spells.js';
 import {createSettlementView} from './settlement-view.js';
 import {syncWeaponReadiness} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {enhancePickTemplate} from './pick-luminance.js';
 import {spellUnavailable} from './spell-availability.js';
+import {expeditionRunning} from '../shared/adventure.js';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
@@ -543,25 +544,30 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return hit;
   }
   function isLineSpell(){return spell==='sunder'||spell==='wall';}
+  // Casting never refuses a placement. Point spells settle where authority will put them;
+  // a drawn line longer than 18 m is shortened and a tiny one becomes the default line.
+  function settledPoint(id,x,z){const [sx,,sz]=settleCastPoint(id,[x,0,z],{expedition:expeditionRunning(snapshot.adventure)});return [sx,heightAt(sx,sz,snapshot.edits),sz];}
+  function fitLine(start,end){const dx=end[0]-start[0],dz=end[2]-start[2],d=Math.hypot(dx,dz);return d<=18?end:[start[0]+dx/d*17.99,end[1],start[2]+dz/d*17.99];}
   function targetPreview(){
     if(!active||role!=='god'||!cursor.visible)return null;
-    const player=snapshot.players.find(p=>p.id===playerId),point=hitPoint.toArray();
-    let start,end,fallback=false,length=0,lineCount=3;
+    const player=snapshot.players.find(p=>p.id===playerId),hit=hitPoint.toArray();
+    let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=3;
     if(isLineSpell()){
-      if(castStart){start=castStart.toArray();end=point;length=Math.hypot(start[0]-point[0],start[2]-point[2]);lineCount=Math.ceil(length/2.5)+1;}
+      if(castStart&&Math.hypot(castStart.x-hit[0],castStart.z-hit[2])>=.5){start=castStart.toArray();end=point=fitLine(start,hit);lineCount=Math.ceil(Math.hypot(start[0]-end[0],start[2]-end[2])/2.5)+1;}
       else {const dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),clamp=v=>THREE.MathUtils.clamp(v,-55,55);
         start=[clamp(point[0]-uz*3),point[1],clamp(point[2]+ux*3)];end=[clamp(point[0]+uz*3),point[1],clamp(point[2]-ux*3)];fallback=true;}
     }
-    return {spell,point,start,end,fallback,valid:(!castStart||(length>=.5&&length<=18&&Math.abs(start[0])<=55&&Math.abs(start[2])<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount})};
+    return {spell,point,start,end,fallback,valid:(fallback||(Math.abs(start?.[0]??0)<=55&&Math.abs(start?.[2]??0)<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount})};
   }
   function cancelCast() { castStart = null; quickKey = null; castRevision++; }
   function castAt(point,finish=false) {
     if (!active || role !== 'god' || inventionPlacement) return;
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
-    const at=[x,heightAt(x,z,snapshot.edits),z];
+    let at=isLineSpell()?[x,heightAt(x,z,snapshot.edits),z]:settledPoint(spell,x,z);
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
-    if(castStart){const length=Math.hypot(castStart.x-at[0],castStart.z-at[2]);if(length<.5||length>18){report('Draw a line between 0.5 and 18 metres.');return;}}
-    const extra=castStart?{start:castStart.toArray(),end:at}:{};pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
+    let extra={};
+    if(castStart&&Math.hypot(castStart.x-at[0],castStart.z-at[2])>=.5){at=fitLine(castStart.toArray(),at);extra={start:castStart.toArray(),end:at};}
+    pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {
     if (!active || renderer.xr.isPresenting) return;

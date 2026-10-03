@@ -20,8 +20,7 @@ export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
   };
 }
 export function spellbookReadiness(player = {}, tick = 0, selected = 'skeleton', enabled = true) {
-  // Current rules share a 45-tick recovery between ALL spells. Showing independent
-  // invented timers would promise availability the simulation cannot honour.
+  // Spells have no recovery timer (mana is the only gate); castTick still marks the last cast.
   return {mana: player.mana || 0, tick, selected, enabled,
     spellTicks: Object.fromEntries(SPELLS.map(s => [s.id, player.castTick ?? -1000]))};
 }

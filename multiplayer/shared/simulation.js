@@ -9,11 +9,11 @@ import {resolveStartingWorld} from './starting-world.js';
 import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
-import {SPELL_COST as COST} from './spells.js';
+import {SPELL_COST as COST,settleCastPoint} from './spells.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits} from './resources.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
-import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
+import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs} from './trees.js';
 export const HZ = 60;
 export const MAX_PLAYERS = 8;
@@ -141,13 +141,10 @@ function instantiate(state) {
         if (!r.ok) return fail(r.code);
         applyAdventureIntents(state, r.intents, adventureContext); return ok(r.events);
       }
-      const gate = p && message?.type === 'cast' && p.role === 'god' && safeSeq(message.seq) && message.seq > p.seq ? adventureCastGate(state.adventure, id, message, state) : null;
-      if (gate && !gate.ok) { p.seq = message.seq; return fail(gate.code); }
       const result = api.baseCommand(id, message, p);
       // Optional attribution: events caused by a player's action name that player (public id) so clients
       // can scope physical feedback. Never overwrites; older clients ignore it.
       if (result.ok && message?.type === 'action') for (const e of result.events || []) if (e && e.by === undefined) e.by = id;
-      if (gate && !result.ok) adventureCastRefund(state.adventure, gate);
       recordSettlementDeaths(state,result.events);
       if (result.events?.length && adventureEvents.length < 256) adventureEvents.push(...result.events);
       return result;
@@ -264,15 +261,13 @@ function instantiate(state) {
         return ok(events);
       }
       if (p.role !== 'god') return fail('role_required');
-      const spell = message.spell, point = message.point;
+      const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
       if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
       const lineCount=line&&message.start?Math.ceil(distance(message.start,message.end)/2.5)+1:3;
-      if (!Object.hasOwn(COST, spell) || !validPoint(point)) return fail('invalid_cast');
-      if ((spell==='grove'||spell==='ring')&&(Math.abs(point[0])>51||Math.abs(point[2])>51)) return fail('outside_world');
-      if(['grove','ring','crystal','skeleton','squad','golem'].includes(spell)&&Math.hypot(point[0],point[2])<7)return fail('protected_forge');
-      if (state.tick - p.castTick < 45) return fail('cooldown');
-      if(['starfall','lightning','sunder','skeleton','golem','squad'].includes(spell)&&!state.inventions.structures.some(b=>['influence','ward'].includes(b.type)&&b.side===(p.side||'party')&&b.hp>0&&Math.hypot(b.position[0]-point[0],b.position[2]-point[2])<50))return fail('no_influence');
+      if (!Object.hasOwn(COST, spell) || !validPoint(message.point)) return fail('invalid_cast');
+      // Mana is the only rule that refuses a cast; placement rules move it instead.
+      const point = settleCastPoint(spell, message.point, {expedition: expeditionRunning(state.adventure)});
       if (p.mana < COST[spell]) return fail('insufficient_mana');
       if(spell==='crystal'||spell==='starfall')reclaimDepletedDeposits(state);
       if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
