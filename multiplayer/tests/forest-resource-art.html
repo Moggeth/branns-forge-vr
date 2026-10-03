@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Forest resource review</title><style>body{margin:0;background:#9aafb5}canvas{display:block}#label{position:absolute;left:18px;top:12px;color:#fff;font:18px sans-serif;text-shadow:0 1px 3px #000}</style><div id="label">Forest and resource material review</div><script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createResourceArt,enhanceTreeTemplate} from '../client/forest-resource-art.js';
+import {createTreeMaterials} from '../client/tree-materials.js';
+import {attachFracture} from '../client/mining-fracture.js';
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1280,800);renderer.setPixelRatio(1);renderer.shadowMap.enabled=true;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.55;room.dispose();pmrem.dispose();scene.background=new T.Color(0xa9bfcb);scene.add(new T.HemisphereLight(0xf0f4ff,0x756a3a,2));const sun=new T.DirectionalLight(0xffedcb,3.2);sun.position.set(5,15,8);scene.add(sun);
+const ground=new T.Mesh(new T.PlaneGeometry(100,100).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x797d51,roughness:1}));scene.add(ground);
+const camera=new T.PerspectiveCamera(48,1280/800,.1,150),art=createResourceArt(),mats=createTreeMaterials(),loader=new GLTFLoader();let fractures=[];
+for(const [n,x]of [['tree',-7],['tree_b',0],['tree_young',7]]){const model=(await loader.loadAsync('/assets/'+n+'.glb')).scene;enhanceTreeTemplate(model,{variant:n==='tree_b'?'weeping':n==='tree_young'?'upright':'broad'});model.position.set(x,0,-7);model.traverse(o=>{if(o.isMesh){const part=o.parent?.name||o.name;const role=part==='Leaves'?'leaf':'bark';o.material=mats.material(o.material,role);mats.decorate(o);}});scene.add(model);}
+for(const [kind,x]of [['iron',-5],['mithril',0],['crystal',5]])for(let stage=0;stage<2;stage++){const root=art.deposit(kind,{variant:0});root.position.set(x,0,stage*2);root.scale.setScalar(1.5);scene.add(root);if(stage){const f=attachFracture(T,root,kind);f.setDamage(2,4,{animate:false});fractures.push(f);}}
+for(const [n,kind]of ['ironOre','mithrilOre','starOre','iron','mithril','starMetal','crystal'].entries()){const p=art.pickup(kind);p.position.set((n-3)*1.55,0,5);p.scale.setScalar(2.7);scene.add(p);}
+camera.position.set(11,12,21);camera.lookAt(0,2,-1);mats.update(1);art.update(1);await renderer.compileAsync(scene,camera);renderer.render(scene,camera);
+window.forestResourceReview={stats:{resources:art.stats(),fractures:fractures.map(f=>f.stats()),programs:renderer.info.programs.length},close(){camera.position.set(5,6,13);camera.lookAt(0,.7,2);renderer.render(scene,camera);}};document.title='ready';
+</script>

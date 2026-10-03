@@ -1,3 +1,4 @@
+import {enhanceTreeTemplate} from './forest-resource-art.js';
 // Tree presentation: authored GLB kits, real notch carving, hinge fall driven by the shared sim tick, logs, LOD, wind.
 // No decisions here: every state change comes from snapshots; time is only used for cosmetic growth/recoil/chips/wind.
 // Intact trees live in shared InstancedMesh batches (tree-batch.js); a tree becomes an individual entity only while it
@@ -49,6 +50,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   return mats ? mats.attach(kit) : kit; // shared patched clones; template materials stay untouched
  }
  function buildKits() {
+  for(const name of [...VARIANTS,...VARIANTS.map(v=>v+'_lod')]){const source=templates.get(name)?.scene;if(source)enhanceTreeTemplate(source,{lod:name.endsWith('_lod'),variant:name.startsWith('tree_b')?'weeping':name.startsWith('tree_young')?'upright':'broad'});}
   kits = new Map(); missing.clear();
   for (const v of VARIANTS) { const full = kitFrom(v); if (full) { full.lod = templates.has(v + '_lod') ? kitFrom(v + '_lod') : null; kits.set(v, full); } }
   const cap = meshesUnder(templates.get('endcap')?.scene)[0]; woodMaterial = cap?.material || null; uvMap = fitEndcapUV(cap); if (!woodMaterial) missing.add('endcap');
