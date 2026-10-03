@@ -1,0 +1,213 @@
+{
+ "version": 1,
+ "units": "metre",
+ "up": "+Y",
+ "forward": "-Z",
+ "right": "+X",
+ "ballista": {
+  "origin": "ground centre under the traverse axis",
+  "pivots": {
+   "Traverse": {
+    "pos": [
+     0,
+     0.62,
+     0
+    ],
+    "axis": "+Y (yaw)",
+    "range_deg": null
+   },
+   "Elevation": {
+    "pos_in_traverse": [
+     0,
+     0.43,
+     0
+    ],
+    "axis": "+X (pitch, positive = muzzle up in Three)",
+    "range_deg": [
+     -8,
+     25
+    ]
+   },
+   "Recoil": {
+    "note": "animated by clips: translation along local +Z (backwards) and small pitch"
+   },
+   "Drum": {
+    "axis": "local X",
+    "pos_in_recoil": [
+     0,
+     0.15,
+     0.56
+    ]
+   },
+   "Crank": {
+    "axis": "local X",
+    "gear_ratio": 2.4444444444444446,
+    "pos_in_recoil": [
+     0,
+     0.0404,
+     0.6696
+    ]
+   },
+   "Trigger": {
+    "axis": "local X",
+    "pos_in_recoil": [
+     0,
+     -0.145,
+     0.05
+    ]
+   },
+   "Limb_*": {
+    "axis": "local Y (Three)",
+    "note": "rotate at limb root"
+   },
+   "String_*": {
+    "note": "unit cord along local +Y, scaled on Y to span tip -> nock"
+   },
+   "Claw_*": {
+    "axis": "local X"
+   },
+   "Vanes": {
+    "axis": "local X at hinge",
+    "open_deg": 40.0
+   }
+  },
+  "rail_centres_x": [
+   -0.5,
+   0.5
+  ],
+  "loaded_eye_spacing": 0.9,
+  "filament_taut_length": 1.12,
+  "filament_horn": [
+   0.0,
+   -0.01971,
+   -1.22169
+  ],
+  "events": {
+   "Fire": [
+    [
+     "trigger_pull",
+     0.0
+    ],
+    [
+     "release",
+     0.05
+    ],
+    [
+     "recoil_peak",
+     0.085
+    ],
+    [
+     "settled",
+     0.7
+    ]
+   ],
+   "Reload": [
+    [
+     "reload_start",
+     0.0
+    ],
+    [
+     "pawl_release",
+     0.12
+    ],
+    [
+     "strings_caught",
+     0.62
+    ],
+    [
+     "winding_start",
+     0.75
+    ],
+    [
+     "strings_latched",
+     2.2
+    ],
+    [
+     "bolts_seat",
+     2.62
+    ],
+    [
+     "filament_reset",
+     2.8
+    ],
+    [
+     "reload_complete",
+     3.15
+    ]
+   ],
+   "Idle_Loaded": [
+    [
+     "pawl_tick",
+     1.2
+    ]
+   ]
+  },
+  "clip_lengths": {
+   "Fire": 0.75,
+   "Reload": 3.15,
+   "Idle_Loaded": 3.0,
+   "Unloaded": 0.5
+  },
+  "cooldown_fit": {
+   "fire_plus_reload_s": 3.9,
+   "budget_s": 4.0
+  }
+ },
+ "bolts": {
+  "origin": "collar station on the shaft axis (filament eye is offset inboard)",
+  "tip_offset": [
+   0,
+   0,
+   -0.2
+  ],
+  "nock_offset": [
+   0,
+   0,
+   0.9
+  ],
+  "eye_offset_left": [
+   0.05,
+   0,
+   -0.005
+  ],
+  "eye_offset_right": [
+   -0.05,
+   0,
+   -0.005
+  ],
+  "shaft_radius": 0.027,
+  "length": 1.1,
+  "collision_capsule": {
+   "radius": 0.045,
+   "from": [
+    0,
+    0,
+    -0.2
+   ],
+   "to": [
+    0,
+    0,
+    0.9
+   ]
+  },
+  "events": {
+   "Deploy": [
+    [
+     "fins_open",
+     0.0
+    ],
+    [
+     "fins_settled",
+     0.22
+    ]
+   ],
+   "Impact": [
+    [
+     "impact",
+     0.0
+    ]
+   ]
+  },
+  "vane_open_deg": 40.0
+ }
+}

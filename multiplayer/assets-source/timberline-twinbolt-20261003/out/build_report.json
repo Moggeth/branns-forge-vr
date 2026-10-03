@@ -1,0 +1,563 @@
+{
+ "builder": "build_timberline.py",
+ "blender": "4.5.13 LTS",
+ "ballista": {
+  "bytes": 1458052,
+  "triangles": {
+   "LOD0": 12118,
+   "LOD1": 4104,
+   "other": 0
+  },
+  "materials": 6,
+  "animations": [
+   [
+    "Fire",
+    66
+   ],
+   [
+    "Reload",
+    66
+   ],
+   [
+    "Unloaded",
+    66
+   ],
+   [
+    "Idle_Loaded",
+    66
+   ]
+  ],
+  "images": [
+   {
+    "name": "tl_wood_normal",
+    "mime": "image/jpeg",
+    "bytes": 80605
+   },
+   {
+    "name": "tl_wood_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 108383
+   },
+   {
+    "name": "tl_iron_normal",
+    "mime": "image/jpeg",
+    "bytes": 72696
+   },
+   {
+    "name": "tl_iron_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 24734
+   },
+   {
+    "name": "tl_rope_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 10456
+   }
+  ],
+  "nodes": 106
+ },
+ "bolts": {
+  "bytes": 399952,
+  "triangles": {
+   "LOD0": 868,
+   "LOD1": 468,
+   "other": 0
+  },
+  "materials": 4,
+  "animations": [
+   [
+    "Deploy",
+    12
+   ],
+   [
+    "Impact",
+    12
+   ],
+   [
+    "Folded",
+    12
+   ]
+  ],
+  "images": [
+   {
+    "name": "tl_wood_normal",
+    "mime": "image/jpeg",
+    "bytes": 80605
+   },
+   {
+    "name": "tl_wood_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 108383
+   },
+   {
+    "name": "tl_iron_normal",
+    "mime": "image/jpeg",
+    "bytes": 72696
+   },
+   {
+    "name": "tl_iron_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 24734
+   }
+  ],
+  "nodes": 27
+ },
+ "collision": {
+  "bytes": 16920,
+  "triangles": {
+   "LOD0": 0,
+   "LOD1": 0,
+   "other": 208
+  },
+  "materials": 0,
+  "animations": [],
+  "images": [],
+  "nodes": 17
+ },
+ "texture_files": {
+  "tl_iron_basecolor.jpg": 24734,
+  "tl_iron_normal.jpg": 72696,
+  "tl_rope_basecolor.jpg": 10456,
+  "tl_wood_basecolor.jpg": 108383,
+  "tl_wood_normal.jpg": 80605
+ },
+ "contract": {
+  "version": 1,
+  "units": "metre",
+  "up": "+Y",
+  "forward": "-Z",
+  "right": "+X",
+  "ballista": {
+   "origin": "ground centre under the traverse axis",
+   "pivots": {
+    "Traverse": {
+     "pos": [
+      0,
+      0.62,
+      0
+     ],
+     "axis": "+Y (yaw)",
+     "range_deg": null
+    },
+    "Elevation": {
+     "pos_in_traverse": [
+      0,
+      0.43,
+      0
+     ],
+     "axis": "+X (pitch, positive = muzzle up in Three)",
+     "range_deg": [
+      -8,
+      25
+     ]
+    },
+    "Recoil": {
+     "note": "animated by clips: translation along local +Z (backwards) and small pitch"
+    },
+    "Drum": {
+     "axis": "local X",
+     "pos_in_recoil": [
+      0,
+      0.15,
+      0.56
+     ]
+    },
+    "Crank": {
+     "axis": "local X",
+     "gear_ratio": 2.4444444444444446,
+     "pos_in_recoil": [
+      0,
+      0.0404,
+      0.6696
+     ]
+    },
+    "Trigger": {
+     "axis": "local X",
+     "pos_in_recoil": [
+      0,
+      -0.145,
+      0.05
+     ]
+    },
+    "Limb_*": {
+     "axis": "local Y (Three)",
+     "note": "rotate at limb root"
+    },
+    "String_*": {
+     "note": "unit cord along local +Y, scaled on Y to span tip -> nock"
+    },
+    "Claw_*": {
+     "axis": "local X"
+    },
+    "Vanes": {
+     "axis": "local X at hinge",
+     "open_deg": 40.0
+    }
+   },
+   "rail_centres_x": [
+    -0.5,
+    0.5
+   ],
+   "loaded_eye_spacing": 0.9,
+   "filament_taut_length": 1.12,
+   "filament_horn": [
+    0.0,
+    -0.01971,
+    -1.22169
+   ],
+   "events": {
+    "Fire": [
+     [
+      "trigger_pull",
+      0.0
+     ],
+     [
+      "release",
+      0.05
+     ],
+     [
+      "recoil_peak",
+      0.085
+     ],
+     [
+      "settled",
+      0.7
+     ]
+    ],
+    "Reload": [
+     [
+      "reload_start",
+      0.0
+     ],
+     [
+      "pawl_release",
+      0.12
+     ],
+     [
+      "strings_caught",
+      0.62
+     ],
+     [
+      "winding_start",
+      0.75
+     ],
+     [
+      "strings_latched",
+      2.2
+     ],
+     [
+      "bolts_seat",
+      2.62
+     ],
+     [
+      "filament_reset",
+      2.8
+     ],
+     [
+      "reload_complete",
+      3.15
+     ]
+    ],
+    "Idle_Loaded": [
+     [
+      "pawl_tick",
+      1.2
+     ]
+    ]
+   },
+   "clip_lengths": {
+    "Fire": 0.75,
+    "Reload": 3.15,
+    "Idle_Loaded": 3.0,
+    "Unloaded": 0.5
+   },
+   "cooldown_fit": {
+    "fire_plus_reload_s": 3.9,
+    "budget_s": 4.0
+   }
+  },
+  "bolts": {
+   "origin": "collar station on the shaft axis (filament eye is offset inboard)",
+   "tip_offset": [
+    0,
+    0,
+    -0.2
+   ],
+   "nock_offset": [
+    0,
+    0,
+    0.9
+   ],
+   "eye_offset_left": [
+    0.05,
+    0,
+    -0.005
+   ],
+   "eye_offset_right": [
+    -0.05,
+    0,
+    -0.005
+   ],
+   "shaft_radius": 0.027,
+   "length": 1.1,
+   "collision_capsule": {
+    "radius": 0.045,
+    "from": [
+     0,
+     0,
+     -0.2
+    ],
+    "to": [
+     0,
+     0,
+     0.9
+    ]
+   },
+   "events": {
+    "Deploy": [
+     [
+      "fins_open",
+      0.0
+     ],
+     [
+      "fins_settled",
+      0.22
+     ]
+    ],
+    "Impact": [
+     [
+      "impact",
+      0.0
+     ]
+    ]
+   },
+   "vane_open_deg": 40.0
+  }
+ },
+ "collision_proxies": [
+  {
+   "name": "COL_Column",
+   "shape": "cylinder_y",
+   "parent": "Pedestal.001",
+   "radius": 0.34,
+   "height": 0.62,
+   "loc_blender": [
+    0,
+    0,
+    0.31
+   ]
+  },
+  {
+   "name": "COL_Feet_A",
+   "shape": "box",
+   "parent": "Pedestal.001",
+   "size_blender": [
+    2.04,
+    0.21,
+    0.175
+   ],
+   "loc_blender": [
+    0,
+    0,
+    0.0875
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0.7853981633974483
+   ]
+  },
+  {
+   "name": "COL_Feet_B",
+   "shape": "box",
+   "parent": "Pedestal.001",
+   "size_blender": [
+    2.04,
+    0.21,
+    0.175
+   ],
+   "loc_blender": [
+    0,
+    0,
+    0.0875
+   ],
+   "rot_blender": [
+    0,
+    0,
+    -0.7853981633974483
+   ]
+  },
+  {
+   "name": "COL_Carriage",
+   "shape": "cylinder_y",
+   "parent": "Traverse.001",
+   "radius": 0.37,
+   "height": 0.08,
+   "loc_blender": [
+    0,
+    0,
+    0.04
+   ]
+  },
+  {
+   "name": "COL_Fork",
+   "shape": "box",
+   "parent": "Traverse.001",
+   "size_blender": [
+    0.46,
+    0.66,
+    0.49000000000000005
+   ],
+   "loc_blender": [
+    0,
+    0,
+    0.24500000000000002
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Rail_L",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.18,
+    1.42,
+    0.22499999999999998
+   ],
+   "loc_blender": [
+    -0.5,
+    0.09000000000000002,
+    -0.0075
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Prod_L",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.9400000000000001,
+    0.2,
+    0.12
+   ],
+   "loc_blender": [
+    -0.5,
+    0.52,
+    0.0
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Rail_R",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.18,
+    1.42,
+    0.22499999999999998
+   ],
+   "loc_blender": [
+    0.5,
+    0.09000000000000002,
+    -0.0075
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Prod_R",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.9400000000000001,
+    0.2,
+    0.12
+   ],
+   "loc_blender": [
+    0.5,
+    0.52,
+    0.0
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Keel",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.18,
+    1.44,
+    0.14
+   ],
+   "loc_blender": [
+    0,
+    0.09999999999999998,
+    -0.06
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Windlass",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    1.5,
+    0.3,
+    0.32
+   ],
+   "loc_blender": [
+    0,
+    -0.6148007755419576,
+    0.06
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "COL_Horn",
+   "shape": "box",
+   "parent": "Recoil.001",
+   "size_blender": [
+    0.08,
+    0.42169470787048335,
+    0.12
+   ],
+   "loc_blender": [
+    0,
+    1.0108473539352416,
+    -0.039852536022663115
+   ],
+   "rot_blender": [
+    0,
+    0,
+    0
+   ]
+  }
+ ]
+}
