@@ -69,7 +69,9 @@ import {specialCooldown} from '../shared/special-cooldowns.js';
 import {worldTrees} from '../shared/world-content.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
-export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick},x,z,false);}
+// Presentation helpers pass only edits; the baked ground (old settled earthworks) comes from the latest snapshot.
+let currentTerrainBake;
+export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null }) {
   const started = performance.now();
@@ -1155,7 +1157,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
-      terrainSampler.setState(snapshot);
+      currentTerrainBake=snapshot.terrainBake;terrainSampler.setState(snapshot);
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
       presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});

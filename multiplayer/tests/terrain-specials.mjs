@@ -33,7 +33,10 @@ for(const tool of ['pick'])for(const cap of ['edits','deposits']) {
   let s=fixture(tool),c=s.checkpoint();
   if(cap==='edits')c.edits=Array.from({length:59},(_,i)=>({id:`e${i}`,kind:'raise',x:-30,z:-30,radius:6,height:2}));
   else c.deposits=Array.from({length:78},(_,i)=>({id:`o${i}`,kind:'stone',x:-30,z:-30,hits:0,maxHits:3,depleted:false}));
-  s=loadSimulation(c);const before=s.checkpoint();assert.equal(special(s).code,'world_limit');
+  s=loadSimulation(c);const before=s.checkpoint();
+  // Settled earth folds into the baked ground, so only deposits can still be full.
+  if(cap==='edits'){assert.equal(special(s).ok,true);assert.ok(s.snapshot().terrainBake);continue;}
+  assert.equal(special(s).code,'world_limit');
   assert.deepEqual(gameplay(s.checkpoint()),gameplay(before));
 }
 let s=fixture('pick',45,45);let c=s.checkpoint();c.players[0].yaw=Math.PI;s=loadSimulation(c);const edge=s.checkpoint();
@@ -103,7 +106,8 @@ assert.ok(s.snapshot().players[0].position[0]<outside-1);
 // Reserved future meteors count toward capacity before the special changes any gameplay.
 s=fixture('pick');c=s.checkpoint();c.edits=Array.from({length:57},(_,i)=>({id:`r${i}`,kind:'raise',x:-30,z:-30,radius:6,height:2}));
 c.pendingStarfalls=[{id:'meteorPending',x:-20,z:-20,radius:5,impactTick:48}];s=loadSimulation(c);
-const reserved=s.checkpoint();assert.equal(special(s).code,'world_limit');assert.deepEqual(gameplay(s.checkpoint()),gameplay(reserved));
+// Baking makes room for the wall plus the reserved meteor, so the live list stays within capacity.
+assert.equal(special(s).ok,true);{const after=s.checkpoint();assert.ok(after.edits.length+after.pendingStarfalls.length<=48&&after.terrainBake);}
 
 // Full pickup capacity preserves the last wall hit, cooldown and terrain; retry can finish later.
 s=fixture('pick');special(s);c=s.checkpoint();ore=c.deposits.find(d=>d.special==='pick_wall');ore.hits=2;

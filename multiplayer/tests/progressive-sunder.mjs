@@ -51,8 +51,12 @@ const legacy={...current,edits:current.edits.map(({rupture,...e})=>e)};
  step(s,72);step(restored,72);assert.deepEqual(s.snapshot(),restored.snapshot());
  for(let x=8;x<24;x+=.2)assert.ok(terrainHeight(s.snapshot(),x,10)-baseHeight(x,10)>=-6.000001);
  const capped=s.checkpoint();while(capped.edits.length<63)capped.edits.push({id:'cap'+capped.edits.length,kind:'raise',x:30,z:30,radius:6,height:2});
- const full=loadSimulation(capped),before=full.checkpoint();assert.equal(full.command('a',{type:'cast',seq:2,spell:'sunder',point:[16,0,10],start:[10,0,10],end:[22,0,10]}).ok,false);
- assert.deepEqual(full.checkpoint().edits,before.edits);assert.equal(full.snapshot().players[0].mana,before.players[0].mana);
+ // Unlimited terrain: a full list folds its oldest settled edits into the baked ground instead of refusing.
+ const full=loadSimulation(capped),before=full.checkpoint(),probe=[[30,30],[34,27],[12,10]].map(([x,z])=>terrainHeight(full.snapshot(),x,z));
+ assert.equal(full.command('a',{type:'cast',seq:2,spell:'sunder',point:[16,0,10],start:[10,0,10],end:[22,0,10]}).ok,true);
+ const after=full.snapshot();assert.ok(after.edits.length<=48&&after.terrainBake?.rev===1,'old edits baked');assert.ok(after.players[0].mana<before.players[0].mana);
+ [[30,30],[34,27]].forEach(([x,z],i)=>assert.ok(Math.abs(terrainHeight(after,x,z)-probe[i])<.001,'baked ground keeps its height'));
+ const again=loadSimulation(full.checkpoint());step(full,140);step(again,140);assert.deepEqual(full.snapshot(),again.snapshot(),'baked terrain survives checkpoint restore');
 }
 
 for(let x=8;x<=24;x+=.3)assert.equal(terrainHeight(current,x,10),terrainHeight(legacy,x,10),'completed earth is permanently identical to final state');

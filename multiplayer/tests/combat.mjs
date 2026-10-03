@@ -59,7 +59,7 @@ const clean=s.checkpoint();clean.detachedParts[0].unknown={nested:['unbounded']}
 
 // Terrain lines stay connected and reserve every edit atomically before spending mana.
 let r=createSimulation();r.addPlayer({id:'g',role:'god'});assert.equal(r.command('g',{type:'cast',seq:1,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).ok,true);assert.equal(r.snapshot().edits.length,9);
-cp=r.checkpoint();cp.players[0].castTick=-1000;cp.edits=Array.from({length:60},(_,i)=>({id:`edit${i}`,kind:'raise',x:0,z:0,radius:6,height:2}));r=loadSimulation(cp);const mana=r.snapshot().players[0].mana;assert.equal(r.command('g',{type:'cast',seq:2,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).code,'world_limit');assert.equal(r.snapshot().players[0].mana,mana);
+cp=r.checkpoint();cp.players[0].castTick=-1000;cp.edits=Array.from({length:60},(_,i)=>({id:`edit${i}`,kind:'raise',x:0,z:0,radius:6,height:2}));r=loadSimulation(cp);const mana=r.snapshot().players[0].mana;assert.equal(r.command('g',{type:'cast',seq:2,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).ok,true,'a full edit list bakes instead of refusing');assert.ok(r.snapshot().players[0].mana<mana);assert.ok(r.snapshot().edits.length<=48);
 
 // Saves from the first import wave acquire defaults without changing old content.
 const old=createSimulation().checkpoint();delete old.projectiles;delete old.embeds;delete old.detachedParts;old.enemies=[{id:'old',position:[0,0,0],yaw:0,hp:100,attackTick:-1000}];const upgraded=loadSimulation(old);assert.equal(upgraded.snapshot().enemies[0].kind,'skeleton');assert.deepEqual(upgraded.snapshot().projectiles,[]);
