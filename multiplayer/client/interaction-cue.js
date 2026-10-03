@@ -1,5 +1,5 @@
 import {isTestingGift,giftContents} from '../shared/testing-supplies.js';
-import {STRUCTURES} from '../shared/inventions.js';
+import {STRUCTURES, MACHINE_AMMO, inventionAvailable} from '../shared/inventions.js';
 import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
@@ -16,6 +16,7 @@ export const CUE_RULES = Object.freeze({
   pickupReach: 2.5,     // simulation.js interact: nearest pickup within 2.5 m of the feet
   forgeRange: 9,        // adventure.js DEPOSIT_RANGE around FORGE [0, 0]
   workshopReach: 5,     // inventions.js usable; outside the forge's three-metre collision footprint
+  structureReach: 5,    // inventions.js usable (flat distance); game.js useInvention uses the same reach
   inventoryCap: 999,    // simulation.js / trees.js inventory_full
   probeRange: 8,        // cue only: show "move closer" up to this aimed distance
 });
@@ -123,11 +124,11 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     if(c?.full)return make('pickup','full',q.id,`${materialLabel(q.kind)} ×${q.amount}`,'Pack full','');
   }
 
-  // The permanent forge is a usable world object, not a menu hidden behind Tab.
-  // Loose collectibles and aimed work targets retain priority over proximity use.
+  // The permanent forge is a usable world object, not a menu hidden behind Tab. Other structures are cued
+  // when looked at (aimedTarget). Loose collectibles and aimed work targets retain priority over proximity use.
   const forge = snapshot.inventions?.structures.find(b => b.type === 'forge' && b.hp > 0);
-  if (forge && flat(p, forge.position) <= CUE_RULES.workshopReach)
-    return make('pickup', 'ready', forge.id, 'Central Forge', 'Open workshop', keys === CONTROLS.touch ? '' : keys.collect, 'Build, refine and manage shared stores.');
+  const forgeCue = forge && structureCue(forge, self, snapshot, keys, make);
+  if (forgeCue) return forgeCue;
 
   // 4. Forge delivery: only inside DEPOSIT_RANGE while the expedition offers Deliver and the Hero carries an accepted kind.
   const deliver = ctx.deliver;
@@ -145,6 +146,24 @@ export function deliverableNow(adv, role, held = {}) {
     : adv.stage === 'star' ? (kind === 'gems' ? adv.need.star - adv.star.charge : 0)
     : Math.ceil((100 - adv.flame) / ({wood: 4, stone: 2, gems: 10}[kind] || Infinity));
   return ['wood', 'stone', 'gems'].filter(k => (held?.[k] | 0) > 0 && room(k) > 0);
+}
+
+/** Cue for using one structure, or null. Mirrors game.js useInvention and inventions.js usable/fire. */
+function structureCue(b, self, snapshot, keys, make) {
+  const p = self.position;
+  if (b.type === 'forge') return flat(p, b.position) <= CUE_RULES.workshopReach
+    ? make('pickup', 'ready', b.id, 'Central Forge', 'Open workshop', keys === CONTROLS.touch ? '' : keys.collect, 'Build, refine and manage shared stores.') : null;
+  const def = STRUCTURES[b.type];
+  if (!def?.use || b.side !== (self.side || 'party') || flat(p, b.position) > CUE_RULES.structureReach) return null;
+  const ammo = MACHINE_AMMO[b.type];
+  if (!ammo) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect);
+  if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', '');
+  // inventions.js pay: carried materials first, then the side's store when it is reachable.
+  const have = snapshot.inventions?.stockpiles ? inventionAvailable(snapshot, self) : (self.resources || {});
+  const cost = Object.entries(ammo).map(([k, n]) => `${n} ${materialLabel(k)}`).join(' + ');
+  if (Object.entries(ammo).every(([k, n]) => (have[k] | 0) >= n)) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect, `${cost} per shot`);
+  return make('pickup', 'short', b.id, def.name, def.use, keys.collect,
+    `Needs ${cost} per shot · you have ${Object.keys(ammo).map(k => `${have[k] | 0} ${materialLabel(k)}`).join(', ')}`);
 }
 
 function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) {
@@ -173,9 +192,8 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     if (local > CUT_RANGE[1]*s + .15) return make('tree', 'aim', id, 'Tree', 'Aim lower on the trunk', '', '', progress);
     return make('tree', 'ready', id, 'Tree', 'Chop', keys.strike, '', progress);
   }
-  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0&&(b.side===(self.side||'party')||b.type==='forge'));
-  if(building?.type==='forge'&&flat(p,building.position)<=CUE_RULES.workshopReach)return make('pickup','ready',id,'Central Forge','Open workshop',keys === CONTROLS.touch ? '' : keys.collect,'Build, refine and manage shared stores.');
-  if(building&&STRUCTURES[building.type]?.use&&hit.distance<=3.2)return make('pickup','ready',id,STRUCTURES[building.type].name,STRUCTURES[building.type].use,keys.collect);
+  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0);
+  if(building){const cue=structureCue(building,self,snapshot,keys,make);if(cue)return cue;}
   const ore = (snapshot.deposits || []).find(q => q.id === id);
   if (ore) {
     if (ore.depleted) return null; // depleted ores are not rendered (world-content-view.js), so never aimed
