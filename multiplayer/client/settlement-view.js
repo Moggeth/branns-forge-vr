@@ -4,9 +4,9 @@ import * as THREE from 'three';
 // attack clips. Owns only actor roots; the caller retains shared asset ownership.
 export function createSettlementView({scene,heroView}) {
  const entries=new Map();let workers=[];
- const data=w=>({...w,hp:100,role:'hero',tool:w.job==='wood'?'axe':'pick',name:`Worker ${w.id.replace('worker','')} · ${w.job}`});
+ const data=w=>({...w,hp:100,role:'hero',tool:w.defender?'crossbow':w.job==='wood'?'axe':'pick',name:w.defender?'Forge defender':`Worker ${w.id.replace('worker','')} · ${w.job}`});
  function sync(snapshot){
-  workers=snapshot?.settlement?.workers||[];const ids=new Set(workers.map(w=>w.id));
+  workers=[...(snapshot?.settlement?.workers||[]),...(snapshot?.inventions?.defenders||[]).map(d=>({...d,defender:true}))];const ids=new Set(workers.map(w=>w.id));
   for(const [id,e]of entries)if(!ids.has(id)){heroView.release(e.visual);e.root.removeFromParent();entries.delete(id);}
   for(const w of workers){
    let e=entries.get(w.id);if(!e){const visual=heroView.create(data(w),{variant:'mosswarden'});if(!visual)continue;const root=new THREE.Group();root.name=`Settlement ${w.id}`;root.userData.workerId=w.id;root.add(visual);scene.add(root);e={root,visual,data:data(w),position:new THREE.Vector3(...w.position),yaw:w.yaw};entries.set(w.id,e);root.position.copy(e.position);root.rotation.y=w.yaw;}

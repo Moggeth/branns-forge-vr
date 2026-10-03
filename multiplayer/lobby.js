@@ -10,7 +10,9 @@ import {spellbookReadiness} from './client/ability-readiness.js';
 import {spellUnavailable} from './client/spell-availability.js';
 import {actionError} from './client/action-feedback.js';
 import {createSpellbook} from './client/spellbook.js';
-import {createForgePanel} from './client/forge-panel.js';
+import {createInventionPanel} from './client/invention-panel.js';
+import {inventionView} from './shared/inventions.js';
+import './client/invention-panel.css';
 import './client/spellbook.css';
 import './client/forge-panel.css';
 import {SPELLS} from './shared/spells.js';
@@ -72,6 +74,8 @@ function friendlyError(detail) {
   if (code === 'insufficient_resources') return 'Not enough supplies. Check the cost, then collect more.';
   if (code === 'not_needed') return 'Already fully restored — no supplies were used.';
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
+  const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The hopper is busy. Try shortly.',output_empty:'No finished metal in your tray yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.'};
+  if(inventionErrors[code])return inventionErrors[code];
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
   if (code === 'save_failed') return raw && raw.length < 140 ? raw : 'This browser couldn’t save the world. Download a backup from the Menu.';
@@ -384,7 +388,7 @@ function recordProblem(problem) {
 let expeditionBanner = null;
 let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
 function expeditionAction(action,detail={}) {
-  if(action.startsWith('forge')){command('action',{action,...detail});return;}
+  if((action.startsWith('forge')||action.startsWith('invention'))){command('action',{action,...detail});return;}
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
   if (!session || !adv || !self) return;
   const send = payload => command('adventure', payload);
@@ -454,7 +458,7 @@ function onSnapshot(snapshot) {
   if (menuOpen && $('techDetails').open && snapshots % 10 === 0) renderTech();
   refreshFieldModel();
   if(self)spellbook?.update({...spellbookReadiness(self,snapshot.tick,spell,connected&&currentRole==='god'),blocked:Object.fromEntries(SPELLS.map(s=>[s.id,spellUnavailable(snapshot,self,s.id)]))});
-  if(forgeOpen)forgePanel?.update(settlementView(snapshot,playerId));
+  if(forgeOpen)forgePanel?.update(workshopModel(snapshot));
 }
 
 function meter(kind, value, max) {
@@ -657,9 +661,10 @@ function openForge(){
   if(phase!=='game'||!lastSnapshot||xrActive)return;
   restoreFieldLock=false;holdOverlays?.close();closeMenu(false);
   forgeOpen=true;document.exitPointerLock?.();syncActive();
-  forgePanel.show(settlementView(lastSnapshot,playerId));
+  forgePanel.show(workshopModel(lastSnapshot));
 }
-forgePanel=createForgePanel({mount:body,onAction:(action,detail)=>command('action',{action,...detail}),onClose:closeForge});
+function workshopModel(snapshot){const m=inventionView(snapshot,playerId),self=snapshot.players.find(p=>p.id===playerId),legacy=settlementView(snapshot,playerId);return {...m,legacyActions:[{action:'inventionCollectOutput',label:'Collect finished metal',enabled:snapshot.pickups.some(q=>q.id.startsWith('ingot')&&q.side===m.side)},{action:'inventionAssault',label:'Call a rewarded assault',enabled:!snapshot.inventions?.assault},{action:'inventionPlaceInfluence',label:'Build God Influence',enabled:true},{action:'inventionSide',label:m.side==='party'?'Join rival side (deposit first)':'Join cooperative side (deposit first)',detail:{side:m.side==='party'?'rivals':'party'},enabled:!self.heldOre&&!Object.values(self.resources).some(n=>n>0)},...(m.side==='party'?[...legacy.actions.filter(a=>a.action==='forgeSummon'),...legacy.workers.flatMap(w=>['wood','stone','gems','ironOre','mithrilOre','starOre','iron'].map(kind=>({action:'forgeAssign',label:w.name+': gather '+kind,enabled:!w.cargo,detail:{workerId:w.id,kind}})))]:[])]};}
+forgePanel=createInventionPanel({mount:body,onAction:(action,detail)=>{if(action==='inventionPlaceInfluence'){closeForge();game.beginInventionPlacement('influence');return;}command('action',{action,...detail});},onPlace:type=>{closeForge();game.beginInventionPlacement(type);},onClose:closeForge});
 for(const button of document.querySelectorAll('[data-open-forge]'))button.addEventListener('click',openForge);
 function updateSpellHint(){const spec=SPELLS.find(s=>s.id===spell);if(!spec)return;const quick=$('quickCast')?.checked;setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?(quick?'Drag to cast; or tap two ends':'Drag to aim; touch Cast confirms'):(quick?'Tap ground to cast':'Aim, then cast')}`);}
 function chooseSpell(next) {

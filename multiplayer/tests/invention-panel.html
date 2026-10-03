@@ -1,0 +1,4 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../client/invention-panel.css"></head><body style="margin:0;background:#65754a"><script type="module">
+import {createInventionPanel} from '../client/invention-panel.js';import {createSimulation} from '../shared/simulation.js';import {inventionView} from '../shared/inventions.js';
+const sim=createSimulation();sim.addPlayer({id:'preview',role:'god'});Object.assign(sim.adventureWorld().players[0].resources,{wood:15,stone:12,ironOre:4});const panel=createInventionPanel({onAction:(a,d)=>{window.lastAction={a,d}},onPlace:t=>window.placed=t});panel.show(inventionView(sim.snapshot(),'preview'));window.preview={sim,panel};
+</script></body></html>

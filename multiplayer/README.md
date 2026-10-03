@@ -1,5 +1,16 @@
 # Browser multiplayer proof
 
+## Physical inventions — 2026-10-03
+
+Open **Menu → Manage the forge**. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
+
+All twelve core structure jobs are implemented. Timberline uses 2 Wood + 1 Iron per shot, cuts trees in a cascade and severs golem arms. Heavy Launcher costs 3 Stone + 1 Iron per shot and deforms ground. Wards, traps, gate, logging yard, prospecting, sanctuary rally, tower ramp and barracks defenders have distinct actions. Machines can turn 45° per action, with a short turning delay plus firing reload. Opponents can attack Influence sources to disable nearby destructive God spells. Quiet-interval incursions and distant patrols provide ongoing salvage.
+
+Heroes can E/tap nearby owned structures. VR uses the wrist workshop with controller-ray placement/aiming; grip ore and release over the hopper, or use the convenient Refine action. Worker assignments include ore and scrap, so solo Gods can advance the same economy. Physical phone/HMD acceptance remains unverified.
+
+Checks: `node tests/inventions-review.mjs`, `node tests/material-economy.mjs`, `node tests/forge-protection.mjs`; browser `tests/browser-inventions.mjs` imports an explicitly stocked QA save and uses actual touch controls. `tests/invention-gallery.html` renders the actual authored models. See [source, measured timings and limitations](../docs/PHYSICAL-INVENTIONS-20261003.md).
+
+
 ## Quiet phone HUD — 2026-10-03
 
 Tap the current spell/weapon to open its palette. **More (⋯)** holds invitations,

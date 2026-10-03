@@ -267,8 +267,8 @@ test('runtime wiring: panel guard runs first and lobby mirrors expeditionAction'
   const panelSource = read('../client/vr-adventure-panel.js');
   assert.doesNotMatch(panelSource, /buttons\[|addEventListener|querySelector|getElementById/, 'panel reads no gamepad buttons and no DOM');
   assert.match(lobby, /onExpeditionAction: expeditionAction/);
-  assert.match(game,/onAction: \(action,detail\) => onExpeditionAction\(action,detail\)/);
-  assert.match(lobby,/if\(action\.startsWith\('forge'\)\)\{command\('action',\{action,\.\.\.detail\}\)/);
+  assert.match(game,/onAction: \(action,detail\).*beginInventionPlacement.*onExpeditionAction\(action,detail\)/);
+  assert.match(lobby,/action\.startsWith\('forge'\).*action\.startsWith\('invention'\).*command\('action',\{action,\.\.\.detail\}\)/);
   assert.match(lobby, /if \(xrActive\) game\.setExpedition\(view, snapshot, playerId\);/);
 });
 

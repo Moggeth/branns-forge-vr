@@ -1,3 +1,4 @@
+import {inventionView} from '../shared/inventions.js';
 // In-world VR Hero panel for the Forge Expedition. One CanvasTexture quad hovers above the off-hand wrist, faces the
 // head, and is operated by the pointer-hand select ray (trigger). It consumes adventureView() from shared/adventure.js
 // plus the viewer's carried resources and emits only lobby expeditionAction names; it owns no world state.
@@ -30,7 +31,7 @@ export function carried(snapshot, playerId) {
 }
 // Mirrors lobby expeditionAction('deposit'): kinds the current stage accepts that the hero is carrying.
 export function deliverable(stage, held) {
-  const kinds = stage === 'camp' ? ['wood', 'stone'] : stage === 'star' ? ['gems'] : ['wood', 'stone', 'gems'];
+  const kinds = stage === 'camp' ? ['wood', 'stone'] : stage === 'star' ? ['gems'] : ['wood', 'stone', 'gems', 'ironOre', 'mithrilOre', 'starOre', 'iron'];
   return kinds.filter(k => (held[k] || 0) > 0);
 }
 export function nextStep(view, held) {
@@ -91,9 +92,9 @@ export function heroPanelModel(view, held, ui = {}) {
     rows, next: nextStep(view, held), alert, carry: CARRY.map(([k, icon]) => ({icon, count: held[k] || 0})), buttons};
 }
 export function forgePanelPages(settlement){
- const pages=settlement.actions.filter(a=>a.action!=='forgeAssign').map(a=>({...a,id:`forge:${a.action}:${a.detail?.kind||''}`,category:a.action==='forgeSupply'?'Supplies':'Forge'}));
+ const pages=settlement.actions.filter(a=>a.action!=='forgeAssign').map(a=>({...a,id:`forge:${a.action}:${a.detail?.kind||a.detail?.structureId||''}`,category:a.action==='forgeSupply'?'Supplies':'Forge'}));
  const assign=settlement.actions.find(a=>a.action==='forgeAssign');
- for(const w of settlement.workers)for(const kind of ['wood','stone','gems'])if(kind!==w.job)pages.push({id:`forge:job:${w.id}:${kind}`,action:'forgeAssign',label:`Assign ${kind}`,title:`${w.name||w.id} · ${w.job}`,category:'Workers',enabled:assign?.enabled!==false&&!w.cargo,reason:w.cargo?'Wait for this worker to deliver cargo':assign?.reason||'',detail:{workerId:w.id,kind},cost:{},phase:w.phase});
+ for(const w of settlement.workers)for(const kind of ['wood','stone','gems','ironOre','mithrilOre','starOre','iron'])if(kind!==w.job)pages.push({id:`forge:job:${w.id}:${kind}`,action:'forgeAssign',label:`Assign ${kind}`,title:`${w.name||w.id} · ${w.job}`,category:'Workers',enabled:assign?.enabled!==false&&!w.cargo,reason:w.cargo?'Wait for this worker to deliver cargo':assign?.reason||'',detail:{workerId:w.id,kind},cost:{},phase:w.phase});
  return pages;
 }
 export function forgePanelModel(settlement,pageId,ui={}){
@@ -280,6 +281,7 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
       if (disposed) return false;
       const wasEmpty=!view;view = nextView || null; held = carried(snapshot, playerId);
       settlement=snapshot?.settlement?settlementView(snapshot,playerId):null;
+      if(settlement&&snapshot.inventions){const m=inventionView(snapshot,playerId);settlement.stock=m.stock;settlement.goal='Gather, refine, invent. Place with the controller ray.';settlement.actions=[{action:'inventionDeposit',label:'Deposit all',enabled:m.canDeposit},{action:'inventionCollectOutput',label:'Collect metal',enabled:snapshot.pickups.some(q=>q.id.startsWith('ingot')&&q.side===m.side)},...['ironOre','mithrilOre','starOre'].map(kind=>({action:'inventionRefine',label:'Refine '+kind,enabled:m.refine[kind].enabled,detail:{kind,amount:1}})),...m.recipes.filter(r=>r.id!=='forge').map(r=>({action:'inventionPlace',label:'Build '+r.name,cost:r.cost,enabled:r.enabled,reason:'Gather the recipe materials',detail:{kind:r.id}})),...m.structures.filter(b=>b.type!=='forge').map(b=>({action:['timberline','launcher'].includes(b.type)?'inventionAim':'inventionUse',label:b.useLabel+' '+b.name,enabled:b.hp>0&&b.usable,detail:{structureId:b.id}})),...m.structures.filter(b=>['timberline','launcher'].includes(b.type)).map(b=>({action:'inventionTurn',label:'Turn 45° '+b.name,enabled:b.hp>0&&b.usable&&!b.cooldown,detail:{structureId:b.id}})),...m.structures.filter(b=>b.type!=='forge'&&b.hp<b.maxHp).map(b=>({action:'inventionRepair',label:'Repair '+b.name,cost:b.repairCost,enabled:b.repairEnabled,detail:{structureId:b.id}})),{action:'inventionAssault',label:'Call assault',enabled:!snapshot.inventions.assault},...settlement.actions.filter(a=>['forgeSummon','forgeAssign'].includes(a.action))];}
       if(wasEmpty&&settlement&&view?.stage==='idle')section='forge';
       if (!view) { hide(); pressed = null; confirmAt = 0;raidConfirmAt=0;section='quest';pageId=null;return false; }
       return redraw();

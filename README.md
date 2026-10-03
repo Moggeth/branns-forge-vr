@@ -1,3 +1,5 @@
+Browser physical inventions (2026-10-03): permanent forge, owned storage, ore refining, twelve working structure roles and autonomous conflict. Open Menu > Manage the forge. See [implementation and checks](docs/PHYSICAL-INVENTIONS-20261003.md).
+
 Browser solo/world feedback (2026-10-03): workers, forge development and raids for solo Heroes/Gods; all 14 spells, progressive Sunder, physical creature feedback and diegetic weapon readiness. See docs/SOLO-WORLD-FEEDBACK-20261003.md for controls, checks and limitations.
 
 Browser multiplayer preview (2026-10-02): https://branns-forge-multiplayer.vercel.app — eight-player peer rooms, FPS/VR Heroes, RTS Gods. See multiplayer/PEER-PLAYTEST.md for current limits, saves, hosting and recovery.

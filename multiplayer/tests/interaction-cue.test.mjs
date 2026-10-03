@@ -72,17 +72,17 @@ test('ore: Mine with pick, wrong tool, star shard naming, progress', () => {
   const s = snap({deposits: [{id: 'ore1', x: 0, z: -2.5, kind: 'stone', hits: 1, maxHits: 3, depleted: false}, {id: 'm1', x: 0, z: -2.5, kind: 'meteor', hits: 0, maxHits: 5, depleted: false}]});
   const p = [0, .6, -2.0];
   const m = decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'ore1'), ctx());
-  assert.deepEqual([m.kind, m.name, m.action, m.control, m.note, m.progress], ['ore', 'Boulder', 'Mine', 'Click', 'stone', {done: 1, total: 3}]);
+  assert.deepEqual([m.kind, m.name, m.action, m.control, m.note, m.progress], ['ore', 'Stone boulder', 'Mine', 'Click', 'Foundations, walls and heavy ammunition.', {done: 1, total: 3}]);
   const w = decideCue(view(), hero(), s, aimAt(p, 'ore1'), ctx());
   assert.deepEqual([w.action, w.control], ['Needs the Pick', '2']);
-  assert.equal(decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'm1'), ctx()).name, 'Star shard');
+  assert.equal(decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'm1'), ctx()).name, 'Meteor');
 });
 test('loose log in reach: Collect E directly', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -1.8])]});
   const c = decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Collect', 'E', '']);
+  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Collect', 'E', 'Frames, ammunition shafts and repairs.']);
   const t = decideCue(view({mode: 'touch'}), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([t.control, t.note], ['Collect', '']);
+  assert.deepEqual([t.control, t.note], ['Collect', 'Frames, ammunition shafts and repairs.']);
 });
 test('log beyond grab reach: Move closer', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -4])]});
