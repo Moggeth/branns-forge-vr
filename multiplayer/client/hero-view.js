@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
 import {setWeaponGrip, updateWeaponPresentation} from './asset-pose.js';
+import {SIEGEBIRD_RELOAD} from './siegebird-reload.js';
 
 // Remote Hero body (opus-player-character). Presentation only: reads snapshot
 // position/yaw/role/hp/tool/head/hands and attributed events, never writes input, physics or network state.
@@ -53,7 +54,8 @@ export function poseRemoteWeapon(visual, tool) {
  * while the template is not loaded. The view never disposes template GPU resources; it only disposes what
  * updateWeaponPresentation itself allocates per visual (the bowstring line).
  */
-export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null} = {}) {
+// siegebird: () => the shared songbird flock (siegebird-flock.js) or null while its assets load.
+export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null} = {}) {
   let template = null, clips = null, eyeHeight = 1.645;
   const materials = new Map(), live = new Set(), warned = new Set();
 
@@ -147,7 +149,15 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   function event(group, ev, data = {}) {
     const u = group?.userData; if (!u?.hero || !ev) return null;
     if (ev.kind === 'embed') { u.embedAt = u.clock; return null; }        // same-frame hits are a projectile contact relayed by the host
-    if (ev.kind === 'shoot' && ['bow', 'crossbow'].includes(ev.weapon)) { u.recoil = 1; return 'recoil'; }
+    if (ev.kind === 'shoot' && ['bow', 'crossbow'].includes(ev.weapon)) {
+      u.recoil = 1;
+      if (ev.weapon === 'crossbow') {
+        u.reloadAt = u.clock; const flock = siegebird?.();
+        if (flock && u.weapon && u.weaponTool === 'crossbow') { flock.fired(u.weapon, !!ev.golden);
+          flock.shot(u.weapon, {n: ev.reload?.n ?? ((data.siegebird?.n ?? 0) + 1), golden: ev.reload?.golden ?? null, playerId: data.id ?? '', time: u.clock}); }
+      }
+      return 'recoil';
+    }
     const special = HERO_ATTACK_EVIDENCE.special.includes(ev.kind), strike = HERO_ATTACK_EVIDENCE.strike.includes(ev.kind);
     if (!special && !strike) return null;
     const tool = data.tool ?? u.weaponTool;
@@ -269,8 +279,19 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     u.hp = data.hp;
     syncWeapon(u, data);
     if (u.weapon) u.weapon.visible = !(u.lod && cameraPosition && root.getWorldPosition(_v).distanceToSquared(cameraPosition) > 4 * lodDistance * lodDistance);
-    if (u.recoil > 0) { u.recoil = Math.max(0, u.recoil - dt * 1.4);
-      if (u.weaponTool === 'crossbow' && u.weapon) updateWeaponPresentation(u.weapon, 'crossbow', {recoil: u.recoil, time: u.clock}); }
+    if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 1.4);
+    if (u.weaponTool === 'crossbow' && u.weapon) {
+      // The whole Siegebird cycle replays from the shot event: wind, latch and the songbird seating the bolt.
+      const t = u.clock - (u.reloadAt ?? -Infinity), flock = siegebird?.();
+      if (t <= SIEGEBIRD_RELOAD.gone + .1) updateWeaponPresentation(u.weapon, 'crossbow', {reload: t, time: u.clock});
+      else if (u.reloadAt !== undefined) { updateWeaponPresentation(u.weapon, 'crossbow', {reload: Infinity}); u.reloadAt = undefined; }
+      if (flock) {
+        const sb = data.siegebird;
+        if (sb && t <= SIEGEBIRD_RELOAD.gone) flock.inform(u.weapon, sb);
+        else if (sb && flock.loadedGolden(u.weapon) !== sb.golden) flock.rest(u.weapon, sb.golden);
+        if (u.weapon.visible) flock.update(u.weapon, u.clock, {viewer: cameraPosition, dt});
+      }
+    }
     if (data.head) placeBody(u, data, root, dt);
     else { u.torsoYaw = null; u.crouch = 0; u.look = null; if (u.model.rotation.y || u.model.position.x || u.model.position.z) { u.model.rotation.y = 0; u.model.position.set(0, 0, 0); } }
     locomotion(u, u.model, dt);

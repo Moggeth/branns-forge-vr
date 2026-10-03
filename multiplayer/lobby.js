@@ -18,6 +18,7 @@ import './client/invention-panel.css';
 import './client/spellbook.css';
 import './client/forge-panel.css';
 import {SPELLS} from './shared/spells.js';
+import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
@@ -467,7 +468,7 @@ function onSnapshot(snapshot) {
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · Q crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:'Siegebird · click to fire · unlimited bolts',bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · Q crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }

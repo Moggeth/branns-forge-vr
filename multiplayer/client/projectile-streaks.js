@@ -8,6 +8,8 @@ import * as THREE from 'three';
 export const STREAK_STYLE = Object.freeze({
   arrow: {color: 0xf3b25e, length: .55, perSpeed: .018, width: .018, max: 1.1},
   bolt: {color: 0xdcd4c2, length: .32, perSpeed: .006, width: .011, max: .6},
+  // Golden Siegebird bolt (quad damage): a longer, brighter gold comet.
+  golden: {color: 0xffc845, length: .7, perSpeed: .016, width: .03, max: 1.4},
 });
 
 // Crossed ribbons along +Z (head at z=0, tail at z=-1), so streaks read from
@@ -36,7 +38,7 @@ export function createProjectileStreaks({capacity = 96} = {}) { // COMBAT_LIMITS
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.count = 0; mesh.frustumCulled = false;
   mesh.name = 'ranged-projectile-streaks'; mesh.userData.ignoreContact = true;
   mesh.setColorAt(0, new THREE.Color()); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-  const colors = {arrow: new THREE.Color(STREAK_STYLE.arrow.color), bolt: new THREE.Color(STREAK_STYLE.bolt.color)};
+  const colors = {arrow: new THREE.Color(STREAK_STYLE.arrow.color), bolt: new THREE.Color(STREAK_STYLE.bolt.color), golden: new THREE.Color(STREAK_STYLE.golden.color).multiplyScalar(1.6)};
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), v = new THREE.Vector3(), z = new THREE.Vector3(0, 0, 1), dim = new THREE.Color();
 
   // projectiles: snapshot.projectiles (or the rendered interpolated subset).
@@ -46,7 +48,7 @@ export function createProjectileStreaks({capacity = 96} = {}) { // COMBAT_LIMITS
     let n = 0;
     for (const data of projectiles || []) {
       if (n >= capacity) break;
-      const style = STREAK_STYLE[data.kind]; if (!style || hidden?.has(data.id)) continue;
+      const look = data.golden && data.kind === 'bolt' ? 'golden' : data.kind, style = STREAK_STYLE[look]; if (!style || hidden?.has(data.id)) continue;
       v.fromArray(data.velocity); const speed = v.length(); if (speed < 1) continue;
       positionOf ? p.copy(positionOf(data)) : p.fromArray(data.position);
       q.setFromUnitVectors(z, v.multiplyScalar(1 / speed));
@@ -55,7 +57,7 @@ export function createProjectileStreaks({capacity = 96} = {}) { // COMBAT_LIMITS
       const born = data.trail?.length ?? 16, fade = Math.min(1, born / 4);
       s.set(style.width, style.width, length * fade);
       m.compose(p, q, s); mesh.setMatrixAt(n, m);
-      mesh.setColorAt(n, dim.copy(colors[data.kind]).multiplyScalar(.55 + .45 * fade)); n++;
+      mesh.setColorAt(n, dim.copy(colors[look]).multiplyScalar(.55 + .45 * fade)); n++;
     }
     mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     return n;
