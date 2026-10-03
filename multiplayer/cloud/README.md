@@ -1,0 +1,106 @@
+# Cloud rooms (personal free plan)
+
+Stable service: https://branns-forge-rooms.fauxgrady.workers.dev
+
+Browser endpoint: `wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud`.
+Vercel serves the game/assets. One player runs the 60 Hz world simulation. Cloudflare
+Workers and one SQLite Durable Object per room handle eight-digit invites, membership,
+reconnect credentials and host handoff. Neither the developer's PC nor its tunnel is
+in this route. Closing the browser that is *currently hosting a world* still requires
+another eligible desktop player to accept the continuation offer. Otherwise use the
+browser recovery save. This is not a dedicated always-running simulation/cloud save.
+
+Direct WebRTC is preferred. After eight seconds without a usable connection, the same
+cloud service forwards bounded game frames over secure WebSockets. This avoids a paid
+TURN dependency and works when UDP/direct peer connections are blocked. The relay can
+see forwarded payloads; it does not log or persist game state. Each client renders its
+own graphics. A relay has extra latency compared with a direct route.
+
+The personal account's Workers **Free / $0 / Current plan** was verified in the
+dashboard on 2026-10-03. No paid plan, TURN service or payment method was enabled.
+Free quotas are hard limits, not unlimited capacity: 100,000 Worker requests/day,
+100,000 Durable Object requests/day (incoming WebSocket messages count 20:1),
+13,000 GB-seconds/day of DO duration and the SQLite storage/write limits apply.
+Multiple busy relayed rooms use that allowance faster than direct rooms. At capacity,
+new joins/relayed play can fail until reset; solo works and healthy direct edges can
+continue through a temporary signaling outage. Never promise unlimited public scale.
+Pricing source: https://developers.cloudflare.com/durable-objects/platform/pricing/
+
+## Deploy / inspect / recover
+
+From `multiplayer/` using the personal Cloudflare subscription:
+
+```powershell
+npx --yes wrangler@4.147.0 whoami
+npx --yes wrangler@4.147.0 deploy --config cloud/wrangler.jsonc
+npx --yes wrangler@4.147.0 tail --config cloud/wrangler.jsonc
+./scripts/deploy-peer-preview.ps1 -PeerUrl wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud
+```
+
+`GET /peer/health` reports service/protocol, never credentials. Dashboard Workers
+observability samples 10% of events; explicit application logs include room/count only.
+Do not print Wrangler OAuth tokens, socket credentials, SDP or game frame contents.
+Secrets stay in Wrangler's user configuration, never this repository. Revalidate the
+Free plan before any account upgrade or paid service integration.
+
+The Worker uses a hibernating WebSocket API, persisted membership/authority and alarms
+instead of polling timers. Closed rooms expire after 30 minutes with no signaling
+sockets; all rooms have an eight-hour lifetime. Worlds remain recoverable from client
+saves. An explicit host departure offers continuation immediately; network loss gets
+15 seconds of grace. A continuation offer lasts two minutes. Healthy direct peers
+decline unnecessary migration offers after a signaling-only interruption.
+
+Origins are explicitly allowlisted; signaling/relay routes are restricted to the
+room's host and guests. There are per-IP connection limits, per-socket message/byte
+limits, at most eight members, at most sixteen pending/connected sockets, and 12-second
+join timeouts. These limits reduce abuse but invite codes are not private accounts or
+anti-cheat. Browser hosts are authoritative and trusted in this friends playtest.
+
+For local development:
+
+```powershell
+npx --yes wrangler@4.147.0 dev --config cloud/wrangler.jsonc --port 8791 --inspector-port 9233
+# Separate shell:
+$env:VITE_PEER_WS_URL='ws://127.0.0.1:8791/peer/cloud'
+npm run dev -- --strictPort
+# Separate shell:
+node cloud/test.mjs
+```
+
+Stop only the owned local Wrangler/Vite commands with Ctrl+C. `.wrangler` runtime
+state is ignored. Do not delete a production Durable Object namespace to troubleshoot:
+that loses room membership. Deploy a fix/rollback and let clients resume with their
+credentials. The user-owned old 8789 service and Quick Tunnel were deliberately not
+stopped during migration and are no longer required by the new website build.
+
+## Verification and lessons
+
+- Local protocol: 0.353 s. Hosted protocol: 1.984 s. Origin rejection, room/peer isolation,
+  eight-player limit, relay forwarding, epoch rejection, reconnect identity, transfer and
+  host-departure recovery passed.
+- Hosted real-browser direct route: 6.031 s, including a forced signaling outage while
+  simulation/RTC continue, restoration without replacing the live simulation, host
+  handoff and old-host commands accepted by the new host.
+- Hosted forced no-ICE route: 17.743 s, including the eight-second fallback at first
+  join and again at handoff. Game commands replicate through the actual cloud relay.
+- Public-interface local-cloud Hero/God expedition and terrain replication: 11.978 s.
+- Solo/reload regression and legacy Node signaling tests: combined command 2.178 s.
+- Timberline: 14 authority checks (0.168 s); real touch Aim & fire and 2 Wood + 1 Iron
+  ammunition deduction (5.964 s). Build costs 10 Wood + 6 Iron + 2 Mithril; four-second
+  reload. Menu > Forge > Build > Timberline; then Built > Aim & fire. VR has the same
+  ray placement/aim actions, but physical headset acceptance is still unverified.
+- Initial protocol fixture assumed ordering across *different* sockets: transfer raced
+  checkpoint readiness and timed out. Use a same-socket ping acknowledgment barrier.
+- An initial browser fixture sent `target` to cast instead of the real `point` contract;
+  it correctly failed `invalid_cast`. Reuse existing session fixtures.
+- Handoff left old relay/ICE frames in flight; the coordinator rejects stale epochs and
+  the client suppresses only errors already explained by a known epoch/departure.
+- Wrangler OAuth lacks subscription-list API permission (403). Verify the actual plan
+  in the dashboard rather than attempting wider credentials or assuming it is paid/free.
+
+Use `tests/cloud-transport.mjs` with `CLOUD_WS_URL`, `ACCEPT_BASE` (local fixture server),
+`PW_CORE`, `PW_CHROME`, `BROWSER_QA_DIR`; `FORCE_RELAY=1` injects unavailable ICE.
+Fixtures are excluded from the public deployment. `cloud/test.mjs` accepts
+`CLOUD_TEST_URL` / `CLOUD_TEST_ORIGIN`. Logs/captures/results go under ignored `logs/`.
+Physical headset, physical phone and two independent household networks remain manual
+acceptance items; forced-relay tests demonstrate the fallback, not those devices.

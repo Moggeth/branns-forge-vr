@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>Room transport verification fixture</title>
+<p>Networking fixture. No game UI or assets.</p>
+<script type="module">
+import { WorldSession } from '../client/session.js';
+window.makeSession = (url, options) => {
+  const data = new Map();
+  const storage = { getItem: k => data.get(k) ?? null, setItem: (k,v) => data.set(k,v), removeItem: k => data.delete(k) };
+  const s = new WorldSession({url,storage}); window.s = s; window.events = [];
+  for (const name of ['status','welcome','error','continue_world_offer','host_changed']) s.addEventListener(name,e=>window.events.push({name,detail:e.detail}));
+  s.connect(options);
+};
+</script>

@@ -347,7 +347,7 @@ function onWelcome(detail) {
   setText($('hudName'), nameInput.value.trim() || 'Wanderer');
   hideLobbyStatus();
   setPhase('game');
-  notice('loading', 'Gathering the world…', null, 'info');
+  if (!detail.resume) notice('loading', 'Gathering the world…', null, 'info');
   refreshHostControls();
 }
 
@@ -360,7 +360,7 @@ const STATUS_TEXT = {
 function onStatus(detail) {
   const state = String(detail?.state || '');
   lastStatus = state || 'unknown';
-  connected = state === 'connected' || state === 'hosting';
+  connected = state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
   syncActive();
   if (phase === 'connecting' && !playerId && state === 'closed') {
     teardown(); setPhase('lobby');
@@ -368,6 +368,9 @@ function onStatus(detail) {
     return;
   }
   if (phase !== 'game') return;
+  if (state === 'signaling_reconnecting') {
+    notice('net', detail.playable ? 'Game connected. Restoring invites…' : 'Restoring the room connection…', null, 'info'); return;
+  }
   if (connected) { for (const id of ['net','owner','waiting','continue','relay']) removeNotice(id); return; }
   if (state === 'reconnecting' || state === 'connecting') notice('net', STATUS_TEXT[state], null, 'info');
   else if (state === 'disconnected' || state === 'closed') {

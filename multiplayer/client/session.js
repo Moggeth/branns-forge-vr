@@ -43,7 +43,8 @@ export class WorldSession extends EventTarget {
       const resume = this.identity?.peerId === d.peerId && this.identity?.room === d.room;
       this.identity = d; if (!resume) { this.sequence = sequenceFloor(); this.decoder.reset(); }
       this.emit('welcome', d);
-      if (d.hostId === d.peerId) this.promote(resume ? this.latest : this.initialCheckpoint);
+      if (d.hostId === d.peerId && !(resume && d.resume && this.simulation)) this.promote(resume ? this.latest : this.initialCheckpoint);
+      else if (d.hostId !== d.peerId && this.simulation) this.simulation = null;
     });
     on('message', ({detail}) => this.receive(detail));
     on('peer_connected', ({detail:d}) => {

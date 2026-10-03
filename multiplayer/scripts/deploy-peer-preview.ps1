@@ -2,7 +2,7 @@ param([Parameter(Mandatory=$true)][string]$PeerUrl, [switch]$StageOnly)
 $ErrorActionPreference = 'Stop'
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $uri = [Uri]$PeerUrl
-if ($uri.Scheme -ne 'wss' -or $uri.AbsolutePath -ne '/peer/ws') { throw 'Expected wss://host/peer/ws' }
+if ($uri.Scheme -ne 'wss' -or $uri.AbsolutePath -notin @('/peer/ws','/peer/cloud')) { throw 'Expected wss://host/peer/cloud (cloud) or /peer/ws (local service)' }
 $projectRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $projectRoot
 try {

@@ -7,3 +7,4 @@ dist-check/
 server/.godot/
 state/
 logs/
+.wrangler/
