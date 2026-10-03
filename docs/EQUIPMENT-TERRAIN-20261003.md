@@ -98,3 +98,21 @@ remain unverified. Local and remote VR command routing is covered by
 The original peer on 8789 and its tunnel are preserved. Root QA uses separate
 8799/5188 processes; stop only those owned sessions at handoff. Release details
 are appended after public verification.
+
+## Release verification and final dock correction
+
+Public runtime 576c2d1 deployed successfully in 19.367 s. Anonymous two-player
+public play passed in 12.974 s; real axe/pick specials and shaders 9.916 s,
+progressive mining 6.429 s, and highlight/direct lumber collection 4.520 s.
+Version tag was visually confirmed as `576c2d1 · 10-03 00:58Z`.
+
+The first public overlay harness failed at 8.2 s because a detached unit test
+imported a Vite-only source URL. That unit check now runs only on localhost;
+public acceptance still exercises real F1/Tab and phone controls.
+Public landscape acceptance then revealed a genuine utility-dock overlap (30 s
+click timeout): bundled CSS had lost the earlier reserved header space while a
+later mobile rule reset it to zero. Remove the obsolete reset, reserve 106 px
+plus safe area in the mobile rule too, and verify the bundled public build—not
+only Vite. Final local overlay regression passed in 12.913 s including desktop,
+portrait and landscape, before redeployment. Investigation/correction completed
+at 01:07:18 UTC. All screenshots/reports remain under ignored logs/mastery-*.
