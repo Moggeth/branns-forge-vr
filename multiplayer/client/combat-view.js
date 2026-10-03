@@ -14,7 +14,6 @@ const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm'
 const forward = new THREE.Vector3(0, 0, -1);
 const geometryRecords = new WeakMap();
 const sharedTriangleRecords = new WeakMap();
-const golemPoses = new WeakMap();
 const hashId = id => [...String(id)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
 export function updateGolemArmor(root, armor = 3) {
@@ -25,41 +24,6 @@ export function updateGolemArmor(root, armor = 3) {
   }
   const core = root.getObjectByName('CoreGlow');
   if (core) { core.userData.restScale ||= core.scale.clone(); core.scale.copy(core.userData.restScale).multiplyScalar(armor === 0 ? 1.12 : 1); }
-}
-
-export function updateGolemPose(entry, dt, tick, elapsed) {
-  const root = entry.visual;
-  if (root.userData.mixer) return;
-  let pose = golemPoses.get(root);
-  if (!pose) {
-    pose = {distance: 0, previous: entry.root.position.clone(), nodes: {}};
-    for (const name of ['Head', 'BodyCore', 'ArmL', 'ArmR', 'LegL', 'LegR']) {
-      const node = root.getObjectByName(name); if (node) pose.nodes[name] = {node, rest: node.quaternion.clone()};
-    }
-    golemPoses.set(root, pose);
-  }
-  const travel = pose.previous.distanceTo(entry.root.position); pose.previous.copy(entry.root.position);
-  if (travel < .5) pose.distance += travel;
-  const moving = travel > .0001, phase = pose.distance / 1.1 * Math.PI * 2;
-  const attackAge = (tick - (entry.data.attackTick ?? -1000)) / 60;
-  const attack = attackAge >= 0 && attackAge < 1;
-  for (const [name, {node, rest}] of Object.entries(pose.nodes)) {
-    const angles = new THREE.Euler();
-    if (attack) {
-      const t = attackAge;
-      let lift = t <= .65 ? Math.sin(Math.min(t / .65, 1) * Math.PI / 2) * -1.55 : THREE.MathUtils.lerp(-1.55, .55, THREE.MathUtils.clamp((t - .65) / .15, 0, 1));
-      if (t > .8) lift = THREE.MathUtils.lerp(.55, 0, (t - .8) / .2);
-      if (name === 'ArmL' || name === 'ArmR') angles.x = lift;
-      if (name === 'BodyCore') angles.x = -lift * .09;
-    } else if (moving) {
-      if (/Arm|Leg/.test(name)) angles.x = Math.sin(phase) * .22 * (['ArmL', 'LegR'].includes(name) ? -1 : 1);
-      if (name === 'Head') angles.z = Math.sin(phase) * .035;
-    } else {
-      if (name === 'Head') angles.y = Math.sin(elapsed * Math.PI * .4) * .045;
-      if (name === 'BodyCore') angles.x = Math.sin(elapsed * Math.PI * .4) * .012;
-    }
-    node.quaternion.copy(rest).multiply(new THREE.Quaternion().setFromEuler(angles));
-  }
 }
 
 export function canonicalPart(name = '') {
@@ -449,7 +413,6 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
     if (camera) fractures.update(camera);
-    for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, renderTick, elapsed);
     beforeContacts();
     for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, renderTick, dt);
     creatures.syncDetached(detached, snapshot.detachedParts || []);

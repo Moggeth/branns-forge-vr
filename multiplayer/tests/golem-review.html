@@ -4,7 +4,7 @@
 <button id="aim">Hold aim</button><button id="cast">Release / cast</button><button id="run">Run 1 s</button><button id="end">Skip to last 3 s</button><button id="god">Orbit view</button><button id="hero">Hero view</button>
 <span id="status"></span><div id="error"></div></header><canvas id="world" aria-label="Crystal wall review world"></canvas>
 <script type="module">
-// Golem review (copied from axe-cleave-game): ?kind=skeleton swaps the foes. the real createGame renderer and a local shared simulation (copied from crystal-wall-review). The hero
+// Golem review (copied from axe-cleave-game): ?kind=skeleton swaps the foes; ?weak leaves them one cleave from breaking. the real createGame renderer and a local shared simulation (copied from crystal-wall-review). The hero
 // stands at ?at=x,z facing ?yaw (radians, 0 faces -Z) with the axe; ?foes=f,r;f,r places skeletons by forward/right
 // metres. ?clean hides the toolbar, ?auto runs the authority at 60 Hz. Not shipped.
 import {createGame} from '../client/game.js';
@@ -17,6 +17,7 @@ sim.addPlayer({id:'hero',name:'Reviewer'});sim.addPlayer({id:'god',name:'Camera'
 let save=sim.checkpoint();save.players[0].position=[at[0],terrainHeight(save,at[0],at[1]),at[1]];save.players[0].yaw=yaw;save.players[0].tool='axe';
 if(q.has('foes')){const f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
  save.enemies=q.get('foes').split(';').map(v=>v.split(',').map(Number)).map(([a,b],i)=>{const x=at[0]+f[0]*a+r[0]*b,z=at[1]+f[1]*a+r[1]*b;return Object.assign(createEnemy('foe'+i,[x,terrainHeight(save,x,z),z],q.get('kind')||'golem'),{yaw:Math.atan2(Math.sin(yaw+Math.PI),Math.cos(yaw+Math.PI))});});}
+if(q.has('weak'))for(const e of save.enemies||[]){e.hp=60;e.armor=0;for(const k in e.parts)e.parts[k]=Math.min(e.parts[k],12);}
 sim=loadSimulation(save);
 window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
 const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,

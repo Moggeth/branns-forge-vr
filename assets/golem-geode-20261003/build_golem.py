@@ -839,7 +839,7 @@ def export_glb(path):
     kw = dict(filepath=path, export_format="GLB", export_materials="EXPORT",
               export_animations=True, export_animation_mode="NLA_TRACKS", export_apply=False, export_cameras=False,
               export_lights=False, export_yup=True, export_texcoords=True, export_normals=True, export_tangents=False,
-              export_vertex_color="ACTIVE", export_image_format="WEBP", export_image_quality=82, export_force_sampling=True, export_optimize_animation_size=False)
+              export_vertex_color="ACTIVE", export_image_format="JPEG", export_image_quality=86, export_force_sampling=True, export_optimize_animation_size=False)
     props = bpy.ops.export_scene.gltf.get_rna_type().properties.keys()
     kw = {k: v for k, v in kw.items() if k in props}
     bpy.ops.export_scene.gltf(**kw)

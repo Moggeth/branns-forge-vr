@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor, updateGolemPose} from '../client/combat-view.js';
+import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
 import {assetBasis, ASSET_POSES, prepareAsset, weaponTip, weaponForward, updateWeaponPresentation} from '../client/asset-pose.js';
 
 const started = performance.now();
@@ -65,11 +65,6 @@ updateGolemArmor(golem, 0); assert.equal(golem.getObjectByName('ChestPlate').vis
 const golemArm = snapshotDetachedPart(golem, 'leftArm');
 assert.ok(golemArm.children.some(n => n.name.includes('ForearmHandL')), 'complete borrowed arm includes authored hand');
 assert.ok(!golemArm.children.some(n => n.name === 'ShoulderL:detached'), 'broken armor is absent from loose piece');
-const golemEntry = {root: golemRoot, visual: golem, data: {attackTick: -1000}};
-updateGolemPose(golemEntry, .016, 0, 0); golemRoot.position.z += .1; updateGolemPose(golemEntry, .016, 0, .016);
-assert.ok(Math.abs(golem.getObjectByName('ArmL').rotation.x) > .01, 'native gait moves actual modular golem arm');
-golemEntry.data.attackTick = 0; updateGolemPose(golemEntry, .016, 30, .5);
-assert.ok(golem.getObjectByName('ArmL').rotation.x < -1, 'native two-arm attack windup');
 maskMissingParts(golem, ['leftLeg']); let missingTriangles = 0; golem.getObjectByName('LegL').traverse(n => { if (n.isMesh) missingTriangles += n.geometry.index?.count || 0; });
 assert.equal(missingTriangles, 0, 'golem named modular leg is removed');
 const bowTemplate = await geometryTemplate('bow'), actualArrow = await geometryTemplate('arrow');
