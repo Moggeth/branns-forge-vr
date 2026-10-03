@@ -1,6 +1,7 @@
 // Integration of shared/trees.js into the authoritative simulation: chop -> hinge fall -> logs, saves, hands, collision.
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
+import {isTestingGift} from '../shared/testing-supplies.js';
 import {worldTrees} from '../shared/world-content.js';
 import {trunkRadius, timberSections} from '../shared/trees.js';
 const started = performance.now();
@@ -24,7 +25,7 @@ steps(sim, 28); strike(); steps(sim, 28);
 // Save while wounded survives exactly.
 assert.deepEqual(loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))).snapshot().harvestedTrees, sim.snapshot().harvestedTrees);
 const fell = strike(); assert.ok(fell.events.some(e => e.kind === 'tree_fell'));
-assert.equal(sim.snapshot().pickups.filter(p => p.kind === 'wood').length, 0);
+assert.equal(sim.snapshot().pickups.filter(p => p.kind === 'wood' && !isTestingGift(p)).length, 0);
 // Mid-fall save/rejoin: continuing from the save must land exactly once with the cut-height-dependent log yield.
 steps(sim, 20); const midFall = JSON.parse(JSON.stringify(sim.checkpoint()));
 let landEvents = steps(sim, 600).filter(e => e.kind === 'tree_land');

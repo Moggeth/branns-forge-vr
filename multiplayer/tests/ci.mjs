@@ -7,20 +7,25 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'ability-readiness','action-feedback','adventure','asset-dependencies','asset-pose',
-  'combat','combat-performance','combat-session','combat-view','combat-view-perf',
-  'contact-feedback','contact-feedback-shared','creature-life-death','crossbow-cords',
+  'ability-readiness','action-feedback','adventure','asset-dependencies','asset-pose','combat',
+  'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
+  'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud',
-  'expedition-presentation.test','fire','fire-performance','forge-protection',
+  'expedition-presentation.test','fire','fire-authored-samples','fire-performance',
+  'fire-spatial-phoenix','forest-resource-integration','forge-protection','foundation-tiles',
   'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
-  'impact-presentation','import-performance','interaction-cue.test','interaction-cue-view.test',
+  'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',
   'inventions-review','legacy-trees','lobby-ui.test','lumber-collection','lumber-session',
-  'material-audio','material-economy','meteor-creature','mining-geometry','orchard-presentation',
-  'progressive-sunder','quality-performance','ranged-fx','saved-worlds-chooser.test',
-  'session','session-reload','settlement-budget','settlement-view','skeleton-performance',
-  'skin-bounds','solo-session','spell-presentation','spell-spectacle','spell-targeting',
-  'starting-world','state-codec','terrain-presentation','terrain-ray','terrain-specials',
-  'terrain-storage-budget','terrain-triangles','throw-momentum-capacity','touch-input',
+  'material-audio','material-economy','meteor-creature','mining-geometry',
+  'orchard-presentation','phoenix-bank','pick-luminance','placement-preview',
+  'placement-rotation','placement-session','progressive-sunder','quality-performance',
+  'ranged-fx','saved-worlds-chooser.test','session','session-reload','settlement-budget',
+  'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
+  'siegebird-flock','siegebird-songbird','simulation','skeleton-performance','skin-bounds',
+  'skull-surface-regression','solo-session','spell-presentation','spell-spectacle',
+  'spell-targeting','starting-world','state-codec','terrain-presentation','terrain-ray',
+  'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
+  'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','weapon-readiness','wood-audio',
   'world-content','world-saves',
@@ -29,8 +34,8 @@ const suite = [
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).
 // Fix each one and move it into `suite`; never move a passing check out of `suite`.
 const stale = [
-  'batching','creature-state','dom-contract','embedded-skull','expedition-integration',
-  'expedition-persistence','expedition-real-play','forge','meteor-resources','simulation',
+  'batching','creature-state','dom-contract','expedition-integration',
+  'expedition-persistence','expedition-real-play','forge','meteor-resources',
   'solo-settlement','spell-availability',
   'enemy-motion',      // reads an absolute Windows asset path
   'fire-presentation', // needs assets/asset-lab gltf-validator install
