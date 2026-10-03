@@ -4,11 +4,11 @@ import {createTimberlineFx} from '../assets-source/timberline-twinbolt-20261003/
 import {timberlineFlight,timberlineLaunch,TIMBERLINE_RELEASE_TICKS} from '../shared/timberline-flight.js';
 import * as THREE from 'three';
 import {createInventionModel,animateInventionModel,disposeInventionArt} from './invention-art.js';
-import {STRUCTURES} from '../shared/inventions.js';
+import {STRUCTURES,machineCycleAge} from '../shared/inventions.js';
 import {terrainHeight} from '../shared/terrain.js';
 // Presentation consumes authoritative structures; no gameplay timers or resources live here.
 export function createInventionView({scene}){
- const assets={},entries=new Map(),shots=new Map();const timberFx=createTimberlineFx({maxChips:96,maxDust:16});scene.add(timberFx.object);let snapshot=null;const effects=[];
+ const assets={},entries=new Map(),shots=new Map(),localAim=new Map();const timberFx=createTimberlineFx({maxChips:96,maxDust:16});scene.add(timberFx.object);let snapshot=null;const effects=[];
  const ring=new THREE.Mesh(new THREE.RingGeometry(1.7,1.78,40),new THREE.MeshBasicMaterial({color:0xe9ca75,side:THREE.DoubleSide,transparent:true,opacity:.8,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.visible=false;scene.add(ring);
  const tilePreview=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-3,0,-3),new THREE.Vector3(3,0,-3),new THREE.Vector3(3,0,3),new THREE.Vector3(-3,0,3)]),new THREE.LineBasicMaterial({color:0xe9ca75}));tilePreview.visible=false;scene.add(tilePreview);
  const tileFill=new THREE.Mesh(new THREE.PlaneGeometry(6,6),new THREE.MeshBasicMaterial({color:0xe9ca75,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide}));tileFill.rotation.x=-Math.PI/2;tileFill.visible=false;scene.add(tileFill);
@@ -42,11 +42,14 @@ export function createInventionView({scene}){
    else {const t=THREE.MathUtils.clamp((tick-q.launchTick)/(q.impactTick-q.launchTick),0,1);v.root.position.set(...q.origin).lerp(new THREE.Vector3(...q.target),t);v.root.position.y+=Math.sin(t*Math.PI)*6;}
   }
   for(const[id,v]of shots)if(!ids.has(id)){v.pair?.dispose();v.root.removeFromParent();shots.delete(id);}
-for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Math.sin(b.yaw-e.root.rotation.y),Math.cos(b.yaw-e.root.rotation.y))*Math.min(1,dt*9);if(e.field){e.field.position.copy(e.root.position);e.field.position.y+=.08;e.field.visible=b.hp>0&&b.charge>0;}if(e.machine){e.root.rotation.y=b.yaw;e.machine.aimImmediate(b.aimYaw||0,0);e.machine.seekCycle((tick-e.fireTick)/60,camera,viewportHeight);}else animateInventionModel(e.root,{time:tick/60,fireAge:(tick-e.fireTick)/60,damage:1-b.hp/Math.max(1,b.maxHp||STRUCTURES[b.type]?.hp||100),progress:Math.max(0,Math.min(1,1-(b.readyTick-tick)/(b.type==='launcher'?360:240))),active:b.hp>0,yaw:b.aimYaw??0,open:b.open?1:0,armed:b.armed,charge:b.charge/240});e.root.scale.y=b.hp<=0?.24:1;if(b.type==='foundation'){e.root.rotation.z=0;e.root.visible=b.hp>0;}}
+for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Math.sin(b.yaw-e.root.rotation.y),Math.cos(b.yaw-e.root.rotation.y))*Math.min(1,dt*9);if(e.field){e.field.position.copy(e.root.position);e.field.position.y+=.08;e.field.visible=b.hp>0&&b.charge>0;}if(e.machine){e.root.rotation.y=b.yaw;const local=localAim.get(b.id);e.machine.aimImmediate(local?local.yaw:b.aimYaw||0,local?local.pitch:b.aimPitch||0);e.machine.seekCycle(machineCycleAge({...b,fireTick:e.fireTick},tick),camera,viewportHeight);}else animateInventionModel(e.root,{time:tick/60,fireAge:(tick-e.fireTick)/60,damage:1-b.hp/Math.max(1,b.maxHp||STRUCTURES[b.type]?.hp||100),progress:Math.max(0,Math.min(1,1-(b.readyTick-tick)/(b.type==='launcher'?360:240))),active:b.hp>0,yaw:b.aimYaw??0,open:b.open?1:0,armed:b.armed,charge:b.charge/240});e.root.scale.y=b.hp<=0?.24:1;if(b.type==='foundation'){e.root.rotation.z=0;e.root.visible=b.hp>0;}}
   if(refinery)animateInventionModel(refinery,{time:tick/60,progress:snapshot?.pickups?.some(q=>q.id.startsWith('ingot'))?1:0,active:!!snapshot?.inventions?.refining?.length});
   for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.line.material.opacity=Math.max(0,e.life/.3);if(e.life<=0){e.line.removeFromParent();e.line.geometry.dispose();e.line.material.dispose();effects.splice(i,1);}}
  }
- return {installTimberline,sync,event,update,targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root),preview(point,type,validation=null){
+ return {installTimberline,sync,event,update,
+  // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
+  setLocalAim(id,aim){if(aim)localAim.set(id,aim);else localAim.delete(id);},
+  targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root),preview(point,type,validation=null){
    previewState=point?validation:null;const valid=validation?.ok!==false,color=valid?0xe9ca75:0xf06458,at=validation?.position|| (point?[point.x,point.y,point.z]:null);
    tilePreview.visible=!!point&&type==='foundation';tileFill.visible=tilePreview.visible;ring.visible=!!point&&type!=='foundation';
    if(point){const x=type==='foundation'?Math.round(at[0]/.75)*.75:at[0],z=type==='foundation'?Math.round(at[2]/.75)*.75:at[2];tilePreview.position.set(x,at[1]+.07,z);tileFill.position.set(x,at[1]+.065,z);ring.position.set(x,at[1]+.06,z);const r=STRUCTURES[type]?.radius||1.7;ring.scale.setScalar(r/1.7);tilePreview.material.color.setHex(color);tileFill.material.color.setHex(color);ring.material.color.setHex(color);if(previewLabel){previewLabel.position.set(x,at[1]+1.65,z);previewLabel.visible=!!validation&&!valid;label(validation?.reason||'',valid);}}

@@ -13,10 +13,10 @@ try{
  await page.locator('[data-equip="pick"]').tap();
  await page.waitForFunction(()=>{const s=window.brannHarness.snapshot(),p=s.players.find(p=>p.id===window.brannHarness.state().playerId);return s.tick-p.specialTick>=240;});
  await page.keyboard.press('KeyQ');
- await page.waitForFunction(()=>window.brannHarness.snapshot().deposits.filter(d=>d.special==='pick_wall').length===7);
+ await page.waitForFunction(()=>window.brannHarness.snapshot().deposits.filter(d=>d.special==='pick_wall').length>=2);// aimed: 2..7 segments
  await sleep(900);await shot(page,'mastery-crystal-wall');
- result=await me(page);assert.equal(result.s.edits.filter(e=>e.kind==='pick_wall').length,7);
- record('pick-persistent-curved-wall','pass',{deposits:result.s.deposits.filter(e=>e.special==='pick_wall').map(d=>[d.x,d.z])});
+ result=await me(page);assert.equal(result.s.edits.filter(e=>e.kind==='pick_wall').length,result.s.deposits.filter(d=>d.special==='pick_wall').length);
+ record('pick-aimed-crystal-wall','pass',{deposits:result.s.deposits.filter(e=>e.special==='pick_wall').map(d=>[d.x,d.z])});
  const diagnostics=await page.evaluate(()=>document.querySelector('canvas').brannDiagnostics());record('render-budget','pass',diagnostics);
  await page.locator('[data-equip="bow"]').tap();await sleep(250);await shot(page,'mastery-left-bow');
  assert.deepEqual(page.errors,[]);record('console','pass');

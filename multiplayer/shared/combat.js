@@ -1,5 +1,6 @@
 import {terrainSpecial} from './weapon-specials.js';
 import {queueMeteorReward} from './resources.js';
+import {specialCooldown} from './special-cooldowns.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask']);
@@ -164,7 +165,7 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='special'&&p.tool==='wyrmspout'){
     if((p.overheatUntil||0)>state.tick)return fail('overheated');
     if(state.tick-(p.flameTick??-1000)<10)return fail('release_to_vent');
-    if(state.tick-(p.specialTick??-1000)<120)return fail('cooldown');
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('wyrmspout'))return fail('cooldown');
     p.specialTick=state.tick;p.heat=Math.max(0,(p.heat||0)-.5);return ok([]);
   }
   if(m.action==='special'&&p.tool==='flask'){p.flaskLit=!p.flaskLit;return ok([]);}
@@ -181,10 +182,10 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='projectileHit')return fail('host_required');
   if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
   if(m.action==='release'){if(m.throw!==undefined&&typeof m.throw!=='boolean')return fail('invalid_action');const dir=m.direction??[-Math.sin(p.yaw),.1,-Math.cos(p.yaw)];if(!vec(dir,1.01))return fail('invalid_action');const n=Math.hypot(...dir);if(n<.9||n>1.1)return fail('invalid_action');return releaseHeld(state,p,dir.map(v=>v/n),m.throw===true)?ok([]):fail('nothing_held');}
-  if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart);
+  if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart,m);
   if(m.action==='special'){
     if(p.tool!=='hammer')return fail('invalid_action');
-    if(state.tick-(p.specialTick??-1000)<240)return fail('cooldown');
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('hammer'))return fail('cooldown');
     const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[];
     p.specialTick=state.tick;
     for(const e of [...state.enemies])if(dist(e.position,at)<5)hitEnemyPart(state,e,'torso',65,{tool:p.tool,point:at,ownerId:p.id},ctx,events);

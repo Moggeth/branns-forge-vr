@@ -10,32 +10,39 @@ const scene=new T.Scene(),templates=new Map(['boulder','meteor'].map(n=>[n,loadG
 const content=createWorldContent({scene,templates,height});
 let sim=createSimulation();sim.addPlayer({id:'hero'});let c=sim.checkpoint();c.players[0].position=[10,height(10,10),10];c.players[0].tool='pick';sim=loadSimulation(c);
 assert.equal(sim.command('hero',{type:'action',action:'special',seq:1}).ok,true);
-const snapshot=sim.snapshot();content.sync(snapshot);content.tick(0);
-const wallBudget=content.stats().crystalWalls;assert.equal(wallBudget.segments,7);assert.equal(wallBudget.draws,28);
+for(let i=0;i<90;i++)sim.step();// the v2 wall rises behind its front; settle before measuring
+const snapshot=sim.snapshot();content.sync(snapshot);content.tick(0,snapshot.tick);
+const wallBudget=content.stats().crystalWalls;assert.equal(wallBudget.segments,7);assert.equal(wallBudget.draws,5,'3 crystal batches + crust + glow strip per wall');
 const wallDeposits=snapshot.deposits.filter(d=>d.special==='pick_wall');
-assert.equal(content.targets().filter(n=>wallDeposits.some(d=>n.userData.targetId===d.id)).length,7);
+const instancesOf=id=>content.targets().filter(n=>n.userData.wallTargets).flatMap(m=>m.userData.wallTargets.map((t,i)=>t===id?{m,i}:null).filter(Boolean));
+for(const d of wallDeposits)assert.ok(instancesOf(d.id).length>0,'every segment has tagged instances');
 scene.updateMatrixWorld(true);
-for(const d of wallDeposits){const target=content.targets().find(n=>n.userData.targetId===d.id),floor=height(d.x,d.z,snapshot.edits);let top=-Infinity;
- target.traverse(m=>{if(!m.isMesh)return;const a=m.geometry.attributes.position;for(let j=0;j<(m.isInstancedMesh?m.count:1);j++){const matrix=m.matrixWorld.clone();if(m.isInstancedMesh){const instance=new T.Matrix4();m.getMatrixAt(j,instance);matrix.multiply(instance);}for(let i=0;i<a.count;i++){const p=new T.Vector3().fromBufferAttribute(a,i).applyMatrix4(matrix);top=Math.max(top,p.y);assert.ok(Math.hypot(p.x-d.x,p.z-d.z)<1.5,'crystal stays inside authority horizontal contact envelope');}}});
- assert.ok(top>floor+.1&&top<floor+2,'crystal tip remains exposed and mineable');
+for(const d of wallDeposits){const floor=height(d.x,d.z,snapshot.edits);let top=-Infinity;
+ for(const {m,i} of instancesOf(d.id)){if(m.name==='CrystalCrust')continue;const a=m.geometry.attributes.position,matrix=m.matrixWorld.clone(),instance=new T.Matrix4();m.getMatrixAt(i,instance);matrix.multiply(instance);
+  for(let k=0;k<a.count;k++){const p=new T.Vector3().fromBufferAttribute(a,k).applyMatrix4(matrix);top=Math.max(top,p.y);assert.ok(Math.hypot(p.x-d.x,p.z-d.z)<1.9,'crystal stays inside its segment envelope');}}
+ assert.ok(top>floor+.1&&top<floor+2.3,'crystal tip remains exposed and mineable');
 }
 const ray=new T.Raycaster();
-const first=wallDeposits[0],group=content.targets().find(n=>n.userData.targetId===first.id);
-ray.set(new T.Vector3(first.x,height(first.x,first.z,snapshot.edits)+3,first.z),new T.Vector3(0,-1,0));
-const wallHit=ray.intersectObject(group,true)[0];assert.ok(wallHit);assert.equal(content.resolveTarget(wallHit).id,first.id);
-// Live damage removes actual crystals, snapshots alone recreate their exact surviving geometry.
-const damaged=structuredClone(snapshot);damaged.deposits.find(d=>d.id===first.id).hits=2;content.sync(damaged);content.tick(700);
-assert.equal(content.stats().crystalWalls.crystals,57);assert.equal(content.targets().flatMap(g=>g.children).filter(m=>m.name.startsWith('CrystalBatch_')).reduce((n,m)=>n+m.count,0),57);
-const compare=new T.Scene(),late=createCrystalWall({THREE:T,scene:compare,height});late.sync(damaged);assert.equal(late.stats().debris,0);
-const liveNames=group.children.map(n=>n.name),lateNames=late.targets()[0].children.map(n=>n.name);assert.deepEqual(liveNames,lateNames);
+const first=wallDeposits.at(-1);
+{const {m,i}=instancesOf(first.id).find(x=>x.m.name==='CrystalBatch_1'),q=new T.Matrix4();m.getMatrixAt(i,q);const at=new T.Vector3().setFromMatrixPosition(q);ray.set(new T.Vector3(at.x,at.y+4,at.z),new T.Vector3(0,-1,0));}
+const wallHit=ray.intersectObjects(content.targets(),false)[0];assert.ok(wallHit);assert.equal(content.resolveTarget(wallHit).id,first.id);
+// Live damage removes actual crystals; snapshots alone recreate their exact surviving geometry.
+const damaged=structuredClone(snapshot);damaged.deposits.find(d=>d.id===first.id).hits=2;content.sync(damaged);content.tick(700,damaged.tick);
+assert.equal(content.stats().crystalWalls.crystals,64);
+assert.equal(content.targets().filter(m=>m.name.startsWith('CrystalBatch_')).reduce((n,m)=>n+m.count,0),64);
+const compare=new T.Scene(),late=createCrystalWall({THREE:T,scene:compare,height});late.sync(damaged);late.update(0,damaged.tick);
+assert.equal(late.stats().crystals,64);assert.equal(late.stats().shards,0,'late join invents no flying chips');
 // The same deposit can be restored to an earlier checkpoint without keeping hidden damage.
-content.sync(snapshot);assert.equal(content.stats().crystalWalls.crystals,63);
-// Reanchor existing geometry after terrain changes, and collapse it on the authoritative edit removal.
+content.sync(snapshot);content.tick(800,snapshot.tick);assert.equal(content.stats().crystalWalls.crystals,70);
+// Reanchor existing geometry after terrain changes.
+const crystalY=()=>{const {m,i}=instancesOf(first.id).find(x=>x.m.name.startsWith('CrystalBatch_')),q=new T.Matrix4();m.getMatrixAt(i,q);return new T.Vector3().setFromMatrixPosition(q).y;};
 const raised=structuredClone(snapshot);raised.edits.push({id:'raiseTest',kind:'raise',x:first.x,z:first.z,radius:6,height:2});
-const before=content.targets().find(n=>n.userData.targetId===first.id).position.y;content.sync(raised);
-assert.ok(content.targets().find(n=>n.userData.targetId===first.id).position.y>before+1.9);
-raised.deposits.find(d=>d.id===first.id).depleted=true;raised.edits=raised.edits.filter(e=>e.id!==first.editId);content.sync(raised);
-assert.ok(!content.targets().some(n=>n.userData.targetId===first.id));
+const before=crystalY();content.sync(raised);content.tick(900,raised.tick);assert.ok(crystalY()>before+1.5,'crystals ride the ground');
+// Mining it out shatters its crystals and sinks its earth; the authority then retires edit+deposit.
+const mined=structuredClone(snapshot);Object.assign(mined.deposits.find(d=>d.id===first.id),{hits:3,depleted:true});mined.edits.find(e=>e.id===first.editId).wall.expireTick=mined.tick;
+content.sync(mined);content.tick(1000,mined.tick+1);assert.equal(content.stats().crystalWalls.crystals,60);assert.ok(content.stats().crystalWalls.shards>0,'mined segment bursts into shards');
+mined.edits=mined.edits.filter(e=>e.id!==first.editId);mined.deposits=mined.deposits.filter(d=>d.id!==first.id);mined.tick+=40;content.sync(mined);content.tick(1700,mined.tick);
+assert.ok(!instancesOf(first.id).length,'retired segment leaves no tagged geometry');
 
 // Real imported boulder and meteor meshes lose cells, preserving scale/materials and honest ray hits.
 for(const kind of ['stone','meteor']) {

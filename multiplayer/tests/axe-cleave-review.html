@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Axe cleave review</title>
+<style>html,body{margin:0;height:100%;background:#111}canvas{display:block;width:100%;height:100%}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// Review fixture for the axe cleave: the first-person held axe on the game's FPS anchor, posed by the real special
+// motion, plus the real cleave sweep, under the game's renderer settings. window.review.set(progress, seconds since
+// release) poses one frame (progress < 0 hides nothing and leaves the rest pose). ?third views from behind. Not shipped.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE} from '../client/asset-pose.js';
+import {enhanceAxeTemplate} from '../client/axe-luminance.js';
+import {createWeaponReadiness} from '../client/weapon-readiness.js';
+import {specialPose} from '../client/weapon-special-motion.js';
+import {createAxeCleaveView} from '../client/axe-cleave-view.js';
+const q = new URLSearchParams(location.search), third = q.has('third');
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias: true});
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xabc5c2); scene.fog = new THREE.Fog(0xabc5c2, 30, 90);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55;
+scene.add(new THREE.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2));
+const sun = new THREE.DirectionalLight(0xffe3ad, 2.2); sun.position.set(-22, 38, 15); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({color: 0x667b43, roughness: 1})); scene.add(ground);
+for (const [x, z] of [[-1.2, -3], [1.6, -3.4], [0, -6.5], [3.8, -2.2]]) { // stand-in skeletons for scale
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(.22, 1.2, 4, 8), new THREE.MeshStandardMaterial({color: 0xe8dcc0})); m.position.set(x, .82, z); scene.add(m);
+}
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .05, 180); camera.rotation.order = 'YXZ';
+const rig = new THREE.Group(); rig.add(camera); scene.add(rig); camera.position.set(0, 1.6, 0); camera.rotation.x = -.12;
+const viewer = third ? new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .05, 180) : camera;
+if (third) { viewer.position.set(2.4, 3.6, 4.2); viewer.lookAt(0, .8, -2.4); }
+const anchor = new THREE.Group(); anchor.position.fromArray(FPS_WEAPON_POSE.position); anchor.rotation.fromArray(FPS_WEAPON_POSE.rotation); camera.add(anchor);
+const rest = {position: anchor.position.clone(), quaternion: anchor.quaternion.clone()};
+const gltf = await new GLTFLoader().loadAsync('/assets/axe.glb'); enhanceAxeTemplate(gltf.scene);
+const {visual} = prepareAsset(gltf, 'axe', .7); anchor.add(visual); setWeaponGrip(visual, false, 'axe', 'right');
+scene.updateMatrixWorld(true);
+const readiness = createWeaponReadiness({root: visual, tool: 'axe'});
+const cleave = createAxeCleaveView({scene, height: () => 0});
+let base = 1e6;
+function set(progress, sweep = -1, charge = 1) {
+  const pose = progress >= 0 ? specialPose('axe', progress, rest) : rest;
+  anchor.position.copy(pose.position); anchor.quaternion.copy(pose.quaternion);
+  if (sweep >= 0) { if (!cleave.active) cleave.play({position: [0, 0, 0], direction: [0, 0, -1], reach: 4.5, arc: 140}, base); cleave.update(base + sweep * 1000); }
+  readiness.update({specialReady: charge, time: base / 1000 + Math.max(0, sweep)});
+  renderer.render(scene, viewer);
+}
+function resize() { renderer.setSize(innerWidth, innerHeight, false); for (const c of [camera, viewer]) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); } anchor.position.x = .33 * Math.min(1, camera.aspect / .9); rest.position.x = anchor.position.x; set(-1); }
+addEventListener('resize', resize); resize();
+// Direct pose for authoring: hand offset (m) and pitch/yaw/roll (deg), composed exactly as specialPose does.
+function pose([x, y, z], pitch, yaw, roll, twist = 0) {
+  const D = Math.PI / 180, q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -roll * D)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw * D)).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch * D)).multiply(rest.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), twist * D));
+  anchor.position.copy(rest.position).add(new THREE.Vector3(x, y, z)); anchor.quaternion.copy(q); renderer.render(scene, viewer);
+}
+window.review = {set, pose, ready: true};
+</script></html>
