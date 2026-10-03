@@ -142,7 +142,7 @@ const DEPOSIT = {
  // Mountain-foot veins (shared/ore-veins.js). style picks the sculpt: nodule band, plane seam or open geode.
  copper: {style: 'nodule', shape: [.74, .52, .64, -.12], bands: [[.4, .37, .33], [.5, .46, .41], [.33, .3, .27], [.45, .41, .36]], rust: [.22, .56, .44], ore: 0xb8663a, oreMetal: .95, oreRough: .34, crystal: [.35, .95, .78], emissive: 0x1d8c6c, bounce: 0x0f4a38},
  gold: {style: 'seam', shape: [.62, .6, .5, .12], oreCount: 15, oreSize: 1.6, bands: [[.26, .25, .25], [.33, .32, .31], [.2, .2, .2], [.3, .29, .28]], rust: [.95, .92, .84], ore: 0xffc94a, oreMetal: 1, oreRough: .2, crystal: [1, .96, .82], emissive: 0xb88a24, bounce: 0x5a3c08},
- star: {style: 'geode', shape: [.7, .58, .62, 0], bands: [[.14, .12, .13], [.22, .19, .19], [.1, .09, .1], [.18, .15, .14]], rust: [.5, .3, .12], ore: 0xf2b95c, oreMetal: 1, oreRough: .24, crystal: [1, .8, .45], emissive: 0xf09a2a, bounce: 0x5c3008}
+ star: {style: 'geode', shape: [.7, .58, .62, 0], bands: [[.14, .12, .13], [.22, .19, .19], [.1, .09, .1], [.18, .15, .14]], rust: [.5, .3, .12], ore: 0xf2b95c, oreMetal: 1, oreRough: .24, crystal: [1, .58, .16], emissive: 0xff8a12, bounce: 0x7a3a06}
 };
 for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
 const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
