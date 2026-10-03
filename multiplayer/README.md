@@ -1,5 +1,11 @@
 # Browser multiplayer proof
 
+## Quiet phone HUD — 2026-10-03
+
+Tap the current spell/weapon to open its palette. **More (⋯)** holds invitations,
+role switching, help and party. Quest expands on tap; **Actions** includes Heal,
+Deliver and Drop. Quick cast stays directly accessible. See [mobile HUD handoff](../docs/MOBILE-QUIET-HUD-20261003.md).
+
 ## Golem emergence polish — 2026-10-03
 
 Duplicate block-based spawn effects are removed; the authored stone assembly

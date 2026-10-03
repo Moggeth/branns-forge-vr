@@ -1,0 +1,435 @@
+/* Brann's Forge — quiet mobile in-game HUD.
+   Loads LAST (after mobile-compact.css). Every rule is scoped to
+   ":root[data-mq] body.touch-controls-active" (set by mobile-quiet.js + mobile-ui.js), so desktop,
+   lobby and menu are untouched. Specificity (0,3,1)+ ties/beats mobile-compact's role overrides and
+   wins ties by order; !important only where the older layers already use it.
+
+   Layout map, landscape phone (844x390):
+     top-left   : vitals pill (160px) · quest chip below it
+     top-right  : ghost util row  [−][+][◎][⋯ tools][☰]      (fullscreen shows inside tools state)
+     bottom-L/R : 112px translucent pan/move and orbit/look pads
+     above R pad: Cancel + Cast (God) / Jump + Attack (Hero)
+     bottom-mid : one dock — selected spell + Quick (God) / weapon + Actions + Special (Hero)
+     centre     : nothing pressable, ever. Palettes open from the dock with a tap-to-close scrim. */
+
+:root[data-mq] body.touch-controls-active {
+  --mq-t: env(safe-area-inset-top, 0px);
+  --mq-r: env(safe-area-inset-right, 0px);
+  --mq-b: env(safe-area-inset-bottom, 0px);
+  --mq-l: env(safe-area-inset-left, 0px);
+  --mq-edge: 8px;
+  --mq-pad: 112px;
+  --mq-hit: 44px;
+  --mq-glass: rgba(18, 14, 10, .46);
+  --mq-glass-solid: rgba(22, 17, 12, .92);
+  --mq-line: rgba(201, 164, 92, .26);
+  --mq-line-hi: rgba(236, 210, 154, .55);
+  --mq-gold: var(--brass, #c9a45c);
+  --mq-gold-hi: var(--brass-hi, #ecd29a);
+  --mq-ink: var(--parchment, #f2e6cd);
+  --mq-muted: var(--muted, #b9aa8e);
+  --mq-dock-b: calc(var(--mq-b) + var(--mq-edge));
+}
+
+/* Containing blocks: fixed children must be relative to the viewport. */
+:root[data-mq] body.touch-controls-active .hud,
+:root[data-mq] body.touch-controls-active .hud-top,
+:root[data-mq] body.touch-controls-active .hud-bottom {
+  transform: none !important; filter: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+:root[data-mq] body.touch-controls-active .hud-top {
+  padding: 0 !important; margin: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important;
+  min-height: 0 !important; height: 0 !important; overflow: visible !important;
+}
+:root[data-mq] body.touch-controls-active .hud-bottom {
+  background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important;
+}
+:root[data-mq] body.touch-controls-active .look-hint { display: none !important; }
+:root[data-mq] body.touch-controls-active .fo-build { display:block; font-size:8px; opacity:.7; pointer-events:none; }
+
+/* ------------------------------------------------------------------ vitals pill */
+:root[data-mq] body.touch-controls-active .hud-self {
+  position: fixed !important; z-index: 31;
+  top: calc(var(--mq-t) + 6px) !important; left: calc(var(--mq-l) + var(--mq-edge)) !important;
+  right: auto !important; bottom: auto !important;
+  display: flex !important; align-items: center; gap: 6px;
+  width: 168px !important; max-width: 168px !important; min-height: 0 !important;
+  margin: 0 !important; padding: 5px 9px 5px 6px !important;
+  background: var(--mq-glass) !important; border: 1px solid var(--mq-line) !important; border-radius: 12px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .28) !important;
+  pointer-events: none;
+}
+:root[data-mq] body.touch-controls-active .hud-role-icon { width: 18px !important; height: 18px !important; flex: none; color: var(--mq-gold); opacity: .9; margin: 0 !important; }
+/* Name and role are known to the player; keep them for assistive tech only. */
+:root[data-mq] body.touch-controls-active .hud-self-text {
+  position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap;
+}
+:root[data-mq] body.touch-controls-active .hud-self .meters { display: grid !important; gap: 3px !important; flex: 1; min-width: 0; margin: 0 !important; }
+:root[data-mq] body.touch-controls-active .hud-self .meter {
+  display: grid !important; grid-template-columns: 30px minmax(0, 1fr) auto !important; align-items: center; gap: 5px !important; min-height: 0 !important; margin: 0 !important;
+}
+:root[data-mq] body.touch-controls-active .hud-self .meter-label { font: 700 9.5px/1 var(--sans, system-ui) !important; letter-spacing: .08em; text-transform: uppercase; color: var(--mq-muted) !important; }
+:root[data-mq] body.touch-controls-active .hud-self .meter-track { height: 5px !important; min-width: 0; border-radius: 3px !important; }
+:root[data-mq] body.touch-controls-active .hud-self .meter-value {
+  font: 600 10.5px/1 var(--sans, system-ui) !important; font-variant-numeric: tabular-nums; color: var(--mq-ink) !important; min-width: 0 !important; text-align: right;
+}
+/* God at full health: hide HP entirely; mana stays. Hero always sees HP. */
+:root[data-mq] body.touch-controls-active[data-role="god"][data-mq-hp-full] .hud-self .meter.hp { display: none !important; }
+
+/* ------------------------------------------------------------------ quest chip */
+:root[data-mq] body.touch-controls-active .hud > .xhud {
+  position: fixed !important; z-index: 31;
+  top: calc(var(--mq-t) + 50px) !important; left: calc(var(--mq-l) + var(--mq-edge)) !important; right: auto !important;
+  width: auto !important; max-width: min(268px, 34vw) !important;
+  background: var(--mq-glass) !important; border-color: var(--mq-line) !important; border-radius: 12px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .28) !important;
+}
+:root[data-mq] body.touch-controls-active .hud > .xhud[data-expanded="false"] {
+  display: flex !important; align-items: center; gap: 2px !important; min-height: var(--mq-hit); padding: 0 4px 0 0 !important; row-gap: 0 !important;
+}
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-toggle {
+  flex: 1 1 auto; min-width: 0; min-height: var(--mq-hit) !important; padding: 0 4px 0 8px !important; border-radius: 12px 0 0 12px;
+}
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-title { font-size: 12.5px !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] :is(.xhud-next, .xhud-chips, .xhud-alerts, .xhud-timer, .xhud-role) { display: none !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-row { display: contents !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-actions { display: flex !important; flex: none; margin: 0 !important; gap: 4px !important; flex-wrap: nowrap !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-btn:not(.xhud-primary) { display: none !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-primary { min-height: 36px !important; min-width: var(--mq-hit); padding: 0 10px !important; font-size: 12.5px !important; }
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-primary .xhud-btn-note { display: none !important; }
+:root[data-mq] body.touch-controls-active .hud > .xhud[data-expanded="true"] {
+  width: min(340px, 46vw) !important; max-width: none !important;
+  max-height: calc(100dvh - var(--mq-t) - var(--mq-b) - 64px) !important; overflow: auto !important;
+  background: var(--mq-glass-solid) !important; z-index: 42;
+}
+/* Legacy objective banner (if shown): same chip treatment. */
+:root[data-mq] body.touch-controls-active #objectiveBanner:not([hidden]) {
+  position: fixed !important; z-index: 31; top: calc(var(--mq-t) + 50px) !important; left: calc(var(--mq-l) + var(--mq-edge)) !important;
+  width: auto !important; max-width: min(268px, 34vw) !important; min-height: var(--mq-hit); padding: 2px 4px 2px 8px !important; gap: 6px !important;
+  background: var(--mq-glass) !important; border: 1px solid var(--mq-line) !important; border-radius: 12px !important;
+}
+:root[data-mq] body.touch-controls-active #objectiveBanner :is(.objective-goal, .objective-progress, .objective-phase) { display: none !important; }
+:root[data-mq] body.touch-controls-active #objectiveBanner .objective-icon { width: 18px; height: 18px; }
+:root[data-mq] body.touch-controls-active #objectiveBanner .objective-title { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------------------------ top-right ghost util row */
+:root[data-mq] body.touch-controls-active .mui-util-bar {
+  position: absolute !important; z-index: 33;
+  top: calc(var(--mq-t) + 6px) !important; right: calc(var(--mq-r) + var(--mq-edge)) !important; left: auto !important; bottom: auto !important;
+  display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 4px !important; width: auto !important;
+}
+:root[data-mq] body.touch-controls-active .mui-util-bar .mui-util {
+  width: var(--mq-hit) !important; height: var(--mq-hit) !important; min-width: var(--mq-hit) !important; margin: 0 !important; padding: 0 !important;
+  background: rgba(18, 14, 10, .34) !important; border: 1px solid var(--mq-line) !important; border-radius: 12px !important;
+  box-shadow: none !important; color: var(--mq-gold-hi) !important;
+}
+:root[data-mq] body.touch-controls-active .mui-util-bar .mui-util .mui-icon { width: 20px; height: 20px; }
+:root[data-mq] body.touch-controls-active .mui-util-bar .mui-util:active { background: rgba(201, 164, 92, .22) !important; }
+/* Order: camera trio, then tools, then menu at the far corner. */
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="zoom-out"] { order: 1; }
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="zoom-in"]  { order: 2; }
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="center"]   { order: 3; }
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="fullscreen"] { order: 4; display: none !important; }
+:root[data-mq] body.touch-controls-active .mui-util-bar .mq-more { order: 5; }
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="menu"] { order: 6; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"]:not([hidden]) { display: grid !important; place-items: center; }
+:root[data-mq] body.touch-controls-active .mq-more[aria-expanded="true"] { background: rgba(201, 164, 92, .26) !important; border-color: var(--mq-line-hi) !important; }
+.mq-more .mui-icon { fill: currentColor; stroke: none; }
+.mq-more { display: none; }
+:root[data-mq] body.touch-controls-active .mq-more { display: grid !important; place-items: center; }
+
+/* ------------------------------------------------------------------ tools drawer (.hud-room) */
+:root[data-mq] body.touch-controls-active .hud-room { display: none !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room {
+  position: fixed !important; z-index: 41;
+  top: calc(var(--mq-t) + 56px) !important; right: calc(var(--mq-r) + var(--mq-edge)) !important; left: auto !important; bottom: auto !important;
+  display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px !important;
+  width: min(300px, calc(100vw - 16px - var(--mq-l) - var(--mq-r))) !important; max-width: none !important;
+  max-height: calc(100dvh - var(--mq-t) - var(--mq-b) - 64px); overflow: auto;
+  margin: 0 !important; padding: 10px !important;
+  background: var(--mq-glass-solid) !important; border: 1px solid var(--mq-line-hi) !important; border-radius: 14px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5) !important; pointer-events: auto;
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room::before {
+  content: "World tools"; grid-column: 1 / -1; font: 700 11px/1.2 var(--sans, system-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--mq-gold);
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room .room-chip {
+  grid-column: 1 / -1; display: flex !important; align-items: baseline; gap: 8px; min-height: 0 !important; padding: 2px 2px 4px !important; background: none !important; border: 0 !important;
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room .room-code { font-size: 17px !important; letter-spacing: .12em; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room > .btn:not([hidden]) {
+  display: inline-flex !important; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--mq-hit) !important; min-width: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 10px !important;
+  font-size: 13.5px !important; white-space: nowrap;
+}
+/* Switch role reads as a sentence, not a bare "God"/"Hero" chip. */
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] #perspectiveButton { grid-column: 1 / -1; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] #perspectiveButton > span::before { content: "Switch to "; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] #perspectiveButton .ico { width: 18px; height: 18px; }
+/* Menu is always reachable from the persistent ☰; no duplicate in the drawer. */
+:root[data-mq] body.touch-controls-active .hud-room #menuButton { display: none !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room .fo-entry {
+  grid-column: 1 / -1; position: static !important; display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px !important; margin: 0 !important; inset: auto !important;
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .hud-room .fo-entry-btn {
+  width: 100% !important; min-height: var(--mq-hit) !important; height: auto !important; margin: 0 !important;
+}
+
+/* ------------------------------------------------------------------ thumb pads */
+:root[data-mq] body.touch-controls-active .mui-stick {
+  width: var(--mq-pad) !important; height: var(--mq-pad) !important;
+  bottom: calc(var(--mq-b) + var(--mq-edge)) !important;
+  opacity: .55; transition: opacity .15s ease;
+}
+:root[data-mq] body.touch-controls-active .mui-stick.is-active { opacity: .95; }
+:root[data-mq] body.touch-controls-active .mui-stick-ring {
+  background: radial-gradient(closest-side, rgba(16, 13, 10, .06), rgba(16, 13, 10, .22) 80%, rgba(16, 13, 10, .3)) !important;
+  border-color: rgba(236, 210, 154, .28) !important; box-shadow: none !important;
+}
+:root[data-mq] body.touch-controls-active .mui-stick-tick { opacity: .6; }
+:root[data-mq] body.touch-controls-active .mui-knob { width: 40% !important; height: 40% !important; opacity: .8; }
+:root[data-mq] body.touch-controls-active .mui-stick-caption { display: none !important; } /* names stay on the group's aria-label */
+
+/* ------------------------------------------------------------------ primary actions above the right pad */
+:root[data-mq] body.touch-controls-active .mui-actions {
+  position: absolute !important; z-index: 32;
+  right: calc(var(--mq-r) + var(--mq-edge)) !important; left: auto !important;
+  bottom: calc(var(--mq-b) + var(--mq-edge) + var(--mq-pad) + 10px) !important; top: auto !important;
+  display: flex !important; flex-direction: row !important; align-items: flex-end !important; gap: 8px !important; width: auto !important;
+}
+:root[data-mq] body.touch-controls-active .mui-root[data-left-handed="true"] .mui-actions {
+  right: auto !important; left: calc(var(--mq-l) + var(--mq-edge)) !important; flex-direction: row-reverse !important;
+}
+:root[data-mq] body.touch-controls-active .mui-actions .mui-btn { margin: 0 !important; }
+:root[data-mq] body.touch-controls-active .mui-actions .mui-primary {
+  width: 60px !important; height: 60px !important; min-width: 60px !important;
+}
+:root[data-mq] body.touch-controls-active .mui-actions .mui-secondary {
+  width: 48px !important; height: 48px !important; min-width: 48px !important; opacity: .9;
+}
+:root[data-mq] body.touch-controls-active .mui-actions .mui-btn-label { font-size: 9.5px !important; letter-spacing: .06em; }
+:root[data-mq] body.touch-controls-active .mui-actions .mui-icon { width: 20px; height: 20px; }
+
+/* ------------------------------------------------------------------ the dock (shared) */
+:root[data-mq] body.touch-controls-active :is(#godHelp, #heroTools) {
+  position: fixed !important; z-index: 32;
+  left: 0 !important; right: 0 !important; top: auto !important; bottom: var(--mq-dock-b) !important;
+  margin: 0 auto !important; width: max-content !important; max-width: calc(100vw - 2 * (var(--mq-pad) + var(--mq-edge) + 10px)) !important;
+  transform: none !important; translate: none !important;
+  display: flex !important; flex-direction: row !important; align-items: center !important; gap: 6px !important;
+  padding: 4px !important; min-height: 0 !important;
+  background: var(--mq-glass) !important; border: 1px solid var(--mq-line) !important; border-radius: 14px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .3) !important;
+}
+:root[data-mq] body.touch-controls-active[data-role="god"] #heroTools,
+:root[data-mq] body.touch-controls-active[data-role="hero"] #godHelp { display: none !important; }
+:root[data-mq] body.touch-controls-active :is(#godHelp, #heroTools) kbd { display: none !important; }
+
+/* ---------------- God dock: [selected spell] [Quick] — palette on tap */
+:root[data-mq] body.touch-controls-active #godHelp .sb-bar { display: contents !important; }
+:root[data-mq] body.touch-controls-active #godHelp .sb-page { display: none !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells {
+  display: flex !important; overflow: visible !important; gap: 4px !important; padding: 0 !important; margin: 0 !important;
+  mask: none !important; -webkit-mask: none !important; scroll-snap-type: none !important; width: auto !important; max-width: none !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell]:not([aria-checked="true"]) { display: none !important; }
+/* Collapsed selected spell: icon · name · cost · chevron. */
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell][aria-checked="true"] {
+  display: inline-flex !important; flex-direction: row !important; align-items: center !important; gap: 7px !important;
+  width: auto !important; min-width: 128px !important; max-width: 176px; height: 46px !important; min-height: 46px !important;
+  padding: 0 26px 0 8px !important; margin: 0 !important; position: relative;
+  border-radius: 10px !important; border: 1px solid var(--mq-line-hi) !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell][aria-checked="true"]::after {
+  content: ""; position: absolute; right: 10px; top: 50%; width: 7px; height: 7px; margin-top: -6px;
+  border-right: 2px solid var(--mq-gold-hi); border-bottom: 2px solid var(--mq-gold-hi); transform: rotate(225deg); opacity: .8;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) .sb-art { width: 26px !important; height: 26px !important; position: static !important; margin: 0 !important; flex: none; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) .bf-name {
+  position: static !important; font-size: 13.5px !important; line-height: 1.1 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin: 0 !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) .bf-cost {
+  position: static !important; font-size: 11px !important; padding: 1px 4px !important; margin: 0 !important; flex: none;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-cost svg { width: 10px !important; height: 10px !important; }
+
+/* Sub row: only Quick cast is persistent; hint, Forge and help join the palette footer. */
+:root[data-mq] body.touch-controls-active #godHelp .bf-sub { display: flex !important; align-items: center; gap: 6px !important; margin: 0 !important; padding: 0 !important; flex-wrap: nowrap !important; }
+:root[data-mq] body.touch-controls-active #godHelp:not(:has([data-mq-open="true"])) .bf-sub > :not(.bf-toggle) { display: none !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle {
+  display: inline-flex !important; align-items: center; gap: 6px; min-height: 46px !important; min-width: var(--mq-hit); padding: 0 10px 0 6px !important; margin: 0 !important;
+  border-radius: 10px !important; background: rgba(0, 0, 0, .18) !important; border: 1px solid var(--mq-line) !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle .bf-switch { display: none !important; } /* the bolt icon + gold fill carries state */
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle .sb-qc-icon { width: 20px; height: 20px; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle .bf-name { font-size: 12px !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle.sb-qc-on { background: rgba(201, 164, 92, .3) !important; border-color: var(--mq-gold-hi) !important; color: var(--mq-gold-hi); }
+:root[data-mq] body.touch-controls-active #godHelp .bf-toggle:has(input:focus-visible) { outline: 2px solid var(--mq-gold-hi); outline-offset: 2px; }
+
+/* God palette open: the dock grows into a panel — 7x2 grid of named icon cells + footer. */
+:root[data-mq] body.touch-controls-active[data-mq-tray="spells"] #godHelp {
+  z-index: 41; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; padding: 10px !important;
+  max-width: calc(100vw - 16px - var(--mq-l) - var(--mq-r)) !important;
+  background: var(--mq-glass-solid) !important; border-color: var(--mq-line-hi) !important; box-shadow: 0 10px 30px rgba(0, 0, 0, .5) !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {
+  display: grid !important; grid-template-columns: repeat(7, 58px); gap: 6px !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {
+  display: grid !important; grid-template-rows: 28px auto; justify-items: center; align-content: center; gap: 3px !important;
+  width: 58px !important; min-width: 0 !important; height: 60px !important; min-height: 0 !important; padding: 4px 2px !important; margin: 0 !important;
+  position: relative; border-radius: 10px !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-art { width: 26px !important; height: 26px !important; position: static !important; margin: 0 !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .bf-name {
+  position: static !important; font-size: 10.5px !important; line-height: 1.1 !important; max-width: 54px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .bf-cost {
+  position: absolute !important; top: 2px !important; right: 2px !important; left: auto !important; bottom: auto !important;
+  font-size: 9.5px !important; padding: 0 3px !important; line-height: 13px !important; margin: 0 !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .bf-cost svg { display: none !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [aria-checked="true"] { outline: 2px solid var(--mq-gold-hi); outline-offset: -2px; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="spells"] #godHelp .bf-sub { flex-wrap: wrap !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="spells"] #godHelp .bf-sub .bf-hint {
+  order: 9; flex: 1 1 100%; margin: 0 !important; font-size: 12px !important; color: var(--mq-muted) !important; white-space: normal;
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="spells"] #godHelp .bf-sub [data-open-forge] { min-height: var(--mq-hit) !important; padding: 0 14px !important; }
+:root[data-mq] body.touch-controls-active :is(#godHelp, #heroTools) details.bf-help > summary { min-width: var(--mq-hit) !important; min-height: var(--mq-hit) !important; display: grid !important; place-items: center; }
+:root[data-mq] body.touch-controls-active :is(#godHelp, #heroTools) details.bf-help[open] .bf-help-list {
+  position: absolute !important; bottom: calc(100% + 8px) !important; left: 0 !important; right: 0 !important; top: auto !important;
+  max-height: 46dvh; overflow: auto; margin: 0 !important; padding: 10px 12px 10px 26px !important; z-index: 2;
+  background: var(--mq-glass-solid) !important; border: 1px solid var(--mq-line-hi) !important; border-radius: 12px !important; font-size: 12.5px !important;
+}
+
+/* ---------------- Hero dock: [equipped weapon] [Actions ⋯] [★ Special] */
+:root[data-mq] body.touch-controls-active #heroTools .bf-bar { display: flex !important; align-items: center; gap: 6px !important; margin: 0 !important; padding: 0 !important; flex-wrap: nowrap !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip {
+  display: flex !important; gap: 4px !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; mask: none !important; -webkit-mask: none !important; width: auto !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip:not([data-mq-open="true"]) > [data-equip]:not([aria-pressed="true"]) { display: none !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip:not([data-mq-open="true"]):not(:has([aria-pressed="true"])) > [data-equip]:first-child { display: inline-flex !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip > [data-equip] {
+  display: inline-flex !important; align-items: center; gap: 6px !important; height: 46px !important; min-height: 46px !important; min-width: var(--mq-hit) !important;
+  padding: 0 10px 0 8px !important; margin: 0 !important; border-radius: 10px !important; font-size: 13px !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip > [data-equip] svg { width: 22px !important; height: 22px !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip > [data-equip] .bf-name { display: inline !important; position: static !important; font-size: 13px !important; white-space: nowrap; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions-drawer { position: relative; margin: 0 !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions-drawer > summary {
+  display: grid !important; place-items: center; width: 46px !important; height: 46px !important; min-height: 46px !important; padding: 0 !important; border-radius: 10px !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions-drawer > summary .bf-name { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions-drawer[open] > .bf-actions {
+  position: absolute !important; bottom: calc(100% + 10px) !important; left: 50% !important; top: auto !important; right: auto !important; translate: -50% 0;
+  display: grid !important; grid-template-columns: repeat(5, 58px); gap: 6px !important; padding: 8px !important; margin: 0 !important; width: max-content !important; z-index: 2;
+  background: var(--mq-glass-solid) !important; border: 1px solid var(--mq-line-hi) !important; border-radius: 12px !important; box-shadow: 0 10px 30px rgba(0, 0, 0, .5) !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions > .bf-act {
+  display: grid !important; grid-template-rows: 24px auto; justify-items: center; align-content: center; gap: 3px;
+  width: 58px !important; height: 56px !important; min-height: 0 !important; padding: 4px 2px !important; margin: 0 !important; font-size: 10.5px !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions > .bf-act svg { width: 22px !important; height: 22px !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-special {
+  position: static !important; display: inline-flex !important; align-items: center; justify-content: center; gap: 5px;
+  width: auto !important; height: 46px !important; min-width: 46px !important; padding: 0 10px !important; margin: 0 !important; border-radius: 10px !important; inset: auto !important; font-size: 12.5px !important;
+}
+:root[data-mq] body.touch-controls-active #heroTools .bf-special svg { width: 20px !important; height: 20px !important; }
+/* Resources + weapon hint + hero help join the weapon palette; persistent dock stays three cells. */
+:root[data-mq] body.touch-controls-active #heroTools:not(:has([data-mq-open="true"])) :is(.bf-sub, .hero-help) { display: none !important; }
+
+/* Hero weapon palette open: 4x2 named cells + supplies footer. */
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools {
+  z-index: 41; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; padding: 10px !important;
+  max-width: calc(100vw - 16px - var(--mq-l) - var(--mq-r)) !important;
+  background: var(--mq-glass-solid) !important; border-color: var(--mq-line-hi) !important; box-shadow: 0 10px 30px rgba(0, 0, 0, .5) !important;
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools .bf-bar { flex-wrap: wrap !important; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] { display: grid !important; grid-template-columns: repeat(4, 84px); flex: 1 1 100%; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [data-equip] { justify-content: flex-start; }
+:root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [aria-pressed="true"] { outline: 2px solid var(--mq-gold-hi); outline-offset: -2px; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools :is(.bf-actions-drawer, .bf-special) { display: none !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools .bf-sub { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools .bf-hint { flex: 1 1 100%; margin: 0 !important; font-size: 12px !important; color: var(--mq-muted) !important; }
+:root[data-mq] body.touch-controls-active[data-mq-tray="weapons"] #heroTools .hero-help { position: relative !important; inset: auto !important; display: block !important; align-self: flex-end; }
+
+/* ------------------------------------------------------------------ scrim (tap-to-return; never casts) */
+.mq-scrim { display: none; }
+:root[data-mq] body.touch-controls-active[data-mq-tray] .mq-scrim {
+  display: block; position: fixed; inset: 0; z-index: 30; pointer-events: auto; background: rgba(8, 6, 4, .18);
+}
+:root[data-mq] body.touch-controls-active[data-mq-tray] .mui-stick { opacity: .3; }
+
+/* ------------------------------------------------------------------ notices / toast stay off the centre */
+:root[data-mq] body.touch-controls-active .toast { max-width: min(420px, 60vw) !important; font-size: 13px !important; }
+
+/* ------------------------------------------------------------------ portrait (390x844) */
+@media (orientation: portrait) {
+  :root[data-mq] body.touch-controls-active { --mq-pad: 108px; }
+  /* Util: [⋯][☰] on the top row; camera trio as a right-edge column below. */
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar {
+    display: grid !important; grid-template-columns: var(--mq-hit) var(--mq-hit); grid-auto-flow: row; justify-items: end;
+  }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar .mq-more { grid-column: 1; grid-row: 1; }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="menu"] { grid-column: 2; grid-row: 1; }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="zoom-in"] { grid-column: 2; grid-row: 2; }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="zoom-out"] { grid-column: 2; grid-row: 3; }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="center"] { grid-column: 2; grid-row: 4; }
+  :root[data-mq] body.touch-controls-active[data-role="god"][data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"] { grid-column: 1; grid-row: 2; }
+  :root[data-mq] body.touch-controls-active[data-role="hero"][data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"] { order: 4; }
+  :root[data-mq] body.touch-controls-active .hud > .xhud,
+  :root[data-mq] body.touch-controls-active #objectiveBanner:not([hidden]) { max-width: calc(100vw - 16px - 104px - var(--mq-l) - var(--mq-r)) !important; }
+  :root[data-mq] body.touch-controls-active .hud > .xhud[data-expanded="true"] { width: calc(100vw - 16px - 56px - var(--mq-l) - var(--mq-r)) !important; }
+  /* Dock sits above the left pad; actions above the right pad. Nothing in between the pads. */
+  :root[data-mq] body.touch-controls-active :is(#godHelp, #heroTools) {
+    left: calc(var(--mq-l) + var(--mq-edge)) !important; right: auto !important; margin: 0 !important;
+    bottom: calc(var(--mq-b) + var(--mq-edge) + var(--mq-pad) + 12px) !important;
+    max-width: calc(100vw - 2 * var(--mq-edge) - 132px) !important;
+  }
+  :root[data-mq] body.touch-controls-active .mui-root[data-left-handed="true"] ~ .hud :is(#godHelp, #heroTools),
+  :root[data-mq] body.touch-controls-active .hud:has(~ .mui-root[data-left-handed="true"]) :is(#godHelp, #heroTools) {
+    left: auto !important; right: calc(var(--mq-r) + var(--mq-edge)) !important;
+  }
+  :root[data-mq] body.touch-controls-active[data-mq-tray] :is(#godHelp, #heroTools) {
+    left: calc(var(--mq-l) + var(--mq-edge)) !important; right: calc(var(--mq-r) + var(--mq-edge)) !important; max-width: none !important; width: auto !important;
+  }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] { grid-template-columns: repeat(5, minmax(54px, 1fr)); }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] { width: auto !important; }
+  :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [data-equip] { flex-direction: column; justify-content: center; height: 58px !important; gap: 2px !important; padding: 4px !important; }
+  :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [data-equip] .bf-name { font-size: 10.5px !important; }
+  :root[data-mq] body.touch-controls-active #heroTools .bf-actions-drawer[open] > .bf-actions { grid-template-columns: repeat(3, 58px); left: 0 !important; translate: none; }
+}
+
+/* Short landscape (<=400px tall): trim pads and the actions gap so Cast never meets the util row. */
+@media (orientation: landscape) and (max-height: 400px) {
+  :root[data-mq] body.touch-controls-active { --mq-pad: 104px; }
+  :root[data-mq] body.touch-controls-active .mui-actions { bottom: calc(var(--mq-b) + var(--mq-edge) + var(--mq-pad) + 6px) !important; }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] { height: 56px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) { :root[data-mq] body.touch-controls-active .mui-stick { transition: none; } }
+@media (forced-colors: active) {
+  :root[data-mq] body.touch-controls-active :is(.hud-self, .hud-room, #godHelp, #heroTools, .mui-util) { border: 1px solid CanvasText !important; }
+  :root[data-mq] body.touch-controls-active :is([aria-checked="true"], [aria-pressed="true"], [aria-expanded="true"]) { outline: 2px solid Highlight !important; }
+}
+/* Integration: the old pager sets grid-auto-flow:column; palettes need real rows.
+   Raise open trays above the independent touch layer, retaining only utility buttons. */
+:root[data-mq] body.touch-controls-active[data-mq-tray] .hud {z-index:7;}
+:root[data-mq] body.touch-controls-active[data-mq-tray] #touchControls {z-index:8;}
+:root[data-mq] body.touch-controls-active[data-mq-tray] #touchControls :is(.mui-stick,.mui-stick *,.mui-actions,.mui-actions *,.ta-wrap,.ta-wrap *) {pointer-events:none !important;}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {grid-auto-flow:row !important;grid-template-columns:repeat(7,78px);overflow:visible !important;}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {width:78px !important;height:70px !important;}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .bf-name {white-space:normal !important;overflow:visible !important;text-overflow:clip !important;overflow-wrap:anywhere;}
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-toggle::after {content:'Quest';font-size:12px;}
+:root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-primary {min-height:44px !important;}
+@media (orientation:portrait) {
+ :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {grid-template-columns:repeat(4,minmax(0,1fr));}
+ :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {width:auto !important;}
+}
+/* Existing help layout uses #hud selectors; keep the quest at the same quiet edge in both roles. */
+:root[data-mq] body.touch-controls-active #hud > .xhud {top:calc(var(--mq-t) + 50px) !important;bottom:auto !important;left:calc(var(--mq-l) + 8px) !important;}
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions .ta-quick {grid-column:1/-1;display:flex;gap:6px;}
+:root[data-mq] body.touch-controls-active #heroTools .bf-actions .ta-q {width:58px;height:48px;}
+/* The contextual Collect chip stays available, above—not on—the equipment selector. */
+:root[data-mq] body.touch-controls-active .ta-wrap {bottom:calc(var(--mq-b) + var(--mq-pad) + 84px) !important;}

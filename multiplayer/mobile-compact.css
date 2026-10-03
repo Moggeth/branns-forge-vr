@@ -286,3 +286,15 @@ body.touch-controls-active .hud > .xhud[data-expanded="false"] { grid-template-c
 body.touch-controls-active .xhud[data-expanded="false"] .xhud-row { display:contents; }
 body.touch-controls-active .xhud[data-expanded="false"] .xhud-actions { grid-column:3;grid-row:1;margin:0;flex-wrap:nowrap; }
 body.touch-controls-active .xhud[data-expanded="false"] .xhud-alerts { grid-row:2; }
+/* Keep the visually hidden checkbox inside its label; generic form sizing otherwise
+   creates 27px of horizontal overflow in the narrow Controls menu. */
+#menu .menu-card[data-mc-tabs="on"] #damageNumbers {width:1px !important;height:1px !important;max-width:1px;clip-path:inset(50%);}
+#menu .menu-card[data-mc-tabs="on"] #touchLeftHanded {width:24px;height:24px;min-height:24px;flex:none;}
+@media (orientation:landscape) and (max-height:440px) {
+ #menu .menu-card[data-mc-tabs="on"][data-mc-active="controls"] .menu-section:has(#damageNumbers) {display:flex !important;align-items:center;gap:12px;}
+ #menu .menu-card[data-mc-tabs="on"][data-mc-active="controls"] .menu-section:has(#damageNumbers) > .hint {flex:1;}
+}
+
+@media (orientation:landscape) and (max-height:440px) {
+ #menu .menu-card[data-mc-tabs="on"][data-mc-active="controls"] {gap:4px !important;}
+}

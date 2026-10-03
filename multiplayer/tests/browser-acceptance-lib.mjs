@@ -46,3 +46,13 @@ export const snap = page => page.evaluate(() => window.brannHarness.snapshot());
 export const ctl = page => page.evaluate(() => window.brannHarness.controls());
 export const me = async page => { const [s, id] = await page.evaluate(() => [window.brannHarness.snapshot(), window.brannHarness.state().playerId]); return {s, self: s.players.find(p => p.id === id), id}; };
 export async function shot(page, name) { const file = join(CAPTURES, `${name}.png`); await page.screenshot({path: file}); return `captures/${name}.png`; }
+
+// Quiet mobile HUD: open the palette before choosing; selecting closes it again.
+export async function chooseTouchSpell(page,id){
+ if(await page.locator('body').getAttribute('data-mq-tray')!=='spells')await page.locator('[data-spell][aria-checked="true"]').tap();
+ await page.locator('[data-spell="'+id+'"]').tap();
+}
+export async function chooseTouchWeapon(page,id){
+ if(await page.locator('body').getAttribute('data-mq-tray')!=='weapons')await page.locator('[data-equip][aria-pressed="true"]').tap();
+ await page.locator('[data-equip="'+id+'"]').tap();
+}

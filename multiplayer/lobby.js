@@ -1,3 +1,4 @@
+import {mountQuietHud} from './mobile-quiet.js';
 import {createFieldOverlays,createBuildTag} from './client/field-overlays.js';
 import {equipmentHelp} from './client/equipment-help.js';
 import {bindHoldOverlays} from './client/hold-overlays.js';
@@ -81,6 +82,7 @@ function friendlyError(detail) {
 
 // ---------------------------------------------------------------- state
 let mobile = null, xrActive = false;
+let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
 let forgePanel=null,forgeOpen=false,spellbook=null;
 let game = null, session = null, rendererReady = false, rendererFailed = false;
@@ -785,6 +787,7 @@ try {
   mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:()=>{updateLookHint();refreshFieldModel();},onExpeditionAction:expeditionAction});
   document.head.append($('compactStyles'));
   createMenuTabs();
+  quietHud=mountQuietHud();
   rendererReady = true;
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
@@ -811,7 +814,7 @@ applyRoleUi(chosenRole());
 setPhase('lobby');
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
