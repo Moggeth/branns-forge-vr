@@ -82,3 +82,15 @@ its settings on other tabs.
 Two-client updated-palette test passed in **12.680 seconds**; desktop emergence
 regression passed in **7.732 seconds**. The old two-client harness attempted to
 tap a now-collapsed spell directly; it now follows the palette UI.
+
+## Published acceptance
+
+Live runtime **aaba75f** at https://branns-forge-multiplayer.vercel.app.
+Vercel deployment dpl_EFVmquVDbRPvf6HnVaDCfNcN9qA7 completed in **15.460 seconds**.
+Reviewed actual public screenshot and its aaba75f build tag.
+Public anonymous HUD suite **14.960 seconds**, touch gameplay **11.579 seconds**,
+two friends **12.351 seconds**; all passed with zero console errors.
+Only owned QA 8799/5188 stopped (2.937 seconds); original public peer 8789 PID43880
+and tunnel remain running. Unrelated Godot UID files preserved.
+
+Measured task wall clock through public acceptance: 1639.537 seconds.
