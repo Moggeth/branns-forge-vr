@@ -9,7 +9,7 @@ export {MOUNTAIN_ROCK_GLSL};
 //   itself, dressed by mountain-ground-treatment.js (moss foot, strata rock, snow) so rock appears exactly where the
 //   shared slope becomes impassable.
 // - Never adds collision, raycast targets, lights or shadow casters. 1 draw call, ~22k triangles.
-export const MOUNTAIN_ARENA_VERSION = 2;
+export const MOUNTAIN_ARENA_VERSION = 3;
 export const ARENA = Object.freeze({walk: 55, mountainStart: 46, crest: 55, shellStart: 52, outer: 65, columnsPerSide: 160, rows: 18});
 
 // Deterministic integer hash (same family as orchard-presentation hash2) and periodic 1D value noise.
@@ -38,7 +38,7 @@ export function ridgeProfile(u, seed = 7) {
   const fine = pnoise(u * 61, 244, seed + 3), fu = u - Math.floor(u), corner = sstep(.09, 0, Math.min(fu, 1 - fu)); // corner bastions
   void P;
   return {
-    peak: 6 + 11 * macro * macro + 3.2 * ribs + 1.4 * fine + 7 * corner, // summit height above the crest surface (m)
+    peak: 4 + 10 * Math.pow(macro, 1.5) + 2.6 * ribs + 1.4 * fine + 5 * corner, // alpine foothills: forested shoulders under the distant giants // summit height above the crest surface (m)
     at: 60.2 + 2.4 * (pnoise(u * 5, 20, seed + 4) - .5), // summit Chebyshev distance
     bay: pnoise(u * 11, 44, seed + 5), // 0 spur .. 1 bay (horizontal breakup of the wall)
     ribs, macro,
@@ -59,7 +59,7 @@ export function liftAt(s, u, seed = 7) {
   if (s <= R.at) {
     const t = clamp01((s - A.crest) / (R.at - A.crest)), q = R.peak * Math.pow(sstep(0, 1, t), 1.6); // concave scree apron, steep summit
     const step = 2.3, terr = Math.floor(q / step) * step + sstep(.45, 1, q / step - Math.floor(q / step)) * step; // strata benches
-    return shoulder + q * .35 + terr * .65 + rib * 1.6 * t;
+    return shoulder + q * .72 + terr * .28 + rib * 2.2 * t; // benches only hint, no contour lines
   }
   const t = clamp01((s - R.at) / (A.outer - R.at)); // back side falls below the surface into the skirt
   return (shoulder + R.peak + rib * 1.6) * (1 - sstep(0, 1, t)) - 8 * sstep(.4, 1, t);
