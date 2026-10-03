@@ -1,0 +1,46 @@
+name: Browser game
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: multiplayer
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # quality-performance compares against a fixed earlier revision
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: multiplayer/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:check
+      - run: node tests/ci.mjs
+
+  stale-checks:
+    # Known failures on main; visible here but not blocking.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: multiplayer/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: node tests/ci.mjs --stale
+        continue-on-error: true # job stays green; the step log lists what still fails
