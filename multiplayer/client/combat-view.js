@@ -70,6 +70,15 @@ export function canonicalPart(name = '') {
   return 'torso';
 }
 
+// Shield primitives are skinned to an arm, but their surface is armour, not flesh.
+// Preserve this tag on baked detached geometry as well as authored GLB groups.
+function contactSurface(node) {
+  for (let n = node; n; n = n.parent) {
+    if (n.userData.contactSurface === 'shield' || /^shield(?:_|:|$)/i.test(n.name)) return 'shield';
+  }
+  return undefined;
+}
+
 function namedPart(node) {
   for (let n = node; n; n = n.parent) {
     const part = canonicalPart(n.name);
@@ -187,7 +196,7 @@ export function segmentSurfaceContacts(root, from, to, targetId, prepared, {incl
         new THREE.Box3(new THREE.Vector3().fromArray(partBounds.min), new THREE.Vector3().fromArray(partBounds.max)), new THREE.Vector3());
       if (exit) impactThickness = THREE.MathUtils.clamp(justInside.distanceTo(partRoot.localToWorld(exit)) + .002, 0, .8);
     }
-    return {targetId, part, boneName: bone?.name || (!root.userData.detachedPart && anchor !== root ? anchor.name : ''), point: hit.point.toArray(), normal: normal.toArray(),
+    return {targetId, part, ...(contactSurface(mesh) ? {surface: 'shield'} : {}), boneName: bone?.name || (!root.userData.detachedPart && anchor !== root ? anchor.name : ''), point: hit.point.toArray(), normal: normal.toArray(),
       localPoint: anchor.worldToLocal(hit.point.clone()).toArray(), localNormal: localNormal.toArray(), localQuaternion: inverse.multiply(orientation).toArray(),
       partPosition: partRoot.getWorldPosition(new THREE.Vector3()).toArray(), partQuaternion: partRoot.getWorldQuaternion(new THREE.Quaternion()).toArray(),
       partPoses, localBounds: partBounds, ...(impactThickness===undefined?{}:{impactThickness}), distance: hit.distance};
@@ -250,7 +259,9 @@ export function snapshotDetachedPart(root, part) {
     for (const [name, attr] of Object.entries(attributes)) geometry.setAttribute(name, new THREE.Float32BufferAttribute(attr.values, attr.source.itemSize));
     geometry.computeVertexNormals(); geometry.computeBoundingSphere();
     const piece = new THREE.Mesh(geometry, mesh.material); piece.name = `${mesh.name}:detached`;
-    piece.userData.detachedPart = part; detached.add(piece);
+    piece.userData.detachedPart = part;
+    if (contactSurface(mesh)) piece.userData.contactSurface = 'shield';
+    detached.add(piece);
   });
   return detached;
 }
