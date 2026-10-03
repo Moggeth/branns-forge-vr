@@ -181,7 +181,7 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='projectileHit')return fail('host_required');
   if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
   if(m.action==='release'){if(m.throw!==undefined&&typeof m.throw!=='boolean')return fail('invalid_action');const dir=m.direction??[-Math.sin(p.yaw),.1,-Math.cos(p.yaw)];if(!vec(dir,1.01))return fail('invalid_action');const n=Math.hypot(...dir);if(n<.9||n>1.1)return fail('invalid_action');return releaseHeld(state,p,dir.map(v=>v/n),m.throw===true)?ok([]):fail('nothing_held');}
-  if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart);
+  if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart,m);
   if(m.action==='special'){
     if(p.tool!=='hammer')return fail('invalid_action');
     if(state.tick-(p.specialTick??-1000)<240)return fail('cooldown');

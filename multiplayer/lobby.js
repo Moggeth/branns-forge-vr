@@ -468,7 +468,7 @@ function onSnapshot(snapshot) {
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · Q crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -726,7 +726,13 @@ for(const button of document.querySelectorAll('[data-equip]'))button.addEventLis
 for(const button of document.querySelectorAll('[data-resource-use]'))button.addEventListener('click',()=>command('action',{action:'useResource',kind:button.dataset.resourceUse}));
 $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
-for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
+for(const [id,method] of [['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
+// Special is press-and-release: the pick shows its wall footprint while held and raises it on release (touch buttons
+// activate on release, so 'click' is the release); other weapons fire on that same click.
+$('special')?.addEventListener('pointerdown',()=>{if(game?.weaponState()?.tool==='pick')game.specialPress(true);});
+// A finger dragged off the button never casts (release outside does not click); drop the footprint instead.
+for(const name of ['pointercancel','lostpointercapture'])$('special')?.addEventListener(name,()=>game?.cancelSpecialAim?.());
+$('special')?.addEventListener('click',()=>{game?.specialPress?game.specialPress(false):game?.special();$('special').blur();});
 $('throw')?.addEventListener('click',()=>{game?.release(true);$('throw').blur();});
 $('quickCast')?.addEventListener('change',()=>{game?.setQuickCast($('quickCast').checked);updateSpellHint();mobile?.update({active:phase==='game'&&connected&&!menuOpen&&!fieldKind,role:currentRole,xr:xrActive});});
 releaseFocusAfterPointer($('quickCast'));

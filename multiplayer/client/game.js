@@ -34,6 +34,8 @@ import {createWeaponController} from './weapon-controller.js';
 import {createContactFeedback} from './contact-feedback.js';
 import {createCombatView} from './combat-view.js';
 import {createSpellPresentation} from './spell-presentation.js';
+import {createWallPreview} from './crystal-wall-preview.js';
+import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createImpactPresentation} from './impact-presentation.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
@@ -233,6 +235,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function report(message) { if (!disposed) onStatus(message); }
   const content = createWorldContent({scene,templates,instantiate,height:heightAt,camera});
+  // Stonewhisper wall: hold Special (Q / right mouse / touch Special / VR trigger) to see the exact footprint, release to raise it.
+  const wallPreview=createWallPreview({THREE,scene,height:(x,z)=>heightAt(x,z)});let wallAim=null,wallAudio=null;
   const pickupHighlight=createPickupHighlight({scene});
   applyMountainGroundTreatment(orchard.material);
   const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
@@ -248,8 +252,22 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0;const guideTiming={lastMs:0,maxMs:0,updates:0};
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>snapshot.tick??0,height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   let specialSwing=null, waistPouch=null;
+  function selfPlayer(){return snapshot.players.find(p=>p.id===playerId);}
+  // Ground point under the weapon aim (camera, or the VR controller holding the pick); open sky aims at full reach.
+  function wallAimPoint(){const aim=weaponAim(),o=aim.origin,d=aim.direction,hit=terrainRay.segment(o,[o[0]+d[0]*14,o[1]+d[1]*14,o[2]+d[2]*14]);
+    if(hit)return [...hit.point];const p=selfPlayer()?.position||o,h=Math.hypot(d[0],d[2])||1;return [p[0]+d[0]/h*20,p[1],p[2]+d[2]/h*20];}
+  function beginWallAim(){if(!active||role!=='hero'||inventionPlacement||tool!=='pick')return;unlockAudio();wallAim??={since:performance.now()};}
+  function cancelWallAim(){wallAim=null;wallPreview.hide();}
+  // Release casts toward the aimed point (a tap casts too). The host re-plans from its own state; the preview used the same plan.
+  function releaseWallAim(){if(!active||role!=='hero'||tool!=='pick'){cancelWallAim();return;}const point=wallAimPoint();cancelWallAim();onAction('special',{point});}
+  function specialPress(down){if(tool==='pick'){if(down)beginWallAim();else releaseWallAim();return;}if(!down)special();}
+  function updateWallPreview(){
+    if(!wallAim||tool!=='pick'||!active||role!=='hero'){if(wallAim)cancelWallAim();return;}
+    const p=selfPlayer();if(!p){wallPreview.hide();return;}
+    wallPreview.show({position:p.position,yaw:p.yaw,point:wallAimPoint(),ready:(snapshot.tick||0)-(p.specialTick??-1000)>=240});
+  }
   function sendSpecial(){const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=heightAt(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}
-  function requestSpecial(){if(!active||specialSwing)return;if(tool==='axe'&&!renderer.xr.isPresenting){const p=snapshot.players.find(p=>p.id===playerId);if((snapshot.tick||0)-(p?.specialTick??-1000)<240)return;specialSwing={at:performance.now(),sent:false,rest:{position:weaponAnchor.position.clone(),quaternion:weaponAnchor.quaternion.clone()}};swingContact=true;swingAt=-Infinity;}else sendSpecial();}
+  function requestSpecial(){if(!active||specialSwing)return;if(tool==='pick'){beginWallAim();return;}if(tool==='axe'&&!renderer.xr.isPresenting){const p=snapshot.players.find(p=>p.id===playerId);if((snapshot.tick||0)-(p?.specialTick??-1000)<240)return;specialSwing={at:performance.now(),sent:false,rest:{position:weaponAnchor.position.clone(),quaternion:weaponAnchor.quaternion.clone()}};swingContact=true;swingAt=-Infinity;}else sendSpecial();}
   const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();const golden=tool==='crossbow'&&!!siegebirdFlock?.loadedGolden(axeModel);feedback.release(tool,{golden});onAction('fire',details);if(tool==='crossbow')siegebirdFired(golden);},emitFlame:details=>{unlockAudio();onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0;},special:requestSpecial});
   function attachWeapon() {
     if (!axeModel) return;
@@ -597,7 +615,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Wood kit shares this one context (bounded 16-voice pool); it is created only inside the existing gesture unlock.
   const ear={position:[0,0,0],forward:[0,0,-1],up:[0,1,0]},earVector=new THREE.Vector3(),earQuaternion=new THREE.Quaternion();
   function listenerPose(){camera.getWorldPosition(earVector);earVector.toArray(ear.position);camera.getWorldDirection(earVector);earVector.toArray(ear.forward);earVector.set(0,1,0).applyQuaternion(camera.getWorldQuaternion(earQuaternion)).toArray(ear.up);return ear;}
-  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();}catch{}}
+  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();wallAudio??=createCrystalWallAudio({context:audioContext});}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
   let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
@@ -622,6 +640,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
     if(event.kind==='spell')spellVisual.play(event);
+    if(event.kind==='pick_burst'){wallAudio?.cast(event,listenerPose());
+      // The caster feels the wave roll away from them: pulses fade as the front travels, then one crack as it blooms.
+      if(event.id===playerId){const ms=(event.durationTicks||50)/.06,steps=[];for(let t=0;t<ms;t+=110)steps.push({at:t,amplitude:.55-.35*t/ms,duration:38});steps.push({at:ms+60,amplitude:.7,duration:60});feedback.pattern?.(steps);
+        if(touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([30,60,22,60,16,90,45]);}catch{}}}
     // The persistent crystal wall owns its growth effect. Replaying the older Crystal spell here doubled its geometry.
     const specialEffect={hammer_slam:'raise',axe_cleave:'sunder'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
     const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
@@ -638,7 +660,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     axeModel?.removeFromParent();tool=next;axeModel=model;weaponAnchor.remove(axePlaceholder);attachWeapon();
     if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});}
   }
-  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();specialSwing=null;presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
+  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();cancelWallAim();specialSwing=null;presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});equipVisual(next);}
   // VR aim comes from the controller that actually holds the weapon (or that made this grab/throw press), never an
   // assumed hand or index 0; with no usable controller it falls back to the head.
   function weaponAim(pressIndex){
@@ -746,7 +768,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function primaryDown(){if(!active||role!=='hero'||inventionPlacement)return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function special(){if(!active||role!=='hero'||inventionPlacement)return;if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else weapons.special();}
-  function primaryUp(){if(active&&role==='hero')weapons.end();}
+  function primaryUp(){if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
   function collectibleVisible(from,to,id){const delta=new THREE.Vector3(...to).sub(new THREE.Vector3(...from)),length=delta.length();if(length<.01)return true;
     const ray=new THREE.Raycaster(new THREE.Vector3(...from),delta.multiplyScalar(1/length),0,Math.max(0,length-.06));
     return !ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).some(h=>surfaceVisible(h.object)&&resolveHit(h)?.targetId!==id);
@@ -775,7 +797,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
-    aiming=false;weapons.cancel();specialSwing=null;pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
+    aiming=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -802,6 +824,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (!active || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return;
     unlockAudio();
     if (role === 'god' && event.code === 'Escape') { cancelCast(); return; }
+    if (role === 'hero' && event.code === 'Escape' && wallAim) { cancelWallAim(); return; }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
@@ -810,6 +833,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   });
   listen(window,'keyup',event=>{
     keys.delete(event.code);
+    if(event.code==='KeyQ'&&wallAim&&role==='hero')releaseWallAim();
     if(event.code===quickKey){
       if(castStart&&active&&role==='god'&&cursor.visible)castAt(hitPoint,true);
       else cancelCast();
@@ -839,7 +863,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(event.button===0)primaryDown();
     if(event.button===2){if(['crossbow','bow'].includes(tool))aiming=true;else weapons.special();}
   });
-  listen(window,'mouseup',event=>{if(role!=='hero')return;if(event.button===0)primaryUp();if(event.button===2)aiming=false;});
+  listen(window,'mouseup',event=>{if(role!=='hero')return;if(event.button===0)primaryUp();if(event.button===2){aiming=false;if(wallAim)releaseWallAim();}});
   listen(window,'pointerup',event=>{
     if(event.pointerType!=='mouse')return; // touch buttons own their press/release; another finger must not release a held bow
     rightDrag=false;
@@ -983,6 +1007,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if(now>=nextGuideAt){nextGuideAt=now+66;const guideStart=performance.now(),aim=projectileAim();trajectoryGuide.update({origin:aim.origin,aimDirection:aim.direction,curveBase:weaponState.curveBase,draw:weaponState.draw,hit:worldContact,terrainHeight:heightAt,sampleEvery:3});guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;}
     }else{trajectoryGuide.hide();nextGuideAt=0;}
     content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
       const animation = entry.visual.userData;
@@ -1107,7 +1132,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
     jump() { if (active && role === 'hero') jumpPending = true; },
     projectWorld(point){camera.updateMatrixWorld();const p=new THREE.Vector3(...point).project(camera);if(p.z < -1||p.z>1)return null;const r=canvas.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2,viewportWidth:innerWidth,viewportHeight:innerHeight};},
-    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,weaponState:()=>({tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
+    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
     useResource(kind){if(active&&role==='hero')onAction('useResource',{kind});},
     beginInventionPlacement,
     interact,
