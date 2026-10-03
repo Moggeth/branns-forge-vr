@@ -1,3 +1,5 @@
+Current takeover guide: [Claude handoff](../docs/CLAUDE-HANDOFF-20261003.md). This supersedes older proof/scope notes.
+
 # Browser multiplayer proof
 
 ## Cloud multiplayer is live - 2026-10-03
