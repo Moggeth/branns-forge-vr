@@ -125,6 +125,13 @@ export function createContactFeedback({sources = () => [], playerId = () => null
   }
 
   return {
+    // Authored local rumble (e.g. the crystal wall wave rolling away from the caster). Steps: {at ms, amplitude, duration};
+    // each goes through the same throttle/limits as every other pulse. Returns the number of scheduled steps.
+    pattern(steps = [], hand = toolHand(tool(), weaponHand())) {
+      if (disposed || !presenting()) return 0;
+      for (const s of steps) later(s.at, () => pulse(hand, s));
+      return steps.length;
+    },
     // Real geometric contact detected locally (VR physical melee). Pulses now; registers ownership for confirmation.
     contact({targetId, point, normal, direction, speed, material, tool: used = tool(), hand} = {}) {
       if (disposed || !MELEE_TOOLS.includes(used) || used !== tool()) return false;
@@ -135,11 +142,20 @@ export function createContactFeedback({sources = () => [], playerId = () => null
       return pulse(side, contactProfile({material, tool: used, speed, normal, direction}));
     },
     // Local release of a ranged weapon (the string/limb actually leaves the hand). Not an impact.
-    release(used = tool()) {
+    release(used = tool(), {golden = false} = {}) {
       if (disposed) return false; drawFull = false;
       if (used === 'bow') { const bow = toolHand('bow', weaponHand()); const a = pulse(bow, {amplitude: .4, duration: 22});
         pulse(otherHand(bow), {amplitude: .25, duration: 12}); return a; }
-      if (used === 'crossbow') return pulse(toolHand(used, weaponHand()), {amplitude: .45, duration: 20});
+      if (used === 'crossbow') return pulse(toolHand(used, weaponHand()), golden ? {amplitude: .85, duration: 60} : {amplitude: .55, duration: 28});
+      return false;
+    },
+    // Siegebird reload on the weapon hand: every other ratchet tooth, the latch, and the bird seating the bolt.
+    siegebird(cue, {golden = false, index = 0} = {}) {
+      if (disposed || tool() !== 'crossbow') return false;
+      const hand = toolHand('crossbow', weaponHand());
+      if (cue === 'click') return index % 2 === 0 && pulse(hand, {amplitude: .1, duration: 8});
+      if (cue === 'latch') return pulse(hand, {amplitude: .22, duration: 14});
+      if (cue === 'seat') return pulse(hand, golden ? {amplitude: .6, duration: 55} : {amplitude: .3, duration: 18});
       return false;
     },
     // Weapon-controller draw state. One tension tick on the string hand at full draw; nothing continuous.

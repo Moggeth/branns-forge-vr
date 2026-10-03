@@ -6,6 +6,7 @@ import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
 import {createEmbedFractures} from './embed-fractures.js';
 import {createProjectileStreaks} from './projectile-streaks.js';
+import {dressGoldenProjectile, disposeGoldenProjectile} from './siegebird-flock.js';
 import {attachEmberdew} from './emberdew-presentation.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
@@ -311,15 +312,16 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
   const remove = (map, id, ownsGeometry = false) => {
     const node = map.get(id); if (!node) return;
-    node.userData.emberdew?.dispose();
+    node.userData.emberdew?.dispose(); node.traverse(n => { if (n.userData.siegebirdGolden) disposeGoldenProjectile(n); });
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
-  function projectile(kind) {
+  function projectile(kind, golden = false) {
     // Flame tongues are pooled by the fire presentation; collision still sweeps
     // the same complete authoritative trail, independently of this empty group.
     if(kind==='flame')return new THREE.Group();
     const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
+    if (golden && kind === 'bolt') dressGoldenProjectile(visual);
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual);
     if (kind === 'fuel') { group.userData.emberdewRoot = visual; group.userData.emberdew = attachEmberdew({root: visual}); }
@@ -360,7 +362,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     for (const data of next.projectiles || []) {
       let node = projectiles.get(data.id);
-      if (!node) { node = projectile(data.kind); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
+      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
       node.position.fromArray(data.position);
       node.userData.flight = {position: new THREE.Vector3().fromArray(data.position), velocity: new THREE.Vector3().fromArray(data.velocity), age: 0};
       node.userData.projectileData = data;
@@ -381,7 +383,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
-      if (!node) { node = projectile(data.kind); if (!node) continue; embeds.set(data.id, node); }
+      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; embeds.set(data.id, node); }
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
       if (!target) { node.visible = false; fractures.remove(data.id); fractureAnchors.delete(data.id); continue; }

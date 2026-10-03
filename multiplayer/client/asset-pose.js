@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {siegebirdMechanism} from './siegebird-reload.js';
 
 // Engine contract: metres, +Y up, -Z forward. Model axes are independently
 // authored facts, never inferred from a bounding box or camera angle.
@@ -122,7 +123,7 @@ export function updateCrossbowCords(visual,sledY){
  for(const r of rig){r.target.copy(r.moving);r.target.y+=sledY-.535;r.axis.subVectors(r.target,r.fixed);const length=r.axis.length();r.node.quaternion.setFromUnitVectors(r.up,r.axis.normalize());r.node.scale.y=length/r.length;r.node.position.copy(r.fixed).add(r.target).multiplyScalar(.5).addScaledVector(r.axis,-r.mid*r.node.scale.y);}
 }
 
-export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, time = 0, templates} = {}) {
+export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, time = 0, templates} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
   if (tool === 'bow') {
     const upper = visual.getObjectByName('UpperLimb'), lower = visual.getObjectByName('LowerLimb');
@@ -150,13 +151,18 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, ti
     const arrow = visual.userData.nockedArrow;
     if (arrow) { arrow.visible = amount > 0; arrow.position.copy(nock).z -= .78; }
   } else if (tool === 'crossbow') {
-    const cocked = 1 - THREE.MathUtils.clamp(recoil, 0, 1);
-    const rotate = (name, axis, value) => { const node = visual.getObjectByName(name); if (node) node.rotation[axis] = value; };
-    rotate('Pinion', 'x', cocked * Math.PI * 4); rotate('Reduction', 'x', -cocked * Math.PI * 2 + Math.PI / 20);
-    rotate('Drum', 'x', -cocked * Math.PI * 2); rotate('Crank', 'x', recoil > 0 ? time * 10 : 0);
-    rotate('Trigger', 'x', -.32 * recoil); rotate('Latch', 'y', -.8 * recoil);
-    const sled = visual.getObjectByName('Sled'); if (sled) {sled.position.y = .79 - .255 * cocked;updateCrossbowCords(visual,sled.position.y);}
-    const bolt = visual.getObjectByName('Bolt'); if (bolt) bolt.visible = recoil < .08;
+    // Reload time (seconds since the shot) drives the whole Siegebird cycle: release, two-turn wind, latch and
+    // the songbird seating the next bolt (siegebird-reload.js). Callers without a clock pass legacy recoil 0..1.
+    const t = Number.isFinite(reload) ? reload : recoil > 0 ? (1 - THREE.MathUtils.clamp(recoil, 0, 1)) * .45 : Infinity;
+    const m = siegebirdMechanism(t), cocked = m.cocked;
+    const parts = visual.userData.crossbowParts ||= Object.fromEntries(['Pinion', 'Reduction', 'Drum', 'Crank', 'CrankKnob', 'Trigger', 'Latch', 'Sled', 'Bolt'].map(n => [n, visual.getObjectByName(n)]));
+    const rotate = (name, axis, value) => { const node = parts[name]; if (node) node.rotation[axis] = value; };
+    // Crank and pinion share a shaft (2 turns); the 10:20 reduction and drum turn one.
+    rotate('Pinion', 'x', m.crank); rotate('Reduction', 'x', -m.crank / 2 + Math.PI / 20);
+    rotate('Drum', 'x', -m.crank / 2); rotate('Crank', 'x', m.crank); rotate('CrankKnob', 'x', -m.crank);
+    rotate('Trigger', 'x', -.32 * m.trigger); rotate('Latch', 'y', m.latch);
+    if (parts.Sled) { parts.Sled.position.y = .79 - .255 * cocked + .014 * m.string * (1 - cocked); updateCrossbowCords(visual, parts.Sled.position.y); }
+    if (parts.Bolt) { parts.Bolt.userData.rest ||= parts.Bolt.position.clone(); parts.Bolt.visible = m.bolt; parts.Bolt.position.z = parts.Bolt.userData.rest.z + .012 * m.boltDrop; }
     visual.traverse(mesh => { if (mesh.morphTargetDictionary?.Drawn !== undefined) mesh.morphTargetInfluences[mesh.morphTargetDictionary.Drawn] = cocked; });
   }
 }

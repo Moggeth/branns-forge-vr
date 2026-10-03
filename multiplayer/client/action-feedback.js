@@ -1,4 +1,5 @@
 import {WEAPONS} from '../shared/spells.js';
+import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const RECOVERY = {
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",
@@ -53,7 +54,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if(command.type==='cast')return `Magic is recovering: ${wait(player.castTick,45)}s.`;
   if(command.action==='forgeEncounter')return `The next raid is ready in ${Math.max(.1,((world.settlement?.cooldownUntil||tick)-tick)/60).toFixed(1)}s.`;
   const special=command.action==='special';
-  return `${special?'Special':'Attack'} is recovering: ${wait(special?player.specialTick:player.attackTick,special?(player.tool==='wyrmspout'?120:240):(WEAPONS.find(w=>w.id===player.tool)?.cooldown||30))}s.`;
+  return `${special?'Special':'Attack'} is recovering: ${wait(special?player.specialTick:player.attackTick,special?specialCooldown(player.tool):(WEAPONS.find(w=>w.id===player.tool)?.cooldown||30))}s.`;
  }
  if(code==='shrine_disabled')return `The forge was damaged. Repair it with timber, or wait ${Math.max(0,Math.ceil(((world.shrine?.disabledUntil||tick)-tick)/60))}s for recovery.`;
  if(code==='projectile_limit')return 'Too many projectiles are still in flight. Let them land before firing again (up to 8s).';
@@ -65,6 +66,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if((world.groves?.length||0)>=64&&['grove','ring'].includes(command.spell))return 'The grove limit is reached. This world cannot accept another grove.';
   if((world.pendingStarfalls?.length||0)>=8&&command.spell==='starfall')return 'Eight meteors are already descending. Wait for an impact before calling another.';
   if((world.deposits?.length||0)+(world.pendingStarfalls?.length||0)>=80)return 'Too many mineral sites are reserved. Finish mining existing deposits before creating more.';
+  if(command.action==='special'&&player.tool==='pick')return `Terrain storage is full (${world.edits?.length||0} edits). Crystal walls free their space when they shatter (within a minute); mine one now to make room sooner.`;
   return `Terrain storage is full (${world.edits?.length||0} edits). Mine crystal walls to clear space, or save and reset this world. Waiting does not clear terrain.`;
  }
  if(code==='rate_limited')return 'Too many network requests arrived together. Wait up to a minute before creating or joining another room.';
