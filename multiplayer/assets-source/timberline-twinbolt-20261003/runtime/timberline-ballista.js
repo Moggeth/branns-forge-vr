@@ -243,6 +243,21 @@ export function createTimberlineBallista(gltf, {lodDistance = 18, autoReload = t
     loadedFilament,
     setAim, aimImmediate, fire, reload, update, launchFrame,
     socketWorld,
+    // Network presentation: seek directly without replaying release/gameplay events.
+    // A reconnect at any point in the four-second cycle sees exactly the same pose.
+    seekCycle(age, camera = null, viewportHeight = 1080) {
+      const idle = age < 0 || age >= 3.9;
+      const name = idle ? 'Idle_Loaded' : age < .75 ? 'Fire' : 'Reload';
+      const next = idle ? actions.idle : age < .75 ? actions.fire : actions.reload;
+      if (current !== next || clipName !== name) { mixer.stopAllAction(); next.reset().play(); current = next; clipName = name; }
+      next.enabled = true; next.paused = false; next.setEffectiveWeight(1);
+      next.time = idle ? Math.max(0, age) % 3 : age < .75 ? age : age - .75;
+      lastTime = next.time;
+      state = idle ? 'loaded' : age < .75 ? 'firing' : 'reloading';
+      boltsOnRails = idle || age < .05 || age >= .75;
+      filamentShown = idle || age < .05 || age >= 3.55;
+      update(0, camera, viewportHeight);
+    },
     forceLod(l) { forcedLod = l; if (l != null) setLod(l); },
     setLoadedImmediate() { state = 'loaded'; filamentShown = boltsOnRails = true; play(actions.idle, 'Idle_Loaded', 0); },
     setEmptyImmediate() { state = 'empty'; filamentShown = boltsOnRails = false; play(actions.unloaded, 'Unloaded', 0); },

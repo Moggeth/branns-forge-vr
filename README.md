@@ -1249,3 +1249,5 @@ Browser fire checkpoint (2026-10-03): Wyrmspout slot7 and Emberdew slot8 share b
 Browser tree/Expedition pre-release integration and acceptance: multiplayer/IMPORT-TREES-EXPEDITION.md. Editable portable art: multiplayer/assets-source/trees and resources.
 
 Browser VR Expedition wrist-panel controls and verification: multiplayer/IMPORT-VR-EXPEDITION-20261003.md. Ground-mask and mobile layout follow-ups: multiplayer/IMPORT-PRESENTATION-20261003.md.
+
+Claude PR assets: Timberline now uses the authored twin-bolt machine, moving strings/crank, live cutting filament and four-second reload. Build through B, then use E nearby or Workshop > Built > Aim & fire. Each shot costs 2 Wood + 1 Iron. The pick's gems glow by special cooldown. Refresh all room participants to use the same game version. Verification: node multiplayer/tests/timberline-integration.mjs; node multiplayer/tests/pick-luminance.mjs. Browser captures and timings: logs/pr-assets-local, logs/pr-assets-touch, logs/pr-assets-friends.

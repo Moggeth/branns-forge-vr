@@ -470,6 +470,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
   }
   const loader = new GLTFLoader();
+  for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
+    if(disposed){disposeResources(gltf.scene);return;}
+    try{await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Timberline material preparation failed: ${error.message}`);}
+    if(disposed){disposeResources(gltf.scene);return;}
+    inventionVisual.installTimberline(name,gltf);
+  },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
+
   loader.load('/assets/waist_pouch.glb',gltf=>{if(disposed){disposeResources(gltf.scene);return;}waistPouch=gltf.scene;waistPouch.visible=false;rig.add(waistPouch);},undefined,()=>report('Pouch visual unavailable; collection remains available.'));
   loader.load('/assets/hero.glb', async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
@@ -959,7 +966,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
-    inventionVisual.update(dt,renderTick);
+    inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
     combat.beginCreatureFrame?.();
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
