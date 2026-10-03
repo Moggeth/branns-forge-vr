@@ -11,12 +11,14 @@ export function createWallPreview({THREE:T,scene,height}){
  const material=stripMaterial(T);material.uniforms.uPreview.value=1;material.uniforms.uTime=wallTime;
  const mesh=new T.Mesh(g,material);mesh.name='CrystalWallPreview';mesh.frustumCulled=false;mesh.renderOrder=4;mesh.visible=false;mesh.raycast=()=>{};mesh.userData.ignoreContact=true;scene.add(mesh);
  let last=null;
- function show({position,yaw,point,ready=true,inside=true}){
+ function show({position,yaw,point,ready=true,inside}){
   const plan=planCrystalWall(position,yaw,point),[sx,sz]=plan.start,[fx,fz]=plan.direction,nx=-fz,nz=fx,len=plan.length;
   const nA=Math.min(MAX_ALONG,Math.max(6,Math.ceil((len+1.4)/.3)));
   for(let i=0;i<MAX_ALONG;i++)for(let j=0;j<ACROSS;j++){const k=i*ACROSS+j,ii=Math.min(i,nA-1),a=-.4+(len+1.0)*ii/(nA-1),c=-1.3+2.6*j/(ACROSS-1),x=sx+fx*a+nx*c,z=sz+fz*a+nz*c;
    wall[k*2]=a;wall[k*2+1]=c;positions[k*3]=x;positions[k*3+1]=height(x,z)+.12;positions[k*3+2]=z;}
   g.attributes.position.needsUpdate=g.attributes.aWall.needsUpdate=true;g.setDrawRange(0,(nA-1)*(ACROSS-1)*6);
+  // Same world bound the authority enforces (outside_world), so an amber preview always means the cast will fail.
+  inside??=[plan.start,plan.end].every(q=>Math.abs(q[0])<=46&&Math.abs(q[1])<=46);
   const bad=!ready||!inside;material.uniforms.uLength.value=len;material.uniforms.uBad.value=bad?1:0;
   mesh.visible=true;last={plan,ready,inside};return last;
  }
