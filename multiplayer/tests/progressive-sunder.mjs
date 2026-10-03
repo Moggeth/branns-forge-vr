@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {createSimulation,loadSimulation} from '../shared/simulation.js';
+import {createSimulation as createBaseSimulation,loadSimulation} from '../shared/simulation.js';
 import {terrainHeight,baseHeight,terrainFrameKey,terrainDirtyEdits,sunderFront,hasActiveTerrain} from '../shared/terrain.js';
 import {createDeformationField} from '../client/terrain-deformation-field.js';
 import {createSpellPresentation} from '../client/spell-presentation.js';
 import {createWorldContent} from '../client/world-content-view.js';
 import {createOrchardPresentation,disturbanceAt} from '../client/orchard-presentation.js';
+// Put this terrain/VFX fixture inside friendly influence; the old endpoint at
+// (22,10) was outside the new starting influence introduced by inventions.
+const createSimulation=()=>{const s=createBaseSimulation();s.adventureWorld().inventions.structures.find(b=>b.id==='party-influence').position=[0,0,-25];return s;};
 const start=performance.now(),step=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 // Only horizontal distance controls a spatial line, regardless of target terrain Y.
 {

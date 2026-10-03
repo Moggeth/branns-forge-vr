@@ -62,8 +62,8 @@ assert.equal(loadSimulation(c).checkpoint().players[0].stats.unknown,undefined);
 // Arbitrary repeated casts cannot excavate/stack unbounded earth, even loaded old saves.
 const empty={edits:[],bridges:[]};
 for(const height of [-2,2]) {
-  const terrain={edits:Array.from({length:64},()=>({kind:height<0?'lower':'raise',x:0,z:0,radius:6,height}))};
-  assert.equal(Math.abs(terrainHeight(terrain,0,0)-baseHeight(0,0)),6);
+  const terrain={edits:Array.from({length:64},()=>({kind:height<0?'lower':'raise',x:0,z:12,radius:6,height}))};
+  assert.equal(Math.abs(terrainHeight(terrain,0,12)-baseHeight(0,12)),6);
 }
 const scars={edits:Array.from({length:64},()=>({kind:'axe_sunder',x:10,z:10,radius:1.35,height:-.12}))};
 assert.ok(Math.abs(terrainHeight(scars,10,10)-baseHeight(10,10))<=.6500001);

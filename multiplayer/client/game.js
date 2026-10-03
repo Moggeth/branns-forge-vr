@@ -16,6 +16,7 @@ import {createSettlementView} from './settlement-view.js';
 import {syncWeaponReadiness} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {spellUnavailable} from './spell-availability.js';
+import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
 import {createRangedReticle} from './ranged-reticle.js';
 import {createTrajectoryGuide,shouldShowTrajectory} from './ranged-trajectory.js';
@@ -54,7 +55,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
-  const heightAt=(x,z,edits=snapshot.edits)=>terrainHeight(x,z,edits,snapshot.tick??Infinity);
+  const terrainSampler=createTerrainSampler(snapshot);
+  const heightAt=(x,z,edits=snapshot.edits)=>edits===snapshot.edits?terrainSampler.height(x,z):terrainHeight(x,z,edits,snapshot.tick??Infinity);
   const terrainRay=createTerrainRaycaster({height:(x,z)=>heightAt(x,z)});
   const presentationClock=createPresentationClock(); let renderTick=0, pendingCastPreview=null;
   let contactFrame=0,worldMatricesAt=-1,worldTargets=[];
@@ -998,6 +1000,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
+      terrainSampler.setState(snapshot);
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
       presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});
@@ -1052,7 +1055,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },

@@ -76,7 +76,11 @@ export function baseHeight(x,z) {return triangleHeight(rawBaseHeight,x,z);}
 export function rawTerrainHeight(state,x,z) {
   let earth=0,scar=0,wall=0;
   for(const edit of state.edits||[]) {
-    const t=clamp(1-Math.hypot(x-edit.x,z-edit.z)/edit.radius,0,1);if(t<=0)continue;
+    const dx=x-edit.x,dz=z-edit.z;
+    // Most kernels do not cover this vertex. Reject before the costly hypot,
+    // preserving original edit order, distance calculation and floating-point sum.
+    if(Math.abs(dx)>=edit.radius||Math.abs(dz)>=edit.radius)continue;
+    const t=clamp(1-Math.hypot(dx,dz)/edit.radius,0,1);if(t<=0)continue;
     const h=edit.height*smooth(t)*terrainEditScale(edit,state.tick??Infinity,x,z);
     if(edit.kind==='axe_sunder')scar+=h;
     else if(edit.kind==='pick_wall')wall=Math.max(wall,h);

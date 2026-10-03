@@ -21,6 +21,7 @@ const distance = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
 export const variantName = tree => VARIANTS[tree.variant] || 'tree';
 export const treeProfile = tree => TREE_PROFILES[variantName(tree)];
 export const treeScale = tree => tree.height / treeProfile(tree).height;
+const widestRing = new Map(Object.values(TREE_PROFILES).map(p=>[p,Math.max(...p.rings.map(r=>r[1]))]));
 export const isFelled = cut => cut?.cuts === 3 && cut.felledTick > 0;
 export function rotateVector(v, q) { const [x,y,z,w] = q, [a,b,c] = v, tx = 2*(y*c-z*b), ty = 2*(z*a-x*c), tz = 2*(x*b-y*a); return [a+w*tx+y*tz-z*ty, b+w*ty+z*tx-x*tz, c+w*tz+x*ty-y*tx]; }
 
@@ -103,6 +104,10 @@ const scratch = [];
 /** Push a character capsule (feet at position) out of trunks/stumps. cuts: Map id->harvest record. */
 export function resolveTrees(position, index, cuts, ground, radius = .28, bodyHeight = 1.6) {
  for (let pass = 0; pass < 2; pass++) for (const tree of index.near(position[0], position[2], scratch)) {
+  // Conservative horizontal bound before terrain sampling. Exact tapered trunk
+  // contact below remains unchanged, including both separation passes.
+  const maxRadius=widestRing.get(treeProfile(tree))*treeScale(tree)+radius;
+  if(Math.abs(position[0]-tree.x)>=maxRadius||Math.abs(position[2]-tree.z)>=maxRadius)continue;
   const cut = cuts.get(tree.id), floor = ground(tree.x, tree.z), top = isFelled(cut) ? cutLocalHeight(tree, cut, floor) : treeProfile(tree).firstLimb*treeScale(tree);
   if (position[1] >= floor + top - .03 || position[1] + bodyHeight < floor) continue;
   const yLocal = clamp(position[1] - floor + .3, .3, top), dx = position[0]-tree.x, dz = position[2]-tree.z, d = Math.hypot(dx, dz), r = trunkRadius(tree, yLocal) + radius;
