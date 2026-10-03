@@ -11,7 +11,7 @@ Refresh older tabs before making a new room. [Cloud setup, free limits and check
 
 ## Physical inventions — 2026-10-03
 
-Open **Menu → Manage the forge**. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
+Walk up to the forge and press **E** or tap **Open workshop**. **B** opens quick build; **T** directly places Timberline for Heroes (God T remains Frost); **Shift+B** places a bridge. Menu also retains Manage the forge. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
 
 All twelve core structure jobs are implemented. Timberline uses 2 Wood + 1 Iron per shot, cuts trees in a cascade and severs golem arms. Heavy Launcher costs 3 Stone + 1 Iron per shot and deforms ground. Wards, traps, gate, logging yard, prospecting, sanctuary rally, tower ramp and barracks defenders have distinct actions. Machines can turn 45° per action, with a short turning delay plus firing reload. Opponents can attack Influence sources to disable nearby destructive God spells. Quiet-interval incursions and distant patrols provide ongoing salvage.
 
@@ -332,3 +332,10 @@ Performance evidence and remaining cold-start/GPU limitations: [Performance and 
 ## Timber and stone foundations - 2026-10-03
 Cut trees lower for more Wood. The trunk separates into matching physical logs at touchdown; the canopy disperses in a brief leaf burst. In Workshop > Build, place an 8-Stone Foundation, then build Timberline or another fitting structure on top. Its six-metre tile holds the ground against earth magic while intact; destroying it releases that protection. Repair restores it. Existing saves remain supported.
 See [timber checks](../docs/CONTINUOUS-TIMBER-20261003.md) and [foundation checks](../docs/STONE-FOUNDATIONS-20261003.md).
+
+
+## Construction and ranged polish - 2026-10-03
+
+Hold right mouse to aim Siegebird or zoom Emberwing. Emberwing Q/Special locks the Phoenix curve; its stronger guide shows the predicted route, and Phoenix contacts ignite targets. Siegebird has an authored physical 30m sight with 50m/70m marks. On touch, use the Aim action. Escape deliberately releases capture; returning focus attempts capture only when browser rules permit it.
+
+Stone foundations use worn Opus masonry, separated from rendered soil while maintaining the same walkable surface. Placement previews and failures share authority validation and explain the remedy. Enemy scorching follows exposed body regions and persists after extinguishing. Material contacts select varied stone, timber, bone, metal, shield or flesh audio. See ../docs/INTERACTION-COMBAT-PASS-20261003.md for verification and limitations.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {createSimulation,loadSimulation} from '../shared/simulation.js';
-import {terrainHeight,rawTerrainHeight,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,moveOnTerrain} from '../shared/terrain.js';
+import {terrainHeight,terrainRenderHeight,terrainRenderVertex,rawTerrainHeight,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,moveOnTerrain} from '../shared/terrain.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {worldTrees} from '../shared/world-content.js';
 import {damageInvention,resolveInventions,inventionView} from '../shared/inventions.js';
@@ -34,14 +34,19 @@ assert.equal(terrainHeight(loaded.adventureWorld(),x,z,false),terrainHeight(s,x,
 const scene=new THREE.Scene(),view=createInventionView({scene});view.sync(s);view.update(0,s.tick);
 const tileModel=scene.getObjectByName(tile.id),machineModel=scene.getObjectByName(machine.id);
 assert.equal(tileModel.position.y,y);assert.ok(Math.abs(machineModel.position.y-y)<1e-6);
-const bounds=new THREE.Box3().setFromObject(tileModel);assert.ok(Math.abs(bounds.min.x-(x-3))<1e-6);assert.ok(bounds.max.y-y<.03);
+const bounds=new THREE.Box3().setFromObject(tileModel);assert.ok(bounds.min.x>=x-3-1e-6&&bounds.min.x<=x-2.99,'authored chamfer stays inside six-metre support');assert.ok(bounds.max.x<=x+3+1e-6&&bounds.max.x>=x+2.99);assert.ok(bounds.max.y-y<.03);
+// Every visible paver/kerb/mortar hit is separated from rendered soil. This
+// catches hidden mortar and bevel intersections, not merely coplanar top faces.
+const artRay=new THREE.Raycaster();tileModel.updateWorldMatrix(true,true);let surfaceSamples=0,minClearance=Infinity;
+for(let dx=-2.8;dx<=2.8;dx+=.2)for(let dz=-2.8;dz<=2.8;dz+=.2){artRay.set(new THREE.Vector3(x+dx,y+2,z+dz),new THREE.Vector3(0,-1,0));const hit=artRay.intersectObject(tileModel,true)[0];if(!hit)continue;const clearance=hit.point.y-terrainRenderHeight(s,x+dx,z+dz,false);minClearance=Math.min(minClearance,clearance);assert.ok(clearance>.015,`masonry/soil clearance ${clearance} at ${dx},${dz}`);surfaceSamples++;}
+assert.ok(surfaceSamples>700);assert.ok(minClearance>.015);
 // Execute the actual ground mesh rebuild closure, not a parallel mesh implementation.
 const game=readFileSync(new URL('../client/game.js',import.meta.url),'utf8');
 const body=game.slice(game.indexOf('  function rebuildGround() {'),game.indexOf('  // Stone/canopy'));
 const geometry=new THREE.PlaneGeometry(120,120,160,160);geometry.rotateX(-Math.PI/2);
-const env={snapshot:s,terrainSignature:null,terrainFoundationKey:null,terrainPreviousEdits:[],terrainPreviousTick:Infinity,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,groundGeometry:geometry,fireVisual:{invalidateTerrain(){}},terrainRay:{invalidateTerrain(){}},worldMatricesAt:0,mountainArena:{sync(){}},frameMetrics:{record(){}},orchard:{groundChanged(){}},heightAt:(a,b)=>sampler.height(a,b)};
+const env={snapshot:s,terrainSignature:null,terrainFoundationKey:null,terrainPreviousEdits:[],terrainPreviousTick:Infinity,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,groundGeometry:geometry,fireVisual:{invalidateTerrain(){}},terrainRay:{invalidateTerrain(){}},worldMatricesAt:0,mountainArena:{sync(){}},frameMetrics:{record(){}},orchard:{groundChanged(){}},heightAt:(a,b)=>sampler.height(a,b)};
 const rebuild=new Function('env',`with(env){${body};return rebuildGround;}`)(env),mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial()),ray=new THREE.Raycaster();mesh.updateMatrixWorld(true);
-function meshParity(){sampler.setState(s);rebuild();for(const [dx,dz]of [[0,0],[2.8,2.8],[3.6,1.2],[4.8,0]]){ray.set(new THREE.Vector3(x+dx,100,z+dz),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(mesh)[0];assert.ok(hit);assert.ok(Math.abs(hit.point.y-terrainHeight(s,x+dx,z+dz,false))<1e-6);}}
+function meshParity(){sampler.setState(s);rebuild();for(const [dx,dz]of [[0,0],[2.8,2.8],[3.6,1.2],[4.8,0]]){ray.set(new THREE.Vector3(x+dx,100,z+dz),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(mesh)[0];assert.ok(hit);assert.ok(Math.abs(hit.point.y-terrainRenderHeight(s,x+dx,z+dz,false))<1e-6);}}
 meshParity();const oldKey=foundationTerrainKey(s);damageInvention(s,tile.id,70,'enemy',[],'rivals');assert.equal(foundationTerrainKey(s),oldKey);assert.equal(sampler.setState(s),false);meshParity();assert.ok(Math.abs(sampler.height(x,z)-y)<1e-6);
 damageInvention(s,tile.id,400,'enemy',[],'rivals');meshParity();assert.ok(sampler.height(x,z)<y-1);
 view.sync(s);view.update(0,s.tick);assert.equal(tileModel.visible,false);

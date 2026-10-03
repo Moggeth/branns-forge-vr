@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Real skeleton spatial scorch review</title>
+<style>body{margin:0;background:#9caeb2;color:#fff;font:16px system-ui}header{position:absolute;top:12px;left:0;width:100%;display:flex;justify-content:space-around;text-shadow:0 2px 3px #000}button{position:absolute;bottom:16px;left:40%;padding:12px 24px}canvas{display:block}#result{position:absolute;bottom:65px;left:24px;font-size:10px}</style>
+<header><b>Clean control</b><b>Ankle-height embers</b><b>All regions exposed</b></header><button id="quench">Extinguish — retain char</button><pre id="result"></pre>
+<script type="module">
+import * as T from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';import {createCreatureLifeDeath} from '../client/creature-life-death.js';import {createCombatView} from '../client/combat-view.js';import {createFirePresentation} from '../client/fire-presentation.js';import {stepFire,quenchFire} from '../shared/fire.js';import {createEnemy} from '../shared/combat.js';
+const scene=new T.Scene();scene.background=new T.Color('#8c9d9d');const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const camera=new T.PerspectiveCamera(40,innerWidth/innerHeight,.1,100);camera.position.set(0,2.1,9.2);camera.lookAt(0,1,0);scene.add(new T.HemisphereLight(0xffffff,0x6a7360,2));const sun=new T.DirectionalLight(0xffe3b0,2.4);sun.position.set(-3,6,5);scene.add(sun);const floor=new T.Mesh(new T.PlaneGeometry(50,50),new T.MeshStandardMaterial({color:0x69715b,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.02;scene.add(floor);
+const model=await new GLTFLoader().loadAsync('/assets/skeleton.glb'),actors=new Map(),enemies=[];
+for(let i=0;i<3;i++){const data=createEnemy('e'+i,[(i-1)*2.5,0,0]);const {visual}=prepareAsset(model,'skeleton');if(i===1)visual.traverse(n=>{if(n.isBone&&/^RightArm/.test(n.name))n.rotation.z=1.2;});const root=new T.Group();root.position.fromArray(data.position);root.add(visual);scene.add(root);actors.set('e:'+data.id,{enemy:true,root,visual,data});enemies.push(data);}
+const combat=createCombatView({scene,templates:new Map(),actors,camera}),fx=createCreatureLifeDeath({scene,height:()=>0}),fire=createFirePresentation({scene,height:()=>0,fireSamples:id=>combat.fireSamples(id)});
+const state={tick:0,players:[],enemies,detachedParts:[],fireCells:[],fireSurfaces:[{id:'ankle-embers',position:[0,-.45,0],normal:[0,1,0],expiresTick:99999}],shrine:{hp:0}};
+for(const points of Object.values(combat.fireSamples('e2')))if(points.length)state.fireSurfaces.push({id:'f'+state.fireSurfaces.length,position:[...points[0]],normal:[0,1,0],expiresTick:99999});
+const ctx={terrainHeight:()=>0,damageEnemy:()=>{},damageHero:()=>{},fireSamples:e=>combat.fireSamples(e.id)};
+for(let i=0;i<65;i++){state.tick+=30;stepFire(state,ctx,[]);state.fireCells.forEach(c=>c.fuel=1);state.fireSurfaces.forEach(p=>p.expiresTick=99999);}
+document.querySelector('#result').textContent=JSON.stringify(enemies.map(e=>({id:e.id,scorch:e.scorch})),null,1);
+document.querySelector('#quench').onclick=()=>{quenchFire(state,[0,0,0],10);state.fireSurfaces=[];window.review.extinguished=true;};
+window.review={ready:false,extinguished:false,char:()=>enemies.map(e=>e.scorch),stats:()=>({renderer:renderer.info.render,fire:fire.stats(),creatures:fx.stats()})};let last=performance.now(),elapsed=0;
+function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;elapsed+=dt;fx.beginFrame();for(const actor of actors.values())fx.sync(actor,2000+elapsed*60,dt);fx.tick(dt);fire.sync({...state,tick:state.tick});fire.update(now,dt);renderer.render(scene,camera);if(elapsed>2)window.review.ready=true;requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script>

@@ -13,6 +13,8 @@ const begin=performance.now();for(let i=0;i<600;i++)view.update(i*16.67,.01667);
 const stats=view.stats();assert.ok(stats.instances<=768);assert.ok(stats.draws<=4);assert.equal(stats.lights,3);assert.ok(stats.fuelTriangles<=40960);const rebuilds=stats.fuelRebuilds;
 view.sync(s);assert.equal(view.stats().fuelRebuilds,rebuilds,'unchanged snapshots do not rebuild fuel');view.invalidateTerrain();view.sync(s);assert.equal(view.stats().fuelRebuilds,rebuilds+1);
 assert.equal(lightCount(),3,'burning light count unchanged');view.sync({tick:1000,fireCells:[],fireSurfaces:[],projectiles:[]});for(let i=0;i<600;i++)view.update(20000+i*16.67,.01667);assert.equal(lightCount(),3,'extinguishing retains the shader light count');assert.equal(view.stats().lightsActive,0);
+view.sync({tick:1100,fireCells:[],fireSurfaces:[],projectiles:[],enemies:[{id:'e1',kind:'skeleton',position:[4,0,0],yaw:0,burnPart:'leftArm',burnUntil:1250}],detachedParts:[]});view.update(22000,.1);assert.equal(view.stats().patches,1,'Phoenix flames attach without new draw system');
+view.sync({tick:1106,fireCells:[],fireSurfaces:[],projectiles:[],enemies:[],detachedParts:[{id:'d1',sourceId:'e1',part:'leftArm',position:[5,.1,0],burnUntil:1250}]});view.update(22100,.1);assert.ok(view.stats().patches>=1,'burn follows detached remains');
 view.dispose();assert.equal(scene.children.length,0);
 const flask=createEmberdewModel();assert.ok(flask.getObjectByName('Muzzle'));assert.ok(flask.userData.stats.triangles<2000);flask.userData.dispose();
 const require=createRequire(import.meta.url),validator=require('../../assets/asset-lab/node_modules/gltf-validator');

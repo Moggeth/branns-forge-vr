@@ -1,0 +1,95 @@
+{
+  "elapsedSeconds": 0.21597559994552284,
+  "assets": [
+    {
+      "file": "stone_blunt_a.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999984619,
+      "rms": 0.06871728114194312
+    },
+    {
+      "file": "stone_blunt_b.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999989974,
+      "rms": 0.04092519906540308
+    },
+    {
+      "file": "stone_blunt_c.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999987513,
+      "rms": 0.05624320732467194
+    },
+    {
+      "file": "timber_knock_a.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999988446,
+      "rms": 0.06381365367374389
+    },
+    {
+      "file": "timber_knock_b.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999986982,
+      "rms": 0.06875306312243755
+    },
+    {
+      "file": "timber_knock_c.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999985259,
+      "rms": 0.08225927602730113
+    },
+    {
+      "file": "shield_thunk_a.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999991102,
+      "rms": 0.07035838074891329
+    },
+    {
+      "file": "shield_thunk_b.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999989854,
+      "rms": 0.08026926091779664
+    },
+    {
+      "file": "shield_thunk_c.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999989427,
+      "rms": 0.08273870738863189
+    },
+    {
+      "file": "flesh_thud_a.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999975871,
+      "rms": 0.08432107595639324
+    },
+    {
+      "file": "flesh_thud_b.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999972721,
+      "rms": 0.08231006710430737
+    },
+    {
+      "file": "flesh_thud_c.wav",
+      "seconds": 0.34,
+      "peak": 0.5799999999986418,
+      "rms": 0.05867770694457943
+    },
+    {
+      "file": "phoenix_call_a.wav",
+      "seconds": 0.62,
+      "peak": 0.5799999999983977,
+      "rms": 0.12910737970545622
+    },
+    {
+      "file": "phoenix_call_b.wav",
+      "seconds": 0.62,
+      "peak": 0.5799999999983491,
+      "rms": 0.1323226158407847
+    },
+    {
+      "file": "phoenix_call_c.wav",
+      "seconds": 0.62,
+      "peak": 0.5799999999981628,
+      "rms": 0.1468448592786491
+    }
+  ]
+}

@@ -2213,3 +2213,15 @@ Browser fire learning (2026-10-03): tests/run.mjs needs gateway8090; isolated si
 
 ### Continuous timber and foundation checks - 2026-10-03
 Read docs/CONTINUOUS-TIMBER-20261003.md and docs/STONE-FOUNDATIONS-20261003.md. Geometry partitioning must retain original cut caps and use both bark/wood boundary vertices for new caps; see timber-continuity27case test. Python default Windows encoding can inject cp1252 punctuation into otherwise UTF-8 JavaScript; explicitly specify encoding='utf-8' for new edits and run production build (Node alone did not catch this).
+
+
+### Browser interaction/combat integration lessons - 2026-10-03
+- Pointerdown fires only for the first mouse button in a chord; use mousedown/up for Hero buttons so RMB aim plus LMB fire works. Preserve touch pointer paths and guard synthetic touch mouse events.
+- GLB sight removal must inspect actual mesh geometry: Siegebird has a legacy tower baked into Body as well as named optic nodes. Keep original geometry for disposal restoration.
+- Placement previews must call the same authority validator and retain structured reason/missing fields through both local and peer session responses. Preview mode must guard Q, touch Attack and God hotkeys as well as canvas mouse events.
+- A masonry mortar bed lies below its visible cap. Soil must clear the lowest visible bed, not only the top. Keep walkable collision separate and preserve cached physical vertex heights during mesh updates.
+- An initial fire pivot allegation confused mesh Head with weighted bone Head_1 and was retracted after real GLB inspection. Geometry-bound samples improve spatial surface coverage; they do not establish that alleged old bug. Cache once, never reskin every frame.
+- Headless new-tab bringToFront is not native Alt-Tab: observed pointerlockchange without blur/focus/visibility and document still focused. Report that limitation instead of repeatedly retrying OS-focus assertions.
+- Use explicit multiplayer cwd and rg --files tests before choosing test names. Guessed ranged-trajectory.mjs did not exist; ranged-fx.mjs is the existing forecast regression.
+- Vite HMR adds a same-origin WebSocket to browser traces. Cloud-game endpoint assertions may ignore only that exact HMR socket, not all local sockets.
+- Terminal flash tracing found a sibling Personal Package Manager polling hidden Python into visible PowerShell. Its local fix uses STARTUPINFO SW_HIDE and removes contradictory detached/no-window flags; preserve running apps when restarting only the manager.

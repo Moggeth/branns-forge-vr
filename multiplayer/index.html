@@ -221,7 +221,7 @@
           <dt>Hold click</dt><dd>Draw Emberwing or breathe Wyrmspout fire; release to loose</dd>
           <dt><kbd>Q</kbd> / right-click</dt><dd>Weapon special (works while drawing)</dd>
           <dt><kbd>1</kbd>–<kbd>8</kbd></dt><dd>Choose weapon</dd>
-          <dt><kbd>E</kbd> <kbd>B</kbd></dt><dd>Collect, eat or stow a held log · build bridge (3 wood)</dd>
+          <dt><kbd>E</kbd> <kbd>B</kbd> <kbd>T</kbd></dt><dd>Collect · Quick build · Place Timberline. Shift+B builds a bridge (3 carried Wood).</dd>
           <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>X</kbd></dt><dd>Grab a log or bone · drop · throw</dd>
           <dt><kbd>F9</kbd></dt><dd>Switch Hero / God perspective</dd>
           <dt><kbd>Esc</kbd></dt><dd>Release the mouse, then use Menu</dd>
@@ -323,6 +323,7 @@
       <button id="copyInvite" class="btn btn-chip" type="button">Copy invite</button>
       <button id="vr" class="btn btn-chip btn-vr" type="button" hidden>Enter VR</button>
       <button id="perspectiveButton" class="btn btn-chip" type="button" title="Switch Hero / God (F9)" aria-label="Switch Hero / God perspective" aria-keyshortcuts="F9"><svg class="ico" aria-hidden="true"><use href="#i-god"/></svg><span>F9</span></button>
+      <button id="quickBuildButton" class="btn btn-chip" type="button" data-qb-toggle aria-keyshortcuts="B" aria-haspopup="dialog" title="Quick build (B)"><svg class="ico" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span></button>
       <button id="menuButton" class="btn btn-chip btn-menu" type="button" aria-haspopup="dialog">Menu</button>
     </div>
   </div>
@@ -376,7 +377,7 @@
       <summary aria-label="More actions"><svg aria-hidden="true"><use href="#bfi-more"/></svg><span class="bf-name">Actions</span></summary>
       <div class="bf-actions" role="group" aria-label="Actions">
         <button type="button" class="bf-act" id="collect" aria-keyshortcuts="E"><svg aria-hidden="true"><use href="#bfi-hand"/></svg><span class="bf-name">Collect</span><kbd>E</kbd></button>
-        <button type="button" class="bf-act" id="bridge" aria-keyshortcuts="B"><svg aria-hidden="true"><use href="#bfi-bridge"/></svg><span class="bf-name">Bridge</span><kbd>B</kbd></button>
+        <button type="button" class="bf-act" id="bridge" aria-keyshortcuts="Shift+B"><svg aria-hidden="true"><use href="#bfi-bridge"/></svg><span class="bf-name">Bridge</span><kbd>Shift+B</kbd></button>
         <button type="button" class="bf-act" id="grab" aria-keyshortcuts="F"><svg aria-hidden="true"><use href="#bfi-grab"/></svg><span class="bf-name">Grab</span><kbd>F</kbd></button>
         <button type="button" class="bf-act" id="drop" aria-keyshortcuts="G"><svg aria-hidden="true"><use href="#bfi-drop"/></svg><span class="bf-name">Drop</span><kbd>G</kbd></button>
         <button type="button" class="bf-act" id="throw" aria-keyshortcuts="X"><svg aria-hidden="true"><use href="#bfi-throw"/></svg><span class="bf-name">Throw</span><kbd>X</kbd></button>

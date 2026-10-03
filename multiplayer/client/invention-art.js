@@ -1,3 +1,4 @@
+import {createStoneFoundation,disposeStoneFoundationArt} from './foundation-art.js';
 // Procedural invention art for Brann's Forge. +Y up, -Z forward, metres, base at y=0.
 // Only dependency: three. Materials and geometries are shared across every model.
 import * as THREE from 'three';
@@ -73,13 +74,7 @@ function beam(parent, mat, a, b, w = 0.1, h = w) {
 
 // ---------------------------------------------------------------- models
 const BUILDERS = {
-  foundation(root, P) {
-    // Top is exactly the authoritative support plane; masonry extends into earth.
-    part(root,'box','stoneDark',[6,.28,6],[0,-.14,0]);
-    for(let x=0;x<4;x++)for(let z=0;z<4;z++)part(root,'box',(x+z)%3?'stone':'stoneDark',[1.47,.12,1.47],[-2.25+x*1.5,-.06,-2.25+z*1.5]);
-    for(const z of [-2.92,2.92])part(root,'box','iron',[5.84,.025,.035],[0,.012,z]);
-    for(const x of [-2.92,2.92])part(root,'box','iron',[.035,.025,5.84],[x,.012,0]);
-  },
+  foundation(root, P) { root.add(createStoneFoundation()); },
   storehouse(root, P) {
     part(root, 'box', 'stoneDark', [3.4, 0.12, 2.8], [0, 0.06, 0]);
     for (const [x, z] of [[-1.6, -1.3], [1.6, -1.3], [-1.6, 1.3], [1.6, 1.3]]) part(root, 'box', 'timberDark', [0.16, 2.3, 0.16], [x, 1.27, z]);
@@ -574,6 +569,7 @@ export function countInventionMeshes(root) {
 }
 
 export function disposeInventionArt() {
+  disposeStoneFoundationArt();
   if (G) for (const g of Object.values(G)) g.dispose();
   if (M) for (const m of Object.values(M)) m.dispose();
   G = null;

@@ -8,5 +8,8 @@ assert.match(actionError('world_limit',{world:{edits:new Array(64)}}),/Waiting d
 assert.match(actionError('world_limit',{world:{deposits:new Array(80)}}),/mining/);
 assert.match(actionError('world_limit',{world:{enemies:new Array(64)},command:{spell:'skeleton'}}),/Defeat/);
 assert.match(actionError('rate_limited'),/minute/);
-assert.equal(actionError('out_of_reach'),null);
+assert.match(actionError('out_of_reach'),/Move closer/);
+assert.match(actionError('invalid_target'),/Aim at another/);
+assert.match(actionError('guarded'),/Defeat/);
+assert.match(actionError('permanent_forge'),/cannot be damaged/);
 console.log('action-feedback: precise recovery and capacity causes pass');

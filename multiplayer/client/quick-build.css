@@ -1,0 +1,82 @@
+/* Quick-build tray: warm brass on dark parchment-ink, matching the invention workshop. Bottom-centred above the
+   equipment tray; 2x3 + Catalog on portrait/desktop, one row of 7 on short landscape. 44 px minimum targets. */
+.qb-host { position: fixed; inset: auto 0 0 0; z-index: 30; display: flex; justify-content: center; pointer-events: none;
+  padding: 0 8px calc(env(safe-area-inset-bottom, 0px) + var(--qb-bottom, 84px)); }
+.qb-host[hidden] { display: none; }
+.qb-tray {
+  pointer-events: auto; box-sizing: border-box; width: min(100%, 372px);
+  padding: 6px 8px 8px; border-radius: 12px;
+  border: 1px solid var(--bf-line, rgba(231, 194, 122, .35));
+  background: linear-gradient(180deg, rgba(36, 28, 19, .94), rgba(22, 17, 12, .94));
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 222, 160, .08);
+  color: var(--bf-parch, #f1e4c8); font-size: 13px; line-height: 1.2;
+  animation: qb-in .14s var(--bf-ease, ease-out);
+}
+@keyframes qb-in { from { opacity: 0; transform: translateY(8px); } }
+.qb-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 2px; }
+.qb-title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--bf-gold, #e7c27a); }
+.qb-hint { flex: 1; font-size: 11px; color: var(--bf-parch-dim, #cdbb98); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-hint kbd { font: 700 10px/1 ui-monospace, Menlo, Consolas, monospace; padding: 1px 4px; border-radius: 3px;
+  color: var(--bf-soot, #14110e); background: rgba(231, 194, 122, .85); }
+.qb-x { flex: none; width: 44px; height: 44px; margin: -8px -6px -8px auto; border: 0; border-radius: 10px; background: transparent;
+  color: var(--bf-parch-dim, #cdbb98); display: grid; place-items: center; cursor: pointer; }
+.qb-x .qb-ico { width: 18px; height: 18px; }
+.qb-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.qb-cat-li { grid-column: 1 / -1; }
+.qb-tile {
+  position: relative; box-sizing: border-box; width: 100%; min-height: 64px; padding: 6px 6px 5px;
+  display: grid; grid-template-rows: auto auto auto; justify-items: center; align-content: center; gap: 2px;
+  border-radius: 9px; border: 1px solid rgba(231, 194, 122, .4);
+  background: linear-gradient(180deg, rgba(70, 52, 30, .65), rgba(44, 33, 21, .65));
+  color: inherit; font: inherit; text-align: center; cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.qb-tile:hover:not(.qb-off) { border-color: var(--bf-gold, #e7c27a); background: linear-gradient(180deg, rgba(92, 68, 38, .75), rgba(56, 41, 25, .75)); }
+.qb-tile:active:not(.qb-off) { transform: translateY(1px); }
+.qb-tile:focus-visible, .qb-x:focus-visible { outline: 2px solid var(--bf-ember-hot, #ffb35a); outline-offset: 2px; }
+.qb-ico { width: 22px; height: 22px; color: var(--bf-gold, #e7c27a); }
+.qb-name { font-weight: 700; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.qb-cost { font-size: 11px; color: var(--bf-parch-dim, #cdbb98); max-width: 100%; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.qb-miss { color: var(--bf-ember-hot, #ffb35a); }
+.qb-n { position: absolute; top: 3px; left: 5px; font: 700 10px/1 ui-monospace, Menlo, Consolas, monospace; color: rgba(231, 194, 122, .7); }
+/* Unaffordable: still focusable/tappable so it explains itself, but clearly not a primary action. */
+.qb-off { cursor: not-allowed; border-style: dashed; border-color: rgba(205, 187, 152, .3); background: rgba(30, 24, 18, .55); }
+.qb-off .qb-ico, .qb-off .qb-name { opacity: .55; }
+.qb-cat { min-height: 44px; grid-template-rows: none; grid-auto-flow: column; justify-content: center; gap: 8px;
+  background: transparent; border-color: rgba(231, 194, 122, .28); }
+.qb-cat .qb-cost { -webkit-line-clamp: 1; line-clamp: 1; }
+.qb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Phones: hide the keyboard hint (no keys), keep the tray clear of the thumb buttons. */
+@media (pointer: coarse) { .qb-hint { visibility: hidden; } }
+/* 390x650: 2x3 + Catalog ~210 px tall, bottom 72 -> tray top ~y368, ~43 px below the centred reticle. */
+@media (max-width: 420px) { .qb-host { --qb-bottom: 72px; } .qb-tray { width: min(100%, 360px); } .qb-tile { min-height: 56px; } }
+/* Short landscape (844x390): one row of seven, ~86 px tall total, above the equipment tray. */
+@media (max-height: 430px) and (orientation: landscape) {
+  .qb-host { --qb-bottom: 64px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+  .qb-tray { width: min(100%, 640px); padding: 4px 6px 6px; }
+  .qb-head { margin-bottom: 3px; }
+  .qb-x { margin-top: -12px; margin-bottom: -12px; } /* stays 44x44; negative margins keep the header slim */
+  .qb-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .qb-cat-li { grid-column: auto; }
+  .qb-cat { min-height: 58px; grid-template-rows: auto auto auto; grid-auto-flow: row; gap: 2px; }
+  .qb-tile { min-height: 58px; padding: 5px 3px 4px; }
+  .qb-name { font-size: 11.5px; }
+  .qb-cost { font-size: 10px; }
+  .qb-ico { width: 20px; height: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .qb-tray { animation: none; } .qb-tile:active:not(.qb-off) { transform: none; } }
+@media (prefers-contrast: more) { .qb-tray { background: #15100b; } .qb-tile { border-color: var(--bf-gold, #e7c27a); } }
+body.xr .qb-host { display: none; }
+
+/* Persistent Build uses the existing utility button, keeping the tray hidden until requested. */
+.qb-entry { order: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.qb-entry span { font-size: 9px; line-height: 1; }
+body.quick-build-open .qb-host { z-index: 90; }
+#quickBuildButton .ico { width:16px; height:16px; flex:none; }
+/* A paused touch overlay must not reveal the larger desktop HUD underneath. */
+body.quick-build-open #hud { visibility:hidden; }
+@media (orientation: portrait) {
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar .qb-entry { grid-column: 1; grid-row: 3; }
+}

@@ -16,7 +16,7 @@ try{
  await b.page.locator('#quickCast').check();await chooseTouchSpell(b.page,'raise');await b.page.touchscreen.tap(580,280);
  await Promise.all([a.page,b.page].map(p=>p.waitForFunction(()=>window.brannHarness.snapshot().edits.some(e=>e.kind==='raise'))));
  record('god-terrain-cast-visible-to-hero','pass');await sleep(350);await shot(a.page,'friends-starting-fps');await shot(b.page,'friends-starting-rts');
- if(process.env.EXPECT_CLOUD==='1'){assert.equal(sockets.length>=2,true);assert.ok(sockets.every(url=>url.startsWith('wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud')));record('no-desktop-hosting-dependency','pass',{sockets});}
+ if(process.env.EXPECT_CLOUD==='1'){const gameSockets=sockets.filter(url=>{const u=new URL(url);return !(u.host===new URL(BASE).host&&u.pathname==='/'&&u.searchParams.has('token'));});assert.equal(gameSockets.length>=2,true);assert.ok(gameSockets.every(url=>url.startsWith('wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud')));record('no-desktop-hosting-dependency','pass',{sockets});}
  assert.deepEqual([...a.page.errors,...b.page.errors],[]);record('console','pass');
  if(process.env.HOST_CRASH==='1'){
   // Allow the 2 Hz recovery cadence; the assertion after takeover verifies the saved edit.

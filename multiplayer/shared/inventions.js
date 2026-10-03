@@ -27,7 +27,8 @@ const num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
 const vec=v=>Array.isArray(v)&&v.length===3&&v.every((n,i)=>num(n,i===1?-200:-48,i===1?200:48));
 const point=(b)=>b.position;
 const ground=(s,x,z,c)=>c.terrainHeight(s,x,z,false);
-const event=(kind,b,extra={})=>({kind,id:b.id,structureId:b.id,position:[...b.position],...extra});
+export const structureMaterial=type=>['foundation','sanctuary','ward','influence','forge'].includes(type)?'stone':['trap','loggingYard','timberline','launcher','prospector'].includes(type)?'metal':'wood';
+const event=(kind,b,extra={})=>({kind,id:b.id,structureId:b.id,position:[...b.position],material:structureMaterial(b.type),sourceMaterial:extra.by?'weapon':'bone',...extra});
 function make(type,id,position,yaw,owner,tick){const d=STRUCTURES[type];return {id,type,position:[...position],yaw,hp:d?.hp||180,maxHp:d?.hp||180,side:owner,builtTick:tick,readyTick:0,fireTick:-1000,open:false,charge:0,armed:type==='trap',aimYaw:0};}
 export function createInventions(){return {v:1,seq:0,structures:[make('forge','central-forge',[0,0,0],0,'neutral',0),make('influence','party-influence',[-25,0,-25],0,'party',0),make('influence','rival-influence',[25,0,-25],0,'rivals',0)],stockpiles:{party:emptyMaterials(),rivals:emptyMaterials()},refining:[],shots:[],fells:[],defenders:[],assault:null,nextRaid:10800,surveyTick:0};}
 function state(s){return s.inventions??=createInventions();}
@@ -39,18 +40,48 @@ function pay(s,p,cost){const a=inventionAvailable(s,p);if(Object.entries(cost).s
 function owned(s,p,id){return state(s).structures.find(b=>b.id===id&&(b.side===side(p)||b.type==='forge'));}
 const usable=(p,b)=>p.role==='god'||flat(p.position,b.position)<=5;
 function overlap(s,type,at,owner){const r=STRUCTURES[type].radius;
+ const hit=(obstacle,code='occupied')=>({code,obstacle});
  const intersects=(x,z,radius)=>type==='foundation'?Math.hypot(Math.max(0,Math.abs(at[0]-x)-FOUNDATION_HALF),Math.max(0,Math.abs(at[2]-z)-FOUNDATION_HALF))<radius:Math.hypot(at[0]-x,at[2]-z)<r+radius;
- if(type!=='foundation'&&s.players.some(p=>p.role==='hero'&&flat(p.position,at)<r+.4))return 'occupied';
- if(s.landmarks&&STARTING_SITES.some(site=>site.footprints.some(b=>intersects(b.x,b.z,Math.hypot(b.w,b.d)/2))))return 'occupied';
- if(intersects(0,0,7))return 'protected_forge';
+ if(type!=='foundation'&&s.players.some(p=>p.role==='hero'&&flat(p.position,at)<r+.4))return hit('player');
+ if(s.landmarks&&STARTING_SITES.some(site=>site.footprints.some(b=>intersects(b.x,b.z,Math.hypot(b.w,b.d)/2))))return hit('landmark');
+ if(intersects(0,0,7))return hit('forge','protected_forge');
  const support=type==='foundation'?null:foundationAt(s,at[0],at[2],r,owner);
  for(const b of state(s).structures){if(b.type==='forge'||b.hp<=0||b===support)continue;
-  if(type==='foundation'&&b.type==='foundation'){if(Math.abs(at[0]-b.position[0])<FOUNDATION_HALF*2-.001&&Math.abs(at[2]-b.position[2])<FOUNDATION_HALF*2-.001)return 'occupied';continue;}
-  if(b.type==='foundation'){if(Math.abs(at[0]-b.position[0])<FOUNDATION_HALF+r&&Math.abs(at[2]-b.position[2])<FOUNDATION_HALF+r)return 'foundation_edge';continue;}
-  if(intersects(b.position[0],b.position[2],(STRUCTURES[b.type]?.radius||1.5)+.6))return 'occupied';
+  if(type==='foundation'&&b.type==='foundation'){if(Math.abs(at[0]-b.position[0])<FOUNDATION_HALF*2-.001&&Math.abs(at[2]-b.position[2])<FOUNDATION_HALF*2-.001)return hit('foundation');continue;}
+  if(b.type==='foundation'){if(Math.abs(at[0]-b.position[0])<FOUNDATION_HALF+r&&Math.abs(at[2]-b.position[2])<FOUNDATION_HALF+r)return hit('foundation','foundation_edge');continue;}
+  if(intersects(b.position[0],b.position[2],(STRUCTURES[b.type]?.radius||1.5)+.6))return hit('building');
  }
- if(s.deposits.some(d=>!d.depleted&&intersects(d.x,d.z,1.3)))return 'occupied';
- if(worldTrees(s).some(t=>!s.harvestedTrees.some(h=>h.id===t.id&&h.cuts>=3)&&intersects(t.x,t.z,.45)))return 'occupied';return null;}
+ if(s.deposits.some(d=>!d.depleted&&intersects(d.x,d.z,1.3)))return hit('deposit');
+ if(worldTrees(s).some(t=>!s.harvestedTrees.some(h=>h.id===t.id&&h.cuts>=3)&&intersects(t.x,t.z,.45)))return hit('tree');return null;
+}
+/** One shared validator drives authority and the visible placement preview. No spending or writes. */
+export function inventionPlacementReason(code,detail={}) {
+ const occupied={player:'A player is standing here. Move the footprint clear.',landmark:'This overlaps a landmark. Choose an open patch.',foundation:'This overlaps another foundation. Align the tile edge-to-edge.',building:'This overlaps a building. Leave space beside it.',deposit:'A mineral deposit blocks this spot. Mine it or move the footprint.',tree:'A standing tree blocks this spot. Fell it or choose a clearing.'};
+ if(code==='occupied')return occupied[detail.obstacle]||'Something occupies this spot. Choose a clear patch.';
+ if(code==='insufficient_resources'){const missing=Object.entries(detail.missing||{}).filter(([,n])=>n>0).map(([k,n])=>`${n} ${materialLabel(k)}`).join(', ');return missing?`Need ${missing}. Gather more or move near your Storehouse.`:'Not enough supplies. Gather materials or move near your Storehouse.';}
+ return ({protected_forge:'Keep the Forge apron clear. Move the whole footprint beyond it.',foundation_edge:'The building overhangs a foundation. Move it fully onto your tile or off its edge.',uneven_ground:detail.obstacle==='foundation_heights'?'Neighbouring tiles have different heights. Choose a matching edge.':'The ground is too steep. Choose flatter ground or level it first.',outside_boundary:'The footprint reaches the mountain boundary. Move it towards the valley.',too_far:'Too far to build. Move within 8 metres of the footprint.',structure_limit:'The world has 48 structures. Repair or use an existing one.',invalid_structure:'Choose a buildable structure.',invalid_placement:'Aim at a valid patch of ground.'})[code]||'Choose a different building position.';
+}
+export function validateInventionPlacement(s,p,m,c){
+ const i=s.inventions||createInventions(),type=m.kind||m.type;
+ const reject=(code,detail={})=>({ok:false,code,...detail,reason:inventionPlacementReason(code,detail)});
+ if(!Object.hasOwn(STRUCTURES,type)||type==='forge')return reject('invalid_structure');
+ if(i.structures.filter(b=>b.type!=='forge').length>=48)return reject('structure_limit');
+ let at=m.position||[m.x,0,m.z];
+ if(!Array.isArray(at)||at.length!==3||!at.every(n=>num(n,-200,200))||!num(m.yaw??p.yaw,-Math.PI,Math.PI))return reject('invalid_placement');
+ at=[...at];if(type==='foundation')at=[Math.round(at[0]/.75)*.75,at[1],Math.round(at[2]/.75)*.75];
+ const r=STRUCTURES[type].radius;
+ if(Math.abs(at[0])+r>48||Math.abs(at[2])+r>48)return reject('outside_boundary',{position:at});
+ if(p.role!=='god'&&flat(at,p.position)>8)return reject('too_far',{position:at});
+ const blocked=overlap(s,type,at,side(p));if(blocked)return reject(blocked.code,{...blocked,position:at});
+ const support=type==='foundation'?null:foundationAt(s,at[0],at[2],r,side(p));
+ const neighbours=type==='foundation'?i.structures.filter(b=>b.type==='foundation'&&b.hp>0&&b.side===side(p)&&Math.max(Math.abs(b.position[0]-at[0]),Math.abs(b.position[2]-at[2]))===6):[];
+ const y=support?support.position[1]:neighbours.length?neighbours[0].position[1]:ground(s,at[0],at[2],c);at[1]=y;
+ if(neighbours.some(b=>Math.abs(b.position[1]-y)>1e-6))return reject('uneven_ground',{position:at,obstacle:'foundation_heights'});
+ if(!support&&[[-r,0],[r,0],[0,-r],[0,r],[-r,-r],[-r,r],[r,-r],[r,r]].some(([x,z])=>Math.abs(ground(s,at[0]+x,at[2]+z,c)-y)>.9))return reject('uneven_ground',{position:at});
+ const available=inventionAvailable(s,p),missing=Object.fromEntries(Object.entries(STRUCTURES[type].cost).filter(([k,n])=>available[k]<n).map(([k,n])=>[k,n-available[k]]));
+ if(Object.keys(missing).length)return reject('insufficient_resources',{position:at,missing});
+ return {ok:true,code:null,position:at,reason:'Ready to build',missing:{}};
+}
 export function damageInvention(s,id,amount,by,events=[],attackerSide){const b=state(s).structures.find(b=>b.id===id);if(!b||b.type==='forge'||b.hp<=0||!num(amount,0,1000))return false;const p=s.players.find(p=>p.id===by);if((attackerSide||(p?side(p):null))===b.side)return false;const ward=state(s).structures.find(w=>w.type==='ward'&&w.side===b.side&&w.hp>0&&w.charge>0&&flat(w.position,b.position)<=6);if(ward){ward.charge=Math.max(0,ward.charge-amount);amount*=.3;}b.hp=Math.max(0,b.hp-amount);events.push(event(b.hp?'invention_hit':'invention_destroyed',b,{amount,by}));return true;}
 function refine(s,p,m,c){const i=state(s),kind=m.kind||m.ore,recipe=ORE_RECIPES[kind],amount=m.amount??1;if(!Object.hasOwn(ORE_RECIPES,kind)||!Number.isSafeInteger(amount)||amount<1||amount>10)return fail('invalid_resource');if(p.role!=='god'&&flat(p.position,[0,0,0])>7)return fail('too_far');if(i.refining.length>=16)return fail('refinery_full');if(!pay(s,p,{[kind]:amount}))return fail('insufficient_resources');const job={id:fresh(i,'refine'),kind,output:recipe.output,amount,side:side(p),finishTick:s.tick+recipe.ticks,startedTick:s.tick};i.refining.push(job);return ok([{kind:'refinery_feed',position:[2.5,ground(s,2.5,0,c),0],amount,material:kind}]);}
 function deposit(s,p){const i=state(s),near=p.role==='god'||flat(p.position,[0,0,0])<=7||i.structures.some(b=>b.type==='storehouse'&&b.hp>0&&b.side===side(p)&&flat(b.position,p.position)<=5);if(!near)return fail('too_far');const store=storage(s,p);let amount=0;for(const k of MATERIAL_KEYS){const n=Math.min(p.resources[k]||0,999-store[k]);p.resources[k]=(p.resources[k]||0)-n;store[k]+=n;amount+=n;}return amount?ok([{kind:'invention_deposit',position:[...p.position],amount}]):fail('nothing_carried');}
@@ -63,7 +94,7 @@ export function inventionAction(s,p,m,c){const i=state(s);p.resources={...emptyM
  if(action==='inventionCollectOutput'){if(p.role!=='god'&&flat(p.position,[3.5,0,1])>5)return fail('too_far');let total=0;for(const q of [...s.pickups])if(q.side===side(p)&&q.id.startsWith('ingot')){const n=Math.min(q.amount,999-p.resources[q.kind]);p.resources[q.kind]+=n;q.amount-=n;total+=n;if(!q.amount)s.pickups.splice(s.pickups.indexOf(q),1);}return total?ok():fail('output_empty');}
  if(action==='inventionDeposit')return deposit(s,p);
  if(action==='inventionRefine')return refine(s,p,m,c);
- if(action==='inventionBuild'){const type=m.kind||m.type;if(!Object.hasOwn(STRUCTURES,type)||type==='forge')return fail('invalid_structure');if(i.structures.filter(b=>b.type!=='forge').length>=48)return fail('structure_limit');let at=m.position||[m.x,0,m.z];if(!vec(at)||!num(m.yaw??p.yaw,-Math.PI,Math.PI))return fail('invalid_placement');if(type==='foundation')at=[Math.round(at[0]/.75)*.75,at[1],Math.round(at[2]/.75)*.75];if(p.role!=='god'&&flat(at,p.position)>8)return fail('too_far');const blocked=overlap(s,type,at,side(p));if(blocked)return fail(blocked);const support=type==='foundation'?null:foundationAt(s,at[0],at[2],STRUCTURES[type].radius,side(p)),neighbours=type==='foundation'?i.structures.filter(b=>b.type==='foundation'&&b.hp>0&&b.side===side(p)&&Math.max(Math.abs(b.position[0]-at[0]),Math.abs(b.position[2]-at[2]))===6):[],y=support?support.position[1]:neighbours.length?neighbours[0].position[1]:ground(s,at[0],at[2],c),r=STRUCTURES[type].radius;if(neighbours.some(b=>Math.abs(b.position[1]-y)>1e-6))return fail('uneven_ground');if(!support&&[[-r,0],[r,0],[0,-r],[0,r],[-r,-r],[-r,r],[r,-r],[r,r]].some(([x,z])=>Math.abs(ground(s,at[0]+x,at[2]+z,c)-y)>.9))return fail('uneven_ground');if(!pay(s,p,STRUCTURES[type].cost))return fail('insufficient_resources');const b=make(type,fresh(i,'building'),[at[0],y,at[2]],type==='foundation'?0:(m.yaw??p.yaw),side(p),s.tick);i.structures.push(b);return ok([event('invention_build',b,{by:p.id})]);}
+ if(action==='inventionBuild'){const type=m.kind||m.type,validation=validateInventionPlacement(s,p,m,c);if(!validation.ok)return {...validation,events:[]};if(!pay(s,p,STRUCTURES[type].cost))return fail('insufficient_resources');const b=make(type,fresh(i,'building'),validation.position,type==='foundation'?0:(m.yaw??p.yaw),side(p),s.tick);i.structures.push(b);return ok([event('invention_build',b,{by:p.id})]);}
  if(action==='inventionAssault'){if(!p)return fail('no_player');if(i.assault)return fail('encounter_active');if(s.enemies.length>58)return fail('world_limit');i.assault={side:side(p),foes:[],startTick:s.tick};for(let n=0;n<4;n++){const a=n*.3+Math.PI/3,x=Math.sin(a)*32,z=Math.cos(a)*32,e=c.createEnemy(c.nextId(s,'incursion'),[x,ground(s,x,z,c),z],'skeleton');s.enemies.push(e);i.assault.foes.push(e.id);}return ok([{kind:'invention_assault',position:[0,0,0]}]);}
  const b=owned(s,p,m.structureId||m.id);if(!b)return fail('not_your_structure');if(!usable(p,b))return fail('too_far');
  if(action==='inventionTurn'){if(!['timberline','launcher'].includes(b.type)||b.hp<=0)return fail('invalid_action');if(s.tick<b.readyTick)return fail('machine_loading');b.yaw=Math.atan2(Math.sin(b.yaw+Math.PI/4),Math.cos(b.yaw+Math.PI/4));b.aimYaw=0;b.readyTick=s.tick+30;return ok([event('machine_turn',b)]);}

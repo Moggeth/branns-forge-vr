@@ -5,7 +5,7 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 // It never mutates the snapshot and never fires actions. Rules mirror the authoritative simulation; each mirrored
 // constant names its source so a rule change is a one-line audit (test/interaction-cue.test.mjs checks the text).
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
-import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector} from '../shared/trees.js';
+import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
 export const CUE_RULES = Object.freeze({
   strikeReach: 3.2,     // game.js contactRay far, simulation.js targetOK horizontal limit
@@ -14,6 +14,7 @@ export const CUE_RULES = Object.freeze({
   grabReach: 2.5,       // world-content-view.js grabTarget clamp == TREE_LIMITS.reach
   pickupReach: 2.5,     // simulation.js interact: nearest pickup within 2.5 m of the feet
   forgeRange: 9,        // adventure.js DEPOSIT_RANGE around FORGE [0, 0]
+  workshopReach: 5,     // inventions.js usable; outside the forge's three-metre collision footprint
   inventoryCap: 999,    // simulation.js / trees.js inventory_full
   probeRange: 8,        // cue only: show "move closer" up to this aimed distance
 });
@@ -37,7 +38,7 @@ const finite3 = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFini
 
 /** Closest approach of ray (origin o, unit d, t in [0,max]) to a log capsule. Returns along-ray t or null. */
 export function rayLogDistance(o, d, log, max) {
-  const half = TREE_LIMITS.logLength / 2 - TREE_LIMITS.logRadius, a = rotateVector([0, 1, 0], log.quaternion), c = log.position;
+  const radius = logRadius(log), half = Math.max(0, logLength(log) / 2 - radius), a = rotateVector([0, 1, 0], log.quaternion), c = log.position;
   // Segment (c + a*u, |u|<=half) vs ray: solve the 2x2 closest-point system, then clamp and re-project.
   const w = [o[0] - c[0], o[1] - c[1], o[2] - c[2]], b = d[0]*a[0] + d[1]*a[1] + d[2]*a[2];
   const dw = d[0]*w[0] + d[1]*w[1] + d[2]*w[2], aw = a[0]*w[0] + a[1]*w[1] + a[2]*w[2], den = 1 - b*b;
@@ -45,8 +46,8 @@ export function rayLogDistance(o, d, log, max) {
   let t = den > 1e-6 ? (b*aw - dw) / den : b*clamp(aw, -half, half) - dw; t = clamp(t, 0, max);
   let u = clamp(aw + b*t, -half, half); t = clamp(b*u - dw, 0, max); u = clamp(aw + b*t, -half, half);
   const gap = Math.hypot(w[0] + d[0]*t - a[0]*u, w[1] + d[1]*t - a[1]*u, w[2] + d[2]*t - a[2]*u);
-  if (gap > TREE_LIMITS.logRadius) return null;
-  return Math.max(0, t - Math.sqrt(Math.max(0, TREE_LIMITS.logRadius**2 - gap*gap))); // entry point, like grabTarget's march
+  if (gap > radius) return null;
+  return Math.max(0, t - Math.sqrt(Math.max(0, radius**2 - gap*gap))); // entry point, like grabTarget's march
 }
 
 /** First terrain crossing along the ray (analytic height samples, no 51k-triangle raycast). */
@@ -121,6 +122,12 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     if(c?.full)return make('pickup','full',q.id,`${materialLabel(q.kind)} ×${q.amount}`,'Pack full','');
   }
 
+  // The permanent forge is a usable world object, not a menu hidden behind Tab.
+  // Loose collectibles and aimed work targets retain priority over proximity use.
+  const forge = snapshot.inventions?.structures.find(b => b.type === 'forge' && b.hp > 0);
+  if (forge && flat(p, forge.position) <= CUE_RULES.workshopReach)
+    return make('pickup', 'ready', forge.id, 'Central Forge', 'Open workshop', keys === CONTROLS.touch ? '' : keys.collect, 'Build, refine and manage shared stores.');
+
   // 4. Forge delivery: only inside DEPOSIT_RANGE while the expedition offers Deliver and the Hero carries an accepted kind.
   const deliver = ctx.deliver;
   if (deliver?.kinds?.length && flat(p, [0, 0, 0]) <= CUE_RULES.forgeRange) {
@@ -165,7 +172,9 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     if (local > CUT_RANGE[1]*s + .15) return make('tree', 'aim', id, 'Tree', 'Aim lower on the trunk', '', '', progress);
     return make('tree', 'ready', id, 'Tree', 'Chop', keys.strike, '', progress);
   }
-  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0&&(b.side===(self.side||'party')||b.type==='forge'));if(building&&STRUCTURES[building.type]?.use&&hit.distance<=3.2)return make('pickup','ready',id,STRUCTURES[building.type].name,STRUCTURES[building.type].use,keys.collect);
+  const building=snapshot.inventions?.structures.find(b=>b.id===id&&b.hp>0&&(b.side===(self.side||'party')||b.type==='forge'));
+  if(building?.type==='forge'&&flat(p,building.position)<=CUE_RULES.workshopReach)return make('pickup','ready',id,'Central Forge','Open workshop',keys === CONTROLS.touch ? '' : keys.collect,'Build, refine and manage shared stores.');
+  if(building&&STRUCTURES[building.type]?.use&&hit.distance<=3.2)return make('pickup','ready',id,STRUCTURES[building.type].name,STRUCTURES[building.type].use,keys.collect);
   const ore = (snapshot.deposits || []).find(q => q.id === id);
   if (ore) {
     if (ore.depleted) return null; // depleted ores are not rendered (world-content-view.js), so never aimed
