@@ -1,4 +1,4 @@
-// Orchard's Edge ready cue (2026-10-03): when the held axe's sundering strike finishes recharging and the light reaches
+// Orchard's Edge ready cue (2026-10-03): when the held axe's cleave finishes recharging and the light reaches
 // the horns of the edge, a quiet whetstone "shing" and a resonant ring, plus one light haptic tick. Local player only;
 // edge-triggered on the shared readiness fraction (never on a timer of its own), so it fires once per recharge.
 

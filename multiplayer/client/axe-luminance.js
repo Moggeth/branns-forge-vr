@@ -9,7 +9,7 @@ import * as THREE from 'three';
 //   fake edge/inlay light on the cheek, lit brass vine inlays, and worn brass and forged steel. Static: renders "ready".
 //   Writes one static per-vertex attribute (`axeChannel`, its ignition order) onto the template's brass geometries.
 // - createAxeLuminance(owner, host, find): the HELD axe only (called from weapon-readiness.js). Gives that axe its own
-//   material copies so the light discharges when the sundering strike is used, then refills over the 4 s recharge:
+//   material copies so the light discharges when the cleave is used, then refills over the 6 s recharge:
 //   the blossom kindles, a spark runs down the vine, the edge line fills outward from where the vine meets it, and
 //   the light jumps to the honed edge and sweeps out to both horns, flaring when ready. One additive ribbon draw along
 //   the edge stands in for light; there are no real lights, post or extra passes. Original materials are restored on

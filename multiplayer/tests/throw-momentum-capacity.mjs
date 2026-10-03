@@ -39,6 +39,7 @@ test('safe reclamation protects embeds, active quest IDs, workers and live linke
  const state=fullOre().checkpoint();state.embeds=[{targetId:'oldOre0'}];state.settlement.workers=[{targetId:'oldOre1'}];state.deposits[2].id='xv1s0';state.adventure.stage='star';state.adventure.run=1;state.deposits[3].editId='wall';state.edits=[{id:'wall'}];state.deposits[4].depleted=false;
  assert.equal(reclaimDepletedDeposits(state),75);assert.deepEqual(state.deposits.map(d=>d.id),['oldOre0','oldOre1','xv1s0','oldOre3','oldOre4']);assert.equal(reclaimDepletedDeposits(state),0);
 });
+// The pick's crystal wall is the Hero special that places ore now (the axe cleave places none).
 test('reclaimed deposits permit new Hero special ore while permanent terrain remains unchanged',()=>{
- const sim=fullOre('hero');sim.command('p',{type:'action',seq:1,action:'equip',tool:'axe'});const before=sim.snapshot();const r=sim.command('p',{type:'action',seq:2,action:'special'});assert.equal(r.ok,true);assert.equal(sim.snapshot().deposits.length,3);assert.equal(sim.snapshot().edits.length,before.edits.length+6);assert.ok(sim.snapshot().deposits.every(d=>!d.depleted));loadSimulation(sim.checkpoint());
+ const sim=fullOre('hero');sim.command('p',{type:'action',seq:1,action:'equip',tool:'pick'});const before=sim.snapshot();const r=sim.command('p',{type:'action',seq:2,action:'special'});assert.equal(r.ok,true);assert.equal(sim.snapshot().deposits.length,7);assert.equal(sim.snapshot().edits.length,before.edits.length+7);assert.ok(sim.snapshot().deposits.every(d=>!d.depleted));loadSimulation(sim.checkpoint());
 });
