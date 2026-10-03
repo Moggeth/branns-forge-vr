@@ -85,6 +85,16 @@ const FRAG_COLOR = /* glsl */`
  diffuseColor.rgb *= mix(.88, 1.1, treeSeed);
 #endif
 `;
+// Foliage light (v3): sunlight glowing through the crown when looking toward the sun, plus a soft wrap so shaded undersides
+// read as leafy green rather than muddy. Uses the scene's first directional light (the orchard sun); no extra uniforms.
+const FRAG_FOLIAGE_LIGHT = /* glsl */`
+#if defined(TREE_LEAF) && NUM_DIR_LIGHTS > 0
+ { vec3 L = directionalLights[0].direction, V = normalize(vViewPosition);
+   float through = pow(clamp(dot(-V, L), 0.0, 1.0), 5.0);
+   float wrap = clamp((dot(normal, L) + .6) / 1.6, 0.0, 1.0) * (1.0 - clamp(dot(normal, L), 0.0, 1.0));
+   reflectedLight.directDiffuse += diffuseColor.rgb * directionalLights[0].color * (through * TREE_TRANSLUCENCY * vec3(1.05, 1.0, .55) + wrap * .22); }
+#endif
+`;
 const FRAG_NORMAL = /* glsl */`
 #if defined(TREE_BARK) || defined(TREE_LEAF)
  { float fade = 1.0 - smoothstep(14.0, 32.0, length(vViewPosition));   // fade derivative bump before it aliases
@@ -106,7 +116,8 @@ function patchSurface(m, role, cfg) {
    .replace('#include <common>', `#include <common>\n${COMMON}\nvarying vec3 vTreeObj; varying vec3 vTreeSeed; varying float vTreeH; varying float vTreeUp;`)
    .replace('#include <color_fragment>', `#include <color_fragment>\n${FRAG_COLOR}`)
    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * treeRough, .35, 1.0);')
-   .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${FRAG_NORMAL}`);
+   .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${FRAG_NORMAL}`)
+   .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${FRAG_FOLIAGE_LIGHT}`);
  };
  m.customProgramCacheKey = () => `${VERSION}:${role}`;
 }
@@ -122,7 +133,7 @@ function patchDepth(m, role, cfg) {
 export function createTreeMaterials({windStrength = 1, maxSway = .05, leafSway = .07, bump = .9, windDirection = [1, 0, .35]} = {}) {
  const uniforms = {uTreeTime: {value: 0}, uTreeWind: {value: new T.Vector3(...windDirection).normalize()}, uTreeWindStrength: {value: windStrength}};
  const cfg = {uniforms}, cache = new Map(), owned = new Set(); let unpatched = 0;
- function defines(role) { const r = ROLES[role] || ROLES.bark, d = {TREE_SWAY: r.sway, TREE_MAX_SWAY: (r.sway > 1 ? leafSway : maxSway).toFixed(4), TREE_BUMP: (role === 'leaf' ? bump*.35 : role === 'roots' ? bump*.02 : bump*.05).toFixed(4)}; // curved roots alias with full bump
+ function defines(role) { const r = ROLES[role] || ROLES.bark, d = {TREE_SWAY: r.sway, TREE_MAX_SWAY: (r.sway > 1 ? leafSway : maxSway).toFixed(4), TREE_BUMP: (role === 'leaf' ? bump*.35 : role === 'roots' ? bump*.02 : bump*.05).toFixed(4), TREE_TRANSLUCENCY: '.85'}; // curved roots alias with full bump
   if (r.bark) d.TREE_BARK = ''; if (r.leaf) d.TREE_LEAF = ''; if (role === 'fruit') d.TREE_FRUIT = ''; return d; }
  /** Shared patched clone for an authored material. Idempotent; non-standard materials are returned unchanged. */
  function material(base, role) {

@@ -30,15 +30,19 @@ export const RESOURCES = [
   ['mithril', 'Mithril', 'Light, strong fittings for advanced work', 'mithril'],
   ['crystal', 'Crystal', 'Wards, sanctuary focus, rune work', 'crystal'],
   ['starMetal', 'Star metal', 'Rarest alloy for master inventions', 'star'],
+  ['copper', 'Copper', 'Wiring, bells and warm fittings for coming inventions', 'ingot'],
+  ['gold', 'Gold', 'Inlay and enchanting foci for coming inventions', 'ingot'],
 ];
 export const ORES = [
   ['ironOre', 'Iron ore', 'iron', 'Refine at the forge into Iron'],
   ['mithrilOre', 'Mithril ore', 'mithril', 'Refine at the forge into Mithril'],
   ['starOre', 'Star ore', 'starMetal', 'Refine at the forge into Star metal'],
+  ['copperOre', 'Copper ore', 'copper', 'Refine at the forge into Copper'],
+  ['goldOre', 'Gold ore', 'gold', 'Refine at the forge into Gold'],
 ];
 const RES_NAME = Object.fromEntries([...RESOURCES.map(r => [r[0], r[1]]), ...ORES.map(o => [o[0], o[1]])]);
 const RES_ICO = Object.fromEntries([...RESOURCES.map(r => [r[0], r[3]]), ...ORES.map(o => [o[0], 'ore'])]);
-const ALIAS = { star_metal: 'starMetal', starmetal: 'starMetal', stars: 'starMetal', gems: 'crystal', iron_ore: 'ironOre', mithril_ore: 'mithrilOre', star_ore: 'starOre' };
+const ALIAS = { star_metal: 'starMetal', starmetal: 'starMetal', stars: 'starMetal', gems: 'crystal', iron_ore: 'ironOre', mithril_ore: 'mithrilOre', star_ore: 'starOre', copper_ore: 'copperOre', gold_ore: 'goldOre' };
 const key = k => ALIAS[k] || k;
 
 const S = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';

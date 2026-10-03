@@ -1,5 +1,6 @@
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
+import {isVein} from './ore-veins.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
 import {worldTrees} from './world-content.js';
@@ -87,14 +88,15 @@ export function flushMeteorRewards(state,height){
 
 // Depleted ore has already paid its one mining reward. Removing an unreferenced
 // tombstone frees a slot without changing terrain, pickups, inventory or IDs.
-function retainedDepositPredicate(state){
+// Spent mountain-foot veins hold their slot's respawn timer until ore-veins.js raises the replacement.
+export function retainedDepositPredicate(state){
  const referenced=new Set([
   ...(state.embeds||[]).map(e=>e.targetId),...(state.fireSurfaces||[]).map(e=>e.targetId),
   ...(state.settlement?.workers||[]).map(w=>w.targetId),...(state.pendingStarfalls||[]).map(p=>p.id)
  ]);
  const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
  const liveEdits=new Set((state.edits||[]).map(e=>e.id));
- return d=>!d.depleted||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
+ return d=>!d.depleted||isVein(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
 }
 // Preview the exact post-reclamation budget without changing world state. Pending
 // meteors reserve their eventual deposit slots, just as the authority does.

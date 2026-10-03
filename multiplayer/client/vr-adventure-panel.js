@@ -6,6 +6,8 @@ import {inventionView} from '../shared/inventions.js';
 import * as THREE from 'three';
 import {ADVENTURE_ICONS} from './adventure-view.js';
 import {settlementView} from '../shared/resources.js';
+import {ORE_RECIPES} from '../shared/material-catalog.js';
+const ORE_KINDS = Object.keys(ORE_RECIPES);
 
 // Canvas pixels and physical metres. 512 px across 0.22 m is ~18 px per degree at 0.45 m.
 export const PANEL = Object.freeze({px: 512, py: 384, width: 0.22, height: 0.165});
@@ -31,7 +33,7 @@ export function carried(snapshot, playerId) {
 }
 // Mirrors lobby expeditionAction('deposit'): kinds the current stage accepts that the hero is carrying.
 export function deliverable(stage, held) {
-  const kinds = stage === 'camp' ? ['wood', 'stone'] : stage === 'star' ? ['gems'] : ['wood', 'stone', 'gems', 'ironOre', 'mithrilOre', 'starOre', 'iron'];
+  const kinds = stage === 'camp' ? ['wood', 'stone'] : stage === 'star' ? ['gems'] : ['wood', 'stone', 'gems', ...ORE_KINDS, 'iron'];
   return kinds.filter(k => (held[k] || 0) > 0);
 }
 export function nextStep(view, held) {
@@ -94,7 +96,7 @@ export function heroPanelModel(view, held, ui = {}) {
 export function forgePanelPages(settlement){
  const pages=settlement.actions.filter(a=>a.action!=='forgeAssign').map(a=>({...a,id:`forge:${a.action}:${a.detail?.kind||a.detail?.structureId||''}`,category:a.action==='forgeSupply'?'Supplies':'Forge'}));
  const assign=settlement.actions.find(a=>a.action==='forgeAssign');
- for(const w of settlement.workers)for(const kind of ['wood','stone','gems','ironOre','mithrilOre','starOre','iron'])if(kind!==w.job)pages.push({id:`forge:job:${w.id}:${kind}`,action:'forgeAssign',label:`Assign ${kind}`,title:`${w.name||w.id} · ${w.job}`,category:'Workers',enabled:assign?.enabled!==false&&!w.cargo,reason:w.cargo?'Wait for this worker to deliver cargo':assign?.reason||'',detail:{workerId:w.id,kind},cost:{},phase:w.phase});
+ for(const w of settlement.workers)for(const kind of ['wood','stone','gems',...ORE_KINDS,'iron'])if(kind!==w.job)pages.push({id:`forge:job:${w.id}:${kind}`,action:'forgeAssign',label:`Assign ${kind}`,title:`${w.name||w.id} · ${w.job}`,category:'Workers',enabled:assign?.enabled!==false&&!w.cargo,reason:w.cargo?'Wait for this worker to deliver cargo':assign?.reason||'',detail:{workerId:w.id,kind},cost:{},phase:w.phase});
  return pages;
 }
 export function forgePanelModel(settlement,pageId,ui={}){
@@ -281,7 +283,7 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
       if (disposed) return false;
       const wasEmpty=!view;view = nextView || null; held = carried(snapshot, playerId);
       settlement=snapshot?.settlement?settlementView(snapshot,playerId):null;
-      if(settlement&&snapshot.inventions){const m=inventionView(snapshot,playerId);settlement.stock=m.stock;settlement.goal='Gather, refine, invent. Place with the controller ray.';settlement.actions=[{action:'inventionDeposit',label:'Deposit all',enabled:m.canDeposit},{action:'inventionCollectOutput',label:'Collect metal',enabled:snapshot.pickups.some(q=>q.id.startsWith('ingot')&&q.side===m.side)},...['ironOre','mithrilOre','starOre'].map(kind=>({action:'inventionRefine',label:'Refine '+kind,enabled:m.refine[kind].enabled,detail:{kind,amount:1}})),...m.recipes.filter(r=>r.id!=='forge').map(r=>({action:'inventionPlace',label:'Build '+r.name,cost:r.cost,enabled:r.enabled,reason:'Gather the recipe materials',detail:{kind:r.id}})),...m.structures.filter(b=>b.type!=='forge'&&!b.passive).map(b=>({action:['timberline','launcher'].includes(b.type)?'inventionAim':'inventionUse',label:b.useLabel+' '+b.name,enabled:b.hp>0&&b.usable,detail:{structureId:b.id}})),...m.structures.filter(b=>['timberline','launcher'].includes(b.type)).map(b=>({action:'inventionTurn',label:'Turn 45° '+b.name,enabled:b.hp>0&&b.usable&&!b.cooldown,detail:{structureId:b.id}})),...m.structures.filter(b=>b.type!=='forge'&&b.hp<b.maxHp).map(b=>({action:'inventionRepair',label:'Repair '+b.name,cost:b.repairCost,enabled:b.repairEnabled,detail:{structureId:b.id}})),{action:'inventionAssault',label:'Call assault',enabled:!snapshot.inventions.assault},...settlement.actions.filter(a=>['forgeSummon','forgeAssign'].includes(a.action))];}
+      if(settlement&&snapshot.inventions){const m=inventionView(snapshot,playerId);settlement.stock=m.stock;settlement.goal='Gather, refine, invent. Place with the controller ray.';settlement.actions=[{action:'inventionDeposit',label:'Deposit all',enabled:m.canDeposit},{action:'inventionCollectOutput',label:'Collect metal',enabled:snapshot.pickups.some(q=>q.id.startsWith('ingot')&&q.side===m.side)},...ORE_KINDS.map(kind=>({action:'inventionRefine',label:'Refine '+kind,enabled:m.refine[kind].enabled,detail:{kind,amount:1}})),...m.recipes.filter(r=>r.id!=='forge').map(r=>({action:'inventionPlace',label:'Build '+r.name,cost:r.cost,enabled:r.enabled,reason:'Gather the recipe materials',detail:{kind:r.id}})),...m.structures.filter(b=>b.type!=='forge'&&!b.passive).map(b=>({action:['timberline','launcher'].includes(b.type)?'inventionAim':'inventionUse',label:b.useLabel+' '+b.name,enabled:b.hp>0&&b.usable,detail:{structureId:b.id}})),...m.structures.filter(b=>['timberline','launcher'].includes(b.type)).map(b=>({action:'inventionTurn',label:'Turn 45° '+b.name,enabled:b.hp>0&&b.usable&&!b.cooldown,detail:{structureId:b.id}})),...m.structures.filter(b=>b.type!=='forge'&&b.hp<b.maxHp).map(b=>({action:'inventionRepair',label:'Repair '+b.name,cost:b.repairCost,enabled:b.repairEnabled,detail:{structureId:b.id}})),{action:'inventionAssault',label:'Call assault',enabled:!snapshot.inventions.assault},...settlement.actions.filter(a=>['forgeSummon','forgeAssign'].includes(a.action))];}
       if(wasEmpty&&settlement&&view?.stage==='idle')section='forge';
       if (!view) { hide(); pressed = null; confirmAt = 0;raidConfirmAt=0;section='quest';pageId=null;return false; }
       return redraw();
