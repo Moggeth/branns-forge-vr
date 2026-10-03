@@ -3,7 +3,7 @@ import {weaponReadiness, spellbookReadiness} from '../client/ability-readiness.j
 const p = {attackTick:100, specialTick:100, castTick:100, mana:30};
 assert.equal(weaponReadiness(p,'axe',220).specialReady,.5);
 assert.equal(weaponReadiness(p,'pick',220).specialSeconds,2);
-assert.equal(weaponReadiness(p,'crossbow',121).attackReady,.5);
+assert.equal(weaponReadiness(p,'crossbow',130).attackReady,.5);
 assert.equal(weaponReadiness(p,'bow',133).attackReady,1);
 assert.equal(weaponReadiness(p,'bow',101).hasSpecialCooldown,false);
 assert.equal(weaponReadiness({...p,heat:1,overheatUntil:280},'wyrmspout',190).attackSeconds,1.5);

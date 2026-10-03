@@ -11,7 +11,7 @@ import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './f
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits} from './resources.js';
-import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
+import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs} from './trees.js';
@@ -374,8 +374,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,head, hands}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,head, hands}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -425,6 +425,7 @@ export function loadSimulation(saved) {
         (p.stats!==undefined&&(!record(p.stats)||!['kills','deaths','harvested','contribution'].every(k=>finite(p.stats[k])&&p.stats[k]>=0&&p.stats[k]<=1e9&&(k==='contribution'||Number.isInteger(p.stats[k]))))) ||
         (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
+        (p.siegebird !== undefined && !validSiegebird(p.siegebird)) ||
         (p.heldOre!==undefined&&!['ironOre','mithrilOre','starOre'].includes(p.heldOre)) ||
         (p.rally!==undefined&&!validId(p.rally)) ||
         (p.side!==undefined&&!['party','rivals'].includes(p.side)) ||
@@ -491,7 +492,7 @@ export function loadSimulation(saved) {
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
-    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
+    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits}}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick}) => ({id, position, yaw, hp, attackTick,...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
