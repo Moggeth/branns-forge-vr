@@ -19,6 +19,8 @@ import {createSettlementView} from './settlement-view.js';
 import {syncWeaponReadiness} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {enhancePickTemplate} from './pick-luminance.js';
+import {enhanceAxeTemplate} from './axe-luminance.js';
+import {createAxeReadyCue} from './axe-ready-cue.js';
 import {spellUnavailable} from './spell-availability.js';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
@@ -176,6 +178,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let weaponHand = null;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
+  // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
+  const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
   function contactMaterial(id) {
     const enemy = [...(snapshot.enemies || []),...(snapshot.detachedParts||[])].find(e => e.id === id); if (enemy) return enemy.kind === 'golem' ? 'stone' : 'bone';
     if ((snapshot.deposits || []).some(d => d.id === id)) return 'stone';
@@ -519,6 +523,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
+    if (name === 'axe') enhanceAxeTemplate(gltf.scene); // shared edge/inlay/metal look before any clone renders
     templates.set(name, gltf);
     if(name==='golem'||name==='meteor')meteorCreatures.setAssets({[name]:gltf});
     // Meteor materials otherwise compile for the first time during impact.
@@ -1037,7 +1042,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     tickPhysicalMelee(now,dt);
     const heldRoot=tool==='limb'?combat.heldLimbRoot(playerId):axeModel;
     if(!heldRoot||heldRoot!==failedReadinessRoot){try{heldReadiness=syncWeaponReadiness(heldReadiness,{root:heldRoot,tool,reducedMotion:reducedWeaponMotion});}catch(error){failedReadinessRoot=heldRoot;heldReadiness=null;report(`Weapon readiness: ${error.message}`);}}
-    heldReadiness?.update({...weaponReadiness(snapshot.players.find(p=>p.id===playerId),tool,snapshot.tick),time:now/1000});
+    const readiness=weaponReadiness(snapshot.players.find(p=>p.id===playerId),tool,snapshot.tick);
+    heldReadiness?.update({...readiness,time:now/1000});
+    axeReadyCue.update(role==='hero'&&heldReadiness?tool:null,readiness.specialReady);
     enemyShadows.update(actors,role==='god'?pan:localPosition,now,{maxCasters:touchEnabled?4:8});
     spellVisual.setTarget(targetPreview());
     spellVisual.update(now,dt);

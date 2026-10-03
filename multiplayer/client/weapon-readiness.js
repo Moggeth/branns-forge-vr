@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createPickLuminance} from './pick-luminance.js';
+import {createAxeLuminance} from './axe-luminance.js';
 
 // Diegetic weapon readiness for Brann's Forge held tools.
 //
@@ -236,7 +237,9 @@ const BUILD = {
       transforms.push([new THREE.Vector3(x, y, side * z), q]); steps.push(i);
     });
     const strip = new Strip(owner, named(diamondGeometry(.011, .024, .0011), 'axe-rune'), glowMaterial({color: 0x7a5a24, metalness: .85, roughness: .35}), transforms, steps, PALETTES.gold);
-    return {special: strip};
+    // The head's own light carries the charge too: discharge on use, blossom → vine → edge line → honed edge.
+    const luminance = createAxeLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
+    return {special: strip, luminance};
   },
   // Blue crystal nodes in brass settings: three tiers on four faces under the head, filling up toward it.
   pick(owner, host, find) {

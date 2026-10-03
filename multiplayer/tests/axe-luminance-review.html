@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Axe luminance review</title>
+<style>html,body{margin:0;height:100%;background:#111}canvas{display:block;width:100%;height:100%}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// Review fixture for the Orchard's Edge axe: the game's renderer settings and lights around the real axe.glb, with the
+// held-axe readiness indicator driven by ?charge. ?before skips the luminance patch, ?night dims the sky, ?view picks a
+// camera (cheek | edge | held). window.review.set(charge, time) drives a capture sequence. Not shipped.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import {createWeaponReadiness} from '../client/weapon-readiness.js';
+const q = new URLSearchParams(location.search), before = q.has('before'), night = q.has('night'), view = q.get('view') || 'cheek';
+const enhance = before ? null : await import(/* @vite-ignore */ new URL('../client/axe-luminance.js', import.meta.url).href).catch(() => null);
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias: true});
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(night ? 0x141b2a : 0xabc5c2);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+scene.environmentIntensity = night ? .18 : .55;
+scene.add(new THREE.HemisphereLight(night ? 0x34466e : 0xc6e0ed, night ? 0x1a1610 : 0x5e5139, night ? .45 : 1.2));
+const sun = new THREE.DirectionalLight(night ? 0x8aa4ff : 0xffe3ad, night ? .35 : 2.2); sun.position.set(-22, 38, 15); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(view === 'held' ? 70 : 30, innerWidth / innerHeight, .01, 50);
+const gltf = await new GLTFLoader().loadAsync('/assets/axe.glb');
+if (enhance) enhance.enhanceAxeTemplate(gltf.scene);
+const {visual} = prepareAsset(gltf, 'axe', .7);
+const holder = new THREE.Group(); holder.add(visual); scene.add(holder);
+const box = new THREE.Box3().setFromObject(holder), c = box.getCenter(new THREE.Vector3());
+if (view === 'held') { holder.position.set(.22, -.42, -.42); holder.rotation.set(-.2, -1.25, .28); camera.position.set(0, 0, 0); }
+else {
+  // Frame the head between its authored centre and the cutting edge, looking at the cheek along the head's own +Z.
+  holder.updateWorldMatrix(true, true);
+  const node = n => { let hit; visual.traverse(o => { if (o.name === n) hit = o; }); return hit; };
+  const head = node('Head_Center').getWorldPosition(new THREE.Vector3()).lerp(node('CuttingEdge_Mid').getWorldPosition(new THREE.Vector3()), .45);
+  const space = node('Head_Center').parent, cheek = new THREE.Vector3(0, 0, Number(q.get('side') || 1)).transformDirection(space.matrixWorld);
+  const along = new THREE.Vector3(1, 0, 0).transformDirection(space.matrixWorld);
+  const dir = view === 'edge' ? cheek.clone().multiplyScalar(.55).addScaledVector(along, .85) : cheek.clone().addScaledVector(along, .12);
+  camera.up.copy(new THREE.Vector3(0, 1, 0).transformDirection(space.matrixWorld));
+  camera.position.copy(head).addScaledVector(dir.normalize(), view === 'edge' ? .5 : .62); camera.lookAt(head);
+}
+holder.updateWorldMatrix(true, true);
+let indicator = null;
+try { indicator = createWeaponReadiness({root: visual, tool: 'axe'}); } catch (e) { console.error(e); }
+let charge = q.has('charge') ? Number(q.get('charge')) : 1, time = 0;
+function frame() { indicator?.update({specialReady: charge, time}); renderer.render(scene, camera); }
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); frame(); }
+addEventListener('resize', resize); resize();
+window.review = {set(c, t) { charge = c; time = t; frame(); }, drawCalls: () => indicator?.drawCalls, info: () => renderer.info.render, ready: true};
+</script></html>
