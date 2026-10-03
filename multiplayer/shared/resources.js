@@ -77,14 +77,24 @@ export function flushMeteorRewards(state,height){
 
 // Depleted ore has already paid its one mining reward. Removing an unreferenced
 // tombstone frees a slot without changing terrain, pickups, inventory or IDs.
-export function reclaimDepletedDeposits(state){
+function retainedDepositPredicate(state){
  const referenced=new Set([
   ...(state.embeds||[]).map(e=>e.targetId),...(state.fireSurfaces||[]).map(e=>e.targetId),
   ...(state.settlement?.workers||[]).map(w=>w.targetId),...(state.pendingStarfalls||[]).map(p=>p.id)
  ]);
  const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
+ const liveEdits=new Set((state.edits||[]).map(e=>e.id));
+ return d=>!d.depleted||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
+}
+// Preview the exact post-reclamation budget without changing world state. Pending
+// meteors reserve their eventual deposit slots, just as the authority does.
+export function depositCapacityUsed(state){
+ const retained=retainedDepositPredicate(state);
+ return (state.deposits||[]).reduce((used,d)=>used+(retained(d)?1:0),0)+(state.pendingStarfalls?.length||0);
+}
+export function reclaimDepletedDeposits(state){
  const before=state.deposits.length;
- state.deposits=state.deposits.filter(d=>!d.depleted||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&state.edits.some(e=>e.id===d.editId)));
+ state.deposits=state.deposits.filter(retainedDepositPredicate(state));
  return before-state.deposits.length;
 }
 
