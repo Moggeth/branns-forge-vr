@@ -1,0 +1,296 @@
+{
+ "asset": "pick",
+ "input": "reference\\assets\\pick.glb",
+ "removed": {
+  "node": "Embellish_Darkmetal_Spine",
+  "mesh": "Embellish_Darkmetal_Spine_Mesh",
+  "tris": 96,
+  "min": [
+   -0.3,
+   0.375,
+   -0.023
+  ],
+  "max": [
+   0.3,
+   0.668,
+   0.023
+  ]
+ },
+ "added": [
+  {
+   "name": "Embellish_Darkmetal_Langets",
+   "material": "Steel_Blued",
+   "tris": 40,
+   "min": [
+    -0.009,
+    0.375,
+    -0.023
+   ],
+   "max": [
+    0.009,
+    0.545,
+    0.023
+   ]
+  },
+  {
+   "name": "Embellish_Gold_ShardSettings",
+   "material": "Brass_Trim",
+   "tris": 720,
+   "min": [
+    -0.1936,
+    0.5984,
+    -0.0118
+   ],
+   "max": [
+    0.1936,
+    0.6641,
+    0.0124
+   ]
+  }
+ ],
+ "before": {
+  "bounds": {
+   "min": [
+    -0.32,
+    -0.045,
+    -0.0428
+   ],
+   "max": [
+    0.32,
+    0.718,
+    0.0428
+   ]
+  },
+  "totalTris": 5396,
+  "drawPrimitives": 9,
+  "trisPerMaterial": {
+   "Brass_Trim": 2800,
+   "Leather_Wrap": 1172,
+   "Steel_Blued": 388,
+   "Resonance_Crystal": 536,
+   "Wood_Ash": 500
+  },
+  "materials": [
+   "Brass_Trim",
+   "Leather_Wrap",
+   "Steel_Blued",
+   "Resonance_Crystal",
+   "Wood_Ash"
+  ],
+  "images": [
+   "embedded:image/png",
+   "embedded:image/png",
+   "embedded:image/png"
+  ],
+  "sockets": [
+   {
+    "name": "ChargeGlow",
+    "translation": [
+     0,
+     0.6200000047683716,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "Grip",
+    "translation": [
+     0,
+     0.2199999988079071,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "HitCentre",
+    "translation": [
+     0,
+     0.5600000023841858,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "PickTipLeft",
+    "translation": [
+     -0.3199999928474426,
+     0.5350000262260437,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0.7071068286895752,
+     0.7071068286895752
+    ],
+    "scale": null
+   },
+   {
+    "name": "PickTipRight",
+    "translation": [
+     0.3199999928474426,
+     0.5350000262260437,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     -0.7071068286895752,
+     0.7071068286895752
+    ],
+    "scale": null
+   },
+   {
+    "name": "StonewhisperPick",
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "nodes": [
+   "BrassTrim",
+   "ChargeGlow",
+   "Grip",
+   "GripWrap",
+   "HeadSocket",
+   "HitCentre",
+   "PickHead",
+   "PickTipLeft",
+   "PickTipRight",
+   "ResonanceCrystal",
+   "Shaft",
+   "StonewhisperPick",
+   "Embellish_Crystal_Crown",
+   "Embellish_Gold_Bands",
+   "Embellish_Darkmetal_Spine"
+  ]
+ },
+ "after": {
+  "bounds": {
+   "min": [
+    -0.32,
+    -0.045,
+    -0.0428
+   ],
+   "max": [
+    0.32,
+    0.718,
+    0.0428
+   ]
+  },
+  "totalTris": 6060,
+  "drawPrimitives": 10,
+  "trisPerMaterial": {
+   "Brass_Trim": 3520,
+   "Leather_Wrap": 1172,
+   "Steel_Blued": 332,
+   "Resonance_Crystal": 536,
+   "Wood_Ash": 500
+  },
+  "materials": [
+   "Brass_Trim",
+   "Leather_Wrap",
+   "Steel_Blued",
+   "Resonance_Crystal",
+   "Wood_Ash"
+  ],
+  "images": [
+   "embedded:image/png",
+   "embedded:image/png",
+   "embedded:image/png"
+  ],
+  "sockets": [
+   {
+    "name": "ChargeGlow",
+    "translation": [
+     0,
+     0.6200000047683716,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "Grip",
+    "translation": [
+     0,
+     0.2199999988079071,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "HitCentre",
+    "translation": [
+     0,
+     0.5600000023841858,
+     0
+    ],
+    "rotation": null,
+    "scale": null
+   },
+   {
+    "name": "PickTipLeft",
+    "translation": [
+     -0.3199999928474426,
+     0.5350000262260437,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0.7071068286895752,
+     0.7071068286895752
+    ],
+    "scale": null
+   },
+   {
+    "name": "PickTipRight",
+    "translation": [
+     0.3199999928474426,
+     0.5350000262260437,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     -0.7071068286895752,
+     0.7071068286895752
+    ],
+    "scale": null
+   },
+   {
+    "name": "StonewhisperPick",
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "nodes": [
+   "BrassTrim",
+   "ChargeGlow",
+   "Grip",
+   "GripWrap",
+   "HeadSocket",
+   "HitCentre",
+   "PickHead",
+   "PickTipLeft",
+   "PickTipRight",
+   "ResonanceCrystal",
+   "Shaft",
+   "StonewhisperPick",
+   "Embellish_Crystal_Crown",
+   "Embellish_Gold_Bands",
+   "Embellish_Darkmetal_Langets",
+   "Embellish_Gold_ShardSettings"
+  ]
+ },
+ "delta": {
+  "tris": 664,
+  "drawPrimitives": 1
+ }
+}

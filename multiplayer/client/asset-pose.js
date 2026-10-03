@@ -107,6 +107,21 @@ export function prepareProjectile(templates, kind = 'arrow') {
 
 export const FPS_WEAPON_POSE = Object.freeze({position: [.33, -.38, -.48], rotation: [-.2, .55, .12]});
 
+// The authored cord cylinders share geometry; stretch only their node transforms.
+// Each bowstring keeps its limb endpoint while the inner end follows the sled.
+const cordRigs=new WeakMap();
+export function updateCrossbowCords(visual,sledY){
+ let rig=cordRigs.get(visual);
+ if(!rig){rig=[];for(const name of ['LiveCord_00','LiveCord_01','LiveCord_19']){
+  const node=visual.getObjectByName(name);if(!node?.geometry)continue;
+  node.geometry.computeBoundingBox();const box=node.geometry.boundingBox;
+  node.updateMatrix();const a=new THREE.Vector3(0,box.min.y,0).applyMatrix4(node.matrix),b=new THREE.Vector3(0,box.max.y,0).applyMatrix4(node.matrix);
+  const moving=name==='LiveCord_19'?(a.y>b.y?a:b):(Math.abs(a.x)<Math.abs(b.x)?a:b),fixed=moving===a?b:a;
+  rig.push({node,fixed:fixed.clone(),moving:moving.clone(),target:moving.clone(),axis:new THREE.Vector3(),up:new THREE.Vector3(0,1,0),length:box.max.y-box.min.y,mid:(box.max.y+box.min.y)*.5});
+ }cordRigs.set(visual,rig);}
+ for(const r of rig){r.target.copy(r.moving);r.target.y+=sledY-.535;r.axis.subVectors(r.target,r.fixed);const length=r.axis.length();r.node.quaternion.setFromUnitVectors(r.up,r.axis.normalize());r.node.scale.y=length/r.length;r.node.position.copy(r.fixed).add(r.target).multiplyScalar(.5).addScaledVector(r.axis,-r.mid*r.node.scale.y);}
+}
+
 export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, time = 0, templates} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
   if (tool === 'bow') {
@@ -140,7 +155,7 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, ti
     rotate('Pinion', 'x', cocked * Math.PI * 4); rotate('Reduction', 'x', -cocked * Math.PI * 2 + Math.PI / 20);
     rotate('Drum', 'x', -cocked * Math.PI * 2); rotate('Crank', 'x', recoil > 0 ? time * 10 : 0);
     rotate('Trigger', 'x', -.32 * recoil); rotate('Latch', 'y', -.8 * recoil);
-    const sled = visual.getObjectByName('Sled'); if (sled) sled.position.y = .79 - .255 * cocked;
+    const sled = visual.getObjectByName('Sled'); if (sled) {sled.position.y = .79 - .255 * cocked;updateCrossbowCords(visual,sled.position.y);}
     const bolt = visual.getObjectByName('Bolt'); if (bolt) bolt.visible = recoil < .08;
     visual.traverse(mesh => { if (mesh.morphTargetDictionary?.Drawn !== undefined) mesh.morphTargetInfluences[mesh.morphTargetDictionary.Drawn] = cocked; });
   }
