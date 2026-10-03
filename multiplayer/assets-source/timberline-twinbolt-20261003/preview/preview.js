@@ -72,7 +72,9 @@ controls.target.set(0, 0.95, 0);
 controls.enableDamping = !CAPTURE;
 
 const loader = new GLTFLoader();
-const load = (p) => new Promise((res, rej) => loader.load(new URL(p, BASE).href, res, undefined, rej));
+// Hosts that cannot serve .glb may set window.TL_LOAD(path, loader, base) -> Promise<gltf>.
+const load = (p) => window.TL_LOAD ? window.TL_LOAD(p, loader, BASE)
+  : new Promise((res, rej) => loader.load(new URL(p, BASE).href, res, undefined, rej));
 const [ballGltf, boltGltf, colGltf] = await Promise.all([
   load('out/timberline_ballista.glb'), load('out/timberline_bolts.glb'), load('out/timberline_collision.glb'),
 ]);
