@@ -259,3 +259,10 @@ body.touch-controls-active .bf-help { display: none; }   /* the controls card in
 @media (forced-colors: active) {
   .bf-chip[aria-pressed="true"], .bf-spell[aria-checked="true"], .controls-tabs > button[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
+
+.objective-title {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+.objective-goal {-webkit-line-clamp:unset;overflow:visible;}
+.objective-line {flex-wrap:wrap;}
+
+/* Text-fit repair: override the narrower touch/landscape line clamps as well as the base banner. */
+body .objective .objective-goal {display:block;white-space:normal;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible;overflow-wrap:anywhere;}

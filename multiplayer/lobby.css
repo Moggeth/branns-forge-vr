@@ -426,3 +426,17 @@ body.field-overlay-open .mui-root {pointer-events:none;}
   body.touch-controls-active[data-role="hero"] #heroTools{top:calc(var(--hud-header-bottom,108px) + 6px)!important;}
   body.touch-controls-active[data-role="hero"] #hud > .xhud{top:calc(var(--field-tools-bottom,220px) + 6px)!important;}
 }
+
+.hud-name {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+#perspectiveButton .ico {width:16px;height:16px;flex:none;}
+.toast,.menu-card,.hint,.error {overflow-wrap:anywhere;}
+.help span {white-space:normal;}
+
+/* Text-fit repair: give the name its own measure instead of squeezing it beside the meters. */
+.hud-top .hud-self {display:grid;grid-template-columns:26px minmax(0,1fr);column-gap:8px;row-gap:4px;width:min(320px,100%);min-width:0;}
+.hud-self > .hud-role-icon {grid-column:1;grid-row:1 / 3;align-self:center;}
+.hud-self > .hud-self-text {grid-column:2;}
+.hud-self .hud-name {max-width:none;overflow-wrap:anywhere;}
+.hud-self > .meters {grid-column:2;width:100%;min-width:0;}
+.hud-self .meter {grid-template-columns:2.6em minmax(0,1fr) auto;}
+.hud-self .meter-track {min-width:0;}

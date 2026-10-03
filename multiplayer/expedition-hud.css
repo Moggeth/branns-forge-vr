@@ -171,3 +171,35 @@ body.xr .hud > .xhud { display: none; } /* WebXR uses the wrist panel */
 body.touch-controls-active .hud:has(.xhud[data-expanded="true"], .xhud-confirm:not([hidden])) { z-index: 7; }
 
 @media (max-width: 340px) and (orientation: portrait) { .hud > .xhud { padding-bottom: 4px; } }
+
+.xhud-title {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+.xhud-btn {white-space:normal;height:auto;min-height:40px;padding-block:6px;}
+.xhud-detail,.xhud-alert {overflow-wrap:anywhere;}
+
+/* Text-fit repair: compact mode may abbreviate controls, but must not discard the next step. */
+body.touch-controls-active #hud > .xhud {top:calc(var(--hud-header-bottom,56px) + 6px)!important;max-height:calc(100dvh - var(--hud-header-bottom,56px) - 14px)!important;}
+body.touch-controls-active #hud > .xhud[data-expanded="false"] .xhud-next {
+  white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;padding-block:4px;
+}
+body.touch-controls-active #hud > .xhud[data-expanded="false"] {max-width:min(330px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));}
+/* The artist's short action labels leave a useful sentence width even at enlarged UI scale.
+   Full button labels are restored by the existing expanded drawer. */
+body.touch-controls-active #hud > .xhud[data-expanded="false"] .xhud-btn-label {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+body.touch-controls-active #hud > .xhud[data-expanded="false"] .xhud-btn-short {display:inline;}
+body.touch-controls-active #hud > .xhud[data-expanded="false"] .xhud-btn > svg {display:none;}
+body.touch-controls-active #hud > .xhud[data-expanded="false"] .xhud-btn {padding-inline:7px;}
+/* Reset landscape's visually-hidden title geometry when the player opens the full objective drawer. */
+body #hud > .xhud[data-expanded="true"] :is(.xhud-title,.xhud-role) {
+  position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:normal;
+}
+body #hud > .xhud[data-expanded="true"] .xhud-toggle {grid-column:1 / -1;width:100%;min-width:0;flex-wrap:wrap;}
+body #hud > .xhud[data-expanded="true"] .xhud-row {grid-column:1 / -1;grid-row:auto;flex-wrap:wrap;}
+body #hud > .xhud[data-expanded="true"] .xhud-chips {flex-wrap:wrap;overflow:visible;}
+.xhud .xhud-next,.xhud .xhud-notice,.xhud .xhud-facts,.xhud .xhud-goal-label,.xhud .xhud-btn-label {white-space:normal;overflow-wrap:anywhere;}
+.xhud .xhud-goal {grid-template-columns:18px minmax(0,1fr) auto auto;}
+.xhud .xhud-btn {min-width:0;}
+/* At enlarged landscape UI scale the thumb pad reaches the objective chip. Keep its toggle tappable. */
+@media(max-height:320px) {
+  body.touch-controls-active #hud {z-index:7;}
+  body.touch-controls-active #hud > .xhud {z-index:22;}
+}

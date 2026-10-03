@@ -276,3 +276,24 @@ body.touch-controls-active .fo-entry, .fo-entry[data-force] { display: flex; }
   .fo-panel, .fo-primary, .fo-quest, .fo-entry-btn { border: 1px solid CanvasText; }
   .fo-table tbody tr.fo-self th { outline: 2px solid Highlight; }
 }
+
+/* Full names and descriptions remain readable at zoom and narrow widths. */
+.fo-eyebrow,.fo-title,.fo-ptext {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+.fo-quest-sum {display:block;-webkit-line-clamp:unset;overflow:visible;}
+.fo-table th,.fo-table td,.fo-detail,.fo-primary-text {overflow-wrap:anywhere;}
+.fo-head {flex-wrap:wrap;}
+.fo-titles {min-width:120px;}
+
+/* Text-fit repair: keep full names and instructions available inside the existing scrolling body. */
+.fo-root {grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);}
+.fo-root .fo-panel,.fo-root .fo-body,.fo-root .fo-primary,.fo-root .fo-help,.fo-root .fo-prims,.fo-root .fo-inter {min-width:0;}
+.fo-root .fo-head,.fo-root .fo-foot {flex-shrink:0;}
+.fo-root .fo-detail {display:block;}
+.fo-root .fo-inter-row {flex-wrap:wrap;}
+.fo-root .fo-inter dd,.fo-root .fo-keys {min-width:0;max-width:100%;}
+.fo-root .fo-keys kbd {white-space:normal;overflow-wrap:anywhere;}
+.fo-root .fo-actions {min-width:0;flex-wrap:wrap;}
+.fo-root .fo-pname {display:grid;grid-template-columns:16px minmax(0,1fr);column-gap:6px;row-gap:2px;}
+.fo-root .fo-you {grid-column:2;}
+.fo-root .fo-quest-sum {overflow-wrap:anywhere;}
+@media(max-width:600px) {.fo-root .fo-party,.fo-root .fo-prims {grid-template-columns:minmax(0,1fr);}}
