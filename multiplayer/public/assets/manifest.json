@@ -1,8 +1,8 @@
 [
   {
     "name": "axe.glb",
-    "bytes": 4812892,
-    "sha256": "53e4a9290ce74957d068e2833f1d152dac2179f3d9f72d695a5dc663730f8171"
+    "bytes": 4949408,
+    "sha256": "0b4c31bac639ecddf08cd5efa3f948eb9b65737ca7e906b8b8b322ae5308a062"
   },
   {
     "name": "skeleton.glb",
@@ -13,5 +13,15 @@
     "name": "tree.glb",
     "bytes": 43396,
     "sha256": "fd8bad9c65c16ff82fb4d7aef864cd5415c257f5e72abe0f5f97bf97e9411e09"
+  },
+  {
+    "name": "pick.glb",
+    "bytes": 273332,
+    "sha256": "1443ec911158ff37ec130342428df05e7983f476bdb3d86b5ec7ed54a63fb298"
+  },
+  {
+    "name": "waist_pouch.glb",
+    "bytes": 128112,
+    "sha256": "fe3bddf3b1e7dd9905393ea28efc34f4a277bffd5955c324002eb57c1a5296a2"
   }
 ]

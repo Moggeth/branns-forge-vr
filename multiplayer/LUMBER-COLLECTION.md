@@ -52,3 +52,6 @@ Verified lessons:
 - The read-only controls probe exposes camera/weapon state, not a movement vector. Verify stopped movement using two authoritative player positions separated in time; do not invent a probe field.
 
 Pinned panels must receive their DOM key handlers: the lobby gameplay capture filter lets events originating inside a pinned panel pass to its focus trap while gameplay remains inactive. Browser acceptance includes 12 consecutive Tab presses confined to the pinned panel.
+
+VR pose ordering regression: `node --test multiplayer/tests/lumber-session.mjs` executes the real small `sendInput` publisher with synthetic tracking and tests both local and guest WorldSession routes. Grip and pouch actions force a current pose before the action even within the normal 50 ms input throttle. Commands are not coalesced: local authority applies synchronously, and remote commands use the ordered forge RTCDataChannel. The test verifies two wood exactly once. Physical right-trigger throw bypasses pouch stow; physical grip selects the nearby capsule even when the target ray points away. World-aligned hand offsets and pouch coordinates use the current local yaw.
+Read paths from imports or `rg --files` before inspection; PowerShell does not expand positional wildcard paths for rg.

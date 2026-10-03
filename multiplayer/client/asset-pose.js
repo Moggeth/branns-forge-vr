@@ -65,8 +65,9 @@ export function prepareAsset(template, name, height = ASSET_POSES[name]?.height)
 }
 
 // Separate presentation transforms from the canonical asset basis. Both XR
-// hands use the same unmirrored model; gripSpace is the attachment origin.
-export function setWeaponGrip(visual, xr = false, tool = 'axe') {
+// hands share resources; left-hand Emberwing mirrors across the grip to clear the sightline.
+export function setWeaponGrip(visual, xr = false, tool = 'axe', hand = 'right') {
+  visual.scale.set(tool==='bow'&&hand==='left'?-1:1,1,1);
   visual.position.set(0, 0, 0);
   visual.quaternion.copy(assetBasis(ASSET_POSES[tool]));
   if (xr && !['crossbow', 'bow', 'wyrmspout', 'flask'].includes(tool)) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));

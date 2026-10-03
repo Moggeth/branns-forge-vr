@@ -2,6 +2,7 @@
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
 // It never mutates the snapshot and never fires actions. Rules mirror the authoritative simulation; each mirrored
 // constant names its source so a rule change is a one-line audit (test/interaction-cue.test.mjs checks the text).
+import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector} from '../shared/trees.js';
 
 export const CUE_RULES = Object.freeze({
@@ -17,7 +18,7 @@ export const CUE_RULES = Object.freeze({
 
 // Item names come from the existing vocabulary (HUD resources line, adventure-view CARRY_NAMES, objective text).
 const ORE = {stone: {name: 'Boulder', yields: 'stone'}, meteor: {name: 'Star shard', yields: 'star gems'}};
-const PICKUP = {wood: 'Timber', stone: 'Stone', gems: 'Star gems', apple: 'Apple'};
+const PICKUP = {wood: 'Lumber', stone: 'Stone', gems: 'Star gems', apple: 'Apple'};
 const KIND_WORD = {wood: 'timber', stone: 'stone', gems: 'gems'}; // adventure-view.js CARRY_NAMES
 
 // Control names exactly as visible: compact HUD chips/drawer (index.html), mobile Attack button (mobile-ui.js),
@@ -63,6 +64,7 @@ export function terrainDistance(o, d, height, max, step = .25) {
  */
 export function decideCue(view, self, snapshot, aim, ctx) {
   if (!view?.active || view.role !== 'hero' || view.xr || view.menuOpen || !self || !finite3(self.position)) return null;
+  const p = self.position;
   const keys = CONTROLS[view.mode] || CONTROLS.desktop, res = self.resources || {}, tool = self.tool || 'axe';
   const make = (kind, state, id, name, action, control, note = '', progress = null) =>
     ({key: [kind, state, id, name, action, control, note, progress ? progress.done : ''].join('|'), kind, state, target: id, name, action, control, note, progress});
@@ -74,6 +76,16 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     return make('carry', 'ready', held.id, 'Log in hand', 'Stow', keys.stow, `${keys.drop} drop · ${keys.throw} throw`);
   }
   const boneHeld = (snapshot.detachedParts || []).some(p => p.heldBy === self.id);
+
+  // The game supplies the exact visible E target. Pure callers use the same authority selector.
+  const selected = aim && Object.hasOwn(aim,'collectible') ? aim.collectible : nearestCollectible(snapshot,self,{height:ctx.height,visible:(from,to,id)=>{
+    const l=(snapshot.looseLogs||[]).find(l=>l.id===id);if(!l||!aim?.origin||!aim?.direction)return true;
+    const t=rayLogDistance(aim.origin,aim.direction,l,CUE_RULES.probeRange);if(t===null)return true;
+    const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
+    return t<=wall+.05;
+  }});
+  const pickupCue = c => make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Lumber':c.kind==='apple'?'Apple':`${PICKUP[c.kind]} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect);
+  if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
   if (aim && finite3(aim.origin) && finite3(aim.direction)) {
@@ -88,8 +100,11 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     }
     if (log) {
       if (log.t > CUE_RULES.grabReach) return make('log', 'far', log.l.id, 'Loose log', 'Move closer', '');
-      if (boneHeld) return make('log', 'busy', log.l.id, 'Loose log', 'Drop the bone first', keys.drop);
-      return make('log', 'ready', log.l.id, 'Loose log', 'Grab', keys.grab, `then ${keys.stow} to stow`);
+      const candidate=collectibleCandidate(snapshot,self,log.l.id,{height:ctx.height});
+      if(candidate?.full)return make('log','full',log.l.id,'Lumber','Pack full','');
+      // An explicit null means the real scene visibility probe found no collectible.
+      if(candidate&&!(aim&&Object.hasOwn(aim,'collectible')))return pickupCue(candidate);
+      return null;
     }
     if (hit && hit.distance <= ground && hit.distance <= CUE_RULES.probeRange && finite3(hit.point)) {
       const cue = aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, aim.yaw ?? self.yaw, make);
@@ -97,17 +112,11 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     }
   }
 
-  // 3. Proximity pickup (simulation interact: nearest within 2.5 m of the feet, not aim based).
-  const p = self.position;
-  let near = null;
-  for (const q of snapshot.pickups || []) {
-    const dist = Math.hypot(p[0] - q.x, p[2] - q.z, p[1] - (ctx.height ? ctx.height(q.x, q.z) : Number.isFinite(q.y) ? q.y : p[1])); // server: terrainHeight(q)
-    if (dist <= CUE_RULES.pickupReach && (!near || dist < near.dist)) near = {q, dist};
-  }
-  if (near && PICKUP[near.q.kind]) {
-    const q = near.q, name = q.kind === 'apple' ? 'Apple' : `${PICKUP[q.kind]} ×${q.amount | 0}`;
-    if (q.kind !== 'apple' && (res[q.kind] | 0) + (q.amount | 0) > CUE_RULES.inventoryCap) return make('pickup', 'full', q.id, name, 'Pack full', '');
-    return make('pickup', 'ready', q.id, name, q.kind === 'apple' ? 'Eat' : 'Collect', keys.collect);
+  // Explain a full nearby stack, but never advertise a collectible control for it.
+  for(const q of snapshot.pickups||[]) {
+    if(Math.hypot(p[0]-q.x,p[2]-q.z)>CUE_RULES.pickupReach)continue;
+    const c=collectibleCandidate(snapshot,self,q.id,{height:ctx.height});
+    if(c?.full)return make('pickup','full',q.id,`${PICKUP[q.kind]} ×${q.amount}`,'Pack full','');
   }
 
   // 4. Forge delivery: only inside DEPOSIT_RANGE while the expedition offers Deliver and the Hero carries an accepted kind.

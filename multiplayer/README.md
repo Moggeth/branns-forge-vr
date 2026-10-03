@@ -1,5 +1,32 @@
 # Browser multiplayer proof
 
+## Equipment and terrain mastery — 2026-10-03
+
+Hold **F1** for the current tool's basic attack, special and interactions. Hold
+**Tab** for party K/D/damage, the current objective and expedition/menu actions;
+releasing restores prior mouse capture. Phone players have matching help/party
+icons. The small bottom-right build tag identifies the exact source revision.
+
+Orchard's Edge special (**Q/right click**, or **Special** on touch) winds back
+and bowls a sundering strike forward, leaving shallow permanent scars and
+mineable stone. Stonewhisper raises a curved, persistent crystal wall; mining
+each section breaks its crystals and removes that section of raised earth.
+Both share a four-second special cooldown. In VR, trigger activates the special
+and ordinary strikes remain physical swings.
+
+**E** directly collects nearby lumber (one wood); a subtle ground highlight
+marks the eligible target. VR right grip can physically take a log, then release
+it into the visible right waist pouch for **two wood**. Ordinary drops/throws
+remain available. This bonus is pose-validated and cannot be collected twice.
+Boulders and meteors lose real chunks with exposed interiors as they are mined.
+Left-hand Emberwing is mirrored outward in FPS/VR and remote-player presentation.
+
+Mountains now form the visible world boundary. Collision and deformation use
+the exact triangles rendered by the ground, including saved/reloaded edits.
+All friends should refresh to this version before starting or continuing a room.
+See [../docs/EQUIPMENT-TERRAIN-20261003.md](../docs/EQUIPMENT-TERRAIN-20261003.md)
+for tests, artist provenance, measured timings and physical-device limitations.
+
 ## Live eight-player peer preview — 2026-10-02
 
 Open https://branns-forge-multiplayer.vercel.app . Choose Hero (FPS, or Enter VR

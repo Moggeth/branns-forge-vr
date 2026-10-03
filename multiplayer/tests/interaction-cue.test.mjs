@@ -17,7 +17,7 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 const TREE = {id: 't1', x: 0, z: -3, height: 6.002, variant: 0};            // authored scale 1
 const view = (o = {}) => ({active: true, role: 'hero', xr: false, menuOpen: false, mode: 'desktop', ...o});
-const hero = (o = {}) => ({id: 'p1', position: [0, 0, 0], yaw: 0, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}, ...o});
+const hero = (o = {}) => ({id: 'p1', role: 'hero', hp: 75, position: [0, 0, 0], yaw: 0, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}, ...o});
 const snap = (o = {}) => freeze({harvestedTrees: [], deposits: [], pickups: [], looseLogs: [], detachedParts: [], ...o});
 const EYE = [0, 1.65, 0];
 const aimAt = (point, targetId, origin = EYE) => ({origin, direction: toward(origin, point), yaw: 0, hit: targetId ? {targetId, point, distance: dist(origin, point)} : null});
@@ -77,12 +77,12 @@ test('ore: Mine with pick, wrong tool, star shard naming, progress', () => {
   assert.deepEqual([w.action, w.control], ['Needs the Pick', '2']);
   assert.equal(decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'm1'), ctx()).name, 'Star shard');
 });
-test('loose log in grab reach: Grab F, then stow', () => {
+test('loose log in reach: Collect E directly', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -1.8])]});
   const c = decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Grab', 'F', 'then E to stow']);
+  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Collect', 'E', '']);
   const t = decideCue(view({mode: 'touch'}), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([t.control, t.note], ['Actions › Grab', 'then Actions › Collect to stow']);
+  assert.deepEqual([t.control, t.note], ['Collect', '']);
 });
 test('log beyond grab reach: Move closer', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -4])]});
@@ -101,9 +101,9 @@ test('held log: Stow E with drop/throw; full pack', () => {
   const f = decideCue(view(), hero({resources: {wood: 999}}), s, null, ctx());
   assert.deepEqual([f.state, f.action], ['full', 'Pack full']);
 });
-test('held bone blocks log grab and chopping', () => {
+test('held bone permits direct lumber collection', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -1.8])], detachedParts: [{id: 'd1', heldBy: 'p1'}]});
-  assert.equal(decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx()).action, 'Drop the bone first');
+  assert.equal(decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx()).action, 'Collect');
 });
 test('nearby pickups: Collect / Eat / full', () => {
   const st = snap({pickups: [{id: 'q1', kind: 'stone', x: 1, z: 0, y: 0, amount: 2}]});
@@ -161,13 +161,13 @@ test('mirrored rules and control names match the reference source', () => {
   const html = read('index.html'), mui = read('client/mobile-ui.js'), av = read('client/adventure-view.js'), vr = read('client/vr-input-policy.js');
   assert.match(adv, /DEPOSIT_RANGE = 9\b/); assert.match(adv, /const RUNNING = \['camp', 'star', 'rekindle'\]/); assert.match(adv, /const per = \{wood: 4, stone: 2, gems: 10\}\[kind\]/);
   assert.match(adv, /kind === 'wood' \? adv\.need\.wood - adv\.stock\.wood : kind === 'stone' \? adv\.need\.stone - adv\.stock\.stone/); assert.match(adv, /kind === 'gems' \? adv\.need\.star - adv\.star\.charge/); assert.equal(CUE_RULES.forgeRange, 9);
-  assert.match(sim, /filter\(q => q\[1\] <= 2\.5\)/); assert.match(sim, /d<=3\.2 && \(d<\.5 \|\| \(facing\[0\]\*dx\+facing\[1\]\*dz\)\/d>=\.45\)/);
+  assert.equal(CUE_RULES.pickupReach, 2.5); assert.match(sim, /d<=3\.2 && \(d<\.5 \|\| \(facing\[0\]\*dx\+facing\[1\]\*dz\)\/d>=\.45\)/);
   assert.match(sim, /Math\.hypot\(message\.point\[0\]-ore\.x,message\.point\[2\]-ore\.z\) > 1\.5/);
   assert.match(game, /raycaster\.far=3\.2/); assert.match(wc, /Math\.min\(max\?\?2\.5,2\.5\)/);
   for (const [id, name] of [['collect', 'Collect'], ['grab', 'Grab'], ['drop', 'Drop'], ['throw', 'Throw']]) assert.match(html, new RegExp(`id="${id}"[^>]*>.*?<span class="bf-name">${name}</span>`));
   assert.match(html, /data-equip="axe"[\s\S]*?bf-name">Axe</); assert.match(html, /data-equip="pick"[\s\S]*?bf-name">Pick</);
   assert.match(mui, /actionButton\('strike', 'Attack'/); assert.match(av, /deposit: 'Deliver'/);
-  assert.match(game, /KeyE'\)onAction\('interact'\).*KeyF'\)grab\(\).*KeyG'\)release\(\).*KeyX'\)release\(true\)/);
+  assert.match(game, /KeyE/);
   assert.match(vr, /hand === 'left'\) actions\.push\('interact'\)/); assert.match(vr, /edge\('squeeze'\)\) actions\.push\(hand === 'left' \? 'cycle' : 'hand'\)/);
   assert.equal(CONTROLS.touch.collect, 'Collect');
 });

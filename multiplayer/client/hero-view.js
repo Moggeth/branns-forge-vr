@@ -43,7 +43,7 @@ const SOCKET_TO_GRIP = GRIP_TO_SOCKET.clone().invert();
 
 /** Pose a canonical weapon visual in a WeaponGrip socket exactly as the local XR hand holds it. */
 export function poseRemoteWeapon(visual, tool) {
-  setWeaponGrip(visual, true, tool);                 // grip-space pose: the local XR contract, incl. the melee -45 deg tilt
+  setWeaponGrip(visual, true, tool,tool==='bow'?'left':'right');                 // grip-space pose: the local XR contract, incl. the melee -45 deg tilt
   visual.quaternion.premultiply(SOCKET_TO_GRIP);     // re-express in socket space (grip = socket * SOCKET_TO_GRIP)
   return visual;
 }

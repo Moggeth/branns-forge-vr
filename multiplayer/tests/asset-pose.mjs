@@ -18,3 +18,6 @@ assert.throws(()=>prepareAsset({scene:new T.Group()},'unregistered'),/Unreviewed
 assert.throws(()=>prepareAsset({scene:new T.Mesh(new T.BoxGeometry())},'axe'),/Missing/);
 assert.throws(()=>assetBasis({forward:[0,1,0],up:[0,1,0]}),/perpendicular/);
 console.log('PASS: 15 cardinal/oblique headings, up axes, socket origin, XR/desktop reattachment, source root transforms and invalid contracts');
+const bow=new T.Group(),feather=new T.Object3D();feather.position.set(.3,.4,-.1);bow.add(feather);
+for(const xr of [false,true]){setWeaponGrip(bow,xr,'bow','left');bow.updateWorldMatrix(true,true);assert.ok(feather.getWorldPosition(new T.Vector3()).x<0);assert.ok(new T.Vector3(0,0,-1).transformDirection(bow.matrixWorld).distanceTo(new T.Vector3(0,0,-1))<1e-9);setWeaponGrip(bow,xr,'bow','right');bow.updateWorldMatrix(true,true);assert.ok(feather.getWorldPosition(new T.Vector3()).x>0);}
+console.log('PASS: left bow mirrors feathers while keeping up/forward and resets for right hand');

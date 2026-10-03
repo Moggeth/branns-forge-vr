@@ -344,8 +344,8 @@ function instantiate(state) {
     projectileContact(message){return projectileContact(state,message,combatContext);},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, protectedUntil,head, hands}) =>
-          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, stats, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, specialTick,protectedUntil,head, hands}) =>
+          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, stats, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
