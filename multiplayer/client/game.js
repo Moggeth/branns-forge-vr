@@ -48,6 +48,7 @@ import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} fr
 import {createExpeditionPresentation} from './expedition-presentation.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
+import {createMeadowCover} from './meadow-cover.js';
 import {createHeroView} from './hero-view.js';
 import {createWoodAudio} from './wood-audio.js';
 import {createMaterialAudio} from './material-audio.js';
@@ -88,7 +89,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), templates = new Map(), warnings = new Map();
   const heroView = createHeroView({resolveWeapon: remoteWeapon, onWarning: report, siegebird: () => siegebirdFlockReady()}), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
-  const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3();
+  const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3(), meadowPushers = [];
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
   const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster(), hitPoint = new THREE.Vector3();
   const posePosition = new THREE.Vector3(), poseQuaternion = new THREE.Quaternion(), poseScale = new THREE.Vector3();
@@ -130,6 +131,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // authoritative surface as the ground mesh; it never changes heights, collision or raycast targets.
   const orchard = createOrchardPresentation({scene, renderer, ground, sun, camera, height: (x, z) => heightAt(x, z, snapshot.edits),
     baseHeight: (x,z) => heightAt(x,z,[]), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
+  // Living meadow (grass, wildflowers, pollen) over the same authoritative surface; presentation only.
+  const meadow = createMeadowCover({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
   let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
@@ -301,6 +304,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     groundGeometry.computeBoundingSphere();
     groundGeometry.computeBoundingBox();
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
+    meadow.terrainChanged({edits: snapshot.edits, terrainTick: snapshot.tick, dirty: foundationChanged ? null : dirty});
     orchard.groundChanged({edits: snapshot.edits,terrainTick:snapshot.tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
   }
   // Stone/canopy channels follow the world's tree set (seed + groves) and live deposits. A full mask bake measured
@@ -1028,6 +1032,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       shrineBar.quaternion.copy(shrineBarBack.quaternion);
       shrineCore.rotation.y += dt * 0.7;
     }
+    meadowPushers.length = 0; if (role === 'hero') meadowPushers.push([localPosition.x, localPosition.y, localPosition.z, .8]);
+    for (const p of snapshot.players || []) { if (meadowPushers.length >= 4) break; if (p.id !== playerId && p.role === 'hero' && p.position) meadowPushers.push([p.position[0], p.position[1], p.position[2], .8]); }
+    meadow.update(dt, camera, {pushers: meadowPushers});
     orchard.update(dt, camera);
     renderer.render(scene, camera);
     frameMetrics.record('frameCpu',performance.now()-frameStarted);
@@ -1076,7 +1083,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (grounded) localPosition.y = authoritative.y;
       }
       startingWorld.group.visible=!!snapshot.landmarks;const nextStartingEdits=terrainFrameKey(snapshot.edits,snapshot.tick)+'|'+foundationTerrainKey(snapshot);if(startingEdits!==nextStartingEdits){startingEdits=nextStartingEdits;startingWorld.update();}
-      combat.prepareActors(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot,{prepared:true}); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
+      combat.prepareActors(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot,{prepared:true}); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();meadow.sync(snapshot);expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
       frameMetrics.record('snapshotCpu',performance.now()-syncStarted);
     },
     setRole(next) {
@@ -1114,7 +1121,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {cpuTimings:frameMetrics.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {cpuTimings:frameMetrics.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),meadow:meadow.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1142,7 +1149,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();
+      heldResourceArt.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
