@@ -178,7 +178,27 @@ test('forge proximity offers direct workshop; loose pickups retain E priority', 
   assert.equal(decideCue(view(),hero({position:[0,0,5.1]}),s,null,ctx()),null);
   assert.equal(decideCue(view(),h,snap({inventions:{structures:[forge]},pickups:[{id:'stone1',kind:'stone',x:0,y:0,z:4,amount:1}]}),null,ctx()).target,'stone1');
 });
-
+test('Timberline cue when looked at within 5 m: ammo cost, shortfall, reload, reach and side', () => {
+  const forge={id:'central-forge',type:'forge',position:[0,0,0],hp:100,side:'neutral'};
+  const tl={id:'tl1',type:'timberline',position:[0,0,20],hp:200,side:'party',readyTick:0};
+  const stock={party:{wood:0,iron:0},rivals:{wood:0,iron:0}};
+  const s=(o={})=>snap({tick:100,inventions:{structures:[forge,{...tl,...o}],stockpiles:stock}});
+  const at=z=>hero({position:[0,0,z]}), look=(z,id='tl1')=>aimAt([0,1,20.4],id,[0,1.65,z]);
+  assert.equal(decideCue(view(),at(24.5),s(),null,ctx()),null);                 // not looking at it: no cue
+  let c=decideCue(view(),at(24.5),s(),look(24.5),ctx());
+  assert.deepEqual([c.target,c.name,c.action,c.control,c.state],['tl1','Timberline','Aim & fire','E','short']);
+  assert.equal(c.note,'Needs 2 Wood + 1 Iron per shot · you have 0 Wood, 0 Iron');
+  c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:3,iron:1}}),s(),look(24.5),ctx());
+  assert.deepEqual([c.state,c.note],['ready','2 Wood + 1 Iron per shot']);
+  c=decideCue(view(),at(24.5),s({readyTick:300}),look(24.5),ctx());
+  assert.deepEqual([c.state,c.action,c.control,c.note],['busy','Reloading','Hold R','Crank to wind it faster']);
+  c=decideCue(view(),at(24.5),s({operator:'p1'}),look(24.5),ctx());
+  assert.deepEqual([c.action,c.control],['Step off','E'],'the operator is told how to step off');
+  c=decideCue(view(),at(24.5),s({operator:'p2'}),look(24.5),ctx());
+  assert.deepEqual([c.state,c.action],['busy','Manned']);
+  assert.equal(decideCue(view(),at(25.6),s(),look(25.6),ctx()),null);            // 5.6 m: beyond inventions.js usable
+  assert.equal(decideCue(view(),at(24.5),s({side:'rivals'}),look(24.5),ctx()),null);
+});
 test('cost: 48 logs + 256 pickups, 10k decisions', () => {
   const logs = Array.from({length: 48}, (_, i) => log(`log${i}`, [i % 8 - 4, .16, -10 - (i >> 3)]));
   const pickups = Array.from({length: 256}, (_, i) => ({id: `p${i}`, kind: 'stone', x: 20 + i % 16, z: 20 + (i >> 4), y: 0, amount: 1}));

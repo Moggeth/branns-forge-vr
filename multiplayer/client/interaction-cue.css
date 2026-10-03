@@ -42,7 +42,7 @@
 .bf-cue[data-state="ready"] { border-left-color: rgba(231, 194, 122, .75); }
 .bf-cue--placed.bf-cue--flip[data-state="ready"] { border-left-color: rgba(231, 194, 122, .16); border-right-color: rgba(231, 194, 122, .75); }
 .bf-cue[data-state="tool"] .bf-cue-action, .bf-cue[data-state="far"] .bf-cue-action,
-.bf-cue[data-state="aim"] .bf-cue-action, .bf-cue[data-state="busy"] .bf-cue-action { color: var(--bf-parch-dim, #cdbb98); }
+.bf-cue[data-state="aim"] .bf-cue-action, .bf-cue[data-state="busy"] .bf-cue-action, .bf-cue[data-state="short"] .bf-cue-action { color: var(--bf-parch-dim, #cdbb98); }
 .bf-cue[data-state="full"] .bf-cue-action { color: var(--bf-ember-hot, #ffb35a); }
 
 /* Leader: full-viewport, non-interactive SVG under the plate. Thin, low-alpha amber; ring marks the target without
