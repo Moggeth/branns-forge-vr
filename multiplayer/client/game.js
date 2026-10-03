@@ -16,6 +16,7 @@ import {createSettlementView} from './settlement-view.js';
 import {syncWeaponReadiness} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {spellUnavailable} from './spell-availability.js';
+import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
 import {createRangedReticle} from './ranged-reticle.js';
@@ -55,6 +56,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
+  const frameMetrics=createFrameMetrics();
   const terrainSampler=createTerrainSampler(snapshot);
   const heightAt=(x,z,edits=snapshot.edits)=>edits===snapshot.edits?terrainSampler.height(x,z):terrainHeight(x,z,edits,snapshot.tick??Infinity);
   const terrainRay=createTerrainRaycaster({height:(x,z)=>heightAt(x,z)});
@@ -277,6 +279,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function rebuildGround() {
     const signature = terrainFrameKey(snapshot.edits,snapshot.tick);
     if (signature === terrainSignature) return;
+    const terrainStarted=performance.now();
     const dirty=terrainSignature?terrainDirtyEdits(terrainPreviousEdits,snapshot.edits,terrainPreviousTick,snapshot.tick):null;
     terrainPreviousEdits=snapshot.edits;terrainPreviousTick=snapshot.tick;
     terrainSignature = signature;
@@ -287,6 +290,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     groundGeometry.computeVertexNormals();
     groundGeometry.computeBoundingSphere();
     groundGeometry.computeBoundingBox();
+    frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
     orchard.groundChanged({edits: snapshot.edits,terrainTick:snapshot.tick}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
   }
   // Stone/canopy channels follow the world's tree set (seed + groves) and live deposits. A full mask bake measured
@@ -873,6 +877,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function frame(now) {
     contactFrame++;
     if (disposed) return;
+    const frameStarted=performance.now();
+    frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
     previous = now; renderTick=presentationClock.sample(now);
     if (active && !renderer.xr.isPresenting) {
@@ -974,6 +980,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
     orchard.update(dt, camera);
     renderer.render(scene, camera);
+    frameMetrics.record('frameCpu',performance.now()-frameStarted);
   }
   function disposeResources(root) {
     const geometries = new Set(), materials = new Set(), textures = new Set();
@@ -997,6 +1004,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const api = {
     applySnapshot(next, id) {
       if (disposed) return;
+      const syncStarted=performance.now();
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
@@ -1018,8 +1026,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (grounded) localPosition.y = authoritative.y;
       }
       startingWorld.group.visible=!!snapshot.landmarks;const nextStartingEdits=terrainFrameKey(snapshot.edits,snapshot.tick);if(startingEdits!==nextStartingEdits){startingEdits=nextStartingEdits;startingWorld.update();}
-      combat.sync(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
-
+      combat.prepareActors(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot,{prepared:true}); syncTrees(); syncWorldSignals();spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
+      frameMetrics.record('snapshotCpu',performance.now()-syncStarted);
     },
     setRole(next) {
       if (next !== 'hero' && next !== 'god') return;
@@ -1055,7 +1063,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {cpuTimings:frameMetrics.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },

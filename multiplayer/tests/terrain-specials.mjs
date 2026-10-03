@@ -131,6 +131,7 @@ for(let x=-40;x<=40;x+=8)for(let z=-40;z<=40;z+=8)for(const [dx,dz] of [[1/12,0]
 // All four boundary line directions produce valid, reloadable coordinates.
 for(const spell of ['sunder','wall'])for(const point of [[55,0,55],[-55,0,55],[55,0,-55],[-55,0,-55]]) {
   s=createSimulation();s.addPlayer({id:'g',role:'god'});
+  s.adventureWorld().inventions.structures.find(b=>b.id==='party-influence').position=[Math.sign(point[0])*40,0,Math.sign(point[2])*40];
   assert.equal(s.command('g',{type:'cast',spell,point,seq:1}).ok,true);
   assert.ok(s.snapshot().edits.every(e=>Math.abs(e.x)<=55&&Math.abs(e.z)<=55));
   assert.doesNotThrow(()=>loadSimulation(JSON.parse(JSON.stringify(s.checkpoint()))));

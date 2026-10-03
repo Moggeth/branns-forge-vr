@@ -313,9 +313,9 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     if (kind === 'fuel') { group.userData.emberdewRoot = visual; group.userData.emberdew = attachEmberdew({root: visual}); }
     return group;
   }
-  function sync(next) {
-    contactRevision++;
-    snapshot = next;
+  // Capture limbs while their animated source actors still exist. The game calls
+  // this before replacing/removing actors, then syncs flight/embeds only once.
+  function prepareActors(next) {
     for (const data of next.detachedParts || []) {
       let node = detached.get(data.id);
       if (!node) {
@@ -332,9 +332,15 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       }
       node.userData.targetId = data.id; node.userData.heldBy = data.heldBy;
     }
-    for (const [id] of detached) if (!(next.detachedParts || []).some(p => p.id === id)) remove(detached, id, true);
+    const detachedIds=new Set((next.detachedParts||[]).map(p=>p.id));
+    for (const [id] of detached) if (!detachedIds.has(id)) remove(detached, id, true);
     // Release owned mask buffers before the caller removes dead actor roots.
-    for (const entry of actors.values()) if (entry.enemy && !(next.enemies || []).some(p => p.id === entry.data?.id)) maskMissingParts(entry.visual, []);
+    const enemyIds=new Set((next.enemies||[]).map(p=>p.id));
+    for (const entry of actors.values()) if (entry.enemy && !enemyIds.has(entry.data?.id)) maskMissingParts(entry.visual, []);
+  }
+  function sync(next,{prepared=false}={}) {
+    contactRevision++;snapshot=next;
+    if(!prepared)prepareActors(next);
     for (const data of next.enemies || []) {
       const actor = actorFor(data.id); if (!actor) continue;
       if (data.kind === 'golem') updateGolemArmor(actor.visual, data.armor);
@@ -359,7 +365,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         node.userData.wings.rotation.z = THREE.MathUtils.clamp(curve.y, -1, 1) * -.8 * fade;
       }
     }
-    for (const [id] of projectiles) if (!(next.projectiles || []).some(p => p.id === id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
+    const projectileIds=new Set((next.projectiles||[]).map(p=>p.id));
+    for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
       if (!node) { node = projectile(data.kind); if (!node) continue; embeds.set(data.id, node); }
@@ -392,7 +399,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         fractureAnchors.set(data.id, {anchor,targetId:data.targetId});
       }
     }
-    for (const [id] of embeds) if (!(next.embeds || []).some(p => p.id === id)) {
+    const embedIds=new Set((next.embeds||[]).map(p=>p.id));
+    for (const [id] of embeds) if (!embedIds.has(id)) {
       remove(embeds, id); fractures.remove(id); fractureAnchors.delete(id);
     }
   }
@@ -501,7 +509,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id] of detached) remove(detached, id, true);
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
-  return {sync, tick, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
+  return {sync, prepareActors, tick, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
     rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),
