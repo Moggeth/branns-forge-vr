@@ -40,6 +40,18 @@ try{
  await page.keyboard.press('b');await page.keyboard.press('c');await page.waitForFunction(()=>window.brannHarness.state().forgeOpen);
  assert.equal(await page.locator('[data-ip-tab="build"]').getAttribute('aria-selected'),'true');await page.keyboard.press('Escape');
  await page.keyboard.press('b');await shot(page,'quick-build-desktop');await page.keyboard.press('Escape');
+ // Exercise the real camera input, not a synthetic already-normalized yaw.
+ await page.locator('#world').click({position:{x:640,y:360}});await page.waitForFunction(()=>!!document.pointerLockElement);
+ await page.mouse.move(640-5*Math.PI/.0022,360+.35/.0022);await sleep(150);
+ assert.ok((await page.evaluate(()=>window.brannHarness.controls().yaw))>Math.PI*4,'camera accumulated multiple turns');
+ for(const type of ['foundation','timberline']){
+  await page.keyboard.press('b');await page.locator(`[data-qb-place="${type}"]`).click();
+  await page.mouse.move(640,360);await page.mouse.click(640,360);
+  await page.waitForFunction(type=>window.brannHarness.snapshot().inventions.structures.some(s=>s.type===type),type,{timeout:5000});
+ }
+ const built=await page.evaluate(()=>window.brannHarness.snapshot().inventions.structures.filter(s=>['foundation','timberline'].includes(s.type)));
+ assert.ok(built.every(s=>Math.abs(s.yaw)<=Math.PI),'saved structure orientations are canonical');
+ record('hero-builds-foundation-and-machine-after-multiple-turns','pass',{built});
  assert.deepEqual(page.errors,[]);record('desktop-quick-build-key-routing-and-catalog','pass');
 }catch(error){record('desktop-exception','fail',{message:error.message,errors:page.errors,text:await page.locator('body').innerText()});await shot(page,'quick-build-desktop-failure');process.exitCode=1;}
 finally{await browser.close();}

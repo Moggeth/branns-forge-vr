@@ -67,7 +67,7 @@ export function validateInventionPlacement(s,p,m,c){
  if(!Object.hasOwn(STRUCTURES,type)||type==='forge')return reject('invalid_structure');
  if(i.structures.filter(b=>b.type!=='forge').length>=48)return reject('structure_limit');
  let at=m.position||[m.x,0,m.z];
- if(!Array.isArray(at)||at.length!==3||!at.every(n=>num(n,-200,200))||!num(m.yaw??p.yaw,-Math.PI,Math.PI))return reject('invalid_placement');
+ if(!Array.isArray(at)||at.length!==3||!at.every(n=>num(n,-200,200))||!num(m.yaw??p.yaw,-100000,100000))return reject('invalid_placement');
  at=[...at];if(type==='foundation')at=[Math.round(at[0]/.75)*.75,at[1],Math.round(at[2]/.75)*.75];
  const r=STRUCTURES[type].radius;
  if(Math.abs(at[0])+r>48||Math.abs(at[2])+r>48)return reject('outside_boundary',{position:at});
@@ -80,7 +80,9 @@ export function validateInventionPlacement(s,p,m,c){
  if(!support&&[[-r,0],[r,0],[0,-r],[0,r],[-r,-r],[-r,r],[r,-r],[r,r]].some(([x,z])=>Math.abs(ground(s,at[0]+x,at[2]+z,c)-y)>.9))return reject('uneven_ground',{position:at});
  const available=inventionAvailable(s,p),missing=Object.fromEntries(Object.entries(STRUCTURES[type].cost).filter(([k,n])=>available[k]<n).map(([k,n])=>[k,n-available[k]]));
  if(Object.keys(missing).length)return reject('insufficient_resources',{position:at,missing});
- return {ok:true,code:null,position:at,reason:'Ready to build',missing:{}};
+ // Camera yaw accumulates across turns; match movement input's angle contract.
+ const yaw=type==='foundation'?0:(((m.yaw??p.yaw)+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+ return {ok:true,code:null,position:at,yaw,reason:'Ready to build',missing:{}};
 }
 export function damageInvention(s,id,amount,by,events=[],attackerSide){const b=state(s).structures.find(b=>b.id===id);if(!b||b.type==='forge'||b.hp<=0||!num(amount,0,1000))return false;const p=s.players.find(p=>p.id===by);if((attackerSide||(p?side(p):null))===b.side)return false;const ward=state(s).structures.find(w=>w.type==='ward'&&w.side===b.side&&w.hp>0&&w.charge>0&&flat(w.position,b.position)<=6);if(ward){ward.charge=Math.max(0,ward.charge-amount);amount*=.3;}b.hp=Math.max(0,b.hp-amount);events.push(event(b.hp?'invention_hit':'invention_destroyed',b,{amount,by}));return true;}
 function refine(s,p,m,c){const i=state(s),kind=m.kind||m.ore,recipe=ORE_RECIPES[kind],amount=m.amount??1;if(!Object.hasOwn(ORE_RECIPES,kind)||!Number.isSafeInteger(amount)||amount<1||amount>10)return fail('invalid_resource');if(p.role!=='god'&&flat(p.position,[0,0,0])>7)return fail('too_far');if(i.refining.length>=16)return fail('refinery_full');if(!pay(s,p,{[kind]:amount}))return fail('insufficient_resources');const job={id:fresh(i,'refine'),kind,output:recipe.output,amount,side:side(p),finishTick:s.tick+recipe.ticks,startedTick:s.tick};i.refining.push(job);return ok([{kind:'refinery_feed',position:[2.5,ground(s,2.5,0,c),0],amount,material:kind}]);}
@@ -94,7 +96,7 @@ export function inventionAction(s,p,m,c){const i=state(s);p.resources={...emptyM
  if(action==='inventionCollectOutput'){if(p.role!=='god'&&flat(p.position,[3.5,0,1])>5)return fail('too_far');let total=0;for(const q of [...s.pickups])if(q.side===side(p)&&q.id.startsWith('ingot')){const n=Math.min(q.amount,999-p.resources[q.kind]);p.resources[q.kind]+=n;q.amount-=n;total+=n;if(!q.amount)s.pickups.splice(s.pickups.indexOf(q),1);}return total?ok():fail('output_empty');}
  if(action==='inventionDeposit')return deposit(s,p);
  if(action==='inventionRefine')return refine(s,p,m,c);
- if(action==='inventionBuild'){const type=m.kind||m.type,validation=validateInventionPlacement(s,p,m,c);if(!validation.ok)return {...validation,events:[]};if(!pay(s,p,STRUCTURES[type].cost))return fail('insufficient_resources');const b=make(type,fresh(i,'building'),validation.position,type==='foundation'?0:(m.yaw??p.yaw),side(p),s.tick);i.structures.push(b);return ok([event('invention_build',b,{by:p.id})]);}
+ if(action==='inventionBuild'){const type=m.kind||m.type,validation=validateInventionPlacement(s,p,m,c);if(!validation.ok)return {...validation,events:[]};if(!pay(s,p,STRUCTURES[type].cost))return fail('insufficient_resources');const b=make(type,fresh(i,'building'),validation.position,validation.yaw,side(p),s.tick);i.structures.push(b);return ok([event('invention_build',b,{by:p.id})]);}
  if(action==='inventionAssault'){if(!p)return fail('no_player');if(i.assault)return fail('encounter_active');if(s.enemies.length>58)return fail('world_limit');i.assault={side:side(p),foes:[],startTick:s.tick};for(let n=0;n<4;n++){const a=n*.3+Math.PI/3,x=Math.sin(a)*32,z=Math.cos(a)*32,e=c.createEnemy(c.nextId(s,'incursion'),[x,ground(s,x,z,c),z],'skeleton');s.enemies.push(e);i.assault.foes.push(e.id);}return ok([{kind:'invention_assault',position:[0,0,0]}]);}
  const b=owned(s,p,m.structureId||m.id);if(!b)return fail('not_your_structure');if(!usable(p,b))return fail('too_far');
  if(action==='inventionTurn'){if(!['timberline','launcher'].includes(b.type)||b.hp<=0)return fail('invalid_action');if(s.tick<b.readyTick)return fail('machine_loading');b.yaw=Math.atan2(Math.sin(b.yaw+Math.PI/4),Math.cos(b.yaw+Math.PI/4));b.aimYaw=0;b.readyTick=s.tick+30;return ok([event('machine_turn',b)]);}

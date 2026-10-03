@@ -2225,3 +2225,8 @@ Read docs/CONTINUOUS-TIMBER-20261003.md and docs/STONE-FOUNDATIONS-20261003.md. 
 - Use explicit multiplayer cwd and rg --files tests before choosing test names. Guessed ranged-trajectory.mjs did not exist; ranged-fx.mjs is the existing forecast regression.
 - Vite HMR adds a same-origin WebSocket to browser traces. Cloud-game endpoint assertions may ignore only that exact HMR socket, not all local sockets.
 - Terminal flash tracing found a sibling Personal Package Manager polling hidden Python into visible PowerShell. Its local fix uses STARTUPINFO SW_HIDE and removes contradictory detached/no-window flags; preserve running apps when restarting only the manager.
+
+
+### Structure placement rotation hotfix - 2026-10-03
+Camera yaw accumulates beyond +/-pi after looking around. Placement mistakenly rejected it while movement accepted +/-100000 and normalized it. Shared placement now uses that same finite input range and returns canonical yaw for structure creation/save. Foundations remain axis-aligned. Reproduced old failure hero/foundation/-31.2; 130 combinations of 13 structures, two roles and five headings now place and reload. Browser acceptance must build actual Hero structures after several full turns: selecting a tray item or building as God at yaw zero cannot catch this. Desktop browser constructed a foundation then Timberline after 5*pi of mouse rotation.
+The first new save test used abbreviated harvested-tree records and failed save validation; replace them with complete landed-tree fixtures before testing roundtrip. Do not weaken save validation.
