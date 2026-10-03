@@ -409,6 +409,13 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   };
 
   const FX = {
+    // Hero gifts from God spells (shared/god-boons.js): blue resonance marks what was left behind.
+    gift(ev, c) { ev.dur = 1.9; pulse(ev, c, ribMat(PAL.teal, PAL.ice, 0, 1), 0.15, 1.5, 0, 0.75, 0.3); let acc = 0;
+      ev.fx.push((age, dt) => { if (age > 1.3) return; acc += dt * 24 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 0.55, c.R() < 0.5 ? PAL.teal : PAL.ice, 0.22, 1.9); } }); },
+    charge(ev, c) { ev.dur = 1.2; sparks(c, c.x, c.y + 1.1, c.z, 26, 4, PAL.bolt, 0.24, 0.7); sparks(c, c.x, c.y + 1.1, c.z, 12, 2, PAL.teal, 0.3, 1); pulse(ev, c, ribMat(PAL.bolt, PAL.teal, 0, 2), 0.2, 1.8, 0, 0.45, 0.25); },
+    charged_strike(ev, c) { ev.dur = .8; sparks(c, c.x, c.y + 1.1, c.z, 18, 5, PAL.bolt, 0.22, 0.45); },
+    swift(ev, c) { ev.dur = 1.6; let acc = 0; pulse(ev, c, ribMat(PAL.ice, PAL.mint, 0, 1), 0.3, 2.2, 0, 0.6, 0.2);
+      ev.fx.push((age, dt) => { if (age > 1) return; acc += dt * 30 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.1, c.R() < 0.6 ? PAL.ice : PAL.mint, 0.18, 2.4); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
     squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
