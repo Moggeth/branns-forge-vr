@@ -40,6 +40,7 @@ import {createCombatView} from './combat-view.js';
 import {createSpellPresentation} from './spell-presentation.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
+import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
 import {createRewardMoments} from './reward-moments.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
@@ -362,7 +363,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const template = templates.get(name);
     if (!template) return null;
     const {visual: wrapper, model} = prepareAsset(template, name, height);
-    if (template.animations.length && (name === 'skeleton'||name==='golem')) {
+    // Golems are posed procedurally (enemy-motion.js: stride-locked gait, slam, recoil); their clips stay in the GLB for tools.
+    if (template.animations.length && name === 'skeleton') {
       const mixer = new THREE.AnimationMixer(model);
       const idle = template.animations.find(item => /idle/i.test(item.name)) || template.animations[0];
       const walk = template.animations.find(item => /walk/i.test(item.name)) || idle;
@@ -542,6 +544,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
+    if (name === 'golem') gltf.scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^crystal/i.test(m.name)) m.emissive.setRGB(.3, .62, 1); }); // resonance blue; also the assembly binding colour
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
     if (name === 'axe') enhanceAxeTemplate(gltf.scene); // shared edge/inlay/metal look before any clone renders
     templates.set(name, gltf);
@@ -613,6 +616,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return cursor.visible;
   }
   const impacts=createImpactPresentation({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits)});
+  // Geode golems: crystal light, footfall/slam dust and resonance ring, procedural sound; rumble only reaches a nearby Hero.
+  const golemFx=createGolemPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),
+    haptic:(amplitude,ms)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:Math.min(1,amplitude),duration:ms}]);else if(touchEnabled&&amplitude>.3)try{navigator.vibrate?.(Math.round(ms*amplitude));}catch{}}});
   let audioContext=null;let lastSound=0;let woodAudio=null;let materialAudio=null;
   // Wins (raids, rewards, crafting, building, loot) answer with light, chimes and rumble; presentation only.
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
@@ -662,6 +668,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(event.kind==='respawn'&&event.id===playerId){clearInput();localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     feedback.handleEvent(event);
     combat.handleEvent(event);
+    golemFx.handleEvent(event);
     settlementVisual.event(event);inventionVisual.event(event);
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
 
@@ -1103,6 +1110,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     for (const mixer of mixers) mixer.update(dt);
     // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
     updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround});
+    golemFx.update(actors,renderTick,dt,now/1000);
     combat.tick(dt,isHost(),now/1000,renderTick);
     if(tool==='limb'&&!renderer.xr.isPresenting&&role==='hero')combat.poseLocalHeld?.(playerId,weaponAnchor);
     tickPhysicalMelee(now,dt);
@@ -1243,7 +1251,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
