@@ -34,3 +34,9 @@ All four commissions verified personal fauxgrady@gmail.com, claude.ai subscripti
 Physical HMD/phone acceptance and human listening/comfort judgement are outstanding. Headless new-tab switching emits pointer-lock loss without OS blur/focus/visibility events; it cannot establish Alt-Tab acceptance. The runtime attempts recovery where security allows, and deliberate Escape remains released. Some browsers require a new gesture. Do not claim guaranteed click-free capture.
 
 Terminal interruption was unrelated: Personal Package Manager polled PowerShell every five seconds. Its separate local commit 622025f adds hidden startup flags; four observed polling cycles had zero visible windows. Managed apps were preserved; that sibling repo has no remote.
+
+## Published acceptance
+
+Source dd6168d is live at https://branns-forge-multiplayer.vercel.app via Vercel dpl_8VocyU74Wercro2xvyuWikqS8xL1 (READY). Build, 30-texture dependency gate, asset staging/hash checks and deployment completed in 14.776s. Private origin/main is pushed.
+
+The public site passed two-client cloud room creation/join, shared expedition and terrain (15.771s); actual direct forge E/tap, offset cues and portrait/landscape projection (16.234s); desktop/touch quick build and placement input guards (9.752s); desktop/touch Siegebird aim/fire (14.411s); Emberwing ADS/fire/movement/Phoenix and deliberate Escape (8.271s). No console errors. Native focus-return remains environment-limited. Captures/results are in ignored logs/interaction-hosted. Owned QA Vite and browser session were stopped; user hosting processes were untouched.
