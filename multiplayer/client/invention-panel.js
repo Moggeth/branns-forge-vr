@@ -213,6 +213,17 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
         ${btn(`refine-${k}`, `data-ip-act="inventionRefine" data-ip-kind="${k}"`, `${icon(RES_ICO[into])}<span>Refine 1</span>`, enabled, reason)}</li>`);
     }
     out.push('</ul>');
+    const craft = Array.isArray(m.craft) ? m.craft : [];
+    if (craft.length) {
+      out.push(`<h3 class="ip-h3">${icon('flame')} Craft at the forge</h3><ul class="ip-refine">`);
+      for (const r of craft) {
+        const cost = Object.entries(r.input || {}).map(([k, n]) => `${num(n)} ${RES_NAME[k] || k}`).join(' + ');
+        out.push(`<li class="ip-ore">${icon('aim', 'ip-ico')}<div class="ip-ore-main"><b>${esc(r.name)}</b>
+        <small>${num(r.have)} on your rack · ${cost} makes ${num(r.output)}</small><small>Each Timberline shot uses one bolt before raw Wood and Iron.</small></div>
+        ${btn(`craft-${esc(r.id)}`, `data-ip-act="inventionCraft" data-ip-recipe="${esc(r.id)}"`, `${icon('aim')}<span>Craft ${num(r.output)}</span>`, !!r.enabled, r.reason || 'Unavailable right now')}</li>`);
+      }
+      out.push('</ul>');
+    }
     return out.join('');
   }
 
@@ -314,6 +325,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     if (ds.ipRepair) { onAction('inventionRepair', { structureId: realId(ds.ipRepair) }); return; }
     if (ds.ipAct === 'inventionDeposit') { onAction('inventionDeposit', {}); return; }
     if (ds.ipAct === 'inventionRefine') { onAction('inventionRefine', { kind: ds.ipKind, amount: 1 }); return; }
+    if (ds.ipAct === 'inventionCraft') { onAction('inventionCraft', { recipe: ds.ipRecipe }); return; }
     if (has(ds.ipLegacy)) { const a = model?.legacyActions?.[+ds.ipLegacy]; if (a) onAction(a.action, legacyDetail(a)); }
   }
   const realId = s => { const b = (model?.structures || []).find(x => String(x?.id) === s); return b ? b.id : s; };

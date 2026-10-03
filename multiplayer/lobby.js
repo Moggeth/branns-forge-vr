@@ -80,7 +80,7 @@ function friendlyError(detail) {
   if (code === 'insufficient_resources') return 'Not enough supplies. Check the cost, then collect more.';
   if (code === 'not_needed') return 'Already fully restored — no supplies were used.';
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
-  const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The hopper is busy. Try shortly.',output_empty:'No finished metal in your tray yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.'};
+  const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The hopper is busy. Try shortly.',output_empty:'No finished metal in your tray yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.',machine_manned:'Someone is already manning that Timberline.',rack_full:'Your bolt rack is full (99 bolts).',not_operator:'Step onto the Timberline first (E).'};
   if(inventionErrors[code])return inventionErrors[code];
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
@@ -468,7 +468,7 @@ function onSnapshot(snapshot) {
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · Q crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -726,7 +726,13 @@ for(const button of document.querySelectorAll('[data-equip]'))button.addEventLis
 for(const button of document.querySelectorAll('[data-resource-use]'))button.addEventListener('click',()=>command('action',{action:'useResource',kind:button.dataset.resourceUse}));
 $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
-for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
+for(const [id,method] of [['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
+// Special is press-and-release: the pick shows its wall footprint while held and raises it on release (touch buttons
+// activate on release, so 'click' is the release); other weapons fire on that same click.
+$('special')?.addEventListener('pointerdown',()=>{if(game?.weaponState()?.tool==='pick')game.specialPress(true);});
+// A finger dragged off the button never casts (release outside does not click); drop the footprint instead.
+for(const name of ['pointercancel','lostpointercapture'])$('special')?.addEventListener(name,()=>game?.cancelSpecialAim?.());
+$('special')?.addEventListener('click',()=>{game?.specialPress?game.specialPress(false):game?.special();$('special').blur();});
 $('throw')?.addEventListener('click',()=>{game?.release(true);$('throw').blur();});
 $('quickCast')?.addEventListener('change',()=>{game?.setQuickCast($('quickCast').checked);updateSpellHint();mobile?.update({active:phase==='game'&&connected&&!menuOpen&&!fieldKind,role:currentRole,xr:xrActive});});
 releaseFocusAfterPointer($('quickCast'));

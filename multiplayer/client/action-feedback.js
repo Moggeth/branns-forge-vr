@@ -65,6 +65,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if((world.groves?.length||0)>=64&&['grove','ring'].includes(command.spell))return 'The grove limit is reached. This world cannot accept another grove.';
   if((world.pendingStarfalls?.length||0)>=8&&command.spell==='starfall')return 'Eight meteors are already descending. Wait for an impact before calling another.';
   if((world.deposits?.length||0)+(world.pendingStarfalls?.length||0)>=80)return 'Too many mineral sites are reserved. Finish mining existing deposits before creating more.';
+  if(command.action==='special'&&player.tool==='pick')return `Terrain storage is full (${world.edits?.length||0} edits). Crystal walls free their space when they shatter (within a minute); mine one now to make room sooner.`;
   return `Terrain storage is full (${world.edits?.length||0} edits). Mine crystal walls to clear space, or save and reset this world. Waiting does not clear terrain.`;
  }
  if(code==='rate_limited')return 'Too many network requests arrived together. Wait up to a minute before creating or joining another room.';
