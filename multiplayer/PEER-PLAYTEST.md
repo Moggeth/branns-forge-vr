@@ -2,7 +2,9 @@
 
 Public page: https://branns-forge-multiplayer.vercel.app
 
-Current temporary signaling URL:
+OUTAGE 2026-10-03: the following previous temporary hostname no longer resolves. No live 8789 peer/tunnel was found. Automated recovery was policy-blocked even after user approval. Start the documented service/tunnel from a permitted environment, then redeploy with the new hostname before inviting players.
+
+Previous temporary signaling URL:
 `wss://blackjack-meals-mia-meals.trycloudflare.com/peer/ws`.
 It changes when the Quick Tunnel restarts. Do not promise this endpoint is permanent.
 

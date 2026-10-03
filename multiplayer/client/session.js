@@ -1,4 +1,5 @@
 import {createSimulation, loadSimulation, HZ, MAX_PLAYERS} from '../shared/simulation.js';
+import {MATERIAL_KEYS, emptyMaterials} from '../shared/material-catalog.js';
 import {PeerRoomConnection} from '../peer/browser.js';
 import {makeSave, parseSave, WorldSaves} from './world-saves.js';
 import {quantizeWire} from './wire-quantize.js';
@@ -12,9 +13,9 @@ const PARK_MS = 120_000;
 // (old counters advance far slower than 1 per ms) and the host also tells each (re)opened channel its exact
 // floor. Replayed or stale packets still fail: the host never lowers a player's seq.
 const SEQ_MAX = 2 ** 52;
-const PACK = ['wood','stone','gems'];
+const PACK = MATERIAL_KEYS;
 const pickupTotals = simulation => {
-  const totals = {wood:0, stone:0, gems:0};
+  const totals = emptyMaterials();
   for (const p of simulation.adventureWorld?.().pickups || []) if (p.kind in totals) totals[p.kind] += p.amount | 0;
   return totals;
 };

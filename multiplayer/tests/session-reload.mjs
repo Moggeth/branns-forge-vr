@@ -3,6 +3,7 @@
 // real applyCommand path and the guest's real receive path are both exercised.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {MATERIAL_KEYS, emptyMaterials} from '../shared/material-catalog.js';
 import {WorldSession} from '../client/session.js';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {worldTrees} from '../shared/world-content.js';
@@ -138,7 +139,7 @@ test('transient reconnect (resume) keeps the counter; HP/tool/role preserved; pa
   assert.equal(g.s.sequence, seqBefore, 'resume does not reseed');
   const back = hostPlayer(host, 'two');
   assert.equal(back.hp, 37); assert.equal(back.tool, 'pick');
-  assert.deepEqual(back.resources, {wood: 0, stone: 0, gems: 0}, 'dropped pack is not duplicated');
+  assert.deepEqual(back.resources, emptyMaterials(), 'dropped pack is not duplicated');
   assert.deepEqual(total(), t0);
   move(g.s); assert.deepEqual(g.errors, []);
   host.dispose(); g.s.dispose();
@@ -234,4 +235,19 @@ test('integrated world: tree/log/adventure/fire snapshots decode exactly; save r
   assert.deepEqual(back.snapshot(), s.snapshot());
   console.log(JSON.stringify({frames, deltas, chopped, harvested: snap.harvestedTrees.length, logs: snap.looseLogs.length,
     fireCells: snap.fireCells.length, adventureStart: started.ok ? 'ok' : started.code, stage: snap.adventure.stage}));
+});
+
+// All nine material types must survive the bounded pickup queue across departure/rejoin.
+test('full pickup cap preserves every new metal and ore across reconnect', () => {
+  const {r, hostLink, host} = room(), guest = join(r, 'two');
+  const world = host.simulation.adventureWorld();
+  while (world.pickups.length < 256) world.pickups.push({id:`cap${world.pickups.length}`,kind:'wood',x:0,z:0,y:0,amount:1});
+  const pack = Object.fromEntries(MATERIAL_KEYS.map((key,i)=>[key,i+11]));
+  hostPlayer(host,'two').resources = {...pack};
+  r.roster.get('two').online=false; hostLink.emit('peer_left',{peerId:'two'});
+  assert.deepEqual(host.parked.get('two').record.resources,pack);
+  r.roster.get('two').online=true; hostLink.emit('peer_joined',{id:'two'});
+  assert.deepEqual(hostPlayer(host,'two').resources,pack);
+  assert.equal(world.pickups.length,256);
+  host.dispose(); guest.s.dispose();
 });
