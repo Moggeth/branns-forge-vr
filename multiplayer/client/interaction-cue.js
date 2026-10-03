@@ -1,3 +1,4 @@
+import {isTestingGift,giftContents} from '../shared/testing-supplies.js';
 import {STRUCTURES} from '../shared/inventions.js';
 import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
@@ -87,7 +88,7 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
     return t<=wall+.05;
   }});
-  const pickupCue = c => make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||'');
+  const pickupCue = c => isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||'');
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.

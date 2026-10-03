@@ -1,3 +1,4 @@
+import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,materialLabel} from './material-catalog.js';
 import {capsuleDistance, TREE_LIMITS} from './trees.js';
 
@@ -12,9 +13,9 @@ export function collectibleCandidate(state,p,id,ctx={}) {
  const log=(state.looseLogs||[]).find(l=>l.id===id);
  const q=log||(state.pickups||[]).find(q=>q.id===id);
  if(!q||q.side&&q.side!==(p.side||'party'))return null;
- return candidateFor(p,q,!!log,ctx);
+ return candidateFor(p,q,!!log,ctx,state);
 }
-function candidateFor(p,q,log,ctx) {
+function candidateFor(p,q,log,ctx,state) {
  if(q.side&&q.side!==(p.side||'party'))return null;
  if(p?.role!=='hero'||!p.position||p.hp<=0)return null;
  const position=log?[...q.position]:[q.x,ctx.height?ctx.height(q.x,q.z):q.y,q.z];
@@ -25,7 +26,7 @@ function candidateFor(p,q,log,ctx) {
  const kind=log?'wood':q.kind, amount=log?1:q.amount;
  if(![...MATERIAL_KEYS,'apple'].includes(kind))return null;
  const target={id:q.id,type:log?'log':'pickup',kind,amount,position,distance,held,
-  full:kind!=='apple'&&(p.resources?.[kind]||0)+amount>INVENTORY_CAP,
+  full:isTestingGift(q)?giftContents(state).some(item=>(p.resources?.[item.kind]||0)+item.amount>INVENTORY_CAP):kind!=='apple'&&(p.resources?.[kind]||0)+amount>INVENTORY_CAP,
   unnecessary:kind==='apple'&&p.hp>=100};
  // Terrain occlusion remains deterministic on host and clients. Stop above the resource surface.
  if(!held){
@@ -42,7 +43,7 @@ export function nearestCollectible(state,p,ctx={}) {
  if(held)return collectibleCandidate(state,p,held.id,ctx);
  let best=null;
  for(const q of [...(state.pickups||[]),...(state.looseLogs||[])]){
-  const c=candidateFor(p,q,Array.isArray(q.position),ctx);if(!c||c.full||c.unnecessary)continue;
+  const c=candidateFor(p,q,Array.isArray(q.position),ctx,state);if(!c||c.full||c.unnecessary)continue;
   if(!best||c.distance<best.distance||c.distance===best.distance&&c.id<best.id)best=c;
  }
  return best;

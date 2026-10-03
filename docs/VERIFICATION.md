@@ -2232,3 +2232,9 @@ Camera yaw accumulates beyond +/-pi after looking around. Placement mistakenly r
 The first new save test used abbreviated harvested-tree records and failed save validation; replace them with complete landed-tree fixtures before testing roundtrip. Do not weaken save validation.
 
 Hotfix3d56f51 published as dpl_EHuKNoTBjNhkftAovLxi5wiaxWJT in13.895s. Actual public-site Hero foundation+Timberline after5*pi turn and touch foundation placement passed14.543s; no console errors. Results: logs/placement-yaw-hosted. Owned Vite/browser stopped. Existing room hosts and guests must refresh to load the corrected authority and preview.
+
+
+### Temporary Timberline supplies - 2026-10-03
+Use ordinary persisted pickups keyed by testing-supplies.js, derive quantities from the actual Timberline recipe, collect the bundle atomically through the existing authoritative E/touch/VR Collect route, and exclude it from automatic worker harvesting. Range/side/inventory limits still apply. Unit check proves exact recipe, full-inventory refusal without consumption, duplicate/rejoin/save protection and successful one-machine spending. Real fresh-world E collection enables Timberline in quick build (10.103s).
+Initial gift position(-3.8,5) required walking past an existing tree; a diagonal test stopped at(-1.614,6.386) leaving it just outside collection reach. Use clear forge approach(-1.2,6.2), reachable directly from spawn. No collision rules were weakened.
+Artist attempt timed out without output180.411s; a smaller retry was cancelled after34.089s when the user explicitly prioritized simplest implementation without new art. Both verified personal Opus5.5; existing authored resource models are reused. Avoid commissioning decorative work when speed is explicitly preferred.

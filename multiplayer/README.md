@@ -339,3 +339,6 @@ See [timber checks](../docs/CONTINUOUS-TIMBER-20261003.md) and [foundation check
 Hold right mouse to aim Siegebird or zoom Emberwing. Emberwing Q/Special locks the Phoenix curve; its stronger guide shows the predicted route, and Phoenix contacts ignite targets. Siegebird has an authored physical 30m sight with 50m/70m marks. On touch, use the Aim action. Escape deliberately releases capture; returning focus attempts capture only when browser rules permit it.
 
 Stone foundations use worn Opus masonry, separated from rendered soil while maintaining the same walkable surface. Placement previews and failures share authority validation and explain the remedy. Enemy scorching follows exposed body regions and persists after extinguishing. Material contacts select varied stone, timber, bone, metal, shield or flesh audio. See ../docs/INTERACTION-COMBAT-PASS-20261003.md for verification and limitations.
+
+
+Temporary testing supplies: every fresh world places one shared Timberline gift bundle on the forge approach (-1.2, 6.2), reachable from Hero spawn. Press E/Collect once for exactly 10 Wood, 6 Iron, 2 Mithril. Existing pickup art is reused at the user's request. The bundle is consumed atomically, saved normally, and never refilled by joining/loading. Older saves are not retroactively granted supplies; start/reset a world to receive it.
