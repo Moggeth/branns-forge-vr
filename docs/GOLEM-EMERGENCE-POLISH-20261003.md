@@ -57,3 +57,21 @@ not physical 120 Hz headset or phone performance measurements.
   after role switching. Roles now close the menu automatically. Assert the
   actual role/menu state instead of clicking a hidden control.
 - Keep the original public peer 8789/tunnel and unrelated Godot UID work intact.
+
+## Published result
+
+Runtime source **cde0f85** is live at
+https://branns-forge-multiplayer.vercel.app.
+Deployment dpl_4d9yvVc3xhfMB1HrruBQJ5oPfHjS took **11.738 seconds**.
+The public screenshot build tag confirms cde0f85.
+
+Anonymous production emergence checks passed in **10.093 seconds**, touch
+casting/controls in **10.752 seconds**, and two independent browser clients in
+**10.961 seconds**. All reported zero console errors. Reviewed the actual
+production assembly screenshot: finished stone pieces and bindings, no duplicate
+block assembly or dominant cast marker. Evidence: logs/golem-polish-public.
+Owned QA listeners 8799 (14840) and 5188 (58284) stopped. Public peer 8789
+(43880), tunnel and unrelated Godot UID files preserved. Follow-up documentation
+commits do not change the deployed runtime.
+
+Task wall clock through final verification: **1164.706 seconds**, ending 2026-10-03T03:03:46.705859+00:00.
