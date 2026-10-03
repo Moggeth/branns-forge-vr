@@ -6,11 +6,12 @@ import * as T from 'three';
 
 const tmp = new T.Matrix4(), nm = new T.Matrix3();
 
-export function createTreeBatches({group, minCapacity = 64}) {
+// decorate(mesh): optional hook (tree-materials.js) that attaches wind-matched shadow depth/distance materials.
+export function createTreeBatches({group, minCapacity = 64, decorate = null}) {
  const batches = new Map(), where = new Map(); let writes = 0, moves = 0;
  const keyOf = (variant, level) => variant + ':' + level;
  function makeMeshes(b, capacity) {
-  return b.parts.map(p => { const im = new T.InstancedMesh(p.geometry, p.material, capacity); im.instanceMatrix.setUsage(T.DynamicDrawUsage); im.count = 0;
+  return b.parts.map(p => { const im = new T.InstancedMesh(p.geometry, p.material, capacity); im.instanceMatrix.setUsage(T.DynamicDrawUsage); im.count = 0; decorate?.(im);
    im.name = `TreeBatch:${b.key}:${p.part}`; im.matrixAutoUpdate = false; im.userData.treeBatch = b; im.userData.part = p.part; group.add(im); return im; });
  }
  function batch(variant, level, kit) {

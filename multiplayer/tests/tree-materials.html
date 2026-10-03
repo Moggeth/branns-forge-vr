@@ -1,0 +1,44 @@
+<!doctype html><meta charset="utf-8"><title>Forest material integration</title>
+<style>body{margin:0;background:#263028;color:white;font:13px monospace}canvas{display:block}#status{position:absolute;left:8px;top:8px;white-space:pre;text-shadow:1px 1px black}</style>
+<script type="importmap">{"imports":{"three":"/multiplayer/node_modules/three/build/three.module.js","three/addons/":"/multiplayer/node_modules/three/examples/jsm/"}}</script>
+<div id="status">Loading authored trees</div>
+<script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createTreeMaterials} from '../client/tree-materials.js';
+import {createTreeView} from '../client/tree-view.js';
+import {createTreeBatches} from '../client/tree-batch.js';
+import {worldTrees} from '../shared/world-content.js';
+import {chopTree,trunkRadius} from '../shared/trees.js';
+const status=document.querySelector('#status'), results=[];
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true}); renderer.setSize(900,600); renderer.shadowMap.enabled=true; document.body.append(renderer.domElement);
+const scene=new T.Scene(); scene.background=new T.Color(0xa9c3d6); scene.add(new T.HemisphereLight(0xdfefff,0x4a3b2a,1.4));
+const sun=new T.DirectionalLight(0xfff1d6,2.2); sun.position.set(8,12,7); sun.castShadow=true; sun.shadow.mapSize.set(512,512); Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,far:60}); scene.add(sun,sun.target);
+const lamp=new T.PointLight(0xffd18b,12,20); lamp.position.set(2,5,1); lamp.castShadow=true; lamp.shadow.mapSize.set(128,128); scene.add(lamp);
+const ground=new T.Mesh(new T.PlaneGeometry(120,120).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x64733f,roughness:1}));ground.receiveShadow=true;scene.add(ground);
+const cam=new T.PerspectiveCamera(55,1.5,.1,250),loader=new GLTFLoader(),templates=new Map();
+for(const n of ['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_young_lod','endcap','log']) templates.set(n,await loader.loadAsync(`/multiplayer/public/assets/${n}.glb`));
+const materials=createTreeMaterials(),view=createTreeView({scene,templates,height:()=>0,camera:cam,treeMaterials:materials}),s={seed:7,tick:100,groves:[],harvestedTrees:[],looseLogs:[]};
+view.sync(s);const target=worldTrees(s)[0];
+cam.position.set(target.x+5,2,target.z+8);cam.lookAt(target.x,2.4,target.z);cam.updateMatrixWorld(true);
+sun.position.set(target.x+8,12,target.z+7);sun.target.position.set(target.x,0,target.z);lamp.position.set(target.x+2,5,target.z+1);
+function render(label,seconds){materials.update(seconds);view.group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); renderer.render(scene,cam); results.push({label,...view.stats(),calls:renderer.info.render.calls,programs:renderer.info.programs.length});}
+render('intact',.5);
+s.groves.push({id:'growth',kind:'ring',x:target.x,z:target.z});view.tick(1000,100);view.sync(s);
+for(const ms of [100,300,600,1400]){view.tick(1000+ms,100);render('growth-'+ms,ms/1000);}
+chopTree(s,target,[target.x+trunkRadius(target,1),1,target.z],[1,0,0],{terrainHeight:()=>0});view.sync(s);render('notch',2);
+for(let i=0;i<4&&!s.harvestedTrees[0].felledTick;i++){s.tick+=30;chopTree(s,target,[target.x+trunkRadius(target,1),1,target.z],[1,0,0],{terrainHeight:()=>0});}
+view.sync(s);view.tick(2800,s.tick+50);render('fall',2.8);
+view.reload();view.tick(3100,s.tick+50);render('reload',3.1);
+window.forestReview={renderer,scene,cam,view,materials,results,render};
+// Render a 500-tree forest with exactly the production batches and their attached surface/depth/distance materials.
+const groups=new T.Group();scene.add(groups);const batches=createTreeBatches({group:groups,decorate:m=>{m.castShadow=true;m.receiveShadow=true;materials.decorate(m);}});
+const kits={};for(const n of ['tree','tree_b','tree_young']){const root=templates.get(n+'_lod').scene.getObjectByName('Tree');root.updateMatrixWorld(true);const inv=root.matrixWorld.clone().invert(),parts={};
+ for(const p of ['Trunk','Roots','Branches','Leaves','Fruit']){const list=[];root.getObjectByName(p)?.traverse(o=>{if(o.isMesh)list.push({geometry:o.geometry,material:o.material,matrix:inv.clone().multiply(o.matrixWorld)});});if(list.length)parts[p]=list;}
+ kits[n]=materials.attach({parts});}
+const m=new T.Matrix4();for(let i=0;i<500;i++){const name=['tree','tree_b','tree_young'][i%3];batches.place('forest'+i,name,'lod',kits[name],m.makeTranslation((i%23-11)*4,0,-Math.floor(i/23)*4));}batches.flush();
+view.group.visible=false;cam.position.set(0,26,60);cam.lookAt(0,0,-20);renderer.render(scene,cam);
+results.push({label:'forest-500',trees:500,draws:batches.meshes().length,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,materials:materials.stats()});
+window.forestReview.showTree=()=>{groups.visible=false;view.group.visible=true;cam.position.set(target.x+5,2,target.z+8);cam.lookAt(target.x,2.4,target.z);renderer.render(scene,cam);};
+status.textContent=JSON.stringify(results.at(-1),null,2);document.title='done';
+</script>

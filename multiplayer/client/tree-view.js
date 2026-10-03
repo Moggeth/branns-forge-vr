@@ -4,6 +4,7 @@
 // has a harvest record (wounded/felled), and returns to its batch if the record disappears.
 import * as T from 'three';
 import {createTreeBatches} from './tree-batch.js';
+import {createTreeMaterials} from './tree-materials.js';
 import {worldTrees} from '../shared/world-content.js';
 import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector} from '../shared/trees.js';
 import {bakeTriangles, buildNotch, buildFelled, toGeometry, fitEndcapUV} from './tree-carve.js';
@@ -12,12 +13,15 @@ import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} f
 const PARTS = ['Trunk', 'Roots', 'Branches', 'Leaves', 'Fruit'];
 const meshesUnder = node => { const out = []; node?.traverse(c => { if (c.isMesh) out.push(c); }); return out; };
 
-export function createTreeView({scene, templates, height, camera = null, lodDistance = 26, windAmplitude = .025, lodStep = 1, lodBudget = 128}) {
+// treeMaterials: optional createTreeMaterials() instance (shared across views); one is created and owned otherwise.
+// Pass treeMaterials: false to keep the legacy flat materials + leaf-only windMaterial below.
+export function createTreeView({scene, templates, height, camera = null, lodDistance = 26, windAmplitude = .025, lodStep = 1, lodBudget = 128, treeMaterials = undefined}) {
  const group = new T.Group(); group.name = 'TreeView'; scene.add(group);
  const trees = new Map(), wind = {value: 0}, missing = new Set(); let kits = new Map(), woodMaterial = null, uvMap = null, logs = null, chips = null, last = null, initialized = false, targetList = [], clock = 0;
  const ownedGeometry = new Set(), ownedMaterials = new Set();
+ const ownMats = treeMaterials === undefined, mats = ownMats ? createTreeMaterials({windStrength: windAmplitude/.025}) : treeMaterials || null, decorate = m => mats ? mats.decorate(m) : m;
  // Intact trees: id -> {tree, kit, floor, scale, born, lod, key, synced}. growing: ids whose per-instance scale animates.
- const batches = createTreeBatches({group}), intact = new Map(), growing = new Set(), lodCam = new T.Vector3(), rootM = new T.Matrix4(), rootP = new T.Vector3(), rootS = new T.Vector3(), noRot = new T.Quaternion();
+ const batches = createTreeBatches({group, decorate}), intact = new Map(), growing = new Set(), lodCam = new T.Vector3(), rootM = new T.Matrix4(), rootP = new T.Vector3(), rootS = new T.Vector3(), noRot = new T.Quaternion();
  let lodValid = false, lodPending = false, lodSwitches = 0;
 
  function windMaterial(m) { // tiny bounded leaf sway in the vertex shader; one shared program per base material
@@ -35,10 +39,11 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function kitFrom(name) {
   const src = templates.get(name)?.scene, root = src?.getObjectByName('Tree'); if (!root) { missing.add(name); return null; }
   root.updateMatrixWorld(true); const inv = new T.Matrix4().copy(root.matrixWorld).invert(), parts = {};
-  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: m.geometry, material: p === 'Leaves' ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)})); if (list.length) parts[p] = list; }
+  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: m.geometry, material: p === 'Leaves' && !mats ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)})); if (list.length) parts[p] = list; }
   if (!parts.Trunk || !parts.Roots) { missing.add(name); return null; }
   const trunkMesh = meshesUnder(root.getObjectByName('Trunk'))[0];
-  return {name, parts, trunk: bakeTriangles(trunkMesh, root), trunkColor: !!trunkMesh.geometry.attributes.color, trunkMaterial: trunkMesh.material};
+  const kit = {name, parts, trunk: bakeTriangles(trunkMesh, root), trunkColor: !!trunkMesh.geometry.attributes.color, trunkMaterial: trunkMesh.material};
+  return mats ? mats.attach(kit) : kit; // shared patched clones; template materials stay untouched
  }
  function buildKits() {
   kits = new Map(); missing.clear();
@@ -48,7 +53,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   const logSrc = templates.get('log')?.scene; if (logSrc) { logSrc.updateMatrixWorld(true); logs = meshesUnder(logSrc).map(m => { const im = new T.InstancedMesh(m.geometry, m.material, TREE_LIMITS.logs); im.userData.local = m.matrixWorld.clone(); im.count = 0; im.frustumCulled = false; im.name = 'TreeLogs'; group.add(im); return im; }); } else missing.add('log');
   if (!chips && woodMaterial) { const g = new T.BoxGeometry(.07, .014, .035); ownedGeometry.add(g); chips = {mesh: new T.InstancedMesh(g, woodMaterial, 40), list: []}; chips.mesh.count = 0; chips.mesh.frustumCulled = false; group.add(chips.mesh); }
  }
- const place = (parent, list, tag) => list.map(p => { const m = new T.Mesh(p.geometry, p.material); m.matrixAutoUpdate = false; m.matrix.copy(p.matrix); if (tag) m.userData.targetId = tag; parent.add(m); return m; });
+ const place = (parent, list, tag) => list.map(p => { const m = decorate(new T.Mesh(p.geometry, p.material)); m.matrixAutoUpdate = false; m.matrix.copy(p.matrix); if (tag) m.userData.targetId = tag; parent.add(m); return m; });
  function partsGroup(kit, id, skip = []) { const g = new T.Group(), byPart = {}; for (const p of PARTS) if (kit.parts[p] && !skip.includes(p)) byPart[p] = place(g, kit.parts[p], id); return {g, byPart}; }
  function owned(tris, color) { const g = toGeometry(tris, color); ownedGeometry.add(g); return g; }
  function release(g) { if (g && ownedGeometry.delete(g)) g.dispose(); }
@@ -135,7 +140,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   lodCam.copy(cam); lodValid = true; lodPending = false;
  }
  function tick(now, simTick) {
-  clock = now; wind.value = now/1000;
+  clock = now; wind.value = now/1000; if (ownMats) mats.update(now/1000); // shared instances are updated by their owner
   const cam = camera ? camera.getWorldPosition(tmpV) : null;
   for (const id of growing) { const r = intact.get(id); if (r) placeIntact(r); else growing.delete(id); }
   if (cam) updateLod(cam);
@@ -167,14 +172,14 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   return {id, point: hit.point.toArray(), normal: normal ? normal.toArray() : null, instanced};
  }
  function stats() { let drawCalls = 0, triangles = 0, intactDraws = 0; const programs = new Set();
-  group.traverseVisible(o => { if (!o.isMesh || (o.isInstancedMesh && o.count === 0)) return; drawCalls++; if (o.userData.treeBatch) intactDraws++; const n = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count)/3; triangles += n*(o.isInstancedMesh ? o.count : 1); for (const m of [].concat(o.material)) programs.add(m.type + (m.vertexColors ? '+vc' : '') + (m.map ? '+map' : '') + (m.userData.treeWind ? '+wind' : '')); });
+  group.traverseVisible(o => { if (!o.isMesh || (o.isInstancedMesh && o.count === 0)) return; drawCalls++; if (o.userData.treeBatch) intactDraws++; const n = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count)/3; triangles += n*(o.isInstancedMesh ? o.count : 1); for (const m of [].concat(o.material)) programs.add(m.type + (m.vertexColors ? '+vc' : '') + (m.map ? '+map' : '') + (m.userData.treeWind ? '+wind' : '') + (m.userData.treeMaterial ? '+' + m.userData.treeMaterial : '')); });
   const list = [...trees.values()], rs = [...intact.values()], c = batches.counters();
   return {trees: list.length + rs.length, intact: rs.length, individual: list.length, lod: rs.filter(r => r.lod).length, growing: growing.size, wounded: list.filter(e => e.wound).length, felled: list.filter(e => e.felled).length, falling: list.filter(e => e.felled?.pivot.visible).length,
    logs: logs?.[0]?.count || 0, chips: chips?.list.length || 0, drawCalls, intactDraws, batches: batches.batches().filter(b => b.ids.length).length, triangles: Math.round(triangles), shaderPrograms: programs.size, ownedGeometries: ownedGeometry.size,
-   matrixWrites: c.writes, slotMoves: c.moves, lodSwitches, missingAssets: [...missing]}; }
+   matrixWrites: c.writes, slotMoves: c.moves, lodSwitches, missingAssets: [...missing], treeMaterials: mats?.stats() || null}; }
  function clearAll() { for (const e of trees.values()) destroy(e); trees.clear(); batches.clear(); intact.clear(); growing.clear(); lodValid = false; }
- function reload(next = templates) { templates = next; clearAll(); for (const m of ownedMaterials) m.dispose(); ownedMaterials.clear(); initialized = false; buildKits(); if (last) sync(last); }
- function dispose() { clearAll(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
+ function reload(next = templates) { templates = next; clearAll(); for (const m of ownedMaterials) m.dispose(); ownedMaterials.clear(); if (ownMats) mats.dispose(); initialized = false; buildKits(); if (last) sync(last); }
+ function dispose() { clearAll(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); if (ownMats) mats.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
  buildKits();
  return {sync, tick, collectibleTargets:()=>logs||[], collectibleId:hit=>logs?.includes(hit.object)?last?.looseLogs?.[hit.instanceId]?.id:null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
   entity: id => trees.get(id) || null, intactTree: id => intact.get(id) || null};
