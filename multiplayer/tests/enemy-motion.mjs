@@ -5,12 +5,13 @@
 // AnimationMixer clips, then layers enemy-motion and checks invariants.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import * as THREE from 'three';
 import {assetBasis, ASSET_POSES} from '../client/asset-pose.js';
-import {attackEnvelope, recoilEnvelope, solveTwoBone, poseSignals, traits, hashId, noise1, applyEnemyMotion, noteEnemyHit, enemyMotionState, updateEnemyMotion, STRIKE_TICK} from '../client/enemy-motion.js';
+import {attackEnvelope, recoilEnvelope, solveTwoBone, poseSignals, traits, hashId, noise1, applyEnemyMotion, noteEnemyHit, enemyMotionState, updateEnemyMotion, STRIKE_TICK, GOLEM_CYCLE} from '../client/enemy-motion.js';
 
-const ASSETS = process.env.BRANN_ASSETS || 'C:/Users/mog/OneDrive/Documents/Coding/Personal/Python/things_are_different_now/branns-forge-vr/multiplayer/public/assets';
+const ASSETS = process.env.BRANN_ASSETS || fileURLToPath(new URL('../public/assets', import.meta.url));
 let passed = 0; const results = [];
 function test(name, fn) { const t0 = performance.now(); fn(); passed++; results.push(`ok  ${name} (${(performance.now() - t0).toFixed(1)} ms)`); }
 
@@ -243,6 +244,40 @@ test('golem: telegraph raises arms forward-up, slam lands at strike tick, entry.
   assert.ok(apex.y > restHand.y + .8, `arm raised overhead ${apex.y} vs ${restHand.y}`);
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(entry.root.quaternion);
   assert.ok(slam.dot(fwd) > .5, `slam ends forward ${slam.dot(fwd)}`);
+});
+test('golem gait: stride-locked rigid legs, soles stay near the ground, footfalls alternate once per half cycle', () => {
+  const {entry, rig} = makeEnemy('golem', 'gw', 0, 0); const flat = () => 0; entry.root.position.y = 0;
+  const legL = named(rig, 'LegL'), legR = named(rig, 'LegR'), steps = [], sole = new THREE.Vector3();
+  let maxSwing = 0, lowest = Infinity, highest = -Infinity;
+  for (let f = 0; f < 240; f++) {
+    if (f >= 30) entry.root.position.z -= 1.25 / 60; // walk forward (-Z) at golem speed
+    const st = applyEnemyMotion(entry, {tick: f, dt: 1 / 60, height: flat}); entry.root.updateWorldMatrix(true, true);
+    for (const e of st.events) if (e.type === 'step') steps.push([f, e.side]);
+    if (f > 60) {
+      maxSwing = Math.max(maxSwing, legL.quaternion.angleTo(legR.quaternion));
+      legL.localToWorld(sole.set(0, -.95, 0)); lowest = Math.min(lowest, sole.y); highest = Math.max(highest, sole.y); // authored sole is .95 below the hip pivot
+    }
+  }
+  assert.ok(maxSwing > .45, `legs scissor ${maxSwing}`);
+  assert.ok(lowest > -.12 && lowest < .08, `planted sole stays at the ground ${lowest}`);
+  assert.ok(highest > lowest + .03, `swing foot clears the ground ${highest - lowest}`);
+  const travelled = 1.25 / 60 * 210, expected = travelled / (GOLEM_CYCLE * 1.0) * 2;
+  assert.ok(Math.abs(steps.length - expected) <= 2.5, `footfalls ${steps.length} vs ${expected.toFixed(1)}`);
+  for (let i = 1; i < steps.length; i++) assert.notEqual(steps[i][1], steps[i - 1][1], 'feet alternate');
+  const stopped = applyEnemyMotion(entry, {tick: 240, dt: 1 / 60, height: flat});
+  for (let f = 241; f < 300; f++) applyEnemyMotion(entry, {tick: f, dt: 1 / 60, height: flat});
+  assert.ok(stopped.walk < .2 || enemyMotionState(rig.visual).walk < .05, 'gait fades out when the golem stops');
+  assert.ok(legL.quaternion.angleTo(legR.quaternion) < .08, 'feet settle together at rest');
+});
+test('golem cues: telegraph and slam fire once on the shared attack tick; a lost leg lurches, no legs drags', () => {
+  const {entry, rig} = makeEnemy('golem', 'gs', 0, 0), flat = () => 0, fired = [];
+  for (let f = 0; f < 140; f++) { if (f === 40) entry.data.attackTick = 50; for (const e of applyEnemyMotion(entry, {tick: f, dt: 1 / 60, height: flat}).events) fired.push([f, e.type]); }
+  assert.deepEqual(fired.filter(e => e[1] !== 'step'), [[50, 'telegraph'], [50 + STRIKE_TICK, 'slam']]);
+  const body = named(rig, 'Golem');
+  applyEnemyMotion(entry, {tick: 200, dt: 1 / 60, height: flat}); const upright = body.position.y;
+  entry.data.missingParts = ['leftLeg', 'rightLeg'];
+  for (let f = 201; f < 210; f++) applyEnemyMotion(entry, {tick: f, dt: 1 / 60, height: flat});
+  assert.ok(body.position.y < upright - .3, `legless golem sinks to the ground ${upright} -> ${body.position.y}`);
 });
 test('no drift: with the mixer stopped the layer reuses its stored base each frame', () => {
   const {entry, rig} = makeEnemy('skeleton', 'e9');
