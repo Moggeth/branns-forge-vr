@@ -1,5 +1,11 @@
 # Browser multiplayer proof
 
+## Golem emergence polish — 2026-10-03
+
+Duplicate block-based spawn effects are removed; the authored stone assembly
+now advances every rendered frame independently of snapshot delivery. All spell
+previews recede after a confirmed cast. See [verification and timing](../docs/GOLEM-EMERGENCE-POLISH-20261003.md).
+
 ## Mining, ranged weapons and performance - 2026-10-03
 
 F9 or the Hero/God button switches perspective. Distinct ranged reticles, a curved

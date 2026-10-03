@@ -404,7 +404,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node), {includePartPoses}));
     return contacts.sort((a, b) => a.distance - b.distance);
   }
-  function tick(dt, isHost = false, time = elapsed + dt) {
+  function tick(dt, isHost = false, time = elapsed + dt, renderTick = snapshot.tick || 0) {
     if (disposed) return;
     elapsed += dt;
     damageNumbers.tick(dt);
@@ -427,9 +427,9 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
     if (camera) fractures.update(camera);
-    for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, snapshot.tick || 0, elapsed);
+    for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, renderTick, elapsed);
     beforeContacts();
-    for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, snapshot.tick || 0, dt);
+    for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, renderTick, dt);
     creatures.syncDetached(detached, snapshot.detachedParts || []);
     creatures.tick(dt);
     contactRevision++;

@@ -377,7 +377,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
 
   // ---------- target state ----------
   const want = { on: false, spell: '', valid: true, cx: 0, cz: 0, ang: 0, len: 0, rad: 0, fb: false, ax: 0, az: 0, bx: 0, bz: 0 };
-  let builtKey = '', fade = 0, clock = 0, builds = 0, lastBuildMs = 0, lastSamples = 0;
+  let builtKey = '', fade = 0, clock = 0, builds = 0, lastBuildMs = 0, lastSamples = 0, committed = null, suppressed = false;
   function setTarget(t) {
     if (disposed) return false;
     const spec = t && typeof t === 'object' && typeof t.spell === 'string' && Object.hasOwn(SPELL_SHAPES, t.spell) ? SPELL_SHAPES[t.spell] : null;
@@ -395,7 +395,19 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       if (!p) { want.on = false; return false; }
       const r = Number(t.radius); want.rad = Number.isFinite(r) && r > 0.05 && r < 60 ? r : spec.r; want.cx = p[0]; want.cz = p[2]; want.ang = 0; want.len = 0; want.fb = false;
     }
+    const aim = p || b;
+    if (committed && (want.spell !== committed.spell || !aim || Math.hypot(aim[0]-committed.x,aim[2]-committed.z) > .4)) committed=null;
+    suppressed=!!committed;
     want.on = true; return true;
+  }
+  // Only the local player's acknowledged cast commits a preview. Keep it out
+  // of the spectacle until the player aims elsewhere or chooses another spell.
+  // A rejected cast leaves the informative marker untouched.
+  function commit(t) {
+    const p=vec(t?.point); if(disposed || !p || !SPELL_SHAPES[t.spell])return false;
+    committed={spell:t.spell,x:p[0],z:p[2]};
+    suppressed=want.spell===t.spell;
+    return true;
   }
   // Rebuild only when changed earth intersects this marker's footprint.
   function invalidateTerrain(dirty = null) {
@@ -421,7 +433,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   function update(nowMs, dt) {
     if (disposed) return; dt = clamp(Number.isFinite(dt) ? dt : 0, 0, 0.1); clock += dt;
     if (want.on) { const k = keyOf(); if (k !== builtKey) { builtKey = k; build(); } }
-    fade = want.on ? (RM ? 1 : clamp(fade + dt * 8)) : (RM ? 0 : clamp(fade - dt * 9));
+    fade = want.on && !suppressed ? (RM ? 1 : clamp(fade + dt * 8)) : (RM ? 0 : clamp(fade - dt * 9));
     root.visible = fade > 0.005 && builtKey !== '';
     U.uFade.value = fade; U.uInv.value = want.valid ? 0 : 1; U.uMo.value = RM ? 0 : 1;
     U.uT.value = RM ? 0 : (Number.isFinite(nowMs) ? (nowMs / 1000) % 600 : clock % 600);
@@ -434,7 +446,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   function stats() {
     let draws = 0, triangles = 0;
     if (root.visible) { if (lines.visible) { draws++; triangles += B.ni / 3; } if (surf.visible) { draws++; triangles += gridN * gridN * 2; } if (motes.visible) draws++; }
-    return { spell: want.on ? want.spell : null, valid: want.valid, visible: root.visible, fade, draws, triangles, ribbonPoints: B.np, strands: B.strands, droppedStrands: B.dropped,
+    return { spell: want.on ? want.spell : null, valid: want.valid, visible: root.visible, fade, suppressed, draws, triangles, ribbonPoints: B.np, strands: B.strands, droppedStrands: B.dropped,
       motes: motes.visible ? mg.drawRange.count : 0, surface: surf.visible, quality: qName, reducedMotion: RM, builds, lastBuildMs, heightSamplesPerBuild: lastSamples,
       materials: 3, geometries: 3, budget: qName === 'low' ? { draws: 10, triangles: 5000 } : { draws: 20, triangles: 12000 } };
   }
@@ -448,7 +460,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     if (root.parent) root.parent.remove(root); root.clear();
     lg.dispose(); sg.dispose(); mg.dispose(); lineMat.dispose(); surfMat.dispose(); moteMat.dispose();
   }
-  return { root, setTarget, update, configure, stats, dispose, prepareShaders, invalidateTerrain, get disposed() { return disposed; } };
+  return { root, setTarget, commit, update, configure, stats, dispose, prepareShaders, invalidateTerrain, get disposed() { return disposed; } };
 }
 
 // Opt-in for the production bare-earth mesh contract only. Arbitrary height

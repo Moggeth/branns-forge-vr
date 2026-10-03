@@ -411,25 +411,9 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   const FX = {
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
     squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
-    golem(ev, c) {
-      ev.dur = 3.2; const { x, z, R } = c, gy = c.y, ring = mk(ev, 64, ribMat(PAL.gold, PAL.ember, 0, 1.5));
-      const parts = [[-0.36, 0, 0.42, 0.9, 0.46], [0.36, 0, 0.42, 0.9, 0.46], [0, 0.9, 1.2, 1, 0.7], [0, 1.95, 0.52, 0.46, 0.5], [-0.88, 0.95, 0.36, 0.95, 0.42], [0.88, 0.95, 0.36, 0.95, 0.42]].map(([px, py, w, h, d], i) => {
-        const a = R() * TAU, r = 2.2 + R(); return { m: mesh(ev, i === 3 ? G.rock : G.slab, solid(i === 3 ? PAL.earth : PAL.stone, PAL.amber, 0.12)), px, py, w, h, d, sx: x + Math.cos(a) * r, sz: z + Math.sin(a) * r, q: new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * 6, R() * 6, R() * 6)), t0: 0.15 + i * 0.17, landed: false, dug: false };
-      });
-      pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1.2), 0.5, 3, 0, 1.1, 0.4); pulse(ev, c, ribMat(PAL.amber, PAL.ember, 0, 1), 0.5, 2.2, 1.6, 2.5, 0.35);
-      decal(ev, c, soilM(), 0.2, 1.6, 0.45, 0.1, 0.6, 3.2);
-      ev.fx.push((age) => {
-        const k = 1 - sstep(2.4, 3, age); gRing(ring, x, z, 1.5 + 0.3 * Math.sin(age * 2), age, 0.1, 0.14, age * 3); ring.commit(0.2, easeOut(age / 0.8), k * sstep(0, 0.3, age));
-        for (const p of parts) {
-          const u = clamp((age - p.t0) / 0.9), e = easeOut(u), fx = x + p.px, fy = gy + p.py + p.h / 2;
-          p.m.visible = u > 0 && k > 0.01; if (!p.m.visible) continue;
-          if (!p.dug) { p.dug = true; const dx = x - p.sx, dz = z - p.sz; for (let i = 0; i < qn(4); i++) dustDir(c, p.sx, p.sz, dx, dz, 1.6, 0.7, PAL.dust, 0.4, 1.4, 0.6); debris(c, p.sx, p.sz, 2, 1.5, 0.1, [PAL.earth], 3); }
-          p.m.position.set(lp(p.sx, fx, e), lp(H(p.sx, p.sz) - 0.4, fy, e) + Math.sin(u * Math.PI) * 1.4, lp(p.sz, z, e)); p.m.quaternion.slerpQuaternions(p.q, QI, e); p.m.scale.set(p.w * k, p.h * k, p.d * k);
-          if (u >= 1 && !p.landed) { p.landed = true; for (let i = 0; i < qn(5); i++) { const a = R() * TAU; dustDir(c, fx, z, Math.cos(a), Math.sin(a), 1.8, 0.7, PAL.dust, 0.45, 1.5, 0.3, 0.3); } debris(c, fx, z, 2, 2, 0.1, [PAL.stone], 3); }
-        }
-        if (age > 2.4 && age < 3) puff(c, x + (R() - 0.5) * 1.5, z, 1, 1.5, 1, PAL.dust, 0.4);
-      });
-    },
+    // The actual golem kit owns emergence, stone assembly, dust and binding.
+    // The former six-box stand-in duplicated that actor and obscured its pieces.
+    golem(ev) { ev.dur = .01; },
     // RAISE EARTH: ground shudders (soil decal + radial fissures), clods churn up from below in a spiral and heap into a mound,
     // a crown of soil is flung up, loose rocks tumble down the flanks and a low dust skirt rolls outward over the terrain.
     raise(ev, c) {
@@ -664,16 +648,14 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     },
   };
   const q2r = new THREE.Quaternion();
-  const WARN = (ev, c) => { // persistent in-world starfall warning: ground rings, star, sky beacon
-    ev.info = { x: c.x, z: c.z, r: c.radius, at: c.at }; const R = mulberry(hashStr(ev.key)), rr = mk(ev, 64, ribMat(PAL.ember, PAL.gold, 5, 2)), st = dens(star(5, 1, 0.4), 1, 1, 0.05, 60), sr = mk(ev, st.length, ribMat(PAL.amber, PAL.ember, 0, 1));
-    const bm = [[1, 0], [0, 1]].map((s) => { const b = mk(ev, 2, ribMat(PAL.amber, PAL.gold, 0, 2), null); b.side = s; return b; }); let acc = 0;
-    ev.fx.push((age, dt) => {
-      const i = ev.info, left = i.at - clock, urg = 1 - clamp(left / 4), pl = MO.flick ? 0.5 + 0.5 * Math.sin(age * (4 + urg * 14)) : 0.5 + 0.5 * urg, gy = H(i.x, i.z);
-      const fade = (ev.closing >= 0 ? 1 - clamp((age - (ev.closing - 0.35)) / 0.35) : 1) * sstep(0, 0.3, age);
-      gRing(rr, i.x, i.z, i.r * (1 + 0.02 * pl), age * 0.5 * MO.swirl, 0.08, 0.02, age * 3); rr.commit(0.28 + 0.2 * urg, 1, fade * (0.55 + 0.45 * pl));
-      place(sr, st, i.x, i.z, i.r * 0.8, i.r * 0.8, -age * (0.4 + urg) * MO.swirl, 0.1); sr.commit(0.12, 1, fade * (0.4 + 0.4 * urg));
-      bm.forEach((b) => { b.set(0, i.x, gy, i.z); b.set(1, i.x, gy + 40, i.z); b.commit(0.4 + urg * 0.5, 1, fade * (0.12 + 0.2 * urg), 0); });
-      acc += dt * (3 + urg * 12) * Q.n; while (acc >= 1) { acc--; const a = R() * TAU, px = i.x + Math.cos(a) * i.r, pz = i.z + Math.sin(a) * i.r; glow.emit({ x: px, y: H(px, pz) + 0.2, z: pz, vy: 1 + R() * 1.5, life: 1.2, size: 0.25, grow: -0.4, color: R() < 0.5 ? PAL.amber : PAL.gold, alpha: 0.8 }); }
+  const WARN = (ev, c) => { // Subtle danger outline, not a second targeting graphic.
+    ev.info = { x:c.x,z:c.z,r:c.radius,at:c.at };
+    const rr=mk(ev,64,ribMat(PAL.ember,PAL.gold,5,2));
+    ev.fx.push(age=>{
+      const i=ev.info,urg=1-clamp((i.at-clock)/4);
+      const fade=(ev.closing>=0?1-clamp((age-(ev.closing-.35))/.35):1)*sstep(0,.15,age);
+      gRing(rr,i.x,i.z,i.r,0,.06,.015,0);
+      rr.commit(.08+.04*urg,1,fade*(.16+.10*urg));
     });
   };
 
@@ -748,5 +730,5 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); targeting.dispose(); pools.forEach((p) => p.dispose()); kins.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose(); kinMat.dispose();
     Object.values(G).forEach((g) => g.dispose()); cache.forEach((m) => m.dispose()); cache.clear(); tex.dispose(); scene.remove(root); events.clear(); recent.clear(); warns.clear(); launched.clear();
   }
-  return { setTarget, play, update, sync, dispose, stats, prepareShaders, configure };
+  return { setTarget, commitTarget: t=>targeting.commit(t), play, update, sync, dispose, stats, prepareShaders, configure };
 }

@@ -273,16 +273,18 @@ function stepParticles(sys, dt, height) {
       continue;
     }
     const o = i * 3, k = Math.exp(-sys.drag[i] * dt);
-    sys.vel[o + 1] += sys.grav[i] * dt;
-    sys.vel[o] *= k; sys.vel[o + 1] *= sys.grav[i] ? 1 : k; sys.vel[o + 2] *= k;
-    sys.pos[o] += sys.vel[o] * dt; sys.pos[o + 1] += sys.vel[o + 1] * dt; sys.pos[o + 2] += sys.vel[o + 2] * dt;
+    const travel = sys.drag[i] > 1e-6 ? (1-k)/sys.drag[i] : dt;
+    sys.pos[o] += sys.vel[o] * travel; sys.pos[o+2] += sys.vel[o+2] * travel;
+    sys.pos[o+1] += sys.grav[i] ? sys.vel[o+1]*dt + .5*sys.grav[i]*dt*dt : sys.vel[o+1]*travel;
+    sys.vel[o] *= k; sys.vel[o+2] *= k;
+    sys.vel[o+1] = sys.grav[i] ? sys.vel[o+1]+sys.grav[i]*dt : sys.vel[o+1]*k;
     if (sys.grav[i] < 0 && sys.vel[o + 1] < 0) {
       const g = height(sys.pos[o], sys.pos[o + 2]);
       if (Number.isFinite(g) && sys.pos[o + 1] < g + .015) { sys.pos[o + 1] = g + .015; sys.vel[o] *= .3; sys.vel[o + 1] = -sys.vel[o + 1] * .18; sys.vel[o + 2] *= .3; }
     }
     const f = sys.life[i] / sys.max[i], fade = sys.additive ? f * f : Math.min(1, f * 4);
     for (let c = 0; c < 3; c++) sys.col[o + c] = sys.base[o + c] * (sys.additive ? fade : 1);
-    if (!sys.additive && fade < 1) sys.pos[o + 1] -= (1 - fade) * .004; // settled clods sink into the soil
+    if (!sys.additive && fade < 1) sys.pos[o + 1] -= (1 - fade) * .24 * dt; // settled clods sink into the soil
     i++;
   }
   sys.n = n;
@@ -400,7 +402,7 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
   group.add(dirt.points, magic.points, ...Object.values(decals.meshes));
   scene?.add(group);
   const H = (x, z) => { const g = height(x, z); return Number.isFinite(g) ? g : 0; };
-  let frame = 0, lastTick = 0;
+  let frame = 0, lastTick = 0, elapsedSeconds = 0;
 
   function stateFor(entry) {
     const data = entry.data, id = data.id;
@@ -414,7 +416,7 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
       st = {id, kind, entry, visual: entry.visual, recs: [], plan: emergencePlan(id, kind), seen: frame, rig: null, fired: new Set(), lastU: -1, emergeStart: emergeStartTick(data), placeholder: !!entry.visual?.userData?.placeholder};
       states.set(id, st);
     }
-    st.entry = entry; st.seen = frame;
+    st.entry = entry; st.seen = frame; st.seenAt=elapsedSeconds;
     return st;
   }
   function release(st) {
@@ -925,10 +927,11 @@ totalEmissiveRadiance *= 1. + cldCore;`);
 
   function tick(dt) {
     dt = clamp(Number.isFinite(dt) ? dt : 1 / 60, 0, .1);
+    elapsedSeconds += dt;
     stepParticles(dirt, dt, H); stepParticles(magic, dt, H); stepDecals(decals, dt);
     const g = binds.lines.geometry; g.setDrawRange(0, binds.n * 2); g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true;
     for (const c of [...corpses.values()]) if ((c.age += dt) > COLLAPSE[c.kind].T + .1) endCorpse(c);
-    for (const st of [...states.values()]) if (frame - st.seen > 180) release(st); // unseen ~3 s: drop
+    for (const st of [...states.values()]) if (elapsedSeconds - st.seenAt > 3) release(st); // duration independent of display refresh
   }
 
   function remove(entryOrId) { const st = states.get(entryOrId?.data?.id ?? entryOrId); if (st) release(st); }
@@ -946,7 +949,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
   }
 
   function isEmerging(id) { return !!states.get(id)?.emerging; }
-  function stats() { return {actors: states.size, corpses: corpses.size, dirt: dirt.n, magic: magic.n, decals: decals.items.length, binds: binds.n, variants: variants.size}; }
+  function stats() { return {presentationTick:lastTick, actors: states.size, corpses: corpses.size, dirt: dirt.n, magic: magic.n, decals: decals.items.length, binds: binds.n, variants: variants.size}; }
 
   return {beginFrame, sync, hit, death, syncDetached, tick, remove, dispose, isEmerging, stats, group};
 }

@@ -1,3 +1,4 @@
+import {createPresentationClock} from './presentation-clock.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
 import {createPickupHighlight} from './pickup-highlight.js';
@@ -53,6 +54,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
   const heightAt=(x,z,edits=snapshot.edits)=>terrainHeight(x,z,edits,snapshot.tick??Infinity);
   const terrainRay=createTerrainRaycaster({height:(x,z)=>heightAt(x,z)});
+  const presentationClock=createPresentationClock(); let renderTick=0, pendingCastPreview=null;
   let contactFrame=0,worldMatricesAt=-1,worldTargets=[];
   let terrainPreviousEdits=[],terrainPreviousTick=Infinity;
   let yaw = 0, pitch = 0, jumpPending = false, verticalSpeed = 0, grounded = true;
@@ -219,7 +221,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,(snapshot.tick||0)+Math.min(3,Math.max(0,performance.now()-snapshotAt)*.06));},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const fireVisual=createFirePresentation({scene,terrainGrid:true,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:createEmberdewModel(),animations:[]});weaponModels.set('flask',flaskModel);
@@ -524,7 +526,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const at=[x,heightAt(x,z,snapshot.edits),z];
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
     if(castStart){const length=Math.hypot(castStart.x-at[0],castStart.z-at[2]);if(length<.5||length>18){report('Draw a line between 0.5 and 18 metres.');return;}}
-    const extra=castStart?{start:castStart.toArray(),end:at}:{};onCast(spell,at,extra);castStart=null;quickKey=null;
+    const extra=castStart?{start:castStart.toArray(),end:at}:{};pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {
     if (!active || renderer.xr.isPresenting) return;
@@ -851,7 +853,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     contactFrame++;
     if (disposed) return;
     const dt = Math.min((now - previous) / 1000, 0.05);
-    previous = now;
+    previous = now; renderTick=presentationClock.sample(now);
     if (active && !renderer.xr.isPresenting) {
       lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
     }
@@ -924,8 +926,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
     for (const mixer of mixers) mixer.update(dt);
     // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
-    updateEnemyMotion(actors,{tick:(snapshot.tick||0)+Math.min(0.3,(now-snapshotAt)/1000)*60,dt,height:enemyGround});
-    combat.tick(dt,isHost(),now/1000);
+    updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround});
+    combat.tick(dt,isHost(),now/1000,renderTick);
     if(tool==='limb'&&!renderer.xr.isPresenting&&role==='hero')combat.poseLocalHeld?.(playerId,weaponAnchor);
     tickPhysicalMelee(now,dt);
     const heldRoot=tool==='limb'?combat.heldLimbRoot(playerId):axeModel;
@@ -972,10 +974,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     applySnapshot(next, id) {
       if (disposed) return;
       worldMatricesAt=-1;
+      const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
+      presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});
       const self = snapshot.players.find(player => player.id === playerId);
+      if(previousSelf && self?.castTick>previousSelf.castTick && pendingCastPreview){spellVisual.commitTarget(pendingCastPreview);pendingCastPreview=null;}
       if (self) {
         if(self.tool && self.tool!==tool)equipVisual(self.tool);
         const authoritative = new THREE.Vector3().fromArray(self.position);
@@ -1024,7 +1029,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),mountains:mountainArena.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
