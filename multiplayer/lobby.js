@@ -7,6 +7,7 @@ import {RESOURCE_RECIPES} from './shared/resources.js';
 import {settlementView} from './shared/resources.js';
 import {spellbookReadiness} from './client/ability-readiness.js';
 import {spellUnavailable} from './client/spell-availability.js';
+import {actionError} from './client/action-feedback.js';
 import {createSpellbook} from './client/spellbook.js';
 import {createForgePanel} from './client/forge-panel.js';
 import './client/spellbook.css';
@@ -63,6 +64,7 @@ const humanize = code => String(code || '').replaceAll('_', ' ').replace(/^\w/, 
 function friendlyError(detail) {
   const code = String(detail?.code || '').toLowerCase();
   const raw = typeof detail?.message === 'string' ? detail.message : '';
+  const action=actionError(code,{world:lastSnapshot||{},player:lastSnapshot?.players?.find(p=>p.id===playerId)||{},command:lastGameplayCommand});if(action)return action;
   const known = knownErrorText(code); if (known) return known;
   if (/not.?found|unknown.?room|no.?room/.test(code)) return 'We couldn’t find a world with that code. Check the digits with your friend.';
   if (code === 'inventory_full') return 'Your supplies are full. Use some before collecting more.';
@@ -70,7 +72,6 @@ function friendlyError(detail) {
   if (code === 'not_needed') return 'Already fully restored — no supplies were used.';
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
-  if (/rate|busy|limit/.test(code)) return 'The forge is busy right now. Wait a moment and try again.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
   if (code === 'save_failed') return raw && raw.length < 140 ? raw : 'This browser couldn’t save the world. Download a backup from the Menu.';
   if (raw && raw.length < 140 && !/undefined|null|\bat\s+\S+:\d+/.test(raw)) return raw.replace(/^\w/, c => c.toUpperCase()).replace(/([^.!?])$/, '$1.');
@@ -88,6 +89,8 @@ let playerId = null, room = '', connected = false, menuOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
+let lastGameplayCommand={};
+function command(type,payload={}){lastGameplayCommand={type,...payload};return session?.command(type,payload);}
 const shown = {};             // cache of last rendered HUD values
 
 // ---------------------------------------------------------------- lobby form
@@ -379,10 +382,10 @@ function recordProblem(problem) {
 let expeditionBanner = null;
 let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
 function expeditionAction(action,detail={}) {
-  if(action.startsWith('forge')){session?.command('action',{action,...detail});return;}
+  if(action.startsWith('forge')){command('action',{action,...detail});return;}
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
   if (!session || !adv || !self) return;
-  const send = payload => session.command('adventure', payload);
+  const send = payload => command('adventure', payload);
   if (action === 'start' || action === 'rematch') return void send({action: 'start'});
   if (action === 'retry' || action === 'leave') return void send({action});
   if (action === 'deposit') {
@@ -470,6 +473,9 @@ function applyRoleUi(role) {
   $('hudRoleUse').setAttribute('href', role === 'god' ? '#i-god' : '#i-hero');
   for (const radio of document.querySelectorAll('input[name="menuRole"]')) radio.checked = radio.value === role;
   $('vr').hidden = !(vrSupported && role === 'hero');
+  $('perspectiveButton').querySelector('use').setAttribute('href',role==='hero'?'#i-god':'#i-hero');
+  $('perspectiveButton').querySelector('span').textContent=role==='hero'?'God':'Hero';
+  $('perspectiveButton').setAttribute('aria-label',`Switch to ${role==='hero'?'God strategy':'Hero first-person'} view (F9)`);
   setText($('vrNote'), describeVr({supported: vrChecked ? vrSupported : null, secure: window.isSecureContext !== false, role}));
   if (role !== 'hero' && document.pointerLockElement === canvas) document.exitPointerLock?.();
   mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind,role:currentRole,xr:xrActive});
@@ -593,15 +599,21 @@ $('leave').addEventListener('click', () => {
   $('create').focus();
 });
 
-for (const radio of document.querySelectorAll('input[name="menuRole"]')) radio.addEventListener('change', () => {
-  if (!radio.checked) return;
-  const role = radio.value;
+function changePerspective(role=currentRole==='hero'?'god':'hero'){
+  if(!connected||phase!=='game')return;
+  if(xrActive){toast('Leave VR before switching perspective.');return;}
+  const self=lastSnapshot?.players.find(p=>p.id===playerId);
+  if(self&&lastSnapshot.tick-self.roleTick<120){toast(actionError('cooldown',{world:lastSnapshot,player:self,command:{type:'role'}}));return;}
+  game?.clearControls();if(forgeOpen)closeForge();holdOverlays?.close();if(menuOpen)closeMenu(false);
+  if(role==='hero'&&!mobile?.enabled){try{canvas.requestPointerLock?.()?.catch?.(()=>{});}catch{}}
   store.set(ROLE_KEY, role);
   const lobbyRadio = document.querySelector(`input[name="role"][value="${role}"]`);
   if (lobbyRadio) lobbyRadio.checked = true;
-  if (!session?.command('role', {role})) toast('You can switch roles once you’re connected.');
+  if (!command('role', {role})) toast('You can switch roles once you’re connected.');
   else toast(role === 'god' ? 'Rising to the heavens…' : 'Descending to the land…');
-});
+}
+for (const radio of document.querySelectorAll('input[name="menuRole"]')) radio.addEventListener('change',()=>{if(radio.checked)changePerspective(radio.value);});
+$('perspectiveButton').addEventListener('click',()=>changePerspective());
 
 $('download').addEventListener('click', () => {
   try {
@@ -645,7 +657,7 @@ function openForge(){
   forgeOpen=true;document.exitPointerLock?.();syncActive();
   forgePanel.show(settlementView(lastSnapshot,playerId));
 }
-forgePanel=createForgePanel({mount:body,onAction:(action,detail)=>session?.command('action',{action,...detail}),onClose:closeForge});
+forgePanel=createForgePanel({mount:body,onAction:(action,detail)=>command('action',{action,...detail}),onClose:closeForge});
 for(const button of document.querySelectorAll('[data-open-forge]'))button.addEventListener('click',openForge);
 function updateSpellHint(){const spec=SPELLS.find(s=>s.id===spell);if(!spec)return;const quick=$('quickCast')?.checked;setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?(quick?'Drag to cast; or tap two ends':'Drag to aim; touch Cast confirms'):(quick?'Tap ground to cast':'Aim, then cast')}`);}
 function chooseSpell(next) {
@@ -664,7 +676,7 @@ document.querySelector('.bf-spells')?.addEventListener('keydown',event=>{
 });
 
 for(const button of document.querySelectorAll('[data-equip]'))button.addEventListener('click',()=>{game?.equip(button.dataset.equip);button.blur();});
-for(const button of document.querySelectorAll('[data-resource-use]'))button.addEventListener('click',()=>session?.command('action',{action:'useResource',kind:button.dataset.resourceUse}));
+for(const button of document.querySelectorAll('[data-resource-use]'))button.addEventListener('click',()=>command('action',{action:'useResource',kind:button.dataset.resourceUse}));
 $('collect').addEventListener('click',()=>{game?.interact();$('collect').blur();});
 $('bridge').addEventListener('click',()=>{game?.buildBridge();$('bridge').blur();});
 for(const [id,method] of [['special','special'],['grab','grab'],['drop','release']])$(id)?.addEventListener('click',()=>{game?.[method]();$(id).blur();});
@@ -727,6 +739,7 @@ refreshFieldModel();
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
 for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(type, event => {
+  if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   // Pinned panels own their focus trap; gameplay is already inactive. Let their DOM key handler run.
   if(fieldPinned&&fieldOverlays?.root.contains(event.target))return;
   if (isTyping(event.target) || phase !== 'game' || menuOpen || fieldKind) {
@@ -757,8 +770,8 @@ try {
   game = createGame({
     canvas,
     isHost, onSelection: chooseSpell,
-    onAction: (action, details = {}) => action==='projectileHit'?session?.projectileContact(details):session?.command('action', {action, ...details}),
-    onCast: (chosen, point, details={}) => session?.command('cast', {spell: chosen, point,...details}),
+    onAction: (action, details = {}) => action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
+    onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onStatus: status => { rendererStatus = String(status); },
     onXRChange: value => { restoreFieldLock=false;holdOverlays?.close();xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },

@@ -1,6 +1,7 @@
 // Brann's Forge — fire / liquid-fuel presentation module (Three.js, imports only 'three').
 // Presentation only: the integrator owns damage, ignition, heat, fuel. See HANDOFF.md.
 import * as THREE from 'three';
+import {triangleHeight} from '../shared/terrain.js';
 
 const MAX_PACKETS = 96, MAX_CELLS = 256, MAX_PATCHES = 32, MAX_LIGHTS = 3;
 const FLAME_CAP = 448, EMBER_CAP = 192, SMOKE_CAP = 128; // = 768 instances
@@ -222,7 +223,7 @@ function mkMat(vs, fs, uniforms, blending, extra = {}) {
 }
 
 // =====================================================================================
-export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6 } = {}) {
+export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false } = {}) {
   let q = clamp(quality, 0, 1);
   const group = new THREE.Group(); group.name = 'FirePresentation';
   scene.add(group);
@@ -273,43 +274,55 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
   const cFuel = new Float32Array(MAX_CELLS), cHeat = new Float32Array(MAX_CELLS), cBurn = new Uint8Array(MAX_CELLS);
   const cTongues = new Uint8Array(MAX_CELLS), cEmber = new Uint8Array(MAX_CELLS), cSmoke = new Uint8Array(MAX_CELLS);
   const cMap = new Map();
+  // Heights do not change when fuel burns. Cache exact samples independently of
+  // the fuel/heat attributes; production can opt into shared triangle vertices.
+  const groundCache=new Map(), vertexCache=new Map();
+  let heightSamples=0, topologyBuilds=0, topologyKey='', fuelSamples=[];
+  const sampleIndex=new Uint16Array(MAX_FUEL_TILES*VPC),sampleCorners=new Int16Array(MAX_FUEL_TILES*VPC*8);
+  const vertexHeight=(x,z)=>{const key=x+','+z;if(vertexCache.has(key))return vertexCache.get(key);heightSamples++;const y=height(x,z);if(vertexCache.size>=32768)vertexCache.clear();vertexCache.set(key,y);return y;};
+  const groundHeight=(x,z)=>{const key=cellKey(Math.round(x*8),Math.round(z*8));if(groundCache.has(key))return groundCache.get(key);const y=terrainGrid?triangleHeight(vertexHeight,x,z):(heightSamples++,height(x,z));if(groundCache.size>=32768)groundCache.clear();groundCache.set(key,y);return y;};
   let cellCount = 0, sigA = 0, sigB = 0, terrainVersion = 0, builtTerrainVersion = -1, fuelRebuilds = 0, fuelTiles = 0, burningCount = 0;
 
-  const fuelAt = (ix, iz) => { const s = cMap.get(cellKey(ix, iz)); return s === undefined ? 0 : cFuel[s]; };
-  const heatAt = (ix, iz) => { const s = cMap.get(cellKey(ix, iz)); return s === undefined || !cBurn[s] ? 0 : cHeat[s]; };
-  function field(fn, x, z) {
-    const gx = x / CELL, gz = z / CELL, i0 = Math.floor(gx), j0 = Math.floor(gz), u = gx - i0, v = gz - j0;
-    return (fn(i0, j0) * (1 - u) + fn(i0 + 1, j0) * u) * (1 - v) + (fn(i0, j0 + 1) * (1 - u) + fn(i0 + 1, j0 + 1) * u) * v;
-  }
   function rebuildFuel() {
     fuelRebuilds++;
-    const step = CELL / SUB, g = 0.06;
-    let nv = 0;
-    // Field samples live at tile centres. Include the neighbouring empty tiles
-    // so interpolation reaches zero before the mesh ends, rather than clipping
-    // every puddle to the edges of its non-empty simulation cells.
-    const tiles = new Map();
-    for(let s=0;s<cellCount;s++)for(const [dx,dz] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){
-      const ix=cIx[s]+dx,iz=cIz[s]+dz;tiles.set(cellKey(ix,iz),[ix,iz]);
-    }
-    fuelTiles=tiles.size;
-    for (const [ix,iz] of tiles.values()) {
-      const x0 = ix * CELL - CELL / 2, z0 = iz * CELL - CELL / 2;
-      for (let j = 0; j <= SUB; j++) for (let i = 0; i <= SUB; i++, nv++) {
-        const x = x0 + i * step, z = z0 + j * step;
-        const f = field(fuelAt, x, z);
-        const lift = 0.03 + 0.012 * clamp((f - 0.2) / 0.6, 0, 1);
-        fuelPos[nv * 3] = x; fuelPos[nv * 3 + 1] = height(x, z) + lift; fuelPos[nv * 3 + 2] = z;
-        fuelF[nv * 4] = f;
-        fuelF[nv * 4 + 1] = (field(fuelAt, x + g, z) - field(fuelAt, x - g, z)) / (2 * g);
-        fuelF[nv * 4 + 2] = (field(fuelAt, x, z + g) - field(fuelAt, x, z - g)) / (2 * g);
-        fuelF[nv * 4 + 3] = field(heatAt, x, z);
+    const step=CELL/SUB,nextTopology=Array.from(cMap.keys()).join(',');
+    if(nextTopology!==topologyKey){
+      topologyKey=nextTopology;topologyBuilds++;fuelSamples=[];
+      const tiles=new Map(),unique=new Map();
+      for(let s=0;s<cellCount;s++)for(const [dx,dz] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){const ix=cIx[s]+dx,iz=cIz[s]+dz;tiles.set(cellKey(ix,iz),[ix,iz]);}
+      fuelTiles=tiles.size;let nv=0;
+      for(const [ix,iz] of tiles.values())for(let j=0;j<=SUB;j++)for(let i=0;i<=SUB;i++,nv++){
+        const x=ix*CELL-CELL/2+i*step,z=iz*CELL-CELL/2+j*step,key=cellKey(Math.round(x*8),Math.round(z*8));
+        let index=unique.get(key);if(index===undefined){index=fuelSamples.length;unique.set(key,index);const gx=x/CELL,gz=z/CELL,cx=Math.floor(gx),cz=Math.floor(gz),u=gx-cx,v=gz-cz;
+          fuelSamples.push({x,z,y:0,f:0,dx:0,dz:0,heat:0,u,v,ground:0,version:-1});
+          const neighbors=[[0,0],[1,0],[0,1],[1,1],[-1,0],[-1,1],[0,-1],[1,-1]];
+          for(let k=0;k<8;k++)sampleCorners[index*8+k]=cMap.get(cellKey(cx+neighbors[k][0],cz+neighbors[k][1]))??-1;}
+        sampleIndex[nv]=index;fuelPos[nv*3]=x;fuelPos[nv*3+2]=z;
       }
+      fuelGeo.setDrawRange(0,fuelTiles*QPC*6);
     }
-    fuelGeo.attributes.position.needsUpdate = true; fuelGeo.attributes.aF.needsUpdate = true;
-    fuelGeo.setDrawRange(0, fuelTiles * QPC * 6);
-    fuelMesh.visible = cellCount > 0;
-    builtTerrainVersion = terrainVersion;
+    // Adjacent tiles share sample locations: evaluate each attribute once and
+    // scatter into the existing buffers without changing mesh order or shading.
+    // Vertices sit at quarter-cell positions. At interior positions the
+    // bilinear derivative is exact; at a grid seam the original +/- .06 m
+    // central difference is exactly the mean of the two adjacent slopes.
+    for(let i=0;i<fuelSamples.length;i++){
+      const p=fuelSamples[i],k=i*8,ia=sampleCorners[k],ib=sampleCorners[k+1],ic=sampleCorners[k+2],id=sampleCorners[k+3];
+      const a=ia<0?0:cFuel[ia],b=ib<0?0:cFuel[ib],c=ic<0?0:cFuel[ic],d=id<0?0:cFuel[id],u=p.u,v=p.v;
+      p.f=(a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;
+      if(u===0){const ie=sampleCorners[k+4],if_=sampleCorners[k+5],e=ie<0?0:cFuel[ie],f=if_<0?0:cFuel[if_];p.dx=((b-e)*(1-v)+(d-f)*v)/(2*CELL);}
+      else p.dx=((b-a)*(1-v)+(d-c)*v)/CELL;
+      if(v===0){const ig=sampleCorners[k+6],ih=sampleCorners[k+7],g=ig<0?0:cFuel[ig],h=ih<0?0:cFuel[ih];p.dz=((c-g)*(1-u)+(d-h)*u)/(2*CELL);}
+      else p.dz=((c-a)*(1-u)+(d-b)*u)/CELL;
+      const ha=ia<0||!cBurn[ia]?0:cHeat[ia],hb=ib<0||!cBurn[ib]?0:cHeat[ib],hc=ic<0||!cBurn[ic]?0:cHeat[ic],hd=id<0||!cBurn[id]?0:cHeat[id];
+      p.heat=(ha*(1-u)+hb*u)*(1-v)+(hc*(1-u)+hd*u)*v;
+      if(p.version!==terrainVersion){p.ground=groundHeight(p.x,p.z);p.version=terrainVersion;}
+      p.y=p.ground+(.03+.012*clamp((p.f-.2)/.6,0,1));
+    }
+    const nv=fuelTiles*VPC;
+    for(let i=0;i<nv;i++){const p=fuelSamples[sampleIndex[i]];fuelPos[i*3+1]=p.y;fuelF[i*4]=p.f;fuelF[i*4+1]=p.dx;fuelF[i*4+2]=p.dz;fuelF[i*4+3]=p.heat;}
+    for(const name of ['position','aF']){const a=fuelGeo.attributes[name];a.clearUpdateRanges();a.addUpdateRange(0,nv*a.itemSize);a.needsUpdate=true;}
+    fuelMesh.visible=cellCount>0;builtTerrainVersion=terrainVersion;
   }
   function syncCells(list) {
     const n = Math.min(list ? list.length : 0, MAX_CELLS);
@@ -323,13 +336,14 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     }
     if (a === sigA && b === sigB && builtTerrainVersion === terrainVersion) return;
     sigA = a; sigB = b;
+    if(builtTerrainVersion!==terrainVersion){groundCache.clear();vertexCache.clear();}
     cMap.clear(); cellCount = 0; burningCount = 0;
     for (let i = 0; i < n; i++) {
       const c = list[i];
       if (!(c.fuel > 0.02) && !(c.burning && c.heat > 0)) continue;
       const s = cellCount++;
       cIx[s] = Math.round(c.x / CELL); cIz[s] = Math.round(c.z / CELL);
-      cY[s] = height(cIx[s] * CELL, cIz[s] * CELL);
+      cY[s] = groundHeight(cIx[s] * CELL, cIz[s] * CELL);
       cFuel[s] = clamp(c.fuel, 0, 1); cHeat[s] = clamp(c.heat, 0, 1); cBurn[s] = c.burning ? 1 : 0;
       cMap.set(cellKey(cIx[s], cIz[s]), s);
       if (cBurn[s] && cHeat[s] > 0.02) burningCount++;
@@ -586,7 +600,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
       instances, instanceCap: FLAME_CAP + EMBER_CAP + SMOKE_CAP,
       flame: flameBuf.n, flameCap: FLAME_CAP, ember: emberBuf.n, emberCap: EMBER_CAP, smoke: smokeBuf.n, smokeCap: SMOKE_CAP,
       packets, packetCap: MAX_PACKETS, patches, patchCap: MAX_PATCHES, cells: cellCount, cellCap: MAX_CELLS, burningCells: burningCount,
-      fuelRebuilds, fuelTriangles: fuelTiles * QPC * 2, lights: MAX_LIGHTS, lightsActive: active, lightIntensityScale: lightIntensity,
+      fuelRebuilds, topologyBuilds, heightSamples, cachedGroundSamples:groundCache.size, cachedTerrainVertices:vertexCache.size, uniqueFuelSamples:fuelSamples.length, fuelTriangles: fuelTiles * QPC * 2, lights: MAX_LIGHTS, lightsActive: active, lightIntensityScale: lightIntensity,
     };
   }
   function dispose() {
@@ -594,7 +608,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     for (const L of lights) { group.remove(L.l); L.l.dispose && L.l.dispose(); }
     for (const g of [flameGeo, emberGeo, smokeGeo, fuelGeo]) g.dispose();
     for (const m of [flameMat, emberMat, smokeMat, fuelMat]) m.dispose();
-    pkMap.clear(); spMap.clear(); cMap.clear(); bucketMap.clear();
+    pkMap.clear(); spMap.clear(); cMap.clear(); bucketMap.clear();groundCache.clear();vertexCache.clear();fuelSamples.length=0;
   }
   return {
     sync, update, stats, dispose,

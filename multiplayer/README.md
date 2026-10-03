@@ -1,5 +1,16 @@
 # Browser multiplayer proof
 
+## Mining, ranged weapons and performance - 2026-10-03
+
+F9 or the Hero/God button switches perspective. Distinct ranged reticles, a curved
+bow guide, embedded cracks, liquid slosh, StarShard light and restored pick/crossbow
+details are integrated. Long UI text wraps; trees use shared material/wind upgrades.
+Fire and terrain targeting avoid repeated mesh/height work.
+
+See [the polish handoff](../docs/MINING-WEAPONS-POLISH-20261003.md) for exact
+provenance, tests, cost evidence, commands and remaining limits. Permanent terrain
+storage still caps at 64 edits; the error explains that waiting will not clear it.
+
 ## Equipment and terrain mastery — 2026-10-03
 
 Hold **F1** for the current tool's basic attack, special and interactions. Hold

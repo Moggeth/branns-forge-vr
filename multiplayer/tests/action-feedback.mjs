@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {actionError} from '../client/action-feedback.js';
+assert.match(actionError('cooldown',{world:{tick:115},player:{castTick:100},command:{type:'cast'}}),/0.5s/);
+assert.match(actionError('cooldown',{world:{tick:160},player:{roleTick:100},command:{type:'role'}}),/1.0s/);
+assert.match(actionError('world_limit',{command:{action:'fire'}}),/projectile/);
+assert.match(actionError('world_limit',{world:{pickups:new Array(256)}}),/Collect/);
+assert.match(actionError('world_limit',{world:{edits:new Array(64)}}),/Waiting does not clear/);
+assert.match(actionError('world_limit',{world:{deposits:new Array(80)}}),/mining/);
+assert.match(actionError('world_limit',{world:{enemies:new Array(64)},command:{spell:'skeleton'}}),/Defeat/);
+assert.match(actionError('rate_limited'),/minute/);
+assert.equal(actionError('out_of_reach'),null);
+console.log('action-feedback: precise recovery and capacity causes pass');

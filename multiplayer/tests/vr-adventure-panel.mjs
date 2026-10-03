@@ -1,5 +1,8 @@
 // Pure + mock-XR tests for client/vr-adventure-panel.js.
 // Run: node --test multiplayer/tests/vr-adventure-panel.mjs
+// Canvas screenshot verification needs a source-serving dev URL. Built preview
+// returns index HTML for /client/*.js, so dynamic imports fail despite HTTP 200.
+// Do not assume esbuild is installed; this project uses its configured Vite build.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -265,7 +268,7 @@ test('runtime wiring: panel guard runs first and lobby mirrors expeditionAction'
   assert.doesNotMatch(panelSource, /buttons\[|addEventListener|querySelector|getElementById/, 'panel reads no gamepad buttons and no DOM');
   assert.match(lobby, /onExpeditionAction: expeditionAction/);
   assert.match(game,/onAction: \(action,detail\) => onExpeditionAction\(action,detail\)/);
-  assert.match(lobby,/if\(action\.startsWith\('forge'\)\)\{session\?\.command\('action',\{action,\.\.\.detail\}\)/);
+  assert.match(lobby,/if\(action\.startsWith\('forge'\)\)\{command\('action',\{action,\.\.\.detail\}\)/);
   assert.match(lobby, /if \(xrActive\) game\.setExpedition\(view, snapshot, playerId\);/);
 });
 

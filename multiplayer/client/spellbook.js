@@ -89,6 +89,7 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
   for (const btn of list.querySelectorAll('[data-spell]')) {
     const id = btn.dataset.spell, spec = byId.get(id) || { id, label: btn.textContent.trim() };
     btn.classList.add('sb-card');
+    const label=btn.querySelector('.bf-name');if(label)label.textContent=spec.label||id;
     const art = span('sb-art');
     const url = icons[id] || spec.iconUrl;
     if (url) { const img = document.createElement('img'); img.src = url; img.alt = ''; img.draggable = false; img.decoding = 'async'; art.append(img); }

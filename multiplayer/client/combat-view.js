@@ -3,6 +3,9 @@ import {prepareAsset, prepareProjectile} from './asset-pose.js';
 import {updateSkinBounds} from './skin-bounds.js';
 import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
+import {createEmbedFractures} from './embed-fractures.js';
+import {createProjectileStreaks} from './projectile-streaks.js';
+import {attachEmberdew} from './emberdew-presentation.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
@@ -10,6 +13,7 @@ const forward = new THREE.Vector3(0, 0, -1);
 const geometryRecords = new WeakMap();
 const sharedTriangleRecords = new WeakMap();
 const golemPoses = new WeakMap();
+const hashId = id => [...String(id)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
 export function updateGolemArmor(root, armor = 3) {
   // The simulation exposes three armor stages. Remove existing authored plates
@@ -170,10 +174,23 @@ export function segmentSurfaceContacts(root, from, to, targetId, prepared, {incl
     const worldVertices = vertices.map(v => v.applyMatrix4(mesh.matrixWorld));
     const normal = THREE.Triangle.getNormal(...worldVertices, new THREE.Vector3());
     if (normal.dot(direction) > 0) normal.negate();
+    const localNormal = normal.clone().applyQuaternion(inverse).normalize();
+    const partBounds = partPoses?.[part]?.localBounds;
+    let impactThickness;
+    if (partBounds) {
+      // An oriented part box gives a conservative travel distance through the
+      // authored skull/limb. It affects only the visual embed, never hit authority.
+      const justInside = hit.point.clone().addScaledVector(direction, .002);
+      const localOrigin = partRoot.worldToLocal(justInside.clone());
+      const localDirection = partRoot.worldToLocal(justInside.clone().add(direction)).sub(localOrigin).normalize();
+      const exit = new THREE.Ray(localOrigin, localDirection).intersectBox(
+        new THREE.Box3(new THREE.Vector3().fromArray(partBounds.min), new THREE.Vector3().fromArray(partBounds.max)), new THREE.Vector3());
+      if (exit) impactThickness = THREE.MathUtils.clamp(justInside.distanceTo(partRoot.localToWorld(exit)) + .002, 0, .8);
+    }
     return {targetId, part, boneName: bone?.name || (!root.userData.detachedPart && anchor !== root ? anchor.name : ''), point: hit.point.toArray(), normal: normal.toArray(),
-      localPoint: anchor.worldToLocal(hit.point.clone()).toArray(), localQuaternion: inverse.multiply(orientation).toArray(),
+      localPoint: anchor.worldToLocal(hit.point.clone()).toArray(), localNormal: localNormal.toArray(), localQuaternion: inverse.multiply(orientation).toArray(),
       partPosition: partRoot.getWorldPosition(new THREE.Vector3()).toArray(), partQuaternion: partRoot.getWorldQuaternion(new THREE.Quaternion()).toArray(),
-      partPoses, localBounds: partPoses?.[part]?.localBounds, distance: hit.distance};
+      partPoses, localBounds: partBounds, ...(impactThickness===undefined?{}:{impactThickness}), distance: hit.distance};
   });
 }
 
@@ -260,10 +277,16 @@ export function maskMissingParts(root, missing = []) {
   });
 }
 
-export function createCombatView({scene, templates, actors, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0}) {
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
   const creatures = createCreatureLifeDeath({scene, height});
+  const fractures = createEmbedFractures({camera});
+  const streaks = createProjectileStreaks();
+  scene.add(fractures.object, streaks.object);
+  const embedPoint = new THREE.Vector3(), embedTravel = new THREE.Vector3(), embedQuaternion = new THREE.Quaternion();
+  const streakFallback = new THREE.Vector3();
+  const emberPoint = new THREE.Vector3(), emberQuaternion = new THREE.Quaternion();
   const surfaceCaches = new WeakMap();
   function surface(root) {
     let cache = surfaceCaches.get(root);
@@ -271,10 +294,12 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
     return cache;
   }
   const detached = new Map(), projectiles = new Map(), embeds = new Map(), reported = new Set(), sweptUntil = new Map();
+  const fractureAnchors = new Map();
   const actorFor = id => actors.get(`e:${id}`) || actors.get(id);
   const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
   const remove = (map, id, ownsGeometry = false) => {
     const node = map.get(id); if (!node) return;
+    node.userData.emberdew?.dispose();
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
   function projectile(kind) {
@@ -284,7 +309,9 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
     const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
-    const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual); return group;
+    const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual);
+    if (kind === 'fuel') { group.userData.emberdewRoot = visual; group.userData.emberdew = attachEmberdew({root: visual}); }
+    return group;
   }
   function sync(next) {
     contactRevision++;
@@ -318,6 +345,7 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
       if (!node) { node = projectile(data.kind); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
       node.position.fromArray(data.position);
       node.userData.flight = {position: new THREE.Vector3().fromArray(data.position), velocity: new THREE.Vector3().fromArray(data.velocity), age: 0};
+      node.userData.projectileData = data;
       const velocity = new THREE.Vector3().fromArray(data.velocity);
       if (velocity.lengthSq()) node.quaternion.setFromUnitVectors(forward, velocity.normalize());
       if (data.kind === 'arrow' && templates.has('wings') && !node.userData.wings) {
@@ -337,17 +365,36 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
       if (!node) { node = projectile(data.kind); if (!node) continue; embeds.set(data.id, node); }
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
-      if (!target) { node.visible = false; continue; }
+      if (!target) { node.visible = false; fractures.remove(data.id); fractureAnchors.delete(data.id); continue; }
       let anchor = world ? scene : null;
       if (data.boneName) target.traverse(n => { if (n.name === data.boneName && (!anchor || n.isBone)) anchor = n; });
       anchor ||= loose || partAnchor(target, data.part);
       if (node.parent !== anchor) anchor.add(node);
-      node.visible = true; node.position.fromArray(data.localPoint || [0, 0, 0]); node.quaternion.fromArray(data.localQuaternion || [0, 0, 0, 1]);
+      node.visible = true; node.quaternion.fromArray(data.localQuaternion || [0, 0, 0, 1]);
       const scale = anchor.getWorldScale(new THREE.Vector3()); node.scale.set(1 / scale.x, 1 / scale.y, 1 / scale.z);
-      // A small penetration puts the tip inside the actual struck surface.
-      node.position.add(forward.clone().applyQuaternion(node.quaternion).multiplyScalar(.025).divide(scale));
+      const penetration = data.penetration ?? (world ? .025 : data.kind === 'bolt' && data.part === 'head' ? .125 : .065);
+      anchor.updateWorldMatrix(true, false);
+      embedPoint.fromArray(data.localPoint || [0, 0, 0]); anchor.localToWorld(embedPoint);
+      embedTravel.copy(forward).applyQuaternion(node.quaternion).applyQuaternion(anchor.getWorldQuaternion(embedQuaternion)).normalize().multiplyScalar(penetration);
+      node.position.copy(anchor.worldToLocal(embedPoint.add(embedTravel)));
+      // Crack art can attach to this same bone/root with an exact surface
+      // tangent, while the projectile tip sits deeper along its entry path.
+      const localNormal = data.localNormal || new THREE.Vector3().fromArray(data.normal || [0, 0, 1])
+        .applyQuaternion(anchor.getWorldQuaternion(embedQuaternion).invert()).normalize().toArray();
+      node.userData.fracture = {id:data.id,part:data.part,targetId:data.targetId,localPoint:data.localPoint,
+        localNormal,penetration};
+      const previous = fractureAnchors.get(data.id);
+      if (!previous || previous.anchor !== anchor || previous.targetId !== data.targetId) {
+        const piece = (snapshot.detachedParts || []).find(d => d.id === data.targetId);
+        fractures.add({embedId:data.id,targetId:data.targetId,part:data.part,anchor,localPoint:data.localPoint,
+          localSurfaceNormal:localNormal,penetration,seed:hashId(data.id),
+          material:world || piece?.kind === 'golem' || actor?.data?.kind === 'golem' ? 'stone' : 'bone'});
+        fractureAnchors.set(data.id, {anchor,targetId:data.targetId});
+      }
     }
-    for (const [id] of embeds) if (!(next.embeds || []).some(p => p.id === id)) remove(embeds, id);
+    for (const [id] of embeds) if (!(next.embeds || []).some(p => p.id === id)) {
+      remove(embeds, id); fractures.remove(id); fractureAnchors.delete(id);
+    }
   }
   function segmentContacts(from, to, {excludeId, includePartPoses = true} = {}) {
     const contacts = [];
@@ -357,7 +404,7 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
     for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node), {includePartPoses}));
     return contacts.sort((a, b) => a.distance - b.distance);
   }
-  function tick(dt, isHost = false) {
+  function tick(dt, isHost = false, time = elapsed + dt) {
     if (disposed) return;
     elapsed += dt;
     damageNumbers.tick(dt);
@@ -366,12 +413,20 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
       if (!flight || !node.visible) continue;
       flight.age = Math.min(.05, flight.age + dt);
       node.position.copy(flight.position).addScaledVector(flight.velocity, flight.age);
+      if (node.userData.emberdew) {
+        const root = node.userData.emberdewRoot;
+        root.updateWorldMatrix(true, false);
+        node.userData.emberdew.update({dt,time,lit:node.userData.projectileData?.lit,
+          worldPosition:root.getWorldPosition(emberPoint),worldQuaternion:root.getWorldQuaternion(emberQuaternion),velocity:flight.velocity});
+      }
     }
     for (const node of detached.values()) {
       const pose = node.userData.pose; if (!pose) continue;
       pose.age = Math.min(.05, pose.age + dt); const alpha = pose.age / .05;
       node.position.lerpVectors(pose.from, pose.position, alpha); node.quaternion.slerpQuaternions(pose.fromQuaternion, pose.quaternion, alpha);
     }
+    streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
+    if (camera) fractures.update(camera);
     for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, snapshot.tick || 0, elapsed);
     beforeContacts();
     for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, snapshot.tick || 0, dt);
@@ -406,16 +461,48 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
     for (const [id, node] of detached) if (!node.userData.heldBy) candidates.push(...segmentSurfaceContacts(node, origin, to, id, surface(node)));
     return candidates.sort((a, b) => a.distance - b.distance)[0]?.targetId || null;
   }
+  // Presentation-only FPS pose. The authoritative held part still follows the
+  // server's hand/yaw; the local view follows the camera-attached weapon grip,
+  // including pitch. Call after tick(), before render(), only outside XR.
+  function poseLocalHeld(holderId, grip) {
+    if (disposed || !holderId || !grip?.isObject3D) return false;
+    const data = (snapshot.detachedParts || []).find(d => d.heldBy === holderId);
+    const node = data && detached.get(data.id);
+    if (!node) return false;
+    grip.updateWorldMatrix(true, false);
+    const rotation = grip.getWorldQuaternion(embedQuaternion);
+    const centre = data.localBounds
+      ? new THREE.Vector3().fromArray(data.localBounds.min).add(new THREE.Vector3().fromArray(data.localBounds.max)).multiplyScalar(.5)
+      : new THREE.Vector3();
+    node.quaternion.copy(rotation);
+    node.position.copy(grip.getWorldPosition(embedPoint)).sub(centre.applyQuaternion(rotation));
+    if (camera) fractures.update(camera);
+    return true;
+  }
+  function forEachEmbedFracture(visit) {
+    if (disposed || typeof visit !== 'function') return 0;
+    let count = 0;
+    for (const node of embeds.values()) {
+      if (!node.visible || !node.parent || !node.userData.fracture) continue;
+      visit(node.userData.fracture, node.parent, node);
+      count++;
+    }
+    return count;
+  }
   function dispose() {
     disposed = true;
     damageNumbers.dispose();
     creatures.dispose();
+    fractures.dispose();
+    streaks.dispose();
+    fractureAnchors.clear();
     for (const [id] of embeds) remove(embeds, id);
     for (const [id] of projectiles) remove(projectiles, id);
     for (const [id] of detached) remove(detached, id, true);
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
-  return {sync, tick, segmentContacts, grabTarget, dispose, detached, embeds, projectiles,
+  return {sync, tick, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
+    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),
     heldLimbRoot: holderId => {

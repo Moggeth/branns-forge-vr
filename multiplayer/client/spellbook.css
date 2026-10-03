@@ -137,3 +137,9 @@ body.touch-controls-active .sb-bar {
   .sb-card.sb-cooling .sb-veil { background: none; border-bottom: calc(var(--sb-cd) * 66px) solid GrayText; }
   .sb-card.sb-nomana .bf-cost { forced-color-adjust: none; outline: 1px solid Mark; }
 }
+
+/* Cards grow to fit complete labels rather than cropping long spell names. */
+.sb-bar .bf-spell.sb-card {width:82px;height:auto;min-height:var(--sb-card-h);grid-template-rows:30px auto;padding:6px 5px;align-self:stretch;}
+.sb-bar .sb-card .bf-name,body.touch-controls-active .sb-bar .sb-card .bf-name {white-space:normal;overflow-wrap:anywhere;max-width:100%;font-size:11px;line-height:1.2;text-align:center;}
+.sb-bar .sb-track {align-items:stretch;}
+.sb-legend {white-space:normal;overflow-wrap:anywhere;}

@@ -65,6 +65,10 @@ export function stepFire(state,ctx,events){
     else if(state.tick-(player.flameTick??-1000)>9)player.heat=Math.max(0,(player.heat||0)-.18/60);
   }
   if(state.tick%6)return;
+  // Ecology queries the same cell/neighbor repeatedly. This cache lives only
+  // for this step, so deformation, bridges and restored worlds cannot go stale.
+  const sourceHeight=ctx.terrainHeight,samples=new Map();
+  ctx={...ctx,terrainHeight:(s,x,z)=>{const k=key(x,z);if(samples.has(k))return samples.get(k);const h=sourceHeight(s,x,z);samples.set(k,h);return h;}};
   state.fireSurfaces=state.fireSurfaces.filter(p=>p.expiresTick>state.tick);
   state.fireCells=state.fireCells.filter(c=>c.expiresTick>state.tick&&c.fuel>.001);
   const map=new Map(state.fireCells.map(c=>[key(c.x,c.z),c])),heat=new Map(),flows=[];

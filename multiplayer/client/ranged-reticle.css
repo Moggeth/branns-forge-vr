@@ -1,0 +1,28 @@
+/* Ranged reticles: subtle brass/ember line work, matches field-overlays palette. */
+.rr-root {
+  --rr-size: clamp(38px, 11vmin, 54px);
+  --rr-ink: var(--fo-brass-hi, var(--brass-hi, #ecd29a));
+  --rr-hot: var(--fo-ember, var(--bf-ember, #f08a3c));
+  --rr-draw: 0; --rr-recoil: 0;
+  position: fixed; left: 50%; top: 50%; width: var(--rr-size); height: var(--rr-size);
+  transform: translate(-50%, -50%) scale(calc(1 + var(--rr-recoil) * .18));
+  pointer-events: none; user-select: none; z-index: 4; opacity: .82;
+  filter: drop-shadow(0 0 1px #14110e) drop-shadow(0 0 1px #14110e);
+}
+.rr-root[hidden] { display: none; }
+.rr-svg { width: 100%; height: 100%; overflow: visible; }
+.rr-s { fill: none; stroke: var(--rr-ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rr-thin { stroke-width: 1.1; opacity: .7; }
+.rr-f { fill: var(--rr-ink); }
+/* Emberwing: feathers start wide and settle inward as the draw builds. */
+.rr-feather { transition: transform 60ms linear; transform: translateX(calc((1 - var(--rr-draw)) * -5px)); }
+.rr-feather.rr-r { transform: translateX(calc((1 - var(--rr-draw)) * 5px)); }
+.rr-drawing .rr-s, .rr-drawing .rr-f { stroke: color-mix(in srgb, var(--rr-ink), var(--rr-hot) calc(var(--rr-draw) * 100%)); }
+.rr-drawing .rr-f { fill: color-mix(in srgb, var(--rr-ink), var(--rr-hot) calc(var(--rr-draw) * 100%)); }
+.rr-curved .rr-thin { opacity: .35; } /* trajectory guide takes over */
+.rr-root[data-weapon="wyrmspout"].rr-firing .rr-s { stroke: var(--rr-hot); }
+.rr-root[data-weapon="emberdew"] { --rr-size: clamp(26px, 7vmin, 36px); }
+@media (pointer: coarse) { .rr-root { opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .rr-root, .rr-feather { transition: none; } }
+
+body.ranged-aim-active .mui-root[data-role="hero"] .mui-reticle {visibility:hidden;}
