@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {launch,enterWorld,BASE,record,save,shot,sleep} from './browser-acceptance-lib.mjs';
+import {launch,enterWorld,BASE,record,save,shot,sleep,chooseTouchSpell} from './browser-acceptance-lib.mjs';
 const a=await launch({touch:true,viewport:{width:960,height:600}}),b=await launch({touch:true,viewport:{width:960,height:600}});
 try{
  await enterWorld(a.page,{name:'Friend Hero'});const room=await a.page.evaluate(()=>window.brannHarness.snapshot().room);
@@ -10,7 +10,7 @@ try{
  await a.page.locator('.xhud-actions [data-action="start"]').tap();
  await Promise.all([a.page,b.page].map(p=>p.waitForFunction(()=>window.brannHarness.snapshot().adventure.stage==='camp')));
  record('hero-starts-expedition-visible-to-god','pass');
- await b.page.locator('#quickCast').check();await b.page.locator('[data-spell="raise"]').tap();await b.page.touchscreen.tap(580,280);
+ await b.page.locator('#quickCast').check();await chooseTouchSpell(b.page,'raise');await b.page.touchscreen.tap(580,280);
  await Promise.all([a.page,b.page].map(p=>p.waitForFunction(()=>window.brannHarness.snapshot().edits.some(e=>e.kind==='raise'))));
  record('god-terrain-cast-visible-to-hero','pass');await sleep(350);await shot(a.page,'friends-starting-fps');await shot(b.page,'friends-starting-rts');
  assert.deepEqual([...a.page.errors,...b.page.errors],[]);record('console','pass');

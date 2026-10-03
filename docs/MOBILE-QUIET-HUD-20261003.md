@@ -41,7 +41,7 @@ Actual Chromium touch context, built production output, all real UI actions:
 - Help/party, secondary actions, palette dismissal without casting.
 - Quick tap, drag Sunder, manual confirm, pinch/cancel, dual thumbs, jump/attack,
   bow hold through movement release, two-finger special and cancellation.
-- Lobby/menu fit checks at 390x650 and 844x340; two-player desktop regression.
+- Lobby/menu fit checks at 390x650 and 844x340; two-player touch regression plus desktop emergence regression.
 
 At 844x390, sampled input coverage fell from **36.52% to 17.67%** in God mode.
 Center region coverage fell from **31.84% to zero**. Hero input coverage is 11.91%.
@@ -78,3 +78,7 @@ Final local menu suite: **9.329 seconds**, all four pages fit without scrolling
 at 390x650 and 844x340. Short-landscape repair uses reduced gaps, retaining
 44px buttons; scope flex layout to the active Controls page to avoid displaying
 its settings on other tabs.
+
+Two-client updated-palette test passed in **12.680 seconds**; desktop emergence
+regression passed in **7.732 seconds**. The old two-client harness attempted to
+tap a now-collapsed spell directly; it now follows the palette UI.
