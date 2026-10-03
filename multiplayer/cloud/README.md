@@ -112,6 +112,15 @@ stopped during migration and are no longer required by the new website build.
 
 Cloud Worker version at cutover: `b5842550-8296-4178-a4fb-69cd9e6b5fa9`.
 
+The liveness fix shipped as source `d95e2ef`, Vercel
+`dpl_HXLRKtbijk2vcf6E1WVh6C3aPMio` (13.270 s build/stage/deploy). With local
+Wrangler and Vite stopped, the anonymous public two-browser UI check passed in
+30.500 s: create/join, Expedition, terrain replication, cloud-only socket URLs,
+abrupt host-browser closure, visible **Continue world here** button and successful
+takeover retaining the terrain edit. The old user-owned 8789 service was preserved.
+A subsequent text-only correction replaces the obsolete "no relay" warning with
+the actual cloud fallback status; it does not change the verified network protocol.
+
 Use `tests/cloud-transport.mjs` with `CLOUD_WS_URL`, `ACCEPT_BASE` (local fixture server),
 `PW_CORE`, `PW_CHROME`, `BROWSER_QA_DIR`; `FORCE_RELAY=1` injects unavailable ICE.
 Fixtures are excluded from the public deployment. `cloud/test.mjs` accepts

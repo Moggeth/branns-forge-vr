@@ -1,3 +1,4 @@
+import {partPosition} from '../shared/combat.js';
 // Brann's Forge — fire / liquid-fuel presentation module (Three.js, imports only 'three').
 // Presentation only: the integrator owns damage, ignition, heat, fuel. See HANDOFF.md.
 import * as THREE from 'three';
@@ -223,7 +224,7 @@ function mkMat(vs, fs, uniforms, blending, extra = {}) {
 }
 
 // =====================================================================================
-export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false } = {}) {
+export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null } = {}) {
   let q = clamp(quality, 0, 1);
   const group = new THREE.Group(); group.name = 'FirePresentation';
   scene.add(group);
@@ -462,7 +463,15 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     for (let i = 0; i < MAX_PACKETS; i++) { const p = pk[i]; if (p.used && !p.seen) p.dying = true; }
     // surface patches
     for (let i = 0; i < MAX_PATCHES; i++) sp[i].seen = false;
-    const fs = snap.fireSurfaces;
+    const fs = [...(snap.fireSurfaces||[])];
+    // Existing authored flame tongues follow burning bodies/remains, sharing the
+    // same 32-patch budget and three lights as static fire.
+    for(const e of [...(snap.enemies||[]),...(snap.detachedParts||[])]){
+      if(!(e.burnUntil>snap.tick))continue;
+      const part=e.burnPart||e.part||'torso',points=!e.sourceId?fireSamples?.(e.id)?.[part]:null;
+      const position=points?.length?points[Math.floor(points.length/2)]:e.sourceId?e.position:partPosition(e,part);
+      fs.push({id:`burn:${e.id}`,position,normal:[0,1,0],expiresTick:e.burnUntil});
+    }
     if (fs) for (let i = 0, n = Math.min(fs.length, MAX_PATCHES * 2); i < n; i++) {
       const s = fs[i];
       let p = spMap.get(s.id);

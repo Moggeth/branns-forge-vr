@@ -50,7 +50,10 @@ await test('mapping', () => {
  assert.deepEqual(materialLayersFor(ev({kind: 'embed', impact: true, material: 'stone'})).map(l => l.sound), ['pick_stone']);
  assert.deepEqual(materialLayersFor(ev({kind: 'embed', impact: false, material: 'bone'})), []);  // enemy embed: hit event already sounds
  for (const k of ['wood_hit', 'tree_fell', 'pickup', 'shoot', 'death', 'detach', 'pick_burst', 'axe_cleave']) assert.deepEqual(materialLayersFor(ev({kind: k})), [], k);
- assert.deepEqual(materialLayersFor(ev({kind: 'hit', material: 'wood'})), []);
+ assert.equal(materialLayersFor(ev({kind: 'hit', material: 'wood'}))[0].sound,'timber_knock');
+ for(const [material,sound] of [['stone','stone_blunt'],['wood','timber_knock'],['metal','metal_ricochet'],['shield','shield_thunk'],['flesh','flesh_thud']])assert.equal(materialLayersFor(ev({kind:'invention_hit',material,sourceMaterial:'bone'}))[0].sound,sound);
+ assert.equal(materialLayersFor(ev({kind:'embed',impact:true,blocked:true,material:'wood'}))[0].sound,'shield_thunk');
+ assert.equal(materialLayersFor(ev({kind:'shoot',phoenix:true}))[0].sound,'phoenix_call');
  assert.equal(materialOf({kind: 'stone_hit'}), 'stone');
  assert.equal(energyOf({energy: 9}), 2); assert.equal(energyOf({}), 1); assert.equal(energyOf({energy: NaN}), 1);
  assert.ok(energyShape(1.8).gain > energyShape(1).gain && energyShape(1.8).rate < energyShape(1).rate && energyShape(.2).gain >= .45);
@@ -59,7 +62,7 @@ await test('mapping', () => {
 });
 
 await test('loads all real WAVs through the shared context', async () => {
- const {r, k} = await kit(); assert.deepEqual(r, {loaded: 13, total: 13}); assert.equal(k.stats().buffers, 13); k.dispose();
+ const {r, k} = await kit(); assert.deepEqual(r, {loaded: 28, total: 28}); assert.equal(k.stats().buffers, 28); k.dispose();
 });
 
 await test('deterministic variant/pitch/gain per event', async () => {

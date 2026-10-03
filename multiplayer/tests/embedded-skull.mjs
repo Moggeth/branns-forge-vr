@@ -41,7 +41,7 @@ assert.ok(Math.abs(Math.hypot(...contact.localNormal)-1)<1e-3);
 // The host computes visual penetration from measured geometry; an untrusted
 // client cannot choose its own embed depth.
 let detachedId=0;
-const impactState={tick:1,players:[],enemies:[createEnemy('target',[0,0,0])],detachedParts:[],embeds:[],
+const impactState={tick:1,players:[],pickups:[],enemies:[createEnemy('target',[0,0,0])],detachedParts:[],embeds:[],
   projectiles:[{id:'q',kind:'bolt',ownerId:'hero',trail:[contact.point.map((v,i)=>v+(i===2?1:0)),contact.point.map((v,i)=>v-(i===2?1:0))]}]};
 const impact=projectileContact(impactState,{...contact,projectileId:'q',penetration:0},
   {nextId:()=>`d${++detachedId}`,terrainHeight:()=>0});

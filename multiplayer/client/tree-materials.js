@@ -8,7 +8,7 @@ import * as T from 'three';
 export const TREE_ROLE_OF_PART = {Trunk: 'bark', Roots: 'roots', Branches: 'branch', Leaves: 'leaf', Fruit: 'fruit'};
 // sway: 0 static (trunk/roots stay exact for axe raycasts and notch carving), 1 crown sway, 2 sway + leaf flutter
 const ROLES = {bark: {sway: 0, bark: 1}, roots: {sway: 0, bark: 1}, branch: {sway: 1, bark: 1}, leaf: {sway: 2, leaf: 1}, fruit: {sway: 1}};
-const VERSION = 'tree-mat-v2';
+const VERSION = 'tree-mat-v3';
 
 const COMMON = /* glsl */`
 uniform float uTreeTime; uniform vec3 uTreeWind; uniform float uTreeWindStrength;
@@ -53,17 +53,23 @@ const FRAG_COLOR = /* glsl */`
  { vec3 p = vTreeObj; float warp = treeNoise(p*vec3(2.3, .7, 2.3) + treeSeed*7.0);
    float n = treeNoise(p*vec3(7.5, 1.1, 7.5) + warp*1.7);                  // long vertical fissures
    float plates = treeNoise(p*vec3(3.2, .9, 3.2) + 11.0);
-   treeGroove = 1.0 - smoothstep(.03, .14, abs(n - .5));
+   // Interrupted, narrower fissures (broken by a second noise) instead of continuous parallel black lines.
+   float broken = smoothstep(.28, .62, treeNoise(p*vec3(3.6, 1.4, 3.6) + 5.0));
+   treeGroove = (1.0 - smoothstep(.02, .095, abs(n - .5))) * broken;
    treeHt = (1.0 - treeGroove)*.75 + plates*.25;
    float fine = treeNoise(p*vec3(23.0, 6.0, 23.0));
-   vec3 tone = mix(vec3(.93, .9, .86), vec3(1.07, 1.03, .97), plates) * mix(.92, 1.08, treeSeed);
-   diffuseColor.rgb *= tone * mix(1.0, .42, treeGroove) * (.93 + .14*fine);
+   vec3 tone = mix(vec3(.94, .91, .87), vec3(1.08, 1.04, .98), plates) * mix(.94, 1.06, treeSeed);
+   float ridge = smoothstep(.55, .9, plates) * (1.0 - treeGroove);                        // sunlit plate tops
+   diffuseColor.rgb *= tone * mix(1.0, .7, treeGroove) * (.95 + .1*fine) * (1.0 + .08*ridge);
+   // sparse grey-green lichen flecks on plates (multiplicative tint, never a flat overlay)
+   float lichen = smoothstep(.68, .82, treeNoise(p*vec3(5.0, 3.0, 5.0) + 17.0)) * (1.0 - treeGroove) * smoothstep(.4, 2.0, vTreeH);
+   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.12, 1.18, 1.02), lichen*.6);
    // root collar: darker, damp, faintly mossy where the trunk meets the soil and on upward faces of the roots
    float collar = 1.0 - smoothstep(.0, .65, vTreeH);
    float moss = collar * smoothstep(.2, .8, vTreeUp) * smoothstep(.35, .7, treeNoise(p*4.0 + 3.0));
    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(.66, .62, .57), collar*.7);
    diffuseColor.rgb *= mix(vec3(1.0), vec3(.72, .9, .5), moss*.7);            // multiplicative: never brighter than the bark
-   treeRough = mix(1.0, 1.12, treeGroove) * mix(1.0, 1.06, collar); }
+   treeRough = mix(1.0, 1.1, treeGroove) * mix(1.0, 1.06, collar) * mix(1.0, .92, ridge); }
 #endif
 #ifdef TREE_LEAF
  { vec3 p = vTreeObj; float c = treeNoise(p*1.7 + treeSeed*13.0), d = treeNoise(p*5.3 + 2.0);
@@ -72,7 +78,7 @@ const FRAG_COLOR = /* glsl */`
    tint *= mix(vec3(.94, 1.0, .96), vec3(1.06, 1.0, .9), treeSeed);              // per-tree hue drift
    float outer = smoothstep(.4, 2.2, length(p.xz - vec2(.17, .14)));             // crown shell brighter than the interior
    float lift = smoothstep(2.4, 6.0, vTreeH);
-   diffuseColor.rgb *= tint * (.62 + .22*outer + .2*lift) * (.9 + .2*d);
+   diffuseColor.rgb *= tint * (.7 + .2*outer + .16*lift) * (.92 + .16*d);              // less interior crush
    treeHt = c*.6 + d*.4; treeRough = .92 + .14*d; }
 #endif
 #ifdef TREE_FRUIT

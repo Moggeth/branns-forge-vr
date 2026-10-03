@@ -1,6 +1,6 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
-import {applyEnemyScorch} from './combat.js';
+import {applyEnemyScorch,partPosition,PARTS} from './combat.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
@@ -29,12 +29,20 @@ export function applyHeat(state,point,radius,strength,ctx){
 }
 
 export function quenchFire(state,point,radius){
+  for(const e of [...state.enemies,...(state.detachedParts||[])])if(Math.hypot(e.position[0]-point[0],e.position[2]-point[2])<=radius){delete e.burnUntil;delete e.burnPart;}
   for(const c of state.fireCells)if(Math.hypot(c.x-point[0],c.z-point[2])<=radius){c.heat=0;c.burning=false;c.wetUntil=state.tick+300;}
   state.fireSurfaces=state.fireSurfaces.filter(p=>Math.hypot(p.position[0]-point[0],p.position[2]-point[2])>radius);
 }
 
 export function fireContact(state,shot,hit,ctx){
   const events=[],point=hit.point,ground=ctx.terrainHeight(state,point[0],point[2]);
+  if(shot.kind==='arrow'&&Math.hypot(...(shot.curve||[0,0,0]))>.000001){
+    const target=state.enemies.find(e=>e.id===hit.targetId)||state.detachedParts?.find(d=>d.id===hit.targetId);
+    if(target){target.burnUntil=state.tick+240;target.burnPart=hit.part||target.part||'torso';if(target.parts)applyEnemyScorch(target,target.burnPart,.18);else target.scorch=clamp((target.scorch||0)+.18,0,1);}
+    else addFuel(state,[point[0],ground,point[2]],.7,.28,true);
+    applyHeat(state,point,1,1,ctx);
+    return [{kind:'phoenix_ignite',id:hit.targetId,position:[...point],normal:[...hit.normal],part:hit.part}];
+  }
   if(shot.kind==='fuel'){
     addFuel(state,[point[0],ground,point[2]],1.2,.85,!!shot.lit);
     if(shot.lit)applyHeat(state,point,1.5,1,ctx);
@@ -56,6 +64,27 @@ export function fireContact(state,shot,hit,ctx){
     ctx.damageEnemy(state,enemy,shot.kind==='flame'?4:12,events);
   }
   return events;
+}
+
+// A few points per articulated region; the host renderer supplies actual posed
+// joints where present, with deterministic anatomical samples for headless hosts.
+export function fireSamples(enemy, supplied) {
+  const out={};
+  for(const part of PARTS){
+    if(enemy.missingParts?.includes(part))continue;
+    const points=supplied?.[part];
+    out[part]=Array.isArray(points)&&points.length<=8&&points.length&&points.every(p=>validVector(p)&&Math.hypot(...p.map((n,i)=>n-enemy.position[i]))<5)?points: [partPosition({...enemy,yaw:enemy.yaw||0},part)];
+    if(out[part]!==points&&part.endsWith('Leg'))out[part]=[.12,.42,.8].map(h=>{const p=[...out[part][0]];p[1]=enemy.position[1]+h*(enemy.kind==='golem'?1.45:1);return p;});
+  }
+  return out;
+}
+export function flameExposure(points, sources){
+  let exposure=0;
+  for(const p of points)for(const f of sources){
+    const radial=Math.hypot(p[0]-f.position[0],p[2]-f.position[2]),dy=p[1]-f.position[1];
+    if(radial<f.radius&&dy>=-.16&&dy<f.height)exposure=Math.max(exposure,(1-radial/f.radius)*(.55+.45*(1-Math.max(0,dy)/f.height)));
+  }
+  return exposure;
 }
 
 export function stepFire(state,ctx,events){
@@ -100,18 +129,22 @@ export function stepFire(state,ctx,events){
   for(const [from,to,amount]of flows){const moved=Math.min(amount,1-to.fuel);from.fuel-=moved;to.fuel+=moved;}
   for(const patch of state.fireSurfaces)applyHeat(state,patch.position,1,.35,ctx);
   if(state.tick%30)return;
-  const hot=state.fireCells.filter(c=>c.burning).map(c=>[c.x,ctx.terrainHeight(state,c.x,c.z),c.z]);
-  hot.push(...state.fireSurfaces.map(p=>p.position));
-  const exposed=actor=>hot.some(p=>Math.hypot(actor.position[0]-p[0],actor.position[2]-p[2])<.7&&Math.abs(actor.position[1]-p[1])<1.8);
-  for(const enemy of [...state.enemies])if(exposed(enemy)){
-    // Ground fire reaches the feet first; heat rises through the torso. Keep
-    // these six bounded bone values after the flame patch burns out.
-    applyEnemyScorch(enemy,'leftLeg',.07);
-    applyEnemyScorch(enemy,'rightLeg',.07);
-    applyEnemyScorch(enemy,'torso',.035);
-    ctx.damageEnemy(state,enemy,6,events);
+  const hot=state.fireCells.filter(c=>c.burning).map(c=>({position:[c.x,ctx.terrainHeight(state,c.x,c.z),c.z],radius:.55,height:.8}));
+  hot.push(...state.fireSurfaces.map(p=>({position:p.position,radius:.5,height:.65})));
+  for(const enemy of [...state.enemies]){
+    const burning=(enemy.burnUntil||0)>state.tick;
+    const nearby=hot.filter(f=>(f.position[0]-enemy.position[0])**2+(f.position[2]-enemy.position[2])**2<30.25);
+    if(!nearby.length&&!burning)continue;
+    const samples=nearby.length?fireSamples(enemy,ctx.fireSamples?.(enemy)):{};let exposed=false;
+    for(const [part,points] of Object.entries(samples)){
+      const heat=flameExposure(points,nearby);
+      if(heat>0){applyEnemyScorch(enemy,part,.16*heat);exposed=true;}
+    }
+    if(burning)applyEnemyScorch(enemy,enemy.burnPart||'torso',.095);
+    if(exposed||burning)ctx.damageEnemy(state,enemy,burning?7:6,events);
   }
-  for(const player of state.players)if(player.role==='hero'&&exposed(player))ctx.damageHero(state,player,2,events);
+  for(const d of state.detachedParts||[])if((d.burnUntil||0)>state.tick)d.scorch=clamp((d.scorch||0)+.095,0,1);
+  for(const player of state.players)if(player.role==='hero'&&flameExposure([[player.position[0],player.position[1]+.12,player.position[2]]],hot)>0)ctx.damageHero(state,player,2,events);
 }
 
 export function restoreFire(saved,ids){

@@ -1,40 +1,79 @@
-/* Contextual harvesting cue: one quiet parchment/brass plate just below the crosshair. Never takes input,
-   never covers the reticle (hero ring is 16 px), and fits between the compact HUD and the equipment tray on short landscape screens. */
+/* Contextual harvesting cue. Two placements share one slim plate:
+   - anchored (legacy default): just below the crosshair, centred; never covers the 16 px hero ring.
+   - .bf-cue--placed: beside the screen-projected target (JS writes translate3d), joined by a faint amber leader.
+   Faint translucent ink, no heavy card; never takes input; stacked compactly so it fits beside a centred target
+   on a 390 px portrait phone (each side has ~160 px). */
 .bf-cue {
   position: fixed; left: 50%; top: calc(50% + 26px); transform: translateX(-50%);
-  z-index: 4; pointer-events: none; user-select: none;
-  max-width: min(78vw, 420px); padding: 5px 11px 6px;
-  border-radius: 9px; border: 1px solid var(--bf-line, rgba(231, 194, 122, .28));
-  background: linear-gradient(180deg, rgba(28, 22, 16, .78), rgba(18, 14, 10, .72));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 222, 160, .07);
-  color: var(--bf-parch, #f1e4c8); font-size: 13px; line-height: 1.25; text-align: center;
+  z-index: 4; pointer-events: none; user-select: none; -webkit-user-select: none;
+  box-sizing: border-box; width: max-content; max-width: min(calc(50vw - 36px), 232px); min-width: 0;
+  padding: 4px 9px 5px; border-radius: 7px;
+  border: 1px solid rgba(231, 194, 122, .16); border-left: 2px solid rgba(231, 194, 122, .42);
+  background: rgba(16, 12, 9, .46);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  color: var(--bf-parch, #f1e4c8); font-size: 13px; line-height: 1.22; text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
   opacity: 1; transition: opacity .14s var(--bf-ease, ease-out);
+  will-change: transform;
 }
 .bf-cue[hidden] { display: block; opacity: 0; visibility: hidden; transition: opacity .14s, visibility 0s .14s; }
-.bf-cue-line { display: flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
-.bf-cue-name { font-weight: 700; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; }
-.bf-cue-action { color: var(--bf-gold, #e7c27a); }
-.bf-cue-action::before { content: "·"; margin-right: 7px; color: var(--bf-parch-dim, #cdbb98); }
+.bf-cue.bf-cue--placed { left: 0; top: 0; transform: translate3d(-9999px, -9999px, 0); }
+/* Plate accent faces the leader: when the label sits left of the target the brass edge moves to the right side. */
+.bf-cue--placed.bf-cue--flip { border-left-width: 1px; border-left-color: rgba(231, 194, 122, .16); border-right: 2px solid rgba(231, 194, 122, .42); }
+
+.bf-cue-line { display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+.bf-cue-name { font-weight: 700; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bf-cue-act { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; margin-top: 1px; }
+.bf-cue-action { color: var(--bf-gold, #e7c27a); font-size: .93em; }
 .bf-cue-key {
-  font: 700 11px/1 ui-monospace, monospace; padding: 3px 6px; border-radius: 5px;
+  font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace; padding: 2px 5px; border-radius: 4px; text-shadow: none;
   color: var(--bf-soot, #14110e); background: var(--bf-gold, #e7c27a); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);
 }
 .bf-cue-key[hidden], .bf-cue-note[hidden], .bf-cue-pips[hidden], .bf-cue-pips i[hidden] { display: none; }
-.bf-cue-note { margin-top: 2px; font-size: 11px; color: var(--bf-parch-dim, #cdbb98); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bf-cue-note {
+  margin-top: 2px; font-size: 11px; color: var(--bf-parch-dim, #cdbb98);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
 /* The single progress indicator: notches cut / ore strikes, as small brass pips. */
-.bf-cue-pips { display: inline-flex; gap: 3px; margin-left: 2px; }
+.bf-cue-pips { display: inline-flex; gap: 3px; margin-left: auto; padding-left: 2px; flex: none; }
 .bf-cue-pips i { width: 6px; height: 6px; border-radius: 50%; border: 1px solid rgba(231, 194, 122, .6); }
 .bf-cue-pips i.on { background: var(--bf-ember, #f08a3c); border-color: var(--bf-ember-hot, #ffb35a); }
-/* Ready = brass edge; blocked states (wrong tool, too far, full) stay muted, never alarm red. */
-.bf-cue[data-state="ready"] { border-color: rgba(231, 194, 122, .5); }
+/* Ready = brighter brass edge; blocked states (wrong tool, too far, full) stay muted, never alarm red. */
+.bf-cue[data-state="ready"] { border-left-color: rgba(231, 194, 122, .75); }
+.bf-cue--placed.bf-cue--flip[data-state="ready"] { border-left-color: rgba(231, 194, 122, .16); border-right-color: rgba(231, 194, 122, .75); }
 .bf-cue[data-state="tool"] .bf-cue-action, .bf-cue[data-state="far"] .bf-cue-action,
 .bf-cue[data-state="aim"] .bf-cue-action, .bf-cue[data-state="busy"] .bf-cue-action { color: var(--bf-parch-dim, #cdbb98); }
 .bf-cue[data-state="full"] .bf-cue-action { color: var(--bf-ember-hot, #ffb35a); }
-/* Short landscape: the objective occupies y=120..167; the central gap below the reticle remains clear. */
-@media (max-height: 430px) and (orientation: landscape) {
-  .bf-cue { top: calc(50% + 14px); font-size: 11px; padding: 3px 8px; }
-  .bf-cue-note { font-size: 10px; }
+
+/* Leader: full-viewport, non-interactive SVG under the plate. Thin, low-alpha amber; ring marks the target without
+   filling it, so the object itself stays visible. */
+.bf-cue-leader {
+  position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: visible;
+  z-index: 3; pointer-events: none;
 }
-@media (max-width: 400px) { .bf-cue { font-size: 12px; max-width: 72vw; } .bf-cue-line { gap: 5px; } }
+.bf-cue-leader polyline {
+  fill: none; stroke: rgba(240, 190, 110, .55); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .8));
+}
+.bf-cue-leader circle { fill: none; stroke: rgba(240, 190, 110, .6); stroke-width: 1.25; }
+.bf-cue-leader[data-state="ready"] polyline, .bf-cue-leader[data-state="ready"] circle { stroke: rgba(255, 200, 120, .8); }
+.bf-cue-leader:not([data-state="ready"]) circle { stroke-dasharray: 3 3; }
+
+/* Short landscape (844x390): the objective occupies y=120..167; keep the plate small. */
+@media (max-height: 430px) and (orientation: landscape) {
+  .bf-cue { top: calc(50% + 14px); font-size: 11.5px; padding: 3px 7px 4px; max-width: 210px; }
+  .bf-cue-note { font-size: 10px; -webkit-line-clamp: 1; line-clamp: 1; }
+  .bf-cue-key { font-size: 10px; }
+}
+/* Narrow portrait (390x650): each side of a centred target offers ~160 px. */
+@media (max-width: 420px) {
+  .bf-cue { font-size: 12px; padding: 3px 7px 4px; max-width: calc(50vw - 34px); }
+  .bf-cue-note { font-size: 10.5px; }
+}
 @media (prefers-reduced-motion: reduce) { .bf-cue, .bf-cue[hidden] { transition: none; } }
-body.xr .bf-cue { display: none; }
+@media (prefers-contrast: more) {
+  .bf-cue { background: rgba(10, 8, 6, .82); border-color: rgba(231, 194, 122, .6); }
+  .bf-cue-leader polyline, .bf-cue-leader circle { stroke: #ffc878; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .bf-cue { background: rgba(16, 12, 9, .62); } }
+body.xr .bf-cue, body.xr .bf-cue-leader { display: none; }

@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8"><title>Siegebird reload sequence</title>
+<style>html,body{margin:0;background:#1d2228;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<script type="module">
+// Contact sheet of one reload: crossbow mechanism + sight + songbird at fixed reload times.
+// ?view=fps (hip camera, as the game's weaponAnchor) | ads | third | top ; ?n=1 (right) / 2 (left) ; ?golden=1 ; ?times=.3,.4
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {prepareAsset, updateWeaponPresentation} from '/client/asset-pose.js';
+import {createSiegebirdSight, SIEGEBIRD_PRESENTATION} from '/client/siegebird-sight.js';
+import {createSiegebirdFlock} from '/client/siegebird-flock.js';
+const q = new URLSearchParams(location.search);
+const view = q.get('view') || 'fps', n = +(q.get('n') || 1), golden = q.get('golden') === '1';
+const times = (q.get('times') || '.3,.4,.5,.58,.66,.72,.78,.84,.95,1.15').split(',').map(Number);
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x7d98b3); scene.fog = new THREE.Fog(0x7d98b3, 8, 40);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6;
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4); sun.position.set(3, 6, 2); scene.add(sun, new THREE.HemisphereLight(0xcfe2ff, 0x5a4a36, .7));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({color: 0x5f7a45, roughness: .95})); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; scene.add(ground);
+const loader = new GLTFLoader();
+const [crossbow, bird] = await Promise.all([loader.loadAsync('/assets/crossbow.glb'), loader.loadAsync('/assets/siegebird_songbird.glb')]);
+const flock = createSiegebirdFlock({birdTemplate: bird, crossbowTemplate: crossbow});
+const anchor = new THREE.Group(); scene.add(anchor);
+const {visual} = prepareAsset(crossbow, 'crossbow'); anchor.add(visual);
+createSiegebirdSight(THREE, visual);
+const P = SIEGEBIRD_PRESENTATION;
+const cam = new THREE.PerspectiveCamera(view === 'ads' ? P.zoomFov : 70, 1, .01, 100);
+if (view === 'fps' || view === 'ads') {
+  // Camera at the origin of the game's camera space; the weapon anchor sits at the hip offset in front of it.
+  const hip = view === 'ads' ? [0, -.06 - .334 + .0, -.42] : P.hip; anchor.position.fromArray(hip); cam.position.set(0, 0, 0); cam.lookAt(0, 0, -10);
+} else if (view === 'third') { cam.position.set(1.2, .7, 1.1); cam.lookAt(0, .25, -.45); }
+else { cam.position.set(0, 1.25, -.5); cam.up.set(0, 0, -1); cam.lookAt(0, 0, -.5); }
+const cols = 5, rows = Math.ceil(times.length / cols), W = innerWidth / cols, H = innerHeight / rows; cam.aspect = W / H; cam.updateProjectionMatrix();
+renderer.setScissorTest(true);
+let shotAt = 100; flock.shot(visual, {n, golden, playerId: q.get('player') || 'preview', time: shotAt});
+let prev = 0;
+times.forEach((t, i) => {
+  // Step the flock through intermediate times so cues and seat state advance as in play.
+  for (let s = prev; s < t; s += 1 / 60) flock.update(visual, shotAt + s, {});
+  flock.update(visual, shotAt + t, {}); prev = t;
+  updateWeaponPresentation(visual, 'crossbow', {reload: t, time: shotAt + t});
+  const x = (i % cols) * W, y = (rows - 1 - Math.floor(i / cols)) * H;
+  renderer.setViewport(x, y, W, H); renderer.setScissor(x, y, W, H); renderer.render(scene, cam);
+});
+window.previewReady = true;
+</script>

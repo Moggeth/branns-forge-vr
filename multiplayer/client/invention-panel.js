@@ -6,6 +6,7 @@
 /** All twelve structures. forge is permanent (never placed from here). */
 export const STRUCTURES = [
   ['forge', 'Forge', 'Permanent heart of the settlement. Refines ore and powers inventions.', 'anvil'],
+  ['foundation', 'Stone Foundation', 'Anchored tile resists earth magic. Build machines on top.', 'stone'],
   ['storehouse', 'Storehouse', 'Safe storage. Stored goods count toward every recipe.', 'storehouse'],
   ['loggingYard', 'Logging Yard', 'Gathers nearby fallen Wood into shared stores.', 'axe'],
   ['prospector', 'Prospector', 'Surveys seams and focuses new geological growth.', 'pick'],
@@ -232,7 +233,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
         parts.push(btn(`turn-${sid}`,`data-ip-turn="${esc(sid)}"`,`${icon('wrench')}<span>Turn 45°</span>`,ok,'Wait for loading / turning'));
         parts.push(btn(`op-${sid}`, `data-ip-operate="${esc(sid)}"`, `${icon('aim')}<span>${esc(b.useLabel || 'Aim & fire')}</span>`, ok,
           b.useReason || (building ? 'Still under construction' : destroyed ? 'Destroyed — repair first' : has(b.cooldown) ? `Reloading ${fmtTime(b.cooldown)}` : 'Not ready'), 'ip-primary'));
-      } else if (t !== 'palisade' && t !== 'trap' || b.usable) {
+      } else if (!b.passive && (t !== 'palisade' && t !== 'trap' || b.usable)) {
         const ok = b.usable !== false && !building && !destroyed && !(num(b.cooldown) > 0);
         parts.push(btn(`use-${sid}`, `data-ip-use="${esc(sid)}"`, `${icon('hand')}<span>${esc(b.useLabel || 'Use')}</span>`, ok,
           b.useReason || (building ? 'Still under construction' : destroyed ? 'Destroyed — repair first' : num(b.cooldown) > 0 ? `Ready in ${fmtTime(b.cooldown)}` : 'Nothing to do here now'), 'ip-primary'));

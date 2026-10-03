@@ -73,6 +73,24 @@ export function triangleHeight(sample,x,z) {
   return Math.fround(sample(x0+step,z0+step))*(u+v-1)+h10*(1-v)+h01*(1-u);
 }
 export function baseHeight(x,z) {return triangleHeight(rawBaseHeight,x,z);}
+// Foundation tops are recorded at placement, independent of future terrain edits.
+export const FOUNDATION_HALF=3,FOUNDATION_BLEND=2;
+export function foundationTerrainKey(state) {return (state.inventions?.structures||[]).filter(b=>b.type==='foundation').map(b=>`${b.id}:${b.hp>0?1:0}:${b.position.join(',')}`).join(';');}
+export function foundationAt(state,x,z,radius=0,owner=null) {return (state.inventions?.structures||[]).find(b=>b.type==='foundation'&&b.hp>0&&(!owner||b.side===owner)&&Math.abs(x-b.position[0])+radius<=FOUNDATION_HALF&&Math.abs(z-b.position[2])+radius<=FOUNDATION_HALF);}
+function foundationHeight(state,x,z,y) {
+  // Blend independent of structure ordering. Odds weighting tends to the exact
+  // anchored plane at each tile edge, even where neighbouring skirts overlap.
+  let remaining=1,total=0,target=0;
+  for(const b of state.inventions?.structures||[]) {
+    if(b.type!=='foundation'||b.hp<=0)continue;
+    const d=Math.max(Math.abs(x-b.position[0]),Math.abs(z-b.position[2]));
+    if(d>=FOUNDATION_HALF+FOUNDATION_BLEND)continue;
+    if(d<=FOUNDATION_HALF)return b.position[1];
+    const w=1-smooth(clamp((d-FOUNDATION_HALF)/FOUNDATION_BLEND,0,1)),odds=w/Math.max(1e-12,1-w);
+    remaining*=1-w;total+=odds;target+=b.position[1]*odds;
+  }
+  return total?y+(target/total-y)*(1-remaining):y;
+}
 export function rawTerrainHeight(state,x,z) {
   let earth=0,scar=0,wall=0;
   for(const edit of state.edits||[]) {
@@ -91,7 +109,22 @@ export function rawTerrainHeight(state,x,z) {
   // excavation outside remains continuous rather than making an invisible cliff.
   const forgeProtection=smooth(clamp((Math.hypot(x,z)-4)/3,0,1));
   const protection=(1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1)))*forgeProtection;
-  return rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall,-6,6)*protection;
+  return foundationHeight(state,x,z,rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall,-6,6)*protection);
+}
+// Soil rendering is recessed beneath masonry; authoritative walking/support stay on y=top.
+// Tile edges align to the .75m ground lattice, so interpolation cannot poke soil through tiles.
+export const FOUNDATION_SOIL_RECESS=.16;
+export function terrainRenderHeight(state,x,z,includeBridges=true) {
+ return triangleHeight((a,b)=>terrainRenderVertex(state,a,b,includeBridges),x,z);
+}
+// Mesh rebuilds pass their cached physical vertex height to avoid resampling edits.
+export function terrainRenderVertex(state,x,z,includeBridges=false,y=terrainHeight(state,x,z,includeBridges)) {
+ let cover=0;
+ for(const b of state.inventions?.structures||[])if(b.type==='foundation'&&b.hp>0){
+  const d=Math.max(Math.abs(x-b.position[0]),Math.abs(z-b.position[2]));
+  if(d<=FOUNDATION_HALF+.75&&y<=b.position[1]+.001)cover=Math.max(cover,1-smooth(clamp((d-FOUNDATION_HALF)/.75,0,1)));
+ }
+ return y-FOUNDATION_SOIL_RECESS*cover;
 }
 export function terrainHeight(state,x,z,includeBridges=true) {
   let y=triangleHeight((a,b)=>rawTerrainHeight(state,a,b),x,z);

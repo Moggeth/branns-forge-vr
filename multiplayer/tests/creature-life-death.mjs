@@ -6,6 +6,7 @@ import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {prepareAsset} from '../client/asset-pose.js';
+import {createCombatView} from '../client/combat-view.js';
 import {applyEnemyMotion} from '../client/enemy-motion.js';
 import {createCreatureLifeDeath, sampleCrawl, crawlWeight, emergencePlan, partDamage, CRAWL_KEYS} from '../client/creature-life-death.js';
 
@@ -161,6 +162,30 @@ function frame(entries, tick, dt = 1 / 60) {
   assert.equal(fx.stats().corpses, 0);
   let carried = false; nodes.get('d1').traverse(m => { if (m.userData.cldDamage?.rec.scorch[0] > .3) carried = true; }); assert.ok(carried, 'torso remains keep scorch');
   console.log('damage/death ok', fx.stats());
+}
+
+// Actual posed skeleton joints drive host fire samples without reskinning vertices.
+{
+ const sk=actor('skeleton','fire-pose',0),camera=new THREE.PerspectiveCamera();
+ const combat=createCombatView({scene,templates:new Map(),actors:new Map([['e:fire-pose',sk]]),camera});
+ const before=combat.fireSamples('fire-pose');assert.ok(before.leftLeg.length>=3&&before.head.length);
+ let foot;sk.visual.traverse(n=>{if(n.isBone&&/^LeftFoot/.test(n.name))foot=n;});assert.ok(foot);foot.position.y+=.25;
+ const after=combat.fireSamples('fire-pose');assert.notDeepEqual(after.leftLeg,before.leftLeg,'articulated foot motion changes real exposure samples');
+ assert.deepEqual(after.rightLeg,before.rightLeg,'opposite leg unaffected');assert.ok(Object.values(after).every(points=>points.length<=8));combat.dispose();
+}
+
+// Region uniforms on the real GLB must not bleed between bodies or regions.
+{
+ const a=actor('skeleton','charA',0,{scorch:{leftLeg:1,rightLeg:.75,head:0}}),b=actor('skeleton','charB',3,{scorch:{head:1,leftLeg:0}});
+ for(let t=0;t<45;t++)frame([a,b],6000+t);
+ const get=e=>{const rows=[];e.visual.traverse(m=>{if(m.isMesh&&m.userData.cldDamage)rows.push(m);});return rows;};
+ const am=get(a),bm=get(b);assert.ok(am.length&&bm.length);
+ const leg=am.find(m=>m.userData.cldDamage.rec.map.includes('leftLeg'));
+ const record=leg.userData.cldDamage.rec;assert.ok(record.scorch[record.map.indexOf('leftLeg')]>.7);
+ assert.ok(record.scorch[record.map.indexOf('head')]===0||!record.map.includes('head'));
+ assert.ok(am.every(x=>bm.every(y=>x.material!==y.material)),'different actors have distinct uniform material instances');
+ fx.hit(a,{kind:'hit',fire:true,part:'torso',position:[0,0,0]});frame([a,b],6050);
+ a.visual.traverse(m=>{const r=m.userData.cldDamage?.rec;if(r&&r.map.includes('torso'))assert.equal(r.scorch[r.map.indexOf('torso')],0,'generic burn damage does not invent torso scorch');});
 }
 
 // --- cost -------------------------------------------------------------------

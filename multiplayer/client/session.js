@@ -170,7 +170,7 @@ export class WorldSession extends EventTarget {
   applyCommand(id, message) {
     const result = this.simulation.command(id,message);
     if (!result.ok) {
-      const detail = {code:result.code,message:result.code.replaceAll('_',' ')};
+      const detail = {code:result.code,message:result.code.replaceAll('_',' '),...(typeof result.reason==='string'?{reason:result.reason.slice(0,280)}:{}),...(result.missing?{missing:result.missing}:{}),...(result.obstacle?{obstacle:result.obstacle}:{})};
       if (id === this.identity.peerId) this.emit('error',detail);
       // A stale counter learns the accepted floor at once instead of being refused until it catches up.
       else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail,

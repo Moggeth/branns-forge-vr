@@ -1,3 +1,4 @@
+import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
@@ -42,6 +43,13 @@ export function collectTarget(state,p,m,ctx){
  if(q){
   if(q.side&&q.side!==(p.side||'party'))return fail('not_your_resources');
   if(!collectibleCandidate(state,p,q.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
+  if(isTestingGift(q)){
+   const bundle=giftContents(state);
+   if(bundle.some(item=>(p.resources[item.kind]||0)+item.amount>999))return fail('inventory_full');
+   for(const item of bundle){p.resources[item.kind]=(p.resources[item.kind]||0)+item.amount;state.pickups.splice(state.pickups.indexOf(item),1);}
+   (p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+bundle.reduce((n,item)=>n+item.amount,0));
+   return ok(bundle.map(item=>({kind:'pickup',id:item.id,position:[item.x,item.y,item.z],material:item.kind})));
+  }
   if(q.kind==='apple'&&p.hp>=100)return fail('not_needed');
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
@@ -165,7 +173,7 @@ export function settlementAction(state,p,m,ctx){
 
 function targetFor(state,w,trees){
  const found=[];
- for(const q of state.pickups)if(q.kind===w.job&&(!q.side||q.side==='party'))found.push({id:q.id,position:[q.x,q.y,q.z],type:'pickup',item:q});
+ for(const q of state.pickups)if(!isTestingGift(q)&&q.kind===w.job&&(!q.side||q.side==='party'))found.push({id:q.id,position:[q.x,q.y,q.z],type:'pickup',item:q});
  if(w.job==='wood'){
   for(const l of state.looseLogs)if(!l.heldBy)found.push({id:l.id,position:l.position,type:'log',item:l});
   // Prefer wood already felled. A worker never chops a second tree while reachable logs exist.

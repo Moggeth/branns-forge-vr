@@ -171,6 +171,14 @@ test('mirrored rules and control names match the reference source', () => {
   assert.match(vr, /hand === 'left'\) actions\.push\('interact'\)/); assert.match(vr, /edge\('squeeze'\)\) actions\.push\(hand === 'left' \? 'cycle' : 'hand'\)/);
   assert.equal(CONTROLS.touch.collect, 'Collect');
 });
+test('forge proximity offers direct workshop; loose pickups retain E priority', () => {
+  const forge={id:'central-forge',type:'forge',position:[0,0,0],hp:100,side:'neutral'};
+  const s=snap({inventions:{structures:[forge]}}), h=hero({position:[0,0,4.8]});
+  const c=decideCue(view(),h,s,null,ctx());assert.equal(c.target,forge.id);assert.equal(c.action,'Open workshop');assert.equal(c.control,'E');
+  assert.equal(decideCue(view(),hero({position:[0,0,5.1]}),s,null,ctx()),null);
+  assert.equal(decideCue(view(),h,snap({inventions:{structures:[forge]},pickups:[{id:'stone1',kind:'stone',x:0,y:0,z:4,amount:1}]}),null,ctx()).target,'stone1');
+});
+
 test('cost: 48 logs + 256 pickups, 10k decisions', () => {
   const logs = Array.from({length: 48}, (_, i) => log(`log${i}`, [i % 8 - 4, .16, -10 - (i >> 3)]));
   const pickups = Array.from({length: 256}, (_, i) => ({id: `p${i}`, kind: 'stone', x: 20 + i % 16, z: 20 + (i >> 4), y: 0, amount: 1}));

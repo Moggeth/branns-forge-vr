@@ -57,6 +57,8 @@ export function createDeformationField({size = 384, half = 60, height, baseHeigh
   }
   return {
     data, size, half,
+    // Ground supports may change while edit IDs stay unchanged. Queue one bounded rebake.
+    invalidate() {known=new Map();queue=[[0,0,size-1,size-1]];cursor=0;peaks=new Map();},
     get pending() { return queue.length > 0; }, get cpuMs() { return cpuMs; }, get lastStepMs() { return lastStepMs; }, get maxStepMs() { return maxStepMs; },
     get texelsDone() { return texelsDone; }, get version() { return version; }, get queuedRects() { return queue.length; },
     // Diff accepted edits and queue dirty rects. Never samples anything itself.

@@ -1,3 +1,4 @@
+import {phoenixBank} from './phoenix-bank.js';
 import * as THREE from 'three';
 import {prepareAsset, prepareProjectile} from './asset-pose.js';
 import {updateSkinBounds} from './skin-bounds.js';
@@ -5,6 +6,7 @@ import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
 import {createEmbedFractures} from './embed-fractures.js';
 import {createProjectileStreaks} from './projectile-streaks.js';
+import {dressGoldenProjectile, disposeGoldenProjectile} from './siegebird-flock.js';
 import {attachEmberdew} from './emberdew-presentation.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
@@ -68,6 +70,15 @@ export function canonicalPart(name = '') {
   if (/leftarm|lefthand|arml|shoulderl|forearml|elbowl/.test(n)) return 'leftArm';
   if (/rightarm|righthand|armr|shoulderr|forearmr|elbowr/.test(n)) return 'rightArm';
   return 'torso';
+}
+
+// Shield primitives are skinned to an arm, but their surface is armour, not flesh.
+// Preserve this tag on baked detached geometry as well as authored GLB groups.
+function contactSurface(node) {
+  for (let n = node; n; n = n.parent) {
+    if (n.userData.contactSurface === 'shield' || /^shield(?:_|:|$)/i.test(n.name)) return 'shield';
+  }
+  return undefined;
 }
 
 function namedPart(node) {
@@ -187,7 +198,7 @@ export function segmentSurfaceContacts(root, from, to, targetId, prepared, {incl
         new THREE.Box3(new THREE.Vector3().fromArray(partBounds.min), new THREE.Vector3().fromArray(partBounds.max)), new THREE.Vector3());
       if (exit) impactThickness = THREE.MathUtils.clamp(justInside.distanceTo(partRoot.localToWorld(exit)) + .002, 0, .8);
     }
-    return {targetId, part, boneName: bone?.name || (!root.userData.detachedPart && anchor !== root ? anchor.name : ''), point: hit.point.toArray(), normal: normal.toArray(),
+    return {targetId, part, ...(contactSurface(mesh) ? {surface: 'shield'} : {}), boneName: bone?.name || (!root.userData.detachedPart && anchor !== root ? anchor.name : ''), point: hit.point.toArray(), normal: normal.toArray(),
       localPoint: anchor.worldToLocal(hit.point.clone()).toArray(), localNormal: localNormal.toArray(), localQuaternion: inverse.multiply(orientation).toArray(),
       partPosition: partRoot.getWorldPosition(new THREE.Vector3()).toArray(), partQuaternion: partRoot.getWorldQuaternion(new THREE.Quaternion()).toArray(),
       partPoses, localBounds: partBounds, ...(impactThickness===undefined?{}:{impactThickness}), distance: hit.distance};
@@ -250,7 +261,9 @@ export function snapshotDetachedPart(root, part) {
     for (const [name, attr] of Object.entries(attributes)) geometry.setAttribute(name, new THREE.Float32BufferAttribute(attr.values, attr.source.itemSize));
     geometry.computeVertexNormals(); geometry.computeBoundingSphere();
     const piece = new THREE.Mesh(geometry, mesh.material); piece.name = `${mesh.name}:detached`;
-    piece.userData.detachedPart = part; detached.add(piece);
+    piece.userData.detachedPart = part;
+    if (contactSurface(mesh)) piece.userData.contactSurface = 'shield';
+    detached.add(piece);
   });
   return detached;
 }
@@ -299,15 +312,16 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
   const remove = (map, id, ownsGeometry = false) => {
     const node = map.get(id); if (!node) return;
-    node.userData.emberdew?.dispose();
+    node.userData.emberdew?.dispose(); node.traverse(n => { if (n.userData.siegebirdGolden) disposeGoldenProjectile(n); });
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
-  function projectile(kind) {
+  function projectile(kind, golden = false) {
     // Flame tongues are pooled by the fire presentation; collision still sweeps
     // the same complete authoritative trail, independently of this empty group.
     if(kind==='flame')return new THREE.Group();
     const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
+    if (golden && kind === 'bolt') dressGoldenProjectile(visual);
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual);
     if (kind === 'fuel') { group.userData.emberdewRoot = visual; group.userData.emberdew = attachEmberdew({root: visual}); }
@@ -348,7 +362,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     for (const data of next.projectiles || []) {
       let node = projectiles.get(data.id);
-      if (!node) { node = projectile(data.kind); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
+      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
       node.position.fromArray(data.position);
       node.userData.flight = {position: new THREE.Vector3().fromArray(data.position), velocity: new THREE.Vector3().fromArray(data.velocity), age: 0};
       node.userData.projectileData = data;
@@ -362,14 +376,14 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         const age = Math.max(0, (next.tick - data.bornTick) / 60) || 0, curve = new THREE.Vector3().fromArray(data.curve || [0, 0, 0]);
         const fade = Math.max(0, 1 - age / .85); node.userData.wings.visible = curve.lengthSq() > .000001 && fade > 0;
         node.userData.wings.scale.setScalar(Math.max(.002, fade * 1.1));
-        node.userData.wings.rotation.z = THREE.MathUtils.clamp(curve.y, -1, 1) * -.8 * fade;
+        node.userData.wings.rotation.z = phoenixBank(data.curve,data.velocity,age,node.quaternion);
       }
     }
     const projectileIds=new Set((next.projectiles||[]).map(p=>p.id));
     for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
-      if (!node) { node = projectile(data.kind); if (!node) continue; embeds.set(data.id, node); }
+      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; embeds.set(data.id, node); }
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
       if (!target) { node.visible = false; fractures.remove(data.id); fractureAnchors.delete(data.id); continue; }
@@ -497,6 +511,45 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     return count;
   }
+  // Actual animated joint positions, bounded to eight samples per region. This
+  // reuses rendered transforms; it never reskins all vertices for fire ecology.
+  function fireSamples(id) {
+    const actor=actorFor(typeof id==='object'?id.id:id);if(!actor)return null;
+    // Joint pivots describe articulation rather than the extent of a surface.
+    // Use actual authored geometry so low flames can reach toes and lower limbs.
+    // Cache authored bounds relative to the actual weighted bone once, then
+    // transform at most eight points per region as that bone animates.
+    actor.root.updateMatrixWorld(true);
+    const cache=fireSamples.cache ||= new WeakMap();let records=cache.get(actor.visual);
+    if(!records){
+      const byAnchor=new Map(),point=new THREE.Vector3();
+      actor.visual.traverse(mesh=>{
+        if(!mesh.isMesh||!isVisible(mesh,actor.visual)||contactSurface(mesh))return;
+        if(mesh.isSkinnedMesh)mesh.skeleton.update();
+        const ids=mesh.geometry.attributes.skinIndex,weights=mesh.geometry.attributes.skinWeight;
+        for(let i=0;i<mesh.geometry.attributes.position.count;i++){
+          let anchor=null;
+          if(mesh.isSkinnedMesh&&ids&&weights){let best=-1;for(let j=0;j<4;j++)if(weights.getComponent(i,j)>best){best=weights.getComponent(i,j);anchor=mesh.skeleton.bones[ids.getComponent(i,j)];}}
+          const part=anchor?canonicalPart(anchor.name):namedPart(mesh);anchor ||= partAnchor(actor.visual,part);
+          let record=byAnchor.get(anchor);
+          if(!record){record={anchor,part,bounds:new THREE.Box3(),inverse:anchor.matrixWorld.clone().invert()};byAnchor.set(anchor,record);}
+          mesh.getVertexPosition(i,point).applyMatrix4(mesh.matrixWorld).applyMatrix4(record.inverse);record.bounds.expandByPoint(point);
+        }
+      });
+      records=[...byAnchor.values()].filter(r=>!r.bounds.isEmpty()).map(r=>{
+        const c=r.bounds.getCenter(new THREE.Vector3()),lo=r.bounds.min,hi=r.bounds.max;
+        return {anchor:r.anchor,part:r.part,points:[c,new THREE.Vector3(c.x,lo.y,c.z),new THREE.Vector3(c.x,hi.y,c.z),new THREE.Vector3(lo.x,c.y,c.z),new THREE.Vector3(hi.x,c.y,c.z),new THREE.Vector3(c.x,c.y,lo.z),new THREE.Vector3(c.x,c.y,hi.z)]};
+      });cache.set(actor.visual,records);
+    }
+    const out=Object.fromEntries(PARTS.map(p=>[p,[]]));
+    // Round-robin preserves feet/hands when a part spans several weighted bones.
+    for(let sample=0;sample<7;sample++)for(const record of records){
+      if(actor.data?.missingParts?.includes(record.part)||out[record.part].length>=8)continue;
+      out[record.part].push(record.points[sample].clone().applyMatrix4(record.anchor.matrixWorld).toArray());
+    }
+    return out;
+  }
+
   function dispose() {
     disposed = true;
     damageNumbers.dispose();
@@ -509,7 +562,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id] of detached) remove(detached, id, true);
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
-  return {sync, prepareActors, tick, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
+  return {sync, prepareActors, tick, fireSamples, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
     rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),

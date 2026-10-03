@@ -682,15 +682,17 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
   }
 
   // ---- damage: scorch + cracks/chips -------------------------------------
-  // One shared shader variant per SOURCE material (bounded by the asset set),
-  // fed per draw by material.onBeforeRender from object.userData.cldDamage.
-  // Values persist on actor records; no per-actor material/texture clones.
-  const variants = new Map(), variantOf = new WeakSet(), sourceOf = new WeakMap();
+  // GPU programs and textures remain shared. Material uniform instances belong
+  // to bounded actor/region records: standard-material uniforms are refreshed
+  // on material switches, not by ShaderMaterial's uniformsNeedUpdate flag.
+  const variants = new Set(), recordVariants = new Map(), detachedRecords = new Map(), variantOf = new WeakSet(), sourceOf = new WeakMap();
   const SUPPORTED = m => m && (m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial);
   const ZERO = new Float32Array(32), BLACK = new THREE.Color(0);
-  function variant(source) {
-    if (!SUPPORTED(source) || variantOf.has(source)) return source;
-    let m = variants.get(source);
+  function variant(source, record) {
+    source=sourceOf.get(source)||source;
+    if (!SUPPORTED(source)) return source;
+    let bySource=recordVariants.get(record);if(!bySource)recordVariants.set(record,bySource=new Map());
+    let m = bySource.get(source);
     if (m) return m;
     m = source.clone(); m.name = `${source.name || 'mat'}:cld`;
     const u = m.userData.cld = {cldScorch: {value: ZERO}, cldCrack: {value: ZERO}, cldGlow: {value: 0}, cldCore: {value: 0}, cldScale: {value: 4}, cldGlowColor: {value: new THREE.Color()}};
@@ -739,7 +741,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       u.cldScale.value = d ? d.scale : 4; u.cldGlowColor.value.copy(r ? r.color : BLACK);
       m.uniformsNeedUpdate = true;
     };
-    variants.set(source, m); variantOf.add(m); sourceOf.set(m, source);
+    variants.add(m); bySource.set(source,m); variantOf.add(m); sourceOf.set(m, source);
     return m;
   }
   function damageSetup(st) {
@@ -779,15 +781,17 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       r.core = golem && (data.armor ?? 3) === 0 ? (.6 + 1.4 * low) * pulse : 0;
     }
     for (const mesh of dm.meshes) {
-      if (Array.isArray(mesh.material)) { if (mesh.material.some(m => !variantOf.has(m))) mesh.material = mesh.material.map(variant); }
-      else if (!variantOf.has(mesh.material)) mesh.material = variant(mesh.material);
+      if (Array.isArray(mesh.material)) { if (mesh.material.some(m => !variantOf.has(m))) mesh.material = mesh.material.map(m=>variant(m,mesh.userData.cldDamage.rec)); }
+      else if (!variantOf.has(mesh.material)) mesh.material = variant(mesh.material,mesh.userData.cldDamage.rec);
     }
   }
+  function releaseRecord(record){const list=recordVariants.get(record);if(!list)return;for(const m of list.values()){m.dispose();variants.delete(m);}recordVariants.delete(record);}
   function releaseDamage(st) {
     for (const mesh of st.dmg?.meshes || []) {
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(m => sourceOf.get(m) || m) : sourceOf.get(mesh.material) || mesh.material;
       delete mesh.userData.cldDamage; delete mesh.userData.cldCoreMesh;
     }
+    for(const record of st.dmg?.recs||[])releaseRecord(record);
     st.dmg = null;
   }
 
@@ -852,15 +856,19 @@ totalEmissiveRadiance *= 1. + cldCore;`);
   }
   // nodes: Map(detachedId -> node) (combat-view `detached`), parts: snapshot.detachedParts.
   function syncDetached(nodes, parts = []) {
+    const liveIds=new Set(parts.map(p=>p.id));for(const [id,r] of detachedRecords)if(!liveIds.has(id)){releaseRecord(r);detachedRecords.delete(id);}
     for (const data of parts) {
       const node = nodes?.get?.(data.id); if (!node) continue;
       const c = corpses.get(data.sourceId), st = states.get(data.sourceId);
-      if (!node.userData.cldDamageSet && (c?.damage || st?.dmg)) { // persistent char/cracks on the remains
-        const d = c?.damage?.[data.part] || {scorch: st.dmg.shown[data.part], crack: st.dmg.cracks[data.part]};
+      if (!node.userData.cldDamageSet && (c?.damage || st?.dmg || data.scorch>0)) { // persistent char/cracks on the remains
+        const d = c?.damage?.[data.part] || {scorch: st?.dmg?.shown[data.part]||data.scorch||0, crack: st?.dmg?.cracks[data.part]||0};
+        d.scorch=Math.max(d.scorch,data.scorch||0);
         const rec = {map: [data.part], scorch: new Float32Array(32).fill(d.scorch, 0, 1), crack: new Float32Array(32).fill(d.crack, 0, 1), glow: 0, core: 0, color: c?.color || BLACK};
-        node.traverse(m => { if (m.isMesh) { m.userData.cldDamage = {rec, scale: 4.2}; if (!Array.isArray(m.material) && variantOf.has(m.material) === false && (d.scorch > .001 || d.crack > .001)) m.material = variant(m.material); } });
+        node.traverse(m => { if (m.isMesh) { m.userData.cldDamage = {rec, scale: 4.2}; if(d.scorch > .001 || d.crack > .001)m.material=Array.isArray(m.material)?m.material.map(source=>variant(source,rec)):variant(m.material,rec); } });
+        detachedRecords.set(data.id,rec);
         node.userData.cldDamageSet = true;
       }
+      const damageRecord=detachedRecords.get(data.id);if(damageRecord)damageRecord.scorch[0]=Math.max(damageRecord.scorch[0],data.scorch||0);
       if (!c || data.heldBy || c.age >= COLLAPSE[c.kind].T) continue;
       let piece = c.pieces.get(data.id);
       if (!piece) {
@@ -895,7 +903,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       emit(dirt, p[0], p[1], p[2], (n[0] + a * .5) * sp, (n[1] + .6 + b * .3) * sp, (n[2] + b * .5) * sp, c, c * (golem ? .93 : .95), c * (golem ? .86 : .82), .5 + rand(s, i + 13) * .5, -9.8, .8);
     }
     if (golem && (entry?.data?.armor ?? 0) > 0) for (let i = 0; i < 6; i++) emit(magic, p[0], p[1], p[2], n[0] * 2 + (rand(s, i + 200) - .5) * 3, n[1] * 2 + rand(s, i + 210) * 2, n[2] * 2 + (rand(s, i + 220) - .5) * 3, 1, .7, .3, .25, -6, 1);
-    if (event.fire || event.scorch) {
+    if (Number(event.scorch)>0) {
       const part = PARTS.includes(event.part) ? event.part : 'torso';
       st.dmg ||= (st.visual && !st.placeholder ? damageSetup(st) : null);
       if (st.dmg) st.dmg.local[part] = clamp(st.dmg.local[part] + (Number(event.scorch) || .25), 0, 1);
@@ -945,7 +953,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
     for (const o of decals.owned) o.dispose();
     for (const m of Object.values(decals.meshes)) m.dispose?.();
     for (const m of variants.values()) m.dispose();
-    variants.clear();
+    variants.clear();recordVariants.clear();detachedRecords.clear();
   }
 
   function isEmerging(id) { return !!states.get(id)?.emerging; }

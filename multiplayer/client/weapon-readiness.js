@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createPickLuminance} from './pick-luminance.js';
 
 // Diegetic weapon readiness for Brann's Forge held tools.
 //
@@ -10,13 +11,13 @@ import * as THREE from 'three';
 // - One Group `readiness:<tool>` is added under that host. Existing geometry, node names, socket names and
 //   parent transforms are never written. Surfaces are found by scanning authored vertices once.
 // - Inputs are fractions owned by the shared simulation; this module never runs its own timers.
-//   axe/pick/hammer: specialReady (4 s special) · crossbow: attackReady (0.7 s) · bow: attackReady (0.55 s,
+//   axe/pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
 //   curve adds nothing) · limb: attackReady (0.53 s) · wyrmspout: heat + overheated (3 s lock) and
 //   specialReady (2 s vent) · flask: attackReady (1 s toss; wick toggle is instant so it has no indicator).
 // - Max 3 draw calls per tool, no lights, every descendant has userData.ignoreContact = true.
 
 export const READINESS_TIMINGS = Object.freeze({
-  axe: {special: 4}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: .7}, bow: {attack: .55},
+  axe: {special: 4}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
   limb: {attack: .53}, wyrmspout: {vent: 2, overheatLock: 3}, flask: {attack: 1},
 });
 
@@ -181,7 +182,7 @@ class Strip {
 class Owner {
   constructor(tool) {
     this.group = new THREE.Group(); this.group.name = `readiness:${tool}`;
-    this.geometries = new Set(); this.materials = new Set();
+    this.geometries = new Set(); this.materials = new Set(); this.cleanup = [];
   }
   add(mesh, geometry, material) {
     if (geometry) this.geometries.add(geometry);
@@ -252,7 +253,9 @@ const BUILD = {
     settings.forEach(([p, q], i) => setting.setMatrixAt(i, _m.compose(p, q, _s))); setting.computeBoundingSphere();
     owner.add(setting, setting.geometry, setting.material);
     const gem = named(new THREE.OctahedronGeometry(.0058, 0).scale(.85, 1.45, .7), 'pick-node');
-    return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal)};
+    // The head's own Resonance gems carry the charge too: drain on use, re-ignite heart → arm tips → crown.
+    const luminance = createPickLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
+    return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal), luminance};
   },
   // Copper collar sleeve above the grip; four raised rings warm upward as the slam recharges.
   hammer(owner, host, find) {
@@ -407,7 +410,10 @@ export function createWeaponReadiness({root, tool, reducedMotion = false} = {}) 
       strip?.paint(value, ready ? 'ready' : 'charge', boost);
       return boost;
     };
-    if (parts.special) show(parts.special, channels.special, special);
+    if (parts.special) {
+      const boost = show(parts.special, channels.special, special);
+      parts.luminance?.update(special, time, reducedMotion, boost);
+    }
     if (parts.attack) {
       const boost = show(parts.attack, channels.attack, attack);
       if (parts.aim) { parts.aim(attack); parts.needle.material.emissiveIntensity = attack >= .999 ? .35 + boost * .9 : 0; }
@@ -427,6 +433,7 @@ export function createWeaponReadiness({root, tool, reducedMotion = false} = {}) 
   function dispose() {
     if (disposed) return; disposed = true;
     owner.group.removeFromParent();
+    owner.cleanup.forEach(fn => fn()); owner.cleanup.length = 0;
     owner.group.traverse(o => o.isInstancedMesh && o.dispose());
     owner.geometries.forEach(g => g.dispose()); owner.materials.forEach(m => m.dispose());
     owner.geometries.clear(); owner.materials.clear();

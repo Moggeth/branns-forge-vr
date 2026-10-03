@@ -68,6 +68,16 @@ export function buildFelled(trunk, notch, uvMap) {
  const stumpCap = sectionFace(stumpBark, above, [0, 1, 0], behind, uvMap, notch.radius, t), topCap = sectionFace(topBark, above, [0, -1, 0], behind, uvMap, notch.radius, t);
  return {stump: {bark: stumpBark, wood: [...n.lower, ...stumpCap]}, top: {bark: topBark, wood: [...n.upper, ...topCap]}, caps: {stump: stumpCap, top: topCap}};
 }
+/** Split the actual felled bark into a contiguous log; retain original UVs and add end-grain only at the seams. */
+export function buildTimberSection(top, low, high, uvMap, radius) {
+ const above=p=>p[1]-low,below=p=>high-p[1],ys=top.bark.flat().map(v=>v.p[1]);
+ const lower=low>Math.min(...ys)+1e-5,upper=high<Math.max(...ys)-1e-5;
+ const planes=[...(lower?[above]:[]),...(upper?[below]:[])];
+ const bark=clipTriangles(top.bark,...planes),wood=clipTriangles(top.wood,...planes),shell=[...bark,...wood];
+ if(lower)wood.push(...sectionFace(shell,above,[0,-1,0],()=>true,uvMap,radius,[1,0,0]));
+ if(upper)wood.push(...sectionFace(shell,below,[0,1,0],()=>true,uvMap,radius,[1,0,0]));
+ return {bark,wood};
+}
 /** Triangle list -> non-indexed BufferGeometry with position/normal/uv(/color). */
 export function toGeometry(tris, withColor = true) {
  const n = tris.length*3, P = new Float32Array(n*3), N = new Float32Array(n*3), U = new Float32Array(n*2), C = withColor ? new Float32Array(n*4) : null; let i = 0;

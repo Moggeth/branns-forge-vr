@@ -1,3 +1,5 @@
+Current takeover guide: [Claude handoff](../docs/CLAUDE-HANDOFF-20261003.md). This supersedes older proof/scope notes.
+
 # Browser multiplayer proof
 
 ## Cloud multiplayer is live - 2026-10-03
@@ -11,7 +13,7 @@ Refresh older tabs before making a new room. [Cloud setup, free limits and check
 
 ## Physical inventions — 2026-10-03
 
-Open **Menu → Manage the forge**. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
+Walk up to the forge and press **E** or tap **Open workshop**. **B** opens quick build; **T** directly places Timberline for Heroes (God T remains Frost); **Shift+B** places a bridge. Menu also retains Manage the forge. **Build** shows costs and missing materials; tap/click clear ground to place. **Stores** deposits everything and refines ore into physical metal at the forge. **Built** operates, repairs, turns and aims machines. The central forge and its work apron are permanent. Keep Wood as one resource; Iron/Mithril/Star ore refine 1:1 in 2–3 seconds. Shared stores belong to your side and pay recipes automatically (Heroes near forge/storehouses, Gods anywhere).
 
 All twelve core structure jobs are implemented. Timberline uses 2 Wood + 1 Iron per shot, cuts trees in a cascade and severs golem arms. Heavy Launcher costs 3 Stone + 1 Iron per shot and deforms ground. Wards, traps, gate, logging yard, prospecting, sanctuary rally, tower ramp and barracks defenders have distinct actions. Machines can turn 45° per action, with a short turning delay plus firing reload. Opponents can attack Influence sources to disable nearby destructive God spells. Quiet-interval incursions and distant patrols provide ongoing salvage.
 
@@ -328,3 +330,17 @@ Choose **Play solo** in the lobby (or **Play solo instead** after a connection f
 Regression: `node tests/solo-session.mjs` covers both roles, resource-preserving save/resume, reset and zero WebSockets. `node tests/browser-quality-solo.mjs` covers actual renderer startup, touch jump/attack, role switching, quick-cast skeleton spawn, diagnostics, disabled invites and a 390x650 lobby. Uses the existing PW_CORE/PW_CHROME/ACCEPT_BASE/BROWSER_QA_DIR harness settings.
 
 Performance evidence and remaining cold-start/GPU limitations: [Performance and quality](../docs/PERFORMANCE-QUALITY-20261003.md). The browser's canvas.brannDiagnostics().cpuTimings provides bounded rolling CPU measurements; it is not GPU timing.
+
+## Timber and stone foundations - 2026-10-03
+Cut trees lower for more Wood. The trunk separates into matching physical logs at touchdown; the canopy disperses in a brief leaf burst. In Workshop > Build, place an 8-Stone Foundation, then build Timberline or another fitting structure on top. Its six-metre tile holds the ground against earth magic while intact; destroying it releases that protection. Repair restores it. Existing saves remain supported.
+See [timber checks](../docs/CONTINUOUS-TIMBER-20261003.md) and [foundation checks](../docs/STONE-FOUNDATIONS-20261003.md).
+
+
+## Construction and ranged polish - 2026-10-03
+
+Hold right mouse to aim Siegebird or zoom Emberwing. Emberwing Q/Special locks the Phoenix curve; its stronger guide shows the predicted route, and Phoenix contacts ignite targets. Siegebird has an authored physical 30m sight with 50m/70m marks. On touch, use the Aim action. Escape deliberately releases capture; returning focus attempts capture only when browser rules permit it.
+
+Stone foundations use worn Opus masonry, separated from rendered soil while maintaining the same walkable surface. Placement previews and failures share authority validation and explain the remedy. Enemy scorching follows exposed body regions and persists after extinguishing. Material contacts select varied stone, timber, bone, metal, shield or flesh audio. See ../docs/INTERACTION-COMBAT-PASS-20261003.md for verification and limitations.
+
+
+Temporary testing supplies: every fresh world places one shared Timberline gift bundle on the forge approach (-1.2, 6.2), reachable from Hero spawn. Press E/Collect once for exactly 10 Wood, 6 Iron, 2 Mithril. Existing pickup art is reused at the user's request. The bundle is consumed atomically, saved normally, and never refilled by joining/loading. Older saves are not retroactively granted supplies; start/reset a world to receive it.

@@ -1,3 +1,4 @@
+import {createStoneFoundation,disposeStoneFoundationArt} from './foundation-art.js';
 // Procedural invention art for Brann's Forge. +Y up, -Z forward, metres, base at y=0.
 // Only dependency: three. Materials and geometries are shared across every model.
 import * as THREE from 'three';
@@ -73,6 +74,7 @@ function beam(parent, mat, a, b, w = 0.1, h = w) {
 
 // ---------------------------------------------------------------- models
 const BUILDERS = {
+  foundation(root, P) { root.add(createStoneFoundation()); },
   storehouse(root, P) {
     part(root, 'box', 'stoneDark', [3.4, 0.12, 2.8], [0, 0.06, 0]);
     for (const [x, z] of [[-1.6, -1.3], [1.6, -1.3], [-1.6, 1.3], [1.6, 1.3]]) part(root, 'box', 'timberDark', [0.16, 2.3, 0.16], [x, 1.27, z]);
@@ -567,6 +569,7 @@ export function countInventionMeshes(root) {
 }
 
 export function disposeInventionArt() {
+  disposeStoneFoundationArt();
   if (G) for (const g of Object.values(G)) g.dispose();
   if (M) for (const m of Object.values(M)) m.dispose();
   G = null;

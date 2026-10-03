@@ -11,6 +11,11 @@
 //   mat.dispose();
 
 export const MATERIAL_SOUNDS = Object.freeze({
+ stone_blunt: {files:['stone_blunt_a','stone_blunt_b','stone_blunt_c'],priority:5,cap:3,duration:.34,rate:.065,cull:35,cooldown:.025},
+ timber_knock: {files:['timber_knock_a','timber_knock_b','timber_knock_c'],priority:5,cap:3,duration:.34,rate:.07,cull:35,cooldown:.025},
+ shield_thunk: {files:['shield_thunk_a','shield_thunk_b','shield_thunk_c'],priority:6,cap:3,duration:.34,rate:.06,cull:40,cooldown:.025},
+ flesh_thud: {files:['flesh_thud_a','flesh_thud_b','flesh_thud_c'],priority:6,cap:3,duration:.34,rate:.07,cull:30,cooldown:.025},
+ phoenix_call: {files:['phoenix_call_a','phoenix_call_b','phoenix_call_c'],priority:7,cap:2,duration:.62,rate:.025,cull:55,cooldown:.3},
  // files (variants), priority (higher survives stealing), cap (same-sound instances), duration s, rate jitter,
  // cull m (beyond this no nodes are created), cooldown s (global minimum spacing for this sound)
  pick_stone:     {files: ['pick_stone_a', 'pick_stone_b', 'pick_stone_c'], priority: 5, cap: 4, duration: .46, rate: .05, cull: 35, cooldown: .02},
@@ -19,7 +24,7 @@ export const MATERIAL_SOUNDS = Object.freeze({
  stone_fracture: {files: ['stone_fracture_a', 'stone_fracture_b'], priority: 8, cap: 2, duration: 1.3, rate: .04, cull: 60, cooldown: .05},
  ore_break:      {files: ['ore_break_a', 'ore_break_b'], priority: 9, cap: 2, duration: 1.1, rate: .03, cull: 50, cooldown: 0}
 });
-export const MATERIAL_EVENT_KINDS = Object.freeze(['hit', 'headshot', 'stone_hit', 'ore_break', 'armor_break', 'embed', 'hammer_slam']);
+export const MATERIAL_EVENT_KINDS = Object.freeze(['hit', 'headshot', 'stone_hit', 'ore_break', 'armor_break', 'embed', 'hammer_slam','invention_hit','invention_destroyed','shoot']);
 export const VOICE_CEILING = 12;
 const SAME_SOURCE_COOLDOWN = .045; // s: same sound on the same id (duplicate packet / multi-contact flam)
 
@@ -49,6 +54,13 @@ export function materialLayersFor(event) {
  const k = event?.kind;
  if (!MATERIAL_EVENT_KINDS.includes(k)) return [];
  const material = materialOf(event), e = energyOf(event);
+ if(k==='shoot')return event.phoenix?[{sound:'phoenix_call',gain:.58,rateBase:1}]:[];
+ if(k==='embed'&&!event.impact)return [];
+ if(event.blocked||material==='shield')return [{sound:'shield_thunk',gain:.85,rateBase:1}];
+ if(material==='flesh')return [{sound:'flesh_thud',gain:.85,rateBase:1}];
+ if(material==='wood')return [{sound:'timber_knock',gain:.85,rateBase:1}];
+ if(material==='stone'&&(event.sourceMaterial==='bone'||k==='invention_hit'))return [{sound:'stone_blunt',gain:.95,rateBase:1}];
+ if(k==='invention_destroyed')return [{sound:material==='metal'?'metal_ricochet':'stone_fracture',gain:.9,rateBase:.9}];
  if (k === 'ore_break') return [{sound: 'ore_break', gain: 1, rateBase: 1}];
  if (k === 'hammer_slam') return [{sound: 'stone_fracture', gain: 1, rateBase: .92}];
  if (k === 'armor_break') return [{sound: 'stone_fracture', gain: .7, rateBase: 1.18}]; // golem plate; its hit event adds the bite

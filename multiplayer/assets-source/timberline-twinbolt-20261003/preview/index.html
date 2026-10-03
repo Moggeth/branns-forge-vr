@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timberline Preview</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+} }
+</script>
+<style>
+  :root { --bg: #1d1915; --panel: rgba(28, 23, 18, 0.88); --ink: #f2e6d2; --muted: #b9a68a; --line: rgba(242, 230, 210, 0.14); --accent: #d9a24a; --accent-ink: #20170c; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --panel: rgba(250, 244, 233, 0.92); --ink: #2b2016; --muted: #7a6650; --line: rgba(43, 32, 22, 0.14); } }
+  :root[data-theme="dark"] { --panel: rgba(28, 23, 18, 0.88); --ink: #f2e6d2; --muted: #b9a68a; --line: rgba(242, 230, 210, 0.14); }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  #panel { position: fixed; top: 12px; left: 12px; width: 264px; max-height: calc(100vh - 24px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-sizing: border-box; backdrop-filter: blur(6px); }
+  #panel h1 { font-size: 16px; margin: 0 0 2px; letter-spacing: 0.04em; }
+  #panel .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  label { display: block; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; cursor: pointer; min-height: 32px; }
+  button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.fire { width: 100%; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; font-size: 15px; min-height: 40px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  #state { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  #log { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); margin-top: 8px; max-height: 150px; overflow: auto; border-top: 1px solid var(--line); padding-top: 6px; white-space: pre; }
+  #hint { position: fixed; right: 12px; bottom: 12px; color: var(--muted); font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; }
+  body.capture #panel, body.capture #hint { display: none; }
+  @media (max-width: 600px) { #panel { width: auto; right: 12px; max-height: 46vh; } #hint { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>TIMBERLINE</h1>
+  <div class="sub">Twin-bolt ballista · asset preview</div>
+  <button class="fire" id="fire">Fire (Space)</button>
+  <div id="state">loading…</div>
+  <label>Traverse <span id="yawv"></span></label>
+  <input type="range" id="yaw" min="-180" max="180" value="0" step="1">
+  <label>Elevation <span id="pitchv"></span></label>
+  <input type="range" id="pitch" min="-8" max="25" value="4" step="0.5">
+  <label>Camera</label>
+  <div class="row" id="views"></div>
+  <label>Speed</label>
+  <div class="row" id="speeds"></div>
+  <label>Show</label>
+  <div class="row">
+    <button id="auto" class="on">Auto reload</button>
+    <button id="lod">LOD auto</button>
+    <button id="sockets">Sockets</button>
+    <button id="col">Collision</button>
+    <button id="targets" class="on">Trees</button>
+  </div>
+  <div id="log"></div>
+</div>
+<div id="hint">Drag to orbit · Space fires · R reloads</div>
+<script type="module" src="./preview.js"></script>
+</body>
+</html>
