@@ -75,6 +75,19 @@ export function flushMeteorRewards(state,height){
  }
 }
 
+// Depleted ore has already paid its one mining reward. Removing an unreferenced
+// tombstone frees a slot without changing terrain, pickups, inventory or IDs.
+export function reclaimDepletedDeposits(state){
+ const referenced=new Set([
+  ...(state.embeds||[]).map(e=>e.targetId),...(state.fireSurfaces||[]).map(e=>e.targetId),
+  ...(state.settlement?.workers||[]).map(w=>w.targetId),...(state.pendingStarfalls||[]).map(p=>p.id)
+ ]);
+ const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
+ const before=state.deposits.length;
+ state.deposits=state.deposits.filter(d=>!d.depleted||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&state.edits.some(e=>e.id===d.editId)));
+ return before-state.deposits.length;
+}
+
 // The settlement uses the existing finite world resources and combat actors.
 // Four workers and six raiders maximum; idle worlds do no settlement work.
 export const SETTLEMENT_RULES=Object.freeze({workers:4,workerMana:25,speed:2.8,workTicks:60,range:9,cap:999,raidTicks:7200});

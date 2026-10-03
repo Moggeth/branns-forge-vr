@@ -7,7 +7,7 @@ import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './f
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
-import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths} from './resources.js';
+import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits} from './resources.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
@@ -77,7 +77,7 @@ function damageHero(state, hero, amount, events) {
     if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);
     events.push(event('death', hero.position, hero.id));
     releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
-    hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0]; hero.protectedUntil=state.tick+180;
+    hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];hero.velocity=[0,0,0]; hero.protectedUntil=state.tick+180;
     events.push({...event('respawn',hero.position,hero.id),protectedUntil:hero.protectedUntil});
   }
 }
@@ -92,7 +92,7 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
 
 function instantiate(state) {
   const fireContext={nextId,terrainHeight,damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext)};
+  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext)};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
   const treeIndex = createTreeIndex();
@@ -113,7 +113,7 @@ function instantiate(state) {
       if (state.players.length >= MAX_PLAYERS) return fail('room_full');
       const position = spawn(state);
       state.players.push({id, name: cleanName(name), role, position, yaw: 0, hp: 100, mana: 100,
-        move: [0, 0], vy: 0, inputTick: -1000, attackTick: -1000, castTick: -1000,
+        move: [0, 0], vy: 0,velocity:[0,0,0], inputTick: -1000, attackTick: -1000, castTick: -1000,
         roleTick: -1000, seq: 0, stats:{kills:0,deaths:0,harvested:0,contribution:0}, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}});
       return ok([event('join', position, id)]);
     },
@@ -129,6 +129,7 @@ function instantiate(state) {
         if (!safeSeq(message.seq)) return fail('invalid_sequence');
         if (message.seq <= p.seq) return fail('duplicate_sequence');
         p.seq = message.seq;
+        if(message.action==='start')reclaimDepletedDeposits(state);
         const r = adventureAction(state.adventure, id, message, state);
         if (!r.ok) return fail(r.code);
         applyAdventureIntents(state, r.intents, adventureContext); return ok(r.events);
@@ -153,7 +154,7 @@ function instantiate(state) {
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
           releaseHeld(state,p,[0,0,0]); releaseLog(state,p);
-          p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;
+          p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
         return ok();
@@ -189,6 +190,7 @@ function instantiate(state) {
         }
         // Held logs own grab/release/stow first; a full hand blocks swings until the log is dropped or stowed.
         const logResult=logAction(state,p,message);if(logResult)return logResult;
+        if(message.action==='special'&&['axe','pick'].includes(p.tool))reclaimDepletedDeposits(state);
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const target=nearestCollectible(state,p,{height:(x,z)=>terrainHeight(state,x,z,false)});
@@ -267,6 +269,7 @@ function instantiate(state) {
       if (state.shrine.hp <= 0) return fail('shrine_disabled');
       if (state.tick - p.castTick < 45) return fail('cooldown');
       if (p.mana < COST[spell]) return fail('insufficient_mana');
+      if(spell==='crystal'||spell==='starfall')reclaimDepletedDeposits(state);
       if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           ((spell === 'grove' || spell === 'ring') && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
@@ -308,6 +311,7 @@ function instantiate(state) {
       if (state.shrine.hp === 0 && state.tick >= state.shrine.disabledUntil) state.shrine.hp = 100;
       treeIndex.update(state); const treeCuts=new Map(state.harvestedTrees.map(h=>[h.id,h]));
       for (const p of state.players) {
+        const previousPosition=[...p.position];
         p.mana = Math.min(100, p.mana + 3 / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
@@ -318,6 +322,11 @@ function instantiate(state) {
         if(p.role==='hero'){resolveForge(p.position,forgeY);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
+        let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
+        if(!p.move[0]&&!p.move[1]){vx=0;vz=0;}
+        // Collision corrections and spawn relocation are not locomotion impulse.
+        const speed=Math.hypot(vx,vz);if(speed>5){vx*=5/speed;vz*=5/speed;}
+        p.velocity=p.role==='hero'?[vx,p.vy,vz]:[0,0,0];
       }
       for (const pending of [...state.pendingStarfalls]) {
         if (pending.impactTick > state.tick) continue;
@@ -354,8 +363,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,head, hands}) =>
-          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, stats,castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, roleTick, position,velocity, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,head, hands}) =>
+          ({id, name, role, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -397,6 +406,7 @@ export function loadSimulation(saved) {
         !Array.isArray(p.move) || p.move.length !== 2 || !p.move.every(n => finite(n) && Math.abs(n) <= 1) ||
         Math.hypot(...p.move) > 1.000001 || (p.role === 'god' && Math.hypot(...p.move) > 0) ||
         !finite(p.vy) || Math.abs(p.vy) > 100 ||
+        (p.velocity!==undefined&&(!Array.isArray(p.velocity)||p.velocity.length!==3||!p.velocity.every(n=>finite(n)&&Math.abs(n)<=100)||Math.hypot(p.velocity[0],p.velocity[2])>5.000001)) ||
         !validTick(p.inputTick, saved.tick) || !validTick(p.attackTick, saved.tick) ||
         !validTick(p.castTick, saved.tick) || !validTick(p.roleTick, saved.tick) ||
         !Number.isSafeInteger(p.seq) || p.seq < 0 ||
@@ -464,7 +474,7 @@ export function loadSimulation(saved) {
   state.idCounter = saved.idCounter;
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     stats:Object.fromEntries(['kills','deaths','harvested','contribution'].map(k=>[k,p.stats?.[k]||0])),
-    yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy, inputTick: p.inputTick,
+    yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));

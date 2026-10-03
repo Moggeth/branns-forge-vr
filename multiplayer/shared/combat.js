@@ -12,6 +12,25 @@ const unit = v => vec(v,1.01)&&Math.abs(Math.hypot(...v)-1)<.02;
 const bounds = b => b&&vec(b.min,4)&&vec(b.max,4)&&b.min.every((n,i)=>n<=b.max[i]&&b.max[i]-n<=5);
 const partPose = p => p&&vec(p.position)&&quat(p.quaternion)&&(p.localBounds===undefined||bounds(p.localBounds));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const depth = n => Number.isFinite(n)&&n>=0&&n<=.25;
+const thickness = n => Number.isFinite(n)&&n>=0&&n<=.8;
+const rotate = (v,q) => {const [x,y,z,w]=q,[a,b,c]=v,tx=2*(y*c-z*b),ty=2*(z*a-x*c),tz=2*(x*b-y*a);return [a+w*tx+y*tz-z*ty,b+w*ty+z*tx-x*tz,c+w*tz+x*ty-y*tx];};
+function heldPose(d,holder){
+  const hand=holder.hands?.[1]||holder.hands?.[0],yaw=holder.yaw||0;
+  const q=hand?[...hand.quaternion]:[0,Math.sin(yaw/2),0,Math.cos(yaw/2)];
+  // Match the visible part's centre to the grip, not its authored bone pivot.
+  const box=d.localBounds,center=box?box.min.map((n,i)=>(n+box.max[i])*.5):[0,0,0];
+  const offset=rotate(center,q);
+  const right=[Math.cos(yaw),0,-Math.sin(yaw)],forward=[-Math.sin(yaw),0,-Math.cos(yaw)];
+  const grip=hand?holder.position.map((n,i)=>n+hand.position[i]):holder.position.map((n,i)=>n+right[i]*.3+forward[i]*.7+(i===1?1.2:0));
+  d.quaternion=q;d.position=grip.map((n,i)=>n-offset[i]);
+}
+function embedDepth(kind,part,measured,targetId){
+  if(targetId==='world'||targetId==='terrain')return .025;
+  const nominal=part==='head'?.26:part==='torso'?.3:.2;
+  const available=thickness(measured)&&measured>.001?measured:nominal;
+  return Math.round(clamp(available*.52,kind==='bolt'?.06:.045,kind==='bolt'?.17:.13)*1000)/1000;
+}
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton') {return Object.fromEntries(PARTS.map(part=>[part,kind==='golem'?120:part==='torso'?100:55]));}
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
@@ -74,7 +93,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   return true;
 }
 function segmentDistance(p,a,b){const d=b.map((n,i)=>n-a[i]),l=d.reduce((n,v)=>n+v*v,0),t=l?clamp(p.reduce((n,v,i)=>n+(v-a[i])*d[i],0)/l,0,1):0;return dist(p,a.map((n,i)=>n+d[i]*t));}
-function validContact(m){return vec(m.point)&&unit(m.normal)&&vec(m.localPoint,m.targetId==='world'||m.targetId==='terrain'?200:8)&&quat(m.localQuaternion)&&(m.boneName===undefined||(typeof m.boneName==='string'&&m.boneName.length<=128))&&(m.partPosition===undefined||vec(m.partPosition))&&(m.partQuaternion===undefined||quat(m.partQuaternion))&&(m.localBounds===undefined||bounds(m.localBounds))&&(m.partPoses===undefined||(m.partPoses&&typeof m.partPoses==='object'&&Object.keys(m.partPoses).length<=6&&Object.entries(m.partPoses).every(([k,v])=>PARTS.includes(k)&&partPose(v))));}
+function validContact(m){return vec(m.point)&&unit(m.normal)&&vec(m.localPoint,m.targetId==='world'||m.targetId==='terrain'?200:8)&&quat(m.localQuaternion)&&(m.localNormal===undefined||unit(m.localNormal))&&(m.impactThickness===undefined||thickness(m.impactThickness))&&(m.penetration===undefined||depth(m.penetration))&&(m.boneName===undefined||(typeof m.boneName==='string'&&m.boneName.length<=128))&&(m.partPosition===undefined||vec(m.partPosition))&&(m.partQuaternion===undefined||quat(m.partQuaternion))&&(m.localBounds===undefined||bounds(m.localBounds))&&(m.partPoses===undefined||(m.partPoses&&typeof m.partPoses==='object'&&Object.keys(m.partPoses).length<=6&&Object.entries(m.partPoses).every(([k,v])=>PARTS.includes(k)&&partPose(v))));}
 export function projectileContact(state,m,ctx){
   if(!m||typeof m!=='object')return fail('invalid_contact');
   const shot=state.projectiles.find(q=>q.id===m.projectileId);if(!shot||!validContact(m))return fail('invalid_contact');
@@ -85,7 +104,7 @@ export function projectileContact(state,m,ctx){
   state.projectiles.splice(state.projectiles.indexOf(shot),1);
   if(['flame','fuel'].includes(shot.kind))return ok(ctx.fireContact(state,shot,m));
   if(state.embeds.length>=COMBAT_LIMITS.embeds)state.embeds.shift();
-  state.embeds.push({id:shot.id,kind:shot.kind,targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.boneName?{boneName:m.boneName}:{})});
+  state.embeds.push({id:shot.id,kind:shot.kind,targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.localNormal?{localNormal:[...m.localNormal]}:{}),penetration:embedDepth(shot.kind,m.part,m.impactThickness,m.targetId),...(m.boneName?{boneName:m.boneName}:{})});
   const events=[{kind:'embed',id:shot.id,ownerId:shot.ownerId,position:[...m.point],targetId:m.targetId,impact:!enemy,normal:[...m.normal],material:detached?.kind==='skeleton'?'bone':'stone'}];
   if(enemy)hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?48:38,{...m,ownerId:shot.ownerId},ctx,events,{projectile:true});
   return ok(events);
@@ -100,8 +119,9 @@ export function combatAction(state,p,m,ctx){
     if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.attackTick=state.tick;
     if(flame){p.flameTick=state.tick;p.heat=clamp((p.heat||0)+.0125,0,1);if(p.heat>=.999){p.heat=1;p.overheatUntil=state.tick+180;}}
-    const id=ctx.nextId(state,'q'),speed=flame?10.5:6;
-    state.projectiles.push({id,ownerId:p.id,kind:flame?'flame':'fuel',lit:!flame&&!!p.flaskLit,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(!flame&&i===1?2:0)),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    const id=ctx.nextId(state,'q'),speed=flame?10.5:6,motion=flame?[0,0,0]:ctx.playerVelocity?.(p);
+    const inherited=vec(motion,100)?motion:[0,0,0];
+    state.projectiles.push({id,ownerId:p.id,kind:flame?'flame':'fuel',lit:!flame&&!!p.flaskLit,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(!flame&&i===1?2:0)+inherited[i]),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
     return ok([{kind:flame?'flame_emit':'fuel_throw',weapon:p.tool,position:[...m.origin],id}]);
   }
   if(m.action==='special'&&p.tool==='wyrmspout'){
@@ -119,7 +139,7 @@ export function combatAction(state,p,m,ctx){
     state.projectiles.push({id,ownerId:p.id,kind:p.tool==='bow'?'arrow':'bolt',position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*speed),curve:p.tool==='bow'?[...curve]:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});return ok([{kind:'shoot',weapon:p.tool,position:[...m.origin],id}]);
   }
   if(m.action==='projectileHit')return fail('host_required');
-  if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
+  if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
   if(m.action==='release'){if(m.throw!==undefined&&typeof m.throw!=='boolean')return fail('invalid_action');const dir=m.direction??[-Math.sin(p.yaw),.1,-Math.cos(p.yaw)];if(!vec(dir,1.01))return fail('invalid_action');const n=Math.hypot(...dir);if(n<.9||n>1.1)return fail('invalid_action');return releaseHeld(state,p,dir.map(v=>v/n),m.throw===true)?ok([]):fail('nothing_held');}
   if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart);
   if(m.action==='special'){
@@ -142,7 +162,7 @@ export function stepCombat(state,ctx,events){
   }
   for(const d of [...state.detachedParts]){
     const holder=state.players.find(p=>p.id===d.heldBy&&p.role==='hero');if(d.heldBy&&!holder)d.heldBy=null;
-    if(holder){const hand=holder.hands?.[1]||holder.hands?.[0],target=hand?holder.position.map((n,i)=>n+hand.position[i]):[holder.position[0]-Math.sin(holder.yaw)*1.2,holder.position[1]+1.1,holder.position[2]-Math.cos(holder.yaw)*1.2];d.position=d.position.map((n,i)=>n+(target[i]-n)*.4);d.quaternion=hand?[...hand.quaternion]:[0,Math.sin(holder.yaw/2),0,Math.cos(holder.yaw/2)];continue;}
+    if(holder){heldPose(d,holder);continue;}
     // Settled remains keep their actual geometry and grab/mining behavior, but
     // stop sampling all eight terrain corners every tick until re-thrown.
     if(state.tick-d.bornTick>45&&Math.hypot(...d.velocity)<.035&&Math.hypot(...d.angularVelocity)<.035){d.velocity=[0,0,0];d.angularVelocity=[0,0,0];continue;}
@@ -160,7 +180,7 @@ export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);
   const tick=n=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick;
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
-  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
+  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   const held=new Set();
   for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.miningHits!==undefined&&(d.kind!=='golem'||!Number.isInteger(d.miningHits)||d.miningHits<0||d.miningHits>1))||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
   for(const e of saved.embeds||[])if(!e||!unique(e.id)||!['arrow','bolt'].includes(e.kind)||!PARTS.includes(e.part)||!validContact(e)||!(e.targetId==='world'||e.targetId==='terrain'||saved.enemies.some(q=>q.id===e.targetId)||saved.detachedParts?.some(q=>q.id===e.targetId)))throw Error('Invalid embed');
@@ -173,7 +193,7 @@ export function restoreCombat(saved){
   const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value[k]!==undefined).map(k=>[k,structuredClone(value[k])]));
   return {
     projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','kind','position','previousPosition','velocity','curve','bornTick','trail','lit'])),
-    embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','boneName'])),
+    embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','localNormal','penetration','boneName'])),
     detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','hitIds','miningHits']),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
   };
 }
