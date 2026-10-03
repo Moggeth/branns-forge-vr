@@ -9,8 +9,13 @@ and loose-end cleanup. This handoff adds no new gameplay or deployment.
 - Real Windows checkout: `C:/Users/mog/OneDrive/Documents/Coding/Personal/Python/things_are_different_now/branns-forge-vr`.
 - The ChatGPT folder with a similar name holds attachments, not this Git checkout.
 - Play: https://branns-forge-multiplayer.vercel.app
-- Live gameplay revision: **4adc79c**. Verification-only follow-up: **34d08d3**.
-- Live deployment: `dpl_GaeqAKBdJG1naU3yop9MU27pzjRj`.
+- Live gameplay revision at handoff: **4adc79c** (`dpl_GaeqAKBdJG1naU3yop9MU27pzjRj`).
+  Verification-only follow-up: **34d08d3**. Later production deploys supersede this; check
+  Vercel for the current one.
+- 2026-10-03 Siegebird songbirds (PR #4, **9577d73**): `dpl_95AqcLDvbfWybauChX8UN3H5xcQn`.
+  Deploy 20.213 s; public check 1.552 s: root 200, `/assets/siegebird_songbird.glb` 200
+  (96788 bytes, matches source), live bundle contains Siegebird code. No in-game, mobile
+  or headset playtest of it recorded.
 - PR1 pick polish merged as `5a1b743`; PR2 Timberline kit merged as `3663970`.
   Integration on top of those merges is essential: do not replace it with the kit alone.
 - At handoff inspection, main matched origin/main, no open GitHub PRs, and the public

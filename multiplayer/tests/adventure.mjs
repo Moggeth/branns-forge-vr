@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
-import {createAdventure, stepAdventure, adventureAction, adventureCastGate, adventureCastRefund, validateRestore,
+import {settleCastPoint} from '../shared/spells.js';
+import {createAdventure, stepAdventure, adventureAction, expeditionRunning, validateRestore,
   checkpointAdventure, applyIntentsViaCheckpoint, adventureView, PACING} from '../shared/adventure.js';
 
 const results = [];
@@ -25,12 +26,7 @@ class Room {
     return r;
   }
   cast(id, spell, point) {
-    const msg = {type: 'cast', spell, point};
-    const gate = adventureCastGate(this.adv, id, msg, this.world());
-    if (!gate.ok) return gate;
-    const r = this.cmd(id, msg);
-    if (!r.ok) adventureCastRefund(this.adv, gate);
-    return r;
+    return this.cmd(id, {type: 'cast', spell, point});
   }
   tick(n = 1) {
     for (let i = 0; i < n; i++) {
@@ -207,20 +203,15 @@ test('defeat, bounded retries, and leave vote', () => {
   r.act('h2', {action: 'leave'}); assert.equal(r.adv.stage, 'idle');
 });
 
-test('hostile God summons are a bounded challenge, never forge spam', () => {
-  const r = new Room(); r.add('h1', 'hero'); r.add('g1', 'god'); r.add('g2', 'god'); r.act('g1', {action: 'start'});
-  assert.equal(adventureCastGate(r.adv, 'g1', {type: 'cast', spell: 'squad', point: [3, 0, 3]}, r.world()).code, 'expedition_keep_out');
-  const hp = r.player('h1').position;
-  assert.equal(adventureCastGate(r.adv, 'g1', {type: 'cast', spell: 'skeleton', point: [hp[0], 0, hp[2] + 13]}, r.world()).ok, true);
-  r.adv.hostileUsed = 0;
-  let spent = 0;
-  for (const spell of ['golem', 'squad', 'golem', 'squad']) if (adventureCastGate(r.adv, 'g2', {type: 'cast', spell, point: [-30, 0, -30]}, r.world()).ok) spent++;
-  assert.equal(spent, 1, 'budget 4 for one hero: one golem (3), then a squad (4) no longer fits');
-  assert.equal(adventureCastGate(r.adv, 'g2', {type: 'cast', spell: 'heal', point: [0, 0, 0]}, r.world()).ok, true, 'support spells unaffected');
-  const solo = new Room(); solo.add('g1', 'god'); solo.act('g1', {action: 'start'});
-  assert.equal(adventureCastGate(solo.adv, 'g1', {spell: 'skeleton', point: [-30, 0, -30]}, solo.world()).code, 'expedition_no_heroes');
-  const idle = new Room(); idle.add('g1', 'god');
-  assert.equal(adventureCastGate(idle.adv, 'g1', {spell: 'squad', point: [1, 0, 1]}, idle.world()).ok, true, 'free sandbox untouched');
+test('God summons are never refused; they only land outside the forge keep-out', () => {
+  const r = new Room(); r.add('h1', 'hero'); r.add('g1', 'god'); r.act('g1', {action: 'start'});
+  assert.equal(expeditionRunning(r.adv), true);
+  assert.deepEqual(settleCastPoint('squad', [3, 0, 4], {expedition: true}).map(n => +n.toFixed(6)), [7.2, 0, 9.6]);
+  assert.deepEqual(settleCastPoint('skeleton', [0, 0, 0], {expedition: true}), [0, 0, 12]);
+  assert.deepEqual(settleCastPoint('skeleton', [3, 0, 4], {expedition: false}).map(n => +n.toFixed(6)), [4.2, 0, 5.6], 'sandbox keeps the small forge apron');
+  assert.deepEqual(settleCastPoint('heal', [0, 0, 0], {expedition: true}), [0, 0, 0], 'support spells land where aimed');
+  assert.deepEqual(settleCastPoint('grove', [54, 0, -54]), [51, 0, -51], 'trees keep room inside the mountain wall');
+  const idle = new Room(); idle.add('g1', 'god'); assert.equal(expeditionRunning(idle.adv), false);
 });
 
 test('hostile payloads and corrupt saves are rejected', () => {
