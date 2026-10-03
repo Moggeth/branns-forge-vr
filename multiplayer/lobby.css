@@ -413,3 +413,16 @@ body.touch-controls-active .hero-tools {position:fixed;top:85px;left:50%;transfo
 @media(max-height:500px) and (orientation:landscape){body.touch-controls-active .hero-tools{top:auto;bottom:12px;width:230px;}body.touch-controls-active .hero-tools .spell-tray{display:grid;grid-template-columns:1fr 1fr;width:100%;}body.touch-controls-active .hero-tools .btn{min-height:36px;font-size:11px;padding:6px;}}
 
 @media(max-width:480px){.hud-self .meters{min-width:110px;flex:none}.hud-self .meter{grid-template-columns:18px 35px auto;gap:4px}.hud-self .meter-track{min-width:0}.hud-self .hud-self-text{flex:1}.hud-self .meter.mana{grid-template-columns:18px 35px auto}.hud-self .meter-label{font-size:9px;letter-spacing:0}}
+
+/* Authored overlay entry controls participate in the existing header flow, clear of the fixed phone utility dock. */
+body .hud-room .fo-entry {position:static;top:auto;right:auto;flex:none;pointer-events:auto;}
+body.field-overlay-open .fo-entry {display:none!important;}
+body.field-overlay-open #hud > :not(.hud-top) {visibility:hidden;}
+body.field-overlay-open .mui-root {pointer-events:none;}
+.howto-row {gap:8px;flex-wrap:wrap;}
+@media(max-width:600px){body.touch-controls-active .hud-room .fo-entry{gap:4px;}.hud-room .fo-entry-btn{width:44px;height:44px;}}
+
+@media(max-width:600px) and (orientation:portrait){
+  body.touch-controls-active[data-role="hero"] #heroTools{top:calc(var(--hud-header-bottom,108px) + 6px)!important;}
+  body.touch-controls-active[data-role="hero"] #hud > .xhud{top:calc(var(--field-tools-bottom,220px) + 6px)!important;}
+}
