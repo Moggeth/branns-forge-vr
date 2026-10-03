@@ -136,16 +136,16 @@ vec3 mountainRock(vec3 w, vec3 n, vec3 tint) {
   float mWarp = 0.8 * mtnNoise(w.xz * 0.07) + 0.45 * mtnNoise(vec2(mAlong, w.y) * 0.3);
   float mBed = fract((w.y + 0.14 * w.x - 0.09 * w.z) / 4.6 + mWarp);
   float mBeds = smoothstep(0.0, 0.3, mBed) * smoothstep(1.0, 0.7, mBed);
-  vec3 rock = mix(vec3(0.17, 0.168, 0.165), vec3(0.27, 0.225, 0.17), smoothstep(0.38, 0.72, mBody)); // granite vs sandstone
+  vec3 rock = mix(vec3(0.105, 0.11, 0.118), vec3(0.2, 0.185, 0.165), smoothstep(0.38, 0.72, mBody)); // alpine: cool granite vs weathered gneiss
   rock = mix(rock, vec3(0.24, 0.16, 0.11), smoothstep(0.7, 0.85, mtnNoise(w.xz * 0.06 + 9.1)) * 0.5); // iron-stained bodies
   rock *= 0.93 + 0.14 * mBeds;                                                  // beds now a hint, not a stripe
   float mBlock = mtnNoise(vec2(mAlong * 0.45, w.y * 0.8) + mWarp);              // jointed blocks
   rock *= 0.82 + 0.3 * mBlock;
   float mCl = abs(mtnNoise(vec2(mAlong * 0.42, w.y * 0.09) + mWarp * 0.6) - 0.5);
-  float mCleft = (1.0 - smoothstep(0.0, 0.055, mCl)) * mSteepR;                 // vertical clefts
+  float mCleft = (1.0 - smoothstep(0.0, 0.03, mCl)) * mSteepR;                 // vertical clefts
   float mSeep = smoothstep(0.58, 0.86, mtnNoise(vec2(mAlong * 0.9, w.y * 0.04 + 2.0))) * mSteepR; // dark seep streaks
   rock *= 1.0 - 0.25 * mSeep;
-  rock = mix(rock, vec3(0.055, 0.052, 0.05), mCleft * 0.8);
+  rock = mix(rock, vec3(0.045, 0.045, 0.048), mCleft * 0.4);
   rock *= 0.9 + 0.2 * mtnNoise(w.xz * 3.1 + w.y * 1.7);                          // grain
   float mLedge = smoothstep(0.62, 0.9, n.y);
   rock = mix(rock, vec3(0.29, 0.27, 0.24), mLedge * 0.3 * (1.0 - mCleft));       // dust/scree on ledges
@@ -159,11 +159,16 @@ vec3 mountainRock(vec3 w, vec3 n, vec3 tint) {
   float mLichen = smoothstep(0.72, 0.9, mtnNoise(w.xz * 0.9 + w.y * 0.3)) * smoothstep(20.0, 8.0, w.y) * (1.0 - moss);
   rock = mix(rock, vec3(0.26, 0.27, 0.21), mLichen * 0.35);
   // Snow: high line, only on up-facing ledges, broken by noise; summits keep thin caps instead of a white blanket.
-  float mLine = 22.5 + 2.4 * sin(w.x * 0.071) * cos(w.z * 0.053) + 2.2 * (mtnNoise(w.xz * 0.25) - 0.5);
+  // Alpine conifer belt: dark stippled forest on gentler low slopes, thinning with altitude into krummholz.
+  float mForestN = mtnNoise(w.xz * 1.9 + w.y * 0.6), mForestM = mtnNoise(w.xz * 0.21 + 3.7);
+  float mForest = smoothstep(27.0, 20.0, w.y + 4.0 * mForestM) * smoothstep(4.0, 7.0, w.y) * smoothstep(0.3, 0.55, n.y + 0.25 * mForestM);
+  vec3 mPine = mix(vec3(0.02, 0.04, 0.024), vec3(0.04, 0.07, 0.035), smoothstep(0.35, 0.8, mForestN)) * (0.75 + 0.5 * n.y);
+  rock = mix(rock, mPine, mForest * (0.75 + 0.25 * smoothstep(0.2, 0.45, mForestN)));
+  float mLine = 28.0 + 2.4 * sin(w.x * 0.071) * cos(w.z * 0.053) + 3.0 * (mtnNoise(w.xz * 0.25) - 0.5);
   float mSnowN = mtnNoise(w.xz * 1.4 + w.y * 0.2);
-  float snow = smoothstep(mLine - 0.6, mLine + 1.4, w.y) * smoothstep(0.62, 0.85, n.y + 0.25 * (mSnowN - 0.5));
-  snow = max(snow, smoothstep(mLine + 5.0, mLine + 8.0, w.y) * smoothstep(0.35, 0.6, n.y) * 0.85);
-  snow *= smoothstep(0.25, 0.45, mSnowN + 0.2) * (1.0 - mCleft);
-  vec3 snowCol = mix(vec3(0.55, 0.6, 0.68), vec3(0.8, 0.82, 0.84), smoothstep(0.5, 0.95, n.y));
+  float snow = smoothstep(mLine - 0.6, mLine + 1.4, w.y) * smoothstep(0.5, 0.72, n.y + 0.25 * (mSnowN - 0.5));
+  snow = max(snow, smoothstep(mLine + 4.0, mLine + 7.0, w.y) * smoothstep(0.22, 0.45, n.y) * 0.92);
+  snow *= smoothstep(0.25, 0.45, mSnowN + 0.2);
+  vec3 snowCol = mix(vec3(0.6, 0.66, 0.76), vec3(0.88, 0.9, 0.93), smoothstep(0.4, 0.95, n.y));
   return mix(rock * tint, snowCol * (0.85 + 0.15 * tint), clamp(snow, 0.0, 1.0));
 }`;

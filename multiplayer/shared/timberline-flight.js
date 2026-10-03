@@ -4,12 +4,16 @@ import {timberlinePairState,TIMBERLINE_FLIGHT} from '../assets-source/timberline
 import {sweepFilament} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-sim.js';
 import {worldTrees} from './world-content.js';
 export const TIMBERLINE_RELEASE_TICKS=3;
+// Manned shots carry an elevation (q.pitch, radians, positive = muzzle up). The rails pivot on the trunnion
+// 0.25 m below q.origin; at zero pitch the release eyes sit 0.924945 m ahead and 0.122416 m above it.
+const EYE_AHEAD=.924945,EYE_ABOVE=.122416,TRUNNION_BELOW=.25;
 export function timberlineLaunch(q){
- const dx=q.target[0]-q.origin[0],dz=q.target[2]-q.origin[2],d=Math.hypot(dx,dz),forward=[dx/d,0,dz/d],right=[-forward[2],0,forward[0]];
- return {origin:[q.origin[0]+forward[0]*.924945,q.origin[1]-.127584,q.origin[2]+forward[2]*.924945],forward,right,up:[0,1,0]};
+ const dx=q.target[0]-q.origin[0],dz=q.target[2]-q.origin[2],d=Math.hypot(dx,dz),fx=dx/d,fz=dz/d,p=q.pitch||0,cp=Math.cos(p),sp=Math.sin(p);
+ const ahead=EYE_AHEAD*cp-EYE_ABOVE*sp,above=EYE_AHEAD*sp+EYE_ABOVE*cp;
+ return {origin:[q.origin[0]+fx*ahead,q.origin[1]-TRUNNION_BELOW+above,q.origin[2]+fz*ahead],forward:[fx*cp,sp,fz*cp],right:[-fz,0,fx],up:[-fx*sp,cp,-fz*sp]};
 }
 export function timberlineFlight(q,tick){return timberlinePairState(Math.max(0,(tick-q.launchTick-TIMBERLINE_RELEASE_TICKS)/60),timberlineLaunch(q),TIMBERLINE_FLIGHT);}
-export function timberlineDuration(q){return TIMBERLINE_RELEASE_TICKS+Math.ceil(Math.max(0,Math.hypot(q.target[0]-q.origin[0],q.target[2]-q.origin[2])-.924945)/TIMBERLINE_FLIGHT.speed*60);}
+export function timberlineDuration(q){return TIMBERLINE_RELEASE_TICKS+Math.ceil(Math.max(0,Math.hypot(q.target[0]-q.origin[0],q.target[2]-q.origin[2])-EYE_AHEAD)/(TIMBERLINE_FLIGHT.speed*Math.cos(q.pitch||0))*60);}
 export function stepTimberline(s,q,c,events,structureDefs){
  const elapsed=s.tick-q.launchTick;if(elapsed<=TIMBERLINE_RELEASE_TICKS)return false;
  const a=timberlineFlight(q,s.tick-1),b=timberlineFlight(q,s.tick),hits=[];
@@ -24,7 +28,7 @@ export function stepTimberline(s,q,c,events,structureDefs){
  for(const h of hits){if(q.hitIds.includes(h.obj.id))continue;
   if(h.kind==='block'||h.kind==='ground'){events.push({kind:'timberline_stop',id:q.id,structureId:q.structureId,position:h.point,material:'stone'});return true;}
   q.hitIds.push(h.obj.id);
-  if(h.kind==='tree'){for(let cut=0;cut<3;cut++){const r=c.chopTree(s,h.obj,h.point,timberlineLaunch(q).forward,{terrainHeight:(x,z)=>c.terrainHeight(s,x,z,false)});events.push(...(r.events||[]).map(e=>({...e,by:q.owner})));}events.push({kind:'timberline_shear',id:q.id,structureId:q.structureId,position:h.point,material:'wood'});}
+  if(h.kind==='tree'){for(let cut=0;cut<3;cut++){const f=timberlineLaunch(q).forward,flatF=[f[0],0,f[2]].map(v=>v/Math.max(1e-6,Math.hypot(f[0],f[2]))),r=c.chopTree(s,h.obj,h.point,flatF,{terrainHeight:(x,z)=>c.terrainHeight(s,x,z,false)});events.push(...(r.events||[]).map(e=>({...e,by:q.owner})));}events.push({kind:'timberline_shear',id:q.id,structureId:q.structureId,position:h.point,material:'wood'});}
   else if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,270,{ownerId:q.owner,tool:'axe'},c,events);
   else c.damageEnemy(s,h.obj,250,events,q.owner);
  }
