@@ -295,7 +295,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
@@ -541,6 +541,14 @@ function removeNotice(id) { document.querySelector(`[data-notice="${id}"]`)?.rem
 function clearNotices() { $('notices').replaceChildren(); }
 
 let toastTimer = 0;
+// God spells leave Hero boons (shared/god-boons.js). Tell the Hero who got one, and the caster what the spell left.
+const GIFT_TEXT={stone_boulder:'a stone boulder to mine',iron_seam:'an iron seam to mine',crystal:'crystal shards along the crack',apple:'fruit that heals'};
+let lastGiftToast=0;
+function giftToast(e) {
+  if(e.gift==='charge'&&e.id===playerId)return toast(`Lightning struck close: your weapon is charged for ${e.hits} heavy hits.`);
+  if(e.gift==='swift'&&e.id===playerId)return toast('Frost quickens your step for six seconds.');
+  if(e.by===playerId&&GIFT_TEXT[e.gift]&&performance.now()-lastGiftToast>4000){lastGiftToast=performance.now();toast(`Your spell left the Heroes ${GIFT_TEXT[e.gift]}.`);}
+}
 function toast(text) {
   const el = $('toast');
   setText(el, text);

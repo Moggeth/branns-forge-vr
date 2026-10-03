@@ -14,6 +14,7 @@ import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMete
 import {stepVeins,validateVein} from './ore-veins.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
+import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
 import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs} from './trees.js';
 export const HZ = 60;
@@ -253,12 +254,12 @@ function instantiate(state) {
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
-          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);
+          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point)){const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:hitEnemy.id,by:p.id,position:[...message.point],hits:p.charge?.hits||0});hitEnemyPart(state,hitEnemy,message.part||'torso',(requestedTool==='hammer'?70:requestedTool==='limb'?30:34)+charge,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);}
           else if(message.targetId==='shrine')return fail('permanent_forge');
           return ok(events); // No fallback to another target when a precise surface missed.
         }
         const enemy = state.enemies.map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
-        if (enemy && Number.isFinite(enemy[1])) damageEnemy(state, enemy[0], 34, events,p.id);
+        if (enemy && Number.isFinite(enemy[1])) {const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:enemy[0].id,by:p.id,position:[...enemy[0].position],hits:p.charge?.hits||0});damageEnemy(state, enemy[0], 34+charge, events,p.id);}
         return ok(events);
       }
       if (p.role !== 'god') return fail('role_required');
@@ -305,6 +306,7 @@ function instantiate(state) {
         for (let i=0;i<lineCount;i++) state.edits.push({id:`${idNew}_${i}`,kind:spell,x:start[0]+(end[0]-start[0])*i/(lineCount-1),z:start[2]+(end[2]-start[2])*i/(lineCount-1),radius:2.5,height:spell==='wall'?1.5:-1.5,...(rupture?{rupture}:{})});
         liftActors(state);
       }
+      events.push(...castBoons(state,p,spell,at,{nextId,terrainHeight,damageHero},{start,end}));
       return ok(events);
     },
     step() {
@@ -319,7 +321,7 @@ function instantiate(state) {
         p.mana = Math.min(100, p.mana + (3+(p.role==='god'?Math.min(2,state.groves.filter(g=>!state.harvestedTrees.some(t=>t.id.startsWith(g.id)&&t.cuts>=3)).length*.15):0)) / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
-          moveOnTerrain(state,p.position,p.move[0]*5/HZ,p.move[1]*5/HZ);
+          const pace=5*swiftFactor(state,p)/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
@@ -332,6 +334,7 @@ function instantiate(state) {
         const speed=Math.hypot(vx,vz);if(speed>5){vx*=5/speed;vz*=5/speed;}
         p.velocity=p.role==='hero'?[vx,p.vy,vz]:[0,0,0];
       }
+      stepBoons(state);
       for (const pending of [...state.pendingStarfalls]) {
         if (pending.impactTick > state.tick) continue;
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
@@ -374,8 +377,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,head, hands}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -425,7 +428,7 @@ export function loadSimulation(saved) {
         (p.stats!==undefined&&(!record(p.stats)||!['kills','deaths','harvested','contribution'].every(k=>finite(p.stats[k])&&p.stats[k]>=0&&p.stats[k]<=1e9&&(k==='contribution'||Number.isInteger(p.stats[k]))))) ||
         (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
-        (p.siegebird !== undefined && !validSiegebird(p.siegebird)) ||
+        (p.siegebird !== undefined && !validSiegebird(p.siegebird)) || !validBoons(p, saved.tick) ||
         (p.heldOre!==undefined&&!['ironOre','mithrilOre','starOre'].includes(p.heldOre)) ||
         (p.rally!==undefined&&!validId(p.rally)) ||
         (p.side!==undefined&&!['party','rivals'].includes(p.side)) ||
@@ -493,7 +496,7 @@ export function loadSimulation(saved) {
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
-    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits}}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
+    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick}) => ({id, position, yaw, hp, attackTick,...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');

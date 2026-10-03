@@ -37,7 +37,7 @@ assert.equal(hitEnemyPart(s,enemy,'torso',200,{ownerId:'hero'},ctx,[]),false,'de
 kill(s,'skel2');assert.equal(s.pickups.length,1);assert.equal(s.pickups[0].amount,2,'nearby scrap coalesces');
 s=world();s.pickups=Array.from({length:256},(_,i)=>({id:`q${i}`,kind:'stone',amount:1,x:20,z:20}));kill(s);assert.equal(s.pickups.length,256);assert.equal(s.players[0].resources.iron,1,'saturated world delivers bounded scrap to credited player');
 s=world();const golem=createEnemy('golem',[0,0,0],'golem');s.enemies.push(golem);golem.armor=0;
-hitEnemyPart(s,golem,'torso',400,{ownerId:'hero'},ctx,[]);assert.equal(s.pickups.length,0,'golem retains physical remains to mine');
+hitEnemyPart(s,golem,'torso',400,{ownerId:'hero'},ctx,[]);assert.deepEqual(s.pickups.map(q=>[q.kind,q.amount]),[['iron',2],['gems',1]],'golem core breaks into iron and crystal (god-boons)');assert.ok(s.detachedParts.some(d=>d.part==='torso'),'golem retains physical remains to mine');s.pickups=[];
 const d=s.detachedParts.find(d=>d.part==='torso'),p=s.players[0];p.position=[0,0,1];p.yaw=0;p.tool='pick';d.position=[0,0,0];
 const strike={targetId:d.id,point:[0,0,0],normal:[0,1,0]};assert.ok(mineGolemRemains(s,p,strike,ctx).ok);assert.ok(mineGolemRemains(s,p,strike,ctx).ok);assert.equal(s.pickups[0].kind,'stone');assert.equal(s.pickups[0].amount,2);
 console.log('material-economy: catalog, old inventory upgrade, useful seeded veins, visible deterministic renewal, one-time scrap and mineable remains pass');

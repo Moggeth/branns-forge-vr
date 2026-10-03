@@ -1,4 +1,5 @@
 import {terrainSpecial} from './weapon-specials.js';
+import {addPickup} from './god-boons.js';
 import {queueMeteorReward} from './resources.js';
 import {specialCooldown} from './special-cooldowns.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
@@ -105,8 +106,13 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='skeleton')dropSkeletonSalvage(state,enemy,ctx,events,owner);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='skeleton')dropSkeletonSalvage(state,enemy,ctx,events,owner);else if(enemy.kind==='golem')dropGolemCore(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
+}
+// A felled golem's core breaks into iron and a shard of crystal (its remains stay mineable for stone).
+function dropGolemCore(state,enemy,ctx,events){
+ const [x,,z]=enemy.position;
+ for(const [kind,amount,dx] of [['iron',2,-.5],['gems',1,.5]]){const id=addPickup(state,kind,x+dx,z,amount,ctx);if(id)events.push({kind:'salvage',id,resource:kind,amount,position:[...enemy.position]});}
 }
 // Skeleton equipment is useful Iron immediately; ore has its separate Forge path.
 // Coalesce nearby scrap when the world is busy instead of making another draw call.

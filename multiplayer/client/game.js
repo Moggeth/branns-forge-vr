@@ -24,6 +24,7 @@ import {createAxeReadyCue} from './axe-ready-cue.js';
 import {createAxeCleaveView,playCleaveSound} from './axe-cleave-view.js';
 import {spellUnavailable} from './spell-availability.js';
 import {expeditionRunning} from '../shared/adventure.js';
+import {swiftFactor} from '../shared/god-boons.js';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
@@ -1026,7 +1027,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
-      const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*dt*5,move.z*dt*5);localPosition.fromArray(predicted);
+      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{});const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(snapshot, localPosition.x, localPosition.z)),localPosition.y);
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
