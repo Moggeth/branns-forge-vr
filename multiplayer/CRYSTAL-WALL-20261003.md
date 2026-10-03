@@ -11,7 +11,8 @@ on the shared authority tick and has four roles. It is cover, an attack, travers
   that the authority uses, so it shows the wall that will form. It turns amber and dashed while the special is
   recharging or the target is out of bounds. Q up, mouse up, pointer release or the XR trigger release casts.
   Escape, re-equipping or losing input cancels the aim.
-- **Shape.** The wall is 3 to 8 m long (from 0.9 m in front of the caster) and is built from 2 to 7 segments
+- **Shape.** The wall reaches 3.5 to 8.7 m out and starts 1.6 m in front of the caster, so casting while
+  standing still never raises the ground under you (a test checks 0.75 m around the caster). It is built from 2 to 7 segments
   of about 1 m. Each segment is a capsule terrain kernel `wall:{a,b,h0,h1,expireTick,owner}`, and the
   segments combine into one continuous crest up to 2.4 m high. The caster end is a 0.8-slope ramp you can
   walk up. Short elliptical end caps let a mined segment leave a real breach.

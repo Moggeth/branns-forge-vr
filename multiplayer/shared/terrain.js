@@ -6,7 +6,7 @@ export const SUNDER_SETTLE_DISTANCE=1.1;
 export const sunderDurationTicks=length=>Math.max(36,Math.min(120,Math.ceil(length/12*60)+12));
 /** Stonewhisper crystal wall: a chain of capsule kernels (continuous crest, no saddles between segments) that rises
  * behind a 10 m/s front, stands for one minute, then sinks back over SINK ticks. One edit per mineable segment. */
-export const PICK_WALL=Object.freeze({width:1.1,peak:2.4,rampStart:.55,rampSlope:.8,start:.9,minReach:3,maxReach:8,segment:1,maxSegments:7,
+export const PICK_WALL=Object.freeze({width:1.1,peak:2.4,rampStart:.55,rampSlope:.8,start:1.6,minReach:3.5,maxReach:8.7,segment:1,maxSegments:7,
   cap:.3,speed:10,lifetimeTicks:3600,sinkTicks:36,warnTicks:180,standing:2,launchTicks:42,launchPeak:1.6,heroLift:6.5,damage:65});
 export const pickWallDurationTicks=length=>Math.max(24,Math.ceil(length/PICK_WALL.speed*60)+10);
 const RUPTURE_DURATION={sunder:sunderDurationTicks,pick_wall:pickWallDurationTicks};

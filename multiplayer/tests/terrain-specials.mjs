@@ -199,4 +199,15 @@ assert.deepEqual([...new Set(s.snapshot().edits.filter(e=>e.kind==='pick_wall').
 // Legacy permanent walls (pre-v2 saves) still load and stay put.
 c=fixture('pick').checkpoint();c.edits.push({id:'legacyWall',kind:'pick_wall',x:12,z:12,radius:1,height:2.4});c.deposits.push({id:'legacyOre',kind:'stone',x:12,z:12,hits:0,maxHits:3,depleted:false,special:'pick_wall',editId:'legacyWall'});
 s=loadSimulation(c);for(let i=0;i<10;i++)s.step();assert.ok(s.snapshot().edits.some(e=>e.id==='legacyWall'));
+// Casting while standing still never lifts the caster: the ground under and around them (0.75 m, wider than the body) stays put for
+// the whole rise, for both an unaimed cast and the closest legal aim.
+for(const point of [undefined,[10,0,7]]){
+  const s=fixture('pick'),c0=s.snapshot(),p0=c0.players[0].position;
+  const around=state=>Array.from({length:16},(_,i)=>{const a=i*Math.PI/8;return terrainHeight(state,p0[0]+Math.sin(a)*.75,p0[2]+Math.cos(a)*.75);}).concat(terrainHeight(state,p0[0],p0[2]));
+  const ground=around(c0);assert.equal(s.command('h',{type:'action',action:'special',seq:1,...(point?{point}:{})}).ok,true);
+  for(let i=0;i<150;i++){s.command('h',{type:'input',seq:i+2,move:{x:0,z:0},yaw:0});s.step();}
+  const c1=s.snapshot();assert.ok(Math.abs(c1.players[0].position[1]-p0[1])<1e-6,'caster stays on the ground');
+  around(c1).forEach((h,i)=>assert.ok(Math.abs(h-ground[i])<1e-6,`ground near the caster unchanged ${i} ${point} ${(h-ground[i]).toFixed(4)}`));
+  assert.ok(c1.edits.some(e=>e.wall&&terrainHeight(c1,e.x,e.z)>ground.at(-1)+.4),'the wall itself rose');
+}
 console.log(`terrain-specials: pass (${((performance.now()-started)/1000).toFixed(3)} s)`);
