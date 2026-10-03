@@ -85,7 +85,7 @@ export class WorldSession extends EventTarget {
     this.stop(); this.identity = null; this.latest = null; this.sequence = 0; this.parked.clear();
     this.lastSave = 0; this.lastCheckpoint = 0;
     this.initialCheckpoint = options.save?.checkpoint || null;
-    this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || 'Little Orchard';
+    this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || (this.connection.local?'Solo Orchard':'Little Orchard');
     if (this.initialCheckpoint) loadSimulation(this.initialCheckpoint); // Reject corrupt saves before joining.
     this.running = true; this.last = performance.now(); this.accumulator = 0;
     this.timer = setInterval(() => this.tick(), 8);
@@ -249,6 +249,7 @@ export class WorldSession extends EventTarget {
     this.emit('snapshot',snapshot);
     // Exact sweep history is host-only; guests need current flight state, not16 old poses.
     // Millimetre rounding keeps the same JSON shape; checkpoints below stay exact.
+    if(!this.connection.local){
     const wireSnapshot=quantizeWire({...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)});
     const legacy = {kind:'snapshot',epoch:this.connection.epoch,snapshot:wireSnapshot};
     const peers = this.connection.peers;
@@ -261,6 +262,7 @@ export class WorldSession extends EventTarget {
         if (!frame) this.connection.send(id, legacy);
         else if (!this.connection.send(id, frame)) this.codec.resync(id);
       }
+    }
     }
     const now = performance.now();
     if(force || now-this.lastCheckpoint > 500) {

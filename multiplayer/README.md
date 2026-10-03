@@ -312,3 +312,10 @@ Press **Start Expedition**: gather and Deliver to the Forge, recover the fallen 
 Enemy melee commits to a target and direction during the wind-up. Dodge aside or retreat before the strike; a stagger or solid cover interrupts damage. Crowds separate and steer around nearby trunks and structures. Death grants three seconds of protection, clears a held attack and resets the camera at the new spawn. These rules apply to existing saves after refreshing the host's game.
 
 [Combat verification, limits and timings](../docs/COMBAT-QUALITY-20261003.md).
+
+## Play without the room service
+Choose **Play solo** in the lobby (or **Play solo instead** after a connection failure). This runs the same 60 Hz world, Hero/God roles, VR input route, equipment, Expedition and local saves on this device without opening signaling or WebRTC connections. The HUD says Solo; invite buttons are disabled. Solo saves resume locally. Closing the page stops the world; use Resume last saved world or export a recovery save to continue. Solo is not a replacement for friend rooms, which still require a reachable room service.
+
+Regression: `node tests/solo-session.mjs` covers both roles, resource-preserving save/resume, reset and zero WebSockets. `node tests/browser-quality-solo.mjs` covers actual renderer startup, touch jump/attack, role switching, quick-cast skeleton spawn, diagnostics, disabled invites and a 390x650 lobby. Uses the existing PW_CORE/PW_CHROME/ACCEPT_BASE/BROWSER_QA_DIR harness settings.
+
+Performance evidence and remaining cold-start/GPU limitations: [Performance and quality](../docs/PERFORMANCE-QUALITY-20261003.md). The browser's canvas.brannDiagnostics().cpuTimings provides bounded rolling CPU measurements; it is not GPU timing.

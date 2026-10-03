@@ -19,6 +19,7 @@ import {SPELLS} from './shared/spells.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
+import {LocalRoomConnection} from './client/local-room.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
 import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.js';
@@ -137,6 +138,8 @@ $('lobbyForm').addEventListener('submit', event => {
   joinFromForm();
 });
 $('create').addEventListener('click', () => start({create: true}));
+$('solo').addEventListener('click',()=>start({create:true,solo:true}));
+$('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save}));
 
 function joinFromForm() {
   const code = roomInput.value.trim();
@@ -211,6 +214,7 @@ function showLobbyStatus(text, {busy = false, retry = false, back = false, cance
   panel.classList.toggle('problem', !busy);
   setText($('lobbyStatusText'), text);
   $('statusRetry').hidden = !retry;
+  $('statusSolo').hidden = busy;
   $('statusBack').hidden = !back;
   $('statusCancel').hidden = !cancel;
   body.classList.toggle('lobby-busy', busy);
@@ -265,6 +269,7 @@ function teardown() {
 }
 
 function start(attempt) {
+  attempt={...attempt,solo:!!attempt.solo||attempt.save?.checkpoint?.room==='SOLO'};
   if (rendererFailed || !game) {
     showLobbyProblem('This browser couldn’t start the 3D world. Try a recent version of Chrome, Edge or Firefox.', {back: true});
     return;
@@ -278,7 +283,7 @@ function start(attempt) {
   snapshots = 0; inputs = 0;
 
   let next;
-  try { next = session = new WorldSession({url: peerEndpoint()}); }
+  try { next = session = new WorldSession(attempt.solo?{connection:new LocalRoomConnection()}:{url:peerEndpoint()}); }
   catch (error) { recordProblem(error); showLobbyProblem('We couldn’t open a connection to the forge. Please try again in a moment.', {retry: true}); return; }
 
   const mine = handler => event => { if (session === next) handler(event.detail); };
@@ -334,10 +339,11 @@ function onWelcome(detail) {
   playerId = detail.peerId;
   room = String(detail.room || '');
   const url = new URL(location.href);
-  url.search = ''; url.searchParams.set('room', room);
+  url.search = ''; if(!detail.local)url.searchParams.set('room', room);
   try { history.replaceState(null, '', url); } catch { /* sandboxed */ }
   roomInput.value = ROOM_PATTERN.test(room) ? room : roomInput.value;
-  setText($('hudRoom'), room); setText($('menuRoom'), room);
+  setText($('hudRoom'), detail.local?'Solo':room); setText($('menuRoom'), detail.local?'Solo — this device':room);
+  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite'])$(id).disabled=!!detail.local;
   setText($('hudName'), nameInput.value.trim() || 'Wanderer');
   hideLobbyStatus();
   setPhase('game');
@@ -445,7 +451,7 @@ function onSnapshot(snapshot) {
   } catch (error) { recordProblem(error); }
   else if (xrActive) game.setExpedition(null);
 
-  const count = `${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
+  const count = session?.connection.local?'This device':`${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
@@ -823,7 +829,7 @@ window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); forge
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
-  state: () => ({phase, connected, menuOpen, forgeOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !forgeOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !forgeOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });

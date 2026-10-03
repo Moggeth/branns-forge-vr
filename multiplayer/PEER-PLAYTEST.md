@@ -122,3 +122,12 @@ MVP actions, fullscreen and standalone metadata. Twelve Node regressions and
 thirteen synthetic real-renderer input assertions passed; physical phones remain
 pending. No signaling restart was needed. The compiled-only deploy now includes
 manifest.webmanifest, and still excludes tests/mobile-playtest.html.
+
+## Availability recovery, 2026-10-03
+The public quick-tunnel hostname stopped resolving and the resident 8789 service/tunnel were absent. The user has repeatedly and explicitly authorized their restoration. Automatic approval review still rejected startup with "blocked by policy"; user consent is not missing. Do not retry equivalent launch mechanisms to evade this restriction. The documented startup commands remain the recovery handoff; no replacement public endpoint was obtained.
+
+Added an explicit, independently useful **Play solo** transport. It starts no network listeners or sockets and does not disguise an unsuccessful multiplayer connection. Friend-room creation/joining remains unavailable until hosting can be restored. The Vercel deployment retains the existing peer endpoint rather than inventing a new one. Physical headset/phone and separate-network acceptance remain unverified.
+
+Measured verification: solo session/save tests 0.022 s, combat handoff 0.539 s, reconnect suite 0.103 s. Real-renderer local acceptance 6.398 s harness (6.943 s command): Hero jump and attack, role switch, God quick-cast enemy spawn, no sockets, usable phone lobby. Manual screenshot inspection retained the compact mobile Hero/God layout.
+
+Failure lessons: a local transport must emit the same hosting-status event as the network transport, otherwise the world renders but input stays inactive. The browser test asserts controlsActive before input. Initial quick-cast acceptance hit the forge apron and correctly failed protected_forge (35.493 s); a diagnostic retry confirmed the exact target at x0.797/z2.781 (35.648 s). Target ordinary meadow for successful-cast assertions. Do not relax forge protection. An assumed global Playwright path failed immediately (0.142 s); this machine's actual cached module is C:/Users/mog/AppData/Local/npm-cache/_npx/31e32ef8478fbf80/node_modules/playwright-core and Chromium is C:/Users/mog/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe. Discover cached paths if they change; no reinstall required. Browser captures/results live under repository logs/, not multiplayer/logs/.

@@ -107,7 +107,7 @@
     </header>
 
     <!-- New: shown by lobby-ui.js bindConnectivity() when navigator.onLine is false -->
-    <p id="offlineNote" class="bf-banner" data-tone="warn" role="status" hidden>You appear to be offline. Saved worlds still open, but creating or joining needs a connection.</p>
+    <p id="offlineNote" class="bf-banner" data-tone="warn" role="status" hidden>You appear to be offline. Play solo on this device. Friend rooms need a connection.</p>
 
     <form id="lobbyForm" class="lobby-form" novalidate>
       <div class="field">
@@ -145,6 +145,7 @@
         <section class="create-block">
           <button id="create" class="btn btn-primary btn-large" type="button">Create a world</button>
           <p class="hint">Start fresh and invite friends with a code.</p>
+          <button id="solo" class="btn btn-quiet" type="button">Play solo · no room service needed</button>
         </section>
 
         <div class="divider" role="presentation"><span>or</span></div>
@@ -166,6 +167,7 @@
       <span class="spinner" aria-hidden="true"></span>
       <p id="lobbyStatusText"></p>
       <div class="status-actions">
+        <button id="statusSolo" class="btn btn-secondary" type="button" hidden>Play solo instead</button>
         <button id="statusRetry" class="btn btn-secondary" type="button" hidden>Try again</button>
         <button id="statusBack" class="btn btn-quiet" type="button" hidden>Back</button>
         <button id="statusCancel" class="btn btn-quiet" type="button" hidden>Cancel</button>
