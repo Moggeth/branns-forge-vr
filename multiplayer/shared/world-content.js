@@ -22,7 +22,9 @@ export function renewGeology(state,ctx,events=[]){
  if(state.deposits.some(d=>d.id===id))return false;
  const kinds=['stone','iron','crystal','stone','iron','mithril'],kind=kinds[(cycle-1)%kinds.length];
  for(let attempt=0;attempt<16;attempt++){
-  const h=hash(state.seed,cycle*17+attempt),angle=(h%6283)/1000,radius=18+((h>>>12)%20),x=+(Math.cos(angle)*radius).toFixed(3),z=+(Math.sin(angle)*radius).toFixed(3);
+  const survey=(state.inventions?.structures||[]).find(b=>b.type==='prospector'&&b.hp>0&&state.inventions.surveyTick>state.tick-7200);
+  const h=hash(state.seed,cycle*17+attempt),angle=(h%6283)/1000,radius=survey?7+((h>>>12)%7):18+((h>>>12)%20),x=+((survey?.position[0]||0)+Math.cos(angle)*radius).toFixed(3),z=+((survey?.position[2]||0)+Math.sin(angle)*radius).toFixed(3);
+  if(Math.abs(x)>43||Math.abs(z)>43)continue;
   if((state.players||[]).some(p=>p.role==='hero'&&Math.hypot(p.position[0]-x,p.position[2]-z)<10)||state.deposits.some(d=>Math.hypot(d.x-x,d.z-z)<3)||(state.landmarks&&STARTING_SITES.some(s=>Math.hypot(s.x-x,s.z-z)<s.radius+2))||(state.structures||[]).some(b=>Math.hypot((b.x??b.position?.[0]??0)-x,(b.z??b.position?.[2]??0)-z)<5)||ctx.canPlace?.(x,z)===false)continue;
   const y=ctx.terrainHeight(state,x,z);if(!Number.isFinite(y)||Math.abs(y)>180)continue;
   state.deposits.push({id,x,z,kind,hits:0,maxHits:DEPOSIT_CATALOG[kind].maxHits,depleted:false});

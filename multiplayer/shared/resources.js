@@ -1,3 +1,4 @@
+import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
 import {worldTrees} from './world-content.js';
@@ -39,6 +40,7 @@ export function collectTarget(state,p,m,ctx){
  if(typeof m.targetId!=='string')return fail('invalid_target');
  const q=state.pickups.find(q=>q.id===m.targetId);
  if(q){
+  if(q.side&&q.side!==(p.side||'party'))return fail('not_your_resources');
   if(!collectibleCandidate(state,p,q.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
   if(q.kind==='apple'&&p.hp>=100)return fail('not_needed');
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
@@ -101,15 +103,15 @@ export function reclaimDepletedDeposits(state){
 // The settlement uses the existing finite world resources and combat actors.
 // Four workers and six raiders maximum; idle worlds do no settlement work.
 export const SETTLEMENT_RULES=Object.freeze({workers:4,workerMana:25,speed:2.8,workTicks:60,range:9,cap:999,raidTicks:7200});
-const PACK=['wood','stone','gems'],HOME=[0,6.5];
+const PACK=MATERIAL_KEYS,HOME=[0,6.5];
 const flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const bounded=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
 const integer=(v,a,b)=>Number.isSafeInteger(v)&&v>=a&&v<=b;
-export function createSettlement(){return {v:1,stock:{wood:0,stone:0,gems:0},workers:[],level:0,defenses:0,completed:0,encounter:null,lastResult:'',cooldownUntil:0,delivered:0};}
+export function createSettlement(){return {v:1,stock:emptyMaterials(),workers:[],level:0,defenses:0,completed:0,encounter:null,lastResult:'',cooldownUntil:0,delivered:0};}
 const upgradeCost=s=>({wood:6*(s.level+1),stone:4*(s.level+1),gems:s.level});
 const defenseCost=s=>({wood:4+2*s.defenses,stone:3+2*s.defenses,gems:0});
-const canPay=(s,cost)=>PACK.every(k=>s.stock[k]>=cost[k]);
-const pay=(s,cost)=>{for(const k of PACK)s.stock[k]-=cost[k];};
+const canPay=(s,cost)=>Object.entries(cost).every(([k,n])=>s.stock[k]>=n);
+const pay=(s,cost)=>{for(const [k,n] of Object.entries(cost))s.stock[k]-=n;};
 const managed=p=>p.role==='god'||Math.hypot(p.position[0],p.position[2])<=SETTLEMENT_RULES.range;
 export function settlementAction(state,p,m,ctx){
  const s=state.settlement;
@@ -163,12 +165,12 @@ export function settlementAction(state,p,m,ctx){
 
 function targetFor(state,w,trees){
  const found=[];
- for(const q of state.pickups)if(q.kind===w.job)found.push({id:q.id,position:[q.x,q.y,q.z],type:'pickup',item:q});
+ for(const q of state.pickups)if(q.kind===w.job&&(!q.side||q.side==='party'))found.push({id:q.id,position:[q.x,q.y,q.z],type:'pickup',item:q});
  if(w.job==='wood'){
   for(const l of state.looseLogs)if(!l.heldBy)found.push({id:l.id,position:l.position,type:'log',item:l});
   // Prefer wood already felled. A worker never chops a second tree while reachable logs exist.
   if(!found.length)for(const t of trees){const cut=state.harvestedTrees.find(c=>c.id===t.id);if(!cut||cut.cuts<3)found.push({id:t.id,position:[t.x,0,t.z],type:'tree',item:t});}
- }else for(const d of state.deposits)if(!d.depleted&&(w.job==='stone'?d.kind==='stone':d.kind==='meteor'))found.push({id:d.id,position:[d.x,0,d.z],type:'ore',item:d});
+ }else for(const d of state.deposits)if(!d.depleted&&(DEPOSIT_CATALOG[d.kind]?.resource===w.job||(w.job==='gems'&&d.kind==='meteor')))found.push({id:d.id,position:[d.x,0,d.z],type:'ore',item:d});
  const eligible=found.filter(t=>t.id!==w.avoidId||state.tick>=w.avoidUntil);
  return eligible.find(t=>t.id===w.targetId)||eligible.sort((a,b)=>flat(w.position,a.position)-flat(w.position,b.position)||a.id.localeCompare(b.id))[0]||null;
 }
@@ -276,11 +278,11 @@ export function settlementView(world,playerId){
 export function restoreSettlement(value,tick,ids,enemyIds=new Set()){
  if(value===undefined)return createSettlement();
  const bad=()=>{throw Error('Invalid settlement');},record=v=>v&&typeof v==='object'&&!Array.isArray(v),exact=(v,keys)=>record(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
- if(!exact(value,['v','stock','workers','level','defenses','completed','encounter','lastResult','cooldownUntil','delivered'])||value.v!==1||!exact(value.stock,PACK)||!PACK.every(k=>integer(value.stock[k],0,999))||!integer(value.level,0,3)||!integer(value.defenses,0,3)||!integer(value.completed,0,999)||!integer(value.delivered,0,1e9)||!integer(value.cooldownUntil,0,tick+180)||!['','victory','defeat'].includes(value.lastResult)||!Array.isArray(value.workers)||value.workers.length>4)bad();
+ if(!exact(value,['v','stock','workers','level','defenses','completed','encounter','lastResult','cooldownUntil','delivered'])||value.v!==1||!record(value.stock)||Object.keys(value.stock).some(k=>!PACK.includes(k))||!PACK.every(k=>value.stock[k]===undefined||integer(value.stock[k],0,999))||!integer(value.level,0,3)||!integer(value.defenses,0,3)||!integer(value.completed,0,999)||!integer(value.delivered,0,1e9)||!integer(value.cooldownUntil,0,tick+180)||!['','victory','defeat'].includes(value.lastResult)||!Array.isArray(value.workers)||value.workers.length>4)bad();
  for(const w of value.workers){
   if(!exact(w,['id','position','yaw','job','phase','cargo','targetId','workTicks','stuckTicks','bestDistance','avoidId','avoidUntil'])||typeof w.id!=='string'||w.id.length>64||!/^worker\d+$/.test(w.id)||ids.has(w.id)||!Array.isArray(w.position)||w.position.length!==3||!w.position.every((v,i)=>bounded(v,i===1?-200:-55,i===1?200:55))||!bounded(w.yaw,-Math.PI,Math.PI)||!PACK.includes(w.job)||!['seeking','travelling','working','returning','sheltering','store_full','no_resource','blocked'].includes(w.phase)||!integer(w.cargo,0,2)||typeof w.targetId!=='string'||!/^[-A-Za-z0-9_]{0,64}$/.test(w.targetId)||!integer(w.workTicks,0,59)||!integer(w.stuckTicks,0,120)||!bounded(w.bestDistance,0,160)||typeof w.avoidId!=='string'||!/^[-A-Za-z0-9_]{0,64}$/.test(w.avoidId)||!integer(w.avoidUntil,0,tick+1200))bad();
   ids.add(w.id);
  }
  if(value.encounter!==null){const e=value.encounter;if(!exact(e,['wave','elapsed','foes','killed'])||!integer(e.wave,1,1000)||e.wave!==value.completed+1||!integer(e.elapsed,0,7200)||!integer(e.killed,0,6)||!Array.isArray(e.foes)||e.foes.length>6||new Set(e.foes).size!==e.foes.length||!e.foes.every(id=>typeof id==='string'&&/^raid\d+$/.test(id)&&enemyIds.has(id))||e.foes.length+e.killed!==Math.min(6,2+value.completed))bad();}
- return structuredClone(value);
+ return {...structuredClone(value),stock:restoreMaterials(value.stock)};
 }

@@ -11,10 +11,11 @@ export function collectibleCandidate(state,p,id,ctx={}) {
  if(p?.role!=='hero'||!p.position||p.hp<=0)return null;
  const log=(state.looseLogs||[]).find(l=>l.id===id);
  const q=log||(state.pickups||[]).find(q=>q.id===id);
- if(!q)return null;
+ if(!q||q.side&&q.side!==(p.side||'party'))return null;
  return candidateFor(p,q,!!log,ctx);
 }
 function candidateFor(p,q,log,ctx) {
+ if(q.side&&q.side!==(p.side||'party'))return null;
  if(p?.role!=='hero'||!p.position||p.hp<=0)return null;
  const position=log?[...q.position]:[q.x,ctx.height?ctx.height(q.x,q.z):q.y,q.z];
  const eye=collectionEye(p),held=!!log&&q.heldBy===p.id;
