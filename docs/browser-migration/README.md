@@ -1,3 +1,5 @@
+> Historical selection audit (2026-10-02), not the current implementation inventory. See [current handoff](../CLAUDE-HANDOFF-20261003.md); many candidates below have since shipped.
+
 # What deserves to become the browser game?
 
 Decision date: 2026-10-02. This is a migration recommendation, not an instruction to delete native work.

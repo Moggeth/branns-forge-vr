@@ -69,12 +69,12 @@ const capped = createSimulation(); capped.addPlayer({id: 'g', role: 'god'});
 let cp = capped.checkpoint();
 cp.groves = Array.from({length: 64}, (_, i) => ({id: `t${i}`, x: i % 55, z: 0}));
 const loaded = loadSimulation(cp);
-assert.equal(loaded.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [0, 0, 0]}).code, 'world_limit');
+assert.equal(loaded.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [10, 0, 10]}).code, 'world_limit');
 assert.equal(loaded.snapshot().groves.length, 64);
 assert.equal(loaded.removePlayer('g').ok, true);
 assert.equal(loaded.snapshot().players.length, 0);
 
-// A Hero can break the God power anchor. Its cooldown persists across reload.
+// The central Forge is permanent. Its apron remains protected after hits and reload.
 const shrineSeed = createSimulation();
 shrineSeed.addPlayer({id: 'h'}); shrineSeed.addPlayer({id: 'g', role: 'god'});
 const shrineState = shrineSeed.checkpoint();
@@ -84,12 +84,12 @@ for (let i = 0; i < 4; i++) {
   assert.equal(shrineRoom.command('h', {type: 'action', seq: i + 1, action: 'strike'}).ok, true);
   for (let t = 0; t < 27; t++) shrineRoom.step();
 }
-assert.equal(shrineRoom.snapshot().shrine.hp, 0);
-assert.equal(shrineRoom.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [0, 0, 0]}).code, 'shrine_disabled');
+assert.equal(shrineRoom.snapshot().shrine.hp, 100);
+assert.equal(shrineRoom.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [0, 0, 0]}).code, 'protected_forge');
 const shrineRestored = loadSimulation(JSON.parse(JSON.stringify(shrineRoom.checkpoint())));
-while (shrineRestored.snapshot().shrine.hp === 0) shrineRestored.step();
+assert.equal(shrineRestored.snapshot().shrine.disabledUntil, 0);
 assert.equal(shrineRestored.snapshot().shrine.hp, 100);
-assert.equal(shrineRestored.command('g', {type: 'cast', seq: 2, spell: 'grove', point: [0, 0, 0]}).ok, true);
+assert.equal(shrineRestored.command('g', {type: 'cast', seq: 2, spell: 'grove', point: [10, 0, 10]}).ok, true);
 
 // User-imported checkpoints are untrusted, including nested objects.
 const safe = shrineSeed.checkpoint();
