@@ -1,11 +1,12 @@
 // Fixed-tick movement and committed melee. No clocks, rendering or random streams.
 // Strike remains tick 18: the existing authored animations depend on that contract.
 import {PICK_WALL} from './terrain.js';
+import {entSpec,entWaking,entRooting} from './ents.js';
 export const ENEMY_STRIKE_TICK=18;
 const flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
-const radius=e=>e.kind==='golem'?.5:.32;
+const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='golem'?.5:.32;
 
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,events}){
  const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
@@ -14,6 +15,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
  const blocked=(a,b)=>{const n=Math.ceil(flat(a,b)/.18);for(let i=1;i<n;i++){const t=i/n,p=a.map((v,k)=>v+(b[k]-v)*t);p[1]+=1.05;const q=[...p];resolve(q,0,.04);if(flat(p,q)>.003||ground(p[0],p[2])>p[1])return true;}return false;};
  for(const e of state.enemies){
   if(e.meteorBorn&&state.tick-e.unfurlTick<90)continue;
+  // An ent tearing free of the ground, or sinking its roots for good, neither walks nor strikes.
+  if(e.kind==='ent'&&(entWaking(e,state.tick)||entRooting(e,state.tick)))continue;
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}
@@ -21,7 +24,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
   let patrol=false;
   if(e.id.startsWith('camp_')&&best>14){const n=Number(e.id.replace(/\D/g,''))||0,a=state.tick/360+n;target={id:'patrol',position:[(n%2?-37:37)+Math.sin(a)*2,e.position[1],30+Math.cos(a)*2]};best=flat(e.position,target.position);patrol=true;}
   if(!target)continue;
-  const building=buildings.includes(target),reach=building?3.2:1.8;
+  const ent=e.kind==='ent'?entSpec(e):null,building=buildings.includes(target),reach=building?3.2:ent?ent.reach:1.8;
   let age=state.tick-e.attackTick;
   // Old saves can contain a wind-up without a locked target: let it recover harmlessly.
   const committed=age>=0&&age<34;
@@ -30,7 +33,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
    const dx=target.position[0]-e.position[0],dz=target.position[2]-e.position[2];
    const desired=Math.atan2(-dx,-dz);e.yaw=wrap(e.yaw+clamp(wrap(desired-e.yaw),-.15,.15));
    const legs=e.missingParts.filter(p=>p.endsWith('Leg')).length;
-   const speed=(e.kind==='golem'?1.25:2)*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
+   const speed=(ent?ent.speed:e.kind==='golem'?1.25:2)*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
    let vx=best>1.5?dx/Math.max(best,.001)*speed:0,vz=best>1.5?dz/Math.max(best,.001)*speed:0;
    const ci=Math.floor(e.position[0]/cell),cj=Math.floor(e.position[2]/cell);
    for(let i=ci-1;i<=ci+1;i++)for(let j=cj-1;j<=cj+1;j++)for(const other of grid.get(`${i},${j}`)||[]){
@@ -61,8 +64,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
   if(age===ENEMY_STRIKE_TICK){
    const victim=targets.find(p=>p.id===e.attackTarget);if(!victim)continue;
    const d=flat(e.position,victim.position),dot=(-Math.sin(e.yaw)*(victim.position[0]-e.position[0])-Math.cos(e.yaw)*(victim.position[2]-e.position[2]))/Math.max(d,.001);
-   if(d<(buildings.includes(victim)?3.5:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(buildings.includes(victim)||!blocked(e.position,victim.position))){
-    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(buildings.includes(victim))damageStructure?.(victim.id,amount,events);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else damageHero(state,victim,amount,events);
+   if(d<(buildings.includes(victim)?3.5:ent?ent.strike:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(buildings.includes(victim)||!blocked(e.position,victim.position))){
+    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(buildings.includes(victim))damageStructure?.(victim.id,amount,events);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
    }
   }
  }

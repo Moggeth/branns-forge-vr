@@ -110,7 +110,7 @@ export function createTreeIndex(cell = TREE_LIMITS.cell) {
  let key = '', trees = [], grid = new Map(), byId = new Map();
  const k = (i, j) => `${i},${j}`;
  return {
-  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
+  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
    for (const t of trees) { const c = k(Math.floor(t.x/cell), Math.floor(t.z/cell)); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t); } return true; },
   all: () => trees, get: id => byId.get(id),
   near(x, z, out = []) { out.length = 0; const ci = Math.floor(x/cell), cj = Math.floor(z/cell); for (let i = ci-1; i <= ci+1; i++) for (let j = cj-1; j <= cj+1; j++) { const g = grid.get(k(i, j)); if (g) for (const t of g) out.push(t); } return out; }
@@ -260,7 +260,7 @@ export function restoreHarvested(saved, treeIds) {
 }
 export function restoreLogs(saved, ids) {
  if (saved.looseLogs !== undefined && (!Array.isArray(saved.looseLogs) || saved.looseLogs.length > TREE_LIMITS.logs)) throw Error('Invalid log limit');
- const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), trees = new Set(worldTrees(saved).map(t => t.id));
+ const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), trees = new Set([...worldTrees(saved), ...(saved.awakenedTrees || [])].map(t => t.id)); // ent timber names its awakened tree
  const KEYS = ['id', 'sourceId', 'position', 'quaternion', 'velocity', 'angularVelocity', 'heldBy', 'bornTick', 'sleeping', 'section', 'length', 'radius'];
  return (saved.looseLogs || []).map(log => {
   if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > 55 || Math.abs(log.position[2]) > 55 || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
