@@ -231,7 +231,7 @@ class God {
   send(msg) { return this.room.cmd(this.id, {...msg, seq: ++this.seq}); }
   cast(spell, point, extra = {}) {
     const {SPELL_COST} = God; let waited = 0;
-    while (this.me.mana < SPELL_COST[spell] || this.room.t - this.me.castTick < 45) { this.room.step(1); assert.ok(++waited < 60 * 60, `mana wait ${spell}`); }
+    while (this.me.mana < SPELL_COST[spell]) { this.room.step(1); assert.ok(++waited < 60 * 60, `mana wait ${spell}`); }
     return this.send({type: 'cast', spell, point: [point[0], 0, point[1]], ...extra});
   }
   adventure(action, extra = {}) { const stage = this.room.adv.stage; let w = 0; while (this.me.mana < 31 || this.room.adv.tick - (this.room.adv.cool[this.id] ?? -1e9) < 120) { this.room.step(1); if (++w > 3600) break; } if (this.room.adv.stage !== stage) return {ok: true, skipped: 'stage_advanced'}; return this.send({type: 'adventure', action, ...extra}); }
@@ -320,7 +320,7 @@ function scenarioGod({letDie = false} = {}) {
   // Camp: God must shape and plant (deeds), tithe covers all resources when no hero can gather.
   assert.equal(god.cast('raise', [8, -8]).ok, true);
   assert.equal(god.cast('grove', [-14, -4]).ok, true);
-  assert.equal(god.cast('skeleton', [20, 20]).code, 'expedition_no_heroes');
+  assert.equal(god.cast('skeleton', [20, 20]).ok, true, 'a God alone may still summon');
   let tithes = 0;
   while (room.adv.stage === 'camp') {
     const kind = room.adv.stock.wood < room.adv.need.wood ? 'wood' : 'stone';
@@ -361,7 +361,7 @@ function scenarioMixed() {
   room.join('p1', 'hero'); room.join('p2', 'god');
   assert.equal(hero.adventure('start').ok, true);
   // Gate/refund checks with real casts.
-  assert.equal(god.cast('skeleton', [3, 3]).code, 'expedition_keep_out');
+  assert.equal(god.cast('skeleton', [3, 3]).ok, true, 'a summon at the forge lands at the keep-out edge');
   const drained = room.adv.hostileUsed;
   assert.equal(god.cast('raise', [6, -6]).ok, true); // shape deed
   // Spend mana to force a sim-side rejection after the gate reserved budget.
