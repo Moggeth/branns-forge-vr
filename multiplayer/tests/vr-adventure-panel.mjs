@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {FIXTURES} from './vr-adventure-fixtures.mjs';
 import {adventureView} from '../shared/adventure.js';
-import {PANEL, GATE, carried, deliverable, nextStep, layoutButtons, heroPanelModel, hitButton, toCanvas, drawHeroPanel, createVRAdventurePanel} from '../client/vr-adventure-panel.js';
+import {createSettlement,settlementView} from '../shared/resources.js';
+import {PANEL, GATE, carried, deliverable, nextStep, layoutButtons, heroPanelModel,forgePanelPages,forgePanelModel, hitButton, toCanvas, drawHeroPanel, createVRAdventurePanel} from '../client/vr-adventure-panel.js';
 
 // ---- mock canvas: records 2D calls so draws are countable without a browser
 function mockCanvas() {
@@ -26,11 +27,11 @@ function rigFixture({pointerHand = 'right', name = 'camp', clock} = {}) {
   for (let i = 0; i < 2; i++) rig.add(controllers[i], grips[i]);
   const sources = new Map([[0, xrSource('left')], [1, xrSource('right')]]);
   const head = new THREE.PerspectiveCamera(); rig.add(head);
-  const actions = [], time = clock || {t: 1000};
-  const panel = createVRAdventurePanel({parent: scene, controllers, grips, sources, onAction: a => actions.push(a), pointerHand, createCanvas: mockCanvas, now: () => time.t});
+  const actions = [],details=[], time = clock || {t: 1000};
+  const panel = createVRAdventurePanel({parent: scene, controllers, grips, sources, onAction: (a,d) => {actions.push(a);details.push(d);}, pointerHand, createCanvas: mockCanvas, now: () => time.t});
   const f = FIXTURES[name]();
   panel.update(f.view, f.snapshot, f.playerId);
-  return {scene, rig, controllers, grips, sources, head, panel, actions, time, f};
+  return {scene, rig, controllers, grips, sources, head, panel, actions,details, time, f};
 }
 const look = (obj, eye, target) => { obj.position.copy(eye); obj.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(eye, target, new THREE.Vector3(0, 1, 0))); obj.updateMatrixWorld(true); };
 // Watch pose: head pitched down 30 deg; panel-hand controller across the chest pointing sideways (not aimed).
@@ -233,12 +234,12 @@ test('bounded draws and no world targets: panel + cursor only, both ignored by w
   assert.equal(r.panel.mesh.material.map.isCanvasTexture, true);
 });
 
-test('session lifecycle: controller loss hides, endSession clears press/confirm, dispose is idempotent', () => {
+test('session lifecycle: one controller remains usable, endSession clears press/confirm, dispose is idempotent', () => {
   const r = rigFixture(); gameHandlers(r); watchPose(r); r.panel.tick(r.head);
   pointAt(r, 1, buttonWorld(r.panel, 'leave')); r.panel.tick(r.head);
   r.controllers[1].dispatchEvent({type: 'selectstart'}); r.controllers[1].dispatchEvent({type: 'selectend'});
   assert.equal(r.panel.state().confirmLeave, true);
-  r.sources.delete(0); r.panel.tick(r.head); assert.equal(r.panel.state().shown, false);
+  r.sources.delete(0); r.panel.tick(r.head); assert.equal(r.panel.state().shown, true,'look-down fallback retains access with one controller');
   r.sources.set(0, xrSource('left')); r.panel.tick(r.head); assert.equal(r.panel.state().shown, true);
   r.controllers[1].dispatchEvent({type: 'selectstart'});
   r.panel.endSession();
@@ -258,10 +259,57 @@ test('runtime wiring: panel guard runs first and lobby mirrors expeditionAction'
   const game = read('../client/game.js'), lobby = read('../lobby.js');
   assert.match(game, /if \(adventurePanel\.handleSelectStart\(i\)\) \{ presses\.begin\(i, 'panel'\); return; \}\n\s+if \(!active\) return;/);
   assert.match(game, /'selectend',\(\)=>\{const press=presses\.end\(i\);if\(press\?\.owner==='panel'\)adventurePanel\.handleSelectEnd\(i\);/);
-  assert.match(game, /movement\(\);\n\s+if \(renderer\.xr\.isPresenting\) adventurePanel\.tick\(renderer\.xr\.getCamera\(\), \{suppressed: !active \|\| role !== 'hero'\}\);/);
+  assert.match(game, /adventurePanel\.tick\(renderer\.xr\.getCamera\(\), \{suppressed: !active\}\)/);
   assert.match(game, /'sessionend', \(\) => \{ clearInput\(\); adventurePanel\.endSession\(\);/);
   const panelSource = read('../client/vr-adventure-panel.js');
   assert.doesNotMatch(panelSource, /buttons\[|addEventListener|querySelector|getElementById/, 'panel reads no gamepad buttons and no DOM');
   assert.match(lobby, /onExpeditionAction: expeditionAction/);
+  assert.match(game,/onAction: \(action,detail\) => onExpeditionAction\(action,detail\)/);
+  assert.match(lobby,/if\(action\.startsWith\('forge'\)\)\{session\?\.command\('action',\{action,\.\.\.detail\}\)/);
   assert.match(lobby, /if \(xrActive\) game\.setExpedition\(view, snapshot, playerId\);/);
+});
+
+function withForge(r){
+ r.f.snapshot.settlement=createSettlement();r.f.snapshot.settlement.stock={wood:30,stone:30,gems:5};r.f.snapshot.players[0].mana=100;
+ r.f.snapshot.settlement.workers=[{id:'worker1',name:'Worker 1',position:[0,0,6],yaw:0,job:'wood',phase:'working',cargo:0}];
+ r.panel.update(r.f.view,r.f.snapshot,'p1');return r;
+}
+function clickPanel(r,id,index=1){pointAt(r,index,buttonWorld(r.panel,id));r.panel.tick(r.head);r.controllers[index].dispatchEvent({type:'selectstart'});r.controllers[index].dispatchEvent({type:'selectend'});r.panel.tick(r.head);}
+function pageTo(r,id,index=1){for(let i=0;i<24&&r.panel.state().model.pageId!==id;i++)clickPanel(r,'forge-next',index);assert.equal(r.panel.state().model.pageId,id);}
+
+test('forge pages expose every authority action, carried supply detail and worker job with large buttons',()=>{
+ const r=withForge(rigFixture()),model=settlementView(r.f.snapshot,'p1'),pages=forgePanelPages(model);
+ for(const action of model.actions.filter(a=>a.action!=='forgeAssign'))assert.ok(pages.some(p=>p.action===action.action&&p.detail?.kind===action.detail?.kind));
+ assert.ok(pages.some(p=>p.action==='forgeAssign'&&p.detail.workerId==='worker1'&&p.detail.kind==='stone'));
+ for(const page of pages){const m=forgePanelModel(model,page.id);assert.equal(m.buttons.length,3);for(const b of m.buttons)assert.ok(b.h/PANEL.py*PANEL.height>=.03);}
+ r.f.snapshot.players[0].position=[30,0,30];const far=forgePanelPages(settlementView(r.f.snapshot,'p1'));assert.ok(far.every(p=>!p.enabled));
+});
+test('forge action and worker assignment route details without weapon trigger leakage',()=>{
+ const r=withForge(rigFixture()),fired=gameHandlers(r);watchPose(r);r.panel.tick(r.head);clickPanel(r,'nav-forge');
+ pageTo(r,'forge:forgeSupply:wood');clickPanel(r,'forge:forgeSupply:wood');assert.equal(r.actions.at(-1),'forgeSupply');assert.deepEqual(r.details.at(-1),{kind:'wood',amount:3});
+ pageTo(r,'forge:job:worker1:stone');clickPanel(r,'forge:job:worker1:stone');assert.equal(r.actions.at(-1),'forgeAssign');assert.deepEqual(r.details.at(-1),{workerId:'worker1',kind:'stone'});assert.deepEqual(fired,[]);
+ clickPanel(r,'nav-quest');assert.equal(r.panel.state().section,'quest');assert.ok(r.panel.state().model.buttons.some(b=>b.id==='deposit'));
+});
+test('raid needs deliberate second press and rechecks current authority eligibility',()=>{
+ const r=withForge(rigFixture()),fired=gameHandlers(r);watchPose(r);r.panel.tick(r.head);clickPanel(r,'nav-forge');pageTo(r,'forge:forgeEncounter:');clickPanel(r,'forge:forgeEncounter:');
+ assert.equal(r.panel.state().confirmRaid,true);clickPanel(r,'raid-confirm');assert.deepEqual(r.actions,[]);r.time.t+=GATE.confirmMinMs;clickPanel(r,'raid-confirm');assert.deepEqual(r.actions,['forgeEncounter']);assert.deepEqual(fired,[]);
+ r.time.t+=GATE.repeatMs;clickPanel(r,'forge:forgeEncounter:');r.f.snapshot.settlement.encounter={wave:1,foes:['raid1'],elapsed:0,killed:0};r.panel.update(r.f.view,r.f.snapshot,'p1');r.time.t+=GATE.confirmMinMs;clickPanel(r,'raid-confirm');assert.deepEqual(r.actions,['forgeEncounter']);assert.match(r.panel.state().hint,/Raid in progress/);
+});
+test('disabled forge presses and eligibility changes during a press are consumed but never sent',()=>{
+ const r=withForge(rigFixture()),fired=gameHandlers(r);watchPose(r);r.panel.tick(r.head);clickPanel(r,'nav-forge');pageTo(r,'forge:forgeSummon:');
+ pointAt(r,1,buttonWorld(r.panel,'forge:forgeSummon:'));r.panel.tick(r.head);r.controllers[1].dispatchEvent({type:'selectstart'});
+ r.f.snapshot.players[0].mana=0;r.panel.update(r.f.view,r.f.snapshot,'p1');r.controllers[1].dispatchEvent({type:'selectend'});
+ assert.deepEqual(r.actions,[]);assert.deepEqual(fired,[]);assert.match(r.panel.state().hint,/mana/);
+});
+test('either sole controller can open the look-down forge panel and perform actions',()=>{
+ for(const index of [0,1]){const r=withForge(rigFixture()),fired=gameHandlers(r);r.sources.delete(index===0?1:0);watchPose(r,index);r.panel.tick(r.head);assert.equal(r.panel.state().shown,true);
+  clickPanel(r,'nav-forge',index);pageTo(r,'forge:forgeSummon:',index);clickPanel(r,'forge:forgeSummon:',index);assert.deepEqual(r.actions,['forgeSummon']);assert.deepEqual(fired,[]);
+  r.head.rotation.set(0,0,0);r.head.updateMatrixWorld(true);r.panel.tick(r.head);assert.equal(r.panel.state().shown,false,'normal forward view remains clear');r.panel.dispose();
+ }
+});
+test('controller-count changes during a panel press consume release without accidental activation',()=>{
+ const r=withForge(rigFixture()),fired=gameHandlers(r);watchPose(r);r.panel.tick(r.head);clickPanel(r,'nav-forge');pageTo(r,'forge:forgeSummon:');
+ pointAt(r,1,buttonWorld(r.panel,'forge:forgeSummon:'));r.panel.tick(r.head);r.controllers[1].dispatchEvent({type:'selectstart'});
+ r.sources.delete(0);r.panel.tick(r.head);pointAt(r,1,buttonWorld(r.panel,'forge:forgeSummon:'));r.panel.tick(r.head);r.controllers[1].dispatchEvent({type:'selectend'});
+ assert.deepEqual(r.actions,[]);assert.deepEqual(fired,[]);
 });

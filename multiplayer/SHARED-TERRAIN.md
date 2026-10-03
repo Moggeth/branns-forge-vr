@@ -108,3 +108,5 @@ resource/state-codec batch 0.560 seconds. Focused special suite 0.022 seconds.
 Enemy worst-population simulation measured 1.479 ms/tick on this machine.
 
 Independent review/fix/test work measured 160.739 seconds; expanded terrain suite 0.025 seconds.
+
+God Sunder now has authoritative progressive deformation; see [PROGRESSIVE-SUNDER.md](PROGRESSIVE-SUNDER.md) for its tick/save/renderer contract and spatial marker integration. Axe weapon-special scars retain the immediate behaviour documented above.

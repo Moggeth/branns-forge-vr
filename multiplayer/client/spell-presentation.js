@@ -4,6 +4,8 @@
 // Options beyond the original contract are optional: quality 'high'|'medium'|'low'
 // (default 'high' = original behaviour budget) and reducedMotion (default false).
 import * as THREE from 'three';
+import {createSpellTargeting,createMarkerTerrainSampler} from './spell-targeting.js';
+import {createSunderRupture,sunderDurationTicks,sunderFront,terrainEditScale,terrainDirtyEdits} from '../shared/terrain.js';
 
 const TAU = Math.PI * 2, MAX_EVENTS = 32, MAX_LIFE = 5, LAUNCH = 0.8;
 const CAPS = { dust: 224, glow: 96, shard: 112, leaf: 80 }; // 512 particles in total
@@ -220,38 +222,16 @@ function meteorGeo(heat) {
   g.computeVertexNormals(); return g;
 }
 
-// ---------- reticle shape vocabulary (unit coordinates; line shapes use x in [-.5,.5] of length, z in metres) ----------
+// ---------- spell-effect shape vocabulary ----------
 const circ = (r, n = 48, a0 = 0, a1 = TAU) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / n; return [Math.cos(a) * r, Math.sin(a) * r]; });
 const star = (k, r1, r2, rot = 0) => Array.from({ length: k * 2 + 1 }, (_, i) => { const a = rot + (i * Math.PI) / k, r = i % 2 ? r2 : r1; return [Math.cos(a) * r, Math.sin(a) * r]; });
-const wave = (r, k, amp, rot = 0, n = 96) => Array.from({ length: n + 1 }, (_, i) => { const a = rot + (TAU * i) / n, q = r + amp * Math.sin(a * k); return [Math.cos(a) * q, Math.sin(a) * q]; });
-const spiral = (r0, r1, turns, n = 64) => Array.from({ length: n + 1 }, (_, i) => { const u = i / n, a = u * turns * TAU, r = lp(r0, r1, u); return [Math.cos(a) * r, Math.sin(a) * r]; });
-const zig = (x0, x1, z, amp, k) => Array.from({ length: k + 1 }, (_, i) => [lp(x0, x1, i / k), z + (i % 2 ? amp : -amp) * (0.6 + 0.4 * Math.sin(i * 2.7))]);
-const chev = (r, dir, rot) => [[r - 0.06 * dir, 0.14], [r + 0.14 * dir, 0], [r - 0.06 * dir, -0.14]].map(([x, y]) => [x * Math.cos(rot) - y * Math.sin(rot), x * Math.sin(rot) + y * Math.cos(rot)]);
-const chevs = (r, dir) => [0, 1, 2, 3].map((i) => [chev(r, dir, (i * Math.PI) / 2), 0.05, 0.5, 0]);
 const polar = (a, r) => [Math.cos(a) * r, Math.sin(a) * r];
 const flake = () => { const o = []; for (let k = 0; k < 6; k++) { const a = (k * TAU) / 6; o.push(polar(a, 0), polar(a, 1), polar(a, 0.62), polar(a + 0.38, 0.88), polar(a, 0.62), polar(a - 0.38, 0.88), polar(a, 0.62), polar(a, 0)); } return o; };
-// [colours, default radius, line?, paths -> [points, width, spin rad/s, dash frequency]]
-const RET = {
-  skeleton: { c: [PAL.bone, PAL.purple], r: 2, p: () => [[circ(1), 0.07, 0.3, 0], [circ(0.7, 40), 0.05, -0.6, 7], [star(3, 0.7, 0.3), 0.05, -0.6, 0], [star(3, 0.45, 0.2, 0.52), 0.04, 0.8, 0]] },
-  squad: { c: [PAL.gold, PAL.purple], r: 3.2, p: () => [[circ(1), 0.07, 0.2, 0], ...[0, 1, 2].map((i) => [circ(0.26, 24).map(([x, z]) => [x + Math.cos(i * 2.094) * 0.55, z + Math.sin(i * 2.094) * 0.55]), 0.05, 0.2, 0]), [circ(0.8, 48), 0.04, -0.3, 8]] },
-  golem: { c: [PAL.gold, PAL.amber], r: 2.6, p: () => [[circ(1, 8), 0.09, 0.2, 0], [circ(0.72, 8), 0.06, -0.4, 0], [circ(0.5, 4), 0.07, 0.2, 0], [circ(0.25, 4), 0.06, -0.2, 0]] },
-  raise: { c: [PAL.gold, PAL.amber], r: 2.4, p: () => [[circ(1), 0.08, 0.1, 0], [circ(0.35, 28), 0.05, -0.5, 5], ...chevs(0.62, 1)] },
-  lower: { c: [PAL.purple, PAL.teal], r: 2.4, p: () => [[circ(1), 0.08, -0.1, 0], [circ(0.35, 28), 0.05, 0.5, 5], ...chevs(0.78, -1)] },
-  sunder: { line: 1, c: [PAL.ember, PAL.gold], p: () => [[zig(-0.5, 0.5, 0.4, 0.3, 24), 0.1, 0, 0], [zig(-0.5, 0.5, -0.4, 0.3, 19), 0.1, 0, 0], [[[-0.5, 0], [0.5, 0]], 0.05, 0, 8]] },
-  wall: { line: 1, c: [PAL.gold, PAL.stone], p: () => [[[[-0.5, -0.6], [0.5, -0.6], [0.5, 0.6], [-0.5, 0.6], [-0.5, -0.6]], 0.09, 0, 0], [[[-0.5, 0], [0.5, 0]], 0.05, 0, 9], [zig(-0.5, 0.5, 0, 0.6, 18), 0.04, 0, 0]] },
-  grove: { c: [PAL.leaf, PAL.gold], r: 4, p: () => [[circ(1), 0.08, 0.15, 0], [spiral(0.12, 0.9, 2.2), 0.07, 0.5, 0], [spiral(0.12, 0.9, 2.2).map(([x, z]) => [-x, -z]), 0.07, 0.5, 0], [circ(0.9, 60), 0.04, -0.3, 6]] },
-  ring: { c: [PAL.teal, PAL.leaf], r: 4.5, p: () => [[circ(1), 0.09, 0.1, 0], [wave(0.88, 12, 0.07), 0.06, -0.25, 0], [star(12, 0.7, 0.55), 0.05, 0.25, 0], [circ(0.45, 40), 0.04, 0, 6]] },
-  starfall: { c: [PAL.amber, PAL.gold], r: 5, p: () => [[circ(1), 0.1, 0.2, 0], [circ(1.12, 64), 0.05, -0.2, 10], [star(5, 0.85, 0.34), 0.07, 0.5, 0], [circ(0.2, 20), 0.06, 0, 0]] },
-  crystal: { c: [PAL.teal, PAL.purple], r: 2.6, p: () => [[circ(1, 6), 0.08, 0.2, 0], [star(6, 1, 0.5), 0.06, -0.3, 0], [circ(0.45, 6), 0.06, 0.5, 0]] },
-  heal: { c: [PAL.mint, PAL.gold], r: 3.2, p: () => [[circ(1), 0.07, 0, 0], [wave(0.72, 6, 0.09), 0.07, 0.5, 0], [wave(0.45, 8, 0.06), 0.06, -0.7, 0]] },
-  lightning: { c: [PAL.bolt, PAL.purple], r: 2.2, p: () => [[circ(1, 48), 0.06, 0.3, 6], [star(7, 1, 0.5, 0.2), 0.06, -0.5, 0], [circ(0.3, 20), 0.06, 0, 0]] },
-  frost: { c: [PAL.ice, PAL.teal], r: 3.4, p: () => [[circ(1, 48), 0.06, 0.1, 8], [flake(), 0.06, 0.15, 0], [circ(0.5, 6), 0.06, -0.4, 0]] },
-};
-
-export function createSpellPresentation({ scene, height, pointScale = 720, tickSeconds = 0.05, quality = 'high', reducedMotion = false }) {
+export function createSpellPresentation({ scene, height, pointScale = 720, tickSeconds = 0.05, quality = 'high', reducedMotion = false, getTerrainTick = null, terrainGrid = false }) {
   const H = (x, z) => { const h = height ? height(x, z) : 0; return Number.isFinite(h) ? h : 0; };
   const root = new THREE.Group(); root.name = 'SpellPresentation'; scene.add(root);
-  const TIME = { value: 0 }; let clock = 0, disposed = false;
+  const TIME = { value: 0 }; let clock = 0, disposed = false,worldTick=null;
+  const terrainTick=()=>{const n=getTerrainTick?.()??worldTick;return Number.isFinite(n)?n:null;};
   let Q = QUALITY[quality] || QUALITY.high, qName = QUALITY[quality] ? quality : 'high', RM = !!reducedMotion;
   const M = () => (RM ? { shake: 0, flick: 0, spin: 0.35, swirl: 0.45, flash: 0.4 } : { shake: 1, flick: 1, spin: 1, swirl: 1, flash: 1 });
   let MO = M();
@@ -492,7 +472,8 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     // cracks fork off, ground plates heave up on their outer hinges and settle; dust is thrown outward and forward off the front.
     sunder(ev, c) {
       const { ax, az, bx, bz, len, ang, R } = c, dx = Math.cos(ang), dz = Math.sin(ang), nx = -dz, nz = dx;
-      const T = clamp(0.4 + len * 0.07, 0.55, 1.5), t0 = 0.06; ev.dur = T + 2.5;
+      const T=(c.rupture?.durationTicks??sunderDurationTicks(len))*tickSeconds,t0=0;ev.dur=T+2.5;
+      const rupture=c.rupture||createSunderRupture('local',[ax,az],[bx,bz],0);ev.rupture=c.rupture;
       const n = Math.min(110, Math.max(24, Math.ceil(len / 0.4))), jit = Float32Array.from({ length: n }, () => R() * 2 - 1);
       const env = (u) => Math.min(1, u * 6, (1 - u) * 6), off = (u) => { const f = u * (n - 1), i = Math.min(n - 2, Math.floor(f)), k = f - i; return lp(jit[i], jit[i + 1], k * k * (3 - 2 * k)) * 0.34 * env(u); };
       const at = (u, o) => { const w = off(u); o[0] = lp(ax, bx, u) + nx * w; o[2] = lp(az, bz, u) + nz * w; o[1] = H(o[0], o[2]) + 0.09; return o; };
@@ -504,9 +485,11 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       for (const s of [-1, 1]) { const ns = s < 0 ? np : Math.max(3, np - 1 + ((R() * 2) | 0)), sh = s < 0 ? 0 : 0.5; for (let k = 0; k < ns; k++) pl.push({ s, u: clamp((k + sh * 0.5 + 0.5 + (R() - 0.5) * 0.45) / ns, 0.03, 0.97), lm: (np / ns) * (0.7 + R() * 0.6), i: slabs.claim(ev, [0xffffff, 0xeee4d8, 0xd9d2c8, 0xf6efe2, 0xe2d6c4][(k * 2 + (s > 0 ? 1 : 0)) % 5]), w: 0.4 + R() * 0.75, th: 0.24 + R() * 0.26, tilt: 0.22 + R() * 0.75, d: R() * 0.08, yaw: (R() - 0.5) * 0.6, pitch: (R() - 0.5) * 0.42, flip: R() < 0.5, lift: 0.06 + R() * 0.16 }); }
       const rest = 0.55 + R() * 0.15; let accD = 0, accB = 0, accE = 0, done = false; const fp = [0, 0, 0], q2 = new THREE.Quaternion();
       ev.fx.push((age, dt) => {
-        const front = clamp((age - t0) / T), fade = 1 - sstep(ev.dur - 1.0, ev.dur, age), cool = 1 - 0.75 * sstep(T, T + 1.6, age), hp = MO.flick ? 0.8 + 0.2 * Math.sin(age * 11) : 0.9;
+        const sharedTick=c.rupture&&terrainTick()!==null?terrainTick():rupture.startTick+age/tickSeconds;
+        const progress=sunderFront(rupture,sharedTick),front=progress.fraction;ev.front={fraction:front,tick:sharedTick,progress:progress.progress};
+        const fade = 1 - sstep(ev.dur - 1.0, ev.dur, age), cool = 1 - 0.75 * sstep(T, T + 1.6, age), hp = MO.flick ? 0.8 + 0.2 * Math.sin(age * 11) : 0.9;
         for (let i = 0; i < n; i++) {
-          const u = i / (n - 1), behind = front - u, open = behind > 0 ? easeOut(behind * len / 1.1) : 0; at(u, fp);
+          const u=i/(n-1),behind=front-u,open=terrainEditScale({rupture},sharedTick,lp(ax,bx,u),lp(az,bz,u));at(u,fp);
           lip.set(i, fp[0], fp[1], fp[2]); dark.set(i, fp[0], fp[1], fp[2]); heat.set(i, fp[0], fp[1] + 0.01, fp[2]);
           lip.wm[i] = open * (1 + 0.25 * jit[(i * 7) % n]); lip.am[i] = open > 0 ? 1 : 0;
           dark.wm[i] = open * (0.75 + 0.25 * Math.abs(jit[i])); dark.am[i] = open > 0 ? 1 : 0;
@@ -516,7 +499,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         bl.forEach((b, j) => { const rv = easeOut((front - b.u) * len / 1.2); at(b.u, fp); const x0 = fp[0], z0 = fp[2]; strand(br, j, rv, fade * 0.85, (u2) => 0.17 * (1 - 0.85 * u2) / 0.18, (s, o) => { const i = Math.min(7, Math.floor(s * 7)), q = b.L * s, px = x0 + b.dxb * q + nx * b.j[i] * s, pz = z0 + b.dzb * q + nz * b.j[i] * s; o[0] = px; o[1] = H(px, pz) + 0.08; o[2] = pz; }); });
         br.rb?.commit(0.18, 1, 1, 0);
         for (const p of pl) {
-          const tp = age - t0 - T * p.u - p.d; if (tp <= 0) { slabs.hide(p.i); continue; }
+          const tp=(sharedTick-rupture.startTick)*tickSeconds-T*(p.u*len/(len+1.1))-p.d; if (tp <= 0) { slabs.hide(p.i); continue; }
           const heave = backOut(tp / 0.32), settle = lp(1, rest, sstep(0.35, 1.2, tp)), sink = sstep(ev.dur - 0.9, ev.dur, age), jolt = MO.shake * 0.05 * Math.sin(tp * 40) * (1 - sstep(0, 0.4, tp));
           const tilt = p.tilt * heave * settle * (1 - sink), L = (len / np) * 0.92 * p.lm, hw = p.w * 0.5, cxu = lp(ax, bx, p.u), czu = lp(az, bz, p.u), w0 = off(p.u), dist = 0.3 * heave + hw + Math.abs(w0) * 0.2;
           const x = cxu + nx * (w0 + p.s * dist), z = czu + nz * (w0 + p.s * dist), y = H(x, z) - p.th * 0.5 + Math.sin(tilt) * hw * 0.9 + p.lift * heave * (1 - sink) + jolt - sink * 0.4;
@@ -696,23 +679,35 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
 
   // ---------- public play / sync ----------
   const LINE = { sunder: 1, wall: 1 };
-  function play({ spell, position, start, end, id, tick, phase, radius, flight } = {}) {
+  function play({ spell, position, start, end, id, tick, phase, radius, flight, rupture } = {}) {
     const fn = FX[spell]; if (!fn || disposed) return false;
     const p = vec(position), a = vec(start), b = vec(end), ctr = p || (a && b ? [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2] : b || a || [0, 0, 0]);
     const key = spell === 'starfall' && id != null ? `sf:${id}` : `${spell}:${id ?? `${tick}:${ctr[0].toFixed(2)}:${ctr[2].toFixed(2)}`}`;
     if (spell === 'starfall' && phase === 'impact' && (events.has(key) || recent.has(key))) return false;
-    const c = { x: ctr[0], z: ctr[2], y: H(ctr[0], ctr[2]), R: mulberry(hashStr(key)), radius, flight: clamp(flight ?? LAUNCH, 0.15, LAUNCH), hasLine: !!(a && b), tick };
+    const c = { x: ctr[0], z: ctr[2], y: H(ctr[0], ctr[2]), R: mulberry(hashStr(key)), radius, flight: clamp(flight ?? LAUNCH, 0.15, LAUNCH), hasLine: !!(a && b), tick,rupture };
     if (c.hasLine) Object.assign(c, { ax: a[0], ay: a[1], az: a[2], bx: b[0], by: b[1], bz: b[2] });
     else if (LINE[spell]) { const q = 3; Object.assign(c, { ax: c.x - q, az: c.z, bx: c.x + q, bz: c.z }); }
     else Object.assign(c, { ax: c.x, ay: c.y, az: c.z, bx: c.x, by: c.y, bz: c.z });
     c.len = Math.max(0.5, Math.hypot(c.bx - c.ax, c.bz - c.az)); c.ang = Math.atan2(c.bz - c.az, c.bx - c.ax);
     if (spell === 'starfall' && phase === 'impact') c.flight = 0.001;
-    return !!startEvent(key, false, fn, c);
+    const ev=startEvent(key,false,fn,c);
+    if(ev&&rupture&&terrainTick()!==null)ev.age=Math.max(0,(terrainTick()-rupture.startTick)*tickSeconds);
+    return !!ev;
   }
   const warns = new Map(), launched = new Set();
   function sync(snapshot) {
     if (disposed || !snapshot) return;
     const list = snapshot.pendingStarfalls || [], tick = snapshot.tick ?? 0, seen = new Set();
+    if(worldTick!==null&&tick<worldTick){for(const [key,event] of events)if(event.rupture)kill(key);for(const key of recent.keys())if(key.startsWith('sunder:'))recent.delete(key);}
+    const dirtyTerrain=terrainDirtyEdits(targetEdits,snapshot.edits||[],targetTick,tick);
+    if(dirtyTerrain.length)markerTerrain?.invalidate();
+    targeting.invalidateTerrain(dirtyTerrain);
+    targetEdits=snapshot.edits||[];targetTick=tick;
+    worldTick=tick;
+    const ruptures=new Set();
+    for(const edit of snapshot.edits||[]){const r=edit.rupture;if(!r||ruptures.has(r.id)||tick>=r.startTick+r.durationTicks)continue;ruptures.add(r.id);
+      play({spell:'sunder',id:r.id,tick:r.startTick,rupture:r,start:[r.start[0],0,r.start[1]],end:[r.end[0],0,r.end[1]]});}
+
     for (const s of list) {
       const key = `warn:${s.id}`, at = clock + (s.impactTick - tick) * tickSeconds, c = { x: s.x, z: s.z, radius: s.radius ?? 4, at }; seen.add(s.id);
       let ev = events.get(key); if (!ev) ev = startEvent(key, true, WARN, c); if (ev) { ev.info = { x: s.x, z: s.z, r: c.radius, at }; warns.set(s.id, { x: s.x, z: s.z, radius: c.radius }); }
@@ -725,58 +720,32 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     }
   }
 
-  // ---------- reticle ----------
-  const ret = { g: new THREE.Group(), paths: [], key: '', fade: 0, want: null, pose: null, acc: 0, def: null };
-  root.add(ret.g);
-  function clearRet() { for (const p of ret.paths) { ret.g.remove(p.rb.mesh); p.rb.dispose(); } ret.paths = []; }
-  function buildRet(w) {
-    clearRet(); const def = (ret.def = RET[w.spell]), sx = def.line ? w.len : w.rad;
-    for (const [pts, width, spin, dash] of def.p()) { const d = dens(pts, sx, def.line ? 1 : w.rad); ret.paths.push({ pts: d, w: width, spin, rb: new Ribbon(d.length, ribMat(def.c[0], def.c[1], dash, 1), H), good: ribMat(def.c[0], def.c[1], dash, 1), bad: ribMat(PAL.bad, PAL.badDark, dash, 0.4) }); }
-    ret.paths.forEach((p) => { p.rb.mesh.renderOrder = 4; ret.g.add(p.rb.mesh); });
-  }
-  function setTarget(t) {
-    if (!t || !RET[t.spell]) { ret.want = null; return; }
-    const def = RET[t.spell], p = vec(t.point), a = vec(t.start), b = vec(t.end), w = { spell: t.spell, valid: t.valid !== false, rad: t.radius ?? def.r ?? 3, line: !!def.line };
-    if (def.line && a && b) Object.assign(w, { cx: (a[0] + b[0]) / 2, cz: (a[2] + b[2]) / 2, ang: Math.atan2(b[2] - a[2], b[0] - a[0]), len: Math.max(0.5, Math.hypot(b[0] - a[0], b[2] - a[2])) });
-    else if (p) Object.assign(w, { cx: p[0], cz: p[2], ang: 0, len: def.line ? 6 : 0 });
-    else { ret.want = null; return; }
-    ret.want = w;
-  }
-  function updateReticle(dt) {
-    const w = ret.want; ret.fade = clamp(ret.fade + (w ? dt * 6 : -dt * 7));
-    ret.g.visible = ret.fade > 0.01 && ret.paths.length > 0 || !!w;
-    if (!w) { if (ret.fade <= 0.01) ret.pose = null; if (ret.fade <= 0.01 && !ret.paths.length) return; }
-    if (w) {
-      const key = w.spell + (w.line ? Math.round(w.len / 2) : Math.round(w.rad * 4)); if (key !== ret.key) { ret.key = key; buildRet(w); }
-      const k = ret.pose && ret.fade > 0.05 ? 1 - Math.exp(-dt * 18) : 1; ret.pose = ret.pose || {};
-      for (const f of ['cx', 'cz', 'len']) ret.pose[f] = ret.pose[f] === undefined ? w[f] : lp(ret.pose[f], w[f], k);
-      ret.pose.ang = w.ang; ret.pose.rad = w.rad; ret.pose.line = w.line; ret.pose.valid = w.valid;
-    }
-    const s = ret.pose; if (!s) return;
-    const pulseS = 1 + 0.03 * Math.sin(clock * 3) * MO.flick, sx = s.line ? s.len : s.rad * pulseS, sz = s.line ? 1 : s.rad * pulseS, a = ret.fade * (s.valid ? 0.9 + 0.1 * Math.sin(clock * 5) * MO.flick : 0.55);
-    for (const p of ret.paths) { p.rb.mesh.material = s.valid ? p.good : p.bad; place(p.rb, p.pts, s.cx, s.cz, sx, sz, s.ang + p.spin * clock * MO.swirl, 0.08); p.rb.commit(p.w, 1, a); }
-    ret.acc += w ? dt * 6 * Q.n : 0;
-    while (ret.acc >= 1) { ret.acc--; const d = ret.def, ang = Math.random() * TAU, q = d.line ? 0 : s.rad * (0.7 + 0.3 * Math.random()); const px = s.cx + (d.line ? (Math.random() - 0.5) * s.len * Math.cos(s.ang) : Math.cos(ang) * q), pz = s.cz + (d.line ? (Math.random() - 0.5) * s.len * Math.sin(s.ang) : Math.sin(ang) * q); glow.emit({ x: px, y: H(px, pz) + 0.15, z: pz, vy: 0.5 + Math.random() * 0.6, life: 1.2, size: 0.18, grow: -0.4, color: s.valid ? d.c[Math.random() < 0.6 ? 0 : 1] : PAL.bad, alpha: 0.7 }); }
-  }
+  // Targeting is a pooled Opus-authored module; effect events retain their own pools.
+  const markerTerrain=terrainGrid?createMarkerTerrainSampler(H):null;
+  const targeting=createSpellTargeting({scene:root,height:markerTerrain?.height||H,quality:qName,reducedMotion:RM});
+  let targetEdits=[],targetTick=Infinity;
+  const setTarget=t=>targeting.setTarget(t);
 
   function update(nowMs, dt) {
     if (disposed) return; dt = clamp(dt || 0, 0, 0.1); clock += dt; TIME.value = ((nowMs || 0) / 1000) % 1000;
     for (const ev of events.values()) { ev.age += dt; for (const f of ev.fx) f(ev.age, dt); if ((!ev.persist && ev.age >= ev.dur) || (ev.closing >= 0 && ev.age >= ev.closing)) kill(ev.key); }
     for (const [k, t] of recent) if (t < clock) recent.delete(k);
-    updateReticle(dt); pools.forEach((p) => p.update(dt)); kins.forEach((p) => { p.flush(); p.mesh.visible = p.live() > 0; });
+    targeting.update(nowMs,dt); pools.forEach((p) => p.update(dt)); kins.forEach((p) => { p.flush(); p.mesh.visible = p.live() > 0; });
   }
   function configure({ quality: q, reducedMotion: rm } = {}) { // optional live settings; events already running keep their spawned counts
+    targeting.configure({quality:q,reducedMotion:rm});
     if (q !== undefined && QUALITY[q]) { Q = QUALITY[q]; qName = q; }
     if (rm !== undefined) { RM = !!rm; MO = M(); }
   }
   function stats() {
     const live = { dust: dust.live(), glow: glow.live(), shards: shards.live(), leaves: leaves.live() };
     let draws = 0; root.traverseVisible((o) => { if (o.isMesh || o.isPoints) draws++; });
-    return { events: events.size, maxEvents: MAX_EVENTS, warnings: warns.size, ribbons: [...events.values()].reduce((n, e) => n + e.rib.length, 0) + ret.paths.length, particles: { ...live, total: live.dust + live.glow + live.shards + live.leaves, budget: 512 }, pooledMaterials: cache.size, reticle: !!ret.want, recent: recent.size,
+    return { events: events.size, maxEvents: MAX_EVENTS, warnings: warns.size, ribbons: [...events.values()].reduce((n, e) => n + e.rib.length, 0) + targeting.stats().strands, particles: { ...live, total: live.dust + live.glow + live.shards + live.leaves, budget: 512 }, pooledMaterials: cache.size, reticle: !!targeting.stats().spell, targeting:targeting.stats(), recent: recent.size,
+      ruptureFronts:[...events.values()].filter(e=>e.rupture).map(e=>({id:e.rupture.id,...e.front})),
       kinematic: { slabs: slabs.live(), rocks: rocks.live(), budget: KCAPS.slab + KCAPS.rock }, draws, quality: qName, reducedMotion: RM };
   }
   function dispose() {
-    if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); clearRet(); pools.forEach((p) => p.dispose()); kins.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose(); kinMat.dispose();
+    if (disposed) return; disposed = true; for (const k of [...events.keys()]) kill(k); targeting.dispose(); pools.forEach((p) => p.dispose()); kins.forEach((p) => p.dispose()); shards.mesh.material.dispose(); leaves.mesh.material.dispose(); kinMat.dispose();
     Object.values(G).forEach((g) => g.dispose()); cache.forEach((m) => m.dispose()); cache.clear(); tex.dispose(); scene.remove(root); events.clear(); recent.clear(); warns.clear(); launched.clear();
   }
   return { setTarget, play, update, sync, dispose, stats, prepareShaders, configure };

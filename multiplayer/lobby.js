@@ -4,6 +4,13 @@ import {bindHoldOverlays} from './client/hold-overlays.js';
 import './client/field-overlays.css';
 import {createMenuTabs} from './mobile-compact.js';
 import {RESOURCE_RECIPES} from './shared/resources.js';
+import {settlementView} from './shared/resources.js';
+import {spellbookReadiness} from './client/ability-readiness.js';
+import {spellUnavailable} from './client/spell-availability.js';
+import {createSpellbook} from './client/spellbook.js';
+import {createForgePanel} from './client/forge-panel.js';
+import './client/spellbook.css';
+import './client/forge-panel.css';
 import {SPELLS} from './shared/spells.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
@@ -74,6 +81,7 @@ function friendlyError(detail) {
 // ---------------------------------------------------------------- state
 let mobile = null, xrActive = false;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
+let forgePanel=null,forgeOpen=false,spellbook=null;
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false;
@@ -225,16 +233,17 @@ function setPhase(next) {
   syncActive();
 }
 function syncActive() {
-  $('hud').inert=menuOpen||!!fieldKind;
+  $('hud').inert=menuOpen||!!fieldKind||forgeOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !fieldKind);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  closeForge();
   restoreFieldLock=false;holdOverlays?.close();
   clearTimeout(joinTimer);
   game?.setActive(false);
@@ -369,7 +378,8 @@ function recordProblem(problem) {
 // ---------------------------------------------------------------- Forge Expedition (optional co-op run, shared/adventure.js)
 let expeditionBanner = null;
 let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
-function expeditionAction(action) {
+function expeditionAction(action,detail={}) {
+  if(action.startsWith('forge')){session?.command('action',{action,...detail});return;}
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
   if (!session || !adv || !self) return;
   const send = payload => session.command('adventure', payload);
@@ -438,6 +448,8 @@ function onSnapshot(snapshot) {
   if (snapshots % 15 === 0) refreshHostControls();
   if (menuOpen && $('techDetails').open && snapshots % 10 === 0) renderTech();
   refreshFieldModel();
+  if(self)spellbook?.update({...spellbookReadiness(self,snapshot.tick,spell,connected&&currentRole==='god'),blocked:Object.fromEntries(SPELLS.map(s=>[s.id,spellUnavailable(snapshot,self,s.id)]))});
+  if(forgeOpen)forgePanel?.update(settlementView(snapshot,playerId));
 }
 
 function meter(kind, value, max) {
@@ -537,6 +549,7 @@ $('menuCopyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTa
 // ---------------------------------------------------------------- menu
 function openMenu() {
   if (phase !== 'game' || menuOpen) return;
+  closeForge();
   restoreFieldLock=false;holdOverlays?.close();
   menuOpen = true;
   if (document.pointerLockElement) document.exitPointerLock?.();
@@ -621,10 +634,23 @@ function renderTech() {
 }
 $('techDetails').addEventListener('toggle', renderTech);
 
+$('damageNumbers').addEventListener('change',()=>{const enabled=$('damageNumbers').checked;store.set('branns-forge.damage-numbers',enabled?'on':'off');game?.setDamageNumbers(enabled);});
+
 // ---------------------------------------------------------------- spells
+spellbook=createSpellbook({root:$('godHelp'),spells:SPELLS});
+function closeForge(){forgeOpen=false;forgePanel?.hide();syncActive();}
+function openForge(){
+  if(phase!=='game'||!lastSnapshot||xrActive)return;
+  restoreFieldLock=false;holdOverlays?.close();closeMenu(false);
+  forgeOpen=true;document.exitPointerLock?.();syncActive();
+  forgePanel.show(settlementView(lastSnapshot,playerId));
+}
+forgePanel=createForgePanel({mount:body,onAction:(action,detail)=>session?.command('action',{action,...detail}),onClose:closeForge});
+for(const button of document.querySelectorAll('[data-open-forge]'))button.addEventListener('click',openForge);
 function updateSpellHint(){const spec=SPELLS.find(s=>s.id===spell);if(!spec)return;const quick=$('quickCast')?.checked;setText($('spellHint'),`${spec.label} · ${spec.cost} mana · ${spec.target==='line'?(quick?'Drag to cast; or tap two ends':'Drag to aim; touch Cast confirms'):(quick?'Tap ground to cast':'Aim, then cast')}`);}
 function chooseSpell(next) {
   spell = next;
+  spellbook?.scrollToSpell(next,true);
   updateSpellHint();
   try { game?.setSpell(next); } catch (error) { recordProblem(error); }
   for (const button of document.querySelectorAll('[data-spell]')) {const selected=button.dataset.spell===next;button.setAttribute('aria-checked',String(selected));button.tabIndex=selected?0:-1;}
@@ -663,6 +689,7 @@ function fieldModel() {
 }
 function refreshFieldModel(){fieldOverlays?.update(fieldModel());}
 function fieldChanged(kind) {
+  if(kind&&forgeOpen)closeForge();
   const wasOpen=!!fieldKind;
   if(kind&&!wasOpen)restoreFieldLock=document.pointerLockElement===canvas;
   fieldKind=kind;body.classList.toggle('field-overlay-open',!!kind);
@@ -677,6 +704,7 @@ function fieldChanged(kind) {
   }
 }
 function fieldAction(a){
+  if(a.id==='forge'){openForge();return;}
   if(a.id==='open'){fieldPinned=true;holdOverlays.open(a.kind==='help'?'equipment':'party');return;}
   if(a.id==='close'){holdOverlays.close();return;}
   if(a.id==='menu'){openMenu();return;}
@@ -690,7 +718,7 @@ document.querySelector('.hud-room').append(fieldOverlays.entry);
 const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='undefined'?String(__BRANN_BUILD__):'dev · local'});
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
-holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!menuOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
+holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!menuOpen&&!forgeOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
 const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.textContent='Equipment guide';
 lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
@@ -713,7 +741,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
 // game.js owns the canvas pointer-lock gesture; duplicate requests can race.
 document.addEventListener('pointerlockchange', updateLookHint);
 function updateLookHint() {
-  $('lookHint').hidden = !(phase === 'game' && connected && !menuOpen && !fieldKind && currentRole === 'hero' && document.pointerLockElement !== canvas && !xrActive && !mobile?.enabled);
+  $('lookHint').hidden = !(phase === 'game' && connected && !menuOpen && !forgeOpen && !fieldKind && currentRole === 'hero' && document.pointerLockElement !== canvas && !xrActive && !mobile?.enabled);
 }
 
 $('vr').addEventListener('click', async () => {
@@ -736,8 +764,10 @@ try {
     onXRChange: value => { restoreFieldLock=false;holdOverlays?.close();xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,
     onExpeditionAction: expeditionAction,
-    onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud')); const cue=interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen || !!fieldKind); mobile?.setCue(cue); },
+    onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud')); const cue=interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen || forgeOpen || !!fieldKind); mobile?.setCue(cue); },
   });
+  game.setDamageNumbers(store.get('branns-forge.damage-numbers')==='on');
+  $('damageNumbers').checked=store.get('branns-forge.damage-numbers')==='on';
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
   mobile = createMobileControls({game,canvas,onMenu:openMenu,notify:toast,onChange:()=>{updateLookHint();refreshFieldModel();},onExpeditionAction:expeditionAction});
   document.head.append($('compactStyles'));
@@ -768,11 +798,11 @@ applyRoleUi(chosenRole());
 setPhase('lobby');
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
-  state: () => ({phase, connected, menuOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  state: () => ({phase, connected, menuOpen, forgeOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !forgeOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });

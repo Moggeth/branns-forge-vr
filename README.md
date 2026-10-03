@@ -1,3 +1,5 @@
+Browser solo/world feedback (2026-10-03): workers, forge development and raids for solo Heroes/Gods; all 14 spells, progressive Sunder, physical creature feedback and diegetic weapon readiness. See docs/SOLO-WORLD-FEEDBACK-20261003.md for controls, checks and limitations.
+
 Browser multiplayer preview (2026-10-02): https://branns-forge-multiplayer.vercel.app — eight-player peer rooms, FPS/VR Heroes, RTS Gods. See multiplayer/PEER-PLAYTEST.md for current limits, saves, hosting and recovery.
 
 Browser multiplayer proof (2026-10-02): local 32-player networking and browser checks pass; hosting/lobby sign-in is pending. See [multiplayer handoff](multiplayer/README.md). Not a hosted release yet.

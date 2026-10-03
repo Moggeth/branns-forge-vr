@@ -1,3 +1,4 @@
+import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terrain.js';
 // Orchard environment presentation: warm golden meadow ground, worn paths, slope soil/stone,
 // hazy sky, far-only silhouette backdrop and a fixed-budget follow shadow.
 // Presentation only: never changes terrain height, collision, raycast targets or gameplay.
@@ -54,6 +55,18 @@ const segDist = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, 
 // Macro dryness: 0 lush green .. 1 golden straw. Same formula as orchardDry() in GLSL.
 export const dryness = (x, z) => smooth(.2, .66, .62 * valueNoise(x * .031 + 11.3, z * .031 - 4.7) + .38 * valueNoise(x * .11 - 3.1, z * .11 + 8.9));
 
+export function disturbanceAt(x,z,edits=[],tick=Infinity) {
+  let disturbed = 0;
+  for (const e of edits) {
+    const r = Math.max(.01, e.radius || 0), d = Math.hypot(x - e.x, z - e.z); if (d >= r * 1.25) continue;
+    const t = 1 - d / r, mag = Math.min(1, Math.abs(e.height || 0) / 1.2 * terrainEditScale(e,tick,x,z));
+    // Raised mounds expose earth on their flanks; lowered craters show a churned rim and floor.
+    const band = (e.height || 0) < 0 ? Math.max(smooth(-.25, .2, t) * smooth(1, .55, t), .55 * smooth(.3, .8, t)) : smooth(-.2, .25, t) * smooth(1.05, .45, t);
+    disturbed = Math.max(disturbed, mag * band);
+  }
+  return Math.min(1,disturbed);
+}
+
 // Pure surface sample: wear (paths/clearings), disturbed (fresh earth from edits), stone, shade (under canopies).
 export function surfaceSample(x, z, ctx = {}) {
   const layout = ctx.layout || ORCHARD_LAYOUT, edits = ctx.edits || [], deposits = ctx.deposits || layout.deposits, trees = ctx.trees || layout.trees;
@@ -62,14 +75,7 @@ export function surfaceSample(x, z, ctx = {}) {
   let wear = 0;
   for (const [cx, cz, r, w] of layout.clearings) wear = Math.max(wear, w * smooth(r * 1.45, r * .55, Math.hypot(wx - cx, wz - cz)));
   for (const [ax, az, bx, bz, hw, w] of layout.paths) wear = Math.max(wear, w * smooth(hw * 1.9, hw * .45, segDist(wx, wz, ax, az, bx, bz)));
-  let disturbed = 0;
-  for (const e of edits) {
-    const r = Math.max(.01, e.radius || 0), d = Math.hypot(x - e.x, z - e.z); if (d >= r * 1.25) continue;
-    const t = 1 - d / r, mag = Math.min(1, Math.abs(e.height || 0) / 1.2);
-    // Raised mounds expose earth on their flanks; lowered craters show a churned rim and floor.
-    const band = (e.height || 0) < 0 ? Math.max(smooth(-.25, .2, t) * smooth(1, .55, t), .55 * smooth(.3, .8, t)) : smooth(-.2, .25, t) * smooth(1.05, .45, t);
-    disturbed = Math.max(disturbed, mag * band);
-  }
+  const disturbed=disturbanceAt(x,z,edits,ctx.terrainTick??Infinity);
   let stone = 0;
   for (const p of deposits) { const px = p.x ?? p[0], pz = p.z ?? p[1]; if (p.depleted) continue; const d = Math.hypot(wx - px, wz - pz); if (d < 2.6) stone = Math.max(stone, smooth(2.4, .9, d) * (.55 + .45 * valueNoise(x * 1.7, z * 1.7))); }
   let shade = 0;
@@ -112,14 +118,14 @@ export function createSurfaceMaskJob(ctx, size, half = GROUND_HALF) {
 }
 
 // Edit-only rebake: rewrites just the disturbed (G) channel; static wear/stone/shade stay cached.
-export function bakeDisturbedChannel(edits = [], size = 160, half = GROUND_HALF, out) {
+export function bakeDisturbedChannel(edits = [], size = 160, half = GROUND_HALF, out,tick=Infinity) {
   const step = half * 2 / size;
   for (let o = 1; o < out.length; o += 4) out[o] = 0;
   for (const e of edits) {
     const r = Math.max(.01, e.radius || 0) * 1.25, i0 = Math.max(0, Math.floor((e.x - r + half) / step)), i1 = Math.min(size - 1, Math.ceil((e.x + r + half) / step));
     const j0 = Math.max(0, Math.floor((e.z - r + half) / step)), j1 = Math.min(size - 1, Math.ceil((e.z + r + half) / step));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const v = surfaceSample(-half + (i + .5) * step, -half + (j + .5) * step, {edits: [e], layout: EMPTY_LAYOUT, deposits: [], trees: []}).disturbed * 255 + .5, o = (j * size + i) * 4 + 1;
+      const v = disturbanceAt(-half + (i + .5) * step, -half + (j + .5) * step, [e],tick) * 255 + .5, o = (j * size + i) * 4 + 1;
       if (v > out[o]) out[o] = v;
     }
   }
@@ -512,7 +518,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   const maskData = new Uint8Array(cfg.mask * cfg.mask * 4);
   const mask = new THREE.DataTexture(maskData, cfg.mask, cfg.mask, THREE.RGBAFormat); mask.magFilter = THREE.LinearFilter; mask.minFilter = THREE.LinearFilter; mask.colorSpace = THREE.NoColorSpace; mask.wrapS = mask.wrapT = THREE.ClampToEdgeWrapping;
   U.orchardMask.value = mask; owned.push(mask);
-  const ctx = {edits, deposits: deposits || ORCHARD_LAYOUT.deposits, trees: trees || ORCHARD_LAYOUT.trees};
+  const ctx = {edits, terrainTick:Infinity, deposits: deposits || ORCHARD_LAYOUT.deposits, trees: trees || ORCHARD_LAYOUT.trees};
   let lastBakeMs = 0, bakes = 0, signature = '', staticSignature = '', lastBakeKind = '';
   let maskJob = null;
 
@@ -571,18 +577,32 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     if (!sun.castShadow || extent === shadowExtent) return; shadowExtent = extent;
     const c = sun.shadow.camera; c.left = c.bottom = -extent; c.right = c.top = extent; c.near = 1; c.far = 160; c.updateProjectionMatrix();
   }
+  const temporalMask=new Set();let phaseEdits=[],phaseTick=Infinity,phaseKey='';
+  function queueTemporalMask(dirty){const step=GROUND_HALF*2/cfg.mask;
+    for(const e of dirty){const r=e.radius*1.25+step,i0=Math.max(0,Math.floor((e.x-r+GROUND_HALF)/step)),i1=Math.min(cfg.mask-1,Math.ceil((e.x+r+GROUND_HALF)/step)),j0=Math.max(0,Math.floor((e.z-r+GROUND_HALF)/step)),j1=Math.min(cfg.mask-1,Math.ceil((e.z+r+GROUND_HALF)/step));
+      for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)temporalMask.add(j*cfg.mask+i);}
+  }
+  function drainTemporalMask(budgetMs){const start=performance.now(),step=GROUND_HALF*2/cfg.mask;let done=0;
+    for(const key of temporalMask){const i=key%cfg.mask,j=Math.floor(key/cfg.mask);maskData[key*4+1]=disturbanceAt(-GROUND_HALF+(i+.5)*step,-GROUND_HALF+(j+.5)*step,ctx.edits,ctx.terrainTick)*255+.5;temporalMask.delete(key);done++;if((done&15)===0&&performance.now()-start>=budgetMs)break;}
+    if(done)mask.needsUpdate=true;return done;
+  }
   function groundChanged(next = {}) {
+    if(next.terrainTick!==undefined)ctx.terrainTick=next.terrainTick;
     if (next.edits) ctx.edits = next.edits; if (next.deposits) ctx.deposits = next.deposits; if (next.trees) ctx.trees = next.trees;
     const staticSig = JSON.stringify([ctx.deposits, ctx.trees]), sig = staticSig + JSON.stringify(ctx.edits);
-    if (sig === signature && !next.force) return false; signature = sig;
-    field?.setEdits(ctx.edits); // queues dirty rects only; drained under the frame budget in update()
+    const frame=terrainFrameKey(ctx.edits,ctx.terrainTick),phaseChanged=frame!==phaseKey;
+    const dirty=phaseChanged?terrainDirtyEdits(phaseEdits,ctx.edits,phaseTick,ctx.terrainTick):[];
+    phaseEdits=ctx.edits;phaseTick=ctx.terrainTick;phaseKey=frame;
+    field?.setEdits(ctx.edits,ctx.terrainTick);
+    if (sig === signature && !next.force) {if(phaseChanged)queueTemporalMask(dirty);return phaseChanged;} signature = sig;
+    temporalMask.clear(); // queues dirty rects only; drained under the frame budget in update()
     const t0 = performance.now();
-    if (staticSig === staticSignature && !next.force) { bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData); lastBakeKind = 'edits'; }
+    if (staticSig === staticSignature && !next.force) { bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData,ctx.terrainTick); lastBakeKind = 'edits'; }
     else if (bakes) {
       maskJob = createSurfaceMaskJob({...ctx}, cfg.mask);
       staticSignature = staticSig; lastBakeKind = 'queued';
       // Newer ecosystem requests replace unfinished work; edit shading remains immediately responsive.
-      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData);
+      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData,ctx.terrainTick);
       mask.needsUpdate = true; skirt.rebuild();
       return true;
     }
@@ -601,10 +621,11 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     const jobStart = performance.now();
     if (maskJob && maskJob.step()) {
       maskData.set(maskJob.data);
-      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData);
+      bakeDisturbedChannel(ctx.edits, cfg.mask, GROUND_HALF, maskData,ctx.terrainTick);
       lastBakeMs = maskJob.cpuMs; lastBakeKind = 'full'; bakes++;
       mask.needsUpdate = true; maskJob = null;
     }
+    if(temporalMask.size)drainTemporalMask(Math.max(.25,Math.min(.6,DEFORM_JOB_BUDGET_MS-(performance.now()-jobStart))));
     // Deformation texels share what is left of the per-frame job budget (always some progress: >= .25 ms).
     if (field?.pending && field.step(Math.max(.25, DEFORM_JOB_BUDGET_MS - (performance.now() - jobStart)))) { deformTex.needsUpdate = true; deformUploads++; }
     adoptLegacyMaps();
@@ -634,7 +655,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     const tris = m => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
     return {version: ORCHARD_PRESENTATION_VERSION, quality: q, shaderPatched: report.patched, shaderMissing: report.missing.slice(), maskSize: cfg.mask, maskBakeMs: +lastBakeMs.toFixed(3), maskBakeKind: lastBakeKind, maskBakes: bakes,
       maskPending: !!maskJob, addedDrawCalls: 3 + (puffs.live() ? 1 : 0), addedTriangles: {sky: tris(sky), skirt: tris(skirt.mesh), backdrop: tris(backdrop)}, shadowMapSize: sun.castShadow ? sun.shadow.mapSize.x : 0, shadowExtent, pendingTextures: pending, puffs: puffs.live(),
-      deformation: {enabled: !!field, reason: deformReason, strata: material.userData.orchardStrata, size: field ? field.size : 0, pending: !!field?.pending, queuedRects: field?.queuedRects || 0,
+      deformation: {enabled: !!field, reason: deformReason, strata: material.userData.orchardStrata, size: field ? field.size : 0, pending: !!field?.pending||temporalMask.size>0, temporalTexels:temporalMask.size, queuedRects: field?.queuedRects || 0,
         lastStepMs: field ? +field.lastStepMs.toFixed(3) : 0, maxStepMs: field ? +field.maxStepMs.toFixed(3) : 0, cpuMs: field ? +field.cpuMs.toFixed(3) : 0, texels: field?.texelsDone || 0, uploads: deformUploads, features: {...features}}};
   }
   function dispose() {
@@ -655,5 +676,5 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   if (sun.castShadow) setShadowExtent(20);
   setDaylight(daylight); groundChanged({force: true});
   return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
-    flushDeformation() { if (field?.pending) { field.flush(); deformTex.needsUpdate = true; deformUploads++; } }}; // loading screens/tests only
+    flushDeformation() { if(temporalMask.size)drainTemporalMask(Infinity);if (field?.pending) { field.flush(); deformTex.needsUpdate = true; deformUploads++; } }}; // loading screens/tests only
 }

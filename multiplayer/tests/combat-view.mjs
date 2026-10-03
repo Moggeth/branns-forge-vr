@@ -141,6 +141,8 @@ const smoothShot = {id: 'smooth', kind: 'arrow', position: [5, 3, 0], previousPo
 const looseState = {id: 'smoothLeg', kind: 'skeleton', part: 'leftLeg', sourceId: 'test', position: [0, 1, 0], quaternion: [0, 0, 0, 1], heldBy: 'player'};
 const smoothSnapshot = {enemies: [{id: 'test', missingParts: ['leftLeg']}], projectiles: [smoothShot], detachedParts: [looseState], embeds: [{id: 'still', kind: 'arrow', targetId: 'world', part: 'torso', localPoint: [2, 1, 0], localQuaternion: [0, 0, 0, 1]}]};
 smoothView.sync(smoothSnapshot); const authoritativeBefore = JSON.stringify(smoothSnapshot), stillPosition = smoothView.embeds.get('still').position.clone();
+assert.equal(smoothView.heldLimbRoot('player'), smoothView.detached.get('smoothLeg'), 'held-limb marker uses the visible detached render root');
+assert.equal(smoothView.heldLimbRoot('someone-else'), null);
 smoothView.tick(.025, false); assert.equal(smoothView.projectiles.get('smooth').position.x, 5.5, 'flight advances between snapshots');
 smoothView.tick(.2, false); assert.equal(smoothView.projectiles.get('smooth').position.x, 6, 'flight extrapolation capped at 50 ms');
 assert.equal(JSON.stringify(smoothSnapshot), authoritativeBefore, 'presentation never mutates authoritative projectile state');

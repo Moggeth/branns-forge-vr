@@ -4,6 +4,7 @@
 // Budget: <= 2 draw calls (panel + ray cursor), canvas redraw only when the drawn model changes, no DOM reads in XR.
 import * as THREE from 'three';
 import {ADVENTURE_ICONS} from './adventure-view.js';
+import {settlementView} from '../shared/resources.js';
 
 // Canvas pixels and physical metres. 512 px across 0.22 m is ~18 px per degree at 0.45 m.
 export const PANEL = Object.freeze({px: 512, py: 384, width: 0.22, height: 0.165});
@@ -89,6 +90,24 @@ export function heroPanelModel(view, held, ui = {}) {
     track: STAGES.map(([s, label], i) => ({label, state: view.stage === 'victory' || (stageIndex >= 0 && i < stageIndex) ? 'done' : i === stageIndex ? 'now' : 'todo'})),
     rows, next: nextStep(view, held), alert, carry: CARRY.map(([k, icon]) => ({icon, count: held[k] || 0})), buttons};
 }
+export function forgePanelPages(settlement){
+ const pages=settlement.actions.filter(a=>a.action!=='forgeAssign').map(a=>({...a,id:`forge:${a.action}:${a.detail?.kind||''}`,category:a.action==='forgeSupply'?'Supplies':'Forge'}));
+ const assign=settlement.actions.find(a=>a.action==='forgeAssign');
+ for(const w of settlement.workers)for(const kind of ['wood','stone','gems'])if(kind!==w.job)pages.push({id:`forge:job:${w.id}:${kind}`,action:'forgeAssign',label:`Assign ${kind}`,title:`${w.name||w.id} · ${w.job}`,category:'Workers',enabled:assign?.enabled!==false&&!w.cargo,reason:w.cargo?'Wait for this worker to deliver cargo':assign?.reason||'',detail:{workerId:w.id,kind},cost:{},phase:w.phase});
+ return pages;
+}
+export function forgePanelModel(settlement,pageId,ui={}){
+ const pages=forgePanelPages(settlement),page=pages.find(p=>p.id===pageId)||pages[0],index=Math.max(0,pages.indexOf(page));
+ const cost=Object.entries(page?.cost||{}).filter(([,n])=>n>0).map(([k,n])=>`${n} ${k}`).join(' · ');
+ const ids=ui.confirmRaid?['raid-confirm','raid-cancel']:['forge-prev',page?.id||'forge-none','forge-next'];
+ const buttons=layoutButtons(ids).map(b=>({...b,label:b.id==='forge-prev'?'Previous':b.id==='forge-next'?'Next':b.id==='raid-confirm'?'Confirm raid':b.id==='raid-cancel'?'Cancel':page?.label||'Unavailable',enabled:b.id===page?.id?!!page.enabled:true,hover:ui.hover===b.id,pressed:ui.pressed===b.id,tone:b.id==='raid-confirm'?DANGER:null,reason:page?.reason||''}));
+ return {stage:'camp',title:'Bran’s Forge',tone:TONE.camp,timer:'',carryLabel:'Stores',carry:CARRY.map(([k,icon])=>({icon,count:settlement.stock[k]||0})),
+  track:['Forge','Workers','Supplies'].map(label=>({label,state:label===page?.category?'now':'todo'})),
+  rows:[{icon:'timber',label:page?.title||page?.label||'Forge',info:true},{icon:'stone',label:cost?`Cost: ${cost}`:page?.phase?`Worker: ${page.phase}`:`Forge ${settlement.level}/3 · wards ${settlement.defenses}/3`,info:true},{icon:'star',label:page?.cooldown>0?`Ready in ${Math.ceil(page.cooldown)} seconds`:page?.enabled?'Ready':page?.reason||'',info:true}],
+  next:ui.confirmRaid?'Start the next raid against the forge?':settlement.goal,
+  alert:{text:ui.hint||`Page ${index+1} / ${pages.length}${settlement.encounter?` · ${settlement.encounter.foes.length} raiders`:''}`,color:ui.confirmRaid?DANGER:DIM},buttons,pageId:page?.id};
+}
+function sectionButton(section,ui){return {id:section==='forge'?'nav-quest':'nav-forge',label:section==='forge'?'Quest':'Forge',x:376,y:9,w:120,h:36,enabled:true,hover:ui.hover===(section==='forge'?'nav-quest':'nav-forge'),pressed:false};}
 export function hitButton(buttons, u, v, pad = 4) {
   return buttons.find(b => u >= b.x - pad && u <= b.x + b.w + pad && v >= b.y - pad && v <= b.y + b.h + pad) || null;
 }
@@ -144,7 +163,7 @@ export function drawHeroPanel(ctx, m) {
     ctx.fillText(m.alert.text, m.alert.icon ? 38 : 16, 246, W - 54);
   }
   // Carried resources
-  ctx.fillStyle = DIM; ctx.font = '16px system-ui,sans-serif'; ctx.fillText('Carrying', 16, 278);
+  ctx.fillStyle = DIM; ctx.font = '16px system-ui,sans-serif'; ctx.fillText(m.carryLabel||'Carrying', 16, 278);
   m.carry.forEach((c, i) => {
     const x = 112 + i * 128;
     glyph(c.icon, x, 266, 22, c.count ? INK : '#ffffff44');
@@ -170,7 +189,7 @@ const defaultCanvas = () => typeof document !== 'undefined' ? Object.assign(docu
   : new OffscreenCanvas(PANEL.px, PANEL.py);
 
 // controllers/grips: the renderer.xr target-ray and grip spaces (index-aligned). sources: Map<index, XRInputSource>.
-// onAction(name): lobby expeditionAction. now(): ms clock (performance.now in game).
+// onAction(name, detail): lobby routes forge* to ordinary authority actions, others to expeditionAction.
 export function createVRAdventurePanel({parent, controllers, grips, sources, onAction = () => {}, pointerHand = 'right',
   createCanvas = defaultCanvas, now = () => performance.now()}) {
   const canvas = createCanvas(), ctx = canvas.getContext('2d');
@@ -186,18 +205,24 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
 
   let view = null, held = {wood: 0, stone: 0, gems: 0}, model = null, key = '', drawn = 0, shown = false, disposed = false;
   let hover = null, onPanel = false, pressed = null, confirmAt = 0, hint = null, hintUntil = 0, lastSent = {};
+  let settlement=null,section='quest',pageId=null,raidConfirmAt=0,lastSourceCount=0;
   const inverse = new THREE.Matrix4(), origin = new THREE.Vector3(), dir = new THREE.Vector3(), head = new THREE.Vector3();
   const headFwd = new THREE.Vector3(), anchor = new THREE.Vector3(), handFwd = new THREE.Vector3(), quat = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0), local = new THREE.Vector3();
 
   const indexOf = hand => { for (const [i, s] of sources) if (s.handedness === hand) return i; return undefined; };
+  const pointerIndex=()=>indexOf(pointerHand)??(sources.size===1?sources.keys().next().value:undefined);
   const panelHand = () => pointerHand === 'left' ? 'right' : 'left';
   function redraw() {
     if (!view) return false;
     const t = now();
     if (hint && t > hintUntil) hint = null;
     if (confirmAt && t - confirmAt > GATE.confirmMs) confirmAt = 0;
-    model = heroPanelModel(view, held, {confirmLeave: !!confirmAt, hover, pressed: pressed?.button || null, hint});
+    if(raidConfirmAt&&t-raidConfirmAt>GATE.confirmMs)raidConfirmAt=0;
+    const ui={confirmLeave:!!confirmAt,confirmRaid:!!raidConfirmAt,hover,pressed:pressed?.button||null,hint};
+    model=section==='forge'&&settlement?forgePanelModel(settlement,pageId,ui):heroPanelModel(view,held,ui);
+    if(section==='forge')pageId=model.pageId;
+    if(settlement){model.timer='';model.buttons.push(sectionButton(section,ui));}
     const next = JSON.stringify(model);
     if (next === key) return false;
     key = next; drawHeroPanel(ctx, model); texture.needsUpdate = true; drawn++;
@@ -206,7 +231,7 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
   function hide() { shown = false; mesh.visible = false; cursor.visible = false; onPanel = false; hover = null; }
   // Pointer ray against the panel quad in panel-local space. Returns {u, v, button} or null.
   function pointerHit() {
-    const i = indexOf(pointerHand);
+    const i = pointerIndex();
     if (!shown || i === undefined || !controllers[i]) return null;
     controllers[i].updateWorldMatrix(true, false);
     origin.setFromMatrixPosition(controllers[i].matrixWorld);
@@ -224,6 +249,20 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
   function pulse(i, strength, ms) { sources.get(i)?.gamepad?.hapticActuators?.[0]?.pulse?.(strength, ms)?.catch?.(() => {}); }
   function activate(id) {
     const t = now();
+    if(id==='nav-forge'||id==='nav-quest'){section=id==='nav-forge'?'forge':'quest';confirmAt=0;raidConfirmAt=0;hint=null;return;}
+    if(id==='forge-prev'||id==='forge-next'){const pages=forgePanelPages(settlement),i=pages.findIndex(p=>p.id===pageId);pageId=pages[(i+(id==='forge-next'?1:-1)+pages.length)%pages.length]?.id;raidConfirmAt=0;return;}
+    if(id==='raid-cancel'){raidConfirmAt=0;return;}
+    if(id==='raid-confirm'){
+      const action=settlement?.actions.find(a=>a.action==='forgeEncounter');
+      if(raidConfirmAt&&t-raidConfirmAt>=GATE.confirmMinMs&&action?.enabled){raidConfirmAt=0;send('forgeEncounter',t);}
+      else if(!action?.enabled){raidConfirmAt=0;hint=action?.reason||'Raid unavailable';hintUntil=t+GATE.hintMs;}return;
+    }
+    if(id.startsWith('forge:')){
+      const action=forgePanelPages(settlement).find(a=>a.id===id);
+      if(!action?.enabled){hint=action?.reason||'Action unavailable';hintUntil=t+GATE.hintMs;return;}
+      if(action.action==='forgeEncounter'){raidConfirmAt=t;return;}
+      send(action.action,t,action.detail,id);return;
+    }
     if (id === 'cancel') { confirmAt = 0; return; }
     if (id === 'leave') { confirmAt = t; return; }
     if (id === 'confirm') { if (confirmAt && t - confirmAt >= GATE.confirmMinMs) { confirmAt = 0; send('leave', t); } return; }
@@ -232,32 +271,36 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
     }
     send(id, t);
   }
-  function send(id, t) { if (t - (lastSent[id] ?? -Infinity) < GATE.repeatMs) return; lastSent[id] = t; onAction(id); }
+  function send(id, t, detail={},key=id) { if (t - (lastSent[key] ?? -Infinity) < GATE.repeatMs) return; lastSent[key] = t; onAction(id,detail); }
 
   return {
     mesh,
     // Call from lobby onSnapshot (via game hook) with adventureView(...) and the snapshot; null hides the panel.
     update(nextView, snapshot, playerId) {
       if (disposed) return false;
-      view = nextView || null; held = carried(snapshot, playerId);
-      if (!view) { hide(); pressed = null; confirmAt = 0; return false; }
+      const wasEmpty=!view;view = nextView || null; held = carried(snapshot, playerId);
+      settlement=snapshot?.settlement?settlementView(snapshot,playerId):null;
+      if(wasEmpty&&settlement&&view?.stage==='idle')section='forge';
+      if (!view) { hide(); pressed = null; confirmAt = 0;raidConfirmAt=0;section='quest';pageId=null;return false; }
       return redraw();
     },
     setPointerHand(hand) { if (hand === 'left' || hand === 'right') { pointerHand = hand; pressed = null; hide(); } },
     // Per XR frame, after controller poses update. headObject: renderer.xr.getCamera(). suppressed: e.g. role !== 'hero'.
     tick(headObject, {suppressed = false} = {}) {
       if (disposed) return;
-      const pi = indexOf(panelHand());
+      const single=sources.size===1,pi = single?pointerIndex():indexOf(panelHand());
       const grip = pi === undefined ? null : sources.get(pi)?.gripSpace ? grips[pi] : controllers[pi];
       if (!view || suppressed || !grip || !headObject) { hide(); return; }
       grip.updateWorldMatrix(true, false); headObject.updateWorldMatrix(true, false);
       anchor.setFromMatrixPosition(grip.matrixWorld).addScaledVector(up, GATE.lift);
       head.setFromMatrixPosition(headObject.matrixWorld);
       headFwd.set(0, 0, -1).transformDirection(headObject.matrixWorld);
+      if(single)anchor.copy(head).addScaledVector(headFwd,.48);
+      if(lastSourceCount!==sources.size){if(pressed)pressed.cancelled=true;lastSourceCount=sources.size;}
       handFwd.set(0, 0, -1).transformDirection(grip.matrixWorld);
       const toPanel = local.copy(anchor).sub(head), dist = toPanel.length();
       const angle = THREE.MathUtils.radToDeg(toPanel.divideScalar(dist || 1).angleTo(headFwd)), aim = handFwd.dot(headFwd);
-      const visible = dist >= GATE.near && dist <= GATE.far && angle <= (shown ? GATE.hideAngle : GATE.showAngle) && aim <= (shown ? GATE.hideAim : GATE.showAim);
+      const visible = single?headFwd.y<(shown?-.12:-.22):dist >= GATE.near && dist <= GATE.far && angle <= (shown ? GATE.hideAngle : GATE.showAngle) && aim <= (shown ? GATE.hideAim : GATE.showAim);
       if (!visible) { if (shown) { hide(); redraw(); } return; }
       shown = true; mesh.visible = true;
       mesh.parent.updateWorldMatrix(true, false); mesh.position.copy(mesh.parent.worldToLocal(anchor)); mesh.lookAt(head); mesh.updateMatrixWorld(true);
@@ -265,12 +308,12 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
       onPanel = !!hit; cursor.visible = onPanel;
       if (hit) cursor.position.set(hit.x, hit.y, .002);
       const nextHover = hit?.button?.enabled !== false ? hit?.button?.id || null : null;
-      if (nextHover !== hover) { hover = nextHover; if (hover) pulse(indexOf(pointerHand), .08, 12); }
+      if (nextHover !== hover) { hover = nextHover; if (hover) pulse(pointerIndex(), .08, 12); }
       redraw(); // no-op unless hover/press/confirm/hint changed the drawn model
     },
     // Wire first in game.js selectstart/selectend. true = consumed: the game must not fire, strike or cast this press.
     handleSelectStart(index) {
-      if (disposed || index !== indexOf(pointerHand)) return false;
+      if (disposed || index !== pointerIndex()) return false;
       const hit = pointerHit();
       if (!hit) return false;
       pressed = {index, button: hit.button?.id || null}; redraw();
@@ -278,15 +321,15 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
     },
     handleSelectEnd(index) {
       if (!pressed || pressed.index !== index) return false;
-      const started = pressed.button, hit = pointerHit();
+      const started = pressed.cancelled?null:pressed.button, hit = pointerHit();
       pressed = null;
       if (started && hit?.button?.id === started) { activate(started); pulse(index, .3, 25); }
       redraw();
       return true;
     },
     // XR sessionend / controller loss: drop all transient interaction state.
-    endSession() { hide(); pressed = null; confirmAt = 0; hint = null; lastSent = {}; },
-    state: () => ({shown, onPanel, hover, pressed: pressed && {...pressed}, confirmLeave: !!confirmAt, hint, redraws: drawn, pointerHand, model}),
+    endSession() { hide(); pressed = null; confirmAt = 0;raidConfirmAt=0; hint = null; lastSent = {}; },
+    state: () => ({shown, onPanel, hover, pressed: pressed && {...pressed}, confirmLeave: !!confirmAt,confirmRaid:!!raidConfirmAt,section, hint, redraws: drawn, pointerHand, model}),
     dispose() {
       if (disposed) return; disposed = true;
       parent.remove(mesh); mesh.geometry.dispose(); material.dispose(); texture.dispose();

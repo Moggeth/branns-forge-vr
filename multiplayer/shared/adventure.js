@@ -336,6 +336,20 @@ function credit(adv, kind, amount) {
   else adv.flame = clamp(adv.flame + amount * {wood: 4, stone: 2, gems: 10}[kind], 0, 100);
 }
 
+// Workers deliver into real shared stores. Spending those stores on the existing
+// expedition follows the same stage caps as a Hero deposit, with no mana subsidy.
+export function contributeSettlement(adv, stock) {
+  if (!RUNNING.includes(adv.stage)) return {ok:false,code:'invalid_stage',events:[]};
+  const events=[];
+  for (const kind of ['wood','stone','gems']) {
+    const amount=Math.min(stock[kind],Math.max(0,depositRoom(adv,kind)));
+    if (!amount) continue;
+    stock[kind]-=amount;credit(adv,kind,amount);
+    events.push({kind:'adventure_deposit',id:'forge',resource:kind,amount});
+  }
+  return events.length?{ok:true,events}:{ok:false,code:'not_needed',events:[]};
+}
+
 // Call before forwarding a God `cast` to the simulation. During a run, hostile summons are a bounded team
 // "challenge" budget: none near the forge, none while no Hero can answer, and a per-stage cap.
 export function adventureCastGate(adv, playerId, message, world) {
@@ -362,7 +376,7 @@ export function applyAdventureIntents(state, intents, {createEnemy, terrainHeigh
     if(it.type==='partyReward'){for(const p of state.players){p.hp=Math.min(100,p.hp+it.health);p.mana=Math.min(100,p.mana+it.mana);for(const k of ['wood','stone','gems'])p.resources[k]=Math.min(999,p.resources[k]+it[k]);}applied++;}
     else if (it.type === 'spawn') {
       if (state.enemies.length >= 64 || taken(it.id)) { skipped.push(it.id); continue; }
-      state.enemies.push(createEnemy(it.id, [it.x, terrainHeight(state, it.x, it.z), it.z], it.kind)); applied++;
+      state.enemies.push({...createEnemy(it.id, [it.x, terrainHeight(state, it.x, it.z), it.z], it.kind),emergeTick:state.tick}); applied++;
     } else if (it.type === 'deposit') {
       // The save validator caps deposits + pending starfalls at 80 together.
       const full = () => state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80;

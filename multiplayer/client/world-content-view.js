@@ -1,3 +1,4 @@
+import {terrainFrameKey,terrainDirtyEdits,TERRAIN_GRID} from '../shared/terrain.js';
 import * as T from 'three';
 import {createCrystalWall} from './crystal-wall.js';
 import {attachFracture} from './mining-fracture.js';
@@ -11,7 +12,7 @@ const TREE_ASSETS=['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_yo
 export const PICKUP_ASSETS={gems:'star_gem',stone:'stone_chunk',apple:'orchard_apple'};
 const pickupLift=e=>e.root.userData.authoredPickup?.12:.45;
 export function createWorldContent({scene,templates,instantiate,height,camera=null}) {
- const objects=new Map(),batches=[],formations=[];let terrainKey='',last=null,seed=null,treeAssets='';
+ const objects=new Map(),batches=[],formations=[];let terrainKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
  const treeView=createTreeView({scene,templates,height,camera});
  const crystalWall=createCrystalWall({THREE:T,scene,height});let previousTickTime=null;
  const matrix=new T.Matrix4(),dummy=new T.Object3D();
@@ -35,10 +36,15 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
    if(c.type==='deposit'&&c.hits>0){e.fracture??=attachFracture(T,e.root,c.id);e.fracture?.setDamage(c.hits,c.maxHits,{animate:!newlyCreated});}
   }
   for(const [id,e]of objects)if(!objectIds.has(id)){e.fracture?.dispose();remove(e.root);if(e.root.isMesh)e.root.geometry.dispose();objects.delete(id);}
-  if(seed!==s.seed){for(const b of batches){scene.remove(b.mesh);b.mesh.dispose();}batches.length=0;for(const f of formations)f.mesh.removeFromParent();formations.length=0;seed=s.seed;scatter(s);terrainKey='';}
-  const nextTerrainKey=JSON.stringify(s.edits);if(nextTerrainKey!==terrainKey){terrainKey=nextTerrainKey;
-  for(const f of formations)f.mesh.position.y=height(f.x,f.z,s.edits)-.1;
-  for(const b of batches){for(let i=0;i<b.points.length;i++){const p=b.points[i];dummy.position.set(p.x,height(p.x,p.z,s.edits),p.z);dummy.rotation.y=p.angle;dummy.scale.setScalar(p.scale);dummy.updateMatrix();matrix.multiplyMatrices(dummy.matrix,b.local);b.mesh.setMatrixAt(i,matrix);}b.mesh.instanceMatrix.needsUpdate=true;b.mesh.computeBoundingSphere();}}
+  if(seed!==s.seed){for(const b of batches){scene.remove(b.mesh);b.mesh.dispose();}batches.length=0;for(const f of formations)f.mesh.removeFromParent();formations.length=0;seed=s.seed;scatter(s);terrainKey=null;}
+  const nextTerrainKey=terrainFrameKey(s.edits,s.tick);if(nextTerrainKey!==terrainKey){
+   const full=terrainKey===null,dirty=terrainDirtyEdits(previousTerrainEdits,s.edits,previousTerrainTick,s.tick),touched=p=>full||dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step);
+   terrainKey=nextTerrainKey;
+   for(const f of formations)if(touched(f))f.mesh.position.y=height(f.x,f.z,s.edits)-.1;
+   for(const b of batches){let changed=false;for(let i=0;i<b.points.length;i++){const p=b.points[i];if(!touched(p))continue;dummy.position.set(p.x,height(p.x,p.z,s.edits),p.z);dummy.rotation.y=p.angle;dummy.scale.setScalar(p.scale);dummy.updateMatrix();matrix.multiplyMatrices(dummy.matrix,b.local);b.mesh.setMatrixAt(i,matrix);changed=true;}if(changed){b.mesh.instanceMatrix.needsUpdate=true;b.mesh.computeBoundingSphere();}}
+  }
+  previousTerrainEdits=s.edits;previousTerrainTick=s.tick;
+
  }
  function scatter(s){
   for(const [name,x,z,size,angle]of [['bank',-18,-18,1.4,.8],['bank',-21,-16,1.1,1.2],['ridge',20,-22,3.1,-.5],['ridge',23,-24,2.4,.5],['roots',-13,-10,.65,1.2]]){const mesh=authored(name,size);if(mesh){mesh.position.set(x,height(x,z,s.edits)-.1,z);mesh.rotation.y=angle;scene.add(mesh);formations.push({mesh,x,z});}}

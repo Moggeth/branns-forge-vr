@@ -419,12 +419,13 @@
 
   <div class="bf-sub">
     <p class="bf-hint" id="spellHint" aria-live="polite">Skeleton — raise a warrior where you tap.</p>
+    <button type="button" class="btn btn-quiet" data-open-forge title="Workers, resources and forge defence">Forge</button>
     <label class="bf-toggle"><input type="checkbox" id="quickCast"><span class="bf-switch" aria-hidden="true"></span><span class="bf-name">Quick cast</span></label>
     <details class="bf-drawer bf-help">
       <summary aria-label="How to cast"><svg aria-hidden="true"><use href="#bfi-help"/></svg></summary>
       <ul class="bf-help-list">
         <li><b>Choose</b> a spell, then click the ground to cast.</li>
-        <li><b>Sunder &amp; Wall</b> — drag a line; on touch, Cast at the start, then again at the end.</li>
+        <li><b>Sunder &amp; Wall</b> — drag a line. Quick Cast releases on touch-up; otherwise use Cast to confirm.</li>
         <li><b>Quick cast</b> casts at the pointer on key press; hold and release for a line.</li>
       </ul>
     </details>
@@ -444,6 +445,7 @@
     </header>
 
     <button id="resumePlay" class="btn btn-primary btn-large" type="button">Back to the world</button>
+    <button type="button" class="btn btn-secondary" data-open-forge data-mc-page="play">Manage the forge</button>
 
     <fieldset class="roles roles-compact">
       <legend>Play as</legend>
@@ -503,6 +505,9 @@
       </div>
     </details>
 
+    <section class="menu-section" data-mc-page="controls" aria-label="Combat feedback">
+      <label class="bf-toggle"><input id="damageNumbers" type="checkbox"><span>Damage numbers</span></label><p class="hint">Small impact numbers. Off keeps combat fully in-world.</p>
+    </section>
     <details id="techDetails" class="menu-section tech">
       <summary>Technical details</summary>
       <dl class="tech-list">

@@ -13,6 +13,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const DASH = '—';
 const ROLE_ICON = { hero: 'i-hero', god: 'i-god' };
 const ACTION_ICONS = {
+  'forge': 'M3 7h14v3h4v3h-6l-1 4h3v3H6v-3h3l-1-4H6L3 10z',
   'current-quest': 'M6 3h9l3 3v15H6z M9 9h6 M9 13h6 M9 17h4',
   'start-expedition': 'M5 21V4 M5 4h11l-2 4 2 4H5',
   menu: 'M4 7h16 M4 12h16 M4 17h16',
@@ -334,7 +335,7 @@ export function createFieldOverlays({ mount, onAction } = {}) {
       bar.setAttribute('role', 'group');
       bar.setAttribute('aria-label', 'Party actions');
       const disabled = new Set(m.disabledActions || []);
-      for (const [id, label] of [['current-quest', 'Current quest'], ['start-expedition', 'Start expedition'], ['menu', 'Menu']]) {
+      for (const [id, label] of [['current-quest', 'Current quest'], ['start-expedition', 'Start expedition'], ['forge','Manage forge'], ['menu', 'Menu']]) {
         const b = el('button', 'fo-btn fo-btn-icon');
         b.type = 'button';
         b.dataset.foAction = id;

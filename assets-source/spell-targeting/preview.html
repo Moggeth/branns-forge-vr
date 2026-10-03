@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Spell targeting preview</title>
+<style>html,body{margin:0;height:100%;background:#9cc7e8;overflow:hidden;font:12px sans-serif}#l{position:fixed;left:8px;top:6px;color:#222;background:#fff8;padding:4px 8px;border-radius:4px}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script></head>
+<body><div id="l">?invalid=1 &nbsp; ?only=heal &nbsp; ?q=low &nbsp; ?rm=1 &nbsp; ?cam=top</div>
+<script type="module">
+import * as THREE from 'three';
+import { createSpellTargeting } from './spell-targeting.js';
+const Q = new URLSearchParams(location.search), IDS = ['skeleton','squad','golem','raise','lower','sunder','wall','grove','ring','starfall','crystal','heal','lightning','frost'];
+const only = Q.get('only'), ids = only ? [only] : IDS;
+const H = (x, z) => 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07) + 0.9 * Math.sin(x * 0.21 + 1) * Math.cos(z * 0.17) + 0.04 * x;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight); document.body.appendChild(renderer.domElement);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9cc7e8); scene.fog = new THREE.Fog(0x9cc7e8, 80, 160);
+scene.add(new THREE.HemisphereLight(0xfff4dc, 0x5b6b3a, 1.4)); const sun = new THREE.DirectionalLight(0xfff1cf, 2.2); sun.position.set(30, 50, 20); scene.add(sun);
+const tg = new THREE.PlaneGeometry(120, 90, 240, 180).rotateX(-Math.PI / 2), tp = tg.attributes.position, col = [];
+for (let i = 0; i < tp.count; i++) { const x = tp.getX(i), z = tp.getZ(i), y = H(x, z); tp.setY(i, y); const c = new THREE.Color().setHSL(0.24 + 0.03 * Math.sin(x * 0.3) * Math.cos(z * 0.4), 0.42, 0.42 + 0.04 * y); col.push(c.r, c.g, c.b); }
+tg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); tg.computeVertexNormals();
+scene.add(new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+const cols = only ? 1 : 5, sp = 17, fxs = [];
+ids.forEach((spell, i) => {
+  const cx = only ? 0 : ((i % cols) - (cols - 1) / 2) * sp, cz = only ? 0 : (Math.floor(i / cols) - 1) * sp;
+  const fx = createSpellTargeting({ scene, height: H, quality: Q.get('q') || 'high', reducedMotion: Q.get('rm') === '1' });
+  fx.setTarget({ spell, point: [cx, 0, cz], start: [cx - 6, 0, cz + 2.5], end: [cx + 6, 0, cz - 2.5], valid: Q.get('invalid') !== '1' }); fxs.push(fx);
+});
+const cam = new THREE.PerspectiveCamera(only ? 45 : 40, innerWidth / innerHeight, 0.1, 400);
+const SZ = { skeleton: 2, squad: 2.6, golem: 2.6, crystal: 2.6, lightning: 3, grove: 4, ring: 4.5, starfall: 5, raise: 6, lower: 6, heal: 7, frost: 7, sunder: 8, wall: 8 }, d = 2.2 * (SZ[only] || 6) + 3;
+if (Q.get('cam') === 'top') { cam.position.set(0, only ? d * 1.6 : 70, only ? d * 0.35 : 14); } else { cam.position.set(only ? d * 0.35 : 0, only ? d * 0.8 : 52, only ? d * 0.95 : 56); }
+cam.lookAt(0, 0, only ? 0 : 2);
+let last = performance.now(); const t0 = last;
+function frame(now) { const dt = (now - last) / 1000; last = now; for (const f of fxs) f.update(now - t0 + 1200, dt || 0.016); renderer.render(scene, cam);
+  document.title = 'draws ' + renderer.info.render.calls + ' tris ' + renderer.info.render.triangles; requestAnimationFrame(frame); }
+for (const f of fxs) for (let k = 0; k < 20; k++) f.update(1200 + k * 16, 0.016);
+requestAnimationFrame(frame);
+window.__stats = () => fxs.map((f) => f.stats());
+</script></body></html>

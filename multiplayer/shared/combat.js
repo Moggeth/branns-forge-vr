@@ -14,6 +14,13 @@ const partPose = p => p&&vec(p.position)&&quat(p.quaternion)&&(p.localBounds===u
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton') {return Object.fromEntries(PARTS.map(part=>[part,kind==='golem'?120:part==='torso'?100:55]));}
+export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
+export function applyEnemyScorch(enemy,part,amount){
+  if(!enemy||!PARTS.includes(part)||!Number.isFinite(amount)||amount<=0)return false;
+  enemy.scorch ||= emptyScorch();
+  enemy.scorch[part]=clamp((enemy.scorch[part]||0)+amount,0,1);
+  return true;
+}
 export function createEnemy(id,position,kind='skeleton') {return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
 const centers={head:[0,1.75,0],torso:[0,1.15,0],leftArm:[.48,1.12,0],rightArm:[-.48,1.12,0],leftLeg:[.2,.48,0],rightLeg:[-.2,.48,0]};
 export function partPosition(enemy,part){const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45:1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
@@ -25,7 +32,12 @@ function detach(state,enemy,part,hit,ctx,events){
   enemy.missingParts.push(part);enemy.parts[part]=0;
   const supplied=hit?.partPoses?.[part]||(hit?.part===part?{position:hit.partPosition,quaternion:hit.partQuaternion,localBounds:hit.localBounds}:null);
   const usePose=partPose(supplied)&&dist(supplied.position,partPosition(enemy,part))<2.4;
-  const d={id:ctx.nextId(state,'d'),sourceId:enemy.id,kind:enemy.kind,part,position:usePose?[...supplied.position]:partPosition(enemy,part),quaternion:usePose?[...supplied.quaternion]:[0,Math.sin(enemy.yaw/2),0,Math.cos(enemy.yaw/2)],localBounds:usePose&&bounds(supplied.localBounds)?structuredClone(supplied.localBounds):{min:[-.25,part.endsWith('Leg')?-.5:-.25,-.25],max:[.25,part.endsWith('Leg')?.5:.25,.25]},velocity:[0,2,0],angularVelocity:[1.8,.7,1.1],heldBy:null,bornTick:state.tick};
+  // The exact struck surface normal drives the collapse. Stable per-limb
+  // spread prevents six pieces from launching in an identical rigid pose.
+  const index=PARTS.indexOf(part),seed=[...String(enemy.id)].reduce((h,c)=>Math.imul(h,31)+c.charCodeAt(0)|0,17);
+  const angle=(seed+index*167)*.017,side=[Math.cos(angle),Math.sin(angle)],normal=unit(hit?.normal)?hit.normal:[Math.sin(enemy.yaw),0,Math.cos(enemy.yaw)];
+  const force=enemy.kind==='golem'?1.1:2.1,impact=clamp(Number(hit?.energy)||1,.5,2);
+  const d={id:ctx.nextId(state,'d'),sourceId:enemy.id,kind:enemy.kind,part,position:usePose?[...supplied.position]:partPosition(enemy,part),quaternion:usePose?[...supplied.quaternion]:[0,Math.sin(enemy.yaw/2),0,Math.cos(enemy.yaw/2)],localBounds:usePose&&bounds(supplied.localBounds)?structuredClone(supplied.localBounds):{min:[-.25,part.endsWith('Leg')?-.5:-.25,-.25],max:[.25,part.endsWith('Leg')?.5:.25,.25]},velocity:[(-normal[0]*force+side[0]*.65)*impact,1.0+(part==='head'?1.5:part.endsWith('Arm')?1.1:.45)+Math.max(0,-normal[1])*.7,(-normal[2]*force+side[1]*.65)*impact],angularVelocity:[(1.1+index*.13)*side[1],.5+index*.19,(1.4+index*.09)*side[0]],heldBy:null,bornTick:state.tick};
   state.detachedParts.push(d);
   for(const e of state.embeds)if(e.targetId===enemy.id&&e.part===part)e.targetId=d.id;
   events.push({kind:'detach',position:[...d.position],id:d.id,sourceId:enemy.id,part});return d;
@@ -45,7 +57,8 @@ export function mineGolemRemains(state,p,m,ctx){
 }
 export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=false}={}) {
   if(!state.enemies.includes(enemy)||!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
-  if(enemy.kind==='golem'&&(enemy.armor??3)>0){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
+  const armored=enemy.kind==='golem'&&(enemy.armor??3)>0;
+  if(armored){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
   const headshot=projectile&&part==='head'&&enemy.kind!=='golem';
   // Body hits take normal damage: one arrow cannot kill a fresh skeleton, but
@@ -54,10 +67,10 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   const owner=state.players.find(p=>p.id===hit?.ownerId);
   if(owner?.stats)owner.stats.contribution=Math.min(1e9,owner.stats.contribution+creditedDamage);
   enemy.hp-=headshot?enemy.hp:amount;
-  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});
+  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
 function segmentDistance(p,a,b){const d=b.map((n,i)=>n-a[i]),l=d.reduce((n,v)=>n+v*v,0),t=l?clamp(p.reduce((n,v,i)=>n+(v-a[i])*d[i],0)/l,0,1):0;return dist(p,a.map((n,i)=>n+d[i]*t));}
@@ -130,6 +143,9 @@ export function stepCombat(state,ctx,events){
   for(const d of [...state.detachedParts]){
     const holder=state.players.find(p=>p.id===d.heldBy&&p.role==='hero');if(d.heldBy&&!holder)d.heldBy=null;
     if(holder){const hand=holder.hands?.[1]||holder.hands?.[0],target=hand?holder.position.map((n,i)=>n+hand.position[i]):[holder.position[0]-Math.sin(holder.yaw)*1.2,holder.position[1]+1.1,holder.position[2]-Math.cos(holder.yaw)*1.2];d.position=d.position.map((n,i)=>n+(target[i]-n)*.4);d.quaternion=hand?[...hand.quaternion]:[0,Math.sin(holder.yaw/2),0,Math.cos(holder.yaw/2)];continue;}
+    // Settled remains keep their actual geometry and grab/mining behavior, but
+    // stop sampling all eight terrain corners every tick until re-thrown.
+    if(state.tick-d.bornTick>45&&Math.hypot(...d.velocity)<.035&&Math.hypot(...d.angularVelocity)<.035){d.velocity=[0,0,0];d.angularVelocity=[0,0,0];continue;}
     d.velocity[1]-=15*dt;const old=[...d.position];d.position=d.position.map((n,i)=>clamp(n+d.velocity[i]*dt,i===1?-150:-54.5,i===1?150:54.5));
     const [x,y,z,w]=d.quaternion,[a,b,c]=d.angularVelocity;const q=[x+dt*.5*(a*w+b*z-c*y),y+dt*.5*(b*w+c*x-a*z),z+dt*.5*(c*w+a*y-b*x),w-dt*.5*(a*x+b*y+c*z)],l=Math.hypot(...q);d.quaternion=q.map(n=>n/l);
     // Project all eight corners of the complete frozen limb (including feet) onto
@@ -148,7 +164,7 @@ export function validateCombat(saved,ids){
   const held=new Set();
   for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.miningHits!==undefined&&(d.kind!=='golem'||!Number.isInteger(d.miningHits)||d.miningHits<0||d.miningHits>1))||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
   for(const e of saved.embeds||[])if(!e||!unique(e.id)||!['arrow','bolt'].includes(e.kind)||!PARTS.includes(e.part)||!validContact(e)||!(e.targetId==='world'||e.targetId==='terrain'||saved.enemies.some(q=>q.id===e.targetId)||saved.detachedParts?.some(q=>q.id===e.targetId)))throw Error('Invalid embed');
-  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>3)||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=(e.kind==='golem'?120:p==='torso'?100:55)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0)))throw Error('Invalid enemy anatomy');
+  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>3)||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=(e.kind==='golem'?120:p==='torso'?100:55)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0))||e.scorch!==undefined&&(!e.scorch||typeof e.scorch!=='object'||Object.keys(e.scorch).length!==PARTS.length||!PARTS.every(p=>Number.isFinite(e.scorch[p])&&e.scorch[p]>=0&&e.scorch[p]<=1)))throw Error('Invalid enemy anatomy');
 }
 
 // Only known fields survive a user-imported checkpoint. Validation above checks

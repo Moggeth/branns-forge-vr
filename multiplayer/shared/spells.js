@@ -22,3 +22,12 @@ export const WEAPONS = Object.freeze([
   {id:'bow',label:'Emberwing',slot:5,cooldown:33}, {id:'limb',label:'Held Limb',slot:6,cooldown:32},
   {id:'wyrmspout',label:'Wyrmspout',slot:7,cooldown:6}, {id:'flask',label:'Emberdew',slot:8,cooldown:60},
 ].map(Object.freeze));
+
+// Spatial preview dimensions mirror authoritative spell effects and world-content tree sites.
+export const SPELL_TARGET_SHAPES = Object.freeze({
+  skeleton: { r: 2 }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 },
+  raise: { r: 6, h: 2 }, lower: { r: 6, h: -2 },
+  sunder: { line: true, kr: 2.5, kh: -1.5 }, wall: { line: true, kr: 2.5, kh: 1.5 },
+  grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
+  starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
+});

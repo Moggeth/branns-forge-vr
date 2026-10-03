@@ -1,5 +1,6 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
+import {applyEnemyScorch} from './combat.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
@@ -50,7 +51,10 @@ export function fireContact(state,shot,hit,ctx){
     }
   }
   const enemy=state.enemies.find(e=>e.id===hit.targetId);
-  if(enemy&&(shot.kind==='flame'||shot.lit))ctx.damageEnemy(state,enemy,shot.kind==='flame'?4:12,events);
+  if(enemy&&(shot.kind==='flame'||shot.lit)){
+    applyEnemyScorch(enemy,hit.part||'torso',shot.kind==='flame'?.045:.14);
+    ctx.damageEnemy(state,enemy,shot.kind==='flame'?4:12,events);
+  }
   return events;
 }
 
@@ -95,7 +99,14 @@ export function stepFire(state,ctx,events){
   const hot=state.fireCells.filter(c=>c.burning).map(c=>[c.x,ctx.terrainHeight(state,c.x,c.z),c.z]);
   hot.push(...state.fireSurfaces.map(p=>p.position));
   const exposed=actor=>hot.some(p=>Math.hypot(actor.position[0]-p[0],actor.position[2]-p[2])<.7&&Math.abs(actor.position[1]-p[1])<1.8);
-  for(const enemy of [...state.enemies])if(exposed(enemy))ctx.damageEnemy(state,enemy,6,events);
+  for(const enemy of [...state.enemies])if(exposed(enemy)){
+    // Ground fire reaches the feet first; heat rises through the torso. Keep
+    // these six bounded bone values after the flame patch burns out.
+    applyEnemyScorch(enemy,'leftLeg',.07);
+    applyEnemyScorch(enemy,'rightLeg',.07);
+    applyEnemyScorch(enemy,'torso',.035);
+    ctx.damageEnemy(state,enemy,6,events);
+  }
   for(const player of state.players)if(player.role==='hero'&&exposed(player))ctx.damageHero(state,player,2,events);
 }
 

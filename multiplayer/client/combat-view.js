@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {prepareAsset, prepareProjectile} from './asset-pose.js';
 import {updateSkinBounds} from './skin-bounds.js';
+import {createCombatDamageNumbers} from './combat-damage-numbers.js';
+import {createCreatureLifeDeath} from './creature-life-death.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
@@ -260,6 +262,8 @@ export function maskMissingParts(root, missing = []) {
 
 export function createCombatView({scene, templates, actors, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
+  const damageNumbers = createCombatDamageNumbers(scene);
+  const creatures = createCreatureLifeDeath({scene, height});
   const surfaceCaches = new WeakMap();
   function surface(root) {
     let cache = surfaceCaches.get(root);
@@ -268,6 +272,7 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
   }
   const detached = new Map(), projectiles = new Map(), embeds = new Map(), reported = new Set(), sweptUntil = new Map();
   const actorFor = id => actors.get(`e:${id}`) || actors.get(id);
+  const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
   const remove = (map, id, ownsGeometry = false) => {
     const node = map.get(id); if (!node) return;
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
@@ -355,6 +360,7 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
   function tick(dt, isHost = false) {
     if (disposed) return;
     elapsed += dt;
+    damageNumbers.tick(dt);
     for (const node of projectiles.values()) {
       const flight = node.userData.flight;
       if (!flight || !node.visible) continue;
@@ -368,6 +374,9 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
     }
     for (const entry of actors.values()) if (entry.enemy && entry.data?.kind === 'golem') updateGolemPose(entry, dt, snapshot.tick || 0, elapsed);
     beforeContacts();
+    for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, snapshot.tick || 0, dt);
+    creatures.syncDetached(detached, snapshot.detachedParts || []);
+    creatures.tick(dt);
     contactRevision++;
     if (!isHost) return;
     for (const data of snapshot.projectiles || []) {
@@ -399,10 +408,26 @@ export function createCombatView({scene, templates, actors, beforeContacts = () 
   }
   function dispose() {
     disposed = true;
+    damageNumbers.dispose();
+    creatures.dispose();
     for (const [id] of embeds) remove(embeds, id);
     for (const [id] of projectiles) remove(projectiles, id);
     for (const [id] of detached) remove(detached, id, true);
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
-  return {sync, tick, segmentContacts, grabTarget, dispose, detached, embeds, projectiles};
+  return {sync, tick, segmentContacts, grabTarget, dispose, detached, embeds, projectiles,
+    beginCreatureFrame: () => creatures.beginFrame(),
+    creatureStats: () => creatures.stats(),
+    heldLimbRoot: holderId => {
+      for (const node of detached.values()) if (node.userData.heldBy === holderId) return node;
+      return null;
+    },
+    setDamageNumbers: value => damageNumbers.setEnabled(value),
+    handleEvent: event => {
+      damageNumbers.note(event);
+      const actor = event?.id === undefined ? null : actorFor(event.id);
+      if ((event?.kind === 'hit' || event?.kind === 'headshot') && creatureActor(actor)) creatures.hit(actor, event);
+      if (event?.kind === 'death' && (creatureActor(actor) || ['skeleton', 'golem'].includes(event.creature))) creatures.death(actor, event);
+    },
+    damageNumberStats: () => damageNumbers.stats()};
 }

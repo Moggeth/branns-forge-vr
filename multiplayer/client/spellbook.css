@@ -1,0 +1,139 @@
+/* Brann's Forge — spellbook pager. Load after styles.css / combat-hud.css.
+   Scoped to .sb-* classes added by spellbook.js; removing the module restores the old bar. */
+.sb-root {
+  --sb-card-w: 62px; --sb-card-h: 66px; --sb-gap: 4px; --sb-arrow: 30px;
+  --sb-iron: #241d17; --sb-iron-2: #322820; --sb-brass: #c9a25e; --sb-brass-lo: rgba(201,162,94,.35);
+  --sb-mana: #6fa8ff; --sb-mana-lo: #33507e; --sb-icon-ink: #1a140f;
+  --sb-reserve: 0px;                       /* per-side thumbstick reserve (touch, set below) */
+  max-width: 100%;
+}
+.sb-bar {
+  display: flex; align-items: stretch; gap: 2px; max-width: 100%; min-width: 0;
+  padding: 3px; border-radius: 12px; position: relative;
+  background: linear-gradient(180deg, rgba(50,40,31,.92), rgba(22,18,14,.94));
+  border: 1px solid var(--sb-brass-lo);
+  box-shadow: inset 0 1px 0 rgba(255,225,170,.10), 0 4px 14px rgba(0,0,0,.45);
+  max-height: 100px; box-sizing: border-box;
+}
+.sb-bar.sb-off { filter: saturate(.55) brightness(.8); }
+
+/* the existing .bf-spells is the scroll viewport — no edge mask, so nothing reachable is hidden */
+.sb-bar > .bf-spells.sb-track {
+  position: relative; flex: 1 1 auto; min-width: 0; gap: var(--sb-gap);
+  display: flex; overflow-x: auto; overflow-y: hidden; padding: 2px;
+  -webkit-mask-image: none; mask-image: none;
+  scroll-snap-type: x proximity; scroll-padding-inline: 4px; overscroll-behavior-x: contain;
+  scrollbar-width: none; touch-action: pan-x; cursor: grab;
+}
+.sb-bar.sb-dragging > .sb-track { cursor: grabbing; scroll-snap-type: none; }
+.sb-bar.sb-dragging .sb-card { pointer-events: none; }
+
+/* paging arrows: always visible while the row overflows; ≥44px tall touch target via padding */
+.sb-page {
+  flex: none; width: var(--sb-arrow); min-width: var(--sb-arrow); min-height: 44px; padding: 0;
+  display: none; place-items: center; border-radius: 9px; cursor: pointer;
+  color: var(--sb-brass); background: linear-gradient(180deg, var(--sb-iron-2), var(--sb-iron));
+  border: 1px solid var(--sb-brass-lo); touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.sb-bar.sb-overflow .sb-page { display: grid; }
+.sb-page svg { width: 18px; height: 18px; }
+.sb-page:hover { color: #ffd690; border-color: var(--sb-brass); }
+.sb-page[aria-disabled="true"] { opacity: .32; cursor: default; }
+
+/* ---- card: icon over name, key top-left, cost bottom-right ---- */
+.sb-bar .bf-spell.sb-card {
+  flex: none; position: relative; box-sizing: border-box;
+  min-width: var(--sb-card-w); width: auto; height: var(--sb-card-h); min-height: 44px;
+  padding: 4px 4px 3px; margin: 0;
+  display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; gap: 1px;
+  border-radius: 9px; overflow: hidden; scroll-snap-align: start;
+  color: var(--bf-parch, #f1e4c8); font: 600 10px/1.1 system-ui, "Segoe UI", sans-serif;
+  background: radial-gradient(120% 90% at 50% 20%, rgba(255,255,255,.06), transparent 60%),
+              linear-gradient(180deg, var(--sb-iron-2), var(--sb-iron));
+  border: 1px solid rgba(201,162,94,.30);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 -10px 16px rgba(0,0,0,.25);
+  transition: border-color .15s, box-shadow .15s, transform .12s;
+}
+.sb-bar .bf-spell.sb-card::before { left: 8px; right: 8px; top: 1px; height: 2px; z-index: 3; }   /* school stripe */
+.sb-bar .bf-spell.sb-card:hover { border-color: var(--sb-brass); }
+.sb-bar .bf-spell.sb-card:active { transform: translateY(1px); }
+.sb-bar .bf-spell.sb-card[aria-checked="true"], .sb-bar .bf-spell.sb-card.sb-selected {
+  border-color: #ffd690; background: radial-gradient(110% 90% at 50% 25%, rgba(255,179,90,.32), transparent 65%),
+              linear-gradient(180deg, #3d2e1f, #22190f);
+  box-shadow: inset 0 0 0 1px rgba(255,214,144,.55), 0 0 10px rgba(240,138,60,.45);
+}
+.sb-art { grid-row: 1; width: 30px; height: 30px; display: grid; place-items: center; z-index: 1;
+  color: var(--school, var(--bf-gold, #e7c27a)); filter: drop-shadow(0 1px 0 #000) drop-shadow(0 0 3px rgba(0,0,0,.6)); }
+.sb-art svg, .sb-art img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.sb-card[aria-checked="true"] .sb-art { color: #ffe2a8; }
+.sb-bar .sb-card .bf-name { grid-row: 2; z-index: 1; white-space: nowrap; font-size: 10px; letter-spacing: -.01em;
+  max-width: none; overflow: visible; text-overflow: clip; text-shadow: 0 1px 1px #000; }
+.sb-bar .sb-card kbd { position: absolute; top: 3px; left: 3px; z-index: 4; padding: 1px 3px; font-size: 9px; line-height: 1;
+  background: rgba(10,8,6,.78); color: #f3dfb4; border-color: rgba(231,194,122,.4); }
+.sb-bar .sb-card .bf-cost { position: absolute; top: 3px; right: 3px; z-index: 4; display: inline-flex; align-items: center; gap: 1px;
+  padding: 1px 3px; border-radius: 4px; font: 700 9px/1 ui-monospace, Consolas, monospace;
+  color: #bcd7ff; background: rgba(10,8,6,.78); }
+.sb-bar .sb-card .bf-cost svg { width: 8px; height: 8px; }
+.sb-card[data-sb-line] .bf-name::after { content: " ⟷"; opacity: .7; }
+
+/* not enough mana: cold blue wash + red-flagged cost (distinct from the cooldown sweep) */
+.sb-card.sb-nomana .sb-art { color: var(--sb-mana-lo); filter: grayscale(.4) drop-shadow(0 1px 0 #000); }
+.sb-card.sb-nomana::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(180deg, rgba(40,70,130,.28), rgba(20,35,80,.38)); }
+.sb-card.sb-nomana .bf-cost { color: #fff; background: #8e2b22; box-shadow: 0 0 0 1px #ff8a70; }
+
+/* cooldown: progressive dark veil sweeping clockwise from 12 o'clock + compact seconds */
+.sb-veil { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
+  background: conic-gradient(from 0deg, rgba(8,6,4,.78) calc(var(--sb-cd, 0) * 360deg), transparent 0); }
+.sb-card.sb-cooling .sb-veil { opacity: 1; }
+.sb-secs { position: absolute; left: 0; right: 0; top: 20px; z-index: 3; text-align: center; pointer-events: none;
+  font: 800 15px/1 ui-monospace, Consolas, monospace; color: #fff3d6; text-shadow: 0 0 3px #000, 0 1px 1px #000; }
+.sb-secs:empty { display: none; }
+
+/* ---- QuickCast: deliberate bolt-in-ring icon, clear off/on, subtle pulse on activation ---- */
+.bf-toggle.sb-qc { gap: 6px; padding: 0 8px 0 4px; border-radius: 10px; border: 1px solid transparent; }
+.sb-qc-icon { width: 22px; height: 22px; color: var(--bf-parch-dim, #cdbb98); opacity: .55; transition: color .2s, opacity .2s; }
+.bf-toggle.sb-qc-on { border-color: rgba(255,179,90,.55); background: rgba(240,138,60,.14); }
+.bf-toggle.sb-qc-on .sb-qc-icon { color: var(--bf-ember-hot, #ffb35a); opacity: 1; filter: drop-shadow(0 0 4px rgba(240,138,60,.7)); }
+.bf-toggle.sb-qc-on .bf-name::after { content: " · on"; color: var(--bf-ember-hot, #ffb35a); font-weight: 700; }
+.bf-toggle.sb-qc-pulse .sb-qc-icon { animation: sb-qc-pulse .8s var(--bf-ease, ease-out) 1; }
+@keyframes sb-qc-pulse { 0% { transform: scale(1); } 35% { transform: scale(1.28); filter: drop-shadow(0 0 9px #ffb35a); } 100% { transform: scale(1); } }
+
+.sb-legend .sb-lg-cost { color: #ff9a85; font-weight: 700; }
+.sb-card.sb-blocked { opacity: .55; border-style: dashed; }
+.sb-legend .sb-lg-cd { color: #fff3d6; font-weight: 700; }
+
+/* ---- responsive ---- */
+@media (any-pointer: coarse) {
+  .sb-bar .bf-spell.sb-card { min-width: 56px; min-height: 52px; }
+  .sb-page { width: 34px; min-width: 34px; }
+}
+/* touch play: reserve thumbstick corners in landscape; full usable width in portrait */
+body.touch-controls-active .sb-root { --sb-card-h: 56px; }
+body.touch-controls-active .sb-bar .sb-card .bf-name { font-size: 9.5px; }
+body.touch-controls-active .sb-secs { top: 15px; }
+@media (orientation: landscape) and (any-pointer: coarse) {
+  body.touch-controls-active .sb-root { --sb-reserve: clamp(110px, 19vw, 190px); }
+}
+body.touch-controls-active .sb-bar {
+  max-width: calc(100vw - 2 * var(--sb-reserve) - var(--bf-safe-l, env(safe-area-inset-left, 0px)) - var(--bf-safe-r, env(safe-area-inset-right, 0px)) - 12px);
+  margin-inline: auto;
+}
+@media (max-width: 420px) {
+  .sb-root { --sb-card-w: 54px; --sb-card-h: 58px; }
+  .sb-art { width: 26px; height: 26px; }
+  .sb-secs { top: 16px; font-size: 13px; }
+}
+@media (max-height: 440px) and (orientation: landscape) {
+  .sb-root { --sb-card-h: 52px; }
+  .sb-art { width: 24px; height: 24px; }
+  .sb-secs { top: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-bar .bf-spell.sb-card, .sb-qc-icon { transition: none; }
+  .bf-toggle.sb-qc-pulse .sb-qc-icon { animation: none; }
+}
+@media (forced-colors: active) {
+  .sb-card.sb-cooling .sb-veil { background: none; border-bottom: calc(var(--sb-cd) * 66px) solid GrayText; }
+  .sb-card.sb-nomana .bf-cost { forced-color-adjust: none; outline: 1px solid Mark; }
+}
