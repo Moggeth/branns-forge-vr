@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createPickLuminance} from './pick-luminance.js';
 
 // Diegetic weapon readiness for Brann's Forge held tools.
 //
@@ -181,7 +182,7 @@ class Strip {
 class Owner {
   constructor(tool) {
     this.group = new THREE.Group(); this.group.name = `readiness:${tool}`;
-    this.geometries = new Set(); this.materials = new Set();
+    this.geometries = new Set(); this.materials = new Set(); this.cleanup = [];
   }
   add(mesh, geometry, material) {
     if (geometry) this.geometries.add(geometry);
@@ -252,7 +253,9 @@ const BUILD = {
     settings.forEach(([p, q], i) => setting.setMatrixAt(i, _m.compose(p, q, _s))); setting.computeBoundingSphere();
     owner.add(setting, setting.geometry, setting.material);
     const gem = named(new THREE.OctahedronGeometry(.0058, 0).scale(.85, 1.45, .7), 'pick-node');
-    return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal)};
+    // The head's own Resonance gems carry the charge too: drain on use, re-ignite heart → arm tips → crown.
+    const luminance = createPickLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
+    return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal), luminance};
   },
   // Copper collar sleeve above the grip; four raised rings warm upward as the slam recharges.
   hammer(owner, host, find) {
@@ -407,7 +410,10 @@ export function createWeaponReadiness({root, tool, reducedMotion = false} = {}) 
       strip?.paint(value, ready ? 'ready' : 'charge', boost);
       return boost;
     };
-    if (parts.special) show(parts.special, channels.special, special);
+    if (parts.special) {
+      const boost = show(parts.special, channels.special, special);
+      parts.luminance?.update(special, time, reducedMotion, boost);
+    }
     if (parts.attack) {
       const boost = show(parts.attack, channels.attack, attack);
       if (parts.aim) { parts.aim(attack); parts.needle.material.emissiveIntensity = attack >= .999 ? .35 + boost * .9 : 0; }
@@ -427,6 +433,7 @@ export function createWeaponReadiness({root, tool, reducedMotion = false} = {}) 
   function dispose() {
     if (disposed) return; disposed = true;
     owner.group.removeFromParent();
+    owner.cleanup.forEach(fn => fn()); owner.cleanup.length = 0;
     owner.group.traverse(o => o.isInstancedMesh && o.dispose());
     owner.geometries.forEach(g => g.dispose()); owner.materials.forEach(m => m.dispose());
     owner.geometries.clear(); owner.materials.clear();
