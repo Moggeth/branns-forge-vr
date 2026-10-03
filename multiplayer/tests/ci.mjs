@@ -11,7 +11,7 @@ const suite = [
   'timberline-manned','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
-  'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud',
+  'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
   'expedition-presentation.test','fire','fire-authored-samples','fire-performance',
   'fire-spatial-phoenix','forest-resource-integration','forge-protection','foundation-tiles',
   'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
@@ -24,7 +24,7 @@ const suite = [
   'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
   'siegebird-flock','siegebird-songbird','simulation','skeleton-performance','skin-bounds',
   'skull-surface-regression','solo-session','spell-presentation','spell-spectacle',
-  'spell-targeting','starting-world','state-codec','terrain-presentation','terrain-ray',
+  'spell-availability','spell-targeting','starting-world','state-codec','terrain-presentation','terrain-ray',
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
@@ -35,9 +35,8 @@ const suite = [
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).
 // Fix each one and move it into `suite`; never move a passing check out of `suite`.
 const stale = [
-  'batching','creature-state','dom-contract','expedition-integration',
-  'expedition-persistence','expedition-real-play','forge','meteor-resources',
-  'solo-settlement','spell-availability',
+  'batching','creature-state','dom-contract','expedition-persistence',
+  'expedition-real-play','forge','meteor-resources','solo-settlement',
   'enemy-motion',      // reads an absolute Windows asset path
   'fire-presentation', // needs assets/asset-lab gltf-validator install
 ];

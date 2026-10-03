@@ -41,7 +41,7 @@ const originalMeteors=magic.snapshot().deposits.filter(d=>d.kind==='meteor').len
 let sequence=0;for(const spell of ['sunder','wall','ring','starfall']){assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell,point:[10,0,10]}).ok,true);for(let i=0;i<60;i++)magic.step();}
 assert.equal(magic.snapshot().edits.length,7);assert.equal(worldTrees(magic.snapshot()).length,33);assert.equal(magic.snapshot().deposits.filter(d=>d.kind==='meteor').length,originalMeteors+1);
 assert.deepEqual(loadSimulation(magic.checkpoint()).snapshot(),magic.snapshot());
-assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell:'ring',point:[55,0,55]}).code,'outside_world');
+{const r=magic.command('g',{type:'cast',seq:++sequence,spell:'ring',point:[55,0,55]}),ring=magic.snapshot().edits.at(-1);assert.equal(r.ok,true,'mana alone refuses a cast; placement moves it');assert.ok(Math.abs(ring.x)<=51&&Math.abs(ring.z)<=51,'ring settles inside the world');}
 // No spend on a cast that would overflow the terrain budget.
 let capped=magic.checkpoint();capped.edits=Array.from({length:63},(_,i)=>({id:'limit'+i,kind:'raise',x:0,z:0,radius:6,height:2}));capped.players[0].mana=100;capped=loadSimulation(capped);
 assert.equal(capped.command('g',{type:'cast',seq:++sequence,spell:'wall',point:[0,0,0]}).code,'world_limit');assert.equal(capped.snapshot().players[0].mana,100);
