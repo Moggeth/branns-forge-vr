@@ -12,6 +12,7 @@ const s=new THREE.Scene(),dusk=q.has('dusk');s.background=new THREE.Color(dusk?0
 s.add(new THREE.HemisphereLight(dusk?0x5a6a90:0xc6e0ed,0x5e5139,dusk?.5:1.2));const sun=new THREE.DirectionalLight(dusk?0x9fb0ff:0xffe3ad,dusk?.6:2.2);sun.position.set(6,10,5);s.add(sun);
 const g=new THREE.Mesh(new THREE.CircleGeometry(4,32).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x6b7a3a,roughness:1}));s.add(g);
 new GLTFLoader().load(q.get('glb')||'/assets/golem.glb',gltf=>{
+ gltf.scene.traverse(n=>{for(const m of [n.material].flat())if(m&&/^crystal/i.test(m.name))m.emissive.setRGB(.3,.62,1);}); // as game.js
  const {visual}=prepareAsset(gltf.scene?gltf:gltf,'golem',2.8);s.add(visual);
  if(q.get('armor')!==null){const a=+q.get('armor');for(const[n,t]of[['ForearmL',3],['ForearmR',3],['ShoulderL',2],['ShoulderR',2],['ChestPlate',1]]){const o=visual.getObjectByName(n);if(o)o.visible=a>=t;}}
  const views=[[0,1.6,4.6,1.5],[Math.PI*.25,1.8,5,1.5],[Math.PI,1.8,5,1.5],[Math.PI*-.15,2.35,1.9,2.25]];
