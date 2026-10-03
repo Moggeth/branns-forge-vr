@@ -2,7 +2,11 @@
 
 Public page: https://branns-forge-multiplayer.vercel.app
 
-OUTAGE 2026-10-03: the following previous temporary hostname no longer resolves. No live 8789 peer/tunnel was found. Automated recovery was policy-blocked even after user approval. Start the documented service/tunnel from a permitted environment, then redeploy with the new hostname before inviting players.
+RECOVERED 2026-10-03 16:07 Australia/Sydney: the user started the service and tunnel in two PowerShell windows. Both must remain open. The website was rebuilt and redeployed with the new endpoint, and public two-client joining/replication passed. These processes are user-owned; do not stop or restart them as QA cleanup.
+
+Current temporary signaling URL: `wss://terry-essence-trips-minolta.trycloudflare.com/peer/ws`.
+
+The historical outage below was caused by the old tunnel disappearing; automated launch was blocked. A stable hostname and managed process remain future reliability work.
 
 Previous temporary signaling URL:
 `wss://blackjack-meals-mia-meals.trycloudflare.com/peer/ws`.
@@ -133,3 +137,10 @@ Measured verification: solo session/save tests 0.022 s, combat handoff 0.539 s, 
 Failure lessons: a local transport must emit the same hosting-status event as the network transport, otherwise the world renders but input stays inactive. The browser test asserts controlsActive before input. Initial quick-cast acceptance hit the forge apron and correctly failed protected_forge (35.493 s); a diagnostic retry confirmed the exact target at x0.797/z2.781 (35.648 s). Target ordinary meadow for successful-cast assertions. Do not relax forge protection. An assumed global Playwright path failed immediately (0.142 s); this machine's actual cached module is C:/Users/mog/AppData/Local/npm-cache/_npx/31e32ef8478fbf80/node_modules/playwright-core and Chromium is C:/Users/mog/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe. Discover cached paths if they change; no reinstall required. Browser captures/results live under repository logs/, not multiplayer/logs/.
 
 Public verification: source ee0d1ea deployed as dpl_GmTHAWMTjYx93GRS1JKQyrtzjUJH to https://branns-forge-multiplayer.vercel.app (build/stage/deploy 11.781 s; all browser GLBs and 30 texture references resolved). Anonymous public browser acceptance passed in 7.490 s harness / 7.973 s command: actual Hero jump/attack, role switching, God quick-cast spawn, zero WebSockets, no console/resource errors, portrait solo button within viewport. Authored Hero/God captures were visually inspected locally. Public code retains the dead signaling endpoint; public friend joining is NOT restored. No hosting-service launch succeeded in this recovery.
+
+## User-assisted public recovery verification — 2026-10-03
+Read the new hostname from the supplied terminal screenshot; local and public /peer/health both returned ok (1.187 s). User-owned service 127.0.0.1:8789 and Cloudflare Quick Tunnel were already running; no tool launch or policy workaround was used. Private repo/auth/fetch confirmed Moggeth and no divergence (discovery 1.323 s; health/fetch/inspection batch 2.983 s).
+
+Compiled source c8c2d5f with the new endpoint; all GLBs and 30 texture references passed preflight. Deployment dpl_BfbbUxKKZovkwHzs5MaGEHwYRWUa is READY at https://branns-forge-multiplayer.vercel.app (13.041 s). Anonymous real-browser test created a room as Hero, joined by its eight-digit code as God, saw two players in both snapshots, started Expedition on Hero and replicated God Raise terrain to both (13.180 s). No application/resource errors except the intentionally ignored favicon 404; software-renderer precision warnings remain. Both role screenshots visually inspected. Test clients closed normally, leaving the user's service and tunnel running.
+
+Solo was rechecked against the same deployment: both roles, jump/attack, quick-cast, zero network sockets and phone lobby passed (6.025 s harness; 6.569 s command). This verifies public signaling and WebRTC from two local browser processes, not different-household NAT traversal or physical VR. No TURN relay configured. Users must refresh old website tabs to pick up the new endpoint. Future Quick Tunnel restarts require another endpoint update/deploy; a PC sleep/shutdown interrupts public discovery.
