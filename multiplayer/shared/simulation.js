@@ -1,10 +1,13 @@
+import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents} from './terrain.js';
+import {collapseMinedWall} from './weapon-specials.js';
+export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld} from './starting-world.js';
 import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
-import {useResource, collectTarget, meteorAwakens, flushMeteorRewards} from './resources.js';
+import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards} from './resources.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {createAdventure,stepAdventure,adventureAction,adventureCastGate,adventureCastRefund,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
@@ -37,20 +40,6 @@ function pose(value) {
   return {position: [...value.position], quaternion: value.quaternion.map(n => n / length)};
 }
 
-function baseHeight(x, z) { return 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07); }
-export function terrainHeight(state, x, z, includeBridges = true) {
-  let y = baseHeight(x, z);
-  for (const edit of state.edits) {
-    const t = clamp(1 - Math.hypot(x - edit.x, z - edit.z) / edit.radius, 0, 1);
-    y += edit.height * t * t * (3 - 2 * t);
-  }
-  for (const bridge of includeBridges ? (state.bridges || []) : []) {
-    const dx = x - bridge.x, dz = z - bridge.z, forward = -Math.sin(bridge.yaw) * dx - Math.cos(bridge.yaw) * dz;
-    const side = Math.cos(bridge.yaw) * dx - Math.sin(bridge.yaw) * dz;
-    if (Math.abs(forward) <= 2.5 && Math.abs(side) <= .8) y = Math.max(y, bridge.y);
-  }
-  return y;
-}
 
 function spawn(state, ignored = '') {
   let best = [0, 0, 8], clearance = -1;
@@ -60,7 +49,7 @@ function spawn(state, ignored = '') {
     const candidate = [clamp(Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(8 + Math.sin(theta) * radius, -BOUND, BOUND)];
     candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
     resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));
-    if(candidate.some((v,k)=>k!==1&&Math.abs(v)>BOUND))continue;
+    if(candidate.some((v,k)=>k!==1&&Math.abs(v)>49.5))continue;
     const others = [...state.players.filter(p => p.role === 'hero' && p.id !== ignored), ...state.enemies];
     const hazards=state.fireCells.filter(c=>c.burning);
     const space = Math.min(10000,...others.map(p => distance(candidate, p.position)),...hazards.map(c=>Math.hypot(candidate[0]-c.x,candidate[2]-c.z)));
@@ -73,11 +62,11 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[])].map(x=>x.id);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[])].flatMap(x=>x.editId?[x.id,x.editId]:[x.id]);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
-function damageEnemy(state, enemy, amount, events) {
-  return hitEnemyPart(state,enemy,'torso',amount,null,{nextId,terrainHeight},events);
+function damageEnemy(state, enemy, amount, events, ownerId) {
+  return hitEnemyPart(state,enemy,'torso',amount,ownerId?{ownerId}:null,{nextId,terrainHeight},events);
 
 }
 function damageHero(state, hero, amount, events) {
@@ -85,6 +74,7 @@ function damageHero(state, hero, amount, events) {
   hero.hp -= amount;
   events.push(event('hit', hero.position, hero.id));
   if (hero.hp <= 0) {
+    if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);
     events.push(event('death', hero.position, hero.id));
     releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
     hero.hp = 100; hero.position = spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0]; hero.protectedUntil=state.tick+180;
@@ -124,7 +114,7 @@ function instantiate(state) {
       const position = spawn(state);
       state.players.push({id, name: cleanName(name), role, position, yaw: 0, hp: 100, mana: 100,
         move: [0, 0], vy: 0, inputTick: -1000, attackTick: -1000, castTick: -1000,
-        roleTick: -1000, seq: 0, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}});
+        roleTick: -1000, seq: 0, stats:{kills:0,deaths:0,harvested:0,contribution:0}, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}});
       return ok([event('join', position, id)]);
     },
     removePlayer(id) {
@@ -199,12 +189,8 @@ function instantiate(state) {
         const logResult=logAction(state,p,message);if(logResult)return logResult;
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
-          const candidates = state.pickups.map(q => [q, Math.hypot(p.position[0]-q.x,p.position[2]-q.z,p.position[1]-terrainHeight(state,q.x,q.z))]).filter(q => q[1] <= 2.5).sort((a,b)=>a[1]-b[1]);
-          if (!candidates.length) return ok(); const q = candidates[0][0];
-          if(q.kind!=='apple' && p.resources[q.kind]+q.amount>999)return fail('inventory_full');
-          state.pickups.splice(state.pickups.indexOf(q),1);
-          if (q.kind === 'apple') p.hp = Math.min(100, p.hp + 35); else p.resources[q.kind] += q.amount;
-          return ok([event('pickup',[q.x,q.y,q.z],q.id)]);
+          const target=nearestCollectible(state,p,{height:(x,z)=>terrainHeight(state,x,z,false)});
+          return target?collectTarget(state,p,{targetId:target.id},{terrainHeight,combatAction,combatContext}):ok();
         }
         if (message.action === 'buildBridge') {
           if (state.bridges.length >= 32) return fail('world_limit');
@@ -221,6 +207,8 @@ function instantiate(state) {
         // 27 ticks is the legacy .45 s cadence; pick is the requested .48 s (29 ticks).
         const cooldown = {axe:27,pick:29,hammer:40,limb:32}[requestedTool];
         if (state.tick - p.attackTick < cooldown) return fail('cooldown');
+        const requestedOre=state.deposits.find(d=>d.id===message.targetId);
+        if(requestedTool==='pick'&&requestedOre&&!requestedOre.depleted&&requestedOre.hits===requestedOre.maxHits-1&&state.pickups.length>=256)return fail('world_limit');
         p.attackTick = state.tick;
         const facing = [-Math.sin(p.yaw), -Math.cos(p.yaw)];
         const inReach = target => {
@@ -241,20 +229,22 @@ function instantiate(state) {
           return chop.code?fail(chop.code):ok(chop.events);
         }
         if (supplied && ore) {
-          if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:terrainHeight(state,ore.x,ore.z)}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-terrainHeight(state,ore.x,ore.z))>2) return ok();
+          // Ore is anchored to visible earth; a bridge deck overhead is not its contact surface.
+          const oreFloor=terrainHeight(state,ore.x,ore.z,false);
+          if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:oreFloor}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-oreFloor)>2) return ok();
           if(ore.hits===ore.maxHits-1&&state.pickups.length>=256)return fail('world_limit');
           ore.hits++; events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
-          if (ore.hits >= ore.maxHits) { ore.depleted=true; makePickup(ore.kind==='meteor'?'gems':'stone',ore.x,ore.z,ore.kind==='meteor'?2:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
+          if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); makePickup(ore.kind==='meteor'?'gems':'stone',ore.x,ore.z,ore.kind==='meteor'?2:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
-          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool},combatContext,events);
+          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);
           else if(message.targetId==='shrine' && inReach({position:[0,terrainHeight(state,0,0,false),0]})<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
           return ok(events); // No fallback to another target when a precise surface missed.
         }
         const enemy = state.enemies.map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
-        if (enemy && Number.isFinite(enemy[1])) damageEnemy(state, enemy[0], 34, events);
+        if (enemy && Number.isFinite(enemy[1])) damageEnemy(state, enemy[0], 34, events,p.id);
         else if (state.shrine.hp > 0 && inReach({position:[0,terrainHeight(state,0,0,false),0]}) < Infinity) {
           state.shrine.hp = Math.max(0, state.shrine.hp - 25);
           events.push(event('hit', state.shrine.position, 'shrine'));
@@ -290,7 +280,7 @@ function instantiate(state) {
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
       if(spell==='lightning')applyHeat(state,at,3,1,fireContext);
       if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
-      if(spell==='lightning')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=3)damageEnemy(state,enemy,80,events);
+      if(spell==='lightning')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=3)damageEnemy(state,enemy,80,events,p.id);
       if(spell==='frost')for(const enemy of state.enemies)if(distance(enemy.position,at)<=7)enemy.slowUntil=state.tick+300;
       if (spell === 'grove' || spell === 'ring') state.groves.push({id: idNew, x, z, ...(spell === 'ring' ? {kind:'ring'} : {})});
       if (spell === 'raise'||spell==='lower') {
@@ -315,11 +305,11 @@ function instantiate(state) {
         p.mana = Math.min(100, p.mana + 3 / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
-          p.position[0] = clamp(p.position[0] + p.move[0] * 5 / HZ, -BOUND, BOUND);
-          p.position[2] = clamp(p.position[2] + p.move[1] * 5 / HZ, -BOUND, BOUND);
+          moveOnTerrain(state,p.position,p.move[0]*5/HZ,p.move[1]*5/HZ);
+          resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
       }
@@ -339,7 +329,7 @@ function instantiate(state) {
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       stepEnemies(state,{
         ground:(x,z)=>forgeFloor(x,z,forgeY,terrainHeight(state,x,z)),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;},
         damageHero,events
       });
       flushMeteorRewards(state,terrainHeight);
@@ -354,8 +344,8 @@ function instantiate(state) {
     projectileContact(message){return projectileContact(state,message,combatContext);},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, protectedUntil,head, hands}) =>
-          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, protectedUntil,head, hands}) =>
+          ({id, name, role, roleTick, position, yaw, hp, mana, tool, resources, stats, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -369,10 +359,7 @@ function instantiate(state) {
   return api;
 }
 
-function liftActors(state) {
-  for (const actor of [...state.players, ...state.enemies])
-    actor.position[1] = Math.max(actor.position[1], terrainHeight(state, actor.position[0], actor.position[2]));
-}
+function liftActors(state) { settleTerrainContents(state); }
 
 export function createSimulation(options) { return instantiate(newState(options)); }
 export function loadSimulation(saved) {
@@ -404,6 +391,7 @@ export function loadSimulation(saved) {
         !validTick(p.castTick, saved.tick) || !validTick(p.roleTick, saved.tick) ||
         !Number.isSafeInteger(p.seq) || p.seq < 0 ||
         (p.tool !== undefined && !TOOLS.includes(p.tool)) ||
+        (p.stats!==undefined&&(!record(p.stats)||!['kills','deaths','harvested','contribution'].every(k=>finite(p.stats[k])&&p.stats[k]>=0&&p.stats[k]<=1e9&&(k==='contribution'||Number.isInteger(p.stats[k]))))) ||
         (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
         (p.resources !== undefined && (!record(p.resources) || !['wood','stone','gems'].every(k => Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
@@ -420,7 +408,8 @@ export function loadSimulation(saved) {
     if (!record(e) || !unique(e.id) || !validXZ(e) ||
         !((e.kind === 'raise' && e.radius === 6 && e.height === 2) || (e.kind === 'lower' && e.radius === 6 && e.height === -2) ||
           (e.kind === 'starfall' && e.radius === 5 && e.height === -1) ||
-          (e.kind === 'sunder' && e.radius === 2.5 && e.height === -1.5) || (e.kind === 'wall' && e.radius === 2.5 && e.height === 1.5)))
+          (e.kind === 'sunder' && e.radius === 2.5 && e.height === -1.5) || (e.kind === 'wall' && e.radius === 2.5 && e.height === 1.5) ||
+          (e.kind === 'axe_sunder' && e.radius === 1.35 && e.height === -.12) || (e.kind === 'pick_wall' && e.radius === 1 && e.height === 2.4)))
       throw Error('Invalid simulation edit');
   }
   for (const g of saved.groves) {
@@ -430,6 +419,17 @@ export function loadSimulation(saved) {
   const harvestedTrees=restoreHarvested({...saved,harvestedTrees:harvested},treeIds); // strict; legacy felled trees count as landed (wood already awarded)
   const contentIds = new Set([...ids, 'shrine', ...treeIds, ...saved.pendingStarfalls.map(p=>p.id)]);
   for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !['stone','meteor'].includes(d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > (d.kind==='meteor'?5:3) || d.maxHits !== (d.kind==='meteor'?5:3) || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
+  const linkedWalls=new Set();
+  for(const d of deposits) {
+    if(d.special!==undefined&&!['axe_sunder','pick_wall'].includes(d.special))throw Error('Invalid special deposit');
+    if(d.special!==undefined&&d.kind!=='stone')throw Error('Invalid special material');
+    if(d.special==='pick_wall') {
+      const edit=saved.edits.find(e=>e.id===d.editId);
+      if(!validId(d.editId)||linkedWalls.has(d.editId)||(d.depleted?!!edit:!edit||edit.kind!=='pick_wall'||edit.x!==d.x||edit.z!==d.z))throw Error('Invalid wall linkage');
+      linkedWalls.add(d.editId);
+    } else if(d.editId!==undefined)throw Error('Invalid wall linkage');
+  }
+  if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall');
   for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || !['wood','stone','gems','apple'].includes(q.kind) || !validXZ(q) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
   const meteorRewards=saved.meteorRewards??[];
@@ -452,17 +452,18 @@ export function loadSimulation(saved) {
   state.tick = saved.tick;
   state.idCounter = saved.idCounter;
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
+    stats:Object.fromEntries(['kills','deaths','harvested','contribution'].map(k=>[k,p.stats?.[k]||0])),
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy, inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick}) => ({id, position, yaw, hp, attackTick,...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
-  state.edits = copy(saved.edits); state.groves = copy(saved.groves);
+  state.edits = saved.edits.map(({id,kind,x,z,radius,height})=>({id,kind,x,z,radius,height})); state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls);
   state.harvestedTrees = harvestedTrees; state.looseLogs = looseLogs;
   if (saved.adventure !== undefined) { const restored = restoreAdventure(saved.adventure); if (!restored.ok) throw Error('Invalid expedition: ' + restored.code); state.adventure = restored.adventure; }
-  state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted})=>({id,x,z,kind,hits,maxHits,depleted}));
+  state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted,special,editId})=>({id,x,z,kind,hits,maxHits,depleted,...(special?{special}:{}),...(editId?{editId}:{})}));
   state.meteorRewards=copy(meteorRewards);
   state.pickups = pickups.map(({id,kind,x,z,y,amount})=>({id,kind,x,z,y,amount}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));

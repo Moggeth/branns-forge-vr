@@ -11,6 +11,8 @@ const json = value => JSON.parse(JSON.stringify(value));
 // 1. Deposits full of depleted expedition ores (xv ids) from earlier runs: camp restock reuses those slots.
 {
   const base = createSimulation({room: 'CAPREUSE', seed: 41}).checkpoint();
+  // Exhaust the new sanctuary cache as well as ore: this case specifically tests mineable restocking.
+  base.pickups = base.pickups.filter(q => q.kind !== 'stone');
   const world = base.deposits.map(d => ({...d, hits: d.maxHits, depleted: true}));
   const quest = Array.from({length: 80 - world.length}, (_, i) => ({id: `xv0q${i}`, kind: 'stone', x: -40 + (i % 9) * 3, z: -40 + Math.floor(i / 9) * 3, hits: 3, maxHits: 3, depleted: true}));
   const sim = loadSimulation({...base, deposits: [...world, ...quest]});
@@ -22,6 +24,15 @@ const json = value => JSON.parse(JSON.stringify(value));
   assert.ok(cp.deposits.length + cp.pendingStarfalls.length <= 80, 'deposit cap holds');
   for (const d of world) assert.ok(cp.deposits.some(x => x.id === d.id), `world ore ${d.id} kept`);
   assert.doesNotThrow(() => loadSimulation(json(cp)), 'restocked world restores strictly');
+}
+// Loose starting caches count toward camp supply; no redundant boulder is spawned.
+{
+  const cp=createSimulation().checkpoint();
+  cp.deposits=cp.deposits.map(d=>({...d,hits:d.maxHits,depleted:true}));
+  const sim=loadSimulation(cp);sim.addPlayer({id:'h'});
+  assert.equal(startRun(sim,'h',1).ok,true);
+  assert.equal(sim.checkpoint().deposits.filter(d=>!d.depleted).length,0);
+  assert.ok(cp.pickups.filter(q=>q.kind==='stone').reduce((n,q)=>n+q.amount,0)>=sim.checkpoint().adventure.need.stone);
 }
 // 2. Cap full of non-expedition ores: nothing is evicted; the run still starts (God tithe or mined stone covers it).
 {
@@ -39,6 +50,7 @@ const json = value => JSON.parse(JSON.stringify(value));
   let seq = 0;
   for (let run = 1; run <= 10; run++) {
     const cp = sim.checkpoint();
+    cp.pickups = cp.pickups.filter(q => q.kind !== 'stone'); // Prior runs used every loose/cache supply.
     if (run > 1) cp.adventure.stage = 'victory';
     sim = loadSimulation(json(cp));
     assert.equal(startRun(sim, 'h', ++seq).ok, true, `run ${run} starts`);

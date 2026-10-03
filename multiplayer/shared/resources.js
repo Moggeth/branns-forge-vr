@@ -1,9 +1,11 @@
 // Shared collection and spending: authority validates role, range and benefit before consuming.
-import {capsuleDistance, TREE_LIMITS} from './trees.js';
+import {collectLog} from './trees.js';
+import {collectibleCandidate} from './collection-target.js';
+export {nearestCollectible} from './collection-target.js';
 export const RESOURCE_RECIPES=Object.freeze({
- wood:{cost:3,hero:'Bandage · +35 health',god:'Mend Forge · +20 integrity'},
- stone:{cost:2,hero:'Reinforce Forge · +35 integrity',god:'Reinforce Forge · +35 integrity'},
- gems:{cost:1,hero:'Rekindle · +35 health, ready special and cool weapon',god:'Restore Mana · +40 mana'}
+ wood:{cost:3,hero:'Bandage Â· +35 health',god:'Mend Forge Â· +20 integrity'},
+ stone:{cost:2,hero:'Reinforce Forge Â· +35 integrity',god:'Reinforce Forge Â· +35 integrity'},
+ gems:{cost:1,hero:'Rekindle Â· +35 health, ready special and cool weapon',god:'Restore Mana Â· +40 mana'}
 });
 const fail=code=>({ok:false,code,events:[]});
 const ok=events=>({ok:true,events});
@@ -35,20 +37,17 @@ export function collectTarget(state,p,m,ctx){
  if(typeof m.targetId!=='string')return fail('invalid_target');
  const q=state.pickups.find(q=>q.id===m.targetId);
  if(q){
-  if(Math.hypot(p.position[0]-q.x,p.position[2]-q.z,p.position[1]-q.y)>2.5)return fail('out_of_reach');
+  if(!collectibleCandidate(state,p,q.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
   if(q.kind==='apple'&&p.hp>=100)return fail('not_needed');
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
-  if(q.kind==='apple')p.hp=Math.min(100,p.hp+35);else p.resources[q.kind]+=q.amount;
+  if(q.kind==='apple')p.hp=Math.min(100,p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
   return ok([{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}]);
  }
  const log=state.looseLogs.find(l=>l.id===m.targetId);
  if(log){
-  if(log.heldBy&&log.heldBy!==p.id)return fail('out_of_reach');
-  if(capsuleDistance(log,p.position.map((n,i)=>n+(i===1?1.1:0)))>TREE_LIMITS.reach)return fail('out_of_reach');
-  if(p.resources.wood>=999)return fail('inventory_full');
-  p.resources.wood++;state.looseLogs.splice(state.looseLogs.indexOf(log),1);
-  return ok([{kind:'pickup',id:log.id,position:[...log.position],material:'wood'}]);
+  if(!collectibleCandidate(state,p,log.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
+  return collectLog(state,p,log);
  }
  if(state.detachedParts.some(d=>d.id===m.targetId)){
   if(state.looseLogs.some(l=>l.heldBy===p.id))return fail('hands_full');

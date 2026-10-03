@@ -111,6 +111,23 @@ export function resolveTrees(position, index, cuts, ground, radius = .28, bodyHe
  return position;
 }
 
+// The host retains physical-effort proof only for this live hold. Save/import cannot manufacture a bonus.
+const gripProof = new WeakMap();
+export const POUCH_RULES = Object.freeze({wood: 2, radius: .35, grabReach: .45, minTicks: 12, minTravel: .25, maxInputAge: 12});
+/** Pouch centre is a world-aligned local offset from the player's feet, like replicated hand poses. */
+export function waistPouchPosition(player) {
+ const y = clamp((player.head?.position?.[1] || 1.65)*.55, .55, 1.05), yaw=player.yaw||0;
+ return [.28*Math.cos(yaw)-.12*Math.sin(yaw), y, -.28*Math.sin(yaw)-.12*Math.cos(yaw)];
+}
+const trackedHand = (state,p,hand) => p.head && p.hands?.[hand] && Number.isInteger(p.inputTick) && state.tick-p.inputTick <= POUCH_RULES.maxInputAge && state.tick>=p.inputTick ? p.hands[hand].position : null;
+function forgetGrip(state,log) { gripProof.get(state)?.delete(log.id); }
+export function collectLog(state,p,log,amount=1) {
+ if ((p.resources?.wood??0)+amount>999) return {ok:false,code:'inventory_full',events:[]};
+ const index=state.looseLogs.indexOf(log);if(index<0)return {ok:false,code:'invalid_target',events:[]};
+ p.resources.wood+=amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+amount);state.looseLogs.splice(index,1);forgetGrip(state,log);
+ return {ok:true,events:[{kind:'pickup',id:log.id,position:[...log.position],material:'wood',amount,physicalBonus:amount>1}]};
+}
+
 // ---- Logs: three 1.1 m x 0.32 m capsules per tree, cap 48, sleeping, explicit grab/drop/throw/collect.
 const heldPose = (holder) => { const hand = holder.hands?.[1] || holder.hands?.[0];
  if (hand && vec(hand.position, 5) && Array.isArray(hand.quaternion) && hand.quaternion.length === 4) return {position: holder.position.map((n, i) => n + hand.position[i]), quaternion: [...hand.quaternion]};
@@ -128,11 +145,18 @@ export function logSupport(log, ground) {
 }
 export function releaseLog(state, player, direction = [0,0,0], throwing = false) {
  const log = state.looseLogs?.find(l => l.heldBy === player.id); if (!log) return false;
- log.heldBy = null; log.sleeping = false; log.velocity = throwing ? direction.map((n, i) => n*8 + (i === 1 ? 1.5 : 0)) : [0, 0, 0]; log.angularVelocity = throwing ? [2, 3, 1] : [0, 0, 0]; return true;
+ forgetGrip(state,log); log.heldBy = null; log.sleeping = false; log.velocity = throwing ? direction.map((n, i) => n*8 + (i === 1 ? 1.5 : 0)) : [0, 0, 0]; log.angularVelocity = throwing ? [2, 3, 1] : [0, 0, 0]; return true;
 }
 /** Handles log messages. Returns null when the message is not about logs. */
 export function logAction(state, p, m) {
  state.looseLogs ||= []; const held = state.looseLogs.find(l => l.heldBy === p.id);
+ if(m.action==='stowLog') {
+  if(p.role!=='hero')return {ok:false,code:'role_required',events:[]};
+  if(!held||m.id!==held.id)return {ok:false,code:'invalid_target',events:[]};
+  const proof=gripProof.get(state)?.get(held.id),hand=proof&&trackedHand(state,p,proof.hand);
+  if(!proof||proof.player!==p.id||!hand||state.tick-proof.tick<POUCH_RULES.minTicks||distance(hand,proof.start)<POUCH_RULES.minTravel||distance(hand,waistPouchPosition(p))>POUCH_RULES.radius)return {ok:false,code:'invalid_pouch',events:[]};
+  return collectLog(state,p,held,POUCH_RULES.wood);
+ }
  if (m.action === 'release') { if (!held) return null; const dir = m.direction ?? [-Math.sin(p.yaw), 0, -Math.cos(p.yaw)];
   if (!vec(dir, 1.01) || Math.abs(Math.hypot(...dir) - 1) > .1 || (m.throw !== undefined && typeof m.throw !== 'boolean')) return {ok: false, code: 'invalid_action', events: []};
   releaseLog(state, p, dir, m.throw === true); return {ok: true, events: [{kind: m.throw ? 'log_throw' : 'log_drop', id: held.id, position: [...held.position]}]}; }
@@ -140,10 +164,14 @@ export function logAction(state, p, m) {
   if (!log) return {ok: false, code: 'invalid_target', events: []};
   const eye = p.position.map((n, i) => n + (i === 1 ? 1.1 : 0)), reachFrom = heldPose(p).position;
   if (p.role !== 'hero' || log.heldBy || held || (state.detachedParts || []).some(d => d.heldBy === p.id) || Math.min(capsuleDistance(log, eye), capsuleDistance(log, reachFrom)) > TREE_LIMITS.reach) return {ok: false, code: 'out_of_reach', events: []};
+  if(m.interaction==='vr-grip') {
+   const hand=m.hand===1?trackedHand(state,p,1):null;
+   if(!hand||capsuleDistance(log,p.position.map((n,i)=>n+hand[i]))>POUCH_RULES.grabReach)return {ok:false,code:'out_of_reach',events:[]};
+   if(!gripProof.has(state))gripProof.set(state,new Map());
+   gripProof.get(state).set(log.id,{player:p.id,hand:1,tick:state.tick,start:[...hand]});
+  } else forgetGrip(state,log);
   log.heldBy = p.id; log.sleeping = false; log.velocity = [0, 0, 0]; log.angularVelocity = [0, 0, 0]; return {ok: true, events: [{kind: 'grab', id: log.id, position: [...log.position]}]}; }
- if (m.action === 'interact' && held) { // explicit stow of the HELD log only: no proximity auto-collect
-  if ((p.resources?.wood ?? 0) >= 999) return {ok: false, code: 'inventory_full', events: []};
-  p.resources.wood++; state.looseLogs.splice(state.looseLogs.indexOf(held), 1); return {ok: true, events: [{kind: 'pickup', id: held.id, position: [...held.position], material: 'wood'}]}; }
+ if (m.action === 'interact' && held) return collectLog(state,p,held); // desktop stow grants the base amount
  if (held && ['strike', 'fire', 'flame', 'pour', 'special', 'grab'].includes(m.action)) return {ok: false, code: 'hands_full', events: []};
  return null;
 }
@@ -175,7 +203,7 @@ export function stepTrees(state, ctx, index, events) {
  const awake = [];
  for (const log of state.looseLogs) {
   const holder = log.heldBy && state.players.find(p => p.id === log.heldBy && p.role === 'hero');
-  if (log.heldBy && !holder) { log.heldBy = null; log.sleeping = false; }
+  if (log.heldBy && !holder) { forgetGrip(state,log); log.heldBy = null; log.sleeping = false; }
   if (holder) { const pose = heldPose(holder); log.position = pose.position; log.quaternion = pose.quaternion; log.velocity = [0, 0, 0]; log.angularVelocity = [0, 0, 0]; continue; } // rigid: no lag/bend
   if (log.sleeping) continue;
   awake.push(log); const dt = 1/TREE_LIMITS.hz;

@@ -1,3 +1,4 @@
+import {terrainSpecial} from './weapon-specials.js';
 import {queueMeteorReward} from './resources.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
@@ -49,11 +50,14 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   const headshot=projectile&&part==='head'&&enemy.kind!=='golem';
   // Body hits take normal damage: one arrow cannot kill a fresh skeleton, but
   // repeated body shots must not leave it immortal at one HP.
+  const creditedDamage=Math.min(enemy.hp,headshot?enemy.hp:amount);
+  const owner=state.players.find(p=>p.id===hit?.ownerId);
+  if(owner?.stats)owner.stats.contribution=Math.min(1e9,owner.stats.contribution+creditedDamage);
   enemy.hp-=headshot?enemy.hp:amount;
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
 function segmentDistance(p,a,b){const d=b.map((n,i)=>n-a[i]),l=d.reduce((n,v)=>n+v*v,0),t=l?clamp(p.reduce((n,v,i)=>n+(v-a[i])*d[i],0)/l,0,1):0;return dist(p,a.map((n,i)=>n+d[i]*t));}
@@ -70,7 +74,7 @@ export function projectileContact(state,m,ctx){
   if(state.embeds.length>=COMBAT_LIMITS.embeds)state.embeds.shift();
   state.embeds.push({id:shot.id,kind:shot.kind,targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.boneName?{boneName:m.boneName}:{})});
   const events=[{kind:'embed',id:shot.id,ownerId:shot.ownerId,position:[...m.point],targetId:m.targetId,impact:!enemy,normal:[...m.normal],material:detached?.kind==='skeleton'?'bone':'stone'}];
-  if(enemy)hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?48:38,m,ctx,events,{projectile:true});
+  if(enemy)hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?48:38,{...m,ownerId:shot.ownerId},ctx,events,{projectile:true});
   return ok(events);
 }
 export function releaseHeld(state,p,direction,throwing=false){const held=state.detachedParts.find(d=>d.heldBy===p.id);if(!held)return false;held.heldBy=null;held.velocity=throwing?direction.map((v,i)=>v*12+(i===1?2:0)):[0,0,0];held.angularVelocity=throwing?[5,2,3]:[0,0,0];held.throwerId=throwing?p.id:null;held.hitIds=[];if(p.tool==='limb')p.tool='axe';return true;}
@@ -104,12 +108,14 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='projectileHit')return fail('host_required');
   if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
   if(m.action==='release'){if(m.throw!==undefined&&typeof m.throw!=='boolean')return fail('invalid_action');const dir=m.direction??[-Math.sin(p.yaw),.1,-Math.cos(p.yaw)];if(!vec(dir,1.01))return fail('invalid_action');const n=Math.hypot(...dir);if(n<.9||n>1.1)return fail('invalid_action');return releaseHeld(state,p,dir.map(v=>v/n),m.throw===true)?ok([]):fail('nothing_held');}
+  if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart);
   if(m.action==='special'){
-    if(!['axe','hammer','pick'].includes(p.tool))return fail('invalid_action');if(state.tick-(p.specialTick??-1000)<240)return fail('cooldown');
-    const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[];p.specialTick=state.tick;
-    for(const e of [...state.enemies])if(dist(e.position,at)<(p.tool==='hammer'?5:3))hitEnemyPart(state,e,p.tool==='axe'?'leftArm':'torso',p.tool==='hammer'?65:55,{tool:p.tool,point:at},ctx,events);
-    if(p.tool==='pick')for(const ore of state.deposits){if(ore.depleted||Math.hypot(ore.x-at[0],ore.z-at[2])>4||ore.hits===ore.maxHits-1&&state.pickups.length>=256)continue;ore.hits++;events.push({kind:'stone_hit',id:ore.id,position:[ore.x,ctx.terrainHeight(state,ore.x,ore.z),ore.z]});if(ore.hits===ore.maxHits){ore.depleted=true;state.pickups.push({id:ctx.nextId(state,'p'),kind:ore.kind==='meteor'?'gems':'stone',amount:2,x:ore.x,z:ore.z,y:ctx.terrainHeight(state,ore.x,ore.z)});}}
-    events.push({kind:p.tool==='hammer'?'hammer_slam':p.tool==='pick'?'pick_burst':'axe_cleave',id:p.id,position:at});return ok(events);
+    if(p.tool!=='hammer')return fail('invalid_action');
+    if(state.tick-(p.specialTick??-1000)<240)return fail('cooldown');
+    const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[];
+    p.specialTick=state.tick;
+    for(const e of [...state.enemies])if(dist(e.position,at)<5)hitEnemyPart(state,e,'torso',65,{tool:p.tool,point:at,ownerId:p.id},ctx,events);
+    events.push({kind:'hammer_slam',id:p.id,position:at});return ok(events);
   }
   return null;
 }
@@ -131,7 +137,7 @@ export function stepCombat(state,ctx,events){
     const [qx,qy,qz,qw]=d.quaternion,box=d.localBounds||{min:[-.3,-.5,-.3],max:[.3,.5,.3]};let floor=-Infinity;
     for(const x of [box.min[0],box.max[0]])for(const y of [box.min[1],box.max[1]])for(const z of [box.min[2],box.max[2]]){const tx=2*(qy*z-qz*y),ty=2*(qz*x-qx*z),tz=2*(qx*y-qy*x),rx=x+qw*tx+qy*tz-qz*ty,ry=y+qw*ty+qz*tx-qx*tz,rz=z+qw*tz+qx*ty-qy*tx;floor=Math.max(floor,ctx.terrainHeight(state,d.position[0]+rx,d.position[2]+rz)-ry);}
     if(d.position[1]<floor){d.position[1]=floor;d.velocity[1]=Math.abs(d.velocity[1])>.8?Math.abs(d.velocity[1])*.3:0;d.velocity[0]*=.88;d.velocity[2]*=.88;d.angularVelocity=d.angularVelocity.map(n=>n*.9);}
-    const speed=Math.hypot(...d.velocity);if(d.throwerId&&speed>4)for(const enemy of [...state.enemies])if(!d.hitIds.includes(enemy.id)&&segmentDistance(partPosition(enemy,'torso'),old,d.position)<.9){d.hitIds.push(enemy.id);hitEnemyPart(state,enemy,'torso',Math.min(60,speed*4),null,ctx,events);d.velocity=d.velocity.map(n=>n*.55);}
+    const speed=Math.hypot(...d.velocity);if(d.throwerId&&speed>4)for(const enemy of [...state.enemies])if(!d.hitIds.includes(enemy.id)&&segmentDistance(partPosition(enemy,'torso'),old,d.position)<.9){d.hitIds.push(enemy.id);hitEnemyPart(state,enemy,'torso',Math.min(60,speed*4),{ownerId:d.throwerId},ctx,events);d.velocity=d.velocity.map(n=>n*.55);}
   }
 }
 export function validateCombat(saved,ids){
