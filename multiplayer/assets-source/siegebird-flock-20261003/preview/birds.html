@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>Songbird plumages</title>
+<style>html,body{margin:0;background:#1d2228;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<script type="module">
+// Lineup: six plumages + golden, top row from three-quarter above (wings mid-beat), bottom row side view (wings up).
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from '/client/siegebird-flock.js';
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x56708a);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7;
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4); sun.position.set(2, 4, 3); scene.add(sun, new THREE.HemisphereLight(0xcfe2ff, 0x4a3e30, .6));
+const loader = new GLTFLoader();
+const [bird, crossbow] = await Promise.all([loader.loadAsync('/assets/siegebird_songbird.glb'), loader.loadAsync('/assets/crossbow.glb')]);
+const flock = createSiegebirdFlock({birdTemplate: bird, crossbowTemplate: crossbow});
+const mats = [...flock.materials.plumage, flock.materials.golden];
+const rows = [{wing: +(q.get('a') || .35), tip: .2, view: [.9, .7, 1.1]}, {wing: +(q.get('b') || 1.05), tip: .5, view: [1, .05, 0]}];
+const W = innerWidth / 7, H = innerHeight / 2, cam = new THREE.PerspectiveCamera(32, W / H, .01, 20);
+renderer.setScissorTest(true);
+rows.forEach((row, ri) => mats.forEach((m, i) => {
+  const b = clone(bird.scene); scene.add(b);
+  b.traverse(n => { if (n.isMesh) n.material = m; });
+  for (const [name, sign] of [['SongbirdWingR', 1], ['SongbirdWingL', -1]]) b.getObjectByName(name).rotation.set(0, 0, sign * row.wing);
+  for (const [name, sign] of [['SongbirdWingR_Tip', 1], ['SongbirdWingL_Tip', -1]]) b.getObjectByName(name).rotation.set(0, 0, sign * row.tip);
+  b.rotation.y = -.5;
+  const c = new THREE.Vector3(0, .06, 0); cam.position.copy(c).add(new THREE.Vector3(...row.view).normalize().multiplyScalar(+(q.get("d") || .95))); cam.lookAt(c);
+  renderer.setViewport(i * W, (1 - ri) * H, W, H); renderer.setScissor(i * W, (1 - ri) * H, W, H); renderer.render(scene, cam);
+  scene.remove(b);
+}));
+window.previewReady = true;
+</script>
