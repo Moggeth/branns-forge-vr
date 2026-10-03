@@ -14,7 +14,7 @@ import {createStartingWorld} from './starting-world.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
-import {SPELLS} from '../shared/spells.js';
+import {SPELLS,settleCastPoint} from '../shared/spells.js';
 import {createSettlementView} from './settlement-view.js';
 import {syncWeaponReadiness} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
@@ -23,6 +23,7 @@ import {enhanceAxeTemplate} from './axe-luminance.js';
 import {createAxeReadyCue} from './axe-ready-cue.js';
 import {createAxeCleaveView,playCleaveSound} from './axe-cleave-view.js';
 import {spellUnavailable} from './spell-availability.js';
+import {expeditionRunning} from '../shared/adventure.js';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
@@ -41,6 +42,7 @@ import {createWallPreview} from './crystal-wall-preview.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
+import {createRewardMoments} from './reward-moments.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
@@ -569,25 +571,30 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return hit;
   }
   function isLineSpell(){return spell==='sunder'||spell==='wall';}
+  // Casting never refuses a placement. Point spells settle where authority will put them;
+  // a drawn line longer than 18 m is shortened and a tiny one becomes the default line.
+  function settledPoint(id,x,z){const [sx,,sz]=settleCastPoint(id,[x,0,z],{expedition:expeditionRunning(snapshot.adventure)});return [sx,heightAt(sx,sz,snapshot.edits),sz];}
+  function fitLine(start,end){const dx=end[0]-start[0],dz=end[2]-start[2],d=Math.hypot(dx,dz);return d<=18?end:[start[0]+dx/d*17.99,end[1],start[2]+dz/d*17.99];}
   function targetPreview(){
     if(!active||role!=='god'||!cursor.visible)return null;
-    const player=snapshot.players.find(p=>p.id===playerId),point=hitPoint.toArray();
-    let start,end,fallback=false,length=0,lineCount=3;
+    const player=snapshot.players.find(p=>p.id===playerId),hit=hitPoint.toArray();
+    let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=3;
     if(isLineSpell()){
-      if(castStart){start=castStart.toArray();end=point;length=Math.hypot(start[0]-point[0],start[2]-point[2]);lineCount=Math.ceil(length/2.5)+1;}
+      if(castStart&&Math.hypot(castStart.x-hit[0],castStart.z-hit[2])>=.5){start=castStart.toArray();end=point=fitLine(start,hit);lineCount=Math.ceil(Math.hypot(start[0]-end[0],start[2]-end[2])/2.5)+1;}
       else {const dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),clamp=v=>THREE.MathUtils.clamp(v,-55,55);
         start=[clamp(point[0]-uz*3),point[1],clamp(point[2]+ux*3)];end=[clamp(point[0]+uz*3),point[1],clamp(point[2]-ux*3)];fallback=true;}
     }
-    return {spell,point,start,end,fallback,valid:(!castStart||(length>=.5&&length<=18&&Math.abs(start[0])<=55&&Math.abs(start[2])<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount})};
+    return {spell,point,start,end,fallback,valid:(fallback||(Math.abs(start?.[0]??0)<=55&&Math.abs(start?.[2]??0)<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount})};
   }
   function cancelCast() { castStart = null; quickKey = null; castRevision++; }
   function castAt(point,finish=false) {
     if (!active || role !== 'god' || inventionPlacement) return;
     const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
-    const at=[x,heightAt(x,z,snapshot.edits),z];
+    let at=isLineSpell()?[x,heightAt(x,z,snapshot.edits),z]:settledPoint(spell,x,z);
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
-    if(castStart){const length=Math.hypot(castStart.x-at[0],castStart.z-at[2]);if(length<.5||length>18){report('Draw a line between 0.5 and 18 metres.');return;}}
-    const extra=castStart?{start:castStart.toArray(),end:at}:{};pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
+    let extra={};
+    if(castStart&&Math.hypot(castStart.x-at[0],castStart.z-at[2])>=.5){at=fitLine(castStart.toArray(),at);extra={start:castStart.toArray(),end:at};}
+    pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {
     if (!active || renderer.xr.isPresenting) return;
@@ -613,6 +620,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const golemFx=createGolemPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),
     haptic:(amplitude,ms)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:Math.min(1,amplitude),duration:ms}]);else if(touchEnabled&&amplitude>.3)try{navigator.vibrate?.(Math.round(ms*amplitude));}catch{}}});
   let audioContext=null;let lastSound=0;let woodAudio=null;let materialAudio=null;
+  // Wins (raids, rewards, crafting, building, loot) answer with light, chimes and rumble; presentation only.
+  const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
   let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity};
   function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird'))siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});return siegebirdFlock;}
@@ -664,6 +673,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
 
     expedition.handleEvent(event);
+    const rewardSound=!!rewards.handle(event);
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
     if(event?.by!==undefined&&event.by!==playerId){const a=actors.get(`p:${event.by}`);if(a?.visual.userData.hero)heroView.event(a.visual,event,a.data);} // attributed result -> remote swing/recoil
     if(!event?.position||event.fire)return;
@@ -684,7 +694,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
     const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
     if(isImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed});}
-    const now=performance.now();if(audioContext&&!woodSound&&!materialSound&&!(kind==='embed'&&!event.impact)&&!(kind==='shoot'&&event.weapon==='crossbow'&&event.by===playerId)&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
+    const now=performance.now();if(audioContext&&!woodSound&&!materialSound&&!rewardSound&&!(kind==='embed'&&!event.impact)&&!(kind==='shoot'&&event.weapon==='crossbow'&&event.by===playerId)&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
   }
   function equipVisual(next) {
     if(next!==tool)feedback.reset();
@@ -1074,7 +1084,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(shouldShowTrajectory({tool,role,menuOpen:!active,...weaponState})){
       if(now>=nextGuideAt){nextGuideAt=now+66;const guideStart=performance.now(),aim=projectileAim();trajectoryGuide.update({origin:aim.origin,aimDirection:aim.direction,curveBase:weaponState.curveBase,draw:weaponState.draw,hit:worldContact,terrainHeight:heightAt,sampleEvery:3});guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;}
     }else{trajectoryGuide.hide();nextGuideAt=0;}
-    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
@@ -1213,7 +1223,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {cpuTimings:frameMetrics.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1241,7 +1251,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

@@ -313,7 +313,7 @@ export function createAdventureBanner(root, {onAction = () => {}, expanded = sto
     goals.hidden = !goals.childElementCount; optional.hidden = !optItems.length;
     const f = [];
     if (v.stage === 'idle' || !v.objectives.length) f.push(`Party: ${plural(v.party.heroes, 'Hero', 'Heroes')}, ${plural(v.party.gods, 'God')}`);
-    if (v.role === 'god' && running) f.push(`God aid left: ${v.godSupportLeft}`, `Challenge budget: ${v.challengeLeft}`);
+    if (v.role === 'god' && running) f.push(`God aid left: ${v.godSupportLeft}`);
     if (v.stage === 'defeat') f.push(`Retries left: ${v.retriesLeft}`);
     if (v.renown) f.push(`Your renown: ${v.renown}`);
     setText(facts, f.join(' · ')); facts.hidden = !f.length;
