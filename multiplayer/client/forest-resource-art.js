@@ -129,17 +129,25 @@ function surfacePoints(g, count, seed, filter) { const p = g.attributes.position
 const ORE = {
  ironOre: {bands: [[.5, .22, .13], [.66, .4, .2], [.3, .16, .13], [.58, .3, .17]], vein: 0x2d2a2c, veinMetal: .9, veinRough: .3, crystal: null, emissive: 0},
  mithrilOre: {bands: [[.36, .42, .48], [.55, .62, .66], [.27, .32, .38], [.47, .52, .56]], vein: 0xd8eef4, veinMetal: 1, veinRough: .18, crystal: [.62, .95, 1], emissive: 0x3ab8d0},
- starOre: {bands: [[.12, .1, .1], [.26, .16, .09], [.08, .07, .08], [.2, .12, .08]], vein: 0xf2b95c, veinMetal: 1, veinRough: .25, crystal: [1, .78, .4], emissive: 0xf09a2a}
+ starOre: {bands: [[.12, .1, .1], [.26, .16, .09], [.08, .07, .08], [.2, .12, .08]], vein: 0xf2b95c, veinMetal: 1, veinRough: .25, crystal: [1, .78, .4], emissive: 0xf09a2a},
+ copperOre: {bands: [[.2, .42, .34], [.32, .58, .46], [.16, .3, .26], [.42, .3, .2]], vein: 0xc0703e, veinMetal: .95, veinRough: .3, crystal: null, emissive: 0},
+ goldOre: {bands: [[.78, .76, .7], [.88, .86, .8], [.64, .6, .54], [.82, .78, .7]], vein: 0xf2c24a, veinMetal: 1, veinRough: .2, crystal: null, emissive: 0}
 };
-const METAL = {iron: {color: 0x9aa3aa, rough: .4, tone: .22}, mithril: {color: 0xcfe9ef, rough: .2, tone: .1}, starMetal: {color: 0xffffff, rough: .28, tone: .14}};
+const METAL = {iron: {color: 0x9aa3aa, rough: .4, tone: .22}, mithril: {color: 0xcfe9ef, rough: .2, tone: .1}, starMetal: {color: 0xffffff, rough: .28, tone: .14},
+ copper: {color: 0xe39a6c, rough: .32, tone: .16}, gold: {color: 0xffd36e, rough: .22, tone: .1}};
 const DEPOSIT = {
  iron: {bands: [[.42, .38, .35], [.52, .47, .42], [.36, .31, .29], [.47, .42, .38]], rust: [.62, .3, .16], ore: 0x3a2a26, oreMetal: .85, oreRough: .32, crystal: [1, .66, .36], emissive: 0xc26a2a, bounce: 0x5a2a10},
  mithril: {bands: [[.34, .38, .43], [.46, .51, .56], [.27, .3, .35], [.4, .45, .5]], rust: [.42, .58, .64], ore: 0xd9f2f7, oreMetal: 1, oreRough: .16, crystal: [.6, .95, 1], emissive: 0x2fb7d6, bounce: 0x0f4652},
- crystal: {bands: [[.33, .3, .36], [.44, .4, .46], [.26, .23, .29], [.38, .34, .4]], rust: [.5, .36, .62], ore: 0x7a4bc8, oreMetal: .35, oreRough: .3, crystal: [.78, .55, 1], emissive: 0x8a4cf0, bounce: 0x341a5c}
+ crystal: {bands: [[.33, .3, .36], [.44, .4, .46], [.26, .23, .29], [.38, .34, .4]], rust: [.5, .36, .62], ore: 0x7a4bc8, oreMetal: .35, oreRough: .3, crystal: [.78, .55, 1], emissive: 0x8a4cf0, bounce: 0x341a5c},
+ // Mountain-foot veins (shared/ore-veins.js). style picks the sculpt: nodule band, plane seam or open geode.
+ copper: {style: 'nodule', shape: [.74, .52, .64, -.12], bands: [[.4, .37, .33], [.5, .46, .41], [.33, .3, .27], [.45, .41, .36]], rust: [.22, .56, .44], ore: 0xb8663a, oreMetal: .95, oreRough: .34, crystal: [.35, .95, .78], emissive: 0x1d8c6c, bounce: 0x0f4a38},
+ gold: {style: 'seam', shape: [.62, .6, .5, .12], oreCount: 15, oreSize: 1.6, bands: [[.26, .25, .25], [.33, .32, .31], [.2, .2, .2], [.3, .29, .28]], rust: [.95, .92, .84], ore: 0xffc94a, oreMetal: 1, oreRough: .2, crystal: [1, .96, .82], emissive: 0xb88a24, bounce: 0x5a3c08},
+ star: {style: 'geode', shape: [.7, .58, .62, 0], bands: [[.14, .12, .13], [.22, .19, .19], [.1, .09, .1], [.18, .15, .14]], rust: [.5, .3, .12], ore: 0xf2b95c, oreMetal: 1, oreRough: .24, crystal: [1, .58, .16], emissive: 0xff8a12, bounce: 0x7a3a06}
 };
-const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal'};
-export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal']);
-export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal']);
+for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
+const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
+export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold']);
+export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star']);
 export const HELD_SCALE = .5; // hero/held ore: same asset at half scale
 
 export function createResourceArt() {
@@ -186,29 +194,29 @@ export function createResourceArt() {
   sitOnFloorGroup([base, cr], .27);
   return {parts: [[own(base), stoneMat('crystalPickup', 0)], [own(cr), crystalMat('crystal', DEPOSIT.crystal.emissive, [.92, .85, 1])]]};
  }
- function depositKit(kind, variant) { const d = DEPOSIT[kind], seed = 1000 + kind.length * 131 + variant * 7919, r = rng(seed), lumps = [];
-  const shape = {iron: [.78, .5, .62, 0], mithril: [.5, .66, .44, .2], crystal: [.68, .56, .6, 0]}[kind];
-  const main = rockLump({detail: 3, sx: shape[0], sy: shape[1], sz: shape[2], seed, cuts: kind === 'crystal' ? 3 : 5, strata: .16, rough: .3, bed: -.62}); main.rotateZ(shape[3]); main.translate(0, .32, 0); lumps.push(main);
+ function depositKit(kind, variant) { const d = DEPOSIT[kind], st = d.style, seed = 1000 + kind.length * 131 + variant * 7919, r = rng(seed), lumps = [];
+  const shape = d.shape || {iron: [.78, .5, .62, 0], mithril: [.5, .66, .44, .2], crystal: [.68, .56, .6, 0]}[kind];
+  const main = rockLump({detail: 3, sx: shape[0], sy: shape[1], sz: shape[2], seed, cuts: st === 'geode' ? 3 : 5, strata: .16, rough: .3, bed: -.62}); main.rotateZ(shape[3]); main.translate(0, .32, 0); lumps.push(main);
   const side = rockLump({detail: 2, sx: .42, sy: .3, sz: .36, seed: seed + 1, cuts: 4, strata: .12, rough: .35}); side.rotateY(r() * 6); side.translate(.5 + r() * .15, .1, -.25 + r() * .2); lumps.push(side);
   const shelf = rockLump({detail: 2, sx: .32, sy: .24, sz: .4, seed: seed + 2, cuts: 4, strata: .1, rough: .35}); shelf.translate(-.48, .06, .3 - r() * .2); lumps.push(shelf);
-  if (kind === 'crystal') { const p = main.attributes.position, n = new T.Vector3(.35, .5, .8).normalize(); // geode opening: cleave and hollow the front face
+  if (st === 'geode') { const p = main.attributes.position, n = new T.Vector3(.35, .5, .8).normalize(); // geode opening: cleave and hollow the front face
    for (let i = 0; i < p.count; i++) { _v.fromBufferAttribute(p, i); const s = _v.clone().sub(new T.Vector3(0, .5, 0)).dot(n) - .32; if (s > 0) _v.addScaledVector(n, -s * 1.6); p.setXYZ(i, _v.x, _v.y, _v.z); } main.computeVertexNormals(); }
   // crystal roots on the main mass
   const crystals = [], roots = [];
-  const sites = kind === 'crystal' ? surfacePoints(main, 14, seed + 5, (P, N) => N.dot(new T.Vector3(.35, .5, .8)) > .5 || (P.y > .7 && N.y > .4))
-   : kind === 'mithril' ? surfacePoints(main, 10, seed + 5, (P, N) => Math.abs(P.x * .8 - P.y * .3 + P.z * .5 - .05) < .1 && N.y > -.1)
+  const sites = st === 'geode' ? surfacePoints(main, 14, seed + 5, (P, N) => N.dot(new T.Vector3(.35, .5, .8)) > .5 || (P.y > .7 && N.y > .4))
+   : st === 'seam' ? surfacePoints(main, 10, seed + 5, (P, N) => Math.abs(P.x * .8 - P.y * .3 + P.z * .5 - .05) < .1 && N.y > -.1)
    : surfacePoints(main, 6, seed + 5, (P, N) => N.y > .55 && P.x < .15);
-  sites.forEach(([P, N], i) => { const big = kind === 'crystal' ? (i < 6 ? 1 : .55) : kind === 'mithril' ? .8 : .5, lean = new T.Vector3(r() - .5, .7, r() - .5).multiplyScalar(.6);
-   crystals.push(prism({base: P.clone().addScaledVector(N, -.06), dir: N.clone().add(lean), len: (.35 + r() * .35) * big + (kind === 'mithril' ? .15 : 0), rad: (kind === 'mithril' ? .035 : .07) * big * (.8 + r() * .4), sides: kind === 'mithril' ? 4 : 6, seed: seed + 40 + i, broken: r() < .3, tint: d.crystal, flat: kind === 'mithril' ? .45 : 1}));
+  sites.forEach(([P, N], i) => { const big = st === 'geode' ? (i < 6 ? 1 : .55) : st === 'seam' ? .8 : .5, lean = new T.Vector3(r() - .5, .7, r() - .5).multiplyScalar(.6);
+   crystals.push(prism({base: P.clone().addScaledVector(N, -.06), dir: N.clone().add(lean), len: (.35 + r() * .35) * big + (st === 'seam' ? .15 : 0), rad: (st === 'seam' ? .035 : .07) * big * (.8 + r() * .4), sides: st === 'seam' ? 4 : 6, seed: seed + 40 + i, broken: r() < .3, tint: d.crystal, flat: st === 'seam' ? .45 : 1}));
    roots.push(P); });
   // ore matrix: ferric nodules (iron), silver nuggets along the seam (mithril), druzy lining (crystal)
-  const ore = [], orePts = kind === 'crystal' ? surfacePoints(main, 22, seed + 9, (P, N) => N.dot(new T.Vector3(.35, .5, .8)) > .6)
-   : surfacePoints(main, kind === 'iron' ? 11 : 8, seed + 9, kind === 'iron' ? (P, N) => Math.abs(P.y - .25 - P.x * .35) < .12 : (P, N) => Math.abs(P.x * .8 - P.y * .3 + P.z * .5 - .05) < .14);
+  const ore = [], orePts = st === 'geode' ? surfacePoints(main, 22, seed + 9, (P, N) => N.dot(new T.Vector3(.35, .5, .8)) > .6)
+   : surfacePoints(main, d.oreCount || (st === 'nodule' ? 11 : 8), seed + 9, st === 'nodule' ? (P, N) => Math.abs(P.y - .25 - P.x * .35) < .12 : (P, N) => Math.abs(P.x * .8 - P.y * .3 + P.z * .5 - .05) < .14);
   orePts.forEach(([P, N], i) => { let g;
-   if (kind === 'crystal') g = prism({base: P.clone().addScaledVector(N, -.01), dir: N, len: .05 + r() * .05, rad: .02, sides: 3, seed: seed + 70 + i});
-   else { g = rockLump({detail: 1, sx: .06 + r() * .05, sy: .05, sz: .06 + r() * .04, seed: seed + 90 + i, cuts: 3, rough: .3, bed: -2}); g.lookAt(N); g.translate(P.x - N.x * .015, P.y - N.y * .015, P.z - N.z * .015); }
+   if (st === 'geode') g = prism({base: P.clone().addScaledVector(N, -.01), dir: N, len: .05 + r() * .05, rad: .02, sides: 3, seed: seed + 70 + i});
+   else { const k = d.oreSize || 1; g = rockLump({detail: 1, sx: (.06 + r() * .05) * k, sy: .05 * k, sz: (.06 + r() * .04) * k, seed: seed + 90 + i, cuts: 3, rough: .3, bed: -2}); g.lookAt(N); g.translate(P.x - N.x * .015, P.y - N.y * .015, P.z - N.z * .015); }
    ore.push(g); });
-  const rust = {color: d.rust, at: p => kind === 'iron' ? 1 - Math.abs(p.y - .25 - p.x * .35) * 5 + (fbm(p.x * 6, p.y * 6, p.z * 6) - .5) : kind === 'mithril' ? 1 - Math.abs(p.x * .8 - p.y * .3 + p.z * .5 - .05) * 7 : 0};
+  const rust = {color: d.rust, at: p => st === 'nodule' ? 1 - Math.abs(p.y - .25 - p.x * .35) * 5 + (fbm(p.x * 6, p.y * 6, p.z * 6) - .5) : st === 'seam' ? 1 - Math.abs(p.x * .8 - p.y * .3 + p.z * .5 - .05) * 7 : 0};
   for (const g of lumps) paint(g, strataPaint(d.bands, {freq: 6.5, rust}));
   const rock = mergeFlat(lumps), crys = mergeFlat(crystals), oreG = mergeFlat(ore);
   paint(oreG, (p, n, i, out) => { const k = .7 + .3 * Math.max(0, n.y); out[0] = out[1] = out[2] = k; });

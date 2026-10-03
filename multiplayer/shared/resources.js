@@ -1,10 +1,12 @@
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
+import {isVein} from './ore-veins.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
 import {worldTrees} from './world-content.js';
 import {contributeSettlement} from './adventure.js';
 import {collectibleCandidate} from './collection-target.js';
+import {specialCooldown} from './special-cooldowns.js';
 export {nearestCollectible} from './collection-target.js';
 export const RESOURCE_RECIPES=Object.freeze({
  wood:{cost:3,hero:'Bandage Â· +35 health',god:'Mend Forge Â· +20 integrity'},
@@ -28,7 +30,7 @@ export function useResource(state,p,m){
  }else if(p.role==='god'){
   if(p.mana>=100)return fail('not_needed');p.mana=Math.min(100,p.mana+40);
  }else{
-  const cooldown=p.tool==='wyrmspout'?120:['axe','hammer','pick'].includes(p.tool)?240:0;
+  const cooldown=specialCooldown(p.tool);
   const specialCooling=cooldown>0&&state.tick-(p.specialTick??-1000)<cooldown;
   if(p.hp>=100&&!specialCooling&&!(p.heat>0)&&!(p.overheatUntil>state.tick))return fail('not_needed');
   p.hp=Math.min(100,p.hp+35);p.specialTick=-1000;p.heat=0;p.overheatUntil=0;
@@ -87,14 +89,15 @@ export function flushMeteorRewards(state,height){
 
 // Depleted ore has already paid its one mining reward. Removing an unreferenced
 // tombstone frees a slot without changing terrain, pickups, inventory or IDs.
-function retainedDepositPredicate(state){
+// Spent mountain-foot veins hold their slot's respawn timer until ore-veins.js raises the replacement.
+export function retainedDepositPredicate(state){
  const referenced=new Set([
   ...(state.embeds||[]).map(e=>e.targetId),...(state.fireSurfaces||[]).map(e=>e.targetId),
   ...(state.settlement?.workers||[]).map(w=>w.targetId),...(state.pendingStarfalls||[]).map(p=>p.id)
  ]);
  const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
  const liveEdits=new Set((state.edits||[]).map(e=>e.id));
- return d=>!d.depleted||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
+ return d=>!d.depleted||isVein(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
 }
 // Preview the exact post-reclamation budget without changing world state. Pending
 // meteors reserve their eventual deposit slots, just as the authority does.
