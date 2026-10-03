@@ -63,11 +63,27 @@ export function treeFall(tree, cut, tick, floor, ground) {
  const h = cutLocalHeight(tree, cut, floor), end = landingAngle(tree, cut, floor, ground), table = fallTable(tree.height - h, end);
  const age = Math.max(0, tick - cut.felledTick), landTicks = table.length - 1;
  const i0 = Math.min(Math.floor(age), landTicks), i1 = Math.min(i0 + 1, landTicks); // fractional ticks interpolate for render
- let angle = table[i0] + (table[i1] - table[i0])*(age - i0 > 0 && i0 < landTicks ? age - i0 : 0), shake = 0, phase = age < landTicks ? 'falling' : 'settling';
- if (age >= landTicks) { const s = age - landTicks; shake = s < TREE_LIMITS.settleTicks ? Math.exp(-s/9)*Math.cos(s/TREE_LIMITS.settleTicks*Math.PI*5) : 0; angle = end - .05*Math.max(0, shake); if (s >= TREE_LIMITS.settleTicks) phase = 'down'; }
+ let angle = table[i0] + (table[i1] - table[i0])*(age - i0 > 0 && i0 < landTicks ? age - i0 : 0), shake = 0, phase = age < landTicks ? 'falling' : 'down';
+
  const r = trunkRadius(tree, h), axis = [-Math.cos(cut.fallYaw), 0, Math.sin(cut.fallYaw)], direction = [-Math.sin(cut.fallYaw), 0, -Math.cos(cut.fallYaw)];
  // Hinge line passes through the back edge of the trunk (opposite the notch), exactly at the cut height.
- return {height: h, angle, end, age, phase, shake, landTicks, doneTicks: landTicks + TREE_LIMITS.settleTicks, axis, direction, hinge: [direction[0]*r, h, direction[2]*r]};
+ return {height: h, angle, end, age, phase, shake, landTicks, doneTicks: landTicks, axis, direction, hinge: [direction[0]*r, h, direction[2]*r]};
+}
+
+/** Contiguous authored trunk sections. Lower notches retain more usable wood (2–5 logs). */
+export function timberSections(tree, cut, floor) {
+ const scale=treeScale(tree), low=cutLocalHeight(tree,cut,floor)/scale;
+ const high=treeProfile(tree).rings.at(-1)[0], count=clamp(Math.ceil((high-low)/.65),2,5);
+ return Array.from({length:count},(_,i)=>{const a=low+(high-low)*i/count,b=low+(high-low)*(i+1)/count;
+  return {section:[a,b],length:(b-a)*scale,radius:trunkRadius(tree,a*scale),center:(a+b)*scale/2};});
+}
+export const logLength=log=>log.length??TREE_LIMITS.logLength;
+export const logRadius=log=>log.radius??TREE_LIMITS.logRadius;
+/** Exact rigid transform used both by the falling mesh and its released trunk sections. */
+export function timberPose(tree,fall,floor,center) {
+ const q=[...fall.axis.map(n=>n*Math.sin(fall.end/2)),Math.cos(fall.end/2)];
+ const v=rotateVector([-fall.hinge[0],center-fall.hinge[1],-fall.hinge[2]],q);
+ return {quaternion:q,position:[tree.x+fall.hinge[0]+v[0],floor+fall.hinge[1]+v[1],tree.z+fall.hinge[2]+v[2]]};
 }
 
 // ---- Chop decision (simulation-owned). Returns {code} on failure or {events}.
@@ -133,7 +149,7 @@ export function collectLog(state,p,log,amount=1) {
  return {ok:true,events:[{kind:'pickup',id:log.id,position:[...log.position],material:'wood',amount,physicalBonus:amount>1}]};
 }
 
-// ---- Logs: three 1.1 m x 0.32 m capsules per tree, cap 48, sleeping, explicit grab/drop/throw/collect.
+// ---- Logs: retained trunk sections, cap 48, sleeping, explicit grab/drop/throw/collect.
 const heldPose = (holder) => { const hand = holder.hands?.[1] || holder.hands?.[0];
  if (hand && vec(hand.position, 5) && Array.isArray(hand.quaternion) && hand.quaternion.length === 4) return {position: holder.position.map((n, i) => n + hand.position[i]), quaternion: [...hand.quaternion]};
  // Carried crosswise in front of the chest: log +Y axis along the player's right vector.
@@ -144,8 +160,8 @@ function horizontalLogQuat(yaw) { // long axis (+Y) laid horizontal, perpendicul
  const ql = Math.hypot(c[0], c[2]) || 1; return [c[0]/ql*s, 0, c[2]/ql*s, s];
 }
 export function logSupport(log, ground) {
- const half = TREE_LIMITS.logLength/2 - TREE_LIMITS.logRadius, axis = rotateVector([0, half, 0], log.quaternion);
- let best = -Infinity; for (const sgn of [-1, 0, 1]) best = Math.max(best, ground(log.position[0]+axis[0]*sgn, log.position[2]+axis[2]*sgn) - axis[1]*sgn + TREE_LIMITS.logRadius);
+ const half = Math.max(.001,logLength(log)/2 - logRadius(log)), axis = rotateVector([0, half, 0], log.quaternion);
+ let best = -Infinity; for (const sgn of [-1, 0, 1]) best = Math.max(best, ground(log.position[0]+axis[0]*sgn, log.position[2]+axis[2]*sgn) - axis[1]*sgn + logRadius(log));
  return best;
 }
 export function releaseLog(state, player, direction = [0,0,0], throwing = false) {
@@ -182,27 +198,28 @@ export function logAction(state, p, m) {
 }
 /** Distance from a point to a log's capsule surface (0 inside). */
 export function capsuleDistance(log, point) {
- const half = TREE_LIMITS.logLength/2 - TREE_LIMITS.logRadius, a = rotateVector([0, half, 0], log.quaternion);
+ const half = Math.max(.001,logLength(log)/2 - logRadius(log)), a = rotateVector([0, half, 0], log.quaternion);
  const v = [point[0]-log.position[0], point[1]-log.position[1], point[2]-log.position[2]], t = clamp((v[0]*a[0]+v[1]*a[1]+v[2]*a[2])/(half*half), -1, 1);
- return Math.max(0, Math.hypot(v[0]-a[0]*t, v[1]-a[1]*t, v[2]-a[2]*t) - TREE_LIMITS.logRadius);
+ return Math.max(0, Math.hypot(v[0]-a[0]*t, v[1]-a[1]*t, v[2]-a[2]*t) - logRadius(log));
 }
 
-/** One sim tick: spawn logs for settled felled trees, then integrate awake logs. ctx: {terrainHeight(state,x,z), nextId(state,prefix), makePickup?(kind,x,z,amount)} */
+/** One sim tick: release matching trunk sections at first touchdown, then integrate awake logs. ctx: {terrainHeight(state,x,z), nextId(state,prefix), makePickup?(kind,x,z,amount)} */
 export function stepTrees(state, ctx, index, events) {
  state.looseLogs ||= []; index.update(state);
  const ground = (x, z) => ctx.terrainHeight(state, x, z);
  for (const cut of state.harvestedTrees) {
   if (!isFelled(cut) || cut.landed) continue; const tree = index.get(cut.id); if (!tree) continue;
   const floor = ground(tree.x, tree.z), fall = treeFall(tree, cut, state.tick, floor, ground);
-  if (fall.age < fall.doneTicks) continue;
-  // Never wait for capacity: spawn what fits, award the remainder as a normal wood pickup. Landing is recorded once (persisted).
-  cut.landed = true; const room = Math.max(0, Math.min(TREE_LIMITS.logsPerTree, TREE_LIMITS.logs - state.looseLogs.length)), q = horizontalLogQuat(cut.fallYaw);
-  const length = tree.height - fall.height, c = Math.cos(fall.end), s = Math.sin(fall.end);
-  for (let i = 0; i < room; i++) { const d = length*(.18 + i*.24); let x = tree.x + fall.hinge[0] + fall.direction[0]*d*s, z = tree.z + fall.hinge[2] + fall.direction[2]*d*s;
-   x = clamp(x, -TREE_LIMITS.worldHalf, TREE_LIMITS.worldHalf); z = clamp(z, -TREE_LIMITS.worldHalf, TREE_LIMITS.worldHalf);
-   const log = {id: ctx.nextId(state, 'log'), sourceId: tree.id, position: [x, 0, z], quaternion: [...q], velocity: [0, .6 + i*.2, 0], angularVelocity: [0, 0, 0], heldBy: null, bornTick: state.tick, sleeping: false};
-   log.position[1] = Math.max(floor + fall.height + d*c, logSupport(log, ground) + .02); state.looseLogs.push(log); }
-  const rest = TREE_LIMITS.logsPerTree - room; if (rest > 0) ctx.makePickup?.('wood', tree.x + fall.direction[0]*1.5, tree.z + fall.direction[2]*1.5, rest);
+  if (fall.age < fall.landTicks) continue;
+  // Release at first contact. The exact authored trunk sections become physical logs without moving/reorienting.
+  cut.landed = true; const sections=timberSections(tree,cut,floor), room=Math.min(sections.length,Math.max(0,TREE_LIMITS.logs-state.looseLogs.length));
+  for (const [i,piece] of sections.slice(0,room).entries()) {
+   const pose=timberPose(tree,fall,floor,piece.center);
+   state.looseLogs.push({id:ctx.nextId(state,'log'),sourceId:tree.id,...pose,section:piece.section,length:piece.length,radius:piece.radius,
+    velocity:[fall.direction[0]*(.35+i*.12)+fall.axis[0]*(i%2?.55:-.55),.4+i*.12,fall.direction[2]*(.35+i*.12)+fall.axis[2]*(i%2?.55:-.55)],angularVelocity:fall.axis.map(n=>n*(.5+i*.12)),heldBy:null,bornTick:state.tick,sleeping:false});
+  }
+  const rest=sections.length-room;
+  if(rest>0)ctx.makePickup?.('wood',tree.x+fall.direction[0]*1.5,tree.z+fall.direction[2]*1.5,rest);
   events.push({kind: 'tree_land', id: tree.id, position: [tree.x + fall.direction[0]*2, ground(tree.x + fall.direction[0]*2, tree.z + fall.direction[2]*2), tree.z + fall.direction[2]*2], material: 'wood', normal: [0, 1, 0], logs: room});
  }
  const awake = [];
@@ -210,7 +227,7 @@ export function stepTrees(state, ctx, index, events) {
   const holder = log.heldBy && state.players.find(p => p.id === log.heldBy && p.role === 'hero');
   if (log.heldBy && !holder) { forgetGrip(state,log); log.heldBy = null; log.sleeping = false; }
   if (holder) { const pose = heldPose(holder); log.position = pose.position; log.quaternion = pose.quaternion; log.velocity = [0, 0, 0]; log.angularVelocity = [0, 0, 0]; continue; } // rigid: no lag/bend
-  if (log.sleeping) continue;
+  if (log.sleeping || log.bornTick===state.tick) continue;
   awake.push(log); const dt = 1/TREE_LIMITS.hz;
   log.velocity[1] -= TREE_LIMITS.gravity*dt;
   for (let i = 0; i < 3; i++) log.position[i] = clamp(log.position[i] + log.velocity[i]*dt, i === 1 ? -150 : -TREE_LIMITS.worldHalf, i === 1 ? 150 : TREE_LIMITS.worldHalf);
@@ -225,7 +242,7 @@ export function stepTrees(state, ctx, index, events) {
  }
  // Awake-vs-any log separation (horizontal push between capsule segments). Sleeping pairs cost nothing.
  for (const log of awake) for (const other of state.looseLogs) { if (other === log || other.heldBy) continue;
-  const gap = capsuleDistance(other, log.position) - TREE_LIMITS.logRadius; if (gap >= 0) continue;
+  const gap = capsuleDistance(other, log.position) - logRadius(log); if (gap >= 0) continue;
   const dx = log.position[0]-other.position[0], dz = log.position[2]-other.position[2], d = Math.hypot(dx, dz) || 1; log.position[0] -= dx/d*gap*.5; log.position[2] -= dz/d*gap*.5; }
 }
 
@@ -244,9 +261,11 @@ export function restoreHarvested(saved, treeIds) {
 export function restoreLogs(saved, ids) {
  if (saved.looseLogs !== undefined && (!Array.isArray(saved.looseLogs) || saved.looseLogs.length > TREE_LIMITS.logs)) throw Error('Invalid log limit');
  const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), trees = new Set(worldTrees(saved).map(t => t.id));
- const KEYS = ['id', 'sourceId', 'position', 'quaternion', 'velocity', 'angularVelocity', 'heldBy', 'bornTick', 'sleeping'];
+ const KEYS = ['id', 'sourceId', 'position', 'quaternion', 'velocity', 'angularVelocity', 'heldBy', 'bornTick', 'sleeping', 'section', 'length', 'radius'];
  return (saved.looseLogs || []).map(log => {
   if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > 55 || Math.abs(log.position[2]) > 55 || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
-  ids.add(log.id); if (log.heldBy) holders.add(log.heldBy); return Object.fromEntries(KEYS.map(k => [k, structuredClone(log[k])]));
+  if(log.section!==undefined && (!Array.isArray(log.section)||log.section.length!==2||!log.section.every(n=>Number.isFinite(n)&&n>=0&&n<=4)||log.section[1]<=log.section[0]||!Number.isFinite(log.length)||log.length<=0||log.length>4||!Number.isFinite(log.radius)||log.radius<=0||log.radius>1.5))throw Error('Invalid timber section');
+  if(log.section===undefined&&(log.length!==undefined||log.radius!==undefined))throw Error('Invalid legacy log dimensions');
+  ids.add(log.id); if (log.heldBy) holders.add(log.heldBy); return Object.fromEntries(KEYS.filter(k=>log[k]!==undefined).map(k => [k, structuredClone(log[k])]));
  });
 }

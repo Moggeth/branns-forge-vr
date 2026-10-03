@@ -3,11 +3,12 @@
 // Intact trees live in shared InstancedMesh batches (tree-batch.js); a tree becomes an individual entity only while it
 // has a harvest record (wounded/felled), and returns to its batch if the record disappears.
 import * as T from 'three';
+import {createCanopyRelease} from './canopy-release.js';
 import {createTreeBatches} from './tree-batch.js';
 import {createTreeMaterials} from './tree-materials.js';
 import {worldTrees} from '../shared/world-content.js';
-import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector} from '../shared/trees.js';
-import {bakeTriangles, buildNotch, buildFelled, toGeometry, fitEndcapUV} from './tree-carve.js';
+import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
+import {bakeTriangles, buildNotch, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
 import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} from './tree-growth.js';
 
 const PARTS = ['Trunk', 'Roots', 'Branches', 'Leaves', 'Fruit'];
@@ -17,6 +18,8 @@ const meshesUnder = node => { const out = []; node?.traverse(c => { if (c.isMesh
 // Pass treeMaterials: false to keep the legacy flat materials + leaf-only windMaterial below.
 export function createTreeView({scene, templates, height, camera = null, lodDistance = 26, windAmplitude = .025, lodStep = 1, lodBudget = 128, treeMaterials = undefined}) {
  const group = new T.Group(); group.name = 'TreeView'; scene.add(group);
+ const canopyFX=createCanopyRelease({group});
+ const logEntities=new Map();
  const trees = new Map(), wind = {value: 0}, missing = new Set(); let kits = new Map(), woodMaterial = null, uvMap = null, logs = null, chips = null, last = null, initialized = false, targetList = [], clock = 0;
  const ownedGeometry = new Set(), ownedMaterials = new Set();
  const ownMats = treeMaterials === undefined, mats = ownMats ? createTreeMaterials({windStrength: windAmplitude/.025}) : treeMaterials || null, decorate = m => mats ? mats.decorate(m) : m;
@@ -72,8 +75,8 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   const fall = treeFall(e.tree, cut, cut.felledTick, e.floor, ground), s = treeScale(e.tree), pivot = new T.Group(), body = new T.Group();
   pivot.position.set(fall.hinge[0]/s, fall.hinge[1]/s, fall.hinge[2]/s); body.position.copy(pivot.position).negate(); pivot.add(body);
   const tb = new T.Mesh(owned(res.top.bark, kit.trunkColor), kit.trunkMaterial), tw = new T.Mesh(owned(res.top.wood, true), woodMaterial); body.add(tb, tw); meshes.push(tb, tw);
-  for (const p of ['Branches', 'Leaves', 'Fruit']) if (kit.parts[p]) place(body, kit.parts[p]);
-  e.root.add(stump, pivot); e.felled = {stump, pivot, meshes, cut, axis: new T.Vector3(...fall.axis), capRadius: notch.radius*s};
+  const canopy=[];for (const p of ['Branches', 'Leaves', 'Fruit']) if (kit.parts[p]) {for(const mesh of place(body,kit.parts[p])){mesh.geometry.computeBoundingBox();canopy.push({mesh,matrix:mesh.matrix.clone(),center:mesh.geometry.boundingBox.getCenter(new T.Vector3()),leaves:p==='Leaves'});}}
+  e.root.add(stump, pivot); e.felled = {stump, pivot, body, canopy, topMeshes:[tb,tw], meshes, cut, axis: new T.Vector3(...fall.axis), capRadius: notch.radius*s};
  }
  const ground = (x, z) => height(x, z, last?.edits);
  function hitFeedback(e, cut, now) {
@@ -120,14 +123,38 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
     if (isFelled(cut)) { if (!e.felled) applyFelled(e, cut); } else applyWound(e, cut);
     e.key = key; e.cuts = cut?.cuts || 0;
    }
-   if (e.felled) e.felled.pivot.visible = !cut?.landed;
+   if (e.felled) {
+    const f=e.felled;
+    if(cut.landed&&!f.landed){
+     if(e.synced){const pose=treeFall(e.tree,cut,s.tick,e.floor,ground);f.pivot.quaternion.setFromAxisAngle(f.axis,pose.end);e.root.scale.setScalar(e.scale);e.root.updateMatrixWorld(true);
+      const points=[];for(const part of f.canopy.filter(p=>p.leaves)){const pos=part.mesh.geometry.attributes.position,step=Math.max(1,Math.floor(pos.count/32));for(let i=0;i<pos.count;i+=step)points.push(new T.Vector3().fromBufferAttribute(pos,i).applyMatrix4(part.mesh.matrixWorld).toArray());}
+      canopyFX.burst({points,seed:growthSeed(e.tree.id)});f.releaseAt=clock;
+     }
+     f.landed=true;f.topMeshes.forEach(m=>m.visible=false);
+    }
+    f.pivot.visible=!cut.landed||(f.releaseAt!==undefined&&clock-f.releaseAt<220);
+   }
    e.synced = true;
   }
   for (const [id, e] of trees) if (!ids.has(id)) { destroy(e); trees.delete(id); }
   for (const id of intact.keys()) if (!ids.has(id)) { batches.remove(id); intact.delete(id); growing.delete(id); }
   batches.flush();
-  if (logs) { const list = (s.looseLogs || []).slice(0, TREE_LIMITS.logs), m = new T.Matrix4(), q = new T.Quaternion(), p = new T.Vector3(), one = new T.Vector3(1, 1, 1);
-   for (const im of logs) { list.forEach((l, i) => { m.compose(p.fromArray(l.position), q.fromArray(l.quaternion), one).multiply(im.userData.local); im.setMatrixAt(i, m); }); im.count = list.length; im.instanceMatrix.needsUpdate = true; } }
+  const liveLogs=new Set();
+  for(const l of s.looseLogs||[]) {
+   if(!l.section)continue;const e=trees.get(l.sourceId);if(!e?.felled)continue;liveLogs.add(l.id);
+   let entry=logEntities.get(l.id);
+   if(!entry){const notch=authoredNotch(e,{...e.felled.cut,cuts:2}),top=buildFelled(e.kit.trunk,notch,uvMap).top;
+    const piece=buildTimberSection(top,l.section[0],l.section[1],uvMap,l.radius/e.scale),root=new T.Group(),center=(l.section[0]+l.section[1])/2;
+    for(const [tris,material,color] of [[piece.bark,e.kit.trunkMaterial,e.kit.trunkColor],[piece.wood,woodMaterial,true]]) {
+     const geometry=owned(tris,color);geometry.translate(0,-center,0);const mesh=new T.Mesh(geometry,material);mesh.userData.logId=l.id;root.add(mesh);
+    }
+    root.scale.setScalar(e.scale);group.add(root);entry={root};logEntities.set(l.id,entry);
+   }
+   entry.root.position.fromArray(l.position);entry.root.quaternion.fromArray(l.quaternion);
+  }
+  for(const [id,e] of logEntities)if(!liveLogs.has(id)){for(const m of e.root.children)release(m.geometry);e.root.removeFromParent();logEntities.delete(id);}
+  if (logs) { const list = (s.looseLogs || []).filter(l=>!l.section).slice(0, TREE_LIMITS.logs), m = new T.Matrix4(), q = new T.Quaternion(), p = new T.Vector3(), one = new T.Vector3(1, 1, 1);
+   for (const im of logs) { im.userData.logIds=list.map(l=>l.id);list.forEach((l, i) => { m.compose(p.fromArray(l.position), q.fromArray(l.quaternion), one).multiply(im.userData.local); im.setMatrixAt(i, m); }); im.count = list.length; im.instanceMatrix.needsUpdate = true; } }
   targetList = batches.targets(); for (const e of trees.values()) if (!e.felled) targetList.push(...e.full.byPart.Trunk, ...(e.wound?.meshes || []));
   initialized = true;
  }
@@ -140,7 +167,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   lodCam.copy(cam); lodValid = true; lodPending = false;
  }
  function tick(now, simTick) {
-  clock = now; wind.value = now/1000; if (ownMats) mats.update(now/1000); // shared instances are updated by their owner
+  canopyFX.tick(Math.max(0,(now-clock)/1000));clock = now; wind.value = now/1000; if (ownMats) mats.update(now/1000); // shared instances are updated by their owner
   const cam = camera ? camera.getWorldPosition(tmpV) : null;
   for (const id of growing) { const r = intact.get(id); if (r) placeIntact(r); else growing.delete(id); }
   if (cam) updateLod(cam);
@@ -148,7 +175,11 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   for (const e of trees.values()) { // individual (wounded/felled) trees only: always the full authored mesh, as before
    e.root.scale.setScalar(e.scale);
    if (e.recoil) { const k = (now - e.recoil.start)/260; if (k >= 1) { e.recoil = null; e.root.quaternion.identity(); } else e.root.quaternion.setFromAxisAngle(e.recoil.axis, -(.006 + .004*e.recoil.cuts)*Math.sin(k*Math.PI)*(1 - k)); }
-   if (e.felled && last) { const cut = e.felled.cut, f = treeFall(e.tree, cut, simTick, e.floor, ground); e.felled.pivot.quaternion.setFromAxisAngle(e.felled.axis, f.angle); }
+   if (e.felled && last) { const cut = e.felled.cut, f = treeFall(e.tree, cut, simTick, e.floor, ground); e.felled.pivot.quaternion.setFromAxisAngle(e.felled.axis, f.angle);
+    if(e.felled.landed){const age=now-(e.felled.releaseAt??-1e9),shrink=Math.max(0,1-age/220);e.felled.pivot.visible=shrink>0;
+     for(const part of e.felled.canopy){const c=part.center;part.mesh.matrix.copy(part.matrix).multiply(m4.makeTranslation(c.x,c.y,c.z)).multiply(m4.makeScale(shrink,shrink,shrink)).multiply(m4.makeTranslation(-c.x,-c.y,-c.z));}
+    }
+   }
   }
   if (chips) { chips.list = chips.list.filter(c => now - c.start < 650); chips.list.forEach((c, i) => { const t = (now - c.start)/1000, y = Math.max(ground(c.p[0], c.p[2]) + .01, c.p[1] + c.v[1]*t - 7.5*t*t);
     m4.compose(tmpV.set(c.p[0] + c.v[0]*t, y, c.p[2] + c.v[2]*t), tmpQ.setFromEuler(e3.set(c.spin*t, c.spin*.6*t, 0)), new T.Vector3(1, 1, 1).multiplyScalar(1 - t*.8)); chips.mesh.setMatrixAt(i, m4); });
@@ -156,9 +187,9 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  }
  /** Analytic ray vs log capsules (unheld). Returns {id, distance, point} or null. */
  function grabTarget(origin, direction, max = TREE_LIMITS.reach) {
-  let best = null; const o = new T.Vector3(...(origin.toArray ? origin.toArray() : origin)), d = new T.Vector3(...(direction.toArray ? direction.toArray() : direction)).normalize(), half = TREE_LIMITS.logLength/2 - TREE_LIMITS.logRadius;
-  for (const l of last?.looseLogs || []) { if (l.heldBy) continue; const a = new T.Vector3(...rotateVector([0, 1, 0], l.quaternion)), c = new T.Vector3(...l.position);
-   for (let t = 0; t <= max; t += .04) { const p = o.clone().addScaledVector(d, t), v = p.clone().sub(c), u = T.MathUtils.clamp(v.dot(a), -half, half); if (v.addScaledVector(a, -u).length() <= TREE_LIMITS.logRadius) { if (!best || t < best.distance) best = {id: l.id, distance: t, point: p.toArray()}; break; } } }
+  let best = null; const o = new T.Vector3(...(origin.toArray ? origin.toArray() : origin)), d = new T.Vector3(...(direction.toArray ? direction.toArray() : direction)).normalize();
+  for (const l of last?.looseLogs || []) { if (l.heldBy) continue; const half=Math.max(.001,logLength(l)/2-logRadius(l)); const a = new T.Vector3(...rotateVector([0, 1, 0], l.quaternion)), c = new T.Vector3(...l.position);
+   for (let t = 0; t <= max; t += .04) { const p = o.clone().addScaledVector(d, t), v = p.clone().sub(c), u = T.MathUtils.clamp(v.dot(a), -half, half); if (v.addScaledVector(a, -u).length() <= logRadius(l)) { if (!best || t < best.distance) best = {id: l.id, distance: t, point: p.toArray()}; break; } } }
   return best;
  }
  /** True when a raycast hit lies on a rendered surface (respects material clipping planes). */
@@ -174,13 +205,13 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function stats() { let drawCalls = 0, triangles = 0, intactDraws = 0; const programs = new Set();
   group.traverseVisible(o => { if (!o.isMesh || (o.isInstancedMesh && o.count === 0)) return; drawCalls++; if (o.userData.treeBatch) intactDraws++; const n = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count)/3; triangles += n*(o.isInstancedMesh ? o.count : 1); for (const m of [].concat(o.material)) programs.add(m.type + (m.vertexColors ? '+vc' : '') + (m.map ? '+map' : '') + (m.userData.treeWind ? '+wind' : '') + (m.userData.treeMaterial ? '+' + m.userData.treeMaterial : '')); });
   const list = [...trees.values()], rs = [...intact.values()], c = batches.counters();
-  return {trees: list.length + rs.length, intact: rs.length, individual: list.length, lod: rs.filter(r => r.lod).length, growing: growing.size, wounded: list.filter(e => e.wound).length, felled: list.filter(e => e.felled).length, falling: list.filter(e => e.felled?.pivot.visible).length,
-   logs: logs?.[0]?.count || 0, chips: chips?.list.length || 0, drawCalls, intactDraws, batches: batches.batches().filter(b => b.ids.length).length, triangles: Math.round(triangles), shaderPrograms: programs.size, ownedGeometries: ownedGeometry.size,
-   matrixWrites: c.writes, slotMoves: c.moves, lodSwitches, missingAssets: [...missing], treeMaterials: mats?.stats() || null}; }
- function clearAll() { for (const e of trees.values()) destroy(e); trees.clear(); batches.clear(); intact.clear(); growing.clear(); lodValid = false; }
+  return {trees: list.length + rs.length, intact: rs.length, individual: list.length, lod: rs.filter(r => r.lod).length, growing: growing.size, wounded: list.filter(e => e.wound).length, felled: list.filter(e => e.felled).length, falling: list.filter(e => e.felled?.pivot.visible&&!e.felled.landed).length,
+   logs: (logs?.[0]?.count || 0)+logEntities.size, chips: chips?.list.length || 0, drawCalls, intactDraws, batches: batches.batches().filter(b => b.ids.length).length, triangles: Math.round(triangles), shaderPrograms: programs.size, ownedGeometries: ownedGeometry.size,
+   canopy:canopyFX.stats(), matrixWrites: c.writes, slotMoves: c.moves, lodSwitches, missingAssets: [...missing], treeMaterials: mats?.stats() || null}; }
+ function clearAll() { canopyFX.tick(1); for(const e of logEntities.values()){for(const m of e.root.children)release(m.geometry);e.root.removeFromParent();}logEntities.clear(); for (const e of trees.values()) destroy(e); trees.clear(); batches.clear(); intact.clear(); growing.clear(); lodValid = false; }
  function reload(next = templates) { templates = next; clearAll(); for (const m of ownedMaterials) m.dispose(); ownedMaterials.clear(); if (ownMats) mats.dispose(); initialized = false; buildKits(); if (last) sync(last); }
- function dispose() { clearAll(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); if (ownMats) mats.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
+ function dispose() { clearAll();canopyFX.dispose(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); if (ownMats) mats.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
  buildKits();
- return {sync, tick, collectibleTargets:()=>logs||[], collectibleId:hit=>logs?.includes(hit.object)?last?.looseLogs?.[hit.instanceId]?.id:null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
+ return {sync, tick, collectibleTargets:()=>[...(logs||[]),...Array.from(logEntities.values()).flatMap(e=>e.root.children)], collectibleId:hit=>hit.object.userData.logId||hit.object.userData.logIds?.[hit.instanceId]||null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
   entity: id => trees.get(id) || null, intactTree: id => intact.get(id) || null};
 }

@@ -1,0 +1,4 @@
+import {createRequire} from 'node:module';import {mkdirSync} from 'node:fs';
+const require=createRequire(import.meta.url),{chromium}=require(process.env.PW_CORE);const browser=await chromium.launch({executablePath:process.env.PW_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1440,height:480}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+try{await page.goto('http://127.0.0.1:5178/tests/timber-review.html');await page.waitForFunction(()=>document.title==='Timber review ready');mkdirSync('../logs/timber-review',{recursive:true});await page.screenshot({path:'../logs/timber-review/continuity.png'});console.log(JSON.stringify({errors,review:await page.evaluate(()=>window.review)}));}finally{await browser.close();}

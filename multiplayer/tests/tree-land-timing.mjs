@@ -22,13 +22,13 @@ const cut = sim.snapshot().harvestedTrees.find(h => h.id === tree.id);
 const ground = (x, z) => terrainHeight(sim.snapshot(), x, z);
 const fall = treeFall(tree, cut, cut.felledTick + fell.landTicks, floor, ground);
 assert.equal(fall.landTicks, fell.landTicks, 'payload equals the pure treeFall land tick');
-assert.equal(fall.phase, 'settling', 'trunk is in contact exactly at felledTick + landTicks');
+assert.equal(fall.phase, 'down', 'trunk is in contact exactly at felledTick + landTicks');
 assert.equal(treeFall(tree, cut, cut.felledTick + fell.landTicks - 1, floor, ground).phase, 'falling', 'and not one tick earlier');
-// The authoritative settle event still fires once, landTicks + settleTicks after the fell tick.
+// The authoritative settle event still fires once, landTicks after the fell tick.
 let landTick = null;
 for (let i = 0; i < 600 && landTick === null; i++) { const tick = sim.snapshot().tick; if (sim.step().some(e => e.kind === 'tree_land')) landTick = tick; }
 assert.ok(landTick !== null, 'tree_land fires');
-assert.ok(Math.abs(landTick - (cut.felledTick + fell.landTicks + TREE_LIMITS.settleTicks)) <= 1, `tree_land at ${landTick}, fell ${cut.felledTick}, land ${fell.landTicks}`);
+assert.ok(Math.abs(landTick - (cut.felledTick + fell.landTicks)) <= 1, `tree_land at ${landTick}, fell ${cut.felledTick}, land ${fell.landTicks}`);
 // Audio plan: heavy landing is scheduled at exactly landTicks/60 s (no 2.5 s magic delay); tree_land then plays settle.
 const scheduled = new Map(), plan = woodLayersFor(fell, scheduled);
 assert.equal(plan.find(l => l.sound === 'log_land_heavy').delay, fell.landTicks / 60);

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
 import {worldTrees} from '../shared/world-content.js';
-import {trunkRadius} from '../shared/trees.js';
+import {trunkRadius, timberSections} from '../shared/trees.js';
 const started = performance.now();
 let seq = 0;
 const act = (sim, body) => sim.command('h', {type: 'action', seq: ++seq, ...body});
@@ -25,14 +25,14 @@ steps(sim, 28); strike(); steps(sim, 28);
 assert.deepEqual(loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))).snapshot().harvestedTrees, sim.snapshot().harvestedTrees);
 const fell = strike(); assert.ok(fell.events.some(e => e.kind === 'tree_fell'));
 assert.equal(sim.snapshot().pickups.filter(p => p.kind === 'wood').length, 0);
-// Mid-fall save/rejoin: continuing from the save must land exactly once with exactly three logs.
+// Mid-fall save/rejoin: continuing from the save must land exactly once with the cut-height-dependent log yield.
 steps(sim, 20); const midFall = JSON.parse(JSON.stringify(sim.checkpoint()));
 let landEvents = steps(sim, 600).filter(e => e.kind === 'tree_land');
-assert.equal(landEvents.length, 1); assert.equal(sim.snapshot().looseLogs.length, 3);
+assert.equal(landEvents.length, 1); assert.equal(sim.snapshot().looseLogs.length, timberSections(tree,midFall.harvestedTrees[0],floor).length);
 const resumed = loadSimulation(midFall); const resumedLand = steps(resumed, 600).filter(e => e.kind === 'tree_land');
 assert.equal(resumedLand.length, 1); assert.deepEqual(resumed.snapshot().looseLogs, sim.snapshot().looseLogs, 'deterministic logs after resume');
 steps(sim, 600); const afterSettle = sim.snapshot().looseLogs; assert.ok(afterSettle.every(l => l.sleeping), 'logs come to rest');
-const again = loadSimulation(sim.checkpoint()); steps(again, 120); assert.equal(again.snapshot().looseLogs.length, 3, 'no duplicate timber after reload');
+const again = loadSimulation(sim.checkpoint()); steps(again, 120); assert.equal(again.snapshot().looseLogs.length, afterSettle.length, 'no duplicate timber after reload');
 // Felled tree no longer accepts chops.
 assert.deepEqual(strike().events, []);
 // Hands: grab -> swings blocked -> throw -> regrab -> stow; logs never auto-collect.

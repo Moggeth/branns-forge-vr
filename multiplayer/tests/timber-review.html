@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Timber continuity review</title><style>body{margin:0}canvas{display:block}#labels{position:absolute;inset:8px;display:flex;color:white;font:18px sans-serif}span{width:480px}</style><div id="labels"><span>Before contact · original tree</span><span>Contact · trunk sections + canopy release</span><span>After · collectable timber</span></div>
+<script type="module">
+import * as T from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createTreeView} from '/client/tree-view.js';import {worldTrees} from '/shared/world-content.js';import * as R from '/shared/trees.js';
+const templates=new Map(),loader=new GLTFLoader();for(const name of [...R.VARIANTS,...R.VARIANTS.map(v=>v+'_lod'),'log','endcap'])templates.set(name,await loader.loadAsync('/assets/'+name+'.glb'));
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1440,480);renderer.setScissorTest(true);document.body.append(renderer.domElement);let seq=0;window.review=[];
+for(let col=0;col<3;col++){
+ const s={seed:7,tick:100,groves:[],harvestedTrees:[],looseLogs:[],players:[]},tree=worldTrees(s)[0],scene=new T.Scene();scene.background=new T.Color(0xb8cfc6);scene.add(new T.HemisphereLight(0xfff8e5,0x334423,2));const sun=new T.DirectionalLight(0xfff0da,2);sun.position.set(4,8,5);scene.add(sun);
+ scene.add(new T.Mesh(new T.PlaneGeometry(100,100).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x637b40})));
+ const camera=new T.PerspectiveCamera(48,1,.1,150);camera.position.set(tree.x+6,4.8,tree.z+5);camera.lookAt(tree.x,.8,tree.z-1.8);scene.add(camera);
+ const view=createTreeView({scene,templates,height:()=>0,camera});view.sync(s);view.tick(0,s.tick);
+ for(let i=0;i<3;i++)R.chopTree(s,tree,[tree.x,.5,tree.z+R.trunkRadius(tree,.5)],[0,0,1],{terrainHeight:()=>0});view.sync(s);
+ const cut=s.harvestedTrees[0],fall=R.treeFall(tree,cut,100,0,()=>0),index=R.createTreeIndex();s.tick=100+fall.landTicks-1;view.tick(1000,s.tick);view.sync(s);
+ if(col){s.tick++;R.stepTrees(s,{terrainHeight:()=>0,nextId:()=>`log${++seq}`},index,[]);view.sync(s);const ticks=col===1?6:75;for(let i=0;i<ticks;i++){s.tick++;R.stepTrees(s,{terrainHeight:()=>0,nextId:()=>`log${++seq}`},index,[]);view.tick(1000+(i+1)*1000/60,s.tick);view.sync(s);}}
+ view.group.traverse(o=>{if(o.userData.treeBatch)o.visible=false;});renderer.setViewport(col*480,0,480,480);renderer.setScissor(col*480,0,480,480);renderer.render(scene,camera);window.review.push(view.stats());
+}document.title='Timber review ready';
+</script>
