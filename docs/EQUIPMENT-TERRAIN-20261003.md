@@ -116,3 +116,14 @@ plus safe area in the mobile rule too, and verify the bundled public build—not
 only Vite. Final local overlay regression passed in 12.913 s including desktop,
 portrait and landscape, before redeployment. Investigation/correction completed
 at 01:07:18 UTC. All screenshots/reports remain under ignored logs/mastery-*.
+
+Final production runtime: **1cceb62**, deployment dpl_8YoCS8ZMWVW2oerUnr6rQvkBEjGG.
+Public F1/Tab, actual expedition action, pointer-lock restoration, portrait and
+landscape touch panels all passed in 13.655 s. Phone screenshots verified the
+version tag. Local isolated button-identity unit test passes separately.
+The first corrected deployment returned Not authorized after 4.864 s; CLI whoami
+still verified Moggeth (2.998 s). One retry of the exact already-verified stage
+succeeded in 9.187 s without changing accounts or credentials. Cause unknown;
+check identity and preserve the verified stage before rebuilding or reauthenticating.
+Owned QA servers 8799/5188 stopped; original public peer 8789/PID43880 remains.
+Physical headset pouch/comfort and physical phone acceptance still need user testing.
