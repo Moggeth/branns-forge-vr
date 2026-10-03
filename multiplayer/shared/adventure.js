@@ -7,12 +7,11 @@ export const ADVENTURE_VERSION = 1;
 export const HZ = 60;
 export const STAGES = Object.freeze(['idle', 'camp', 'star', 'rekindle', 'victory', 'defeat']);
 const RUNNING = ['camp', 'star', 'rekindle'];
-const BOUND = 55, FORGE = [0, 0], DEPOSIT_RANGE = 9, DRAIN_RANGE = 11, HOSTILE_KEEP_OUT = 12;
+const BOUND = 55, FORGE = [0, 0], DEPOSIT_RANGE = 9, DRAIN_RANGE = 11;
 const MAX_FOES = 16, MAX_TELEGRAPHS = 8, MAX_LEDGER = 16, MAX_RETRIES = 3, STOCK_CAP = 99;
 const GATES = Object.freeze([[-24, -16], [24, -16], [0, -30], [-22, 20], [22, 20]]);
 export const STAR_SITES = Object.freeze([[-30, 26], [32, 24], [-4, -38]]);
 const SHAPE = ['raise', 'lower', 'sunder', 'wall'], PLANT = ['grove', 'ring'], SUPPORT = ['heal', 'frost', 'lightning', 'crystal', 'starfall'];
-const HOSTILE_COST = Object.freeze({skeleton: 1, squad: 4, golem: 3});
 const s = secs => Math.round(secs * HZ);
 // Authored pacing. All times are stage-elapsed ticks, which only advance while someone is present.
 export const PACING = Object.freeze({
@@ -352,20 +351,9 @@ export function contributeSettlement(adv, stock) {
 
 // Call before forwarding a God `cast` to the simulation. During a run, hostile summons are a bounded team
 // "challenge" budget: none near the forge, none while no Hero can answer, and a per-stage cap.
-export function adventureCastGate(adv, playerId, message, world) {
-  if (!RUNNING.includes(adv.stage) || !record(message) || !Object.hasOwn(HOSTILE_COST, message.spell)) return {ok: true};
-  const {heroes} = roster(world);
-  if (!heroes.length) return {ok: false, code: 'expedition_no_heroes'};
-  if (!Array.isArray(message.point) || message.point.length !== 3 || !num(message.point[0], -BOUND, BOUND) || !num(message.point[2], -BOUND, BOUND)) return {ok: false, code: 'invalid_cast'};
-  if (flat(xz(message.point), FORGE) < HOSTILE_KEEP_OUT) return {ok: false, code: 'expedition_keep_out'};
-  if (heroes.some(h => flat(xz(h.position), xz(message.point)) < 6)) return {ok: false, code: 'expedition_too_close'};
-  const budget = 2 + 2 * scale(heroes.length);
-  if (adv.hostileUsed + HOSTILE_COST[message.spell] > budget) return {ok: false, code: 'expedition_challenge_spent'};
-  adv.hostileUsed += HOSTILE_COST[message.spell];
-  return {ok: true, charged: HOSTILE_COST[message.spell]};
-}
-// If the simulation then rejects the cast (mana, cooldown, limits), refund the reservation.
-export function adventureCastRefund(adv, gate) { if (gate?.charged) adv.hostileUsed = Math.max(0, adv.hostileUsed - gate.charged); }
+// God casts are never refused by expedition rules; summons only land outside the forge keep-out
+// (shared/spells.js settleCastPoint). hostileUsed stays in saves for compatibility.
+export const expeditionRunning = adv => RUNNING.includes(adv?.stage);
 
 // Apply intents to a raw simulation state object. ctx = {createEnemy, terrainHeight}. Debit/mana intents
 // are re-checked so a stale intent can never mint resources. Returns {applied, skipped}.
@@ -490,7 +478,7 @@ export function adventureView(adv, world, viewerId) {
   return {stage: adv.stage, run: adv.run, title: STAGE_TITLES[adv.stage], notice: adv.notice, role,
     elapsedSeconds: Math.floor(adv.elapsed / HZ), objectives, telegraphs: t,
     flame: adv.stage === 'rekindle' ? Math.floor(adv.flame) : null, retriesLeft: MAX_RETRIES - adv.retries,
-    godSupportLeft: cap, challengeLeft: RUNNING.includes(adv.stage) ? Math.max(0, 2 + 2 * scale(heroes.length) - adv.hostileUsed) : 0,
+    godSupportLeft: cap,
     renown: me ? adv.renown[me.id] || 0 : 0, party: {heroes: heroes.length, gods: gods.length}, actions,
     star: adv.stage === 'star' ? {x: STAR_SITES[adv.star.site][0], z: STAR_SITES[adv.star.site][1], landed: adv.star.landed} : null};
 }

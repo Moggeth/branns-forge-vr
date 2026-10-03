@@ -1,4 +1,5 @@
 import {SPELLS, WEAPONS} from '../shared/spells.js';
+import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const clamp = n => Math.max(0, Math.min(1, n));
 // Read authority clocks; changing tools never resets or invents a cooldown.
@@ -8,7 +9,7 @@ export function readiness(lastTick, duration, tick) {
 }
 export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
   const basic = WEAPONS.find(w => w.id === tool)?.cooldown || 0;
-  const secondary = ['axe','pick','hammer'].includes(tool) ? 240 : tool === 'wyrmspout' ? 120 : 0;
+  const secondary = specialCooldown(tool);
   const overheated = (player.overheatUntil || 0) > tick;
   return {
     attackReady: overheated ? clamp(1 - (player.overheatUntil - tick) / 180) : readiness(player.attackTick, basic, tick),
@@ -20,8 +21,7 @@ export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
   };
 }
 export function spellbookReadiness(player = {}, tick = 0, selected = 'skeleton', enabled = true) {
-  // Current rules share a 45-tick recovery between ALL spells. Showing independent
-  // invented timers would promise availability the simulation cannot honour.
+  // Spells have no recovery timer (mana is the only gate); castTick still marks the last cast.
   return {mana: player.mana || 0, tick, selected, enabled,
     spellTicks: Object.fromEntries(SPELLS.map(s => [s.id, player.castTick ?? -1000]))};
 }

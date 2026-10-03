@@ -1,4 +1,5 @@
 import {WEAPONS} from '../shared/spells.js';
+import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const RECOVERY = {
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",
@@ -55,7 +56,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if(command.type==='cast')return `Magic is recovering: ${wait(player.castTick,45)}s.`;
   if(command.action==='forgeEncounter')return `The next raid is ready in ${Math.max(.1,((world.settlement?.cooldownUntil||tick)-tick)/60).toFixed(1)}s.`;
   const special=command.action==='special';
-  return `${special?'Special':'Attack'} is recovering: ${wait(special?player.specialTick:player.attackTick,special?(player.tool==='wyrmspout'?120:240):(WEAPONS.find(w=>w.id===player.tool)?.cooldown||30))}s.`;
+  return `${special?'Special':'Attack'} is recovering: ${wait(special?player.specialTick:player.attackTick,special?specialCooldown(player.tool):(WEAPONS.find(w=>w.id===player.tool)?.cooldown||30))}s.`;
  }
  if(code==='shrine_disabled')return `The forge was damaged. Repair it with timber, or wait ${Math.max(0,Math.ceil(((world.shrine?.disabledUntil||tick)-tick)/60))}s for recovery.`;
  if(code==='projectile_limit')return 'Too many projectiles are still in flight. Let them land before firing again (up to 8s).';

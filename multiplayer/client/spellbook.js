@@ -189,8 +189,8 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
   let legend = null;
   if (helpList) {
     legend = document.createElement('li'); legend.className = 'sb-legend';
-    legend.innerHTML = '<b>Spell cards</b> — <span class="sb-lg-cost">red cost</span> means not enough mana yet; '
-      + '<span class="sb-lg-cd">dark sweep + seconds</span> means recharging. Every card stays selectable. '
+    legend.innerHTML = '<b>Spell cards</b> — <span class="sb-lg-cost">red cost</span> means not enough mana yet. '
+      + 'Mana is the only limit: aim anywhere and the spell lands. Every card stays selectable. '
       + 'Scroll the row with ‹ ›, mouse wheel, drag or arrow keys.';
     helpList.append(legend);
   }

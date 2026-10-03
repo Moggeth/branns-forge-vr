@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createPickLuminance} from './pick-luminance.js';
+import {createAxeLuminance} from './axe-luminance.js';
 
 // Diegetic weapon readiness for Brann's Forge held tools.
 //
@@ -11,13 +12,13 @@ import {createPickLuminance} from './pick-luminance.js';
 // - One Group `readiness:<tool>` is added under that host. Existing geometry, node names, socket names and
 //   parent transforms are never written. Surfaces are found by scanning authored vertices once.
 // - Inputs are fractions owned by the shared simulation; this module never runs its own timers.
-//   axe/pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
+//   axe: specialReady (6 s cleave) · pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
 //   curve adds nothing) · limb: attackReady (0.53 s) · wyrmspout: heat + overheated (3 s lock) and
 //   specialReady (2 s vent) · flask: attackReady (1 s toss; wick toggle is instant so it has no indicator).
 // - Max 3 draw calls per tool, no lights, every descendant has userData.ignoreContact = true.
 
 export const READINESS_TIMINGS = Object.freeze({
-  axe: {special: 4}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
+  axe: {special: 6}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
   limb: {attack: .53}, wyrmspout: {vent: 2, overheatLock: 3}, flask: {attack: 1},
 });
 
@@ -236,7 +237,9 @@ const BUILD = {
       transforms.push([new THREE.Vector3(x, y, side * z), q]); steps.push(i);
     });
     const strip = new Strip(owner, named(diamondGeometry(.011, .024, .0011), 'axe-rune'), glowMaterial({color: 0x7a5a24, metalness: .85, roughness: .35}), transforms, steps, PALETTES.gold);
-    return {special: strip};
+    // The head's own light carries the charge too: discharge on use, blossom → vine → edge line → honed edge.
+    const luminance = createAxeLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
+    return {special: strip, luminance};
   },
   // Blue crystal nodes in brass settings: three tiers on four faces under the head, filling up toward it.
   pick(owner, host, find) {

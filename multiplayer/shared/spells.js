@@ -17,7 +17,7 @@ export const SPELLS = Object.freeze([
   {id:'frost',label:'Frost Nova',cost:20,target:'point',icon:'❄'},
   {id:'awaken',label:'Awaken',cost:18,target:'point',icon:'❦'},
   {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
-].map(s=>Object.freeze({...s,cooldown:45})));
+].map(s=>Object.freeze({...s,cooldown:0})));  // Mana is the only gate on casting.
 export const SPELL_COST = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.cost])));
 export const WEAPONS = Object.freeze([
   {id:'axe',label:'Axe',slot:1,cooldown:27}, {id:'pick',label:'Pick',slot:2,cooldown:29},
@@ -25,6 +25,19 @@ export const WEAPONS = Object.freeze([
   {id:'bow',label:'Emberwing',slot:5,cooldown:33}, {id:'limb',label:'Held Limb',slot:6,cooldown:32},
   {id:'wyrmspout',label:'Wyrmspout',slot:7,cooldown:6}, {id:'flask',label:'Emberdew',slot:8,cooldown:60},
 ].map(Object.freeze));
+
+// Placement rules move a cast to the nearest allowed spot; they never refuse it.
+// Creatures, trees and crystal stay off the forge apron (wider during an
+// expedition for creatures), and trees keep room inside the mountain wall.
+export const FORGE_APRON = 7, EXPEDITION_KEEP_OUT = 12, GROVE_EDGE = 51;
+const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem'], SUMMONS = ['skeleton','squad','golem'];
+export function settleCastPoint(spell, point, {expedition = false} = {}) {
+  let [x, y, z] = point;
+  if (spell === 'grove' || spell === 'ring') { x = Math.max(-GROVE_EDGE, Math.min(GROVE_EDGE, x)); z = Math.max(-GROVE_EDGE, Math.min(GROVE_EDGE, z)); }
+  const apron = expedition && SUMMONS.includes(spell) ? EXPEDITION_KEEP_OUT : APRON_SPELLS.includes(spell) ? FORGE_APRON : 0, d = Math.hypot(x, z);
+  if (apron && d < apron) { if (d < 1e-6) { x = 0; z = apron; } else { x = x / d * apron; z = z / d * apron; } }
+  return [x, y, z];
+}
 
 // Spatial preview dimensions mirror authoritative spell effects and world-content tree sites.
 export const SPELL_TARGET_SHAPES = Object.freeze({

@@ -20,10 +20,9 @@ steps(50);
 const start = send('h', {type: 'adventure', action: 'start'}); assert.equal(start.ok, true);
 assert.ok(start.events.some(e => e.kind === 'adventure_stage' && e.stage === 'camp'));
 assert.equal(sim.checkpoint().players.find(p => p.id === 'h').seq >= seq.h, true, 'expedition seq advances the shared sequence');
-// During a run the gate protects the forge and refunds nothing it did not charge.
-const mana = sim.snapshot().players.find(p => p.id === 'g').mana;
-assert.equal(send('g', {type: 'cast', spell: 'skeleton', point: [2, 0, 2]}).code, 'expedition_keep_out');
-assert.equal(sim.snapshot().players.find(p => p.id === 'g').mana, mana, 'rejected gate spends no mana');
+// During a run a summon aimed at the forge emerges at the keep-out edge instead of being refused.
+const kept = send('g', {type: 'cast', spell: 'skeleton', point: [2, 0, 2]}); assert.equal(kept.ok, true, kept.code);
+const raised = sim.snapshot().enemies.at(-1); assert.ok(Math.abs(Math.hypot(raised.position[0], raised.position[2]) - 12) < 1e-9, 'summon lands at the keep-out edge');
 assert.equal(send('g', {type: 'cast', spell: 'raise', point: [0, 0, 20]}).ok, true, 'terrain shaping never gated');
 // Deposit real carried resources once; surplus is never taken.
 let cp = sim.checkpoint(); cp.players.find(p => p.id === 'h').resources = {wood: 40, stone: 3, gems: 0}; sim = loadSimulation(cp);
