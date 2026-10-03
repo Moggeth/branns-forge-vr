@@ -1,3 +1,4 @@
+import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain} from './terrain.js';
 import {collapseMinedWall} from './weapon-specials.js';
 export {terrainHeight} from './terrain.js';
@@ -5,7 +6,7 @@ import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld} from './starting-world.js';
 import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
-import {worldTrees, initialDeposits} from './world-content.js';
+import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST} from './spells.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits} from './resources.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact} from './combat.js';
@@ -100,7 +101,7 @@ function instantiate(state) {
   const treeContext = {terrainHeight, nextId, makePickup: addPickup};
   // A leaving player's pack falls where they stood (gems first: star shards are finite) in <=10-unit pickups, at most 24,
   // so a Hero who leaves mid-expedition cannot strand the team. Parked reconnect records rejoin with an empty pack (no duplicates).
-  const dropCarried = p => { let slot = 0; for (const kind of ['gems','stone','wood']) { while ((p.resources?.[kind] | 0) > 0 && slot < 24) {
+  const dropCarried = p => { let slot = 0; for (const kind of MATERIAL_KEYS) { while ((p.resources?.[kind] | 0) > 0 && slot < 24) {
     const n = Math.min(10, p.resources[kind]), a = slot * 2.39996, r = .7 + .25 * (slot % 3);
     if (!addPickup(kind, clamp(p.position[0] + Math.cos(a) * r, -BOUND, BOUND), clamp(p.position[2] + Math.sin(a) * r, -BOUND, BOUND), n)) return;
     p.resources[kind] -= n; slot++; } } };
@@ -114,7 +115,7 @@ function instantiate(state) {
       const position = spawn(state);
       state.players.push({id, name: cleanName(name), role, position, yaw: 0, hp: 100, mana: 100,
         move: [0, 0], vy: 0,velocity:[0,0,0], inputTick: -1000, attackTick: -1000, castTick: -1000,
-        roleTick: -1000, seq: 0, stats:{kills:0,deaths:0,harvested:0,contribution:0}, tool: 'axe', resources: {wood: 0, stone: 0, gems: 0}});
+        roleTick: -1000, seq: 0, stats:{kills:0,deaths:0,harvested:0,contribution:0}, tool: 'axe', side:'party', resources: emptyMaterials()});
       return ok([event('join', position, id)]);
     },
     removePlayer(id) {
@@ -200,6 +201,7 @@ function instantiate(state) {
           if (state.bridges.length >= 32) return fail('world_limit');
           if (p.resources.wood < 3) return fail('insufficient_resources');
           const x = clamp(p.position[0]-Math.sin(p.yaw)*3,-BOUND,BOUND), z = clamp(p.position[2]-Math.cos(p.yaw)*3,-BOUND,BOUND);
+          if(Math.hypot(x,z)<7)return fail('protected_forge');
           p.resources.wood -= 3; const idNew = nextId(state,'b'); const y = Math.max(...[-2.5,0,2.5].map(d=>terrainHeight(state,clamp(x-Math.sin(p.yaw)*d,-BOUND,BOUND),clamp(z-Math.cos(p.yaw)*d,-BOUND,BOUND))))+.12;
           state.bridges.push({id:idNew,x,z,y,yaw:p.yaw}); return ok([event('build',[x,y,z],idNew)]);
         }
@@ -238,25 +240,17 @@ function instantiate(state) {
           if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:oreFloor}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-oreFloor)>2) return ok();
           if(ore.hits===ore.maxHits-1&&state.pickups.length>=256)return fail('world_limit');
           ore.hits++; events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
-          if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); makePickup(ore.kind==='meteor'?'gems':'stone',ore.x,ore.z,ore.kind==='meteor'?2:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
+          if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,reward.amount);if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
           if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point))hitEnemyPart(state,hitEnemy,message.part||'torso',requestedTool==='hammer'?70:requestedTool==='limb'?30:34,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);
-          else if(message.targetId==='shrine' && inReach({position:[0,terrainHeight(state,0,0,false),0]})<Infinity && state.shrine.hp>0){state.shrine.hp=Math.max(0,state.shrine.hp-25);events.push(event('hit',message.point,'shrine'));if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
+          else if(message.targetId==='shrine')return fail('permanent_forge');
           return ok(events); // No fallback to another target when a precise surface missed.
         }
         const enemy = state.enemies.map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
         if (enemy && Number.isFinite(enemy[1])) damageEnemy(state, enemy[0], 34, events,p.id);
-        else if (state.shrine.hp > 0 && inReach({position:[0,terrainHeight(state,0,0,false),0]}) < Infinity) {
-          state.shrine.hp = Math.max(0, state.shrine.hp - 25);
-          events.push(event('hit', state.shrine.position, 'shrine'));
-          if (!state.shrine.hp) {
-            state.shrine.disabledUntil = state.tick + 480;
-            events.push(event('death', state.shrine.position, 'shrine'));
-          }
-        }
         return ok(events);
       }
       if (p.role !== 'god') return fail('role_required');
@@ -266,7 +260,7 @@ function instantiate(state) {
       const lineCount=line&&message.start?Math.ceil(distance(message.start,message.end)/2.5)+1:3;
       if (!Object.hasOwn(COST, spell) || !validPoint(point)) return fail('invalid_cast');
       if ((spell==='grove'||spell==='ring')&&(Math.abs(point[0])>51||Math.abs(point[2])>51)) return fail('outside_world');
-      if (state.shrine.hp <= 0) return fail('shrine_disabled');
+      if(['grove','ring','crystal','skeleton','squad','golem'].includes(spell)&&Math.hypot(point[0],point[2])<7)return fail('protected_forge');
       if (state.tick - p.castTick < 45) return fail('cooldown');
       if (p.mana < COST[spell]) return fail('insufficient_mana');
       if(spell==='crystal'||spell==='starfall')reclaimDepletedDeposits(state);
@@ -285,7 +279,7 @@ function instantiate(state) {
       events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start,end,...(rupture?{rupture}:{})}:{})});
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-BOUND,BOUND),sz=clamp(z+(i<2?-1:1)*1.4,-BOUND,BOUND);state.enemies.push({...createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]),emergeTick:state.tick});}
-      if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+      if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'crystal',hits:0,maxHits:5,depleted:false});
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
       if(spell==='lightning')applyHeat(state,at,3,1,fireContext);
       if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
@@ -308,7 +302,7 @@ function instantiate(state) {
       if(hasActiveTerrain(state.edits,state.tick))settleTerrainContents(state);
       const events = [];
       let forgeY=terrainHeight(state,0,0,false);
-      if (state.shrine.hp === 0 && state.tick >= state.shrine.disabledUntil) state.shrine.hp = 100;
+      state.shrine.hp=100;state.shrine.disabledUntil=0;
       treeIndex.update(state); const treeCuts=new Map(state.harvestedTrees.map(h=>[h.id,h]));
       for (const p of state.players) {
         const previousPosition=[...p.position];
@@ -348,6 +342,7 @@ function instantiate(state) {
         damageHero,events
       });
       flushMeteorRewards(state,terrainHeight);
+      renewGeology(state,{terrainHeight},events);
       stepCombat(state,combatContext,events);
       stepFire(state,fireContext,events);
       stepTrees(state,treeContext,treeIndex,events);
@@ -358,13 +353,14 @@ function instantiate(state) {
       const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
       if (expedition.intents.length) applyAdventureIntents(state, expedition.intents, adventureContext);
       events.push(...expedition.events);
+      state.shrine.hp=100;state.shrine.disabledUntil=0;
       return events;
     },
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, roleTick, position,velocity, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,head, hands}) =>
-          ({id, name, role, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,head, hands}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, groves: state.groves, pendingStarfalls: state.pendingStarfalls,
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -414,7 +410,7 @@ export function loadSimulation(saved) {
         (p.stats!==undefined&&(!record(p.stats)||!['kills','deaths','harvested','contribution'].every(k=>finite(p.stats[k])&&p.stats[k]>=0&&p.stats[k]<=1e9&&(k==='contribution'||Number.isInteger(p.stats[k]))))) ||
         (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
-        (p.resources !== undefined && (!record(p.resources) || !['wood','stone','gems'].every(k => Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
+        (p.resources !== undefined && (!record(p.resources) || !MATERIAL_KEYS.every(k => p.resources[k]===undefined || Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
         (p.head !== undefined && !pose(p.head)) ||
         (p.hands !== undefined && (!Array.isArray(p.hands) || p.hands.length > 2 || !p.hands.every(h => pose(h)))))
       throw Error('Invalid simulation player');
@@ -439,7 +435,7 @@ export function loadSimulation(saved) {
   const treeIds=new Set(worldTrees(saved).map(t=>t.id));
   const harvestedTrees=restoreHarvested({...saved,harvestedTrees:harvested},treeIds); // strict; legacy felled trees count as landed (wood already awarded)
   const contentIds = new Set([...ids, 'shrine', ...treeIds, ...saved.pendingStarfalls.map(p=>p.id)]);
-  for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !['stone','meteor'].includes(d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > (d.kind==='meteor'?5:3) || d.maxHits !== (d.kind==='meteor'?5:3) || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
+  for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !Object.hasOwn(DEPOSIT_CATALOG,d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > DEPOSIT_CATALOG[d.kind].maxHits || d.maxHits !== DEPOSIT_CATALOG[d.kind].maxHits || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
   const linkedWalls=new Set();
   for(const d of deposits) {
     if(d.special!==undefined&&!['axe_sunder','pick_wall'].includes(d.special))throw Error('Invalid special deposit');
@@ -451,7 +447,7 @@ export function loadSimulation(saved) {
     } else if(d.editId!==undefined)throw Error('Invalid wall linkage');
   }
   if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall');
-  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || !['wood','stone','gems','apple'].includes(q.kind) || !validXZ(q) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
+  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
   const meteorRewards=saved.meteorRewards??[];
   if(!Array.isArray(meteorRewards)||meteorRewards.length>64)throw Error('Invalid meteor rewards');
@@ -475,7 +471,7 @@ export function loadSimulation(saved) {
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     stats:Object.fromEntries(['kills','deaths','harvested','contribution'].map(k=>[k,p.stats?.[k]||0])),
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
-    attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', resources: {wood:p.resources?.wood||0,stone:p.resources?.stone||0,gems:p.resources?.gems||0},
+    attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', side:p.side||'party', resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,emergeTick}) => ({id, position, yaw, hp, attackTick,...(scorch?{scorch}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {})}));

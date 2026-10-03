@@ -1,3 +1,4 @@
+import {MATERIAL_KEYS,materialLabel} from './material-catalog.js';
 import {capsuleDistance, TREE_LIMITS} from './trees.js';
 
 export const COLLECTION_REACH = TREE_LIMITS.reach;
@@ -21,7 +22,7 @@ function candidateFor(p,q,log,ctx) {
  const distance=log?capsuleDistance(q,eye):dist(p.position,position);
  if(!held&&distance>COLLECTION_REACH)return null;
  const kind=log?'wood':q.kind, amount=log?1:q.amount;
- if(!['wood','stone','gems','apple'].includes(kind))return null;
+ if(![...MATERIAL_KEYS,'apple'].includes(kind))return null;
  const target={id:q.id,type:log?'log':'pickup',kind,amount,position,distance,held,
   full:kind!=='apple'&&(p.resources?.[kind]||0)+amount>INVENTORY_CAP,
   unnecessary:kind==='apple'&&p.hp>=100};

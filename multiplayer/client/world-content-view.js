@@ -1,3 +1,4 @@
+import {MATERIAL_CATALOG,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 import {terrainFrameKey,terrainDirtyEdits,TERRAIN_GRID} from '../shared/terrain.js';
 import * as T from 'three';
 import {createCrystalWall} from './crystal-wall.js';
@@ -19,9 +20,10 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
  const matrix=new T.Matrix4(),dummy=new T.Object3D();
  const lightCandidates=[],cameraPosition=new T.Vector3();
  const pickMaterials={apple:new T.MeshStandardMaterial({color:0xc84826,roughness:.65}),gems:new T.MeshStandardMaterial({color:0x69dada,metalness:.25,roughness:.3,emissive:0x123232}),stone:new T.MeshStandardMaterial({color:0x898879,roughness:.95})};
+ for(const [kind,info] of Object.entries(MATERIAL_CATALOG))if(!pickMaterials[kind])pickMaterials[kind]=new T.MeshStandardMaterial({color:info.color,roughness:.48,metalness:kind.includes('Ore')?.22:.65});
  function authored(name,size=1){const template=templates.get(name);if(!template)return null;const mesh=template.scene.clone(true);const collisionOnly=[];mesh.traverse(n=>{if(n.name.toLowerCase().includes('colonly'))collisionOnly.push(n);});for(const n of collisionOnly)n.removeFromParent();const bounds=new T.Box3().setFromObject(mesh),span=bounds.getSize(new T.Vector3());const scale=size/Math.max(.01,span.y);const root=new T.Group();root.add(mesh);mesh.scale.multiplyScalar(scale);mesh.position.set(-(bounds.min.x+bounds.max.x)/2*scale,-bounds.min.y*scale,-(bounds.min.z+bounds.max.z)/2*scale);return root;}
  function tag(node,id){node.userData.targetId=id;node.traverse(c=>{if(c.isMesh)c.userData.targetId=id;});return node;}
- function remove(node){node.removeFromParent();node.traverse(c=>{for(const m of Array.isArray(c.material)?c.material:[c.material])if(m?.clippingPlanes?.length)m.dispose();});}
+ function remove(node){node.removeFromParent();node.traverse(c=>{for(const m of Array.isArray(c.material)?c.material:[c.material])if(m?.clippingPlanes?.length||c.userData.ownMaterial)m.dispose();});}
  function sync(s){last=s;
   // Rebuild tree kits once per change in the loaded tree asset set (GLBs arrive asynchronously).
   const assetKey=TREE_ASSETS.map(n=>templates.has(n)?1:0).join('');if(assetKey!==treeAssets){treeAssets=assetKey;treeView.reload(templates);}
@@ -33,7 +35,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
     else if(c.kind==='wood'){root=authored('log',.38);if(root){root.rotation.z=Math.PI/2;root.scale.setScalar(2);}}
     else if(templates.has(PICKUP_ASSETS[c.kind])){root=new T.Group();root.add(templates.get(PICKUP_ASSETS[c.kind]).scene.clone(true));root.userData.authoredPickup=true;}
     else root=new T.Mesh(new T.IcosahedronGeometry(c.kind==='apple'?.16:.22,1),pickMaterials[c.kind]||pickMaterials.stone); // until the Opus GLB has loaded
-    if(!root)continue;scene.add(root);tag(root,c.id);e={root,data:c};objects.set(c.id,e);
+    if(!root)continue;if(c.type==='deposit'&&!['stone','meteor'].includes(c.kind)){root.traverse(n=>{if(n.isMesh){n.material=n.material.clone();n.material.color.lerp(new T.Color(DEPOSIT_CATALOG[c.kind]?.color||0xffffff),.65);n.userData.ownMaterial=true;}});}scene.add(root);tag(root,c.id);e={root,data:c};objects.set(c.id,e);
    }e.data=c;const floor=height(c.x,c.z,s.edits);e.root.position.set(c.x,c.type==='bridge'?c.y:floor+(c.type==='pickup'?pickupLift(e):0),c.z);if(c.type==='bridge')e.root.rotation.y=c.yaw;
    if(c.type==='deposit'&&c.hits>0){
     if(!e.fracture){e.fracture=attachFracture(T,e.root,c.id);if(c.kind==='meteor'&&e.fracture)e.light=createGeodeLight({root:e.root,id:c.id,fracture:e.fracture});}

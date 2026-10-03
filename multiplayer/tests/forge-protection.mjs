@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createSimulation,loadSimulation} from '../shared/simulation.js';
+import {baseHeight,terrainHeight} from '../shared/terrain.js';
+import {MATERIAL_KEYS} from '../shared/material-catalog.js';
+const s=createSimulation({seed:41});s.addPlayer({id:'hero'});const state=s.adventureWorld();
+state.edits.push({id:'excavate',kind:'lower',x:0,z:0,radius:6,height:-2},{id:'pile',kind:'raise',x:3,z:0,radius:6,height:2});
+for(let x=-2;x<=2;x+=.25)for(let z=-2;z<=2;z+=.25)assert.equal(terrainHeight(state,x,z,false),baseHeight(x,z));
+state.edits.push({id:'away',kind:'lower',x:12,z:0,radius:6,height:-2});assert.ok(terrainHeight(state,12,0,false)<baseHeight(12,0)-1.9);
+assert.deepEqual(Object.keys(s.snapshot().players[0].resources),MATERIAL_KEYS);
+assert.doesNotThrow(()=>loadSimulation(s.checkpoint()));
+state.shrine.hp=0;state.shrine.disabledUntil=900;s.step();assert.equal(state.shrine.hp,100);
+console.log('PASS permanent forge apron, external deformation, expanded resource save roundtrip');

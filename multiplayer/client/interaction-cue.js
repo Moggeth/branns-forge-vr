@@ -1,3 +1,4 @@
+import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
 // It never mutates the snapshot and never fires actions. Rules mirror the authoritative simulation; each mirrored
@@ -84,7 +85,7 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
     return t<=wall+.05;
   }});
-  const pickupCue = c => make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Lumber':c.kind==='apple'?'Apple':`${PICKUP[c.kind]} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect);
+  const pickupCue = c => make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect);
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
@@ -101,7 +102,7 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     if (log) {
       if (log.t > CUE_RULES.grabReach) return make('log', 'far', log.l.id, 'Loose log', 'Move closer', '');
       const candidate=collectibleCandidate(snapshot,self,log.l.id,{height:ctx.height});
-      if(candidate?.full)return make('log','full',log.l.id,'Lumber','Pack full','');
+      if(candidate?.full)return make('log','full',log.l.id,'Wood','Pack full','');
       // An explicit null means the real scene visibility probe found no collectible.
       if(candidate&&!(aim&&Object.hasOwn(aim,'collectible')))return pickupCue(candidate);
       return null;
@@ -116,7 +117,7 @@ export function decideCue(view, self, snapshot, aim, ctx) {
   for(const q of snapshot.pickups||[]) {
     if(Math.hypot(p[0]-q.x,p[2]-q.z)>CUE_RULES.pickupReach)continue;
     const c=collectibleCandidate(snapshot,self,q.id,{height:ctx.height});
-    if(c?.full)return make('pickup','full',q.id,`${PICKUP[q.kind]} ×${q.amount}`,'Pack full','');
+    if(c?.full)return make('pickup','full',q.id,`${materialLabel(q.kind)} ×${q.amount}`,'Pack full','');
   }
 
   // 4. Forge delivery: only inside DEPOSIT_RANGE while the expedition offers Deliver and the Hero carries an accepted kind.

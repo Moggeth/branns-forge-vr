@@ -83,7 +83,10 @@ export function rawTerrainHeight(state,x,z) {
     else earth+=h;
   }
   // Mountains cannot be excavated into a route outside the playable bowl.
-  const protection=1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1));
+  // Permanent forge: its work apron never moves. Blend over three metres so
+  // excavation outside remains continuous rather than making an invisible cliff.
+  const forgeProtection=smooth(clamp((Math.hypot(x,z)-4)/3,0,1));
+  const protection=(1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1)))*forgeProtection;
   return rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall,-6,6)*protection;
 }
 export function terrainHeight(state,x,z,includeBridges=true) {

@@ -70,8 +70,8 @@ export function queueMeteorReward(state,enemy,ctx,events){
  events.push({kind:'meteor_reward',id:enemy.id,amount:6,resource:'gems',position:[...enemy.position]});
 }
 export function flushMeteorRewards(state,height){
- while(state.meteorRewards?.length&&state.pickups.length<256){
-  const r=state.meteorRewards.shift();state.pickups.push({...r,kind:'gems',y:height(state,r.x,r.z)});
+ while(state.meteorRewards?.length&&state.pickups.length<255){
+  const r=state.meteorRewards.shift();state.pickups.push({...r,id:r.id+'_star',kind:'starOre',y:height(state,r.x,r.z)});state.pickups.push({...r,kind:'gems',y:height(state,r.x,r.z)});
  }
 }
 
@@ -236,7 +236,7 @@ export function stepSettlement(state,ctx,events,recent=[]){
  }
  if(state.tick%60===0){
   const attackers=raiders.filter(e=>Math.hypot(e.position[0],e.position[2])<=7);
-  if(attackers.length){const damage=attackers.length*Math.max(1,5-s.level);state.shrine.hp=Math.max(0,state.shrine.hp-damage);events.push({kind:'forge_damage',amount:damage,position:[...state.shrine.position]});if(!state.shrine.hp)state.shrine.disabledUntil=state.tick+480;}
+  // Central forge is permanent; new invention structures take siege damage instead.
   if(s.defenses){const target=raiders.filter(e=>Math.hypot(e.position[0],e.position[2])<16).sort((a,b)=>Math.hypot(a.position[0],a.position[2])-Math.hypot(b.position[0],b.position[2]))[0];if(target){ctx.damageEnemy(state,target,8*s.defenses+2*s.level,events);events.push({kind:'forge_ward',id:target.id,position:[...target.position],origin:[...state.shrine.position]});}}
  }
  // Ward deaths occurred after the first bookkeeping pass.

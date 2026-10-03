@@ -89,8 +89,19 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='skeleton')dropSkeletonSalvage(state,enemy,ctx,events,owner);for(const limb of PARTS)detach(state,enemy,limb,hit,ctx,events);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
+}
+// Skeleton equipment is useful Iron immediately; ore has its separate Forge path.
+// Coalesce nearby scrap when the world is busy instead of making another draw call.
+function dropSkeletonSalvage(state,enemy,ctx,events,owner){
+ const [x,,z]=enemy.position,near=state.pickups.find(q=>q.kind==='iron'&&Number.isSafeInteger(q.amount)&&q.amount<10&&Math.hypot(q.x-x,q.z-z)<2);
+ let id=near?.id;
+ if(near)near.amount++;
+ else if(state.pickups.length<256){id=ctx.nextId(state,'p');state.pickups.push({id,kind:'iron',amount:1,x,z,y:ctx.terrainHeight(state,x,z)});}
+ else if(owner&&Number.isSafeInteger(owner.resources?.iron)&&owner.resources.iron<999){owner.resources.iron++;id=owner.id;}
+ else return;
+ events.push({kind:'salvage',id,resource:'iron',amount:1,position:[...enemy.position]});
 }
 function segmentDistance(p,a,b){const d=b.map((n,i)=>n-a[i]),l=d.reduce((n,v)=>n+v*v,0),t=l?clamp(p.reduce((n,v,i)=>n+(v-a[i])*d[i],0)/l,0,1):0;return dist(p,a.map((n,i)=>n+d[i]*t));}
 function validContact(m){return vec(m.point)&&unit(m.normal)&&vec(m.localPoint,m.targetId==='world'||m.targetId==='terrain'?200:8)&&quat(m.localQuaternion)&&(m.localNormal===undefined||unit(m.localNormal))&&(m.impactThickness===undefined||thickness(m.impactThickness))&&(m.penetration===undefined||depth(m.penetration))&&(m.boneName===undefined||(typeof m.boneName==='string'&&m.boneName.length<=128))&&(m.partPosition===undefined||vec(m.partPosition))&&(m.partQuaternion===undefined||quat(m.partQuaternion))&&(m.localBounds===undefined||bounds(m.localBounds))&&(m.partPoses===undefined||(m.partPoses&&typeof m.partPoses==='object'&&Object.keys(m.partPoses).length<=6&&Object.entries(m.partPoses).every(([k,v])=>PARTS.includes(k)&&partPose(v))));}
