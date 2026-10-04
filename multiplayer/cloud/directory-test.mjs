@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {WebSocket} from 'ws';
+import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
 const base=process.env.CLOUD_TEST_URL || 'http://127.0.0.1:8792', origin='http://127.0.0.1:5178', sockets=[];
 const started=performance.now();
 async function list(){const r=await fetch(base+'/peer/rooms',{headers:{Origin:origin}});assert.equal(r.status,200);assert.equal(r.headers.get('access-control-allow-origin'),origin);return(await r.json()).rooms;}
@@ -14,8 +15,8 @@ try{
  const host=await connect(),code=host.welcome.room;
  let row=(await list()).find(r=>r.code===code);assert.equal(row.count,1);assert.equal(row.joinable,true);assert.equal(row.hostName,'Directory host');
  assert.ok(!JSON.stringify(row).includes(host.welcome.secret));assert.ok(!JSON.stringify(row).includes(host.welcome.peerId));
- const guests=[];for(let i=0;i<7;i++)guests.push(await connect(code));
- row=(await list()).find(r=>r.code===code);assert.equal(row.count,8);assert.equal(row.status,'full');assert.equal(row.joinable,false);
+ const guests=[];for(let i=0;i<MAX_PLAYERS-1;i++)guests.push(await connect(code));
+ row=(await list()).find(r=>r.code===code);assert.equal(row.count,MAX_PLAYERS);assert.equal(row.maxPlayers,MAX_PLAYERS);assert.equal(row.status,'full');assert.equal(row.joinable,false);
  guests[0].send({type:'checkpoint_ready',revision:10});guests[0].send({type:'ping',at:77});await guests[0].wait(m=>m.type==='pong'&&m.at===77);
  host.send({type:'transfer_host',to:guests[0].welcome.peerId});await guests[0].wait(m=>m.type==='continue_world_offer');guests[0].send({type:'continue_world',epoch:1});await host.wait(m=>m.type==='host_changed');
  row=(await list()).find(r=>r.code===code);assert.equal(row.hostName,'Guest');

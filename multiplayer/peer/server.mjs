@@ -4,6 +4,7 @@ import { mkdirSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
+import {MAX_PLAYERS,SIGNAL_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const number = (name, fallback) => { const value = Number(process.env[name]); return Number.isFinite(value) && value > 0 ? value : fallback; };
@@ -12,7 +13,7 @@ const config = {
   port: number('PEER_PORT', 8789),
   origins: (process.env.PEER_ORIGINS || 'http://127.0.0.1:5178,http://localhost:5178').split(',').map(x => x.trim()).filter(Boolean),
   maxRooms: number('PEER_MAX_ROOMS', 100),
-  maxPeers: Math.min(8, number('PEER_MAX_PEERS', 8)),
+  maxPeers: Math.min(MAX_PLAYERS, Math.floor(number('PEER_MAX_PEERS', MAX_PLAYERS))),
   idleMs: number('PEER_ROOM_IDLE_MS', 30 * 60_000),
   maxAgeMs: number('PEER_ROOM_MAX_AGE_MS', 8 * 60 * 60_000),
   shutdownIdleMs: Number(process.env.PEER_SHUTDOWN_IDLE_MS || 0),
@@ -101,8 +102,10 @@ function onDeparture(peer, ws) {
   log('peer_disconnected', { room: room.code, peerId: peer.id, host: room.hostId === peer.id });
 }
 function bucket(map, key, limit, intervalMs) {
-  const now = Date.now(); const entry = map.get(key) || { tokens: limit, at: now };
-  entry.tokens = Math.min(limit, entry.tokens + (now - entry.at) * limit / intervalMs); entry.at = now;
+  const now = Date.now(); const entry = map.get(key) || { tokens: limit, at: now, limit };
+  // New host edges need an immediate bounded ICE burst, not ten seconds of refill
+  // at the old one-edge capacity. Shrinking membership clamps the budget again.
+  entry.tokens = Math.min(limit, entry.tokens + Math.max(0,limit-(entry.limit??limit)) + (now - entry.at) * limit / intervalMs); entry.at = now; entry.limit = limit;
   map.set(key, entry); if (entry.tokens < 1) return false; entry.tokens -= 1; return true;
 }
 function validName(v) { return typeof v === 'string' && v.trim().length >= 1 && v.trim().length <= 24 && !/[\u0000-\u001f<>]/.test(v); }
@@ -119,7 +122,8 @@ function attach(ws, room, peer) {
 }
 function handle(ws, message) {
   if (!message || typeof message !== 'object' || Array.isArray(message)) return fail(ws, 'bad_message', 'Invalid message.');
-  if (!bucket(ws.rate, 'messages', 120, 10_000)) return ws.close(1008, 'Rate limit');
+  const edges = ws.peer && ws.peer.id === ws.peer.room.hostId ? Math.max(1,Math.min(config.maxPeers-1,[...ws.peer.room.peers.values()].filter(p=>connected(ws.peer.room,p)).length-1)) : 1;
+  if (!bucket(ws.rate, 'messages', SIGNAL_MESSAGES_PER_EDGE * edges, 10_000)) return ws.close(1008, 'Rate limit');
   if (!ws.peer) {
     if (message.type !== 'create' && message.type !== 'join') return fail(ws, 'not_joined', 'Create or join a room first.');
     if (!validName(message.name) || !validRole(message.role)) return fail(ws, 'invalid_identity', 'Choose a valid name and role.');
@@ -148,7 +152,7 @@ function handle(ws, message) {
       const now = Date.now();
       const stale = [...room.peers.values()].filter(p => p.id !== room.hostId && !p.ws && room.offer?.peerId !== p.id && now - (p.offlineAt || 0) >= config.evictOfflineMs)
         .sort((a, b) => (a.offlineAt || 0) - (b.offlineAt || 0))[0];
-      if (!stale) return fail(ws, 'room_full', 'This room has eight players.');
+      if (!stale) return fail(ws, 'room_full', `All ${config.maxPeers} seats are occupied or reconnecting. Choose another world or retry shortly.`);
       room.peers.delete(stale.id);
       broadcast(room, { type: 'peer_left', peerId: stale.id, epoch: room.epoch, removed: true });
       log('peer_evicted', { room: room.code, peerId: stale.id });
@@ -214,7 +218,7 @@ server.on('upgrade', (req, socket, head) => {
   const origin = req.headers.origin;
   if (req.url !== '/peer/ws' || !config.origins.includes(origin)) { socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); socket.destroy(); return; }
   const ip = req.socket.remoteAddress || 'unknown';
-  if (!bucket(ipBuckets, `upgrade:${ip}`, 30, 60_000)) { socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n'); socket.destroy(); return; }
+  if (!bucket(ipBuckets, `upgrade:${ip}`, MAX_PLAYERS * 2, 60_000)) { socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n'); socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, ws => { ws.ip = ip; ws.rate = new Map(); ws.lastPong = Date.now(); wss.emit('connection', ws); });
 });
 wss.on('connection', ws => {

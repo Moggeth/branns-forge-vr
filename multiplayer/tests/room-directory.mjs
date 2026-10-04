@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {roomListing,DIRECTORY_TTL} from '../cloud/room-directory.js';
+import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
 
-const now=Date.now(), peers=Array.from({length:8},(_,i)=>({id:String(i),name:'Player '+i,role:i?'hero':'god',secret:'hidden',revision:123}));
+const now=Date.now(), peers=Array.from({length:MAX_PLAYERS},(_,i)=>({id:String(i),name:'Player '+i,role:i?'hero':'god',secret:'hidden',revision:123,offlineAt:now-6000}));
 const room={code:'01234567',peers,hostId:'0',created:now,secret:'hidden'};
 const listing=roomListing(room,()=>true,now);
 assert.equal(listing.status,'full');assert.equal(listing.joinable,false);
-assert.equal(listing.players.length,8);assert.ok(!JSON.stringify(listing).includes('hidden'));
+assert.equal(listing.players.length,MAX_PLAYERS);assert.equal(listing.maxPlayers,MAX_PLAYERS);assert.ok(!JSON.stringify(listing).includes('hidden'));
 assert.deepEqual(Object.keys(listing.players[0]),['name','role']);
 assert.equal(roomListing(room,id=>id==='0',now).joinable,true);
+assert.equal(roomListing({...room,peers:peers.map(p=>({...p,offlineAt:now}))},id=>id==='0',now).joinable,false,'recently disconnected guests retain their reconnect seats');
 assert.equal(roomListing(room,id=>id==='1',now).status,'waiting');
 assert.equal(roomListing({...room,migrating:true},()=>true,now).joinable,false);
 assert.equal(roomListing(room,()=>false,now),null);

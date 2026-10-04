@@ -1,10 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import {roomListing, DIRECTORY_REFRESH} from './room-directory.js';
+import {MAX_PLAYERS, MAX_PENDING_ROOM_SOCKETS, OFFLINE_SEAT_GRACE_MS, SIGNAL_MESSAGES_PER_EDGE, RELAY_BYTES_PER_EDGE, RELAY_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
 export {ForgeDirectory} from './directory.js';
 
 // One hibernating coordinator per room. Simulation and saves stay on players' devices.
 // Direct WebRTC is preferred; bounded opaque WebSocket frames can bridge restrictive NATs.
-const MAX_PEERS = 8, MAX_AGE = 8 * 3600_000, EMPTY_AGE = 30 * 60_000;
+const MAX_PEERS = MAX_PLAYERS, MAX_AGE = 8 * 3600_000, EMPTY_AGE = 30 * 60_000;
 const token = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, '0')).join('');
 const roomCode = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000).padStart(8, '0');
 const send = (ws, m) => { try { ws?.send(JSON.stringify(m)); } catch { /* departure handled by socket event */ } };
@@ -90,7 +91,7 @@ export class ForgeRoom extends DurableObject {
     const url = new URL(request.url), create = url.searchParams.get('mode') === 'create';
     if (create && (this.room || this.ctx.getWebSockets().length)) return new Response('Occupied', { status: 409 });
     // A bounded pending socket lets the existing client receive a useful room_not_found error.
-    if (this.ctx.getWebSockets().length >= 16) return new Response('Room busy', { status: 429 });
+    if (this.ctx.getWebSockets().length >= MAX_PEERS + MAX_PENDING_ROOM_SOCKETS) return new Response('Room busy; wait a moment and retry.', { status: 429 });
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ opened: Date.now(), mode: create ? 'create' : 'join', code: url.searchParams.get('room'), messages: 0, at: Date.now() });
@@ -130,7 +131,8 @@ export class ForgeRoom extends DurableObject {
     if (!m || typeof m !== 'object' || Array.isArray(m)) return error(ws, 'bad_message', 'Invalid message.');
     const a = ws.deserializeAttachment(), now = Date.now();
     if (now - a.at > 10000) { a.at = now; a.messages = 0; }
-    if (m.type !== 'relay') { if (++a.messages > 120) return ws.close(1008, 'Rate limit'); ws.serializeAttachment(a); }
+    const edges = a.id === this.room?.hostId ? Math.max(1,Math.min(MAX_PEERS-1,this.sockets.size-1)) : 1;
+    if (m.type !== 'relay') { if (++a.messages > SIGNAL_MESSAGES_PER_EDGE * edges) return ws.close(1008, 'Rate limit'); ws.serializeAttachment(a); }
     if (!a.id) {
       if (!['create', 'join'].includes(m.type)) return error(ws, 'not_joined', 'Create or join first.');
       if (typeof m.name !== 'string' || !m.name.trim() || m.name.trim().length > 24 || /[\u0000-\u001f<>]/.test(m.name) || !['hero', 'god'].includes(m.role)) return error(ws, 'invalid_identity', 'Choose a valid name and role.');
@@ -148,8 +150,8 @@ export class ForgeRoom extends DurableObject {
         return this.attach(ws, p);
       }
       if (this.peers().length >= MAX_PEERS) {
-        const stale = this.peers().filter(p => p.id !== r.hostId && p.id !== r.offer?.peerId && !this.online(p.id) && now - p.offlineAt >= 5000).sort((a, b) => a.offlineAt - b.offlineAt)[0];
-        if (!stale) return error(ws, 'room_full', 'This room has eight players.');
+        const stale = this.peers().filter(p => p.id !== r.hostId && p.id !== r.offer?.peerId && !this.online(p.id) && now - p.offlineAt >= OFFLINE_SEAT_GRACE_MS).sort((a, b) => a.offlineAt - b.offlineAt)[0];
+        if (!stale) return error(ws, 'room_full', `All ${MAX_PEERS} seats are occupied or reconnecting. Choose another world or retry shortly.`);
         r.peers = r.peers.filter(p => p !== stale); this.broadcast({ type: 'peer_left', peerId: stale.id, epoch: r.epoch, removed: true });
       }
       const p = { id: token().slice(0, 16), secret: token(), name: m.name.trim(), role: m.role, desktop: m.desktop === true, revision: -1, offlineAt: 0 };
@@ -172,11 +174,10 @@ export class ForgeRoom extends DurableObject {
       if (m.type === 'signal' && !['offer', 'answer', 'ice'].includes(m.signal?.type)) return error(ws, 'bad_message', 'Invalid signal.');
       if (m.type === 'relay') {
         if (typeof m.frame !== 'string' || m.frame.length > 25000) return ws.close(1009, 'Relay frame too large');
-        // Keep a bad client bounded. A host has seven edges; guests have one. No unbounded queues.
+        // Scale the host's bounded budget to its actual online edges; guests still have one.
         if (now - (a.relayAt || 0) >= 1000) { a.relayAt = now; a.relayBytes = 0; a.relayMessages = 0; }
         a.relayBytes = (a.relayBytes || 0) + m.frame.length; a.relayMessages = (a.relayMessages || 0) + 1;
-        const edges = p.id === r.hostId ? 7 : 1;
-        if (a.relayBytes > edges * 2 * 1024 * 1024 || a.relayMessages > edges * 200) return ws.close(1008, 'Relay budget exceeded');
+        if (a.relayBytes > edges * RELAY_BYTES_PER_EDGE || a.relayMessages > edges * RELAY_MESSAGES_PER_EDGE) return ws.close(1008, 'Relay budget exceeded');
         ws.serializeAttachment(a);
       }
       send(this.sockets.get(m.to), { type: m.type, from: p.id, epoch: r.epoch, ...(m.type === 'signal' ? { signal: m.signal } : m.type === 'relay' ? { frame: m.frame } : {}) });
