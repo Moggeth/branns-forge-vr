@@ -18,6 +18,12 @@ const gltf = await new GLTFLoader().loadAsync(q.get('glb') || '/assets/crossbow.
 const recoil = +(q.get('recoil') || 0);
 const {visual} = prepareAsset(gltf, 'crossbow'); const holder = new THREE.Group(); holder.add(visual); scene.add(holder);
 if (q.get('sight') !== '0') createSiegebirdSight(THREE, visual);
+if (q.get('uv')) { // UV checker on the named materials (comma list) to judge texel density and seams
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = (x + y) % 2 ? '#e8e8e8' : (x < 8 ? '#d0402a' : '#2a60d0'); g.fillRect(x * 16, y * 16, 16, 16); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
+  const names = q.get('uv').split(','); visual.traverse(o => { if (o.isMesh && names.some(n => o.material.name.includes(n))) { o.material = o.material.clone(); o.material.map = tex; o.material.color.set(0xffffff); o.material.metalness = 0; o.material.roughness = .6; } });
+}
 updateWeaponPresentation(visual, 'crossbow', {recoil, time: 0});
 const zoom = +(q.get('zoom') || 1);
 const box = new THREE.Box3().setFromObject(visual), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() * .5;
