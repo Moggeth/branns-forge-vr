@@ -45,6 +45,7 @@ import {createCombatView} from './combat-view.js';
 import {createEntView} from './ent-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
 import {createSpellPresentation} from './spell-presentation.js';
+import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {earthLineEdits} from '../shared/earth-spells.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
@@ -299,6 +300,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:createEmberdewModel(),animations:[]});weaponModels.set('flask',flaskModel);
   const bottleFx=attachEmberdew({root:flaskModel}),bottlePosition=new THREE.Vector3(),bottleRotation=new THREE.Quaternion();
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
+  const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>snapshot.tick??0,height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   let specialSwing=null, waistPouch=null;
@@ -779,6 +781,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     expedition.handleEvent(event);
     const rewardSound=!!rewards.handle(event);
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
+    skeletonFx.handle(event);
     if(event?.by!==undefined&&event.by!==playerId){const a=actors.get(`p:${event.by}`);if(a?.visual.userData.hero)heroView.event(a.visual,event,a.data);} // attributed result -> remote swing/recoil
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
@@ -1271,6 +1274,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     golemFx.update(actors,renderTick,dt,now/1000);
     entView.update(actors,renderTick,dt);entView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
+    goldenFlight.length=0;for(const q of snapshot.projectiles||[])if(q.golden){const node=combat.projectiles.get(q.id);if(node?.visible!==false)goldenFlight.push({id:q.id,position:node?node.position:new THREE.Vector3().fromArray(q.position)});}
+    skeletonFx.update(dt,{camera,golden:goldenFlight,viewportHeight:renderer.domElement.height||800});
     if(tool==='limb'&&!renderer.xr.isPresenting&&role==='hero')combat.poseLocalHeld?.(playerId,weaponAnchor);
     tickPhysicalMelee(now,dt);
     const heldRoot=tool==='limb'?combat.heldLimbRoot(playerId):axeModel;
@@ -1412,7 +1417,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

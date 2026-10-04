@@ -376,89 +376,143 @@ HEAD_C = V((0, 0.0, 1.55))
 
 
 SKULL_R = 0.16
-EYES = [V((s * 0.43, -0.84, -0.2)).normalized() for s in (-1, 1)]
-NOSE = V((0, -0.87, -0.5)).normalized()
+# Cartoon skull (Mitch, 2026-10-04: "keep the goofy cartoonish skull, but polished"): a big round bobble-head with huge
+# dark eye sockets, soft brows, a rounded muzzle carrying chunky teeth and a wide hinged jaw. Friendly, not grim.
+EYES = [V((s * 0.47, -0.86, 0.13)).normalized() for s in (-1, 1)]
+NOSE = V((0, -0.97, -0.16)).normalized()
+MUZZLE = V((0, -0.86, -0.5)).normalized()
+EYE_RX, EYE_RY, EYE_TILT = 0.4, 0.37, 0.2  # socket half-angles (radians) and the droop of the outer corner
+UPPER_EL, LOWER_EL, SMILE = -0.42, -0.6, 0.09  # elevation (sin) of the upper teeth and the jaw bar; the corners lift
 
 
-def skull_point(d, carve_on=True, extra=0.0):
-    """Cranium surface along unit direction d: returns (position, carve depth)."""
-    d = d.normalized()
-    x, y, z = d
-    m = 1.0 + extra
-    sx, sy, sz = 0.97, 1.07, 0.95
-    if z < -0.25:  # tuck the base of the cranium in behind the face
-        q = min(1.0, (-0.25 - z) / 0.75)
-        sx *= 1 - 0.3 * q; sy *= 1 - 0.12 * q; sz *= 1 - 0.25 * q
-    m -= 0.045 * math.exp(-((abs(x) - 0.85) ** 2 + (z + 0.05) ** 2 + (y + 0.3) ** 2) / 0.05)  # temples
-    m += 0.035 * math.exp(-((y - 0.8) ** 2 + (z - 0.1) ** 2) / 0.15)  # occiput
-    carve = 0.0
-    if carve_on:
-        for e in EYES:
-            a = math.acos(max(-1.0, min(1.0, d.dot(e))))
-            t = 1 - min(1.0, max(0.0, (a - 0.2) / 0.2))
-            carve = max(carve, 0.36 * t * t * (3 - 2 * t))
-        an = math.acos(max(-1.0, min(1.0, d.dot(NOSE))))
-        t = 1 - min(1.0, max(0.0, (an - 0.06) / 0.12))
-        carve = max(carve, 0.2 * t * t * (3 - 2 * t))
-    m -= carve
-    return HEAD_C + V((x * sx, y * sy, z * sz)) * (SKULL_R * m), carve
+def _g(d, c, w):
+    """Smooth angular bump on the unit sphere: 1 at c, falling off with angular width ~sqrt(2w)."""
+    return math.exp(-(1 - d.dot(c)) / w)
 
 
-def around(e, rho, phi):
-    """Direction at angle rho from axis e, at azimuth phi (0 = outward/lateral, pi/2 = up)."""
+def eye_frame(e):
     side = V((1 if e.x >= 0 else -1, 0, 0))
     side = (side - e * side.dot(e)).normalized()
     up = e.cross(side).normalized()
     if up.z < 0: up = -up
+    return side, up
+
+
+def eye_r(d, e):
+    """Elliptical socket coordinate: <1 inside the socket. The outer corner droops for a goofy, hangdog look."""
+    side, up = eye_frame(e)
+    if d.dot(e) <= 0: return 9.0
+    u, v = d.dot(side), d.dot(up)
+    c, s = math.cos(EYE_TILT), math.sin(EYE_TILT)
+    u, v = u * c + v * s, -u * s + v * c
+    return math.hypot(u / math.sin(EYE_RX), v / math.sin(EYE_RY))
+
+
+def face_dir(a, el):
+    """Direction across the face: azimuth a from straight ahead (-Y), elevation given as sin."""
+    ce = math.sqrt(1 - el * el)
+    return V((math.sin(a) * ce, -math.cos(a) * ce, el))
+
+
+def skull_point(d, carve_on=True, extra=0.0):
+    """Cranium surface along unit direction d: returns (position, carve depth, mouth shade)."""
+    d = d.normalized()
+    x, y, z = d
+    m = 1.0 + extra
+    sx, sy, sz = 1.0, 0.97, 0.98
+    if z < -0.45:  # the base tucks under, so the head sits on the neck like a ball on a stick
+        q = min(1.0, (-0.45 - z) / 0.55)
+        sx *= 1 - 0.16 * q; sy *= 1 - 0.06 * q
+    m += 0.06 * _g(d, MUZZLE, 0.06)  # rounded muzzle carrying the top teeth
+    m += 0.02 * math.exp(-((y - 0.75) ** 2 + (z - 0.2) ** 2) / 0.2)  # full back of the head
+    for e in EYES:
+        side, up = eye_frame(e)
+        brow = (e * math.cos(0.47) + (up * 0.95 - side * 0.3).normalized() * math.sin(0.47)).normalized()
+        cheek = (e * math.cos(0.46) + (-up * 0.75 + side * 0.65).normalized() * math.sin(0.46)).normalized()
+        m += 0.03 * _g(d, cheek, 0.01)
+    carve = 0.0
+    if carve_on:
+        for e in EYES:
+            r = eye_r(d, e)  # the cranium falls away under the socket bowl (build_skull), which owns the crisp rim
+            t = min(1.0, max(0.0, (0.95 - r) / 0.1))
+            carve = max(carve, 0.32 * t * t * (3 - 2 * t))
+        carve = max(carve, 0.05 * _g(d, NOSE, 0.004))
+    m -= carve
+    # mouth: the band behind the teeth, dark so an open jaw shows a mouth rather than more bone
+    a = math.atan2(x, -y)
+    lift = SMILE * (a / 0.85) ** 2
+    mouth = 1.0 if (abs(a) < 1.0 and LOWER_EL + lift - 0.02 < z < UPPER_EL + lift - 0.035) else 0.0
+    return HEAD_C + V((x * sx, y * sy, z * sz)) * (SKULL_R * m), carve, mouth
+
+
+def around(e, rho, phi):
+    """Direction at angle rho from axis e, at azimuth phi (0 = outward/lateral, pi/2 = up)."""
+    side, up = eye_frame(e)
     return (e * math.cos(rho) + (side * math.cos(phi) + up * math.sin(phi)) * math.sin(rho)).normalized()
 
 
+def chiclet(P, c, w, d, h, yaw, tilt=0.0, tint=(0.97, 0.94, 0.85)):
+    """One rounded cartoon tooth: a soft pillow (superellipsoid), slightly narrower at the root."""
+    out = bmesh.ops.create_uvsphere(P.bm, u_segments=8, v_segments=6, radius=1.0)
+    rot = Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(tilt, 4, 'X')
+    sq = lambda t: math.copysign(abs(t) ** 0.5, t)
+    vs = []
+    for v in out['verts']:
+        q = v.co
+        v.co = V(c) + rot @ V((sq(q.x) * w, sq(q.y) * d, sq(q.z) * h))
+        vs.append(v)
+    P._tag(vs, tint=tint)
+
+
+def tooth_row(P, el, n, span, h, up, skip=(), odd=None, sink=0.006):
+    """Chunky teeth sitting on the face surface along elevation el; up=True hangs them from the upper jaw."""
+    for i in range(n):
+        if i in skip: continue
+        u = (i - (n - 1) / 2) / ((n - 1) / 2)
+        a = u * span
+        d = face_dir(a, el + SMILE * u * u)
+        p = skull_point(d, carve_on=False)[0]
+        nrm = (p - HEAD_C).normalized()
+        w = 0.0135 * (1.1 - 0.25 * abs(u))
+        hh = h * (1.0 - 0.2 * abs(u)) * (1.2 if odd == i else 1.0)
+        centre = p - nrm * sink + V((0, 0, -hh * 0.55 if up else hh * 0.55))
+        tint = (0.99, 0.96, 0.88) if odd != i else (0.88, 0.8, 0.6)
+        chiclet(P, centre, w, 0.0095, hh, a, tilt=-0.12 if up else 0.1, tint=tint)
+
+
 def build_skull(P):
-    """Big, readable stylised skull: domed cranium, deep sockets framed by bony rims, cheekbones, maxilla and teeth."""
+    """Big round cartoon skull: deep dark sockets with a pinpoint glow, soft brows and cheeks, heart nose, chunky teeth."""
     P.use(bone='Head', mat='bone', tint=BONE_TINT)
     c = HEAD_C
-    out = bmesh.ops.create_uvsphere(P.bm, u_segments=36, v_segments=24, radius=1.0)
+    out = bmesh.ops.create_uvsphere(P.bm, u_segments=52, v_segments=34, radius=1.0)
     verts = out['verts']
     shade = {}
     for v in verts:
-        p, carve = skull_point(v.co)
-        shade[v] = carve
+        p, carve, mouth = skull_point(v.co)
+        shade[v] = (carve, mouth)
         v.co = p
     P._tag(verts)
-    for v in verts:
-        k = 1 - min(1.0, shade[v] / 0.22) * 0.88
-        v[P.lc] = (k, k * 0.96, k * 0.9, 1)
-    # bony rims hugging the socket edge (brow heavier above, cheekbone below), then the zygomatic arch
+    for v in verts:  # crisp near-black sockets like the old cartoon skull; nose and mouth are warm shadow
+        carve, mouth = shade[v]
+        t = min(1.0, max(0.0, (carve - 0.02) / 0.06))
+        k = 1 - (t * t * (3 - 2 * t)) * 0.97
+        k = min(k, 1 - 0.9 * mouth)
+        v[P.lc] = (k, k * 0.95, k * 0.88, 1)
     for e in EYES:
-        pts, rs = [], []
-        for k in range(16):
-            phi = k / 16 * math.tau
-            p, _ = skull_point(around(e, 0.4, phi), carve_on=False, extra=0.0)
-            pts.append(p)
-            rs.append(0.0075 + 0.007 * max(0.0, math.sin(phi)) ** 2 + 0.003 * max(0.0, -math.sin(phi)))
-        P.tube(pts, rs, seg=6, closed=True, flat=(1.0, 0.8))
-        arch = [skull_point(around(e, rho, -0.35 - rho * 0.6), carve_on=False, extra=0.03)[0] for rho in (0.42, 0.62, 0.82, 1.0)]
-        P.tube(arch, [0.011, 0.01, 0.009, 0.008], seg=6, flat=(0.6, 1.3))
-        # eye light deep in the socket (own material so the game can tint / pulse it)
-        P.sphere(skull_point(e, carve_on=False)[0] - (skull_point(e, carve_on=False)[0] - c) * 0.36, 0.015, scale=(1, 0.6, 1.15), seg=8, rings=5, mat='glow')
-    # nasal aperture: dark inverted heart set into the face
-    nos = ccw([(0.0, 0.0), (0.016, 0.012), (0.022, 0.034), (0.008, 0.05), (0.0, 0.042), (-0.008, 0.05), (-0.022, 0.034), (-0.016, 0.012)])
-    P.prism(nos, -0.004, 0.012, xf=Matrix.Translation(c + V((0, -0.145, -0.098))) @ Matrix.Rotation(-0.35, 4, 'X'), tint=(0.12, 0.1, 0.08))
-    # maxilla: rounded upper jaw block carrying the top teeth
-    out = bmesh.ops.create_uvsphere(P.bm, u_segments=16, v_segments=10, radius=1.0)
-    vs = []
-    for v in out['verts']:
-        d = v.co.normalized()
-        v.co = c + V((d.x * 0.064, d.y * 0.042 - 0.1, max(d.z, -0.6) * 0.032 - 0.122))
-        vs.append(v)
-    P._tag(vs)
-    for i in range(10):
-        u = (i - 4.5) / 4.5
-        a = u * 1.0
-        x = math.sin(a) * 0.061
-        y = -math.cos(a) * 0.058 - 0.105 + 0.0
-        P.box(c + V((x, y, -0.152)), (0.0125, 0.012, 0.024 if abs(u) < 0.5 else 0.019), rot=Matrix.Rotation(a, 4, 'Z'), bevel=0.003, smooth=True,
-              tint=(0.98, 0.95, 0.86) if i != 6 else (0.55, 0.48, 0.36))
+        socket_bowl(P, e)
+        # a heavy cartoon brow ridge, low over the inner corner: grumpy-goofy, like the old skull's brow bars
+        side, up = eye_frame(e)
+        brow = [skull_point(around(e, 0.5 + 0.06 * abs(t), math.pi / 2 + t * 0.85 + 0.12), carve_on=False)[0] for t in np.linspace(-1, 1, 9)]
+        P.tube(brow, [0.007 + 0.009 * math.cos(t * 1.2) for t in np.linspace(-1, 1, 9)], seg=8, flat=(0.8, 1.15))
+        # a small warm pupil of light deep in each socket (own material: the game tints and pulses it)
+        p = skull_point(e, carve_on=False)[0]
+        P.sphere(c + (p - c) * 0.8, 0.0115, scale=(1, 0.5, 1.15), seg=10, rings=7, mat='glow')
+    # nose: an inverted heart set into the face (dark inset)
+    nos = ccw([(0.0, 0.0), (0.023, 0.016), (0.03, 0.043), (0.014, 0.064), (0.0, 0.053), (-0.014, 0.064), (-0.03, 0.043), (-0.023, 0.016)])
+    np_ = skull_point(NOSE, carve_on=False)[0]
+    P.prism(nos, -0.004, 0.02, xf=Matrix.Translation(np_ + V((0, -0.002, -0.03))) @ Matrix.Rotation(-0.3, 4, 'X'), smooth=True, tint=(0.12, 0.09, 0.07))
+    # upper teeth in a slight smile along the muzzle; one is a little long and yellowed
+    tooth_row(P, UPPER_EL, 8, 0.8, 0.019, True, odd=5, sink=0.001)
     # cervical vertebrae under the skull
     for k in range(3):
         z = 1.405 + k * 0.03
@@ -466,22 +520,60 @@ def build_skull(P):
         P.box((0, 0.067, z), (0.016, 0.03, 0.016), bevel=0.004)
 
 
+def socket_bowl(P, e, n=32, rings=5):
+    """A smooth dark bowl for the eye: crisp elliptical rim (n points) curling into a deep, near-black hollow."""
+    c = HEAD_C
+    grid = []
+    for i in range(rings + 1):
+        r = 1.0 - i / rings * 0.995
+        depth = 0.004 - 0.62 * (1 - r) ** 1.6 - 0.02 * (1 - r)  # lip sits just proud of the dome, then dives
+        k = 1.0 if i == 0 else max(0.04, 0.14 - i * 0.06)
+        ring = []
+        for d in socket_outline(e, r, n):
+            p = skull_point(d, carve_on=False)[0]
+            v = P.bm.verts.new(c + (p - c) * (1 + depth))
+            v[P.lc] = (k, k * 0.95, k * 0.88, 1)
+            ring.append(v)
+        grid.append(ring)
+    for i in range(rings):
+        for j in range(n):
+            P.bm.faces.new((grid[i][j], grid[i][(j + 1) % n], grid[i + 1][(j + 1) % n], grid[i + 1][j]))
+    cen = P.bm.verts.new(sum((v.co for v in grid[-1]), V()) / n)
+    for j in range(n): P.bm.faces.new((grid[-1][j], grid[-1][(j + 1) % n], cen))
+    vs = [v for ring in grid for v in ring] + [cen]
+    cols = {v: tuple(v[P.lc]) for v in vs[:-1]}
+    P._tag(vs)
+    for v, col in cols.items(): v[P.lc] = col
+    cen[P.lc] = (0.05, 0.047, 0.044, 1)
+
+
+def socket_outline(e, r, n):
+    side, up = eye_frame(e)
+    c, s = math.cos(EYE_TILT), math.sin(EYE_TILT)
+    out = []
+    for k in range(n):
+        t = k / n * math.tau
+        u, v = math.cos(t) * math.sin(EYE_RX) * r, math.sin(t) * math.sin(EYE_RY) * r
+        u, v = u * c - v * s, u * s + v * c
+        out.append((e * math.sqrt(max(0.0, 1 - u * u - v * v)) + side * u + up * v).normalized())
+    return out
+
+
 def build_jaw(P):
-    """Mandible on its own joint (HeadJaw) so the game can chatter, gape and clack it."""
+    """Wide cartoon mandible on its own joint (HeadJaw) so the game can chatter, gape and clack it."""
     P.use(bone='HeadJaw', mat='bone')
     c = HEAD_C
-    pts = []
-    for a in np.linspace(-1.35, 1.35, 11):
-        pts.append(c + V((math.sin(a) * 0.068, -math.cos(a) * 0.066 - 0.088, -0.19 - 0.012 * math.cos(a))))
-    P.tube(pts, 0.016, seg=7, flat=(1.4, 0.75), up=(0, 0, 1))
-    P.sphere(c + V((0, -0.158, -0.2)), 0.02, scale=(1.3, 0.8, 0.9))  # chin
-    for s in (-1, 1):  # rami up to the hinge under the cheekbones
-        base = pts[0] if s < 0 else pts[-1]
-        P.tube([base, base + V((s * 0.004, 0.012, 0.04)), c + V((s * 0.075, -0.035, -0.11))], [0.015, 0.013, 0.012], seg=6, flat=(0.6, 1.25))
-    for i in range(8):
-        u = (i - 3.5) / 3.5
-        a = u * 0.95
-        P.box(c + V((math.sin(a) * 0.056, -math.cos(a) * 0.055 - 0.093, -0.17)), (0.0125, 0.012, 0.02), rot=Matrix.Rotation(a, 4, 'Z'), bevel=0.003, smooth=True, tint=(0.97, 0.94, 0.85))
+    pts, rs = [], []
+    for a in np.linspace(-1.08, 1.08, 15):
+        p = skull_point(face_dir(a, LOWER_EL + SMILE * (a / 0.85) ** 2 * 0.9), carve_on=False, extra=0.006 + 0.03 * math.cos(a) ** 2)[0]
+        pts.append(p); rs.append(0.0095 + 0.006 * math.cos(a) ** 2)
+    P.tube(pts, rs, seg=10, flat=(1.3, 0.75), up=(0, 0, 1))
+    chin = skull_point(face_dir(0, LOWER_EL - 0.05), carve_on=False, extra=0.07)[0]
+    P.sphere(chin, 0.022, scale=(1.5, 0.75, 0.8), seg=12, rings=8)  # round chin
+    for end in (pts[0], pts[-1]):  # rounded condyles where the jaw tucks into the cheeks
+        P.sphere(end, 0.0115, scale=(1, 1, 0.9), seg=8, rings=6)
+    # lower teeth meet the upper row when the mouth is shut (one gap for character)
+    tooth_row(P, LOWER_EL + 0.04, 8, 0.76, 0.013, False, skip=(2,), sink=0.0)
 
 
 def build_torso(P):
@@ -664,7 +756,7 @@ def gear_moss_cap(P):
 
 
 def gear_iron_helm(P):
-    """Rustguard: dented iron kettle-helm with a brim and a nasal bar."""
+    """Rustguard: dented iron kettle-helm with a brim and a stub of nasal bar, worn high so the big eyes show."""
     P.use(bone='Head', mat='iron', tint=(1, 1, 1))
     out = bmesh.ops.create_uvsphere(P.bm, u_segments=24, v_segments=12, radius=1.0)
     vs = []
@@ -672,14 +764,14 @@ def gear_iron_helm(P):
         d = v.co.normalized()
         z = max(d.z, -0.05)
         dent = 1 - 0.06 * math.exp(-((d.x - 0.5) ** 2 + (d.y + 0.3) ** 2 + (d.z - 0.6) ** 2) / 0.05)
-        v.co = HEAD_C + V((d.x * 0.165, d.y * 0.175, z * 0.155 + 0.03)) * dent
+        v.co = HEAD_C + V((d.x * 0.165, d.y * 0.175, z * 0.155 + 0.075)) * dent
         vs.append(v)
     P._tag(vs, smooth=True)
-    P.tube([HEAD_C + V((0.19 * math.cos(a), 0.2 * math.sin(a) + 0.005, 0.035 - 0.012 * math.cos(a * 2))) for a in np.linspace(0, math.tau, 24, endpoint=False)],
+    P.tube([HEAD_C + V((0.19 * math.cos(a), 0.2 * math.sin(a) + 0.005, 0.08 - 0.012 * math.cos(a * 2))) for a in np.linspace(0, math.tau, 24, endpoint=False)],
            0.012, seg=6, closed=True, flat=(2.6, 0.5), up=(0, 0, 1))  # brim
-    P.box(HEAD_C + V((0, -0.178, -0.005)), (0.022, 0.012, 0.11), rot=Matrix.Rotation(-0.08, 4, 'X'), bevel=0.004, smooth=True)  # nasal
+    P.box(HEAD_C + V((0, -0.182, 0.07)), (0.02, 0.012, 0.06), rot=Matrix.Rotation(-0.25, 4, 'X'), bevel=0.004, smooth=True)  # nasal
     for a in np.linspace(0, math.tau, 10, endpoint=False):
-        P.sphere(HEAD_C + V((0.168 * math.cos(a), 0.176 * math.sin(a), 0.06)), 0.008, seg=6, rings=4)
+        P.sphere(HEAD_C + V((0.168 * math.cos(a), 0.176 * math.sin(a), 0.105)), 0.008, seg=6, rings=4)
 
 
 def drape(P, rows, cols=22, ragged=0.0, seed=1):
