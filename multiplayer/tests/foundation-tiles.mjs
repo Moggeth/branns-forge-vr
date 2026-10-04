@@ -1,3 +1,4 @@
+import {groundRects,refreshGround} from '../client/ground-refresh.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
@@ -42,9 +43,10 @@ for(let dx=-2.8;dx<=2.8;dx+=.2)for(let dz=-2.8;dz<=2.8;dz+=.2){artRay.set(new TH
 assert.ok(surfaceSamples>700);assert.ok(minClearance>.015);
 // Execute the actual ground mesh rebuild closure, not a parallel mesh implementation.
 const game=readFileSync(new URL('../client/game.js',import.meta.url),'utf8');
-const body=game.slice(game.indexOf('  function rebuildGround() {'),game.indexOf('  // Stone/canopy'));
+const body=game.slice(game.indexOf('  function rebuildGround('),game.indexOf('  // Stone/canopy'));
 const geometry=new THREE.PlaneGeometry(120,120,160,160);geometry.rotateX(-Math.PI/2);
 const env={snapshot:s,terrainSignature:null,terrainFoundationKey:null,terrainPreviousEdits:[],terrainPreviousTick:Infinity,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,groundGeometry:geometry,fireVisual:{invalidateTerrain(){}},terrainRay:{invalidateTerrain(){}},worldMatricesAt:0,mountainArena:{sync(){}},alpineForest:{sync(){}},meadow:{terrainChanged(){}},frameMetrics:{record(){}},orchard:{groundChanged(){}},heightAt:(a,b)=>sampler.height(a,b)};
+Object.assign(env,{terrainShownTick:()=>env.snapshot.tick??Infinity,groundRects,refreshGround,terrainLive:false,meadowPending:new Map(),flushMeadow(){},content:{terrainMoved(){}}});
 const rebuild=new Function('env',`with(env){${body};return rebuildGround;}`)(env),mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial()),ray=new THREE.Raycaster();mesh.updateMatrixWorld(true);
 function meshParity(){sampler.setState(s);rebuild();for(const [dx,dz]of [[0,0],[2.8,2.8],[3.6,1.2],[4.8,0]]){ray.set(new THREE.Vector3(x+dx,100,z+dz),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(mesh)[0];assert.ok(hit);assert.ok(Math.abs(hit.point.y-terrainRenderHeight(s,x+dx,z+dz,false))<1e-6);}}
 meshParity();const oldKey=foundationTerrainKey(s);damageInvention(s,tile.id,70,'enemy',[],'rivals');assert.equal(foundationTerrainKey(s),oldKey);assert.equal(sampler.setState(s),false);meshParity();assert.ok(Math.abs(sampler.height(x,z)-y)<1e-6);

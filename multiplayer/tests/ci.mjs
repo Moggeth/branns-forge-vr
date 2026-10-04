@@ -29,7 +29,7 @@ const suite = [
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
-  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','remains-physics',
+  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','remains-physics',
   'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall',
 ];
 

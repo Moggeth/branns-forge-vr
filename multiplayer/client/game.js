@@ -4,12 +4,13 @@ import {createSiegebirdAim} from './siegebird-aim.js';
 import {createInventionView} from './invention-view.js';
 import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo} from '../shared/inventions.js';
 import {createPresentationClock} from './presentation-clock.js';
+import {groundRects,refreshGround} from './ground-refresh.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
 import {createPickupHighlight} from './pickup-highlight.js';
 import {nearestCollectible} from '../shared/collection-target.js';
 import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} from '../shared/trees.js';
-import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
+import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,hasActiveTerrain} from '../shared/terrain.js';
 import {createStartingWorld} from './starting-world.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
@@ -99,6 +100,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const heightAt=(x,z,edits=snapshot.edits)=>edits===snapshot.edits?terrainSampler.height(x,z):terrainHeight(x,z,edits,snapshot.tick??Infinity);
   const terrainRay=createTerrainRaycaster({height:(x,z)=>heightAt(x,z)});
   const presentationClock=createPresentationClock(); let renderTick=0, pendingCastPreview=null;
+  // Terrain/earth-spell display tick (see liveTerrain).
+  const terrainShownTick=()=>{const t=snapshot.tick;if(!Number.isFinite(t))return Infinity;return Math.abs(renderTick-t)<=12?renderTick:t;};
   let contactFrame=0,worldMatricesAt=-1,worldTargets=[];
   let terrainPreviousEdits=[],terrainPreviousTick=Infinity;
   let yaw = 0, pitch = 0, jumpPending = false, verticalSpeed = 0, grounded = true;
@@ -308,7 +311,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const bottleFx=attachEmberdew({root:flaskModel}),bottlePosition=new THREE.Vector3(),bottleRotation=new THREE.Quaternion();
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
-  const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>snapshot.tick??0,height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
+  const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   let specialSwing=null, waistPouch=null;
   function selfPlayer(){return snapshot.players.find(p=>p.id===playerId);}
@@ -367,24 +370,41 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(canvas);
-  function rebuildGround() {
-    const foundations=foundationTerrainKey(snapshot),foundationChanged=foundations!==terrainFoundationKey;
-    const signature = terrainFrameKey(snapshot.edits,snapshot.tick)+'|'+foundations;
-    if (signature === terrainSignature) return;
+  // Terrain is drawn at the presentation clock, not the snapshot tick: rising walls, tearing chasms and sinking
+  // segments move every frame (snapshots arrive at 20 Hz). Within a tick or two of the authority, so collision
+  // still matches what is seen; far off (rewind, room change, no clock yet) it falls back to the snapshot tick.
+  let terrainLive=false;const meadowPending=new Map();
+  // Grass refills are whole-buffer uploads, so live frames batch their dirty kernels and the meadow catches up on
+  // each snapshot (grass on moving earth is cleared by the disturbance mask anyway).
+  function flushMeadow(){if(!meadowPending.size)return;meadow.terrainChanged({edits:snapshot.edits,terrainTick:terrainPreviousTick,dirty:[...meadowPending.values()]});meadowPending.clear();}
+  function liveTerrain() {
+    const tick=terrainShownTick(),active=hasActiveTerrain(snapshot.edits,tick);
+    if(!active&&!terrainLive)return;terrainLive=active;
+    terrainSampler.setState({...snapshot,tick});rebuildGround(tick,true);
+  }
+  function rebuildGround(tick=terrainShownTick(),live=false) {
+    const foundations=live?terrainFoundationKey:foundationTerrainKey(snapshot),foundationChanged=foundations!==terrainFoundationKey;
+    const signature = terrainFrameKey(snapshot.edits,tick)+'|'+foundations;
+    if (signature === terrainSignature) {if(!live)flushMeadow();return;}
     const terrainStarted=performance.now();
-    const dirty=terrainSignature&&!foundationChanged?terrainDirtyEdits(terrainPreviousEdits,snapshot.edits,terrainPreviousTick,snapshot.tick):null;
-    terrainPreviousEdits=snapshot.edits;terrainPreviousTick=snapshot.tick;
+    const dirty=terrainSignature&&!foundationChanged?terrainDirtyEdits(terrainPreviousEdits,snapshot.edits,terrainPreviousTick,tick):null;
+    terrainPreviousEdits=snapshot.edits;terrainPreviousTick=tick;
     terrainSignature = signature;terrainFoundationKey=foundations;
-    fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;mountainArena.sync(snapshot);alpineForest.sync();
-    const positions = groundGeometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) {const x=positions.getX(i),z=positions.getZ(i);if(!dirty||dirty.some(e=>Math.hypot(x-e.x,z-e.z)<=e.radius+.75))positions.setY(i,terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)));}
-    positions.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
-    groundGeometry.computeBoundingSphere();
-    groundGeometry.computeBoundingBox();
+    fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;
+    const vertexY=(x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits));
+    if(dirty)for(const rect of groundRects(groundGeometry,dirty))refreshGround(groundGeometry,rect,vertexY);
+    else {
+      const positions = groundGeometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) positions.setY(i,vertexY(positions.getX(i),positions.getZ(i)));
+      positions.clearUpdateRanges?.();positions.needsUpdate = true;
+      groundGeometry.attributes.normal?.clearUpdateRanges?.();groundGeometry.computeVertexNormals();
+    }
+    if(!live||!terrainLive){groundGeometry.computeBoundingSphere();groundGeometry.computeBoundingBox();}
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
-    meadow.terrainChanged({edits: snapshot.edits, terrainTick: snapshot.tick, dirty: foundationChanged ? null : dirty});
-    orchard.groundChanged({edits: snapshot.edits,terrainTick:snapshot.tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
+    if(live){orchard.terrainTick?.(tick);content.terrainMoved(dirty);for(const e of dirty||[])meadowPending.set(e.id,e);return;}
+    const meadowDirty=dirty&&dirty.concat([...meadowPending.values()]);meadowPending.clear();mountainArena.sync(snapshot);alpineForest.sync();
+    meadow.terrainChanged({edits: snapshot.edits, terrainTick: tick, dirty: foundationChanged ? null : meadowDirty});
+    orchard.groundChanged({edits: snapshot.edits,terrainTick:tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
   }
   // Stone/canopy channels follow the world's tree set (seed + groves) and live deposits. A full mask bake measured
   // 0.3-0.75 s in headless SwiftShader; ecosystem changes now rebuild in bounded frame slices, never per chop.
@@ -1184,7 +1204,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const frameStarted=performance.now();
     frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
-    previous = now; renderTick=presentationClock.sample(now);
+    previous = now; renderTick=presentationClock.sample(now);liveTerrain();
     if (active && !renderer.xr.isPresenting) {
       lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
     }
@@ -1197,7 +1217,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
       const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{});const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
-      const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(snapshot, localPosition.x, localPosition.z)),localPosition.y);
+      // Standing on rising or sinking earth follows the drawn ground every frame, not the 20 Hz snapshot.
+      const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(terrainLive?{...snapshot,tick:terrainShownTick()}:snapshot, localPosition.x, localPosition.z)),localPosition.y);
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
       if (!grounded && localPosition.y <= groundY && verticalSpeed < -4) orchard.contact(localPosition.x, localPosition.z, {strength: 1.5}); // landing dust (presentation only)
       if (grounded || localPosition.y <= groundY) { localPosition.y = groundY; verticalSpeed = 0; grounded = true; }
@@ -1263,7 +1284,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if(full||r.hit)guideHitTick=r.hit?r.ticks-1:null;
       guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;
     }else{trajectoryGuide.hide();nextGuideAt=0;guideHitTick=null;}
-    content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
@@ -1352,7 +1373,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
-      currentTerrainBake=snapshot.terrainBake;terrainSampler.setState(snapshot);
+      currentTerrainBake=snapshot.terrainBake;terrainSampler.setState({...snapshot,tick:terrainShownTick()});
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
       presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});

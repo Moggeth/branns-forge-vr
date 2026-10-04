@@ -629,6 +629,13 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     for(const key of temporalMask){const i=key%cfg.mask,j=Math.floor(key/cfg.mask);maskData[key*4+1]=disturbanceAt(-GROUND_HALF+(i+.5)*step,-GROUND_HALF+(j+.5)*step,ctx.edits,ctx.terrainTick)*255+.5;temporalMask.delete(key);done++;if((done&15)===0&&performance.now()-start>=budgetMs)break;}
     if(done)mask.needsUpdate=true;return done;
   }
+  // Presentation-clock terrain frames: the edit list is unchanged, only time moved. Queue just the kernels whose
+  // animation advanced (budgeted drains below), skipping groundChanged's static signatures.
+  function terrainTickChanged(tick) {
+    const frame=terrainFrameKey(ctx.edits,tick);if(frame===phaseKey)return false;
+    const dirty=terrainDirtyEdits(phaseEdits,ctx.edits,phaseTick,tick);ctx.terrainTick=tick;phaseTick=tick;phaseKey=frame;
+    field?.setEdits(ctx.edits,tick);queueTemporalMask(dirty);return true;
+  }
   function groundChanged(next = {}) {
     if(next.terrainTick!==undefined)ctx.terrainTick=next.terrainTick;
     if (next.edits) ctx.edits = next.edits; if (next.deposits) ctx.deposits = next.deposits; if (next.trees) ctx.trees = next.trees;
@@ -719,6 +726,6 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
 
   if (sun.castShadow) setShadowExtent(20);
   setDaylight(daylight); groundChanged({force: true});
-  return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, applyEnvironment, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
+  return {update, groundChanged, terrainTick: terrainTickChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, applyEnvironment, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
     flushDeformation() { if(temporalMask.size)drainTemporalMask(Infinity);if (field?.pending) { field.flush(); deformTex.needsUpdate = true; deformUploads++; } }}; // loading screens/tests only
 }
