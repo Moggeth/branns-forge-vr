@@ -369,14 +369,44 @@ export function createOrchardGroundMaterial({quality = 'high', report = {}, stra
 }
 
 // ---------- sky dome, skirt and backdrop ----------
-function createSky() {
+// Sky dome: gradient + sun, plus a night layer (stars, moon, faint resonance aurora), drifting clouds,
+// overcast grey-out and storm flashes. All analytic in one draw; `cloudOctaves` drops to 2 on low quality.
+function createSky(cloudOctaves = 3) {
   const material = new THREE.ShaderMaterial({
-    uniforms: {zenith: {value: new THREE.Color()}, horizon: {value: new THREE.Color()}, sunColor: {value: new THREE.Color()}, sunDir: {value: new THREE.Vector3(0, 1, 0)}},
+    uniforms: {zenith: {value: new THREE.Color()}, horizon: {value: new THREE.Color()}, sunColor: {value: new THREE.Color()}, sunDir: {value: new THREE.Vector3(0, 1, 0)},
+      moonDir: {value: new THREE.Vector3(0, -1, 0)}, night: {value: 0}, overcast: {value: 0}, clouds: {value: .22}, cloudTint: {value: new THREE.Color(1, 1, 1)}, flash: {value: 0}, time: {value: 0}},
     vertexShader: 'varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
-    fragmentShader: `uniform vec3 zenith, horizon, sunColor, sunDir; varying vec3 vDir;
-      void main(){ vec3 d = normalize(vDir); float h = max(d.y, 0.0); float s = max(dot(d, normalize(sunDir)), 0.0);
+    fragmentShader: `uniform vec3 zenith, horizon, sunColor, sunDir, moonDir, cloudTint; uniform float night, overcast, clouds, flash, time; varying vec3 vDir;
+      float h3(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y); }
+      void main(){ vec3 d = normalize(vDir); float h = max(d.y, 0.0); vec3 sd = normalize(sunDir); float s = max(dot(d, sd), 0.0);
         vec3 c = mix(horizon, zenith, pow(h, 0.55)); c = mix(c, horizon * 0.92, smoothstep(0.0, -0.08, d.y));
-        c += sunColor * (pow(s, 7.0) * 0.28 + pow(s, 90.0) * 0.6 + smoothstep(0.9993, 0.9997, s) * 6.0);
+        float clear = 1.0 - overcast;
+        c += sunColor * (pow(s, 7.0) * 0.28 + (pow(s, 90.0) * 0.6 + smoothstep(0.9993, 0.9997, s) * 6.0) * clear);
+        if (night > 0.01) {
+          float n = night * clear * smoothstep(-0.02, 0.18, d.y);
+          vec3 g = d * 260.0, cell = floor(g); float r = h3(cell);
+          float star = step(0.9975, r) * smoothstep(0.5, 0.05, length(fract(g) - 0.5)) * (0.55 + 0.45 * sin(time * (1.5 + r * 3.0) + r * 60.0));
+          c += vec3(0.75, 0.85, 1.0) * star * 1.6 * n;
+          vec3 md = normalize(moonDir); float m = max(dot(d, md), 0.0);
+          c += vec3(0.75, 0.85, 1.0) * (smoothstep(0.99955, 0.9998, m) * 2.6 + pow(m, 60.0) * 0.18 + pow(m, 6.0) * 0.05) * night * (0.35 + 0.65 * clear);
+          float az = atan(d.z, d.x), band = smoothstep(0.12, 0.32, d.y) * smoothstep(0.75, 0.38, d.y);
+          float ribbon = pow(0.5 + 0.5 * sin(az * 5.0 + sin(az * 2.0 + time * 0.07) * 2.2 + time * 0.03), 6.0);
+          c += mix(vec3(0.18, 0.75, 1.0), vec3(0.45, 0.4, 1.0), 0.5 + 0.5 * sin(az * 3.0 - time * 0.05)) * ribbon * band * 0.22 * n;
+        }
+        if (d.y > -0.05) {
+          vec2 uv = d.xz / (d.y + 0.18) * 1.4 + vec2(time * 0.006, time * 0.002);
+          float f = n2(uv) * 0.55 + n2(uv * 2.3 + 7.1) * 0.3;
+          ${cloudOctaves > 2 ? 'f += n2(uv * 5.1 - 3.3) * 0.15;' : 'f += 0.07;'}
+          float cov = smoothstep(1.0 - clouds, 1.0 - clouds + 0.28, f) * smoothstep(-0.05, 0.12, d.y);
+          vec3 lit = cloudTint * (0.65 + 0.35 * pow(s, 3.0)) + sunColor * pow(s, 12.0) * 0.4 * clear;
+          c = mix(c, lit, cov * (0.85 - 0.25 * night));
+        }
+        vec3 grey = vec3(dot(c, vec3(0.3, 0.55, 0.15))) * cloudTint;
+        c = mix(c, grey, overcast * 0.75);
+        c += vec3(0.8, 0.85, 1.0) * flash * 1.4 * smoothstep(-0.1, 0.4, d.y);
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -533,7 +563,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
     for (const [name, [slot, srgb]] of Object.entries(textureSlots)) { pending++; loader.load(`${assetBase}${name}.png`, tex => { pending--; if (disposed) { tex.dispose(); return; } owned.push(tex); setTex(slot, tex, srgb); }, undefined, () => { pending--; console.warn(`[orchard] missing ${name}.png; flat fallback kept`); }); }
   }
 
-  const sky = createSky(); scene.add(sky);
+  const sky = createSky(q === 'low' ? 2 : 3); scene.add(sky);
   const skirt = createSkirt(material, height); scene.add(skirt.mesh);
   const backdrop = createBackdrop(); scene.add(backdrop);
   const puffs = createContactPuffs(scene);
@@ -554,16 +584,29 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   function setDaylight(name) {
     preset = typeof name === 'object' ? {...DAYLIGHT.golden, ...name} : DAYLIGHT[name] || DAYLIGHT.golden;
     const el = THREE.MathUtils.degToRad(preset.elev), az = THREE.MathUtils.degToRad(preset.azim);
-    sunDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).normalize();
-    sun.color.copy(srgbHex(preset.sun)); sun.intensity = preset.sunI;
-    if (hemisphere) { hemisphere.color.copy(srgbHex(preset.hemiSky)); hemisphere.groundColor.copy(srgbHex(preset.hemiGround)); hemisphere.intensity = preset.hemiI; }
-    sky.material.uniforms.zenith.value.copy(srgbHex(preset.zenith)); sky.material.uniforms.horizon.value.copy(srgbHex(preset.horizon));
-    sky.material.uniforms.sunColor.value.copy(srgbHex(preset.sun)); sky.material.uniforms.sunDir.value.copy(sunDir);
-    backdrop.material.uniforms.hill.value.copy(srgbHex(preset.hill)); backdrop.material.uniforms.haze.value.copy(srgbHex(preset.haze)); backdrop.material.uniforms.sunColor.value.copy(srgbHex(preset.sun));
-    fog.color.copy(srgbHex(preset.haze)); scene.background = fog.color;
-    if (renderer) renderer.toneMappingExposure = preset.exposure;
-    scene.environmentIntensity = preset.env;
-    lightUp.set(0, 1, 0); lightRight.crossVectors(lightUp, sunDir).normalize(); lightUp.crossVectors(sunDir, lightRight).normalize();
+    const env = {sunDir: new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)), sunI: preset.sunI, hemiI: preset.hemiI, exposure: preset.exposure, envI: preset.env};
+    for (const k of ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill']) env[k] = srgbHex(preset[k]);
+    applyEnvironment(env);
+  }
+  // Live environment from the day/night + weather layer (colours are linear THREE.Color, sunDir points at the light).
+  // Optional sky extras: moonDir, night, overcast, clouds, cloudTint, flash, time, fogScale.
+  let fogScale = 1;
+  function applyEnvironment(env) {
+    sunDir.copy(env.sunDir).normalize();
+    sun.color.copy(env.sun); sun.intensity = env.sunI;
+    if (hemisphere) { hemisphere.color.copy(env.hemiSky); hemisphere.groundColor.copy(env.hemiGround); hemisphere.intensity = env.hemiI; }
+    const u = sky.material.uniforms;
+    u.zenith.value.copy(env.zenith); u.horizon.value.copy(env.horizon); u.sunColor.value.copy(env.skySun || env.sun); u.sunDir.value.copy(env.skySunDir || sunDir);
+    if (env.moonDir) u.moonDir.value.copy(env.moonDir);
+    u.night.value = env.night ?? 0; u.overcast.value = env.overcast ?? 0; u.clouds.value = env.clouds ?? .22; u.flash.value = env.flash ?? 0; u.time.value = env.time ?? 0;
+    if (env.cloudTint) u.cloudTint.value.copy(env.cloudTint); else u.cloudTint.value.setRGB(1, 1, 1);
+    backdrop.material.uniforms.hill.value.copy(env.hill); backdrop.material.uniforms.haze.value.copy(env.haze); backdrop.material.uniforms.sunColor.value.copy(env.skySun || env.sun);
+    fog.color.copy(env.haze); scene.background = fog.color;
+    fogScale = env.fogScale ?? 1;
+    if (renderer) renderer.toneMappingExposure = env.exposure;
+    scene.environmentIntensity = env.envI;
+    lightUp.set(0, 1, 0); if (Math.abs(sunDir.y) > .999) lightUp.set(0, 0, 1);
+    lightRight.crossVectors(lightUp, sunDir).normalize(); lightUp.crossVectors(sunDir, lightRight).normalize();
     placeSun(focus);
   }
   function placeSun(target) {
@@ -635,7 +678,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
       sky.position.copy(camPos);
       const above = Math.max(0, camPos.y - height(camPos.x, camPos.z)), rts = above > 10;
       // Higher views see further: push haze back so the RTS board stays legible; FPS keeps depth haze.
-      fog.near = rts ? 75 : 50; fog.far = rts ? 175 : 135;
+      fog.near = (rts ? 75 : 50) * fogScale; fog.far = (rts ? 175 : 135) * Math.max(fogScale, .28);
       if (sun.castShadow) {
         setShadowExtent(rts ? 34 : 20);
         if (rts && camDir.y < -.05) { const t = above / -camDir.y; focus.copy(camPos).addScaledVector(camDir, Math.min(t, 80)); }
@@ -676,6 +719,6 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
 
   if (sun.castShadow) setShadowExtent(20);
   setDaylight(daylight); groundChanged({force: true});
-  return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
+  return {update, groundChanged, contact, surfaceAt: (x, z) => classifySurface(x, z, height, ctx), setDaylight, applyEnvironment, setFeatures, enableShadowCasting, stats, dispose, material, objects: {sky, skirt: skirt.mesh, backdrop, puffs: puffs.mesh},
     flushDeformation() { if(temporalMask.size)drainTemporalMask(Infinity);if (field?.pending) { field.flush(); deformTex.needsUpdate = true; deformUploads++; } }}; // loading screens/tests only
 }
