@@ -30,7 +30,7 @@ const suite = [
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','remains-physics',
-  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall',
+  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).
