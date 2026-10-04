@@ -1,10 +1,11 @@
 {
- "build_s": 4.8,
+ "build_s": 3.9,
  "sweep": {
   "states": 147,
   "hits": [],
   "contacts": {
    "Yoke/Buffer": 51,
+   "peg-barbs": 294,
    "Axle/Cassette_R": 143,
    "Axle/Cassette_L": 143,
    "Arm/Sear": 55
@@ -13,18 +14,18 @@
  "print": {
   "base": {
    "non_manifold_edges": 0,
-   "volume_mm3": 104296,
-   "mass_pla_g": 129.3,
+   "volume_mm3": 105552,
+   "mass_pla_g": 130.9,
    "size_mm": [
-    96.0,
-    182.0,
+    97.2,
+    183.2,
     107.3
    ]
   },
   "arm": {
    "non_manifold_edges": 0,
-   "volume_mm3": 25964,
-   "mass_pla_g": 32.2,
+   "volume_mm3": 27427,
+   "mass_pla_g": 34.0,
    "size_mm": [
     25.1,
     127.9,
@@ -124,7 +125,7 @@
   "axle": [
    0,
    1.3,
-   -0.752
+   -0.7520000610351563
   ],
   "psi_cock": -0.6108652381980153,
   "psi_stop": 0.8726646259971648,
@@ -134,9 +135,9 @@
   "release": [
    0,
    2.5805885013378975,
-   0.21552191387488176
+   0.21552185283972553
   ],
-  "triangles": 13352,
-  "glb_bytes": 833804
+  "triangles": 14394,
+  "glb_bytes": 879796
  }
 }

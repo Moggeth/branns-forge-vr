@@ -69,7 +69,7 @@ def reset():
 MAT_DEF = {
     'Walnut':   dict(c='4b2c19', m=0.0, r=0.42),
     'Heartwood':dict(c='6d391c', m=0.0, r=0.45),
-    'Iron':     dict(c='55575e', m=1.0, r=0.42),
+    'Iron':     dict(c='6a6c73', m=0.55, r=0.45),   # half-metal so it reads on phones without reflections
     'Brass':    dict(c='c99a45', m=1.0, r=0.3),
     'Steel':    dict(c='34507a', m=1.0, r=0.3),     # blued spring steel
     'Stone':    dict(c='8d887e', m=0.0, r=0.9),
@@ -233,6 +233,12 @@ CUP_AX = Vector((0, math.sin(CUP_TILT), math.cos(CUP_TILT)))
 BOWL_C = Vector((0, -CUP_R, ARM_UNDER + 2.6 + BOWL_R)) + CUP_AX * 0.0
 BALL_C = BOWL_C - CUP_AX * (BOWL_R - BALL_R)
 
+def cut_copy(lift=3.0):
+    """Half-space above the bowl's rim plane (square to the tilted bowl axis)."""
+    cut = box(-40, 40, -CUP_R - 40, -CUP_R + 40, 0, 40, None, 0, 'podcut')
+    xform(cut, Matrix.Translation(BOWL_C + CUP_AX * lift) @ Matrix.Rotation(CUP_TILT, 4, 'X'))
+    return cut
+
 def build_arm():
     adds, subs = [], []
     # beam: side profile (y, z) flat underside, tapering top; extruded in x with tapering width done by
@@ -258,12 +264,23 @@ def build_arm():
     for r in (34, 70):
         w = arm_half_w(r) + 0.6; t = arm_top(r) + 0.6
         adds.append(box(-w, w, -r - 3, -r + 3, ARM_UNDER, t, 'Iron', 0.5, 'band'))
+    # brass inlay strips down both sides of the beam (0.3 mm proud; clears the lever plates)
+    for sx in (-1, 1):
+        for r0, r1 in ((14, 31), (37, 67), (73, 86)):
+            q = ccw([(-r0, ARM_UNDER + 2.2), (-r1, ARM_UNDER + 2.2), (-r1, arm_top(r1) - 2.2), (-r0, arm_top(r0) - 2.2)])
+            w = arm_half_w(r0)
+            x0, x1 = sorted((sx * (arm_half_w(r1) - 0.4), sx * (w + 0.3)))
+            adds.append(prism(q, 'x', x0, x1, 'Brass', 'inlay'))
     # cup pod: octagonal, flat bottom on the bed, top cut square to the tilted bowl axis
     pod = prism(ccw(ngon(0, -CUP_R, 13.0, 8, math.pi / 8)), 'z', ARM_UNDER, 22, 'Iron', 'pod')
-    cut = box(-40, 40, -CUP_R - 40, -CUP_R + 40, 0, 40, None, 0, 'podcut')
-    xform(cut, Matrix.Translation(BOWL_C + CUP_AX * 3.0) @ Matrix.Rotation(CUP_TILT, 4, 'X'))
-    boolean(pod, [cut], 'DIFFERENCE')
+    boolean(pod, [cut_copy()], 'DIFFERENCE')
     adds.append(pod)
+    for i in range(4):                  # four iron tines up the pod's corners hold the bowl like a claw
+        a = math.pi / 4 + i * math.pi / 2
+        c = (13.4 * math.cos(a), -CUP_R + 13.4 * math.sin(a))
+        tine = prism(ccw(ngon(c[0], c[1], 1.9, 6, a)), 'z', ARM_UNDER, 17, 'Iron', 'tine')
+        boolean(tine, [cut_copy()], 'DIFFERENCE')
+        adds.append(tine)
     rim = prism(ccw(ngon(0, 0, 13.6, 8, math.pi / 8)), 'z', -1.6, 0, 'Brass', 'rim')
     boolean(rim, [cyl('z', (0, 0), BOWL_R + 0.6, -5, 5, None, 32)], 'DIFFERENCE')
     xform(rim, Matrix.Translation(BOWL_C + CUP_AX * 3.0) @ Matrix.Rotation(CUP_TILT, 4, 'X'))
@@ -431,6 +448,10 @@ def build_base():
     W = 48.0
     adds.append(box(-W, W, Y_FRONT0, Y_FRONT1, 0, BASE_T, 'Iron', 1.2, 'front'))
     adds.append(box(-W, W, Y_REAR0, Y_REAR1, 0, BASE_T, 'Iron', 1.2, 'rear'))
+    for sx in (-1, 1):
+        for y0, y1 in ((Y_REAR0 - 0.6, Y_REAR1 + 0.6), (Y_FRONT0 - 0.6, Y_FRONT1 + 0.6)):
+            x0, x1 = sorted((sx * (W - 7.6), sx * (W + 0.6)))
+            adds.append(box(x0, x1, y0, y1, 0, BASE_T + 0.6, 'Brass', 0.8, 'cap'))
     for s in (-1, 1):
         x0, x1 = sorted((s * (W - 7), s * W))
         adds.append(box(x0, x1, Y_REAR0, Y_FRONT1, 0, BASE_T - 1, 'Walnut', 1.0, 'outer'))
@@ -448,6 +469,15 @@ def build_base():
         tie = [(-60, 0), (34, 0), (34, BASE_T + 4), (-60, BASE_T + 4)]
         for poly, nm in ((boss, 'boss'), (rear_leg, 'rleg'), (front_leg, 'fleg'), (tie, 'tie')):
             adds.append(prism(ccw(chamfer_poly(poly, 2.0)), 'x', x0, x1, 'Walnut', nm))
+        # iron shoes on the cheek feet and brass rivets down both legs
+        xo = s * CHEEK_OUT
+        for y0, y1 in ((-62, -38), (12, 36)):
+            adds.append(box(*sorted((xo - s * 0.5, xo + s * 0.6)), y0, y1, 0, 11.5, 'Iron', 0.4, 'shoe'))
+        for (ya, za), (yb, zb) in (((-50, 4), (-10, H - 8)), ((24, 4), (8, H - 8))):
+            for k in range(1, 4):
+                t = k / 4.0; y = ya + (yb - ya) * t; z = za + (zb - za) * t
+                if math.hypot(y, z - H) < 29: continue
+                adds.append(prism(ccw(ngon(y, z, 1.3, 8)), 'x', *sorted((xo - s * 0.2, xo + s * 0.7)), 'Brass', 'rivet'))
         # brass dial plate with its twelve peg holes
         xo = s * CHEEK_OUT
         dp = prism(ccw(ngon(0, H, 25.5, 12, math.pi / 12)), 'x', *sorted((xo, xo + s * 0.8)), 'Brass', 'dial')
@@ -500,11 +530,15 @@ def sweep(P, steps=48):
         pose(P, psi, yoke)
         dg = bpy.context.evaluated_depsgraph_get(); dg.update()
         T = {n: bvh(P[n], dg) for n in fixed + moving}
-        pairs = [(a, b) for a in moving for b in fixed] + [('Arm', 'Yoke'), ('Ball', 'Yoke'), ('Axle', 'Yoke')]
+        pairs = [(a, b) for a in moving for b in fixed] + [('Arm', 'Yoke'), ('Ball', 'Yoke'), ('Axle', 'Yoke'), ('Cassette_R', 'Base'), ('Cassette_L', 'Base'), ('Axle', 'Base')]
         for a, b in pairs:
             hits = T[a].overlap(T[b])
             if not hits: continue
             key = '%s/%s' % (a, b)
+            if a.startswith('Cassette'):        # only the peg barbs may bite into the dial holes (snap fit)
+                me, M = P[a].data, P[a].matrix_world
+                tips = all(abs((M @ me.polygons[i].center).x) < CHEEK_OUT - 2.4 for i, _ in hits)
+                if tips: rep['contacts']['peg-barbs'] = rep['contacts'].get('peg-barbs', 0) + 1; continue
             allowed = (key == 'Axle/Cassette_R' or key == 'Axle/Cassette_L'      # keyed: the hub rides the shaft
                        or (key == 'Arm/Sear' and psi < PSI_COCK + 9 * D2R)
                        or (key == 'Yoke/Buffer' and abs(yoke - finger_rest()) < 1e-6))
