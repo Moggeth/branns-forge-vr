@@ -6,7 +6,7 @@
 
    Layout map, landscape phone (844x390):
      top-left   : vitals pill (160px) · quest chip below it
-     top-right  : ghost util row  [−][+][◎][⋯ tools][☰]      (fullscreen shows inside tools state)
+     top-right  : ghost util row  [−][+][◎][⋯ tools][☰]      (fullscreen is always visible)
      bottom-L/R : 112px translucent pan/move and orbit/look pads
      above R pad: Cancel + Cast (God) / Jump + Attack (Hero)
      bottom-mid : one dock — selected spell + Quick (God) / weapon + Actions + Special (Hero)
@@ -129,10 +129,10 @@
 :root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="zoom-out"] { order: 1; }
 :root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="zoom-in"]  { order: 2; }
 :root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="center"]   { order: 3; }
-:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="fullscreen"] { order: 4; display: none !important; }
+:root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="fullscreen"] { order: 4; display: grid !important; place-items: center; }
 :root[data-mq] body.touch-controls-active .mui-util-bar .mq-more { order: 5; }
 :root[data-mq] body.touch-controls-active .mui-util-bar [data-touch-action="menu"] { order: 6; }
-:root[data-mq] body.touch-controls-active[data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"]:not([hidden]) { display: grid !important; place-items: center; }
+
 :root[data-mq] body.touch-controls-active .mq-more[aria-expanded="true"] { background: rgba(201, 164, 92, .26) !important; border-color: var(--mq-line-hi) !important; }
 .mq-more .mui-icon { fill: currentColor; stroke: none; }
 .mq-more { display: none; }
@@ -375,7 +375,7 @@
   :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="zoom-in"] { grid-column: 2; grid-row: 2; }
   :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="zoom-out"] { grid-column: 2; grid-row: 3; }
   :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="center"] { grid-column: 2; grid-row: 4; }
-  :root[data-mq] body.touch-controls-active[data-role="god"][data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"] { grid-column: 1; grid-row: 2; }
+  :root[data-mq] body.touch-controls-active[data-role="god"] .mui-util-bar [data-touch-action="fullscreen"] { grid-column: 1; grid-row: 2; }
   :root[data-mq] body.touch-controls-active[data-role="hero"][data-mq-tray="tools"] .mui-util-bar [data-touch-action="fullscreen"] { order: 4; }
   :root[data-mq] body.touch-controls-active .hud > .xhud,
   :root[data-mq] body.touch-controls-active #objectiveBanner:not([hidden]) { max-width: calc(100vw - 16px - 104px - var(--mq-l) - var(--mq-r)) !important; }
@@ -433,3 +433,13 @@
 :root[data-mq] body.touch-controls-active #heroTools .bf-actions .ta-q {width:58px;height:48px;}
 /* The contextual Collect chip stays available, above—not on—the equipment selector. */
 :root[data-mq] body.touch-controls-active .ta-wrap {bottom:calc(var(--mq-b) + var(--mq-pad) + 84px) !important;}
+
+/* Both roles use two columns in portrait: keep fullscreen clear of the vitals,
+   quest chip and Build, even at 320px. Camera controls retain their God slots. */
+@media (orientation: portrait) {
+  :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar { display: grid !important; grid-template-columns: 44px 44px; }
+  :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar .mq-more { grid-column: 1; grid-row: 1; }
+  :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar [data-touch-action="menu"] { grid-column: 2; grid-row: 1; }
+  :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar [data-touch-action="fullscreen"] { grid-column: 1; grid-row: 2; }
+  :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar .qb-entry { grid-column: 2; grid-row: 2; }
+}

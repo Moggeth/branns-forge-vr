@@ -32,7 +32,7 @@ export function wake(d) {if (d.rest) d.rest = 0;}
 
 // Instant velocity change from an impulse J (world) at world point p. Tears a joint on a big enough blow.
 export function applyImpulse(state, d, J, p) {
-  if (!d || d.heldBy) return;
+  if (!d || d.heldBy || d.carry) return; // a phoenix-carried skull follows its flight path (shared/phoenix-carry.js)
   const m = partMass(d), I = inertia(d, m), c = add(d.position, rotate(centre(d), d.quaternion));
   d.velocity = d.velocity.map((v, i) => clamp(v + J[i] / m, -60, 60));
   const t = cross(p ? sub(p, c) : [0, 0, 0], J);
@@ -70,7 +70,7 @@ export function stepRemains(state, ctx, dt = 1 / 60) {
   const byId = new Map(all.map(d => [d.id, d]));
   // A sleeping ragdoll wakes as a whole if any of its parts is disturbed.
   for (const d of all) if (d.joint) {const t = byId.get(d.joint.to); if (!t) {delete d.joint; continue;} if (awake(d) !== awake(t) && !d.heldBy && !t.heldBy) {wake(d); wake(t);} if (d.heldBy || t.heldBy) {wake(d); wake(t);}}
-  const bodies = all.filter(d => d.heldBy || awake(d)); if (!bodies.length) return;
+  const bodies = all.filter(d => !d.carry && (d.heldBy || awake(d))); if (!bodies.length) return;
   const h = dt / SUB, S = new Map();
   for (const d of bodies) {
     const m = partMass(d), c = centre(d);

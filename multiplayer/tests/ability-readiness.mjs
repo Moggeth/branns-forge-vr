@@ -6,7 +6,8 @@ assert.equal(weaponReadiness(p,'axe',280).specialReady,.5);
 assert.equal(weaponReadiness(p,'pick',220).specialSeconds,2);
 assert.equal(weaponReadiness(p,'crossbow',130).attackReady,.5);
 assert.equal(weaponReadiness(p,'bow',133).attackReady,1);
-assert.equal(weaponReadiness(p,'bow',101).hasSpecialCooldown,false);
+// Emberwing's Special is Phoenix Flare (Q): a 10 s recharge.
+assert.equal(weaponReadiness(p,'bow',101).hasSpecialCooldown,true);assert.equal(weaponReadiness({specialTick:0},'bow',300).specialReady,.5);
 assert.equal(weaponReadiness({...p,heat:1,overheatUntil:280},'wyrmspout',190).attackSeconds,1.5);
 assert.equal(weaponReadiness({...p,heat:1,overheatUntil:280},'wyrmspout',281).overheated,false);
 assert.equal(weaponReadiness({},'axe',0).specialReady,1);

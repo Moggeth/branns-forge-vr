@@ -2250,3 +2250,66 @@ Public verification: source4adc79c deployed as dpl_GaeqAKBdJG1naU3yop9MU27pzjRj 
 ### Claude takeover cleanup - 2026-10-03
 The active starting guide is docs/CLAUDE-HANDOFF-20261003.md, linked from root CLAUDE.md, README and AGENTS. Corrected the stale native-first entry point; marked migration recommendations historical. Checked private main synchronization, no open PRs, public page200/cloud health8peers, paused sprint automations and targeted local process state. Claude meadow/canopy branch6bd929f is not integrated; no duplicate commission started. Nineteen unrelated Godot UID files remain untouched.
 Baseline simulation.mjs failed because its Grove cap fixture targeted the protected apron and its shrine test expected obsolete destructibility. Corrected only fixtures/assertions to current permanent-forge behavior (0e9e77e). All eight recommended focused checks pass. No runtime or production deployment changes in this handoff. Readiness gaps and optional Timberline kit features are explicitly documented; do not overstate physical-device acceptance.
+
+
+### Directional proximity voice draft - 2026-10-04
+
+Isolated checkout on remote main f1c1c55; active Claude checkout untouched.
+Focused proximity-voice assertions pass. Actual local Chromium WebRTC synthetic
+audio: guest-to-guest with host outside voice, left/right RMS (0.102/0.062 then
+0.062/0.103), head-turn reversal, near/far attenuation (0.068/0.019), silence
+beyond 32m, denied permission/retry, muted/deafened silence, stopped tracks,
+retry/failed connection recovery and participant cleanup pass (13.95s).
+Actual desktop Hero + phone-sized touch God UI, microphone opt-in, denial/retry,
+God focus, touch camera orientation, quick mute, deafen, leave and console checks
+pass (~20s). Only oscillator media or microphone mocks were used. Physical
+phone/headset/mic, cross-network NAT and eight-client endurance remain unverified.
+
+Aggregate suite: 124/125 pass in 75.1s; the existing Windows CRLF patch-notes check
+reads historical front matter as body (2026-10-03-crystal-wall.md, pr: 7). This is
+already fixed by PR #33; left unchanged here. Check and full production builds
+pass, including packaged asset validation. Source/test/doc details and network
+limitations: docs/PROXIMITY-VOICE.md. Captures/results: ignored
+logs/browser-acceptance/{captures,voice-results.json,voice-game-results.json}.
+
+Recovery evidence: sandboxed browser ICE could not connect; approved unsandboxed
+loopback Chromium succeeded. Receiving RTP initially produced no decoded samples
+with Web Audio alone; a retained muted media element starts Chromium's receiver,
+while only the spatial graph is audible. The real browser output test caught this.
+The first touch UI run targeted the desktop menu button; corrected to the existing
+touch menu. Visual QA then caught compact-menu clipping; scoped voice controls
+styles fix it without changing shared touch/fullscreen files.
+
+
+### Voice retry acceptance audit follow-up - 2026-10-04
+
+The independent audit reproduced a flaky acceptance assertion, not an established
+runtime fault: Retry could satisfy the other browser's old connected peer before
+the new session arrived, and then assume 700ms was enough for replacement audio.
+Only test fixtures/helpers, the CI list and documentation changed in this follow-up.
+
+Acceptance now records both endpoints before Retry, requires the remote to observe
+the new session, checks matching fresh negotiation IDs with both peers connected,
+and polls measured audio until the unchanged RMS threshold (>0.001) is met within
+8s. The negotiation deadline remains 20s. Measurements are checked against the same
+connection both before and after sampling. Both offerer and answerer retries run
+every time. Failure injection cannot accidentally close a newly negotiating peer.
+
+Deterministic regression uses the same helpers with delayed session propagation,
+both-end connection readiness and delayed audio. It rejects stale connected peers,
+continued silence and samples crossing another connection replacement. Added to CI.
+Six consecutive actual three-client Chromium synthetic-audio runs all passed, each
+covering both retry roles (12 successful retry/recovery cases) plus failed-connection
+recovery and the original spatial/privacy/lifecycle checks. The six runs took
+14.968s, 15.229s, 14.948s, 14.848s, 14.623s, 14.761s.
+Artifacts: logs/voice-recovery-final-{1..6}/voice-results.json and
+logs/voice-recovery-repeat-summary.json. No real microphone was accessed.
+Aggregate Windows checks: 125/126 pass in 67.8s; the sole failure is the unchanged
+historical CRLF patch-notes check documented above. No unrelated fix was added.
+### Touch fullscreen surface - 2026-10-04
+
+Isolated main f1c1c55: persistent touch fullscreen control, menu/lobby surface, real fullscreen state and honest unsupported/denied recovery. Browser, build evidence, fixed overlap/containing-block failures, Windows patch-notes LF limitation, screenshots and physical-device gaps: [fullscreen acceptance](TOUCH-FULLSCREEN-20261004.md). No voice/audio, permissions, merge or deployment changes.
+
+## Browser robustness review — 2026-10-04
+
+See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 130 suites pass. CI anchors its child working directory and patch-note checks normalize Windows line endings. Immediate save roundtrips, held-item material conservation and hidden-geometry disposal now have regressions. Original saved-player ownership restoration remains unresolved; an inventory recovery copy prevents destructive autosave in the reproduced capped-pickup case. No production deployment or physical-device acceptance is claimed.

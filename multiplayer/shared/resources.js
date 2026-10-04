@@ -211,7 +211,7 @@ export function stepSettlement(state,ctx,events,recent=[]){
  const s=state.settlement;if(!state.players.length)return;
  const trees=s.workers.some(w=>w.job==='wood'&&!w.cargo)?worldTrees(state):[];
  for(const w of s.workers){
-  if(state.enemies.some(e=>flat(e.position,w.position)<3)){w.phase='sheltering';walk(w,[0,ctx.ground(0,HOME[1]),HOME[1]],ctx);continue;}
+  if(state.enemies.some(e=>e.kind!=='stumpling'&&flat(e.position,w.position)<3)){w.phase='sheltering';walk(w,[0,ctx.ground(0,HOME[1]),HOME[1]],ctx);continue;}
   if(w.cargo){
    w.phase='returning';const home=[HOME[0],ctx.ground(...HOME),HOME[1]];
    if(flat(w.position,home)>.8){walk(w,home,ctx);continue;}

@@ -1,6 +1,9 @@
+**Directional proximity voice (draft, 2026-10-04):** opt-in nearby voice for browser Hero/God play on desktop, touch and WebXR. See [design, privacy, verification and network limits](docs/PROXIMITY-VOICE.md). Not deployed.
+
 # Brann's Forge - current browser game
 
 **Start here:** [Claude takeover handoff](docs/CLAUDE-HANDOFF-20261003.md).
+Latest engineering review: [2026-10-04 robustness findings, fixes and remaining save-recovery limitation](docs/CODE-QUALITY-REVIEW-20261004.md).
 The active application is `multiplayer/`. Vercel serves the game and assets;
 Cloudflare handles room discovery/relay, and one player's browser runs each world.
 The developer desktop is not required. `godot/` is the preserved native predecessor.

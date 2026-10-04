@@ -100,6 +100,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function demote(id) { const e = trees.get(id); if (!e) return; destroy(e); trees.delete(id); }
  function sync(s) {
   last = s; const now = clock, cuts = new Map((s.harvestedTrees || []).map(h => [h.id, h])), ids = new Set();
+  const walking = new Set((s.enemies || []).filter(e => e.kind === 'stumpling').map(e => e.treeId)); // stumps that got up (stumpling-view draws them)
   if (!lodValid && camera && !intact.size) { camera.getWorldPosition(lodCam); lodValid = true; } // first build places every tree at its LOD once
   for (const t of worldTrees(s)) {
    const kit = kits.get(VARIANTS[t.variant] || 'tree'); if (!kit) continue; ids.add(t.id);
@@ -108,7 +109,8 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
    if (r && r.kit !== kit) { batches.remove(t.id); intact.delete(t.id); growing.delete(t.id); r = null; }
    if (!cut) { // intact: instanced; rewritten only when its transform key changes
     if (e) demote(t.id);
-    if (!r) { r = {tree: t, kit, born: initialized && !e ? now : -1e9, key: '', lod: false, synced: false}; intact.set(t.id, r);
+    // A stump whose record is released (its stumpling died or burrowed) regrows from a sapling where it stood.
+    if (!r) { r = {tree: t, kit, born: initialized && (!e || e.felled) ? now : -1e9, key: '', lod: false, synced: false}; intact.set(t.id, r);
      if (lodValid) r.lod = lodFor(r, Math.hypot(lodCam.x - t.x, lodCam.z - t.z)); }
     r.tree = t; r.floor = floor; r.scale = sc; const key = `${t.x}|${t.z}|${floor}|${sc}`;
     if (key !== r.key) { r.key = key; placeIntact(r); }
@@ -128,7 +130,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
     e.key = key; e.cuts = cut?.cuts || 0;
    }
    if (e.felled) {
-    const f=e.felled;
+    const f=e.felled; f.stump.visible = !walking.has(t.id);
     if(cut.landed&&!f.landed){
      if(e.synced){const pose=treeFall(e.tree,cut,s.tick,e.floor,ground);f.pivot.quaternion.setFromAxisAngle(f.axis,pose.end);e.root.scale.setScalar(e.scale);e.root.updateMatrixWorld(true);
       const points=[];for(const part of f.canopy.filter(p=>p.leaves)){const pos=part.mesh.geometry.attributes.position,step=Math.max(1,Math.floor(pos.count/32));for(let i=0;i<pos.count;i+=step)points.push(new T.Vector3().fromBufferAttribute(pos,i).applyMatrix4(part.mesh.matrixWorld).toArray());}

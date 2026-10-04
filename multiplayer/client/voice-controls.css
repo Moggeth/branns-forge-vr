@@ -1,0 +1,21 @@
+/* Scoped so compact menu rules cannot squeeze four voice labels into one row. */
+.voice-controls .voice-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.voice-controls .voice-actions > .btn,
+.voice-controls .voice-peer-line > .btn {
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.voice-controls .voice-peer-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.voice-controls .voice-peer-line > span { flex: 1 1 9rem; overflow-wrap: anywhere; }

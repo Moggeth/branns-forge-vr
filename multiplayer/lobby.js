@@ -1,3 +1,5 @@
+import {ProximityVoice} from './client/proximity-voice.js';
+import {createVoiceControls} from './client/voice-controls.js';
 import {mountQuietHud} from './mobile-quiet.js';
 import {createFieldOverlays,createBuildTag} from './client/field-overlays.js';
 import {equipmentHelp} from './client/equipment-help.js';
@@ -35,6 +37,9 @@ import { adventureView } from './shared/adventure.js';
 import { createAdventureBanner, nextStep, actionModel } from './client/adventure-view.js';
 import { createInteractionCueController } from './client/interaction-cue-controller.js';
 import { rewardBanner } from './client/reward-moments.js';
+import {createPatchNotes} from './client/patch-notes.js';
+import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
+import './client/patch-notes.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -100,9 +105,11 @@ let mobile = null, xrActive = false;
 let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
 let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
+let voice = null;
+const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
-let playerId = null, room = '', connected = false, menuOpen = false;
+let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
@@ -258,14 +265,15 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  voice?.dispose(); voice = null; voiceControls.update();
   closeQuickBuild();closeForge();
   restoreFieldLock=false;holdOverlays?.close();
   clearTimeout(joinTimer);
@@ -296,11 +304,13 @@ function start(attempt) {
   try { next = session = new WorldSession(attempt.solo?{connection:new LocalRoomConnection()}:{url:peerEndpoint()}); }
   catch (error) { recordProblem(error); showLobbyProblem('We couldn’t open a connection to the forge. Please try again in a moment.', {retry: true}); return; }
 
+  if (!attempt.solo) { voice = new ProximityVoice(next.connection); voice.addEventListener('change', voiceControls.update); }
+  voiceControls.update();
   const mine = handler => event => { if (session === next) handler(event.detail); };
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
@@ -473,7 +483,7 @@ function onSnapshot(snapshot) {
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · Q then aim to curve',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -800,6 +810,7 @@ function fieldAction(a){
   if(a.id==='open'){fieldPinned=true;holdOverlays.open(a.kind==='help'?'equipment':'party');return;}
   if(a.id==='close'){holdOverlays.close();return;}
   if(a.id==='menu'){openMenu();return;}
+  if(a.id==='patch-notes'){holdOverlays.close();patchNotes.open();return;}
   if(a.id==='current-quest'){fieldOverlays.root.querySelector('.fo-quest')?.scrollIntoView({block:'nearest'});return;}
   if(a.id==='start-expedition'){const stage=lastSnapshot?.adventure?.stage;if(['idle','victory','defeat'].includes(stage))expeditionAction(stage==='idle'?'start':'rematch');return;}
   if(a.source==='quest')expeditionAction(a.id);
@@ -810,15 +821,17 @@ document.querySelector('.hud-room').append(fieldOverlays.entry);
 const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='undefined'?String(__BRANN_BUILD__):'dev · local'});
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
-holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
+holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
 const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.textContent='Equipment guide';
 lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
+const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
 for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(type, event => {
+  if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
     const trayKey=/^Digit[1-6]$/.test(event.code)||['KeyB','KeyC','Escape','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.code);
@@ -860,6 +873,7 @@ try {
   game = createGame({
     canvas,
     isHost, onSelection: chooseSpell,
+    onVoicePose: pose => voice?.updatePose(pose),
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
@@ -901,13 +915,15 @@ bindObjectiveActions(document, {onStart: () => objectiveHooks.onStart?.(), onRes
 export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
+patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
-  state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  voice: () => voice ? structuredClone({...voice.state(), pose:voice.pose}) : null,
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });
