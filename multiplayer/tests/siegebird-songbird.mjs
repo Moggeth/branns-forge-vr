@@ -5,7 +5,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {prepareAsset, updateWeaponPresentation} from '../client/asset-pose.js';
 import {createSiegebirdSight, SIEGEBIRD_PRESENTATION as P} from '../client/siegebird-sight.js';
 import {createSiegebirdFlock, siegebirdBirdPose, SIEGEBIRD_PLUMAGES} from '../client/siegebird-flock.js';
-import {SIEGEBIRD_RELOAD as R, siegebirdSide, siegebirdPlumage, siegebirdMechanism, siegebirdCues} from '../client/siegebird-reload.js';
+import {SIEGEBIRD_RELOAD as R, siegebirdSide, siegebirdPlumage, siegebirdMechanism, siegebirdCues, SIEGEBIRD_WINCH} from '../client/siegebird-reload.js';
 // Siegebird songbird reload presentation: alternation, plumage flock, timeline, off-frame entry, bolt hand-off,
 // clearance against the crossbow and sight, golden dressing and shared GPU resources.
 const begin = performance.now();
@@ -39,9 +39,26 @@ assert.ok(R.windEnd < R.seat && R.enter < R.arrive && R.arrive < R.seat && R.sea
 assert.equal(siegebirdMechanism(R.seat - .01).bolt, false); assert.equal(siegebirdMechanism(R.seat).bolt, true);
 assert.equal(siegebirdMechanism(R.windEnd).cocked, 1); assert.ok(Math.abs(siegebirdMechanism(R.windEnd).crank - 4 * Math.PI) < 1e-9, 'two crank turns');
 assert.equal(siegebirdMechanism(0).kick, 0, 'the bolt leaves before the kick moves the bore');
-assert.deepEqual(siegebirdMechanism(Infinity), {cocked: 1, crank: 0, latch: 0, trigger: 0, string: 0, bolt: true, boltDrop: 0, kick: 0});
+assert.deepEqual(siegebirdMechanism(Infinity), {cocked: 1, crank: 0, pinion: 0, drum: 0, clutch: 0, latch: 0, trigger: 0, string: 0, flex: 0, wound: SIEGEBIRD_WINCH.baseWraps + 1, bolt: true, boltDrop: 0, kick: 0});
+{ // Coherent winch: the gear train stays meshed (pinion = 2 x drum, opposite sense), the crank only turns while the
+  // clutch is engaged, one drum turn is one full draw (cable radius = travel / tau) and the cable on the drum
+  // tracks the draw. Release is fast and spins the drum back; the clutch is out while it does.
+  const W = SIEGEBIRD_WINCH, tau = Math.PI * 2;
+  for (let t = 0; t <= R.seconds; t += .005) {
+    const m = siegebirdMechanism(t);
+    assert.ok(Math.abs(m.pinion + m.drum * W.gearTeeth / W.pinionTeeth) < 1e-9, `gears meshed at ${t}`);
+    assert.ok(Math.abs(m.drum + m.cocked * tau) < 1e-9 && Math.abs(m.wound - W.baseWraps - m.cocked) < 1e-9, `drum and cable follow the draw at ${t}`);
+    if (m.clutch > .5) assert.equal(m.crank, 0, `crank still while the clutch is out at ${t}`);
+    if (t >= R.windStart) assert.ok(Math.abs(m.crank - m.pinion) < 1e-9, `crank drives the pinion once engaged at ${t}`);
+  }
+  assert.ok(siegebirdMechanism(W.release).cocked < 1e-9 && siegebirdMechanism(.5 * W.release).clutch > .5, 'string thrown forward with the clutch out');
+  const lifts = []; for (let t = R.windStart + .01; t < R.windEnd - .03; t += .001) lifts.push(siegebirdMechanism(t).latch);
+  assert.ok(lifts.every(a => a < 0 && a > -.2), 'pawl rides the ratchet while winding');
+  assert.ok(lifts.filter((a, i) => i && a - lifts[i - 1] > .05).length >= 12, 'pawl drops off tooth after tooth');
+  assert.equal(siegebirdMechanism(R.windEnd).latch, 0, 'pawl in the last notch at full draw');
+}
 const cues = siegebirdCues(0, R.seconds).map(c => c.cue);
-assert.equal(cues.filter(c => c === 'click').length, 8); assert.equal(cues.at(-1), 'ready'); assert.ok(cues.indexOf('latch') < cues.indexOf('seat'));
+assert.equal(cues.filter(c => c === 'click').length, SIEGEBIRD_WINCH.ratchetTeeth - 1); assert.deepEqual(cues.slice(0, 2), ['release', 'engage']); assert.equal(cues.at(-1), 'ready'); assert.ok(cues.indexOf('latch') < cues.indexOf('seat'));
 assert.deepEqual(siegebirdCues(.5, .5), []); assert.deepEqual(siegebirdCues(Infinity, .2), []);
 
 // 3. First-person framing: the bird enters off-frame on its side, is on screen by the hover, and is clear of the
