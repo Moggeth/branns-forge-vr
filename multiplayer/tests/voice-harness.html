@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Synthetic voice verification</title>
+<p>Test fixture: generated tone only, no real microphone access.</p>
+<button id="listen">Join voice</button><button id="mic">Synthetic microphone</button>
+<script type="module">
+import {PeerRoomConnection} from '../peer/browser.js';
+import {ProximityVoice} from '../client/proximity-voice.js';
+window.makeVoice = (url,options) => {
+  window.c = new PeerRoomConnection({url,iceServers:[]});
+  window.captureCalls = 0; window.syntheticTracks = []; window.toneContexts = [];
+  window.v = new ProximityVoice(c,{mediaDevices:{getUserMedia:async()=>{
+    captureCalls++;
+    if(window.deny)throw new DOMException('Synthetic denial','NotAllowedError');
+    const ctx = new AudioContext(), oscillator=ctx.createOscillator(), gain=ctx.createGain(), destination=ctx.createMediaStreamDestination();
+    toneContexts.push(ctx); oscillator.frequency.value=440; gain.gain.value=.12;
+    oscillator.connect(gain).connect(destination);oscillator.start();await ctx.resume();
+    syntheticTracks.push(...destination.stream.getTracks());return destination.stream;
+  }}});
+  window.pose={position:[0,1.65,0],forward:[0,0,-1],up:[0,1,0]};v.updatePose(pose);
+  c.connect(options);
+};
+document.querySelector('#listen').onclick=()=>v.join();document.querySelector('#mic').onclick=()=>v.enableMicrophone();
+window.meter = async () => {
+  const ctx=v.audio.context, split=ctx.createChannelSplitter(2), analysers=[ctx.createAnalyser(),ctx.createAnalyser()];
+  v.audio.output.connect(split);analysers.forEach((a,i)=>{a.fftSize=2048;split.connect(a,i);});
+  const values=[0,0];for(let n=0;n<8;n++){await new Promise(r=>setTimeout(r,50));analysers.forEach((a,i)=>{const f=new Float32Array(2048);a.getFloatTimeDomainData(f);values[i]+=Math.sqrt(f.reduce((s,x)=>s+x*x,0)/f.length)/8;});}
+  v.audio.output.disconnect(split);split.disconnect();return values;
+};
+window.cleanup=()=>{v.dispose();c.close();for(const ctx of toneContexts)void ctx.close();};
+</script>

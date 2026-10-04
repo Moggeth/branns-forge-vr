@@ -2250,3 +2250,32 @@ Public verification: source4adc79c deployed as dpl_GaeqAKBdJG1naU3yop9MU27pzjRj 
 ### Claude takeover cleanup - 2026-10-03
 The active starting guide is docs/CLAUDE-HANDOFF-20261003.md, linked from root CLAUDE.md, README and AGENTS. Corrected the stale native-first entry point; marked migration recommendations historical. Checked private main synchronization, no open PRs, public page200/cloud health8peers, paused sprint automations and targeted local process state. Claude meadow/canopy branch6bd929f is not integrated; no duplicate commission started. Nineteen unrelated Godot UID files remain untouched.
 Baseline simulation.mjs failed because its Grove cap fixture targeted the protected apron and its shrine test expected obsolete destructibility. Corrected only fixtures/assertions to current permanent-forge behavior (0e9e77e). All eight recommended focused checks pass. No runtime or production deployment changes in this handoff. Readiness gaps and optional Timberline kit features are explicitly documented; do not overstate physical-device acceptance.
+
+
+### Directional proximity voice draft - 2026-10-04
+
+Isolated checkout on remote main f1c1c55; active Claude checkout untouched.
+Focused proximity-voice assertions pass. Actual local Chromium WebRTC synthetic
+audio: guest-to-guest with host outside voice, left/right RMS (0.102/0.062 then
+0.062/0.103), head-turn reversal, near/far attenuation (0.068/0.019), silence
+beyond 32m, denied permission/retry, muted/deafened silence, stopped tracks,
+retry/failed connection recovery and participant cleanup pass (13.95s).
+Actual desktop Hero + phone-sized touch God UI, microphone opt-in, denial/retry,
+God focus, touch camera orientation, quick mute, deafen, leave and console checks
+pass (~20s). Only oscillator media or microphone mocks were used. Physical
+phone/headset/mic, cross-network NAT and eight-client endurance remain unverified.
+
+Aggregate suite: 124/125 pass in 75.1s; the existing Windows CRLF patch-notes check
+reads historical front matter as body (2026-10-03-crystal-wall.md, pr: 7). This is
+already fixed by PR #33; left unchanged here. Check and full production builds
+pass, including packaged asset validation. Source/test/doc details and network
+limitations: docs/PROXIMITY-VOICE.md. Captures/results: ignored
+logs/browser-acceptance/{captures,voice-results.json,voice-game-results.json}.
+
+Recovery evidence: sandboxed browser ICE could not connect; approved unsandboxed
+loopback Chromium succeeded. Receiving RTP initially produced no decoded samples
+with Web Audio alone; a retained muted media element starts Chromium's receiver,
+while only the spatial graph is audible. The real browser output test caught this.
+The first touch UI run targeted the desktop menu button; corrected to the existing
+touch menu. Visual QA then caught compact-menu clipping; scoped voice controls
+styles fix it without changing shared touch/fullscreen files.
