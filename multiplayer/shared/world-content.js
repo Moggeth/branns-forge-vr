@@ -36,7 +36,12 @@ export function worldTrees(state) {
   const trees = baseTrees.map(([x,z,height], i) => ({id: `tree${i + 1}`, x, z, height, variant: i % 3}));
   for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}); }
   if(state.landmarks) trees.splice(0,trees.length,...clearLandmarkTrees(trees));
-  for (const g of state.groves || []) { const count = g.kind === 'ring' ? 8 : 5; for (let i=0;i<count;i++) { const a = i * Math.PI * 2 / count; const r = g.kind === 'ring' ? 4 : 2.5; trees.push({id:`${g.id}-tree${i}`,x:+(g.x+Math.cos(a)*r).toFixed(3),z:+(g.z+Math.sin(a)*r).toFixed(3),height:5.5+(i%2),variant:i%3}); } }
+  for (const g of state.groves || []) {
+    // Growth spells store where each tree actually took root (shared/grove-growth.js); a wave's trees appear in order.
+    if (g.trees) { g.trees.forEach((t, i) => { if ((t[4] ?? 0) <= (state.tick ?? Infinity)) trees.push({id:`${g.id}-tree${i}`,x:t[0],z:t[1],height:t[2],variant:t[3]}); }); continue; }
+    // Groves saved before adaptive placement keep their original fixed pattern.
+    const count = g.kind === 'ring' ? 8 : 5; for (let i=0;i<count;i++) { const a = i * Math.PI * 2 / count; const r = g.kind === 'ring' ? 4 : 2.5; trees.push({id:`${g.id}-tree${i}`,x:+(g.x+Math.cos(a)*r).toFixed(3),z:+(g.z+Math.sin(a)*r).toFixed(3),height:5.5+(i%2),variant:i%3}); }
+  }
   // Ents (shared/ents.js): an awakened tree leaves the world while it walks; a rooted ent is a new tree where it stood.
   const awake = state.awakenedTrees?.length ? new Set(state.awakenedTrees.map(t => t.id)) : null;
   const standing = awake ? trees.filter(t => !awake.has(t.id)) : trees;

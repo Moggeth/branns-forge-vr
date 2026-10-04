@@ -2,7 +2,7 @@
 // each level unlocks more God spells. Pure and deterministic (authority state only, no clock or RNG).
 export const BLOOM = Object.freeze({
   levels: [30, 90, 180], max: 999,
-  grove: 2, apple: 3, skeleton: 1, golem: 3,
+  grove: 2, wave: 3, apple: 3, skeleton: 1, golem: 3,
   // Every 30 s each living grove adds a point, up to 8.
   passiveTicks: 1800, passiveCap: 8,
   spring: {radius: 3, hpPerSecond: 4, ticks: 3600, cap: 8},

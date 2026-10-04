@@ -5,6 +5,7 @@
 // Size comes from the tree: young trees wake as nimble saplings, mature trees as lumbering elders.
 // Anatomy is in units of the ent's height and is mirrored by client/ent-view.js (model faces -Z, its left is -X).
 
+import {findTreeSpot} from './grove-growth.js';
 export const ENT = Object.freeze({
  wakeTicks: 72,        // 1.2 s pulling free of the ground before it may move or strike
  rootTicks: 3600,      // 60 s after waking it roots where it stands
@@ -123,9 +124,10 @@ export function stepEntRooting(state, trees, ctx, events) {
   if (e.kind !== 'ent' || state.tick < entRootTick(e)) continue;
   state.enemies.splice(state.enemies.indexOf(e), 1);
   state.embeds = (state.embeds || []).filter(m => m.targetId !== e.id);
-  const x = +e.position[0].toFixed(3), z = +e.position[2].toFixed(3), y = ctx.terrainHeight(state, x, z);
-  const crowded = Math.hypot(x, z) < ENT.forgeClear || Math.abs(x) > 51 || Math.abs(z) > 51 || trees.some(t => Math.hypot(t.x - x, t.z - z) < 1.6) ||
-   state.wildTrees.some(t => Math.hypot(t.x - x, t.z - z) < 1.6) || state.wildTrees.length >= ENT.wild || !!ctx.blocked?.(x, z);
+  // Roots under the growth spells' spacing rule (shared/grove-growth.js): the open ground nearest where it stands.
+  const spot = state.wildTrees.length < ENT.wild ? findTreeSpot(state, {x: +e.position[0].toFixed(3), z: +e.position[2].toFixed(3), height: e.treeHeight, variant: e.variant}, 2.1, false) : null;
+  const x = spot ? spot.x : +e.position[0].toFixed(3), z = spot ? spot.z : +e.position[2].toFixed(3), y = ctx.terrainHeight(state, x, z);
+  const crowded = !spot || Math.hypot(x, z) < ENT.forgeClear || !!ctx.blocked?.(x, z);
   if (crowded) {
    const logs = dropEntTimber(state, e, ctx, events, entSpec(e).trunkLogs);
    events.push({kind: 'ent_fade', id: e.id, position: [x, y, z], material: 'wood', size: e.size, logs: logs.length});
