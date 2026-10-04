@@ -1,3 +1,4 @@
+import {MAX_PLAYERS} from './multiplayer-limits.js';
 // Forge Expedition: an optional, cooperative 10-15 minute run layered on the free sandbox.
 // Pure deterministic module (no DOM, clock, RNG or transport). The host owns one adventure per room,
 // steps it once per 60 Hz simulation tick, and applies the returned intents to the simulation state.
@@ -10,7 +11,7 @@ export const HZ = 60;
 export const STAGES = Object.freeze(['idle', 'camp', 'star', 'rekindle', 'victory', 'defeat']);
 const RUNNING = ['camp', 'star', 'rekindle'];
 const BOUND = 55, FORGE = [0, 0], DEPOSIT_RANGE = 9, DRAIN_RANGE = 11;
-const MAX_FOES = 16, MAX_TELEGRAPHS = 8, MAX_LEDGER = 16, MAX_RETRIES = 3, STOCK_CAP = 99;
+const MAX_FOES = 16, MAX_TELEGRAPHS = 8, MAX_LEDGER = MAX_PLAYERS * 2, MAX_RETRIES = 3, STOCK_CAP = 99;
 const GATES = Object.freeze([[-24, -16], [24, -16], [0, -30], [-22, 20], [22, 20]]);
 export const STAR_SITES = Object.freeze([[-30, 26], [32, 24], [-4, -38]]);
 const SHAPE = ['raise', 'lower', 'sunder', 'wall'], PLANT = ['grove', 'ring'], SUPPORT = ['heal', 'frost', 'lightning', 'crystal', 'starfall'];
@@ -51,6 +52,16 @@ function blank(seed) {
 export function createAdventure({seed = 41} = {}) {
   if (!Number.isSafeInteger(seed)) throw Error('Invalid adventure seed');
   return blank(seed);
+}
+
+// Keep all current room participants plus bounded reconnect history. Evict only
+// departed IDs; a 32-person room must never reject its 17th participant or lose
+// another present player's cooldown/renown merely because historical IDs remain.
+function ledgerRoom(map,playerId,players) {
+  if(Object.hasOwn(map,playerId)||Object.keys(map).length<MAX_LEDGER)return true;
+  const present=new Set(players.map(p=>p.id)),stale=Object.keys(map).find(id=>!present.has(id));
+  if(stale===undefined)return false;
+  delete map[stale];return true;
 }
 
 // ---- World view helpers. `world` is a simulation snapshot or the live state (read only). ----
@@ -118,7 +129,7 @@ function restockStone(adv, world, out) {
 function enterStage(adv, stage, world, out) {
   const {heroes} = roster(world);
   adv.stage = stage; adv.elapsed = 0; adv.supportUsed = 0; adv.hostileUsed = 0; adv.telegraphs = []; adv.votes = [];
-  adv.heroesAtStart = Math.min(8, heroes.length);
+  adv.heroesAtStart = Math.min(MAX_PLAYERS, heroes.length);
   if (stage === 'camp') { adv.need = {...adv.need, ...needs(heroes.length), star: 0}; adv.stock = {wood: 0, stone: 0}; restockStone(adv, world, out); }
   if (stage === 'star') { adv.need.star = needs(heroes.length).star; adv.star = {charge: 0, site: mix(adv.seed, adv.run, 99) % STAR_SITES.length, landed: false}; }
   if (stage === 'rekindle') { adv.flame = heroes.length ? 25 : 40; adv.rekindled = false; adv.waveIndex = 0; }
@@ -220,8 +231,8 @@ function victory(adv, world, out) {
   if (adv.rewardedRun !== adv.run) { // Team reward exactly once per run, to everyone present at the finish.
     adv.rewardedRun = adv.run;
     const award = 10 + 5 * Math.max(0, 2 - adv.retries) + Math.min(10, adv.deeds.starpath + (adv.deeds.support > 0 ? 3 : 0));
-    for (const p of roster(world).players.slice(0, 8)) {
-      if (!(p.id in adv.renown) && Object.keys(adv.renown).length >= MAX_LEDGER) delete adv.renown[Object.keys(adv.renown)[0]];
+    for (const p of roster(world).players.slice(0, MAX_PLAYERS)) {
+      ledgerRoom(adv.renown,p.id,roster(world).players);
       adv.renown[p.id] = Math.min(9999, (adv.renown[p.id] || 0) + award);
     }
     out.intents.push({type:'partyReward',health:100,mana:100,wood:6,stone:4,gems:3});
@@ -249,11 +260,7 @@ export function adventureAction(adv, playerId, message, world) {
   if (!p) return fail('not_joined');
   if (!int(message.seq, 1, Number.MAX_SAFE_INTEGER)) return fail('invalid_sequence');
   if (message.seq <= (adv.seqs[playerId] || 0)) return fail('duplicate_sequence');
-  if (!(playerId in adv.seqs) && Object.keys(adv.seqs).length >= MAX_LEDGER) {
-    const stale = Object.keys(adv.seqs).find(id => !players.some(q => q.id === id));
-    if (!stale) return fail('ledger_full');
-    delete adv.seqs[stale];
-  }
+  if (!ledgerRoom(adv.seqs,playerId,players)) return fail('ledger_full');
   adv.seqs[playerId] = message.seq; // A valid new sequence is consumed even if the payload is rejected.
   const out = {events: [], intents: []};
   const action = message.action;
@@ -273,7 +280,7 @@ export function adventureAction(adv, playerId, message, world) {
   if (action === 'leave') { // Majority of present players returns the room to free sandbox.
     if (adv.stage === 'idle') return fail('invalid_stage');
     if (!adv.votes.includes(playerId)) adv.votes.push(playerId);
-    adv.votes = adv.votes.filter(id => players.some(q => q.id === id)).slice(0, 8);
+    adv.votes = adv.votes.filter(id => players.some(q => q.id === id)).slice(0, MAX_PLAYERS);
     if (adv.votes.length * 2 > players.length || !RUNNING.includes(adv.stage)) {
       despawnAll(adv, out); adv.stage = 'idle'; adv.elapsed = 0; adv.telegraphs = []; adv.votes = []; phaseNotice(adv, 'Expedition ended. Free building resumes.');
       out.events.push({kind: 'adventure_stage', stage: 'idle', run: adv.run});
@@ -317,6 +324,7 @@ export function adventureAction(adv, playerId, message, world) {
     }
     amount = Math.min(amount, cap, kind === 'flame' ? Math.ceil(100 - adv.flame) : depositRoom(adv, kind));
     if (amount <= 0) return fail('not_needed');
+    if(!ledgerRoom(adv.cool,playerId,players))return fail('ledger_full');
     if (kind === 'flame') adv.flame = clamp(adv.flame + amount, 0, 100); else credit(adv, kind, amount);
     adv.supportUsed += amount; adv.cool[playerId] = adv.tick;
     out.intents.push({type: 'mana', playerId, amount: manaCost});
@@ -423,7 +431,7 @@ function restore(a) {
   const MAXT = Number.MAX_SAFE_INTEGER;
   if (a.v !== ADVENTURE_VERSION) throw Error('version');
   if (!int(a.seed, Number.MIN_SAFE_INTEGER, MAXT) || !int(a.run, 0, 99999) || !STAGES.includes(a.stage)) throw Error('bad_header');
-  if (!int(a.elapsed, 0, 60 * 60 * 60) || !int(a.tick, 0, MAXT) || !int(a.heroesAtStart, 0, 8)) throw Error('bad_clock');
+  if (!int(a.elapsed, 0, 60 * 60 * 60) || !int(a.tick, 0, MAXT) || !int(a.heroesAtStart, 0, MAX_PLAYERS)) throw Error('bad_clock');
   if (!int(a.campReadyAt, 0, a.elapsed)) throw Error('bad_clock');
   exact(a.need, ['wood', 'stone', 'star'], 'need');
   if (!int(a.need.wood, 0, 24) || !int(a.need.stone, 0, 16) || !int(a.need.star, 0, 8)) throw Error('bad_need');
@@ -443,7 +451,7 @@ function restore(a) {
   idMap(a.seqs, 'seqs', MAX_LEDGER, v => int(v, 0, MAXT));
   idMap(a.cool, 'cool', MAX_LEDGER, v => int(v, -1e9, MAXT));
   idMap(a.renown, 'renown', MAX_LEDGER, v => int(v, 0, 9999));
-  if (!Array.isArray(a.votes) || a.votes.length > 8 || !a.votes.every(validId) || new Set(a.votes).size !== a.votes.length) throw Error('bad_votes');
+  if (!Array.isArray(a.votes) || a.votes.length > MAX_PLAYERS || !a.votes.every(validId) || new Set(a.votes).size !== a.votes.length) throw Error('bad_votes');
   if (typeof a.notice !== 'string' || a.notice.length > 96) throw Error('bad_notice');
   if (!RUNNING.includes(a.stage) && a.stage !== 'defeat' && a.foes.length) throw Error('bad_foes');
   return copy(a); // Whitelisted keys only; prototype keys such as __proto__ fail `exact`.

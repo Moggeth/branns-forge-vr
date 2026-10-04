@@ -80,4 +80,11 @@ test('God healing, wards, offensive spells and battle respawns honor sides',()=>
  p.role='hero';p.side='rivals';p.position=[30,terrainHeight(r.w,30,0),0];p.hp=1;const neutral=createEnemy('respawn-check',[30,p.position[1],1.6]);neutral.attackTick=r.w.tick-17;neutral.attackTarget=p.id;neutral.yaw=0;r.w.enemies=[neutral];r.sim.step();assert.equal(p.hp,100);assert.ok(Math.hypot(p.position[0]-40,p.position[2]-40)<15);loadSimulation(r.sim.checkpoint());
 });
 
+
+test('axe cleave excludes allied bot damage, knockback and hit feedback',()=>{
+ const r=rig();r.command('start');r.sim.step();const p=r.w.players[0],ally=r.w.enemies.find(e=>e.side==='party'),foe=r.w.enemies.find(e=>e.side==='rivals');p.position=[30,0,4];p.yaw=0;ally.position=[30,0,1];foe.position=[31,0,1];const original=structuredClone(ally);
+ const result=r.sim.command('host',{type:'action',action:'special',seq:2});assert.equal(result.ok,true);assert.deepEqual(ally,original);assert.ok(!result.events.find(e=>e.kind==='axe_cleave').hits.includes(ally.id));assert.ok(result.events.find(e=>e.kind==='axe_cleave').hits.includes(foe.id));
+ assert.equal(hitEnemyPart(r.w,ally,'torso',50,{ownerId:'departed'},ctx,[]),false);assert.equal(ally.hp,original.hp,'unknown legacy delayed owner cannot bypass faction protection');
+});
+
 console.log(`${count} battle mode tests passed in ${((performance.now()-start)/1000).toFixed(3)}s`);
