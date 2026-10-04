@@ -28,7 +28,7 @@ const notes = changed.filter(f => /^multiplayer\/patch-notes\/\d{4}-\d{2}-\d{2}-
 const optOut = /\[no patch notes\]/i.test(run('log', '--format=%B', `${mergeBase}..${head}`));
 
 if (!game.length) console.log('patch-notes-required: no game files changed');
-else if (notes.length) console.log(`patch-notes-required: ${game.length} game files changed, entries: ${notes.join(', ')}`);
+else if (notes.length) console.log(`patch-notes-required: ${game.length} game files changed, ${notes.length} patch-notes entr${notes.length === 1 ? 'y' : 'ies'} added or updated`);
 else if (optOut) console.log('patch-notes-required: game files changed, opted out with [no patch notes]');
 else {
   console.log(`This PR changes the game (${game.slice(0, 5).join(', ')}${game.length > 5 ? ', …' : ''}) but adds no patch notes.`);
