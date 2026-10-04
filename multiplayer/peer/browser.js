@@ -3,6 +3,7 @@ const FRAME_BYTES = 12_000;
 const MAX_MESSAGE_BYTES = 512 * 1024;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const preparedOwner = new WeakMap();
 const emit = (target, type, detail) => target.dispatchEvent(new CustomEvent(type, { detail }));
 const open = channel => channel?.readyState === 'open';
 // Pre-welcome rejections that no automatic retry can fix.
@@ -306,32 +307,52 @@ export class PeerRoomConnection extends EventTarget {
       emit(this, 'message', { from: id, data: envelope.data });
     }
   }
-  #sendEnvelope(id, envelope) {
-    const peer = this.peers.get(id), channel = peer?.relay ? this.socket : peer?.channel;
-    if ((peer?.relay ? channel?.readyState !== WebSocket.OPEN : !open(channel)) || channel.bufferedAmount > 1024 * 1024) return false;
+  #prepareEnvelope(envelope) {
     let serialized; try { serialized = encoder.encode(JSON.stringify(envelope)); } catch { return false; }
     if (!serialized.length || serialized.length > MAX_MESSAGE_BYTES) return false;
-    const idSequence = `${this.peerId}:${++this.frameSequence}`;
     const total = Math.ceil(serialized.length / FRAME_BYTES);
     if (total > 64) return false;
+    const bodies = [];
     for (let part = 0; part < total; part++) {
       const chunk = serialized.subarray(part * FRAME_BYTES, (part + 1) * FRAME_BYTES);
-      const frame = JSON.stringify({ id: idSequence, epoch: this.epoch, part, total, body: btoa(String.fromCharCode(...chunk)) });
-      channel.send(peer?.relay ? JSON.stringify({ type: 'relay', to: id, epoch: this.epoch, frame }) : frame);
+      bodies.push(btoa(String.fromCharCode(...chunk)));
     }
+    const prepared = Object.freeze({epoch:this.epoch, peerId:this.peerId, bodies:Object.freeze(bodies)});
+    preparedOwner.set(prepared, this);
+    return prepared;
+  }
+  #sendPreparedEnvelope(id, prepared) {
+    if (!prepared || preparedOwner.get(prepared) !== this || prepared.epoch !== this.epoch || prepared.peerId !== this.peerId) return false;
+    const peer = this.peers.get(id), channel = peer?.relay ? this.socket : peer?.channel;
+    if ((peer?.relay ? channel?.readyState !== WebSocket.OPEN : !open(channel)) || channel.bufferedAmount > 1024 * 1024) return false;
+    const idSequence = `${this.peerId}:${++this.frameSequence}`, total = prepared.bodies.length;
+    try {
+      for (let part = 0; part < total; part++) {
+        // Check between fragments too: relay peers share one socket's send buffer.
+        if (channel.bufferedAmount > 1024 * 1024) return false;
+        const frame = JSON.stringify({id:idSequence, epoch:this.epoch, part, total, body:prepared.bodies[part]});
+        channel.send(peer?.relay ? JSON.stringify({type:'relay', to:id, epoch:this.epoch, frame}) : frame);
+      }
+    } catch { return false; } // A channel may close between its readiness check and send.
     return true;
   }
+  #sendEnvelope(id, envelope) { return this.#sendPreparedEnvelope(id, this.#prepareEnvelope(envelope)); }
+  // Explicit per-publication preparation; no object-identity cache that could retain stale mutations.
+  prepareMessage(data) { return this.#prepareEnvelope({kind:'message', data}); }
+  sendPrepared(to, prepared) { if (!this.isHost && to !== this.hostId) return false; return this.#sendPreparedEnvelope(to, prepared); }
   send(to, data) { if (!this.isHost && to !== this.hostId) return false; return this.#sendEnvelope(to, { kind: 'message', data }); }
-  broadcast(data) { if (!this.isHost) return false; let sent = 0; for (const id of this.peers.keys()) if (this.send(id, data)) sent++; return sent; }
+  broadcast(data) { if (!this.isHost || !this.peers.size) return false; const prepared = this.prepareMessage(data); let sent = 0; for (const id of this.peers.keys()) if (this.sendPrepared(id, prepared)) sent++; return sent; }
   setCheckpoint(state, revision) {
     if (!this.isHost || !Number.isSafeInteger(revision) || revision < 0 || revision < this.checkpointRevision) return false;
     this.checkpoint = state; this.checkpointRevision = revision;
     // Only desktop peers can be offered the world, so only they need 2 Hz recovery points. Others
     // keep a local backup at the 10 s autosave cadence instead of ~130 KB/s of unused checkpoints.
     const now = Date.now();
+    let prepared;
     for (const [id, peer] of this.peers) {
       if (this.roster.get(id)?.desktop !== true && now - (peer.checkpointAt || 0) < 10_000) continue;
-      if (this.#sendEnvelope(id, { kind: 'checkpoint', state, revision })) peer.checkpointAt = now;
+      prepared ??= this.#prepareEnvelope({kind:'checkpoint', state, revision});
+      if (this.#sendPreparedEnvelope(id, prepared)) peer.checkpointAt = now;
     }
     return true;
   }
