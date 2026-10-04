@@ -47,6 +47,12 @@ async function walkTo(at, near) {
   await look([at[0], me.position[1] + 1.65, at[2]], 2); await page.keyboard.down('KeyW'); await frames(Math.min(4, 1 + Math.floor(Math.hypot(at[0] - me.position[0], at[2] - me.position[2])*2))); await page.keyboard.up('KeyW'); }
  return false;
 }
+// Look and attack need the pointer captured, as on desktop; the first click only captures it.
+async function capture() {
+ if (await page.evaluate(() => !!document.pointerLockElement)) return;
+ await page.mouse.click(320, 180); await frames(2);
+ await page.waitForFunction(() => !!document.pointerLockElement, null, {timeout: 60000, polling: 250});
+}
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
@@ -54,7 +60,7 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().controlsActive);
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
- await page.locator('#world').click({position: {x: 320, y: 180}});
+ await capture();
  await frames(10);
  await page.keyboard.press('Digit5'); await frames(30);
  const {s} = await harness(); assert.equal((await harness()).c.weapon.tool, 'bow');
@@ -69,7 +75,9 @@ try {
  const target = slot.w.position; record('target', 'pass', {tree: tree.id, slot: slot.i, target, vantage});
  recording = true;
  await look(target, 40, .02);
- await page.mouse.down(); await frames(50); await page.mouse.up();
+ await capture(); await page.mouse.down(); await frames(10);
+ const drawing = (await harness()).c.weapon; record('draw', drawing.drawing ? 'pass' : 'fail', {weapon: drawing, locked: await page.evaluate(() => !!document.pointerLockElement)});
+ await frames(40); await page.mouse.up();
  let pierced = null;
  await frames(40, async () => { if (!pierced) { const {s} = await harness(); pierced = s.fruit?.drops?.[0] || null; } });
  assert.ok(pierced, 'the apple came off on the arrow'); record('pierce', 'pass', {drop: pierced.id, stick: pierced.stick});
@@ -87,7 +95,7 @@ try {
  let held = (await harness()).s.fruit.drops[0]; assert.equal(held?.heldBy, (await page.evaluate(() => window.brannHarness.state().playerId))); record('take', 'pass');
  await look([0, 1.6, 0], 12); await frames(20); await shot(page, 'apple-held');
  const hp0 = (await harness()).me.hp;
- for (let b = 0; b < 3; b++) { if (b === 1) await page.keyboard.press('KeyE'); else { await page.mouse.down(); await page.mouse.up(); } await frames(68); if (b === 0) await shot(page, 'apple-bite-1'); }
+ await capture(); for (let b = 0; b < 3; b++) { if (b === 1) await page.keyboard.press('KeyE'); else { await page.mouse.down(); await page.mouse.up(); } await frames(68); if (b === 0) await shot(page, 'apple-bite-1'); }
  await frames(60);
  const after = await harness(); assert.equal(after.s.fruit.drops.length, 0, 'eaten'); record('eaten', 'pass', {hp: [hp0, after.me.hp]});
  await shot(page, 'apple-done');

@@ -50,6 +50,12 @@ async function walkTo(at, near) {
   await look(at, 2); await page.keyboard.down('KeyW'); await frames(4); await page.keyboard.up('KeyW'); }
  return false;
 }
+// Look and attack need the pointer captured, as on desktop; the first click only captures it.
+async function capture() {
+ if (await page.evaluate(() => !!document.pointerLockElement)) return;
+ await page.mouse.click(320, 180); await frames(2);
+ await page.waitForFunction(() => !!document.pointerLockElement, null, {timeout: 60000, polling: 250});
+}
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
@@ -58,7 +64,7 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().phase === 'game');
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
- await page.mouse.click(320, 180); await frames(10);
+ await capture(); await frames(10);
  const machine = (await harness()).s.inventions.structures.find(b => b.id === 'apple-line');
  assert.ok(await walkTo(machine.position, 1.8), 'reached the Timberline');
  await page.keyboard.press('KeyE'); await frames(30);
@@ -66,7 +72,7 @@ try {
  assert.equal((await harness()).s.inventions.structures.find(b => b.id === 'apple-line').operator, id, 'manned'); record('manned', 'pass');
  recording = true; await frames(20); await shot(page, 'timberline-apple-aim');
  const before = (await harness()).s.fruit.missing.length;
- await page.mouse.down(); await page.mouse.up();
+ await capture(); await page.mouse.down(); await page.mouse.up();
  let halves = [], burst = 0;
  await frames(110, async i => { if (i%10 === 9) { const {s} = await harness(); halves = s.fruit.drops.filter(d => d.half); burst = s.fruit.missing.length - before - halves.length/2; } });
  await shot(page, 'timberline-apple-cut');
@@ -82,7 +88,7 @@ try {
  await page.keyboard.press('KeyE'); await frames(45);
  assert.equal((await harness()).s.fruit.drops.find(d => d.id === half.id)?.heldBy, id, 'took the half'); record('take-half', 'pass');
  await look([half.position[0], half.position[1] + 1.6, half.position[2] - 6], 12); await frames(15);
- for (let b = 0; b < 2; b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
+ await capture(); for (let b = 0; b < 2; b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
  await frames(60);
  const done = await harness(); assert.ok(!done.s.fruit.drops.some(d => d.id === half.id), 'eaten'); record('eaten-half', 'pass', {hp: [hp0, done.me.hp]});
  assert.deepEqual(page.errors, []);
