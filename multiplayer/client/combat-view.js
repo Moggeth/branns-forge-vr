@@ -1,6 +1,7 @@
 import {phoenixBank} from './phoenix-bank.js';
 import * as THREE from 'three';
 import {prepareAsset, prepareProjectile} from './asset-pose.js';
+import {dressSkeleton, setShieldBroken} from './skeleton-look.js';
 import {updateSkinBounds} from './skin-bounds.js';
 import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
@@ -31,8 +32,8 @@ export function canonicalPart(name = '') {
   if (/head|skull/.test(n)) return 'head';
   if (/leftleg|leftknee|leftfoot|legl/.test(n)) return 'leftLeg';
   if (/rightleg|rightknee|rightfoot|legr/.test(n)) return 'rightLeg';
-  if (/leftarm|lefthand|arml|shoulderl|forearml|elbowl/.test(n)) return 'leftArm';
-  if (/rightarm|righthand|armr|shoulderr|forearmr|elbowr/.test(n)) return 'rightArm';
+  if (/leftarm|leftforearm|lefthand|arml|shoulderl|forearml|elbowl/.test(n)) return 'leftArm';
+  if (/rightarm|rightforearm|righthand|armr|shoulderr|forearmr|elbowr/.test(n)) return 'rightArm';
   return 'torso';
 }
 
@@ -190,6 +191,14 @@ export function capturePartPoses(root) {
 
 // Bake visible posed triangles, retaining UVs, colours and material groups.
 // A whole leg includes every triangle weighted to its thigh, knee and foot.
+// Rotation taking local face direction f (and local up, +Y of the frozen bone) onto world direction `to` with `up`.
+const _fb = new THREE.Matrix4(), _tb = new THREE.Matrix4(), _fx = new THREE.Vector3(), _fu = new THREE.Vector3(), _tx = new THREE.Vector3(), _tu = new THREE.Vector3();
+export function faceToward(out, f, to, up) {
+  _fu.set(0, 1, 0).addScaledVector(f, -f.y).normalize(); _fx.crossVectors(_fu, f);
+  _tu.copy(up).addScaledVector(to, -up.dot(to)).normalize(); _tx.crossVectors(_tu, to);
+  _fb.makeBasis(_fx, _fu, f); _tb.makeBasis(_tx, _tu, to);
+  return out.setFromRotationMatrix(_tb.multiply(_fb.transpose()));
+}
 export function snapshotDetachedPart(root, part) {
   root.updateWorldMatrix(true, true);
   const anchor = partAnchor(root, part);
@@ -203,6 +212,7 @@ export function snapshotDetachedPart(root, part) {
     const frozen = new THREE.Group(); frozen.name = node.name; frozen.matrix.copy(worldToDetached).multiply(node.matrixWorld);
     frozen.matrix.decompose(frozen.position, frozen.quaternion, frozen.scale); detached.add(frozen);
   });
+  const eyes = new THREE.Vector3(); let eyeCount = 0, centre = null;
   root.traverse(mesh => {
     if (!mesh.isMesh || !isVisible(mesh, root)) return;
     const record = recordGeometry(mesh), selected = record.triangles.filter(t => t.part === part);
@@ -214,9 +224,11 @@ export function snapshotDetachedPart(root, part) {
     }
     let offset = 0;
     for (const triangle of selected) {
+      const glow = (Array.isArray(mesh.material) ? mesh.material[triangle.materialIndex] : mesh.material)?.name === 'EyeGlow';
       for (const index of triangle.ids) {
         const point = mesh.getVertexPosition(index, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(worldToDetached);
         positions.push(...point.toArray());
+        if (glow) { eyes.add(point); eyeCount++; }
         for (const attr of Object.values(attributes)) for (let c = 0; c < attr.source.itemSize; c++) attr.values.push(attr.source.getComponent(index, c));
       }
       appendMaterialGroup(geometry, offset, triangle.materialIndex); offset += 3;
@@ -228,7 +240,13 @@ export function snapshotDetachedPart(root, part) {
     piece.userData.detachedPart = part;
     if (contactSurface(mesh)) piece.userData.contactSurface = 'shield';
     detached.add(piece);
+    if (piece.material?.name === 'Bone' || (Array.isArray(piece.material) && piece.material.some(m => m.name === 'Bone'))) centre = (centre || new THREE.Box3()).union(geometry.boundingBox || (geometry.computeBoundingBox(), geometry.boundingBox));
   });
+  // A skull remembers which way its face looks (towards its glowing eyes), so a hero holding it sees it grin back.
+  if (eyeCount && centre) {
+    const face = eyes.divideScalar(eyeCount).sub(centre.getCenter(new THREE.Vector3()));
+    if (face.lengthSq() > 1e-8) detached.userData.faceLocal = face.normalize();
+  }
   return detached;
 }
 
@@ -270,7 +288,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     if (!cache || cache.revision !== contactRevision) { cache = prepareSurfaceCache(root); cache.revision = contactRevision; surfaceCaches.set(root, cache); }
     return cache;
   }
-  const detached = new Map(), projectiles = new Map(), embeds = new Map(), reported = new Set(), sweptUntil = new Map();
+  const detached = new Map(), projectiles = new Map(), embeds = new Map(), reported = new Set(), sweptUntil = new Map(), piercedBy = new Map();
   const fractureAnchors = new Map();
   const actorFor = id => actors.get(`e:${id}`) || actors.get(id);
   const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
@@ -298,7 +316,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       let node = detached.get(data.id);
       if (!node) {
         let source = actorFor(data.sourceId)?.visual;
-        if (!source && templates.has(data.kind)) source = prepareAsset(templates.get(data.kind), data.kind).visual;
+        if (!source && templates.has(data.kind)) { source = prepareAsset(templates.get(data.kind), data.kind).visual; if (data.kind === 'skeleton') dressSkeleton(source, data.sourceId); }
         if (!source || source.userData.placeholder) continue;
         node = snapshotDetachedPart(source, data.part); detached.set(data.id, node); scene.add(node);
         node.position.fromArray(data.position); node.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);
@@ -322,6 +340,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const data of next.enemies || []) {
       const actor = actorFor(data.id); if (!actor) continue;
       if (data.kind === 'golem') updateGolemArmor(actor.visual, data.armor);
+      if (data.kind === 'skeleton') setShieldBroken(actor.visual, !!data.shieldBroken);
       maskMissingParts(actor.visual, data.missingParts || []);
     }
     for (const data of next.projectiles || []) {
@@ -344,7 +363,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       }
     }
     const projectileIds=new Set((next.projectiles||[]).map(p=>p.id));
-    for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
+    for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); piercedBy.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
       if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; embeds.set(data.id, node); }
@@ -434,7 +453,22 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         if (from.every((n, axis) => n === to[axis])) continue;
         const hits = segmentContacts(from, to, {excludeId: data.ownerId}), world = worldContact(from, to);
         if (world) hits.push({...world, distance: world.distance ?? new THREE.Vector3().fromArray(from).distanceTo(new THREE.Vector3().fromArray(world.point))});
-        const hit = hits.sort((a, b) => a.distance - b.distance)[0];
+        hits.sort((a, b) => a.distance - b.distance);
+        if (data.golden) {
+          // Radiant bolt: report every body it passes through (shield and the body behind count separately),
+          // each once; it stops only at the world.
+          const seen = piercedBy.get(data.id) || piercedBy.set(data.id, new Set(data.pierced || [])).get(data.id);
+          let stop = false;
+          for (const hit of hits) {
+            const key = hit.targetId + (hit.surface === 'shield' ? '#shield' : '');
+            if (seen.has(key)) continue;
+            seen.add(key); onContact({type: 'projectileHit', projectileId: data.id, ...hit});
+            if (hit.targetId === 'world' || hit.targetId === 'terrain' || seen.size > 6) { stop = true; break; }
+          }
+          if (stop) { reported.add(data.id); const visual = projectiles.get(data.id); if (visual) visual.visible = false; break; }
+          continue;
+        }
+        const hit = hits[0];
         if (hit) { reported.add(data.id); const visual = projectiles.get(data.id); if (visual) visual.visible = false; onContact({type: 'projectileHit', projectileId: data.id, ...hit}); break; }
       }
       sweptUntil.set(data.id, [...data.position]);
@@ -449,6 +483,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   // Presentation-only FPS pose. The authoritative held part still follows the
   // server's hand/yaw; the local view follows the camera-attached weapon grip,
   // including pitch. Call after tick(), before render(), only outside XR.
+  const heldEye = new THREE.Vector3(), heldUp = new THREE.Vector3(), heldCamQ = new THREE.Quaternion();
   function poseLocalHeld(holderId, grip) {
     if (disposed || !holderId || !grip?.isObject3D) return false;
     const data = (snapshot.detachedParts || []).find(d => d.heldBy === holderId);
@@ -459,6 +494,12 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     const centre = data.localBounds
       ? new THREE.Vector3().fromArray(data.localBounds.min).add(new THREE.Vector3().fromArray(data.localBounds.max)).multiplyScalar(.5)
       : new THREE.Vector3();
+    const face = node.userData.faceLocal;
+    if (face && camera) { // a held skull turns its grin to the viewer, a little three-quarter, like holding up Yorick
+      const at = grip.getWorldPosition(embedPoint), eye = camera.getWorldPosition(heldEye);
+      heldUp.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(heldCamQ));
+      faceToward(rotation, face, eye.sub(at).normalize().applyAxisAngle(heldUp, .32), heldUp);
+    }
     node.quaternion.copy(rotation);
     node.position.copy(grip.getWorldPosition(embedPoint)).sub(centre.applyQuaternion(rotation));
     if (camera) fractures.update(camera);

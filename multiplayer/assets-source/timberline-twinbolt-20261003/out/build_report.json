@@ -1,14 +1,14 @@
 {
  "builder": "build_timberline.py",
- "blender": "4.5.13 LTS",
+ "blender": "4.5.14 LTS",
  "ballista": {
-  "bytes": 1458052,
+  "bytes": 1728076,
   "triangles": {
-   "LOD0": 12118,
-   "LOD1": 4104,
+   "LOD0": 15640,
+   "LOD1": 4758,
    "other": 0
   },
-  "materials": 6,
+  "materials": 7,
   "animations": [
    [
     "Fire",
@@ -31,39 +31,79 @@
    {
     "name": "tl_wood_normal",
     "mime": "image/jpeg",
-    "bytes": 80605
+    "bytes": 77170
    },
    {
     "name": "tl_wood_basecolor",
     "mime": "image/jpeg",
-    "bytes": 108383
+    "bytes": 83686
+   },
+   {
+    "name": "tl_wood_orm",
+    "mime": "image/jpeg",
+    "bytes": 10595
    },
    {
     "name": "tl_iron_normal",
     "mime": "image/jpeg",
-    "bytes": 72696
+    "bytes": 64357
    },
    {
     "name": "tl_iron_basecolor",
     "mime": "image/jpeg",
-    "bytes": 24734
+    "bytes": 26959
+   },
+   {
+    "name": "tl_iron_orm",
+    "mime": "image/jpeg",
+    "bytes": 5578
+   },
+   {
+    "name": "tl_brass_normal",
+    "mime": "image/jpeg",
+    "bytes": 10307
+   },
+   {
+    "name": "tl_brass_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 7495
+   },
+   {
+    "name": "tl_brass_orm",
+    "mime": "image/jpeg",
+    "bytes": 7743
+   },
+   {
+    "name": "tl_rope_normal",
+    "mime": "image/jpeg",
+    "bytes": 21942
    },
    {
     "name": "tl_rope_basecolor",
     "mime": "image/jpeg",
-    "bytes": 10456
+    "bytes": 21215
+   },
+   {
+    "name": "tl_mithril_normal",
+    "mime": "image/jpeg",
+    "bytes": 20238
+   },
+   {
+    "name": "tl_mithril_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 6236
    }
   ],
-  "nodes": 106
+  "nodes": 111
  },
  "bolts": {
-  "bytes": 399952,
+  "bytes": 554752,
   "triangles": {
-   "LOD0": 868,
-   "LOD1": 468,
+   "LOD0": 3260,
+   "LOD1": 716,
    "other": 0
   },
-  "materials": 4,
+  "materials": 5,
   "animations": [
    [
     "Deploy",
@@ -82,22 +122,57 @@
    {
     "name": "tl_wood_normal",
     "mime": "image/jpeg",
-    "bytes": 80605
+    "bytes": 77170
    },
    {
     "name": "tl_wood_basecolor",
     "mime": "image/jpeg",
-    "bytes": 108383
+    "bytes": 83686
+   },
+   {
+    "name": "tl_wood_orm",
+    "mime": "image/jpeg",
+    "bytes": 10595
    },
    {
     "name": "tl_iron_normal",
     "mime": "image/jpeg",
-    "bytes": 72696
+    "bytes": 64357
    },
    {
     "name": "tl_iron_basecolor",
     "mime": "image/jpeg",
-    "bytes": 24734
+    "bytes": 26959
+   },
+   {
+    "name": "tl_iron_orm",
+    "mime": "image/jpeg",
+    "bytes": 5578
+   },
+   {
+    "name": "tl_brass_normal",
+    "mime": "image/jpeg",
+    "bytes": 10307
+   },
+   {
+    "name": "tl_brass_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 7495
+   },
+   {
+    "name": "tl_brass_orm",
+    "mime": "image/jpeg",
+    "bytes": 7743
+   },
+   {
+    "name": "tl_mithril_normal",
+    "mime": "image/jpeg",
+    "bytes": 20238
+   },
+   {
+    "name": "tl_mithril_basecolor",
+    "mime": "image/jpeg",
+    "bytes": 6236
    }
   ],
   "nodes": 27
@@ -115,11 +190,19 @@
   "nodes": 17
  },
  "texture_files": {
-  "tl_iron_basecolor.jpg": 24734,
-  "tl_iron_normal.jpg": 72696,
-  "tl_rope_basecolor.jpg": 10456,
-  "tl_wood_basecolor.jpg": 108383,
-  "tl_wood_normal.jpg": 80605
+  "tl_brass_basecolor.jpg": 7495,
+  "tl_brass_normal.jpg": 10307,
+  "tl_brass_orm.jpg": 7743,
+  "tl_iron_basecolor.jpg": 26959,
+  "tl_iron_normal.jpg": 64357,
+  "tl_iron_orm.jpg": 5578,
+  "tl_mithril_basecolor.jpg": 6236,
+  "tl_mithril_normal.jpg": 20238,
+  "tl_rope_basecolor.jpg": 21215,
+  "tl_rope_normal.jpg": 21942,
+  "tl_wood_basecolor.jpg": 83686,
+  "tl_wood_normal.jpg": 77170,
+  "tl_wood_orm.jpg": 10595
  },
  "contract": {
   "version": 1,
