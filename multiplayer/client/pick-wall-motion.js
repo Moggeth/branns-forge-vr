@@ -69,6 +69,8 @@ export function createPickWallMotion({reducedMotion=false}={}){
   /** Drop everything instantly (tool swapped away, VR started). */
   reset(){phase=null;from=null;},
   get active(){return phase!==null;},
+  /** True during the authored slam (the sway layer steps aside for it, as it does for swings). */
+  get slamming(){return phase==='slam';},
   /** Layer for this frame, or null when the pick is not doing anything wall-related. Reuses its objects. */
   pose(now){
    const c=current(now);if(!c){result.phase=null;result.focus=0;return null;}
