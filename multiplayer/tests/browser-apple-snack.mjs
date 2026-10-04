@@ -15,7 +15,7 @@ const fixture = (() => { const sim = createSimulation({room: 'SOLO'}), w = sim.a
  return Buffer.from(JSON.stringify(makeSave(sim.checkpoint()))); })();
 const CLIP = process.env.CLIP_DIR || '', TOUCH = !!process.env.TOUCH;
 const viewport = TOUCH ? {width: 844, height: 390} : {width: 640, height: 360};
-const {browser, page} = await launch({viewport, touch: TOUCH});
+const {browser, page} = await launch({viewport, touch: TOUCH, pointerLock: true});
 // Virtual clock: performance.now and requestAnimationFrame only move when the test advances a frame.
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
@@ -60,6 +60,9 @@ async function capture() {
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
+ // A fresh browser opens release notes; dismiss them through the real UI before expecting controls.
+ const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
+ if (await whatsNew.isVisible()) await whatsNew.click();
  // The Orchard world with two falling stars timed to land beside the spawn, so the hero is hurt (about 64 HP) and the
  // apple's healing shows. Starfalls this small leave no golem behind.
  await page.fill('#name', 'Orchard QA'); await page.check('input[name="role"][value="hero"]', {force: true});

@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
-import {giftContents,GIFT_POSITION} from '../shared/testing-supplies.js';
+import {giftContents,GIFT_POSITION,createTestingSupplies} from '../shared/testing-supplies.js';
+import {baseHeight} from '../shared/terrain.js';
 import {STRUCTURES,inventionAction} from '../shared/inventions.js';
 import {collectTarget} from '../shared/resources.js';
 import {nearestCollectible} from '../shared/collection-target.js';
 import {worldTrees} from '../shared/world-content.js';
 const start=performance.now(),sim=createSimulation();sim.addPlayer({id:'a',role:'hero'});sim.addPlayer({id:'b',role:'hero'});
-const s=sim.adventureWorld(),p=s.players[0],q=giftContents(s)[0],ctx={terrainHeight};
+const s=sim.adventureWorld();assert.equal(giftContents(s).length,0,'new worlds have no testing pile');
+// Worlds saved while the gift existed still carry it: seed one the way they did.
+s.pickups.push(...createTestingSupplies(STRUCTURES.timberline.cost,baseHeight));
+const p=s.players[0],q=giftContents(s)[0],ctx={terrainHeight};
 assert.deepEqual(Object.fromEntries(giftContents(s).map(q=>[q.kind,q.amount])),STRUCTURES.timberline.cost);
 assert.equal(giftContents(loadSimulation(sim.checkpoint()).adventureWorld()).length,3);
 p.position=[40,0,40];assert.equal(collectTarget(s,p,{targetId:q.id},ctx).code,'out_of_reach');
@@ -19,5 +23,5 @@ const restored=loadSimulation(sim.checkpoint());restored.addPlayer({id:'late',ro
 s.landmarks=false;s.deposits=[];s.harvestedTrees=worldTrees(s).map(t=>({id:t.id,cuts:3}));p.position=[18,0,6];
 assert.equal(inventionAction(s,p,{action:'inventionBuild',kind:'timberline',position:[18,0,0],yaw:0},{terrainHeight:()=>0}).ok,true);
 for(const kind of Object.keys(STRUCTURES.timberline.cost))assert.equal(p.resources[kind],0,'exactly one machine worth');
-assert.equal(giftContents(createSimulation().adventureWorld()).length,3,'fresh world gets one gift');
+assert.equal(giftContents(createSimulation().adventureWorld()).length,0,'fresh worlds stay clear');
 console.log(JSON.stringify({suite:'testing-supplies',pass:true,seconds:(performance.now()-start)/1000}));
