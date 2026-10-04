@@ -442,34 +442,57 @@ def build_carriage():
          bevel=0.004)
 
 
-SCOPE_Z = 0.42                  # sight line above the trunnion (Elevation frame), parallel to the rails
-SCOPE_EYE_Y, SCOPE_LENS_Y = -0.36, 0.47
+# Open brass range ladder (2026-10-04, round 3): an eye rest under the eye point and a hinged ladder ahead of it whose
+# rungs are honest holdovers worked out from the shared v3 flight (client/timberline-ladder.js writes ladder_marks.json).
+with open(os.path.join(HERE, "ladder_marks.json")) as _f:
+    LADDER = json.load(_f)
+SCOPE_Z = LADDER["eye"]["z"]    # sight line above the trunnion (Elevation frame), parallel to the rails
+SCOPE_EYE_Y = LADDER["eye"]["y"]
+LADDER_Y = LADDER["ladderY"]
+EYE_REST_Y = SCOPE_EYE_Y + 0.10
+LADDER_X = 0.05                 # half width between the ladder's side rails
+LADDER_BASE_Z = 0.16
 
 
 def build_scope():
-    """Brass sighting telescope on two iron standards over the keel (Elevation frame, so it pitches with the
-    rails but stays still under the firing recoil). The objective holds a resonance lens that glows blue."""
+    """Rear eye rest and front range ladder (Elevation frame, so they pitch with the rails but stay still under
+    the firing recoil). Each rung carries a mithril pip whose tip is the aim point for that range."""
     N = "Scope"
-    for yy in (-0.16, 0.28):
-        beam(N, "TL_Iron", (0, yy, 0.0), (0, yy, SCOPE_Z - 0.03), 0.035, 0.03, bevel=0.006, up=Vector((0, 1, 0)))
+    # Rear eye rest: an iron post with a brass cup just under the eye line, so the operator's eye has a fixed place
+    # (the rungs only read true from there) without anything crossing the view.
+    beam(N, "TL_Iron", (0, EYE_REST_Y, 0.0), (0, EYE_REST_Y, SCOPE_Z - 0.075), 0.03, 0.024, bevel=0.005, up=Vector((0, 1, 0)))
+    box(N, "TL_Iron", (0.07, 0.05, 0.012), T((0, EYE_REST_Y, 0.006)), bevel=0.003)
+    for sx in (-1, 1):
+        stud(N, "TL_Brass", T((sx * 0.024, EYE_REST_Y, 0.012)), s=0.012, h=0.006)
+    cyl(N, "TL_Brass", 0.022, 0.014, T((0, EYE_REST_Y, SCOPE_Z - 0.068)), seg=(14, 8), axis='Z', r2=0.03)
+    cyl(N, "TL_Brass", 0.018, 0.008, T((0, EYE_REST_Y, SCOPE_Z - 0.081)), seg=(12, 6), axis='Z')
+    # Front ladder: iron standards and hinge bar, brass side rails with an arched cap.
+    for sx in (-1, 1):
+        beam(N, "TL_Iron", (sx * 0.075, LADDER_Y, 0.0), (sx * 0.075, LADDER_Y, LADDER_BASE_Z + 0.01), 0.03, 0.024, bevel=0.005,
+             up=Vector((0, 1, 0)))
+        box(N, "TL_Iron", (0.04, 0.05, 0.012), T((sx * 0.075, LADDER_Y, 0.006)), bevel=0.003)
+        stud(N, "TL_Brass", T((sx * 0.075, LADDER_Y, 0.012)), s=0.012, h=0.006)
+        beam(N, "TL_Brass", (sx * LADDER_X, LADDER_Y, LADDER_BASE_Z), (sx * LADDER_X, LADDER_Y, SCOPE_Z + 0.012), 0.008, 0.009,
+             bevel=0.0015, up=Vector((0, 1, 0)))
+    cyl(N, "TL_Iron", 0.011, 0.17, T((0, LADDER_Y, LADDER_BASE_Z)), seg=(12, 6), axis='X')
+    for sx in (-1, 1):
+        cyl(N, "TL_Brass", 0.015, 0.012, T((sx * 0.091, LADDER_Y, LADDER_BASE_Z)), seg=(12, 6), axis='X')
+    for lod in (0, 1):
+        n = 14 if lod == 0 else 7
+        arch = [Vector((-math.cos(math.pi * i / n) * LADDER_X, LADDER_Y, SCOPE_Z + 0.012 + math.sin(math.pi * i / n) * LADDER_X * 0.8))
+                for i in range(n + 1)]
+        tube_along(N, "TL_Brass", arch, 0, 6 if lod == 0 else 4, lod, rect=(0.009, 0.008))
+    # Finial on the cap and a foot plate across the bottom of the ladder.
+    cyl(N, "TL_Brass", 0.007, 0.012, T((0, LADDER_Y, SCOPE_Z + 0.012 + LADDER_X * 0.8 + 0.008)), seg=(8, 6), axis='Z', r2=0.003)
+    box(N, "TL_Brass", (2 * LADDER_X + 0.008, 0.008, 0.016), T((0, LADDER_Y, LADDER_BASE_Z + 0.014)), bevel=0.002)
+    # Rungs: a thin brass bar just under each mark with a mithril pip rising to the exact aim point.
+    for m in LADDER["marks"]:
+        z = m["z"]
+        box(N, "TL_Brass", (2 * LADDER_X, 0.005, 0.003), T((0, LADDER_Y, z - 0.0075)), bevel=0.0, lods=(0, 1))
+        pip = [Vector((sx * 0.0035, sy * 0.002, -0.006)) for sx in (-1, 1) for sy in (-1, 1)] + [
+            Vector((sx * 0.0006, sy * 0.0012, 0.0)) for sx in (-1, 1) for sy in (-1, 1)]
         for lod in (0, 1):
-            torus(N, "TL_Iron", T((0, yy, SCOPE_Z), (math.pi / 2, 0, 0)), 0.034, 0.007, 14 if lod == 0 else 8, 5 if lod == 0 else 4, lod)
-        box(N, "TL_Iron", (0.07, 0.04, 0.012), T((0, yy, 0.006)), bevel=0.003)
-        stud(N, "TL_Brass", T((0.026, yy, 0.012)), s=0.012, h=0.006)
-        stud(N, "TL_Brass", T((-0.026, yy, 0.012)), s=0.012, h=0.006)
-    # Tube: eyepiece, draw tube, main body, objective bell.
-    cyl(N, "TL_WoodDark", 0.036, 0.075, T((0, SCOPE_EYE_Y + 0.0375, SCOPE_Z)), seg=(14, 8), axis='Y')
-    cyl(N, "TL_Brass", 0.040, 0.012, T((0, SCOPE_EYE_Y + 0.006, SCOPE_Z)), seg=(14, 8), axis='Y')
-    cyl(N, "TL_Brass", 0.026, 0.12, T((0, SCOPE_EYE_Y + 0.135, SCOPE_Z)), seg=(14, 8), axis='Y')
-    cyl(N, "TL_Brass", 0.031, 0.50, T((0, 0.10, SCOPE_Z)), seg=(16, 8), axis='Y')
-    cyl(N, "TL_Brass", 0.031, 0.06, T((0, 0.38, SCOPE_Z)), seg=(16, 8), axis='Y', r2=0.044)
-    cyl(N, "TL_Brass", 0.046, 0.05, T((0, 0.435, SCOPE_Z)), seg=(16, 8), axis='Y')
-    for yy in (-0.12, 0.02, 0.32):
-        cyl(N, "TL_Brass", 0.035, 0.012, T((0, yy, SCOPE_Z)), seg=(16, 8), axis='Y', lods=(0,))
-    # Resonance lens and a crystal range dial on the left of the body.
-    cyl(N, "TL_Resonance", 0.040, 0.006, T((0, SCOPE_LENS_Y - 0.005, SCOPE_Z)), seg=(16, 8), axis='Y')
-    cyl(N, "TL_Brass", 0.022, 0.03, T((-0.045, 0.12, SCOPE_Z)), seg=(12, 6), axis='X')
-    cyl(N, "TL_Resonance", 0.016, 0.004, T((-0.061, 0.12, SCOPE_Z)), seg=(12, 6), axis='X')
+            emit(acc(N, lod), hull(pip), "TL_Mithril", T((0, LADDER_Y, z)), False)
 
 
 def build_launch_frame():
@@ -1264,8 +1287,10 @@ def build_ballista(mats):
     sock("Socket_FilamentHorn", rec, tuple(HORN))
     sock("Socket_Trigger", nodes["Trigger"], (0, -0.84, -0.045))
     sock("Socket_OperatorEye", root, (0, -1.25, 1.62))
-    sock("Socket_ScopeEye", elev, (0, SCOPE_EYE_Y - 0.03, SCOPE_Z))
-    sock("Socket_ScopeLens", elev, (0, SCOPE_LENS_Y, SCOPE_Z))
+    sock("Socket_ScopeEye", elev, (0, SCOPE_EYE_Y, SCOPE_Z))
+    sock("Socket_Ladder", elev, (0, LADDER_Y, SCOPE_Z))
+    for m in LADDER["marks"]:
+        sock(f"Socket_Rung_{m['range']}", elev, (LADDER_X + 0.012, LADDER_Y, m["z"] - 0.004))
     sock("Socket_RTSAnchor", root, (0, 0, 1.4))
     for k in range(4):
         a = math.radians(45 + 90 * k)

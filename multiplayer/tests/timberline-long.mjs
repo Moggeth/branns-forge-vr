@@ -8,6 +8,8 @@ import {timberlineFlight,stuckAnchor,TIMBERLINE_LONG,TIMBERLINE_RELEASE_TICKS} f
 import {restoreInventions,mannedShot} from '../shared/inventions.js';
 import {forecastTimberline} from '../client/timberline-sight.js';
 import {createEnemy} from '../shared/combat.js';
+import {ladderMarks,TIMBERLINE_LADDER} from '../client/timberline-ladder.js';
+import {readFileSync} from 'node:fs';
 const t0=performance.now();
 function world(){
  const sim=createSimulation();sim.addPlayer({id:'gunner',role:'hero'});
@@ -78,4 +80,11 @@ for(const aim of [{yaw:0,pitch:.3},{yaw:.6,pitch:.12},{yaw:-1.2,pitch:0},{yaw:2.
  const bad=structuredClone(saved);bad.stuck[0].mode='both';assert.throws(()=>restoreInventions(bad,w.s.tick));
  const old=structuredClone(saved);delete old.stuck;assert.deepEqual(restoreInventions(old,w.s.tick).stuck,[],'older saves load without stuck bolts');
  assert.ok(w.s.inventions.stuck.every(r=>r.launchTick+TIMBERLINE_RELEASE_TICKS<=r.tick));}
-console.log(`timberline-long: far flight, ground/structure/golem sticking, drag, host removal, cap, saves PASS (${((performance.now()-t0)/1000).toFixed(3)}s)`);
+// 5. The brass range ladder built into the kit still matches the shared flight (regenerate: node scripts/timberline-ladder.mjs,
+//    then rebuild the kit), its rungs step down with range, and a shot at each rung's pitch passes the mark's target.
+{const built=JSON.parse(readFileSync(new URL('../assets-source/timberline-twinbolt-20261003/source/ladder_marks.json',import.meta.url),'utf8')),now=ladderMarks();
+ assert.deepEqual(built.eye,TIMBERLINE_LADDER.eye);assert.equal(built.ladderY,TIMBERLINE_LADDER.ladderY);assert.equal(built.marks.length,now.length,'every range has a rung');
+ now.forEach((m,i)=>{assert.equal(built.marks[i].range,m.range);assert.ok(Math.abs(built.marks[i].z-m.z)<.0005,`rung ${m.range} m sits where the flight says`);if(i)assert.ok(m.z<now[i-1].z,'longer ranges sit lower');
+  const q=mannedShot({yaw:0,position:[0,0,0]},{yaw:0,pitch:m.pitch});let hit=null;for(let k=1;k<TIMBERLINE_LONG.maxTicks&&!hit;k++){const f=timberlineFlight(q,k+TIMBERLINE_RELEASE_TICKS);if(-f.centre[2]>=m.range)hit=f.centre;}
+  assert.ok(hit&&Math.abs(hit[1]-TIMBERLINE_LADDER.targetHeight)<.25,`a shot on the ${m.range} m rung meets a chest-high target (${hit?.[1]})`);});}
+console.log(`timberline-long: far flight, ground/structure/golem sticking, drag, host removal, cap, saves, range ladder PASS (${((performance.now()-t0)/1000).toFixed(3)}s)`);

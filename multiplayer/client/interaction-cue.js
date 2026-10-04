@@ -32,7 +32,7 @@ const KIND_WORD = {wood: 'timber', stone: 'stone', gems: 'gems'}; // adventure-v
 // objective banner Deliver (adventure-view.js SHORT), VR bindings (vr-input-policy.js, docs/VR-CONTROLS.md).
 export const CONTROLS = Object.freeze({
   desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver', crank: 'Hold R', wind: 'hold R', scope: 'right-click'},
-  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver', wind: 'hold Wind', scope: 'Scope'},
+  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver', wind: 'hold Wind', scope: 'Sight'},
   xr: {strike: 'Swing', axe: 'Left grip', pick: 'Left grip', grab: 'Right grip', stow: 'Left stick click', drop: 'Right grip', throw: 'Trigger', collect: 'Left stick click', deliver: 'Wrist panel'},
 });
 
@@ -169,7 +169,7 @@ function structureCue(b, self, snapshot, keys, make) {
     // Crafted bolts are spent first (inventions.js fire), then whole Wood + Iron loads the Hero can pay for.
     const count = snapshot.inventions ? timberlineAmmo(snapshot, self) : {bolts: 0, raw: 0, total: 0};
     const shots = count.total ? `${count.total} shot${count.total === 1 ? '' : 's'}${count.bolts ? ` · ${count.bolts} crafted bolt${count.bolts === 1 ? '' : 's'}` : ''}` : '';
-    if (manned && b.operator === self.id) return make('pickup', count.total ? 'ready' : 'short', b.id, def.name, 'Step off', keys.collect, count.total ? `${keys.strike} fires · ${keys.wind || 'hold R'} winds · ${keys.scope || 'right-click'} zooms · ${shots}` : `Out of ammo · ${cost} per shot`);
+    if (manned && b.operator === self.id) return make('pickup', count.total ? 'ready' : 'short', b.id, def.name, 'Step off', keys.collect, count.total ? `${keys.strike} fires · ${keys.wind || 'hold R'} winds · ${keys.scope || 'right-click'} sights · ${shots}` : `Out of ammo · ${cost} per shot`);
     if (manned && b.operator) return make('pickup', 'busy', b.id, def.name, 'Manned', '');
     if (!count.total) return make('pickup', 'short', b.id, def.name, def.use, keys.collect, `Out of ammo · needs ${cost} per shot or crafted bolts`);
     if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', keys.crank || '', keys.crank ? `Crank to wind it faster · ${shots}` : shots);
