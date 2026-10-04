@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><title>Tree species review</title><style>body{margin:0;background:#9fb8c6}canvas{display:block}</style>
+<script type="module">
+// Review page for the rebuilt species (assets/trees-canopy-20261004): production tree view, materials, LOD and batches.
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createTreeMaterials} from '../client/tree-materials.js';
+import {createTreeView} from '../client/tree-view.js';
+import {worldTrees} from '../shared/world-content.js';
+const W=1280,H=800,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.shadowMap.enabled=true;renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.5;room.dispose();pmrem.dispose();scene.background=new T.Color(0xa9c3d6);scene.fog=new T.Fog(0xa9c3d6,40,160);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x5a4b2a,1.5));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-16,right:16,top:16,bottom:-16,far:80});scene.add(sun,sun.target);
+const ground=new T.Mesh(new T.PlaneGeometry(400,400).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x5f7040,roughness:1}));ground.receiveShadow=true;scene.add(ground);
+const cam=new T.PerspectiveCamera(50,W/H,.1,400),loader=new GLTFLoader(),templates=new Map();
+for(const n of ['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_young_lod','endcap','log'])templates.set(n,await loader.loadAsync(`/assets/${n}.glb?${Date.now()}`));
+const materials=createTreeMaterials(),view=createTreeView({scene,templates,height:()=>0,camera:cam,treeMaterials:materials}),s={seed:7,tick:100,groves:[],harvestedTrees:[],looseLogs:[]};
+view.sync(s);const trees=worldTrees(s);
+const shadows=()=>view.group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+let t=1;const shoot=(pos,look)=>{cam.position.set(...pos);cam.lookAt(...look);cam.updateMatrixWorld(true);sun.position.set(look[0]-9,16,look[2]+8);sun.target.position.set(...look);view.tick(t*1000,100);materials.update(t);t+=.1;shadows();renderer.render(scene,cam);};
+window.treeReview={
+ variants:()=>[...new Set(trees.map(x=>x.variant))],
+ tree:(variant,dist=11,h=2.2,ang=.6)=>{const x=trees.find(q=>q.variant===variant);const y=x.height*.5;shoot([x.x+Math.sin(ang)*dist,h,x.z+Math.cos(ang)*dist],[x.x,y,x.z]);return x;},
+ base:(variant)=>{const x=trees.find(q=>q.variant===variant);shoot([x.x+2.2,1.1,x.z+3],[x.x,.4,x.z]);return x;},
+ forest:()=>{const c=trees.reduce((a,q)=>[a[0]+q.x/trees.length,a[1]+q.z/trees.length],[0,0]);shoot([c[0]+4,3.5,c[1]+34],[c[0],3,c[1]]);},
+ stats:()=>({trees:trees.length,...view.stats(),calls:renderer.info.render.calls,tris:renderer.info.render.triangles}),
+};
+await renderer.compileAsync(scene,cam);document.title='ready';
+</script>

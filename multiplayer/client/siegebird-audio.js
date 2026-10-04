@@ -57,9 +57,11 @@ export function createSiegebirdAudio({context, volume = 1} = {}) {
     },
     // One ratchet tooth on the crank.
     click(index = 0) {
-      hiss({length: .018, gain: .07, freq: 4200 + (index % 3) * 300, q: 3});
-      tone({type: 'square', from: 2600, to: 1900, length: .014, gain: .012});
+      hiss({length: .014, gain: .055, freq: 4200 + (index % 3) * 300, q: 3});
+      tone({type: 'square', from: 2600, to: 1900, length: .011, gain: .009});
     },
+    // Cone clutch biting back onto the pinion shaft before the wind: a dull bronze clunk.
+    engage() { tone({type: 'triangle', from: 210, to: 120, length: .07, gain: .05}); hiss({length: .04, gain: .05, freq: 900, q: 1.2}); },
     latch() { tone({type: 'square', from: 1300, to: 640, length: .035, gain: .03}); hiss({length: .03, gain: .09, freq: 2500, q: 2}); },
     // The bird's call as it swoops in from its side.
     call(plumage = 'kingfisher', side = 1, golden = false, delay = 0) {
@@ -80,6 +82,13 @@ export function createSiegebirdAudio({context, volume = 1} = {}) {
       if (golden) { tone({from: 2637, length: .6, gain: .03, at: .02}); tone({from: 3951, length: .5, gain: .018, at: .05}); }
     },
     ready() { tone({from: 2350, length: .07, gain: .012}); },
+    // Perfect wind: the pawl rings true. A bright resonant fifth over a soft shimmer (blue resonance in sound).
+    perfect() {
+      for (const [f, a, at] of [[1760, .045, 0], [2637, .035, .03], [3520, .02, .06]]) tone({from: f, length: .55, gain: a, at, attack: .006});
+      hiss({length: .35, gain: .025, freq: 6500, q: .8});
+    },
+    // A mistimed press: the trigger knocks against the held pawl.
+    fumble() { tone({type: 'triangle', from: 300, to: 190, length: .05, gain: .035}); hiss({length: .02, gain: .04, freq: 1400, q: 2}); },
     stats,
     dispose() { try { out.disconnect(); } catch { /* already gone */ } },
   };

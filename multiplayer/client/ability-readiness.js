@@ -1,5 +1,6 @@
 import {SPELLS, WEAPONS} from '../shared/spells.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
+import {SIEGEBIRD} from '../shared/combat.js';
 
 const clamp = n => Math.max(0, Math.min(1, n));
 // Read authority clocks; changing tools never resets or invents a cooldown.
@@ -8,7 +9,8 @@ export function readiness(lastTick, duration, tick) {
   return clamp((tick - lastTick) / duration);
 }
 export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
-  const basic = WEAPONS.find(w => w.id === tool)?.cooldown || 0;
+  // A Siegebird reload after a perfect wind runs quick (shared/combat.js SIEGEBIRD).
+  const basic = tool === 'crossbow' && player.siegebird?.quick ? SIEGEBIRD.quickTicks : WEAPONS.find(w => w.id === tool)?.cooldown || 0;
   const secondary = specialCooldown(tool);
   const overheated = (player.overheatUntil || 0) > tick;
   return {

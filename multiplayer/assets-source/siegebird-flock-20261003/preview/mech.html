@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>Siegebird mechanism</title>
+<style>html,body{margin:0;background:#20242a;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<script type="module">
+// Mechanism close-up: crank, pinion, reduction, drum, cable, sled at several reload times.
+// ?times=.1,.3 ?view=right|left|top|below|rear ?dist=.55 ?glb=
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {prepareAsset, updateWeaponPresentation} from '/client/asset-pose.js';
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2a3038);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6;
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.2); sun.position.set(2, 4, 3); scene.add(sun, new THREE.HemisphereLight(0xbfd6ff, 0x3a2e22, .5));
+const gltf = await new GLTFLoader().loadAsync(q.get('glb') || '/assets/crossbow.glb');
+const {visual} = prepareAsset(gltf, 'crossbow'); scene.add(visual); visual.updateMatrixWorld(true);
+const native = visual.getObjectByName('Pinion').parent;
+const focus = native.localToWorld(new THREE.Vector3(...(q.get('focus') || '.17,.6,0').split(',').map(Number)));
+const dirs = {right: [1, 0, 0], left: [-1, 0, 0], top: [0, 0, 1], below: [0, 0, -1], rear: [0, -1, .3], three: [1, -.6, .5]};
+const d = native.localToWorld(new THREE.Vector3(...dirs[q.get('view') || 'right'])).sub(native.localToWorld(new THREE.Vector3())).normalize();
+const times = (q.get('times') || 'Infinity,.12,.24,.36,.48,.6').split(',').map(Number);
+const cols = Math.min(3, times.length), rows = Math.ceil(times.length / cols), W = innerWidth / cols, H = innerHeight / rows;
+const cam = new THREE.PerspectiveCamera(30, W / H, .01, 50); cam.position.copy(focus).addScaledVector(d, +(q.get('dist') || .55));
+const up = native.localToWorld(new THREE.Vector3(0, 0, 1)).sub(native.localToWorld(new THREE.Vector3())); cam.up.copy(q.get('view') === 'top' || q.get('view') === 'below' ? native.localToWorld(new THREE.Vector3(0, 1, 0)).sub(native.localToWorld(new THREE.Vector3())) : up); cam.lookAt(focus);
+renderer.setScissorTest(true);
+times.forEach((t, i) => {
+  updateWeaponPresentation(visual, 'crossbow', {reload: t}); visual.updateMatrixWorld(true);
+  const vx = (i % cols) * W, vy = (rows - 1 - Math.floor(i / cols)) * H;
+  renderer.setViewport(vx, vy, W, H); renderer.setScissor(vx, vy, W, H); renderer.render(scene, cam);
+});
+window.previewReady = true;
+</script>
