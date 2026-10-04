@@ -221,10 +221,10 @@ body.xr .hud-bottom { display: none; }   /* VR draws its own controls; free the 
   mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
 }
 .bf-spell { flex: none; scroll-snap-align: start; position: relative; }
-.bf-spell[data-school="earth"]  { --school: #c9a46a; }
-.bf-spell[data-school="summon"] { --school: #b59ad8; }
-.bf-spell[data-school="storm"]  { --school: var(--bf-frost); }
-.bf-spell[data-school="life"]   { --school: var(--bf-moss); }
+[data-school="shape"]  { --school: #c9a46a; }
+[data-school="summon"] { --school: #b59ad8; }
+[data-school="sky"]    { --school: var(--bf-frost); }
+[data-school="grow"]   { --school: var(--bf-moss); }
 .bf-spell::before { content: ""; position: absolute; left: 6px; right: 6px; top: 0; height: 2px; border-radius: 2px; background: var(--school, var(--bf-gold)); opacity: .8; }
 .bf-toggle { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .bf-toggle:has(input:focus-visible) .bf-switch { box-shadow: var(--bf-focus); }

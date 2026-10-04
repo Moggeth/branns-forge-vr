@@ -232,15 +232,15 @@
   display: flex !important; overflow: visible !important; gap: 4px !important; padding: 0 !important; margin: 0 !important;
   mask: none !important; -webkit-mask: none !important; scroll-snap-type: none !important; width: auto !important; max-width: none !important;
 }
-:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell]:not([aria-checked="true"]) { display: none !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) [data-spell]:not([aria-checked="true"]) { display: none !important; }
 /* Collapsed selected spell: icon · name · cost · chevron. */
-:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell][aria-checked="true"] {
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) [data-spell][aria-checked="true"] {
   display: inline-flex !important; flex-direction: row !important; align-items: center !important; gap: 7px !important;
   width: auto !important; min-width: 128px !important; max-width: 176px; height: 46px !important; min-height: 46px !important;
   padding: 0 26px 0 8px !important; margin: 0 !important; position: relative;
   border-radius: 10px !important; border: 1px solid var(--mq-line-hi) !important;
 }
-:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) > [data-spell][aria-checked="true"]::after {
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) [data-spell][aria-checked="true"]::after {
   content: ""; position: absolute; right: 10px; top: 50%; width: 7px; height: 7px; margin-top: -6px;
   border-right: 2px solid var(--mq-gold-hi); border-bottom: 2px solid var(--mq-gold-hi); transform: rotate(225deg); opacity: .8;
 }
@@ -275,7 +275,7 @@
 :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {
   display: grid !important; grid-template-columns: repeat(7, 58px); gap: 6px !important;
 }
-:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [data-spell] {
   display: grid !important; grid-template-rows: 28px auto; justify-items: center; align-content: center; gap: 3px !important;
   width: 58px !important; min-width: 0 !important; height: 60px !important; min-height: 0 !important; padding: 4px 2px !important; margin: 0 !important;
   position: relative; border-radius: 10px !important;
@@ -394,7 +394,7 @@
     left: calc(var(--mq-l) + var(--mq-edge)) !important; right: calc(var(--mq-r) + var(--mq-edge)) !important; max-width: none !important; width: auto !important;
   }
   :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] { grid-template-columns: repeat(5, minmax(54px, 1fr)); }
-  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] { width: auto !important; }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [data-spell] { width: auto !important; }
   :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [data-equip] { flex-direction: column; justify-content: center; height: 58px !important; gap: 2px !important; padding: 4px !important; }
   :root[data-mq] body.touch-controls-active #heroTools .bf-equip[data-mq-open="true"] > [data-equip] .bf-name { font-size: 10.5px !important; }
@@ -405,7 +405,7 @@
 @media (orientation: landscape) and (max-height: 400px) {
   :root[data-mq] body.touch-controls-active { --mq-pad: 104px; }
   :root[data-mq] body.touch-controls-active .mui-actions { bottom: calc(var(--mq-b) + var(--mq-edge) + var(--mq-pad) + 6px) !important; }
-  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] { height: 56px !important; }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [data-spell] { height: 56px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) { :root[data-mq] body.touch-controls-active .mui-stick { transition: none; } }
@@ -419,13 +419,13 @@
 :root[data-mq] body.touch-controls-active[data-mq-tray] #touchControls {z-index:8;}
 :root[data-mq] body.touch-controls-active[data-mq-tray] #touchControls :is(.mui-stick,.mui-stick *,.mui-actions,.mui-actions *,.ta-wrap,.ta-wrap *) {pointer-events:none !important;}
 :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {grid-auto-flow:row !important;grid-template-columns:repeat(7,78px);overflow:visible !important;}
-:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {width:78px !important;height:70px !important;}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [data-spell] {width:78px !important;height:70px !important;}
 :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .bf-name {white-space:normal !important;overflow:visible !important;text-overflow:clip !important;overflow-wrap:anywhere;}
 :root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-toggle::after {content:'Quest';font-size:12px;}
 :root[data-mq] body.touch-controls-active .xhud[data-expanded="false"] .xhud-primary {min-height:44px !important;}
 @media (orientation:portrait) {
  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {grid-template-columns:repeat(4,minmax(0,1fr));}
- :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] > [data-spell] {width:auto !important;}
+ :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] [data-spell] {width:auto !important;}
 }
 /* Existing help layout uses #hud selectors; keep the quest at the same quiet edge in both roles. */
 :root[data-mq] body.touch-controls-active #hud > .xhud {top:calc(var(--mq-t) + 50px) !important;bottom:auto !important;left:calc(var(--mq-l) + 8px) !important;}
@@ -443,3 +443,32 @@
   :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar [data-touch-action="fullscreen"] { grid-column: 1; grid-row: 2; }
   :root[data-mq] body.touch-controls-active[data-role="hero"] .mui-util-bar .qb-entry { grid-column: 2; grid-row: 2; }
 }
+
+/* Spell schools on touch. Collapsed dock: the school panels step aside so only the selected card shows.
+   Open palette: every school at once, each a labelled block. Landscape lays the four schools side by side
+   (3x2, 3x2, 3x2, 2x2); portrait stacks them, one row of up to six spells per school. */
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) :is(.sb-school, .sb-school-grid) { display: contents !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells:not([data-mq-open="true"]) .sb-school-name { display: none !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] {
+  display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 6px !important; justify-content: center;
+  grid-template-columns: none !important; overflow: visible !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school { flex: 0 1 auto; min-width: 0; padding: 4px 5px 5px !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-name { font-size: 10.5px !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid {
+  display: grid !important; grid-template-columns: repeat(var(--sb-cols, 3), minmax(0, 64px)) !important; grid-auto-rows: 60px !important; gap: 4px !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid > [data-spell] {
+  width: auto !important; height: auto !important; min-width: 0 !important; padding: 4px 2px !important;
+}
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid > [data-spell] .bf-name { font-size: 10px !important; max-width: 100% !important; }
+@media (orientation: portrait) {
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] { flex-direction: column !important; align-items: stretch; }
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; grid-auto-rows: 58px !important; }
+}
+@media (orientation: landscape) and (max-height: 400px) {
+  :root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid { grid-auto-rows: 54px !important; }
+}
+/* The open spell palette is modal (the scrim closes it), so Cast / Cancel step aside instead of covering the Sky school. */
+:root[data-mq] body.touch-controls-active[data-mq-tray="spells"] #touchControls .mui-actions { visibility: hidden !important; }
+:root[data-mq] body.touch-controls-active #godHelp .bf-spells[data-mq-open="true"] .sb-school-grid > [data-spell] .bf-name { overflow-wrap: normal !important; word-break: normal !important; font-size: 9.5px !important; letter-spacing: -.02em; }
