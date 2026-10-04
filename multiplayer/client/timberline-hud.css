@@ -1,6 +1,6 @@
-/* Manned Timberline ammo counter: brass plate with a blue resonance glyph, bottom centre above the cue. */
+/* Manned Timberline ammo counter: brass plate with a blue resonance glyph, top centre under the world pill, clear of the aim. */
 .timberline-ammo {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); transform: translateX(-50%);
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 10px; border-radius: 999px;
   background: linear-gradient(180deg, rgba(40,31,20,.88), rgba(22,17,12,.9)); border: 1px solid rgba(236,210,154,.55);
   box-shadow: 0 0 0 1px rgba(12,9,6,.6), 0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,236,190,.18);
@@ -21,4 +21,6 @@
 .timberline-ammo.is-empty .timberline-ammo-glyph::after { border-left-color: transparent; }
 /* Inside the scope the lens carries the count; the plate steps aside. */
 .timberline-ammo.is-scoped { opacity: 0; transition: opacity .12s; }
-@media (pointer: coarse) { .timberline-ammo { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 10px); font-size: 14px; } }
+@media (pointer: coarse) { .timberline-ammo { top: calc(env(safe-area-inset-top, 0px) + 56px); font-size: 14px; } }
+/* Seated at the machine the hand weapons can't be used, so their bar steps out of the sight line. */
+body.timberline-manned .bf-equip, body.timberline-manned .mui-weapons { visibility: hidden; }

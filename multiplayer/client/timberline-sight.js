@@ -47,7 +47,7 @@ export function createTimberlineSight({scene}){
  const group=new THREE.Group();group.name='TimberlineSight';group.visible=false;group.userData.ignoreContact=true;scene.add(group);
  const uniforms={color:{value:new THREE.Color(TIMBERLINE_SIGHT.color)},time:{value:0},total:{value:1},dash:{value:TIMBERLINE_SIGHT.dash},opacity:{value:.85}};
  const arcs=[arcMesh(TIMBERLINE_SIGHT.maxPoints,uniforms),arcMesh(TIMBERLINE_SIGHT.maxPoints,uniforms)];arcs.forEach((a,i)=>{a.name=`TimberlineSightArc_${'LR'[i]}`;group.add(a);});
- const markTex=markTexture(),mark=new THREE.Mesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:markTex,transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
+ const markTex=markTexture(),mark=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:markTex,transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
  mark.name='TimberlineSightMark';mark.renderOrder=6;group.add(mark);
  const lc=document.createElement('canvas');lc.width=256;lc.height=64;const lx=lc.getContext('2d'),labelTex=new THREE.CanvasTexture(lc);labelTex.colorSpace=THREE.SRGBColorSpace;
  const label=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));label.name='TimberlineSightLabel';label.renderOrder=7;group.add(label);
@@ -60,13 +60,15 @@ export function createTimberlineSight({scene}){
   pos.needsUpdate=al.needsUpdate=true;mesh.geometry.setDrawRange(0,Math.max(0,n-1)*6);return along;}
  return {object:group,
   // b: the manned structure; aim {yaw,pitch} (the local wanted aim); height(x,z); eye: camera world position.
-  update({b,aim,height,eye,time,editsKey=''}){if(!b||!aim){group.visible=false;return null;}
+  update({b,aim,height,eye,camera,time,editsKey=''}){if(!b||!aim){group.visible=false;return null;}
    const k=`${b.id}:${aim.yaw.toFixed(4)}:${aim.pitch.toFixed(4)}:${b.yaw}:${editsKey}`;if(k!==key){key=k;last=forecastTimberline(mannedShot(b,aim),height);}
    group.visible=true;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
    if(last.impact){const c=_c.fromArray(last.impact.centre),l=_a.fromArray(last.impact.left),r=_b.fromArray(last.impact.right),d=c.distanceTo(eye);
-    mark.visible=label.visible=true;mark.position.copy(c).y+=.12;mark.rotation.y=Math.atan2(-(r.z-l.z),r.x-l.x);const size=Math.max(2.4,d*.045);mark.scale.setScalar(size);
-    label.position.copy(c).y+=size*.45+.6;label.scale.set(d*.05+.8,(d*.05+.8)/4,1);text(`${Math.round(last.distance)} m · ${last.impact.t.toFixed(1)} s`);}
-   else{mark.visible=false;label.visible=true;label.position.fromArray(last.left.slice(-3));label.scale.set(6,1.5,1);text('Beyond range');}
+    mark.visible=label.visible=true;const size=Math.max(1.6,d*.07);mark.position.copy(c).y+=size*.3;
+    // Stands up facing the operator (a flat ground decal vanishes at grazing angles); the arcs sit left and right like the bolts.
+    mark.quaternion.copy(camera.quaternion);mark.scale.setScalar(size);
+    label.position.copy(c).y+=size*.95;const lw=d*.085+1;label.scale.set(lw,lw/4,1);text(`${Math.round(last.distance)} m · ${last.impact.t.toFixed(1)} s`);}
+   else{mark.visible=false;label.visible=true;label.position.fromArray(last.left.slice(-3));label.scale.set(8,2,1);text('Beyond range');}
    return last;},
   hide(){group.visible=false;},
   get forecast(){return last;},

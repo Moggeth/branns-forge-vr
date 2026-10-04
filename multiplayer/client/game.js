@@ -930,10 +930,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function timberlineReadiness(b){const tick=snapshot.tick??0;if(tick>=b.readyTick)return {reload:1,ready:true,state:'Ready'};const left=b.readyTick-tick;return {reload:THREE.MathUtils.clamp(1-left/MANNED.reloadTicks,0,1),ready:false,state:`Winding · ${(left/60).toFixed(1)} s`};}
   function updateTimberlineAids(now){
     const b=manned&&!renderer.xr.isPresenting&&role==='hero'&&active?mannedMachine():null;
+    document.body.classList.toggle('timberline-manned',!!b);
     if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}timberlineScope.update(0);inventionVisual.setScoped(null);return;}
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
-    const forecast=timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,time:now/1000,editsKey:snapshot.edits?.length||0});
+    const forecast=timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:snapshot.edits?.length||0});
     timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5});
     // Range under the cross: march the view ray over the shared ground a few times a second.
     if(scopeAmount>0&&now>=scopeRangeAt){scopeRangeAt=now+120;const dir=camera.getWorldDirection(scopeEye);let hit=null,prev=0;for(let d=2;d<=400;d+=d<60?1:3){const y=sightEye.y+dir.y*d,g=terrainHeight(sightEye.x+dir.x*d,sightEye.z+dir.z*d,snapshot.edits,snapshot.tick??Infinity);if(y<=g){let lo=prev,hi=d;for(let i=0;i<6;i++){const m=(lo+hi)/2;if(sightEye.y+dir.y*m<=terrainHeight(sightEye.x+dir.x*m,sightEye.z+dir.z*m,snapshot.edits,snapshot.tick??Infinity))hi=m;else lo=m;}hit=hi;break;}prev=d;}scopeRange=hit?`${Math.round(hit)} m`:'—';}
@@ -1322,7 +1323,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
