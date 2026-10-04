@@ -3,6 +3,7 @@
 // and mana, and the pulse strengthens with each Bloom level the world reaches (shared/bloom.js). A broken Heartstone
 // (hp 0) is silent until a Hero restores it with Crystal. Opponents breaking it cut off that side's healing well.
 // No state of its own: everything it needs is already in the structure, the players and state.bloom.
+import {heroMaxHp} from './hero-progress.js';
 import {bloomLevel} from './bloom.js';
 
 export const HEARTSTONE = Object.freeze({reach: 6, every: 30, hp: [0.5, 0.75, 1, 1.25], mana: [1, 1.5, 2, 2.5]});
@@ -20,8 +21,8 @@ export function stepHeartstones(state) {
     for (const p of state.players) {
       if (p.role !== 'hero' || p.hp <= 0 || sideOf(p) !== b.side) continue;
       if (Math.hypot(p.position[0] - b.position[0], p.position[2] - b.position[2]) > HEARTSTONE.reach) continue;
-      if (p.hp >= 100 && (p.mana ?? 100) >= 100) continue;
-      p.hp = Math.min(100, p.hp + hp); if (typeof p.mana === 'number') p.mana = Math.min(100, p.mana + mana); touched++;
+      if (p.hp >= heroMaxHp(p) && (p.mana ?? 100) >= 100) continue;
+      p.hp = Math.min(heroMaxHp(p), p.hp + hp); if (typeof p.mana === 'number') p.mana = Math.min(100, p.mana + mana); touched++;
     }
   }
   return touched;
