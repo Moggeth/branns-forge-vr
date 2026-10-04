@@ -8,8 +8,8 @@ import {worldClock, solarAngle, nightAmount, DAYLIGHT_SHARE} from '../shared/wor
 const C = hex => new THREE.Color(hex);
 // Palette keyed on sun elevation (sin of the solar angle). Colours sRGB hex -> linear working space via THREE.Color.
 const KEYS = [
-  {e: -1.0, sun: 0x8ea6ff, hemiSky: 0x30457a, hemiGround: 0x15140f, hemiI: .46, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
-  {e: -.32, sun: 0x8ea6ff, hemiSky: 0x30457a, hemiGround: 0x15140f, hemiI: .46, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
+  {e: -1.0, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
+  {e: -.32, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
   {e: -.12, sun: 0x96a4e6, hemiSky: 0x46558c, hemiGround: 0x211c18, hemiI: .55, zenith: 0x0d1838, horizon: 0x534a78, haze: 0x2b3152, hill: 0x181d33, exposure: 1.12, env: .09, cloud: 0x4a4466},
   {e: .02, sun: 0xff8746, hemiSky: 0x8f93b6, hemiGround: 0x4a382a, hemiI: .7, zenith: 0x3d5088, horizon: 0xf59a64, haze: 0xd0896c, hill: 0x3f3f52, exposure: 1.08, env: .26, cloud: 0xf2a37a},
   {e: .14, sun: 0xffb26e, hemiSky: 0xb3bccc, hemiGround: 0x5e4a30, hemiI: .85, zenith: 0x5378b0, horizon: 0xf4c088, haze: 0xdcb48c, hill: 0x4f5c4c, exposure: 1.05, env: .36, cloud: 0xffe0bc},
@@ -18,7 +18,7 @@ const KEYS = [
   {e: 1.0, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
 ].map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
 const COLOR_FIELDS = ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'];
-const SUN_PEAK = 2.9, MOON_PEAK = .72, MAX_ELEVATION = .78;
+const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .78;
 const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xd4dce4);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
