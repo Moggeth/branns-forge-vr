@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
 import {assetBasis, ASSET_POSES, prepareAsset, weaponTip, weaponForward, updateWeaponPresentation} from '../client/asset-pose.js';
+import {loadGlb} from './glb-node.mjs';
+import {dressSkeleton} from '../client/skeleton-look.js';
 
 const started = performance.now();
 const material = new THREE.MeshBasicMaterial({side: THREE.DoubleSide});
@@ -36,9 +38,8 @@ assert.equal(geometry.index, null, 'shared source geometry unchanged');
 maskMissingParts(root, []); assert.equal(mesh.geometry, geometry);
 
 // Actual shipped animated skeleton: complete leg and material topology survive.
-const bytes = readFileSync(new URL('../public/assets/skeleton.glb', import.meta.url));
-const template = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
-const skeleton = prepareAsset(template, 'skeleton').visual;
+const template = await loadGlb(new URL('../public/assets/skeleton.glb', import.meta.url));
+const skeleton = prepareAsset(template, 'skeleton').visual; dressSkeleton(skeleton, 0);
 const actualLeg = snapshotDetachedPart(skeleton, 'leftLeg');
 const bounds = new THREE.Box3().setFromObject(actualLeg), size = bounds.getSize(new THREE.Vector3());
 assert.ok(size.y > .55, `actual detached leg includes foot; height=${size.y}`);

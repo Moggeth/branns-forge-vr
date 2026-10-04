@@ -1,8 +1,9 @@
 import {createTestingSupplies} from './testing-supplies.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
-import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validatePickWall,PICK_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
-import {collapseMinedWall,stepCrystalWalls} from './weapon-specials.js';
+import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
+import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS} from './weapon-specials.js';
+import {castEarthLine,earthLineEdits} from './earth-spells.js';
 export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld,STARTING_SITES} from './starting-world.js';
@@ -246,7 +247,9 @@ function instantiate(state) {
         if (supplied && ore) {
           // Ore is anchored to visible earth; a bridge deck overhead is not its contact surface.
           const oreFloor=terrainHeight(state,ore.x,ore.z,false);
-          if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:oreFloor}) || Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5 || Math.abs(message.point[1]-oreFloor)>2) return ok();
+          // A Raise Wall segment is quarried anywhere on its face, from its foot up to the crest.
+          const face=ore.special==='wall'?RAISE_WALL.peak:0,reachY=Math.max(oreFloor-face,Math.min(oreFloor,p.position[1]));
+          if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:reachY}) || (face ? Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > RAISE_WALL.width+.5 : Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5) || message.point[1]>oreFloor+2 || message.point[1]<oreFloor-face-2) return ok();
           if(ore.hits===ore.maxHits-1&&state.pickups.length>=256)return fail('world_limit');
           ore.hits++; events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
           if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,reward.amount);if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
@@ -268,13 +271,13 @@ function instantiate(state) {
       const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
       if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
-      const lineCount=line&&message.start?Math.ceil(distance(message.start,message.end)/2.5)+1:3;
+      const lineCount=line?earthLineEdits(message.start,message.end):1;
       if (!Object.hasOwn(COST, spell) || !validPoint(message.point)) return fail('invalid_cast');
       // Mana is the only rule that refuses a cast; placement rules move it instead.
       const point = settleCastPoint(spell, message.point, {expedition: expeditionRunning(state.adventure)});
       if (bloomLevel(state.bloom) < SPELL_BLOOM[spell]) return fail('bloom_locked');
       if (p.mana < COST[spell]) return fail('insufficient_mana');
-      if(spell==='crystal'||spell==='starfall')reclaimDepletedDeposits(state);
+      if(spell==='crystal'||spell==='starfall'||spell==='wall')reclaimDepletedDeposits(state); // a wall reclaims room for its quarry stone
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
       if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
@@ -294,8 +297,8 @@ function instantiate(state) {
       const dx=x-p.position[0],dz=z-p.position[2],d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(p.yaw),uz=d>.001?dz/d:-Math.cos(p.yaw);
       const start=line?(message.start||[clamp(x-uz*3,-BOUND,BOUND),at[1],clamp(z+ux*3,-BOUND,BOUND)]):null;
       const end=line?(message.end||[clamp(x+uz*3,-BOUND,BOUND),at[1],clamp(z-ux*3,-BOUND,BOUND)]):null;
-      const rupture=spell==='sunder'?createSunderRupture(idNew,start,end,state.tick):null;
-      events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start,end,...(rupture?{rupture}:{})}:{})});
+      const earth=line?castEarthLine(state,p,spell,idNew,start,end,{nextId},events):null;
+      events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start,end,rupture:earth.rupture,expireTick:earth.expireTick,by:p.id}:{})});
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-BOUND,BOUND),sz=clamp(z+(i<2?-1:1)*1.4,-BOUND,BOUND);state.enemies.push({...createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]),emergeTick:state.tick});}
       if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'crystal',hits:0,maxHits:5,depleted:false});
@@ -321,11 +324,8 @@ function instantiate(state) {
         liftActors(state);
       }
       if (spell === 'starfall') state.pendingStarfalls.push({id: idNew, x, z, radius: 5, impactTick: state.tick + 48,side:p.side||'party'});
-      if (spell === 'sunder' || spell === 'wall') {
-        for (let i=0;i<lineCount;i++) state.edits.push({id:`${idNew}_${i}`,kind:spell,x:start[0]+(end[0]-start[0])*i/(lineCount-1),z:start[2]+(end[2]-start[2])*i/(lineCount-1),radius:2.5,height:spell==='wall'?1.5:-1.5,...(rupture?{rupture}:{})});
-        liftActors(state);
-      }
-      events.push(...castBoons(state,p,spell,at,{nextId,terrainHeight,damageHero},{start,end}));
+      if (line) liftActors(state);
+      events.push(...castBoons(state,p,spell,at,{nextId,terrainHeight,damageHero},{start,end,id:idNew}));
       return ok(events);
     },
     step() {
@@ -468,8 +468,8 @@ export function loadSimulation(saved) {
     if (!record(e) || !unique(e.id) || !validXZ(e) ||
         !((e.kind === 'raise' && e.radius === 6 && e.height === 2) || (e.kind === 'lower' && e.radius === 6 && e.height === -2) ||
           (e.kind === 'starfall' && e.radius === 5 && e.height === -1) ||
-          (e.kind === 'sunder' && e.radius === 2.5 && e.height === -1.5) || (e.kind === 'wall' && e.radius === 2.5 && e.height === 1.5) ||
-          (e.kind === 'axe_sunder' && e.radius === 1.35 && e.height === -.12) || (e.kind === 'pick_wall' && (e.wall === undefined ? e.radius === 1 && e.height === 2.4 && e.rupture === undefined : validatePickWall(e, saved.tick)))))
+          (e.kind === 'sunder' && (e.wall === undefined ? e.radius === 2.5 && e.height === -1.5 : validateWallSegment(e, saved.tick))) || (e.kind === 'wall' && (e.wall === undefined ? e.radius === 2.5 && e.height === 1.5 && e.rupture === undefined : validateWallSegment(e, saved.tick))) ||
+          (e.kind === 'axe_sunder' && e.radius === 1.35 && e.height === -.12) || (e.kind === 'pick_wall' && (e.wall === undefined ? e.radius === 1 && e.height === 2.4 && e.rupture === undefined : validateWallSegment(e, saved.tick)))))
       throw Error('Invalid simulation edit');
   }
   for (const g of saved.groves) {
@@ -484,15 +484,15 @@ export function loadSimulation(saved) {
   const veinSlots=new Set();for(const d of deposits)validateVein(d,saved.tick,veinSlots);
   const linkedWalls=new Set();
   for(const d of deposits) {
-    if(d.special!==undefined&&!['axe_sunder','pick_wall'].includes(d.special))throw Error('Invalid special deposit');
+    if(d.special!==undefined&&!['axe_sunder',...WALL_DEPOSITS].includes(d.special))throw Error('Invalid special deposit');
     if(d.special!==undefined&&d.kind!=='stone')throw Error('Invalid special material');
-    if(d.special==='pick_wall') {
+    if(WALL_DEPOSITS.includes(d.special)) {
       const edit=saved.edits.find(e=>e.id===d.editId);
-      if(!validId(d.editId)||linkedWalls.has(d.editId)||(d.depleted?!!edit&&!(edit.wall&&edit.wall.expireTick<=saved.tick):!edit)||edit&&(edit.kind!=='pick_wall'||edit.x!==d.x||edit.z!==d.z))throw Error('Invalid wall linkage');
+      if(!validId(d.editId)||linkedWalls.has(d.editId)||(d.depleted?!!edit&&!(edit.wall&&edit.wall.expireTick<=saved.tick):!edit)||edit&&(edit.kind!==d.special||edit.x!==d.x||edit.z!==d.z)||d.special==='wall'&&edit&&!edit.wall)throw Error('Invalid wall linkage');
       linkedWalls.add(d.editId);
     } else if(d.editId!==undefined)throw Error('Invalid wall linkage');
   }
-  if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall');
+  if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall'); // Raise Wall quarry stone is optional
   for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || (q.side!==undefined&&!['party','rivals'].includes(q.side)) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
   const meteorRewards=saved.meteorRewards??[];

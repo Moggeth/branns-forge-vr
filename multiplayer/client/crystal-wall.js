@@ -1,8 +1,8 @@
 import {applyCrystalMaterial} from './material-refinements.js';
-import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey} from '../shared/terrain.js';
+import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey,wallSpec} from '../shared/terrain.js';
 // Stonewhisper crystal wall presentation, v2 "geode" (2026-10-03).
 // Authority (shared/weapon-specials.js) raises a chain of capsule segments behind a 10 m/s front, keeps them for
-// PICK_WALL.lifetimeTicks, then sinks them. Everything here is a pure function of the snapshot tick, so every peer and
+// its lifetimeTicks, then sinks them. Everything here is a pure function of the snapshot tick, so every peer and
 // every late joiner sees the same moment of the same animation:
 //   seam   a blue fissure races ahead of the front along the ground,
 //   crust  earthy geode plates ride the rising soil, then split open along the crest, showing their glittering lining,
@@ -13,12 +13,22 @@ import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey} from '../shared/terrai
 // Crystals line the two flanks of the crest and leave a druzy channel along its spine, so the walkable ramp/crest reads
 // as walkable. Draw cost per wall: 3 crystal batches + 1 crust batch + 1 glow strip; shared shard/spark/dust pools add 3.
 // No lights, no transparency sorting on solids, no per-frame allocation in update().
+// The God's Raise Wall (edit kind 'wall') is the same geode, grown to rampart size; the God's Sunder (kind 'sunder')
+// turns it inside out: the crust peels back off the chasm lips and crystal lines the chasm walls and floor.
 export const CRYSTALS_PER_SEGMENT=10,PLATES_PER_SEGMENT=6,GROW_TICKS=30,CRACK_TICKS=12;
+/** Per-kind layout. flank: crystal pairs along each side; floor: small crystals on the spine/floor; plates: crust slabs;
+ * reach: lateral scale against the crystal wall; strip: half-width of the ground glow. */
+export const WALL_VIEWS=Object.freeze({
+ pick_wall:{flank:4,floor:2,plates:6,reach:1,strip:1.8,seam:0,layout:'ridge'},
+ wall:{flank:7,floor:3,plates:6,reach:wallSpec('wall').width/PICK_WALL.width,strip:2.9,seam:0,layout:'ridge'},
+ sunder:{flank:8,floor:5,plates:6,reach:1,strip:3.2,seam:1,layout:'chasm'},
+});
+const viewOf=kind=>WALL_VIEWS[kind];
 const SHARD_POOL=192,SPARK_POOL=320,DUST_POOL=96;
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
 const rng=seed=>()=>{seed=seed+0x6d2b79f5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=t=>t*t*(3-2*t);
-const sinkOf=(seg,tick)=>tick<=seg.expireTick?0:smooth(clamp((tick-seg.expireTick)/PICK_WALL.sinkTicks,0,1));
+const sinkOf=(seg,tick)=>tick<=seg.expireTick?0:smooth(clamp((tick-seg.expireTick)/seg.spec.sinkTicks,0,1));
 const backOut=u=>{const c=1.7;return u>=1?1:1+(c+1)*Math.pow(u-1,3)+c*Math.pow(u-1,2);};
 
 // One shared resonance clock (seconds) for every crystal/plate/strip shader.
@@ -68,23 +78,23 @@ float plN(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(
 // Ground light pool + leading fissure. One strip per wall, conformed to the live terrain.
 export function stripMaterial(T){
  return new T.ShaderMaterial({transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,fog:false,
-  uniforms:{uTime:wallTime,uFront:{value:0},uLength:{value:1},uBloom:{value:0},uLive:{value:1},uWarn:{value:0},uPreview:{value:0},uBad:{value:0}},
+  uniforms:{uTime:wallTime,uFront:{value:0},uLength:{value:1},uBloom:{value:0},uLive:{value:1},uWarn:{value:0},uPreview:{value:0},uBad:{value:0},uScale:{value:1},uSeam:{value:0}},
   vertexShader:/* glsl */`attribute vec2 aWall;varying vec2 vWall;void main(){vWall=aWall;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-  fragmentShader:/* glsl */`uniform float uTime,uFront,uLength,uBloom,uLive,uWarn,uPreview,uBad;varying vec2 vWall;
+  fragmentShader:/* glsl */`uniform float uTime,uFront,uLength,uBloom,uLive,uWarn,uPreview,uBad,uScale,uSeam;varying vec2 vWall;
    float h1(float x){return fract(sin(x*127.1)*43758.5453);}
    float n1(float x){float i=floor(x),f=fract(x);return mix(h1(i),h1(i+1.),f*f*(3.-2.*f));}
    void main(){
-    float along=vWall.x,across=abs(vWall.y);
+    float along=vWall.x,across=abs(vWall.y)/uScale,vy=vWall.y/uScale;
     vec3 blue=mix(vec3(.12,.45,1.),vec3(1.,.55,.18),uBad);
     // jagged fissure line: lateral wobble from 1D noise along the wall
     float wob=(n1(along*3.1)-.5)*.22+(n1(along*9.7+4.)-.5)*.08;
-    float crack=1.-smoothstep(.015,.07,abs(vWall.y-wob));
+    float crack=1.-smoothstep(.015,.07,abs(vy-wob));
     float inside=step(-.4,along)*step(along,uLength+.4);
     // preview: dashed chevrons streaming toward the target + soft footprint band
     if(uPreview>.5){
      float band=(1.-smoothstep(.55,1.15,across))*inside;
      float chev=step(.55,fract(along*1.4-across*.9-uTime*1.6))*(1.-smoothstep(.0,.5,across));
-     float endRing=1.-smoothstep(.0,.12,abs(length(vec2(along-uLength,vWall.y))-.45));
+     float endRing=1.-smoothstep(.0,.12,abs(length(vec2(along-uLength,vy))-.45));
      float a=band*.16+chev*.28*inside+crack*.35*inside+endRing*.8;
      if(uBad>.5)a*=.55+.45*step(.5,fract(along*2.));
      gl_FragColor=vec4(blue*a,1.);return;}
@@ -96,7 +106,9 @@ export function stripMaterial(T){
     float pool=smoothstep(.15,.7,across)*(1.-smoothstep(.9,1.8,across))*behind;
     float shimmer=.75+.25*sin(uTime*2.1-along*.9);
     float flick=1.+uWarn*(.6*step(.7,n1(uTime*14.+along*3.))-.35);
-    float a=(lead+pool*(.09*shimmer+uBloom*.22)*flick+crack*behind*.2*uBloom)*uLive;
+    // chasm: the floor keeps a living resonance seam (wider, breathing) for as long as it stands open
+    float seam=uSeam*behind*(crack*.55+(1.-smoothstep(.0,.42,abs(vy-wob)))*.22)*shimmer*flick;
+    float a=(lead+pool*(.09*shimmer+uBloom*.22)*flick*(1.-.6*uSeam)+crack*behind*.2*uBloom+seam)*uLive;
     gl_FragColor=vec4(blue*a,1.);}`});
 }
 // Faceted unit crystal y 0..1, radius ~1, deterministic jitter (convex: all facets face outward for honest rays).
@@ -152,45 +164,55 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
  // ---- wall construction ----
  function build(id,list,deposits,tick){
   const r0=list[0].rupture,dx=r0.end[0]-r0.start[0],dz=r0.end[1]-r0.start[1],len=Math.hypot(dx,dz),tx=dx/len,tz=dz/len,nx=-tz,nz=tx;
-  const g=new T.Group();g.name='CrystalWall_'+id;root.add(g);
-  const segCount=list.length,crystalCap=segCount*CRYSTALS_PER_SEGMENT;
+  const kind=list[0].kind,view=viewOf(kind),spec=wallSpec(kind),g=new T.Group();g.name=(kind==='sunder'?'SunderChasm_':kind==='wall'?'RaiseWall_':'CrystalWall_')+id;root.add(g);
+  const segCount=list.length,crystalCap=segCount*(view.flank*2+view.floor);
   const batches=shapes.map((geometry,k)=>{const mesh=new T.InstancedMesh(geometry,shapeMaterial[k],crystalCap);mesh.name='CrystalBatch_'+k;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
    mesh.setColorAt(0,new T.Color(1,1,1));mesh.instanceColor.setUsage(T.DynamicDrawUsage);mesh.userData.wallTargets=[];mesh.count=0;g.add(mesh);return mesh;});
-  const crustMesh=new T.InstancedMesh(plateGeo,crust,segCount*PLATES_PER_SEGMENT);crustMesh.name='CrystalCrust';crustMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);crustMesh.userData.wallTargets=[];crustMesh.count=0;g.add(crustMesh);
-  // strip: along -0.6..len+1.6, across -1.8..1.8, conformed to live terrain
-  const nA=Math.max(8,Math.ceil((len+2.2)/.3)),nC=9,positions=new Float32Array(nA*nC*3),wall=new Float32Array(nA*nC*2),index=[];
-  for(let i=0;i<nA;i++)for(let j=0;j<nC;j++){const k=i*nC+j;wall[k*2]=-.6+(len+2.2)*i/(nA-1);wall[k*2+1]=-1.8+3.6*j/(nC-1);if(i<nA-1&&j<nC-1)index.push(k,k+1,k+nC,k+1,k+nC+1,k+nC);}
+  const crustMesh=new T.InstancedMesh(plateGeo,crust,segCount*view.plates);crustMesh.name='CrystalCrust';crustMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);crustMesh.userData.wallTargets=[];crustMesh.count=0;g.add(crustMesh);
+  // strip: along -0.6..len+1.6, across -view.strip..view.strip, conformed to live terrain
+  const nA=Math.max(8,Math.ceil((len+2.2)/.3)),nC=view.layout==='chasm'?13:9,positions=new Float32Array(nA*nC*3),wall=new Float32Array(nA*nC*2),index=[];
+  for(let i=0;i<nA;i++)for(let j=0;j<nC;j++){const k=i*nC+j;wall[k*2]=-.6+(len+2.2)*i/(nA-1);wall[k*2+1]=view.strip*(-1+2*j/(nC-1));if(i<nA-1&&j<nC-1)index.push(k,k+1,k+nC,k+1,k+nC+1,k+nC);}
   const sg=new T.BufferGeometry();sg.setAttribute('position',new T.BufferAttribute(positions,3).setUsage(T.DynamicDrawUsage));sg.setAttribute('aWall',new T.BufferAttribute(wall,2));sg.setIndex(index);
-  const sm=strip.clone();sm.uniforms.uTime=wallTime;sm.uniforms.uLength.value=len;
+  const sm=strip.clone();sm.uniforms.uTime=wallTime;sm.uniforms.uLength.value=len;sm.uniforms.uScale.value=view.strip/1.8;sm.uniforms.uSeam.value=view.seam;
   const stripMesh=new T.Mesh(sg,sm);stripMesh.name='CrystalWallGlow';stripMesh.frustumCulled=false;stripMesh.renderOrder=2;stripMesh.raycast=()=>{};stripMesh.userData.ignoreContact=true;g.add(stripMesh);
-  const w={id,group:g,batches,crustMesh,stripMesh,rupture:r0,len,t:[tx,tz],n:[nx,nz],segments:[],lastHeights:null,owner:list[0].wall.owner,quiet:false};
+  const w={id,kind,view,spec,group:g,batches,crustMesh,stripMesh,rupture:r0,len,t:[tx,tz],n:[nx,nz],segments:[],lastHeights:null,owner:list[0].wall.owner,quiet:false};
   const ordered=[...list].sort((a,b)=>((a.x-r0.start[0])*tx+(a.z-r0.start[1])*tz)-((b.x-r0.start[0])*tx+(b.z-r0.start[1])*tz));
   ordered.forEach((e,si)=>w.segments.push(segment(w,e,si,deposits.get(e.id))));
   walls.set(id,w);return w;
  }
  function segment(w,e,si,deposit){
-  const r=rng(hash(e.id)),[tx,tz]=w.t,[nx,nz]=w.n,ws=e.wall,half=Math.hypot(ws.b[0]-ws.a[0],ws.b[1]-ws.a[1])/2;
-  const along=(e.x-w.rupture.start[0])*tx+(e.z-w.rupture.start[1])*tz,hMean=(ws.h0+ws.h1)/2,scale=.45+.55*hMean/PICK_WALL.peak;
-  // front reaches this segment's centre, then the soil finishes rising over the settle band
+  const r=rng(hash(e.id)),[tx,tz]=w.t,[nx,nz]=w.n,ws=e.wall,half=Math.hypot(ws.b[0]-ws.a[0],ws.b[1]-ws.a[1])/2,{view,spec}=w,chasm=view.layout==='chasm';
+  const top=spec.peak??spec.depth,along=(e.x-w.rupture.start[0])*tx+(e.z-w.rupture.start[1])*tz,hMean=(ws.h0+ws.h1)/2,scale=.45+.55*hMean/top;
+  // front reaches this segment's centre, then the soil finishes moving over the settle band
   const span=w.len+SUNDER_SETTLE_DISTANCE,d=w.rupture.durationTicks,front=w.rupture.startTick+d*along/span,risen=w.rupture.startTick+d*Math.min(1,(along+SUNDER_SETTLE_DISTANCE)/span);
   const crack=front+(risen-front)*.55;
-  const crystals=[];
-  for(let k=0;k<CRYSTALS_PER_SEGMENT;k++){
-   const druze=k>=8,side=druze?(r()-.5)*.25:(k%2?1:-1)*(.28+r()*.3),u=druze?(k-8.5)*.8:((k>>1)/3*2-1)*(.85+r()*.15);
-   const shape=druze?0:k%4===1?1:k%3===2?2:0,core=shape===1;
-   const len=druze?(.22+r()*.18)*scale:(core?1.55:1.0+r()*.45)*(.5+hMean*.3),rad=druze?.07+r()*.04:(core?.21:.12+r()*.07)*(.75+scale*.35);
-   const lean=druze?(r()-.5)*.4:Math.sign(side)*(.22+r()*.3),tilt=(r()-.5)*.35,twist=r()*Math.PI*2;
+  const crystals=[],flank=view.flank*2,reach=view.reach,size=chasm?.7+.3*hMean:(.5+hMean*.3);
+  for(let k=0;k<flank+view.floor;k++){
+   const druze=k>=flank,pair=k>>1,s=k%2?1:-1;
+   // ridge: crystals crowd the crest edges, leaning out; chasm: they line both walls, leaning in toward the void
+   const side=druze?(r()-.5)*(chasm?.5:.25)*reach:s*(chasm?spec.width*(.22+r()*.42):(.28+r()*.3)*reach);
+   // the crystal wall keeps its even rhythm; the God's lines scatter crystals freely so long walls never read as a fence
+   const u=druze?((k-flank+.5)/view.floor*2-1)*.8:w.kind==='pick_wall'?(pair/Math.max(1,view.flank-1)*2-1)*(.85+r()*.15):(r()*2-1)*.98;
+   const shape=druze?(chasm&&k%2?1:0):chasm?(k%3?1:k%2?2:0):k%4===1?1:k%3===2?2:0,core=shape===1,grand=!chasm&&reach>1&&(k%5===1);
+   const len=(druze?(chasm?(.35+r()*.35)*size:(.22+r()*.18)*scale):(core?1.55:1.0+r()*.45)*size*(chasm?.7:1))*(grand?1.35:1);
+   const rad=(druze?(chasm?.1+r()*.06:.07+r()*.04):(core?.21:.12+r()*.07)*(.75+scale*.35))*(reach>1?1.25:1);
+   const lean=druze?(r()-.5)*.4:Math.sign(side)*(chasm?-(.4+r()*.35):(.22+r()*.3)),tilt=(r()-.5)*.35,twist=r()*Math.PI*2;
    const q=new T.Quaternion().setFromAxisAngle(new T.Vector3(tx,0,tz),-lean).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(nx,0,nz),tilt)).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),twist));
-   crystals.push({shape,ox:tx*u*half+nx*side,oz:tz*u*half+nz*side,depth:druze?.08:.6+r()*.2,len,rad,q,
-    delay:r()*8+(druze?6:0)+(core?2:0),order:(core?10:0)+(druze?20:0)+r()+(1-Math.abs(side))*.5,seed:hash(e.id+':'+k),glow:core?1.15:1});
+   crystals.push({shape,ox:tx*u*half+nx*side,oz:tz*u*half+nz*side,depth:druze?.08:chasm?.3+r()*.15:.6+r()*.2,len,rad,q,
+    delay:r()*8+(druze?6:0)+(core?2:0),order:(core?10:0)+(druze?20:0)+r()+(1-Math.abs(side))*.5,seed:hash(e.id+':'+k),glow:core||chasm&&druze?1.15:1});
   }
   const removalOrder=[...crystals].sort((a,b)=>a.order-b.order);
-  const platesOut=[];
-  for(let k=0;k<PLATES_PER_SEGMENT;k++){
-   const s=k%2?1:-1,u=(((k>>1)+.5)/(PLATES_PER_SEGMENT/2)*2-1)*.9+(r()-.5)*.15;
-   platesOut.push({ux:tx*u*half,uz:tz*u*half,side:s,lip:.16+r()*.1,w:(.95/(PLATES_PER_SEGMENT/2))*half*2*(.85+r()*.3),h:(.42+r()*.22)*(.5+.5*scale),d:.13+r()*.05,yaw:Math.atan2(nx*s,nz*s)+(r()-.5)*.3,open:.45+r()*.35,seed:hash(e.id+'#'+k)});
+  const platesOut=[],perSide=view.plates/2;
+  for(let k=0;k<view.plates;k++){
+   const s=k%2?1:-1,u=(((k>>1)+.5)/perSide*2-1)*.9+(r()-.5)*(chasm?.35:.15);
+   // chasm slabs hinge at the lip and peel right back over the spoil bank (big open angle, longer slabs)
+   // rampart slabs stand at the foot and lean in against the faces (negative open), so the crust armours the wall
+   const rampart=reach>1;
+   platesOut.push({ux:tx*u*half,uz:tz*u*half,side:s,lip:chasm?spec.width*(1+r()*.15):rampart?spec.width*(.8+r()*.14):(.16+r()*.1),w:(.95/perSide)*half*2*(.85+r()*.3)*(rampart?1.3:chasm?1.25:1),
+    h:chasm?(.55+r()*.4):rampart?hMean*(.62+r()*.36):(.42+r()*.22)*(.5+.5*scale),d:(.13+r()*.05)*(rampart?2.4:chasm?1.5:1),yaw:Math.atan2(nx*s,nz*s)+(r()-.5)*(rampart?.35:chasm?.6:.3),
+    open:chasm?.85+r()*.45:rampart?-(.16+r()*.14):.45+r()*.35,sink:chasm?.05:rampart?.35:.22,seed:hash(e.id+'#'+k)});
   }
-  return {edit:e,deposit,si,along,front,risen,crack,crystals,removalOrder,plates:platesOut,removed:0,hits:deposit?.hits||0,broken:false,bloomed:false,warned:false,expireTick:ws.expireTick,naturalEnd:w.rupture.startTick+PICK_WALL.lifetimeTicks};
+  return {edit:e,spec,deposit,si,along,front,risen,crack,crystals,removalOrder,plates:platesOut,removed:0,hits:deposit?.hits||0,broken:false,bloomed:false,warned:false,expireTick:ws.expireTick,naturalEnd:w.rupture.startTick+spec.lifetimeTicks};
  }
  // ---- per-frame pose ----
  const tmpE=new T.Euler(),axisY=new T.Vector3(0,1,0),tmpQ=new T.Quaternion(),tmpQ2=new T.Quaternion(),tmpV=new T.Vector3(),white=new T.Color();
@@ -201,7 +223,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   for(const seg of w.segments){
    const e=seg.edit,cx=e.x,cz=e.z,ground=height(cx,cz,edits),sink=sinkOf(seg,tick);
    const grow=clamp((tick-seg.crack)/GROW_TICKS,0,1.6),open=clamp((tick-seg.crack+4)/CRACK_TICKS,0,1);
-   if(tick<seg.crack+GROW_TICKS+12||sink>0&&sink<1||tick>seg.naturalEnd-PICK_WALL.warnTicks&&tick<seg.naturalEnd+4)animating=true;
+   if(tick<seg.crack+GROW_TICKS+12||sink>0&&sink<1||tick>seg.naturalEnd-seg.spec.warnTicks&&tick<seg.naturalEnd+4)animating=true;
    const id=seg.deposit?.id;
    // crust plates: ride the soil, split open at the crack, crumble while sinking
    if(!(sink>=1)){
@@ -210,15 +232,15 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
      const grown=tick<seg.front?0:clamp((tick-seg.front)/8,0,1),k=(1-.5*sink)*grown;if(k<=.001)continue;
      const o=-.28+(backOut(open)*(p.open+.28))+sink*.8,lx=cx+p.ux+w.n[0]*p.side*p.lip,lz=cz+p.uz+w.n[1]*p.side*p.lip;
      tmpQ.setFromAxisAngle(axisY,p.yaw);tmpQ2.setFromAxisAngle(tmpV.set(w.t[0],0,w.t[1]),p.side*o);
-     dummy.q.copy(tmpQ2).multiply(tmpQ);dummy.p.set(lx,height(lx,lz,edits)-.22-sink*.45,lz);dummy.s.set(p.w*k,p.h*k,p.d);
+     dummy.q.copy(tmpQ2).multiply(tmpQ);dummy.p.set(lx,height(lx,lz,edits)-p.sink-sink*.45,lz);dummy.s.set(p.w*k,p.h*k,p.d);
      dummy.m.compose(dummy.p,dummy.q,dummy.s);w.crustMesh.setMatrixAt(plateCount++,dummy.m);w.crustMesh.userData.wallTargets.push(id);
     }
    }
    // crystals
    if(sink>0&&!seg.broken){seg.broken=true;breakSegment(w,seg,ground,tick);}
    if(seg.broken)continue;
-   const warn=tick>seg.naturalEnd-PICK_WALL.warnTicks&&seg.expireTick>=seg.naturalEnd?clamp((tick-(seg.naturalEnd-PICK_WALL.warnTicks))/PICK_WALL.warnTicks,0,1):0;
-   if(warn>0&&!seg.warned){seg.warned=true;if(tick<seg.naturalEnd-PICK_WALL.warnTicks+20)events.warn.push({position:[cx,ground,cz],wall:w.id,segment:seg.si});}
+   const warnTicks=seg.spec.warnTicks,warn=tick>seg.naturalEnd-warnTicks&&seg.expireTick>=seg.naturalEnd?clamp((tick-(seg.naturalEnd-warnTicks))/warnTicks,0,1):0;
+   if(warn>0&&!seg.warned){seg.warned=true;if(tick<seg.naturalEnd-warnTicks+20)events.warn.push({position:[cx,ground,cz],wall:w.id,segment:seg.si});}
    if(grow>0&&!seg.bloomed){seg.bloomed=true;if(tick-seg.crack<20)bloom(w,seg,ground);}
    for(let k=seg.removed;k<seg.removalOrder.length;k++){
     const c=seg.removalOrder[k],u=clamp((tick-seg.crack-c.delay)/(GROW_TICKS-8),0,1);if(u<=0)continue;
@@ -240,7 +262,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   u.uFront.value=clamp((tick-r.startTick)/r.durationTicks,0,1)*span;
   u.uBloom.value=Math.max(0,1-(tick-(r.startTick+r.durationTicks))/50)*clamp((tick-r.startTick)/r.durationTicks*2,0,1);
   let alive=0,sinkAll=1;for(const q of w.segments){const k=sinkOf(q,tick);if(k<1)alive++;sinkAll=Math.min(sinkAll,k);}alive/=w.segments.length;
-  u.uLive.value=alive*(1-sinkAll);u.uWarn.value=w.segments.some(s=>s.warned&&!s.broken)?clamp((tick-(w.rupture.startTick+PICK_WALL.lifetimeTicks-PICK_WALL.warnTicks))/PICK_WALL.warnTicks,0,1):0;
+  u.uLive.value=alive*(1-sinkAll);u.uWarn.value=w.segments.some(s=>s.warned&&!s.broken)?clamp((tick-(w.rupture.startTick+w.spec.lifetimeTicks-w.spec.warnTicks))/w.spec.warnTicks,0,1):0;
   conformStrip(w,animating||!w.lastHeights);
   return animating;
  }
@@ -253,7 +275,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   const r=rng(seg.crystals[0].seed),[tx,tz]=w.t,e=seg.edit,many=quality==='low'?6:12;
   for(let i=0;i<many;i++){const a=r()*Math.PI*2,s=.6+r()*1.6;emit(sparks,e.x+(r()-.5)*.8,ground+.2+r()*.6,e.z+(r()-.5)*.8,Math.cos(a)*s*.6,1.2+r()*2.2,Math.sin(a)*s*.6,.7+r()*.6,.06+r()*.05,.35+r()*.3,.7+r()*.25,1,1.8,1.2);}
   for(let i=0;i<(quality==='low'?2:3);i++){const s=r()<.5?1:-1;emit(dust,e.x+w.n[0]*s*(.9+r()*.4)+tx*(r()-.5),ground-.6+r()*.3,e.z+w.n[1]*s*(.9+r()*.4)+tz*(r()-.5),w.n[0]*s*(.5+r()*.6),.3+r()*.4,w.n[1]*s*(.5+r()*.6),.9+r()*.4,.18+r()*.12,.62,.5,.36,2.6,-.15);}
-  events.burst.push({position:[e.x,ground,e.z],wall:w.id,segment:seg.si,height:(e.wall.h0+e.wall.h1)/2});
+  events.burst.push({position:[e.x,ground,e.z],wall:w.id,kind:w.kind,segment:seg.si,height:(e.wall.h0+e.wall.h1)/2});
  }
  function breakSegment(w,seg,ground,tick){
   const fresh=tick<seg.expireTick+10,e=seg.edit;
@@ -262,7 +284,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
     for(let j=0;j<(c.shape===1?2:1);j++)emitShard(e.x+c.ox,ground+c.len*(.2+.6*r()),e.z+c.oz,(r()-.5)*2.4+w.n[0]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,1.4+r()*2.6,(r()-.5)*2.4+w.n[1]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,c.rad*(.45+r()*.3),c.seed+j);
     for(let j=0;j<2;j++)emit(sparks,e.x+c.ox,ground+c.len*r(),e.z+c.oz,(r()-.5)*3,1+r()*2.5,(r()-.5)*3,.55+r()*.4,.07,.5,.85,1,1.2,4);}
    for(let i=0;i<2;i++)emit(dust,e.x+(Math.random()-.5),ground-.3,e.z+(Math.random()-.5),(Math.random()-.5)*.8,.4,(Math.random()-.5)*.8,1.1,.22,.62,.5,.36,2.4,-.15);
-   events.shatter.push({position:[e.x,ground,e.z],wall:w.id,segment:seg.si,crystals:seg.removalOrder.length-seg.removed});
+   events.shatter.push({position:[e.x,ground,e.z],wall:w.id,kind:w.kind,segment:seg.si,crystals:seg.removalOrder.length-seg.removed});
   }
   seg.removed=seg.removalOrder.length;
  }
@@ -279,15 +301,15 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
  // ---- snapshot sync ----
  function sync(s){
   lastEdits=s.edits||[];lastTick=s.tick??lastTick;const deposits=new Map(),key=terrainFrameKey(lastEdits,lastTick),moved=key!==terrainKey;terrainKey=key;
-  for(const d of s.deposits||[])if(d.special==='pick_wall'&&d.editId)deposits.set(d.editId,d);
+  for(const d of s.deposits||[])if((d.special==='pick_wall'||d.special==='wall')&&d.editId)deposits.set(d.editId,d);
   const casts=new Map();
-  for(const e of lastEdits)if(e.kind==='pick_wall'&&e.wall&&e.rupture){if(!casts.has(e.rupture.id))casts.set(e.rupture.id,[]);casts.get(e.rupture.id).push(e);}
+  for(const e of lastEdits)if(e.wall&&e.rupture&&viewOf(e.kind)){if(!casts.has(e.rupture.id))casts.set(e.rupture.id,[]);casts.get(e.rupture.id).push(e);}
   for(const [id,w] of walls)if(!casts.has(id)||lastTick<w.rupture.startTick)retire(id,w);// gone, or world rewound before it
   for(const [id,list] of casts){
    const known=walls.get(id),w=known||build(id,list,deposits,lastTick),byId=new Map(list.map(e=>[e.id,e]));
    let changed=!known||moved;
    for(const seg of w.segments){const e=byId.get(seg.edit.id);
-    if(!e){seg.expireTick=Math.min(seg.expireTick,lastTick-PICK_WALL.sinkTicks);continue;}// authority retired it after its sink
+    if(!e){seg.expireTick=Math.min(seg.expireTick,lastTick-seg.spec.sinkTicks);continue;}// authority retired it after its sink
     const deposit=deposits.get(e.id);if(seg.expireTick!==e.wall.expireTick||(seg.deposit?.hits??0)!==(deposit?.hits??0)||!!seg.deposit?.depleted!==!!deposit?.depleted)changed=true;
     seg.edit=e;seg.expireTick=e.wall.expireTick;seg.deposit=deposit;
     applyHits(w,seg,deposit,!!known&&seg.bloomed);}
@@ -304,7 +326,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
    if(w.quiet&&shownTick<w.wakeAt)continue;
    const busy=pose(w,shownTick);w.quiet=!busy;
    // next scheduled change for a quiet wall: its warning, or the earliest segment expiry
-   w.wakeAt=Infinity;for(const q of w.segments){for(const t of [q.naturalEnd-PICK_WALL.warnTicks,q.expireTick])if(t>shownTick)w.wakeAt=Math.min(w.wakeAt,t);}
+   w.wakeAt=Infinity;for(const q of w.segments){for(const t of [q.naturalEnd-q.spec.warnTicks,q.expireTick])if(t>shownTick)w.wakeAt=Math.min(w.wakeAt,t);}
   }
   stepPools(dt);legacy.update(dt);
  }

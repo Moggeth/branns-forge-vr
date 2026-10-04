@@ -1,6 +1,7 @@
 import {phoenixBank} from './phoenix-bank.js';
 import * as THREE from 'three';
 import {prepareAsset, prepareProjectile, dressArrowVariant} from './asset-pose.js';
+import {dressSkeleton} from './skeleton-look.js';
 import {updateSkinBounds} from './skin-bounds.js';
 import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
@@ -34,8 +35,8 @@ export function canonicalPart(name = '') {
   if (/head|skull/.test(n)) return 'head';
   if (/leftleg|leftknee|leftfoot|legl/.test(n)) return 'leftLeg';
   if (/rightleg|rightknee|rightfoot|legr/.test(n)) return 'rightLeg';
-  if (/leftarm|lefthand|arml|shoulderl|forearml|elbowl/.test(n)) return 'leftArm';
-  if (/rightarm|righthand|armr|shoulderr|forearmr|elbowr/.test(n)) return 'rightArm';
+  if (/leftarm|leftforearm|lefthand|arml|shoulderl|forearml|elbowl/.test(n)) return 'leftArm';
+  if (/rightarm|rightforearm|righthand|armr|shoulderr|forearmr|elbowr/.test(n)) return 'rightArm';
   return 'torso';
 }
 
@@ -406,7 +407,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       let node = detached.get(data.id);
       if (!node) {
         let source = actorFor(data.sourceId)?.visual;
-        if (!source && templates.has(data.kind)) source = prepareAsset(templates.get(data.kind), data.kind).visual;
+        if (!source && templates.has(data.kind)) { source = prepareAsset(templates.get(data.kind), data.kind).visual; if (data.kind === 'skeleton') dressSkeleton(source, data.sourceId); }
         if (!source || source.userData.placeholder) continue;
         node = snapshotDetachedPart(source, data.part); detached.set(data.id, node); scene.add(node);
         node.position.fromArray(data.position); node.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);

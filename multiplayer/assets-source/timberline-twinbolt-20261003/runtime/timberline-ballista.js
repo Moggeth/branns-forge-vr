@@ -245,7 +245,8 @@ export function createTimberlineBallista(gltf, {lodDistance = 18, autoReload = t
     socketWorld,
     // Network presentation: seek directly without replaying release/gameplay events.
     // A reconnect at any point in the four-second cycle sees exactly the same pose.
-    seekCycle(age, camera = null, viewportHeight = 1080) {
+    // ammo=false winds the strings without seating bolts: an empty machine never shows phantom ammunition.
+    seekCycle(age, camera = null, viewportHeight = 1080, {ammo = true} = {}) {
       const idle = age < 0 || age >= 3.9;
       const name = idle ? 'Idle_Loaded' : age < .75 ? 'Fire' : 'Reload';
       const next = idle ? actions.idle : age < .75 ? actions.fire : actions.reload;
@@ -254,8 +255,8 @@ export function createTimberlineBallista(gltf, {lodDistance = 18, autoReload = t
       next.time = idle ? Math.max(0, age) % 3 : age < .75 ? age : age - .75;
       lastTime = next.time;
       state = idle ? 'loaded' : age < .75 ? 'firing' : 'reloading';
-      boltsOnRails = idle || age < .05 || age >= .75;
-      filamentShown = idle || age < .05 || age >= 3.55;
+      boltsOnRails = (idle || age < .05 || age >= .75) && (ammo || age < .05);
+      filamentShown = (idle || age < .05 || age >= 3.55) && (ammo || age < .05);
       update(0, camera, viewportHeight);
     },
     forceLod(l) { forcedLod = l; if (l != null) setLod(l); },

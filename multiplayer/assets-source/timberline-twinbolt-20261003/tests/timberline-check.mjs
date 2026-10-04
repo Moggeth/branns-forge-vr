@@ -129,9 +129,11 @@ check('collision: proxies hang off real pivot names', () => {
 
 check('budgets: triangles, materials, textures, file sizes', () => {
   const b = report.ballista, p = report.bolts;
-  assert.ok(b.triangles.LOD0 <= 16000 && b.triangles.LOD1 <= 6000, JSON.stringify(b.triangles));
-  assert.ok(p.triangles.LOD0 <= 2000, JSON.stringify(p.triangles));
-  assert.ok(b.materials <= 6 && p.materials <= 6);
+  // 2026-10-04 pass: the sighting scope (+~1.6k) and the detailed bolts (rune blade, binding, glowing fins) raised the
+  // LOD0 budgets; LOD1, which far machines and RTS views use, stays lean. TL_Resonance is the seventh material.
+  assert.ok(b.triangles.LOD0 <= 17500 && b.triangles.LOD1 <= 6000, JSON.stringify(b.triangles));
+  assert.ok(p.triangles.LOD0 <= 3600 && p.triangles.LOD1 <= 1000, JSON.stringify(p.triangles));
+  assert.ok(b.materials <= 7 && p.materials <= 7);
   assert.ok(b.bytes < 2.5e6 && p.bytes < 0.6e6 && report.collision.bytes < 0.1e6);
 });
 
