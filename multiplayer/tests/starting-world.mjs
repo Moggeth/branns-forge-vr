@@ -5,7 +5,7 @@ import {worldTrees} from '../shared/world-content.js';
 import {createEnemy,hitEnemyPart} from '../shared/combat.js';
 import * as THREE from 'three';
 import {createStartingWorld} from '../client/starting-world.js';
-const sim=createSimulation({seed:17});sim.addPlayer({id:'hero',role:'hero'});
+const sim=createSimulation({legacyBattle:true,seed:17});sim.addPlayer({id:'hero',role:'hero'});
 const w=sim.adventureWorld(),p=w.players[0];p.tool='pick';w.pickups=[];
 const e=createEnemy('dead',[0,terrainHeight(w,0,6),6],'golem');e.armor=0;w.enemies=[e];
 hitEnemyPart(w,e,'torso',1000,{tool:'pick'},{terrainHeight,nextId:(s,k)=>k+(++s.idCounter)},[]);

@@ -3,7 +3,7 @@ import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulatio
 import {createEnemy,partPosition} from '../shared/combat.js';
 import {SPELLS} from '../shared/spells.js';
 const begin=performance.now();
-function fixture(kind='skeleton') {const s=createSimulation();s.addPlayer({id:'h'});s.addPlayer({id:'g',role:'god'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,6),6],kind)];return loadSimulation(c);}
+function fixture(kind='skeleton') {const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});s.addPlayer({id:'g',role:'god'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,6),6],kind)];return loadSimulation(c);}
 function action(s,seq,action,extra={}){return s.command('h',{type:'action',seq,action,...extra});}
 const advance=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 const localHit=(targetId,part,point)=>({targetId,part,point,normal:[0,0,1],localPoint:[0,0,0],localQuaternion:[0,0,0,1],boneName:part});
@@ -42,11 +42,11 @@ assert.deepEqual(loadSimulation(s.checkpoint()).snapshot(),s.snapshot());
 
 // Golems resist headshots and the curved solver turns in the declared axis direction.
 s=fixture('golem');shot=fireAt(s,'head');assert.equal(s.projectileContact(shot.hit).ok,true);assert.ok(s.snapshot().enemies[0].hp>0);
-function curveFlight(curve,draw){const r=createSimulation();r.addPlayer({id:'h'});action(r,1,'equip',{tool:'bow'});action(r,2,'fire',{origin:[0,2,8],direction:[0,0,-1],curve,draw});advance(r,30);return r.snapshot().projectiles[0];}
+function curveFlight(curve,draw){const r=createSimulation({legacyBattle:true,legacyBattle:true});r.addPlayer({id:'h'});action(r,1,'equip',{tool:'bow'});action(r,2,'fire',{origin:[0,2,8],direction:[0,0,-1],curve,draw});advance(r,30);return r.snapshot().projectiles[0];}
 assert.ok(curveFlight([0,.8,0],1).position[0]<-2);assert.ok(curveFlight([0,0,0],1).position[2]<curveFlight([0,0,0],.2).position[2]);
 
 // Every tray spell has a working host command and a presentation event.
-for(const spell of SPELLS){const r=createSimulation();r.addPlayer({id:'g',role:'god'});r.adventureWorld().bloom=999;const result=r.command('g',{type:'cast',seq:1,spell:spell.id,point:[5,0,5],...(spell.target==='line'?{start:[2,0,5],end:[8,0,5]}:{})});assert.equal(result.ok,true,spell.id);assert.ok(result.events.some(e=>e.kind==='spell'&&e.spell===spell.id),spell.id);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());advance(r,60);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());}
+for(const spell of SPELLS){const r=createSimulation({legacyBattle:true,legacyBattle:true});r.addPlayer({id:'g',role:'god'});r.adventureWorld().bloom=999;const result=r.command('g',{type:'cast',seq:1,spell:spell.id,point:[5,0,5],...(spell.target==='line'?{start:[2,0,5],end:[8,0,5]}:{})});assert.equal(result.ok,true,spell.id);assert.ok(result.events.some(e=>e.kind==='spell'&&e.spell===spell.id),spell.id);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());advance(r,60);assert.deepEqual(loadSimulation(r.checkpoint()).snapshot(),r.snapshot());}
 
 // New nested save fields cannot bypass caps or inject bad transforms.
 s=fixture();shot=fireAt(s,'head');s.projectileContact(shot.hit);const safe=s.checkpoint();
@@ -58,9 +58,9 @@ assert.equal(s.projectileContact({...shot.hit,partPoses:poses}).ok,true);advance
 const clean=s.checkpoint();clean.detachedParts[0].unknown={nested:['unbounded']};clean.embeds[0].unknown=clean.detachedParts[0].unknown;assert.equal(loadSimulation(clean).checkpoint().detachedParts[0].unknown,undefined);assert.equal(loadSimulation(clean).checkpoint().embeds[0].unknown,undefined);
 
 // Terrain lines stay connected and reserve every edit atomically before spending mana.
-let r=createSimulation();r.addPlayer({id:'g',role:'god'});assert.equal(r.command('g',{type:'cast',seq:1,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).ok,true);assert.equal(r.snapshot().edits.length,7);
+let r=createSimulation({legacyBattle:true,legacyBattle:true});r.addPlayer({id:'g',role:'god'});assert.equal(r.command('g',{type:'cast',seq:1,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).ok,true);assert.equal(r.snapshot().edits.length,7);
 cp=r.checkpoint();cp.players[0].castTick=-1000;cp.edits=Array.from({length:60},(_,i)=>({id:`edit${i}`,kind:'raise',x:0,z:0,radius:6,height:2}));cp.deposits=cp.deposits.filter(d=>d.special!=='wall');r=loadSimulation(cp);const mana=r.snapshot().players[0].mana;assert.equal(r.command('g',{type:'cast',seq:2,spell:'wall',point:[0,0,0],start:[-9,0,0],end:[9,0,0]}).ok,true,'a full edit list bakes instead of refusing');assert.ok(r.snapshot().players[0].mana<mana);assert.ok(r.snapshot().edits.length<=48);
 
 // Saves from the first import wave acquire defaults without changing old content.
-const old=createSimulation().checkpoint();delete old.projectiles;delete old.embeds;delete old.detachedParts;old.enemies=[{id:'old',position:[0,0,0],yaw:0,hp:100,attackTick:-1000}];const upgraded=loadSimulation(old);assert.equal(upgraded.snapshot().enemies[0].kind,'skeleton');assert.deepEqual(upgraded.snapshot().projectiles,[]);
+const old=createSimulation({legacyBattle:true,legacyBattle:true}).checkpoint();delete old.projectiles;delete old.embeds;delete old.detachedParts;old.enemies=[{id:'old',position:[0,0,0],yaw:0,hp:100,attackTick:-1000}];const upgraded=loadSimulation(old);assert.equal(upgraded.snapshot().enemies[0].kind,'skeleton');assert.deepEqual(upgraded.snapshot().projectiles,[]);
 console.log(`combat: pass (${((performance.now()-begin)/1000).toFixed(3)} s)`);

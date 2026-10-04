@@ -35,7 +35,7 @@ const EXIT = s => [SEAT.clone(), SEAT.clone().add(new THREE.Vector3(-s * .22, .1
 export const SIEGEBIRD_BIRD_SCALE = .82;               // a little bird: ~24 cm beak to tail, ~41 cm wingspan
 const FORWARD = new THREE.Vector3(0, 1, 0), UP = new THREE.Vector3(0, 0, 1);
 // Lingering birds: hand-off after the shot is ready again, flight speeds (m/s), perch stay (s), live cap.
-export const SIEGEBIRD_ROOST = Object.freeze({handoff: 1.1, max: 6, perchChance: 65, perchMin: 18, perchMax: 36, speed: 7, far: 85, climb: 18, cull: 75,
+export const SIEGEBIRD_ROOST = Object.freeze({handoff: 1.1, max: 6, perchChance: 65, perchMin: 18, perchMax: 36, speed: 7, far: 85, climb: 18, cull: 75, drop: .22, boltRest: 1.4,
   foldSweep: 1.4, foldAngle: -.1, foldTipYaw: .35, foldTip: 0});
 const ROOST = SIEGEBIRD_ROOST;
 function hashKey(text) { let h = 0x811c9dc5; for (const c of String(text)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193); } return h >>> 0; }
@@ -321,7 +321,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     Object.assign(world, options);
   }
   function release(w) { w.bird.root.visible = false; pool.push(w.bird); }
-  function handoff(rig, bird, r, t) {
+  function handoff(rig, bird, r, t, {carrying = false} = {}) {
     if (!bird.root.visible) return false;
     const key = `${r.playerId}:${r.n}`, h = hashKey(key);
     bird.root.updateWorldMatrix(true, false); bird.root.matrixWorld.decompose(wtmp.a, wtmp.q, wtmp.s);
@@ -332,14 +332,53 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     if (roost.length >= ROOST.max) return false;
     const w = {bird: pool.pop() || makeBird(null, world.group), key, h, golden: r.golden === true, plumage: r.plumage, scale: wtmp.s.x, pos: wtmp.a.clone(), vel: v, born: lastWorldTime, state: 'fly', path: null, perch: null};
     if (!w.bird.root.parent) world.group.add(w.bird.root);
-    dress(w.bird, r.plumage, w.golden); w.bird.root.scale.setScalar(w.scale); if (w.bird.carry) w.bird.carry.visible = false;
-    const heading = wtmp.b.set(v.x, 0, v.z); if (heading.lengthSq() < 1e-6) heading.set(0, 0, -1); heading.normalize();
-    const options = (h % 100) < ROOST.perchChance ? world.perch?.(w.pos.clone(), heading.clone()) || [] : [];
+    dress(w.bird, r.plumage, w.golden); w.bird.root.scale.setScalar(w.scale); if (w.bird.carry) w.bird.carry.visible = carrying;
+    const heading = wtmp.b.set(v.x, 0, v.z);
+    // A bird turned away mid-delivery veers off from the crossbow it was heading for, then lets the bolt fall.
+    if (carrying) { rig.group.getWorldPosition(wtmp.c); heading.set(w.pos.x - wtmp.c.x, 0, w.pos.z - wtmp.c.z); w.drop = lastWorldTime + ROOST.drop; }
+    if (heading.lengthSq() < 1e-6) heading.set(0, 0, -1); heading.normalize();
+    const options = !carrying && (h % 100) < ROOST.perchChance ? world.perch?.(w.pos.clone(), heading.clone()) || [] : [];
     const perch = options.length ? options[(h >>> 12) % Math.min(3, options.length)] : null;
     if (perch) { w.perch = perch; flyTo(w, new THREE.Vector3(...perch.position), ROOST.speed, true); }
     else flyAway(w, heading);
     w.bird.root.visible = true; roost.push(w); stats.worldBirds = Math.max(stats.worldBirds, roost.length);
     return true;
+  }
+  // The crossbow is being put away (weapon swap): every bird still on it leaves for the world instead of vanishing
+  // with it. A bird still carrying the bolt re-routes, drops it and flies off. Presentation only.
+  function stow(visual) {
+    const rig = visual?.userData.siegebirdFlock; if (!rig) return;
+    for (const r of rig.reloads) {
+      const bird = rig.birds[r.n % 2];
+      if (world && bird?.root.visible && !r.handed && Number.isFinite(r.t)) handoff(rig, bird, r, THREE.MathUtils.clamp(r.t, R.enter, R.gone), {carrying: !r.seated});
+    }
+    rig.reloads = []; for (const b of rig.birds) if (b) b.root.visible = false;
+  }
+  // The bolt a turned-away bird lets go: tumbles to the ground, rests a moment, then shrinks away.
+  const falling = [];
+  function dropBolt(w) {
+    const carry = w.bird.carry; if (!carry?.visible || !world) return;
+    carry.updateWorldMatrix(true, true);
+    const obj = carry.clone(); obj.visible = true; carry.matrixWorld.decompose(obj.position, obj.quaternion, obj.scale);
+    world.group.add(obj); carry.visible = false;
+    if (falling.length >= 4) world.group.remove(falling.shift().obj);
+    const spin = new THREE.Vector3((w.h % 7) - 3, 1, ((w.h >>> 3) % 5) - 2).normalize();
+    falling.push({obj, vel: w.vel.clone().multiplyScalar(.45), spin, rate: 5 + (w.h % 4), landed: null, scale: obj.scale.x});
+  }
+  function updateFalling(time, dt) {
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const f = falling[i], o = f.obj;
+      if (f.landed === null) {
+        f.vel.y -= 9.8 * dt; o.position.addScaledVector(f.vel, dt); o.rotateOnWorldAxis(f.spin, f.rate * dt);
+        const floor = world.ground?.(o.position.x, o.position.z) ?? -Infinity;
+        if (o.position.y <= floor + .03) { o.position.y = floor + .03; f.landed = time; }
+        else if (o.position.y < floor - 50) f.landed = time - 9;
+      } else {
+        const k = (time - f.landed - ROOST.boltRest) / .35;
+        if (k >= 1) { world.group.remove(o); falling.splice(i, 1); }
+        else if (k > 0) o.scale.setScalar(f.scale * (1 - k));
+      }
+    }
   }
   function evict() {
     const perched = roost.filter(w => w.state === 'perched').sort((a, b) => a.born - b.born)[0];
@@ -388,7 +427,9 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
   let lastWorldTime = 0;
   // Advance the lingering birds once per frame (seconds clock shared with update). viewer: world position to cull from.
   function updateWorld(time, {viewer = null} = {}) {
+    const dt = Math.min(.05, Math.max(0, time - lastWorldTime));
     lastWorldTime = time; if (!world) return;
+    updateFalling(time, dt);
     let perchedCount = 0;
     for (let i = roost.length - 1; i >= 0; i--) {
       const w = roost[i], root = w.bird.root;
@@ -406,6 +447,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
           continue;
         }
       }
+      if (w.drop && time >= w.drop) { w.drop = 0; dropBolt(w); }
       const path = w.path, u = Math.min(1, (time - path.start) / path.duration);
       hermite(path, u, w.pos, w.vel); root.position.copy(w.pos);
       const speed = w.vel.length(), climb = speed > 1e-3 ? Math.asin(THREE.MathUtils.clamp(w.vel.y / speed, -1, 1)) : 0;
@@ -478,5 +520,5 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     shimmerMask.dispose();
     goldenMaterial.map.dispose(); goldenMaterial.emissiveMap.dispose(); goldenMaterial.dispose();
   }
-  return {shot, inform, update, updateWorld, attachWorld, rest, fired, perfect, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
+  return {shot, inform, update, updateWorld, attachWorld, rest, stow, fired, perfect, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
 }

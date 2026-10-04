@@ -3,7 +3,7 @@ import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulatio
 import {createEnemy,partPosition} from '../shared/combat.js';
 import {PHOENIX_CARRY,carryPose,startCarry} from '../shared/phoenix-carry.js';
 
-function fixture(){const s=createSimulation();s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,-2),-2],'skeleton')];return loadSimulation(c);}
+function fixture(){const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,-2),-2],'skeleton')];return loadSimulation(c);}
 const act=(s,seq,action,extra={})=>s.command('h',{type:'action',seq,action,...extra});
 const advance=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 // Emberwing shot at the head; curve [0,0,0] is a plain arrow, anything else is the phoenix.

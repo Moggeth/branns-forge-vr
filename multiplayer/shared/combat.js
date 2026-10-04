@@ -1,4 +1,5 @@
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
+import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
 import {BLOOM,addBloom} from './bloom.js';
 import {queueMeteorReward} from './resources.js';
@@ -175,9 +176,16 @@ export function projectileContact(state,m,ctx){
   const shot=state.projectiles.find(q=>q.id===m.projectileId);if(!shot||!validContact(m))return fail('invalid_contact');
   // Keep 250 ms of fixed-step sweeps so a 20 Hz snapshot can report actual triangles.
   const paths=shot.trail||[shot.previousPosition,shot.position];if(!paths.slice(1).some((b,i)=>segmentDistance(m.point,paths[i],b)<.22))return fail('invalid_contact');
-  const base=state.battle?.bases.find(b=>b.id===m.targetId);
+  const rival=homeBattle(state)&&ctx.damageHero&&state.players.find(h=>h.id===m.targetId&&h.role==='hero');
+  if(rival){
+    const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side||'party';
+    if(!['arrow','bolt'].includes(shot.kind)||(rival.side||'party')===side||rival.id===shot.ownerId||Math.hypot(m.point[0]-rival.position[0],m.point[2]-rival.position[2])>1.2||m.point[1]<rival.position[1]-.3||m.point[1]>rival.position[1]+2.2)return fail('invalid_contact');
+    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,shot.kind==='bolt'?40:28,events);return ok(events);
+  }
+  const home=findHomeTarget(state,m.targetId),base=home?.target||state.battle?.bases.find(b=>b.id===m.targetId);
   if(base){
-    if(!['arrow','bolt'].includes(shot.kind)||dist(m.point,base.position)>3.5)return fail('invalid_contact');
+    // Home-base hearts float above their forge and spires stand tall, so their envelope reaches higher.
+    if(!['arrow','bolt'].includes(shot.kind)||dist(m.point,base.position)>(home?7.5:3.5))return fail('invalid_contact');
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side,events=[];
     if(!side)return fail('not_joined');
     state.projectiles.splice(state.projectiles.indexOf(shot),1);

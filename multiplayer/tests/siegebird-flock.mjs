@@ -4,7 +4,7 @@ import {createEnemy,partPosition,SIEGEBIRD,siegebirdGoldenChance,siegebirdRoll,s
 import {weaponReadiness} from '../client/ability-readiness.js';
 // Shared Siegebird rules: 1.0 s bird reload, deterministic golden bird roll, quad-damage golden bolts and mastery.
 const begin=performance.now();
-function fixture(kind='golem',edit=()=>{}){const s=createSimulation();s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,6),6],kind)];edit(c);return loadSimulation(c);}
+function fixture(kind='golem',edit=()=>{}){const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,6),6],kind)];edit(c);return loadSimulation(c);}
 let seq=1;const act=(s,action,extra={})=>s.command('h',{type:'action',seq:seq++,action,...extra});
 const advance=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 function fire(s,part='torso'){const p=s.snapshot().players[0],e=s.snapshot().enemies[0],at=partPosition(e,part),origin=[p.position[0],at[1],p.position[2]],d=at.map((n,i)=>n-origin[i]),l=Math.hypot(...d);return {result:act(s,'fire',{origin,direction:d.map(n=>n/l)}),at,part};}

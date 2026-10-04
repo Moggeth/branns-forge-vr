@@ -38,4 +38,7 @@ assert.equal(r.cues.at(-1).cue,'latch');assert.ok(w.time()>R.arrive);run(w,1);as
 const m=siegebirdMechanism(.3,.5);assert.equal(m.cocked,.5);assert.ok(Math.abs(m.crank-TURN*.5)<1e-9&&Math.abs(m.pinion-m.crank)<1e-9&&Math.abs(m.drum+Math.PI)<1e-9);
 assert.equal(siegebirdMechanism(.3,1).latch,0,'latched at full draw');
 assert.deepEqual(siegebirdHandCues(0,1).map(c=>c.cue),[...Array(17).fill('click'),'latch']);assert.deepEqual(siegebirdHandCues(.5,.4),[]);
+// Weapon swap back mid-reload: the timeline resumes from the bird's entry with no second wind verdict.
+{const r=createSiegebirdWind();r.resume(.26);assert.equal(r.time(),.26);assert.equal(r.press(),null,'no verdict for a resumed reload');
+ let w2=null;for(let i=0;i<60;i++){const u=r.update(1/60);w2=w2||u.wind;}assert.equal(w2,null);assert.ok(r.time()>1);}
 console.log(`siegebird-wind: press judging, quick reloads, hand cranking, ratchet, waiting bird and resume pass (${((performance.now()-began)/1000).toFixed(3)} s)`);
