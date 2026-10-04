@@ -1,3 +1,5 @@
+import {ProximityVoice} from './client/proximity-voice.js';
+import {createVoiceControls} from './client/voice-controls.js';
 import {mountQuietHud} from './mobile-quiet.js';
 import {createFieldOverlays,createBuildTag} from './client/field-overlays.js';
 import {equipmentHelp} from './client/equipment-help.js';
@@ -103,6 +105,8 @@ let mobile = null, xrActive = false;
 let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
 let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
+let voice = null;
+const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;
@@ -269,6 +273,7 @@ function syncActive() {
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  voice?.dispose(); voice = null; voiceControls.update();
   closeQuickBuild();closeForge();
   restoreFieldLock=false;holdOverlays?.close();
   clearTimeout(joinTimer);
@@ -299,6 +304,8 @@ function start(attempt) {
   try { next = session = new WorldSession(attempt.solo?{connection:new LocalRoomConnection()}:{url:peerEndpoint()}); }
   catch (error) { recordProblem(error); showLobbyProblem('We couldn’t open a connection to the forge. Please try again in a moment.', {retry: true}); return; }
 
+  if (!attempt.solo) { voice = new ProximityVoice(next.connection); voice.addEventListener('change', voiceControls.update); }
+  voiceControls.update();
   const mine = handler => event => { if (session === next) handler(event.detail); };
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
@@ -866,6 +873,7 @@ try {
   game = createGame({
     canvas,
     isHost, onSelection: chooseSpell,
+    onVoicePose: pose => voice?.updatePose(pose),
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
@@ -910,11 +918,12 @@ setPhase('lobby');
 patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
   state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  voice: () => voice ? structuredClone({...voice.state(), pose:voice.pose}) : null,
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });

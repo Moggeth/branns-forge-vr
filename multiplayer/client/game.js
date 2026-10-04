@@ -51,6 +51,7 @@ import {createSpellPresentation} from './spell-presentation.js';
 import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {earthLineEdits} from '../shared/earth-spells.js';
+import {acousticPosition} from './voice-audio.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -92,7 +93,7 @@ import {worldTrees} from '../shared/world-content.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
@@ -1333,6 +1334,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
     renderer.render(scene, camera);
+    if (onVoicePose && playerId) {
+      // After render, WebXR's viewer camera includes this frame's head pose.
+      const earCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+      earCamera.getWorldPosition(earVector);
+      const position = acousticPosition({role, xr:renderer.xr.isPresenting, position:earVector.toArray(), focus:[pan.x,heightAt(pan.x,pan.z,snapshot.edits),pan.z]});
+      earCamera.getWorldDirection(earVector); const forward = earVector.toArray();
+      earVector.set(0,1,0).applyQuaternion(earCamera.getWorldQuaternion(earQuaternion));
+      onVoicePose({position, forward, up:earVector.toArray()});
+    }
     frameMetrics.record('frameCpu',performance.now()-frameStarted);
   }
   function disposeResources(root) {
