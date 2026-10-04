@@ -913,7 +913,7 @@ try {
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
-    onStatus: status => { rendererStatus = String(status); if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
+    onStatus: status => { rendererStatus = String(status); if(/^World renderer ready/.test(rendererStatus))rendererReady=true; if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
     onXRChange: value => { closeQuickBuild();restoreFieldLock=false;holdOverlays?.close();xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,
     onExpeditionAction: expeditionAction,
@@ -927,7 +927,6 @@ try {
   createMenuTabs();
   quietHud=mountQuietHud();
   const touchBuild=document.createElement('button');touchBuild.type='button';touchBuild.className='mui-btn mui-util qb-entry';touchBuild.dataset.qbToggle='';touchBuild.setAttribute('aria-label','Quick build');touchBuild.setAttribute('title','Quick build');touchBuild.innerHTML='<svg class="mui-icon" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span>';touchBuild.addEventListener('click',openQuickBuild);document.querySelector('#touchControls .mui-util-bar')?.append(touchBuild);
-  rendererReady = true;
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
   Promise.resolve().then(() => game.canVR()).then(supported => {
