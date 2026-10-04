@@ -8,6 +8,8 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
+const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
+const titleCase = t => String(t).replace(/\b\w/g, ch => ch.toUpperCase());
 export const CUE_RULES = Object.freeze({
   strikeReach: 3.2,     // game.js contactRay far, simulation.js targetOK horizontal limit
   facingDot: .45,       // simulation.js targetOK / inReach
@@ -89,7 +91,10 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
     return t<=wall+.05;
   }});
-  const pickupCue = c => isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||'');
+  // Ore and finished bars read as one rewarding stack: "Pick up 7 Iron Bars", "Pick up 4 Mithril Ore".
+  const stackCue = c => { const metal = METAL_BARS.has(c.kind), ore = /Ore$/.test(c.kind); if (!metal && !ore) return null; const n = c.amount | 0, label = titleCase(materialLabel(c.kind)), noun = metal ? `${label} Bar${n === 1 ? '' : 's'}` : label;
+    return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, materialInfo(c.kind)?.use || ''); };
+  const pickupCue = c => (c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||''));
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
