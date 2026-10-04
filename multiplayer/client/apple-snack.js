@@ -19,10 +19,10 @@ import {worldTrees} from '../shared/world-content.js';
 
 export const SNACK_MOTION = Object.freeze({
  raise: .5, bite: 1.05, contact: .34, finish: .75,
- idle: {position: [.13, -.155, -.4], tip: [-.5, .36, -.79]},     // camera space: apple centre and shaft direction (to the tip)
- near: {position: [.03, -.105, -.27], tip: [-.86, .2, -.47]},     // wind-up, the next face turning to you
- mouth: {position: [0, -.088, -.155], tip: [-.97, .12, -.2]},     // contact: the apple at your teeth
- tear: {position: [.05, -.13, -.25], tip: [-.85, .02, -.52]},     // pulled away as the chunk comes off
+ idle: {position: [.1, -.085, -.38], tip: [-.5, .36, -.79]},     // camera space: apple centre and shaft direction (to the tip)
+ near: {position: [.025, -.06, -.27], tip: [-.86, .2, -.47]},     // wind-up, the next face turning to you
+ mouth: {position: [0, -.05, -.155], tip: [-.97, .12, -.2]},     // contact: the apple at your teeth
+ tear: {position: [.045, -.08, -.25], tip: [-.85, .02, -.52]},     // pulled away as the chunk comes off
  dip: .03,                                                         // rad the head leans into the bite
  chew: {cycles: 3, amplitude: .0035},
  vrMouth: .15,                                                     // m from the headset that counts as a bite

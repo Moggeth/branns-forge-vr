@@ -7,8 +7,12 @@ import {join} from 'node:path';
 import {launch,BASE,record,save,shot} from './browser-acceptance-lib.mjs';
 import {appleWorld} from '../shared/fruit.js';
 import {worldTrees} from '../shared/world-content.js';
-import {terrainHeight} from '../shared/simulation.js';
+import {createSimulation,terrainHeight} from '../shared/simulation.js';
+import {makeSave} from '../client/world-saves.js';
 
+const fixture = (() => { const sim = createSimulation({room: 'SOLO'}), w = sim.adventureWorld(); w.tick = 10; w.enemies = []; w.landmarks = false;
+ w.pendingStarfalls = [{id: 'qafall0', x: 3, z: 10.4, radius: 5, impactTick: w.tick + 40}, {id: 'qafall1', x: 2.4, z: 11, radius: 5, impactTick: w.tick + 47}];
+ return Buffer.from(JSON.stringify(makeSave(sim.checkpoint()))); })();
 const CLIP = process.env.CLIP_DIR || '', TOUCH = !!process.env.TOUCH;
 const viewport = TOUCH ? {width: 844, height: 390} : {width: 640, height: 360};
 const {browser, page} = await launch({viewport, touch: TOUCH});
@@ -56,7 +60,10 @@ async function capture() {
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
- await page.evaluate(() => document.querySelector('#solo').click());
+ // The Orchard world with two falling stars timed to land beside the spawn, so the hero is hurt (about 64 HP) and the
+ // apple's healing shows. Starfalls this small leave no golem behind.
+ await page.fill('#name', 'Orchard QA'); await page.check('input[name="role"][value="hero"]', {force: true});
+ await page.locator('#import').setInputFiles({name: 'orchard-apples.json', mimeType: 'application/json', buffer: fixture});
  await page.waitForFunction(() => window.brannHarness?.state().controlsActive);
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
