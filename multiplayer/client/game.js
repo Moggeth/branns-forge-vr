@@ -875,8 +875,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!prop&&!earth)return null;
     const point=useEarth?earth.point:prop.point.toArray(),normal=useEarth?earth.normal:hitNormal(prop).toArray();
     const resolved=useEarth?null:resolveHit(prop);
-    const targetId=snapshot.battle?.bases?.some(b=>b.hp>0&&b.id===resolved?.targetId)?resolved.targetId:'world';
-    return {targetId,part:'torso',point,normal,localPoint:point,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
+    const base=snapshot.battle?.bases?.find(b=>b.hp>0&&b.id===resolved?.targetId),targetId=base?base.id:'world';
+    // Battle bases have a local contact envelope like creatures; world-space
+    // coordinates at the ±40 m bases fail that envelope even for a direct hit.
+    const localPoint=base?point.map((v,i)=>v-base.position[i]):point;
+    return {targetId,part:'torso',point,normal,localPoint,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
   }
   let lastPhysicalTip=null,lastPhysicalHit=-Infinity;
   function tickPhysicalMelee(now,dt){
