@@ -37,9 +37,16 @@ export function createCrystalWallAudio({context,master=.55}={}){
  return {
   /** pick_burst authority event: one rolling groan per cast. */
   cast(event,listener){if(context.state!=='running'||!event?.path?.length)return;const mid=event.path[Math.floor(event.path.length/2)];rumble(mid,listener,(event.durationTicks||50)/60,.55);},
+  /** God's Raise Wall / Sunder spell event: the rolling groan (deeper, longer for the rampart; the chasm opens with a
+   * tearing crack and grinds lower). */
+  line({kind,position,seconds},listener){if(context.state!=='running'||!position)return;
+   if(kind==='sunder'){crack(position,listener,.34);rumble(position,listener,seconds,.62);}else rumble(position,listener,seconds+.3,.7);},
   /** drained crystal-wall presentation events. */
   play(events,listener){if(context.state!=='running'||!events)return;
-   for(const e of events.burst){const h=e.height||2.4,note=PENTA[Math.min(PENTA.length-1,e.segment)],freq=520*Math.pow(2,note/12)*(1.15-h/2.4*.25);bell(e.position,listener,freq,.11+.05*h/2.4,1.6+h*.25);}
+   for(const e of events.burst){const h=e.height||2.4,note=PENTA[Math.min(PENTA.length-1,e.segment)],freq=520*Math.pow(2,note/12)*(1.15-h/2.4*.25);
+    // a chasm's lining rings a fifth lower and darker, under a little stone crack, as it splits open
+    if(e.kind==='sunder'){bell(e.position,listener,freq*.67,.09+.04*h/2.4,1.4+h*.2);if(e.segment%2===0)crack(e.position,listener,.16);}
+    else bell(e.position,listener,freq,.11+.05*h/2.4,1.6+h*.25);}
    let breaks=0;for(const e of events.shatter){if(breaks++<4)crack(e.position,listener,.28);bell(e.position,listener,1900+Math.random()*900,.05,.6);}
    const warned=new Set();for(const e of events.warn)if(!warned.has(e.wall)){warned.add(e.wall);shimmer(e.position,listener);}},
   stats:()=>({...stats,voices}),

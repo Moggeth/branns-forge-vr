@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE} from './skeleton-motion.js';
+import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
+import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
+const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
 
 // Enemy presentation polish layered AFTER AnimationMixer.update() and BEFORE
 // combat.tick() contact sweeps. It never moves entry.root (simulation-owned),
@@ -10,8 +14,10 @@ import * as THREE from 'three';
 // node's parent space at runtime. No bone-local axis is assumed.
 //
 // Rig contracts (verified from GLB JSON, see ENEMY-INTEGRATION.md):
-//  skeleton: Root > Torso > {Head, LeftArm, RightArm > RightHand > WeaponTip}
+//  skeleton: Root > Torso > {Head > HeadJaw, LeftArm > LeftForearm > LeftHand (shield),
+//                            RightArm > RightForearm > RightHand > WeaponTip}
 //            Root > {LeftLeg > LeftKnee > LeftFoot, RightLeg > RightKnee > RightFoot}
+//            Posed entirely here (skeleton-motion.js); the GLB carries no clips.
 //  golem:    Golem > {ArmL > ElbowL, ArmR > ElbowR, BodyCore, Head, LegL, LegR}
 //            rigid, unskinned siblings, no knee/foot joints (no leg IK possible).
 
@@ -62,6 +68,7 @@ export function traits(id, kind = 'skeleton') {
     swayAmp: heavy ? .006 : .012 + r(5) * .01,
     jitter: heavy ? 0 : r(6),                        // skeletal twitchiness
     crouch: heavy ? 0 : .03 + r(7) * .025,           // always-bent knees (fraction of leg)
+    gaitStyle: heavy ? 0 : r(8),                     // brisk march .. loose shamble
   };
 }
 
@@ -84,8 +91,8 @@ export function attackEnvelope(age, kind = 'skeleton', out = {coil: 0, strike: 0
     }
     return out;
   }
-  if (age < 13) { out.coil = smooth(age / 13); out.phase = 'anticipate'; }
-  else if (age < STRIKE_TICK + 2) { const t = smooth((age - 13) / (STRIKE_TICK + 2 - 13)); out.coil = 1 - t; out.strike = t; out.phase = 'strike'; }
+  if (age < 11) { out.coil = smooth(age / 11); out.phase = 'anticipate'; }
+  else if (age < STRIKE_TICK + 2) { const t = smooth((age - 11) / (STRIKE_TICK + 2 - 11)); out.coil = 1 - t; out.strike = t; out.phase = 'strike'; }
   else if (age < 46) { out.strike = 1 - smooth((age - STRIKE_TICK - 2) / (46 - STRIKE_TICK - 2)); out.phase = 'recover'; }
   return out;
 }
@@ -158,14 +165,7 @@ export function poseSignals(s, out) {
     out.headPitch += -coil * .26 + strike * .16;
     out.legL += (coil + strike) * .16; out.legR -= (coil + strike) * .1; // stagger the stance
     if (attack.phase === 'hold') { const q = noise1(tr.seed, 9, t * 22) * .045; out.armL += q; out.armR -= q; out.bodyLift += q * .3; } // straining tremble
-  } else {
-    out.torsoYaw += -coil * .32 + strike * .22;       // coil to weapon (right) side, swing through left
-    out.torsoPitch += -coil * .1 + strike * .2;
-    out.armR += -coil * .35 + strike * .25;           // + = forward raise
-    out.headPitch += strike * .08;
-    out.drop += coil * .04 + strike * .07;
-    out.lunge += strike * .06;                        // metres: weight onto lead leg, feet stay planted
-  }
+  } // skeleton attack, guard and gait are posed in skeleton-motion.js from the same envelope
 
   // Hit recoil, local to struck part. dir = actor-space push (x right, z back).
   const r = recoil.value, px = recoil.pushX, pz = recoil.pushZ, part = recoil.part;
@@ -217,7 +217,7 @@ export function poseSignals(s, out) {
 // ---------------------------------------------------------------------------
 
 const RIGS = {
-  skeleton: {root: 'Root', torso: 'Torso', head: 'Head', armL: 'LeftArm', armR: 'RightArm', legs: [['leftLeg', 'LeftLeg', 'LeftKnee', 'LeftFoot'], ['rightLeg', 'RightLeg', 'RightKnee', 'RightFoot']]},
+  skeleton: {root: 'Root', torso: 'Torso', head: 'Head', jaw: 'HeadJaw', armL: 'LeftArm', armR: 'RightArm', foreL: 'LeftForearm', foreR: 'RightForearm', handL: 'LeftHand', handR: 'RightHand', legs: [['leftLeg', 'LeftLeg', 'LeftKnee', 'LeftFoot'], ['rightLeg', 'RightLeg', 'RightKnee', 'RightFoot']]},
   golem: {body: 'Golem', torso: 'BodyCore', head: 'Head', armL: 'ArmL', armR: 'ArmR', elbowL: 'ElbowL', elbowR: 'ElbowR', footL: 'LegL', footR: 'LegR'},
 };
 export const RIG_CONTRACTS = RIGS;
@@ -253,7 +253,7 @@ function track(st, node) {
 
 function buildState(visual, kind) {
   const rig = RIGS[kind], st = {kind, tracked: [], nodes: {}, legs: [], hits: [], pending: null, lastHurt: null, lastPos: new THREE.Vector3(), stride: 0, init: false};
-  for (const key of ['root', 'body', 'torso', 'head', 'armL', 'armR', 'elbowL', 'elbowR', 'footL', 'footR']) {
+  for (const key of ['root', 'body', 'torso', 'head', 'jaw', 'armL', 'armR', 'foreL', 'foreR', 'handL', 'handR', 'elbowL', 'elbowR', 'footL', 'footR']) {
     const node = find(visual, rig[key]); if (node) st.nodes[key] = track(st, node);
   }
   for (const [part, thigh, knee, foot] of rig.legs || []) {
@@ -322,7 +322,10 @@ export function applyEnemyMotion(entry, ctx) {
   if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || visual.userData.released) return null; // ents pose in ent-view
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
-  if (!st || st.kind !== kind) { st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st); }
+  if (!st || st.kind !== kind) {
+    st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st);
+    if (kind === 'skeleton') { rigSkeleton(st, entry.root); measureLegs(st); }
+  }
   restore(st);
   const tick = Number.isFinite(ctx.tick) ? ctx.tick : 0, t = tick / TICK_RATE, dt = clamp(Number.isFinite(ctx.dt) ? ctx.dt : 1 / 60, 0, .1);
 
@@ -346,6 +349,29 @@ export function applyEnemyMotion(entry, ctx) {
     if (!teleport) st.gait = ((st.gait || 0) + travel / (GOLEM_CYCLE * Math.max(.2, _ws.y / 1.24)) * Math.PI * 2) % (Math.PI * 4096);
     // Unweighted, the legs keep easing toward the nearest planted pose rather than freezing mid-swing.
     if (st.walk < .5 && !teleport) { const target = Math.round(st.gait / Math.PI) * Math.PI; st.gait += (target - st.gait) * (1 - Math.exp(-dt / .25)); }
+  } else {
+    // Skeleton gait: phase in cycles, locked to distance so planted feet never skate.
+    const speed = teleport || !st.init ? 0 : travel / Math.max(dt, 1e-3);
+    st.speed = (st.speed || 0) + (speed - (st.speed || 0)) * (1 - Math.exp(-dt / .1));
+    const want = st.speed > .25 ? 1 : 0;
+    st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .12 : .22)));
+    // Each skeleton starts at its own point in the stride, steps its own length and wanders a little, so a crowd never marches in step.
+    const P = st.gaitP ||= gaitProfile(st.traits.seed, skeletonKindIndex(data.id));
+    if (st.phase === undefined) st.phase = P.phase0;
+    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
+    if (!teleport) st.phase = (st.phase + travel / stride) % 4096;
+    if (st.walk < .5 && !teleport) { const target = Math.round(st.phase * 2) / 2; st.phase += (target - st.phase) * (1 - Math.exp(-dt / .18)); }
+    // Guard: the shield comes up while winding up or recoiling, and when a Hero is close in front.
+    let threat = 0;
+    for (const p of ctx.threats || []) {
+      const dx = p[0] - _v.x, dz = p[2] - _v.z, d = Math.hypot(dx, dz);
+      if (d < 6 && d > 1e-3) threat = Math.max(threat, smooth((5.5 - d) / 2.5) * smooth(((dx * aF.x + dz * aF.z) / d - .25) / .5));
+    }
+    const age = tick - (data.attackTick ?? -1000), hurt = tick - (data.hurtTick ?? -1000);
+    // No shield to raise (lost arm, splintered shield) or still clawing out of the ground: no guard.
+    const emerging = tick - (data.emergeTick ?? -1e9) < EMERGE_TICKS;
+    const guardWant = Math.max(threat * .85, age >= 0 && age < 40 ? .4 : 0, hurt >= 0 && hurt < 50 ? .8 : 0) * (data.missingParts?.includes('leftArm') || data.shieldBroken || emerging ? 0 : 1);
+    st.guard = (st.guard || 0) + (guardWant - (st.guard || 0)) * (1 - Math.exp(-dt / (guardWant > (st.guard || 0) ? .14 : .55)));
   }
 
   if (data.hurtTick !== undefined && data.hurtTick !== st.lastHurt) {
@@ -368,7 +394,7 @@ export function applyEnemyMotion(entry, ctx) {
   visual.getWorldScale(_ws); const scale = _ws.y;
   if (kind === 'golem') applyGolem(st, ctx);
   if (kind === 'golem') golemEvents(st, data, tick);
-  else applySkeleton(st, ctx, scale, teleport, dt);
+  else applySkeleton(st, ctx, scale, teleport, dt, tick, data);
   commit(st);
   st.init = true;
   return st;
@@ -428,62 +454,42 @@ function golemEvents(st, data, tick) {
   st.telegraph = envelope.coil; st.recoil = Math.abs(recoilSig.value);
 }
 
-function applySkeleton(st, ctx, scale, teleport, dt) {
-  const N = st.nodes, groundY = st.lastPos.y;
-  // Measure actual joint lengths and the animated foot lift BEFORE layering.
-  let legLen = 0;
+// Rest leg lengths and planted ankle height, measured once from the authored rig (procedural pose starts at rest).
+function measureLegs(st) {
+  let len = 0;
   for (const leg of st.legs) {
     leg.thigh.node.getWorldPosition(H); leg.knee.node.getWorldPosition(K); leg.foot.node.getWorldPosition(A);
-    leg.a = H.distanceTo(K); leg.b = K.distanceTo(A); legLen = Math.max(legLen, leg.a + leg.b);
-    leg.ankleH = clamp(Math.min(leg.ankleH, A.y - groundY), .01 * scale, .3 * scale); // lowest ankle seen = planted ankle height
-    leg.lift = Math.max(0, A.y - groundY - leg.ankleH);
+    leg.a = H.distanceTo(K); leg.b = K.distanceTo(A); len = Math.max(len, leg.a + leg.b);
+    leg.ankleH = Math.max(.005, leg.rest.y);
   }
-  if (!(legLen > 0)) legLen = .65 * scale;
+  st.legLenRest = len || .78;
+}
 
-  // Pelvis = internal rig `Root` joint (never entry.root): drop, weight shift, lunge.
-  if (N.root) {
-    _v.copy(aU).multiplyScalar(-Math.min(sig.drop * legLen, legLen * .88)).addScaledVector(aR, sig.sideShift).addScaledVector(aF, sig.lunge);
-    offsetWorld(N.root.node, _v);
-  }
-  if (N.torso) {
-    rotateWorld(N.torso.node, aU, sig.torsoYaw);
-    rotateWorld(N.torso.node, aR, -sig.torsoPitch);
-    rotateWorld(N.torso.node, aF, sig.torsoRoll);
-  }
-  applyHead(N);
-  if (N.armL && !missingSig.leftArm) rotateWorld(N.armL.node, aR, sig.armL + sig.armSwingL);
-  if (N.armR && !missingSig.rightArm) rotateWorld(N.armR.node, aR, sig.armR + sig.armSwingR);
+const bodyEnv = {};
+function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
+  const N = st.nodes;
+  for (const leg of st.legs) leg.active = !missingSig[leg.part];
+  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t: tick / TICK_RATE, dt, teleport, aR, aU, aF, rootQ,
+    rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits,
+    kind: skeletonKindIndex(data.id), shieldBroken: !!data.shieldBroken,
+    flinch: Number.isFinite(data.flinchTick) && tick >= data.flinchTick && tick - data.flinchTick < FLINCH_SHOW ? (tick - data.flinchTick) / FLINCH_SHOW : -1});
+  poseSkeletonBody(st, bodyEnv, offsetWorld, solveLeg);
   if (!ctx.height || !N.root || !st.legs.length) return;
-
-  // Pass 1: ground targets (with planting) for each surviving leg.
   N.root.node.updateWorldMatrix(true, true);
+  placeFeet(st, bodyEnv);
+  // Lower the pelvis if a target is out of reach (downhill foot); presentation-only smoothing keeps it continuous.
   let extraDrop = 0;
   for (const leg of st.legs) {
-    leg.active = !missingSig[leg.part];
-    if (!leg.active) { leg.locked = false; leg.lockW = 0; continue; }
-    leg.foot.node.getWorldPosition(A); leg.thigh.node.getWorldPosition(H);
-    const stance = leg.lift < .025 * scale;
-    if (teleport) { leg.locked = false; leg.lockW = 0; }
-    if (leg.locked && (!stance || Math.hypot(A.x - leg.lock.x, A.z - leg.lock.z) > .16 * scale)) leg.locked = false;
-    // Re-plant only once the previous plant has fully blended out: no target pop.
-    if (stance && !leg.locked && leg.lockW <= 0) { leg.locked = true; leg.lock.set(A.x, 0, A.z); }
-    leg.lockW = clamp(leg.lockW + (leg.locked ? dt / .06 : -dt / .1), 0, 1);
-    const w = smooth(leg.lockW), tx = mix(A.x, leg.lock.x, w), tz = mix(A.z, leg.lock.z, w);
-    const g = ctx.height(tx, tz);
-    // Platforms the height function does not know (e.g. forge floor) or holes:
-    // trust the simulation-owned root height instead of reaching for terrain.
-    const ground = Number.isFinite(g) && Math.abs(g - groundY) < .4 * legLen ? g : groundY;
-    leg.target.set(tx, ground + leg.ankleH + leg.lift, tz);
-    // Lower the pelvis if the target is out of reach (downhill foot).
+    if (!leg.active) continue;
+    leg.thigh.node.getWorldPosition(H);
     const reach = (leg.a + leg.b) * .985, h = Math.hypot(leg.target.x - H.x, leg.target.z - H.z);
     extraDrop = Math.max(extraDrop, H.y - (leg.target.y + Math.sqrt(Math.max(0, reach * reach - h * h))));
   }
-  // Presentation-only smoothing (fast down, slower up) keeps the pelvis continuous.
+  const legLen = st.legLenRest;
   const want = clamp(extraDrop, 0, .25 * legLen), prev = teleport || !st.init ? want : st.pelvisDrop ?? want;
-  extraDrop = st.pelvisDrop = prev + (want - prev) * (1 - Math.exp(-dt / (want > prev ? .05 : .12)));
+  extraDrop = st.pelvisDrop = want > prev ? want : prev + (want - prev) * (1 - Math.exp(-dt / .12)); // drops at once (no knee snap), recovers smoothly
   if (extraDrop > 0) { _v.copy(aU).multiplyScalar(-extraDrop); offsetWorld(N.root.node, _v); N.root.node.updateWorldMatrix(true, true); }
-  // Pass 2: analytic two-bone IK.
-  for (const leg of st.legs) if (leg.active) solveLeg(leg);
+  for (const leg of st.legs) if (leg.active) { orientFoot(leg, rootQ, aR, (st.gaitP?.toeOut || 0) * (1 - (st.guard || 0) * .5)); solveLeg(leg); }
 }
 
 function solveLeg(leg) {
@@ -495,10 +501,9 @@ function solveLeg(leg) {
   D.divideScalar(d);
   const sol = solveTwoBone(a, b, d);
   TR.copy(H).addScaledVector(D, sol.reach); // reachable target on the hip->target ray
-  // Bend plane: keep the animated knee direction, biased forward so a straight
-  // leg never inverts. Pole is actor forward (engine contract), not a bone axis.
-  _v2.copy(K).sub(H); _v2.addScaledVector(D, -_v2.dot(D));
-  _v2.addScaledVector(aF, .35 * a); _v2.addScaledVector(D, -_v2.dot(D));
+  // Bend plane: knees always point actor-forward (engine contract), whatever the
+  // swing; the rest knee is straight, so its own offset is no usable pole.
+  _v2.copy(aF); _v2.addScaledVector(D, -_v2.dot(D));
   if (_v2.lengthSq() < 1e-12) return;
   _v2.normalize();
   K2.copy(H).addScaledVector(D, Math.cos(sol.hip) * a).addScaledVector(_v2, Math.sin(sol.hip) * a);

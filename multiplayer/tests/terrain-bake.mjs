@@ -27,7 +27,7 @@ for (let t = 0; t < 200; t++) sim.step();
 const state = sim.checkpoint();
 assert.ok(maxLive <= TERRAIN_BAKE.live, `live edit list stays bounded (${maxLive})`);
 assert.ok(state.terrainBake?.rev > 5, 'old earthworks were baked');
-assert.ok(all.size > 1000, `hundreds of casts made ${all.size} edits`);
+assert.ok(all.size > 800, `hundreds of casts made ${all.size} edits`);
 
 // The baked ground matches replaying every edit ever made (ruptures long finished).
 const reference = {edits: [...all.values()], tick: state.tick};

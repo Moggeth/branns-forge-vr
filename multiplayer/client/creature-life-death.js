@@ -75,7 +75,7 @@ const HP_MAX = {skeleton: 100, golem: 320};
 export function emergencePlan(id, kind = 'skeleton') {
   const seed = hashId(id), r = n => rand(seed, 50 + n);
   if (kind === 'golem') return {seed, duration: 2.7 + r(0) * .7, leadLeft: r(1) < .5, spin: r(2) < .5 ? 1 : -1, headTurn: (r(3) - .5) * 1.2};
-  return {seed, duration: 1.6 + r(0) * .7, leadLeft: r(1) < .5, lean: (r(2) - .5) * .5, headTilt: (r(3) - .5) * .5, twitch: .6 + r(4) * .8, legDelay: .03 + r(5) * .07};
+  return {seed, duration: 2.5 + r(0) * .6, leadLeft: r(1) < .5, lean: (r(2) - .5) * .5, headTilt: (r(3) - .5) * .5, twitch: .6 + r(4) * .8, legDelay: .03 + r(5) * .07, screech: .7 + r(6) * .3};
 }
 
 /** Emergence start tick from simulation data, or null when the actor did not spawn in view. */
@@ -102,15 +102,14 @@ export function bodyDamage(data) {
 // mirrored onto the actual left/right sides at runtime. depth is a named rig
 // measurement resolved per actor (see skeletonDepths).
 export const CRAWL_KEYS = [
-  {u: 0, depth: 'buried', fwd: -.28, torso: [0, 1, .2], head: [0, 1, .35], lead: [.1, 1, .1], off: [.25, .3, .9], thigh: [0, -1, -.15], shin: [0, -1, -.25], curl: .9},
-  {u: .15, depth: 'reach', fwd: -.28, torso: [0, 1, .3], head: [0, .9, .45], lead: [.18, 1, .38], off: [.3, .8, .55], thigh: [0, -1, -.15], shin: [0, -1, -.25], curl: -.6},
-  {u: .3, depth: 'reach2', fwd: -.24, torso: [0, .85, .55], head: [0, .6, .8], lead: [.38, -.15, 1], off: [.15, 1, .35], thigh: [0, -1, -.2], shin: [0, -1, -.3], curl: .5},
-  {u: .47, depth: 'pull', fwd: -.12, torso: [0, .5, .87], head: [0, .25, 1], lead: [.42, -.6, .68], off: [.4, -.55, .72], thigh: [0, -.9, -.45], shin: [0, -.6, -.8], curl: .2},
-  {u: .63, depth: 'hip', fwd: -.04, torso: [0, .58, .82], head: [0, .3, 1], lead: [.38, -.85, .38], off: [.38, -.85, .4], thigh: [.12, -.2, .98], shin: [0, -.65, -.76], curl: .35},
-  {u: .77, depth: 'kneel', fwd: .02, torso: [0, .82, .57], head: [0, .45, .9], lead: [.3, -.97, .12], off: [.3, -.97, .1], thigh: [.1, -.45, .9], shin: [0, -.85, -.52], curl: .1},
-  {u: .9, depth: 'stand', fwd: 0, torso: [0, 1, -.14], head: [0, 1, -.3], lead: [.16, -1, -.05], off: [.16, -1, -.05], thigh: [.04, -1, .02], shin: [0, -1, -.02], curl: 0},
-  {u: 1, depth: 'rest', fwd: 0, torso: [0, 1, 0], head: [0, 1, .05], lead: [.12, -1, 0], off: [.12, -1, 0], thigh: [0, -1, 0], shin: [0, -1, 0], curl: 0},
-];
+  {u: 0, depth: 'buried', fwd: -.28, torso: [0, 1, .2], head: [0, 1, .35], lead: [.1, 1, .1], off: [.25, .3, .9], thigh: [0, -1, -.15], shin: [0, -1, -.25], elbow: 0.3, jaw: 0.0, curl: .9},
+  {u: .15, depth: 'reach', fwd: -.28, torso: [0, 1, .3], head: [0, .9, .45], lead: [.18, 1, .38], off: [.3, .8, .55], thigh: [0, -1, -.15], shin: [0, -1, -.25], elbow: 0.05, jaw: 0.15, curl: -.6},
+  {u: .3, depth: 'reach2', fwd: -.24, torso: [0, .85, .55], head: [0, .6, .8], lead: [.38, -.15, 1], off: [.15, 1, .35], thigh: [0, -1, -.2], shin: [0, -1, -.3], elbow: 0.95, jaw: 0.35, curl: .5},
+  {u: .47, depth: 'pull', fwd: -.12, torso: [0, .5, .87], head: [0, .25, 1], lead: [.42, -.6, .68], off: [.4, -.55, .72], thigh: [0, -.9, -.45], shin: [0, -.6, -.8], elbow: 1.45, jaw: 0.55, curl: .2},
+  {u: .63, depth: 'hip', fwd: -.04, torso: [0, .58, .82], head: [0, .3, 1], lead: [.38, -.85, .38], off: [.38, -.85, .4], thigh: [.12, -.2, .98], shin: [0, -.65, -.76], elbow: 1.0, jaw: 0.4, curl: .35},
+  {u: .77, depth: 'kneel', fwd: .02, torso: [0, .82, .57], head: [0, .45, .9], lead: [.3, -.97, .12], off: [.3, -.97, .1], thigh: [.1, -.45, .9], shin: [0, -.85, -.52], elbow: 0.45, jaw: 0.2, curl: .1},
+  {u: .9, depth: 'stand', fwd: 0, torso: [0, 1, -.14], head: [0, 1, -.3], lead: [.16, -1, -.05], off: [.16, -1, -.05], thigh: [.04, -1, .02], shin: [0, -1, -.02], elbow: 0.2, jaw: 0.75, curl: 0},
+  {u: 1, depth: 'rest', fwd: 0, torso: [0, 1, 0], head: [0, 1, .05], lead: [.12, -1, 0], off: [.12, -1, 0], thigh: [0, -1, 0], shin: [0, -1, 0], elbow: 0.3, jaw: 0.05, curl: 0},];
 
 /** Pure: sample the crawl channels at normalized time u. `out` is reused. */
 export function sampleCrawl(u, depths, out = {}) {
@@ -118,7 +117,7 @@ export function sampleCrawl(u, depths, out = {}) {
   let i = 0; while (i < CRAWL_KEYS.length - 2 && u > CRAWL_KEYS[i + 1].u) i++;
   const a = CRAWL_KEYS[i], b = CRAWL_KEYS[i + 1], t = smooth((u - a.u) / (b.u - a.u));
   out.depth = mix(depths[a.depth] ?? 0, depths[b.depth] ?? 0, t);
-  out.fwd = mix(a.fwd, b.fwd, t); out.curl = mix(a.curl, b.curl, t);
+  out.fwd = mix(a.fwd, b.fwd, t); out.curl = mix(a.curl, b.curl, t); out.elbow = mix(a.elbow ?? .3, b.elbow ?? .3, t); out.jaw = mix(a.jaw ?? 0, b.jaw ?? 0, t);
   for (const k of ['torso', 'head', 'lead', 'off', 'thigh', 'shin']) {
     const v = out[k] ||= [0, 0, 0];
     for (let j = 0; j < 3; j++) v[j] = mix(a[k][j], b[k][j], t);
@@ -135,6 +134,7 @@ export const crawlWeight = u => u >= 1 ? 0 : 1 - smooth((u - .86) / .14);
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _wq = new THREE.Quaternion(), IDQ = new THREE.Quaternion();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _ws = new THREE.Vector3(), _m = new THREE.Matrix4();
+const LOCAL_X = new THREE.Vector3(1, 0, 0);
 const aR = new THREE.Vector3(), aU = new THREE.Vector3(), aF = new THREE.Vector3(), rootQ = new THREE.Quaternion(), rootP = new THREE.Vector3();
 
 // Bones win over same-named mesh/group nodes (GLTFLoader may suffix _1).
@@ -428,10 +428,10 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
   // ---- skeleton rig ------------------------------------------------------
   function skeletonRig(st) {
     const v = st.visual, n = name => find(v, name);
-    const rig = {root: n('Root'), torso: n('Torso'), head: n('Head'), armL: n('LeftArm'), armR: n('RightArm'), handR: n('RightHand'), handL: n('LeftHand'),
+    const rig = {root: n('Root'), torso: n('Torso'), head: n('Head'), jaw: n('HeadJaw'), armL: n('LeftArm'), armR: n('RightArm'), foreL: n('LeftForearm'), foreR: n('RightForearm'), handR: n('RightHand'), handL: n('LeftHand'),
       thighL: n('LeftLeg'), kneeL: n('LeftKnee'), thighR: n('RightLeg'), kneeR: n('RightKnee')};
     rig.tips = {
-      torso: segmentTip(v, rig.torso, 'Head'), head: segmentTip(v, rig.head), armL: segmentTip(v, rig.armL, 'LeftHand'), armR: segmentTip(v, rig.armR, 'RightHand'),
+      torso: segmentTip(v, rig.torso, 'Head'), head: segmentTip(v, rig.head), armL: segmentTip(v, rig.armL, rig.armL && find(rig.armL, 'LeftForearm') ? 'LeftForearm' : 'LeftHand'), armR: segmentTip(v, rig.armR, rig.armR && find(rig.armR, 'RightForearm') ? 'RightForearm' : 'RightHand'),
       thighL: segmentTip(v, rig.thighL, 'LeftKnee'), kneeL: segmentTip(v, rig.kneeL, 'LeftFoot'), thighR: segmentTip(v, rig.thighR, 'RightKnee'), kneeR: segmentTip(v, rig.kneeR, 'RightFoot'),
     };
     // Rig measurements at first sight (motion-layered pose ~ standing).
@@ -448,7 +448,7 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
     // Which authored arm/leg is actor-left is measured, not assumed.
     const side = node => node ? Math.sign(node.getWorldPosition(_v).sub(rootP).dot(aR)) || 1 : 1;
     rig.side = {armL: side(rig.armL), armR: side(rig.armR), thighL: side(rig.thighL), thighR: side(rig.thighR)};
-    for (const key of ['root', 'torso', 'head', 'armL', 'armR', 'handR', 'handL', 'thighL', 'kneeL', 'thighR', 'kneeR']) if (rig[key]) track(st, rig[key]);
+    for (const key of ['root', 'torso', 'head', 'jaw', 'armL', 'armR', 'foreL', 'foreR', 'handR', 'handL', 'thighL', 'kneeL', 'thighR', 'kneeR']) if (rig[key]) track(st, rig[key]);
     return rig;
   }
 
@@ -489,6 +489,17 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
       const src = lead ? crawl.lead : crawlLag.off;
       actorDir(src, rig.side[key], _v2); _v2.addScaledVector(aU, shake(lead ? 4 : 5, .18)).addScaledVector(aF, shake(lead ? 6 : 7, .14)).normalize();
       aim(node, rig.tips[key], _v2, w);
+    }
+    // Elbows: straight on the first reach, folded hard while hauling, pushing straight to stand. The trail arm lags.
+    for (const [fore, isL] of [['foreL', true], ['foreR', false]]) {
+      const node = rig[fore]; if (!node || missing.includes(isL ? 'leftArm' : 'rightArm')) continue;
+      const bend = (isL === leadIsL ? crawl.elbow : crawlLag.elbow ?? crawl.elbow) + shake(isL ? 10 : 11, .12);
+      node.quaternion.multiply(_q.setFromAxisAngle(LOCAL_X, -bend * w));
+    }
+    // Jaw: a silent scream as it hauls out, a gasp at the stand, then it clacks shut.
+    if (rig.jaw && !missing.includes('head')) {
+      const clack = u > .9 ? Math.max(0, Math.sin((u - .9) * 90)) * .15 : 0;
+      rig.jaw.quaternion.multiply(_q.setFromAxisAngle(LOCAL_X, (crawl.jaw * plan.screech + clack + shake(12, .06)) * .55 * w));
     }
     // Clawing hand (the rig has hand joints but no finger joints).
     if (rig.handR && !missing.includes('rightArm')) rotateWorld(rig.handR, aR, (crawl.curl + shake(8, .5)) * .7 * w);
@@ -542,6 +553,26 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
     if (fresh(.27) && once(st, 'hand2')) { const p = hand(false); burstDirt(p.x, p.y, p.z, 22, 1.5, s, 2); wisps(p.x, p.y, p.z, 5, s, 2); }
     if (fresh(.4) && once(st, 'torso')) { burstDirt(x, g, z, 70, 2.1, s, 3, 2.2); wisps(x, g, z, 14, s, 3, [.45, 1, .6], 1.4, 1.6); }
     if (fresh(.62) && once(st, 'legs')) burstDirt(x, g, z, 30, 1.2, s, 4, 2.6);
+    // The call: soul-light spirals down into the sigil before the ground answers, and the crust splits.
+    if (once(st, 'crack')) addDecal(decals, 'crack', x, g, z, .95 * rig.size.scale, st.plan.duration * .75, 0x66ff99, rand(s, 5) * 6.28);
+    const vortex = Math.floor(u * 60);
+    if (u < .32 && vortex !== st.lastVortex) {
+      st.lastVortex = vortex;
+      for (let i = 0; i < 3; i++) {
+        const a = rand(s, vortex * 5 + i) * Math.PI * 2 + u * 14, r = .9 + rand(s, vortex * 7 + i) * .35, y = g + .25 + rand(s, vortex * 11 + i) * 1.1;
+        // tangential + inward + down: a funnel winding into the hole
+        emit(magic, x + Math.cos(a) * r, y, z + Math.sin(a) * r, -Math.sin(a) * 1.6 - Math.cos(a) * 1.1, -.9, Math.cos(a) * 1.6 - Math.sin(a) * 1.1, .4, 1, .62, .7, 0, .4);
+      }
+    }
+    // Risen: the eyes kindle, a ring of dust rolls out and the sigil flares one last time.
+    if (fresh(.9) && once(st, 'kindle')) {
+      if (rig.head && !(st.entry.data.missingParts || []).includes('head')) {
+        rig.head.getWorldPosition(_v); _v.addScaledVector(aU, .2 * rig.size.scale).addScaledVector(aF, .1 * rig.size.scale);
+        for (const side of [-1, 1]) for (let i = 0; i < 4; i++) emit(magic, _v.x + aR.x * side * .05, _v.y, _v.z + aR.z * side * .05, aR.x * side * (.2 + i * .1) + aF.x * .3, .05 + i * .04, aR.z * side * (.2 + i * .1) + aF.z * .3, .5, 1, .7, .35 + i * .08, 0, 2.5);
+      }
+      for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2; emit(dirt, x + Math.cos(a) * .35, g + .03, z + Math.sin(a) * .35, Math.cos(a) * 2.6, .5 + rand(s, 900 + i) * .4, Math.sin(a) * 2.6, .3, .22, .14, .8, -9.8, 1.8); }
+      addDecal(decals, 'sigil', x, g, z, 1.25 * rig.size.scale, .6, 0x99ffbb, rand(s, 6) * 6.28);
+    }
     // Soil dribbling off the ribs while it rises (bounded, frame-rate independent via threshold buckets).
     const bucket = Math.floor(u * 40);
     if (u > .35 && u < .85 && bucket !== st.lastBucket && rig.torso) {
@@ -797,7 +828,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
 
   // ---- death: articulated collapse layered onto authoritative remains ----
   const corpses = new Map(); // source actor id -> corpse
-  const COLLAPSE = {skeleton: {T: 1, fall: .5, tilt: 1.15, crumple: .5}, golem: {T: 1.3, fall: .72, tilt: .8, crumple: .3}};
+  const COLLAPSE = {skeleton: {T: 2.4, fall: .5, tilt: 1.15, crumple: .5}, golem: {T: 1.3, fall: .72, tilt: .8, crumple: .3}};
   const PART_DROP = {head: .55, torso: .5, leftArm: .45, rightArm: .45, leftLeg: .22, rightLeg: .22};
   const PART_SWING = {head: .55, torso: 0, leftArm: -.75, rightArm: -.6, leftLeg: -.3, rightLeg: -.25};
   function killDirection(st, event, out) {
@@ -870,6 +901,15 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       }
       const damageRecord=detachedRecords.get(data.id);if(damageRecord)damageRecord.scorch[0]=Math.max(damageRecord.scorch[0],data.scorch||0);
       if (!c || data.heldBy || c.age >= COLLAPSE[c.kind].T) continue;
+      // Skeletons fall as a real (authoritative) ragdoll: no layered collapse, just dust where bones land.
+      if (c.kind === 'skeleton') {
+        const key = 'land:' + data.id;
+        if (!c.pieces.has(key) && c.age > .15 && node.position.y - H(node.position.x, node.position.z) < .32) {
+          c.pieces.set(key, {node, dirty: false});
+          burstDirt(node.position.x, H(node.position.x, node.position.z), node.position.z, data.part === 'torso' ? 10 : 6, .8, c.seed, 500 + data.part.length, 1);
+        }
+        continue;
+      }
       let piece = c.pieces.get(data.id);
       if (!piece) {
         if (c.pieces.size >= 8) continue;

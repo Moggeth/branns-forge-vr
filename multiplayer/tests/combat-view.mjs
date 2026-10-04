@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
+import {segmentSurfaceContacts, snapshotDetachedPart, faceToward, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
 import {assetBasis, ASSET_POSES, prepareAsset, weaponTip, weaponForward, updateWeaponPresentation} from '../client/asset-pose.js';
+import {loadGlb} from './glb-node.mjs';
+import {dressSkeleton} from '../client/skeleton-look.js';
 
 const started = performance.now();
 const material = new THREE.MeshBasicMaterial({side: THREE.DoubleSide});
@@ -36,14 +38,24 @@ assert.equal(geometry.index, null, 'shared source geometry unchanged');
 maskMissingParts(root, []); assert.equal(mesh.geometry, geometry);
 
 // Actual shipped animated skeleton: complete leg and material topology survive.
-const bytes = readFileSync(new URL('../public/assets/skeleton.glb', import.meta.url));
-const template = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
-const skeleton = prepareAsset(template, 'skeleton').visual;
+const template = await loadGlb(new URL('../public/assets/skeleton.glb', import.meta.url));
+const skeleton = prepareAsset(template, 'skeleton').visual; dressSkeleton(skeleton, 0);
 const actualLeg = snapshotDetachedPart(skeleton, 'leftLeg');
 const bounds = new THREE.Box3().setFromObject(actualLeg), size = bounds.getSize(new THREE.Vector3());
 assert.ok(size.y > .55, `actual detached leg includes foot; height=${size.y}`);
 assert.ok(actualLeg.children.some(n => n.isMesh && n.material), 'authored materials preserved');
 assert.ok(actualLeg.getObjectByName('LeftFoot'), 'actual lower limb attachment retained');
+// A severed skull knows where its face is, and a held skull turns that face to the viewer.
+{
+  skeleton.updateWorldMatrix(true, true);
+  const skull = snapshotDetachedPart(skeleton, 'head'), face = skull.userData.faceLocal;
+  assert.ok(face, 'skull remembers its face');
+  const worldFace = face.clone().applyQuaternion(skull.quaternion);
+  assert.ok(Math.abs(worldFace.z) > .9 && Math.abs(worldFace.y) < .35, 'the face looks out level along the authored facing axis');
+  const q = faceToward(new THREE.Quaternion(), face, new THREE.Vector3(.6, .1, .8).normalize(), new THREE.Vector3(0, 1, 0));
+  assert.ok(face.clone().applyQuaternion(q).dot(new THREE.Vector3(.6, .1, .8).normalize()) > .999, 'faceToward aims the face');
+  assert.ok(new THREE.Vector3(0, 1, 0).applyQuaternion(q).y > .9, 'and keeps the skull upright');
+}
 
 // Load native geometry without decoding raster textures in this Node test.
 async function geometryTemplate(name) {

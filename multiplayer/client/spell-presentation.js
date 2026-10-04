@@ -14,7 +14,7 @@ const QUALITY = { // n: particle emission scale, k: kinematic piece scale, b: se
   high: { n: 1, k: 1, b: 1 }, medium: { n: 0.6, k: 0.75, b: 0.6 }, low: { n: 0.35, k: 0.5, b: 0 } };
 const PAL = { gold: 0xffc857, amber: 0xff8f2e, ember: 0xff4a1f, teal: 0x37e0c8, deepTeal: 0x0f7f86, purple: 0x9b6bff, violet: 0x4d2a8f,
   bone: 0xf2e8c9, earth: 0x7b5b3a, stone: 0x8d8a84, slate: 0x55525a, leaf: 0x73d96b, moss: 0x2f7a3e, ice: 0xc4f1ff, mint: 0x9ff7c8,
-  bolt: 0xcfeaff, bad: 0xd24a4a, badDark: 0x6b2a2a, dust: 0xc9b48f,
+  bolt: 0xcfeaff, resonance: 0x3d8bff, resonanceHi: 0x9fd0ff, bad: 0xd24a4a, badDark: 0x6b2a2a, dust: 0xc9b48f,
   soil: 0x4a3423, loam: 0x5e4430, gouge: 0x1c1310, char: 0x140d0b, bark: 0x3d2b1d, barkHi: 0x6a4a2c, smoke: 0x8a7f74, clay: 0x9a7350, cinder: 0x2b2420, ash: 0x6e645b };
 const UP = new THREE.Vector3(0, 1, 0), ZERO = new THREE.Matrix4().makeScale(0, 0, 0), QI = new THREE.Quaternion(), V = new THREE.Vector3();
 const EU = new THREE.Euler(), QT = new THREE.Quaternion(), P3 = [0, 0, 0];
@@ -437,7 +437,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     bloom_level(ev, c) { ev.dur = 3.2; let acc = 0; for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(i % 2 ? PAL.leaf : PAL.teal, PAL.mint, 0, 1), 0.5, 9 + i * 3, i * 0.35, i * 0.35 + 1.6, 0.45);
       ev.fx.push((age, dt) => { if (age > 2.6) return; acc += dt * 40 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 7, c.R() < 0.4 ? PAL.leaf : c.R() < 0.5 ? PAL.mint : PAL.teal, 0.24, 2.6); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
-    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
+    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 4; i++) summon(ev, c, c.x + (i % 2 ? 1 : -1) * 1.4, c.z + (i < 2 ? -1 : 1) * 1.4, 0.75, i * 0.2); /* the four graves shared/simulation.js digs */ pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
     // The former six-box stand-in duplicated that actor and obscured its pieces.
     golem(ev) { ev.dur = .01; },
@@ -479,69 +479,41 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       for (let i = 0; i < qn(14); i++) { const a = c.R() * TAU, q = 2.2 + c.R() * 0.4; dustDir(c, c.x + Math.cos(a) * q, c.z + Math.sin(a) * q, -Math.cos(a), -Math.sin(a), 1.8, 1, PAL.dust, 0.42, 1.6, 0.2, 0.25); }
       for (let i = 0; i < qn(16); i++) shards.emit({ R: c.R, orb: { cx: c.x, cz: c.z, a: c.R() * TAU, r: 1.2 + c.R() * 1.2, w: 1.2 * MO.swirl, dr: -1.1 }, y: c.y + 0.4 + c.R() * 0.6, vy: -0.4, grav: 0, life: 1.4, size: 0.12, color: i % 2 ? PAL.purple : PAL.earth, settle: false, spin: 4 * MO.spin });
     },
-    // SUNDER: a fracture front races lengthwise from start to end. Behind it the gouge widens, a molten seam cools, side
-    // cracks fork off, ground plates heave up on their outer hinges and settle; dust is thrown outward and forward off the front.
+    // SUNDER: a blue resonance fracture races lengthwise from start to end on the authority's front. The persistent
+    // chasm (client/crystal-wall.js) owns the torn ground, peeled crust and crystal lining; this is the moment itself:
+    // side cracks fork off the lips, dust and spoil are thrown outward and forward off the front, resonance light
+    // spits from the split, and a last burst of debris marks the far end.
     sunder(ev, c) {
       const { ax, az, bx, bz, len, ang, R } = c, dx = Math.cos(ang), dz = Math.sin(ang), nx = -dz, nz = dx;
-      const T=(c.rupture?.durationTicks??sunderDurationTicks(len))*tickSeconds,t0=0;ev.dur=T+2.5;
+      const T=(c.rupture?.durationTicks??sunderDurationTicks(len))*tickSeconds;ev.dur=T+1.8;
       const rupture=c.rupture||createSunderRupture('local',[ax,az],[bx,bz],0);ev.rupture=c.rupture;
-      const n = Math.min(110, Math.max(24, Math.ceil(len / 0.4))), jit = Float32Array.from({ length: n }, () => R() * 2 - 1);
-      const env = (u) => Math.min(1, u * 6, (1 - u) * 6), off = (u) => { const f = u * (n - 1), i = Math.min(n - 2, Math.floor(f)), k = f - i; return lp(jit[i], jit[i + 1], k * k * (3 - 2 * k)) * 0.34 * env(u); };
-      const at = (u, o) => { const w = off(u); o[0] = lp(ax, bx, u) + nx * w; o[2] = lp(az, bz, u) + nz * w; o[1] = H(o[0], o[2]) + 0.09; return o; };
-      const lip = mk(ev, n, soilM()), dark = mk(ev, n, gougeM()), heat = mk(ev, n, moltenM()); lip.mesh.renderOrder = 0; dark.mesh.renderOrder = 1;
-      const nbr = qb(10), br = strips(ev, nbr, 8, gougeM()), bl = Array.from({ length: nbr }, (_, k) => { const s = k % 2 ? 1 : -1, th = (0.55 + R() * 0.6) * s; return { u: clamp((k + 0.5) / nbr + (R() - 0.5) * 0.06, 0.05, 0.95), dxb: dx * Math.cos(th) + nx * Math.sin(th), dzb: dz * Math.cos(th) + nz * Math.sin(th), L: 0.6 + R() * 0.9 + len * 0.03, j: Array.from({ length: 8 }, () => (R() - 0.5) * 0.35) }; });
-      const np = qk(Math.min(13, Math.max(4, Math.ceil(len / 0.95))), 3), pl = [];
-      // The two banks are staggered (different counts and half-slot offset) with independent length/width/thickness, flip, lean and
-      // hinge pitch, so the torn wedges never pair up into matching paving slabs.
-      for (const s of [-1, 1]) { const ns = s < 0 ? np : Math.max(3, np - 1 + ((R() * 2) | 0)), sh = s < 0 ? 0 : 0.5; for (let k = 0; k < ns; k++) pl.push({ s, u: clamp((k + sh * 0.5 + 0.5 + (R() - 0.5) * 0.45) / ns, 0.03, 0.97), lm: (np / ns) * (0.7 + R() * 0.6), i: slabs.claim(ev, [0xffffff, 0xeee4d8, 0xd9d2c8, 0xf6efe2, 0xe2d6c4][(k * 2 + (s > 0 ? 1 : 0)) % 5]), w: 0.4 + R() * 0.75, th: 0.24 + R() * 0.26, tilt: 0.22 + R() * 0.75, d: R() * 0.08, yaw: (R() - 0.5) * 0.6, pitch: (R() - 0.5) * 0.42, flip: R() < 0.5, lift: 0.06 + R() * 0.16 }); }
-      const rest = 0.55 + R() * 0.15; let accD = 0, accB = 0, accE = 0, done = false; const fp = [0, 0, 0], q2 = new THREE.Quaternion();
+      const lipW = 1.6, nbr = qb(8), br = strips(ev, nbr, 8, gougeM()), bl = Array.from({ length: nbr }, (_, k) => { const s = k % 2 ? 1 : -1, th = (0.7 + R() * 0.55) * s; return { s, u: clamp((k + 0.5) / nbr + (R() - 0.5) * 0.06, 0.06, 0.94), dxb: dx * Math.cos(th) + nx * Math.sin(th), dzb: dz * Math.cos(th) + nz * Math.sin(th), L: 0.6 + R() * 0.8 + len * 0.02, j: Array.from({ length: 8 }, () => (R() - 0.5) * 0.35) }; });
+      let accD = 0, accB = 0, accE = 0, done = false; const fp = [0, 0, 0];
+      const at = (u, o) => { o[0] = lp(ax, bx, u); o[2] = lp(az, bz, u); o[1] = H(o[0], o[2]); return o; };
       ev.fx.push((age, dt) => {
         const sharedTick=c.rupture&&terrainTick()!==null?terrainTick():rupture.startTick+age/tickSeconds;
         const progress=sunderFront(rupture,sharedTick),front=progress.fraction;ev.front={fraction:front,tick:sharedTick,progress:progress.progress};
-        const fade = 1 - sstep(ev.dur - 1.0, ev.dur, age), cool = 1 - 0.75 * sstep(T, T + 1.6, age), hp = MO.flick ? 0.8 + 0.2 * Math.sin(age * 11) : 0.9;
-        for (let i = 0; i < n; i++) {
-          const u=i/(n-1),behind=front-u,open=terrainEditScale({rupture},sharedTick,lp(ax,bx,u),lp(az,bz,u));at(u,fp);
-          lip.set(i, fp[0], fp[1], fp[2]); dark.set(i, fp[0], fp[1], fp[2]); heat.set(i, fp[0], fp[1] + 0.01, fp[2]);
-          lip.wm[i] = open * (1 + 0.25 * jit[(i * 7) % n]); lip.am[i] = open > 0 ? 1 : 0;
-          dark.wm[i] = open * (0.75 + 0.25 * Math.abs(jit[i])); dark.am[i] = open > 0 ? 1 : 0;
-          heat.wm[i] = open * (0.5 + 0.5 * Math.exp(-behind * len / 1.4)); heat.am[i] = open > 0 ? hp * (0.25 + 0.75 * Math.exp(-behind * len / 2)) * cool : 0;
-        }
-        lip.commit(1.9, 1, fade * 0.7, 0); dark.commit(0.62, 1, fade * 0.92, 0); heat.commit(0.26, 1, fade, 0);
-        bl.forEach((b, j) => { const rv = easeOut((front - b.u) * len / 1.2); at(b.u, fp); const x0 = fp[0], z0 = fp[2]; strand(br, j, rv, fade * 0.85, (u2) => 0.17 * (1 - 0.85 * u2) / 0.18, (s, o) => { const i = Math.min(7, Math.floor(s * 7)), q = b.L * s, px = x0 + b.dxb * q + nx * b.j[i] * s, pz = z0 + b.dzb * q + nz * b.j[i] * s; o[0] = px; o[1] = H(px, pz) + 0.08; o[2] = pz; }); });
+        const fade = 1 - sstep(ev.dur - 1.0, ev.dur, age);
+        bl.forEach((b, j) => { const rv = easeOut((front - b.u) * len / 1.2); const x0 = lp(ax, bx, b.u) + nx * b.s * lipW, z0 = lp(az, bz, b.u) + nz * b.s * lipW; strand(br, j, rv, fade * 0.85, (u2) => 0.17 * (1 - 0.85 * u2) / 0.18, (s, o) => { const i = Math.min(7, Math.floor(s * 7)), q = b.L * s, px = x0 + b.dxb * q + nx * b.j[i] * s, pz = z0 + b.dzb * q + nz * b.j[i] * s; o[0] = px; o[1] = H(px, pz) + 0.08; o[2] = pz; }); });
         br.rb?.commit(0.18, 1, 1, 0);
-        for (const p of pl) {
-          const tp=(sharedTick-rupture.startTick)*tickSeconds-T*(p.u*len/(len+1.1))-p.d; if (tp <= 0) { slabs.hide(p.i); continue; }
-          const heave = backOut(tp / 0.32), settle = lp(1, rest, sstep(0.35, 1.2, tp)), sink = sstep(ev.dur - 0.9, ev.dur, age), jolt = MO.shake * 0.05 * Math.sin(tp * 40) * (1 - sstep(0, 0.4, tp));
-          const tilt = p.tilt * heave * settle * (1 - sink), L = (len / np) * 0.92 * p.lm, hw = p.w * 0.5, cxu = lp(ax, bx, p.u), czu = lp(az, bz, p.u), w0 = off(p.u), dist = 0.3 * heave + hw + Math.abs(w0) * 0.2;
-          const x = cxu + nx * (w0 + p.s * dist), z = czu + nz * (w0 + p.s * dist), y = H(x, z) - p.th * 0.5 + Math.sin(tilt) * hw * 0.9 + p.lift * heave * (1 - sink) + jolt - sink * 0.4;
-          const sg = p.flip ? -p.s : p.s; q2.setFromEuler(EU.set(0, -ang + p.yaw + (p.flip ? Math.PI : 0), 0, 'YXZ')); QT.setFromAxisAngle(V.set(1, 0, 0), sg * tilt); q2.multiply(QT); // inner edge lifts, outer edge hinges on the ground
-          QT.setFromAxisAngle(V.set(0, 0, 1), p.pitch * heave * (1 - sink)); q2.multiply(QT); // uneven hinge: one end rides higher
-          slabs.put(p.i, x, y, z, q2, L, p.th, p.w * (1 - sink * 0.3));
-        }
         if (front > 0 && front < 1) {
           at(front, fp); const fx = fp[0], fz = fp[2];
-          accD += dt * 46 * Q.n; while (accD >= 1) { accD--; const s = R() < 0.5 ? -1 : 1; dustDir(c, fx + nx * s * 0.3, fz + nz * s * 0.3, nx * s * 1.4 + dx * 0.8, nz * s * 1.4 + dz * 0.8, 2.6, 1.05, R() < 0.55 ? PAL.dust : PAL.clay, 0.5, 1.9, 0.3, 0.7); }
-          accB += dt * 16 * Q.n; while (accB >= 1) { accB--; const s = R() < 0.5 ? -1 : 1, a = Math.atan2(nz * s * 1.6 + dz * 0.6, nx * s * 1.6 + dx * 0.6); ejecta(c, fx, fz, a + (R() - 0.5) * 0.6, 0.9 + R() * 1.8, 0.45 + R() * 0.35, 0.09 + R() * 0.09, [PAL.stone, PAL.earth, PAL.loam][(R() * 3) | 0]); }
-          if (R() < dt * 30 * Q.n) glow.emit({ x: fx, y: H(fx, fz) + 0.15, z: fz, vx: dx * 1.5, vy: 0.6 + R(), vz: dz * 1.5, life: 0.4, size: 0.55, grow: -0.6, color: R() < 0.5 ? PAL.gold : PAL.amber, alpha: 0.9, drag: 2 });
+          accD += dt * 46 * Q.n; while (accD >= 1) { accD--; const s = R() < 0.5 ? -1 : 1; dustDir(c, fx + nx * s * 0.9, fz + nz * s * 0.9, nx * s * 1.6 + dx * 0.7, nz * s * 1.6 + dz * 0.7, 2.8, 1.1, R() < 0.55 ? PAL.dust : PAL.clay, 0.5, 1.9, 0.3, 0.7); }
+          accB += dt * 18 * Q.n; while (accB >= 1) { accB--; const s = R() < 0.5 ? -1 : 1, a = Math.atan2(nz * s * 1.6 + dz * 0.6, nx * s * 1.6 + dx * 0.6); ejecta(c, fx + nx * s * 0.5, fz + nz * s * 0.5, a + (R() - 0.5) * 0.6, 1.1 + R() * 2, 0.5 + R() * 0.4, 0.09 + R() * 0.1, [PAL.stone, PAL.earth, PAL.loam][(R() * 3) | 0]); }
+          if (R() < dt * 34 * Q.n) glow.emit({ x: fx, y: H(fx, fz) + 0.2, z: fz, vx: dx * 1.5, vy: 0.9 + R() * 1.4, vz: dz * 1.5, life: 0.5, size: 0.6, grow: -0.6, color: R() < 0.5 ? PAL.resonance : PAL.resonanceHi, alpha: 0.9, drag: 2 });
         }
         if (front >= 1 && !done) { done = true; at(1, fp); for (let i = 0; i < qn(8); i++) dustDir(c, fp[0], fp[2], dx + (R() - 0.5), dz + (R() - 0.5), 2.2, 1.2, PAL.dust, 0.5, 1.8, 0.5, 0.5); debris(c, fp[0], fp[2], 5, 2.2, 0.12, [PAL.stone, PAL.earth], 5); }
-        if (age > t0 + 0.2 && age < T + 1.6) { accE += dt * 9 * Q.n; while (accE >= 1) { accE--; at(R() * front, fp); glow.emit({ x: fp[0], y: fp[1] + 0.08, z: fp[2], vx: (R() - 0.5) * 0.3, vy: 0.5 + R() * 0.8, vz: (R() - 0.5) * 0.3, life: 1.2, size: 0.14 + R() * 0.1, grow: -0.5, color: R() < 0.6 ? PAL.ember : PAL.amber, alpha: 0.85, drag: 0.6 }); if (R() < 0.4) dust.emit({ x: fp[0], y: fp[1] + 0.1, z: fp[2], vy: 0.4 + R() * 0.3, life: 1.8, size: 0.6, grow: 1.6, color: PAL.smoke, alpha: 0.24, grav: -0.15, drag: 1 }); } }
+        if (age > 0.2 && age < T + 1.2) { accE += dt * 10 * Q.n; while (accE >= 1) { accE--; at(R() * front, fp); glow.emit({ x: fp[0] + (R() - 0.5) * 0.6, y: fp[1] + 0.1, z: fp[2] + (R() - 0.5) * 0.6, vx: (R() - 0.5) * 0.3, vy: 0.7 + R() * 0.9, vz: (R() - 0.5) * 0.3, life: 1.3, size: 0.14 + R() * 0.1, grow: -0.5, color: R() < 0.6 ? PAL.resonance : PAL.resonanceHi, alpha: 0.85, drag: 0.6 }); if (R() < 0.35) dust.emit({ x: fp[0], y: fp[1] + 0.1, z: fp[2], vy: 0.4 + R() * 0.3, life: 1.8, size: 0.6, grow: 1.6, color: PAL.dust, alpha: 0.22, grav: -0.15, drag: 1 }); } }
       });
     },
+    // RAISE WALL: the rampart itself (crust, crystals, rising earth, light) is the persistent geode wall in
+    // client/crystal-wall.js, timed by the authority's front. The cast adds a resonance pulse and a heave of dust at
+    // the line's first end, where the seam begins.
     wall(ev, c) {
-      ev.dur = 3.4; const { ax, az, bx, bz, len, ang, R } = c, N = Math.max(3, Math.ceil(len / 1.3)), segL = len / N;
-      const pl = Array.from({ length: N }, (_, k) => { const u = (k + 0.5) / N; return { m: mesh(ev, G.slab, solid(k % 2 ? PAL.stone : 0x9a968c, PAL.gold, 0.08)), x: lp(ax, bx, u), z: lp(az, bz, u), h: 1.7 + R() * 0.7, t0: 0.12 + u, puffed: false }; });
-      const trim = mk(ev, Math.min(100, Math.ceil(len / 0.5) + 2), ribMat(PAL.gold, PAL.amber, 6, 1.2)), scar = mk(ev, Math.min(100, Math.ceil(len / 0.5) + 2), soilM()); scar.mesh.renderOrder = 1;
-      const nx = -Math.sin(ang), nz = Math.cos(ang);
-      ev.fx.push((age) => {
-        const sink = 1 - sstep(2.7, 3.4, age); gLine(trim, ax, az, bx, bz, 0.12); trim.commit(0.35, sstep(0, 1.1, age), sink * (0.75 + 0.25 * Math.sin(age * 8) * MO.flick));
-        gLine(scar, ax, az, bx, bz, 0.06); scar.commit(1.5, sstep(0, 1.15, age), sink * 0.6, 0);
-        for (const p of pl) {
-          const t = age - p.t0, rise = backOut(t / 0.55) * sink; p.m.visible = t > 0 && rise > 0.01; if (!p.m.visible) continue;
-          p.m.rotation.set(0, -ang, 0); p.m.scale.set(segL * 0.96, p.h * rise, 0.55); p.m.position.set(p.x, H(p.x, p.z) + (p.h * rise) / 2 - 0.1, p.z);
-          if (!p.puffed) { p.puffed = true; for (let i = 0; i < qn(6); i++) { const s = i % 2 ? 1 : -1; dustDir(c, p.x + nx * s * 0.4, p.z + nz * s * 0.4, nx * s, nz * s, 1.8, 0.7, PAL.dust, 0.45, 1.5, 0.5, 0.4); } debris(c, p.x, p.z, 3, 2.5, 0.1, [PAL.stone], 4); }
-        }
-      });
+      ev.dur = 1.6; const { ax, az, ang, R } = c, nx = -Math.sin(ang), nz = Math.cos(ang);
+      pulse(ev, c, ribMat(PAL.resonance, PAL.resonanceHi, 0, 1.4), 0.3, 2.4, 0, 0.9, 0.3, ax, az);
+      for (let i = 0; i < qn(10); i++) { const s = i % 2 ? 1 : -1; dustDir(c, ax + nx * s * 0.6, az + nz * s * 0.6, nx * s + (R() - 0.5) * 0.4, nz * s + (R() - 0.5) * 0.4, 1.9, 0.8, PAL.dust, 0.45, 1.5, 0.3, 0.4); }
+      sparks(c, ax, H(ax, az) + 0.3, az, 6, 1.6, PAL.resonanceHi, 0.25, 1.1);
     },
     // GROVE: roots break the soil one after another, fork, and sprout leaves at their tips while sap motes chase the growth.
     grove(ev, c) {
