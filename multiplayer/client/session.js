@@ -43,7 +43,7 @@ export class WorldSession extends EventTarget {
       const resume = this.identity?.peerId === d.peerId && this.identity?.room === d.room;
       this.identity = d; if (!resume) { this.sequence = sequenceFloor(); this.decoder.reset(); }
       this.emit('welcome', d);
-      if (d.hostId === d.peerId && !(resume && d.resume && this.simulation)) this.promote(resume ? this.latest : this.initialCheckpoint);
+      if (d.hostId === d.peerId && !(resume && d.resume && this.simulation)) this.promote(resume ? this.latest : this.initialCheckpoint, {restoringSave:!resume && !!this.initialCheckpoint});
       else if (d.hostId !== d.peerId && this.simulation) this.simulation = null;
     });
     on('message', ({detail}) => this.receive(detail));
@@ -112,8 +112,15 @@ export class WorldSession extends EventTarget {
         this.simulation.removePlayer(player.id); // Releases any held part and drops the pack as pickups first.
         if (record) {
           // The record keeps only what could not be dropped (pickup cap), so nothing is duplicated or lost.
-          const after = pickupTotals(this.simulation), carried = record.resources || {};
+          const after = pickupTotals(this.simulation), carried = {...record.resources};
+          // removePlayer first folds the held ore into the pack before dropping it.
+          // Include it in this balance too, otherwise the parked held slot duplicates
+          // a dropped ore. Keep a held remainder separate from a possibly full pack.
+          const heldOre = record.heldOre;
+          if (heldOre) carried[heldOre] = (carried[heldOre] || 0) + 1;
           record.resources = Object.fromEntries(PACK.map(k => [k, Math.max(0, (carried[k] | 0) - (after[k] - before[k]))]));
+          if (heldOre && record.resources[heldOre] > 0) record.resources[heldOre]--;
+          else delete record.heldOre;
           this.parked.delete(player.id); this.parked.set(player.id, {record, at:now});
         }
       }
@@ -149,16 +156,31 @@ export class WorldSession extends EventTarget {
       if (ids.includes(id) && !present.has(id)) this.simulation.addPlayer({id,name:p.name,role:p.role || 'hero'});
     }
   }
-  promote(checkpoint) {
+  promote(checkpoint, {restoringSave = false} = {}) {
     if (!this.identity) return;
     try {
       this.codec = new SnapshotDeltaEncoder(); // New stream id; guests re-announce after one legacy snapshot.
       this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation({room:this.identity.room,seed:41});
       this.reconcile(); this.last = performance.now(); this.accumulator = 0;
+      let recovery;
+      if (restoringSave && [...this.parked.values()].some(({record}) => record.heldOre || PACK.some(k => record.resources?.[k] > 0))) {
+        // A newly created room has new peer IDs. Undropped packs parked under the
+        // old IDs cannot be claimed, and autosave would otherwise erase them.
+        // Preserve the original checkpoint before publishing the resumed world.
+        try { recovery = this.saves.put(makeSave(checkpoint, {name:`${this.name.slice(0,43)} (inventory recovery)`})); }
+        catch {
+          throw Object.assign(new Error('Could not save the inventory recovery copy. Download your original save, free browser storage, then retry.'), {code:'resume_backup_failed'});
+        }
+      }
       const own = this.simulation.checkpoint().players?.find(p => p.id === this.identity.peerId);
       this.sequence = Math.max(this.sequence, own?.seq || 0, own?.lastSeq || 0);
       this.publish(true); this.emit('hosting',{hz:HZ});
-    } catch(error) { this.simulation = null; this.emit('error',{message:`Cannot recover this world: ${error.message}`}); }
+      if (recovery) this.emit('error', {code:'inventory_recovery_saved',reason:`The ground pickup limit left some supplies in your recovery copy, not your new pack. Download "${recovery.name}" from Saved Worlds to keep them.`,recoveryId:recovery.id});
+    } catch(error) {
+      this.simulation = null;
+      if (error.code === 'resume_backup_failed') { this.running = false; clearInterval(this.timer); this.connection.close(); }
+      this.emit('error',{...(error.code ? {code:error.code,reason:error.message} : {}),message:`Cannot recover this world: ${error.message}`});
+    }
   }
   command(type, payload = {}) {
     if (!this.identity || !this.running) return false;
