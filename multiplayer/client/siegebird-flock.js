@@ -28,6 +28,7 @@ export const SIEGEBIRD_GOLDEN = Object.freeze({id: 'golden',
 const SEAT = new THREE.Vector3(0, .745, .179);           // grip when the bolt lies in the channel (clear of the peep and the hood)
 const NOCK = new THREE.Vector3(0, .535, .2);              // latched string at full draw (perfect-wind glint)
 const GRIP_ON_BOLT = .21;                                 // grip distance from the Bolt node origin along the shaft (near its balance)
+const PERCH = .006;                                       // the bird rides this far above the grip so its belly clears the rail top
 const APPROACH = s => new THREE.Vector3(s * .19, .77, .33);
 const ENTER = s => [new THREE.Vector3(s * 2.3, .15, .95), new THREE.Vector3(s * 1.5, .95, .85), new THREE.Vector3(s * .62, 1.05, .5), APPROACH(s)];
 const EXIT = s => [SEAT.clone(), SEAT.clone().add(new THREE.Vector3(-s * .22, .16, .26)), new THREE.Vector3(-s * .75, 1.25, .95), new THREE.Vector3(-s * 2.1, 2.9, 1.7)];
@@ -77,7 +78,9 @@ export function siegebirdBirdPose(t, side, out = {pos: new THREE.Vector3(), forw
     const lift = Math.max(0, 1 - u * 4);
     out.forward.lerp(FORWARD, lift * .6).normalize();
     // Pitch eases up from the seated (nearly level) pose so the tail never swings down into the rail on take-off.
-    const climb = easeInOut(Math.min(1, u / .14));
+    // It hops clear of the rail first: the tail sits over the rail top and must not swing into it.
+    const climb = easeInOut(Math.max(0, Math.min(1, (u - .05) / .16)));
+    out.pos.z += .022 * easeInOut(Math.min(1, u / .07));
     out.pitch = .05 + (.2 + .3 * lift) * climb; out.roll = -s * .5 * Math.sin(Math.PI * Math.min(1, u * 1.4));
     out.flap = {rate: 11.5, amp: 1.0, dihedral: .15, hover: lift};
     out.carrying = false; out.phase = 'exit';
@@ -157,7 +160,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     if (boltSource) {
       const basis = new THREE.Group(); basis.name = 'SiegebirdCarriedBolt';
       basis.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0)));
-      const shaft = clone(boltSource); shaft.name = 'SiegebirdCarriedBoltShaft'; shaft.position.set(0, -GRIP_ON_BOLT, 0); shaft.quaternion.identity();
+      const shaft = clone(boltSource); shaft.name = 'SiegebirdCarriedBoltShaft'; shaft.position.set(0, -GRIP_ON_BOLT, -PERCH); shaft.quaternion.identity();
       // The pivot keeps the bolt full size under the scaled bird and level while the bird pitches.
       const pivot = new THREE.Group(); pivot.name = 'SiegebirdCarryPivot'; pivot.scale.setScalar(1 / SIEGEBIRD_BIRD_SCALE);
       basis.add(shaft); pivot.add(basis); (root.getObjectByName('SongbirdTalons') || root).add(pivot);
@@ -230,7 +233,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     back.copy(f).negate();
     m.makeBasis(right, up, back); q.setFromRotationMatrix(m);
     qr.setFromAxisAngle(f, pose.roll); bird.root.quaternion.multiplyQuaternions(qr, q);
-    bird.root.position.copy(pose.pos);
+    bird.root.position.copy(pose.pos).addScaledVector(up, PERCH);
     // Wings: asymmetric beat (faster downstroke), tips lag the arm, hover sweeps the stroke forward/back.
     const {rate, amp, dihedral, hover} = pose.flap, phase = (t - R.enter) * rate * Math.PI * 2;
     const beat = Math.sin(phase + .35 * Math.sin(phase)), angle = dihedral + amp * .62 * beat, tip = .55 * amp * Math.sin(phase - 1.1), sweep = hover * .45 * Math.cos(phase);
