@@ -1,4 +1,4 @@
-# Ability performance pass — 2026-10-05
+# Ability performance pass â€” 2026-10-05
 
 Isolated from the active Leap preview (5194); QA uses 5195 with XR and native pointer capture disabled.
 
@@ -21,3 +21,10 @@ The initial RAF probe could briefly overlap adjacent phase callbacks; do not use
 | Exact ray/refit and authored kit tests | 0.758 | Pass |
 
 Use rg --files before targeted reads; guessed filenames and PowerShell positional globs caused failed reads during discovery. Future tuning should profile actual casts and retain render/collision parity, rather than lower effect resolution or preview refresh rate.
+
+## First-use preparation
+Startup now renders isolated representatives of existing shader-based effects, including the hidden Pick footprint, Emberwing ribbon/impact markers, axe cleave and pooled particles. Explicit crystal/crust/strip representatives cover the instanced variants only created by earth spells. They share retained runtime materials, use owned temporary geometry/buffers, and never synthesize a gameplay action or sound.
+
+The guarded browser exercised actual Pick aim/release and curved Emberwing aim (23.773 s), with no console or shader errors. The authored landmark kit retained the same 46,328 triangles, seven merged draws, and only the two startup builds (initial fallback and installed kit) across the cast. The corrected probe observed ~8.3 ms median / 8.4–8.5 ms 95th-percentile frame intervals at 800×450. This is a local small-viewport test, not an expected phone/fullscreen FPS claim. Screenshots in logs/ability-warm-*.png retain the full wall, foliage and visible trajectory.
+
+Targeted warmup lifecycle check passed in 0.192 s. Exact source visibility/draw ranges remain unchanged; no wall state/events change; duplicate cleanup is safe and runtime materials survive. Commit 1ec40e0 pushed to private origin/codex/ability-performance (2.569 s).
