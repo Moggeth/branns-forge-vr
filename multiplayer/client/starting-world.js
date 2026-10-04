@@ -3,6 +3,8 @@
 // Draw calls: one merged mesh per shared material (<= 6) plus the sanctuary's live pieces (runes, hoop, tuning
 // crystal: 4). Triangles are capped (see stats()).
 import * as art from './sanctuary-art.js';
+import * as oc from './outcrop-art.js';
+import {GEODES} from '../shared/geode-outcrop.js';
 
 export const STARTING_SITES = [
   { id: 'sanctuary', name: 'Ancient Stone Sanctuary', x: -25, z: 8, radius: 7.5,
@@ -38,7 +40,7 @@ export function createStartingWorld({ THREE, scene, height }) {
     crystal: art.crystalMaterial(),
     path: new THREE.MeshStandardMaterial({ color: 0xa48a62, roughness: 1, flatShading: true,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9, flatShading: true }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x7a5432, roughness: 0.88, flatShading: true, vertexColors: true }),
   };
   // Shared primitive geometries (owned, disposed).
   const prim = {
@@ -50,7 +52,7 @@ export function createStartingWorld({ THREE, scene, height }) {
     ring: new THREE.TorusGeometry(1, 0.12, 5, 14),
     disc: new THREE.CylinderGeometry(1, 1.1, 1, 9, 1),
   };
-  const runes = []; let hoopAt = null, tuneAt = null; // sanctuary live-piece anchors, filled by the layout below
+  const runes = [], clusters = []; let hoopAt = null, tuneAt = null; // sanctuary live-piece anchors, filled by the layout below
   // Piece list: {mat, geo, x, z, y (above ground), sx,sy,sz, rx,ry,rz}. Ground sampled per piece at build.
   const pieces = [];
   const P = (mat, geo, x, z, y, s, r = [0, 0, 0], id = null) => pieces.push({ mat, geo, x, z, y, s, r, id });
@@ -102,32 +104,49 @@ export function createStartingWorld({ THREE, scene, height }) {
     P('stone', 'fallen', site.x + 3.6, site.z - 4.4, 0.18, [1, 1, 1], [Math.PI / 2 - 0.08, 0.7, 0.1]);
   }
 
-  // --- East: crystal mining outcrop. Stepped boulder mound, crystal clusters, timber+bronze mine frame.
+  // --- East: Crystal Outcrop, a living geode. Geode boulders split along violet seams; six crystal clusters in crust
+  // cups (live: they crack, glow, break and regrow, see shared/geode-outcrop.js); a mine head with a pulley over a shaft
+  // and a plank ore cart on spoked wheels, on the approach side toward the forge.
   {
     const site = STARTING_SITES[1]; site.footprints.length = 0; const r = rng(202);
     const mound = [[0, 0, 3.2, 2.2], [2.4, -1.5, 2.2, 1.6], [-2.2, 1.2, 2.0, 1.4], [1.0, 2.6, 1.6, 1.1], [-1.6, -2.4, 1.5, 1.0]];
-    for (const [dx, dz, w, h] of mound) {
-      P('stone', 'boulder', site.x + dx, site.z + dz, h * 0.45, [w, h, w * 0.9], [r(), r() * 6, r() * 0.4]);
+    mound.forEach(([dx, dz, w, h], i) => {
+      const k = 'geodeBoulder' + i; prim[k] = oc.geodeBoulderGeometry(300 + i * 13);
+      P('stone', k, site.x + dx, site.z + dz, h * 0.3, [w * 0.95, h * 0.72, w * 0.88], [r() * 0.3, r() * 6, r() * 0.3]);
       foot(site, 'rock', site.x + dx, site.z + dz, w * 1.6, w * 1.5, 0, h);
+    });
+    prim.geodeCup = oc.cupGeometry(41);
+    for (const g of GEODES) {
+      P('stone', 'geodeCup', g.x, g.z, g.lift + 0.12, [g.size * 0.42, g.size * 0.36, g.size * 0.42], [0, g.index, 0], g.id);
+      clusters.push({x: g.x, z: g.z, lift: g.lift + 0.05, size: g.size, id: g.id});
     }
-    const clusters = [[0.2, 0.3, 2.4, 1.6], [2.6, -1.4, 1.8, 1.2], [-2.0, 1.4, 1.6, 1.0], [1.2, 3.0, 1.2, 0.6], [4.4, 1.0, 1.0, 0], [-3.8, -1.2, 0.9, 0]];
-    for (const [dx, dz, s, lift] of clusters) {
-      const n = 3 + Math.floor(r() * 2);
-      for (let k = 0; k < n; k++) {
-        const h = s * (0.8 + r() * 0.9);
-        P('crystal', 'prism', site.x + dx + (r() - 0.5) * s * 0.6, site.z + dz + (r() - 0.5) * s * 0.6, lift + h * 0.45,
-          [0.22 * s, h, 0.22 * s], [(r() - 0.5) * 0.7, r() * 6, (r() - 0.5) * 0.7]);
-      }
-      P('crystal', 'shard', site.x + dx, site.z + dz, lift + s * 1.2, [0.18 * s, 0.5 * s, 0.18 * s], [0, r() * 6, 0]);
-    }
-    // Mine frame on the approach side (west, toward forge).
+    for (const g of GEODES) if (!g.lift) foot(site, 'crystal', g.x, g.z, g.size * 0.9, g.size * 0.9, 0, g.size * 1.4); // ground clusters are solid
+    // Mine head on the approach side (west, toward the forge).
     const mx = site.x - 4.2, mz = site.z - 2.2;
-    P('wood', 'slab', mx, mz - 1, 1.3, [0.3, 2.6, 0.3]); P('wood', 'slab', mx, mz + 1, 1.3, [0.3, 2.6, 0.3]);
-    P('wood', 'slab', mx, mz, 2.6, [0.35, 0.3, 2.6]);
-    P('bronze', 'ring', mx, mz, 2.15, [0.32, 0.32, 0.32], [0, Math.PI / 2, 0]);
-    P('wood', 'slab', mx - 1.2, mz + 1.8, 0.35, [1.4, 0.7, 0.9], [0, 0.3, 0]); // ore cart body
-    P('crystal', 'shard', mx - 1.2, mz + 1.8, 0.85, [0.3, 0.4, 0.3]);
-    P('bronze', 'ring', mx - 1.2, mz + 1.8, 0.2, [0.5, 0.5, 0.5], [Math.PI / 2, 0, 0]);
+    prim.minePost = oc.timberGeometry(0.3, 2.9, 0.3, 7); prim.mineBeam = oc.timberGeometry(0.34, 0.3, 2.7, 8);
+    prim.mineBrace = oc.timberGeometry(0.14, 1.3, 0.14, 9); prim.shaftRim = oc.timberGeometry(1.5, 0.22, 0.22, 10, 3);
+    prim.shaftHole = new THREE.PlaneGeometry(1.25, 1.25); prim.shaftHole.rotateX(-Math.PI / 2);
+    prim.shaftHole.setAttribute('color', new THREE.Float32BufferAttribute(Array(prim.shaftHole.attributes.position.count * 3).fill(0.08), 3));
+    for (const s of [-1, 1]) {
+      P('wood', 'minePost', mx, mz + s, 1.3, [1, 1, 1]);
+      P('wood', 'mineBrace', mx, mz + s * 0.62, 2.15, [1, 1, 1], [s * 0.75, 0, 0]);
+    }
+    P('wood', 'mineBeam', mx, mz, 2.82, [1, 1, 1]);
+    for (const [ox, oz, ry] of [[0, -0.64, 0], [0, 0.64, 0], [-0.64, 0, Math.PI / 2], [0.64, 0, Math.PI / 2]]) P('wood', 'shaftRim', mx + ox, mz + oz, 0.1, [1, 1, 1], [0, ry, 0]);
+    P('stone', 'shaftHole', mx, mz, 0.17, [1, 1, 1]);
+    const pulley = oc.wheelGeometries(0.42, 0.12, 6); prim.pulleyWood = pulley.wood; prim.pulleyTyre = pulley.tyre;
+    P('wood', 'pulleyWood', mx, mz, 2.45, [1, 1, 1], [0, Math.PI / 2, 0]); P('bronze', 'pulleyTyre', mx, mz, 2.45, [1, 1, 1], [0, Math.PI / 2, 0]);
+    prim.rope = oc.timberGeometry(0.035, 1.9, 0.035, 11); P('wood', 'rope', mx, mz + 0.4, 1.32, [1, 1, 1]);
+    prim.pail = new THREE.CylinderGeometry(0.16, 0.12, 0.26, 8); P('bronze', 'pail', mx, mz + 0.4, 0.42, [1, 1, 1]);
+    // Ore cart: planked tub on four spoked wheels, heaped with crystal.
+    const cx = mx - 1.3, cz = mz + 2.1, cy = 0.3, yaw = 0.3, at = (lx, lz) => [cx + lx * Math.cos(yaw) + lz * Math.sin(yaw), cz - lx * Math.sin(yaw) + lz * Math.cos(yaw)];
+    prim.cartFloor = oc.timberGeometry(1.3, 0.08, 0.84, 12, 4); prim.cartSide = oc.timberGeometry(1.36, 0.5, 0.07, 13, 1); prim.cartEnd = oc.timberGeometry(0.07, 0.5, 0.84, 14);
+    P('wood', 'cartFloor', ...at(0, 0), cy + 0.12, [1, 1, 1], [0, yaw, 0]);
+    for (const s of [-1, 1]) { P('wood', 'cartSide', ...at(0, s * 0.42), cy + 0.38, [1, 1, 1], [0, yaw, s * 0.0]); P('wood', 'cartEnd', ...at(s * 0.66, 0), cy + 0.38, [1, 1, 1], [0, yaw, 0]); }
+    const wheel = oc.wheelGeometries(0.27, 0.08, 6); prim.cartWheel = wheel.wood; prim.cartTyre = wheel.tyre;
+    for (const sx of [-0.42, 0.42]) for (const sz of [-0.47, 0.47]) { P('wood', 'cartWheel', ...at(sx, sz), 0.27, [1, 1, 1], [0, yaw, 0]); P('bronze', 'cartTyre', ...at(sx, sz), 0.27, [1, 1, 1], [0, yaw, 0]); }
+    prim.cartHeap = art.crystalPointGeometry(1, 0.12);
+    for (let k = 0; k < 6; k++) { const [hx, hz] = at((k % 3 - 1) * 0.35, (k < 3 ? -0.15 : 0.18)); P('crystal', 'cartHeap', hx, hz, cy + 0.2, [1, 0.35 + (k % 2) * 0.2, 1], [(r() - 0.5) * 1.2, r() * 6, (r() - 0.5) * 1.2]); }
     foot(site, 'post', mx, mz - 1, 0.3, 0.3, 0, 2.6); foot(site, 'post', mx, mz + 1, 0.3, 0.3, 0, 2.6);
   }
 
@@ -216,7 +235,8 @@ export function createStartingWorld({ THREE, scene, height }) {
   hoop.add(hoopBronze, hoopGlow); hoopBronze.castShadow = true;
   const tune = new THREE.Mesh(tuneGeo, mats.crystal); tune.scale.set(0.2, 0.46, 0.2); tune.userData.targetId = 'waygateAltar';
   hoop.traverse(o => { o.raycast = () => {}; }); // the hoop hangs out of reach; strikes pass to the stone behind
-  let runeMesh = null; const lit = rune.uLit.value;
+  let runeMesh = null, clusterMesh = null; const lit = rune.uLit.value;
+  const geode = oc.clusterMaterial(GEODES.length), geodeGrow = geode.uGrow.value, geodeGlow = geode.uGlow.value;
   function buildLive() {
     if (runeMesh) { live.remove(runeMesh); runeMesh.geometry.dispose(); runeMesh = null; }
     const parts = [], stoneIds = [], mm = new THREE.Matrix4(), local = new THREE.Matrix4(), qq = new THREE.Quaternion();
@@ -233,6 +253,14 @@ export function createStartingWorld({ THREE, scene, height }) {
       runeMesh = new THREE.Mesh(geo, rune.material); runeMesh.name = 'StartingWorld_runes'; runeMesh.raycast = () => {}; live.add(runeMesh);
     }
     if (hoopAt) { hoop.position.set(hoopAt.x, H(hoopAt.x, hoopAt.z) - 0.15 + hoopAt.y, hoopAt.z); hoop.rotation.set(0, Math.PI / 2, 0); live.add(hoop); }
+    if (clusterMesh) { live.remove(clusterMesh); clusterMesh.geometry.dispose(); }
+    if (clusters.length) {
+      clusterMesh = new THREE.Mesh(oc.clusterGeometry(clusters.map(c => ({x: c.x, y: H(c.x, c.z) - 0.15 + c.lift, z: c.z, size: c.size}))), geode.material);
+      clusterMesh.name = 'StartingWorld_geodes'; clusterMesh.castShadow = true;
+      const ids = clusters.map(c => c.id), idx = clusterMesh.geometry.attributes.aCluster;
+      clusterMesh.userData.faceTarget = f => geodeGrow[idx.getX(f * 3)] > 0.95 ? ids[idx.getX(f * 3)] : null; // stubs can't be struck
+      live.add(clusterMesh);
+    }
     if (tuneAt) { tune.position.set(tuneAt.x, H(tuneAt.x, tuneAt.z) - 0.15 + tuneAt.y, tuneAt.z); tune.userData.baseY = tune.position.y; live.add(tune); }
   }
   // Presentation clock: runes breathe, the hoop sways on its chains, the tuning crystal spins and bobs. Its brightness
@@ -248,6 +276,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     tune.rotation.y = seconds * (0.6 + charge * 2.4);
     if (tune.userData.baseY !== undefined) tune.position.y = tune.userData.baseY + Math.sin(seconds * 1.3) * 0.08 + charge * 0.25;
   }
+  // Outcrop clusters: grow 0..1 (stub..full), glow 0..1 (cracks and flashes), per cluster in GEODES order.
+  function setGeodes(grow = [], glow = []) { for (let i = 0; i < geodeGrow.length; i++) { geodeGrow[i] = Math.max(0.12, Math.min(1, grow[i] ?? 1)); geodeGlow[i] = Math.max(0, Math.min(1, glow[i] || 0)); } }
   // levels: per-stone 0..1 resonance (index order = ring order, gap skipped).
   function setLit(levels = []) { for (let i = 0; i < lit.length; i++) lit[i] = Math.max(0, Math.min(1, +levels[i] || 0)); }
   group.add(live);
@@ -271,8 +301,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in meshes) meshes[k].geometry.dispose();
     for (const k in prim) prim[k].dispose();
     for (const k in mats) mats[k].dispose();
-    runeMesh?.geometry.dispose(); rune.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
+    runeMesh?.geometry.dispose(); rune.material.dispose(); clusterMesh?.geometry.dispose(); geode.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
   }
-  function stats() { return { draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, pieces: pieces.length, runes: runes.length }; }
-  return { group, update, tick, setLit, dispose, stats, sites: STARTING_SITES, paths: PATHS };
+  function stats() { return { draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, pieces: pieces.length, runes: runes.length }; }
+  return { group, update, tick, setLit, setGeodes, dispose, stats, sites: STARTING_SITES, paths: PATHS };
 }

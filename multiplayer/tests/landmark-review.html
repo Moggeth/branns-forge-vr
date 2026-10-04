@@ -26,10 +26,11 @@ const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .05, 200);
 const v = s => s.split(',').map(Number);
 // open: 0 shut, 1 open (the portal animates in over ~2 s of review time, stepped here at 30 fps).
-function frame(at = [-13, 1.7, 4], look = [-25, 1.6, 8], lit = 0, t = 1, open = 0) {
+function frame(at = [-13, 1.7, 4], look = [-25, 1.6, 8], lit = 0, t = 1, open = 0, grow = null, glow = null) {
   camera.position.set(...at); camera.lookAt(...look);
   const tick = 1000, snapshot = {landmarks: true, tick, waygate: {lit: Array(8).fill(lit ? tick + Math.round(lit * 600) : 0), openUntil: open ? tick + 3000 : 0, dest: 0}};
   for (let i = 0; i < Math.max(1, t * 30); i++) gate.update(snapshot, 1 / 30);
+  if (grow) world.setGeodes?.(grow, glow || []);
   renderer.render(scene, camera);
 }
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });

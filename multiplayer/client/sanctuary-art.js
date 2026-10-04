@@ -17,7 +17,7 @@ function hash3(x, y, z, seed) {
   const q = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + seed * 19.19) * 43758.5453;
   return q - Math.floor(q);
 }
-function noise3(x, y, z, seed) {
+export function noise3(x, y, z, seed) {
   const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz;
   const s = t => t * t * (3 - 2 * t), u = s(fx), v = s(fy), w = s(fz);
   const h = (a, b, c) => hash3(ix + a, iy + b, iz + c, seed);
@@ -28,7 +28,7 @@ function noise3(x, y, z, seed) {
 const key = v => `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)}`;
 
 // Bake a per-vertex colour from world-ish height and noise. Non-indexed so flat shading reads as chisel facets.
-function finish(g, tint) {
+export function finish(g, tint) {
   const geo = g.index ? g.toNonIndexed() : g; if (geo !== g) g.dispose();
   geo.computeVertexNormals();
   const pos = geo.attributes.position, nor = geo.attributes.normal, col = new Float32Array(pos.count * 3);

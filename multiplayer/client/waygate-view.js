@@ -3,6 +3,7 @@
 // Budget: two extra draws while the gate is open (portal, return circle), none while it is shut. No lights or textures.
 import * as THREE from 'three';
 import {GATE, WAYSTONES, currentDestination} from '../shared/waygate.js';
+import {createLandmarkAudio} from './landmark-audio.js';
 
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16]; // stone index -> scale step; the full ring is a rising pentatonic chord
 
@@ -37,30 +38,9 @@ export function createWaygateView({scene, startingWorld, height, audio = () => n
   const levels = Array(WAYSTONES.length).fill(0), flash = Array(WAYSTONES.length).fill(0);
   let open = 0, wasOpen = false, seconds = 0, destKey = '';
 
-  // Glassy stone bell: the struck stone's note, brighter and longer when it is the one that completes the chord.
-  function bell(position, step, level, decay) {
-    const ctx = audio(); if (!ctx || ctx.state !== 'running') return;
-    const t = ctx.currentTime, ear = listener(), d = ear ? Math.hypot(position[0] - ear.position[0], position[2] - ear.position[2]) : 0;
-    const gain = level * Math.max(0, 1 - d / 45); if (gain < 0.004) return;
-    const bus = ctx.createGain(); bus.gain.value = gain; bus.connect(ctx.destination);
-    const f = 196 * Math.pow(2, step / 12);
-    for (const [ratio, amp] of [[1, 1], [2.0, 0.45], [2.98, 0.25], [4.16, 0.12]]) {
-      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f * ratio;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + decay / (1 + ratio * 0.3));
-      o.connect(g).connect(bus); o.start(t); o.stop(t + decay + 0.1); o.onended = () => { o.disconnect(); g.disconnect(); };
-    }
-    setTimeout(() => bus.disconnect(), (decay + 0.3) * 1000);
-  }
+  const sound = createLandmarkAudio({audio, listener}), bell = sound.bell, whoosh = sound.whoosh;
   // Opening swell: the whole chord rolled upward over a low hum.
-  function chord(position) { PENTA.forEach((s, i) => setTimeout(() => bell(position, s, 0.09, 3.2), i * 70)); bell(position, -12, 0.14, 4); }
-  function whoosh(position, level = 0.12) {
-    const ctx = audio(); if (!ctx || ctx.state !== 'running') return;
-    const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'triangle'; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.6);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.75); o.onended = () => { o.disconnect(); g.disconnect(); };
-    void position;
-  }
+  function chord(position) { sound.chord(position, PENTA); bell(position, -12, 0.14, 4); }
 
   function handleEvent(event, playerId) {
     if (event.kind === 'waystone_ring') { flash[event.index] = 1; bell(event.position, PENTA[event.index] ?? 0, 0.16, 2.2); }

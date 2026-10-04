@@ -12,6 +12,7 @@ import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} 
 import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
 import {createStartingWorld} from './starting-world.js';
 import {createWaygateView} from './waygate-view.js';
+import {createGeodeView} from './geode-view.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
@@ -217,6 +218,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let weaponHand = null;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
+  const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
@@ -789,7 +791,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function handleEvent(event){
     if(event.kind==='respawn'&&event.id===playerId){clearInput();localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
-    waygateView.handleEvent(event,playerId);
+    waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);
     feedback.handleEvent(event);
     combat.handleEvent(event);
     golemFx.handleEvent(event);
@@ -1187,7 +1189,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
     previous = now; renderTick=presentationClock.sample(now);
-    if(startingWorld.group.visible)waygateView.update(snapshot,dt);
+    if(startingWorld.group.visible){waygateView.update(snapshot,dt);geodeView.update(snapshot,dt);}
     if (active && !renderer.xr.isPresenting) {
       lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
     }
