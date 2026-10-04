@@ -5,3 +5,4 @@ title: Smoother earth magic and Emberwing aiming
 ---
 - Reduced the work needed when the Pick's crystal wall and other earth spells reshape the ground.
 - Emberwing's curved aiming guide checks nearby scenery more efficiently, preserving its detailed flight path and precise impacts.
+- Prepare hidden aiming and earth-magic effects during loading to reduce first-use shader hitches.

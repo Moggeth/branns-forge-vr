@@ -1,3 +1,4 @@
+import {createAbilityWarmup} from './ability-warmup.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
 import {validateInventionPlacement} from '../shared/inventions.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
@@ -1423,7 +1424,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   rebuildGround(); resize(); renderer.setAnimationLoop(frame);
   report('Preparing world assets and materials…');
   void (async()=>{
-    const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup;
+    const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup,abilityWarmup,wallWarmup;
     try{
       await Promise.all(assetInstalls);if(disposed)return;
       // Build the default render-only world before compiling, even in the empty
@@ -1439,6 +1440,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
       treeWarmup=content.trees.prepareWarmup();representatives.add(treeWarmup.group);startup.treeHarvestWarmup=treeWarmup.stats;
       miningWarmup=content.prepareMiningWarmup();representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
+      abilityWarmup=createAbilityWarmup(THREE,scene);representatives.add(abilityWarmup.group);startup.abilityWarmup=abilityWarmup.stats;
+      wallWarmup=content.crystalWall.prepareWarmup();representatives.add(wallWarmup.group);
       scene.add(representatives);scene.updateMatrixWorld(true);
       startup.phase='shaders';report('Preparing world shaders and textures…');
       await spellVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
@@ -1455,7 +1458,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const warmStarted=performance.now();renderer.render(scene,camera);renderer.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
       await renderer.compileAsync(scene,camera);if(disposed)return;
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
-    finally{treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
+    finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
     if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
     report(`World renderer ready (${Math.round(startup.readyMs)} ms).`);
   })();
