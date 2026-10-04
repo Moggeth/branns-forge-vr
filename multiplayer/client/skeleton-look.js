@@ -60,7 +60,7 @@ export function dressSkeleton(visual, id = 0, index) {
 // first drawn buried by the crawl-out, so its legs kept a sphere two metres underground and vanished whenever the
 // ground below them left the view. Every part gets one sphere around the whole standing body instead.
 const _box = new THREE.Box3(), _sphere = new THREE.Sphere(), _toVisual = new THREE.Matrix4(), _toMesh = new THREE.Matrix4();
-function steadyBounds(visual) {
+export function steadyBounds(visual) {
   const meshes = []; visual.traverse(n => { if (n.isSkinnedMesh) meshes.push(n); }); if (!meshes.length) return;
   visual.updateWorldMatrix(true, true); const inv = _toVisual.copy(visual.matrixWorld).invert(); _box.makeEmpty();
   for (const m of meshes) { m.computeBoundingSphere(); _sphere.copy(m.boundingSphere).applyMatrix4(_toMesh.multiplyMatrices(inv, m.matrixWorld)); _box.expandByPoint(_sphere.center.clone().addScalar(_sphere.radius)).expandByPoint(_sphere.center.clone().addScalar(-_sphere.radius)); }
