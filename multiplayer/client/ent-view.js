@@ -153,13 +153,13 @@ function buildGlowGeometry(size) {
  return g;
 }
 
-function softTexture() {
+export function softTexture() {
  const n = 32, data = new Uint8Array(n * n * 4);
  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const d = Math.hypot(x - n / 2 + .5, y - n / 2 + .5) / (n / 2), a = clamp(1 - d) ** 1.6; const i = (y * n + x) * 4; data[i] = data[i + 1] = data[i + 2] = 255; data[i + 3] = a * 255; }
  const t = new THREE.DataTexture(data, n, n); t.needsUpdate = true; return t;
 }
 // Pooled CPU particles in one Points draw: leaves, bark chips, soil (normal blend) or resonance motes (additive).
-function createParticles(scene, cap, additive, texture) {
+export function createParticles(scene, cap, additive, texture) {
  const pos = new Float32Array(cap * 3), col = new Float32Array(cap * 3), aux = new Float32Array(cap * 2), list = [];
  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('col', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('aux', new THREE.BufferAttribute(aux, 2).setUsage(THREE.DynamicDrawUsage));
  const m = new THREE.ShaderMaterial({uniforms: {map: {value: texture}, scale: {value: 420}}, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
