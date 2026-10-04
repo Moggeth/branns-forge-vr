@@ -8,7 +8,7 @@ import {timberlineFlightAt,TIMBERLINE_LONG} from '../shared/timberline-flight.js
 import {mannedShot} from '../shared/inventions.js';
 
 // core/perMetre: half width in metres, so the line stays about a pixel and a half wide at any range.
-export const TIMBERLINE_SIGHT=Object.freeze({stepTicks:3,maxPoints:TIMBERLINE_LONG.maxTicks/3+2,color:0xf4ead0,core:.004,perMetre:.00075,dash:4,flow:2});
+export const TIMBERLINE_SIGHT=Object.freeze({stepTicks:3,maxPoints:TIMBERLINE_LONG.maxTicks/3+2,color:0xf4ead0,core:.006,perMetre:.0011,dash:4,flow:2});
 
 // Forecast one manned shot. height(x,z) is the shared bare-earth height. Returns the sampled eye paths (flat xyz arrays)
 // and where the first bolt meets the ground, or impact null when it leaves the world or outlives its flight.
@@ -63,12 +63,12 @@ export function createTimberlineSight({scene}){
   // b: the manned structure; aim {yaw,pitch} (the local wanted aim); height(x,z); eye: camera world position.
   update({b,aim,height,eye,camera,time,editsKey='',amount=1}){if(!b||!aim){group.visible=false;return null;}
    const k=`${b.id}:${aim.yaw.toFixed(4)}:${aim.pitch.toFixed(4)}:${b.yaw}:${editsKey}`;if(k!==key){key=k;last=forecastTimberline(mannedShot(b,aim),height);}
-   group.visible=true;const fade=THREE.MathUtils.smoothstep(amount,.2,1);uniforms.opacity.value=.8*fade;mark.material.opacity=label.material.opacity=fade;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
+   group.visible=true;const fade=THREE.MathUtils.smoothstep(amount,.2,1);uniforms.opacity.value=.95*fade;mark.material.opacity=label.material.opacity=fade;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
    if(last.impact){const c=_c.fromArray(last.impact.centre),l=_a.fromArray(last.impact.left),r=_b.fromArray(last.impact.right),d=c.distanceTo(eye);
     mark.visible=label.visible=true;const size=Math.max(.5,d*.022);mark.position.copy(c).y+=size*.5;
     // Stands up facing the operator (a flat ground decal vanishes at grazing angles); the arcs sit left and right like the bolts.
     mark.quaternion.copy(camera.quaternion);mark.scale.setScalar(size);
-    label.position.copy(c).y+=size*1.35;const lw=d*.06+.6;label.scale.set(lw,lw/4,1);text(`${Math.round(last.distance)} m · ${last.impact.t.toFixed(1)} s`);}
+    label.position.copy(c).y+=size*.6+d*.03;const lw=d*.15+.8;label.scale.set(lw,lw/4,1);text(`${Math.round(last.distance)} m · ${last.impact.t.toFixed(1)} s`);}
    else{mark.visible=false;label.visible=true;label.position.fromArray(last.left.slice(-3));label.scale.set(6,1.5,1);text('Beyond range');}
    return last;},
   hide(){group.visible=false;},
