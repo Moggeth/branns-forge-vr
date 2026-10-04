@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import {WYRMSPOUT} from '../shared/wyrmspout.js';
 
-export const STREAM_CAPS = Object.freeze({drops: 240, licks: 200, splats: 64, stuck: 48, ribbonPoints: 40, ribbons: 4});
+export const STREAM_CAPS = Object.freeze({drops: 240, licks: 260, splats: 64, stuck: 48, ribbonPoints: 40, ribbons: 4});
 const RIBBON_AGE = .26;       // seconds a drop stays part of the continuous rope before it breaks off into a glob
-const LOCAL_RATE = 78;        // visual drops per second from the local nozzle (scaled by quality)
+const LOCAL_RATE = 110;        // visual drops per second from the local nozzle (scaled by quality)
 const REMOTE_DROPS = 5;       // visual drops per remote authoritative glob
 const SPLAT_LIFE = 2.6, STUCK_FADE = .5;
 
@@ -91,7 +91,7 @@ void main(){
   vec3 c = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   vec3 up = vec3(0.0, 1.0, 0.0), view = normalize(cameraPosition - c), right = normalize(cross(up, view));
   float s = aLick.x, sway = sin(uTime * 9.0 + aLick.y * 40.0) * 0.18 * uv.y * uv.y;
-  vec3 wp = c + right * ((uv.x - 0.5) * s * 0.55 + sway * s) + up * (uv.y * s * 1.2 - s * 0.15);
+  vec3 wp = c + right * ((uv.x - 0.5) * s * 0.75 + sway * s) + up * (uv.y * s * 1.2 - s * 0.15);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
 const LICK_FRAG = `
@@ -199,7 +199,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
         .addScaledVector(side, r1 * WYRMSPOUT.spread * tuning.speed * 2).addScaledVector(lift, r2 * WYRMSPOUT.spread * tuning.speed * 2);
       // Sub-frame emission: start each drop where it would be had it left the nozzle between frames.
       const back = (1 - f) * dt; at.addScaledVector(v, back);
-      const d = spawnDrop(at, v, {life: tuning.lifeTicks / 60, size: .026 + .022 * hash(order * 97 + 4), key, gravity: tuning.gravity});
+      const d = spawnDrop(at, v, {life: tuning.lifeTicks / 60, size: .045 + .045 * hash(order * 97 + 4), key, gravity: tuning.gravity});
       d.age = back;
     }
     s.prevMuzzle = (s.prevMuzzle || new THREE.Vector3()).copy(muzzle); s.muzzle = (s.muzzle || new THREE.Vector3()).copy(muzzle);
@@ -229,7 +229,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
         const v = v0.clone().multiplyScalar(.97 + .06 * hash(idSeed(g.id) + k)).addScaledVector(side, r1 * WYRMSPOUT.spread * speed * 2).addScaledVector(lift, r2 * WYRMSPOUT.spread * speed * 2);
         // Spread the glob's drops over the gap to the next glob, each born at its own (sub-)tick.
         const born = g.bornTick + k * WYRMSPOUT.burstTicks / WYRMSPOUT.globs / REMOTE_DROPS;
-        spawnDrop(new THREE.Vector3().fromArray(origin), v, {life: WYRMSPOUT.lifeTicks / 60 * 1.3, size: .03 + .02 * hash(idSeed(g.id) + k * 5), key, delay: (born - renderTick) / 60});
+        spawnDrop(new THREE.Vector3().fromArray(origin), v, {life: WYRMSPOUT.lifeTicks / 60 * 1.3, size: .045 + .04 * hash(idSeed(g.id) + k * 5), key, delay: (born - renderTick) / 60});
       }
       s.muzzle = (s.muzzle || new THREE.Vector3()).fromArray(origin);
     }
@@ -297,7 +297,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
       const ground = height(d.p.x, d.p.z);
       if (d.p.y <= ground) {
         d.live = false;
-        if (d.splat) { _a.set(d.p.x, ground + .012, d.p.z); splatAt(_a, _y, .07 + d.size * 2.2); if (q >= .5 && hash(d.order * 3) < .25) spawnDrop(_a, _b.set((hash(d.order) - .5) * 1.4, 1 + hash(d.order * 5), (hash(d.order * 7) - .5) * 1.4), {life: .35, size: d.size * .45, splat: false, rope: false}); }
+        if (d.splat) { _a.set(d.p.x, ground + .012, d.p.z); splatAt(_a, _y, .1 + d.size * 3); if (q >= .5 && hash(d.order * 3) < .25) spawnDrop(_a, _b.set((hash(d.order) - .5) * 1.4, 1 + hash(d.order * 5), (hash(d.order * 7) - .5) * 1.4), {life: .35, size: d.size * .45, splat: false, rope: false}); }
         continue;
       }
       // Inside the rope near the mouth the drop is drawn by the ribbon; afterwards it swells into a glob.
@@ -306,7 +306,8 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
         const speed = d.v.length(), stretch = 1 + Math.min(1.6, speed * .09);
         const wobble = 1 + .14 * Math.sin(time * 23 + d.seed * 40);
         pushDrop(d.p, d.v, d.size * stretch * wobble * broke, d.size / Math.sqrt(stretch) * (2 - wobble) * broke, d.heat * (1 - .45 * d.age / d.life));
-        if (d.seed < .45) pushLick(d.p, .1 + d.size * 2.4, d.seed, .8 * broke * (1 - d.age / d.life));
+        // Fire billows off the burning liquid and swells as it flies.
+        if (d.seed < .62) pushLick(d.p, .18 + d.size * 3 + d.age * .9, d.seed, .85 * broke * (1 - d.age / d.life) ** .7);
       }
     }
     // gout balls
@@ -356,7 +357,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
   }
 
   // The rope: from the nozzle through the stream's youngest drops, until the first one that has broken away.
-  const chain = [];
+  const chain = [], _sm = Array.from({length: 128}, () => new THREE.Vector3());
   function updateRibbons(camera, time) {
     const camPos = camera ? camera.getWorldPosition(_c) : _c.set(0, 2, 5);
     let r = 0, verts = 0;
@@ -372,12 +373,14 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
         if (chain.length >= STREAM_CAPS.ribbonPoints) break;
       }
       if (chain.length < 2) continue;
+      // Light smoothing so the spread of single drops reads as one rope, not a zigzag (the nozzle point stays put).
+      for (let pass = 0; pass < 2; pass++) for (let i = 1; i < chain.length - 1; i++) chain[i] = {p: _sm[i + pass * 64].copy(chain[i - 1].p).add(chain[i + 1].p).multiplyScalar(.25).addScaledVector(chain[i].p, .5), age: chain[i].age};
       const base = r * STREAM_CAPS.ribbonPoints * 2; let along = 0;
       for (let i = 0; i < STREAM_CAPS.ribbonPoints; i++) {
         const c = chain[Math.min(i, chain.length - 1)], prev = chain[Math.max(0, Math.min(i, chain.length - 1) - 1)], next = chain[Math.min(chain.length - 1, i + 1)];
         const tangent = _a.copy(next.p).sub(prev.p); if (tangent.lengthSq() < 1e-10) tangent.set(0, 0, 1);
         const side = _b.copy(tangent).cross(_s.copy(camPos).sub(c.p)).normalize();
-        const k = Math.min(1, c.age / RIBBON_AGE), width = i >= chain.length ? 0 : (.016 + .02 * Math.sqrt(k)) * (1 - THREE.MathUtils.smoothstep(k, .7, 1)) * (1 + .12 * Math.sin(time * 31 + i * 1.7));
+        const k = Math.min(1, c.age / RIBBON_AGE), width = i >= chain.length ? 0 : (.028 + .045 * Math.sqrt(k)) * (1 - THREE.MathUtils.smoothstep(k, .7, 1)) * (1 + .12 * Math.sin(time * 31 + i * 1.7));
         if (i > 0) along += chain[Math.min(i, chain.length - 1)].p.distanceTo(chain[Math.min(i, chain.length - 1) - 1].p);
         for (const [j, sign] of [[0, -1], [1, 1]]) {
           const v = base + i * 2 + j;
