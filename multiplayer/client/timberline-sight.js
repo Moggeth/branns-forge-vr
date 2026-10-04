@@ -61,7 +61,7 @@ export function createTimberlineSight({scene}){
  return {object:group,
   // b: the manned structure; aim {yaw,pitch} (the local wanted aim); height(x,z); eye: camera world position.
   update({b,aim,height,eye,camera,time,editsKey=''}){if(!b||!aim){group.visible=false;return null;}
-   const k=`${b.id}:${aim.yaw.toFixed(4)}:${aim.pitch.toFixed(4)}:${b.yaw}:${editsKey}`;if(k!==key){key=k;last=forecastTimberline(mannedShot(b,aim),height);}
+   const k=`${b.id}:${b.position.join(',')}:${aim.yaw.toFixed(4)}:${aim.pitch.toFixed(4)}:${b.yaw}:${editsKey}`;if(k!==key){key=k;last=forecastTimberline(mannedShot(b,aim),height);}
    group.visible=true;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
    if(last.impact){const c=_c.fromArray(last.impact.centre),l=_a.fromArray(last.impact.left),r=_b.fromArray(last.impact.right),d=c.distanceTo(eye);
     mark.visible=label.visible=true;const size=Math.max(1.6,d*.07);mark.position.copy(c).y+=size*.3;
