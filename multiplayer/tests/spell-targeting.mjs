@@ -5,7 +5,7 @@ import {terrainHeight,createSunderRupture} from '../shared/terrain.js';
 import {GROWTH} from '../shared/grove-growth.js';
 import { createSpellTargeting, createMarkerTerrainSampler, SPELL_SHAPES, lineKernels } from '../client/spell-targeting.js';
 
-const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake', 'awaken', 'wildwake', 'wave'];
+const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake', 'awaken', 'wildwake', 'rainfall', 'wave'];
 assert.deepEqual(Object.keys(SPELL_SHAPES).sort(), [...IDS].sort());
 const slope = (x, z) => 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07) + 0.35 * x + 0.2 * z + 0.6 * Math.sin(z * 0.8); // steep, rippled
 const t0 = performance.now(), timings = {};

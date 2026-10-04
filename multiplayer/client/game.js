@@ -70,6 +70,7 @@ import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} fr
 import {createExpeditionPresentation} from './expedition-presentation.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
+import {createDayNightWeather} from './day-night-weather.js';
 import {createMeadowCover} from './meadow-cover.js';
 import {createOreGlint} from './ore-glint.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
@@ -108,7 +109,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
-  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake',KeyH:'wave'};
+  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake',KeyR:'rainfall',KeyH:'wave'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
@@ -174,6 +175,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const oreGlint = createOreGlint({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits)});
   // Layered distant alpine ranges replace the low orchard silhouette backdrop.
   const skyline = createAlpineSkyline({scene, sky: orchard.objects.sky}); orchard.objects.backdrop.visible = false;
+  const skyCycle = createDayNightWeather({scene, orchard, quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
   let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
@@ -760,7 +762,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(renderer.xr.isPresenting)feedback.pattern?.(steps);
     else if(touchEnabled)try{const v=[];let last=0;for(const s of steps){v.push(Math.max(0,Math.round(s.at-last)),s.duration);last=s.at+s.duration;}v[0]=0;navigator.vibrate?.(v.slice(1));}catch{}
   }
-  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
+  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();skyCycle.attachAudio(audioContext);wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
   let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
@@ -1327,6 +1329,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     meadowPushers.length = 0; if (role === 'hero') meadowPushers.push([localPosition.x, localPosition.y, localPosition.z, .8]);
     for (const p of snapshot.players || []) { if (meadowPushers.length >= 4) break; if (p.id !== playerId && p.role === 'hero' && p.position) meadowPushers.push([p.position[0], p.position[1], p.position[2], .8]); }
     meadow.update(dt, camera, {pushers: meadowPushers}); oreGlint.update(dt, camera);
+    const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
+    skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
     renderer.render(scene, camera);
     frameMetrics.record('frameCpu',performance.now()-frameStarted);
@@ -1415,7 +1419,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1443,7 +1447,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

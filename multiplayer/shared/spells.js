@@ -20,6 +20,7 @@ export const SPELLS = Object.freeze([
   {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
   // Growth Wave: drag a band and a rectangle of trees rises along it (shared/grove-growth.js).
   {id:'wave',label:'Growth Wave',cost:30,target:'line',icon:'⁂'},
+  {id:'rainfall',label:'Rainfall',cost:30,target:'point',icon:'☂'}, // world-wide rain: groves bloom faster, Heroes mend
   // Bloom spells open as the world fills with life (shared/bloom.js).
   {id:'spring',label:'Life Spring',cost:16,target:'point',icon:'❀',bloom:1},
   {id:'blessing',label:'Blessing',cost:20,target:'point',icon:'✦',bloom:2},
@@ -57,7 +58,7 @@ export const SPELL_TARGET_SHAPES = Object.freeze({
   grove: { r: 6.4, sites: true, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*3.9).toFixed(3),+(Math.sin(i*Math.PI*2/5)*3.9).toFixed(3)]) }, ring: { r: 7, treeRing: 5.9, trees: 8, sites: true },
   wave: { line: true, band: 3, sites: true },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
-  spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 },
+  spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 }, rainfall: { r: 9 },
   // Ents wake standing trees: Awaken snaps to the nearest tree within reach; Wild Awakening takes up to three in its circle.
   awaken: { r: 1.5, reach: ENT.awakenRadius, count: 1 }, wildwake: { r: ENT.wildRadius, count: ENT.wildCount },
 });

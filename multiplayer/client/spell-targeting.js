@@ -443,6 +443,13 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       aS(halo, 0.06, PAL.star, OK());
       cross(R * 0.3); moteField(26, R, PAL.star, 1.6, 0.14, 73);
     },
+    rainfall(R) { // gathering storm: slow water rims, falling streaks and a cloud ring hanging overhead
+      gS(wave(R, 30, 0.05, 1, 200), 0.08, PAL.water, { flow: 0.25 }); gS(circ(R * 0.7, 72), 0.04, PAL.ice, { dash: 1.4, flow: -0.4, fine: true });
+      for (let i = 0; i < 10; i++) { const a = (i * TAU) / 10 + 0.2, q = R * (i % 2 ? 0.45 : 0.82); gS(drop(Math.cos(a) * q, Math.sin(a) * q, Math.PI / 2, 0.7), 0.05, PAL.water); }
+      const g = G(0, 0), cloud = []; for (let i = 0; i <= 40; i++) { const a = (i * TAU) / 40, r = 2.4 + 0.35 * Math.sin(a * 5); cloud.push([g[0] + Math.cos(a) * r, g[1] + 6, g[2] + Math.sin(a) * r]); }
+      aS(cloud, 0.08, PAL.ice, OK());
+      cross(R * 0.2); moteField(48, R, PAL.water, -3, 0.14, 89);
+    },
     quake(R) { // concentric fault rings with jagged cracks running out from the centre
       const r = rng(79); for (const [q, w] of [[1, 0.08], [0.7, 0.05], [0.4, 0.045]]) gS(wave(R * q, 14, 0.06, q * 3, 140), w, q === 1 ? PAL.crystal : PAL.amethyst, { flow: q === 1 ? 0.4 : -0.3, fine: q !== 1 });
       for (let i = 0; i < 7; i++) { const a = (i * TAU) / 7 + 0.3; gS(jag(Math.cos(a) * 0.5, Math.sin(a) * 0.5, Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95, 8, 0.4, r), 0.055, PAL.crystal, { prop: true, flow: 1.2 }); }
