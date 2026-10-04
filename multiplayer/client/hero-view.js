@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {cloneSkinnedAsset as clone} from './clone-skinned-asset.js';
 import {setWeaponGrip, updateWeaponPresentation} from './asset-pose.js';
 import {SIEGEBIRD_RELOAD} from './siegebird-reload.js';
 

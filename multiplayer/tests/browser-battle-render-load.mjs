@@ -6,10 +6,12 @@ import {createEnemy} from '../shared/combat.js';
 import {writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {here} from './browser-acceptance-lib.mjs';
-const sim=createSimulation({seed:41});for(let i=0;i<32;i++)sim.addPlayer({id:'render'+i});
+import assert from 'node:assert/strict';
+const sim=createSimulation({legacyBattle:true,seed:41});for(let i=0;i<32;i++)sim.addPlayer({id:'render'+i});
 sim.command('render0',{type:'battle',action:'start',seq:1});const state=sim.adventureWorld();
 for(let i=0;i<4;i++){state.tick=i*900;stepBattle(state,{createEnemy,terrainHeight,nextId:(s,p)=>p+(++s.idCounter)},[]);}
 state.tick+=240;
+assert.equal(state.players.length,32);assert.equal(state.enemies.length,32,'do not silently benchmark six bots after home-base changes');
 for(const [i,p] of state.players.entries()){const x=(i%8-3.5)*2,z=12-Math.floor(i/8)*2;p.position=[x,terrainHeight(state,x,z),z];p.side=i%2?'party':'rivals';p.yaw=Math.PI;p.tool=['axe','pick','hammer','crossbow','bow'][i%5];}
 state.players[0].position=[0,terrainHeight(state,0,20),20];state.players[0].yaw=0;
 for(const [i,e] of state.enemies.entries()){const x=(i%8-3.5)*2,z=3-Math.floor(i/8)*2;e.position=[x,terrainHeight(state,x,z),z];e.yaw=0;}
@@ -24,7 +26,7 @@ try{
  await page.route('**/tests/battle-render-load.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="game"></canvas><script type="module">
  import {createGame} from '/client/game.js';
  window.measure={submit:[],gpu:[],pending:[],backend:null,gpuSupported:false,frames:0};
- window.profileRender=(renderer,scene,camera)=>{const m=window.measure,gl=renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+ window.profileRender=(renderer,scene,camera)=>{window.renderScene=scene; const m=window.measure,gl=renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
  if(!m.backend){const debug=gl.getExtension('WEBGL_debug_renderer_info');m.backend=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);m.gpuSupported=!!ext;}
  if(ext)for(let i=m.pending.length-1;i>=0;i--){const q=m.pending[i];if(gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE)){if(!gl.getParameter(ext.GPU_DISJOINT_EXT))m.gpu.push(gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6);gl.deleteQuery(q);m.pending.splice(i,1);}}
  const q=ext&&++m.frames%15===0&&m.pending.length<4?gl.createQuery():null;if(q)gl.beginQuery(ext.TIME_ELAPSED_EXT,q);
@@ -44,7 +46,10 @@ try{
  record('startup-profile','measured',{topSelfMs:[...totals].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([frame,us])=>({frame,ms:us/1000}))});
  for(const role of ['hero','god']){
   await page.evaluate(role=>{window.game.setRole(role);if(role==='god')window.game.zoomBy(8);window.measure.submit=[];window.measure.gpu=[];},role);
+  await profiler.send('Profiler.start');
   await page.waitForTimeout(12000);
+  const steady=await profiler.send('Profiler.stop');writeFileSync(join(here,role+'.cpuprofile'),JSON.stringify(steady.profile));
+  record('scene-'+role,'measured',await page.evaluate(()=>window.renderScene.children.map(root=>{let meshes=0,triangles=0,skinned=0;root.traverseVisible(n=>{if(n.isMesh){meshes++;skinned+=!!n.isSkinnedMesh;triangles+=(n.geometry.index?.count??n.geometry.attributes.position?.count??0)/3*(n.isInstancedMesh?n.count:1);}});return{name:root.name,type:root.type,meshes,triangles,skinned};}).filter(r=>r.meshes).sort((a,b)=>b.meshes-a.meshes)));
   const result=await page.evaluate(()=>{const stats=a=>{a=[...a].sort((a,b)=>a-b);return {samples:a.length,p50:a[Math.floor(a.length*.5)]??null,p95:a[Math.floor(a.length*.95)]??null,p99:a[Math.floor(a.length*.99)]??null,max:a.at(-1)??null};};const d=window.game.diagnostics(),m=window.measure;return {backend:m.backend,gpuSupported:m.gpuSupported,renderSubmitMs:stats(m.submit),gpuMs:stats(m.gpu),cpu:d.cpuTimings,calls:d.calls,triangles:d.triangles,geometries:d.geometries,textures:d.textures,heroes:d.heroes,creatures:d.creatures,world:d.world,fire:d.fire,effects:d.effects};});
   record('full-world-'+role,page.errors.length?'fail':'pass',{...result,fixture:'32 players /32 battle bots;20Hz moving snapshots; no networking or authority stepping',capture:await shot(page,'battle-full-'+role),errors:page.errors});
  }
