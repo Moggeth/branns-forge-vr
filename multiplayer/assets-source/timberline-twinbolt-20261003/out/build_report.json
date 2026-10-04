@@ -2,10 +2,10 @@
  "builder": "build_timberline.py",
  "blender": "4.5.14 LTS",
  "ballista": {
-  "bytes": 1728076,
+  "bytes": 1736156,
   "triangles": {
-   "LOD0": 15640,
-   "LOD1": 4758,
+   "LOD0": 15530,
+   "LOD1": 4816,
    "other": 0
   },
   "materials": 7,
@@ -94,7 +94,7 @@
     "bytes": 6236
    }
   ],
-  "nodes": 111
+  "nodes": 118
  },
  "bolts": {
   "bytes": 554752,
