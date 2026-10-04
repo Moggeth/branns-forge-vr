@@ -19,23 +19,23 @@ OUT = arg('--out', SRC)
 ONLY = arg('--only')
 
 # ---------------------------------------------------------------- species
-# Blender space (Z up). Heights are in authored tree metres; the crown is fitted to the contract height afterwards.
+# Blender space (Z up): crown radii are (x, y, z=vertical). Heights are in authored tree metres; the crown is fitted to the contract height afterwards.
 SPECIES = {
     'tree': dict(  # Orchard apple: low, broad, rounded crown on a few spreading scaffold limbs, apples on the shell
         leaf_cell=0, limbs=5, limb_elev=(24, 40), limb_len=(2.1, 2.6), limb_radius=.11, upturn=.3, droop=0.0,
         child=(3, 4), child_len=(.45, .6), twigs=(3, 5), twig_len=(.32, .45), leader=.35,
-        crown=(2.75, 1.15, 2.6), crown_center=(.17, -.14, 3.85), clusters=330, card=(.82, 1.08), fruit=26,
-        leaf_tint=(1.0, 1.0, 1.0), seed=11),
+        crown=(2.55, 2.45, 1.5), crown_center=(.17, -.14, 4.1), clusters=330, card=(.82, 1.08), fruit=26,
+        leaf_tint=(1.0, 1.0, 1.0), seed=11, roots=(6, .55, .75, .2)),
     'tree_b': dict(  # English oak: broader, irregular, layered; heavy horizontal limbs
         leaf_cell=1, limbs=6, limb_elev=(18, 38), limb_len=(2.4, 3.1), limb_radius=.12, upturn=.4, droop=0.0,
         child=(3, 5), child_len=(.42, .58), twigs=(3, 5), twig_len=(.3, .45), leader=.7,
-        crown=(2.9, 1.45, 2.9), crown_center=(.09, -.3, 4.0), clusters=380, card=(.9, 1.15), fruit=34, fruit_style='acorn',
-        leaf_tint=(1.0, 1.0, 1.0), seed=23),
+        crown=(2.7, 2.7, 1.8), crown_center=(.09, -.3, 4.35), clusters=380, card=(.9, 1.15), fruit=34, fruit_style='acorn',
+        leaf_tint=(1.0, 1.0, 1.0), seed=23, roots=(7, .62, .85, .21)),
     'tree_young': dict(  # Silver birch: slender, upright, airy with gently drooping tips
         leaf_cell=2, limbs=7, limb_elev=(48, 66), limb_len=(1.2, 1.7), limb_radius=.05, upturn=.1, droop=.35,
         child=(2, 3), child_len=(.4, .55), twigs=(2, 4), twig_len=(.28, .38), leader=.9,
-        crown=(1.35, 1.0, 1.35), crown_center=(.02, -.1, 2.85), clusters=210, card=(.6, .8), fruit=44, fruit_style='catkin',
-        leaf_tint=(1.0, 1.0, 1.0), seed=37, bark='birch'),
+        crown=(1.3, 1.3, 1.25), crown_center=(.02, -.1, 3.05), clusters=210, card=(.6, .8), fruit=44, fruit_style='catkin',
+        leaf_tint=(1.0, 1.0, 1.0), seed=37, bark='birch', roots=(5, .3, .42, .09)),
 }
 LOD = dict(cluster_scale=.34, card_scale=1.55, sides=4, twigs=False)
 
@@ -66,7 +66,7 @@ def paint_leaf_atlas(size=1024):
         }[species]
         # Twig: a gently curved stem from the bottom centre toward the top.
         stem = [(.5 + .04 * math.sin(t * 2.4 + seed), .96 - .84 * t) for t in np.linspace(0, 1, 40)]
-        for (sx, sy) in stem:
+        for (sx, sy) in [(.5 + .04 * math.sin(t * 2.4 + seed), .96 - .84 * t) for t in np.linspace(0, 1, 220)]:  # dense: a solid stem, not beads
             d = np.hypot(xx - sx, yy - sy); a = smooth(.012, .006, d)
             out[..., :3] = np.where(a[..., None] > out[..., 3:4], np.array([.28, .2, .12]), out[..., :3])
             out[..., 3] = np.maximum(out[..., 3], a)
@@ -185,6 +185,25 @@ def tube(mesh, pts, radii, sides, bark_v=0.0):
     for s in range(sides): faces.append((last + s, last + s + 1, tip))
     mesh.add(verts, faces, uvs)
 
+# ---------------------------------------------------------------- root flare
+def root_flare(spec, base_r, lod, rng, tint=(1, 1, 1)):
+    """Rounded buttress roots: each starts buried in the trunk, swells out of it right at the soil line, runs along
+    the ground and dives under it, so the trunk spreads into the earth instead of standing on flat wedges."""
+    roots = Mesh(); count, h0, reach, thick = spec['roots']; sides = 5 if lod else 8; segs = 6 if lod else 12
+    for k in range(count):
+        az = (k + rng.uniform(-.3, .3)) / count * math.tau + spec['seed'] * .37
+        L = reach * rng.uniform(.75, 1.15); h = h0 * rng.uniform(.8, 1.15); rb = thick * rng.uniform(.85, 1.1)
+        pts, radii = [], []
+        for i in range(segs + 1):
+            t = i / segs; a = az + .2 * math.sin(t * 2.6 + k) * t
+            d = base_r * .3 + L * t ** .85
+            pts.append(Vector((math.cos(a) * d, math.sin(a) * d, h * (1 - t) ** 3 - .15 * t ** 1.4)))
+            radii.append(max(.012, rb * min(1, .5 + 2.2 * t) * (1 - .85 * t ** .9)))
+        n0 = len(roots.f); tube(roots, pts, radii, sides)
+        for fi in range(n0, len(roots.f)):  # soil contact: darker where the root meets the ground
+            roots.col[fi] = [(lambda g: (tint[0] * g, tint[1] * g * .96, tint[2] * g * .9, 1))(.6 + .4 * min(1, max(0, (roots.v[vi].z + .02) / .3))) for vi in roots.f[fi]]
+    return roots
+
 # ---------------------------------------------------------------- crown growth
 def grow(spec, trunk_top, trunk_r, first_limb, lod, rng):
     sides = LOD['sides'] if lod else 6
@@ -239,8 +258,8 @@ def grow(spec, trunk_top, trunk_r, first_limb, lod, rng):
 def foliage(spec, tips, lod, rng):
     leaves = Mesh(); C = Vector(spec['crown_center']); R = Vector(spec['crown'])
     cell = spec['leaf_cell']; u0, v0 = (cell % 2) * .5, 1 - (cell // 2 + 1) * .5
-    count = int(spec['clusters'] * (LOD['cluster_scale'] if lod else 1))
-    card_scale = LOD['card_scale'] if lod else 1
+    count = int(spec['clusters'] * (LOD['cluster_scale'] if lod else 1.3))  # near kit: more, smaller sprays read finer up close
+    card_scale = LOD['card_scale'] if lod else .82
     # cluster centres: around branch tips (most), plus shell fill so the silhouette is full and rounded
     centres = []
     for i in range(count):
@@ -257,6 +276,7 @@ def foliage(spec, tips, lod, rng):
         rel = Vector(((c.x - C.x) / R.x, (c.y - C.y) / R.y, (c.z - C.z) / R.z))
         lim = 1.0 + .16 * math.sin(math.atan2(rel.y, rel.x) * 5 + rel.z * 3)
         if rel.length > lim: rel = rel.normalized() * lim
+        if rel.z < -.45: rel.z = -.45 - .08 * rng.random()  # lifted skirt: a Hero walks under the crown, not through it
         c = Vector((C.x + rel.x * R.x, C.y + rel.y * R.y, C.z + rel.z * R.z))
         centres.append((c, rel))
     for c, rel in centres:
@@ -300,8 +320,8 @@ def fruit_set(spec, tips, rng, count):  # apples, acorns or catkins on the crown
             if style == 'apple':
                 q = Vector((v.x, v.y, v.z * .88 - .1 * (1 - abs(v.z)) * (v.z > .6)))  # dimple at the top
                 red = (.42 + .2 * sun, .018 + .03 * (1 - blush) + .03 * sun, .012)  # linear: deep apple red
-                yel = (.55, .36, .04)
-                k = .25 + .55 * blush + .3 * sun
+                yel = (.6, .26, .02)
+                k = min(1, .78 + .2 * blush + .1 * sun)
                 col = (red[0] * k + yel[0] * (1 - k), red[1] * k + yel[1] * (1 - k), red[2] * k + yel[2] * (1 - k), 1)
             elif style == 'acorn':  # glossy nut under a rough scaly cap
                 cap = v.z > .25
@@ -368,6 +388,13 @@ def build(variant, lod, atlas_arr, birch_arr):
     if spec.get('bark') == 'birch' and bark and bark.use_nodes:
         for n in bark.node_tree.nodes:
             if n.type == 'TEX_IMAGE': n.image = birch_img
+    # Roots: replace the flat wedge flares with rounded buttresses (the stump keeps them; the trunk ring is untouched)
+    old_roots = bpy.data.objects['Roots']; roots_mat = old_roots.active_material; bpy.data.objects.remove(old_roots, do_unlink=True)
+    base = [v for v in tv if v.z < min(x.z for x in tv) + .02]; base_r = sum((v.x ** 2 + v.y ** 2) ** .5 for v in base) / len(base)
+    tc = trunk.data.color_attributes[0].data if trunk.data.color_attributes else []
+    tint = tuple(sum(c.color[i] for c in tc) / max(1, len(tc)) for i in range(3)) if len(tc) else (1, 1, 1)  # match trunk bark tone
+    roots_ob = root_flare(spec, base_r, lod, random.Random(spec['seed'] * 5 + (1 if lod else 0)), tint).build('Roots', roots_mat)
+    bpy.context.scene.collection.objects.link(roots_ob); roots_ob.parent = tree
     branches, tips = grow(spec, top, top_r, first_limb, lod, rng)
     rng_leaf = random.Random(spec['seed'] * 7 + (1 if lod else 0))
     leaves = foliage(spec, tips, lod, rng_leaf)
