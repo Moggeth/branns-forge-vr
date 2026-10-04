@@ -1,0 +1,2 @@
+import {launch,BASE,record,shot,save} from './browser-acceptance-lib.mjs';
+const {browser,page}=await launch({viewport:{width:800,height:450}});try{await page.goto(`${BASE}/tests/crowd-render.html`);await page.waitForFunction(()=>window.ready,null,{timeout:120000});record('crowd-render',page.errors.length?'fail':'pass',{...await page.evaluate(()=>window.result),capture:await shot(page,'crowd-render'),errors:page.errors});save('crowd-render');if(page.errors.length)process.exitCode=1;}finally{await browser.close();}
