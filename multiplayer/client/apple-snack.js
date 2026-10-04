@@ -49,15 +49,15 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
  const moteMat = new T.MeshBasicMaterial({color: 0xffe9a0, transparent: true, opacity: .9, blending: T.AdditiveBlending, depthWrite: false});
  function pool(geo, mat, n, name) { const m = new T.InstancedMesh(geo, mat, n); m.name = name; m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(T.DynamicDrawUsage); group.add(m); return {mesh: m, list: [], cap: n}; }
  const chunkMat = new T.MeshStandardMaterial({color: 0xffffff, roughness: .55});
- const chunks = pool(crumbGeo, chunkMat, 40, 'AppleChunks'); chunks.coloured = true; chunks.mesh.setColorAt(0, new T.Color()); chunks.mesh.instanceColor.setUsage(T.DynamicDrawUsage);
- const SKIN = new T.Color(.5, .035, .02), FLESH = new T.Color(.86, .7, .38), SEED = new T.Color(.2, .085, .03);
- const crumbs = pool(crumbGeo, crumbMat, 48, 'AppleCrumbs'), juice = pool(dropGeo, juiceMat, 48, 'AppleJuice'), leaves = pool(leafGeo, leafMat, 24, 'AppleLeaves'), motes = pool(dropGeo, moteMat, 24, 'HealMotes');
+ const chunkGeo = new T.DodecahedronGeometry(1, 0), chunks = pool(chunkGeo, chunkMat, 40, 'AppleChunks'); chunks.coloured = true; chunks.mesh.setColorAt(0, new T.Color()); chunks.mesh.instanceColor.setUsage(T.DynamicDrawUsage);
+ const SKIN = new T.Color(.42, .03, .02), FLESH = new T.Color(.74, .55, .22), SEED = new T.Color(.16, .07, .025);
+ const crumbs = pool(crumbGeo, crumbMat, 48, 'AppleCrumbs'), juice = pool(dropGeo, juiceMat, 64, 'AppleJuice'), leaves = pool(leafGeo, leafMat, 24, 'AppleLeaves'), motes = pool(dropGeo, moteMat, 24, 'HealMotes');
  let rng = 1; const rand = () => ((rng = Math.imul(rng ^ (rng >>> 15), 2246822507) ^ 0x9e3779b9) >>> 0)/4294967296;
  function emit(p, item) { if (p.list.length >= p.cap) p.list.shift(); p.list.push(item); }
  function stepPool(p, dt, fn) {
   let n = 0;
   for (let i = p.list.length - 1; i >= 0; i--) { const q = p.list[i]; q.age += dt; if (q.age >= q.life) { p.list.splice(i, 1); continue; } }
-  for (const q of p.list) { fn(q, dt); tmpM.compose(q.p, q.q || tmpQ.identity(), tmpV.setScalar(q.s*(q.fade ? Math.min(1, (q.life - q.age)/.35) : 1))); if (q.sx) tmpM.scale(tmpV2.set(q.sx, 1, 1)); p.mesh.setMatrixAt(n++, tmpM); }
+  for (const q of p.list) { fn(q, dt); tmpM.compose(q.p, q.q || tmpQ.identity(), tmpV.setScalar(q.s*(q.fade ? Math.min(1, (q.life - q.age)/.35) : 1))); if (q.sx) tmpM.scale(tmpV2.set(q.sx, 1, 1)); if (q.sv) tmpM.scale(q.sv); p.mesh.setMatrixAt(n++, tmpM); }
   p.mesh.count = n; if (n) p.mesh.instanceMatrix.needsUpdate = true;
   if (p.coloured && n) { let k = 0; for (const q of p.list) p.mesh.setColorAt(k++, q.color); p.mesh.instanceColor.needsUpdate = true; }
  }
@@ -68,9 +68,9 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
    emit(crumbs, {p: at.clone().add(v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(.02)), v, s: .0035 + rand()*.004, age: 0, life: 1.4 + rand()*1.2, fade: true,
     q: new T.Quaternion().setFromEuler(new T.Euler(rand()*6, rand()*6, rand()*6)), spin: v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(20)}); }
  }
- function juiceBurst(at, dir, n = 10, power = 1) {
+ function juiceBurst(at, dir, n = 10, power = 1, size = 1) {
   for (let i = 0; i < n; i++) { const v = v3([rand() - .5, rand() - .3, rand() - .5]).multiplyScalar(1.2*power).addScaledVector(dir, (1 + rand()*1.5)*power);
-   emit(juice, {p: at.clone(), v, s: .002 + rand()*.0025, age: 0, life: .45 + rand()*.4, fade: true, sx: 1.6}); }
+   emit(juice, {p: at.clone(), v, s: (.002 + rand()*.0025)*size, age: 0, life: .45 + rand()*.4, fade: true, sx: 1.6}); }
  }
  function leafFlutter(at, n = 5) {
   for (let i = 0; i < n; i++) emit(leaves, {p: at.clone().add(v3([rand() - .5, rand()*.4, rand() - .5]).multiplyScalar(.7)), v: v3([rand() - .5, -.2, rand() - .5]), s: .035 + rand()*.02, age: 0, life: 3 + rand()*2, fade: true,
@@ -78,11 +78,13 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
  }
  // A bolt bursts an apple: chunks of skin and flesh, seeds and a spray of juice fan out along the bolt's line.
  function appleBurst(at, dir, radius = .08) {
-  for (let i = 0; i < 22; i++) { const skin = i%3 === 0, seed = i >= 20;
+  for (let i = 0; i < 28; i++) { const skin = i%3 === 0, seed = i >= 25;
    const v = v3([rand() - .5, rand() - .3, rand() - .5]).multiplyScalar(4.5).addScaledVector(dir, 2 + rand()*5);
-   emit(chunks, {p: at.clone().add(v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(radius)), v, s: seed ? .006 : radius*(.12 + rand()*.2), age: 0, life: 2.2 + rand()*1.6, fade: true,
-    q: new T.Quaternion().setFromEuler(new T.Euler(rand()*6, rand()*6, rand()*6)), spin: v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(26), color: seed ? SEED : skin ? SKIN : FLESH, sx: skin ? .45 : 1}); }
-  juiceBurst(at, dir, 30, 2.2); crumbBurst(at, dir, 16, 1.8);
+   // irregular pulp lumps; skin comes off as thin curled flakes, seeds as small dark drops
+   const sv = seed ? v3([.6, 1, .6]) : skin ? v3([1, .22 + rand()*.15, .7 + rand()*.5]) : v3([.6 + rand()*.6, .5 + rand()*.5, .7 + rand()*.6]);
+   emit(chunks, {p: at.clone().add(v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(radius)), v, s: seed ? .0045 : radius*(.1 + rand()*.16), sv, age: 0, life: 2.2 + rand()*1.6, fade: true,
+    q: new T.Quaternion().setFromEuler(new T.Euler(rand()*6, rand()*6, rand()*6)), spin: v3([rand() - .5, rand() - .5, rand() - .5]).multiplyScalar(26), color: seed ? SEED : skin ? SKIN : FLESH}); }
+  juiceBurst(at, dir, 22, 2.2, 2.2); juiceBurst(at, dir, 16, 1.2, 1); crumbBurst(at, dir, 16, 1.8);
  }
  function healMotes(at) {
   for (let i = 0; i < 9; i++) emit(motes, {p: at.clone().add(v3([(rand() - .5)*.32, (rand() - .7)*.12, (rand() - .5)*.12])), v: v3([(rand() - .5)*.06, .1 + rand()*.12, (rand() - .5)*.06]), s: .003 + rand()*.0035, age: -rand()*.25, life: 1.1 + rand()*.6, fade: true});
@@ -341,5 +343,5 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   attachTrees: treeView => mask.attach(treeView),
   stats: () => ({drops: drops.size, held: !!held, crumbs: crumbs.list.length, chunks: chunks.list.length, juice: juice.list.length, leaves: leaves.list.length, growing: growing.count, masked: mask.stats()}),
   dispose() { disposeHeld(); for (const e of drops.values()) e.model.dispose(); drops.clear(); for (const f of flying) f.dispose(); group.removeFromParent(); anchor.removeFromParent(); mask.dispose();
-   for (const g of [crumbGeo, dropGeo, leafGeo]) g.dispose(); for (const m of [crumbMat, chunkMat, juiceMat, leafMat, moteMat, growMaterial]) m.dispose(); }};
+   for (const g of [crumbGeo, chunkGeo, dropGeo, leafGeo]) g.dispose(); for (const m of [crumbMat, chunkMat, juiceMat, leafMat, moteMat, growMaterial]) m.dispose(); }};
 }

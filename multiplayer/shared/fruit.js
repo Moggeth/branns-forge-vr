@@ -173,7 +173,7 @@ export function shaftEnds(d) {
 function lieDown(d, ground) {
  const s = STICKS[d.stick], flat = Math.hypot(d.dir[0], d.dir[2]) > .05 ? norm([d.dir[0], 0, d.dir[2]]) : [1, 0, 0];
  if (!s) { // a half settles on whichever face it fell nearer: flat face down (centre at ground level) or dome down
-  if (d.half) { const up = d.cut[1] > .1; d.cut = [0, up ? 1 : -1, 0]; d.position[1] = ground + (up ? d.radius*.97 : .004); return; }
+  if (d.half) { const up = d.cut[1] > -.25; /* a dome-down half rocks and settles cut-side up a little more often than not */ d.cut = [0, up ? 1 : -1, 0]; d.position[1] = ground + (up ? d.radius*.97 : .004); return; }
   d.position[1] = ground + d.radius; return; }
  const back = s.length - s.apple, lift = Math.asin(clamp((d.radius - .006)/back, 0, .9));
  d.dir = norm([flat[0]*Math.cos(lift), Math.sin(lift), flat[2]*Math.cos(lift)]); d.position[1] = ground + d.radius;

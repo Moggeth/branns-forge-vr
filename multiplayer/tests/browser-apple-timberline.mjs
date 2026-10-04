@@ -86,7 +86,9 @@ try {
  assert.ok(await walkTo(half.position, 1.2), 'walked to a half');
  recording = true; await look(half.position, 16); await frames(20); await shot(page, 'timberline-apple-half');
  const hp0 = (await harness()).me.hp;
- await page.keyboard.press('KeyE'); await frames(45);
+ // E takes the nearest pickup first: the Orchard's gift basket can sit closer than the half, so press until it's in hand.
+ for (let k = 0; k < 4 && (await harness()).s.fruit.drops.find(d => d.id === half.id)?.heldBy !== id; k++) { await look(half.position, 4); await page.keyboard.press('KeyE'); await frames(30); }
+ await frames(15);
  assert.equal((await harness()).s.fruit.drops.find(d => d.id === half.id)?.heldBy, id, 'took the half'); record('take-half', 'pass');
  await look([half.position[0], half.position[1] + 1.6, half.position[2] - 6], 12); await frames(15);
  await capture(); for (let b = 0; b < 2; b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
