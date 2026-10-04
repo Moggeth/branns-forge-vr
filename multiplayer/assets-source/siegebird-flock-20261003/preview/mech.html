@@ -20,7 +20,7 @@ const {visual} = prepareAsset(gltf, 'crossbow'); scene.add(visual); visual.updat
 const native = visual.getObjectByName('Pinion').parent;
 if (q.get('only')) { const keep = q.get('only').split(','); native.children.forEach(c => { if (c.name && !keep.some(k => c.name.startsWith(k))) c.visible = false; }); }
 const focus = native.localToWorld(new THREE.Vector3(...(q.get('focus') || '.17,.6,0').split(',').map(Number)));
-const dirs = {right: [1, 0, 0], left: [-1, 0, 0], top: [0, 0, 1], below: [0, 0, -1], rear: [0, -1, .3], three: [1, -.6, .5]};
+const dirs = {right: [1, 0, 0], left: [-1, 0, 0], top: [0, 0, 1], below: [0, 0, -1], rear: [0, -1, .3], three: [1, -.6, .5], front3: [-1, .9, .45], left3: [-1, -.5, .35]};
 const d = native.localToWorld(new THREE.Vector3(...dirs[q.get('view') || 'right'])).sub(native.localToWorld(new THREE.Vector3())).normalize();
 const times = (q.get('times') || 'Infinity,.12,.24,.36,.48,.6').split(',').map(Number);
 const cols = Math.min(3, times.length), rows = Math.ceil(times.length / cols), W = innerWidth / cols, H = innerHeight / rows;

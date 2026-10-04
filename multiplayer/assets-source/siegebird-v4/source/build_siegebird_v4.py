@@ -35,7 +35,7 @@ SIGHT_REAR = Vector((0.0, 0.425, 0.2524)); SIGHT_FRONT = Vector((0.0, 0.900, 0.2
 
 # ---------------------------------------------------------------- materials
 MAT_DEF = {
-    "Walnut":    dict(c="4a2a18", m=0.0, r=0.45),
+    "Walnut":    dict(c="4a2a18", m=0.0, r=0.38),
     "Heartwood": dict(c="6a3419", m=0.0, r=0.40),
     "Iron":      dict(c="2a2b2e", m=1.0, r=0.55),
     "Brass":     dict(c="c9963f", m=1.0, r=0.30),
@@ -47,6 +47,7 @@ MAT_DEF = {
     "Kingfisher":dict(c="0b6377", m=0.0, r=0.24),
     "Ember":     dict(c="c9542a", m=0.0, r=0.32),
     "Crystal":   dict(c="7cc4ff", m=0.0, r=0.05, e="2f8fff", es=1.3),
+    "EyeCrystal":dict(c="1c4cb4", m=0.0, r=0.05, e="2f8fff", es=0.9),
     "Cord":      dict(c="d8c49a", m=0.0, r=0.70),
     "Feather":   dict(c="ffffff", m=0.0, r=0.48),
     "Ash":       dict(c="c9a477", m=0.0, r=0.50),
@@ -95,6 +96,46 @@ def wood_image(name, size, light, dark, rings, seed):
     img.pixels.foreach_set(px.ravel()); img.pack()
     return img
 
+def grain_image(name, size, light, mid, line, seed):
+    """Long-grain gunstock wood: V runs along the grain, U across it. Gently wandering grain lines, broad
+    colour streaks, pores drawn out along the grain. Periodic in both directions so it tiles."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    u = (np.arange(size) / size)[None, :]; v = (np.arange(size) / size)[:, None]
+    ph = rng.uniform(0, TAU, 6)
+    wob = 0.010 * np.sin(TAU * v + ph[0]) + 0.006 * np.sin(TAU * (3 * v + 2 * u) + ph[1]) + 0.003 * np.sin(TAU * (7 * v + 5 * u) + ph[2])
+    x = u + wob
+    fine = (0.5 + 0.5 * np.sin(TAU * x * 64 + 1.4 * np.sin(TAU * (3 * u + 2 * v) + ph[3]))) ** 7
+    mid_l = (0.5 + 0.5 * np.sin(TAU * x * 17 + ph[4])) ** 3
+    streak = 0.5 + 0.5 * np.sin(TAU * (x * 5 + 0.25 * np.sin(TAU * v + ph[5])))
+    pores = np.repeat(rng.random((size // 32, size)), 32, axis=0)
+    pores = np.roll(pores, rng.integers(0, 32), axis=0); pores = (pores > 0.82) * (0.5 + 0.5 * np.sin(TAU * (v * 32 + u * 3)) ** 2)
+    C = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)])
+    L, M, D = C(light), C(mid), C(line)
+    col = L * (1 - streak[..., None] * 0.65) + M * (streak[..., None] * 0.65)
+    col = col * (1 - 0.22 * mid_l[..., None]) + D * 0.22 * mid_l[..., None]
+    col = col * (1 - 0.45 * fine[..., None]) + D * 0.45 * fine[..., None]
+    col = col * (1 - 0.30 * pores[..., None]) + D * 0.30 * pores[..., None]
+    img = bpy.data.images.new(name, size, size, alpha=False)
+    px = np.ones((size, size, 4), dtype=np.float32); px[..., :3] = np.clip(col, 0, 1)
+    img.pixels.foreach_set(px.ravel()); img.pack(); img.colorspace_settings.name = 'sRGB'
+    return img
+
+GRAIN_MATS = ("Walnut", "Heartwood", "Leather")
+
+def assign_grain_uvs(ob, mb):
+    """Wood runs along the stock (native +Y), and down the grips; U across the grain on each facet."""
+    uv = ob.data.uv_layers.active.data
+    for fi, face in enumerate(ob.data.polygons):
+        if mb.m[fi] not in GRAIN_MATS: continue
+        pts = [mb.v[i] for i in mb.f[fi]]; c = sum(pts, Vector()) / len(pts)
+        n = (pts[1] - pts[0]).cross(pts[2] - pts[0])
+        down = c.z < -0.04 and (0.25 < c.y < 0.34 or 0.68 < c.y < 0.75)
+        for vi, li in zip(mb.f[fi], face.loop_indices):
+            p = mb.v[vi]
+            if down: uv[li].uv = ((p.x + p.y) * 3.0, p.z * 1.6)
+            else: uv[li].uv = ((p.z if abs(n.x) >= abs(n.z) else p.x) * 3.0 + 0.31 * (n.x < 0), p.y * 1.4)
+
 def make_materials():
     for name, d in MAT_DEF.items():
         m = bpy.data.materials.new("SB_" + name); m.use_nodes = True
@@ -106,8 +147,8 @@ def make_materials():
         if name in ("Kingfisher", "Ember", "Horn"):
             p.inputs["Coat Weight"].default_value = 0.6; p.inputs["Coat Roughness"].default_value = 0.08
         B.MATS[name] = m
-    B.textured(B.MATS["Walnut"], wood_image("SB_WalnutGrain", 1024, "5e3a23", "462919", 70, 7))
-    B.textured(B.MATS["Heartwood"], wood_image("SB_HeartwoodGrain", 512, "9a5630", "52260f", 40, 11))
+    B.textured(B.MATS["Walnut"], grain_image("SB_WalnutGrain", 1024, "6e4628", "472a17", "1f1009", 7))
+    B.textured(B.MATS["Heartwood"], grain_image("SB_HeartwoodGrain", 512, "8e4a2a", "5c2816", "260c05", 11))
     B.textured(B.MATS["Ash"], wood_image("SB_AshGrain", 256, "dcc196", "a07c50", 30, 5))
     B.textured(B.MATS["Feather"], feather_image())
 B.make_materials = make_materials
@@ -293,8 +334,8 @@ HULL = [
 ]
 HEAD_KEYS = [(0.950, 0.056, 0.180, 0.044), (0.974, 0.062, 0.197, 0.058), (0.998, 0.058, 0.2010, 0.080),
              (1.020, 0.044, 0.1990, 0.104), (1.034, 0.031, 0.1955, 0.120)]
-BEAK_KEYS = [(1.028, 0.031, 0.1960, 0.121), (1.048, 0.021, 0.1930, 0.138), (1.068, 0.014, 0.1905, 0.150),
-             (1.086, 0.0085, 0.1870, 0.157), (1.100, 0.0040, 0.1810, 0.160)]
+BEAK_KEYS = [(1.028, 0.032, 0.1965, 0.118), (1.046, 0.026, 0.1955, 0.130), (1.062, 0.019, 0.1930, 0.140),
+             (1.074, 0.015, 0.1905, 0.148)]
 
 def hull_ring(wt, top, ws, zs, wl, zl, wk, bot):
     """Keel, belly, lower and upper flank (a sculpted crease between them), shoulder strake, flat top."""
@@ -397,9 +438,18 @@ def build_body():
     gor = keyed_rings([(0.946, 0.060, 0.181, 0.040), (0.958, 0.062, 0.191, 0.048)], falcon_ring, 1)
     gor = [[(x * 1.06, y, z + 0.001) for x, y, z in r] for r in gor]
     loft_mat(st, gor, lambda k, y: "Steel", cap="Steel")
-    # hooked tip of the upper mandible
-    prism(st, [(1.094, 0.1895), (1.108, 0.1880), (1.117, 0.1800), (1.116, 0.1720), (1.110, 0.1760), (1.100, 0.1830)],
-          (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), -0.0118, 0.0118, "Brass", 0.0008, 1)
+    # iron cere where the beak meets the skull, the falcon's hooked upper mandible curling down past the
+    # seated bolt tip, and a short iron lower mandible
+    cere = keyed_rings([(1.022, 0.034, 0.1975, 0.114), (1.031, 0.032, 0.1970, 0.119)], falcon_ring, 1)
+    loft_mat(st, [[(x * 1.05, y, z + 0.0008) for x, y, z in r] for r in cere], lambda k, y: "Iron", cap="Iron")
+    def hook_sec(t):
+        w = lerp(0.0150, 0.0012, t ** 1.1); h = lerp(0.0205, 0.0016, t ** 0.8)
+        return [(0.0, -h), (w * 0.55, -h * 0.7), (w, h * 0.2), (w * 0.55, h), (-w * 0.55, h), (-w, h * 0.2), (-w * 0.55, -h * 0.7)]
+    sweep([(0, 1.066, 0.1695), (0, 1.084, 0.1690), (0, 1.100, 0.1640), (0, 1.111, 0.1540), (0, 1.115, 0.1420), (0, 1.110, 0.1310)],
+          hook_sec, lambda k, y: "Brass", "Brass")
+    sweep([(0, 1.030, 0.1260), (0, 1.052, 0.1350), (0, 1.072, 0.1420)],
+          lambda t: [(0.0, -lerp(0.006, 0.0015, t)), (lerp(0.018, 0.006, t), 0.0), (lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)),
+                     (-lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)), (-lerp(0.018, 0.006, t), 0.0)], lambda k, y: "Iron", "Iron")
     for sx in (-1, 1):
         # tomial edge: an iron line along the jaw
         jaw = [Vector((sx * (w * 0.97 if w * 0.97 > 0.011 else 0.0112), y, bot + (top - bot) * 0.40)) for y, w, top, bot in BEAK_KEYS[:-1]]
@@ -407,11 +457,11 @@ def build_body():
         # deep-set crystal eye under a blued-steel brow
         eye = Vector((sx * 0.0520, 0.990, 0.160)); n = Vector((sx * 0.92, 0.24, 0.20)).normalized()
         U = n.orthogonal().normalized(); V = n.cross(U); ax = (tuple(n), tuple(U), tuple(V))
-        lathe(st, [(-0.003, 0.0), (-0.003, 0.0102), (0.0008, 0.0106), (0.0024, 0.0088), (0.0024, 0.0)], tuple(eye), ax, "Brass", 20)
-        lathe(st, [(0.0, 0.0080), (0.0030, 0.0066), (0.0052, 0.0032), (0.0060, 0.0)], tuple(eye + n * 0.0012), ax, "Crystal", 16)
-        lathe(st, [(0.0, 0.0034), (0.0010, 0.0028), (0.0015, 0.0)], tuple(eye + n * 0.0066), ax, "Horn", 10)
-        prism(st, [(0.958, 0.1835), (0.998, 0.1840), (1.016, 0.1765), (1.002, 0.1790), (0.962, 0.1900)], (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0),
-              sx * 0.040, sx * 0.0585, "Steel", 0.0008, 1)
+        lathe(st, [(-0.003, 0.0), (-0.003, 0.0100), (0.0008, 0.0104), (0.0022, 0.0088), (0.0022, 0.0)], tuple(eye), ax, "Iron", 20)
+        lathe(st, [(0.0, 0.0080), (0.0030, 0.0066), (0.0052, 0.0032), (0.0060, 0.0)], tuple(eye + n * 0.0012), ax, "EyeCrystal", 16)
+        lathe(st, [(0.0, 0.0040), (0.0010, 0.0033), (0.0016, 0.0)], tuple(eye + n * 0.0064), ax, "Horn", 12)
+        prism(st, [(0.958, 0.1790), (0.996, 0.1805), (1.016, 0.1725), (1.000, 0.1750), (0.962, 0.1880)], (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0),
+              sx * 0.036, sx * 0.0625, "Steel", 0.0008, 1)
         # swept steel crest blades, kept under the moon hood's view
         for k, (dz, L) in enumerate(((0.0, 0.056), (-0.007, 0.046))):
             Uc = Vector((sx * 0.30, -0.95, 0.02)).normalized(); Nc = Vector((sx * 0.45, 0.0, 1.0)).normalized(); Vc = Nc.cross(Uc).normalized()
@@ -667,25 +717,26 @@ def build_knob_trigger():
     ob = t.to_object("Trigger", (0, 0, 0)); ob.location = G2B(B.TRIGGER_PIVOT); B.OBJ["Trigger"] = ob
 
 def build_bolt():
-    """Songbird bolt (local: nock at 0, tip at +0.526 along +Y, axis at the origin): a brass swallow-tail nock,
+    """Songbird bolt (local: nock at 0, tip at +0.352 along +Y, axis at the origin; short enough that the bird lowers it
+    onto the rail behind the moon hood): a brass swallow-tail nock,
     a barrelled ash shaft with a kingfisher cresting, three cambered songbird-feather fletches (the cock
-    feather up), a brass ferrule and four-sided bodkin, and a resonance-crystal point. The bodkin stays four
-    sided at 45 degrees so it clears the head's bolt groove when seated."""
+    feather up), a brass ferrule and a slim needle bodkin, and a resonance-crystal point. Everything stays
+    within 7 mm of the axis so the seated bolt clears the rail groove."""
     b = MB()
     lathe(b, [(0.0, 0.0), (0.0, 0.0050), (0.0035, 0.0068), (0.0150, 0.0066), (0.0165, 0.0058), (0.0165, 0.0)], (0, 0, 0), 'y', "Brass", 16)
     for sx in (-1, 1):                                                       # swallow-tail horns either side of the string slot
         prism(b, [(-0.0015, 0.0), (0.006, 0.0), (0.004, 0.0040), (-0.0030, 0.0062)], (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0),
               sx * 0.0020, sx * 0.0058, "Brass", 0.0004, 1)
-    lathe(b, [(0.0160, 0.0), (0.0160, 0.0056), (0.12, 0.0060), (0.28, 0.0063), (0.4420, 0.0057), (0.4420, 0.0)], (0, 0, 0), 'y', "Ash", 14)
-    for y0, y1, m in ((0.136, 0.150, "Kingfisher"), (0.153, 0.156, "Brass"), (0.160, 0.163, "Ember"), (0.024, 0.028, "Brass")):
+    lathe(b, [(0.0160, 0.0), (0.0160, 0.0056), (0.10, 0.0060), (0.20, 0.0061), (0.2900, 0.0057), (0.2900, 0.0)], (0, 0, 0), 'y', "Ash", 14)
+    for y0, y1, m in ((0.122, 0.134, "Kingfisher"), (0.137, 0.140, "Brass"), (0.144, 0.147, "Ember"), (0.024, 0.028, "Brass")):
         lathe(b, [(y0, 0.0), (y0, 0.0064), (y1, 0.0064), (y1, 0.0)], (0, 0, 0), 'y', m, 14)
     for k, a in enumerate((math.pi / 2, math.pi / 6, 5 * math.pi / 6)):
         R = Vector((math.cos(a), 0, math.sin(a))); U = Vector((0, -1, 0)); V = -R; N = U.cross(V)
-        feather(b, Vector((0, 0.132, 0)) + R * 0.0058, U, V, N, 0.100, 0.0128, -0.0005, 0.0010, 2 if k == 0 else 4,
+        feather(b, Vector((0, 0.118, 0)) + R * 0.0058, U, V, N, 0.088, 0.0125, -0.0005, 0.0010, 2 if k == 0 else 4,
                 edge=None, camber=0.0, droop=0.0)
-    lathe(b, [(0.440, 0.0), (0.440, 0.0068), (0.446, 0.0080), (0.452, 0.0070), (0.458, 0.0080), (0.464, 0.0064), (0.464, 0.0)], (0, 0, 0), 'y', "Brass", 16)
-    lathe(b, [(0.462, 0.0), (0.462, 0.0062), (0.478, 0.0118), (0.492, 0.0100), (0.502, 0.0060), (0.502, 0.0)], (0, 0, 0), 'y', "Brass", 4, flat=True, phase=math.pi / 4)
-    lathe(b, [(0.498, 0.0), (0.498, 0.0058), (0.506, 0.0066), (0.526, 0.0)], (0, 0, 0), 'y', "Crystal", 6, flat=True)
+    lathe(b, [(0.284, 0.0), (0.284, 0.0064), (0.290, 0.0070), (0.296, 0.0064), (0.302, 0.0070), (0.306, 0.0062), (0.306, 0.0)], (0, 0, 0), 'y', "Brass", 16)
+    lathe(b, [(0.304, 0.0), (0.304, 0.0058), (0.322, 0.0070), (0.334, 0.0060), (0.340, 0.0042), (0.340, 0.0)], (0, 0, 0), 'y', "Brass", 4, flat=True)
+    lathe(b, [(0.336, 0.0), (0.336, 0.0044), (0.341, 0.0050), (0.352, 0.0)], (0, 0, 0), 'y', "Crystal", 6, flat=True)
     ob = b.to_object("Bolt"); ob.location = G2B((0, DRAW_REAR, RAIL_Z)); B.OBJ["Bolt"] = ob
     assign_feather_uvs(ob, b, 0)
 
@@ -733,7 +784,7 @@ def main():
     out = argv[argv.index("--out") + 1] if "--out" in argv else os.path.join(HERE, '..', 'out', 'siegebird-v4.glb')
     B.setup_scene()
     body = build_body(); body.extend(build_sight())
-    B.OBJ["Body"] = body.to_object("Body", (0, 0, 0))
+    B.OBJ["Body"] = body.to_object("Body", (0, 0, 0)); assign_grain_uvs(B.OBJ["Body"], body)
     B.OBJ["Wings"] = build_wings()
     build_moving()
     # marker: the peep and moon hood are modelled into Body, so client/siegebird-sight.js keeps only its reticle
