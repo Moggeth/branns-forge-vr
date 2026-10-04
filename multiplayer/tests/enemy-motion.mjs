@@ -81,12 +81,13 @@ const finiteNode = n => [...n.position.toArray(), ...n.quaternion.toArray()].eve
 const wpos = (n, v = new THREE.Vector3()) => n.getWorldPosition(v);
 
 // ---------------------------------------------------------------- rig proof
-test('skeleton.glb hierarchy matches the rig contract (two-bone legs, Root pelvis)', () => {
+test('skeleton.glb hierarchy matches the rig contract (two-bone legs, elbows, jaw, Root pelvis; posed procedurally, no clips)', () => {
   const {json} = buildRig('skeleton.glb', 'skeleton', 1.7), N = json.nodes, idx = n => N.findIndex(x => x.name === n && (json.skins[0].joints.includes(N.indexOf(x))));
   const child = (p, c) => N[idx(p)].children.includes(idx(c));
-  for (const [p, c] of [['Root', 'Torso'], ['Torso', 'Head'], ['Torso', 'LeftArm'], ['Torso', 'RightArm'], ['RightArm', 'RightHand'], ['RightHand', 'WeaponTip'], ['Root', 'LeftLeg'], ['LeftLeg', 'LeftKnee'], ['LeftKnee', 'LeftFoot'], ['Root', 'RightLeg'], ['RightLeg', 'RightKnee'], ['RightKnee', 'RightFoot']]) assert.ok(child(p, c), `${p} > ${c}`);
-  const names = json.animations.map(a => a.name).sort();
-  assert.deepEqual(names, ['attack', 'hop_left', 'hop_right', 'idle', 'stagger', 'turn_left', 'turn_right', 'walk']);
+  for (const [p, c] of [['Root', 'Torso'], ['Torso', 'Head'], ['Head', 'HeadJaw'], ['Torso', 'LeftArm'], ['LeftArm', 'LeftForearm'], ['LeftForearm', 'LeftHand'],
+    ['Torso', 'RightArm'], ['RightArm', 'RightForearm'], ['RightForearm', 'RightHand'], ['RightHand', 'WeaponTip'],
+    ['Root', 'LeftLeg'], ['LeftLeg', 'LeftKnee'], ['LeftKnee', 'LeftFoot'], ['Root', 'RightLeg'], ['RightLeg', 'RightKnee'], ['RightKnee', 'RightFoot']]) assert.ok(child(p, c), `${p} > ${c}`);
+  assert.equal((json.animations || []).length, 0);
 });
 test('golem.glb is rigid siblings without knee/foot joints (no leg IK claimed)', () => {
   const {visual, json} = buildRig('golem.glb', 'golem', 2.8);
@@ -143,16 +144,16 @@ function runSkeleton({missing = [], frames = 480, walk = true, hits = [], attack
   const legs = ['Left', 'Right'].map(s => ({s, thigh: named(rig, `${s}Leg`), knee: named(rig, `${s}Knee`), foot: named(rig, `${s}Foot`)}));
   const embed = new THREE.Object3D(); embed.position.set(.01, .1, .02); named(rig, 'Torso').add(embed); // bone-local arrow
   const embedLocal = embed.position.clone();
-  let current = 'idle'; rig.actions.idle.play();
+  let current = 'idle';
   const lengths = legs.map(l => [wpos(l.thigh).distanceTo(wpos(l.knee)), wpos(l.knee).distanceTo(wpos(l.foot))]);
   const prevQ = new Map(), stats = {maxStep: 0, maxFootErr: 0, maxLenErr: 0, minKnee: Math.PI, frames: 0};
   for (let f = 0; f < frames; f++) {
     const tick = 1000 + f;
     if (f === attackAt) entry.data.attackTick = tick;
     for (const h of hits) if (f === h.frame) { entry.data.hurtTick = tick; if (h.event) noteEnemyHit(entry, {...h.event, tick}); }
-    const want = tick - (entry.data.hurtTick ?? -1e9) < 22 ? 'stagger' : tick - entry.data.attackTick < 28 ? 'attack' : walk ? 'walk' : 'idle';
-    if (want !== current) { rig.actions[current].fadeOut(.18); rig.actions[want].reset().fadeIn(.18).play(); if (want !== 'walk' && want !== 'idle') { rig.actions[want].setLoop(THREE.LoopOnce, 1); rig.actions[want].clampWhenFinished = true; } current = want; }
-    if (walk && current === 'walk') entry.root.position.x += 1.4 / 60;
+    // Mirrors shared/enemy-behaviour.js: no steering while winding up or staggered, 2 m/s otherwise.
+    current = tick - (entry.data.hurtTick ?? -1e9) < 22 ? 'stagger' : tick - entry.data.attackTick < 34 ? 'attack' : walk ? 'walk' : 'idle';
+    if (walk && current === 'walk') entry.root.position.x += 2 / 60;
     entry.root.position.y = height(entry.root.position.x, entry.root.position.z);
     const rootBefore = [...entry.root.position.toArray(), ...entry.root.quaternion.toArray()];
     rig.mixer.update(1 / 60);
@@ -228,7 +229,7 @@ test('part-local recoil: head hit snaps head back (layer delta bounded), arm hit
 });
 test('golem: telegraph raises arms forward-up, slam lands at strike tick, entry.root untouched, rigid legs not IK-driven', () => {
   const {entry, rig} = makeEnemy('golem', 'g1', 3, 2);
-  rig.actions.idle.play();
+  rig.actions.idle?.play();
   const armL = named(rig, 'ArmL'), hand = rig.visual.getObjectByName('ForearmHandL');
   const st0 = applyEnemyMotion(entry, {tick: 0, dt: 1 / 60, height});
   assert.equal(st0.legs.length, 0);
@@ -289,7 +290,7 @@ test('no drift: with the mixer stopped the layer reuses its stored base each fra
 
 test('hit events without tick: direction/part applied whether event arrives before or after hurtTick sync', () => {
   for (const order of ['eventFirst', 'snapshotFirst']) {
-    const {entry, rig} = makeEnemy('skeleton', 'e5'); rig.actions.idle.play();
+    const {entry, rig} = makeEnemy('skeleton', 'e5'); rig.actions.idle?.play();
     for (let tick = 0; tick < 5; tick++) { rig.mixer.update(1 / 60); applyEnemyMotion(entry, {tick, dt: 1 / 60, height}); }
     if (order === 'eventFirst') noteEnemyHit(entry, {part: 'leftArm', normal: [1, 0, 0]});
     entry.data.hurtTick = 5; rig.mixer.update(1 / 60); applyEnemyMotion(entry, {tick: 5, dt: 1 / 60, height});
@@ -301,7 +302,7 @@ test('hit events without tick: direction/part applied whether event arrives befo
 });
 test('unknown platform (forge floor above terrain): feet stay at root height, no pelvis plunge', () => {
   const low = () => -3; // terrain far below the simulation-owned root
-  const {entry, rig} = makeEnemy('skeleton', 'e6'); rig.actions.idle.play(); entry.root.position.y = 0.5;
+  const {entry, rig} = makeEnemy('skeleton', 'e6'); rig.actions.idle?.play(); entry.root.position.y = 0.5;
   let st; for (let tick = 0; tick < 60; tick++) { rig.mixer.update(1 / 60); st = applyEnemyMotion(entry, {tick, dt: 1 / 60, height: low}); }
   entry.root.updateWorldMatrix(true, true);
   for (const leg of st.legs) { const y = wpos(leg.foot.node).y - leg.ankleH - leg.lift; assert.ok(Math.abs(y - .5) < .01, `sole ${y}`); }
@@ -312,7 +313,7 @@ test('unknown platform (forge floor above terrain): feet stay at root height, no
 let perf;
 test('budget: 48 skeletons + 16 golems for 600 frames (layer only)', () => {
   const actors = new Map(), rigs = [];
-  for (let i = 0; i < 64; i++) { const kind = i % 4 === 3 ? 'golem' : 'skeleton'; const e = makeEnemy(kind, `e${i}`, (i % 8) * 2, Math.floor(i / 8) * 2); actors.set(`e:${i}`, e.entry); rigs.push(e.rig); (e.rig.actions.walk || e.rig.actions.idle).play(); }
+  for (let i = 0; i < 64; i++) { const kind = i % 4 === 3 ? 'golem' : 'skeleton'; const e = makeEnemy(kind, `e${i}`, (i % 8) * 2, Math.floor(i / 8) * 2); actors.set(`e:${i}`, e.entry); rigs.push(e.rig); (e.rig.actions.walk || e.rig.actions.idle)?.play(); }
   for (let f = 0; f < 30; f++) { rigs.forEach(r => r.mixer.update(1 / 60)); updateEnemyMotion(actors, {tick: f, dt: 1 / 60, height}); }
   global.gc?.(); const heap0 = process.memoryUsage().heapUsed; let layer = 0, worst = 0;
   for (let f = 0; f < 600; f++) {
