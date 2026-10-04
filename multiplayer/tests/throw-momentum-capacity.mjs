@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {reclaimDepletedDeposits} from '../shared/resources.js';
 const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-6,`${actual} != ${expected}`);
-function fixture({x=10,z=-5,above=0}={}){const initial=createSimulation();initial.addPlayer({id:'p'});const state=initial.checkpoint();state.players[0].position=[x,terrainHeight(state,x,z)+above,z];state.players[0].tool='flask';const sim=loadSimulation(state);let seq=0;return {sim,command:m=>sim.command('p',{...m,seq:++seq})};}
+function fixture({x=10,z=-5,above=0}={}){const initial=createSimulation({legacyBattle:true,legacyBattle:true});initial.addPlayer({id:'p'});const state=initial.checkpoint();state.players[0].position=[x,terrainHeight(state,x,z)+above,z];state.players[0].tool='flask';const sim=loadSimulation(state);let seq=0;return {sim,command:m=>sim.command('p',{...m,seq:++seq})};}
 const input=(move={x:0,z:0},extra={})=>({type:'input',move,yaw:0,...extra});
 function pour(f,extra={}){const p=f.sim.snapshot().players[0];assert.equal(f.command({type:'action',action:'pour',origin:p.position.map((n,i)=>n+(i===1?1.2:0)),direction:[0,0,-1],...extra}).ok,true);return f.sim.snapshot().projectiles.at(-1);}
 test('Emberdew inherits authoritative walk and jump motion while ignoring forged velocities',()=>{
@@ -30,7 +30,7 @@ test('movement inheritance is limited to fuel, preserving flame and arrow launch
   assert.deepEqual(f.sim.snapshot().projectiles.at(-1).velocity,[0,0,-speed]);
  }
 });
-function fullOre(role='god'){const initial=createSimulation();initial.addPlayer({id:'p',role});const saved=initial.checkpoint();saved.deposits=Array.from({length:80},(_,i)=>({id:`oldOre${i}`,x:(i%8)*3-12,z:Math.floor(i/8)*3-12,kind:'stone',hits:3,maxHits:3,depleted:true}));return loadSimulation(saved);}
+function fullOre(role='god'){const initial=createSimulation({legacyBattle:true,legacyBattle:true});initial.addPlayer({id:'p',role});const saved=initial.checkpoint();saved.deposits=Array.from({length:80},(_,i)=>({id:`oldOre${i}`,x:(i%8)*3-12,z:Math.floor(i/8)*3-12,kind:'stone',hits:3,maxHits:3,depleted:true}));return loadSimulation(saved);}
 test('depleted tombstones free crystal slots without restoring resources or mining twice',()=>{
  const sim=fullOre();const before=sim.snapshot();assert.equal(sim.command('p',{type:'cast',seq:1,spell:'crystal',point:[10,0,10]}).ok,true);const s=sim.snapshot();assert.equal(s.deposits.length,1);assert.equal(s.deposits[0].depleted,false);assert.deepEqual(s.pickups,before.pickups);assert.deepEqual(s.players[0].resources,before.players[0].resources);assert.deepEqual(s.edits,before.edits);
  assert.equal(sim.command('p',{type:'cast',seq:1,spell:'crystal',point:[10,0,10]}).code,'duplicate_sequence');assert.equal(loadSimulation(sim.checkpoint()).snapshot().deposits.length,1);

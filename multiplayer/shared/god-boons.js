@@ -1,4 +1,4 @@
-import {battleActive} from './battle-mode.js';
+import {battleActive,battleSkirmish} from './battle-mode.js';
 // God spells feed the Heroes. Every cast leaves something a Hero can use: real materials to mine or pick
 // up, fruit that heals, or a short boon. Pure and deterministic (authority state only, no clock or RNG).
 // Feeding is its own reward: nothing here pays the God back.
@@ -68,7 +68,7 @@ export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId
   for (const hero of state.players) {
     if (hero.role !== 'hero') continue;
     const allied=!battleActive(state)||(hero.side||'party')===(caster.side||'party');
-    if (spell === 'quake' && (!battleActive(state)||!allied) && flat(hero.position, at) <= BOONS.quake.radius) ctx.damageHero(state, hero, BOONS.quake.heroDamage, events);
+    if (spell === 'quake' && (!battleSkirmish(state)||!allied) && flat(hero.position, at) <= BOONS.quake.radius) ctx.damageHero(state, hero, BOONS.quake.heroDamage, events);
     if (spell === 'blessing' && allied && flat(hero.position, at) <= BOONS.blessing.radius) {
       hero.hp = Math.min(100, hero.hp + BOONS.blessing.heal);
       hero.charge = {hits: Math.max(BOONS.blessing.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.blessing.ticks, hero.charge?.until || 0)};
@@ -76,7 +76,7 @@ export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId
     }
     if (spell === 'lightning' && flat(hero.position, at) <= BOONS.charge.radius) {
       // A near miss hurts, but the Hero's weapon drinks the charge.
-      if(!battleActive(state)||!allied)ctx.damageHero(state, hero, BOONS.charge.strikeDamage, events);
+      if(!battleSkirmish(state)||!allied)ctx.damageHero(state, hero, BOONS.charge.strikeDamage, events);
       if(!allied)continue;
       hero.charge = {hits: Math.max(BOONS.charge.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.charge.ticks, hero.charge?.until || 0)};
       gift('charge', hero.id, [...hero.position], {hits: hero.charge.hits, until: hero.charge.until});

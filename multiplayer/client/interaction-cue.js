@@ -187,6 +187,13 @@ function structureCue(b, self, snapshot, keys, make) {
 
 function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) {
   const id = hit.targetId, pt = hit.point, p = self.position;
+  const homeBase=snapshot.battle?.v===2&&snapshot.battle.bases?.find(b=>b.id===id||b.parts?.some(q=>q.id===id));
+  if(homeBase){
+    const part=homeBase.parts.find(q=>q.id===id)||homeBase,friendly=homeBase.side===(self.side==='rivals'?'rivals':'party'),name=homeBase.side==='party'?'Dawnhold':'Grumblekeep';
+    const kind=part===homeBase?'heart':part.kind,shielded=part===homeBase&&homeBase.parts.some(q=>q.kind==='pylon'&&q.hp>0);
+    const verb=friendly?`Defend this ${kind}`:shielded?'Shielded: break the pylons first':`Attack this ${kind}`;
+    return make('structure',friendly||shielded?'friendly':'ready',id,`${name} ${kind}`,verb,friendly||shielded?'':keys.strike,`${Math.ceil(part.hp)} / ${part.maxHp} health`,{done:part.hp,total:part.maxHp});
+  }
   const base=snapshot.battle?.status==='running'&&snapshot.battle.bases?.find(b=>b.id===id&&b.hp>0);
   if(base){
     const friendly=base.side===(self.side==='rivals'?'rivals':'party');
