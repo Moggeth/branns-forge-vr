@@ -458,7 +458,16 @@ const SETTINGS = mesh(), moved = [];
 const crownGroups = clusters(crown), crownPos = Float32Array.from(crown.position);
 const resonance = inputMesh('ResonanceCrystal'), resonanceGroups = clusters(resonance), resonancePos = Float32Array.from(resonance.position);
 // Arm crystals: each stands exactly on the ridge normal, its base in a cup sized to it, four claws closing on its sides.
-const cups = [];
+const cups = [], clawGaps = [];
+function crystalDistance(pos, index, verts, point) { // nearest distance from a point to one crystal's triangles
+  const mine = new Set(verts), tri = new THREE.Triangle(), q = new Vector3(); let best = Infinity;
+  for (let t = 0; t < index.length; t += 3) {
+    if (!mine.has(index[t])) continue;
+    tri.set(new Vector3().fromArray(pos, index[t] * 3), new Vector3().fromArray(pos, index[t + 1] * 3), new Vector3().fromArray(pos, index[t + 2] * 3));
+    best = Math.min(best, tri.closestPointToPoint(point, q).distanceTo(point));
+  }
+  return best;
+}
 for (const g of crownGroups) {
   const ax = Math.abs(g.c.x);
   if (ax < .06 || ax > .2 || Math.abs(g.c.z) > .01) continue; // arm ridge crystals only
@@ -481,9 +490,16 @@ for (const g of crownGroups) {
   const X = new Vector3(0, 0, 1).addScaledVector(n, -n.z).normalize(), Z = new Vector3().crossVectors(X, n);
   for (let j = 0; j < 4; j++) { // four claws: from the cup rim up to the crystal's own flank
     const a = j / 4 * Math.PI * 2 + Math.PI / 4, dir = X.clone().multiplyScalar(Math.cos(a)).addScaledVector(Z, Math.sin(a));
-    const r0 = .0063 * k, r1 = flank(dir) - .0002; // wire() lifts its centre one radius along dir
-    SETTINGS.append(wire({steps: 4, sides: 4, radius: .0011, sink: 0, curve: t => ({
-      p: p.clone().addScaledVector(n, .0046 + t * (.0068 + seat)).addScaledVector(dir, lerp(r0, r1, t)), n: dir.clone()})}));
+    // Close the claw onto the crystal: start clear of it (beyond its extent toward dir) and step inward by the measured
+    // surface gap until the tube presses 0.1 mm into the face. Each step is at most the gap, so it never passes through.
+    const r0 = .0063 * k, tipH = .0046 + .0068 + seat;
+    const tipGap = r => crystalDistance(crownPos, crown.index, g.v, p.clone().addScaledVector(n, tipH).addScaledVector(dir, r + .0011)) - .0011;
+    let r1 = flank(dir) + .002;
+    for (let it = 0; it < 24; it++) { const gap = tipGap(r1); if (gap < .00005) break; r1 -= gap + .0001; }
+    const clawPoint = t => p.clone().addScaledVector(n, .0046 + t * (.0068 + seat)).addScaledVector(dir, lerp(r0, r1, t));
+    SETTINGS.append(wire({steps: 4, sides: 4, radius: .0011, sink: 0, curve: t => ({p: clawPoint(t), n: dir.clone()})}));
+    // Contact record: surface gap between each claw tip and its crystal (negative = pressed in).
+    clawGaps.push(+tipGap(r1).toFixed(5));
   }
 }
 // Heart gems: thinnest axis straight out of the socket face, centred on the bezel, narrowed to clear the wire.
@@ -616,6 +632,8 @@ set('Wood_Ash', 'wood_color.jpg', 'wood_normal.jpg', .5);
 set('Leather_Wrap', 'leather_color.jpg', 'leather_normal.jpg', .9);
 set('Brass_Trim', 'brass_color.jpg', 'brass_normal.jpg', .55);
 
+// Every claw must touch its crystal (within 0.15 mm, never sunk deeper).
+if (clawGaps.length !== 24 || clawGaps.some(g => Math.abs(g) > .00015)) throw new Error(`claws not touching crystals: ${clawGaps}`);
 // Bounds contract.
 const box = new THREE.Box3();
 for (const m of meshes) { const a = accessors[m.primitives[0].attributes.POSITION]; box.expandByPoint(new Vector3(...a.min)); box.expandByPoint(new Vector3(...a.max)); }
@@ -635,4 +653,4 @@ const bh = Buffer.alloc(8); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x
 writeFileSync(output, Buffer.concat([header, jh, json, bh, bin]));
 const tris = Object.fromEntries(meshes.map(m => [m.name, accessors[m.primitives[0].indices].count / 3]));
 console.log(JSON.stringify({output: path.basename(output), bytes: 12 + 16 + json.length + bin.length, triangles: tris, total: Object.values(tris).reduce((a, b) => a + b, 0),
-  bounds: {min: box.min.toArray(), max: box.max.toArray()}, movedGems: moved}, null, 1));
+  bounds: {min: box.min.toArray(), max: box.max.toArray()}, movedGems: moved, clawGaps}, null, 1));
