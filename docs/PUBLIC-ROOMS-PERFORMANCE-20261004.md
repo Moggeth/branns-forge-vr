@@ -6,8 +6,8 @@ Baseline: `origin/main` at `0aa1770`. Branch: `codex/public-rooms-performance`.
 
 Public-world discovery, the mobile-first Opus browser, optional Battle controls,
 32-human room capacity, compatibility negotiation, bounded voice and exact recovery
-deltas are integrated on PR #39. Release verification is in progress; production
-status must be checked before calling this live.
+deltas shipped in PR #39, merged as d529ffe. Production was verified on
+2026-10-04 at09:03UTC: https://branns-forge-multiplayer.vercel.app.
 
 The initial Opus call hit its session quota after 2.482 seconds. After the supported
 reset, the completed commission verified personal `fauxgrady@gmail.com`, Claude.ai
@@ -183,4 +183,19 @@ New lessons: use actual model world elevation for sanctuary ray fixtures; y=0 as
 - Authentication downgrade review found old tabs could replace a new member in
   small rooms; fixed in f00e283 with13 focused checks in1.841s. Preserve the old
   connection and require refresh when credential capability would decrease.
-- Frontend publication and hosted UI acceptance are pending this checkpoint.
+- GitHub PR checks passed139s; merged main CI passed, then automatic production
+  deployment run37190787468 succeeded (job69s, production step36s).
+- Actual hosted UI acceptance passed15.172s with no endpoint injection or gameplay
+  mocks: create, public browse/roster/join, choose side, bot replication, disable,
+  solo Battle, portrait/landscape host confirmation and guest menus. No browser
+  errors. The public JS bundle contains the verified d529ffe build revision.
+- Physical phone, headset and separate-network32-player acceptance remain unverified.
+  The hosted test used two real local browser clients through the production service.
+- A premature screenshot caught the menu fade and appeared transparent; a settled
+  capture at600ms confirmed its actual opaque readable state. Wait for transitions
+  before critiquing screenshot appearance.
+- Merge guard correctly rejected an incorrectly transcribed full commit ID. Obtain
+  exact identifiers from git rev-parse/gh JSON; never reconstruct them from a short
+  hash. The corrected merge matched the reviewed2855b20 head exactly.
+- In Windows PowerShell use rg --glob patterns rather than shell-expanded filename
+  wildcards; the latter can produce misleading path errors.
