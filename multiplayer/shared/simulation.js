@@ -18,6 +18,7 @@ import {strikeWaygate,stepWaygate,restoreWaygate} from './waygate.js';
 import {strikeGeode,stepGeodes,restoreGeodes} from './geode-outcrop.js';
 import {strikeBeacon,stepBeacon,beaconHearth,restoreBeacon} from './watch-beacon.js';
 import {stepHeartstones} from './heartstone.js';
+import {createFruit,fruitStrike,fruitSlice,stepFruit,snackAction,releaseSnack,isFruitDrop,restoreFruit} from './fruit.js';
 import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
@@ -80,7 +81,7 @@ function spawn(state, ignored = '') {
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[]),...(state.settlement?.workers||[]),...(state.awakenedTrees||[]),...(state.wildTrees||[])].flatMap(x=>x.editId?[x.id,x.editId]:[x.id]);
+  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[]),...(state.settlement?.workers||[]),...(state.awakenedTrees||[]),...(state.wildTrees||[]),...(state.fruit?.drops||[])].flatMap(x=>x.editId?[x.id,x.editId]:[x.id]);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
 function damageEnemy(state, enemy, amount, events, ownerId, side) {
@@ -94,7 +95,7 @@ function damageHero(state, hero, amount, events) {
   if (hero.hp <= 0) {
     if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);
     events.push(event('death', hero.position, hero.id));
-    releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
+    releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero); releaseSnack(state,hero);
     const rally=state.inventions?.structures.find(b=>b.id===hero.rally&&b.type==='sanctuary'&&b.hp>0&&b.side===(hero.side||'party'));
     hero.hp = 100; hero.position = rally?[rally.position[0]+2.4,terrainHeight(state,rally.position[0]+2.4,rally.position[2]),rally.position[2]]:beaconHearth(state,terrainHeight)||spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];hero.velocity=[0,0,0]; hero.protectedUntil=state.tick+180;
     events.push({...event('respawn',hero.position,hero.id),protectedUntil:hero.protectedUntil});
@@ -106,14 +107,14 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
   return {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-21,z:11,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:22,z:18,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:24,z:20,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
     {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], fruit: createFruit(), shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
   let fireSampleProvider=null;
   const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext)};
-  const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree};
+  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
+  const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
   const treeIndex = createTreeIndex();
@@ -140,7 +141,7 @@ function instantiate(state) {
     },
     removePlayer(id) {
       const p = player(id); if (!p) return fail('not_joined');
-      releaseHeld(state,p,[0,0,0]); releaseLog(state,p);if(p.heldOre){p.resources[p.heldOre]++;delete p.heldOre;}dropCarried(p);
+      releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p);if(p.heldOre){p.resources[p.heldOre]++;delete p.heldOre;}dropCarried(p);
       state.players.splice(state.players.indexOf(p), 1);
       return ok([event('leave', p.position, id)]);
     },
@@ -177,7 +178,7 @@ function instantiate(state) {
         if (!['hero', 'god'].includes(message.role)) return fail('invalid_role');
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
-          releaseHeld(state,p,[0,0,0]); releaseLog(state,p);
+          releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p);
           p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
@@ -212,9 +213,11 @@ function instantiate(state) {
         if (message.action === 'equip') {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
+          if(message.tool!==p.tool)releaseSnack(state,p);
           p.tool = message.tool; return ok();
         }
         // Held logs own grab/release/stow first; a full hand blocks swings until the log is dropped or stowed.
+        if (message.action === 'snack') return snackAction(state,p,message);
         const logResult=logAction(state,p,message);if(logResult)return logResult;
         if(message.action==='special'&&['axe','pick'].includes(p.tool))reclaimDepletedDeposits(state);
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
@@ -418,6 +421,7 @@ function instantiate(state) {
       renewGeology(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)},events);
       stepVeins(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5),retained:d=>retainedDepositPredicate(state)(d)},events);
       stepCombat(state,combatContext,events);
+      stepFruit(state,{nextId,terrainHeight},events);
       stepFire(state,fireContext,events);
       stepTrees(state,treeContext,treeIndex,events);
       stepSettlement(state,{nextId,terrainHeight,damageEnemy,collapseMinedWall,
@@ -441,7 +445,7 @@ function instantiate(state) {
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
-        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
+        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -568,6 +572,7 @@ export function loadSimulation(saved) {
   state.battle=restoreBattle(saved);
   state.settlement=restoreSettlement(saved.settlement,saved.tick,contentIds,new Set(saved.enemies.map(e=>e.id)));
   state.inventions=restoreInventions(saved.inventions,saved.tick);
+  state.fruit=restoreFruit(saved,contentIds,saved.players);
   for(const b of state.inventions.structures){if(contentIds.has(b.id))throw Error('Duplicate structure');contentIds.add(b.id);}
   state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted,special,editId,vein,respawnTick})=>({id,x,z,kind,hits,maxHits,depleted,...(special?{special}:{}),...(editId?{editId}:{}),...(vein!==undefined?{vein}:{}),...(respawnTick!==undefined?{respawnTick}:{})}));
   state.meteorRewards=copy(meteorRewards);

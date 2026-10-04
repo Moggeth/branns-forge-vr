@@ -43,6 +43,8 @@ export function stepTimberline(s,q,c,events,structureDefs){
   else if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,270,{ownerId:q.owner,side:q.side,tool:'axe'},c,events);
   else c.damageEnemy(s,h.obj,250,events,q.owner,q.side);
  }
+ // The bolts burst apples they hit; the wire cuts every apple it passes in two (shared/fruit.js).
+ if(c.fruitSlice)for(let u=0;u<=1;u+=1/3){const L=a.left.map((x,k)=>x+(b.left[k]-x)*u),R=a.right.map((x,k)=>x+(b.right[k]-x)*u);events.push(...c.fruitSlice(s,L,R,{by:q.owner,push:timberlineLaunch(q).forward,bolts:u?[]:[[a.left,b.left],[a.right,b.right]]}));}
  return s.tick>=q.impactTick;
 }
 
@@ -60,6 +62,9 @@ function sweptHit(a,b,v){for(let k=0;k<=SWEEP_STEPS;k++){const u=k/SWEEP_STEPS,L
 function stepLong(s,q,c,events,structureDefs){
  const t1=(s.tick-q.launchTick-TIMBERLINE_RELEASE_TICKS)/60,t0=Math.max(0,t1-1/60),a=timberlineFlightAt(q,t0),b=timberlineFlightAt(q,t1),hits=[];
  if(Math.abs(b.centre[0])>TIMBERLINE_LONG.reach||Math.abs(b.centre[2])>TIMBERLINE_LONG.reach||b.centre[1]<-60)return true;
+ // The bolts burst apples they hit; the wire cuts every apple it passes in two (shared/fruit.js). Runs before the hits so a
+ // pair that sticks this tick still cuts what it swept through.
+ if(c.fruitSlice){const push=b.centre.map((x,k)=>x-a.centre[k]);for(let u=0;u<=1;u+=1/3){const L=a.left.map((x,k)=>x+(b.left[k]-x)*u),R=a.right.map((x,k)=>x+(b.right[k]-x)*u);events.push(...c.fruitSlice(s,L,R,{by:q.owner,push,bolts:u?[]:[[a.left,b.left],[a.right,b.right]]}));}}
  const near=(x,z,r)=>Math.hypot(x-b.centre[0],z-b.centre[2])<r+2+TIMBERLINE_FLIGHT.speed/60;
  // Use authored volumes, preserving Battle faction protection and objective hits.
  for(const v of worldColliders(s,{terrainHeight:c.terrainHeight,near,exclude:q.structureId})){
