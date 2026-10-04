@@ -12,6 +12,7 @@ import {launch,BASE,record,save,shot} from './browser-acceptance-lib.mjs';
 // The fixture: a loaded Timberline 10 m beyond the Orchard's first apple tree, its rails raised 0.2 rad into the crown.
 const sim = createSimulation({room: 'SOLO'}), s = sim.adventureWorld(); s.tick = 1; s.landmarks = false; s.enemies = [];
 for (const k of Object.keys(s.inventions.stockpiles.party)) s.inventions.stockpiles.party[k] = 60;
+s.inventions.bolts = {party: 8, rivals: 0}; // crafted Timberline bolts on the rack
 const tree = worldTrees(s).find(t => t.id === 'tree1'), ang = Math.atan2(tree.x, tree.z), px = tree.x + Math.sin(ang)*10, pz = tree.z + Math.cos(ang)*10;
 s.inventions.structures.push({id: 'apple-line', type: 'timberline', position: [px, terrainHeight(s, px, pz, false), pz], yaw: Math.atan2(-(tree.x - px), -(tree.z - pz)), hp: 200, maxHp: 200,
  side: 'party', builtTick: 0, readyTick: 0, fireTick: -1000, open: false, charge: 0, armed: false, aimYaw: 0, aimPitch: .2});
