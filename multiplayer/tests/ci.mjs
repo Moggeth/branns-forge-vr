@@ -8,7 +8,7 @@ import {performance} from 'node:perf_hooks';
 
 const suite = [
   'ability-readiness','action-feedback','axe-cleave','axe-luminance','meadow-cover','ore-veins',
-  'timberline-manned','adventure','asset-dependencies','asset-pose','combat',
+  'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',

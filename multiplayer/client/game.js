@@ -701,6 +701,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     settlementVisual.event(event);inventionVisual.event(event);
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
 
+    // A Timberline bolt burying itself: a deep thunk in earth or stone, a thud in a body.
+    if(event.kind==='timberline_embed')materialAudio?.play({...event,kind:'embed',material:event.host==='enemy'?'flesh':'stone',energy:1.6},listenerPose(),snapshot.tick);
     expedition.handleEvent(event);
     const rewardSound=!!rewards.handle(event);
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
@@ -1138,7 +1140,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
-    inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);
+    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
     combat.beginCreatureFrame?.();
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
