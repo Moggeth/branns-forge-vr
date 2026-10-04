@@ -991,7 +991,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
-    aiming=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
+    aiming=false;scoping=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -1041,7 +1041,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}timberlineScope.update(0);inventionVisual.setScoped(null);return;}
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
-    const forecast=timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:snapshot.edits?.length||0});
+    const forecast=timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits});
     timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5});
     // Range under the cross: march the view ray over the shared ground a few times a second.
     if(scopeAmount>0&&now>=scopeRangeAt){scopeRangeAt=now+120;const dir=camera.getWorldDirection(scopeEye);let hit=null,prev=0;for(let d=2;d<=400;d+=d<60?1:3){const y=sightEye.y+dir.y*d,g=terrainHeight(sightEye.x+dir.x*d,sightEye.z+dir.z*d,snapshot.edits,snapshot.tick??Infinity);if(y<=g){let lo=prev,hi=d;for(let i=0;i<6;i++){const m=(lo+hi)/2;if(sightEye.y+dir.y*m<=terrainHeight(sightEye.x+dir.x*m,sightEye.z+dir.z*m,snapshot.edits,snapshot.tick??Infinity))hi=m;else lo=m;}hit=hi;break;}prev=d;}scopeRange=hit?`${Math.round(hit)} m`:'—';}

@@ -148,6 +148,9 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
   if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(owner?.role==='hero')addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
+    // Detachment remaps arrows onto physical remains. Wooden creatures have no torso remains,
+    // so discard any contacts still attached to the dead actor before saves validate their targets.
+    state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
