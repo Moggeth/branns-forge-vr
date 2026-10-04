@@ -1,4 +1,4 @@
-/* Patch notes panel and "What's new" toast. Uses the lobby tokens from lobby.css. */
+/* Patch notes panel (also the "What's new" view on first load of a new version). Uses the lobby tokens from lobby.css. */
 .pn-backdrop {
   position: fixed; inset: 0; z-index: 95; display: grid; place-items: center;
   padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
@@ -72,37 +72,19 @@
 }
 .pn-devnote-label { font-style: normal; font-weight: 700; color: var(--brass-hi, #ecd29a); }
 
-/* ---------------------------------------------------------- What's new toast (lobby only) */
-.pn-toast {
-  position: fixed; z-index: 30; left: 50%; transform: translateX(-50%);
-  bottom: max(16px, env(safe-area-inset-bottom)); width: min(420px, calc(100% - 24px));
-  padding: 14px 16px 12px; border-radius: 14px;
-  background: linear-gradient(180deg, #241d15, #18140f); border: 1px solid rgba(201, 164, 92, .5);
-  box-shadow: 0 16px 50px rgba(0, 0, 0, .55), 0 0 0 1px rgba(127, 182, 232, .08);
-  animation: pn-rise .45s cubic-bezier(.2, .8, .2, 1) both;
-}
-@keyframes pn-rise { from { opacity: 0; transform: translate(-50%, 16px); } }
-body:not([data-phase="lobby"]) .pn-toast { display: none; }
-@media (min-width: 1000px) {
-  /* Beside the centred lobby card instead of over it */
-  .pn-toast { left: auto; right: 24px; bottom: 48px; transform: none; width: min(340px, calc((100% - 600px) / 2)); }
-  @keyframes pn-rise { from { opacity: 0; transform: translateY(16px); } }
-}
-.pn-toast-head { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
-.pn-toast-kicker { font: 700 .72rem/1.4 var(--sans, system-ui); letter-spacing: .1em; text-transform: uppercase; color: var(--mana, #7fb6e8); }
-.pn-toast-patch { font: 600 1.05rem/1.25 var(--serif, Georgia, serif); color: var(--brass-hi, #ecd29a); }
-.pn-toast-list { margin: 0 0 10px; padding-left: 1.1em; font-size: .9rem; color: var(--text, #efe5d1); }
-.pn-toast-list li { margin: 2px 0; }
-.pn-toast-more { color: var(--muted, #b9aa8e); list-style: none; margin-left: -1.1em; font-size: .85rem; }
-.pn-toast-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.pn-toast-actions .btn { min-height: 44px; padding: 8px 16px; }
+.pn-entry-title { margin-bottom: 2px; }
+.pn-entry-date { margin: 0 0 6px; font-size: .78rem; color: var(--muted, #b9aa8e); letter-spacing: .02em; }
+.pn-entry[data-fresh] { background: rgba(127, 182, 232, .07); }
+.pn-foot { display: flex; justify-content: center; padding: 12px 20px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(201, 164, 92, .18); }
+.pn-done { min-width: 200px; }
 
 @media (max-width: 520px) {
   .pn-backdrop { padding: 0; place-items: stretch; }
   .pn-dialog { width: 100%; height: 100%; max-height: none; border-radius: 0; border-left: 0; border-right: 0; }
   .pn-head { padding: max(14px, env(safe-area-inset-top)) 14px 12px; }
   .pn-title { font-size: 1.5rem; }
-  .pn-scroll { padding: 6px 12px max(20px, env(safe-area-inset-bottom)); }
+  .pn-scroll { padding: 6px 12px 16px; }
+  .pn-done { width: 100%; }
   .pn-entry { padding: 10px 12px 2px; }
   .pn-list { font-size: 1rem; }
 }
@@ -112,5 +94,5 @@ body:not([data-phase="lobby"]) .pn-toast { display: none; }
   .pn-head { padding-top: 10px; padding-bottom: 8px; }
   .pn-lede { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .pn-backdrop, .pn-toast { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pn-backdrop { animation: none; } }
 #lobbyPatchNotes, #menuPatchNotes { white-space: nowrap; }

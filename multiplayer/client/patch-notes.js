@@ -1,5 +1,6 @@
 // Patch notes: parses the player-facing entries in multiplayer/patch-notes/, groups them
-// into numbered patches, and shows them in a modal panel plus a one-time "What's new" toast.
+// into numbered patches, and shows them in a modal panel. The first load of a newer version
+// opens it by itself as "What's new", with the newest patch in full.
 // Pure parsing/grouping (parsePatchNote, groupPatches, unseenEntries) needs no DOM so
 // tests/patch-notes.mjs can check every entry under Node.
 //
@@ -186,10 +187,10 @@ function readSeen(storage) {
   try { const raw = storage?.getItem(SEEN_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 function writeSeen(storage, ids) {
-  try { storage?.setItem(SEEN_KEY, JSON.stringify(ids)); } catch { /* private mode: the toast simply shows again */ }
+  try { storage?.setItem(SEEN_KEY, JSON.stringify(ids)); } catch { /* private mode: What's new simply shows again */ }
 }
 
-// entries: parsed entries. mount: where the panel and toast live. Returns {open, close, showWhatsNew, patches}.
+// entries: parsed entries. mount: where the panel lives. Returns {open, close, showWhatsNew, patches, isOpen, root}.
 export function createPatchNotes({entries, mount = document.body, storage = globalThis.localStorage, onOpen, onClose} = {}) {
   const patches = groupPatches(entries);
   const allIds = patches.flatMap(p => p.entries.map(e => e.id));
@@ -206,7 +207,8 @@ export function createPatchNotes({entries, mount = document.body, storage = glob
   const titleWrap = el('div', 'pn-head-text');
   const title = el('h2', 'pn-title', 'Patch Notes');
   title.id = 'pnTitle';
-  titleWrap.append(title, el('p', 'pn-lede', 'Everything that has changed in Brann’s Forge, newest first.'));
+  const lede = el('p', 'pn-lede');
+  titleWrap.append(title, lede);
   const close = el('button', 'btn btn-quiet pn-close', '✕');
   close.type = 'button';
   close.setAttribute('aria-label', 'Close patch notes');
@@ -216,26 +218,33 @@ export function createPatchNotes({entries, mount = document.body, storage = glob
   backdrop.append(dialog);
   mount.append(backdrop);
 
-  let rendered = false;
-  function render() {
-    if (rendered) return;
-    rendered = true;
+  const foot = el('footer', 'pn-foot');
+  const done = el('button', 'btn btn-secondary pn-done', 'Back to the forge');
+  done.type = 'button';
+  foot.append(done);
+  dialog.append(foot);
+
+  // fresh: ids of unseen entries. Their patches start expanded, like the newest patch always does.
+  function render(fresh) {
+    scroller.replaceChildren();
     patches.forEach((p, i) => {
       const box = el('details', 'pn-patch');
-      box.open = i === 0;
+      box.open = i === 0 || p.entries.some(e => fresh.has(e.id));
       const sum = el('summary', 'pn-patch-sum');
       const label = el('span', 'pn-version', `Patch ${p.version}`);
-      const name = el('span', 'pn-headline', p.headline || formatRange(p.from, p.to));
-      const when = el('span', 'pn-date', p.headline ? formatRange(p.from, p.to) : `${p.entries.length} change${p.entries.length === 1 ? '' : 's'}`);
+      const name = el('span', 'pn-headline', p.headline || `Patch of ${formatRange(p.from, p.to)}`);
+      const when = el('span', 'pn-date', `${formatRange(p.from, p.to)} · ${p.entries.length} change${p.entries.length === 1 ? '' : 's'}`);
       sum.append(label, name, when);
       box.append(sum);
       const body = el('div', 'pn-patch-body');
       for (const e of p.entries) {
         const art = el('article', 'pn-entry');
         art.dataset.area = areaSlug(e.area);
+        if (fresh.has(e.id)) art.dataset.fresh = '';
         const h = el('h3', 'pn-entry-title');
         h.append(el('span', 'pn-area', e.area), el('span', 'pn-entry-name', e.title));
-        art.append(h, renderBlocks(e.blocks));
+        const meta = el('p', 'pn-entry-date', formatDate(e.date));
+        art.append(h, meta, renderBlocks(e.blocks));
         body.append(art);
       }
       box.append(body);
@@ -243,9 +252,15 @@ export function createPatchNotes({entries, mount = document.body, storage = glob
     });
   }
 
-  function open() {
-    render();
-    hideToast();
+  // whatsNew: opened by itself on load, titled for the newest patch.
+  function open({whatsNew = false, fresh = []} = {}) {
+    const latest = patches[0];
+    render(new Set(fresh.map(e => e.id)));
+    title.textContent = whatsNew ? 'What’s new' : 'Patch Notes';
+    lede.textContent = whatsNew && latest
+      ? `Patch ${latest.version}${latest.headline ? ` · ${latest.headline}` : ''} · ${formatRange(latest.from, latest.to)}`
+      : 'Everything that has changed in Brann’s Forge, newest first.';
+    done.textContent = whatsNew ? 'Got it' : 'Back to the forge';
     writeSeen(storage, allIds);
     returnFocus = document.activeElement;
     backdrop.hidden = false;
@@ -261,9 +276,11 @@ export function createPatchNotes({entries, mount = document.body, storage = glob
     onClose?.();
   }
   close.addEventListener('click', closePanel);
+  done.addEventListener('click', closePanel);
   backdrop.addEventListener('pointerdown', e => { if (e.target === backdrop) closePanel(); });
   backdrop.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePanel(); return; }
+    e.stopPropagation(); // gameplay never sees keys typed into the panel
+    if (e.key === 'Escape') { e.preventDefault(); closePanel(); return; }
     if (e.key === 'Tab') { // keep focus inside the dialog
       const f = [...dialog.querySelectorAll('button, summary')].filter(n => n.offsetParent !== null);
       if (!f.length) return;
@@ -278,33 +295,13 @@ export function createPatchNotes({entries, mount = document.body, storage = glob
     if (t) { e.preventDefault(); open(); }
   });
 
-  // ---------------------------------------------------------------- What's new toast
-  let toast = null;
-  function hideToast() { toast?.remove(); toast = null; }
+  // The first load of a newer version opens the newest patch in full, no click needed.
   function showWhatsNew() {
     const fresh = unseenEntries(patches, readSeen(storage));
-    if (!fresh.length || toast) return false;
-    const latest = patches[0];
-    toast = el('aside', 'pn-toast');
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-label', 'What’s new');
-    const top = el('p', 'pn-toast-head');
-    top.append(el('span', 'pn-toast-kicker', 'What’s new'), el('span', 'pn-toast-patch', `Patch ${latest.version}${latest.headline ? ` · ${latest.headline}` : ''}`));
-    const ul = el('ul', 'pn-toast-list');
-    for (const e of fresh.slice(0, 3)) ul.append(el('li', null, e.title));
-    if (fresh.length > 3) ul.append(el('li', 'pn-toast-more', `and ${fresh.length - 3} more`));
-    const row = el('div', 'pn-toast-actions');
-    const read = el('button', 'btn btn-secondary', 'Read patch notes');
-    read.type = 'button';
-    const dismiss = el('button', 'btn btn-quiet', 'Later');
-    dismiss.type = 'button';
-    read.addEventListener('click', open);
-    dismiss.addEventListener('click', () => { writeSeen(storage, allIds); hideToast(); });
-    row.append(read, dismiss);
-    toast.append(top, ul, row);
-    mount.append(toast);
+    if (!fresh.length || !backdrop.hidden) return false;
+    open({whatsNew: true, fresh});
     return true;
   }
 
-  return {open, close: closePanel, showWhatsNew, hideToast, patches, get isOpen() { return !backdrop.hidden; }, root: backdrop};
+  return {open, close: closePanel, showWhatsNew, patches, get isOpen() { return !backdrop.hidden; }, root: backdrop};
 }

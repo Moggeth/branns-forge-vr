@@ -1,7 +1,8 @@
 # Patch notes
 
-Players read these in the game (Menu → Patch notes, or the welcome screen), and a "What's new" card
-lists new entries the first time someone loads a newer version.
+Players read these in the game (Menu → Patch notes, the Tab menu, or the welcome screen). The first
+time someone loads a newer version, the panel opens by itself as "What's new" with the newest patch
+in full.
 
 **Every PR that changes the game adds one entry file here.** CI fails a pull request that changes
 `multiplayer/client`, `shared`, `public`, `peer`, `server` or the top-level game files without one.

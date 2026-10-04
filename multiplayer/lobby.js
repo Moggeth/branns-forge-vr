@@ -105,7 +105,7 @@ let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restor
 let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
-let playerId = null, room = '', connected = false, menuOpen = false;
+let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
@@ -261,8 +261,8 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
@@ -803,6 +803,7 @@ function fieldAction(a){
   if(a.id==='open'){fieldPinned=true;holdOverlays.open(a.kind==='help'?'equipment':'party');return;}
   if(a.id==='close'){holdOverlays.close();return;}
   if(a.id==='menu'){openMenu();return;}
+  if(a.id==='patch-notes'){holdOverlays.close();patchNotes.open();return;}
   if(a.id==='current-quest'){fieldOverlays.root.querySelector('.fo-quest')?.scrollIntoView({block:'nearest'});return;}
   if(a.id==='start-expedition'){const stage=lastSnapshot?.adventure?.stage;if(['idle','victory','defeat'].includes(stage))expeditionAction(stage==='idle'?'start':'rematch');return;}
   if(a.source==='quest')expeditionAction(a.id);
@@ -813,13 +814,13 @@ document.querySelector('.hud-room').append(fieldOverlays.entry);
 const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='undefined'?String(__BRANN_BUILD__):'dev · local'});
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
-holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
+holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
 const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.textContent='Equipment guide';
 lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
-const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body});
+const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
 for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(type, event => {
@@ -913,7 +914,7 @@ window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); quick
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
-  state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });
