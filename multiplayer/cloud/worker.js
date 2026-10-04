@@ -157,7 +157,7 @@ export class ForgeRoom extends DurableObject {
       if (m.secret) {
         const p = this.peers().find(q => q.secret === m.secret);
         if (!p) return error(ws, 'invalid_secret', 'This reconnect credential expired.');
-        if (capacity<r.peers.length) return error(ws,'client_update_required','Refresh the game before rejoining: this world has more players than your version supports.');
+        if (capacity<r.peers.length || capacity<clientCapacity(p.simCapacity)) return error(ws,'client_update_required','Refresh the game before rejoining: this world requires your newer game version.');
         p.simCapacity=capacity; p.name = m.name.trim(); p.role = m.role; p.desktop = m.desktop === true;
         return this.attach(ws, p);
       }

@@ -51,6 +51,8 @@ try {
   assert.equal((await (await enter(h.room,32)).wait('welcome')).maxPeers,32);
   assert.equal((await (await enter(h.room,undefined,g.secret)).wait('error')).code,'client_update_required');
   const fresh=await enter(undefined,32),f=await fresh.wait('welcome');assert.equal(f.maxPeers,32);
+  const freshGuest=await enter(f.room,32),fg=await freshGuest.wait('welcome');
+  assert.equal((await (await enter(f.room,undefined,fg.secret)).wait('error')).code,'client_update_required');assert.equal(freshGuest.ws.readyState,WebSocket.OPEN);
   const denied=await enter(f.room),e=await denied.wait('error');assert.equal(e.code,'client_update_required');assert.match(e.message,/Refresh/);
   console.log('peer mixed-version admission, all-member refresh, reconnect identity, downgrade rejection: passed');
 } finally {

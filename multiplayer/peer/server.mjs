@@ -146,7 +146,7 @@ function handle(ws, message) {
     if (message.secret) {
       const peer = [...room.peers.values()].find(p => safeEqual(p.secret, message.secret));
       if (!peer) return fail(ws, 'invalid_secret', 'This reconnect credential is invalid.');
-      if (capacity<room.peers.size) return fail(ws,'client_update_required','Refresh the game before rejoining: this world has more players than your version supports.');
+      if (capacity<room.peers.size || capacity<clientCapacity(peer.simCapacity)) return fail(ws,'client_update_required','Refresh the game before rejoining: this world requires your newer game version.');
       peer.simCapacity=capacity; peer.name = message.name.trim(); peer.role = message.role; peer.desktop = message.desktop === true;
       attach(ws, room, peer); return;
     }

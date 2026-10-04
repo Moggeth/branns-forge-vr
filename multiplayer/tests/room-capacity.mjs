@@ -116,3 +116,12 @@ test('legacy refresh and departure broadcast new capacity before host enables ba
   const s2=fixture(),h=await join(s2,{mode:'create'}),g=await join(s2);const refreshed=await join(s2,{simCapacity:32,secret:welcome(h).secret});
   await message(s2,g,{type:'leave'});assert.equal(last(refreshed).type,'peer_left');assert.equal(last(refreshed).maxPeers,32);
 });
+
+test('credential reconnect cannot downgrade even a two-person new-format room',async()=>{
+  const s=fixture(),host=await join(s,{mode:'create',simCapacity:32}),guest=await join(s,{simCapacity:32});
+  const originalPeer=s.peers()[1];originalPeer.revision=77;
+  const rejected=await join(s,{secret:welcome(guest).secret});
+  assert.equal(last(rejected).code,'client_update_required');assert.match(last(rejected).message,/Refresh/);
+  assert.equal(s.sockets.get(originalPeer.id),guest);assert.equal(guest.readyState,1);assert.equal(originalPeer.simCapacity,32);assert.equal(originalPeer.revision,77);assert.equal(roomCapacity(s.room),32);
+  const rejectedHost=await join(s,{secret:welcome(host).secret});assert.equal(last(rejectedHost).code,'client_update_required');assert.equal(s.sockets.get(s.room.hostId),host);
+});
