@@ -1,0 +1,48 @@
+/* Floating callouts: standalone text high in the centre, clear of the hotbar and the crosshair. */
+.callouts {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: clamp(96px, 19vh, 220px);
+  width: min(720px, calc(100% - 24px));
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: none; z-index: 6; text-align: center;
+}
+.callout-errors { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.callout-error {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  animation: callout-in .14s ease-out both;
+  transition: opacity .5s ease, transform .5s ease;
+}
+.callout-error.out { opacity: 0; transform: translateY(-6px); }
+.callout-error.pulse .callout-headline { animation: callout-pulse .28s ease-out; }
+.callout-headline {
+  font-family: var(--serif, Georgia, serif); font-weight: 700;
+  font-size: clamp(19px, 1.05rem + .55vw, 28px); line-height: 1.15; letter-spacing: .015em;
+  color: #ff4433;
+  text-shadow: 0 0 1px #000, 0 0 2px #000, 0 1px 2px #000, 0 0 12px rgba(0, 0, 0, .8);
+}
+.callout-hint {
+  font-size: clamp(12px, .78rem + .15vw, 15px); line-height: 1.25; max-width: 60ch;
+  color: #ffd9c9; opacity: .92;
+  text-shadow: 0 0 2px #000, 0 1px 2px #000, 0 0 8px rgba(0, 0, 0, .9);
+}
+/* Info shares the lane; same floating treatment, warm and calmer. Overrides the old bottom box. */
+.hud .toast.callout-info {
+  position: static; transform: translateY(4px); max-width: min(560px, 100%);
+  padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none;
+  font-family: var(--serif, Georgia, serif); font-weight: 600;
+  font-size: clamp(15px, .9rem + .25vw, 19px); line-height: 1.25;
+  color: #ffe2a8;
+  text-shadow: 0 0 2px #000, 0 1px 1px #000, 0 0 10px rgba(0, 0, 0, .85);
+  opacity: 0; transition: opacity .35s ease, transform .35s ease;
+}
+.hud .toast.callout-info.show { opacity: 1; transform: none; }
+@keyframes callout-in { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes callout-pulse { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+/* Phones: sit just under the top HUD row, a little smaller. */
+body.touch-controls-active .callouts { top: calc(env(safe-area-inset-top, 0px) + clamp(64px, 15vh, 120px)); width: min(560px, calc(100% - 120px)); }
+body.touch-controls-active .hud .toast.callout-info,
+:root[data-mq] body.touch-controls-active .hud .toast.callout-info { bottom: auto !important; max-width: 100% !important; font-size: 14px !important; }
+@media (prefers-reduced-motion: reduce) {
+  .callout-error, .callout-error.pulse .callout-headline { animation: none; }
+}
