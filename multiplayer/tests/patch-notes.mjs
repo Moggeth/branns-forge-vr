@@ -18,7 +18,7 @@ const BANNED = [
 ];
 const entries = [];
 for (const name of names) {
-  const text = readFileSync(dir + name, 'utf8');
+  const text = readFileSync(dir + name, 'utf8').replace(/\r\n?/g, '\n');
   const e = parsePatchNote(name, text); // throws with the file name on any format problem
   assert.ok(e.title.length <= 60, `${name}: title is over 60 characters`);
   const body = text.replace(/^---\n[\s\S]*?\n---\n?/, '');
