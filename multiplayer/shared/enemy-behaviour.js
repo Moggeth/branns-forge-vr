@@ -2,11 +2,12 @@
 // Strike remains tick 18: the existing authored animations depend on that contract.
 import {PICK_WALL} from './terrain.js';
 import {entSpec,entWaking,entRooting} from './ents.js';
+import {STUMPLING,stepStumplingMotion} from './stumplings.js';
 export const ENEMY_STRIKE_TICK=18;
 const flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
-const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='golem'?.5:.32;
+const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
 
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,events}){
  const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
@@ -17,6 +18,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
   if(e.meteorBorn&&state.tick-e.unfurlTick<90)continue;
   // An ent tearing free of the ground, or sinking its roots for good, neither walks nor strikes.
   if(e.kind==='ent'&&(entWaking(e,state.tick)||entRooting(e,state.tick)))continue;
+  // Root critters never fight: they wander, flee and burrow (shared/stumplings.js).
+  if(e.kind==='stumpling'){stepStumplingMotion(state,e,{heroes,ground,resolve});continue;}
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}

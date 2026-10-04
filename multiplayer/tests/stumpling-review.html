@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stumplings in game</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:13px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:6px 10px}button{padding:8px;margin:2px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}body.clean header{display:none}</style>
+<header>Stumplings — actual game renderer, local authority.
+<button id="wake">Fell + wake 3</button><button id="run">Run 1 s</button><button id="hit">Chop nearest</button><button id="burrow">Skip to burrow</button><button id="god">Orbit view</button><button id="hero">Hero view</button>
+<span id="status"></span><div id="error"></div></header><canvas id="world" aria-label="Stumpling review world"></canvas>
+<script type="module">
+// Stumpling review: the real createGame renderer and a local shared simulation (pattern from axe-cleave-game). The hero
+// stands at ?at=x,z facing ?yaw. "Fell + wake" fells the nearest standing trees in front and wakes their stumps at
+// once, so the wake, waddle, flee, chop and burrow can be reviewed without waiting minutes. ?clean hides the toolbar,
+// ?auto runs the authority at 60 Hz. Not shipped.
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {worldTrees} from '../shared/world-content.js';
+import {createStumpling,STUMPLING} from '../shared/stumplings.js';
+import {hitEnemyPart} from '../shared/combat.js';
+const $=id=>document.getElementById(id),q=new URLSearchParams(location.search);if(q.has('clean'))document.body.classList.add('clean');
+const at=(q.get('at')||'0,3').split(',').map(Number),yaw=Number(q.get('yaw')??Math.PI);
+let sim=createSimulation({room:'STUMP_REVIEW'}),seq=0,role='hero',auto=q.has('auto');
+sim.addPlayer({id:'hero',name:'Reviewer'});sim.addPlayer({id:'god',name:'Camera',role:'god'});
+let save=sim.checkpoint();save.players[0].position=[at[0],terrainHeight(save,at[0],at[1]),at[1]];save.players[0].yaw=yaw;save.players[0].tool='axe';
+sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
+ onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
+ onInput:input=>sim.command(role==='god'?'god':'hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
+function publish(){game.applySnapshot(sim.snapshot(),role);}
+function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
+publish();game.setRole('hero');game.setActive(true);
+/** Fell the n standing trees nearest the point in front of the hero (record landed, as after the logs drop), optionally waking them. */
+function fell(n=3,wake=true,reach=6){
+ if(sim.snapshot().tick<120)step(120-sim.snapshot().tick);
+ const s=sim.checkpoint(),f=[-Math.sin(yaw),-Math.cos(yaw)],c=[at[0]+f[0]*reach,at[1]+f[1]*reach];
+ const cut=new Set(s.harvestedTrees.map(h=>h.id)),trees=worldTrees(s).filter(t=>!cut.has(t.id)).sort((a,b)=>Math.hypot(a.x-c[0],a.z-c[1])-Math.hypot(b.x-c[0],b.z-c[1])).slice(0,n);
+ for(const [i,t] of trees.entries()){const floor=terrainHeight(s,t.x,t.z);s.harvestedTrees.push({id:t.id,cuts:3,cutHeight:floor+.55+i*.25,felledTick:Math.max(1,s.tick-4000),fallYaw:i,landed:true});
+  if(wake)s.enemies.push(createStumpling(`stump${900+i}`,t,[t.x,floor,t.z],s.tick-i*25,s.seed));}
+ sim=loadSimulation(s);publish();return trees.map(t=>t.id);
+}
+window.review={
+ step,fell,run:(seconds=1)=>new Promise(done=>{let left=Math.round(seconds*60);const timer=setInterval(()=>{step(Math.min(4,left));left-=4;if(left<=0){clearInterval(timer);done(sim.snapshot().tick);}},1000/15);}),
+ chop(){const s=sim.adventureWorld(),h=s.players[0],e=s.enemies.filter(e=>e.kind==='stumpling').sort((a,b)=>Math.hypot(a.position[0]-h.position[0],a.position[2]-h.position[2])-Math.hypot(b.position[0]-h.position[0],b.position[2]-h.position[2]))[0];if(!e)return false;
+  const ev=[];hitEnemyPart(s,e,'torso',40,{tool:'axe',point:e.position,ownerId:'hero'},{nextId:(st,p)=>`${p}${++st.idCounter}`,terrainHeight},ev);for(const x of ev)game.handleEvent(x);publish();return ev.map(x=>x.kind);},
+ skipToBurrow(){const s=sim.checkpoint();for(const e of s.enemies)if(e.kind==='stumpling')e.wakeTick=Math.max(0,s.tick-STUMPLING.lifeTicks+30);sim=loadSimulation(s);publish();},
+ hero:(x,z,y)=>{const s=sim.checkpoint();s.players[0].position=[x,terrainHeight(s,x,z),z];if(y!==undefined)s.players[0].yaw=y;sim=loadSimulation(s);publish();},
+ look:(x,y)=>game.lookByPixels(x,y),view(next){role=next;publish();game.setRole(next);if(next==='god')game.centerView();},
+ /** Wake every felled stump that is not already walking, staggered a few ticks apart. */
+ wake(){const s=sim.checkpoint(),walking=new Set(s.enemies.map(e=>e.treeId)),ts=worldTrees(s);let i=0;for(const h of s.harvestedTrees){const t=ts.find(t=>t.id===h.id);if(!t||walking.has(t.id))continue;s.enemies.push(createStumpling(`stump${950+i}`,t,[t.x,terrainHeight(s,t.x,t.z),t.z],s.tick-Math.min(s.tick,i*12),s.seed));i++;}sim=loadSimulation(s);publish();return i;},
+ trees:()=>worldTrees(sim.adventureWorld()),
+ /** Stand the hero `back` metres from the centroid of these trees (from the forge side), facing them. */
+ frame(ids,back=3.6,side=0){const s=sim.adventureWorld(),ts=worldTrees(s).filter(t=>ids.includes(t.id)),cx=ts.reduce((a,t)=>a+t.x,0)/ts.length,cz=ts.reduce((a,t)=>a+t.z,0)/ts.length,d=Math.hypot(cx,cz)||1,ux=cx/d,uz=cz/d,a=Math.atan2(uz,ux)+side,x=cx-Math.cos(a)*back,z=cz-Math.sin(a)*back;review.hero(x,z,Math.atan2(-(cx-x),-(cz-z)));return [x,z];},
+ tick:()=>sim.snapshot().tick,stats:()=>game.diagnostics(),snapshot:()=>sim.snapshot(),
+};
+$('wake').onclick=()=>review.fell();$('run').onclick=()=>review.run(1);$('hit').onclick=()=>review.chop();$('burrow').onclick=()=>review.skipToBurrow();
+$('god').onclick=()=>review.view('god');$('hero').onclick=()=>review.view('hero');
+if(auto)setInterval(()=>step(1),1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>

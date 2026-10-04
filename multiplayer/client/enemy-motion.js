@@ -319,7 +319,7 @@ export function noteEnemyHit(entry, event, fallbackTick) {
 // entry: {root, visual, data}; ctx: {tick: float interpolated sim tick, height(x,z), dt}
 export function applyEnemyMotion(entry, ctx) {
   const visual = entry.visual, data = entry.data;
-  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || visual.userData.released) return null; // ents pose in ent-view
+  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || data.kind === 'stumpling' || visual.userData.stumpling || visual.userData.released) return null; // ents pose in ent-view
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) { st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st); }

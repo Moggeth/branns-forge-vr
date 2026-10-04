@@ -151,6 +151,7 @@ export function restoreEntTrees(saved) {
  return {awakenedTrees: awakened.map(pick), wildTrees: wild.map(pick)};
 }
 export function validEnt(e, saved, awakenedIds) {
+ if (e.kind === 'stumpling') return true; // shared/stumplings.js validStumpling
  if (e.kind !== 'ent') return e.size === undefined && e.treeId === undefined && e.variant === undefined && e.treeHeight === undefined && e.wakeTick === undefined;
  const spec = ENT_SIZES[e.size];
  return !!spec && validId(e.treeId) && awakenedIds.has(e.treeId) && Number.isInteger(e.variant) && e.variant >= 0 && e.variant <= 2 &&
