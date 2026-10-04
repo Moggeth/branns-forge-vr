@@ -1,5 +1,7 @@
 Current takeover guide: [Claude handoff](../docs/CLAUDE-HANDOFF-20261003.md). This supersedes older proof/scope notes.
 
+Touch fullscreen controls, browser capability limits and verification: [fullscreen acceptance](../docs/TOUCH-FULLSCREEN-20261004.md).
+
 # Browser multiplayer proof
 
 ## Cloud multiplayer is live - 2026-10-03
