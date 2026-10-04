@@ -101,7 +101,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const terrainRay=createTerrainRaycaster({height:(x,z)=>heightAt(x,z)});
   const presentationClock=createPresentationClock(); let renderTick=0, pendingCastPreview=null;
   // Terrain/earth-spell display tick (see liveTerrain).
-  const terrainShownTick=()=>{const t=snapshot.tick;if(!Number.isFinite(t))return Infinity;return Math.abs(renderTick-t)<=12?renderTick:t;};
+  // Clamped (never switched) to the snapshot window so a late or early clock can never make the ground jump back.
+  const terrainShownTick=()=>{const t=snapshot.tick;if(!Number.isFinite(t))return Infinity;return Math.min(t+18,Math.max(t-12,renderTick));};
   let contactFrame=0,worldMatricesAt=-1,worldTargets=[];
   let terrainPreviousEdits=[],terrainPreviousTick=Infinity;
   let yaw = 0, pitch = 0, jumpPending = false, verticalSpeed = 0, grounded = true;
@@ -371,8 +372,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(canvas);
   // Terrain is drawn at the presentation clock, not the snapshot tick: rising walls, tearing chasms and sinking
-  // segments move every frame (snapshots arrive at 20 Hz). Within a tick or two of the authority, so collision
-  // still matches what is seen; far off (rewind, room change, no clock yet) it falls back to the snapshot tick.
+  // segments move every frame (snapshots arrive at 10-20 Hz). The clock stays within a snapshot interval of the
+  // authority, so collision still matches what is seen.
   let terrainLive=false;const meadowPending=new Map();
   // Grass refills are whole-buffer uploads, so live frames batch their dirty kernels and the meadow catches up on
   // each snapshot (grass on moving earth is cleared by the disturbance mask anyway).
