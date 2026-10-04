@@ -4,9 +4,11 @@ import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {prepareAsset} from '../client/asset-pose.js';
 import {createCombatView} from '../client/combat-view.js';
-const b=readFileSync(new URL('../public/assets/skeleton.glb',import.meta.url));const template=await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
+import {loadGlb} from './glb-node.mjs';
+import {dressSkeleton} from '../client/skeleton-look.js';
+const template = await loadGlb(new URL('../public/assets/skeleton.glb', import.meta.url));
 const scene=new T.Scene(),actors=new Map();let meshes=0,vertices=0,tris=0;template.scene.traverse(n=>{if(n.isMesh){meshes++;vertices+=n.geometry.attributes.position.count;tris+=(n.geometry.index?.count||n.geometry.attributes.position.count)/3;}});
-for(let i=0;i<32;i++){const root=new T.Group(),visual=prepareAsset(template,'skeleton').visual;root.position.set((i%8-3.5)*3,0,(Math.floor(i/8)-1.5)*3);root.add(visual);scene.add(root);actors.set(`e:${i}`,{root,visual,enemy:true,data:{id:String(i)}});}
+for(let i=0;i<32;i++){const root=new T.Group(),visual=prepareAsset(template,'skeleton').visual;dressSkeleton(visual,String(i));root.position.set((i%8-3.5)*3,0,(Math.floor(i/8)-1.5)*3);root.add(visual);scene.add(root);actors.set(`e:${i}`,{root,visual,enemy:true,data:{id:String(i)}});}
 const view=createCombatView({scene,actors,templates:new Map()});
 const t=performance.now();view.sync({enemies:[...actors.values()].map(a=>a.data)});const spawnSyncMs=performance.now()-t;
 let skinnedVertices=0;for(const a of actors.values())a.visual.traverse(n=>{if(n.isSkinnedMesh){const original=n.getVertexPosition;n.getVertexPosition=function(...args){skinnedVertices++;return original.apply(this,args);};}});

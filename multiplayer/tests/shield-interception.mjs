@@ -6,6 +6,7 @@ import {prepareAsset} from '../client/asset-pose.js';
 import {segmentSurfaceContacts, createCombatView, partAnchor, capturePartPoses} from '../client/combat-view.js';
 import {createEnemy, projectileContact, hitEnemyPart, validPartHit} from '../shared/combat.js';
 import {createSimulation,loadSimulation} from '../shared/simulation.js';
+import {dressSkeleton} from '../client/skeleton-look.js';
 const began=performance.now();
 function untextured(name){
   const buf=readFileSync(new URL(`../public/assets/${name}.glb`,import.meta.url));
@@ -23,7 +24,7 @@ function untextured(name){
 const load=name=>new Promise((ok,fail)=>new GLTFLoader().parse(untextured(name),'',ok,fail));
 
 const [skeletonTemplate,crossbowTemplate]=await Promise.all([load('skeleton'),load('crossbow')]);
-const {visual}=prepareAsset(skeletonTemplate,'skeleton',1.7);
+const {visual}=prepareAsset(skeletonTemplate,'skeleton',1.7);dressSkeleton(visual,0); // one variant: one shield, as in game
 const scene=new THREE.Scene(), root=new THREE.Group();root.add(visual);scene.add(root);root.updateWorldMatrix(true,true);
 let shotLine;
 for(let y=.4;y<1.6&&!shotLine;y+=.08)for(let x=-.9;x<=.9&&!shotLine;x+=.04){
@@ -43,7 +44,7 @@ for(const kind of ['arrow','bolt']){
  const result=projectileContact(s,{...shotLine.front,projectileId:'q'},ctx);
  assert.equal(result.ok,true);assert.deepEqual(s.enemies[0],before,'shield does not damage HP, armour, anatomy or hurt timing');
  assert.equal(s.players[0].stats.contribution,0);assert.equal(s.projectiles.length,0);
- assert.equal(s.embeds[0].surface,'shield');assert.equal(s.embeds[0].boneName,'LeftArm');
+ assert.equal(s.embeds[0].surface,'shield');assert.equal(s.embeds[0].boneName,'LeftHand');
  assert.deepEqual(s.embeds[0].localPoint,shotLine.front.localPoint);assert.deepEqual(s.embeds[0].localQuaternion,shotLine.front.localQuaternion);
  assert.equal(s.embeds[0].penetration,.035);assert.deepEqual(result.events.map(e=>e.kind),['embed']);assert.equal(result.events[0].blocked,true);
  assert.equal(projectileContact(s,{...shotLine.back,projectileId:'q'},ctx).ok,false,'consumed shot cannot also damage body behind shield');
@@ -68,13 +69,13 @@ for(const steps of [1,3,12]){
 const s=stateFor();assert.equal(projectileContact(s,{...shotLine.front,projectileId:'q'},ctx).ok,true);
 const view=createCombatView({scene,camera,templates:new Map([['crossbow',crossbowTemplate],['skeleton',skeletonTemplate]]),actors});
 view.sync(s);const embed=view.embeds.get('q'),arm=partAnchor(visual,'leftArm');
-assert.equal(embed.parent,arm);const tip=embed.getWorldPosition(new THREE.Vector3()),rest=arm.quaternion.clone();
+assert.equal(embed.parent.name,'LeftHand');assert.ok(arm.getObjectById(embed.parent.id),'shield hand rides the arm');const tip=embed.getWorldPosition(new THREE.Vector3()),rest=arm.quaternion.clone();
 arm.rotateZ(.35);root.updateWorldMatrix(true,true);const moved=embed.getWorldPosition(new THREE.Vector3());
 assert.ok(moved.distanceTo(tip)>.05,'shield arrow follows articulated arm movement');
 const poses=capturePartPoses(visual),events=[];
 hitEnemyPart(s,s.enemies[0],'leftArm',60,{point:shotLine.front.point,partPoses:poses,ownerId:'hero'},ctx,events);
 const loose=s.detachedParts.find(d=>d.part==='leftArm');assert.ok(loose);assert.equal(s.embeds[0].targetId,loose.id);
-view.sync(s);assert.equal(embed.parent.name,'LeftArm');assert.ok(embed.getWorldPosition(new THREE.Vector3()).distanceTo(moved)<.02,'detachment retains shield embed pose');
+view.sync(s);assert.equal(embed.parent.name,'LeftHand');assert.ok(embed.getWorldPosition(new THREE.Vector3()).distanceTo(moved)<.02,'detachment retains shield embed pose');
 const frozen=view.detached.get(loose.id);let shieldMeshes=0;frozen.traverse(n=>{if(n.isMesh&&n.userData.contactSurface==='shield')shieldMeshes++;});assert.ok(shieldMeshes,'baked shield retains physical shield surface classification');
 arm.quaternion.copy(rest);root.updateWorldMatrix(true,true);view.dispose();
 // Save/migration allowlists retain shield protection and exact local transforms.

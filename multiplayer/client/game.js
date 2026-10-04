@@ -52,6 +52,7 @@ import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createHeldSway} from './held-sway.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
+import {dressSkeleton} from './skeleton-look.js';
 import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
@@ -112,6 +113,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), templates = new Map(), warnings = new Map();
   const heroView = createHeroView({resolveWeapon: remoteWeapon, onWarning: report, siegebird: () => siegebirdFlockReady()}), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
+  const enemyThreats = [], threatPoint = [0, 0, 0]; // Hero positions: skeletons raise their shields when one is close in front
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3(), meadowPushers = [];
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
   const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster(), hitPoint = new THREE.Vector3();
@@ -381,23 +383,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const group=new THREE.Group(),head=new THREE.Object3D(),hands=[new THREE.Object3D(),new THREE.Object3D()];
     group.add(head,...hands);group.userData={head,hands,placeholder:true};return group;
   }
-  function instantiate(name, height) {
+  function instantiate(name, height, skeletonId) {
     const template = templates.get(name);
     if (!template) return null;
     const {visual: wrapper, model} = prepareAsset(template, name, height);
-    // Golems are posed procedurally (enemy-motion.js: stride-locked gait, slam, recoil); their clips stay in the GLB for tools.
-    if (template.animations.length && name === 'skeleton') {
-      const mixer = new THREE.AnimationMixer(model);
-      const idle = template.animations.find(item => /idle/i.test(item.name)) || template.animations[0];
-      const walk = template.animations.find(item => /walk/i.test(item.name)) || idle;
-      const actions = { idle: mixer.clipAction(idle), walk: mixer.clipAction(walk) };
-      for(const name of ['attack','stagger']){const clip=template.animations.find(a=>a.name.toLowerCase().includes(name));if(clip){actions[name]=mixer.clipAction(clip);actions[name].setLoop(THREE.LoopOnce,1);actions[name].clampWhenFinished=true;}}
-      actions.idle.play();
-      wrapper.userData.mixer = mixer;
-      wrapper.userData.actions = actions;
-      wrapper.userData.motion = 'idle';
-      mixers.add(mixer);
-    }
+    // Skeletons and golems are posed procedurally (enemy-motion.js, skeleton-motion.js): no AnimationMixer.
+    if (name === 'skeleton') dressSkeleton(wrapper, skeletonId ?? 0); // archetype gear, colours and size from the enemy id
     return wrapper;
   }
   const WEAPON_HEIGHTS = {axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4};
@@ -411,7 +402,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
-    const model = entry.data.kind==='ent'?entView.build(entry.data):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7);
+    const model = entry.data.kind==='ent'?entView.build(entry.data):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
     if (!model) return;
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
@@ -1228,7 +1219,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
     for (const mixer of mixers) mixer.update(dt);
     // Enemy motion polish (opus-enemy-character): after clips, before contacts, so hits see the final pose.
-    updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround});
+    enemyThreats.length=0;for(const p of snapshot.players||[])if(p.role==='hero'&&p.position)enemyThreats.push(p.id===playerId?localPosition.toArray(threatPoint):p.position);
+    updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround,threats:enemyThreats});
     golemFx.update(actors,renderTick,dt,now/1000);
     entView.update(actors,renderTick,dt);entView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
