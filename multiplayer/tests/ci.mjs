@@ -10,7 +10,7 @@ const suite = [
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'proximity-voice','voice-recovery','voice-topology','battle-model','checkpoint-delta','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
-  'ability-readiness','action-feedback','callouts','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
+  'ability-readiness','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',

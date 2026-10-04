@@ -14,6 +14,8 @@ import {actionError} from './client/action-feedback.js';
 import {createCallouts} from './client/callouts.js';
 import './client/callouts.css';
 import './client/hotbar.css';
+import './client/resource-bar.css';
+import {createResourceBar} from './client/resource-bar.js';
 import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
@@ -110,7 +112,7 @@ function friendlyError(detail) {
 let mobile = null, xrActive = false;
 let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
-let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
+let resourceBar=null,forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
 let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
@@ -512,6 +514,8 @@ function onSnapshot(snapshot) {
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
+    resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
+    resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
     const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0)*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold attack: flame · Q: vent · Heat ${Math.round((self.heat||0)*100)}%${self.overheatUntil>snapshot.tick?' · Cooling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
