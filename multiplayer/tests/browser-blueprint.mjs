@@ -64,8 +64,10 @@ async function choose(page,key,type){for(let i=0;i<6;i++){
   await page.touchscreen.tap(140,250);await sleep(2000);assert.equal(await mode(page),'sanctuary','a tap moves the blueprint, it does not build');
   await shot(page,'blueprint-phone-tapped');
   await page.locator('.bp-hud [data-bp="rotate"]').tap();await sleep(1000);
-  const n=await count(page);await page.locator('.bp-hud [data-bp="place"]').tap();await grew(page,n);
-  assert.equal(await mode(page),null);record('touch-place','pass');
+  // The default spawn sits on the Forge apron, so this spot is refused: Place explains instead of building.
+  const n=await count(page);await page.locator('.bp-hud [data-bp="place"]').tap({force:true});await sleep(1500);
+  assert.equal(await count(page),n,'a refused spot never builds');assert.equal(await mode(page),'sanctuary');assert.match(await page.locator('.bp-why').innerText(),/Forge apron/);record('touch-refused-place','pass');
+  await page.locator('.bp-hud [data-bp="cancel"]').tap();await page.waitForFunction(()=>!window.brannHarness.controls().inventionPlacement);record('touch-cancel','pass');
   assert.deepEqual(page.errors,[]);record('touch-console','pass');
  }catch(e){record('touch-exception','fail',{message:e.message});await shot(page,'blueprint-phone-failure').catch(()=>{});process.exitCode=1;}finally{save('blueprint');await browser.close();}
 }
