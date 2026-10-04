@@ -1,0 +1,91 @@
+name: Deploy live site
+
+# Publishes the browser game to https://branns-forge-multiplayer.vercel.app
+# after "Browser game" CI passes on a push to main. Mirrors
+# multiplayer/scripts/deploy-peer-preview.ps1 so Mitch's PC need not be on.
+# Needs one repository secret: VERCEL_TOKEN. Until it exists, runs skip with a notice.
+
+on:
+  workflow_run:
+    workflows: [Browser game]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: # manual redeploy of the current main
+
+concurrency:
+  group: deploy-live
+  cancel-in-progress: false # one deploy at a time; a queued newer one replaces an older queued one
+
+permissions:
+  contents: read
+
+env:
+  PEER_URL: wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud
+  VERCEL_SCOPE: moggeths-projects
+  VERCEL_PROJECT: branns-forge-multiplayer
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://branns-forge-multiplayer.vercel.app
+    defaults:
+      run:
+        working-directory: multiplayer
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+      - name: Check this is still the newest main and the token exists
+        id: gate
+        working-directory: .
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::notice::VERCEL_TOKEN secret not set yet; skipping deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          latest=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$latest" != "$SHA" ]; then
+            echo "::notice::main moved on to $latest; its own CI run will deploy it."
+            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: multiplayer/package-lock.json
+      - if: steps.gate.outputs.go == 'true'
+        run: npm ci --no-audit --no-fund
+      - name: Build with the cloud peer URL
+        if: steps.gate.outputs.go == 'true'
+        run: npm run build
+        env:
+          VITE_PEER_WS_URL: ${{ env.PEER_URL }}
+      - name: Stage prebuilt output
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          stage="$RUNNER_TEMP/stage"
+          static="$stage/.vercel/output/static"
+          mkdir -p "$static"
+          cp dist/index.html dist/manifest.webmanifest "$static/"
+          cp -R dist/assets "$static/assets"
+          diff -r dist/assets "$static/assets"
+          echo '{"version":3,"routes":[{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' > "$stage/.vercel/output/config.json"
+          echo "STAGE=$stage" >> "$GITHUB_ENV"
+      - name: Deploy to production
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          npx --yes vercel@62.1.0 link --yes --project "$VERCEL_PROJECT" --team "$VERCEL_SCOPE" --cwd "$STAGE" --token "$VERCEL_TOKEN"
+          url=$(npx --yes vercel@62.1.0 deploy --prebuilt --prod --yes --scope "$VERCEL_SCOPE" --cwd "$STAGE" --token "$VERCEL_TOKEN")
+          echo "Deployed $SHA to $url" | tee -a "$GITHUB_STEP_SUMMARY"
