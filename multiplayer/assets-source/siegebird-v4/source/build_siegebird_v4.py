@@ -47,7 +47,7 @@ MAT_DEF = {
     "Kingfisher":dict(c="0b6377", m=0.0, r=0.24),
     "Ember":     dict(c="c9542a", m=0.0, r=0.32),
     "Crystal":   dict(c="7cc4ff", m=0.0, r=0.05, e="2f8fff", es=1.3),
-    "EyeCrystal":dict(c="1c4cb4", m=0.0, r=0.05, e="2f8fff", es=0.9),
+    "EyeCrystal":dict(c="0c2a80", m=0.0, r=0.22, e="1d5fe0", es=0.55),
     "Cord":      dict(c="d8c49a", m=0.0, r=0.70),
     "Feather":   dict(c="ffffff", m=0.0, r=0.48),
     "Ash":       dict(c="c9a477", m=0.0, r=0.50),
@@ -333,8 +333,8 @@ HULL = [
     (0.940, 0.030, 0.148, 0.082, 0.110, 0.074, 0.022, 0.012, -0.030),
     (0.972, 0.026, 0.150, 0.056, 0.114, 0.050, 0.052, 0.010, 0.020),
 ]
-HEAD_KEYS = [(0.950, 0.056, 0.180, 0.044), (0.974, 0.062, 0.197, 0.058), (0.998, 0.058, 0.2010, 0.080),
-             (1.020, 0.044, 0.1990, 0.104), (1.034, 0.031, 0.1955, 0.120)]
+HEAD_KEYS = [(0.946, 0.050, 0.178, 0.050), (0.970, 0.054, 0.195, 0.064), (0.996, 0.050, 0.2005, 0.086),
+             (1.018, 0.040, 0.1990, 0.104), (1.032, 0.031, 0.1960, 0.118)]
 BEAK_KEYS = [(1.028, 0.032, 0.1965, 0.118), (1.046, 0.026, 0.1955, 0.130), (1.062, 0.019, 0.1930, 0.140),
              (1.074, 0.015, 0.1905, 0.148)]
 
@@ -368,6 +368,92 @@ def falcon_ring(w, top, bot, ch=0.0098, floor=0.1665, beak=False):
     right += [(ch + 0.0006, top - 0.002), (ch, floor + 0.004), (ch * 0.55, floor)]
     left = [(-x, z) for x, z in reversed(right[1:])]
     return right + [(0.0, floor - 0.0006)] + left
+
+def eagle_ring(w, top, bot, ch=0.0098, floor=0.1665, n=11):
+    """Smooth head section with the open bolt groove on top: chin round the cheek to the lip, the groove, mirrored."""
+    mid = (top + bot) / 2; h = (top - bot) / 2; right = []
+    for k in range(n):
+        a = -math.pi / 2 + (math.pi / 2 + 1.10) * k / (n - 1); c, s_ = math.cos(a), math.sin(a); e = 2.6 if s_ > 0 else 2.1
+        x = w * abs(c) ** (2 / e); z = mid + h * math.copysign(abs(s_) ** (2 / e), s_)
+        right.append((max(x, ch + 0.0035) if z > floor - 0.004 else x, z))
+    right[0] = (0.0, bot)
+    right += [(max(ch + 0.0035, w * 0.30), top), (ch + 0.0006, top - 0.002), (ch, floor + 0.004), (ch * 0.55, floor)]
+    left = [(-x, z) for x, z in reversed(right[1:])]
+    return right + [(0.0, floor - 0.0006)] + left
+
+class HeadSurface:
+    """Samples the right half of the head loft so inlays can lie on its curved surface."""
+    def __init__(self, rings_, ch=0.0098):
+        self.r = []
+        for r in rings_:
+            outer = [Vector(p) for p in r if p[0] > 0 and not (p[0] <= ch + 0.0012 and p[2] > 0.1665 - 0.001)]
+            outer.sort(key=lambda p: p.z); self.r.append((r[0][1], outer))
+    def _x(self, y, z):
+        ys = [a for a, _ in self.r]; i = max(0, min(len(ys) - 2, max(j for j in range(len(ys)) if ys[j] <= y) if y >= ys[0] else 0))
+        def xr(outer):
+            for a, b in zip(outer, outer[1:]):
+                if a.z <= z <= b.z: return lerp(a.x, b.x, (z - a.z) / max(1e-9, b.z - a.z))
+            return outer[0].x if z < outer[0].z else outer[-1].x
+        t = max(0.0, min(1.0, (y - ys[i]) / max(1e-9, ys[i + 1] - ys[i])))
+        return lerp(xr(self.r[i][1]), xr(self.r[i + 1][1]), t)
+    def at(self, sx, y, z, off=0.0):
+        x = self._x(y, z); e = 0.0015
+        dxdy = (self._x(y + e, z) - self._x(y - e, z)) / (2 * e); dxdz = (self._x(y, z + e) - self._x(y, z - e)) / (2 * e)
+        n = Vector((1.0, -dxdy, -dxdz)).normalized(); p = Vector((x, y, z)) + n * off
+        return Vector((sx * p.x, p.y, p.z)), Vector((sx * n.x, n.y, n.z))
+    def ribbon(self, mb, sx, pts, widths, mat, off=0.0007, thick=0.0013):
+        """Tapered inlay strip along (y, z) points, widths across the strip, lying on the surface."""
+        P = [Vector((0, y, z)) for y, z in pts]; top = []; bot = []
+        for i, p in enumerate(P):
+            t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized(); q = Vector((0, -t.z, t.y))
+            for side in (1, -1):
+                a = p + q * widths[i] * side
+                top.append(self.at(sx, a.y, a.z, off)[0]); bot.append(self.at(sx, a.y, a.z, off - thick)[0])
+        n = len(P); verts = top + bot; faces = []; B0 = len(top)
+        for i in range(n - 1):
+            a, b, c, d = 2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2
+            f = (a, d, c, b) if sx > 0 else (a, b, c, d); faces.append(f)
+            g = tuple(B0 + k for k in reversed(f)); faces.append(g)
+            for e0, e1 in ((a, d), (c, b)):
+                faces.append((e0, e1, B0 + e1, B0 + e0) if sx > 0 else (e1, e0, B0 + e0, B0 + e1))
+        for a, b in ((1, 0), (2 * n - 2, 2 * n - 1)):
+            faces.append((a, b, B0 + b, B0 + a) if sx > 0 else (b, a, B0 + a, B0 + b))
+        mb.add(verts, faces, mat)
+    def eye(self, mb, sx, y, z):
+        """Almond sapphire under a brass lid: the long axis follows the head, tilted down toward the beak."""
+        c, n = self.at(sx, y, z, 0.0)
+        f = Vector((0, 1, 0)); f = (f - n * f.dot(n)).normalized(); u = n.cross(f).normalized() * sx
+        tilt = math.radians(-9); f2 = f * math.cos(tilt) + u * math.sin(tilt); u2 = u * math.cos(tilt) - f * math.sin(tilt)
+        def almond(a_, b_, k=20):
+            out = []
+            for i in range(k):
+                t = TAU * i / k; s_ = math.sin(t)
+                out.append((a_ * math.cos(t), b_ * s_ * (0.55 + 0.45 * abs(s_)) * (1.0 - 0.18 * math.cos(t)) * (0.62 if s_ > 0 else 1.0)))
+            return out
+        P = lambda q, h: c + f2 * q[0] + u2 * q[1] + n * h
+        inner = almond(0.0112, 0.0064); outer = almond(0.0136, 0.0086)
+        # brass lid ring: raised band between the outlines, sunk into the head
+        k = len(inner); verts = [P(q, 0.0013) for q in outer] + [P(q, 0.0016) for q in inner] + [P(q, -0.002) for q in outer]; faces = []
+        for i in range(k):
+            j = (i + 1) % k
+            faces.append((i, j, k + j, k + i) if sx < 0 else (i, k + i, k + j, j))
+            faces.append((2 * k + i, 2 * k + j, j, i) if sx < 0 else (2 * k + i, i, j, 2 * k + j))
+        mb.add(verts, faces, "Brass")
+        # sapphire dome and a dark round pupil with a crystal glint
+        rings_ = [(1.0, 0.0010), (0.80, 0.0024), (0.52, 0.0033), (0.22, 0.0037)]
+        verts = []; faces = []
+        for r_, h in rings_: verts += [P((q[0] * r_, q[1] * r_), h) for q in inner]
+        verts.append(P((0, 0), 0.0038))
+        for ri in range(len(rings_) - 1):
+            for i in range(k):
+                j = (i + 1) % k; a, b, c2, d = ri * k + i, ri * k + j, (ri + 1) * k + j, (ri + 1) * k + i
+                faces.append((a, b, c2, d) if sx < 0 else (a, d, c2, b))
+        last = (len(rings_) - 1) * k; ctr = len(verts) - 1
+        for i in range(k):
+            j = (i + 1) % k; faces.append((last + i, last + j, ctr) if sx < 0 else (last + j, last + i, ctr))
+        mb.add(verts, faces, "EyeCrystal")
+        pup = [P((0.0019 * math.cos(TAU * i / 12) + 0.0012, 0.0024 * math.sin(TAU * i / 12) + 0.0004), 0.00395) for i in range(12)]
+        mb.add(pup, [tuple(range(12)) if sx > 0 else tuple(reversed(range(12)))], "Horn")
 
 def keyed_rings(keys, fn, dense):
     return [[(x, q[0], z) for x, z in fn(*q[1:])] for q in catmull([Vector(k) for k in keys], dense)]
@@ -420,7 +506,7 @@ def build_body():
             rings_.append([tuple(p + X * u + Nn * v) for u, v in sec(i / (len(pts) - 1))])
         return loft_mat(st, rings_, mat_fn, cap=cap)
     def blade_sec(w, h): return [(w * 0.5, -h), (w, -h * 0.3), (w, h * 0.3), (w * 0.5, h), (-w * 0.5, h), (-w, h * 0.3), (-w, -h * 0.3), (-w * 0.5, -h)]
-    strut = [(0, 0.050, -0.080), (0, 0.120, -0.104), (0, 0.200, -0.122), (0, 0.268, -0.132), (0, 0.290, -0.134)]
+    strut = [(0, 0.050, -0.082), (0, 0.120, -0.116), (0, 0.200, -0.150), (0, 0.262, -0.174), (0, 0.284, -0.180)]
     sweep(strut, lambda t: blade_sec(lerp(0.0130, 0.0115, t), lerp(0.0150, 0.0105, t)),
           lambda k, y: "Steel" if k in (3, 7) else "Walnut", "Iron")
     for sx in (-1, 1):                                                       # brass rachis down each side of the tail feather
@@ -431,44 +517,41 @@ def build_body():
           (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), -0.0200, 0.0200, "Leather", 0.0030, 2)
     for z in (0.080, -0.060):
         for sx in (-1, 1): rivet(st, (sx * 0.0225, 0.050, z), (sx, 0, 0), 0.0024)
-    # --- head: faceted falcon skull with the bolt groove, steel brow ridges, a hooked brass beak
-    loft_mat(st, keyed_rings(HEAD_KEYS, falcon_ring, 4), lambda k, y: "Walnut", cap=None)
-    beak = keyed_rings(BEAK_KEYS, falcon_ring, 3)
+    # --- head: a slender walnut eagle with the bolt groove, an elvish brass beak and filigree, sapphire eyes
+    head = keyed_rings(HEAD_KEYS, eagle_ring, 4)
+    loft_mat(st, head, lambda k, y: "Walnut", cap=None)
+    beak = keyed_rings(BEAK_KEYS, eagle_ring, 3)
     loft_mat(st, beak, lambda k, y: "Brass", cap="Brass")
-    # neck gorget: a steel collar where the head meets the shoulders
-    gor = keyed_rings([(0.946, 0.060, 0.181, 0.040), (0.958, 0.062, 0.191, 0.048)], falcon_ring, 1)
-    gor = [[(x * 1.06, y, z + 0.001) for x, y, z in r] for r in gor]
-    loft_mat(st, gor, lambda k, y: "Steel", cap="Steel")
-    # iron cere where the beak meets the skull, the falcon's hooked upper mandible curling down past the
-    # seated bolt tip, and a short iron lower mandible
-    cere = keyed_rings([(1.022, 0.034, 0.1975, 0.114), (1.031, 0.032, 0.1970, 0.119)], falcon_ring, 1)
-    loft_mat(st, [[(x * 1.05, y, z + 0.0008) for x, y, z in r] for r in cere], lambda k, y: "Iron", cap="Iron")
+    surf = HeadSurface(head)
+    # slim brass collar at the neck and a brass cere ring where the beak meets the skull
+    for keys, scale in (([(0.944, 0.051, 0.179, 0.049), (0.951, 0.0515, 0.183, 0.052)], 1.045), ([(1.024, 0.0335, 0.1972, 0.1150), (1.031, 0.0322, 0.1968, 0.1190)], 1.05)):
+        ring_ = keyed_rings(keys, eagle_ring, 1)
+        loft_mat(st, [[(x * scale, y, z + 0.0006) for x, y, z in r] for r in ring_], lambda k, y: "Brass", cap="Brass")
     def hook_sec(t):
         w = lerp(0.0150, 0.0012, t ** 1.1); h = lerp(0.0205, 0.0016, t ** 0.8)
-        return [(0.0, -h), (w * 0.55, -h * 0.7), (w, h * 0.2), (w * 0.55, h), (-w * 0.55, h), (-w, h * 0.2), (-w * 0.55, -h * 0.7)]
+        return [(w * math.cos(a) * (0.55 if math.sin(a) < -0.5 else 1.0), h * math.sin(a)) for a in [-math.pi / 2 + TAU * k / 12 for k in range(12)]]
     sweep([(0, 1.066, 0.1695), (0, 1.084, 0.1690), (0, 1.100, 0.1640), (0, 1.111, 0.1540), (0, 1.115, 0.1420), (0, 1.110, 0.1310)],
           hook_sec, lambda k, y: "Brass", "Brass")
     sweep([(0, 1.030, 0.1260), (0, 1.052, 0.1350), (0, 1.072, 0.1420)],
-          lambda t: [(0.0, -lerp(0.006, 0.0015, t)), (lerp(0.018, 0.006, t), 0.0), (lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)),
-                     (-lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)), (-lerp(0.018, 0.006, t), 0.0)], lambda k, y: "Iron", "Iron")
+          lambda t: [(0.0, -lerp(0.006, 0.0015, t)), (lerp(0.017, 0.006, t), 0.0), (lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)),
+                     (-lerp(0.012, 0.004, t), lerp(0.006, 0.0025, t)), (-lerp(0.017, 0.006, t), 0.0)], lambda k, y: "Horn", "Horn")
     for sx in (-1, 1):
-        # tomial edge: an iron line along the jaw
-        jaw = [Vector((sx * (w * 0.97 if w * 0.97 > 0.011 else 0.0112), y, bot + (top - bot) * 0.40)) for y, w, top, bot in BEAK_KEYS[:-1]]
-        tube(st, catmull(jaw, 3), 0.0010, "Iron", 5)
-        # deep-set crystal eye under a blued-steel brow
-        eye = Vector((sx * 0.0520, 0.990, 0.160)); n = Vector((sx * 0.92, 0.24, 0.20)).normalized()
-        U = n.orthogonal().normalized(); V = n.cross(U); ax = (tuple(n), tuple(U), tuple(V))
-        lathe(st, [(-0.003, 0.0), (-0.003, 0.0100), (0.0008, 0.0104), (0.0022, 0.0088), (0.0022, 0.0)], tuple(eye), ax, "Iron", 20)
-        lathe(st, [(0.0, 0.0080), (0.0030, 0.0066), (0.0052, 0.0032), (0.0060, 0.0)], tuple(eye + n * 0.0012), ax, "EyeCrystal", 16)
-        lathe(st, [(0.0, 0.0040), (0.0010, 0.0033), (0.0016, 0.0)], tuple(eye + n * 0.0064), ax, "Horn", 12)
-        prism(st, [(0.958, 0.1790), (0.996, 0.1805), (1.016, 0.1725), (1.000, 0.1750), (0.962, 0.1880)], (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0),
-              sx * 0.036, sx * 0.0625, "Steel", 0.0008, 1)
-        # swept steel crest blades, kept under the moon hood's view
-        for k, (dz, L) in enumerate(((0.0, 0.056), (-0.007, 0.046))):
-            Uc = Vector((sx * 0.30, -0.95, 0.02)).normalized(); Nc = Vector((sx * 0.45, 0.0, 1.0)).normalized(); Vc = Nc.cross(Uc).normalized()
-            root = Vector((sx * (0.022 + 0.010 * k), 0.992, 0.1975 + dz))
-            prism(st, [(0.0, -0.0042), (L * 0.6, -0.0034), (L, 0.0), (L * 0.6, 0.0030), (0.0, 0.0042)], tuple(root), tuple(Uc), tuple(Vc), tuple(Nc),
-                  -0.0011, 0.0011, "Steel", 0.0005, 1)
+        jaw = [Vector((sx * max(w * 0.985, 0.0136), y, bot + (top - bot) * 0.40)) for y, w, top, bot in BEAK_KEYS[:-1]]
+        tube(st, catmull(jaw, 3), 0.0009, "Horn", 5)
+        # elvish filigree: a brow line sweeping from the cere over the eye and down the neck, a crown line along
+        # the groove lip, the eagle's tear mark below the eye, and three leaves at the nape
+        # raised brass brow ridge: overhangs the eye from the cere back, then flows down the neck
+        surf.ribbon(st, sx, [(1.030, 0.1790), (1.016, 0.1765), (1.002, 0.1738), (0.988, 0.1725), (0.974, 0.1700), (0.962, 0.1640), (0.952, 0.1540)],
+                    [0.0020, 0.0040, 0.0046, 0.0044, 0.0036, 0.0024, 0.0006], "Brass", off=0.0030, thick=0.0034)
+        # dark lore stripe from the front corner of the eye into the gape
+        surf.ribbon(st, sx, [(1.0085, 0.1595), (1.016, 0.1580), (1.024, 0.1560)], [0.0016, 0.0013, 0.0006], "Horn", off=0.0009, thick=0.0012)
+        surf.ribbon(st, sx, [(0.998, 0.1500), (0.992, 0.1380), (0.982, 0.1240), (0.970, 0.1120), (0.958, 0.1040)],
+                    [0.0030, 0.0034, 0.0026, 0.0014, 0.0004], "Brass")
+        for k, (y0, z0) in enumerate(((0.968, 0.140), (0.962, 0.122), (0.958, 0.104))):
+            L = 0.028 - 0.004 * k
+            pts = [(y0 - L * t, z0 - 0.010 * t + 0.004 * math.sin(math.pi * t)) for t in (0.0, 0.25, 0.5, 0.75, 1.0)]
+            surf.ribbon(st, sx, pts, [0.0004, 0.0042, 0.0050, 0.0034, 0.0004], "Brass")
+        surf.eye(st, sx, 0.9955, 0.1620)
     # --- rail: blued steel T-rail on a heartwood spine, iron end cap
     groove = [(-0.0058, 0.1736), (-0.0042, 0.1726), (-0.0022, 0.1720), (0.0, 0.1718), (0.0022, 0.1720), (0.0042, 0.1726), (0.0058, 0.1736)]
     prof = [(-0.0065, 0.100), (0.0065, 0.100), (0.0065, 0.1515), (0.0155, 0.1515), (0.0155, 0.1700), (0.0142, 0.1716), (0.0100, 0.1730)] + \
@@ -488,30 +571,31 @@ def build_body():
             y, z, w_, d_ = q
             rings_.append([(x, y + dy, z) for x, dy in grip_ring(w_, d_)])
         return loft_mat(st, rings_, grip_mat, cap="Iron")
-    axis = [Vector((0.318, -0.026)), Vector((0.306, -0.10)), Vector((0.296, -0.155)), Vector((0.285, -0.205)), Vector((0.277, -0.236))]
-    grip(axis, (0.0150, 0.0160, 0.0168, 0.0160, 0.0146), (0.0230, 0.0235, 0.0245, 0.0232, 0.0205))
+    # pistol grip: ends flush with the tail-feather strut, closing the skeleton stock; a brass base cap with a crystal
+    axis = [Vector((0.318, -0.026)), Vector((0.306, -0.10)), Vector((0.296, -0.155)), Vector((0.290, -0.186))]
+    grip(axis, (0.0150, 0.0160, 0.0168, 0.0166), (0.0230, 0.0235, 0.0245, 0.0242))
+    cap = [[(x * s_, 0.290 + dy * s_, z) for x, dy in grip_ring(0.0166, 0.0242)] for s_, z in ((1.06, -0.184), (1.06, -0.193), (0.92, -0.197))]
+    loft_mat(st, cap, lambda k, y: "Brass", cap="Brass")
+    lathe(st, [(0.0, 0.0), (0.0, 0.0062), (0.0018, 0.0050), (0.0030, 0.0)], (0, 0.272, -0.190), ((0, -1, -0.15), (1, 0, 0), (0, 0.15, -1)), "Crystal", 10, flat=True)
     ferrule = [[(x * 1.10, 0.315 + dy * 1.08, z) for x, dy in grip_ring(0.0152, 0.0232)] for z in (-0.036, -0.046)]
     loft_mat(st, ferrule, lambda k, y: "Brass", cap="Brass")
     fore = [Vector((0.705, -0.070)), Vector((0.712, -0.115)), Vector((0.722, -0.160)), Vector((0.726, -0.176))]
     grip(fore, (0.0125, 0.0135, 0.0130, 0.0118), (0.0190, 0.0200, 0.0195, 0.0170))
     spur = [[(x * s_, 0.726 + dy * s_, z) for x, dy in grip_ring(0.0118, 0.0170)] for s_, z in ((1.08, -0.172), (1.10, -0.182), (0.5, -0.192))]
     loft_mat(st, spur, lambda k, y: "Iron", cap="Iron")
-    # talon pommel: iron claws round a resonance crystal
-    orb = Vector((0.0, 0.282, -0.262))
-    lathe(st, [(0.0, 0.0), (0.0, 0.020), (0.008, 0.024), (0.016, 0.018), (0.018, 0.0)], (0, 0.277, -0.244), ((0, 0.18, -1), (1, 0, 0), (0, 1, 0.18)), "Iron", 16)
-    lathe(st, [(-0.0175, 0.0), (-0.012, 0.0125), (0.0, 0.0175), (0.012, 0.0125), (0.0175, 0.0)], tuple(orb), 'z', "Crystal", 16, flat=True)
-    for k, a in enumerate((-0.75, 0.0, 0.75, math.pi)):
-        d = Vector((math.sin(a), math.cos(a), 0))
-        toe = catmull([orb + Vector((0, 0, 0.022)) + d * 0.004, orb + d * 0.019 + Vector((0, 0, 0.011)), orb + d * 0.022 + Vector((0, 0, -0.006)), orb + d * 0.013 + Vector((0, 0, -0.019))], 3)
-        tube(st, toe, 0.0045, "Iron", 6, rfun=lambda t: 0.0050 - 0.0035 * t)
-    # --- trigger housing + talon guard
+    # --- trigger: a walnut lower receiver with a slot for the talon trigger, closed fore and aft below it, and a
+    #     forged brass guard from the receiver round under the trigger into the front of the grip
     for sx in (-1, 1):
-        prism(st, [(0.326, -0.058), (0.366, -0.058), (0.364, -0.080), (0.352, -0.094), (0.334, -0.092), (0.326, -0.080)],
-              (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), sx * 0.0056, sx * 0.0108, "Iron", 0.0012, 2)
-        lathe(st, [(0, 0), (0, 0.0035), (0.002, 0.003), (0.003, 0)], (sx * 0.0108, TRIGGER_PIVOT.y, TRIGGER_PIVOT.z), ((sx, 0, 0), (0, 1, 0), (0, 0, 1)), "Brass", 10)
-    guard = catmull([(0, 0.366, -0.066), (0, 0.394, -0.098), (0, 0.396, -0.140), (0, 0.374, -0.170), (0, 0.338, -0.178), (0, 0.318, -0.168)], 6)
-    tube(st, guard, 0.0055, "Brass", 12, rfun=lambda t: 0.0045 + 0.003 * math.sin(math.pi * t))
-    tube(st, catmull([(0, 0.394, -0.120), (0, 0.410, -0.124), (0, 0.418, -0.136)], 4), 0.003, "Iron", 8, rfun=lambda t: 0.003 * (1 - 0.8 * t))
+        prism(st, [(0.316, -0.028), (0.450, -0.028), (0.434, -0.056), (0.414, -0.086), (0.330, -0.086), (0.316, -0.072)],
+              (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), sx * 0.0056, sx * 0.0162, "Walnut", 0.0016, 2)
+        prism(st, [(0.330, -0.0852), (0.414, -0.0852), (0.4125, -0.0878), (0.331, -0.0878)], (0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0),
+              sx * 0.0058, sx * 0.0166, "Steel", 0.0004, 1)
+        lathe(st, [(0, 0), (0, 0.0036), (0.0018, 0.0030), (0.0026, 0)], (sx * 0.0162, TRIGGER_PIVOT.y, TRIGGER_PIVOT.z), ((sx, 0, 0), (0, 1, 0), (0, 0, 1)), "Brass", 10)
+    for y0, y1 in ((0.318, 0.333), (0.374, 0.413)):
+        rbox(st, (-0.0058, y0, -0.0862), (0.0058, y1, -0.0300), "Walnut", 0.0008)
+    guard = [(0, 0.405, -0.082), (0, 0.410, -0.112), (0, 0.400, -0.144), (0, 0.374, -0.161), (0, 0.342, -0.164), (0, 0.322, -0.155), (0, 0.308, -0.142)]
+    sweep(guard, lambda t: [(0.0058, -0.0030), (0.0068, 0.0), (0.0058, 0.0030), (-0.0058, 0.0030), (-0.0068, 0.0), (-0.0058, -0.0030)],
+          lambda k, y: "Brass", "Brass")
     build_winch_frame(st)
     return st
 
