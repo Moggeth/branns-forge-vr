@@ -718,7 +718,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
   let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity};
-  function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding});}return siegebirdFlock;}
+  function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding,ground:(x,z)=>heightAt(x,z,snapshot.edits)});}return siegebirdFlock;}
   // Reload birds linger: perches on standing trees near where the bird leaves the crossbow, ahead of its flight first.
   let siegebirdTreeCache=null,siegebirdTreeSnapshot=null;const siegebirdViewer=new THREE.Vector3();
   function siegebirdTrees(){if(siegebirdTreeSnapshot!==snapshot){siegebirdTreeSnapshot=snapshot;const felled=new Set((snapshot.harvestedTrees||[]).filter(isFelled).map(h=>h.id));siegebirdTreeCache=worldTrees(snapshot).filter(t=>!felled.has(t.id));}return siegebirdTreeCache;}
@@ -784,6 +784,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     else if(c.cue==='ready')a?.ready();
     else if(c.cue==='enter'&&c.plumage!==undefined){a?.call(SIEGEBIRD_PLUMAGES[c.plumage]?.id,c.side,c.golden,.12);a?.flutter(c.side,.3,15,.3);}
     else if(c.cue==='seat'&&c.plumage!==undefined){a?.seat(c.golden);feedback.siegebird?.('seat',c);}
+  }
+  // Swapping away mid-reload: the bird turns off with the bolt and drops it (siegebird-flock.js stow). Coming back
+  // replays the delivery from the bird's entry, and the shot waits for the bolt to seat. Unchanged without a swap.
+  function stowSiegebird(){
+    const reload=siegebirdWind.time();if(reload<SIEGEBIRD_RELOAD.seat)siegebirdLocal.stowed={t:Math.max(0,reload),n:siegebirdLocal.n};
+    siegebirdFlock?.stow(axeModel);
+  }
+  function resumeSiegebird(){
+    const s=siegebirdLocal.stowed;siegebirdLocal.stowed=null;if(!s)return;
+    const t0=Math.min(s.t,SIEGEBIRD_RELOAD.enter),sb=snapshot.players.find(p=>p.id===playerId)?.siegebird;
+    siegebirdWind.resume(t0);siegebirdLocal.prevT=t0;
+    const flock=siegebirdFlockReady();if(flock&&axeModel)flock.shot(axeModel,{n:s.n,golden:sb&&sb.n===s.n?!!sb.golden:null,playerId,time:performance.now()/1000-t0});
   }
   function updateSiegebirdLocal(now,reload){
     const flock=siegebirdFlockReady();if(!flock||!axeModel)return;
@@ -893,11 +905,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function equipVisual(next) {
     if(next!==tool)feedback.reset();
+    if(tool==='crossbow'&&next!=='crossbow'&&axeModel)stowSiegebird();
     if(next==='limb'){axeModel?.removeFromParent();axeModel=null;tool=next;return;}
     const model=weaponModels.get(next);if(!model)return;
     aiming=false;adsAmount=0;siegebirdSight?.dispose();siegebirdSight=null;siegebirdAim=null;
     axeModel?.removeFromParent();tool=next;axeModel=model;weaponAnchor.remove(axePlaceholder);attachWeapon();
-    if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});}
+    if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});resumeSiegebird();}
   }
   function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;weapons.cancel();cancelWallAim();specialSwing=null;presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});aiming=false;
     // First person: stash the old item, then draw the new one (weapon-swap.js). VR hands and held limbs swap at once.
