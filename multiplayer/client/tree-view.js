@@ -7,6 +7,8 @@ import * as T from 'three';
 import {createCanopyRelease} from './canopy-release.js';
 import {createTreeBatches} from './tree-batch.js';
 import {createTreeMaterials} from './tree-materials.js';
+import {tagAppleSlots} from './tree-fruit-mask.js';
+import {APPLE_VARIANT} from '../shared/fruit.js';
 import {worldTrees} from '../shared/world-content.js';
 import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
 import {bakeTriangles, buildNotch, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
@@ -43,7 +45,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function kitFrom(name) {
   const src = templates.get(name)?.scene, root = src?.getObjectByName('Tree'); if (!root) { missing.add(name); return null; }
   root.updateMatrixWorld(true); const inv = new T.Matrix4().copy(root.matrixWorld).invert(), parts = {};
-  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: m.geometry, material: p === 'Leaves' && !mats ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)})); if (list.length) parts[p] = list; }
+  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: p === 'Fruit' && name === VARIANTS[APPLE_VARIANT] ? (g => (ownedGeometry.add(g), g))(tagAppleSlots(m.geometry, new T.Matrix4().multiplyMatrices(inv, m.matrixWorld))) : m.geometry, material: p === 'Leaves' && !mats ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)})); if (list.length) parts[p] = list; }
   if (!parts.Trunk || !parts.Roots) { missing.add(name); return null; }
   const trunkMesh = meshesUnder(root.getObjectByName('Trunk'))[0];
   const kit = {name, parts, trunk: bakeTriangles(trunkMesh, root), trunkColor: !!trunkMesh.geometry.attributes.color, trunkMaterial: trunkMesh.material};
