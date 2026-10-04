@@ -68,7 +68,7 @@ for (const spell of SPELLS) {
   const peaks = {};
   for (const q of ['high', 'medium', 'low']) { const { fx } = make({ quality: q }); for (const sp of ['sunder', 'raise', 'starfall', 'grove']) fx.play(ev(sp, `q-${sp}`, { position: [sp.length * 3, 0, 0] })); peaks[q] = run(fx, 1.6); ok(fx.stats().quality === q, `quality ${q} reported`); fx.dispose(); }
   ok(peaks.high.particles >= peaks.medium.particles && peaks.medium.particles >= peaks.low.particles, `particles degrade ${peaks.high.particles}/${peaks.medium.particles}/${peaks.low.particles}`);
-  ok(peaks.high.rocks > peaks.low.rocks && peaks.high.slabs > peaks.low.slabs, 'kinematic pieces degrade');
+  ok(peaks.high.rocks > peaks.low.rocks && peaks.high.slabs >= peaks.low.slabs, 'kinematic pieces degrade'); // Sunder's torn crust is the persistent chasm view now
   ok(peaks.high.draws >= peaks.low.draws, `draws degrade ${peaks.high.draws}/${peaks.low.draws}`);
   const { fx } = make({ reducedMotion: true }); fx.play(ev('lightning', 'rm')); run(fx, 2); ok(fx.stats().reducedMotion === true, 'reduced motion reported'); fx.configure({ quality: 'low', reducedMotion: false }); ok(fx.stats().quality === 'low' && !fx.stats().reducedMotion, 'configure'); fx.dispose();
   console.log('quality peaks', JSON.stringify(peaks));
