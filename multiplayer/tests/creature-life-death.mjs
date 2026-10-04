@@ -9,6 +9,7 @@ import {prepareAsset} from '../client/asset-pose.js';
 import {createCombatView} from '../client/combat-view.js';
 import {applyEnemyMotion} from '../client/enemy-motion.js';
 import {createCreatureLifeDeath, sampleCrawl, crawlWeight, emergencePlan, partDamage, CRAWL_KEYS} from '../client/creature-life-death.js';
+import {EMERGE_TICKS} from '../shared/enemy-behaviour.js';
 
 // Node has no image decoding: strip textures, keep geometry/skin/material factors.
 function untextured(path) {
@@ -34,7 +35,7 @@ assert.equal(crawlWeight(0), 1); assert.equal(crawlWeight(1), 0); assert.ok(craw
 const depths = {buried: 2, reach: 1.5, reach2: 1.3, pull: 1, hip: .8, kneel: .4, stand: -.03, rest: 0};
 assert.equal(sampleCrawl(0, depths).depth, 2); assert.equal(sampleCrawl(1, depths).depth, 0);
 for (let i = 1; i < CRAWL_KEYS.length; i++) assert.ok(CRAWL_KEYS[i].u > CRAWL_KEYS[i - 1].u);
-for (const id of ['e1', 'e2', 'e77']) { const p = emergencePlan(id); assert.ok(p.duration >= 1.6 && p.duration <= 2.3); assert.deepEqual(p, emergencePlan(id)); }
+for (const id of ['e1', 'e2', 'e77']) { const p = emergencePlan(id); assert.ok(p.duration >= 2.5 && p.duration <= 3.1 && p.duration * 60 <= EMERGE_TICKS, 'the crawl finishes before the shared AI releases it'); assert.deepEqual(p, emergencePlan(id)); }
 assert.equal(partDamage({kind: 'skeleton', parts: {head: 55}}, 'head'), 0);
 assert.equal(partDamage({kind: 'skeleton', parts: {head: 0}, missingParts: []}, 'head'), 1);
 
@@ -148,15 +149,17 @@ function frame(entries, tick, dt = 1 / 60) {
   const before = nodes.get('d0').position.clone();
   fx.death(sk, {normal: [0, 0, 1]}); // struck from +Z => falls toward -Z
   scene.remove(sk.root);
-  let fell = false;
-  for (let t = 0; t < 90; t++) {
+  // Skeleton remains are a shared-physics ragdoll now (shared/remains-physics.js): the presentation must not add a
+  // collapse of its own on top of the authoritative pose, or every peer would see the bones double-fall.
+  let drift = 0;
+  for (let t = 0; t < 160; t++) {
     fx.beginFrame();
     for (const [i, d] of parts.entries()) { const n = nodes.get(d.id); n.position.fromArray(d.position); n.quaternion.identity(); } // server pose (static here)
     fx.syncDetached(nodes, parts);
-    if (t === 30 && nodes.get('d0').position.z < before.z - .2) fell = true;
+    drift = Math.max(drift, nodes.get('d0').position.distanceTo(before));
     fx.tick(1 / 60);
   }
-  assert.ok(fell, 'head falls along the killing-blow direction');
+  assert.ok(drift < 1e-6, 'skeleton remains show the shared ragdoll pose unaltered');
   fx.beginFrame(); fx.syncDetached(nodes, parts);
   assert.ok(nodes.get('d0').position.distanceTo(before) < 1e-6, 'remains end exactly on the authoritative pose');
   assert.equal(fx.stats().corpses, 0);

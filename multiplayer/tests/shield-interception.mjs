@@ -7,6 +7,7 @@ import {segmentSurfaceContacts, createCombatView, partAnchor, capturePartPoses} 
 import {createEnemy, projectileContact, hitEnemyPart, validPartHit} from '../shared/combat.js';
 import {createSimulation,loadSimulation} from '../shared/simulation.js';
 import {dressSkeleton} from '../client/skeleton-look.js';
+import {skeletonShield} from '../shared/skeleton-kinds.js';
 const began=performance.now();
 function untextured(name){
   const buf=readFileSync(new URL(`../public/assets/${name}.glb`,import.meta.url));
@@ -42,7 +43,7 @@ function stateFor(kind='bolt',path=[shotLine.from,shotLine.to]){
 for(const kind of ['arrow','bolt']){
  const s=stateFor(kind),before=structuredClone(s.enemies[0]);
  const result=projectileContact(s,{...shotLine.front,projectileId:'q'},ctx);
- assert.equal(result.ok,true);assert.deepEqual(s.enemies[0],before,'shield does not damage HP, armour, anatomy or hurt timing');
+ assert.equal(result.ok,true);const {shield:soaked,...after}=s.enemies[0];assert.deepEqual(after,before,'shield does not damage HP, armour, anatomy or hurt timing');assert.ok(soaked>0&&soaked<skeletonShield('target').hp,'the shield itself soaks the blow');
  assert.equal(s.players[0].stats.contribution,0);assert.equal(s.projectiles.length,0);
  assert.equal(s.embeds[0].surface,'shield');assert.equal(s.embeds[0].boneName,'LeftHand');
  assert.deepEqual(s.embeds[0].localPoint,shotLine.front.localPoint);assert.deepEqual(s.embeds[0].localQuaternion,shotLine.front.localQuaternion);
@@ -89,4 +90,19 @@ for(const mutate of [e=>e.surface='invulnerable',e=>e.part='head',e=>e.targetId=
 const stale=stateFor();stale.enemies[0].missingParts.push('leftArm');
 assert.equal(projectileContact(stale,{...shotLine.front,projectileId:'q'},ctx).ok,false,'missing shield-bearing limb cannot block');
 console.log(`shield-interception: real shield front/rear, zero damage, swept-step ordering, animated and detached embeds, migration pass (${((performance.now()-began)/1000).toFixed(3)}s)`);
-
+// Shields splinter: arrows and bolts wear them down (no damage through), the last blow breaks it, the
+// skeleton flinches and its shield arm no longer blocks. A golden bolt shatters any shield outright and
+// bursts on through to the body behind.
+{
+ const s=stateFor('arrow'),max=skeletonShield('target').hp,enemy=s.enemies[0];let broke=null;
+ for(let i=0;i<max&&!broke;i++){s.projectiles=[stateFor('arrow').projectiles[0]];const r=projectileContact(s,{...shotLine.front,projectileId:'q'},ctx);assert.equal(r.ok,true);broke=r.events.find(e=>e.kind==='shield_break');}
+ assert.ok(broke,'repeated arrows break the shield');assert.equal(enemy.hp,100);assert.equal(enemy.shieldBroken,true);assert.equal(enemy.flinchTick,s.tick);
+ assert.ok(!s.embeds.some(e=>e.surface==='shield'),'arrows in the shield fall with it');
+ s.projectiles=[stateFor('arrow').projectiles[0]];assert.equal(projectileContact(s,{...shotLine.front,projectileId:'q'},ctx).ok,false,'a broken shield no longer intercepts');
+ const sim=createSimulation();sim.addPlayer({id:'hero'});const saved=sim.checkpoint();saved.tick=s.tick;saved.enemies=[{...enemy}];assert.equal(loadSimulation(saved).snapshot().enemies[0].shieldBroken,true,'a broken shield stays broken across save/load');
+ const g=stateFor('bolt');g.projectiles[0].golden=true;const gr=projectileContact(g,{...shotLine.front,projectileId:'q'},ctx);
+ assert.equal(gr.ok,true);assert.ok(gr.events.some(e=>e.kind==='shield_break'&&e.golden));assert.equal(g.projectiles.length,1,'golden bolt flies on');
+ assert.equal(projectileContact(g,{...shotLine.front,projectileId:'q'},ctx).ok,false,'never the same shield twice');
+ const body=projectileContact(g,{...shotLine.back,projectileId:'q'},ctx);assert.equal(body.ok,true);assert.ok(body.events.some(e=>e.kind==='death'),'and kills the skeleton behind it');
+}
+console.log('shield break + golden pierce ok');

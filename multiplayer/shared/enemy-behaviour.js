@@ -3,6 +3,10 @@
 import {PICK_WALL} from './terrain.js';
 import {entSpec,entWaking,entRooting} from './ents.js';
 export const ENEMY_STRIKE_TICK=18;
+// A skeleton whose shield splinters reels for this long (no steering, no new swing, a swing in progress misses).
+export const FLINCH_TICKS=45;
+// A summoned skeleton crawls out of the ground before it can walk or swing (matches the client crawl).
+export const EMERGE_TICKS=190;
 const flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -15,6 +19,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
  const blocked=(a,b)=>{const n=Math.ceil(flat(a,b)/.18);for(let i=1;i<n;i++){const t=i/n,p=a.map((v,k)=>v+(b[k]-v)*t);p[1]+=1.05;const q=[...p];resolve(q,0,.04);if(flat(p,q)>.003||ground(p[0],p[2])>p[1])return true;}return false;};
  for(const e of state.enemies){
   if(e.meteorBorn&&state.tick-e.unfurlTick<90)continue;
+  if(e.kind==='skeleton'&&state.tick-(e.emergeTick??-1e9)<EMERGE_TICKS)continue;
   // An ent tearing free of the ground, or sinking its roots for good, neither walks nor strikes.
   if(e.kind==='ent'&&(entWaking(e,state.tick)||entRooting(e,state.tick)))continue;
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
@@ -28,7 +33,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
   let age=state.tick-e.attackTick;
   // Old saves can contain a wind-up without a locked target: let it recover harmlessly.
   const committed=age>=0&&age<34;
-  const staggered=state.tick-(e.hurtTick??-1000)<22;
+  const staggered=state.tick-(e.hurtTick??-1000)<22||state.tick-(e.flinchTick??-1000)<FLINCH_TICKS;
   if(!committed&&!staggered){
    const dx=target.position[0]-e.position[0],dz=target.position[2]-e.position[2];
    const desired=Math.atan2(-dx,-dz);e.yaw=wrap(e.yaw+clamp(wrap(desired-e.yaw),-.15,.15));
@@ -64,7 +69,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,eve
   if(age===ENEMY_STRIKE_TICK){
    const victim=targets.find(p=>p.id===e.attackTarget);if(!victim)continue;
    const d=flat(e.position,victim.position),dot=(-Math.sin(e.yaw)*(victim.position[0]-e.position[0])-Math.cos(e.yaw)*(victim.position[2]-e.position[2]))/Math.max(d,.001);
-   if(d<(buildings.includes(victim)?3.5:ent?ent.strike:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(buildings.includes(victim)||!blocked(e.position,victim.position))){
+   if(d<(buildings.includes(victim)?3.5:ent?ent.strike:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(e.flinchTick??-1000)<e.attackTick&&(buildings.includes(victim)||!blocked(e.position,victim.position))){
     const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(buildings.includes(victim))damageStructure?.(victim.id,amount,events);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
    }
   }
