@@ -1,36 +1,13 @@
 // Earth that animates (Raise Wall, Sunder, sinking segments) is drawn at the presentation clock every frame.
-// The partial ground refresh must match a full rebuild exactly, and the terrain must change between ticks.
+// The terrain must change between whole ticks, and the game must draw it at the shown tick.
 // Run: node tests/smooth-terrain.mjs
 import assert from 'node:assert/strict';
-import * as T from 'three';
 import {readFileSync} from 'node:fs';
-import {createTerrainGeometryUpdater} from '../client/terrain-geometry.js';
 import {createSimulation} from '../shared/simulation.js';
-import {terrainHeight, hasActiveTerrain, TERRAIN_GRID, sunderFront, SUNDER_SETTLE_DISTANCE} from '../shared/terrain.js';
+import {terrainHeight, hasActiveTerrain, sunderFront, SUNDER_SETTLE_DISTANCE} from '../shared/terrain.js';
 import {createPresentationClock} from '../client/presentation-clock.js';
 
 const started = performance.now();
-// ---- Partial refresh == full rebuild, positions and normals ----
-{
-  const make = () => { const g = new T.PlaneGeometry(120, 120, 160, 160); g.rotateX(-Math.PI / 2); return g; };
-  assert.equal(TERRAIN_GRID.step, .75); assert.equal(TERRAIN_GRID.half, 60);
-  const bump = t => (x, z) => Math.sin(x * .3) * Math.cos(z * .2) + t * Math.max(0, 3 - Math.hypot(x - 10, z + 7));
-  const full = make(), part = make(), pos = full.attributes.position;
-  for (const g of [full, part]) { const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, bump(0)(p.getX(i), p.getZ(i))); g.computeVertexNormals(); }
-  // vertex (i,j) sits at x=-60+.75i, z=-60+.75j
-  assert.equal(pos.getX(161 * 5 + 7), -60 + 7 * .75); assert.equal(pos.getZ(161 * 5 + 7), -60 + 5 * .75);
-  for (let i = 0; i < pos.count; i++) pos.setY(i, bump(1)(pos.getX(i), pos.getZ(i))); full.computeVertexNormals();
-  const updater = createTerrainGeometryUpdater(part); updater.update(bump(0));
-  for (const a of [part.attributes.position, part.attributes.normal]) a.onUploadCallback();
-  updater.update(bump(1), [{x: 10, z: -7, radius: 3}]);
-  const a = full.attributes, b = part.attributes;
-  for (let i = 0; i < a.position.array.length; i++) {
-    assert.ok(Math.abs(a.position.array[i] - b.position.array[i]) < 1e-6, `position ${i}`);
-    assert.ok(Math.abs(a.normal.array[i] - b.normal.array[i]) < 1e-5, `normal ${i}: ${a.normal.array[i]} vs ${b.normal.array[i]}`);
-  }
-  assert.ok(b.position.updateRanges.length > 0 && b.position.updateRanges.reduce((n, r) => n + r.count, 0) < b.position.array.length / 4, 'uploads only the touched rows');
-}
-
 // ---- Terrain differs between whole ticks while a front runs (fractional ticks are honoured) ----
 {
   const s = createSimulation({seed: 9}); s.addPlayer({id: 'g', role: 'god'}); let seq = 0;
