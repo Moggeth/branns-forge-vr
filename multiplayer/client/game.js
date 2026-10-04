@@ -1269,6 +1269,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function frame(now) {
     contactFrame++;
     if (disposed) return;
+    // Loading owns explicit representative poses and warm-up renders. Running
+    // the entire gameplay/terrain/IK pipeline while shaders are still compiling
+    // competes with downloads and the welcome screen without drawing a frame.
+    if (!startup.ready) { previous=now; return; }
     const frameStarted=performance.now();
     if(startup.ready)frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
