@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Terrain upload equivalence</title><script type="module">
+import * as T from 'three';
+import {createTerrainGeometryUpdater} from '../client/terrain-geometry.js';
+import {terrainHeight,terrainRenderVertex} from '../shared/terrain.js';
+const renderer=new T.WebGLRenderer({antialias:false});renderer.setSize(480,320);document.body.append(renderer.domElement);
+const scene=new T.Scene(),camera=new T.PerspectiveCamera(50,1.5,.1,200);camera.position.set(15,19,20);camera.lookAt(0,0,0);
+scene.add(new T.HemisphereLight(0xc6e0ed,0x5e5139,1.2));const sun=new T.DirectionalLight(0xffe3ad,2.2);sun.position.set(-22,38,15);scene.add(sun);
+const old=new T.PlaneGeometry(120,120,160,160).rotateX(-Math.PI/2),fast=old.clone();
+const mesh=new T.Mesh(old,new T.MeshStandardMaterial({color:0x667b43,roughness:1}));scene.add(mesh);
+const updater=createTerrainGeometryUpdater(fast),target=new T.WebGLRenderTarget(480,320),a=new Uint8Array(480*320*4),b=new Uint8Array(a.length);
+let comparisons=0;const before=[],after=[];
+function update(state,full=false){const height=(x,z)=>terrainRenderVertex(state,x,z,false,terrainHeight(state,x,z,false)),p=old.attributes.position;
+  let t=performance.now();for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);if(full||state.edits.some(e=>Math.hypot(x-e.x,z-e.z)<=e.radius+.75))p.setY(i,height(x,z));}
+  p.needsUpdate=true;old.computeVertexNormals();old.computeBoundingSphere();old.computeBoundingBox();before.push(performance.now()-t);
+  t=performance.now();updater.update(height,full?null:state.edits);after.push(performance.now()-t);
+}
+function compare(){renderer.setRenderTarget(target);mesh.geometry=old;renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,480,320,a);
+  mesh.geometry=fast;renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,480,320,b);
+  for(let i=0;i<a.length;i++)if(a[i]!==b[i])throw Error(`Rendered terrain differs at pixel channel ${i}: ${a[i]} vs ${b[i]}`);comparisons++;
+  renderer.setRenderTarget(null);renderer.render(scene,camera);
+}
+try{
+ update({tick:0,edits:[]},true);compare();
+ for(let i=1;i<=24;i++){
+   const state={tick:i,edits:[{id:'raise',kind:'raise',x:-3,z:1,radius:4,height:Math.sin(i/8)*4},{id:'lower',kind:'lower',x:5,z:-2,radius:3,height:-i/12}]};
+   update(state);if(i===12)update({...state,edits:state.edits.map(e=>({...e,height:e.height*.8}))},true); // full refresh followed by partial before upload
+   update(state);compare();await new Promise(requestAnimationFrame);
+ }
+ const summary=v=>({meanMs:v.slice(1).reduce((a,b)=>a+b,0)/(v.length-1),samples:v.length-1});
+ window.result={comparisons,pixelChannelsPerComparison:a.length,before:summary(before),after:summary(after),lastUpdate:updater.stats(),triangles:renderer.info.render.triangles};window.ready=true;
+}catch(e){window.failure=e.stack;window.ready=true;throw e;}
+</script>

@@ -33,7 +33,8 @@ for(let frame=0;frame<10;frame++){
   eightRoute.send('*',state);eightRoute.flush();
 }
 assert.equal(eight.sent.length,70,'eight peers need only ten metadata batches per outgoing edge each second');
-assert(eight.sent.every(m=>m.data.items.length===7&&JSON.stringify(m.data).length<32000));
+assert(eight.sent.every(m=>m.data.items.filter(i=>i.body.type==='state').length===7&&JSON.stringify(m.data).length<32000));
+assert(eight.sent.some(m=>m.data.items.some(i=>i.body.type==='neighbors')),'host distributes bounded symmetric voice selections');
 eight.epoch++;eightRoute.forward('a',{kind:'voice',epoch:1,to:'*',body:state});eightRoute.flush();assert.equal(eight.sent.length,70,'old epoch queued metadata is discarded');eightRoute.dispose();
 
 assert.deepEqual(acousticPosition({role:'god',xr:false,position:[0,80,0],focus:[5,3,7]}),[5,4.65,7]);

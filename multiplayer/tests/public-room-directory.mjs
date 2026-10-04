@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {createRoomDirectory,directoryURL} from '../client/public-room-directory.js';
+import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
+assert.equal(String(directoryURL('wss://example.com/peer/cloud?room=12345678#x')),'https://example.com/peer/rooms');
+assert.equal(directoryURL('ws://localhost:8789/peer'),null);
+const row={code:'12345678',hostName:'<script>unsafe</script>',players:[{name:'A',role:'hero'}],count:1,maxPlayers:8,joinable:true,status:'playing'};
+let requests=[],pending=[],states=[];
+const controller=createRoomDirectory({endpoint:'wss://example.com/peer/cloud',onChange:s=>states.push(s),fetcher:(url,options)=>new Promise(resolve=>{requests.push({url:String(url),options});pending.push(resolve);})});
+const first=controller.open();assert.equal(requests.length,1);controller.close();pending.shift()(Response.json({rooms:[row]}));await first;assert.equal(controller.state.rooms.length,0,'closed dialog ignores late results');
+const next=controller.open();pending.shift()(Response.json({rooms:[row],nextCursor:'room:12345678'}));await next;assert.equal(controller.state.rooms.length,1);
+const more=controller.more();assert.match(requests.at(-1).url,/cursor=room%3A12345678/);pending.shift()(Response.json({rooms:[row,{...row,code:'87654321'}]}));await more;assert.equal(controller.state.rooms.length,2,'pagination deduplicates');
+const failure=controller.refresh();pending.shift()(new Response('',{status:503}));await failure;assert.equal(controller.state.rooms.length,2);assert.match(controller.state.error,/connection/);
+assert.equal(requests[0].options.credentials,'omit');assert.ok(requests[0].options.signal.aborted);controller.dispose();controller.open();assert.equal(requests.length,4);
+const unavailable=createRoomDirectory({endpoint:'ws://localhost:8789/peer',onChange:()=>{},fetcher:()=>{throw Error('should not fetch');}});await unavailable.open();assert.match(unavailable.state.error,/cloud/);unavailable.dispose();
+const full={...row,count:MAX_PLAYERS,maxPlayers:MAX_PLAYERS,players:Array.from({length:MAX_PLAYERS},()=>({name:'Guest',role:'hero'})),joinable:false,status:'full'};
+const capacity=createRoomDirectory({endpoint:'wss://example.com/peer/cloud',onChange(){},fetcher:async()=>Response.json({rooms:[full,{...full,code:'00000001',count:MAX_PLAYERS+1},{...full,code:'00000002',maxPlayers:MAX_PLAYERS+1},null]})});
+await capacity.open();assert.equal(capacity.state.rooms.length,1);assert.equal(capacity.state.rooms[0].count,MAX_PLAYERS);capacity.dispose();
+console.log('public-room-directory: URL, cancellation, stale-response, pagination, retry and endpoint fallback passed');

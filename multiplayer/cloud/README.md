@@ -28,14 +28,55 @@ Pricing source: https://developers.cloudflare.com/durable-objects/platform/prici
 
 ## Deploy / inspect / recover
 
+### Public room directory (2026-10-04)
+
+`GET /peer/rooms` lists public multiplayer rooms, 50 at a time. Pass the returned
+`nextCursor` as `cursor` for the next page. Rows expose only room codes, host/player
+display names, initial chosen roles, online counts and playing/full/waiting status.
+They never include reconnect secrets, peer IDs, ICE data or saves. Solo is not listed.
+There is no private multiplayer mode. Listing is read-only, origin checked for browser
+requests, and separately rate limited (60 requests/minute/IP).
+
+Deploy the v2 Wrangler migration before publishing a browser that uses this endpoint.
+It adds a separate SQLite ForgeDirectory binding; it does not replace ForgeRoom or
+delete existing room data. Active rooms refresh metadata once per minute and on
+membership/handoff; entries expire after 150 seconds without refresh. Empty rooms
+are removed immediately. Existing rooms from before this deployment appear when
+their coordinator next handles traffic or membership; a page reconnect registers an
+otherwise idle old room. Directory failure is logged and does not reject gameplay.
+The index introduces one refresh/alarm per occupied room per minute, separate from
+gameplay traffic. Pagination and cleanup bound individual operations; it is not an
+unlimited-capacity lobby service.
+
+A full room reserves a disconnected guest's seat for five seconds. Its coordinator
+refreshes the listing at that deadline, so the vacancy does not wait for the next
+minute heartbeat. Host and pending continuation seats retain their separate recovery
+rules. `node tests/cloud-directory-lifecycle.mjs` verifies these deadlines and
+hibernation; `node tests/room-service-gate.mjs` verifies release readiness checks.
+
+Checks: `node tests/room-directory.mjs`, `node tests/public-room-directory.mjs`, then
+`CLOUD_TEST_URL=http://127.0.0.1:8792 node cloud/directory-test.mjs` against the owned
+local Wrangler process (set the environment variable using your shell's syntax).
+The live test verifies CORS, no public writes, list/create/join/full, host transfer,
+waiting status and empty-room removal. Use `node cloud/test.mjs` for protocol recovery.
+
 From `multiplayer/` using the personal Cloudflare subscription:
 
 ```powershell
 npx --yes wrangler@4.147.0 whoami
 npx --yes wrangler@4.147.0 deploy --config cloud/wrangler.jsonc
-npx --yes wrangler@4.147.0 tail --config cloud/wrangler.jsonc
+$env:PEER_URL='wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud'
+node scripts/check-room-service.mjs
 ./scripts/deploy-peer-preview.ps1 -PeerUrl wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud
 ```
+
+Despite its historical filename, `deploy-peer-preview.ps1` publishes production.
+Deploy the Worker first, then require the read-only readiness gate to pass before
+publishing the frontend. The gate requires `/peer/health` to advertise the shared
+human capacity (currently 32) and `/peer/rooms` to return a valid HTTP 200 listing;
+it times out after eight seconds and never logs endpoint credentials. The live
+frontend workflow runs this same gate before its build and deploy. To inspect the
+Worker separately, run `npx --yes wrangler@4.147.0 tail --config cloud/wrangler.jsonc`.
 
 `GET /peer/health` reports service/protocol, never credentials. Dashboard Workers
 observability samples 10% of events; explicit application logs include room/count only.
@@ -52,7 +93,7 @@ decline unnecessary migration offers after a signaling-only interruption.
 
 Origins are explicitly allowlisted; signaling/relay routes are restricted to the
 room's host and guests. There are per-IP connection limits, per-socket message/byte
-limits, at most eight members, at most sixteen pending/connected sockets, and 12-second
+limits, at most 32 members, at most 40 pending/connected sockets, and 12-second
 join timeouts. These limits reduce abuse but invite codes are not private accounts or
 anti-cheat. Browser hosts are authoritative and trusted in this friends playtest.
 

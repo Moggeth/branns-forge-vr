@@ -37,6 +37,7 @@ export function deliverable(stage, held) {
   return kinds.filter(k => (held[k] || 0) > 0);
 }
 export function nextStep(view, held) {
+  if(typeof view.nextStep==='string')return view.nextStep;
   const open = id => view.objectives.find(o => o.id === id && !o.done);
   const more = o => o.need - o.have;
   switch (view.stage) {
@@ -90,7 +91,7 @@ export function heroPanelModel(view, held, ui = {}) {
     : view.notice && view.notice !== view.title ? {text: view.notice, color: DIM} : null;
   return {stage: view.stage, title: view.title, tone: TONE[view.stage] || INK,
     timer: !['camp', 'star', 'rekindle'].includes(view.stage) ? '' : `${Math.floor(view.elapsedSeconds / 60)}:${String(view.elapsedSeconds % 60).padStart(2, '0')}`,
-    track: STAGES.map(([s, label], i) => ({label, state: view.stage === 'victory' || (stageIndex >= 0 && i < stageIndex) ? 'done' : i === stageIndex ? 'now' : 'todo'})),
+    track: view.mode==='battle'?[]:STAGES.map(([s, label], i) => ({label, state: view.stage === 'victory' || (stageIndex >= 0 && i < stageIndex) ? 'done' : i === stageIndex ? 'now' : 'todo'})),
     rows, next: nextStep(view, held), alert, carry: CARRY.map(([k, icon]) => ({icon, count: held[k] || 0})), buttons};
 }
 export function forgePanelPages(settlement){

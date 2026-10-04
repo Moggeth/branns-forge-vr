@@ -49,6 +49,8 @@ export function worldColliders(s,{terrainHeight,near,exclude=null}){
    w:box.max[0]-box.min[0],d:box.max[2]-box.min[2],y0:box.min[1],y1:box.max[1],cx:(box.min[0]+box.max[0])/2,cz:(box.min[2]+box.max[2])/2});continue;}
   const sh=STRUCTURE_SHAPES[b.type]||{radius:1.2,height:2.5},r=sh.ring||sh.radius;if(!near(b.position[0],b.position[2],r))continue;
   out.push(sh.ring?{kind:'block',obj:b,shape:'ring',at:b.position,radius:sh.ring,band:sh.band,height:sh.height,reach:sh.ring+sh.band}:{kind:'block',obj:b,shape:'frustum',at:b.position,base:sh.radius,top:sh.radius,height:sh.height,reach:sh.radius});}
+ for(const base of s.battle?.bases||[]){if(!(base.hp>0)||!near(base.position[0],base.position[2],2))continue;
+  out.push({kind:'battle-base',obj:base,shape:'frustum',at:base.position,base:2,top:2,height:2.8,reach:2});}
  for(const d of s.deposits||[]){if(d.depleted||d.special)continue;const sh=depositShape(d);if(!near(d.x,d.z,sh.base))continue;out.push({kind:'block',obj:d,shape:'frustum',at:[d.x,g(d.x,d.z),d.z],...sh,reach:sh.base});}
  for(const t of worldTrees(s)){const reach=.5*treeScale(t);if(!near(t.x,t.z,reach))continue;const cut=s.harvestedTrees?.find(h=>h.id===t.id),floor=g(t.x,t.z);
   // Standing (even notched) trunks are sheared by the wire; a felled tree leaves a stump the bolts bury themselves in.
