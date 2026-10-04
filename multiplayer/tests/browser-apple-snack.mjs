@@ -10,7 +10,7 @@ import {worldTrees} from '../shared/world-content.js';
 import {terrainHeight} from '../shared/simulation.js';
 
 const CLIP = process.env.CLIP_DIR || '', TOUCH = !!process.env.TOUCH;
-const viewport = TOUCH ? {width: 844, height: 390} : {width: 960, height: 540};
+const viewport = TOUCH ? {width: 844, height: 390} : {width: 640, height: 360};
 const {browser, page} = await launch({viewport, touch: TOUCH});
 // Virtual clock: performance.now and requestAnimationFrame only move when the test advances a frame.
 await page.addInitScript(() => {
@@ -22,9 +22,10 @@ await page.addInitScript(() => {
 let frameNo = 0, captured = 0, recording = false; // capture only the moments worth watching (a software renderer is slow)
 if (CLIP) mkdirSync(CLIP, {recursive: true});
 // One 60 Hz frame: advance the clock, let the session's 8 ms interval step the simulation, then render.
+// Off camera (walking, waiting) a frame advances 50 ms so the slow software renderer gets through it sooner.
 async function frames(n, each = null) {
  for (let i = 0; i < n; i++) {
-  await page.evaluate(() => window.__vt.frame()); await new Promise(r => setTimeout(r, 12));
+  await page.evaluate(ms => window.__vt.frame(ms), recording || !CLIP ? 1000/60 : 50); await new Promise(r => setTimeout(r, 12));
   if (each) await each(i);
   if (CLIP && recording && frameNo++ % 2 === 0) await page.screenshot({path: join(CLIP, `f${String(captured++).padStart(4, '0')}.png`)});
  }
@@ -41,6 +42,11 @@ async function look(at, n = 20, lead = 0) {
   await frames(1);
  }
 }
+async function walkTo(at, near) {
+ for (let i = 0; i < 120; i++) { const {me} = await harness(); if (Math.hypot(at[0] - me.position[0], at[2] - me.position[2]) < near) return true;
+  await look([at[0], me.position[1] + 1.65, at[2]], 2); await page.keyboard.down('KeyW'); await frames(Math.min(4, 1 + Math.floor(Math.hypot(at[0] - me.position[0], at[2] - me.position[2])*2))); await page.keyboard.up('KeyW'); }
+ return false;
+}
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
@@ -48,16 +54,21 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().controlsActive);
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
- await page.locator('#world').click({position: {x: 480, y: 270}});
+ await page.locator('#world').click({position: {x: 320, y: 180}});
  await frames(10);
  await page.keyboard.press('Digit5'); await frames(30);
  const {s} = await harness(); assert.equal((await harness()).c.weapon.tool, 'bow');
- const tree = worldTrees(s).find(t => t.id === 'tree1'), floor = terrainHeight(s, tree.x, tree.z);
- // the lowest apple on the side facing us
+ const all = worldTrees(s), tree = all.find(t => t.id === 'tree1'), floor = terrainHeight(s, tree.x, tree.z);
+ // a clear vantage 6.5 m out from tree1, on the side farthest from its neighbours
+ const vantage = [...Array(12).keys()].map(i => { const a = i/12*Math.PI*2, x = tree.x + Math.sin(a)*6.5, z = tree.z + Math.cos(a)*6.5;
+  return {x, z, clear: Math.min(...all.filter(t => t !== tree).map(t => Math.hypot(t.x - x, t.z - z)))}; }).sort((a, b) => b.clear - a.clear)[0];
+ assert.ok(await walkTo([vantage.x, 0, vantage.z], .8), 'reached the vantage point');
  const {me} = await harness();
- const slot = [...Array(26).keys()].map(i => ({i, w: appleWorld(tree, i, floor)})).filter(q => q.w.position[1] < floor + 3.8).sort((a, b) => Math.hypot(a.w.position[0] - me.position[0], a.w.position[2] - me.position[2]) - Math.hypot(b.w.position[0] - me.position[0], b.w.position[2] - me.position[2]))[0];
- const target = slot.w.position; record('target', 'pass', {tree: tree.id, slot: slot.i, target});
- recording = true; await look(target, 40, .02);
+ // the lowest apple on the side facing us
+ const slot = [...Array(26).keys()].map(i => ({i, w: appleWorld(tree, i, floor)})).filter(q => q.w.position[1] < floor + 3.9).sort((a, b) => Math.hypot(a.w.position[0] - me.position[0], a.w.position[2] - me.position[2]) - Math.hypot(b.w.position[0] - me.position[0], b.w.position[2] - me.position[2]))[0];
+ const target = slot.w.position; record('target', 'pass', {tree: tree.id, slot: slot.i, target, vantage});
+ recording = true;
+ await look(target, 40, .02);
  await page.mouse.down(); await frames(50); await page.mouse.up();
  let pierced = null;
  await frames(40, async () => { if (!pierced) { const {s} = await harness(); pierced = s.fruit?.drops?.[0] || null; } });
@@ -69,8 +80,7 @@ try {
  await shot(page, 'apple-landed');
  // walk over to it
  recording = false;
- for (let i = 0; i < 90; i++) { const {me, s} = await harness(), d = s.fruit.drops[0]; if (Math.hypot(d.position[0] - me.position[0], d.position[2] - me.position[2]) < 1.3) break;
-  await look(d.position, 2); await page.keyboard.down('KeyW'); await frames(4); await page.keyboard.up('KeyW'); }
+ assert.ok(await walkTo((await harness()).s.fruit.drops[0].position, 1.3), 'walked to the apple');
  recording = true; await look((await harness()).s.fruit.drops[0].position, 16);
  await frames(20); await shot(page, 'apple-cue');
  await page.keyboard.press('KeyE'); await frames(45);

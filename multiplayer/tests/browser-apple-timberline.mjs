@@ -18,7 +18,7 @@ s.inventions.structures.push({id: 'apple-line', type: 'timberline', position: [p
 const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 
 const CLIP = process.env.CLIP_DIR || '';
-const {browser, page} = await launch({viewport: {width: 960, height: 540}});
+const {browser, page} = await launch({viewport: {width: 640, height: 360}});
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
  performance.now = () => on ? vt : real();
@@ -27,9 +27,10 @@ await page.addInitScript(() => {
 });
 let frameNo = 0, captured = 0, recording = false; // capture only the moments worth watching (a software renderer is slow)
 if (CLIP) mkdirSync(CLIP, {recursive: true});
+// Off camera (walking, waiting) a frame advances 50 ms so the slow software renderer gets through it sooner.
 async function frames(n, each = null) {
  for (let i = 0; i < n; i++) {
-  await page.evaluate(() => window.__vt.frame()); await new Promise(r => setTimeout(r, 12));
+  await page.evaluate(ms => window.__vt.frame(ms), recording || !CLIP ? 1000/60 : 50); await new Promise(r => setTimeout(r, 12));
   if (each) await each(i);
   if (CLIP && recording && frameNo++ % 2 === 0) await page.screenshot({path: join(CLIP, `f${String(captured++).padStart(4, '0')}.png`)});
  }
@@ -57,7 +58,7 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().phase === 'game');
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
- await page.mouse.click(480, 270); await frames(10);
+ await page.mouse.click(320, 180); await frames(10);
  const machine = (await harness()).s.inventions.structures.find(b => b.id === 'apple-line');
  assert.ok(await walkTo(machine.position, 1.8), 'reached the Timberline');
  await page.keyboard.press('KeyE'); await frames(30);
