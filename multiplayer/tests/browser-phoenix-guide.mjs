@@ -5,7 +5,7 @@ for(const mobile of [false,true]){
  try{
   await page.goto(BASE+'/?acceptanceProbe');await page.waitForFunction(()=>window.brannHarness?.state().rendererReady);await page.locator('#solo').click();await page.waitForFunction(()=>window.brannHarness?.state().controlsActive);await sleep(1000);
   if(!mobile){
-   await page.keyboard.press('Digit5');await page.locator('#world').click({position:{x:700,y:350}});await page.waitForFunction(()=>!!document.pointerLockElement);await page.mouse.move(1030,300);await sleep(120);await page.mouse.down({button:'right'});await page.mouse.down({button:'left'});await sleep(350);await page.keyboard.press('KeyQ');await page.mouse.move(1070,285);
+   await page.keyboard.press('Digit5');await page.locator('#world').click({position:{x:700,y:350}});await page.waitForFunction(()=>!!document.pointerLockElement);await page.mouse.move(1030,300);await sleep(120);await page.mouse.down({button:'right'});await page.mouse.down({button:'left'});await sleep(350);await page.mouse.move(1070,285);
   }else{
    await chooseTouchWeapon(page,'bow');const cdp=await context.newCDPSession(page),b=await page.locator('[data-touch-action="strike"]').boundingBox(),q=await page.locator('#special').boundingBox();const p1={x:b.x+b.width/2,y:b.y+b.height/2,id:1},p2={x:q.x+q.width/2,y:q.y+q.height/2,id:2};
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p1]});await sleep(350);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p1,p2]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[p2]});
