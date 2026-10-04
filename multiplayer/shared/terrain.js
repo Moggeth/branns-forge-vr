@@ -9,7 +9,21 @@ export const sunderDurationTicks=length=>Math.max(36,Math.min(120,Math.ceil(leng
 export const PICK_WALL=Object.freeze({width:1.1,peak:2.4,rampStart:.55,rampSlope:.8,start:1.6,minReach:3.5,maxReach:8.7,segment:1,maxSegments:7,
   cap:.3,speed:10,lifetimeTicks:3600,sinkTicks:36,warnTicks:180,standing:2,launchTicks:42,launchPeak:1.6,heroLift:6.5,damage:65});
 export const pickWallDurationTicks=length=>Math.max(24,Math.ceil(length/PICK_WALL.speed*60)+10);
-const RUPTURE_DURATION={sunder:sunderDurationTicks,pick_wall:pickWallDurationTicks};
+/** God's Raise Wall: a geode rampart drawn along a line. Same timed-capsule machinery as the crystal wall, bigger: a flat
+ * crest (plateau) between steep faces, tapering ends that are walkable ramps, one quarryable deposit per segment. */
+export const RAISE_WALL=Object.freeze({width:1.75,peak:3.2,plateau:1.7,endHeight:.35,ramp:4,cap:.5,segment:2.5,minSegments:2,maxSegments:8,
+  speed:9,lifetimeTicks:3600,sinkTicks:48,warnTicks:180,standing:3,launchTicks:42,launchPeak:1.6,heroLift:7.6,damage:45,shove:.14});
+/** God's Sunder: a chasm torn along a line. A steep-walled trench with a flat floor and spoil banks on both lips; its
+ * ends ramp up so anything caught inside can walk out. It closes again after its lifetime (the earth rises back). */
+export const SUNDER=Object.freeze({width:1.3,depth:2.4,plateau:1.45,bank:.75,bankOut:3.1,endHeight:.3,ramp:2.4,cap:.55,segment:2.5,minSegments:2,maxSegments:8,
+  lifetimeTicks:3600,sinkTicks:72,warnTicks:180,standing:3,damage:40,slowTicks:150,seams:2});
+/** Timed capsule segments (edit.wall descriptor): tuning per edit kind. Mastery/upgrades scale these tables. */
+export const WALL_SPECS=Object.freeze({pick_wall:PICK_WALL,wall:RAISE_WALL,sunder:SUNDER});
+export const wallSpec=kind=>WALL_SPECS[kind]||PICK_WALL;
+/** Segments for a drawn God line of `length` metres (Raise Wall and Sunder share the count). */
+export const earthLineSegments=length=>Math.min(RAISE_WALL.maxSegments,Math.max(RAISE_WALL.minSegments,Math.round(length/RAISE_WALL.segment)));
+export const raiseWallDurationTicks=length=>Math.max(24,Math.ceil(length/RAISE_WALL.speed*60)+10);
+const RUPTURE_DURATION={sunder:sunderDurationTicks,pick_wall:pickWallDurationTicks,wall:raiseWallDurationTicks};
 const xz=p=>p.length===3?[p[0],p[2]]:[p[0],p[1]];
 export function createSunderRupture(id,start,end,startTick,kind='sunder') {
   const a=xz(start),b=xz(end),length=Math.hypot(b[0]-a[0],b[1]-a[1]);
@@ -23,7 +37,7 @@ export function sunderFront(rupture,tick=Infinity) {
 /** 0..1 sink of an expiring/mined crystal wall segment (1 = fully gone). */
 export function wallSink(edit,tick=Infinity) {
   const w=edit.wall;if(!w||tick<=w.expireTick)return 0;
-  return smooth(clamp((tick-w.expireTick)/PICK_WALL.sinkTicks,0,1));
+  return smooth(clamp((tick-w.expireTick)/wallSpec(edit.kind).sinkTicks,0,1));
 }
 export function terrainEditScale(edit,tick=Infinity,x=edit.x,z=edit.z) {
   const sink=edit.wall?1-wallSink(edit,tick):1;
@@ -35,13 +49,26 @@ export function terrainEditScale(edit,tick=Infinity,x=edit.x,z=edit.z) {
 }
 /** Profile of a v2 crystal wall segment: height lerps h0->h1 along a->b with a smooth falloff to `width` beside it and
  * a short `cap` past each end, so neighbours join into one crest yet a mined segment leaves a walkable breach. */
-export function wallProfile(w,x,z) {
+export function wallProfile(w,x,z,spec=PICK_WALL) {
   const dx=w.b[0]-w.a[0],dz=w.b[1]-w.a[1],l=Math.hypot(dx,dz),ux=dx/l,uz=dz/l,px=x-w.a[0],pz=z-w.a[1];
   const along=px*ux+pz*uz,over=along<0?-along:along>l?along-l:0,side=Math.abs(px*uz-pz*ux);
-  const t=1-Math.hypot(side,over*PICK_WALL.width/PICK_WALL.cap)/PICK_WALL.width;
-  return t<=0?0:(w.h0+(w.h1-w.h0)*clamp(along/l,0,1))*smooth(Math.min(1,t));
+  const t=1-Math.hypot(side,over*spec.width/spec.cap)/spec.width;
+  return t<=0?0:(w.h0+(w.h1-w.h0)*clamp(along/l,0,1))*smooth(Math.min(1,t*(spec.plateau||1)));
 }
-const sinking=(e,tick)=>e.wall&&tick>=e.wall.expireTick&&tick<=e.wall.expireTick+PICK_WALL.sinkTicks;
+/** Sunder chasm segment: a flat-floored trench (negative, h0/h1 are depths) plus a spoil bank beyond each lip.
+ * Returns [trench<=0, bank>=0] in CHASM; neighbours combine by min/max so joints never double up. */
+export const CHASM=[0,0];
+export function chasmProfile(w,x,z,spec=SUNDER) {
+  const dx=w.b[0]-w.a[0],dz=w.b[1]-w.a[1],l=Math.hypot(dx,dz),ux=dx/l,uz=dz/l,px=x-w.a[0],pz=z-w.a[1];
+  const along=px*ux+pz*uz,over=along<0?-along:along>l?along-l:0,side=Math.abs(px*uz-pz*ux);
+  const depth=w.h0+(w.h1-w.h0)*clamp(along/l,0,1),scale=depth/spec.depth;
+  const t=1-Math.hypot(side,over*spec.width/spec.cap)/spec.width;
+  CHASM[0]=t<=0?0:-depth*smooth(Math.min(1,t*spec.plateau));
+  const centre=(spec.width+spec.bankOut)/2,half=(spec.bankOut-spec.width)/2,b=1-Math.hypot(side-centre,over*half/spec.cap)/half;
+  CHASM[1]=b<=0?0:spec.bank*scale*smooth(b);
+  return CHASM;
+}
+const sinking=(e,tick)=>e.wall&&tick>=e.wall.expireTick&&tick<=e.wall.expireTick+wallSpec(e.kind).sinkTicks;
 export function hasActiveTerrain(edits,tick) {return edits.some(e=>e.rupture&&tick>=e.rupture.startTick&&tick<=e.rupture.startTick+e.rupture.durationTicks||sinking(e,tick));}
 const editStamp=e=>`${e.id}|${e.kind}|${e.x}|${e.z}|${e.radius}|${e.height}|${e.rupture?JSON.stringify(e.rupture):''}|${e.wall?JSON.stringify(e.wall):''}`;
 // A timestamp changes only for a kernel intersecting the moving front; kernels
@@ -79,17 +106,21 @@ export function validateTerrainRuptures(edits,tick) {
 const restoreRupture=r=>({id:r.id,start:[...r.start],end:[...r.end],startTick:r.startTick,durationTicks:r.durationTicks});
 const restoreWall=w=>({a:[...w.a],b:[...w.b],h0:w.h0,h1:w.h1,expireTick:w.expireTick,owner:w.owner});
 export function restoreTerrainEdit(e) {return {id:e.id,kind:e.kind,x:e.x,z:e.z,radius:e.radius,height:e.height,...(e.rupture?{rupture:restoreRupture(e.rupture)}:{}),...(e.wall?{wall:restoreWall(e.wall)}:{})};}
-/** v2 crystal wall segment: exact capsule on its cast's rupture line, bounded heights, lifetime from the cast tick. */
-export function validatePickWall(e,tick) {
-  const w=e.wall,r=e.rupture,pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
-  if(!w||typeof w!=='object'||Array.isArray(w)||!r||!pair(w.a)||!pair(w.b)||typeof w.owner!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(w.owner))return false;
-  const half=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])/2,heights=[w.h0,w.h1,e.height];
-  if(!heights.every(h=>Number.isFinite(h)&&h>0&&h<=PICK_WALL.peak)||e.height!==Math.max(w.h0,w.h1)||half<.05||half>PICK_WALL.segment)return false;
-  if(Math.abs(e.radius-(half+PICK_WALL.width))>1e-9||Math.abs(e.x-(w.a[0]+w.b[0])/2)>1e-9||Math.abs(e.z-(w.a[1]+w.b[1])/2)>1e-9)return false;
-  if(!Number.isSafeInteger(w.expireTick)||w.expireTick<r.startTick||w.expireTick>r.startTick+PICK_WALL.lifetimeTicks||(w.expireTick<r.startTick+PICK_WALL.lifetimeTicks&&w.expireTick>tick))return false;
+/** Footprint radius of a timed segment of half-length `half` (chasms include their spoil banks). */
+export const wallSegmentRadius=(kind,half)=>{const spec=wallSpec(kind);return half+(kind==='sunder'?spec.bankOut:spec.width);};
+/** Timed segment (crystal wall, Raise Wall or Sunder chasm): exact capsule on its cast's rupture line, bounded heights,
+ * lifetime from the cast tick. A chasm stores positive depths in h0/h1 and a negative edit.height. */
+export function validateWallSegment(e,tick) {
+  const w=e.wall,r=e.rupture,spec=WALL_SPECS[e.kind],pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
+  if(!spec||!w||typeof w!=='object'||Array.isArray(w)||!r||!pair(w.a)||!pair(w.b)||typeof w.owner!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(w.owner))return false;
+  const half=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])/2,top=spec.peak??spec.depth,chasm=e.kind==='sunder';
+  if(![w.h0,w.h1].every(h=>Number.isFinite(h)&&h>0&&h<=top)||e.height!==(chasm?-1:1)*Math.max(w.h0,w.h1)||half<.05||half>spec.segment)return false;
+  if(Math.abs(e.radius-wallSegmentRadius(e.kind,half))>1e-9||Math.abs(e.x-(w.a[0]+w.b[0])/2)>1e-9||Math.abs(e.z-(w.a[1]+w.b[1])/2)>1e-9)return false;
+  if(!Number.isSafeInteger(w.expireTick)||w.expireTick<r.startTick||w.expireTick>r.startTick+spec.lifetimeTicks||(w.expireTick<r.startTick+spec.lifetimeTicks&&w.expireTick>tick))return false;
   const dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1],length=Math.hypot(dx,dz);
   return [w.a,w.b].every(p=>{const along=((p[0]-r.start[0])*dx+(p[1]-r.start[1])*dz)/(length*length),side=Math.abs((p[0]-r.start[0])*dz-(p[1]-r.start[1])*dx)/length;return along>=-1e-6&&along<=1+1e-6&&side<1e-5;});
 }
+export const validatePickWall=validateWallSegment;
 export function mountainHeight(x,z) {
   const t=clamp((Math.max(Math.abs(x),Math.abs(z))-46)/9,0,1);
   return smooth(t)*(14+2*Math.sin(x*.31+z*.17)+Math.cos(z*.43-x*.11));
@@ -127,7 +158,7 @@ function foundationHeight(state,x,z,y) {
   return total?y+(target/total-y)*(1-remaining):y;
 }
 export function rawTerrainHeight(state,x,z) {
-  let earth=0,scar=0,wall=0;
+  let earth=0,scar=0,wall=0,low=0,high=0;
   if(state.terrainBake&&sampleBake(state.terrainBake,x,z)){earth=BAKED[0];scar=BAKED[1];}
   for(const edit of state.edits||[]) {
     const dx=x-edit.x,dz=z-edit.z;
@@ -135,11 +166,15 @@ export function rawTerrainHeight(state,x,z) {
     // preserving original edit order, distance calculation and floating-point sum.
     if(Math.abs(dx)>=edit.radius||Math.abs(dz)>=edit.radius)continue;
     let h;
-    if(edit.wall){h=wallProfile(edit.wall,x,z);if(h<=0)continue;}
+    if(edit.wall&&edit.kind==='sunder'){
+      const [trench,bank]=chasmProfile(edit.wall,x,z);if(!trench&&!bank)continue;
+      const k=terrainEditScale(edit,state.tick??Infinity,x,z);low=Math.min(low,trench*k);high=Math.max(high,bank*k);continue;
+    }
+    if(edit.wall){h=wallProfile(edit.wall,x,z,wallSpec(edit.kind));if(h<=0)continue;}
     else{const t=clamp(1-Math.hypot(dx,dz)/edit.radius,0,1);if(t<=0)continue;h=edit.height*smooth(t);}
     h*=terrainEditScale(edit,state.tick??Infinity,x,z);
     if(edit.kind==='axe_sunder')scar+=h;
-    else if(edit.kind==='pick_wall')wall=Math.max(wall,h);
+    else if(edit.wall||edit.kind==='pick_wall')wall=Math.max(wall,h);
     else earth+=h;
   }
   // Mountains cannot be excavated into a route outside the playable bowl.
@@ -147,7 +182,7 @@ export function rawTerrainHeight(state,x,z) {
   // excavation outside remains continuous rather than making an invisible cliff.
   const forgeProtection=smooth(clamp((Math.hypot(x,z)-4)/3,0,1));
   const protection=(1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1)))*forgeProtection;
-  return foundationHeight(state,x,z,rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall,-6,6)*protection);
+  return foundationHeight(state,x,z,rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall+low+high,-6,6)*protection);
 }
 // Soil rendering is recessed beneath masonry; authoritative walking/support stay on y=top.
 // Tile edges align to the .75m ground lattice, so interpolation cannot poke soil through tiles.

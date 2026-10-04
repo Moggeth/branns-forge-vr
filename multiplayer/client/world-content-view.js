@@ -30,7 +30,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   // Rebuild tree kits once per change in the loaded tree asset set (GLBs arrive asynchronously).
   const assetKey=TREE_ASSETS.map(n=>templates.has(n)?1:0).join('');if(assetKey!==treeAssets){treeAssets=assetKey;treeView.reload(templates);}
   treeView.sync(s);crystalWall.sync(s);
-  const content=[...(s.deposits||[]).filter(d=>!d.depleted&&d.special!=='pick_wall').map(d=>({...d,type:'deposit'})),...(s.pickups||[]).map(p=>({...p,type:'pickup'})),...(s.bridges||[]).map(b=>({...b,type:'bridge'}))];const objectIds=new Set(content.map(c=>c.id));
+  const content=[...(s.deposits||[]).filter(d=>!d.depleted&&d.special!=='pick_wall'&&d.special!=='wall').map(d=>({...d,type:'deposit'})),...(s.pickups||[]).map(p=>({...p,type:'pickup'})),...(s.bridges||[]).map(b=>({...b,type:'bridge'}))];const objectIds=new Set(content.map(c=>c.id));
   for(const c of content){let e=objects.get(c.id);if(e&&(e.data.type!==c.type||e.data.kind!==c.kind||c.hits<e.data.hits)){e.light?.dispose();e.fracture?.dispose();remove(e.root);objects.delete(c.id);e=null;}const newlyCreated=!e;if(!e){let root;
     if(c.type==='deposit')root=resourceArt.deposit(c.kind,{variant:resourceVariant(c.id)})||authored(c.kind==='meteor'?'meteor':'boulder',c.kind==='meteor'?1.5:1.2);
     else if(c.type==='bridge'){const source=templates.get('bridge');if(source){root=source.scene.clone(true);const collisionOnly=[];root.traverse(n=>{if(n.name.toLowerCase().includes('colonly'))collisionOnly.push(n);});for(const n of collisionOnly)n.removeFromParent();root.scale.set(1.6/3.4,.65,5/5.9);}}

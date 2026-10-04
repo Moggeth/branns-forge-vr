@@ -2,6 +2,7 @@
 // up, fruit that heals, or a short boon. Pure and deterministic (authority state only, no clock or RNG).
 // Feeding is its own reward: nothing here pays the God back.
 import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {SUNDER} from './terrain.js';
 
 export const BOONS = Object.freeze({
   charge: {hits: 3, ticks: 900, bonus: 40, strikeDamage: 25, radius: 3}, // Lightning near a Hero
@@ -30,19 +31,23 @@ export function addPickup(state, kind, x, z, amount, ctx) {
 }
 
 /** Called once per accepted cast, after the spell's own effect. Returns presentation events. */
-export function castBoons(state, caster, spell, at, ctx, {start, end} = {}) {
+export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId} = {}) {
   const events = [], gift = (what, id, position, extra = {}) => events.push({kind: 'god_gift', spell, gift: what, id, position, by: caster.id, ...extra});
   const [x, , z] = at;
-  if (spell === 'raise' || spell === 'lower' || spell === 'wall') {
-    // Raised earth bares a stone boulder; a pit reaches an iron seam; a wall can be quarried.
-    const kind = spell === 'lower' ? 'iron' : 'stone', p = spell === 'wall' ? [(start[0] + end[0]) / 2, (start[2] + end[2]) / 2] : [x, z];
-    const id = addDeposit(state, kind, p[0], p[1], ctx);
-    if (id) gift(kind === 'iron' ? 'iron_seam' : 'stone_boulder', id, [p[0], ctx.terrainHeight(state, p[0], p[1]), p[1]]);
+  if (spell === 'raise' || spell === 'lower') {
+    // Raised earth bares a stone boulder; a pit reaches an iron seam.
+    const kind = spell === 'lower' ? 'iron' : 'stone', id = addDeposit(state, kind, x, z, ctx);
+    if (id) gift(kind === 'iron' ? 'iron_seam' : 'stone_boulder', id, [x, ctx.terrainHeight(state, x, z), z]);
   }
-  if (spell === 'sunder') for (const t of [1 / 3, 2 / 3]) {
-    // Crystal glints along the crack.
-    const px = start[0] + (end[0] - start[0]) * t, pz = start[2] + (end[2] - start[2]) * t, id = addPickup(state, 'gems', px, pz, 1, ctx);
-    if (id) gift('crystal', id, [px, ctx.terrainHeight(state, px, pz), pz]);
+  if (spell === 'wall') {
+    // The rampart itself is the gift: every segment can be quarried for stone, and it sheds shards when it shatters.
+    const segments = state.deposits.filter(d => d.special === 'wall' && d.editId.startsWith(castId + '_')), mid = segments[segments.length >> 1];
+    if (mid) gift('quarry_wall', mid.id, [mid.x, ctx.terrainHeight(state, mid.x, mid.z), mid.z]);
+  }
+  if (spell === 'sunder') for (let k = 1; k <= SUNDER.seams; k++) {
+    // The chasm lays bare crystal seams on its floor; they stay to be mined after it closes.
+    const t = k / (SUNDER.seams + 1), px = start[0] + (end[0] - start[0]) * t, pz = start[2] + (end[2] - start[2]) * t, id = addDeposit(state, 'crystal', px, pz, ctx);
+    if (id) gift('crystal_seam', id, [px, ctx.terrainHeight(state, px, pz), pz]);
   }
   if (spell === 'grove') for (let i = 0; i < BOONS.apples; i++) {
     const a = i * Math.PI + .6, px = x + Math.cos(a) * 1.2, pz = z + Math.sin(a) * 1.2, id = addPickup(state, 'apple', px, pz, 1, ctx);

@@ -4,11 +4,12 @@ import {ENT, ENT_SPELLS, entTargets} from '../shared/ents.js';
 import {worldTrees} from '../shared/world-content.js';
 import {planTerrainBake} from '../shared/terrain.js';
 import {bloomLevel} from '../shared/bloom.js';
+import {earthLineEdits} from '../shared/earth-spells.js';
 
 // Presentation-only explanation of authoritative cast limits. The server still
 // validates every command; this prevents a green preview promising an impossible cast.
 // Mana is the only game rule once Bloom has unlocked a spell; the rest are malformed points and world capacity caps.
-export function spellUnavailable(world,player,id,{point,lineCount=3,trees}={}) {
+export function spellUnavailable(world,player,id,{point,lineCount=earthLineEdits(),trees}={}) {
   const spec=SPELLS.find(s=>s.id===id);if(!spec||!player||player.role!=='god')return 'God role required';
   if(bloomLevel(world.bloom)<(spec.bloom||0))return `Unlocks at Bloom ${spec.bloom}`;
   if((player.mana??0)<spec.cost)return 'Not enough mana';

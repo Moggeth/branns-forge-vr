@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Skeleton studio</title>
+<style>body{margin:0;background:#9fb3bd}canvas{display:block}</style>
+<script type="module">
+// Skeleton model review: game lighting/tonemapping, four turntable views in one frame. ?glb=/assets/skeleton.glb&dusk&variant=N
+// ?lineup shows every variant side by side. Not shipped. Shares prepareAsset so scale/pivot match the game.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import * as look from '../client/skeleton-look.js';
+const q=new URLSearchParams(location.search),W=innerWidth,H=innerHeight,dusk=q.has('dusk');
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.setScissorTest(true);r.shadowMap.enabled=true;document.body.append(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(dusk?0x2a3448:0xa9c0cc);
+s.add(new THREE.HemisphereLight(dusk?0x5a6a90:0xc6e0ed,0x5e5139,dusk?.5:1.2));const sun=new THREE.DirectionalLight(dusk?0x9fb0ff:0xffe3ad,dusk?.6:2.2);sun.position.set(6,10,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-6,right:6,top:6,bottom:-6});s.add(sun);
+const g=new THREE.Mesh(new THREE.CircleGeometry(9,48).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:dusk?0x2c3a22:0x6b7a3a,roughness:1}));g.receiveShadow=true;s.add(g);
+new GLTFLoader().load(q.get('glb')||'/assets/skeleton.glb',gltf=>{
+ gltf.scene.traverse(n=>{if(n.isMesh)n.castShadow=true;});
+ if(look)look.prepareSkeletonTemplate?.(gltf.scene);
+ const lineup=q.has('lineup'),count=lineup?(look?.SKELETON_VARIANTS?.length||1):1;
+ for(let i=0;i<count;i++){const {visual}=prepareAsset(gltf,'skeleton',1.7);const v=lineup?i:+(q.get('variant')||0);
+  if(look)look.dressSkeleton?.(visual,v);visual.position.x=lineup?(i-(count-1)/2)*1.05:0;visual.rotation.y=lineup?-.35:0;s.add(visual);}
+ if(lineup){const cam=new THREE.PerspectiveCamera(30,W/H,.05,60);r.setViewport(0,0,W,H);r.setScissor(0,0,W,H);cam.position.set(0.6,1.45,-6.2);cam.lookAt(0,.92,0);r.render(s,cam);document.title='ready';return;}
+ const views=q.has('close')?[[0,1.5,1.0,1.5],[Math.PI*.35,1.45,1.0,1.45],[Math.PI*-.2,1.2,1.5,1.1],[Math.PI*.8,1.3,1.6,1.1]]:[[0,1.2,3.1,.95],[Math.PI*.3,1.3,3.1,.95],[Math.PI,1.3,3.1,.95],[Math.PI*-.12,1.65,1.25,1.45]];
+ const cam=new THREE.PerspectiveCamera(36,(W/2)/(H/2),.05,50);
+ views.forEach(([a,y,d,ty],i)=>{const x=(i%2)*W/2,yy=(i<2?H/2:0);r.setViewport(x,yy,W/2,H/2);r.setScissor(x,yy,W/2,H/2);cam.position.set(Math.sin(a)*d,y,-Math.cos(a)*d);cam.lookAt(0,ty,0);r.render(s,cam);});
+ document.title='ready';});
+</script></html>
