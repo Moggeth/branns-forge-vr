@@ -7,7 +7,7 @@ import {isVein} from './ore-veins.js';
 import {collectLog,chopTree} from './trees.js';
 import {worldTrees} from './world-content.js';
 import {contributeSettlement} from './adventure.js';
-import {collectibleCandidate} from './collection-target.js';
+import {collectibleCandidate,goldenBoltPickup} from './collection-target.js';
 import {specialCooldown} from './special-cooldowns.js';
 export {nearestCollectible} from './collection-target.js';
 export const RESOURCE_RECIPES=Object.freeze({
@@ -61,6 +61,16 @@ export function collectTarget(state,p,m,ctx){
   const events=[{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}];
   if(q.kind==='apple')addBloom(state,BLOOM.apple,events,[q.x,q.y,q.z]); // Fruit eaten spreads the seed.
   return ok(events);
+ }
+ const embed=(state.embeds||[]).find(e=>e.id===m.targetId);
+ if(goldenBoltPickup(state,embed)){
+  const c=collectibleCandidate(state,p,embed.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined});
+  if(!c)return fail('out_of_reach');
+  if(c.full)return fail('inventory_full');
+  state.embeds.splice(state.embeds.indexOf(embed),1);
+  p.resources.gold=(p.resources.gold||0)+1;
+  (p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+1);
+  return ok([{kind:'pickup',id:embed.id,position:[...c.position],material:'gold',amount:1}]);
  }
  const log=state.looseLogs.find(l=>l.id===m.targetId);
  if(log){

@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import {attachFracture,prepareFractureWarmup} from '../client/mining-fracture.js';
+import {loadGLB} from './glb.mjs';
+const started=performance.now(),source=loadGLB(new URL('../public/assets/boulder.glb',import.meta.url)).scene;
+const original=[];source.traverse(n=>{if(n.isMesh)original.push({mesh:n,visible:n.visible,raycast:n.raycast,geometry:n.geometry});});
+const inputs=Array.from({length:40},(_,i)=>({root:source,id:'deposit'+i}));
+const warm=prepareFractureWarmup(T,inputs,{limit:2});assert.equal(warm.stats.partitions,2);
+const prepared=new Set();warm.group.traverse(n=>{if(n.isMesh&&n.userData.fractureOwned)prepared.add(n.geometry);});
+assert.ok(prepared.size>10,'actual partition geometry is prepared');
+let releases=0;for(const g of prepared)g.addEventListener('dispose',()=>releases++);
+for(const o of original){assert.equal(o.mesh.visible,o.visible);assert.equal(o.mesh.raycast,o.raycast);assert.equal(o.mesh.geometry,o.geometry);assert.equal(o.mesh.userData.fractureHidden,undefined);}
+let materialDisposals=0;warm.group.traverse(n=>{if(n.material?.name==='FractureInterior')n.material.addEventListener('dispose',()=>materialDisposals++);});
+warm.finish();warm.finish();assert.equal(releases,0,'warm cache ownership survives renderer cleanup');assert.equal(warm.group.parent,null);assert.equal(materialDisposals,0,'warm shader materials stay alive');
+const real=source.clone(true),hitStart=performance.now(),fracture=attachFracture(T,real,'deposit0'),reuseMs=performance.now()-hitStart;
+const actual=[];real.traverse(n=>{if(n.isMesh&&n.userData.fractureOwned)actual.push(n.geometry);});
+assert.ok(actual.some(g=>prepared.has(g)),'first gameplay hit reuses prepared partition buffers');
+const used=new Set(actual),releasedLive=[];for(const g of used)g.addEventListener('dispose',()=>releasedLive.push(g));
+warm.dispose();warm.dispose();assert.equal(releasedLive.length,0,'closing warmup preserves active gameplay fracture');
+fracture.setDamage(2,4);fracture.dispose();assert.equal(releasedLive.length,used.size,'last owner releases runtime geometry');
+const coldRoot=source.clone(true),coldStart=performance.now(),cold=attachFracture(T,coldRoot,'cold-unprepared');const coldMs=performance.now()-coldStart;cold.dispose();
+console.log(JSON.stringify({result:'bounded mining prewarm preserves originals, reuses prepared partitions and releases ownership safely',warm:warm.stats,reuseMs,coldMs,elapsedMs:performance.now()-started}));

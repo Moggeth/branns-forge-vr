@@ -3,8 +3,8 @@
 // time bucket), so every client and late joiner agrees and nothing new is saved for the stump itself.
 //
 // Life: wake (pull free) -> wander near home, flee heroes -> burrow after lifeTicks. Killing one drops a log and
-// sometimes ore its roots were clutching. Either way the stump's harvest record is released, so the original tree
-// regrows (tree-view plays its sapling growth) and the world's 256 harvest slots never fill up for good.
+// sometimes ore its roots were clutching. Its harvest record is released on death or burrowing; burrowing moves
+// the tree root to the critter's exact position. Tree-view grows the sapling and the harvest slot is freed.
 import {isFelled} from './trees.js';
 
 export const STUMPLING = Object.freeze({
@@ -81,6 +81,11 @@ export function stepStumplings(state, ctx, events) {
   if (state.tick < stumplingGoneTick(e)) continue;
   state.enemies.splice(state.enemies.indexOf(e), 1);
   state.embeds = (state.embeds || []).filter(m => m.targetId !== e.id);
+  // Keep the stable tree id (logs/fruit/save references) but move its root to the actual burrow, never a nearby spot.
+  state.treeRoots ||= [];
+  const root = state.treeRoots.find(t => t.id === e.treeId);
+  if (root) { root.x = e.position[0]; root.z = e.position[2]; }
+  else state.treeRoots.push({id: e.treeId, x: e.position[0], z: e.position[2]});
   releaseStump(state, e.treeId);
   events.push({kind: 'stump_gone', id: e.id, treeId: e.treeId, position: [...e.position]});
  }

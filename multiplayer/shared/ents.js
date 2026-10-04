@@ -69,6 +69,8 @@ export function rememberAwakened(state, tree, live) {
  if (wild >= 0) state.wildTrees.splice(wild, 1);
  if (state.awakenedTrees.length >= ENT.records) pruneAwakened(state, live);
  if (state.awakenedTrees.length >= ENT.records) return false;
+ // The awakened record now owns the relocated coordinates; do not retain an orphan override.
+ if (state.treeRoots) state.treeRoots = state.treeRoots.filter(t => t.id !== tree.id);
  state.awakenedTrees.push({id: tree.id, x: tree.x, z: tree.z, height: tree.height, variant: tree.variant});
  return true;
 }

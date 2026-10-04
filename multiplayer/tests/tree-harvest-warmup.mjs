@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import {createTreeView} from '../client/tree-view.js';
+import {worldTrees} from '../shared/world-content.js';
+import {loadGLB} from './glb.mjs';
+
+const start=performance.now(), templates=new Map(['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_young_lod','log','endcap'].map(name=>[name,loadGLB(new URL('../public/assets/'+name+'.glb',import.meta.url))]));
+const scene=new T.Scene(), view=createTreeView({scene,templates,height:()=>0});
+const state={seed:41,tick:100,edits:[],groves:[],harvestedTrees:[],looseLogs:[],enemies:[]};
+view.sync(state);const before=view.stats(), snapshot=JSON.stringify(state), targets=view.targets();
+const materialDisposals=[];view.group.traverse(o=>{for(const m of [].concat(o.material||[]))m.addEventListener('dispose',()=>materialDisposals.push(m.uuid));});
+const cold=view.prepareWarmup();scene.add(cold.group);
+assert.equal(cold.stats.variants.length,3);assert.equal(cold.stats.geometryCount,24);
+assert.equal(cold.stats.poolCount,5,'both log primitives, chips and both canopy pools prepared');
+assert.deepEqual(view.stats(),before,'warmup does not simulate harvesting, particles or growth');
+assert.equal(JSON.stringify(state),snapshot);assert.equal(view.targets(),targets);
+const buffers=[];cold.group.traverse(o=>{if(o.isMesh){assert.ok(o.geometry.attributes.position.count>0);if(o.isInstancedMesh){assert.equal(o.count,1);buffers.push(o);}}});
+const owned=[];cold.group.traverse(o=>{if(o.isMesh&&o.matrixAutoUpdate&&!o.isInstancedMesh)owned.push(o.geometry);});
+let disposedGeometry=0,disposedBuffers=0;
+for(const g of owned)g.addEventListener('dispose',()=>disposedGeometry++);
+for(const m of buffers)m.addEventListener('dispose',()=>disposedBuffers++);
+cold.dispose();cold.dispose();assert.equal(cold.group.parent,null);assert.equal(cold.group.children.length,0);
+assert.equal(disposedGeometry,24);assert.equal(disposedBuffers,5);assert.equal(materialDisposals.length,0,'shared live materials survive cleanup');
+const warm=view.prepareWarmup();warm.dispose();
+const tree=worldTrees(state)[0];state.harvestedTrees.push({id:tree.id,cuts:1,cutHeight:1,fallYaw:0,felledTick:0});
+const chopStart=performance.now();view.sync(state);const chopMs=performance.now()-chopStart;
+assert.ok(view.entity(tree.id).wound);view.dispose();
+console.log(JSON.stringify({result:'harvest warmup preserves live state, covers authored variants and releases only temporary resources',cold:cold.stats,warm:warm.stats,chopMs,elapsedMs:performance.now()-start}));

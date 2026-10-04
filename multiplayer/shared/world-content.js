@@ -46,5 +46,22 @@ export function worldTrees(state) {
   const awake = state.awakenedTrees?.length ? new Set(state.awakenedTrees.map(t => t.id)) : null;
   const standing = awake ? trees.filter(t => !awake.has(t.id)) : trees;
   for (const w of state.wildTrees || []) standing.push({id:w.id,x:w.x,z:w.z,height:w.height,variant:w.variant});
+  // A Stumpling carries its original tree identity to its final burrow location.
+  if (state.treeRoots?.length) {
+    const roots = new Map(state.treeRoots.map(t => [t.id, t]));
+    for (const t of standing) { const root = roots.get(t.id); if (root) { t.x = root.x; t.z = root.z; } }
+  }
   return standing;
+}
+/** Optional, bounded save extension; old worlds keep the deterministic original positions. */
+export function restoreTreeRoots(saved) {
+  const roots = saved.treeRoots ?? [];
+  if (!Array.isArray(roots) || roots.length > 1024) throw Error('Invalid tree roots');
+  const ids = new Set(worldTrees({...saved, treeRoots: []}).map(t => t.id)), seen = new Set();
+  for (const root of roots) {
+    if (!root || typeof root !== 'object' || Array.isArray(root) || Object.keys(root).some(k => !['id', 'x', 'z'].includes(k)) ||
+      !ids.has(root.id) || seen.has(root.id) || !Number.isFinite(root.x) || !Number.isFinite(root.z) || Math.abs(root.x) > 55 || Math.abs(root.z) > 55) throw Error('Invalid tree root');
+    seen.add(root.id);
+  }
+  return roots.map(({id, x, z}) => ({id, x, z}));
 }

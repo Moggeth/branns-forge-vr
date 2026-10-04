@@ -13,6 +13,7 @@ import {worldTrees} from '../shared/world-content.js';
 import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
 import {bakeTriangles, buildNotch, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
 import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} from './tree-growth.js';
+import {createTreeHarvestWarmup} from './tree-harvest-warmup.js';
 
 const PARTS = ['Trunk', 'Roots', 'Branches', 'Leaves', 'Fruit'];
 const meshesUnder = node => { const out = []; node?.traverse(c => { if (c.isMesh) out.push(c); }); return out; };
@@ -218,6 +219,6 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function reload(next = templates) { templates = next; clearAll(); for (const m of ownedMaterials) m.dispose(); ownedMaterials.clear(); if (ownMats) mats.dispose(); initialized = false; buildKits(); if (last) sync(last); }
  function dispose() { clearAll();canopyFX.dispose(); for (const g of ownedGeometry) g.dispose(); ownedGeometry.clear(); for (const m of ownedMaterials) m.dispose(); if (ownMats) mats.dispose(); logs?.forEach(m => m.dispose()); chips?.mesh.dispose(); group.removeFromParent(); }
  buildKits();
- return {sync, tick, collectibleTargets:()=>[...(logs||[]),...Array.from(logEntities.values()).flatMap(e=>e.root.children)], collectibleId:hit=>hit.object.userData.logId||hit.object.userData.logIds?.[hit.instanceId]||null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
+ return {sync, tick, prepareWarmup:()=>createTreeHarvestWarmup({kits, woodMaterial, uvMap, decorate, pools:group.children.filter(m=>m.isInstancedMesh&&!m.userData.treeBatch)}), collectibleTargets:()=>[...(logs||[]),...Array.from(logEntities.values()).flatMap(e=>e.root.children)], collectibleId:hit=>hit.object.userData.logId||hit.object.userData.logIds?.[hit.instanceId]||null, targets: () => targetList, resolveTarget, grabTarget, surfaceVisible, stats, reload, assetReload: reload, dispose, group, batches,
   entity: id => trees.get(id) || null, intactTree: id => intact.get(id) || null};
 }

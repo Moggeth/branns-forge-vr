@@ -112,7 +112,7 @@ export function createTreeIndex(cell = TREE_LIMITS.cell) {
  let key = '', trees = [], grid = new Map(), byId = new Map();
  const k = (i, j) => `${i},${j}`;
  return {
-  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${waitingTrees(state)}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
+  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${waitingTrees(state)}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}|${JSON.stringify(state.treeRoots || [])}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
    for (const t of trees) { const c = k(Math.floor(t.x/cell), Math.floor(t.z/cell)); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t); } return true; },
   all: () => trees, get: id => byId.get(id),
   near(x, z, out = []) { out.length = 0; const ci = Math.floor(x/cell), cj = Math.floor(z/cell); for (let i = ci-1; i <= ci+1; i++) for (let j = cj-1; j <= cj+1; j++) { const g = grid.get(k(i, j)); if (g) for (const t of g) out.push(t); } return out; }

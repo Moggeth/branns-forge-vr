@@ -226,6 +226,7 @@ function mkMat(vs, fs, uniforms, blending, extra = {}) {
 // =====================================================================================
 export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null } = {}) {
   let q = clamp(quality, 0, 1);
+  let disposed=false;
   const group = new THREE.Group(); group.name = 'FirePresentation';
   scene.add(group);
   const uTime = { value: 0 };
@@ -484,6 +485,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
       p.x = s.position[0]; p.y = s.position[1]; p.z = s.position[2];
       const nl = Math.hypot(s.normal[0], s.normal[1], s.normal[2]) || 1;
       p.nx = s.normal[0] / nl; p.ny = s.normal[1] / nl; p.nz = s.normal[2] / nl; p.exp = s.expiresTick;
+      p.emberEnd=s.emberTick;p.emberGround=s.emberTick===undefined?0:groundHeight(p.x,p.z);
     }
     for (let i = 0; i < MAX_PATCHES; i++) { const p = sp[i]; if (p.used && !p.seen) p.dying = true; }
     syncCells(snap.fireCells);
@@ -549,6 +551,10 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
         emberBuf.push(p.x + p.nx * (0.05 + ea * 0.6) + (hash01(s + 1) - 0.5) * 0.3 * ea, p.y + p.ny * (0.05 + ea * 0.6) + ea * 0.4, p.z + p.nz * (0.05 + ea * 0.6) + (hash01(s + 2) - 0.5) * 0.3 * ea,
           p.nx * 0.3, p.ny * 0.3 + 0.5, p.nz * 0.3, 0.05, 0.015, hash01(s + 3), p.a * Math.pow(1 - ea, 1.3));
       }
+      if(q>0.5&&p.emberEnd!==undefined&&p.y>p.emberGround){
+        const duration=Math.sqrt(2*(p.y-p.emberGround)/9.8),age=clamp(duration-(p.emberEnd-curTick)/60,0,duration);
+        if(age<duration)emberBuf.push(p.x,p.y-4.9*age*age,p.z,0,-1,0,.09,.024,hash01(p.seed+916),p.a*.8);
+      }
       if (q > 0.25) {
         const s = p.seed + 777, sa = fract(t * 0.4 + hash01(s));
         smokeBuf.push(p.x + p.nx * 0.2 + 0.1 * sa, p.y + p.ny * 0.2 + 0.2 + sa * 0.9, p.z + p.nz * 0.2 + 0.08 * sa, 0, 1, 0, 0.1 + 0.3 * sa, 0, hash01(s), Math.sin(Math.PI * sa) * 0.16 * p.a);
@@ -600,6 +606,28 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     if (withDir) geo.attributes.iDir.needsUpdate = true;
   }
 
+  async function prepareShaders(renderer, camera, targetScene = scene) {
+    if(disposed)return;
+    // Idle layers are invisible, so the world's normal compile omits all four.
+    // Compile the real materials, then upload the real buffers with one tiny
+    // offscreen draw. No fake fire/simulation event and no visible warm-up flash.
+    const meshes=[flameMesh,emberMesh,smokeMesh,fuelMesh],preview=new THREE.Group();
+    for(const mesh of meshes){const clone=mesh.clone(false);clone.visible=true;preview.add(clone);}
+    try { await renderer.compileAsync(preview,camera,targetScene); }
+    finally { preview.clear(); }
+    if(disposed)return;
+    const previous=meshes.map(mesh=>({visible:mesh.visible,count:mesh.geometry.instanceCount,start:mesh.geometry.drawRange.start,range:mesh.geometry.drawRange.count}));
+    const output=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest();
+    const target=new THREE.WebGLRenderTarget(1,1);
+    try {
+      for(const mesh of meshes){mesh.visible=true;if(mesh.geometry.isInstancedBufferGeometry)mesh.geometry.instanceCount=Math.max(1,mesh.geometry.instanceCount);else mesh.geometry.setDrawRange(0,Math.max(6,mesh.geometry.drawRange.count));}
+      renderer.setRenderTarget(target);renderer.setScissorTest(false);renderer.render(targetScene,camera);
+    } finally {
+      for(let i=0;i<meshes.length;i++){const mesh=meshes[i],saved=previous[i];mesh.visible=saved.visible;mesh.geometry.instanceCount=saved.count;mesh.geometry.setDrawRange(saved.start,saved.range);}
+      renderer.setRenderTarget(output);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);target.dispose();
+    }
+  }
+
   function stats() {
     let active = 0; for (const L of lights) if (L.l.intensity > 0) active++;
     let packets = 0, patches = 0; for (const p of pk) if (p.used) packets++; for (const p of sp) if (p.used) patches++;
@@ -613,6 +641,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     };
   }
   function dispose() {
+    disposed=true;
     scene.remove(group);
     for (const L of lights) { group.remove(L.l); L.l.dispose && L.l.dispose(); }
     for (const g of [flameGeo, emberGeo, smokeGeo, fuelGeo]) g.dispose();
@@ -620,7 +649,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     pkMap.clear(); spMap.clear(); cMap.clear(); bucketMap.clear();groundCache.clear();vertexCache.clear();fuelSamples.length=0;
   }
   return {
-    sync, update, stats, dispose,
+    sync, update, stats, dispose, prepareShaders,
     /** Call when ground height changes under existing fuel cells. */
     invalidateTerrain() { terrainVersion++; },
     setQuality(v) { q = clamp(v, 0, 1); sigA = sigB = 0x7fffffff; },
