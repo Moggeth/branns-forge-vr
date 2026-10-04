@@ -35,6 +35,19 @@ export function quenchFire(state,point,radius){
   state.fireSurfaces=state.fireSurfaces.filter(p=>Math.hypot(p.position[0]-point[0],p.position[2]-point[2])>radius);
 }
 
+// Phoenix Flare burst (Emberwing Q). The flare lights the area (presentation) and rains embers straight down:
+// the ground under it takes lit fuel, and creatures and remains under it catch fire. Bounded by FIRE_LIMITS.
+export const FLARE_BURST=Object.freeze({radius:3.2,fuelRadius:1.8,fuel:.32,reach:9,burn:240,scorch:.12});
+export function flareBurst(state,point,ownerId,ctx){
+  const B=FLARE_BURST,ground=ctx.terrainHeight(state,point[0],point[2]),below=[point[0],ground,point[2]];
+  // Only a flare close enough above the ground rains embers that still burn when they land.
+  const lit=point[1]-ground<=B.reach;
+  if(lit){addFuel(state,below,B.fuelRadius,B.fuel,true);applyHeat(state,below,B.radius,1,ctx);
+    for(const e of [...state.enemies,...(state.detachedParts||[])])if(Math.hypot(e.position[0]-point[0],e.position[2]-point[2])<=B.radius){
+      e.burnUntil=state.tick+B.burn;e.burnPart=e.part||'torso';if(e.parts)applyEnemyScorch(e,'torso',B.scorch);else e.scorch=clamp((e.scorch||0)+B.scorch,0,1);
+    }}
+  return [{kind:'phoenix_flare',position:[...point],ground:below,by:ownerId,lit}];
+}
 export function fireContact(state,shot,hit,ctx){
   const events=[],point=hit.point,ground=ctx.terrainHeight(state,point[0],point[2]);
   if(shot.kind==='arrow'&&Math.hypot(...(shot.curve||[0,0,0]))>.000001){
