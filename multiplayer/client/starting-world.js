@@ -5,6 +5,8 @@
 import * as art from './sanctuary-art.js';
 import * as oc from './outcrop-art.js';
 import {GEODES} from '../shared/geode-outcrop.js';
+import * as wa from './watch-arch-art.js';
+import {BEACON_HEARTH} from '../shared/watch-beacon.js';
 
 export const STARTING_SITES = [
   { id: 'sanctuary', name: 'Ancient Stone Sanctuary', x: -25, z: 8, radius: 7.5,
@@ -22,7 +24,7 @@ export const PATHS = [
   { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
 ];
 
-const TRI_CAP = 15000;
+const TRI_CAP = 20000; // all three landmarks plus paths sit near 15k; the cap guards against runaway layouts
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -52,7 +54,7 @@ export function createStartingWorld({ THREE, scene, height }) {
     ring: new THREE.TorusGeometry(1, 0.12, 5, 14),
     disc: new THREE.CylinderGeometry(1, 1.1, 1, 9, 1),
   };
-  const runes = [], clusters = []; let hoopAt = null, tuneAt = null; // sanctuary live-piece anchors, filled by the layout below
+  const runes = [], clusters = []; let hoopAt = null, tuneAt = null, beaconAt = null; // sanctuary live-piece anchors, filled by the layout below
   // Piece list: {mat, geo, x, z, y (above ground), sx,sy,sz, rx,ry,rz}. Ground sampled per piece at build.
   const pieces = [];
   const P = (mat, geo, x, z, y, s, r = [0, 0, 0], id = null) => pieces.push({ mat, geo, x, z, y, s, r, id });
@@ -150,28 +152,51 @@ export function createStartingWorld({ THREE, scene, height }) {
     foot(site, 'post', mx, mz - 1, 0.3, 0.3, 0, 2.6); foot(site, 'post', mx, mz + 1, 0.3, 0.3, 0, 2.6);
   }
 
-  // --- North: ruined watch-arch. Broken pointed arch, fallen voussoirs, bronze beacon brazier on stump tower.
+  // --- North: Ruined Watch-Arch. A pointed ashlar arch whose left half still stands to the crown (the right half lies
+  // in the grass), and a coursed watch-tower stump carrying a bronze fire basket: the beacon (shared/watch-beacon.js).
+  // A crystal vein climbs the tower from the offering dish at its foot to the coals; the hearth ring before the arch is
+  // where fallen Heroes rise while it burns. The fire, its sky beam and foe flares are live (client/beacon-view.js).
   {
     const site = STARTING_SITES[2]; site.footprints.length = 0; const r = rng(303);
-    const ax = site.x, az = site.z;
-    P('stone', 'slab', ax - 2.2, az, 2.5, [1.1, 5, 1.1]); // left pier, tall
-    P('stone', 'slab', ax + 2.2, az, 1.6, [1.1, 3.2, 1.1], [0, 0, -0.05]); // right pier, broken
-    for (let i = 0; i < 6; i++) { // left half arch voussoirs
-      const t = (i + 0.5) / 7 * Math.PI * 0.5, cx = ax - 2.2 + (1 - Math.cos(t)) * 2.2, cy = 5 + Math.sin(t) * 2.4;
-      P('stone', 'slab', cx, az, cy, [0.95, 0.6, 1.0], [0, 0, -t]);
+    const ax = site.x, az = site.z, ys = 4.84, inner = 3.3, outer = 4.05, step = Math.PI / 3 / 5;
+    prim.pierL = wa.pierGeometry(311, {w: 1.1, h: 4.6, d: 1.0}); prim.pierR = wa.pierGeometry(312, {w: 1.1, h: 3.2, d: 1.0, broken: true});
+    P('stone', 'pierL', ax - 2.2, az, 0, [1, 1, 1]); P('stone', 'pierR', ax + 2.2, az, 0, [1, 1, 1], [0, 0, -0.03]);
+    for (let k = 0; k < 4; k++) { // left half: four of its five voussoirs still lean to the crown
+      const g = 'vous' + k; prim[g] = wa.voussoirGeometry(320 + k, inner, outer, Math.PI - (k + 1) * step, Math.PI - k * step, 1.0);
+      P('stone', g, ax + 1.65, az, ys, [1, 1, 1], [0, 0, -k * 0.004]);
     }
-    P('moss', 'slab', ax - 2.2, az, 5.05, [1.2, 0.15, 1.2]);
-    for (let i = 0; i < 5; i++) // fallen blocks scattered right
-      P(i % 2 ? 'moss' : 'stone', 'slab', ax + 3 + r() * 2.5, az + (r() - 0.5) * 3, 0.25, [0.9, 0.55, 0.9], [r() * 0.3, r() * 6, r() * 0.3]);
+    prim.mossPier = art.mossGeometry(81); P('moss', 'mossPier', ax - 2.3, az, ys - 0.05, [0.5, 0.18, 0.55], [0, 0.4, 0.1]);
+    // Fallen voussoirs and the keystone in the grass east of the arch; the keystone carries a crystal inlay.
+    const fallen = (k, seed) => { const g = wa.voussoirGeometry(seed, inner, outer, k * step, (k + 1) * step, 1.0); g.computeBoundingBox();
+      const c = g.boundingBox.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); return g; };
+    for (let i = 0; i < 4; i++) { const g = 'fallenVous' + i; prim[g] = fallen(i, 340 + i);
+      P('stone', g, ax + 3.1 + r() * 2.4, az + (r() - 0.5) * 3.2, 0.32, [1, 1, 1], [Math.PI / 2 + (r() - 0.5) * 0.4, r() * 6, (r() - 0.5) * 0.5]);
+      if (i % 2) P('moss', 'mossPier', ax + 3.1 + i * 0.5, az - 1 + i * 0.4, 0.05, [0.4, 0.2, 0.35], [0, r() * 6, 0]); }
+    prim.keystone = fallen(4.5, 349); prim.inlay = art.crystalPointGeometry(1, 0.06);
+    const kx = ax + 2.6, kz = az + 2.3; P('stone', 'keystone', kx, kz, 0.3, [1.05, 1.05, 1.05], [0.15, 0.9, Math.PI / 2 - 0.1]);
+    for (let k = 0; k < 3; k++) P('crystal', 'inlay', kx + (k - 1) * 0.12, kz + 0.1, 0.62, [1, 0.3 + k % 2 * 0.15, 1], [(k - 1) * 0.4, 0, 0.2]);
     foot(site, 'pier', ax - 2.2, az, 1.1, 1.1, 0, 5); foot(site, 'pier', ax + 2.2, az, 1.1, 1.1, 0, 3.2);
-    // Stump tower with beacon behind the arch (north), visible from RTS and from spawn through the arch.
-    const tx = ax + 0.5, tz = az - 4.5;
-    P('stone', 'disc', tx, tz, 1.6, [1.6, 3.2, 1.6]);
-    P('moss', 'disc', tx, tz, 3.25, [1.7, 0.15, 1.7]);
-    P('bronze', 'prism', tx, tz, 3.7, [0.9, 0.8, 0.9], [Math.PI, 0, 0]);
-    P('crystal', 'shard', tx, tz, 4.5, [0.35, 0.6, 0.35]);
-    foot(site, 'tower', tx, tz, 3.4, 3.4, 0, 3.4);
-    for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 6 + r() * 3;
+    // Watch-tower stump behind the arch (north), the beacon basket on its rubble top, struck/fed as 'watchBeacon'.
+    const tx = ax + 0.5, tz = az - 4.5, th = 3.2;
+    prim.tower = wa.towerGeometry(361, {r: 1.6, h: th}); P('stone', 'tower', tx, tz, 0, [1, 1, 1], [0, 0.3, 0], 'watchBeacon');
+    prim.basket = wa.basketGeometry(); P('bronze', 'basket', tx, tz, th - 0.25, [1, 1, 1], [0, 0.2, 0], 'watchBeacon');
+    prim.coal = art.crystalPointGeometry(1, 0.08);
+    for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, d = k ? 0.26 : 0;
+      P('crystal', 'coal', tx + Math.cos(a) * d, tz + Math.sin(a) * d, th - 0.25 + wa.BASKET.height - 0.12, [1, k ? 0.28 : 0.4, 1], [Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6]); }
+    // Crystal vein up the arch-facing side, from the dish to the basket.
+    for (let k = 0; k < 9; k++) { const y = 0.75 + k * 0.29, wob = Math.sin(k * 1.7) * 0.18;
+      P('crystal', 'inlay', tx + wob, tz + 1.62, y, [1, 0.22 + (k % 3) * 0.07, 1], [Math.PI / 2 - 0.25, 0, (r() - 0.5) * 0.8], 'watchBeacon'); }
+    prim.plinth = wa.plinthGeometry(371); prim.dish = wa.dishGeometry();
+    P('stone', 'plinth', tx, tz + 1.85, 0, [1, 1, 1], [0, 0.1, 0], 'watchBeacon'); P('bronze', 'dish', tx, tz + 1.85, 0, [1, 1, 1], [0, 0, 0], 'watchBeacon');
+    P('crystal', 'inlay', tx, tz + 1.85, 0.8, [1, 0.25, 1], [0.3, 0, 0], 'watchBeacon');
+    beaconAt = {x: tx, z: tz, y: th - 0.25 + wa.BASKET.fire};
+    foot(site, 'tower', tx, tz, 3.4, 3.4, 0, 3.4); foot(site, 'plinth', tx, tz + 1.85, 0.5, 0.5, 0, 0.9);
+    for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = 2.1 + r() * 0.6; // fallen tower stones round its foot
+      P('stone', 'rock', tx + Math.cos(a) * d, tz + Math.sin(a) * d * 0.8, 0.1, [0.32 + r() * 0.2, 0.22, 0.3], [0, r() * 6, 0]); }
+    // Hearth ring in front of the arch, where the beacon raises fallen Heroes.
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2;
+      P('stone', 'rock', BEACON_HEARTH.x + Math.cos(a) * 0.85, BEACON_HEARTH.z + Math.sin(a) * 0.9, 0.08, [0.34, 0.16, 0.26], [0, a, 0]); }
+    for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 6.5 + r() * 2.5;
       P('stone', 'rock', ax + Math.cos(a) * d, az + Math.sin(a) * d, 0.1, [0.6 + r() * 0.5, 0.4, 0.6], [0, r() * 6, 0]); }
   }
 
@@ -187,16 +212,16 @@ export function createStartingWorld({ THREE, scene, height }) {
   for (const s of pathStones) P('path', 'rock', s.x, s.z, 0.02, [s.s, 0.08, s.s * 0.85], [0, s.ry, 0]);
 
   const group = new THREE.Group(); group.name = 'StartingWorld';
-  const meshes = {}; let tris = 0;
+  const meshes = {}; let tris = 0, dropped = 0;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
 
   function build() {
     for (const k in meshes) { group.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
-    tris = 0; const buckets = {};
+    tris = 0; dropped = 0; const buckets = {};
     for (const p of pieces) {
       const g = prim[p.geo]; const src = g.index ? g.toNonIndexed() : g;
       const triCount = src.attributes.position.count / 3;
-      if (tris + triCount > TRI_CAP) { if (src !== g) src.dispose(); continue; }
+      if (tris + triCount > TRI_CAP) { dropped++; if (src !== g) src.dispose(); continue; }
       tris += triCount;
       // Anchor: sink 0.15 into the ground so slopes never show floating bases.
       const gy = H(p.x, p.z) - 0.15;
@@ -303,6 +328,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in mats) mats[k].dispose();
     runeMesh?.geometry.dispose(); rune.material.dispose(); clusterMesh?.geometry.dispose(); geode.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
   }
-  function stats() { return { draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, pieces: pieces.length, runes: runes.length }; }
-  return { group, update, tick, setLit, setGeodes, dispose, stats, sites: STARTING_SITES, paths: PATHS };
+  function stats() { return { draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
+  // Beacon fire anchor (world space, follows terrain edits): where client/beacon-view.js draws the flame and beam.
+  const beacon = () => beaconAt && {x: beaconAt.x, y: H(beaconAt.x, beaconAt.z) - 0.15 + beaconAt.y, z: beaconAt.z};
+  return { group, update, tick, setLit, setGeodes, beacon, dispose, stats, sites: STARTING_SITES, paths: PATHS };
 }

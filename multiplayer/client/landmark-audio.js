@@ -1,5 +1,5 @@
-// Landmark sounds (procedural Web Audio, no assets): glassy stone bells, rolled chords, a travel whoosh and a crystal
-// shatter. Shared by the sanctuary waygate and the outcrop geode views. Distance-attenuated; every node disconnects.
+// Landmark sounds (procedural Web Audio, no assets): glassy stone bells, rolled chords, a travel whoosh, a crystal
+// shatter, an alarm horn and a fire roar. Shared by the sanctuary waygate, outcrop geode and watch-arch beacon views. Distance-attenuated; every node disconnects.
 export function createLandmarkAudio({audio = () => null, listener = () => null} = {}) {
   const ready = () => { const ctx = audio(); return ctx && ctx.state === 'running' ? ctx : null; };
   const level = (position, gain) => { const ear = listener(); const d = ear && position ? Math.hypot(position[0] - ear.position[0], position[2] - ear.position[2]) : 0; return gain * Math.max(0, 1 - d / 45); };
@@ -33,5 +33,27 @@ export function createLandmarkAudio({audio = () => null, listener = () => null} 
     src.connect(hp).connect(g).connect(ctx.destination); src.start(t); src.onended = () => { src.disconnect(); hp.disconnect(); g.disconnect(); };
     chord(position, [24, 21, 19, 16, 12], gain * 0.55, 45, 1.6);
   }
-  return {bell, chord, whoosh, shatter};
+  // Horn: a low brass call (detuned saws through a lowpass that opens and closes), rising a fourth on the second note.
+  function horn(position, gain = 0.1, notes = [-12, -7]) {
+    const ctx = ready(); if (!ctx) return; const g0 = level(position, gain) || gain * 0.35; // an alarm carries across the map
+    notes.forEach((step, i) => {
+      const t = ctx.currentTime + i * 0.55, f = 196 * Math.pow(2, step / 12), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      lp.type = 'lowpass'; lp.Q.value = 2; lp.frequency.setValueAtTime(300, t); lp.frequency.linearRampToValueAtTime(1400, t + 0.15); lp.frequency.linearRampToValueAtTime(500, t + 0.7);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(g0, t + 0.08); g.gain.setValueAtTime(g0, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+      lp.connect(g).connect(ctx.destination);
+      const os = [0, 7, -6].map(cents => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents; o.connect(lp); o.start(t); o.stop(t + 0.85); return o; });
+      os[0].onended = () => { os.forEach(o => o.disconnect()); lp.disconnect(); g.disconnect(); };
+    });
+  }
+  // Roar: a soft rush of fire (lowpassed noise swelling and settling).
+  function roar(position, gain = 0.12, seconds = 1.2) {
+    const ctx = ready(); if (!ctx) return; const g0 = level(position, gain); if (g0 < 0.004) return;
+    const t = ctx.currentTime, n = ctx.sampleRate * seconds | 0, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    let s = 3; for (let i = 0; i < n; i++) { s = (Math.imul(s, 1103515245) + 12345) | 0; d[i] = (s >>> 16) / 32768 - 1; }
+    const src = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = b; lp.type = 'lowpass'; lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(1800, t + 0.25); lp.frequency.exponentialRampToValueAtTime(400, t + seconds);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(g0, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+    src.connect(lp).connect(g).connect(ctx.destination); src.start(t); src.onended = () => { src.disconnect(); lp.disconnect(); g.disconnect(); };
+  }
+  return {bell, chord, whoosh, shatter, horn, roar};
 }

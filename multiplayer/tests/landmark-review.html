@@ -23,18 +23,22 @@ floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const world = createStartingWorld({THREE, scene, height: () => 0});
 const {createWaygateView} = await import('../client/waygate-view.js');
 const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
+const {createBeaconView} = await import('../client/beacon-view.js');
+const beacon = createBeaconView({scene, startingWorld: world});
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .05, 200);
 const v = s => s.split(',').map(Number);
 // open: 0 shut, 1 open (the portal animates in over ~2 s of review time, stepped here at 30 fps).
-function frame(at = [-13, 1.7, 4], look = [-25, 1.6, 8], lit = 0, t = 1, open = 0, grow = null, glow = null) {
+// fire: 0 cold, 1 burning; foes: [[x,z],...] flared hostiles.
+function frame(at = [-13, 1.7, 4], look = [-25, 1.6, 8], lit = 0, t = 1, open = 0, grow = null, glow = null, fire = 0, foes = []) {
   camera.position.set(...at); camera.lookAt(...look);
   const tick = 1000, snapshot = {landmarks: true, tick, waygate: {lit: Array(8).fill(lit ? tick + Math.round(lit * 600) : 0), openUntil: open ? tick + 3000 : 0, dest: 0}};
-  for (let i = 0; i < Math.max(1, t * 30); i++) gate.update(snapshot, 1 / 30);
+  snapshot.beacon = {litUntil: fire ? tick + 9000 : 0, seen: 0}; snapshot.enemies = foes.map(([x, z]) => ({hp: 100, position: [x, 0, z]}));
+  for (let i = 0; i < Math.max(1, t * 30); i++) { gate.update(snapshot, 1 / 30); beacon.update(snapshot, 1 / 30); }
   if (grow) world.setGeodes?.(grow, glow || []);
   renderer.render(scene, camera);
 }
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 renderer.setSize(innerWidth, innerHeight, false);
 frame(q.get('at') ? v(q.get('at')) : undefined, q.get('look') ? v(q.get('look')) : undefined, +(q.get('lit') || 0), 1, +(q.get('open') || 0));
-window.review = {frame, stats: () => world.stats()};
+window.review = {frame, stats: () => world.stats(), beacon: () => beacon.stats()};
 </script>

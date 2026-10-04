@@ -24,7 +24,7 @@ const suite = [
   'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
   'siegebird-flock','siegebird-songbird','siegebird-wind','simulation','skeleton-performance','skin-bounds',
   'skull-surface-regression','solo-session','spell-presentation','spell-spectacle',
-  'spell-availability','spell-targeting','starting-world','waygate','geode-outcrop','state-codec','terrain-presentation','terrain-ray',
+  'spell-availability','spell-targeting','starting-world','waygate','geode-outcrop','watch-beacon','state-codec','terrain-presentation','terrain-ray',
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
