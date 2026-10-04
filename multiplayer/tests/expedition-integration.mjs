@@ -4,13 +4,13 @@ import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {adventureView} from '../shared/adventure.js';
 const started = performance.now();
 // All commands share one sequence: an old expedition packet cannot run after newer movement.
-const ordered = createSimulation(); ordered.addPlayer({id:'order'});
+const ordered = createSimulation({legacyBattle:true,legacyBattle:true}); ordered.addPlayer({id:'order'});
 assert.equal(ordered.command('order',{type:'input',seq:10,move:{x:0,z:0},yaw:0}).ok,true);
 assert.equal(ordered.command('order',{type:'adventure',seq:9,action:'start'}).code,'duplicate_sequence');
 assert.equal(ordered.snapshot().adventure.stage,'idle');
 assert.equal(ordered.command('order',{type:'adventure',seq:11,action:'start'}).ok,true);
 assert.equal(ordered.command('order',{type:'input',seq:11,move:{x:0,z:0},yaw:0}).code,'duplicate_sequence');
-let sim = createSimulation({seed: 41}); sim.addPlayer({id: 'h'}); sim.addPlayer({id: 'g', role: 'god'});
+let sim = createSimulation({legacyBattle:true,seed: 41}); sim.addPlayer({id: 'h'}); sim.addPlayer({id: 'g', role: 'god'});
 let seq = {h: 0, g: 0}; const send = (id, body) => sim.command(id, {seq: ++seq[id], ...body});
 const steps = n => { const out = []; for (let i = 0; i < n; i++) out.push(...sim.step()); return out; };
 // Sandbox is untouched until someone starts: hostile casts are not gated.

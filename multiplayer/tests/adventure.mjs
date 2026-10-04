@@ -14,7 +14,7 @@ const ctx = {loadSimulation, createEnemy, terrainHeight};
 
 // Harness = the exact host loop described in ADVENTURE-INTEGRATION.md, using the zero-change checkpoint fallback.
 class Room {
-  constructor(seed = 41) { this.game = createSimulation({room: 'EXPD', seed}); this.adv = createAdventure({seed}); this.pending = []; this.seq = {}; this.log = []; }
+  constructor(seed = 41) { this.game = createSimulation({legacyBattle:true,room: 'EXPD', seed}); this.adv = createAdventure({seed}); this.pending = []; this.seq = {}; this.log = []; }
   add(id, role) { const r = this.game.addPlayer({id, name: id, role}); assert.ok(r.ok); this.seq[id] = 0; }
   world() { return this.game.snapshot(); }
   edit(fn) { const s = this.game.checkpoint(); fn(s); this.game = loadSimulation(s); } // Test fixture only.

@@ -12,6 +12,7 @@ import {createForgeWorks,FORGE_WORKS_ORIGIN} from './forge-works-art.js';
 import {terrainHeight} from '../shared/terrain.js';
 import {createTimberlineStuck} from './timberline-stuck.js';
 import {createTimberlineTracers} from './timberline-tracers.js';
+import {createHomeBaseView} from './home-base-view.js';
 // Presentation consumes authoritative structures; no gameplay timers or resources live here.
 export function createInventionView({scene}){
  const assets={},entries=new Map(),shots=new Map(),localAim=new Map();const timberFx=createTimberlineFx({maxChips:96,maxDust:16});scene.add(timberFx.object);const tracers=createTimberlineTracers({scene});let snapshot=null,stuck=null,viewerId=null,scoped=null;const effects=[];
@@ -22,6 +23,7 @@ export function createInventionView({scene}){
  if(typeof document!=='undefined'){labelCanvas=document.createElement('canvas');labelCanvas.width=768;labelCanvas.height=104;labelContext=labelCanvas.getContext('2d');if(labelContext){const map=new THREE.CanvasTexture(labelCanvas);previewLabel=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,depthTest:false,depthWrite:false}));previewLabel.scale.set(7.4,1,1);previewLabel.visible=false;previewLabel.renderOrder=20;scene.add(previewLabel);}}
  function label(text,valid){if(!labelContext||lastLabel===`${valid}:${text}`)return;lastLabel=`${valid}:${text}`;labelContext.clearRect(0,0,768,104);labelContext.fillStyle='rgba(24,23,20,.9)';labelContext.fillRect(0,0,768,104);labelContext.fillStyle=valid?'#ffe1a0':'#ffb7ad';labelContext.font='bold 25px sans-serif';labelContext.textAlign='center';const lines=[];let line='';for(const word of text.split(' ')){const next=line?`${line} ${word}`:word;if(labelContext.measureText(next).width>730&&line){lines.push(line);line=word;}else line=next;}lines.push(line);lines.slice(0,2).forEach((line,i)=>labelContext.fillText(line,384,lines.length>1?38+i*34:61));previewLabel.material.map.needsUpdate=true;}
  let refinery=null;
+ const homeBases=createHomeBaseView({scene});
  const shotGeo=new THREE.IcosahedronGeometry(.28,1),shotMat=new THREE.MeshStandardMaterial({color:0x77736a,roughness:.9});
  const wardGeo=new THREE.RingGeometry(5.92,6,64),wardMat=new THREE.MeshBasicMaterial({color:0x64dbea,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false});
 
@@ -35,7 +37,8 @@ export function createInventionView({scene}){
   if(s.inventions&&!refinery){refinery=createForgeWorks();scene.add(refinery.root);}
   if(refinery)refinery.place(terrainHeight(s,FORGE_WORKS_ORIGIN[0],FORGE_WORKS_ORIGIN[1],false));
   // Battle objectives reuse the commissioned sanctuary, including its real contact geometry.
-  const objectives=(s.battle?.status!=='off'?s.battle?.bases||[]:[]).map(b=>({...b,type:'sanctuary',yaw:0,battleBase:true}));
+  homeBases.sync(s);
+  const objectives=(s.battle?.status!=='off'&&s.battle?.v!==2?s.battle?.bases||[]:[]).map(b=>({...b,type:'sanctuary',yaw:0,battleBase:true}));
   for(const b of [...s.inventions?.structures||[],...objectives]){if(b.type==='forge')continue;ids.add(b.id);let e=entries.get(b.id);
    if(!e){const root=b.type==='timberline'?new THREE.Group():createInventionModel(b.type);root.name=b.id;root.traverse(n=>{if(n.isMesh)n.userData.targetId=b.id;});scene.add(root);e={root,data:b,fireTick:b.fireTick??-10000};if(b.type==='ward'){e.field=new THREE.Mesh(wardGeo,wardMat);e.field.rotation.x=-Math.PI/2;scene.add(e.field);}entries.set(b.id,e);if(b.type==='timberline')upgrade(e);if(b.type==='launcher')upgradeLauncher(e);}
    e.data=b;e.fireTick=b.fireTick??-10000;const p=b.position||[b.x,0,b.z];e.root.position.set(p[0],b.type==='foundation'?p[1]:terrainHeight(s,p[0],p[2],false),p[2]);if(e.root.userData.lastYaw===undefined)e.root.rotation.y=b.yaw||0;e.root.userData.lastYaw=b.yaw||0;e.root.visible=true;
@@ -43,6 +46,7 @@ export function createInventionView({scene}){
   for(const [id,e]of entries)if(!ids.has(id)){e.machine?.dispose();e.launcher?.dispose();e.root.removeFromParent();e.field?.removeFromParent();entries.delete(id);}
  }
  function event(ev){
+  homeBases.event(ev);
   if(refinery&&(ev.kind==='refinery_feed'||ev.kind==='refinery_output'))refinery.event(ev);
   if(ev.kind==='timberline_shear'&&ev.position)timberFx.chips(new THREE.Vector3(...ev.position),new THREE.Vector3(0,1,0),{count:20});
   if(ev.kind==='timberline_stop'&&ev.position)timberFx.dust(new THREE.Vector3(...ev.position),{count:8});
@@ -50,6 +54,7 @@ export function createInventionView({scene}){
   if(/launcher/.test(ev.kind)&&ev.position&&ev.target&&!assets.heavy_launcher){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...ev.position),new THREE.Vector3(...ev.target)]);const m=new THREE.LineBasicMaterial({color:0xa9ffdc,transparent:true});const line=new THREE.Line(g,m);scene.add(line);effects.push({line,life:.3});while(effects.length>16){const old=effects.shift();old.line.removeFromParent();old.line.geometry.dispose();old.line.material.dispose();}}
  }
  function update(dt,tick,camera=null,viewportHeight=1080){
+  homeBases.update(dt,camera);
   timberFx.update(dt);stuck?.update(snapshot,tick);tracers.begin();
   const ids=new Set();for(const q of snapshot?.inventions?.shots||[]){ids.add(q.id);let v=shots.get(q.id);
    if(!v){if(q.type==='timberline'){if(!assets.timberline_bolts)continue;const pair=createTimberlineBoltPair(assets.timberline_bolts,{castShadow:false,sharedMaterials:assets.timberline_ballista?collectMaterials(assets.timberline_ballista.scene):null});v={root:pair.group,pair};}else {const ball=assets.heavy_launcher&&q.type==='launcher'?assets.heavy_launcher.scene.getObjectByName('Ball'):null;v={root:ball?ball.clone():new THREE.Mesh(shotGeo,shotMat)};if(ball){v.root.position.set(0,0,0);v.start=entries.get(q.structureId)?.launcher?.releasePoint();}}scene.add(v.root);shots.set(q.id,v);}
@@ -76,7 +81,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
   setScoped(id,amount=0){scoped=id&&amount>0?{id,amount}:null;},
   scopeEye(id,out=new THREE.Vector3()){const e=entries.get(id);if(!e?.machine)return null;e.root.updateWorldMatrix(true,true);return e.machine.nodes.Socket_ScopeEye?.getWorldPosition(out)||null;},
-  targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root),preview(point,type,validation=null){
+  targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root).concat(homeBases.targets()),preview(point,type,validation=null){
    previewState=point?validation:null;const valid=validation?.ok!==false,color=valid?0xe9ca75:0xf06458,at=validation?.position|| (point?[point.x,point.y,point.z]:null);
    tilePreview.visible=!!point&&type==='foundation';tileFill.visible=tilePreview.visible;ring.visible=!!point&&type!=='foundation';
    if(point){const x=type==='foundation'?Math.round(at[0]/.75)*.75:at[0],z=type==='foundation'?Math.round(at[2]/.75)*.75:at[2];tilePreview.position.set(x,at[1]+.07,z);tileFill.position.set(x,at[1]+.065,z);ring.position.set(x,at[1]+.06,z);const r=STRUCTURES[type]?.radius||1.7;ring.scale.setScalar(r/1.7);tilePreview.material.color.setHex(color);tileFill.material.color.setHex(color);ring.material.color.setHex(color);if(previewLabel){previewLabel.position.set(x,at[1]+1.65,z);previewLabel.visible=!!validation&&!valid;label(validation?.reason||'',valid);}}

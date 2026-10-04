@@ -276,7 +276,17 @@ export function maskMissingParts(root, missing = []) {
   });
 }
 
-export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null}) {
+// Closest approach of segment from-to to a vertical capsule standing at base; null when it misses.
+function capsuleContact(from, to, base, height, radius) {
+  const steps = 12; let best = null;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps, x = from[0] + (to[0] - from[0]) * t, y = from[1] + (to[1] - from[1]) * t, z = from[2] + (to[2] - from[2]) * t;
+    const cy = Math.min(base.y + height - radius, Math.max(base.y + radius, y)), dx = x - base.x, dy = y - cy, dz = z - base.z, d = Math.hypot(dx, dy, dz);
+    if (d <= radius) { const n = d > 1e-4 ? [dx / d, dy / d, dz / d] : [0, 1, 0]; best = {point: [x, y, z], normal: n, distance: Math.hypot(x - from[0], y - from[1], z - from[2])}; break; }
+  }
+  return best;
+}
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party'}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
   const creatures = createCreatureLifeDeath({scene, height});
@@ -524,6 +534,16 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       contacts.push(...segmentSurfaceContacts(entry.visual, from, to, entry.data.id, surface(entry.visual), {includePartPoses}));
     }
     for (const [id, node] of detached) if (id !== excludeId) contacts.push(...segmentSurfaceContacts(node, from, to, id, surface(node), {includePartPoses}));
+    // Home-base PvP: heroes of the other side are 1.8 m capsules at their rendered position.
+    if (snapshot.battle?.v === 2) {
+      const side = (excludeId && (snapshot.players || []).find(p => p.id === excludeId)?.side) || localSide() || 'party';
+      for (const entry of actors.values()) {
+        const d = entry.data;
+        if (entry.enemy || d?.role !== 'hero' || d.id === excludeId || (d.side || 'party') === side || d.hp <= 0) continue;
+        const hit = capsuleContact(from, to, entry.root.position, 1.8, .42);
+        if (hit) contacts.push({targetId: d.id, part: 'torso', ...hit});
+      }
+    }
     return contacts.sort((a, b) => a.distance - b.distance);
   }
   function tick(dt, isHost = false, time = elapsed + dt, renderTick = snapshot.tick || 0) {

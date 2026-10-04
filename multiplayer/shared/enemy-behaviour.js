@@ -1,4 +1,4 @@
-import {BATTLE,battleActive,battleBot,battleWaypoint} from './battle-mode.js';
+import {BATTLE,battleBot,battleObjectives,battleWaypoint} from './battle-mode.js';
 // Fixed-tick movement and committed melee. No clocks, rendering or random streams.
 // Strike remains tick 18: the existing authored animations depend on that contract.
 import {PICK_WALL} from './terrain.js';
@@ -16,7 +16,7 @@ const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.
 
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
  const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
- const battleBots=state.enemies.filter(battleBot),baseTargets=battleActive(state)?state.battle.bases:[],pendingHits=[];
+ const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
  const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e)}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
  const blocked=(a,b)=>{const n=Math.ceil(flat(a,b)/.18);for(let i=1;i<n;i++){const t=i/n,p=a.map((v,k)=>v+(b[k]-v)*t);p[1]+=1.05;const q=[...p];resolve(q,0,.04);if(flat(p,q)>.003||ground(p[0],p[2])>p[1])return true;}return false;};

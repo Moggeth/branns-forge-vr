@@ -1,3 +1,5 @@
+import {HOME,HOME_SITES} from './home-bases.js';
+const insideHome=(x,z,margin=0)=>Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin);
 import {clearLandmarkTrees,STARTING_SITES} from './starting-world.js';
 import {DEPOSIT_CATALOG} from './material-catalog.js';
 // Deterministic world presentation data.  This file deliberately has no clock or RNG.
@@ -25,6 +27,7 @@ export function renewGeology(state,ctx,events=[]){
   const survey=(state.inventions?.structures||[]).find(b=>b.type==='prospector'&&b.hp>0&&state.inventions.surveyTick>state.tick-7200);
   const h=hash(state.seed,cycle*17+attempt),angle=(h%6283)/1000,radius=survey?7+((h>>>12)%7):18+((h>>>12)%20),x=+((survey?.position[0]||0)+Math.cos(angle)*radius).toFixed(3),z=+((survey?.position[2]||0)+Math.sin(angle)*radius).toFixed(3);
   if(Math.abs(x)>43||Math.abs(z)>43)continue;
+  if(state.battle?.v===2&&insideHome(x,z,2))continue;
   if((state.players||[]).some(p=>p.role==='hero'&&Math.hypot(p.position[0]-x,p.position[2]-z)<10)||state.deposits.some(d=>Math.hypot(d.x-x,d.z-z)<3)||(state.landmarks&&STARTING_SITES.some(s=>Math.hypot(s.x-x,s.z-z)<s.radius+2))||(state.structures||[]).some(b=>Math.hypot((b.x??b.position?.[0]??0)-x,(b.z??b.position?.[2]??0)-z)<5)||ctx.canPlace?.(x,z)===false)continue;
   const y=ctx.terrainHeight(state,x,z);if(!Number.isFinite(y)||Math.abs(y)>180)continue;
   state.deposits.push({id,x,z,kind,hits:0,maxHits:DEPOSIT_CATALOG[kind].maxHits,depleted:false});
@@ -36,6 +39,8 @@ export function worldTrees(state) {
   const trees = baseTrees.map(([x,z,height], i) => ({id: `tree${i + 1}`, x, z, height, variant: i % 3}));
   for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}); }
   if(state.landmarks) trees.splice(0,trees.length,...clearLandmarkTrees(trees));
+  // Home-base worlds keep both domes clear of wild trees (shared/home-bases.js).
+  if(state.battle?.v===2) trees.splice(0,trees.length,...trees.filter(t=>!insideHome(t.x,t.z,2)));
   for (const g of state.groves || []) {
     // Growth spells store where each tree actually took root (shared/grove-growth.js); a wave's trees appear in order.
     if (g.trees) { g.trees.forEach((t, i) => { if ((t[4] ?? 0) <= (state.tick ?? Infinity)) trees.push({id:`${g.id}-tree${i}`,x:t[0],z:t[1],height:t[2],variant:t[3]}); }); continue; }

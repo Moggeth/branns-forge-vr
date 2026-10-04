@@ -6,7 +6,7 @@ import {createEnemy,hitEnemyPart} from '../shared/combat.js';
 import {stepEnemies} from '../shared/enemy-behaviour.js';
 const start=performance.now();let count=0;
 function test(name,fn){fn();count++;console.log('PASS',name);}
-function rig(){const sim=createSimulation({seed:4});sim.addPlayer({id:'host'});let seq=0;return {sim,w:sim.adventureWorld(),command:(action,extra={})=>sim.command('host',{type:'battle',action,seq:++seq,...extra})};}
+function rig(){const sim=createSimulation({legacyBattle:true,seed:4});sim.addPlayer({id:'host'});let seq=0;return {sim,w:sim.adventureWorld(),command:(action,extra={})=>sim.command('host',{type:'battle',action,seq:++seq,...extra})};}
 const ctx={createEnemy,terrainHeight,nextId:(s,p)=>p+(++s.idCounter)};
 
 test('32 human seats plus bounded deterministic paired skeleton waves',()=>{

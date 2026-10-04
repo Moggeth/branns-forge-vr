@@ -144,5 +144,26 @@ flock.rest(visual, false); assert.equal(flock.loadedGolden(visual), false); seat
 const templateGeometry = new Set(); bird.scene.traverse(n => n.geometry && templateGeometry.add(n.geometry));
 visual.getObjectByName('SiegebirdFlock').traverse(n => { if (n.isMesh && /^Songbird/.test(n.name)) assert.ok(templateGeometry.has(n.geometry), 'bird geometry shared, never copied'); });
 assert.equal(flock.stats.birds, 2, 'two birds per crossbow at most (one arriving, one leaving)');
+// 7. Weapon swap mid-delivery: the bird leaves for the world still carrying the bolt, veers away from the crossbow,
+// lets the bolt fall to the ground and flies on; nothing is left on the stowed crossbow.
+{
+  const scene = new T.Scene(); scene.add(camera); flock.attachWorld({scene, ground: () => 0});
+  flock.shot(visual, {n: 3, playerId: 'p1', time: 30}); flock.update(visual, 30 + R.arrive - .05, {}); flock.updateWorld(30 + R.arrive - .05);
+  assert.equal(visual.getObjectByName('SiegebirdFlock').children.some(c => c.visible && c.name === 'SiegebirdSongbird'), true);
+  flock.stow(visual);
+  assert.equal(visual.getObjectByName('SiegebirdFlock').children.some(c => c.visible && c.name === 'SiegebirdSongbird'), false, 'nothing left on the stowed crossbow');
+  const roost = scene.getObjectByName('SiegebirdRoost'), worldBird = roost.children.find(c => c.visible && c.name === 'SiegebirdSongbird');
+  assert.ok(worldBird, 'the bird flies on in the world'); assert.equal(worldBird.getObjectByName('SiegebirdCarryPivot').visible, true, 'still carrying the bolt');
+  const start = worldBird.position.clone(), crossbowAt = visual.getWorldPosition(new T.Vector3());
+  for (let t = 0; t <= .3; t += 1 / 60) flock.updateWorld(30 + R.arrive - .05 + t);
+  assert.equal(worldBird.getObjectByName('SiegebirdCarryPivot').visible, false, 'bolt let go');
+  const dropped = roost.children.find(c => c.name === 'SiegebirdCarryPivot'); assert.ok(dropped, 'the dropped bolt is in the world');
+  assert.ok(Math.hypot(worldBird.position.x - crossbowAt.x, worldBird.position.z - crossbowAt.z) > Math.hypot(start.x - crossbowAt.x, start.z - crossbowAt.z), 're-routes away from the crossbow');
+  let t = .3; for (; t < 4 && dropped.position.y > .04; t += 1 / 60) flock.updateWorld(30 + R.arrive - .05 + t);
+  assert.ok(dropped.position.y <= .04, 'bolt lands on the ground');
+  for (const end = t + 2.5; t < end; t += 1 / 60) flock.updateWorld(30 + R.arrive - .05 + t);
+  assert.ok(!roost.children.includes(dropped), 'dropped bolt cleans itself up');
+  flock.attachWorld(null);
+}
 flock.dispose(); sight.dispose();
-console.log(`siegebird-songbird: alternation, flock plumage, timeline, off-frame entry, hand-off, clearance, golden and sharing pass (${((performance.now() - begin) / 1000).toFixed(2)} s)`);
+console.log(`siegebird-songbird: alternation, flock plumage, timeline, off-frame entry, hand-off, clearance, golden, sharing and swap-away drop pass (${((performance.now() - begin) / 1000).toFixed(2)} s)`);

@@ -4,6 +4,7 @@
 import {MATERIAL_KEYS} from '../shared/material-catalog.js';
 import {expeditionRunning} from '../shared/adventure.js';
 import {BATTLE,BATTLE_SIDES} from '../shared/battle-mode.js';
+import {HOME_NAMES} from '../shared/home-bases.js';
 
 export const BATTLE_LABELS=Object.freeze({party:'Dawn',rivals:'Dusk'});
 const sideOf=p=>p?.side==='rivals'?'rivals':'party';
@@ -30,11 +31,29 @@ export function battlePanelModel(snapshot,playerId,{isHost=false,connected=false
     expeditionActive:expeditionRunning(snapshot?.adventure),
     wave:status==='off'?0:nonnegative(battle.wave),
     nextWaveSeconds:status==='running'?Math.max(0,Math.ceil((nonnegative(battle.nextWaveTick)-nonnegative(snapshot?.tick))/60)):0,
-    bots,bases,winner:status==='victory'&&BATTLE_SIDES.includes(battle.winner)?battle.winner:null};
+    bots,bases,winner:status==='victory'&&BATTLE_SIDES.includes(battle.winner)?battle.winner:null,home:battle?.v===2};
 }
 
 // null means the caller should use its ordinary adventureView instead.
+function homeQuestView(snapshot,playerId) {
+  const players=snapshot.players||[],me=players.find(p=>p.id===playerId),role=me?.role==='god'?'god':'hero',selfSide=sideOf(me),foeSide=selfSide==='party'?'rivals':'party';
+  const battle=snapshot.battle,tick=snapshot.tick||0,own=battle.bases.find(b=>b.side===selfSide),foe=battle.bases.find(b=>b.side===foeSide);
+  const pylons=b=>b.parts.filter(p=>p.kind==='pylon'&&p.hp>0).length,fallen=b=>b.fallenUntil>tick;
+  const self=HOME_NAMES[selfSide],enemy=HOME_NAMES[foeSide],waveIn=Math.max(0,Math.ceil((battle.nextWaveTick-tick)/60));
+  const nextStep=fallen(foe)?`${enemy} is rebuilding · back in ${Math.ceil((foe.fallenUntil-tick)/60)}s`:fallen(own)?`${self} is rebuilding · hold the lane`:
+    !pylons(foe)?`${enemy}'s shield is down. Smash its heart!`:role==='god'?`Heal ${self}'s troops; strike ${enemy}'s pylons.`:`Push with your troops and break ${enemy}'s pylons.`;
+  const team=players.filter(p=>sideOf(p)===selfSide);
+  return {mode:'battle',stage:'battle',run:battle.run,title:`${self} vs ${enemy}`,role,nextStep,
+    notice:`You: ${self} · Next squad in ${waveIn}s · Their pylons ${pylons(foe)}/3`,elapsedSeconds:0,
+    objectives:[{id:own.id,label:`${self} heart · defend`,have:own.hp,need:own.maxHp,done:false,icon:'flame',role:'all'},
+      {id:foe.id,label:`${enemy} ${pylons(foe)?'pylons':'heart'} · attack`,have:pylons(foe)?pylons(foe):foe.hp,need:pylons(foe)?3:foe.maxHp,done:false,icon:'skull',role:'all'}],
+    party:{heroes:team.filter(p=>p.role==='hero').length,gods:team.filter(p=>p.role==='god').length},
+    actions:[],telegraphs:[],flame:null,retriesLeft:0,godSupportLeft:0,renown:0,star:null,selfSide,winner:battle.winner,
+    bots:{party:(snapshot.enemies||[]).filter(e=>e.battleRun===battle.run&&e.side==='party'&&e.hp>0).length,rivals:(snapshot.enemies||[]).filter(e=>e.battleRun===battle.run&&e.side==='rivals'&&e.hp>0).length}};
+}
+
 export function battleQuestView(snapshot,playerId) {
+  if(snapshot?.battle?.v===2&&snapshot.battle.status==='running'&&snapshot.battle.bases?.length===2)return homeQuestView(snapshot,playerId);
   const model=battlePanelModel(snapshot,playerId);
   if(model.status==='off')return null;
   const players=snapshot?.players||[],me=players.find(p=>p.id===playerId),role=me?.role==='god'?'god':'hero';
