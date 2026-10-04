@@ -116,7 +116,7 @@ let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let leapControls=null;
-const leapPrototype=import.meta.env.DEV&&location.hostname==='127.0.0.1'&&new URLSearchParams(location.search).has('leap');
+const leapPrototype=import.meta.env.DEV&&location.hostname==='127.0.0.1'&&((typeof __FORGE_LEAP__!=='undefined'&&__FORGE_LEAP__)||new URLSearchParams(location.search).has('leap'));
 window.addEventListener('beforeunload',()=>leapControls?.dispose());
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;

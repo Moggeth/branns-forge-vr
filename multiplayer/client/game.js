@@ -104,6 +104,7 @@ export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainH
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, onNotice = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
+  let handInputFrame=null;
   let requestedActive=false;
   const startup={ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
   // Non-authoritative lobby preview only: never stepped, published or saved.
@@ -1288,6 +1289,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const b = manned && mannedMachine();
       if (!renderer.xr.isPresenting) { camera.position.set(0, 1.65, 0); if (b) { camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
+    handInputFrame?.(now);
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned;
     if (axeModel) axeModel.visible = role === 'hero' && active;
@@ -1494,6 +1496,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       report(role === 'god' ? 'God: WASD pan, right-drag orbit, wheel zoom, click to cast.' : 'Hero: click to look, WASD move, Space jump, click strike.');
     },
     setSpell(next) { spell = next;cancelCast(); },
+    setHandInputFrame(callback) { handInputFrame=typeof callback==='function'?callback:null; },
     setQuickCast(value){quickCast=!!value;cancelCast();},
     setTouchEnabled(value) { if (touchEnabled !== !!value) {clearInput(); touchEnabled = !!value; fixedAim = null; aimTerrain = null; cursor.visible = false;} },
     setTouchAxes(side, x, y) {

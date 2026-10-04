@@ -83,7 +83,6 @@ def main():
             raise RuntimeError(f'LeapC failed: 0x{result:08x}; check Ultraleap Tracking Service')
     check(dll.LeapCreateConnection(None, C.byref(handle)))
     started = time.monotonic()
-    last_sent = 0
     frames = 0
     max_hands = 0
     try:
@@ -106,10 +105,6 @@ def main():
                     raise RuntimeError('Unexpected LeapC hand count; check SDK ABI')
                 frames += 1
                 max_hands = max(max_hands, frame.count)
-                now = time.monotonic()
-                if now - last_sent < 1 / 60:
-                    continue
-                last_sent = now
                 hands = [{'id': h.id, 'side': 'left' if h.type == 0 else 'right',
                           'pinch': round(h.pinch, 3), 'palm': vector(h.palm.position)}
                          for h in frame.hands[:frame.count]]
