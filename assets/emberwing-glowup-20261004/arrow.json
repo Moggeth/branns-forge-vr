@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "asset_id": "emberwing_arrow", "kind": "prop",
+  "required_nodes": ["ArrowNock", "ArrowTip", "Shaft", "Head_0", "Head_1", "Head_2", "Fletch_0", "Fletch_1", "Fletch_2", "Fletch_3"],
+  "variant_groups": {"head": ["Head_0", "Head_1", "Head_2"], "fletch": ["Fletch_0", "Fletch_1", "Fletch_2", "Fletch_3"]},
+  "limits": {"max_bytes": 400000, "max_visible_triangles": 1800, "max_materials": 5, "max_images": 4},
+  "measured": {"bytes": 289396, "max_visible_triangles": 1736, "total_triangles": 4222, "materials": 5, "images": 3},
+  "max_dimensions_m": [0.10, 0.10, 0.82]
+}

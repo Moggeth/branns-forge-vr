@@ -7,7 +7,7 @@ import {castEarthLine,earthLineEdits} from './earth-spells.js';
 export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld,STARTING_SITES} from './starting-world.js';
-import {addFuel,applyHeat,quenchFire,fireContact,stepFire,restoreFire} from './fire.js';
+import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint} from './spells.js';
@@ -104,7 +104,7 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
 function instantiate(state) {
   let fireSampleProvider=null;
   const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext)};
+  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext)};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.

@@ -38,6 +38,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {specialPose, SPECIAL_MOTION} from './weapon-special-motion.js';
 import {createPickWallMotion} from './pick-wall-motion.js';
+import {createEmberwingMotion} from './emberwing-motion.js';
 import {createWeaponController} from './weapon-controller.js';
 import {createContactFeedback, otherHand} from './contact-feedback.js';
 import {createCombatView} from './combat-view.js';
@@ -255,7 +256,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         const kind = triggerRole({tool, hand: controllerSources.get(i)?.handedness, sources: controllerSources, holding: holdingLoose()});
         if (presses.begin(i, kind, tool)?.owner === 'primary') weapons.cancel(); // missed selectend: drop, never fire late
         if (kind === 'throw') release(true, i);
-        else if (kind === 'special') weapons.special();
+        else if (kind === 'special') { if (tool === 'bow') bowSpecial(); else weapons.special(); }
         else primaryDown();
       }
       else {
@@ -279,6 +280,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Stonewhisper wall: hold Special (Q / right mouse / touch Special / VR trigger) to see the exact footprint, release to raise it.
   const wallPreview=createWallPreview({THREE,scene,height:(x,z)=>heightAt(x,z)});let wallAim=null,wallAudio=null;
   const pickWallMotion=createPickWallMotion({reducedMotion:reducedWeaponMotion});
+  const emberwingMotion=createEmberwingMotion({reducedMotion:reducedWeaponMotion});let bowLayer=null,bowLayerShown=false;
   const pickupHighlight=createPickupHighlight({scene});
   applyMountainGroundTreatment(orchard.material);
   const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
@@ -287,7 +289,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   // Ents: awakened trees. Sound goes through the wood kit plus a low root rumble; touch and VR feel big ones nearby.
   const entView=createEntView({scene,templates,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
     onSound:event=>{woodAudio?.play(event,listenerPose());if(event.kind==='ent_slam'||event.kind==='ent_fall')rootRumble(event);},
@@ -302,7 +304,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const fireVisual=createFirePresentation({scene,terrainGrid:true,fireSamples:id=>combat.fireSamples(id),height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:createEmberdewModel(),animations:[]});weaponModels.set('flask',flaskModel);
   const bottleFx=attachEmberdew({root:flaskModel}),bottlePosition=new THREE.Vector3(),bottleRotation=new THREE.Quaternion();
-  const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0;const guideTiming={lastMs:0,maxMs:0,updates:0};
+  const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>snapshot.tick??0,height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
@@ -938,8 +940,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!point)return false;
     const d=point.clone().sub(from).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(THREE.MathUtils.clamp(d.y,-1,1));camera.rotation.set(pitch,yaw,0,'YXZ');camera.updateMatrixWorld();heldSway.snap();strike();return true;
   }
-  function primaryDown(){if(!active||role!=='hero'||inventionPlacement)return;unlockAudio();if(manned){fireManned();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
-  function special(){if(!active||role!=='hero'||inventionPlacement)return;if(manned){scoping=!scoping;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else weapons.special();}
+  // Right click zooms Emberwing and engages the phoenix: drawing while zoomed (or zooming while drawn) latches the curve.
+  function primaryDown(){if(!active||role!=='hero'||inventionPlacement)return;unlockAudio();if(manned){fireManned();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
+  function special(){if(!active||role!=='hero'||inventionPlacement)return;if(manned){scoping=!scoping;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
+  // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
+  // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
+  function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}
+  function phoenixFlare(){
+    const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow')){onAction('special',{});return;} // the host explains the recharge
+    const aim=projectileAim();weapons.cancel();emberwingMotion.loose(performance.now()/1000);onAction('special',{origin:aim.origin,direction:aim.direction});
+  }
   function primaryUp(){if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
   function collectibleVisible(from,to,id){const delta=new THREE.Vector3(...to).sub(new THREE.Vector3(...from)),length=delta.length();if(length<.01)return true;
     const ray=new THREE.Raycaster(new THREE.Vector3(...from),delta.multiplyScalar(1/length),0,Math.max(0,length-.06));
@@ -1083,7 +1093,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(document.pointerLockElement!==canvas){void capturePointer();return;}
     if(manned){if(event.button===0)fireManned();if(event.button===2)scoping=true;return;}
     if(event.button===0)primaryDown();
-    if(event.button===2){if(['crossbow','bow'].includes(tool))aiming=true;else weapons.special();}
+    if(event.button===2){if(['crossbow','bow'].includes(tool))aiming=true;else weapons.special();if(tool==='bow')weapons.special();}
   });
   listen(window,'mouseup',event=>{if(role!=='hero')return;if(event.button===0)primaryUp();if(event.button===2){aiming=false;scoping=false;if(wallAim)releaseWallAim();}});
   listen(window,'pointerup',event=>{
@@ -1226,11 +1236,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(specialSwing){const progress=(now-specialSwing.at)/(SPECIAL_MOTION.axe.duration*1000);if(!specialSwing.sent&&progress>=SPECIAL_MOTION.axe.release){specialSwing.sent=true;sendSpecial();}const pose=specialPose('axe',progress,specialSwing.rest);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);if(progress>=1)specialSwing=null;}
     // Crystal wall wind-up / hold / slam rides on the pick's base pose; the sway layer below then applies on top.
     if(tool==='pick'&&!renderer.xr.isPresenting){const layer=pickWallMotion.pose(performance.now()/1000);if(layer){weaponAnchor.position.add(layer.offset);weaponAnchor.quaternion.premultiply(layer.quaternion);}}else pickWallMotion.reset();
+    // Emberwing equip / draw / phoenix flare / release kick ride on the bow's base pose; the sway layer then applies on top.
+    {const shown=tool==='bow'&&weaponAnchor.visible;if(shown&&!bowLayerShown)emberwingMotion.equip(now/1000);else if(!shown&&bowLayerShown)emberwingMotion.reset();bowLayerShown=shown;
+      bowLayer=shown?emberwingMotion.update(now/1000,dt,weapons.state(),adsAmount):null;if(bowLayer&&!renderer.xr.isPresenting){weaponAnchor.position.add(bowLayer.offset);weaponAnchor.quaternion.premultiply(bowLayer.quaternion);}}
     // The crossbow bore is solved onto the reticle, so it takes the positional sway only (above).
     if(tool!=='crossbow'&&weaponAnchor.visible){weaponAnchor.position.add(sway.position);weaponAnchor.quaternion.premultiply(sway.quaternion);}
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
     {const wound=siegebirdWind.update(dt,siegebirdGrip());for(const c of wound.cues)siegebirdCue({...c,crank:true});siegebirdWindVerdict(wound.wind);}
-    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates});
+    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates,ember:bowLayer?.ember??0,stringSnap:bowLayer?.string??0,stringGlow:bowLayer?.stringGlow??0});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
     siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);updateFireAudio(weaponState.firing);
@@ -1240,8 +1253,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const ranged=rangedReticle.set({tool,role,menuOpen:!active||(tool==='crossbow'&&adsAmount>.5),presenting:renderer.xr.isPresenting,...weaponState});
     document.body.classList.toggle('ranged-aim-active',!!ranged||adsAmount>.5);
     if(shouldShowTrajectory({tool,role,menuOpen:!active,...weaponState})){
-      if(now>=nextGuideAt){nextGuideAt=now+66;const guideStart=performance.now(),aim=projectileAim();trajectoryGuide.update({origin:aim.origin,aimDirection:aim.direction,curveBase:weaponState.curveBase,draw:weaponState.draw,hit:worldContact,terrainHeight:heightAt,sampleEvery:3});guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;}
-    }else{trajectoryGuide.hide();nextGuideAt=0;}
+      // The path is re-integrated from the live bow tip and aim every frame (smooth while moving/turning); the full
+      // world query over the whole flight runs at ~15 Hz, and frames in between only re-query around the last contact.
+      const full=now>=nextGuideAt,guideStart=performance.now(),aim=projectileAim();if(full)nextGuideAt=now+66;
+      const hitWin=full?null:guideHitTick===null?GUIDE_NO_HIT:[Math.max(0,guideHitTick-14),guideHitTick+14];
+      const r=trajectoryGuide.update({origin:aim.origin,aimDirection:aim.direction,curveBase:weaponState.curveBase,draw:weaponState.draw,hit:worldContact,hitWindow:hitWin,terrainHeight:heightAt,sampleEvery:3});
+      if(full||r.hit)guideHitTick=r.hit?r.ticks-1:null;
+      guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;
+    }else{trajectoryGuide.hide();nextGuideAt=0;guideHitTick=null;}
     content.tick(now,(snapshot.tick||0)+Math.min(3,Math.max(0,now-snapshotAt)*.06));impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "asset_id": "emberwing_bow", "kind": "weapon",
+  "coordinate_system": {"unit": "metre", "up": "+Y", "forward": "-Z", "origin": "grip centre"},
+  "required_nodes": ["Grip", "GripMesh", "RiserMesh", "ArrowRest", "ArrowGuide", "StringTop", "StringBottom", "UpperLimb", "LowerLimb", "PhoenixCore"],
+  "required_materials": ["Leather", "Brass", "Wood", "Ember", "EmberEye"],
+  "limits": {"max_bytes": 2000000, "max_triangles": 22000, "max_primitives": 14, "max_materials": 8, "max_images": 8},
+  "measured": {"bytes": 1616088, "triangles": 20636, "primitives": 13, "materials": 5, "images": 8}
+}
