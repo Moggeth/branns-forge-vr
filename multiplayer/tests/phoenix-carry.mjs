@@ -37,18 +37,19 @@ assert.ok(skull.position[2]<from[2]-8,'flies on along the heading (-z)');assert.
 // A save mid-flight drops the carry (never saved) and the skull falls from where it was.
 const reloaded=loadSimulation(s.checkpoint());const ghost=reloaded.snapshot().detachedParts.find(d=>d.id===start.id);assert.equal(ghost.carry,undefined);
 const y0=ghost.position[1];advance(reloaded,90);assert.ok(reloaded.snapshot().detachedParts.find(d=>d.id===start.id).position[1]<y0-.5,'falls after reload');
-// The fumble: far away, the phoenix (its arrow) is gone, the skull falls and settles as an ordinary grabbable skull.
+// Back to you: dropped at the archer's feet, the phoenix (its arrow) is gone, the skull settles as an ordinary skull.
 let drop=null;for(let i=0;i<PHOENIX_CARRY.seconds*60+10&&!drop;i++)drop=(s.step()||[]).find(e=>e.kind==='phoenix_drop')||null;
 assert.ok(drop,'drops');assert.equal(drop.id,start.id);skull=s.snapshot().detachedParts.find(d=>d.id===start.id);assert.equal(skull.carry,undefined);
-assert.ok(Math.hypot(skull.position[0]-from[0],skull.position[2]-from[2])>PHOENIX_CARRY.distance*.8,'dropped far away');
+const archer=s.snapshot().players[0].position;assert.ok(Math.hypot(skull.position[0]-archer[0],skull.position[2]-archer[2])<1.6,'brought back to the archer');
 assert.ok(!s.snapshot().embeds.some(e=>e.id===start.arrowId),'the phoenix flew off');
 advance(s,240);skull=s.snapshot().detachedParts.find(d=>d.id===start.id);
 assert.ok(Math.abs(skull.position[1]-terrainHeight(s.checkpoint(),skull.position[0],skull.position[2]))<1,'landed');
+assert.equal(act(s,4,'collectTarget',{targetId:skull.id}).ok,true,'grabbable at your feet');
 assert.deepEqual(loadSimulation(s.checkpoint()).snapshot(),s.snapshot());
 
-// Pure path: continuous, forward-only, bounded, and done at the world edge.
-const c=startCarry({position:[0,2,0],velocity:[0,0,-20],by:'h',arrow:'a1',tick:0});let last=null,minS=Infinity;
-for(let t=0;t<=PHOENIX_CARRY.seconds*60;t+=.5){const p=carryPose(c,t,()=>0);if(last)assert.ok(Math.hypot(...p.position.map((n,i)=>n-last[i]))<.6,'continuous');minS=Math.min(minS,last?last[2]-p.position[2]:1);last=p.position;assert.ok(Math.abs(Math.hypot(...p.quaternion)-1)<1e-9);}
-assert.ok(minS>-1e-9,'never flies backwards');assert.ok(carryPose(c,PHOENIX_CARRY.seconds*60,()=>0).done);
-assert.ok(carryPose(startCarry({position:[50,2,0],velocity:[1,0,0],arrow:'b',tick:0}),120,()=>0).done,'world edge ends it');
-console.log('phoenix-carry: phoenix headshots carry the skull off, plain headshots do not, saves stay compatible');
+// Pure path: continuous, bounded, homes on wherever the archer walked to.
+const c=startCarry({position:[0,2,0],velocity:[0,0,-20],by:'h',arrow:'a1',tick:0});let last=null;
+for(let t=0;t<=PHOENIX_CARRY.seconds*60;t+=.5){const p=carryPose(c,t,()=>0,[6,0,9]);if(last)assert.ok(Math.hypot(...p.position.map((n,i)=>n-last[i]))<.6,'continuous');last=p.position;assert.ok(Math.abs(Math.hypot(...p.quaternion)-1)<1e-9);}
+const end=carryPose(c,PHOENIX_CARRY.seconds*60,()=>0,[6,0,9]);assert.ok(end.done&&Math.hypot(end.position[0]-6,end.position[2]-9)<1.2&&end.position[1]>1);
+for(let t=0;t<PHOENIX_CARRY.seconds*60;t+=7){const p=carryPose(startCarry({position:[52,2,0],velocity:[1,0,0],arrow:'b',tick:0}),t,()=>0,[50,0,0]).position;assert.ok(Math.abs(p[0])<=PHOENIX_CARRY.bounds,'stays inside the world');}
+console.log('phoenix-carry: phoenix headshots carry the skull off and bring it back, plain headshots do not, saves stay compatible');

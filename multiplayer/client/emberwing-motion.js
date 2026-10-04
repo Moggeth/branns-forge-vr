@@ -31,6 +31,8 @@ export function createEmberwingMotion({reducedMotion = false, config = EMBERWING
   return {
     /** The bow was just equipped (or became visible again). */
     equip(now) { equipAt = now; drawnFor = 0; flare = flareVel = 0; wasCurved = false; },
+    /** A flare loosed without a draw: the same kick and hum as a shot. */
+    loose(now) { lastShot = now; },
     reset() { equipAt = null; drawnFor = 0; flare = flareVel = 0; wasCurved = false; lastRecoil = 0; lastShot = -Infinity; },
     /**
      * state: weapon-controller state() ({drawing, draw, curved}); aiming: 0..1 zoom amount.

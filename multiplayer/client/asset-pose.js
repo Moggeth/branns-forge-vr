@@ -92,6 +92,20 @@ export function weaponForward(visual, tool, target = new THREE.Vector3()) {
 }
 
 // Tip is the origin, so an embedded shaft extends backwards out of the surface.
+// Emberwing arrows carry variant heads and fletchings (Head_0.., Fletch_0..) beside one shared shaft. The arrow's
+// id picks one of each, so an arrow keeps its look from flight to embed and no two volleys look stamped out.
+const variantHash = id => [...String(id)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+export function dressArrowVariant(visual, id) {
+  const families = visual.userData.arrowFamilies ||= (() => {
+    const found = {};
+    visual.traverse(node => { const m = /^(Head|Fletch)_(\d+)$/.exec(node.name); if (m) (found[m[1]] ||= [])[+m[2]] = node; });
+    return Object.values(found).map(list => list.filter(Boolean));
+  })();
+  let h = variantHash(id);
+  for (const list of families) { const pick = h % list.length; h = Math.floor(h / list.length) ^ 0x9e37; list.forEach((node, i) => { node.visible = i === pick; }); }
+  visual.userData.arrowVariant = id;
+  return visual;
+}
 export function prepareProjectile(templates, kind = 'arrow') {
   const template = templates.get(kind === 'bolt' ? 'crossbow' : 'arrow');
   if (!template) return null;
@@ -255,7 +269,11 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, re
       visual.add(arrow); visual.userData.nockedArrow = arrow;
     }
     const arrow = visual.userData.nockedArrow;
-    if (arrow) { arrow.visible = amount > 0; arrow.position.copy(nock).z -= .78; }
+    if (arrow) {
+      // Each new draw nocks a fresh-looking arrow.
+      if (amount > 0 && !arrow.visible) dressArrowVariant(arrow, `nock:${visual.userData.nocks = (visual.userData.nocks || 0) + 1}`);
+      arrow.visible = amount > 0; arrow.position.copy(nock).z -= .78;
+    }
   } else if (tool === 'crossbow') {
     // Reload time (seconds since the shot) drives the whole Siegebird cycle (siegebird-reload.js): the string
     // throws the sled forward and the drum freewheels back, the clutch bites, two crank turns wind one drum turn

@@ -1,6 +1,6 @@
 import {phoenixBank} from './phoenix-bank.js';
 import * as THREE from 'three';
-import {prepareAsset, prepareProjectile} from './asset-pose.js';
+import {prepareAsset, prepareProjectile, dressArrowVariant} from './asset-pose.js';
 import {updateSkinBounds} from './skin-bounds.js';
 import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
@@ -10,6 +10,7 @@ import {dressGoldenProjectile, disposeGoldenProjectile} from './siegebird-flock.
 import {attachEmberdew} from './emberdew-presentation.js';
 import {predictArrow, createPhoenixContrails} from './phoenix-flight.js';
 import {carryPose} from '../shared/phoenix-carry.js';
+import {createPhoenixFlareView, dressFlareArrow} from './phoenix-flare-view.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
@@ -256,13 +257,14 @@ export function maskMissingParts(root, missing = []) {
   });
 }
 
-export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0}) {
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
   const creatures = createCreatureLifeDeath({scene, height});
   const fractures = createEmbedFractures({camera});
   const streaks = createProjectileStreaks();
   const contrails = createPhoenixContrails();
+  const flares = createPhoenixFlareView({scene, templates, height});
   scene.add(fractures.object, streaks.object, contrails.object);
   const flightPoint = new THREE.Vector3(), flightVelocity = new THREE.Vector3(), wingTip = new THREE.Vector3();
   let wingTips = null; // [left, right] wing-tip points in each wing node's own frame, measured once from the mesh
@@ -283,9 +285,10 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   // when it fumbles the skull it climbs away and fades. Every frame samples the same pure path the host steps.
   const carries = new Map(), carryUp = new THREE.Vector3(0, 1, 0), carryHeading = new THREE.Vector3(), carryLook = new THREE.Quaternion(), carryPitch = new THREE.Quaternion();
   const xAxis = new THREE.Vector3(1, 0, 0), zAxis = new THREE.Vector3(0, 0, 1), carryBox = new THREE.Box3();
-  function carryRig(id) {
+  function carryRig(id, arrowId) {
     let rig = carries.get(id); if (rig) return rig;
     const arrow = prepareProjectile(templates, 'arrow'); if (!arrow || !templates.has('wings')) return null;
+    dressArrowVariant(arrow, arrowId);
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(arrow);
     const wings = prepareAsset(templates.get('wings'), 'wings').visual; wings.position.z = .42; arrow.add(wings);
     const wingNodes = ['WingLeft', 'WingRight'].map(name => { const w = wings.getObjectByName(name); if (w) w.userData.rest ||= w.quaternion.clone(); return w; });
@@ -312,7 +315,9 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     const live = new Set();
     for (const [id, node] of detached) {
       const carry = node.userData.carry; if (!carry) continue;
-      const pose = carryPose(carry, tick, height);
+      // The phoenix brings the skull home to its archer: the local archer's predicted feet, others' from the snapshot.
+      const home = playerPosition(carry.by) || (snapshot.players || []).find(p => p.id === carry.by)?.position || null;
+      const pose = carryPose(carry, tick, height, home);
       // The first moments blend from where the skull was knocked off, so the snatch never pops.
       if (!node.userData.carryFrom || node.userData.carryFrom.arrow !== carry.arrow) {
         node.userData.carryFrom = {arrow: carry.arrow, position: node.position.clone(), quaternion: node.quaternion.clone()};
@@ -320,7 +325,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       const from = node.userData.carryFrom, blend = Math.min(1, pose.t / .3), ease = blend * blend * (3 - 2 * blend);
       node.position.fromArray(pose.position).lerp(from.position, 1 - ease); node.quaternion.fromArray(pose.quaternion); node.quaternion.slerp(from.quaternion, 1 - ease);
       node.userData.pose = null; // a dropped skull resumes from here when snapshots stop carrying it
-      const rig = carryRig(id); if (!rig) continue; live.add(id);
+      const rig = carryRig(id, carry.arrow); if (!rig) continue; live.add(id);
       node.updateMatrixWorld(); carryBox.setFromObject(node);
       // Head pieces can include a hood or neck gear; the bird grips the top of the skull.
       const skullCentre = carryBox.getCenter(flightVelocity); skullCentre.y = carryBox.max.y - .12;
@@ -378,16 +383,17 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   const creatureActor = entry => entry?.enemy && (entry.data?.kind === 'skeleton' || entry.data?.kind === 'golem');
   const remove = (map, id, ownsGeometry = false) => {
     const node = map.get(id); if (!node) return;
-    node.userData.emberdew?.dispose(); node.traverse(n => { if (n.userData.siegebirdGolden) disposeGoldenProjectile(n); });
+    node.userData.emberdew?.dispose(); node.userData.flareGlow?.material.dispose(); node.traverse(n => { if (n.userData.siegebirdGolden) disposeGoldenProjectile(n); });
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
-  function projectile(kind, golden = false) {
+  function projectile(kind, golden = false, id = '') {
     // Flame tongues are pooled by the fire presentation; collision still sweeps
     // the same complete authoritative trail, independently of this empty group.
     if(kind==='flame')return new THREE.Group();
     const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
     if (golden && kind === 'bolt') dressGoldenProjectile(visual);
+    if (kind === 'arrow') dressArrowVariant(visual, id);
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual);
     if (kind === 'fuel') { group.userData.emberdewRoot = visual; group.userData.emberdew = attachEmberdew({root: visual}); }
@@ -428,7 +434,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     for (const data of next.projectiles || []) {
       let node = projectiles.get(data.id);
-      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
+      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
       // A fresh snapshot replaces the prediction; the visible gap closes over ~60 ms instead of popping.
       const rendered = node.userData.flight ? node.position.clone() : null;
       node.position.fromArray(data.position);
@@ -436,6 +442,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         tick: next.tick || 0, offset: rendered ? rendered.sub(node.position) : new THREE.Vector3()};
       if (node.userData.flight.offset.lengthSq() > 4) node.userData.flight.offset.set(0, 0, 0);
       node.userData.projectileData = data;
+      if (data.flare) dressFlareArrow(node);
       const velocity = new THREE.Vector3().fromArray(data.velocity);
       if (velocity.lengthSq()) node.quaternion.setFromUnitVectors(forward, velocity.normalize());
       if (data.kind === 'arrow' && templates.has('wings') && !node.userData.wings) {
@@ -455,7 +462,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
-      if (!node) { node = projectile(data.kind, data.golden); if (!node) continue; embeds.set(data.id, node); }
+      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; embeds.set(data.id, node); }
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
       if (!target) { node.visible = false; fractures.remove(data.id); fractureAnchors.delete(data.id); continue; }
@@ -532,6 +539,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       node.position.lerpVectors(pose.from, pose.position, alpha); node.quaternion.slerpQuaternions(pose.fromQuaternion, pose.quaternion, alpha);
     }
     updateCarries(dt, renderTick);
+    flares.update(dt);
     contrails.update(dt, camera);
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
     if (camera) fractures.update(camera);
@@ -640,7 +648,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     damageNumbers.dispose();
     creatures.dispose();
     fractures.dispose();
-    streaks.dispose(); contrails.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
+    streaks.dispose(); contrails.dispose(); flares.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
     fractureAnchors.clear();
     for (const [id] of embeds) remove(embeds, id);
     for (const [id] of projectiles) remove(projectiles, id);
@@ -648,7 +656,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
   return {sync, prepareActors, tick, fireSamples, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
-    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails}),
+    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails, flares: flares.stats().flares}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),
     heldLimbRoot: holderId => {
@@ -661,6 +669,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       const actor = event?.id === undefined ? null : actorFor(event.id);
       if ((event?.kind === 'hit' || event?.kind === 'headshot') && creatureActor(actor)) creatures.hit(actor, event);
       if (event?.kind === 'death' && (creatureActor(actor) || ['skeleton', 'golem'].includes(event.creature))) creatures.death(actor, event);
+      if (event?.kind === 'phoenix_flare' && Array.isArray(event.position)) flares.burst(event);
     },
     damageNumberStats: () => damageNumbers.stats()};
 }

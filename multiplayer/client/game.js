@@ -246,7 +246,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         const kind = triggerRole({tool, hand: controllerSources.get(i)?.handedness, sources: controllerSources, holding: holdingLoose()});
         if (presses.begin(i, kind, tool)?.owner === 'primary') weapons.cancel(); // missed selectend: drop, never fire late
         if (kind === 'throw') release(true, i);
-        else if (kind === 'special') weapons.special();
+        else if (kind === 'special') { if (tool === 'bow') bowSpecial(); else weapons.special(); }
         else primaryDown();
       }
       else {
@@ -279,7 +279,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   // Ents: awakened trees. Sound goes through the wood kit plus a low root rumble; touch and VR feel big ones nearby.
   const entView=createEntView({scene,templates,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
     onSound:event=>{woodAudio?.play(event,listenerPose());if(event.kind==='ent_slam'||event.kind==='ent_fall')rootRumble(event);},
@@ -911,7 +911,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Right click zooms Emberwing and engages the phoenix: drawing while zoomed (or zooming while drawn) latches the curve.
   function primaryDown(){if(!active||role!=='hero'||inventionPlacement)return;unlockAudio();if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
-  function special(){if(!active||role!=='hero'||inventionPlacement)return;if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else weapons.special();}
+  function special(){if(!active||role!=='hero'||inventionPlacement)return;if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
+  // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
+  // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
+  function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}
+  function phoenixFlare(){
+    const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow')){onAction('special',{});return;} // the host explains the recharge
+    const aim=projectileAim();weapons.cancel();emberwingMotion.loose(performance.now()/1000);onAction('special',{origin:aim.origin,direction:aim.direction});
+  }
   function primaryUp(){if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
   function collectibleVisible(from,to,id){const delta=new THREE.Vector3(...to).sub(new THREE.Vector3(...from)),length=delta.length();if(length<.01)return true;
     const ray=new THREE.Raycaster(new THREE.Vector3(...from),delta.multiplyScalar(1/length),0,Math.max(0,length-.06));

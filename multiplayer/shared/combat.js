@@ -5,6 +5,8 @@ import {ENT_SIZES,entSpec,entPartPosition,entPartReach,severEntLimb,dropEntTimbe
 import {TREE_LIMITS} from './trees.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
+// Phoenix Flare: launch speed and extra upward loft (m/s), and the fuse before it bursts (ticks).
+export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask']);
@@ -159,6 +161,7 @@ export function projectileContact(state,m,ctx){
   // must still belong to a skeleton's surviving shield-bearing arm.
   if(shield&&((enemy||detached)?.kind!=='skeleton'||!['leftArm','rightArm'].includes(m.part)))return fail('invalid_contact');
   state.projectiles.splice(state.projectiles.indexOf(shot),1);
+  if(shot.flare)return ok(ctx.flareBurst(state,m.point,shot.ownerId));
   if(['flame','fuel'].includes(shot.kind))return ok(ctx.fireContact(state,shot,m));
   if(state.embeds.length>=COMBAT_LIMITS.embeds)state.embeds.shift();
   state.embeds.push({id:shot.id,kind:shot.kind,...(shot.golden?{golden:true}:{}),targetId:m.targetId,part:m.part||'torso',localPoint:[...m.localPoint],localQuaternion:[...m.localQuaternion],point:[...m.point],normal:[...m.normal],...(m.localNormal?{localNormal:[...m.localNormal]}:{}),...(shield?{surface:'shield'}:{}),penetration:shield?.035:embedDepth(shot.kind,m.part,m.impactThickness,m.targetId),...(m.boneName?{boneName:m.boneName}:{})});
@@ -200,6 +203,16 @@ export function combatAction(state,p,m,ctx){
     p.specialTick=state.tick;p.heat=Math.max(0,(p.heat||0)-.5);return ok([]);
   }
   if(m.action==='special'&&p.tool==='flask'){p.flaskLit=!p.flaskLit;return ok([]);}
+  // Phoenix Flare (Emberwing Q): a flare arrow climbs along the aim, bursts overhead, lights the area and rains
+  // embers that set what is under it alight (fire.js flareBurst). Contact before the burst bursts it there.
+  if(m.action==='special'&&p.tool==='bow'){
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('bow'))return fail('cooldown');
+    if(!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
+    if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
+    p.specialTick=state.tick;const id=ctx.nextId(state,'q'),speed=FLARE.speed;
+    state.projectiles.push({id,ownerId:p.id,kind:'arrow',flare:true,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(i===1?FLARE.loft:0)),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    return ok([{kind:'shoot',weapon:'bow',flare:true,position:[...m.origin],id}]);
+  }
   if(m.action==='fire'){
     if(!['bow','crossbow'].includes(p.tool)||!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
     const curve=m.curve===undefined?[0,0,0]:m.curve;if(!vec(curve,1.31)||Math.hypot(...curve)>1.31||m.draw!==undefined&&(!Number.isFinite(m.draw)||m.draw<0||m.draw>1))return fail('invalid_action');
@@ -237,6 +250,7 @@ export function stepCombat(state,ctx,events){
     p.previousPosition=[...p.position];const age=(state.tick-p.bornTick-1)*dt,len=Math.hypot(...p.curve),fraction=t=>1-Math.pow(1-clamp(t/.85,0,1),3),angle=len*(fraction(age+dt)-fraction(age));
     let v=p.velocity;if(len>.000001){const a=p.curve.map(n=>n/len),c=Math.cos(angle),s=Math.sin(angle),dot=a.reduce((n,q,i)=>n+q*v[i],0),cross=[a[1]*v[2]-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]-a[1]*v[0]];v=v.map((n,i)=>n*c+cross[i]*s+a[i]*dot*(1-c));}
     const nv=v.map((n,i)=>n*Math.exp(-.045*dt)-(i===1?(p.kind==='arrow'?5.8:p.kind==='flame'?5.2:p.kind==='fuel'?15:3)*dt:0));p.position=p.position.map((n,i)=>n+(p.velocity[i]+nv[i])*.5*dt);p.velocity=nv;p.trail.push([...p.position]);if(p.trail.length>16)p.trail.shift();
+    if(p.flare&&state.tick-p.bornTick>=FLARE.fuse){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(...ctx.flareBurst(state,p.position,p.ownerId));continue;}
     if(state.tick-p.bornTick>(p.kind==='flame'?48:p.kind==='fuel'?180:480)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
   }
   for(const d of [...state.detachedParts]){
@@ -259,11 +273,11 @@ export function stepCombat(state,ctx,events){
 // The carried skull follows the shared flight path and always holds its current flight velocity, so if the carry
 // is ever dropped (saved and restored, or the phoenix lets go) it falls naturally from where it was.
 function stepCarry(state,d,ctx,events){
-  const pose=carryPose(d.carry,state.tick,(x,z)=>ctx.terrainHeight(state,x,z));
+  const pose=carryPose(d.carry,state.tick,(x,z)=>ctx.terrainHeight(state,x,z),state.players.find(p=>p.id===d.carry.by)?.position||null);
   d.position=pose.position;d.quaternion=pose.quaternion;d.velocity=pose.velocity.map(n=>clamp(n,-40,40));d.angularVelocity=[0,0,0];d.bornTick=state.tick;
   if(!pose.done)return;
-  // The fumble: a little forward toss and a tumble; the phoenix (the arrow stuck in it) flies off without it.
-  const [hx,hz]=d.carry.dir;d.velocity=[hx*PHOENIX_CARRY.dropSpeed,1.2,hz*PHOENIX_CARRY.dropSpeed];d.angularVelocity=[5.5,1.5,3.5];
+  // The proud drop at the archer's feet: a little hop and a tumble; the phoenix (the arrow stuck in it) flies off.
+  d.velocity=[0,1.4,0];d.angularVelocity=[5.5,1.5,3.5];
   const arrow=state.embeds.findIndex(e=>e.id===d.carry.arrow&&e.targetId===d.id);if(arrow>=0)state.embeds.splice(arrow,1);
   events.push({kind:'phoenix_drop',id:d.id,arrowId:d.carry.arrow,by:d.carry.by,position:[...d.position],material:'bone'});
   delete d.carry;
@@ -272,7 +286,7 @@ export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);
   const tick=n=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick;
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
-  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
+  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   for(const e of [...saved.enemies,...(saved.detachedParts||[])])if(e.burnUntil!==undefined&&(!Number.isSafeInteger(e.burnUntil)||e.burnUntil<0||e.burnUntil>saved.tick+240||!PARTS.includes(e.burnPart))||e.burnPart!==undefined&&!PARTS.includes(e.burnPart))throw Error('Invalid burning part');
   for(const d of saved.detachedParts||[])if(d.scorch!==undefined&&(!Number.isFinite(d.scorch)||d.scorch<0||d.scorch>1))throw Error('Invalid detached scorch');
   const held=new Set();
@@ -286,7 +300,7 @@ export function validateCombat(saved,ids){
 export function restoreCombat(saved){
   const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value[k]!==undefined).map(k=>[k,structuredClone(value[k])]));
   return {
-    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden'])),
+    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden','flare'])),
     embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','localNormal','penetration','boneName','surface','golden'])),
     detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','hitIds','miningHits','scorch','burnUntil','burnPart']),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
   };
