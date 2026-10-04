@@ -284,6 +284,8 @@ export function createStartingWorld({ THREE, scene, height }) {
       // Struck surfaces that matter to gameplay resolve to their shared target id by triangle (see game.js resolveHit).
       const targets = buckets[k].targets; if (targets.length) mesh.userData.faceTarget = f => targets.find(([a, z]) => f >= a && f < z)?.[2] || null;
       mesh.userData.terrainPieces = buckets[k].pieces;
+      // Bounds come from the uploaded Float32 positions, not the pre-rounding doubles.
+      for (const p of mesh.userData.terrainPieces) { p.box.makeEmpty(); for (let i=p.start;i<p.start+p.count;i++) p.box.expandByPoint(v.fromBufferAttribute(geo.attributes.position,i)); }
       mesh.userData.baseY = Float32Array.from(buckets[k].pos.filter((_, i) => i % 3 === 1));
       installPieceRaycast(THREE, mesh, buckets[k].pieces);
       meshes[k] = mesh; group.add(mesh);
@@ -398,9 +400,9 @@ export function createStartingWorld({ THREE, scene, height }) {
       let dirty = false;
       for (const p of mesh.userData.terrainPieces) {
         const h = H(p.x, p.z); if (h === p.height) continue;
-        const shift = h - p.initialHeight, delta = h - p.height; p.height = h;
-        for (let i = p.start; i < p.start + p.count; i++) position.setY(i, base[i] + shift);
-        p.box.min.y += delta; p.box.max.y += delta; dirty = true;
+        const shift = h - p.initialHeight; p.height = h; p.box.makeEmpty();
+        for (let i = p.start; i < p.start + p.count; i++) { position.setY(i, base[i] + shift); p.box.expandByPoint(v.fromBufferAttribute(position,i)); }
+        dirty = true;
       }
       if (dirty) {
         position.needsUpdate = true; mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere(); changed = true;
