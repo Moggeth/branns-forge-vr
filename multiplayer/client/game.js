@@ -873,7 +873,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const useEarth=earth&&(!prop||earth.distance<=prop.distance);
     if(!prop&&!earth)return null;
     const point=useEarth?earth.point:prop.point.toArray(),normal=useEarth?earth.normal:hitNormal(prop).toArray();
-    return {targetId:'world',part:'torso',point,normal,localPoint:point,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
+    const resolved=useEarth?null:resolveHit(prop);
+    const targetId=snapshot.battle?.bases?.some(b=>b.hp>0&&b.id===resolved?.targetId)?resolved.targetId:'world';
+    return {targetId,part:'torso',point,normal,localPoint:point,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
   }
   let lastPhysicalTip=null,lastPhysicalHit=-Infinity;
   function tickPhysicalMelee(now,dt){
@@ -881,7 +883,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const tip=modelTip(axeModel,tool,new THREE.Vector3());
     if(lastPhysicalTip){const travel=tip.distanceTo(lastPhysicalTip);if(travel>.018&&travel<1&&travel/Math.max(dt,.001)>1.15&&now-lastPhysicalHit>(SWING_PROFILES[tool]?.cooldown||.5)*1000){
       const from=lastPhysicalTip.toArray(),to=tip.toArray(),enemy=combat.segmentContacts(from,to)[0],world=worldContact(from,to);let hit=enemy;
-      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));if(h){const r=resolveHit(h);hit=r?{...world,...r}:null;}else hit=null;}
+      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat(inventionVisual.targets(),[shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));if(h){const r=resolveHit(h);hit=r?{...world,...r}:null;}else hit=null;}
       if(hit){lastPhysicalHit=now;unlockAudio();feedback.contact({...hit,tool,material:contactMaterial(hit.targetId),speed:travel/Math.max(dt,.001),direction:tip.clone().sub(lastPhysicalTip).toArray()});onAction('strike',{...hit,tool});}
     }}lastPhysicalTip=tip;
   }

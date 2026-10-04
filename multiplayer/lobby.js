@@ -90,7 +90,7 @@ function friendlyError(detail) {
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
   const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The furnace is full. Collect bars from the output bay as batches finish, then smelt the rest.',nothing_to_smelt:'You have no ore to smelt. Mine ore seams with the pick, then bring it to the Forge.',output_empty:'No finished bars in the output bay yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.',machine_manned:'Someone is already manning that Timberline.',rack_full:'Your bolt rack is full (99 bolts).',not_operator:'Step onto the Timberline first (E).'};
   if(inventionErrors[code])return inventionErrors[code];
-  if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
+  if (/full/.test(code)) return 'That world has no free player slots. Choose another world or try again when someone leaves.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
   if (code === 'save_failed') return raw && raw.length < 140 ? raw : 'This browser couldn’t save the world. Download a backup from the Menu.';
   if (raw && raw.length < 140 && !/undefined|null|\bat\s+\S+:\d+/.test(raw)) return raw.replace(/^\w/, c => c.toUpperCase()).replace(/([^.!?])$/, '$1.');
@@ -471,7 +471,7 @@ function onSnapshot(snapshot) {
   } catch (error) { recordProblem(error); }
   else if (xrActive) game.setExpedition(null);
 
-  const count = session?.connection.local?'This device':`${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
+  const count = session?.connection.local?'This device':`${snapshot.players.length} of ${snapshot.maxPlayers ?? 32} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);

@@ -22,7 +22,7 @@ function fakeDoc(ids) {
 const objectiveIds = ['objectiveBanner', 'objectiveTitle', 'objectivePhase', 'objectiveText', 'objectiveProgress', 'objectiveProgressFill', 'objectiveProgressText', 'objectiveStart', 'objectiveRestart'];
 
 test('knownErrorText distinguishes server_full from room_full and falls through for unknown codes', () => {
-  assert.match(knownErrorText('room_full'), /eight players/);
+  assert.match(knownErrorText('room_full'), /no free player slots.*Choose another world/);
   assert.match(knownErrorText('SERVER_FULL'), /as many worlds/);
   assert.doesNotMatch(knownErrorText('server_full'), /eight players/);
   assert.match(knownErrorText('invalid_token'), /rejoin pass/i);

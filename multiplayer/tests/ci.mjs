@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'room-directory','public-room-directory','peer-encoding','session-publication','terrain-geometry',
+  'room-directory','public-room-directory','peer-encoding','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
   'ability-readiness','action-feedback','callouts','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',

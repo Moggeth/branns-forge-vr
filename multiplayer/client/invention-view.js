@@ -28,7 +28,9 @@ export function createInventionView({scene}){
  function sync(s){snapshot=s;stuck?.sync(s);const ids=new Set();
   if(s.inventions&&!refinery){refinery=createForgeWorks();scene.add(refinery.root);}
   if(refinery)refinery.place(terrainHeight(s,FORGE_WORKS_ORIGIN[0],FORGE_WORKS_ORIGIN[1],false));
-  for(const b of s.inventions?.structures||[]){if(b.type==='forge')continue;ids.add(b.id);let e=entries.get(b.id);
+  // Battle objectives reuse the commissioned sanctuary, including its real contact geometry.
+  const objectives=(s.battle?.status!=='off'?s.battle?.bases||[]:[]).map(b=>({...b,type:'sanctuary',yaw:0,battleBase:true}));
+  for(const b of [...s.inventions?.structures||[],...objectives]){if(b.type==='forge')continue;ids.add(b.id);let e=entries.get(b.id);
    if(!e){const root=b.type==='timberline'?new THREE.Group():createInventionModel(b.type);root.name=b.id;root.traverse(n=>{if(n.isMesh)n.userData.targetId=b.id;});scene.add(root);e={root,data:b,fireTick:b.fireTick??-10000};if(b.type==='ward'){e.field=new THREE.Mesh(wardGeo,wardMat);e.field.rotation.x=-Math.PI/2;scene.add(e.field);}entries.set(b.id,e);if(b.type==='timberline')upgrade(e);}
    e.data=b;e.fireTick=b.fireTick??-10000;const p=b.position||[b.x,0,b.z];e.root.position.set(p[0],b.type==='foundation'?p[1]:terrainHeight(s,p[0],p[2],false),p[2]);if(e.root.userData.lastYaw===undefined)e.root.rotation.y=b.yaw||0;e.root.userData.lastYaw=b.yaw||0;e.root.visible=true;
   }
