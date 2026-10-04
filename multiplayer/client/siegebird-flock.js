@@ -26,6 +26,7 @@ export const SIEGEBIRD_GOLDEN = Object.freeze({id: 'golden',
 
 // Native-space flight anchors (grip = the carried bolt's axis under the talons).
 const SEAT = new THREE.Vector3(0, .745, .179);           // grip when the bolt lies in the channel (clear of the peep and the hood)
+const NOCK = new THREE.Vector3(0, .535, .2);              // latched string at full draw (perfect-wind glint)
 const GRIP_ON_BOLT = .21;                                 // grip distance from the Bolt node origin along the shaft (near its balance)
 const APPROACH = s => new THREE.Vector3(s * .19, .77, .33);
 const ENTER = s => [new THREE.Vector3(s * 2.3, .15, .95), new THREE.Vector3(s * 1.5, .95, .85), new THREE.Vector3(s * .62, 1.05, .5), APPROACH(s)];
@@ -453,7 +454,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     if (!golden) return; goldenFx(rig);
     if (rig.burst) { rig.burst.position.set(0, 1.06, .185); rig.burst.visible = true; rig.burst.userData.at = rig.lastTime ?? 0; rig.burst.userData.fresh = true; }
   }
-  // Perfect wind: the pawl rings with blue resonance light (ring + core at the ratchet) as the next reload quickens.
+  // Perfect wind: the latch rings with blue resonance light (ring + core) as the next reload quickens.
   function perfect(visual) {
     const rig = rigFor(visual), fx = fxTextures(); if (!fx) return;
     if (!rig.resonance) {
@@ -461,9 +462,8 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
         s.userData.ignoreContact = true; s.userData.size = size; s.visible = false; rig.group.add(s); return s; };
       rig.resonance = [make(fx.ring, .05), make(fx.glow, .07)];
     }
-    const latch = visual.getObjectByName('Latch'); visual.updateWorldMatrix(true, true);
-    if (latch) rig.native.worldToLocal(latch.getWorldPosition(tmp.world)); else tmp.world.set(.12, .648, 0);
-    for (const s of rig.resonance) { s.position.copy(tmp.world); s.visible = true; s.userData.at = rig.lastTime ?? 0; s.userData.fresh = true; }
+    // The pawl itself sits inboard under the stock, so the light rings where the player looks: the latched nock on the rail.
+    for (const s of rig.resonance) { s.position.copy(NOCK); s.visible = true; s.userData.at = rig.lastTime ?? 0; s.userData.fresh = true; }
   }
   function loadedGolden(visual) { return !!visual.userData.siegebirdFlock?.loadedGolden; }
   // Equip / respawn with a bolt already on the rail (no bird).
