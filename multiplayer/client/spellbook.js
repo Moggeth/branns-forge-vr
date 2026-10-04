@@ -37,6 +37,11 @@ export const SPELL_ICONS = Object.freeze({
   wildwake: '<g opacity=".7"><path transform="translate(-4.2 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/>'
     + '<path transform="translate(14.6 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/></g>'
     + '<path fill-rule="evenodd" stroke="var(--sb-icon-ink,#1a140f)" stroke-width="1.4" paint-order="stroke" transform="translate(3.6 1) scale(.7)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
+  // Growth Wave: a row of three trees of rising size riding a swell of earth.
+  wave: '<path d="M1 22c3-3.2 6-3.2 9 0s6 3.2 9 0l4-1v2H1z" opacity=".55"/>'
+    + '<path d="M5 9.5c-1.7 0-2.8 1.2-2.8 2.6 0 1.4 1.2 2.4 2.5 2.4h.6v3.6h1.3v-3.6h.6c1.3 0 2.5-1 2.5-2.4 0-1.4-1.1-2.6-2.8-2.6z"/>'
+    + '<path d="M12 6c-2.1 0-3.4 1.5-3.4 3.2 0 1.7 1.4 3 3 3h.7v5.6h1.4v-5.6h.7c1.6 0 3-1.3 3-3C16.4 7.5 14.1 6 12 6z"/>'
+    + '<path d="M19 2.5c-2.3 0-3.8 1.7-3.8 3.6 0 1.9 1.6 3.3 3.4 3.3h.7v8.4h1.5V9.4h-.1c1.6-.3 2.8-1.6 2.8-3.3 0-1.9-1.6-3.6-4.5-3.6z"/>',
 });
 const QUICK_ICON = '<path d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm0 2.2a8.3 8.3 0 1 1 0 16.6 8.3 8.3 0 0 1 0-16.6z" opacity=".55"/><path d="M13.4 4.5L7 13.2h4.3l-1.6 6.3 7.3-9h-4.4l2.3-6z"/>';
 const ARROW = { prev: '<path d="M15.5 4.5L8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',

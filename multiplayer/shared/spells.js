@@ -18,6 +18,8 @@ export const SPELLS = Object.freeze([
   {id:'frost',label:'Frost Nova',cost:20,target:'point',icon:'❄'},
   {id:'awaken',label:'Awaken',cost:18,target:'point',icon:'❦'},
   {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
+  // Growth Wave: drag a band and a rectangle of trees rises along it (shared/grove-growth.js).
+  {id:'wave',label:'Growth Wave',cost:30,target:'line',icon:'⁂'},
   // Bloom spells open as the world fills with life (shared/bloom.js).
   {id:'spring',label:'Life Spring',cost:16,target:'point',icon:'❀',bloom:1},
   {id:'blessing',label:'Blessing',cost:20,target:'point',icon:'✦',bloom:2},
@@ -51,7 +53,9 @@ export const SPELL_TARGET_SHAPES = Object.freeze({
   raise: { r: 6, h: 2 }, lower: { r: 6, h: -2 },
   // Earth lines: kr is the trench lip / wall foot half-width, kh the full depth/height, bank the chasm's outer spoil edge.
   sunder: { line: true, kr: SUNDER.width, kh: -SUNDER.depth, bank: SUNDER.bankOut }, wall: { line: true, kr: RAISE_WALL.width, kh: RAISE_WALL.peak },
-  grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
+  // Growth spells: the reticle marks the exact sites the authority will plant (grove-growth.js growthPlan); these are the open-ground pattern.
+  grove: { r: 6.4, sites: true, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*3.9).toFixed(3),+(Math.sin(i*Math.PI*2/5)*3.9).toFixed(3)]) }, ring: { r: 7, treeRing: 5.9, trees: 8, sites: true },
+  wave: { line: true, band: 3, sites: true },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
   spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 },
   // Ents wake standing trees: Awaken snaps to the nearest tree within reach; Wild Awakening takes up to three in its circle.

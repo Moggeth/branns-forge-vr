@@ -39,7 +39,7 @@ const extras=structuredClone(checkpoint);extras.deposits[0].surprise='discard';a
 const magic=createSimulation({seed:3});magic.addPlayer({id:'g',role:'god'});
 const originalMeteors=magic.snapshot().deposits.filter(d=>d.kind==='meteor').length;
 let sequence=0;for(const spell of ['sunder','wall','ring','starfall']){assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell,point:[10,0,10]}).ok,true);for(let i=0;i<60;i++)magic.step();}
-assert.equal(magic.snapshot().edits.length,5);assert.equal(worldTrees(magic.snapshot()).length,33);assert.equal(magic.snapshot().deposits.filter(d=>d.kind==='meteor').length,originalMeteors+1);
+assert.equal(magic.snapshot().edits.length,5);{const ring=magic.snapshot().groves.at(-1).trees;assert.ok(ring.length>=6,'ring grows around the wall');assert.equal(worldTrees(magic.snapshot()).length,25+ring.length);}assert.equal(magic.snapshot().deposits.filter(d=>d.kind==='meteor').length,originalMeteors+1);
 assert.deepEqual(loadSimulation(magic.checkpoint()).snapshot(),magic.snapshot());
 {const r=magic.command('g',{type:'cast',seq:++sequence,spell:'ring',point:[55,0,55]}),ring=magic.snapshot().edits.at(-1);assert.equal(r.ok,true,'mana alone refuses a cast; placement moves it');assert.ok(Math.abs(ring.x)<=51&&Math.abs(ring.z)<=51,'ring settles inside the world');}
 // A full terrain list never refuses: the oldest settled earthworks fold into the baked ground.
