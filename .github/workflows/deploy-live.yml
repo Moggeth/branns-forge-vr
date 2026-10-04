@@ -67,6 +67,9 @@ jobs:
           cache-dependency-path: multiplayer/package-lock.json
       - if: steps.gate.outputs.go == 'true'
         run: npm ci --no-audit --no-fund
+      - name: Require the matching cloud room service
+        if: steps.gate.outputs.go == 'true'
+        run: node scripts/check-room-service.mjs
       - name: Build with the cloud peer URL
         if: steps.gate.outputs.go == 'true'
         run: npm run build

@@ -48,6 +48,12 @@ The index introduces one refresh/alarm per occupied room per minute, separate fr
 gameplay traffic. Pagination and cleanup bound individual operations; it is not an
 unlimited-capacity lobby service.
 
+A full room reserves a disconnected guest's seat for five seconds. Its coordinator
+refreshes the listing at that deadline, so the vacancy does not wait for the next
+minute heartbeat. Host and pending continuation seats retain their separate recovery
+rules. `node tests/cloud-directory-lifecycle.mjs` verifies these deadlines and
+hibernation; `node tests/room-service-gate.mjs` verifies release readiness checks.
+
 Checks: `node tests/room-directory.mjs`, `node tests/public-room-directory.mjs`, then
 `CLOUD_TEST_URL=http://127.0.0.1:8792 node cloud/directory-test.mjs` against the owned
 local Wrangler process (set the environment variable using your shell's syntax).
@@ -59,9 +65,18 @@ From `multiplayer/` using the personal Cloudflare subscription:
 ```powershell
 npx --yes wrangler@4.147.0 whoami
 npx --yes wrangler@4.147.0 deploy --config cloud/wrangler.jsonc
-npx --yes wrangler@4.147.0 tail --config cloud/wrangler.jsonc
+$env:PEER_URL='wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud'
+node scripts/check-room-service.mjs
 ./scripts/deploy-peer-preview.ps1 -PeerUrl wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud
 ```
+
+Despite its historical filename, `deploy-peer-preview.ps1` publishes production.
+Deploy the Worker first, then require the read-only readiness gate to pass before
+publishing the frontend. The gate requires `/peer/health` to advertise the shared
+human capacity (currently 32) and `/peer/rooms` to return a valid HTTP 200 listing;
+it times out after eight seconds and never logs endpoint credentials. The live
+frontend workflow runs this same gate before its build and deploy. To inspect the
+Worker separately, run `npx --yes wrangler@4.147.0 tail --config cloud/wrangler.jsonc`.
 
 `GET /peer/health` reports service/protocol, never credentials. Dashboard Workers
 observability samples 10% of events; explicit application logs include room/count only.
@@ -78,7 +93,7 @@ decline unnecessary migration offers after a signaling-only interruption.
 
 Origins are explicitly allowlisted; signaling/relay routes are restricted to the
 room's host and guests. There are per-IP connection limits, per-socket message/byte
-limits, at most eight members, at most sixteen pending/connected sockets, and 12-second
+limits, at most 32 members, at most 40 pending/connected sockets, and 12-second
 join timeouts. These limits reduce abuse but invite codes are not private accounts or
 anti-cheat. Browser hosts are authoritative and trusted in this friends playtest.
 

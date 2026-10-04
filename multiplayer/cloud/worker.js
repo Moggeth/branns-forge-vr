@@ -60,10 +60,17 @@ export class ForgeRoom extends DurableObject {
   peers() { return this.room?.peers || []; }
   publicPeer(p) { return { id: p.id, name: p.name, role: p.role, desktop: p.desktop, online: this.online(p.id), checkpointRevision: p.revision }; }
   broadcast(message, except) { for (const [id, ws] of this.sockets) if (id !== except) send(ws, message); }
+  seatReleaseDeadlines() {
+    const r=this.room;
+    if(!r||r.peers.length<MAX_PEERS)return [];
+    return r.peers.filter(p=>p.id!==r.hostId&&p.id!==r.offer?.peerId&&!this.online(p.id))
+      .map(p=>p.offlineAt+OFFLINE_SEAT_GRACE_MS);
+  }
   async updateDirectory(force = false) {
     if (!this.env.DIRECTORY || !this.room) return;
     const now=Date.now();
-    if (!force && now-(this.directoryAt || 0)<DIRECTORY_REFRESH) return;
+    const seatReleased=this.seatReleaseDeadlines().some(at=>at<=now&&at>(this.directoryAt||0));
+    if (!force && !seatReleased && now-(this.directoryAt || 0)<DIRECTORY_REFRESH) return;
     this.directoryAt=now;
     try {
       const result=await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('public')).fetch('https://directory/update',{
@@ -80,6 +87,9 @@ export class ForgeRoom extends DurableObject {
     if (r) {
       deadlines.push(r.created + MAX_AGE);
       if (this.sockets.size && this.env.DIRECTORY) deadlines.push((this.directoryAt || now) + DIRECTORY_REFRESH);
+      // A full room becomes joinable after the short reconnect reservation,
+      // not only after the next minute-long directory heartbeat.
+      if (this.env.DIRECTORY) deadlines.push(...this.seatReleaseDeadlines().filter(at=>at>now));
       if (!this.sockets.size) deadlines.push(r.lastActivity + EMPTY_AGE);
       if (r.graceAt) deadlines.push(r.graceAt);
       if (r.offer) deadlines.push(r.offer.expires);
