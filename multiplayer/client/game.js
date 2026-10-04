@@ -92,7 +92,7 @@ import {createSpellAudio} from './spell-audio.js';
 import {createMaterialAudio} from './material-audio.js';
 import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from './siegebird-flock.js';
 import {createSiegebirdAudio} from './siegebird-audio.js';
-import {siegebirdMechanism, siegebirdCues} from './siegebird-reload.js';
+import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD} from './siegebird-reload.js';
 import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {worldTrees} from '../shared/world-content.js';
