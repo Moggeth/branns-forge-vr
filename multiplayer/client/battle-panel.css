@@ -10,7 +10,10 @@
   #menu .bf-bt-objective { grid-column:1; grid-row:2; }
   #menu .bf-bt-stats { grid-column:2; grid-row:2 / 4; }
   #menu .bf-bt-sides { grid-column:1; }
-  #menu .bf-bt-host { grid-column:2; }
+  #menu .bf-bt-host { grid-column:2; grid-row:4; }
+  #menu .bf-bt[data-status="off"] .bf-bt-host,
+  #menu .bf-bt[data-confirming="true"] .bf-bt-host { grid-row:2 / 5; align-self:start; }
+  #menu .bf-bt[data-confirming="true"] .bf-bt-stats { display:none; }
   #menu .bf-bt-note { grid-column:1; grid-row:4; }
   #menu .bf-bt-guest { grid-column:2; grid-row:4; }
 }

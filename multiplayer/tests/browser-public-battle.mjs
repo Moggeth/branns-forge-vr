@@ -25,6 +25,13 @@ try{
  await mobile.page.locator('#resumePlay').tap();await Promise.all(pages.map(p=>p.waitForFunction(()=>brannHarness.snapshot().enemies.some(e=>e.battleRun),null,{timeout:20000})));record('host-enables-guest-chooses-side-bots-replicate','pass');
  await shot(desktop.page,'battle-fps-world');await battleMenu(desktop.page);await desktop.page.locator('.bf-bt-primary').click();await desktop.page.locator('.bf-bt-no').press('Escape');assert.equal(await desktop.page.locator('#menu').isVisible(),true);assert.equal(await desktop.page.locator('.bf-bt-confirm').isVisible(),false);
  await desktop.page.locator('.bf-bt-primary').click();await desktop.page.locator('.bf-bt-yes').click();await Promise.all(pages.map(p=>p.waitForFunction(()=>brannHarness.snapshot().battle.status==='off'&&!brannHarness.snapshot().enemies.some(e=>e.battleRun))));record('cancel-and-disable-cleans-only-battle','pass');
+ // Real mobile host menu, including confirmation, must fit without scrolling.
+ await mobile.page.setViewportSize({width:390,height:650});await ready(mobile.page,'Solo host');await mobile.page.locator('#solo').tap();
+ await mobile.page.waitForFunction(()=>brannHarness.state().solo&&brannHarness.state().rendererReady);
+ await battleMenu(mobile.page,true);await mobile.page.locator('.bf-bt-primary').tap();
+ await fits(mobile.page,'#menu .menu-card','phone-host-confirmation');await shot(mobile.page,'battle-host-confirmation-phone');
+ await mobile.page.setViewportSize({width:844,height:340});await sleep(200);await fits(mobile.page,'#menu .menu-card','landscape-host-confirmation');
+ await mobile.page.locator('.bf-bt-yes').tap();await mobile.page.waitForFunction(()=>brannHarness.snapshot()?.battle.status==='running');await fits(mobile.page,'#menu .menu-card','landscape-running-host');record('solo-mobile-host-enables-battle','pass');
  assert.deepEqual(pages.flatMap(p=>p.errors),[]);record('application-errors','pass');
 }catch(error){record('exception','fail',{message:error.message});for(let i=0;i<pages.length;i++){console.log(await pages[i].evaluate(()=>({state:window.brannHarness?.state(),status:document.querySelector('#lobbyStatus')?.textContent})).catch(()=>null));await shot(pages[i],'public-battle-failure-'+i).catch(()=>{});}process.exitCode=1;}
 finally{save('public-battle');await desktop.browser.close();await mobile.browser.close();}

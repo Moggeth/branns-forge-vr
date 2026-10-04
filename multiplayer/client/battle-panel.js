@@ -149,6 +149,7 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
   function paint() {
     const v = view, running = v.status === 'running', victory = v.status === 'victory', active = running || victory;
     root.dataset.status = v.status;
+    root.dataset.confirming = String(!!pending);
     setText(pill, running ? 'Running' : victory ? 'Battle over' : 'Off');
 
     // stats

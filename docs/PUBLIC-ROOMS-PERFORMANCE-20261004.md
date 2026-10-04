@@ -130,8 +130,9 @@ Rendering: remote Hero CPU mean0.757->0.310ms with32 Heroes (16VR) and64 skeleto
 32 real lightweight Chromium sessions passed direct and forced-relay connections,
 all-player input, replication and host transfer. After exact checkpoint deltas:
 direct peers received120 snapshots in6seconds, worst peer p95 arrival gap57.8ms;
-relay120-121, p95 <=60.2ms. No codec rejects. Final compatibility changes require a
-fresh release run. This tests real transport, not32 full renderers or WAN latency.
+relay120-121, p95 <=60.2ms. No codec rejects. Final compatibility release rerun passed: direct9.687s, relay16.483s;
+120-121 snapshots/client/6s, worst-peer p95 gaps58.7ms and75ms respectively;
+maximum gaps84.7ms and108.5ms, no errors, checkpoint host transfer passed. This tests real transport, not32 full renderers or WAN latency.
 
 Exact recovery deltas reduce measured checkpoint traffic63.17->10.65MB (83.1%)
 and total heavy31-guest wire traffic104.08->51.56MB (50.5%), preserving values and
@@ -163,3 +164,23 @@ empty-lobby -> joined world; compileAsync alone omits shadow warmup and late
 material variants. Avoid concurrent full-game browser tests during GPU measurement.
 
 New lessons: use actual model world elevation for sanctuary ray fixtures; y=0 assumptions can miss valid geometry. Shared battle helpers require their real nextId context. A test literal saying eight players is obsolete when room capacity changes; retain actionable error assertions. Voice requires spatially bounded topology, not a32-person full mesh. Preserve all CI lists when incorporating another feature's runner changes.
+
+## Release verification checkpoint
+
+- Local CI151/151 passed in80.8s after upstream Timberline integration; build2.908s.
+- Public discovery/join/side choice/enable/disable, solo host and real mobile menu:
+  final12.344s, no browser errors.390x650 portrait and844x340 landscape fit.
+  Eight separate component focus/error/stale-confirmation checks passed0.713s.
+- Short-landscape host confirmation initially overflowed105px (12.518s failed run).
+  Explicit grid placement now shares available columns; confirmation temporarily
+  replaces live stats while keeping the objective and action explanation. Running
+  host panel also verified. Test host controls, not only guest menus.
+- Cloud Worker d69d55b8-85bb-4db8-ac85-e46910e0f6f2 deployed; upload1.54s,
+  trigger deployment0.69s. Hosted readiness0.615s; protocol6.234s and directory
+  lifecycle8.376s passed against the actual public endpoint.
+- Existing voice and Timberline commits were cherry-picked and conflicts reviewed.
+  8a81eef records their already-integrated ancestry; it changes no tree content.
+- Authentication downgrade review found old tabs could replace a new member in
+  small rooms; fixed in f00e283 with13 focused checks in1.841s. Preserve the old
+  connection and require refresh when credential capability would decrease.
+- Frontend publication and hosted UI acceptance are pending this checkpoint.
