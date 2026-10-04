@@ -10,7 +10,7 @@ import {prepareAsset} from './asset-pose.js';
 //   pool     a warm pool of light on the ground under the star, the cheap stand-in for a real light
 // The flying flare arrow wears a small hot glow (dressFlareArrow) so it reads as different from a normal shot.
 
-export const FLARE_VIEW = Object.freeze({max: 3, hang: 5.5, sink: .45, flash: .35, phoenix: .9, phoenixSize: 7, starSize: 1.5,
+export const FLARE_VIEW = Object.freeze({max: 3, hang: 5.5, sink: .45, flash: .35, phoenix: .9, phoenixSize: 10, starSize: 1.5,
   embers: 48, poolRadius: 7.5, poolLift: .12});
 
 function radialTexture(size = 64, falloff = 2.2) {
@@ -38,13 +38,14 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
   const flashMat = additive(0xfff0c8), starMat = additive(0xffe2a0), haloMat = additive(0xff8a2a, .8);
   const poolMat = new THREE.MeshBasicMaterial({map: glow(), color: 0xff9a40, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4});
   const poolGeo = new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2);
-  // Ghost phoenix material: one additive copy shared by every burst.
-  const ghostMat = new THREE.MeshBasicMaterial({color: 0xff7a24, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false});
+  // Ghost phoenix material: one copy shared by every burst. Normal blending so the flame-orange silhouette still reads
+  // against a bright daytime sky (additive washes out to white there).
+  const ghostMat = new THREE.MeshBasicMaterial({color: 0xff5f14, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false});
   const emberGeo = new THREE.BufferGeometry();
   const emberPos = new Float32Array(FLARE_VIEW.max * FLARE_VIEW.embers * 3), emberCol = new Float32Array(emberPos.length);
   emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3).setUsage(THREE.DynamicDrawUsage));
   emberGeo.setAttribute('color', new THREE.BufferAttribute(emberCol, 3).setUsage(THREE.DynamicDrawUsage));
-  const emberMat = new THREE.PointsMaterial({size: .16, map: glow(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, sizeAttenuation: true});
+  const emberMat = new THREE.PointsMaterial({size: .32, map: glow(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, sizeAttenuation: true});
   const embers = new THREE.Points(emberGeo, emberMat); embers.frustumCulled = false; embers.name = 'phoenix-flare-embers'; embers.userData.ignoreContact = true;
   scene.add(embers);
   const emberColor = new THREE.Color();
@@ -94,7 +95,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
       if (flare.ghost) {
         const g = a / F.phoenix; flare.ghost.visible = g < 1;
         if (g < 1) { flare.ghost.scale.setScalar(.6 + F.phoenixSize * (1 - (1 - g) ** 3)); flare.ghost.position.y = .8 * g;
-          ghostMat.opacity = .85 * (1 - g) ** 1.5; }
+          ghostMat.opacity = .9 * (1 - g) ** 1.2; }
       }
       // Pool of light under the star.
       const star = flare.star.getWorldPosition(new THREE.Vector3()), drop = Math.max(.5, star.y - flare.ground);
@@ -114,7 +115,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
         if (s.p.y < flare.ground + .05) { s.p.y = flare.ground + .05; s.v.set(0, 0, 0); }
         const k = s.age < s.life ? 1 - s.age / s.life : 0, o = n * 3;
         emberPos[o] = s.p.x; emberPos[o + 1] = s.p.y; emberPos[o + 2] = s.p.z;
-        emberColor.setRGB(1, .55 + .35 * k, .18 * k).multiplyScalar(k * 1.3);
+        emberColor.setRGB(1, .38 + .4 * k, .08 * k).multiplyScalar(k * 1.6);
         emberCol[o] = emberColor.r; emberCol[o + 1] = emberColor.g; emberCol[o + 2] = emberColor.b; n++;
       }
     }

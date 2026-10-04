@@ -6,7 +6,8 @@
 // REAL combat view (projectiles, wings, contrails, embeds, detached parts, carry rig). Deterministic: the page only
 // advances when window.review.step(frames) is called, so a capture script can grab frame sequences on a slow
 // software GPU. Scenes (?scene=): carry (phoenix headshot, skull hauled away), volley (curved arrows crossing the
-// view with wing contrails), arrows (embedded arrows close up). Not shipped.
+// view with wing contrails), arrows (embedded arrows close up), flare (Phoenix Flare
+// bursting over a skeleton). Not shipped.
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
@@ -52,7 +53,7 @@ function syncActors(snap) {
 }
 function setup() {
   const c = structuredClone(check);
-  const enemyAt = sceneName === 'carry' ? [0, 0, -2] : [0, 0, -6];
+  const enemyAt = sceneName === 'carry' ? [0, 0, -2] : sceneName === 'flare' ? [1.5, 0, -15] : [0, 0, -6];
   c.enemies = [createEnemy('enemy', [enemyAt[0], H(enemyAt[0], enemyAt[2]), enemyAt[2]], 'skeleton')];
   sim = loadSimulation(c);
   view = createCombatView({scene, templates, actors, camera, height: H});
@@ -80,8 +81,8 @@ function headContact() {
 const hitCount = {n: 0};
 function step(frames = 1) {
   for (let f = 0; f < frames; f++) {
-    sim.step(); frame++;
-    if (pending === 'head') { const hit = headContact(); if (hit && sim.projectileContact(hit).ok) { pending = null; hitCount.n++; } }
+    for (const e of sim.step() || []) view.handleEvent(e); frame++;
+    if (pending === 'head') { const hit = headContact(); if (hit) { const r = sim.projectileContact(hit); if (r.ok) { pending = null; hitCount.n++; r.events.forEach(view.handleEvent); } } }
     if (sceneName === 'volley' && frame % 24 === 1 && frame < 200) {
       const k = (frame / 24) | 0, side = k % 2 ? 1 : -1;
       fire([side * 6, H(side * 6, 4) + 1.6, 4], [-side * .55, .12, -1], [0, side * .9, 0]);
@@ -102,12 +103,19 @@ function aimCamera() {
     if (node) { new THREE.Box3().setFromObject(node).getCenter(camTarget); follow.lerp(camTarget, .06); }
     camera.position.set(follow.x + 3.1, follow.y + .5, follow.z + 2.2); camera.lookAt(follow.x, follow.y + .05, follow.z);
   } else if (sceneName === 'volley') { camera.position.set(0, H(0, 7) + 2.2, 7.5); camera.lookAt(0, H(0, -6) + 1.6, -6); }
+  else if (sceneName === 'flare') { camera.position.set(9, H(9, 1) + 2.4, 1); camera.lookAt(0, H(0, -15) + 3.2, -15); }
   else { camera.position.set(.9, H(0, -6) + 1.7, -4.6); camera.lookAt(0, H(0, -6) + 1.4, -6); }
 }
 setup();
 if (sceneName === 'carry') {
   const e = sim.snapshot().enemies[0], at = partPosition(e, 'head'), origin = [1.2, at[1] - .2, 8];
   fire(origin, at.map((n, i) => n - origin[i] + (i === 1 ? -.18 : 0)), [0, -.004, 0]); pending = 'head';
+} else if (sceneName === 'flare') {
+  const p = sim.checkpoint(), player = p.players[0];
+  player.position = [0, H(0, 8), 8]; delete player.specialTick; sim = loadSimulation(p);
+  act(seq++, 'equip', {tool: 'bow'});
+  const origin = [0, H(0, 8) + 1.6, 8], d = [0, .12, -1], l = Math.hypot(...d);
+  window.flareResult = act(seq++, 'special', {origin, direction: d.map(n => n / l)}); window.flareResult.events.forEach(view.handleEvent);
 } else if (sceneName === 'arrows') {
   // Six arrows into the skeleton, then it is frozen for close inspection.
   const e = sim.snapshot().enemies[0];
