@@ -1,4 +1,5 @@
-import {battleAction,createBattle,stepBattle,restoreBattle,battleActive,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
+import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,battleActive,battleSkirmish,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
+import {findHomeTarget,resolveHomeDomes} from './home-bases.js';
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
@@ -102,12 +103,15 @@ function damageHero(state, hero, amount, events) {
   }
 }
 
-function newState({room = 'LOCAL', seed = 41} = {}) {
+function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
-  return {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-21,z:11,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:22,z:18,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:24,z:20,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
+  const state = {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-21,z:11,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:22,z:18,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:24,z:20,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
     {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], fruit: createFruit(), shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+  // New worlds open with the always-on home bases; legacyBattle keeps the old host-started skirmish for its tests.
+  if (!legacyBattle) state.battle = createHomeBattle(state, terrainHeight);
+  return state;
 }
 
 function instantiate(state) {
@@ -153,7 +157,7 @@ function instantiate(state) {
         p.seq=message.seq;return battleAction(state,p,message,{createEnemy,terrainHeight});
       }
       if (p && message?.type === 'adventure') {
-        if (state.battle.status!=='off' && ['start','retry'].includes(message.action)) return fail('battle_active');
+        if (state.battle.status!=='off' && state.battle.v!==2 && ['start','retry'].includes(message.action)) return fail('battle_active');
         if (!safeSeq(message.seq)) return fail('invalid_sequence');
         if (message.seq <= p.seq) return fail('duplicate_sequence');
         p.seq = message.seq;
@@ -280,7 +284,7 @@ function instantiate(state) {
           if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,reward.amount);if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
-          if(state.battle.bases.some(b=>b.id===message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
+          if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
@@ -337,7 +341,7 @@ function instantiate(state) {
       if(spell==='spring'){if(state.springs.length>=BLOOM.spring.cap)state.springs.shift();state.springs.push({id:idNew,x,z,expireTick:state.tick+BLOOM.spring.ticks});quenchFire(state,at,BLOOM.spring.radius);}
       if(spell==='quake')for(const enemy of [...state.enemies])if(enemyHostileTo(enemy,p.side)&&distance(enemy.position,at)<=8){enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+180);damageEnemy(state,enemy,30,events,p.id);}
       if(spell==='lightning')for(const b of state.inventions.structures)if(distance(b.position,at)<=3)damageInvention(state,b.id,65,p.id,events);
-      if(spell==='lightning'&&!battleActive(state))applyHeat(state,at,3,1,fireContext);
+      if(spell==='lightning'&&!battleSkirmish(state))applyHeat(state,at,3,1,fireContext);
       if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&(!battleActive(state)||(hero.side||'party')===(p.side||'party'))&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
       if(battleActive(state)&&['heal','blessing'].includes(spell))for(const enemy of state.enemies)if(enemy.battleRun&&enemy.side===(p.side||'party')&&distance(enemy.position,at)<=(spell==='heal'?7:6))enemy.hp=Math.min(enemyMaxHp(enemy),enemy.hp+(spell==='heal'?40:20));
       if(['lightning','quake'].includes(spell))for(const base of state.battle.bases)if(distance(base.position,at)<=(spell==='lightning'?3:8))damageBattleBase(state,base.id,spell==='lightning'?65:30,p.side||'party',events);
@@ -382,7 +386,7 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -397,24 +401,25 @@ function instantiate(state) {
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
         const at = [pending.x, terrainHeight(state, pending.x, pending.z), pending.z];
         for (const e of [...state.enemies]) if (enemyHostileTo(e,pending.side) && distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
-        for (const p of state.players) if (p.role === 'hero' && (!battleActive(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
+        for (const p of state.players) if (p.role === 'hero' && (!battleSkirmish(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
         for(const base of state.battle.bases)if(distance(base.position,at)<=5)damageBattleBase(state,base.id,90,pending.side||'party',events);
         for(const b of state.inventions.structures)if(distance(b.position,at)<=5)damageInvention(state,b.id,90,null,events,pending.side||'party');
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
         const awakens = meteorAwakens(state.seed,pending.id) && state.enemies.length < MAX_WORLD;
         if (!awakens && state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
-        addFuel(state,at,2,.35,!battleActive(state));if(!battleActive(state))applyHeat(state,at,5,1,fireContext);
+        addFuel(state,at,2,.35,!battleSkirmish(state));if(!battleSkirmish(state))applyHeat(state,at,5,1,fireContext);
         if (awakens) { const enemy=createEnemy(`${pending.id}_creature`,[pending.x,terrainHeight(state,pending.x,pending.z),pending.z],'golem'); Object.assign(enemy,{meteorBorn:true,unfurlTick:state.tick}); state.enemies.push(enemy); events.push({kind:'meteor_unfurl',id:enemy.id,position:[...enemy.position],tick:state.tick}); }
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       stepCrystalWalls(state,combatContext,hitEnemyPart,events);
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
-      stepBattle(state,{createEnemy,terrainHeight,nextId},events);
+      stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side)=>hitEnemyPart(state,enemy,'torso',n,{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side)=>hitEnemyPart(state,enemy,'torso',n,{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
+      for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
       flushMeteorRewards(state,terrainHeight);

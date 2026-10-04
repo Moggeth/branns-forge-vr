@@ -1,5 +1,6 @@
 // Optional host-controlled lane battle. All clocks and IDs belong to the simulation.
 import {expeditionRunning} from './adventure.js';
+import {HOME,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
 
 export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTicks:900,baseHp:400,aggroRange:12});
 export const BATTLE_SIDES = Object.freeze(['party','rivals']);
@@ -10,6 +11,15 @@ const flat = (a,b) => Math.hypot(a[0]-b[0],a[2]-b[2]);
 const int = (n,a,b) => Number.isSafeInteger(n)&&n>=a&&n<=b;
 const fail = code => ({ok:false,code,events:[]});
 export const createBattle = () => ({v:1,status:'off',run:0,wave:0,nextWaveTick:0,winner:null,bases:[]});
+// Every new world starts with the always-on home bases (shared/home-bases.js).
+export function createHomeBattle(state,height,run=1) {
+  return {v:2,status:'running',run,wave:0,nextWaveTick:state.tick+HOME.firstWaveTicks,winner:null,sieges:0,
+    bases:BATTLE_SIDES.map(side=>createHomeBase(side,(x,z)=>height(state,x,z)))};
+}
+/** The old host-started lane battle; it suppresses fires and other world hazards while it runs. */
+export const battleSkirmish = state => state.battle?.status === 'running' && state.battle.v !== 2;
+/** Everything bots may attack as a building: v1 sanctuaries, or v2 pylons, turrets and exposed hearts. */
+export const battleObjectives = state => homeBattle(state)?[...siegeTargets(state,'party'),...siegeTargets(state,'rivals')]:battleActive(state)?state.battle.bases:[];
 export const battleActive = state => state.battle?.status === 'running';
 export const battleBot = e => e?.battleRun !== undefined;
 export const enemyHostileTo = (enemy,side='party') => !battleBot(enemy)||enemy.side!==side;
@@ -32,6 +42,7 @@ function cleanup(state) {
 export function battleAction(state,player,message,ctx) {
   if(!['start','stop','reset','attack_base'].includes(message.action))return fail('invalid_battle_action');
   if(message.action==='attack_base')return attackBattleBase(state,player,message.targetId,ctx);
+  if(state.battle.v===2)return fail('always_on');
   if(message.action==='stop'){
     cleanup(state);state.battle={...createBattle(),run:state.battle.run};
     return {ok:true,events:[{kind:'battle_stop',by:player.id}]};
@@ -46,6 +57,7 @@ export function battleAction(state,player,message,ctx) {
 }
 
 export function damageBattleBase(state,id,amount,side,events) {
+  if(state.battle?.v===2)return damageHome(state,id,amount,side,events);
   const base=state.battle?.bases.find(b=>b.id===id);
   if(!battleActive(state)||!base||base.hp<=0||base.side===side||!BATTLE_SIDES.includes(side)||!Number.isFinite(amount)||amount<=0||amount>1000)return false;
   base.hp=Math.max(0,base.hp-amount);
@@ -56,7 +68,7 @@ export function damageBattleBase(state,id,amount,side,events) {
 
 export function attackBattleBase(state,player,id,ctx,{cooldown=true}={}) {
   if(!battleActive(state))return fail('battle_inactive');
-  const base=state.battle.bases.find(b=>b.id===id);
+  const base=state.battle.v===2?findHomeTarget(state,id)?.target:state.battle.bases.find(b=>b.id===id);
   if(!base)return fail('invalid_battle_target');
   if(player.role!=='hero')return fail('hero_required');
   if(base.side===(player.side||'party'))return fail('friendly_target');
@@ -72,6 +84,7 @@ export function attackBattleBase(state,player,id,ctx,{cooldown=true}={}) {
 // Called before enemy AI; bounded even after a long suspension or host handoff.
 export function stepBattle(state,ctx,events) {
   if(!battleActive(state))return;
+  if(state.battle.v===2)return stepHomeBattle(state,ctx,events);
   for(const base of state.battle.bases)base.position[1]=ctx.terrainHeight(state,base.position[0],base.position[2]);
   if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
   const b=state.battle;b.wave++;b.nextWaveTick=state.tick+BATTLE.waveTicks;
@@ -91,7 +104,34 @@ export function stepBattle(state,ctx,events) {
   events.push({kind:'battle_wave',wave:b.wave,count:spawned,nextWaveTick:b.nextWaveTick});
 }
 
+function stepHomeBattle(state,ctx,events) {
+  stepHomeBases(state,ctx,events);
+  if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
+  const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;
+  let spawned=0;
+  for(const base of b.bases){
+    if(baseFallen(state,base))continue;
+    const index=BATTLE_SIDES.indexOf(base.side),kinds=squadFor(base);
+    kinds.forEach((kind,n)=>{
+      if(state.enemies.length>=64||state.enemies.filter(e=>battleBot(e)&&e.side===base.side).length>=BATTLE.perSideCap)return;
+      // March out of the barracks door, fanned across the plaza.
+      const [x,z]=homePoint(base.side,[-3.6+(n%3)*1.3,4.6+Math.floor(n/3)*1.3]);
+      const e=ctx.createEnemy(ctx.nextId(state,`battle${b.run}_${b.wave}_${base.side}_`),[x,ctx.terrainHeight(state,x,z),z],kind);
+      Object.assign(e,{side:base.side,battleRun:b.run,battleWaypoint:index?lane.length-2:1});
+      state.enemies.push(e);spawned++;
+    });
+  }
+  events.push({kind:'battle_wave',wave:b.wave,count:spawned,nextWaveTick:b.nextWaveTick});
+}
+
 export function battleWaypoint(state,enemy,ground) {
+  if(state.battle.v===2&&(enemy.battleWaypoint===0||enemy.battleWaypoint===lane.length-1)){
+    // At the enemy gate: hit the closest pylon, turret or exposed heart; idle at the gate while that base is rebuilt.
+    const targets=siegeTargets(state,enemy.side);let best=null,d=Infinity;
+    for(const t of targets){const q=flat(enemy.position,t.position);if(q<d){d=q;best=t;}}
+    if(best)return best;
+    const at=lane[enemy.battleWaypoint];return {id:'battle-lane',position:[at[0],ground(...at),at[1]],battleLane:true};
+  }
   const b=state.battle.bases.find(b=>b.side!==enemy.side);
   const i=enemy.battleWaypoint,p=lane[i];
   if(flat(enemy.position,[p[0],0,p[1]])<3&&i!==0&&i!==lane.length-1)enemy.battleWaypoint+=enemy.side==='party'?1:-1;
@@ -103,6 +143,7 @@ export function restoreBattle(saved) {
   const b=saved.battle;
   const bots=saved.enemies.filter(battleBot);
   if(b===undefined){if(bots.length)throw Error('Invalid battle bots');return createBattle();}
+  if(b?.v===2)return restoreHomeBattle(saved,bots);
   const bad=()=>{throw Error('Invalid battle state');};
   if(!b||b.v!==1||!['off','running','victory'].includes(b.status)||!int(b.run,0,1e9)||!int(b.wave,0,1e9)||!int(b.nextWaveTick,0,saved.tick+BATTLE.waveTicks)||!Array.isArray(b.bases)||bots.length>BATTLE.botCap)bad();
   if(b.status==='off'){if(b.bases.length||bots.length||b.winner!==null||b.wave!==0||b.nextWaveTick!==0)bad();}
@@ -118,4 +159,13 @@ export function restoreBattle(saved) {
   for(const e of bots)if(b.status!=='running'||e.battleRun!==b.run||e.kind!=='skeleton'||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_[1-9][0-9]*_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave)bad();
   for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
   return {v:1,status:b.status,run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,bases:b.bases.map(({id,side,position,hp,maxHp})=>({id,side,position:[...position],hp,maxHp}))};
+}
+
+function restoreHomeBattle(saved,bots) {
+  const b=saved.battle,bad=()=>{throw Error('Invalid battle state');};
+  if(b.status!=='running'||!int(b.run,1,1e9)||!int(b.wave,0,1e9)||!int(b.nextWaveTick,0,saved.tick+HOME.waveTicks)||(b.winner!==null&&!BATTLE_SIDES.includes(b.winner))||!int(b.sieges,0,1e9)||bots.length>BATTLE.botCap)bad();
+  for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
+  for(const e of bots)if(e.battleRun!==b.run||!['skeleton','golem'].includes(e.kind)||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_[1-9][0-9]*_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave)bad();
+  for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
+  return {v:2,status:'running',run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,sieges:b.sieges,bases:restoreHomeBases(b.bases,saved.tick)};
 }

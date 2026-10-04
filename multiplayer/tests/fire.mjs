@@ -4,7 +4,7 @@ import {addFuel,applyHeat,quenchFire,stepFire,restoreFire,FIRE_LIMITS} from '../
 import {createWeaponController} from '../client/weapon-controller.js';
 const begin=performance.now(),advance=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 let seq=0;const action=(s,action,rest={})=>s.command('h',{type:'action',seq:++seq,action,...rest});
-const make=()=>{const s=createSimulation();s.addPlayer({id:'h'});return s;};
+const make=()=>{const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});return s;};
 let s=make();assert.equal(action(s,'equip',{tool:'wyrmspout'}).ok,true);
 const origin=[0,1.5,8],direction=[0,0,-1];
 assert.equal(action(s,'flame',{origin,direction}).ok,true);

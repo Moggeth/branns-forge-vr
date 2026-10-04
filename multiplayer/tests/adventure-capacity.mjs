@@ -4,7 +4,7 @@ import {createSimulation,loadSimulation,MAX_PLAYERS} from '../shared/simulation.
 import {createAdventure,adventureAction,validateRestore} from '../shared/adventure.js';
 const started=performance.now();let count=0;
 const test=(name,fn)=>{fn();count++;console.log('PASS',name);};
-function rig(){const s=createSimulation();for(let i=0;i<MAX_PLAYERS;i++)assert.equal(s.addPlayer({id:'p'+i}).ok,true);assert.equal(s.command('p0',{type:'adventure',action:'start',seq:1}).ok,true);return s;}
+function rig(){const s=createSimulation({legacyBattle:true,legacyBattle:true});for(let i=0;i<MAX_PLAYERS;i++)assert.equal(s.addPlayer({id:'p'+i}).ok,true);assert.equal(s.command('p0',{type:'adventure',action:'start',seq:1}).ok,true);return s;}
 
 test('all32 players participate, save16 votes, and17 form a majority',()=>{
  const s=rig();assert.equal(s.snapshot().adventure.heroesAtStart,MAX_PLAYERS);

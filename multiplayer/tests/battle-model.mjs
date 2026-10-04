@@ -7,7 +7,7 @@ import {createSimulation} from '../shared/simulation.js';
 import {MATERIAL_KEYS} from '../shared/material-catalog.js';
 const started=performance.now();let count=0;
 const test=(name,fn)=>{fn();count++;console.log('PASS',name);};
-function fixture(){const sim=createSimulation();sim.addPlayer({id:'h'});sim.addPlayer({id:'g',role:'god'});sim.addPlayer({id:'r'});sim.adventureWorld().players[2].side='rivals';sim.command('h',{type:'battle',action:'start',seq:1});sim.step();return sim;}
+function fixture(){const sim=createSimulation({legacyBattle:true,legacyBattle:true});sim.addPlayer({id:'h'});sim.addPlayer({id:'g',role:'god'});sim.addPlayer({id:'r'});sim.adventureWorld().players[2].side='rivals';sim.command('h',{type:'battle',action:'start',seq:1});sim.step();return sim;}
 function freeze(value){if(value&&typeof value==='object'){Object.freeze(value);for(const child of Object.values(value))freeze(child);}return value;}
 
 test('disconnected and legacy snapshots safely show off without a quest',()=>{

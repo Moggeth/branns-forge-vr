@@ -4,7 +4,7 @@ import {createEnemy,FLARE} from '../shared/combat.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const act=(s,seq,action,extra={})=>s.command('h',{type:'action',seq,action,...extra});
-function fixture(){const s=createSimulation();s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,-6),-6],'skeleton')];return loadSimulation(c);}
+function fixture(){const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});const c=s.checkpoint();c.enemies=[createEnemy('enemy',[0,terrainHeight(c,0,-6),-6],'skeleton')];return loadSimulation(c);}
 let s=fixture();const p=s.snapshot().players[0],origin=[p.position[0],p.position[1]+1.5,p.position[2]];
 // Only Emberwing looses a flare, and only with a sane aim.
 for(let i=0;i<specialCooldown('bow')+1;i++)s.step();
