@@ -2313,3 +2313,7 @@ Isolated main f1c1c55: persistent touch fullscreen control, menu/lobby surface, 
 ## Browser robustness review â€” 2026-10-04
 
 See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 130 suites pass. CI anchors its child working directory and patch-note checks normalize Windows line endings. Immediate save roundtrips, held-item material conservation and hidden-geometry disposal now have regressions. Original saved-player ownership restoration remains unresolved; an inventory recovery copy prevents destructive autosave in the reproduced capped-pickup case. No production deployment or physical-device acceptance is claimed.
+
+## Contact and first-use regressions — 2026-10-04
+
+[Current evidence and warmup lessons](GAMEPLAY-CONTACT-FIXES-20261004.md): 164 required checks pass. Idle-hidden shaders and damaged non-instanced tree variants need actual render representatives; CPU warmup timings alone do not prove GPU frame-time improvement. Guarded browser startup verified without WebXR or pointer capture. From multiplayer, redirect logs to ../logs and stop on PowerShell errors; ../../logs is outside this checkout.

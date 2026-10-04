@@ -53,7 +53,17 @@ export function fireContact(state,shot,hit,ctx){
   if(shot.kind==='arrow'&&Math.hypot(...(shot.curve||[0,0,0]))>.000001){
     const target=state.enemies.find(e=>e.id===hit.targetId)||state.detachedParts?.find(d=>d.id===hit.targetId);
     if(target){target.burnUntil=state.tick+240;target.burnPart=hit.part||target.part||'torso';if(target.parts)applyEnemyScorch(target,target.burnPart,.18);else target.scorch=clamp((target.scorch||0)+.18,0,1);}
-    else addFuel(state,[point[0],ground,point[2]],.7,.28,true);
+    else if(Math.abs(point[1]-ground)<.4)addFuel(state,[point[0],ground,point[2]],.7,.28,true);
+    else {
+      // The impact itself burns at the actual surface. Ground fuel is secondary:
+      // a bounded shower reaches the floor after falling, never teleports the flame.
+      let patch=state.fireSurfaces.find(p=>Math.hypot(...p.position.map((n,i)=>n-point[i]))<.35);
+      if(!patch&&state.fireSurfaces.length<FIRE_LIMITS.surfaces){patch={id:ctx.nextId(state,'f'),position:[...point],normal:[...hit.normal]};state.fireSurfaces.push(patch);}
+      if(patch){patch.expiresTick=state.tick+240;
+        const drop=point[1]-ground;
+        if(drop>0&&drop<=FLARE_BURST.reach)patch.emberTick=state.tick+Math.ceil(Math.sqrt(2*drop/9.8)*60);
+      }
+    }
     applyHeat(state,point,1,1,ctx);
     return [{kind:'phoenix_ignite',id:hit.targetId,position:[...point],normal:[...hit.normal],part:hit.part}];
   }
@@ -141,7 +151,15 @@ export function stepFire(state,ctx,events){
   }
   for(const [cell,amount]of heat){cell.heat=clamp(cell.heat+amount,0,1);if(cell.heat>=.6&&cell.fuel>.015)cell.burning=true;}
   for(const [from,to,amount]of flows){const moved=Math.min(amount,1-to.fuel);from.fuel-=moved;to.fuel+=moved;}
-  for(const patch of state.fireSurfaces)applyHeat(state,patch.position,1,.35,ctx);
+  for(const patch of state.fireSurfaces){
+    applyHeat(state,patch.position,1,.35,ctx);
+    if(patch.emberTick!==undefined&&patch.emberTick<=state.tick){
+      const ground=ctx.terrainHeight(state,patch.position[0],patch.position[2]),drop=patch.position[1]-ground;
+      // Recheck after deformation; do not rain fire up through ground or across a deep chasm.
+      if(drop>=0&&drop<=FLARE_BURST.reach)addFuel(state,[patch.position[0],ground,patch.position[2]],.7,.28,true);
+      delete patch.emberTick;
+    }
+  }
   if(state.tick%30)return;
   const hot=state.fireCells.filter(c=>c.burning).map(c=>({position:[c.x,ctx.terrainHeight(state,c.x,c.z),c.z],radius:.55,height:.8}));
   hot.push(...state.fireSurfaces.map(p=>({position:p.position,radius:.5,height:.65})));
@@ -154,7 +172,13 @@ export function stepFire(state,ctx,events){
       const heat=flameExposure(points,nearby);
       if(heat>0){applyEnemyScorch(enemy,part,.16*heat);exposed=true;}
     }
-    if(burning)applyEnemyScorch(enemy,enemy.burnPart||'torso',.095);
+    if(burning){
+      applyEnemyScorch(enemy,enemy.burnPart||'torso',.095);
+      if(state.tick%60===0){
+        const point=partPosition(enemy,enemy.burnPart||'torso'),ground=ctx.terrainHeight(state,point[0],point[2]),drop=point[1]-ground;
+        if(drop>=0&&drop<=3)addFuel(state,[point[0],ground,point[2]],.35,.08,true);
+      }
+    }
     // Ents are dry timber: flames catch on them, they burn twice as hard and drop burning litter where they walk.
     if(enemy.kind==='ent'){if(exposed&&!burning){enemy.burnUntil=state.tick+240;enemy.burnPart='torso';}if(burning)addFuel(state,enemy.position,.6,.3,true);}
     if(exposed||burning)ctx.damageEnemy(state,enemy,(burning?7:6)*(enemy.kind==='ent'?2:1),events);
@@ -173,9 +197,9 @@ export function restoreFire(saved,ids){
     seen.add(key(c.x,c.z));
   }
   for(const p of surfaces){
-    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,150))throw Error('Invalid fire surface');
+    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,240)||(p.emberTick!==undefined&&(!tick(p.emberTick,90)||p.emberTick>=p.expiresTick)))throw Error('Invalid fire surface');
     ids.add(p.id);
   }
   for(const p of saved.players)if(p.heat!==undefined&&(!Number.isFinite(p.heat)||p.heat<0||p.heat>1)||p.overheatUntil!==undefined&&!tick(p.overheatUntil,180)||p.flameTick!==undefined&&(!Number.isSafeInteger(p.flameTick)||p.flameTick< -1000||p.flameTick>saved.tick)||p.flaskLit!==undefined&&typeof p.flaskLit!=='boolean')throw Error('Invalid fire equipment state');
-  return {fireCells:cells.map(({x,z,fuel,heat,burning,wetUntil,expiresTick})=>({x,z,fuel,heat,burning,wetUntil,expiresTick})),fireSurfaces:surfaces.map(({id,position,normal,expiresTick})=>({id,position:[...position],normal:[...normal],expiresTick}))};
+  return {fireCells:cells.map(({x,z,fuel,heat,burning,wetUntil,expiresTick})=>({x,z,fuel,heat,burning,wetUntil,expiresTick})),fireSurfaces:surfaces.map(({id,position,normal,expiresTick,emberTick})=>({id,position:[...position],normal:[...normal],expiresTick,...(emberTick!==undefined?{emberTick}:{})}))};
 }

@@ -1,8 +1,10 @@
 // Stumplings: settled stumps wake at a seeded random time as root critters, wander, flee, burrow, drop loot, and
-// always hand their harvest slot back so the original tree regrows.
+// hand their harvest slot back; a burrowing critter regrows its tree at its exact final position.
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
-import {worldTrees} from '../shared/world-content.js';
+import {worldTrees, restoreTreeRoots} from '../shared/world-content.js';
+import {createTreeIndex, resolveTrees, chopTree} from '../shared/trees.js';
+import {rememberAwakened} from '../shared/ents.js';
 import {terrainHeight} from '../shared/terrain.js';
 import {hitEnemyPart} from '../shared/combat.js';
 import {STUMPLING, stumpWakes, treeCutMap, stumplingGoneTick, stumplingBurrowTick} from '../shared/stumplings.js';
@@ -94,7 +96,38 @@ const park = (s, x = 40, z = -40) => { const h = s.players.find(p => p.role === 
   events = stepTo(sim, stumplingGoneTick(critter) + 1);
   assert.ok(!s.enemies.includes(critter)); assert.ok(events.some(e => e.kind === 'stump_gone'));
   assert.ok(!s.harvestedTrees.some(h => h.id === tree.id)); assert.ok(worldTrees(s).some(t => t.id === tree.id));
-  roundTrip(sim);
+  const grown = worldTrees(s).find(t => t.id === tree.id);
+  assert.deepEqual([grown.x, grown.z], [at[0], at[2]], 'regrowth is exactly at the burrow, not the original stump');
+  assert.ok(Math.hypot(grown.x-tree.x,grown.z-tree.z)>.1, 'fixture actually moved away from the original root');
+  const restored = roundTrip(sim);
+  assert.deepEqual(worldTrees(state(restored)).find(t => t.id === tree.id), grown, 'save/reload retains relocated root');
+  assert.deepEqual(worldTrees(sim.snapshot()).find(t => t.id === tree.id), grown, 'late join snapshot carries exact root');
+  assert.equal(worldTrees(s).filter(t=>t.id===tree.id).length,1,'no duplicate original tree');
+  const index = createTreeIndex(); index.update({...s,treeRoots:[]});
+  assert.equal(index.update(s),true,'relocation invalidates the spatial index even though ids stay unchanged');
+  assert.deepEqual(index.get(tree.id),grown);
+  const position=[grown.x,terrainHeight(s,grown.x,grown.z),grown.z];
+  resolveTrees(position,index,new Map(),(x,z)=>terrainHeight(s,x,z));
+  assert.ok(Math.hypot(position[0]-grown.x,position[2]-grown.z)>.1,'collision follows new tree location');
+  const chop=chopTree(s,grown,[grown.x+.2,terrainHeight(s,grown.x,grown.z)+.8,grown.z],[1,0,0],{terrainHeight:(x,z)=>terrainHeight(s,x,z)});
+  assert.ok(chop.events?.some(e=>e.kind==='wood_hit'&&e.cuts===1),'regrown tree remains choppable at its new root');
+  const checkpoint=sim.checkpoint();
+  for(const invalid of [[{id:'unknown',x:0,z:0}], [...s.treeRoots,...s.treeRoots], [{id:tree.id,x:56,z:0}], [{id:tree.id,x:NaN,z:0}], [{id:tree.id,x:0,z:0,y:0}]]) {
+    assert.throws(()=>loadSimulation({...checkpoint,treeRoots:invalid}),/tree root/i,'invalid relocation rejected');
+  }
+  // Awakening transfers the same position to the ent record and must not leave an orphan root override.
+  const transfer=structuredClone(s); transfer.harvestedTrees=[];
+  assert.equal(rememberAwakened(transfer,grown,[]),true);
+  assert.equal(transfer.treeRoots.length,0);
+  assert.deepEqual(restoreTreeRoots(transfer),[]);
+}
+
+{ // Overrides work equally for planted groves and ent-grown trees; legacy saves need no extension.
+  const s={seed:7,tick:10,groves:[{id:'g1',trees:[[12,14,6,0,0]]}],wildTrees:[{id:'e1-tree',x:20,z:20,height:6,variant:1}]};
+  assert.deepEqual(restoreTreeRoots(s),[]);
+  s.treeRoots=[{id:'g1-tree0',x:12.123456789,z:13.987654321},{id:'e1-tree',x:24.1,z:22.8}];
+  assert.deepEqual(restoreTreeRoots(s),s.treeRoots);
+  for(const root of s.treeRoots){const tree=worldTrees(s).find(t=>t.id===root.id);assert.deepEqual([tree.x,tree.z],[root.x,root.z]);}
 }
 
 { // Never more than maxLive critters at once, however many stumps there are.

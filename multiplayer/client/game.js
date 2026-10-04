@@ -428,7 +428,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // 0.3-0.75 s in headless SwiftShader; ecosystem changes now rebuild in bounded frame slices, never per chop.
   function syncOrchardContent() {
     const trees = worldTrees(snapshot), deposits = Array.isArray(snapshot.deposits) ? snapshot.deposits : null;
-    const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.trees ? `${g.id}:${g.trees.filter(t => (t[4] ?? 0) <= snapshot.tick).length}` : g.id).join() + '|' + (snapshot.awakenedTrees || []).join() + '|' + (snapshot.wildTrees || []).map(t => t.id).join() + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();
+    const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.trees ? `${g.id}:${g.trees.filter(t => (t[4] ?? 0) <= snapshot.tick).length}` : g.id).join() + '|' + (snapshot.awakenedTrees || []).join() + '|' + (snapshot.wildTrees || []).map(t => t.id).join() + '|' + JSON.stringify(snapshot.treeRoots || []) + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();
     if (key === orchardContentKey) return; orchardContentKey = key;
     orchard.groundChanged(deposits ? {trees, deposits} : {trees});
   }
@@ -973,13 +973,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!active||role!=='hero'||renderer.xr.isPresenting||weapons.state().drawing||weapons.state().firing)return false;
     const rect=canvas.getBoundingClientRect();camera.updateMatrixWorld();
     pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);raycaster.far=4;
-    const targets=[...content.collectibleTargets(),...combat.detached.values(),...content.targets(),...inventionVisual.targets(),ground,shrine,startingWorld.group];
+    const targets=[...content.collectibleTargets(),...Array.from(combat.embeds.values()).filter(n=>n.visible&&n.userData.collectibleId),...combat.detached.values(),...content.targets(),...inventionVisual.targets(),ground,shrine,startingWorld.group];
     for(const t of targets)t.updateWorldMatrix(true,true);
     const hits=raycaster.intersectObjects(targets,true).filter(h=>surfaceVisible(h.object));raycaster.far=Infinity;
     const first=hits[0];if(!first)return false;
-    let id=content.collectibleId(first);if(!id){let n=first.object;while(n&&!n.userData.targetId)n=n.parent;id=n?.userData.targetId;}
+    let id=content.collectibleId(first);if(!id){let n=first.object;while(n&&!n.userData.targetId&&!n.userData.collectibleId)n=n.parent;id=n?.userData.collectibleId||n?.userData.targetId;}
     if(snapshot.inventions?.structures.some(b=>b.id===id))return useInvention(id);
-    const collectible=(snapshot.pickups||[]).some(p=>p.id===id)||(snapshot.looseLogs||[]).some(p=>p.id===id&&!p.heldBy)||(snapshot.detachedParts||[]).some(p=>p.id===id&&!p.heldBy);
+    const collectible=(snapshot.embeds||[]).some(e=>e.id===id&&e.golden&&e.kind==='bolt')||(snapshot.pickups||[]).some(p=>p.id===id)||(snapshot.looseLogs||[]).some(p=>p.id===id&&!p.heldBy)||(snapshot.detachedParts||[]).some(p=>p.id===id&&!p.heldBy);
     if(!collectible||(snapshot.detachedParts||[]).some(p=>p.id===id&&p.kind==='golem'))return false;
     const from=raycaster.ray.origin,to=first.point;
     const enemy=combat.segmentContacts(from.toArray(),to.toArray(),{includePartPoses:false})[0];if(enemy)return false;
@@ -1421,7 +1421,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   rebuildGround(); resize(); renderer.setAnimationLoop(frame);
   report('Preparing world assets and materials…');
   void (async()=>{
-    const representatives=new THREE.Group(),warmHeroes=[];
+    const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup;
     try{
       await Promise.all(assetInstalls);if(disposed)return;
       // Build the default render-only world before compiling, even in the empty
@@ -1435,9 +1435,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       }
       for(let i=0;i<6;i++){const visual=instantiate('skeleton',1.7,i);if(visual){visual.position.set(i*2-5,0,-3);representatives.add(visual);}}
       const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
+      treeWarmup=content.trees.prepareWarmup();representatives.add(treeWarmup.group);startup.treeHarvestWarmup=treeWarmup.stats;
+      miningWarmup=content.prepareMiningWarmup();representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
       scene.add(representatives);scene.updateMatrixWorld(true);
       startup.phase='shaders';report('Preparing world shaders and textures…');
       await spellVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
+      await fireVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
       await expedition.prepare(renderer,camera,scene);if(disposed)return;
       await renderer.compileAsync(scene,camera);if(disposed)return;
       const textures=new Set();scene.traverse(object=>{for(const material of [object.material,object.customDepthMaterial,object.customDistanceMaterial].flat())if(material)for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);});
@@ -1450,7 +1453,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const warmStarted=performance.now();renderer.render(scene,camera);renderer.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
       await renderer.compileAsync(scene,camera);if(disposed)return;
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
-    finally{for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
+    finally{treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
     if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
     report(`World renderer ready (${Math.round(startup.readyMs)} ms).`);
   })();

@@ -14,7 +14,7 @@ export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  starOre:{label:'Star ore',use:'Forge feedstock: one ore makes one Star metal.',source:'Mine fallen meteors or rare star veins deep in the mountain foot; awakened creatures yield triple star ore.',recipes:['refineStar'],color:0xe8a854},
  // Groundwork metals: refined and stored like the others; future recipes list themselves here.
  copper:{label:'Copper',use:'Wiring, bells and warm fittings for coming inventions.',source:'Refine copper ore from the green-streaked lodes along the mountain foot.',recipes:[],groundwork:true,color:0xd08a5a},
- gold:{label:'Gold',use:'Inlay, enchanting foci and fine mechanisms for coming inventions.',source:'Refine gold ore from quartz seams up on the mountain foot.',recipes:[],groundwork:true,color:0xf2c75a},
+ gold:{label:'Gold',use:'Inlay, enchanting foci and fine mechanisms for coming inventions.',source:'Recover impacted golden Siegebird bolts or refine gold ore from mountain-foot quartz seams.',recipes:[],groundwork:true,color:0xf2c75a},
  copperOre:{label:'Copper ore',use:'Forge feedstock: one ore makes one Copper.',source:'Mine the glinting green lodes along the mountain foot.',recipes:['refineCopper'],color:0x4f9a7c},
  goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a}
 }).map(([key,value])=>[key,Object.freeze({...value,recipes:Object.freeze(value.recipes)})])));

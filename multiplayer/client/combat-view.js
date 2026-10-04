@@ -483,6 +483,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
       if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; embeds.set(data.id, node); }
+      node.userData.collectibleId=data.golden&&data.kind==='bolt'?data.id:null;
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
       if (!target) { node.visible = false; fractures.remove(data.id); fractureAnchors.delete(data.id); continue; }

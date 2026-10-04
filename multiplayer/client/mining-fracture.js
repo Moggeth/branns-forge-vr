@@ -14,13 +14,15 @@ export const CHUNKS=14,RECESS=.76,VARIANTS=4;
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
 const rng=seed=>()=>{seed=seed+0x6d2b79f5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 const cache=new Map(); // key -> {cells:[{shells:[{geometry,material}], crater, centroid, order}], walls:Map}
+const fractureKey=(meshes,id,chunks)=>meshes.map(m=>m.geometry.uuid).join('|')+'#'+hash(id)%VARIANTS+'#'+chunks;
+function releasePartition(part,key){if(--part.users<=0){for(const c of part.cells){for(const s of c.shells)s.geometry.dispose();c.crater.dispose();}for(const w of part.walls)w.geometry.dispose();cache.delete(key);}}
 
 // root: the Group returned by authored('boulder'|'meteor') (already tagged with userData.targetId).
 export function attachFracture(T,root,id,{chunks=CHUNKS}={}){
  const meshes=[];root.traverse(n=>{if(n.isMesh&&!n.userData.fractureOwned)meshes.push(n);});
  if(!meshes.length)return null;
  const host=meshes[0].parent; // all primitives of the authored node share this space (glTF multi-primitive -> sibling meshes)
- const variant=hash(id)%VARIANTS,key=meshes.map(m=>m.geometry.uuid).join('|')+'#'+variant+'#'+chunks;
+ const variant=hash(id)%VARIANTS,key=fractureKey(meshes,id,chunks);
  let part=cache.get(key);if(!part){part=partition(T,meshes,variant,chunks);cache.set(key,part);}part.users=(part.users||0)+1;
  // New cut faces have no authored atlas islands. Reusing rock's packed atlas with generated UVs sampled unrelated
  // gem/normal swatches. Use the artist's UV-free mineral material for newly exposed interiors, retaining shell textures.
@@ -41,9 +43,34 @@ export function attachFracture(T,root,id,{chunks=CHUNKS}={}){
   return level;}
  function update(dt){for(let i=chips.length-1;i>=0;i--){const c=chips[i],f=c.userData.fly;f.t+=dt;f.v.y-=9.8*dt;c.position.addScaledVector(f.v,dt*.35);c.rotation.x+=f.spin.x*dt;c.rotation.z+=f.spin.z*dt;
   const k=Math.max(0,1-f.t/.6);c.scale.setScalar(f.s0*k);if(f.t>.6){c.removeFromParent();chips.splice(i,1);}}}
- function dispose(){if(disposed)return;disposed=true;interior.dispose();for(const c of chips)c.removeFromParent();chips.length=0;if(--part.users<=0){for(const c of part.cells){for(const s of c.shells)s.geometry.dispose();c.crater.dispose();}for(const w of part.walls)w.geometry.dispose();cache.delete(key);}}
+ function dispose(){if(disposed)return;disposed=true;interior.dispose();for(const c of chips)c.removeFromParent();chips.length=0;releasePartition(part,key);}
  function stats(){return {variant,chunks,removed:removed.size,chips:chips.length,walls:walls.filter(w=>w.on).length,cachedPartitions:cache.size};}
  return {setDamage,update,dispose,stats,removedCells:()=>[...removed]};
+}
+
+/** Prepare at most 12 unique nearby deposit/variant partitions without changing
+ * the actual deposits. Add group to startup shader/render representatives, call
+ * finish() after their warm draw, and dispose() when the owning world closes. */
+export function prepareFractureWarmup(T,deposits,{limit=12}={}){
+ const started=performance.now(),group=new T.Group();group.name='MiningFractureWarmup';
+ const controllers=[],seen=new Set();let finished=false,disposed=false;
+ const bounded=Math.max(0,Math.min(12,Number.isFinite(limit)?Math.floor(limit):12));
+ try{for(const {root,id} of deposits){
+  if(seen.size>=bounded)break;
+  const meshes=[];root.traverse(n=>{if(n.isMesh&&!n.userData.fractureOwned)meshes.push(n);});
+  if(!meshes.length||meshes.some(m=>m.userData.fractureHidden))continue;
+  const key=fractureKey(meshes,id,CHUNKS);if(seen.has(key))continue;seen.add(key);
+  const clone=root.clone(true);clone.position.set((seen.size%4)*2-3,0,-2-Math.floor(seen.size/4)*2);group.add(clone);
+  const controller=attachFracture(T,clone,id);if(!controller)continue;
+  controllers.push(controller);
+  controller.setDamage(2,4,{animate:false});
+  clone.traverse(n=>{if(n.isMesh)n.frustumCulled=false;});
+ }}catch(error){dispose();throw error;}
+ // Keep the bounded controllers/materials alive off-scene: disposing their
+ // last material reference here also releases the just-warmed WebGL program.
+ function finish(){if(finished)return;finished=true;group.removeFromParent();}
+ function dispose(){if(disposed)return;disposed=true;finish();for(const c of controllers)c.dispose();group.clear();}
+ return {group,finish,dispose,stats:{partitions:controllers.length,prepareMs:performance.now()-started}};
 }
 
 function partition(T,meshes,variant,chunks){
