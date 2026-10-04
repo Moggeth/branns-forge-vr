@@ -49,6 +49,7 @@ import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
 import {createRewardMoments} from './reward-moments.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
+import {createHeldSway} from './held-sway.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
 import {createForgeView} from './forge-view.js';
@@ -194,7 +195,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   scene.add(shrine);
   let resumeCapture=false,deliberateRelease=false,wasCaptured=false,lastCaptureLost=-Infinity;
   let aiming=false,adsAmount=0,siegebirdSight=null,siegebirdAim=null;
-  const weaponAnchor = new THREE.Group();
+  const weaponAnchor = new THREE.Group(),heldSway=createHeldSway({reducedMotion:reducedWeaponMotion}),swayMove=new THREE.Vector3();
   weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position);
   weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);
   camera.add(weaponAnchor);
@@ -850,7 +851,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if(!ore&&tool!=='axe'){report('Use the axe to chop this.');return false;}point=h.point;
     }
     if(!point)return false;
-    const d=point.clone().sub(from).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(THREE.MathUtils.clamp(d.y,-1,1));camera.rotation.set(pitch,yaw,0,'YXZ');camera.updateMatrixWorld();strike();return true;
+    const d=point.clone().sub(from).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(THREE.MathUtils.clamp(d.y,-1,1));camera.rotation.set(pitch,yaw,0,'YXZ');camera.updateMatrixWorld();heldSway.snap();strike();return true;
   }
   function primaryDown(){if(!active||role!=='hero'||inventionPlacement)return;unlockAudio();if(manned){fireManned();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}}
   function special(){if(!active||role!=='hero'||inventionPlacement)return;if(manned){scoping=!scoping;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else weapons.special();}
@@ -902,7 +903,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
     manned={id:b.id,yaw:b.aimYaw||0,pitch:b.aimPitch||0,yawRate:0,sentAt:0,sent:'',sinceTick:snapshot.tick??0};yaw=(b.yaw||0)+manned.yaw;pitch=manned.pitch;
     onAction('inventionMount',{structureId:b.id});report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Scope zooms, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click for the scope, hold R to wind faster, E or Esc steps off.');}
-  function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);pitch=0;if(send)onAction('inventionMount',{structureId:id,off:true});}
+  function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
   function fireManned(){const b=mannedMachine();if(!b)return;unlockAudio();onAction('inventionUse',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   // Heavy traverse: the wanted aim is the mouse; the carriage accelerates toward it and tops out near 50 degrees/s.
   function updateManned(dt,now){
@@ -1126,14 +1127,19 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned;
     if (axeModel) axeModel.visible = role === 'hero' && active;
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
+    // Look inertia, gait bob and jump/land on the camera-held item (held-sway.js); presentation only, never aim.
+    const swinging=(progress>=0&&progress<1&&!!swingRest)||!!specialSwing,swayMe=snapshot.players.find(p=>p.id===playerId);
+    const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
-    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:['crossbow','wyrmspout','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000,move.length()));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
-    if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000,move.length()));
+    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:['crossbow','wyrmspout','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
+    if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000).add(sway.position));
       // Release kick: the stock shoves back and the muzzle climbs, then springs home (the bolt has already left).
       const kick=siegebirdMechanism(weapons.state().reload).kick;if(kick){weaponAnchor.position.z+=.05*kick;weaponAnchor.position.y+=.012*kick;weaponAnchor.rotateX(.075*kick);}}else if(tool==='bow'&&!renderer.xr.isPresenting){adsAmount=THREE.MathUtils.lerp(adsAmount,active&&role==='hero'&&aiming?1:0,1-Math.exp(-14*dt));weaponAnchor.position.lerp(new THREE.Vector3(-.22*Math.min(1,camera.aspect/.9),-.29,-.51),adsAmount);weaponAnchor.rotation.z=THREE.MathUtils.lerp(-.08,-.025,adsAmount);}else adsAmount=0;
     if(!renderer.xr.isPresenting){const fov=manned?70+(TIMBERLINE_SCOPE.fov-70)*scopeAmount:70+((tool==='bow'?56:SIEGEBIRD_PRESENTATION.zoomFov)-70)*adsAmount;if(Math.abs(camera.fov-fov)>.001){camera.fov=fov;camera.updateProjectionMatrix();}}
     if(!swingContact&&progress>=.5){swingContact=true;const hit=contactRay();onAction('strike',hit?{...hit,tool}:{targetId:'miss',point:localPosition.toArray(),normal:[0,1,0],tool});}
     if(specialSwing){const progress=(now-specialSwing.at)/(SPECIAL_MOTION.axe.duration*1000);if(!specialSwing.sent&&progress>=SPECIAL_MOTION.axe.release){specialSwing.sent=true;sendSpecial();}const pose=specialPose('axe',progress,specialSwing.rest);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);if(progress>=1)specialSwing=null;}
+    // The crossbow bore is solved onto the reticle, so it takes the positional sway only (above).
+    if(tool!=='crossbow'&&weaponAnchor.visible){weaponAnchor.position.add(sway.position);weaponAnchor.quaternion.premultiply(sway.quaternion);}
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
