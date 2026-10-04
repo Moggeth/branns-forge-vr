@@ -61,6 +61,11 @@ export function createSiegebirdWind() {
       if (t > R.gone + 1) { t = Infinity; real = Infinity; }
       return {cues, wind};
     },
+    // The crossbow came back out mid-reload (weapon swap): pick the timeline up at reload time `at`. The host has
+    // already judged (or skipped) this reload's wind, so no verdict is sent again.
+    resume(at = 0) {
+      quick = false; scale = 1; real = at; t = Math.max(0, at); pressed = true; verdict = 0; hand = null; held = false; idle = 0; latched = t >= R.windEnd;
+    },
     // Fire pressed while reloading. Returns the verdict to send once per reload, or null.
     press() {
       if (!(t < R.seconds) || pressed || hand !== null) return null;
