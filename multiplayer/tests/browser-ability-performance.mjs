@@ -14,14 +14,15 @@ try{
  await page.goto(`${process.env.FORGE_PERF_URL||'http://127.0.0.1:5195'}/tests/.ability-perf.html`,{waitUntil:'networkidle'});
  await page.evaluate(async()=>{
   const {createGame}=await import('/client/game.js'),{createSimulation}=await import('/shared/simulation.js');const sim=createSimulation({seed:41});sim.addPlayer({id:'p',role:'hero'});let seq=0;
-  const game=createGame({canvas:document.querySelector('canvas'),isHost:()=>true,onAction:(action,body)=>{sim.command('p',{type:'action',seq:++seq,action,...body});game.applySnapshot(sim.snapshot(),'p');}});
+  const game=createGame({canvas:document.querySelector('canvas'),isHost:()=>true,onAction:(action,body)=>{sim.command('p',{type:'action',seq:++seq,action,...body});}});
   window.qa={game,sim};game.applySnapshot(sim.snapshot(),'p');game.setActive(true);game.setTouchEnabled(true);
   window.timer=setInterval(()=>{sim.step();sim.step();sim.step();game.applySnapshot(sim.snapshot(),'p');},50);
  });
  await page.waitForFunction(()=>qa.game.diagnostics().startup.ready,null,{timeout:120000});
  const cdp=await page.context().newCDPSession(page);await cdp.send('Profiler.enable');const results=[];
  for(const phase of ['idle','pickAim','pickCast','bowAim']){
-  await page.evaluate(phase=>{const g=qa.game;if(phase==='pickAim'){g.equip('pick');g.specialPress(true);}if(phase==='pickCast')g.specialPress(false);if(phase==='bowAim'){g.equip('bow');g.primaryDown();g.special();}window.intervals=[];window.lastAt=performance.now();window.run=true;const generation=window.generation=(window.generation||0)+1;let step=0;const tick=t=>{if(!window.run||generation!==window.generation)return;step++;window.intervals.push(t-window.lastAt);window.lastAt=t;if(phase==='bowAim'||phase==='pickAim')g.lookByPixels(.8*Math.sin(step*.016),0);requestAnimationFrame(tick);};requestAnimationFrame(tick);},phase);
+  if(phase==='pickAim'||phase==='bowAim'){await page.evaluate(tool=>qa.game.equip(tool),phase==='pickAim'?'pick':'bow');await page.waitForTimeout(800);}
+  await page.evaluate(phase=>{const g=qa.game;if(phase==='pickAim'){g.specialPress(true);}if(phase==='pickCast')g.specialPress(false);if(phase==='bowAim'){g.primaryDown();g.special();}window.intervals=[];window.lastAt=performance.now();window.run=true;const generation=window.generation=(window.generation||0)+1;let step=0;const tick=t=>{if(!window.run||generation!==window.generation)return;step++;window.intervals.push(t-window.lastAt);window.lastAt=t;if(phase==='bowAim'||phase==='pickAim')g.lookByPixels(.8*Math.sin(step*.016),0);requestAnimationFrame(tick);};requestAnimationFrame(tick);},phase);
   await cdp.send('Profiler.start');await page.waitForTimeout(2500);const {profile}=await cdp.send('Profiler.stop');
   await page.screenshot({path:resolve(out,`${label}-${phase}.png`)});
   const result=await page.evaluate(()=>{window.run=false;const d=qa.game.diagnostics(),a=window.intervals.filter(x=>x>=0).sort((x,y)=>x-y);return{frameP50:a[a.length>>1],frameP95:a[Math.floor(a.length*.95)],frames:a.length,guide:d.guideTiming,terrain:d.terrainSampler,effects:d.effects,world:d.world,landmarks:d.landmarks,startup:d.startup};});

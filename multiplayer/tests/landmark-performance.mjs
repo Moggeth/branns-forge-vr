@@ -15,6 +15,7 @@ assert.deepEqual(merged().map(o=>o.geometry), originals, 'deformation retains me
 const reference = createStartingWorld({THREE:T,scene:new T.Scene(),height});
 const expected = reference.group.children.filter(o=>o.isMesh);
 for(const [n,m] of merged().entries()) {
+ for(const piece of m.userData.terrainPieces)for(let i=piece.start;i<piece.start+piece.count;i++)assert.ok(piece.box.containsPoint(new T.Vector3().fromBufferAttribute(m.geometry.attributes.position,i)),'bounds contain rounded uploaded vertices');
  const actual=m.geometry.attributes.position.array, wanted=expected[n].geometry.attributes.position.array;
  assert.equal(actual.length,wanted.length);
  for(let i=0;i<actual.length;i++) assert.ok(Math.abs(actual[i]-wanted[i])<4e-6,`deformed vertex ${n}:${i}`);

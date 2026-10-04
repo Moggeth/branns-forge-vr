@@ -39,3 +39,5 @@ The root README contains legacy mixed-encoding bytes; a UTF-8 whole-file read fa
 - The reusable guarded browser runner passed in 24.260 s, including actual wall cast and curved guide assertions. No console errors.
 - Check build passed in 1.084 s; Vite's existing large-bundle warning remains.
 - Warmup commit 453cd11 pushed to private origin/codex/ability-performance (2.546 s).
+
+Integrated the current main 95c8f98 (weapon swap), then updated the browser fixture to wait for stashing/drawing and apply snapshots asynchronously. Integrated actual-browser run passed in 23.973 s. The ray broad-phase now builds its bounds from the actual Float32 vertices, including after deformation, so glancing contacts cannot fall outside a pre-rounding bound; the regression explicitly checks every vertex lies inside its piece bounds (0.637 s). Authored visual density and draw batching remain unchanged.
