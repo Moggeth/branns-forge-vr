@@ -188,7 +188,43 @@ function showWound(wrap, wound) {
   wrap.userData.siegebirdWrapCount = segs * w.radial * 6;
 }
 
-export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates} = {}) {
+// Emberwing's string: two thin square prisms (top->nock, nock->bottom) in one mesh, rewritten in place each frame.
+// Unlit, so it reads as a taut glowing cord against any sky; `glow` warms it from sinew to ember.
+const STRING_RADIUS = .0016, STRING_SINEW = new THREE.Color(0xe6d2ad), STRING_EMBER = new THREE.Color(0xffa040);
+function createBowstring() {
+  const geometry = new THREE.BufferGeometry(), index = [];
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(16 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  for (let seg = 0; seg < 2; seg++) for (let f = 0; f < 4; f++) {
+    const a = seg * 8 + f, b = seg * 8 + (f + 1) % 4, c = a + 4, d = b + 4; index.push(a, b, c, b, d, c);
+  }
+  geometry.setIndex(index);
+  const line = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: STRING_SINEW.clone(), toneMapped: false, side: THREE.DoubleSide, fog: true}));
+  line.name = 'EmberwingString'; line.frustumCulled = false; line.userData.ignoreContact = true;
+  return line;
+}
+const _side = new THREE.Vector3(), _up = new THREE.Vector3(), _dir = new THREE.Vector3(), _ref = new THREE.Vector3(1, 0, 0);
+function writePrism(attr, base, a, b, r) {
+  _dir.subVectors(b, a).normalize(); _side.crossVectors(_dir, _ref); if (_side.lengthSq() < 1e-8) _side.set(0, 0, 1); _side.normalize();
+  _up.crossVectors(_dir, _side).normalize();
+  for (let end = 0; end < 2; end++) for (let f = 0; f < 4; f++) {
+    const p = end ? b : a, ang = f * Math.PI / 2, cs = Math.cos(ang) * r, sn = Math.sin(ang) * r;
+    attr.setXYZ(base + end * 4 + f, p.x + _side.x * cs + _up.x * sn, p.y + _side.y * cs + _up.y * sn, p.z + _side.z * cs + _up.z * sn);
+  }
+}
+// The FPS bow gets its own copy of the Ember material(s) the first time `ember` is supplied, so one player's draw
+// never lights every bow sharing the template; the copies live and die with that visual.
+function emberMaterials(visual) {
+  if (visual.userData.emberMaterials) return visual.userData.emberMaterials;
+  const list = [];
+  visual.traverse(mesh => {
+    if (!mesh.isMesh) return;
+    const swap = m => { if (!/^Ember$/.test(m?.name || '')) return m; const copy = m.clone(); copy.userData.baseEmissive = copy.emissiveIntensity ?? 1; list.push(copy); return copy; };
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
+  });
+  return (visual.userData.emberMaterials = list);
+}
+
+export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates, ember, stringSnap = 0, stringGlow = 0} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
   if (tool === 'bow') {
     const upper = visual.getObjectByName('UpperLimb'), lower = visual.getObjectByName('LowerLimb');
@@ -198,17 +234,22 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, re
     }
     const top = visual.getObjectByName('StringTop'), bottom = visual.getObjectByName('StringBottom'), rest = visual.getObjectByName('ArrowRest');
     if (!top || !bottom || !rest) return;
-    if (!visual.userData.bowstring) {
-      const geometry = new THREE.BufferGeometry().setFromPoints(Array.from({length: 4}, () => new THREE.Vector3()));
-      const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({color: 0xdec8a6}));
-      line.userData.ignoreContact = true; visual.add(line); visual.userData.bowstring = line;
-    }
+    if (!visual.userData.bowstring) { const line = createBowstring(); visual.add(line); visual.userData.bowstring = line; }
     visual.updateWorldMatrix(true, true);
-    const nock = visual.worldToLocal(rest.getWorldPosition(new THREE.Vector3())); nock.z += amount * .68;
-    const points = [visual.worldToLocal(top.getWorldPosition(new THREE.Vector3())), nock, nock, visual.worldToLocal(bottom.getWorldPosition(new THREE.Vector3()))];
-    points.forEach((p, i) => visual.userData.bowstring.geometry.attributes.position.setXYZ(i, p.x, p.y, p.z));
-    visual.userData.bowstring.geometry.attributes.position.needsUpdate = true;
-    visual.userData.bowstring.geometry.computeBoundingSphere();
+    // stringSnap: the released string's hum, in metres at the nock (emberwing-motion.js).
+    const nock = visual.worldToLocal(rest.getWorldPosition(new THREE.Vector3())); nock.z += amount * .68 + stringSnap;
+    const string = visual.userData.bowstring, attr = string.geometry.attributes.position;
+    // The canonical visual is scaled to its reviewed height; keep the cord a constant real thickness.
+    const radius = STRING_RADIUS / Math.max(1e-6, visual.getWorldScale(_dir).y || 1);
+    writePrism(attr, 0, visual.worldToLocal(top.getWorldPosition(new THREE.Vector3())), nock, radius);
+    writePrism(attr, 8, nock, visual.worldToLocal(bottom.getWorldPosition(new THREE.Vector3())), radius);
+    attr.needsUpdate = true; string.geometry.computeBoundingSphere();
+    string.material.color.copy(STRING_SINEW).lerp(STRING_EMBER, THREE.MathUtils.clamp(stringGlow, 0, 1)).multiplyScalar(1 + .6 * THREE.MathUtils.clamp(stringGlow, 0, 1));
+    if (Number.isFinite(ember)) {
+      // Embers breathe slowly at rest and surge with the draw, the phoenix latch and the shot.
+      const glow = 1 + .12 * Math.sin(time * 2.1) + 1.7 * THREE.MathUtils.clamp(ember, 0, 1);
+      for (const m of emberMaterials(visual)) m.emissiveIntensity = m.userData.baseEmissive * glow;
+    }
     if (!visual.userData.nockedArrow && templates?.has('arrow')) {
       const arrow = prepareProjectile(templates, 'arrow'); arrow.userData.ignoreContact = true;
       visual.add(arrow); visual.userData.nockedArrow = arrow;

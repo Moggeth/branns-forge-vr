@@ -29,7 +29,8 @@ const suite = [
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
-  'world-content','world-saves','enemy-motion','golem-presentation','pick-wall-motion',
+  'world-content','world-saves','enemy-motion','golem-presentation',
+  'phoenix-flight','phoenix-carry','emberwing-motion','pick-wall-motion',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

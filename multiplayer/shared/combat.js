@@ -4,6 +4,7 @@ import {queueMeteorReward} from './resources.js';
 import {ENT_SIZES,entSpec,entPartPosition,entPartReach,severEntLimb,dropEntTimber} from './ents.js';
 import {TREE_LIMITS} from './trees.js';
 import {specialCooldown} from './special-cooldowns.js';
+import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask']);
@@ -167,6 +168,13 @@ export function projectileContact(state,m,ctx){
     // Siegebird mastery: every bolt that lands on a foe makes the golden bird a little more likely.
     const owner=shot.kind==='bolt'&&state.players.find(p=>p.id===shot.ownerId);if(owner?.siegebird)owner.siegebird.hits=Math.min(SIEGEBIRD.hitCap,owner.siegebird.hits+1);
     hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1):38,{...m,ownerId:shot.ownerId,...(shot.golden?{golden:true}:{})},ctx,events,{projectile:true});
+    // Phoenix headshot: the bird grabs the skull it just knocked off and tries to fly away with it (phoenix-carry.js).
+    const skull=shot.kind==='arrow'&&Math.hypot(...shot.curve)>.000001&&enemy.kind==='skeleton'&&m.part==='head'&&!state.enemies.includes(enemy)&&state.detachedParts.find(d=>d.sourceId===enemy.id&&d.part==='head'&&!d.heldBy);
+    if(skull&&state.detachedParts.filter(d=>d.carry).length<PHOENIX_CARRY.maxActive){
+      skull.carry=startCarry({position:skull.position,velocity:shot.velocity,from:state.players.find(p=>p.id===shot.ownerId)?.position,by:shot.ownerId,arrow:shot.id,tick:state.tick});
+      skull.velocity=[0,0,0];skull.angularVelocity=[0,0,0];skull.throwerId=null;
+      events.push({kind:'phoenix_carry',id:skull.id,arrowId:shot.id,by:shot.ownerId,position:[...skull.position]});
+    }
   }
   return ok(events);
 }
@@ -210,7 +218,7 @@ export function combatAction(state,p,m,ctx){
     return ok([]);
   }
   if(m.action==='projectileHit')return fail('host_required');
-  if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
+  if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||d.carry||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
   if(m.action==='release'){if(m.throw!==undefined&&typeof m.throw!=='boolean')return fail('invalid_action');const dir=m.direction??[-Math.sin(p.yaw),.1,-Math.cos(p.yaw)];if(!vec(dir,1.01))return fail('invalid_action');const n=Math.hypot(...dir);if(n<.9||n>1.1)return fail('invalid_action');return releaseHeld(state,p,dir.map(v=>v/n),m.throw===true)?ok([]):fail('nothing_held');}
   if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart,m);
   if(m.action==='special'){
@@ -232,6 +240,7 @@ export function stepCombat(state,ctx,events){
     if(state.tick-p.bornTick>(p.kind==='flame'?48:p.kind==='fuel'?180:480)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
   }
   for(const d of [...state.detachedParts]){
+    if(d.carry){stepCarry(state,d,ctx,events);continue;}
     const holder=state.players.find(p=>p.id===d.heldBy&&p.role==='hero');if(d.heldBy&&!holder)d.heldBy=null;
     if(holder){heldPose(d,holder);continue;}
     // Settled remains keep their actual geometry and grab/mining behavior, but
@@ -246,6 +255,18 @@ export function stepCombat(state,ctx,events){
     if(d.position[1]<floor){d.position[1]=floor;d.velocity[1]=Math.abs(d.velocity[1])>.8?Math.abs(d.velocity[1])*.3:0;d.velocity[0]*=.88;d.velocity[2]*=.88;d.angularVelocity=d.angularVelocity.map(n=>n*.9);}
     const speed=Math.hypot(...d.velocity);if(d.throwerId&&speed>4)for(const enemy of [...state.enemies])if(!d.hitIds.includes(enemy.id)&&segmentDistance(partPosition(enemy,'torso'),old,d.position)<.9){d.hitIds.push(enemy.id);hitEnemyPart(state,enemy,'torso',Math.min(60,speed*4),{ownerId:d.throwerId},ctx,events);d.velocity=d.velocity.map(n=>n*.55);}
   }
+}
+// The carried skull follows the shared flight path and always holds its current flight velocity, so if the carry
+// is ever dropped (saved and restored, or the phoenix lets go) it falls naturally from where it was.
+function stepCarry(state,d,ctx,events){
+  const pose=carryPose(d.carry,state.tick,(x,z)=>ctx.terrainHeight(state,x,z));
+  d.position=pose.position;d.quaternion=pose.quaternion;d.velocity=pose.velocity.map(n=>clamp(n,-40,40));d.angularVelocity=[0,0,0];d.bornTick=state.tick;
+  if(!pose.done)return;
+  // The fumble: a little forward toss and a tumble; the phoenix (the arrow stuck in it) flies off without it.
+  const [hx,hz]=d.carry.dir;d.velocity=[hx*PHOENIX_CARRY.dropSpeed,1.2,hz*PHOENIX_CARRY.dropSpeed];d.angularVelocity=[5.5,1.5,3.5];
+  const arrow=state.embeds.findIndex(e=>e.id===d.carry.arrow&&e.targetId===d.id);if(arrow>=0)state.embeds.splice(arrow,1);
+  events.push({kind:'phoenix_drop',id:d.id,arrowId:d.carry.arrow,by:d.carry.by,position:[...d.position],material:'bone'});
+  delete d.carry;
 }
 export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);

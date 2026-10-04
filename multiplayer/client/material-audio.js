@@ -24,7 +24,7 @@ export const MATERIAL_SOUNDS = Object.freeze({
  stone_fracture: {files: ['stone_fracture_a', 'stone_fracture_b'], priority: 8, cap: 2, duration: 1.3, rate: .04, cull: 60, cooldown: .05},
  ore_break:      {files: ['ore_break_a', 'ore_break_b'], priority: 9, cap: 2, duration: 1.1, rate: .03, cull: 50, cooldown: 0}
 });
-export const MATERIAL_EVENT_KINDS = Object.freeze(['hit', 'headshot', 'stone_hit', 'ore_break', 'armor_break', 'embed', 'hammer_slam','invention_hit','invention_destroyed','shoot']);
+export const MATERIAL_EVENT_KINDS = Object.freeze(['hit', 'headshot', 'stone_hit', 'ore_break', 'armor_break', 'embed', 'hammer_slam','invention_hit','invention_destroyed','shoot','phoenix_carry','phoenix_drop']);
 export const VOICE_CEILING = 12;
 const SAME_SOURCE_COOLDOWN = .045; // s: same sound on the same id (duplicate packet / multi-contact flam)
 
@@ -55,6 +55,9 @@ export function materialLayersFor(event) {
  if (!MATERIAL_EVENT_KINDS.includes(k)) return [];
  const material = materialOf(event), e = energyOf(event);
  if(k==='shoot')return event.phoenix?[{sound:'phoenix_call',gain:.58,rateBase:1}]:[];
+ // Phoenix skull carry-off: a low, effortful cry as it heaves the skull up; a bright one as it lets go, then the bonk.
+ if(k==='phoenix_carry')return [{sound:'phoenix_call',gain:.7,rateBase:.78}];
+ if(k==='phoenix_drop')return [{sound:'phoenix_call',gain:.5,rateBase:1.3},{sound:'bone_crack',gain:.45,rateBase:.9}];
  if(k==='embed'&&!event.impact)return [];
  if(event.blocked||material==='shield')return [{sound:'shield_thunk',gain:.85,rateBase:1}];
  if(material==='flesh')return [{sound:'flesh_thud',gain:.85,rateBase:1}];
