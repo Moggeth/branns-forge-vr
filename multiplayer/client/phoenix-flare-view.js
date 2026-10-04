@@ -38,7 +38,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
   const flashMat = additive(0xfff0c8), starMat = additive(0xffe2a0), haloMat = additive(0xff8a2a, .8);
   const poolMat = new THREE.MeshBasicMaterial({map: glow(), color: 0xff9a40, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4});
   const poolGeo = new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2);
-  // Ghost phoenix material: one copy shared by every burst. Normal blending so the flame-orange silhouette still reads
+  // Ghost phoenix material template: each bounded burst owns its opacity. Normal blending so the flame-orange silhouette still reads
   // against a bright daytime sky (additive washes out to white there).
   const ghostMat = new THREE.MeshBasicMaterial({color: 0xff5f14, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false});
   const emberGeo = new THREE.BufferGeometry();
@@ -59,7 +59,8 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
     let ghost = null;
     if (templates?.has?.('wings')) {
       ghost = prepareAsset(templates.get('wings'), 'wings').visual;
-      ghost.traverse(m => { if (m.isMesh) m.material = ghostMat; });
+      ghost.userData.flareMaterial = ghostMat.clone();
+      ghost.traverse(m => { if (m.isMesh) m.material = ghost.userData.flareMaterial; });
       group.add(ghost);
     }
     const seed = Math.abs(Math.sin(position[0] * 12.9898 + position[2] * 78.233)) * 43758.5453 % 1;
@@ -74,6 +75,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
     flare.group.removeFromParent(); flare.pool.removeFromParent();
     for (const s of [flare.flash, flare.star, flare.halo]) s.material.dispose();
     flare.pool.material.dispose();
+    flare.ghost?.userData.flareMaterial?.dispose();
   }
   function update(dt) {
     let n = 0;
@@ -95,7 +97,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
       if (flare.ghost) {
         const g = a / F.phoenix; flare.ghost.visible = g < 1;
         if (g < 1) { flare.ghost.scale.setScalar(.6 + F.phoenixSize * (1 - (1 - g) ** 3)); flare.ghost.position.y = .8 * g;
-          ghostMat.opacity = .9 * (1 - g) ** 1.2; }
+          flare.ghost.userData.flareMaterial.opacity = .9 * (1 - g) ** 1.2; }
       }
       // Pool of light under the star.
       const star = flare.star.getWorldPosition(new THREE.Vector3()), drop = Math.max(.5, star.y - flare.ground);

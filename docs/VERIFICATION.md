@@ -2250,3 +2250,8 @@ Public verification: source4adc79c deployed as dpl_GaeqAKBdJG1naU3yop9MU27pzjRj 
 ### Claude takeover cleanup - 2026-10-03
 The active starting guide is docs/CLAUDE-HANDOFF-20261003.md, linked from root CLAUDE.md, README and AGENTS. Corrected the stale native-first entry point; marked migration recommendations historical. Checked private main synchronization, no open PRs, public page200/cloud health8peers, paused sprint automations and targeted local process state. Claude meadow/canopy branch6bd929f is not integrated; no duplicate commission started. Nineteen unrelated Godot UID files remain untouched.
 Baseline simulation.mjs failed because its Grove cap fixture targeted the protected apron and its shrine test expected obsolete destructibility. Corrected only fixtures/assertions to current permanent-forge behavior (0e9e77e). All eight recommended focused checks pass. No runtime or production deployment changes in this handoff. Readiness gaps and optional Timberline kit features are explicitly documented; do not overstate physical-device acceptance.
+
+
+## Browser robustness review — 2026-10-04
+
+See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 130 suites pass. CI anchors its child working directory and patch-note checks normalize Windows line endings. Immediate save roundtrips, held-item material conservation and hidden-geometry disposal now have regressions. Original saved-player ownership restoration remains unresolved; an inventory recovery copy prevents destructive autosave in the reproduced capped-pickup case. No production deployment or physical-device acceptance is claimed.
