@@ -1,6 +1,7 @@
 // Rainfall: the God calls rain over the whole world. Authority state is one small record (state.weather) that every
 // client reads through shared/world-clock.js, so the sky, sound and gameplay agree for the whole room.
 // Any rain, called or natural, feeds life: groves breathe Bloom twice as often and Heroes slowly mend.
+import {heroMaxHp} from './hero-progress.js';
 import {weatherAt, CLOCK_HZ} from './world-clock.js';
 import {BLOOM, addBloom} from './bloom.js';
 
@@ -30,7 +31,7 @@ export function stepRain(state, events) {
   if (state.weather && state.weather.untilTick + 60 * CLOCK_HZ < state.tick) delete state.weather;
   if (!raining(state)) return;
   if (state.tick % BLOOM.passiveTicks === BLOOM.passiveTicks / 2 && state.groves.length) addBloom(state, Math.min(BLOOM.passiveCap, state.groves.length), events);
-  for (const hero of state.players) if (hero.role === 'hero' && hero.hp > 0 && hero.hp < 100) hero.hp = Math.min(100, hero.hp + RAINFALL.heroHpPerSecond / CLOCK_HZ);
+  for (const hero of state.players) if (hero.role === 'hero' && hero.hp > 0 && hero.hp < heroMaxHp(hero)) hero.hp = Math.min(heroMaxHp(hero), hero.hp + RAINFALL.heroHpPerSecond / CLOCK_HZ);
 }
 
 /** Save and snapshot restore. Older saves have no weather record. */

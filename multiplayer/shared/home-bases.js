@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -175,7 +176,7 @@ export function stepHomeBases(state, ctx, events) {
     }
     // The fountain mends its own side inside the dome footprint.
     if (state.tick % HOME.fountainEvery === 0) {
-      for (const hero of heroes) if (sideKey(hero.side) === base.side && hero.hp < 100 && flat(hero.position, base.position) <= HOME.domeRadius) hero.hp = Math.min(100, hero.hp + HOME.fountainHeal);
+      for (const hero of heroes) if (sideKey(hero.side) === base.side && hero.hp < heroMaxHp(hero) && flat(hero.position, base.position) <= HOME.domeRadius) hero.hp = Math.min(heroMaxHp(hero), hero.hp + HOME.fountainHeal);
       for (const bot of state.enemies) if (bot.battleRun !== undefined && bot.side === base.side && bot.hp > 0 && flat(bot.position, base.position) <= HOME.domeRadius) bot.hp = Math.min(bot.kind === 'golem' ? 320 : 100, bot.hp + HOME.fountainHeal);
     }
     for (const turret of base.parts) {

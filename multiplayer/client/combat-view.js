@@ -606,7 +606,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         const hits = segmentContacts(from, to, {excludeId: data.ownerId}), world = worldContact(from, to);
         if (world) hits.push({...world, distance: world.distance ?? new THREE.Vector3().fromArray(from).distanceTo(new THREE.Vector3().fromArray(world.point))});
         hits.sort((a, b) => a.distance - b.distance);
-        if (data.golden) {
+        if (data.golden || data.skewer) {
+          // Skewer bolts (Siegebird talent) pass through up to three bodies the same way, without the radiance.
           // Radiant bolt: report every body it passes through (shield and the body behind count separately),
           // each once; it stops only at the world.
           const seen = piercedBy.get(data.id) || piercedBy.set(data.id, new Set(data.pierced || [])).get(data.id);
@@ -615,7 +616,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
             const key = hit.targetId + (hit.surface === 'shield' ? '#shield' : '');
             if (seen.has(key)) continue;
             seen.add(key); onContact({type: 'projectileHit', projectileId: data.id, ...hit});
-            if (hit.targetId === 'world' || hit.targetId === 'terrain' || seen.size > 6) { stop = true; break; }
+            if (hit.targetId === 'world' || hit.targetId === 'terrain' || seen.size > (data.golden ? 6 : 3)) { stop = true; break; }
           }
           if (stop) { reported.add(data.id); const visual = projectiles.get(data.id); if (visual) visual.visible = false; break; }
           continue;

@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 import {enemyHostileTo,damageBattleBase} from './battle-mode.js';
 import {timberlineDuration,stepTimberline,stepStuck,TIMBERLINE_LONG,TIMBERLINE_RELEASE_TICKS} from './timberline-flight.js';
 // Deterministic physical inventions. Authority owns every resource, cooldown and damage result.
@@ -148,7 +149,7 @@ export function inventionAction(s,p,m,c){const i=state(s);p.resources={...emptyM
  if(b.type==='ward'){if(b.charge>=240)return fail('not_needed');if(!pay(s,p,{gems:1}))return fail('insufficient_resources');b.charge=240;return ok([event('ward_charge',b)]);}
  if(b.type==='influence'){if(!pay(s,p,{gems:1}))return fail('insufficient_resources');b.hp=Math.min(b.maxHp,b.hp+90);return ok([event('influence_restore',b)]);}
  if(b.type==='trap'){if(b.armed)return fail('not_needed');if(!pay(s,p,{iron:1}))return fail('insufficient_resources');b.armed=true;return ok([event('trap_reset',b)]);}
- if(b.type==='sanctuary'){if(s.tick<b.readyTick)return fail('machine_loading');for(const h of s.players)if(side(h)===side(p)&&flat(h.position,b.position)<=8){h.hp=100;h.mana=Math.min(100,h.mana+30);}p.rally=b.id;b.readyTick=s.tick+600;return ok([event('sanctuary_recover',b)]);}
+ if(b.type==='sanctuary'){if(s.tick<b.readyTick)return fail('machine_loading');for(const h of s.players)if(side(h)===side(p)&&flat(h.position,b.position)<=8){h.hp=heroMaxHp(h);h.mana=Math.min(100,h.mana+30);}p.rally=b.id;b.readyTick=s.tick+600;return ok([event('sanctuary_recover',b)]);}
  if(b.type==='watchtower'){if(p.role==='hero')p.position=[b.position[0],b.position[1]+3,b.position[2]];return ok();}
  if(b.type==='prospector'){if(s.tick<b.readyTick)return fail('machine_loading');b.readyTick=s.tick+1200;i.surveyTick=s.tick;const seams=s.deposits.filter(d=>!d.depleted).sort((a,d)=>Math.hypot(a.x-b.position[0],a.z-b.position[2])-Math.hypot(d.x-b.position[0],d.z-b.position[2])).slice(0,5);return ok(seams.map(d=>({kind:'seam_survey',id:d.id,position:[d.x,ground(s,d.x,d.z,c)+1,d.z],material:d.kind})));}
  if(b.type==='loggingYard'){b.readyTick=0;return ok([event('logging_start',b)]);}return fail('invalid_action');
