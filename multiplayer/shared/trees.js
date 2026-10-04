@@ -106,11 +106,13 @@ export function chopTree(state, tree, point, normal, ctx) {
 }
 
 // ---- Spatial index + character collision against trunks/stumps only (never canopy AABBs).
+// Count of wave trees that have appeared so far, so the index rebuilds as each one rises.
+const waitingTrees = state => { let n = 0; for (const g of state.groves || []) for (const t of g.trees || []) if ((t[4] ?? 0) <= (state.tick ?? Infinity)) n++; return n; };
 export function createTreeIndex(cell = TREE_LIMITS.cell) {
  let key = '', trees = [], grid = new Map(), byId = new Map();
  const k = (i, j) => `${i},${j}`;
  return {
-  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
+  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${waitingTrees(state)}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
    for (const t of trees) { const c = k(Math.floor(t.x/cell), Math.floor(t.z/cell)); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t); } return true; },
   all: () => trees, get: id => byId.get(id),
   near(x, z, out = []) { out.length = 0; const ci = Math.floor(x/cell), cj = Math.floor(z/cell); for (let i = ci-1; i <= ci+1; i++) for (let j = cj-1; j <= cj+1; j++) { const g = grid.get(k(i, j)); if (g) for (const t of g) out.push(t); } return out; }
@@ -124,7 +126,8 @@ export function resolveTrees(position, index, cuts, ground, radius = .28, bodyHe
   // contact below remains unchanged, including both separation passes.
   const maxRadius=widestRing.get(treeProfile(tree))*treeScale(tree)+radius;
   if(Math.abs(position[0]-tree.x)>=maxRadius||Math.abs(position[2]-tree.z)>=maxRadius)continue;
-  const cut = cuts.get(tree.id), floor = ground(tree.x, tree.z), top = isFelled(cut) ? cutLocalHeight(tree, cut, floor) : treeProfile(tree).firstLimb*treeScale(tree);
+  const cut = cuts.get(tree.id); if (cut?.awake) continue; // the stump is off walking (shared/stumplings.js)
+  const floor = ground(tree.x, tree.z), top = isFelled(cut) ? cutLocalHeight(tree, cut, floor) : treeProfile(tree).firstLimb*treeScale(tree);
   if (position[1] >= floor + top - .03 || position[1] + bodyHeight < floor) continue;
   const yLocal = clamp(position[1] - floor + .3, .3, top), dx = position[0]-tree.x, dz = position[2]-tree.z, d = Math.hypot(dx, dz), r = trunkRadius(tree, yLocal) + radius;
   if (d < r) { const ux = d > 1e-5 ? dx/d : 1, uz = d > 1e-5 ? dz/d : 0; position[0] = tree.x + ux*(r+.001); position[2] = tree.z + uz*(r+.001); }

@@ -7,7 +7,7 @@ import {SUNDER} from './terrain.js';
 export const BOONS = Object.freeze({
   charge: {hits: 3, ticks: 900, bonus: 40, strikeDamage: 25, radius: 3}, // Lightning near a Hero
   swift: {ticks: 360, speed: 1.4, radius: 7},                              // Frost Nova around a Hero
-  sanctuary: {radius: 4.5, hpPerSecond: 3},                               // standing inside a Tree Ring
+  sanctuary: {radius: 5, hpPerSecond: 3},                               // standing inside a Tree Ring
   blessing: {hits: 8, ticks: 1800, heal: 20, radius: 6},                  // Blessing: a long weapon charge
   quake: {radius: 8, heroDamage: 8, ores: ['ironOre', 'copperOre']},       // Quake shakes ore loose
   seamSpacing: 4, apples: 2, rainApples: 3,
@@ -49,7 +49,7 @@ export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId
     const t = k / (SUNDER.seams + 1), px = start[0] + (end[0] - start[0]) * t, pz = start[2] + (end[2] - start[2]) * t, id = addDeposit(state, 'crystal', px, pz, ctx);
     if (id) gift('crystal_seam', id, [px, ctx.terrainHeight(state, px, pz), pz]);
   }
-  if (spell === 'grove') for (let i = 0; i < BOONS.apples; i++) {
+  if (spell === 'grove' || spell === 'wave') for (let i = 0; i < BOONS.apples; i++) {
     const a = i * Math.PI + .6, px = x + Math.cos(a) * 1.2, pz = z + Math.sin(a) * 1.2, id = addPickup(state, 'apple', px, pz, 1, ctx);
     if (id) gift('apple', id, [px, ctx.terrainHeight(state, px, pz), pz]);
   }

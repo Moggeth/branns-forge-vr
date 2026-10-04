@@ -32,11 +32,17 @@ export const SPELL_ICONS = Object.freeze({
   spring: '<path d="M12 2.5c2.6 3.4 4.4 6 4.4 8.2a4.4 4.4 0 0 1-8.8 0c0-2.2 1.8-4.8 4.4-8.2z"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M3 18.5c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M5 22c1.7-1.2 3.3-1.2 5 0s3.3 1.2 5 0 3.3-1.2 4 0"/>',
   blessing: '<path d="M12 1.5l2.3 6.6 6.9.2-5.5 4.2 2 6.7L12 15.2l-5.7 4 2-6.7-5.5-4.2 6.9-.2z"/><ellipse cx="12" cy="21.5" rx="6" ry="1.5" opacity=".55"/>',
   quake: '<path d="M1.5 16h21V22h-21z" opacity=".45"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M12 16l-1.5 2.5 2 1.5-1 2M12 16l3.5 1.5 1 3M12 16l-4 1.2-1.5 2.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 10.5c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0M5 5.5c1.2-1.5 2.5-1.5 3.7 0s2.5 1.5 3.7 0 2.5-1.5 3.7 0"/>',
+  rainfall: '<path d="M6.4 12.2a4.4 4.4 0 0 1 .5-8.7 5.6 5.6 0 0 1 10.4 1.4 3.7 3.7 0 0 1 .2 7.3z"/><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 14.5l-1.6 4M12 14.5l-2 6M16.5 14.5l-1.6 4"/></g>',
   // A tree with two eyes in its trunk and root feet; Wild Awakening adds two smaller woken trees behind it.
   awaken: '<path fill-rule="evenodd" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
   wildwake: '<g opacity=".7"><path transform="translate(-4.2 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/>'
     + '<path transform="translate(14.6 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/></g>'
     + '<path fill-rule="evenodd" stroke="var(--sb-icon-ink,#1a140f)" stroke-width="1.4" paint-order="stroke" transform="translate(3.6 1) scale(.7)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
+  // Growth Wave: a row of three trees of rising size riding a swell of earth.
+  wave: '<path d="M1 22c3-3.2 6-3.2 9 0s6 3.2 9 0l4-1v2H1z" opacity=".55"/>'
+    + '<path d="M5 9.5c-1.7 0-2.8 1.2-2.8 2.6 0 1.4 1.2 2.4 2.5 2.4h.6v3.6h1.3v-3.6h.6c1.3 0 2.5-1 2.5-2.4 0-1.4-1.1-2.6-2.8-2.6z"/>'
+    + '<path d="M12 6c-2.1 0-3.4 1.5-3.4 3.2 0 1.7 1.4 3 3 3h.7v5.6h1.4v-5.6h.7c1.6 0 3-1.3 3-3C16.4 7.5 14.1 6 12 6z"/>'
+    + '<path d="M19 2.5c-2.3 0-3.8 1.7-3.8 3.6 0 1.9 1.6 3.3 3.4 3.3h.7v8.4h1.5V9.4h-.1c1.6-.3 2.8-1.6 2.8-3.3 0-1.9-1.6-3.6-4.5-3.6z"/>',
 });
 const QUICK_ICON = '<path d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm0 2.2a8.3 8.3 0 1 1 0 16.6 8.3 8.3 0 0 1 0-16.6z" opacity=".55"/><path d="M13.4 4.5L7 13.2h4.3l-1.6 6.3 7.3-9h-4.4l2.3-6z"/>';
 const ARROW = { prev: '<path d="M15.5 4.5L8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
