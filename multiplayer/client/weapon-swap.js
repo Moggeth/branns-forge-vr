@@ -42,6 +42,9 @@ export const WEAPON_SWAP_STYLES = Object.freeze({
     draw: [K(0, [-.05, -.48, .08], [-1.2, 0, .3]), K(1)]},
 });
 
+// One switch back to the plain dip for every weapon (the bow keeps its own raise). Reduced motion always uses it.
+export const WEAPON_SWAP_SIMPLE = false;
+
 const clamp01 = v => Math.min(1, Math.max(0, v));
 const smooth = u => u * u * (3 - 2 * u);
 // Smooth path through the keys (Catmull-Rom tangents, at rest at both ends).
@@ -60,8 +63,9 @@ function sample(keys, u, pos, rot) {
   pos.set(out[0], out[1], out[2]); rot.set(out[3], out[4], out[5], 'XYZ');
 }
 
-export function createWeaponSwap({styles = WEAPON_SWAP_STYLES, reducedMotion = false} = {}) {
-  const style = tool => (reducedMotion ? styles.plain : styles[tool] || styles.plain);
+const PLAIN_BOW = Object.freeze({...WEAPON_SWAP_STYLES.plain, draw: null});
+export function createWeaponSwap({styles = WEAPON_SWAP_STYLES, reducedMotion = false, simple = WEAPON_SWAP_SIMPLE} = {}) {
+  const style = tool => (reducedMotion || simple ? (tool === 'bow' && !styles.bow?.draw ? PLAIN_BOW : styles.plain) : styles[tool] || styles.plain);
   let phase = 'idle', u = 0, stashTool = null, drawTool = null, target = null, blend = null;
   const out = {busy: false, commit: null, amount: 0, position: new T.Vector3(), quaternion: new T.Quaternion()};
   const pos = new T.Vector3(), rot = new T.Euler(), q = new T.Quaternion();

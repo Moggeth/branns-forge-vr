@@ -29,4 +29,7 @@ s=createWeaponSwap();s.request('pick','axe');run(s,.1);assert.equal(s.cancel(),'
 s=createWeaponSwap({reducedMotion:true});s.request('flask','axe');run(s,S.plain.lower+.02);let spin=0;for(let i=0;i<20;i++)spin=Math.max(spin,s.update(1/60).quaternion.angleTo(new T.Quaternion()));assert.ok(spin<1.3,'no flask toss under reduced motion');
 // Frame-rate independent.
 const at=hz=>{const v=createWeaponSwap();v.request('pick','axe');return run(v,.4,hz).r.position;};assert.ok(at(30).distanceTo(at(120))<.05);
-console.log('PASS per-tool stash/draw styles, single commit, smooth paths, mind changes, bow raise, cancel, reduced motion, frame-rate independence');
+// The simple switch: every weapon takes the plain dip, the bow still brings its own raise.
+s=createWeaponSwap({simple:true});s.request('flask','axe');run(s,S.plain.lower+.02);let flip=0;for(let i=0;i<20;i++)flip=Math.max(flip,s.update(1/60).quaternion.angleTo(new T.Quaternion()));assert.ok(flip<1.3,'simple: no toss');
+s=createWeaponSwap({simple:true});s.request('bow','axe');({commits}=run(s,.3));assert.deepEqual(commits,['bow']);assert.ok(!s.busy,'simple: bow keeps its own raise');
+console.log('PASS per-tool stash/draw styles, single commit, smooth paths, mind changes, bow raise, cancel, reduced motion, simple switch, frame-rate independence');
