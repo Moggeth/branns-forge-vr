@@ -28,7 +28,7 @@ const suite = [
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
-  'vr-input-policy','weapon-controller','weapon-motion','weapon-readiness','wood-audio',
+  'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells',
 ];
 
