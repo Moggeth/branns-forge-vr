@@ -1,7 +1,8 @@
 import {dressForgeling} from './forgeling-look.js';
 import {createAbilityWarmup} from './ability-warmup.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
-import {validateInventionPlacement} from '../shared/inventions.js';
+import {validateInventionPlacement,STRUCTURES as INVENTION_TYPES} from '../shared/inventions.js';
+import {createBlueprintHud} from './build-blueprint-hud.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
 import {createSiegebirdAim} from './siegebird-aim.js';
 import {createInventionView} from './invention-view.js';
@@ -151,7 +152,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const scene = new THREE.Scene();
   const settlementVisual=createSettlementView({scene,heroView});
   const inventionVisual=createInventionView({scene});
-  let inventionPlacement=null,placementPointer=null;
+  let inventionPlacement=null,placementPointer=null,placementTurn=0,placementPin=null,placementCursor=null,placementHand=null,placementCheck={key:'',result:null},placementRepeat=false;
   // Manned Timberline (desktop first person): yaw/pitch become the wanted aim; the machine follows with weight.
   let manned=null,crankAt=0,crankHeld=false;
   const heldResourceArt=createResourceArt(),heldOreVisual=new THREE.Group();let heldOreKind=null;heldOreVisual.visible=false;scene.add(heldOreVisual);
@@ -278,12 +279,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (lost?.owner === 'panel') adventurePanel.handleSelectEnd(i);
       attachWeapon();
     });
+    // In build mode the blueprint follows whichever hand last moved its trigger; either grip backs out.
+    listen(controllers[i], 'squeezestart', () => {if(active&&inventionPlacement)cancelInventionPlacement();});
     listen(controllers[i], 'squeezeend', () => {if(active&&renderer.xr.isPresenting&&controllerSources.get(i)?.handedness==='right'&&snapshot.looseLogs?.some(l=>l.heldBy===playerId)&&pouchReady())release(false,i);});
     listen(controllers[i], 'selectstart', () => {
       if (active) unlockAudio();
       if (adventurePanel.handleSelectStart(i)) { presses.begin(i, 'panel'); return; }
       if (!active) return;
-      if(inventionPlacement){controllers[i].getWorldPosition(raycaster.ray.origin);controllers[i].getWorldQuaternion(poseQuaternion);raycaster.ray.direction.set(0,0,-1).applyQuaternion(poseQuaternion);const hit=raycaster.intersectObject(ground)[0];if(hit)placeInvention(hit.point);presses.begin(i,'cast');return;}
+      if(inventionPlacement){placementHand=i;placeInvention();presses.begin(i,'cast');return;}
       if (role === 'hero') {
         const kind = triggerRole({tool, hand: controllerSources.get(i)?.handedness, sources: controllerSources, holding: holdingLoose()});
         if (presses.begin(i, kind, tool)?.owner === 'primary') weapons.cancel(); // missed selectend: drop, never fire late
@@ -1023,6 +1026,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Direct touch selects a visible surface, then uses the normal animated tool and collision path.
   function tapAt(x,y){
+    if(active&&inventionPlacement&&!renderer.xr.isPresenting){pinPlacement(x,y);return true;}
     if(!active||role!=='hero'||renderer.xr.isPresenting||weapons.state().drawing||weapons.state().firing)return false;
     if(collectAt(x,y))return true;
     if(!['axe','pick','hammer','limb'].includes(tool))return false;
@@ -1097,7 +1101,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else zeroInputTimer = setTimeout(() => { if (!disposed) sendInput(performance.now(), true); }, 51 - (now - sentAt));
     }
   }
-  function cancelInventionPlacement(){inventionPlacement=null;placementPointer=null;inventionVisual.preview(null);}
+  function cancelInventionPlacement(){inventionPlacement=null;placementPointer=null;placementPin=null;placementHand=null;placementCheck={key:'',result:null};inventionVisual.preview(null);blueprintHud.set(null);}
   const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
   function mannedMachine(){return manned?snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0):null;}
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
@@ -1144,13 +1148,68 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const self=snapshot.players.find(p=>p.id===playerId),b=manned?mannedMachine():snapshot.inventions?.structures.find(b=>b.type==='timberline'&&b.hp>0&&b.side===(self?.side||'party')&&Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)<=MANNED.crankReach);
     if(!b||!(snapshot.tick<b.readyTick))return;crankAt=now;onAction('inventionCrank',{structureId:b.id});
   }
-  function beginInventionPlacement(type){weapons.cancel();clearInput();cancelCast();inventionPlacement=type;document.exitPointerLock?.();report(type.startsWith('operate:')?'Aim at the target and tap/click to fire. Escape cancels.':'Tap/click clear ground to build. Escape cancels.');}
-  function placeInvention(point){if(!inventionPlacement)return;const mode=inventionPlacement,self=snapshot.players.find(p=>p.id===playerId);if(!mode.startsWith('operate:')&&self){const validation=validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:mode,position:point.toArray(),yaw},{terrainHeight:sharedTerrainHeight});if(!validation.ok){inventionVisual.preview(point,mode,validation);onAction('placementFeedback',{reason:validation.reason});return;}}cancelInventionPlacement();if(mode.startsWith('operate:'))onAction('inventionUse',{structureId:mode.slice(8),target:point.toArray()});else onAction('inventionBuild',{kind:mode,type:mode,position:point.toArray(),x:point.x,z:point.z,yaw});}
-  listen(canvas,'pointerdown',event=>{if(!active||!inventionPlacement)return;event.preventDefault();event.stopImmediatePropagation();placementPointer=event.pointerId;},true);
-  listen(canvas,'pointerup',event=>{if(!active||!inventionPlacement||event.pointerId!==placementPointer)return;event.preventDefault();event.stopImmediatePropagation();const hit=pointerHit(event);if(hit)placeInvention(hit.point);},true);
+  // Blueprint placement: the see-through model follows the aim every frame (crosshair while the mouse is captured,
+  // the cursor while it is free, the controller ray in VR, the screen centre or a tapped spot on touch).
+  // Left-click / trigger / Place confirms; right-click, Esc, grip or Cancel backs out. The authority re-validates.
+  const blueprintHud=createBlueprintHud({parent:canvas.parentElement||document.body,onPlace:()=>placeInvention(),onRotate:()=>turnPlacement(Math.PI/4),onCancel:()=>cancelInventionPlacement()});
+  const PLACE_REACH=7.6;// just inside the 8 m build reach, so the blueprint never strays out of range
+  function beginInventionPlacement(type){weapons.cancel();clearInput();cancelCast();if(manned)dismountMachine();inventionPlacement=type;placementPin=null;placementPointer=null;placementCheck={key:'',result:null};
+    // Keep (or regain) the crosshair on desktop: the menu click that chose the building is the gesture pointer lock needs.
+    if(role==='hero'&&!touchEnabled&&!renderer.xr.isPresenting&&document.pointerLockElement!==canvas){try{canvas.requestPointerLock?.()?.catch?.(()=>{});}catch{}}
+    report(type.startsWith('operate:')?'Aim at the target and click or tap to fire. Right-click or Esc cancels.':'Aim where it should stand. Click or tap Place to build; right-click or Esc cancels.');}
+  function turnPlacement(by){if(!inventionPlacement||inventionPlacement.startsWith('operate:')||inventionPlacement==='foundation')return;placementTurn=wrapAngle(placementTurn+by);}
+  // Touch: a tap on the ground moves the blueprint there; it stays put while the player looks around.
+  function pinPlacement(x,y){const point=screenGround(x,y);if(point)placementPin=point;}
+  function placementYaw(){return (role==='hero'?yaw:0)+placementTurn;}
+  function screenGround(x,y){const rect=canvas.getBoundingClientRect();pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);camera.updateMatrixWorld();raycaster.setFromCamera(pointer,camera);
+    const o=raycaster.ray.origin.toArray(),d=raycaster.ray.direction,far=role==='god'?160:24;return terrainRay.segment(o,[o[0]+d.x*far,o[1]+d.y*far,o[2]+d.z*far])?.point||null;}
+  function placementAim(){
+    let point=null;
+    if(renderer.xr.isPresenting){const i=placementHand??[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0]??0,c=controllers[i];if(!c)return null;
+      const o=c.getWorldPosition(new THREE.Vector3()),d=c.getWorldDirection(new THREE.Vector3()).negate();point=terrainRay.segment(o.toArray(),o.clone().addScaledVector(d,16).toArray())?.point||null;}
+    else if(placementPin)point=[...placementPin];
+    else if(touchEnabled||document.pointerLockElement===canvas||!placementCursor){const rect=canvas.getBoundingClientRect();point=screenGround(rect.left+rect.width/2,rect.top+rect.height/2);
+      // Looking up at the sky still offers a spot straight ahead at full reach.
+      if(!point&&role==='hero'){const d=camera.getWorldDirection(new THREE.Vector3()),h=Math.hypot(d.x,d.z)||1;point=[localPosition.x+d.x/h*PLACE_REACH,0,localPosition.z+d.z/h*PLACE_REACH];}}
+    else point=screenGround(placementCursor.x,placementCursor.y);
+    if(!point)return null;
+    if(role==='hero'&&!inventionPlacement.startsWith('operate:')){const dx=point[0]-localPosition.x,dz=point[2]-localPosition.z,r=Math.hypot(dx,dz);if(r>PLACE_REACH){point[0]=localPosition.x+dx/r*PLACE_REACH;point[2]=localPosition.z+dz/r*PLACE_REACH;}}
+    point[1]=heightAt(point[0],point[2],snapshot.edits);
+    return new THREE.Vector3(...point);
+  }
+  // The shared validator is pure but walks every tree and structure, so it reruns only when the spot, turn or world changes.
+  function placementValidation(point){const self=snapshot.players.find(p=>p.id===playerId),mode=inventionPlacement;if(!self||!point||mode.startsWith('operate:'))return null;
+    const key=`${mode}|${Math.round(point.x*20)}|${Math.round(point.z*20)}|${Math.round(placementYaw()*100)}|${Math.round(localPosition.x*4)}|${Math.round(localPosition.z*4)}`;
+    if(placementCheck.key===key&&placementCheck.snapshot===snapshot)return placementCheck.result;
+    const result=validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:mode,position:point.toArray(),yaw:placementYaw()},{terrainHeight:sharedTerrainHeight});
+    placementCheck={key,snapshot,result};return result;}
+  function updatePlacementPreview(dt){
+    if(!inventionPlacement){blueprintHud.set(null);return;}
+    if(!active){cancelInventionPlacement();return;}
+    const mode=inventionPlacement,point=placementAim(),validation=placementValidation(point),operate=mode.startsWith('operate:');
+    inventionVisual.preview(point,mode,validation,{yaw:placementYaw(),dt,time:renderTick/60,label:renderer.xr.isPresenting});
+    const type=operate?snapshot.inventions?.structures.find(b=>b.id===mode.slice(8))?.type:mode;
+    blueprintHud.set(renderer.xr.isPresenting?null:{name:INVENTION_TYPES[type]?.name||'Building',mode:touchEnabled?'touch':'desktop',valid:!!point&&validation?.ok!==false,reason:point?validation?.reason||'':'Aim at open ground.',operate,cursor:!touchEnabled&&document.pointerLockElement!==canvas});
+  }
+  function placeInvention(){if(!inventionPlacement)return;const mode=inventionPlacement,point=placementAim();if(!point){onAction('placementFeedback',{reason:'Aim at open ground.'});return;}
+    if(!mode.startsWith('operate:')){const validation=placementValidation(point);if(validation&&!validation.ok){onAction('placementFeedback',{reason:validation.reason});return;}}
+    const turn=placementYaw();if(placementRepeat&&!mode.startsWith('operate:'))placementPin=null;else cancelInventionPlacement();
+    if(mode.startsWith('operate:'))onAction('inventionUse',{structureId:mode.slice(8),target:point.toArray()});else onAction('inventionBuild',{kind:mode,type:mode,position:point.toArray(),x:point.x,z:point.z,yaw:turn});}
+  // Mouse: left places, right cancels. Touch is left to the world-touch layer (drag looks, a tap moves the blueprint).
+  listen(canvas,'pointerdown',event=>{if(!active||!inventionPlacement||event.pointerType!=='mouse')return;event.preventDefault();event.stopImmediatePropagation();placementCursor={x:event.clientX,y:event.clientY};
+    placementPointer=event.button===0?event.pointerId:event.button===2?'cancel':null;},true);
+  // Both act on release, so the matching mousedown still sees build mode and never swings, sights or casts.
+  listen(canvas,'pointerup',event=>{if(!active||!inventionPlacement||event.pointerType!=='mouse'||placementPointer===null)return;event.preventDefault();event.stopImmediatePropagation();
+    const press=placementPointer;placementPointer=null;if(press==='cancel'){if(event.button===2)cancelInventionPlacement();return;}if(event.button!==0)return;
+    placementRepeat=event.shiftKey;placementCursor={x:event.clientX,y:event.clientY};placeInvention();placementRepeat=false;},true);
   listen(canvas,'pointercancel',()=>{placementPointer=null;});
-  listen(canvas,'pointermove',event=>{if(!active||!inventionPlacement)return;const hit=pointerHit(event);const self=snapshot.players.find(p=>p.id===playerId),validation=hit&&self&&!inventionPlacement.startsWith('operate:')?validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:inventionPlacement,position:hit.point.toArray(),yaw},{terrainHeight:sharedTerrainHeight}):null;inventionVisual.preview(hit?.point||null,inventionPlacement,validation);},true);
-  listen(window,'keydown',event=>{if(inventionPlacement&&event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelInventionPlacement();}},true);
+  listen(canvas,'pointermove',event=>{if(event.pointerType==='mouse')placementCursor=event.target===canvas?{x:event.clientX,y:event.clientY}:null;},true);
+  listen(canvas,'wheel',event=>{if(!active||!inventionPlacement)return;event.preventDefault();event.stopImmediatePropagation();turnPlacement(Math.sign(event.deltaY||event.deltaX)*Math.PI/12);},{passive:false,capture:true});
+  listen(window,'keydown',event=>{if(!inventionPlacement)return;
+    if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelInventionPlacement();}
+    else if(event.code==='KeyR'&&active&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)turnPlacement((event.shiftKey?-1:1)*Math.PI/4);}},true);
+  // Esc while the mouse is captured is swallowed by the browser to release it; treat that release as the cancel.
+  listen(document,'pointerlockchange',()=>{if(document.pointerLockElement!==canvas&&inventionPlacement&&wasCaptured&&document.hasFocus()&&!document.hidden)cancelInventionPlacement();});
   // Prime both sound banks on the first game gesture, before the first physical impact.
   listen(window, 'pointerdown', () => { if (active) unlockAudio(); });
   listen(window, 'keydown', event => {
@@ -1396,7 +1455,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
-    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);
+    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);updatePlacementPreview(dt);
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
     combat.beginCreatureFrame?.();
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
@@ -1550,6 +1609,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     lookByPixels(x, y) { lookBy(x * 0.003, y * 0.003); },
     zoomBy(amount) { if (active && role === 'god') orbitRadius = THREE.MathUtils.clamp(orbitRadius + amount, 10, 70); },
     aimAt(x, y) {
+      if (active && inventionPlacement) { pinPlacement(x, y); return false; }
       if (!active || role !== 'god') return false;
       camera.updateMatrixWorld(); const hit = pointerHit({clientX:x, clientY:y});
       fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; if(hit)updateTouchAim();else cursor.visible=false; return !!hit;
@@ -1599,7 +1659,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
