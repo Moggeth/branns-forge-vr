@@ -91,10 +91,12 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
     return t<=wall+.05;
   }});
+  // Apple on a stick (shared/fruit.js): take it, then each press is a bite.
+  const snackCue = c => make('pickup','ready',c.id,c.held?`${c.half?'Apple half':'Apple'} · bite ${c.bites+1} of ${c.biteCount||3}`:c.half?'Apple half':c.stick==='arrow'?'Apple on an arrow':c.stick==='bolt'?'Apple on a bolt':'Apple',c.held?'Bite':'Pick up',keys.collect,c.held?'Heals a little each bite':c.half?'A treat: +25 health in two bites':'A treat: +50 health in three bites');
   // Ore and finished bars read as one rewarding stack: "Pick up 7 Iron Bars", "Pick up 4 Mithril Ore".
   const stackCue = c => { const metal = METAL_BARS.has(c.kind), ore = /Ore$/.test(c.kind); if (!metal && !ore) return null; const n = c.amount | 0, label = titleCase(materialLabel(c.kind)), noun = metal ? `${label} Bar${n === 1 ? '' : 's'}` : label;
     return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, materialInfo(c.kind)?.use || ''); };
-  const pickupCue = c => (c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||''));
+  const pickupCue = c => c.type==='snack'?snackCue(c):(c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||''));
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
