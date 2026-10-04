@@ -206,7 +206,7 @@ export function createMobileUI({ mount = true } = {}) {
 
   const menuBtn = actionButton('menu', 'Menu', { cls: 'mui-util', showLabel: false });
   menuBtn.setAttribute('aria-haspopup', 'dialog');
-  const fsBtn = actionButton('fullscreen', 'Full screen', { cls: 'mui-util mui-fs', showLabel: false });
+  const fsBtn = actionButton('fullscreen', 'Full screen', { cls: 'mui-util mui-fs' });
   fsBtn.setAttribute('aria-pressed', 'false');
   const zoomIn = actionButton('zoom-in', 'Zoom in', { cls: 'mui-util mui-god-only', showLabel: false });
   const zoomOut = actionButton('zoom-out', 'Zoom out', { cls: 'mui-util mui-god-only', showLabel: false });
@@ -232,17 +232,32 @@ export function createMobileUI({ mount = true } = {}) {
     el('div', { class: 'mui-actions', role: 'toolbar', 'aria-label': 'Actions' }, [jump, strike, cancel, cast]),
   ]);
 
+  const fullscreenSurface = el('div', { class: 'mui-fullscreen-surface', hidden: true });
+  const utilBar = root.querySelector('.mui-util-bar');
   const settings = buildSettings();
   const sens = settings.querySelector('#touchSensitivity');
   const onSens = () => { settings._sensOut.textContent = `${Number(sens.value).toFixed(1)}×`; };
   sens.addEventListener('input', onSens); // display-only echo of the slider value
 
   if (mount) {
-    document.body.append(root);
+    document.body.append(root, fullscreenSurface);
     mountSettings(settings);
   }
 
-  const state = { tool:'axe',visible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+  const state = { tool:'axe',visible: false, fullscreenVisible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+
+  function placeFullscreenSurface() {
+    if (!mount || fullscreenSurface.hidden) return;
+    const dialog = [...document.querySelectorAll('[role=dialog][aria-modal=true]')].filter(el => el.getClientRects().length).at(-1);
+    // Workshop/field-guide headers remain visible while their bodies scroll.
+    const room = document.body.dataset.phase === 'game' && !document.body.classList.contains('quick-build-open') ? document.querySelector('#hud .hud-room') : null;
+    const parent = dialog?.querySelector('.menu-head, .ip-head, .fo-head') || dialog || room || document.body;
+    if (fullscreenSurface.parentElement !== parent) parent.append(fullscreenSurface);
+  }
+  // Field-guide updates replace their header. Reattach our owned surface without
+  // rerendering unrelated controls or disturbing a held gesture (the panel freezes it).
+  const surfaceObserver = mount ? new MutationObserver(placeFullscreenSurface) : null;
+  surfaceObserver?.observe(document.body, {childList:true, subtree:true});
 
   function render() {
     const { visible, role, fullscreen, fullscreenSupported, standalone, targeting, leftHanded } = state;
@@ -274,15 +289,26 @@ export function createMobileUI({ mount = true } = {}) {
       const text = btn.querySelector('.mui-btn-label');
       if (text) text.textContent = label;
     }
-    fsBtn.hidden = !fullscreenSupported;
-    settings._fsButton.hidden = !fullscreenSupported;
+    // Keep the same button (and pointer identity) on the surface while menus pause input.
+    fullscreenSurface.hidden = visible || !state.fullscreenVisible;
+    const fsParent = visible ? utilBar : fullscreenSurface;
+    if (fsBtn.parentElement !== fsParent) fsParent.append(fsBtn);
+    placeFullscreenSurface();
+    document.body.classList.toggle('touch-fullscreen-surface', !fullscreenSurface.hidden);
+    fsBtn.hidden = !state.fullscreenVisible;
+    settings._fsButton.hidden = false;
+    for (const btn of [fsBtn, settings._fsButton]) {
+      btn.dataset.available = String(fullscreenSupported || fullscreen);
+      btn.setAttribute('aria-label', fullscreen ? 'Exit full screen' : fullscreenSupported ? 'Full screen' : 'Full screen unavailable - show display options');
+      btn.title = btn.getAttribute('aria-label');
+    }
     const note = settings._fsNote;
     if (standalone) {
       note.hidden = false;
-      note.textContent = 'Running as an installed app — the browser bars are already hidden.';
+      note.textContent = 'Running in app display mode. Fullscreen availability still depends on this browser.';
     } else if (!fullscreenSupported) {
       note.hidden = false;
-      note.textContent = 'Full screen isn’t available in this browser. Add to Home Screen opens an app-like display on supported devices.';
+      note.textContent = 'Fullscreen is unavailable in this browser or embedded page. Keep playing here, or open the game in its own tab. Add to Home Screen may offer an app-like display on supported devices.';
     } else {
       note.hidden = true;
       note.textContent = '';
@@ -307,15 +333,18 @@ export function createMobileUI({ mount = true } = {}) {
   }
 
   function destroy() {
+    surfaceObserver?.disconnect();
     sens.removeEventListener('input', onSens);
     root.remove();
+    fullscreenSurface.remove();
+    document.body.classList.remove('touch-fullscreen-surface');
     settings.remove();
     document.body.classList.remove('touch-controls-active');
   }
 
   render();
   return {
-    root, leftStick, rightStick, settings, setState, setStick, destroy,
+    root, fullscreenSurface, leftStick, rightStick, settings, setState, setStick, destroy,
     buttons: { strike, jump, cast, cancel, menu: menuBtn, fullscreen: fsBtn, zoomIn, zoomOut, center },
   };
 }

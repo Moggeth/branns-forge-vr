@@ -2251,6 +2251,9 @@ Public verification: source4adc79c deployed as dpl_GaeqAKBdJG1naU3yop9MU27pzjRj 
 The active starting guide is docs/CLAUDE-HANDOFF-20261003.md, linked from root CLAUDE.md, README and AGENTS. Corrected the stale native-first entry point; marked migration recommendations historical. Checked private main synchronization, no open PRs, public page200/cloud health8peers, paused sprint automations and targeted local process state. Claude meadow/canopy branch6bd929f is not integrated; no duplicate commission started. Nineteen unrelated Godot UID files remain untouched.
 Baseline simulation.mjs failed because its Grove cap fixture targeted the protected apron and its shrine test expected obsolete destructibility. Corrected only fixtures/assertions to current permanent-forge behavior (0e9e77e). All eight recommended focused checks pass. No runtime or production deployment changes in this handoff. Readiness gaps and optional Timberline kit features are explicitly documented; do not overstate physical-device acceptance.
 
+### Touch fullscreen surface - 2026-10-04
+
+Isolated main f1c1c55: persistent touch fullscreen control, menu/lobby surface, real fullscreen state and honest unsupported/denied recovery. Browser, build evidence, fixed overlap/containing-block failures, Windows patch-notes LF limitation, screenshots and physical-device gaps: [fullscreen acceptance](TOUCH-FULLSCREEN-20261004.md). No voice/audio, permissions, merge or deployment changes.
 
 ## Browser robustness review — 2026-10-04
 

@@ -1,0 +1,877 @@
+{
+  "harness": "fullscreen",
+  "monotonicMs": 15671.2,
+  "results": [
+    {
+      "id": "loaded",
+      "status": "pass",
+      "atMs": 1194.8
+    },
+    {
+      "id": "harness-ready",
+      "status": "pass",
+      "atMs": 2756.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "patch-notes",
+      "status": "pass",
+      "atMs": 3303.3
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "lobby",
+      "status": "pass",
+      "atMs": 3351.1
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 3401.3
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 3409.3
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 5753.5
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 5767.2
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 220,
+      "y": 54,
+      "right": 264,
+      "bottom": 98,
+      "viewport": [
+        320,
+        640
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-320x640",
+      "status": "pass",
+      "atMs": 5825.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 220,
+      "y": 54,
+      "right": 264,
+      "bottom": 98,
+      "viewport": [
+        320,
+        640
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-tools-320",
+      "status": "pass",
+      "atMs": 5873.1
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-390x844",
+      "status": "pass",
+      "atMs": 5933.9
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-tools-390",
+      "status": "pass",
+      "atMs": 6043.1
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 492,
+      "y": 6,
+      "right": 536,
+      "bottom": 50,
+      "viewport": [
+        640,
+        360
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-640x360",
+      "status": "pass",
+      "atMs": 6458
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 492,
+      "y": 6,
+      "right": 536,
+      "bottom": 50,
+      "viewport": [
+        640,
+        360
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-tools-640",
+      "status": "pass",
+      "atMs": 6501.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 696,
+      "y": 6,
+      "right": 740,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-844x390",
+      "status": "pass",
+      "atMs": 6865.6
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 696,
+      "y": 6,
+      "right": 740,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-tools-844",
+      "status": "pass",
+      "atMs": 6975.1
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 876,
+      "y": 6,
+      "right": 920,
+      "bottom": 50,
+      "viewport": [
+        1024,
+        768
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-1024x768",
+      "status": "pass",
+      "atMs": 7035.8
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 876,
+      "y": 6,
+      "right": 920,
+      "bottom": 50,
+      "viewport": [
+        1024,
+        768
+      ],
+      "hit": true,
+      "other": [],
+      "id": "hero-tools-1024",
+      "status": "pass",
+      "atMs": 7075.5
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 220,
+      "y": 54,
+      "right": 264,
+      "bottom": 98,
+      "viewport": [
+        320,
+        640
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-320x640",
+      "status": "pass",
+      "atMs": 7326
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 220,
+      "y": 54,
+      "right": 264,
+      "bottom": 98,
+      "viewport": [
+        320,
+        640
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-tools-320",
+      "status": "pass",
+      "atMs": 7376
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-390x844",
+      "status": "pass",
+      "atMs": 7439.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-tools-390",
+      "status": "pass",
+      "atMs": 7556.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 492,
+      "y": 6,
+      "right": 536,
+      "bottom": 50,
+      "viewport": [
+        640,
+        360
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-640x360",
+      "status": "pass",
+      "atMs": 7608
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 492,
+      "y": 6,
+      "right": 536,
+      "bottom": 50,
+      "viewport": [
+        640,
+        360
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-tools-640",
+      "status": "pass",
+      "atMs": 7643.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 696,
+      "y": 6,
+      "right": 740,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-844x390",
+      "status": "pass",
+      "atMs": 7698.9
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 696,
+      "y": 6,
+      "right": 740,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-tools-844",
+      "status": "pass",
+      "atMs": 7810.9
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 876,
+      "y": 6,
+      "right": 920,
+      "bottom": 50,
+      "viewport": [
+        1024,
+        768
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-1024x768",
+      "status": "pass",
+      "atMs": 7867.3
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 876,
+      "y": 6,
+      "right": 920,
+      "bottom": 50,
+      "viewport": [
+        1024,
+        768
+      ],
+      "hit": true,
+      "other": [],
+      "id": "god-tools-1024",
+      "status": "pass",
+      "atMs": 7910
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "menu-play",
+      "status": "pass",
+      "atMs": 8257.5
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "menu-controls",
+      "status": "pass",
+      "atMs": 8300.6
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "menu-world",
+      "status": "pass",
+      "atMs": 8350.3
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "menu-supplies",
+      "status": "pass",
+      "atMs": 8391.3
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 792,
+      "y": 6,
+      "right": 836,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "menu-landscape",
+      "status": "pass",
+      "atMs": 8476.1
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 8539.5
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 8551.7
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "resumed",
+      "status": "pass",
+      "atMs": 8606.3
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "quick-build-390",
+      "status": "pass",
+      "atMs": 8665.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 337,
+      "y": 76.53125,
+      "right": 381,
+      "bottom": 120.53125,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "forge-390",
+      "status": "pass",
+      "atMs": 9033.6
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 23,
+      "y": 239.140625,
+      "right": 67,
+      "bottom": 283.140625,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "field-guide-390",
+      "status": "pass",
+      "atMs": 9307.6
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 792,
+      "y": 6,
+      "right": 836,
+      "bottom": 50,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "quick-build-844",
+      "status": "pass",
+      "atMs": 9423.8
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 785,
+      "y": 11,
+      "right": 829,
+      "bottom": 55,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "forge-844",
+      "status": "pass",
+      "atMs": 9800.1
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 743,
+      "y": 80.4375,
+      "right": 787,
+      "bottom": 124.4375,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "field-guide-844",
+      "status": "pass",
+      "atMs": 10075
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 10161.1
+    },
+    {
+      "reason": "Playwright key injection did not exit browser fullscreen; physical OS input is not available here.",
+      "id": "native-escape",
+      "status": "unverified",
+      "atMs": 11672.5
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 11681.9
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 258,
+      "y": 78,
+      "right": 302,
+      "bottom": 122,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "simulated-safe-area",
+      "status": "pass",
+      "atMs": 11698.1
+    },
+    {
+      "id": "resume-does-not-request",
+      "status": "pass",
+      "atMs": 11782.5
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "denied-still-reachable",
+      "status": "pass",
+      "atMs": 11834.4
+    },
+    {
+      "id": "denial-truthful",
+      "status": "pass",
+      "atMs": 11916.7
+    },
+    {
+      "id": "unsupported-label",
+      "status": "pass",
+      "atMs": 11918.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "unsupported-still-reachable",
+      "status": "pass",
+      "atMs": 11975
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 12093.2
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 12109.4
+    },
+    {
+      "id": "keyboard-entry",
+      "status": "pass",
+      "atMs": 12127.4
+    },
+    {
+      "id": "one-tap-button-exit",
+      "status": "pass",
+      "atMs": 12167.4
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 338,
+      "y": 6,
+      "right": 382,
+      "bottom": 50,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "touch-sticks-off",
+      "status": "pass",
+      "atMs": 12482.7
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 336,
+      "y": 164.390625,
+      "right": 380,
+      "bottom": 208.390625,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "touch-sticks-off-game-390",
+      "status": "pass",
+      "atMs": 12531.7
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 595.78125,
+      "y": 118.390625,
+      "right": 639.78125,
+      "bottom": 162.390625,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "touch-sticks-off-game-844",
+      "status": "pass",
+      "atMs": 12568.2
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "left-handed",
+      "status": "pass",
+      "atMs": 12752.9
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 290,
+      "y": 54,
+      "right": 334,
+      "bottom": 98,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "standalone",
+      "status": "pass",
+      "atMs": 12768.4
+    },
+    {
+      "id": "standalone-is-not-fullscreen",
+      "status": "pass",
+      "atMs": 12772.4
+    },
+    {
+      "id": "real-fullscreen-entered",
+      "status": "pass",
+      "atMs": 12811
+    },
+    {
+      "id": "external-exit-state",
+      "status": "pass",
+      "atMs": 12828.1
+    },
+    {
+      "id": "no-double-request",
+      "status": "pass",
+      "atMs": 12830.8
+    },
+    {
+      "id": "void-return-no-double-request",
+      "status": "pass",
+      "atMs": 12868.3
+    },
+    {
+      "id": "void-return-does-not-fake-state",
+      "status": "pass",
+      "atMs": 12869.6
+    },
+    {
+      "id": "legacy-request-once",
+      "status": "pass",
+      "atMs": 12909
+    },
+    {
+      "id": "legacy-waits-for-real-state",
+      "status": "pass",
+      "atMs": 12910.2
+    },
+    {
+      "id": "legacy-change-state",
+      "status": "pass",
+      "atMs": 12915.6
+    },
+    {
+      "id": "legacy-exit-state",
+      "status": "pass",
+      "atMs": 12951.7
+    },
+    {
+      "id": "legacy-error-message",
+      "status": "pass",
+      "atMs": 12957.3
+    },
+    {
+      "errors": [],
+      "id": "no-page-errors",
+      "status": "pass",
+      "atMs": 12957.3
+    },
+    {
+      "id": "desktop-no-touch-fullscreen",
+      "status": "pass",
+      "atMs": 15621.3
+    }
+  ]
+}
