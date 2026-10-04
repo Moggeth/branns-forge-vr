@@ -14,12 +14,12 @@ import {createAxeLuminance} from './axe-luminance.js';
 // - Inputs are fractions owned by the shared simulation; this module never runs its own timers.
 //   axe: specialReady (6 s cleave) · pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
 //   curve adds nothing) · limb: attackReady (0.53 s) · wyrmspout: heat + overheated (3 s lock) and
-//   specialReady (2 s vent) · flask: attackReady (1 s toss; wick toggle is instant so it has no indicator).
+//   specialReady (6 s Gout) · flask: attackReady (1 s toss; wick toggle is instant so it has no indicator).
 // - Max 3 draw calls per tool, no lights, every descendant has userData.ignoreContact = true.
 
 export const READINESS_TIMINGS = Object.freeze({
   axe: {special: 6}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
-  limb: {attack: .53}, wyrmspout: {vent: 2, overheatLock: 3}, flask: {attack: 1},
+  limb: {attack: .53}, wyrmspout: {vent: 6, overheatLock: 3}, flask: {attack: 1},
 });
 
 export const ANCHORS = Object.freeze({

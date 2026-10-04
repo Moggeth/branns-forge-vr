@@ -224,7 +224,8 @@ function mkMat(vs, fs, uniforms, blending, extra = {}) {
 }
 
 // =====================================================================================
-export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null } = {}) {
+export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null, drawPackets = true } = {}) {
+  // drawPackets=false: Wyrmspout globs are drawn by wyrmspout-stream.js; packets here only steer the pooled lights.
   let q = clamp(quality, 0, 1);
   let disposed=false;
   const group = new THREE.Group(); group.name = 'FirePresentation';
@@ -509,7 +510,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
       p.x += (p.bx + p.vx * age - p.x) * kSmooth; p.y += (p.by + p.vy * age - p.y) * kSmooth; p.z += (p.bz + p.vz * age - p.z) * kSmooth;
       p.a = p.dying ? p.a - dt / 0.18 : Math.min(1, p.a + dt / 0.05);
       if (p.a <= 0 && p.dying) { p.used = false; pkMap.delete(p.id); continue; }
-      if (!emit) continue;
+      if (!emit || !drawPackets) continue;
       const a = clamp(p.a, 0, 1), sp2 = Math.hypot(p.vx, p.vy, p.vz), inv = sp2 > 0.05 ? 1 / sp2 : 0;
       const tx = inv ? -p.vx * inv : 0, ty = inv ? -p.vy * inv + 0.25 : 1, tz = inv ? -p.vz * inv : 0;
       const spd = 0.6 + 0.4 * Math.min(1, sp2 / 8);
