@@ -1,0 +1,77 @@
+[
+ {
+  "file": "tree.glb",
+  "height": 6.0,
+  "crownFit": 0.864,
+  "tris": {
+   "Branches": 2876,
+   "Fruit": 2080,
+   "Leaves": 1980,
+   "Roots": 462,
+   "Trunk": 276
+  },
+  "kb": 758
+ },
+ {
+  "file": "tree_lod.glb",
+  "height": 5.999,
+  "crownFit": 0.871,
+  "tris": {
+   "Branches": 796,
+   "Leaves": 448,
+   "Roots": 140,
+   "Trunk": 88
+  },
+  "kb": 233
+ },
+ {
+  "file": "tree_b.glb",
+  "height": 6.3,
+  "crownFit": 0.788,
+  "tris": {
+   "Branches": 3686,
+   "Fruit": 680,
+   "Leaves": 2280,
+   "Roots": 462,
+   "Trunk": 276
+  },
+  "kb": 779
+ },
+ {
+  "file": "tree_b_lod.glb",
+  "height": 6.313,
+  "crownFit": 0.775,
+  "tris": {
+   "Branches": 1180,
+   "Leaves": 516,
+   "Roots": 140,
+   "Trunk": 88
+  },
+  "kb": 253
+ },
+ {
+  "file": "tree_young.glb",
+  "height": 4.1,
+  "crownFit": 0.816,
+  "tris": {
+   "Branches": 2220,
+   "Fruit": 880,
+   "Leaves": 1260,
+   "Roots": 462,
+   "Trunk": 276
+  },
+  "kb": 938
+ },
+ {
+  "file": "tree_young_lod.glb",
+  "height": 4.103,
+  "crownFit": 0.777,
+  "tris": {
+   "Branches": 772,
+   "Leaves": 284,
+   "Roots": 140,
+   "Trunk": 88
+  },
+  "kb": 297
+ }
+]
