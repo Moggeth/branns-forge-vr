@@ -1,4 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
+import {roomListing, DIRECTORY_REFRESH} from './room-directory.js';
+export {ForgeDirectory} from './directory.js';
 
 // One hibernating coordinator per room. Simulation and saves stay on players' devices.
 // Direct WebRTC is preferred; bounded opaque WebSocket frames can bridge restrictive NATs.
@@ -14,6 +16,18 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/peer/health') return json({ ok: true, service: 'cloud-rooms', protocol: 1, maxPeers: MAX_PEERS, relay: 'bounded-websocket' });
+    if (url.pathname === '/peer/rooms') {
+      const origin = request.headers.get('Origin');
+      if (origin && !(env.ALLOWED_ORIGINS || '').split(',').includes(origin)) return new Response('Origin denied', {status:403});
+      const headers = {'cache-control':'no-store',vary:'Origin',...(origin?{'access-control-allow-origin':origin}:{})};
+      if (request.method !== 'GET') return new Response('Use GET to browse rooms',{status:405,headers});
+      if (env.DIRECTORY_LIMIT && !(await env.DIRECTORY_LIMIT.limit({key:request.headers.get('CF-Connecting-IP') || 'local'})).success)
+        return Response.json({error:'Please wait a minute, then refresh the world list.'},{status:429,headers});
+      const cursor=url.searchParams.get('cursor') || '';
+      if (cursor && !/^room:\d{8}$/.test(cursor)) return Response.json({error:'Refresh the world list to start again.'},{status:400,headers});
+      const result=await env.DIRECTORY.get(env.DIRECTORY.idFromName('public')).fetch('https://directory/list?cursor='+encodeURIComponent(cursor));
+      return new Response(result.body,{status:result.status,headers:{...headers,'content-type':'application/json'}});
+    }
     if (url.pathname !== '/peer/cloud') return new Response('Not found', { status: 404 });
     if (!(env.ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'))) return new Response('Origin denied', { status: 403 });
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('WebSocket required', { status: 426 });
@@ -45,6 +59,18 @@ export class ForgeRoom extends DurableObject {
   peers() { return this.room?.peers || []; }
   publicPeer(p) { return { id: p.id, name: p.name, role: p.role, desktop: p.desktop, online: this.online(p.id), checkpointRevision: p.revision }; }
   broadcast(message, except) { for (const [id, ws] of this.sockets) if (id !== except) send(ws, message); }
+  async updateDirectory(force = false) {
+    if (!this.env.DIRECTORY || !this.room) return;
+    const now=Date.now();
+    if (!force && now-(this.directoryAt || 0)<DIRECTORY_REFRESH) return;
+    this.directoryAt=now;
+    try {
+      const result=await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('public')).fetch('https://directory/update',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:this.room.code,listing:roomListing(this.room,id=>this.online(id),now)})
+      });
+      if (!result.ok) throw new Error('directory_update_failed');
+    } catch { console.warn(JSON.stringify({event:'directory_update_failed',room:this.room.code})); }
+  }
   async save() { if (this.room) await this.ctx.storage.put('room', this.room); }
   async schedule() {
     const r = this.room; const now = Date.now();
@@ -52,6 +78,7 @@ export class ForgeRoom extends DurableObject {
     const deadlines = [...pending];
     if (r) {
       deadlines.push(r.created + MAX_AGE);
+      if (this.sockets.size && this.env.DIRECTORY) deadlines.push((this.directoryAt || now) + DIRECTORY_REFRESH);
       if (!this.sockets.size) deadlines.push(r.lastActivity + EMPTY_AGE);
       if (r.graceAt) deadlines.push(r.graceAt);
       if (r.offer) deadlines.push(r.offer.expires);
@@ -78,6 +105,7 @@ export class ForgeRoom extends DurableObject {
     r.lastActivity = Date.now();
     if (p.id === r.hostId) { r.graceAt = 0; if (!r.offer?.graceful) { r.offer = null; r.migrating = false; r.tried = []; } }
     await this.save();
+    await this.updateDirectory(true);
     send(ws, { type: 'welcome', protocol: 1, room: r.code, peerId: p.id, secret: p.secret, role: p.role, hostId: r.hostId, epoch: r.epoch,
       maxPeers: MAX_PEERS, peers: this.peers().filter(q => q.id !== p.id).map(q => this.publicPeer(q)),
       iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }], relayConfigured: true, relayTransport: 'websocket' });
@@ -130,6 +158,7 @@ export class ForgeRoom extends DurableObject {
     }
     const r = this.room, p = this.peers().find(q => q.id === a.id);
     if (!r || !p || this.sockets.get(p.id) !== ws) return;
+    await this.updateDirectory();
     if (m.type === 'signal' || m.type === 'relay' || m.type === 'relay_request') {
       if (m.epoch !== r.epoch) return error(ws, 'stale_epoch', 'Room ownership changed.', { expectedEpoch: r.epoch });
       if (!this.online(m.to)) {
@@ -169,7 +198,7 @@ export class ForgeRoom extends DurableObject {
     } else if (m.type === 'continue_world') {
       if (r.offer?.peerId !== p.id || m.epoch !== r.epoch || p.revision < 0) return error(ws, 'no_offer', 'No current continuation offer.');
       const previousHostId = r.hostId; r.hostId = p.id; r.epoch++; r.offer = null; r.migrating = false; r.graceAt = 0;
-      await this.save(); this.broadcast({ type: 'host_changed', hostId: p.id, previousHostId, epoch: r.epoch });
+      await this.save(); await this.updateDirectory(true); this.broadcast({ type: 'host_changed', hostId: p.id, previousHostId, epoch: r.epoch });
     } else if (m.type === 'decline_world') {
       if (r.offer?.peerId !== p.id) return;
       const graceful = r.offer.graceful; r.offer = null;
@@ -193,7 +222,7 @@ export class ForgeRoom extends DurableObject {
       this.broadcast({ type: 'owner_lost', epoch: r.epoch, deliberate: !!p.leaving });
       r.graceAt = Date.now() + (p.leaving ? 50 : Number(this.env.DISCONNECT_GRACE_MS || 15000));
     } else if (r.offer?.peerId === id) await this.nextOffer();
-    await this.save(); await this.schedule();
+    await this.save(); await this.updateDirectory(true); await this.schedule();
   }
   async webSocketClose(ws) { await this.depart(ws); try { ws.close(); } catch {} }
   async webSocketError(ws) { await this.depart(ws); try { ws.close(1011, 'Connection error'); } catch {} }
@@ -204,7 +233,7 @@ export class ForgeRoom extends DurableObject {
     if (!r) return this.schedule();
     if (now >= r.created + MAX_AGE || (!this.sockets.size && now >= r.lastActivity + EMPTY_AGE)) {
       this.broadcast({ type: 'room_expired' }); for (const ws of this.ctx.getWebSockets()) ws.close(4000, 'Room expired');
-      this.room = null; this.sockets.clear(); await this.ctx.storage.deleteAll(); return;
+      this.sockets.clear(); await this.updateDirectory(true); this.room = null; await this.ctx.storage.deleteAll(); return;
     }
     if (r.graceAt && now >= r.graceAt) {
       r.graceAt = 0;
@@ -214,6 +243,6 @@ export class ForgeRoom extends DurableObject {
       const offer = r.offer; send(this.sockets.get(offer.peerId), { type: 'continue_offer_expired', epoch: r.epoch, graceful: offer.graceful }); r.offer = null;
       if (offer.graceful) send(this.sockets.get(r.hostId), { type: 'transfer_timeout' }); else await this.nextOffer();
     }
-    await this.save(); await this.schedule();
+    await this.updateDirectory(); await this.save(); await this.schedule();
   }
 }

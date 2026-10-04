@@ -28,6 +28,32 @@ Pricing source: https://developers.cloudflare.com/durable-objects/platform/prici
 
 ## Deploy / inspect / recover
 
+### Public room directory (2026-10-04)
+
+`GET /peer/rooms` lists public multiplayer rooms, 50 at a time. Pass the returned
+`nextCursor` as `cursor` for the next page. Rows expose only room codes, host/player
+display names, initial chosen roles, online counts and playing/full/waiting status.
+They never include reconnect secrets, peer IDs, ICE data or saves. Solo is not listed.
+There is no private multiplayer mode. Listing is read-only, origin checked for browser
+requests, and separately rate limited (60 requests/minute/IP).
+
+Deploy the v2 Wrangler migration before publishing a browser that uses this endpoint.
+It adds a separate SQLite ForgeDirectory binding; it does not replace ForgeRoom or
+delete existing room data. Active rooms refresh metadata once per minute and on
+membership/handoff; entries expire after 150 seconds without refresh. Empty rooms
+are removed immediately. Existing rooms from before this deployment appear when
+their coordinator next handles traffic or membership; a page reconnect registers an
+otherwise idle old room. Directory failure is logged and does not reject gameplay.
+The index introduces one refresh/alarm per occupied room per minute, separate from
+gameplay traffic. Pagination and cleanup bound individual operations; it is not an
+unlimited-capacity lobby service.
+
+Checks: `node tests/room-directory.mjs`, `node tests/public-room-directory.mjs`, then
+`CLOUD_TEST_URL=http://127.0.0.1:8792 node cloud/directory-test.mjs` against the owned
+local Wrangler process (set the environment variable using your shell's syntax).
+The live test verifies CORS, no public writes, list/create/join/full, host transfer,
+waiting status and empty-room removal. Use `node cloud/test.mjs` for protocol recovery.
+
 From `multiplayer/` using the personal Cloudflare subscription:
 
 ```powershell
