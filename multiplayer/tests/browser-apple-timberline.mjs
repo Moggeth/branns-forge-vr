@@ -86,14 +86,14 @@ try {
  assert.ok(await walkTo(half.position, 1.2), 'walked to a half');
  recording = true; await look(half.position, 16); await frames(20); await shot(page, 'timberline-apple-half');
  const hp0 = (await harness()).me.hp;
- // E takes the nearest pickup first: the Orchard's gift basket can sit closer than the half, so press until it's in hand.
- for (let k = 0; k < 4 && (await harness()).s.fruit.drops.find(d => d.id === half.id)?.heldBy !== id; k++) { await look(half.position, 4); await page.keyboard.press('KeyE'); await frames(30); }
- await frames(15);
- assert.equal((await harness()).s.fruit.drops.find(d => d.id === half.id)?.heldBy, id, 'took the half'); record('take-half', 'pass');
- await look([half.position[0], half.position[1] + 1.6, half.position[2] - 6], 12); await frames(15);
- await capture(); for (let b = 0; b < 2; b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
+ // E takes the nearest pickup first (the Orchard's gift basket can sit closer than the halves), so press until a half is in hand.
+ const mine = async () => (await harness()).s.fruit.drops.find(d => d.half && d.heldBy === id);
+ for (let k = 0; k < 4 && !(await mine()); k++) { await look(half.position, 4); await page.keyboard.press('KeyE'); await frames(30); }
+ await frames(15); let held = await mine(); assert.ok(held, 'took a half'); record('take-half', 'pass', {id: held.id});
+ await look([held.position[0], held.position[1] + 1.6, held.position[2] - 6], 12); await frames(15);
+ await capture(); for (let b = 0; b < 2 && (await mine()); b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
  await frames(60);
- const done = await harness(); assert.ok(!done.s.fruit.drops.some(d => d.id === half.id), 'eaten'); record('eaten-half', 'pass', {hp: [hp0, done.me.hp]});
+ const done = await harness(); assert.ok(!done.s.fruit.drops.some(d => d.id === held.id), 'eaten'); record('eaten-half', 'pass', {hp: [hp0, done.me.hp]});
  assert.deepEqual(page.errors, []);
 } catch (e) { record('exception', 'fail', {message: e.message, errors: page.errors}); await shot(page, 'timberline-apple-failure'); process.exitCode = 1; }
 finally { await browser.close(); }

@@ -249,7 +249,8 @@ export function fruitCandidate(state, p, id = null, ctx = {}) {
   if (d.heldBy || (id !== null && d.id !== id)) continue;
   const dx = d.position[0] - p.position[0], dz = d.position[2] - p.position[2], dy = d.position[1] - (p.position[1] + .4), dist = Math.hypot(dx, dz, dy*.5);
   if (dist > FRUIT.reach || Math.abs(dy) > 3) continue;
-  if (ctx.visible && !ctx.visible([p.position[0], p.position[1] + 1.1, p.position[2]], d.position, d.id)) continue;
+  // sight the top of the fruit: a half lying cut-side down has its centre on the ground itself
+  if (ctx.visible && !ctx.visible([p.position[0], p.position[1] + 1.1, p.position[2]], [d.position[0], d.position[1] + d.radius*.6, d.position[2]], d.id)) continue;
   if (!best || dist < best.distance || dist === best.distance && d.id < best.id) best = candidate(d, p, dist, false);
  }
  return best;
