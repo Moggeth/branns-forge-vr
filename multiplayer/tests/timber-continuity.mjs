@@ -11,7 +11,8 @@ let cap;endcap.scene.traverse(o=>{if(o.isMesh)cap=o;});const uv=fitEndcapUV(cap)
 let cases=0;
 for(const variant of [0,1,2]){
  const kit=loadGLB(fileURLToPath(new URL(`../public/assets/${R.VARIANTS[variant]}.glb`,import.meta.url))),root=kit.scene.getObjectByName('Tree');
- let trunk;root.getObjectByName('Trunk').traverse(o=>{if(o.isMesh)trunk=o;});const triangles=bakeTriangles(trunk,root);
+ let trunk;root.getObjectByName('Trunk').traverse(o=>{if(o.isMesh&&!trunk)trunk=o;}); // the trunk mesh itself (tree-view takes the first; oak ivy rides as a child)
+ const triangles=bakeTriangles(trunk,root);
  for(const scale of [.7,1,1.4]){
   const tree={id:'tree1',variant,x:-2,z:6,height:R.TREE_PROFILES[R.VARIANTS[variant]].height*scale};
   const counts=[];
