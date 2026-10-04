@@ -415,7 +415,8 @@ export function createWeaponReadiness({root, tool, reducedMotion = false} = {}) 
     };
     if (parts.special) {
       const boost = show(parts.special, channels.special, special);
-      parts.luminance?.update(special, time, reducedMotion, boost);
+      // focus: the held pick gathering for the crystal wall brightens its gems (no extra lights).
+      parts.luminance?.update(special, time, reducedMotion, Math.max(boost, clamp01(state.focus) * .55));
     }
     if (parts.attack) {
       const boost = show(parts.attack, channels.attack, attack);
