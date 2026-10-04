@@ -2,6 +2,7 @@
 date: 2026-10-04 16:30
 area: God
 title: Smooth earth magic
+pr: 34
 ---
 - **Sunder** and **Raise Wall** now move smoothly at your screen's full frame rate. Before, the ground tore open and rose in visible steps, about 10 to 20 a second.
   - The chasm, the rampart, the crystal glow, the blue fracture racing along the line, and the rocks, ferns and loot sitting on the moving ground now all move every frame.
