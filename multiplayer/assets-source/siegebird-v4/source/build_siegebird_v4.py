@@ -69,13 +69,14 @@ def feather_image(size=512):
     vane = teal * (1 - hue) + cobalt * hue
     vane = vane * (1 - 0.45 * np.clip((u - 0.55) / 0.4, 0, 1)[..., None]) + deep * 0.45 * np.clip((u - 0.55) / 0.4, 0, 1)[..., None]
     col = slate * (1 - t) + vane * t
-    bars = (0.5 + 0.5 * np.cos(TAU * (u * 9.0 + 0.10 * a))) ** 18 * (u > 0.30) * (u < 0.86)          # blue-jay barring
-    col *= (1 - 0.55 * bars[..., None])
-    spot = (row % 2 == 0) * np.exp(-(((u - 0.80) / 0.05) ** 2 + ((across + 0.35) / 0.35) ** 2))     # white spot on the trailing vane
-    col = col * (1 - spot[..., None]) + ivory * spot[..., None]
+    bars = (0.5 + 0.5 * np.cos(TAU * (u * 7.0 + 0.35 * a))) ** 30 * (u > 0.34) * (u < 0.82) * (row % 2 == 1)  # faint chevron barring, alternate rows
+    col *= (1 - 0.18 * bars[..., None])
+    col *= (1 - 0.28 * np.exp(-((a - 0.18) / 0.16) ** 2) * (u > 0.2))[..., None]                     # darker inner vane beside the shaft
+    edge = np.clip((a - 0.70) / 0.25, 0, 1) * (across < 0)                                          # pale trailing-edge fringe
+    col = col * (1 - 0.35 * edge[..., None]) + np.array([0.62, 0.80, 0.92]) * 0.35 * edge[..., None]
     tipk = np.clip((u - 0.90) / 0.08, 0, 1)[..., None]; col = col * (1 - tipk) + dusk * tipk
-    barb = (0.5 + 0.5 * np.sin(TAU * (u * 46 - a * 15))) ** 3                                         # barbs slant out toward the tip
-    col *= (1 - 0.16 * barb[..., None])
+    barb = (0.5 + 0.5 * np.sin(TAU * (u * 90 - a * 26))) ** 2                                         # fine barbs slant out toward the tip
+    col *= (1 - 0.10 * barb[..., None])
     col *= (1 - 0.30 * np.clip((a - 0.85) / 0.15, 0, 1))[..., None]                                   # soft vane edge
     rach = np.exp(-(across / 0.045) ** 2)[..., None]
     vein = (np.exp(-((a - 0.10) / 0.025) ** 2) * np.clip((u - 0.3) / 0.2, 0, 1) * (1 - tipk[..., 0]))[..., None]
@@ -608,7 +609,7 @@ def build_wings():
         ang = lerp(0.10, 1.05, n_ / 12.0)
         dirv = Vector((math.sin(ang), -math.cos(ang), 0)); V = Vector((-dirv.y, dirv.x, 0))
         root = Vector((c.x, c.y, 0)) + n3 * 0.002
-        z0 = 0.0640 + 0.0022 * n_; w = 0.024 + 0.006 * min(1, n_ / 6)
+        z0 = 0.0640 + 0.0022 * n_; w = 0.030 + 0.006 * min(1, n_ / 6)
         k0 = len(right.v)
         feather(right, root, dirv, V, (0, 0, 1), Lf, w, z0, 0.0018, n_ % 5)
         tube(right, [root + Vector((0, 0, z0)), root + Vector((0, 0, zc - hh(s) + 0.004))], 0.0026, "Brass", 8)
