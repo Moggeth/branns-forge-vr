@@ -14,10 +14,12 @@ const cam=new T.PerspectiveCamera(35,W/H,.01,100),loader=new GLTFLoader(),templa
 for(const n of ['arrow','crossbow'])templates.set(n,await loader.loadAsync(`/assets/${n}.glb`));
 const snacks=[];
 function clear(){for(const s of snacks){s.root.removeFromParent();s.dispose();}snacks.length=0;}
-function add(stick,seed,bites,pos,yaw=0,pitch=0){const s=createSnackModel({stick,stickVisual:stick==='none'?null:prepareProjectile(templates,stick),seed,radius:.085,physical:true});s.root.position.set(...pos);s.root.rotation.set(pitch,yaw,0,'YXZ');s.root.traverse(o=>{if(o.isMesh){o.castShadow=true;}});setBites(s.apple.material,s.apple.spheres,bites,{age:2});scene.add(s.root);snacks.push(s);return s;}
-window.lab={
+function add(stick,seed,bites,pos,yaw=0,pitch=0,half=false){const s=createSnackModel({stick,stickVisual:stick==='none'?null:prepareProjectile(templates,stick),seed,radius:.085,physical:true,half});s.root.position.set(...pos);s.root.rotation.set(pitch,yaw,0,'YXZ');s.root.traverse(o=>{if(o.isMesh){o.castShadow=true;}});setBites(s.apple.material,s.apple.spheres,bites,{age:2});scene.add(s.root);snacks.push(s);return s;}
+window.lab={snacks,render:()=>renderer.render(scene,cam),
  row:(stick='arrow',seed=3)=>{clear();for(let i=0;i<4;i++)add(stick,seed,i,[(i-1.5)*.32,.25,0],Math.PI/2+.5,0);cam.position.set(0,.5,1.25);cam.lookAt(0,.22,0);renderer.render(scene,cam);},
  close:(bites=0,seed=3,stick='arrow',yaw=Math.PI/2+.4,roll=0)=>{clear();const s=add(stick,seed,bites,[0,.2,0],yaw,0);s.spin.rotation.z=roll;cam.position.set(0,.3,.42);cam.lookAt(0,.2,0);renderer.render(scene,cam);},
+ halves:(bites=0,seed=4)=>{clear();for(const [i,y,p] of [[0,-.6,0],[1,2.4,0],[2,1.2,-Math.PI/2]]){const h=add('none',seed+i,bites,[(i-1)*.24,.1,0],y,0,true);if(p){h.root.rotation.set(0,0,p);h.root.position.y=.004;}}cam.position.set(0,.42,.62);cam.lookAt(0,.08,0);renderer.render(scene,cam);},
+ half:(bites=1,seed=5,yaw=0,pitch=0)=>{clear();const h=add('none',seed,bites,[0,.2,0],yaw,pitch,true);cam.position.set(0,.3,.42);cam.lookAt(0,.2,0);renderer.render(scene,cam);},
  seeds:(n=6)=>{clear();for(let i=0;i<n;i++)add('none',i+1,0,[(i-(n-1)/2)*.22,.1,0],i);cam.position.set(0,.35,.95);cam.lookAt(0,.1,0);renderer.render(scene,cam);},
 };
 document.title='ready';

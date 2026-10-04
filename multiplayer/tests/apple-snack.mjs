@@ -120,11 +120,43 @@ check('apples grow back after about three minutes', () => {
  assert.equal(state(sim).fruit.missing.length, 1); step(sim, FRUIT.regrowTicks - 40); assert.equal(state(sim).fruit.missing.length, 1); step(sim, 20); assert.equal(state(sim).fruit.missing.length, 0);
 });
 
-check('a cutting wire knocks loose every apple it slices, bare', () => {
- const {sim, tree, apple} = scene(0), s = state(sim), [x, y, z] = apple.position;
+check('a cutting wire cuts every apple it slices into two edible halves', () => {
+ const {sim, apple} = scene(0), s = state(sim), [x, y, z] = apple.position;
  const events = fruitSlice(s, {nextId: (st, p) => p + (++st.idCounter), terrainHeight}, [x - 4, y, z + 4], [x + 4, y, z - 4], {by: 'h', push: [1, 0, 0]});
- assert.ok(events.length >= 1 && events.length <= 8); assert.ok(s.fruit.drops.every(d => d.stick === 'none'));
+ const slices = events.filter(e => e.kind === 'apple_slice'); assert.ok(slices.length >= 1 && slices.length <= 8);
+ assert.equal(s.fruit.drops.length, slices.length*2); assert.ok(s.fruit.drops.every(d => d.stick === 'none' && d.half === true));
+ const [h1, h2] = s.fruit.drops; assert.ok(h1.cut.every((n, i) => Math.abs(n + h2.cut[i]) < 1e-9), 'the flat faces face each other');
  assert.equal(fruitCandidate(s, s.players[0]), null, 'out of reach');
+ // they fall, settle on a face, and a hero eats one in two bites for half an apple's health
+ const sim2 = loadSimulation(s); step(sim2, 240); const s2 = state(sim2);
+ assert.ok(s2.fruit.drops.every(d => d.mode === 'rest' && Math.abs(d.cut[1]) === 1), JSON.stringify(s2.fruit.drops.map(d => [d.mode, d.cut])));
+ const half = s2.fruit.drops[0]; s2.players[0].position = [half.position[0] + .8, terrainHeight(s2, half.position[0] + .8, half.position[2]), half.position[2]]; s2.players[0].hp = 40;
+ const sim3 = loadSimulation(s2); seq = 0; assert.equal(act(sim3, 'collectTarget', {targetId: half.id}).ok, true, 'take a half');
+ step(sim3, 31); const b1 = act(sim3, 'snack', {op: 'bite'}); step(sim3, 31); const b2 = act(sim3, 'snack', {op: 'bite'});
+ assert.equal(b1.ok && b2.ok, true); assert.equal(b2.events.some(e => e.kind === 'snack_done'), true, 'two bites finish a half');
+ assert.equal(state(sim3).players[0].hp, 40 + FRUIT.halfHeal[0] + FRUIT.halfHeal[1]);
+ const again = loadSimulation(state(sim3)).checkpoint(); assert.deepEqual(again.fruit, state(sim3).fruit, 'halves save and restore');
+});
+
+check('a Timberline bolt bursts an apple outright: it leaves the tree and drops nothing', () => {
+ const {sim, apple} = scene(0), s = state(sim), [x, y, z] = apple.position;
+ const events = fruitSlice(s, {nextId: (st, p) => p + (++st.idCounter), terrainHeight}, null, null, {by: 'h', bolts: [[[x - 3, y, z], [x + 3, y, z]]]});
+ assert.ok(events.some(e => e.kind === 'apple_burst' && e.slot === 0), JSON.stringify(events)); assert.equal(s.fruit.drops.length, 0);
+ assert.ok(s.fruit.missing.some(m => m.slot === 0));
+});
+
+check('a manned Timberline fired through an apple crown bursts some apples and cuts others into halves', () => {
+ const base = createSimulation({room: 'SOLO'}), s = base.adventureWorld(); s.tick = 1; s.enemies = []; s.landmarks = false;
+ const tree = worldTrees(s).find(t => t.id === 'tree1'), ang = Math.atan2(tree.x, tree.z), px = tree.x + Math.sin(ang)*10, pz = tree.z + Math.cos(ang)*10;
+ s.inventions.structures.push({id: 'tl', type: 'timberline', position: [px, terrainHeight(s, px, pz, false), pz], yaw: Math.atan2(-(tree.x - px), -(tree.z - pz)), hp: 200, maxHp: 200,
+  side: 'party', builtTick: 0, readyTick: 0, fireTick: -1000, open: false, charge: 0, armed: false, aimYaw: 0});
+ const a = loadSimulation(s); a.addPlayer({id: 'h'}); const st = a.checkpoint(), p = st.players[0];
+ p.role = 'hero'; p.position = [px + 1, terrainHeight(st, px + 1, pz), pz]; p.resources = {...p.resources, wood: 20, iron: 20};
+ const sim = loadSimulation(st); seq = 0;
+ assert.equal(act(sim, 'inventionMount', {structureId: 'tl'}).ok, true); assert.equal(act(sim, 'inventionUse', {structureId: 'tl', aim: {yaw: 0, pitch: .2}}).ok, true);
+ const events = step(sim, 150), after = state(sim);
+ assert.ok(events.some(e => e.kind === 'apple_burst'), 'a bolt burst an apple'); assert.ok(events.some(e => e.kind === 'apple_slice'), 'the wire cut one');
+ assert.ok(after.fruit.drops.length >= 2 && after.fruit.drops.every(d => d.half), 'only halves fall: bursts leave nothing');
 });
 
 check('performance: 96 arrows sweeping an orchard stay cheap', () => {

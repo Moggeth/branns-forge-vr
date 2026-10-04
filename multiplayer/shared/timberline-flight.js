@@ -32,7 +32,7 @@ export function stepTimberline(s,q,c,events,structureDefs){
   else if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,270,{ownerId:q.owner,tool:'axe'},c,events);
   else c.damageEnemy(s,h.obj,250,events,q.owner);
  }
- // The wire knocks loose every apple it slices through (shared/fruit.js).
- if(c.fruitSlice)for(let u=0;u<=1;u+=1/3){const L=a.left.map((x,k)=>x+(b.left[k]-x)*u),R=a.right.map((x,k)=>x+(b.right[k]-x)*u);events.push(...c.fruitSlice(s,L,R,{by:q.owner,push:timberlineLaunch(q).forward}));}
+ // The bolts burst apples they hit; the wire cuts every apple it passes in two (shared/fruit.js).
+ if(c.fruitSlice)for(let u=0;u<=1;u+=1/3){const L=a.left.map((x,k)=>x+(b.left[k]-x)*u),R=a.right.map((x,k)=>x+(b.right[k]-x)*u);events.push(...c.fruitSlice(s,L,R,{by:q.owner,push:timberlineLaunch(q).forward,bolts:u?[]:[[a.left,b.left],[a.right,b.right]]}));}
  return s.tick>=q.impactTick;
 }

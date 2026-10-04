@@ -10,7 +10,7 @@ import {worldTrees} from '../shared/world-content.js';
 import {terrainHeight} from '../shared/simulation.js';
 
 const CLIP = process.env.CLIP_DIR || '', TOUCH = !!process.env.TOUCH;
-const viewport = TOUCH ? {width: 844, height: 390} : {width: 1280, height: 720};
+const viewport = TOUCH ? {width: 844, height: 390} : {width: 960, height: 540};
 const {browser, page} = await launch({viewport, touch: TOUCH});
 // Virtual clock: performance.now and requestAnimationFrame only move when the test advances a frame.
 await page.addInitScript(() => {
@@ -19,14 +19,14 @@ await page.addInitScript(() => {
  window.requestAnimationFrame = cb => { if (!on) return raf(cb); queue.push(cb); return queue.length; };
  window.__vt = {enable() { vt = real(); on = true; }, frame(ms = 1000/60) { vt += ms; const run = queue; queue = []; for (const cb of run) cb(vt); return run.length; }};
 });
-let frameNo = 0, captured = 0;
+let frameNo = 0, captured = 0, recording = false; // capture only the moments worth watching (a software renderer is slow)
 if (CLIP) mkdirSync(CLIP, {recursive: true});
 // One 60 Hz frame: advance the clock, let the session's 8 ms interval step the simulation, then render.
 async function frames(n, each = null) {
  for (let i = 0; i < n; i++) {
   await page.evaluate(() => window.__vt.frame()); await new Promise(r => setTimeout(r, 12));
   if (each) await each(i);
-  if (CLIP && frameNo++ % 2 === 0) await page.screenshot({path: join(CLIP, `f${String(captured++).padStart(4, '0')}.png`)});
+  if (CLIP && recording && frameNo++ % 2 === 0) await page.screenshot({path: join(CLIP, `f${String(captured++).padStart(4, '0')}.png`)});
  }
 }
 const harness = () => page.evaluate(() => { const h = window.brannHarness, s = h.snapshot(); return {s, me: s.players.find(p => p.id === h.state().playerId), c: h.controls()}; });
@@ -36,7 +36,8 @@ async function look(at, n = 20, lead = 0) {
   const {me, c} = await harness(), eye = [me.position[0], me.position[1] + 1.65, me.position[2]];
   const d = at.map((v, k) => v - eye[k]), yaw = Math.atan2(-d[0], -d[2]), pitch = Math.atan2(d[1] + lead, Math.hypot(d[0], d[2]));
   const dy = Math.atan2(Math.sin(c.yaw - yaw), Math.cos(c.yaw - yaw)), dp = c.pitch - pitch, k = 1/Math.max(1, n - i)*1.6;
-  await page.mouse.move(640 + dy*k/.0022, 360 + dp*k/.0022, {steps: 1}); await page.mouse.move(640, 360, {steps: 1}); // movementX/Y only
+  // one pointer-lock style delta through the game's own handler (headless Chromium recentres a captured cursor)
+  await page.evaluate(([x, y]) => window.dispatchEvent(new PointerEvent('pointermove', {pointerType: 'mouse', movementX: x, movementY: y})), [dy*k/.0022, dp*k/.0022]);
   await frames(1);
  }
 }
@@ -47,7 +48,7 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().controlsActive);
  await new Promise(r => setTimeout(r, 1500));
  await page.evaluate(() => window.__vt.enable());
- await page.locator('#world').click({position: {x: 640, y: 360}});
+ await page.locator('#world').click({position: {x: 480, y: 270}});
  await frames(10);
  await page.keyboard.press('Digit5'); await frames(30);
  const {s} = await harness(); assert.equal((await harness()).c.weapon.tool, 'bow');
@@ -56,7 +57,7 @@ try {
  const {me} = await harness();
  const slot = [...Array(26).keys()].map(i => ({i, w: appleWorld(tree, i, floor)})).filter(q => q.w.position[1] < floor + 3.8).sort((a, b) => Math.hypot(a.w.position[0] - me.position[0], a.w.position[2] - me.position[2]) - Math.hypot(b.w.position[0] - me.position[0], b.w.position[2] - me.position[2]))[0];
  const target = slot.w.position; record('target', 'pass', {tree: tree.id, slot: slot.i, target});
- await look(target, 40, .02);
+ recording = true; await look(target, 40, .02);
  await page.mouse.down(); await frames(50); await page.mouse.up();
  let pierced = null;
  await frames(40, async () => { if (!pierced) { const {s} = await harness(); pierced = s.fruit?.drops?.[0] || null; } });
@@ -67,9 +68,10 @@ try {
  const landed = (await harness()).s.fruit.drops[0]; assert.ok(['rest', 'planted'].includes(landed.mode), landed.mode); record('landed', 'pass', {mode: landed.mode});
  await shot(page, 'apple-landed');
  // walk over to it
+ recording = false;
  for (let i = 0; i < 90; i++) { const {me, s} = await harness(), d = s.fruit.drops[0]; if (Math.hypot(d.position[0] - me.position[0], d.position[2] - me.position[2]) < 1.3) break;
   await look(d.position, 2); await page.keyboard.down('KeyW'); await frames(4); await page.keyboard.up('KeyW'); }
- await look((await harness()).s.fruit.drops[0].position, 16);
+ recording = true; await look((await harness()).s.fruit.drops[0].position, 16);
  await frames(20); await shot(page, 'apple-cue');
  await page.keyboard.press('KeyE'); await frames(45);
  let held = (await harness()).s.fruit.drops[0]; assert.equal(held?.heldBy, (await page.evaluate(() => window.brannHarness.state().playerId))); record('take', 'pass');
