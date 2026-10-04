@@ -34,6 +34,11 @@ single-tree de-instancing and resource ownership cases passed. The new regressio
 is in the required suite, not the non-blocking historical list. Full-suite and
 deployment evidence is captured in ignored `logs/tree-fix-*`.
 
+The complete local run passed 158/159 suites in 106.5 s; the only failure was
+missing front matter in the new patch note, corrected before release. Re-ran the
+patch-note parser after adding the required date, area and title. Always copy the
+current patch-note schema before writing an entry: these files feed the live UI.
+
 Recurring lesson: never clear a BufferAttribute's pending update ranges merely
 because a newer simulation/render update arrived. Merge them or retain a pending
 whole-buffer upload until renderer acknowledgement, as with terrain geometry.
