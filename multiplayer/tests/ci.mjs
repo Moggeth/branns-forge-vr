@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'ability-readiness','action-feedback','callouts','axe-cleave','axe-luminance','meadow-cover','ore-veins',
+  'ability-readiness','action-feedback','callouts','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
@@ -29,7 +29,7 @@ const suite = [
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
-  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','pick-wall-motion','patch-notes',
+  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','pick-wall-motion','remains-physics','patch-notes',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

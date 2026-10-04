@@ -11,6 +11,7 @@ import {spellUnavailable} from './client/spell-availability.js';
 import {actionError} from './client/action-feedback.js';
 import {createCallouts} from './client/callouts.js';
 import './client/callouts.css';
+import './client/hotbar.css';
 import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
@@ -87,7 +88,7 @@ function friendlyError(detail) {
   if (code === 'insufficient_resources') return 'Not enough supplies. Check the cost, then collect more.';
   if (code === 'not_needed') return 'Already fully restored — no supplies were used.';
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
-  const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The hopper is busy. Try shortly.',output_empty:'No finished metal in your tray yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.',machine_manned:'Someone is already manning that Timberline.',rack_full:'Your bolt rack is full (99 bolts).',not_operator:'Step onto the Timberline first (E).'};
+  const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The furnace is full. Collect bars from the output bay as batches finish, then smelt the rest.',nothing_to_smelt:'You have no ore to smelt. Mine ore seams with the pick, then bring it to the Forge.',output_empty:'No finished bars in the output bay yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.',machine_manned:'Someone is already manning that Timberline.',rack_full:'Your bolt rack is full (99 bolts).',not_operator:'Step onto the Timberline first (E).'};
   if(inventionErrors[code])return inventionErrors[code];
   if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
@@ -509,6 +510,7 @@ function applyRoleUi(role) {
   $('perspectiveButton').querySelector('use').setAttribute('href',role==='hero'?'#i-god':'#i-hero');
   $('perspectiveButton').querySelector('span').textContent=role==='hero'?'God':'Hero';
   $('perspectiveButton').setAttribute('aria-label',`Switch to ${role==='hero'?'God strategy':'Hero first-person'} view (F9)`);
+  for(const b of document.querySelectorAll('[data-role-switch]')){const next=role==='hero'?'god':'hero';b.dataset.next=next;b.querySelector('use').setAttribute('href',`#i-${next}`);b.querySelector('.bf-name').textContent=next==='god'?'God':'Hero';b.title=`Play as ${next==='god'?'God':'Hero'} (F9)`;b.setAttribute('aria-label',`Play as ${next==='god'?'God: shape the world from above':'Hero: explore and fight'} (F9)`);}
   setText($('vrNote'), describeVr({supported: vrChecked ? vrSupported : null, secure: window.isSecureContext !== false, role}));
   if (role !== 'hero' && document.pointerLockElement === canvas) document.exitPointerLock?.();
   mobile?.update({active:phase === 'game' && connected && !menuOpen && !fieldKind,role:currentRole,xr:xrActive});
@@ -695,6 +697,12 @@ $('damageNumbers').addEventListener('change',()=>{const enabled=$('damageNumbers
 
 // ---------------------------------------------------------------- spells
 spellbook=createSpellbook({root:$('godHelp'),spells:SPELLS});
+// One-press God / Hero switch, the first slot of whichever hotbar is showing (F9 still works; touch keeps its tray entry).
+function makeRoleSwitch(){const b=document.createElement('button');b.type='button';b.className='bf-roleswitch';b.dataset.roleSwitch='';b.setAttribute('aria-keyshortcuts','F9');
+ b.innerHTML='<span class="bf-roleswitch-ring"><svg aria-hidden="true"><use href="#i-god"/></svg></span><span class="bf-name">God</span><kbd>F9</kbd>';
+ b.addEventListener('click',()=>{changePerspective();b.blur();});return b;}
+document.querySelector('#heroTools .bf-bar')?.prepend(makeRoleSwitch());
+(document.querySelector('#godHelp .sb-bar')||document.querySelector('#godHelp'))?.prepend(makeRoleSwitch());
 function closeForge(){forgeOpen=false;forgePanel?.hide();syncActive();}
 function openForge(){
   if(phase!=='game'||!lastSnapshot||xrActive)return;
