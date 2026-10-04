@@ -16,18 +16,18 @@ export function createTreeBatches({group, minCapacity = 64, decorate = null}) {
    // update ranges then. Acknowledge them only once an upload really happened.
    im.instanceMatrix.onUpload(function () { this.clearUpdateRanges(); });
    im.count = 0; decorate?.(im);
-   im.name = `TreeBatch:${b.key}:${p.part}`; im.matrixAutoUpdate = false; im.userData.treeBatch = b; im.userData.part = p.part; group.add(im); return im; });
+   im.name = `TreeBatch:${b.key}:${p.part}`; im.matrixAutoUpdate = false; im.userData.treeBatch = b; im.userData.part = p.part; if (p.ivy) im.userData.ivy = true; group.add(im); return im; });
  }
  function batch(variant, level, kit) {
   const key = keyOf(variant, level); let b = batches.get(key); if (b) return b;
-  const parts = []; for (const [part, list] of Object.entries(kit.parts)) for (const p of list) parts.push({part, geometry: p.geometry, material: p.material, matrix: p.matrix});
+  const parts = []; for (const [part, list] of Object.entries(kit.parts)) for (const p of list) parts.push({part, geometry: p.geometry, material: p.material, matrix: p.matrix, ivy: !!p.ivy});
   b = {key, variant, level, parts, ids: [], capacity: minCapacity, dirtyMin: Infinity, dirtyMax: -1, roots: new Float32Array(minCapacity*16)};
-  b.meshes = makeMeshes(b, b.capacity); b.trunks = b.meshes.filter(m => m.userData.part === 'Trunk'); batches.set(key, b); return b;
+  b.meshes = makeMeshes(b, b.capacity); b.trunks = b.meshes.filter(m => m.userData.part === 'Trunk' && !m.userData.ivy); batches.set(key, b); return b;
  }
  function grow(b) { // capacity doubling: new InstancedMeshes, copied matrices, old instance buffers released (geometry untouched)
   const cap = b.capacity*2, old = b.meshes, roots = new Float32Array(cap*16); roots.set(b.roots); b.roots = roots; b.capacity = cap; b.meshes = makeMeshes(b, cap);
   b.meshes.forEach((im, k) => { im.instanceMatrix.array.set(old[k].instanceMatrix.array); im.count = b.ids.length; }); for (const im of old) { im.removeFromParent(); im.dispose(); }
-  b.trunks = b.meshes.filter(m => m.userData.part === 'Trunk'); b.dirtyMin = 0; b.dirtyMax = b.ids.length - 1;
+  b.trunks = b.meshes.filter(m => m.userData.part === 'Trunk' && !m.userData.ivy); b.dirtyMin = 0; b.dirtyMax = b.ids.length - 1;
  }
  const touch = (b, i) => { if (i < b.dirtyMin) b.dirtyMin = i; if (i > b.dirtyMax) b.dirtyMax = i; };
  // local (optional): {partName: Matrix4} applied between the root and the authored part matrix (cosmetic staged growth).

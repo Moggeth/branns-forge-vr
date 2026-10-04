@@ -74,7 +74,7 @@ test('cut one: only that tree de-instances to a carved entity; every other insta
  const f = height(t.x, t.z), cut = {id: t.id, cuts: 1, cutHeight: f + 1, fallYaw: Math.PI/2, felledTick: 0, landed: false};
  time('sync with 1 new wound (ms)', () => view.sync({...S, harvestedTrees: [cut]}));
  const st = view.stats(); assert.equal(st.intact, 534); assert.equal(st.individual, 1); assert.equal(st.wounded, 1); assert.ok(!view.batches.has(t.id)); assert.ok(view.entity(t.id).wound);
- assert.ok(st.drawCalls - st.intactDraws <= 6, 'one wounded tree costs its own few draws'); assert.equal(st.intactDraws, 27);
+ assert.ok(st.drawCalls - st.intactDraws <= 8, 'one wounded tree costs its own few draws (oak ivy adds two)'); assert.equal(st.intactDraws, 31); // 27 + oak ivy (climb and carpet) at both detail levels
  const after = snapshotIds(view); for (const [id, m] of before) if (id !== t.id) assert.equal(after.get(id), m, 'instance changed ' + id);
  const c = view.batches.counters(); assert.ok(c.writes === 0 && c.moves <= 1, JSON.stringify(c));
  for (const im of view.batches.meshes()) { const n = im.instanceMatrix.updateRanges.reduce((a, r) => a + r.count, 0); assert.ok(n <= 16, 'update range ' + n + ' floats'); }
