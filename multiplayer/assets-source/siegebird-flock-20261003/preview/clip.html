@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><title>Siegebird reload clip</title>
+<style>html,body{margin:0;background:#1d2228;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<script type="module">
+// One reload as a frame sequence for tools/clip.mjs: window.frame(t) renders reload time t (seconds since the shot).
+// ?view=third|mech|fps ?n=1 ?golden=1 ?quick=1 (perfect-wind reload) ?perfect=.6 (resonance glint at that time)
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {prepareAsset, updateWeaponPresentation} from '/client/asset-pose.js';
+import {createSiegebirdSight, SIEGEBIRD_PRESENTATION} from '/client/siegebird-sight.js';
+import {createSiegebirdFlock} from '/client/siegebird-flock.js';
+import {SIEGEBIRD_RELOAD} from '/client/siegebird-reload.js';
+const q = new URLSearchParams(location.search);
+const view = q.get('view') || 'third', n = +(q.get('n') || 1), golden = q.get('golden') === '1', quick = q.get('quick') === '1', perfectAt = q.has('perfect') ? +q.get('perfect') : null;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x7d98b3); scene.fog = new THREE.Fog(0x7d98b3, 8, 40);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6;
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4); sun.position.set(3, 6, 2); scene.add(sun, new THREE.HemisphereLight(0xcfe2ff, 0x5a4a36, .7));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({color: 0x5f7a45, roughness: .95})); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; scene.add(ground);
+const loader = new GLTFLoader();
+const [crossbow, bird] = await Promise.all([loader.loadAsync('/assets/crossbow.glb'), loader.loadAsync('/assets/siegebird_songbird.glb')]);
+const flock = createSiegebirdFlock({birdTemplate: bird, crossbowTemplate: crossbow});
+const anchor = new THREE.Group(); scene.add(anchor);
+const {visual} = prepareAsset(crossbow, 'crossbow'); anchor.add(visual);
+createSiegebirdSight(THREE, visual);
+const cam = new THREE.PerspectiveCamera(view === 'mech' ? 30 : 60, innerWidth / innerHeight, .01, 100);
+if (view === 'fps') { anchor.position.fromArray(SIEGEBIRD_PRESENTATION.hip); cam.position.set(0, 0, 0); cam.lookAt(0, 0, -10); }
+else if (view === 'mech') {
+  visual.updateMatrixWorld(true); const native = visual.getObjectByName('Pinion').parent;
+  const focus = native.localToWorld(new THREE.Vector3(.12, .6, .03)), at = native.localToWorld(new THREE.Vector3(.12 + .62, .6 - .42, .03 + .36));
+  cam.position.copy(at); cam.up.copy(native.localToWorld(new THREE.Vector3(0, 0, 1)).sub(native.localToWorld(new THREE.Vector3()))); cam.lookAt(focus);
+} else { cam.position.set(.62, .36, .3); cam.lookAt(0, .08, -.36); }
+const rate = quick ? 1 / SIEGEBIRD_RELOAD.quick : 1, shotAt = 100;
+flock.fired(visual, false); flock.shot(visual, {n, golden, playerId: q.get('player') || 'preview', time: shotAt, quick});
+let prev = -1 / 60, glinted = false;
+window.frame = real => {
+  // real: seconds since the shot; the reload timeline runs at rate (quick reloads play faster).
+  for (let s = prev + 1 / 60; s < real; s += 1 / 60) flock.update(visual, shotAt + s, {});
+  const t = real * rate;
+  if (perfectAt !== null && !glinted && t >= perfectAt) { glinted = true; updateWeaponPresentation(visual, 'crossbow', {reload: t}); flock.perfect(visual); }
+  flock.update(visual, shotAt + real, {}); prev = real;
+  updateWeaponPresentation(visual, 'crossbow', {reload: t, time: shotAt + real});
+  renderer.render(scene, cam);
+};
+window.frame(0);
+window.previewReady = true;
+</script>

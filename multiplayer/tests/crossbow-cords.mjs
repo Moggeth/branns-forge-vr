@@ -28,13 +28,20 @@ function endpoints(node){
 }
 const source=cords.map(node=>({node,geometry:node.geometry,positionVersion:node.geometry.attributes.position.version,
   geometryData:node.geometry.attributes.position.array.slice(),material:node.material}));
+const native=visual.getObjectByName('Pinion').parent;
+function wingTip(){ // morphed outermost wing vertex (+x) in the native frame
+  const inv=native.matrixWorld.clone().invert(),v=new THREE.Vector3();let best=null;
+  visual.getObjectByName('Wings').traverse(o=>{if(!o.isMesh)return;for(let i=0;i<o.geometry.attributes.position.count;i++){o.getVertexPosition(i,v);v.applyMatrix4(o.matrixWorld).applyMatrix4(inv);if(!best||v.x>best.x)best=v.clone();}});
+  return best;
+}
 const samples=[];
 for(const recoil of [0,.25,.5,.75,1,0]){
   updateWeaponPresentation(visual,'crossbow',{recoil,time:0});
   visual.updateWorldMatrix(true,true);
+  const inv=native.matrixWorld.clone().invert();
   samples.push({recoil,sled:visual.getObjectByName('Sled').position.y,
     sledWorld:visual.getObjectByName('Sled').getWorldPosition(new THREE.Vector3()).clone(),
-    ends:cords.map(endpoints),tip:weaponTip(visual,'crossbow').clone(),
+    ends:cords.map(endpoints),native:cords.map(n=>endpoints(n).map(p=>p.applyMatrix4(inv))),wing:wingTip(),tip:weaponTip(visual,'crossbow').clone(),
     direction:weaponForward(visual,'crossbow').clone()});
 }
 for(const {node,geometry,positionVersion,geometryData,material} of source){
@@ -59,17 +66,23 @@ for(const sample of samples){
   assert.ok(sample.tip.distanceTo(first.tip)<1e-6,'bolt socket is fixed throughout cord recoil');
   assert.ok(sample.direction.distanceTo(first.direction)<1e-6,'canonical launch direction is unaffected by cord recoil');
   assert.ok(sample.direction.distanceTo(new THREE.Vector3(0,0,-1))<1e-6);
-  for(let i=0;i<3;i++){
-    const base=first.ends[i],current=sample.ends[i];
-    const fixed=i===2?0:(Math.abs(base[0].x)<Math.abs(base[1].x)?1:0);
-    const moving=1-fixed;
-    assert.ok(current[fixed].distanceTo(base[fixed])<1e-4,`${names[i]} outer endpoint is fixed at recoil ${sample.recoil}`);
-    const expected=base[moving].clone().add(sample.sledWorld).sub(first.sledWorld);
-    assert.ok(current[moving].distanceTo(expected)<1e-4,`${names[i]} inner endpoint follows sled at recoil ${sample.recoil}: actual=${current[moving].toArray()} expected=${expected.toArray()}`);
+  // Bowstrings: the outer end rides the morphed limb (a constant reach inside the outermost feather) and the inner
+  // end sits on the nock at the sled. Haul cable: the guide end is fixed and the anchor end follows the sled.
+  for(let i=0;i<2;i++){
+    const [outer,inner]=[...sample.native[i]].sort((p,q)=>Math.abs(q.x)-Math.abs(p.x));
+    const reach=new THREE.Vector3(Math.abs(outer.x),outer.y,outer.z).distanceTo(sample.wing);
+    assert.ok(reach>.09&&reach<.12,`${names[i]} outer end follows the limb at recoil ${sample.recoil} (${reach.toFixed(3)} m from the wing tip)`);
+    assert.ok(inner.distanceTo(new THREE.Vector3(0,sample.sled,.179))<.006,`${names[i]} inner end on the nock (arm overshoot and hum aside) at recoil ${sample.recoil}`);
+  }
+  {
+    const base=first.ends[2],current=sample.ends[2];
+    assert.ok(current[0].distanceTo(base[0])<1e-4,`${names[2]} guide end is fixed at recoil ${sample.recoil}`);
+    const expected=base[1].clone().add(sample.sledWorld).sub(first.sledWorld);
+    assert.ok(current[1].distanceTo(expected)<1e-4,`${names[2]} anchor end follows sled at recoil ${sample.recoil}: actual=${current[1].toArray()} expected=${expected.toArray()}`);
   }
 }
 const preparedPick=prepareAsset(pick,'pick');
 assert.ok(preparedPick.visual.getObjectByName('Grip'),'restored authored pick grip exists');
 assert.ok(preparedPick.visual.getObjectByName('PickTipRight'),'restored pick tip socket exists');
 assert.ok(weaponTip(preparedPick.visual,'pick').distanceTo(preparedPick.visual.getObjectByName('PickTipRight').getWorldPosition(new THREE.Vector3()))<1e-6);
-console.log(`crossbow-cords: authored limb endpoints, sled motion, shared geometry, launch basis and pick sockets pass (${((performance.now()-began)/1000).toFixed(3)}s)`);
+console.log(`crossbow-cords: strings ride the morphed limbs to the nock, sled motion, shared geometry, launch basis and pick sockets pass (${((performance.now()-began)/1000).toFixed(3)}s)`);

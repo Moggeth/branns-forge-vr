@@ -152,9 +152,9 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     if (ev.kind === 'shoot' && ['bow', 'crossbow'].includes(ev.weapon)) {
       u.recoil = 1;
       if (ev.weapon === 'crossbow') {
-        u.reloadAt = u.clock; const flock = siegebird?.();
+        u.reloadAt = u.clock; u.reloadRate = ev.reload?.quick ? 1 / SIEGEBIRD_RELOAD.quick : 1; const flock = siegebird?.();
         if (flock && u.weapon && u.weaponTool === 'crossbow') { flock.fired(u.weapon, !!ev.golden);
-          flock.shot(u.weapon, {n: ev.reload?.n ?? ((data.siegebird?.n ?? 0) + 1), golden: ev.reload?.golden ?? null, playerId: data.id ?? '', time: u.clock}); }
+          flock.shot(u.weapon, {n: ev.reload?.n ?? ((data.siegebird?.n ?? 0) + 1), golden: ev.reload?.golden ?? null, playerId: data.id ?? '', time: u.clock, quick: !!ev.reload?.quick}); }
       }
       return 'recoil';
     }
@@ -282,7 +282,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 1.4);
     if (u.weaponTool === 'crossbow' && u.weapon) {
       // The whole Siegebird cycle replays from the shot event: wind, latch and the songbird seating the bolt.
-      const t = u.clock - (u.reloadAt ?? -Infinity), flock = siegebird?.();
+      const t = (u.clock - (u.reloadAt ?? -Infinity)) * (u.reloadRate ?? 1), flock = siegebird?.();
       if (t <= SIEGEBIRD_RELOAD.gone + .1) updateWeaponPresentation(u.weapon, 'crossbow', {reload: t, time: u.clock});
       else if (u.reloadAt !== undefined) { updateWeaponPresentation(u.weapon, 'crossbow', {reload: Infinity}); u.reloadAt = undefined; }
       if (flock) {

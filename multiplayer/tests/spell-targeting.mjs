@@ -54,9 +54,10 @@ for (const quality of ['high', 'medium', 'low']) {
   const P = fx.root.getObjectByName('SpellTargetingGlyphs').geometry.attributes.position.array, ang = Math.atan2(5, 12), cx = 2, cz = 3.5;
   let maxLat = 0, minAlong = 1e9, maxAlong = -1e9; const n = fx.stats().ribbonPoints * 2;
   for (let k = 0; k < 2 * 60; k += 2) { const dx = (P[k * 3] + P[k * 3 + 3]) / 2 - cx, dz = (P[k * 3 + 2] + P[k * 3 + 5]) / 2 - cz; const al = dx * Math.cos(ang) + dz * Math.sin(ang), la = -dx * Math.sin(ang) + dz * Math.cos(ang); maxLat = Math.max(maxLat, Math.abs(la)); minAlong = Math.min(minAlong, al); maxAlong = Math.max(maxAlong, al); }
-  assert.ok(Math.abs(maxLat - 2.5) < 0.01, `half width ${maxLat}`); assert.ok(Math.abs(minAlong + 6.5 + 2.5) < 0.01, `start cap ${minAlong}`);
-  const ks = lineKernels(-4, 1, 8, 6); assert.equal(ks.length, Math.ceil(13 / 2.5) + 1); assert.deepEqual(ks[0], [-4, 1]); assert.deepEqual(ks.at(-1), [8, 6]);
-  for (let i = 1; i < ks.length; i++) assert.ok(Math.hypot(ks[i][0] - ks[i - 1][0], ks[i][1] - ks[i - 1][1]) <= 2.5 + 1e-9);
+  const lip = SPELL_SHAPES.sunder.kr; assert.ok(Math.abs(maxLat - lip) < 0.01, `half width ${maxLat}`); assert.ok(Math.abs(minAlong + 6.5 + lip) < 0.01, `start cap ${minAlong}`);
+  // Segment centres match the authority's plan: earthLineSegments(13) = 5 even segments from start to end.
+  const ks = lineKernels(-4, 1, 8, 6); assert.equal(ks.length, 5); assert.deepEqual(ks[0], [-4 + 12 / 10, 1 + 5 / 10]); assert.ok(Math.abs(ks.at(-1)[0] - (8 - 12 / 10)) < 1e-12);
+  for (let i = 1; i < ks.length; i++) assert.ok(Math.abs(Math.hypot(ks[i][0] - ks[i - 1][0], ks[i][1] - ks[i - 1][1]) - 13 / 5) < 1e-9);
   fx.dispose();
 }
 

@@ -10,7 +10,8 @@
 // The footprint is rebuilt synchronously at the EXACT target; only fade/glow animate.
 import * as THREE from 'three';
 import {SPELL_TARGET_SHAPES} from '../shared/spells.js';
-import {triangleHeight} from '../shared/terrain.js';
+import {triangleHeight,wallProfile,chasmProfile,wallSpec,earthLineSegments} from '../shared/terrain.js';
+import {planEarthLine} from '../shared/earth-spells.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
@@ -19,11 +20,11 @@ const lp = (a, b, t) => a + (b - a) * t;
 
 // ---------- shared gameplay contract (mirrors shared/simulation.js + brief) ----------
 export const SPELL_SHAPES = SPELL_TARGET_SHAPES;
-export const DEFORM_CAP = 6, LINE_SPACING = 2.5, FALLBACK_LINE = 6;
-/** Kernel centres exactly as the authority places them: ceil(d/2.5)+1 evenly from start to end. */
+export const DEFORM_CAP = 6, FALLBACK_LINE = 6;
+/** Segment centres exactly as the authority places Raise Wall / Sunder segments (shared/earth-spells.js). */
 export function lineKernels(ax, az, bx, bz, fallback = false) {
-  const d = Math.hypot(bx - ax, bz - az), n = fallback ? 3 : Math.min(98,Math.max(2,Math.ceil(d / LINE_SPACING) + 1)), out = [];
-  for (let i = 0; i < n; i++) out.push([lp(ax, bx, i / (n - 1)), lp(az, bz, i / (n - 1))]);
+  const n = earthLineSegments(fallback ? FALLBACK_LINE : Math.hypot(bx - ax, bz - az)), out = [];
+  for (let i = 0; i < n; i++) out.push([lp(ax, bx, (i + 0.5) / n), lp(az, bz, (i + 0.5) / n)]);
   return out;
 }
 
@@ -185,9 +186,12 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   const INV = { vis: 2, flow: 0 }, OK = (o = {}) => ({ ...o, vis: 1 });
   const cross = (r, cx = 0, cz = 0) => { gS(seg(cx - r, cz - r, cx + r, cz + r), 0.14, PAL.white, INV); gS(seg(cx - r, cz + r, cx + r, cz - r), 0.14, PAL.white, INV); };
   // Exact kernel-union footprint helpers for line spells (local x along path, z lateral).
-  let K = [], KR = 2.5, KH = 0, KL = 0;
-  const kOff = (lx, lz) => { let h = 0; for (const k of K) { const t = clamp(1 - Math.hypot(lx - k, lz) / KR); h += KH * smooth(t); } return clamp(h, -DEFORM_CAP, DEFORM_CAP); };
-  const halfW = (lx) => { let w = 0; for (const k of K) { const d = Math.abs(lx - k); if (d < KR) w = Math.max(w, Math.sqrt(KR * KR - d * d)); } return w; };
+  // Earth lines preview the authority's own plan: segment centres K and the exact rampart / chasm profile (SEGS).
+  let K = [], KR = 2.5, KH = 0, KL = 0, SEGS = [], KIND = 'wall';
+  const kOff = (lx, lz) => { let wall = 0, low = 0, high = 0; const spec = wallSpec(KIND);
+    for (const g of SEGS) { if (KIND === 'sunder') { const [t, b] = chasmProfile(g, lx, lz, spec); low = Math.min(low, t); high = Math.max(high, b); } else wall = Math.max(wall, wallProfile(g, lx, lz, spec)); }
+    return clamp(wall + low + high, -DEFORM_CAP, DEFORM_CAP); };
+  const halfW = (lx) => { const cap = wallSpec(KIND).cap, over = Math.max(0, Math.abs(lx) - KL / 2); return over >= cap ? 0 : KR * Math.sqrt(1 - (over / cap) ** 2); };
   function envelope(n, sign, inset = 0, R) { const x0 = -KL / 2 - KR, x1 = KL / 2 + KR, o = [];
     for (let i = 0; i <= n; i++) { const x = lp(x0, x1, i / n), w = Math.max(0, halfW(x) - (inset && R ? inset * R() : inset)); o.push([x, sign * w]); } return o; }
 
@@ -299,29 +303,29 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     },
     sunder(_, len, fb) { // exact kernel envelope with torn inset edge, propagating fracture seam start->end
       const R = rng(41), x0 = -len / 2, x1 = len / 2, n = Math.max(24, Math.ceil((len + 5) / 0.3));
-      gS(envelope(n, 1), 0.1, PAL.ember, { prop: true }); gS(envelope(n, -1), 0.1, PAL.ember, { prop: true });
-      gS(envelope(Math.ceil(n * 0.7), 1, 0.22, R), 0.05, PAL.amber, { fine: true }); gS(envelope(Math.ceil(n * 0.7), -1, 0.22, R), 0.05, PAL.amber, { fine: true });
-      gS(jag(x0, 0, x1, 0, Math.max(4, Math.ceil(len / 0.55)), 0.28, R), 0.13, PAL.ember, { prop: true, flow: 2 });
-      for (const s of [-1, 1]) gS([[x0, s * 1.25], [x1, s * 1.25]], 0.04, PAL.amber, { dash: 1.2, flow: 2 });
-      K.forEach((k, i) => { for (const s of [-1, 1]) { const ex = k + 1.4, ez = s * 1.9; gS(jag(k, s * 0.2, Math.min(ex, x1 + 2.2), ez, 4, 0.18, R), 0.06, PAL.amber, { prop: true, fine: i % 2 === 1 }); }
-        gS(poly(4, 0.3, Math.PI / 4, k, 0), 0.05, PAL.ember); });
-      for (let x = x0 + 1; x < x1 - 0.5; x += 2) gS(chevron(x, 0, 0, 0.5), 0.07, PAL.gold);
-      gS(circ(0.5, 20, 0, TAU, x0, 0), 0.08, PAL.gold); gS(seg(x0 - 0.7, 0, x0 - 0.2, 0), 0.06, PAL.gold); // origin seal
-      gS(rot2([[-0.5, -0.8], [0.6, 0], [-0.5, 0.8], [-0.2, 0], [-0.5, -0.8]], 0, x1, 0), 0.08, PAL.ember); // destination arrowhead
+      gS(envelope(n, 1), 0.1, PAL.water, { prop: true }); gS(envelope(n, -1), 0.1, PAL.water, { prop: true });
+      gS(envelope(Math.ceil(n * 0.7), 1, 0.22, R), 0.05, PAL.crystal, { fine: true }); gS(envelope(Math.ceil(n * 0.7), -1, 0.22, R), 0.05, PAL.crystal, { fine: true });
+      gS(jag(x0, 0, x1, 0, Math.max(4, Math.ceil(len / 0.55)), 0.28, R), 0.13, PAL.water, { prop: true, flow: 2 });
+      for (const s of [-1, 1]) gS([[x0, s * SPELL_SHAPES.sunder.bank], [x1, s * SPELL_SHAPES.sunder.bank]], 0.04, PAL.crystal, { dash: 1.2, flow: 2 }); // spoil banks
+      K.forEach((k, i) => { for (const s of [-1, 1]) { const ex = k + 1.4, ez = s * 1.9; gS(jag(k, s * 0.2, Math.min(ex, x1 + 2.2), ez, 4, 0.18, R), 0.06, PAL.crystal, { prop: true, fine: i % 2 === 1 }); }
+        gS(poly(4, 0.3, Math.PI / 4, k, 0), 0.05, PAL.water); });
+      for (let x = x0 + 1; x < x1 - 0.5; x += 2) gS(chevron(x, 0, 0, 0.5), 0.07, PAL.ice);
+      gS(circ(0.5, 20, 0, TAU, x0, 0), 0.08, PAL.ice); gS(seg(x0 - 0.7, 0, x0 - 0.2, 0), 0.06, PAL.ice); // origin seal
+      gS(rot2([[-0.5, -0.8], [0.6, 0], [-0.5, 0.8], [-0.2, 0], [-0.5, -0.8]], 0, x1, 0), 0.08, PAL.water); // destination arrowhead
       if (fb) gS(circ(0.25, 12), 0.05, PAL.white); cross(1, 0, 0); cross(0.7, x1, 0);
-      surfaceLine(false, PAL.ember, 0.5); moteField(28, 0, PAL.ember, 0.9, 0.16, 17);
+      surfaceLine(false, PAL.water, 0.5); moteField(28, 0, PAL.water, 0.9, 0.16, 17);
     },
     wall(_, len, fb) { // exact envelope on ground, lifted crest/ribs, kernel height posts, direction chevrons
       const x0 = -len / 2, x1 = len / 2, n = Math.max(24, Math.ceil((len + 5) / 0.3)), off = kOff;
-      gS(envelope(n, 1), 0.1, PAL.gold); gS(envelope(n, -1), 0.1, PAL.gold);
-      gS(Array.from({ length: n + 1 }, (_, i) => [lp(x0 - KR, x1 + KR, i / n), 0]), 0.08, PAL.astral, { off, lift: 0.05, prop: true });
-      for (const s of [-1, 1]) gS(Array.from({ length: n + 1 }, (_, i) => { const x = lp(x0 - KR, x1 + KR, i / n); return [x, s * Math.min(1.25, halfW(x))]; }), 0.04, PAL.stone, { off, lift: 0.04, fine: true });
+      gS(envelope(n, 1), 0.1, PAL.ice); gS(envelope(n, -1), 0.1, PAL.ice);
+      gS(Array.from({ length: n + 1 }, (_, i) => [lp(x0 - KR, x1 + KR, i / n), 0]), 0.08, PAL.crystal, { off, lift: 0.05, prop: true });
+      for (const s of [-1, 1]) gS(Array.from({ length: n + 1 }, (_, i) => { const x = lp(x0 - KR, x1 + KR, i / n); return [x, s * Math.min(KR * 0.4, halfW(x))]; }), 0.04, PAL.stone, { off, lift: 0.04, fine: true });
       K.forEach((k) => { gS(Array.from({ length: 17 }, (_, i) => [k, lp(-KR, KR, i / 16)]), 0.06, PAL.stone, { off, lift: 0.04 });
-        const top = kOff(k, 0); aS(vertical(k, 0, 0, top, 2), 0.05, PAL.gold, OK()); const g = G(k, 0, top); aS([[g[0] - 0.2 * B.sa, g[1], g[2] + 0.2 * B.ca], [g[0] + 0.2 * B.sa, g[1], g[2] - 0.2 * B.ca]], 0.05, PAL.gold, { fine: true }); });
-      for (let x = x0 + 1; x < x1 - 0.5; x += 2) for (const s of [-1, 1]) gS(chevron(x, s * 3.0, 0, 0.32), 0.06, PAL.amber, { fine: true });
-      gS(circ(0.5, 20, 0, TAU, x0, 0), 0.08, PAL.gold); gS(rot2([[-0.4, -0.6], [0.5, 0], [-0.4, 0.6]], 0, x1 + KR + 0.6, 0), 0.08, PAL.gold);
+        const top = kOff(k, 0); aS(vertical(k, 0, 0, top, 2), 0.05, PAL.ice, OK()); const g = G(k, 0, top); aS([[g[0] - 0.2 * B.sa, g[1], g[2] + 0.2 * B.ca], [g[0] + 0.2 * B.sa, g[1], g[2] - 0.2 * B.ca]], 0.05, PAL.ice, { fine: true }); });
+      for (let x = x0 + 1; x < x1 - 0.5; x += 2) for (const s of [-1, 1]) gS(chevron(x, s * 3.0, 0, 0.32), 0.06, PAL.crystal, { fine: true });
+      gS(circ(0.5, 20, 0, TAU, x0, 0), 0.08, PAL.ice); gS(rot2([[-0.4, -0.6], [0.5, 0], [-0.4, 0.6]], 0, x1 + KR + 0.6, 0), 0.08, PAL.ice);
       if (fb) gS(circ(0.25, 12), 0.05, PAL.white); cross(1, 0, 0);
-      surfaceLine(true, PAL.stone, 0.5); moteField(20, 0, PAL.gold, 0.8, 0.15, 19);
+      surfaceLine(true, PAL.stone, 0.5); moteField(20, 0, PAL.ice, 0.8, 0.15, 19);
     },
     grove(R) { // twin swirl + branching root curls to the five exact tree sites, leaf-scalloped rim, seed heart
       gS(wave(R, 14, 0.1, 0, 168), 0.09, PAL.leaf, { flow: 0.4 });
@@ -463,7 +467,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   // Rebuild only when changed earth intersects this marker's footprint.
   function invalidateTerrain(dirty = null) {
     if (!want.on || disposed) return false;
-    const spec = SPELL_SHAPES[want.spell], r = spec.line ? spec.kr : want.rad * 1.25;
+    const spec = SPELL_SHAPES[want.spell], r = spec.line ? spec.bank ?? spec.kr : want.rad * 1.25;
     const minX = (spec.line ? Math.min(want.ax,want.bx) : want.cx)-r, maxX = (spec.line ? Math.max(want.ax,want.bx) : want.cx)+r;
     const minZ = (spec.line ? Math.min(want.az,want.bz) : want.cz)-r, maxZ = (spec.line ? Math.max(want.az,want.bz) : want.cz)+r;
     if (dirty && !dirty.some(e => e.x+e.radius+.75>=minX && e.x-e.radius-.75<=maxX && e.z+e.radius+.75>=minZ && e.z-e.radius-.75<=maxZ)) return false;
@@ -474,7 +478,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     B.np = 0; B.ni = 0; B.strands = 0; B.dropped = 0; B.cx = want.cx; B.cz = want.cz; B.ca = Math.cos(want.ang); B.sa = Math.sin(want.ang);
     surfOn = false; motesOn = false; mg.setDrawRange(0, 0);
     const spec = SPELL_SHAPES[want.spell];
-    if (spec.line) { KR = spec.kr; KH = spec.kh; KL = want.len; K = lineKernels(want.ax, want.az, want.bx, want.bz, want.fb).map(([x, z]) => (x - want.cx) * B.ca + (z - want.cz) * B.sa); }
+    if (spec.line) { KR = spec.kr; KH = spec.kh; KL = want.len; KIND = want.spell; const L = Math.max(KL, 0.5), plan = planEarthLine(KIND, [-L / 2, 0], [L / 2, 0]); SEGS = plan.segments; K = SEGS.map((g) => g.x); }
     D[want.spell](want.rad, want.len, want.fb);
     lg.setDrawRange(0, B.ni); for (const k of ['position', 'tng', 'col', 'aux', 'fx']) { const at = lg.attributes[k]; at.clearUpdateRanges(); at.addUpdateRange(0, B.np * 2 * at.itemSize); at.needsUpdate = true; }
     lg.index.clearUpdateRanges(); lg.index.addUpdateRange(0, B.ni); lg.index.needsUpdate = true;

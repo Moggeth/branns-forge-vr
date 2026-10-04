@@ -431,7 +431,7 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
     const rig = {root: n('Root'), torso: n('Torso'), head: n('Head'), armL: n('LeftArm'), armR: n('RightArm'), handR: n('RightHand'), handL: n('LeftHand'),
       thighL: n('LeftLeg'), kneeL: n('LeftKnee'), thighR: n('RightLeg'), kneeR: n('RightKnee')};
     rig.tips = {
-      torso: segmentTip(v, rig.torso, 'Head'), head: segmentTip(v, rig.head), armL: segmentTip(v, rig.armL, 'LeftHand'), armR: segmentTip(v, rig.armR, 'RightHand'),
+      torso: segmentTip(v, rig.torso, 'Head'), head: segmentTip(v, rig.head), armL: segmentTip(v, rig.armL, rig.armL && find(rig.armL, 'LeftForearm') ? 'LeftForearm' : 'LeftHand'), armR: segmentTip(v, rig.armR, rig.armR && find(rig.armR, 'RightForearm') ? 'RightForearm' : 'RightHand'),
       thighL: segmentTip(v, rig.thighL, 'LeftKnee'), kneeL: segmentTip(v, rig.kneeL, 'LeftFoot'), thighR: segmentTip(v, rig.thighR, 'RightKnee'), kneeR: segmentTip(v, rig.kneeR, 'RightFoot'),
     };
     // Rig measurements at first sight (motion-layered pose ~ standing).
