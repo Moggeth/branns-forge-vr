@@ -10,7 +10,7 @@ const suite = [
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'proximity-voice','voice-recovery','voice-topology','battle-model','checkpoint-delta','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
-  'ability-readiness','ability-warmup','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
+  'ability-readiness','ability-warmup','shared-skin-palettes','state-codec-performance','entity-id-allocation','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
@@ -33,7 +33,7 @@ const suite = [
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','grove-growth','remains-physics',
-  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','apple-snack','home-bases',
+  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','apple-snack','home-bases','hero-progress',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 import {snackAction,isFruitDrop} from './fruit.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -28,14 +29,14 @@ export function useResource(state,p,m){
   state.shrine.hp=Math.min(state.shrine.maxHp,state.shrine.hp+(m.kind==='wood'?20:35));
   state.shrine.disabledUntil=0;
  }else if(m.kind==='wood'){
-  if(p.hp>=100)return fail('not_needed');p.hp=Math.min(100,p.hp+35);
+  if(p.hp>=heroMaxHp(p))return fail('not_needed');p.hp=Math.min(heroMaxHp(p),p.hp+35);
  }else if(p.role==='god'){
   if(p.mana>=100)return fail('not_needed');p.mana=Math.min(100,p.mana+40);
  }else{
-  const cooldown=specialCooldown(p.tool);
+  const cooldown=specialCooldown(p.tool,p);
   const specialCooling=cooldown>0&&state.tick-(p.specialTick??-1000)<cooldown;
-  if(p.hp>=100&&!specialCooling&&!(p.heat>0)&&!(p.overheatUntil>state.tick))return fail('not_needed');
-  p.hp=Math.min(100,p.hp+35);p.specialTick=-1000;p.heat=0;p.overheatUntil=0;
+  if(p.hp>=heroMaxHp(p)&&!specialCooling&&!(p.heat>0)&&!(p.overheatUntil>state.tick))return fail('not_needed');
+  p.hp=Math.min(heroMaxHp(p),p.hp+35);p.specialTick=-1000;p.heat=0;p.overheatUntil=0;
  }
  p.resources[m.kind]-=recipe.cost;
  return ok([{kind:'resource_use',id:p.id,resource:m.kind,amount:recipe.cost,position:forge?[...state.shrine.position]:[...p.position]}]);
@@ -54,10 +55,10 @@ export function collectTarget(state,p,m,ctx){
    (p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+bundle.reduce((n,item)=>n+item.amount,0));
    return ok(bundle.map(item=>({kind:'pickup',id:item.id,position:[item.x,item.y,item.z],material:item.kind})));
   }
-  if(q.kind==='apple'&&p.hp>=100)return fail('not_needed');
+  if(q.kind==='apple'&&p.hp>=heroMaxHp(p))return fail('not_needed');
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
-  if(q.kind==='apple')p.hp=Math.min(100,p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
+  if(q.kind==='apple')p.hp=Math.min(heroMaxHp(p),p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
   const events=[{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}];
   if(q.kind==='apple')addBloom(state,BLOOM.apple,events,[q.x,q.y,q.z]); // Fruit eaten spreads the seed.
   return ok(events);

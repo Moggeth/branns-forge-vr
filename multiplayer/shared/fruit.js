@@ -10,6 +10,7 @@
 // A felled apple tree sheds the apples it still carried around its crown when it lands.
 // Drops are collectibles: take one, then each bite heals (BITE_HEAL) and three bites reach the core.
 // The apple grows back on its branch after REGROW_TICKS; the last GROW_TICKS of that wait are its visible swelling.
+import {heroMaxHp} from './hero-progress.js';
 import {worldTrees} from './world-content.js';
 import {treeScale,isFelled} from './trees.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -145,10 +146,14 @@ export function fruitSlice(state, ctx, from, to, {by = null, push = [0, 0, 0], b
 }
 // A felled apple tree sheds a handful of its remaining apples where its crown lands; the rest are lost with the crown.
 function shedFelled(state, ctx, events) {
- const f = fruitOf(state), shed = f.shed ??= [];
- for (const h of state.harvestedTrees || []) {
+  const f = fruitOf(state), shed = f.shed ??= [];
+  // A busy saved world can have hundreds of landed cuts.  The tree list is pure for
+  // this tick, so build its id lookup once instead of reconstructing every tree for
+  // each cut that is ready to shed fruit.
+  let treesById = null;
+  for (const h of state.harvestedTrees || []) {
   if (!isFelled(h) || !h.landed || shed.includes(h.id) || state.tick - h.felledTick > 900) continue; // old saves' felled trees stay bare
-  const tree = worldTrees(state).find(t => t.id === h.id); shed.push(h.id); if (shed.length > 128) shed.shift();
+  const tree = (treesById ??= new Map(worldTrees(state).map(t => [t.id, t]))).get(h.id); shed.push(h.id); if (shed.length > 128) shed.shift();
   if (!tree || !isAppleTree(tree)) continue;
   const gone = missingSet(f), s = treeScale(tree), yaw = h.fallYaw || 0, dir = [-Math.sin(yaw), 0, -Math.cos(yaw)];
   let n = 0;
@@ -274,7 +279,7 @@ export function snackAction(state, p, m) {
  if (op === 'bite') {
   if (state.tick - d.biteTick < FRUIT.biteTicks) return {ok: false, code: 'cooldown', events: []};
   d.biteTick = state.tick; d.bites++;
-  const before = p.hp; p.hp = Math.min(100, p.hp + (d.half ? FRUIT.halfHeal : FRUIT.biteHeal)[d.bites - 1]);
+  const before = p.hp; p.hp = Math.min(heroMaxHp(p), p.hp + (d.half ? FRUIT.halfHeal : FRUIT.biteHeal)[d.bites - 1]);
   const events = [{kind: 'snack_bite', id: d.id, by: p.id, bite: d.bites, of: bitesFor(d), ...(d.half ? {half: true} : {}), apples: d.apples, heal: +(p.hp - before).toFixed(2), stick: d.stick, position: [p.position[0], p.position[1] + 1.55, p.position[2]]}];
   if (d.bites >= bitesFor(d)) {
    d.apples--; d.bites = 0; addBloom(state, BLOOM.apple, events, [...p.position]); // fruit eaten spreads the seed

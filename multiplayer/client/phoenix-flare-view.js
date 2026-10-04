@@ -50,7 +50,7 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
   scene.add(embers);
   const emberColor = new THREE.Color();
 
-  function burst({position, ground, lit = true}) {
+  function burst({position, ground, lit = true, radius}) {
     if (active.length >= FLARE_VIEW.max) retire(active[0]);
     const group = new THREE.Group(); group.name = 'phoenix-flare'; group.userData.ignoreContact = true;
     const flash = new THREE.Sprite(flashMat.clone()), star = new THREE.Sprite(starMat.clone()), halo = new THREE.Sprite(haloMat.clone());
@@ -66,7 +66,9 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
     const seed = Math.abs(Math.sin(position[0] * 12.9898 + position[2] * 78.233)) * 43758.5453 % 1;
     const sparks = Array.from({length: FLARE_VIEW.embers}, (_, i) => ({p: new THREE.Vector3(), v: new THREE.Vector3(), age: 9, life: 1, seed: (seed + i * .618) % 1}));
     const flare = {group, flash, star, halo, pool, ghost, sparks, age: 0, origin: new THREE.Vector3().fromArray(position),
-      ground: ground ? ground[1] : height(position[0], position[2]), lit};
+      ground: ground ? ground[1] : height(position[0], position[2]), lit,
+      // Firestorm (Emberwing talent) widens the blaze: the pool and the phoenix grow with the authority's radius.
+      spread: Number.isFinite(radius) ? Math.max(1, radius / 3.2) : 1};
     group.position.copy(flare.origin);
     active.push(flare); update(0); return flare;
   }
@@ -96,13 +98,13 @@ export function createPhoenixFlareView({scene, templates, height = () => 0}) {
       // The phoenix spreads its wings above the burst and dissolves.
       if (flare.ghost) {
         const g = a / F.phoenix; flare.ghost.visible = g < 1;
-        if (g < 1) { flare.ghost.scale.setScalar(.6 + F.phoenixSize * (1 - (1 - g) ** 3)); flare.ghost.position.y = .8 * g;
+        if (g < 1) { flare.ghost.scale.setScalar((.6 + F.phoenixSize * (1 - (1 - g) ** 3)) * flare.spread); flare.ghost.position.y = .8 * g;
           flare.ghost.userData.flareMaterial.opacity = .9 * (1 - g) ** 1.2; }
       }
       // Pool of light under the star.
       const star = flare.star.getWorldPosition(new THREE.Vector3()), drop = Math.max(.5, star.y - flare.ground);
       const r = F.poolRadius * (.6 + .4 * Math.min(1, drop / 8));
-      flare.pool.position.set(star.x, flare.ground + F.poolLift, star.z); flare.pool.scale.setScalar(r);
+      flare.pool.position.set(star.x, flare.ground + F.poolLift, star.z); flare.pool.scale.setScalar(r * flare.spread);
       flare.pool.material.opacity = .55 * strength * Math.min(1, 9 / drop);
       // Ember rain: sparks shed from the star, fall, and fade.
       for (const s of flare.sparks) {

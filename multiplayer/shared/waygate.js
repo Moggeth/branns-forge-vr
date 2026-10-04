@@ -5,6 +5,7 @@
 // them back. Striking the altar's tuning crystal picks the next destination. During the Expedition's star stage the
 // fallen star is a destination too.
 // State lives in state.waygate = {lit:[tick, x8], openUntil, dest}; worlds saved before it load without it.
+import {heroMaxHp} from './hero-progress.js';
 import {STARTING_SITES} from './starting-world.js';
 import {STAR_SITES} from './adventure.js';
 
@@ -71,7 +72,7 @@ export function strikeWaygate(state, p, message, events) {
   if (!waygateOpen(state) && count === WAYSTONES.length) {
     w.openUntil = state.tick + WAYGATE.openTicks;
     for (const h of state.players) if (h.role === 'hero' && h.hp > 0 && flat(h.position, site.x, site.z) <= WAYGATE.ringRadius) {
-      h.hp = Math.min(100, h.hp + WAYGATE.restoreHp); h.mana = Math.min(100, h.mana + WAYGATE.restoreMana);
+      h.hp = Math.min(heroMaxHp(h), h.hp + WAYGATE.restoreHp); h.mana = Math.min(100, h.mana + WAYGATE.restoreMana);
     }
     const d = currentDestination(state);
     events.push({kind: 'waygate_open', id: 'waygate', position: [GATE.x, 0, GATE.z], dest: d.id, name: d.name, until: w.openUntil});
