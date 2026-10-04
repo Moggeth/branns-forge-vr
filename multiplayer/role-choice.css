@@ -1,0 +1,139 @@
+/* Brann's Forge — the lobby's Hero / God choice: two animated scene cards and a "switch any time" promise.
+   Loaded after mobile-compact/mobile-quiet so these lobby-only rules win. The in-game menu's role cards are untouched.
+   Motion is pure CSS on inline SVG; lobby.css's prefers-reduced-motion rule stops all of it. */
+
+#lobby .roles-choice legend { width: 100%; text-align: center; }
+#lobby .role-grid-scenes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+#lobby .role-card-scene .role-body {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-height: 0; padding: 0 0 12px; text-align: center; border-radius: 14px;
+}
+#lobby .role-card-scene .role-scene {
+  display: block; width: 100%; height: 124px; margin-bottom: 8px; overflow: hidden;
+  border-bottom: 1px solid rgba(201, 164, 92, .3); background: #10181a;
+}
+#lobby .role-card-scene .scene { display: block; width: 100%; height: 100%; transition: filter .3s ease, transform .4s ease; }
+#lobby .role-card-scene .role-name { font-size: 1.5rem; line-height: 1.1; }
+#lobby .role-card-scene .role-desc { color: var(--parchment, #f2e6cd); font-size: .9rem; padding: 0 8px; }
+#lobby .role-card-scene .role-detail { color: var(--muted, #b9aa8e); padding: 0 8px; }
+
+/* Not chosen: dimmed and slowed, so the choice reads at a glance. Hover previews it at full colour. */
+#lobby .role-card-scene:not(:has(input:checked)) .scene { filter: saturate(.45) brightness(.62); }
+#lobby .role-card-scene:not(:has(input:checked)):hover .scene { filter: saturate(.85) brightness(.9); }
+#lobby .role-card-scene:has(input:checked) .scene { transform: scale(1.03); }
+#lobby .role-card-hero:has(input:checked) .role-body { box-shadow: 0 0 0 1px var(--ember, #e8692b), 0 10px 32px -8px rgba(240, 138, 60, .75); }
+#lobby .role-card-god:has(input:checked) .role-body {
+  border-color: #8cc4f2;
+  background: radial-gradient(90% 70% at 50% 100%, rgba(127, 182, 232, .2), transparent 70%), rgba(20, 28, 40, .6);
+  box-shadow: 0 0 0 1px #8cc4f2, 0 10px 32px -8px rgba(127, 182, 232, .7);
+}
+#lobby .role-card-god:has(input:checked) .role-body::after { color: #bfe3ff; }
+#lobby .role-card-scene:has(input:checked) .role-body::after {
+  top: 8px; right: auto; left: 8px; width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%;
+  background: rgba(10, 8, 6, .72); font-size: .85rem; z-index: 2;
+}
+
+/* The swap medallion sits on the seam between the two cards. */
+#lobby .role-swap {
+  position: absolute; left: 50%; top: 62px; z-index: 3; width: 38px; height: 38px; margin: -19px 0 0 -19px;
+  display: grid; place-items: center; border-radius: 50%; pointer-events: none;
+  color: var(--brass-hi, #ecd29a); background: radial-gradient(circle, #2a2118 60%, #1a1410);
+  border: 1px solid var(--brass, #c9a45c); box-shadow: 0 4px 14px rgba(0, 0, 0, .55), 0 0 0 4px rgba(20, 17, 14, .7);
+}
+#lobby .role-swap svg { width: 22px; height: 22px; animation: rs-swap 4.8s ease-in-out infinite; }
+
+#lobby .role-switch-note {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 6px;
+  margin: 10px 0 0; text-align: center; font-size: .86rem; line-height: 1.35; color: var(--muted, #b9aa8e);
+}
+#lobby .role-switch-note strong { color: var(--brass-hi, #ecd29a); letter-spacing: .02em; }
+
+/* ------------------------------------------------------------ Hero scene: a pick strikes a crystal outcrop */
+.scene-hero .rs-pick { animation: rs-swing 2.2s cubic-bezier(.5, 0, .3, 1) infinite; } /* rotates about the hand (group origin) */
+.scene-hero .rs-gem-glow { transform-box: fill-box; transform-origin: center; animation: rs-pulse 2.2s ease-in-out infinite; }
+.scene-hero .rs-sparks circle { opacity: 0; animation: rs-spark 2.2s ease-out infinite; }
+.scene-hero .rs-sparks circle:nth-child(1) { --dx: -11px; --dy: -9px; }
+.scene-hero .rs-sparks circle:nth-child(2) { --dx: 9px; --dy: -12px; }
+.scene-hero .rs-sparks circle:nth-child(3) { --dx: -4px; --dy: -15px; }
+.scene-hero .rs-sparks circle:nth-child(4) { --dx: 13px; --dy: -3px; }
+.scene-hero .rs-crystal { animation: rs-crystal 2.2s ease-out infinite; }
+.scene-hero .rs-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: rs-sway 5s ease-in-out infinite; }
+
+@keyframes rs-swing {
+  0%, 30% { transform: rotate(-24deg); }
+  52% { transform: rotate(-18deg); }
+  62% { transform: rotate(-45deg); }
+  68% { transform: rotate(-42deg); }
+  100% { transform: rotate(-24deg); }
+}
+@keyframes rs-spark {
+  0%, 61% { opacity: 0; transform: translate(0, 0); }
+  63% { opacity: 1; }
+  80% { opacity: 0; transform: translate(var(--dx), var(--dy)); }
+  100% { opacity: 0; }
+}
+@keyframes rs-crystal { 0%, 61% { fill: #82ccff; } 64% { fill: #e6f6ff; } 85%, 100% { fill: #82ccff; } }
+@keyframes rs-pulse { 0%, 100% { opacity: .65; transform: scale(.9); } 63% { opacity: 1; transform: scale(1.35); } }
+@keyframes rs-sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+
+/* ------------------------------------------------------------ God scene: land rises and life grows under a spell */
+.scene-god .rs-ring { transform-box: fill-box; transform-origin: center; animation: rs-spin 9s linear infinite; }
+.scene-god .rs-mana { transform-box: fill-box; transform-origin: center; animation: rs-mana 3.6s ease-in-out infinite; }
+.scene-god .rs-beam { animation: rs-beam 3.6s ease-in-out infinite; }
+.scene-god .rs-rise { transform-box: fill-box; transform-origin: center; animation: rs-rise 3.6s cubic-bezier(.3, 0, .2, 1) infinite; }
+.scene-god .rs-grow circle { transform-box: fill-box; transform-origin: center; animation: rs-grow 3.6s ease-out infinite; }
+.scene-god .rs-grow circle:nth-child(2) { animation-delay: .25s; }
+.scene-god .rs-grow circle:nth-child(3) { animation-delay: .5s; }
+.scene-god .rs-grow circle:nth-child(4) { animation-delay: .75s; }
+.scene-god .rs-clouds { animation: rs-drift 14s linear infinite; }
+.scene-god .rs-waves { animation: rs-waves 4s ease-in-out infinite; }
+.scene-god .rs-motes circle { animation: rs-mote 3.6s ease-in infinite; }
+.scene-god .rs-motes circle:nth-child(2) { animation-delay: 1.2s; }
+.scene-god .rs-motes circle:nth-child(3) { animation-delay: 2.4s; }
+
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+@keyframes rs-mana { 0%, 100% { opacity: .25; transform: scale(.85); } 30% { opacity: .8; transform: scale(1.15); } 55% { opacity: .3; } }
+@keyframes rs-beam { 0%, 100% { opacity: .15; } 30% { opacity: 1; } 60% { opacity: .35; } }
+@keyframes rs-rise { 0%, 12% { transform: scale(.45); opacity: .4; } 45%, 82% { transform: scale(1); opacity: 1; } 100% { transform: scale(.45); opacity: .4; } }
+@keyframes rs-grow { 0%, 30% { transform: scale(0); } 48% { transform: scale(1.25); } 56%, 86% { transform: scale(1); } 100% { transform: scale(0); } }
+@keyframes rs-drift { from { transform: translateX(-30px); } to { transform: translateX(30px); } }
+@keyframes rs-waves { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes rs-mote { 0% { transform: translateY(-10px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(16px); opacity: 0; } }
+@keyframes rs-swap { 0%, 70%, 100% { transform: rotate(0); } 85% { transform: rotate(180deg); } }
+
+/* ------------------------------------------------------------ desktop: a little more room for the scenes */
+@media (min-width: 720px) {
+  #lobby .role-card-scene .role-body { padding-bottom: 12px; }
+  #lobby .role-card-scene .role-icon { display: none; }
+}
+
+/* ------------------------------------------------------------ phones (portrait): scene over name and one line */
+@media (max-width: 760px), (max-height: 560px) {
+  #lobby .role-grid-scenes { gap: 10px; }
+  #lobby .role-card-scene .role-body {
+    display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center !important;
+    min-height: 0 !important; padding: 0 0 8px !important; gap: 1px !important;
+  }
+  #lobby .role-card-scene .role-scene { height: 74px; margin-bottom: 5px; }
+  #lobby .role-card-scene .role-name { font-size: 1.15rem !important; }
+  #lobby .role-card-scene .role-desc { font-size: .74rem; -webkit-line-clamp: 2; padding: 0 6px; }
+  #lobby .role-card-scene .role-detail { display: none; }
+  #lobby .role-swap { width: 32px; height: 32px; margin: -16px 0 0 -16px; top: 37px; }
+  #lobby .role-swap svg { width: 18px; height: 18px; }
+  #lobby .role-switch-note { margin-top: 6px; font-size: .74rem; }
+  #lobby .role-switch-note span { display: none; }
+  #lobby .role-switch-note::after { content: "Hotbar button or F9."; }
+}
+
+/* ------------------------------------------------------------ landscape phones: scene becomes a thumbnail */
+@media (orientation: landscape) and (max-height: 560px) {
+  #lobby .role-card-scene .role-body {
+    display: grid !important; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto auto;
+    column-gap: 8px; row-gap: 0 !important; align-items: center !important; text-align: left !important; padding: 4px 8px 4px 4px !important;
+  }
+  #lobby .role-card-scene .role-scene { grid-row: 1 / 3; width: 64px; height: 42px; margin: 0; border: 0; border-radius: 9px; }
+  #lobby .role-card-scene .role-desc { -webkit-line-clamp: 1; padding: 0; }
+  #lobby .role-swap { top: 50%; }
+  #lobby .role-switch-note { margin-top: 4px; }
+}
