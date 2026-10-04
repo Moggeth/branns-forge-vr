@@ -39,9 +39,8 @@ const saved=JSON.parse(JSON.stringify(s.checkpoint()));
 assert.deepEqual(loadSimulation(saved).snapshot().players[0].xp,hero(s).xp);
 assert.equal(saved.heroLedger.mitch.xp,40,'world ledger records progress by hero name');
 
-// Talents: learn with a point, refuse without one, refuse unknown or not-yet-ready ones, free reset refunds.
+// Talents: learn with a point, refuse without one, refuse unknown ones, free reset refunds.
 assert.equal(act(s,{action:'talent',weapon:'axe',talent:'nope'}).code,'invalid_talent');
-assert.equal(act(s,{action:'talent',weapon:'wyrmspout',talent:'flood'}).code,'talent_coming_soon');
 const learned=act(s,{action:'talent',weapon:'axe',talent:'whirlwind'});
 assert.equal(learned.ok,true);assert.equal(learned.events[0].kind,'talent_learned');
 assert.deepEqual(hero(s).talents,{axe:['whirlwind']});
@@ -151,10 +150,10 @@ const burst=third.events.find(e=>e.kind==='geode_burst');
 assert.ok(burst&&burst.hits.includes('geodeFoe'),'burst catches the foe beside the replaced wall');
 assert.ok((w.enemies.find(e=>e.id==='geodeFoe')?.hp??0)<100);
 
-// Panel model: six weapons, Wyrmspout listed but not yet learnable.
+// Panel model: six weapons, every specialty learnable (Wyrmspout's arrived with its uplift).
 const model=progressModel({xp:xpForLevel(3),talents:{pick:['geode']}});
 assert.equal(model.level,3);assert.equal(model.points,1);assert.equal(model.weapons.length,6);
-assert.equal(model.weapons.find(w=>w.id==='wyrmspout').talents.every(t=>!t.ready),true);
+assert.equal(model.weapons.find(w=>w.id==='wyrmspout').talents.every(t=>t.ready),true);
 assert.equal(model.weapons.find(w=>w.id==='pick').talents.find(t=>t.id==='geode').learned,true);
 assert.ok(hasTalent({talents:{pick:['geode']}},'pick','geode'));
 void grantXp;void projectileContact;

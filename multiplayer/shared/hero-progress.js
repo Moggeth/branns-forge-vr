@@ -39,8 +39,8 @@ export const TALENTS = Object.freeze({
     tar: Object.freeze({name: 'Tar Pit', text: 'Spills are far bigger and slow every foe that wades through them.'}),
   }),
   wyrmspout: Object.freeze({
-    flood: Object.freeze({name: 'Wyrmflood', text: 'A longer, bigger gout of fire that reaches further.', ready: false}),
-    cling: Object.freeze({name: 'Clinging Fire', text: 'Sticky fire clings to foes, burns twice as long and splashes onto their friends when they fall.', ready: false}),
+    flood: Object.freeze({name: 'Wyrmflood', text: 'A longer, bigger burst: more sticky fire per tank, thrown further.'}),
+    cling: Object.freeze({name: 'Clinging Fire', text: 'Sticky fire clings to foes, burns twice as long and splashes onto their friends when they fall.'}),
   }),
 });
 export const TALENT_WEAPONS = Object.freeze(Object.keys(TALENTS));

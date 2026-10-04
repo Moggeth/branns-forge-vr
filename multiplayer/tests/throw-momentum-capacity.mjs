@@ -1,3 +1,4 @@
+import {WYRMSPOUT} from '../shared/wyrmspout.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
@@ -24,7 +25,7 @@ test('tracked VR poses use the same authority velocity as FPS and legacy saves d
  for(const velocity of [[10,0,0],[0,Infinity,0],[0,0],[0,101,0]]){const bad=structuredClone(saved);bad.players[0].velocity=velocity;assert.throws(()=>loadSimulation(bad),/player/);}
 });
 test('movement inheritance is limited to fuel, preserving flame and arrow launch behavior',()=>{
- for(const [tool,action,speed] of [['wyrmspout','flame',10.5],['crossbow','fire',42],['bow','fire',36]]){
+ for(const [tool,action,speed] of [['wyrmspout','flame',WYRMSPOUT.speed],['crossbow','fire',42],['bow','fire',36]]){
   const f=fixture();f.command(input({x:1,z:0},{jump:true}));f.sim.step();assert.equal(f.command({type:'action',action:'equip',tool}).ok,true);
   const p=f.sim.snapshot().players[0];assert.equal(f.command({type:'action',action,origin:p.position.map((n,i)=>n+(i===1?1.2:0)),direction:[0,0,-1],draw:1,velocity:[99,99,99]}).ok,true);
   assert.deepEqual(f.sim.snapshot().projectiles.at(-1).velocity,[0,0,-speed]);

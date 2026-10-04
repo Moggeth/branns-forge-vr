@@ -239,8 +239,9 @@ function emberMaterials(visual) {
   return (visual.userData.emberMaterials = list);
 }
 
-export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates, ember, stringSnap = 0, stringGlow = 0} = {}) {
+export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates, ember, stringSnap = 0, stringGlow = 0, spray = 0, fill = 1, gout = 0} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
+  if (tool === 'wyrmspout') { animateWyrmspout(visual, {spray, fill, gout, time}); return; }
   if (tool === 'bow') {
     const upper = visual.getObjectByName('UpperLimb'), lower = visual.getObjectByName('LowerLimb');
     for (const [node, sign] of [[upper, 1], [lower, -1]]) if (node) {
@@ -295,4 +296,21 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, re
     const narrow = (SB.limb - crossbowTip(draw).x) / .053;
     visual.traverse(mesh => { const d = mesh.morphTargetDictionary; if (d?.Drawn === undefined) return; mesh.morphTargetInfluences[d.Drawn] = draw; if (d.Narrow !== undefined) mesh.morphTargetInfluences[d.Narrow] = narrow; });
   }
+}
+
+// Wyrmspout II (assets-source/wyrmspout-v2): the jaw drops while it sprays and snaps wide for the Gout, the tank's
+// liquid and the rear gauge show the fuel left, and the pilot ember and eyes flare with the jet.
+// spray 0..1 (smoothed trigger), fill 0..1 (tank), gout 1..0 (just hocked a Gout). Older models simply lack the nodes.
+export function animateWyrmspout(visual, {spray = 0, fill = 1, gout = 0, time = 0} = {}) {
+  // Shared template materials stay shared (remote copies reuse them): the pilot ember grows instead of brightening.
+  const parts = visual.userData.wyrmParts ||= (() => {
+    const find = n => visual.getObjectByName(n);
+    return {jaw: find('Jaw'), liquid: find('FuelLiquid'), needle: find('Gauge_Needle'), core: find('EmberCore'), head: find('Head')};
+  })();
+  const s = THREE.MathUtils.clamp(spray, 0, 1), f = THREE.MathUtils.clamp(fill, 0, 1), k = THREE.MathUtils.clamp(gout, 0, 1);
+  if (parts.jaw) parts.jaw.rotation.x = -(.36 * s + .62 * Math.sin(Math.PI * Math.min(1, (1 - k) * 1.4)) * (k > 0 ? 1 : 0)) - .03 * s * Math.sin(time * 38);
+  if (parts.head) { parts.head.userData.rest ??= parts.head.position.clone(); parts.head.position.copy(parts.head.userData.rest); parts.head.position.y += .003 * s * Math.sin(time * 47); parts.head.position.z += .012 * k * k; }
+  if (parts.liquid) { parts.liquid.visible = f > .01; parts.liquid.scale.y = Math.max(.01, f) * (1 + .04 * s * Math.sin(time * 29)); }
+  if (parts.needle) parts.needle.rotation.z = THREE.MathUtils.degToRad(120 - 240 * f) + .05 * s * Math.sin(time * 61);
+  if (parts.core) parts.core.scale.setScalar(.7 + 1.1 * s + 1.4 * k + .08 * Math.sin(time * 5));
 }

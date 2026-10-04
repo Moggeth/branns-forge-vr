@@ -3,6 +3,7 @@
 import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart} from './combat.js';
 import {hasTalent} from './hero-progress.js';
 import {entHeight} from './ents.js';
+import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
@@ -91,22 +92,31 @@ export function fireContact(state,shot,hit,ctx){
       }
       events.push({kind:'firebomb',id:shot.id,by:shot.ownerId,position:[point[0],ground,point[2]],radius:FIREBOMB.radius,hits});
     }
-  }else{
-    applyHeat(state,point,1,1,ctx);
-    if(Math.abs(point[1]-ground)<.4)addFuel(state,[point[0],ground,point[2]],.55,.12,true);
-    // Static world patches use contact normals. Enemy fire is direct damage;
-    // don't leave a world-fixed patch pretending to be attached to a limb.
-    else if(!state.enemies.some(e=>e.id===hit.targetId)&&['world','terrain'].includes(hit.targetId)){
-      let patch=state.fireSurfaces.find(p=>Math.hypot(...p.position.map((n,i)=>n-point[i]))<.35);
-      if(patch)patch.expiresTick=state.tick+150;
-      else if(state.fireSurfaces.length<FIRE_LIMITS.surfaces)state.fireSurfaces.push({id:ctx.nextId(state,'f'),position:[...point],normal:[...hit.normal],expiresTick:state.tick+150});
-    }
+    const enemy=state.enemies.find(e=>e.id===hit.targetId);
+    if(enemy&&shot.lit){applyEnemyScorch(enemy,hit.part||'torso',.14);ctx.damageEnemy(state,enemy,12,events,shot.ownerId);}
+    return events;
   }
-  const enemy=state.enemies.find(e=>e.id===hit.targetId);
-  if(enemy&&(shot.kind==='flame'||shot.lit)){
-    applyEnemyScorch(enemy,hit.part||'torso',shot.kind==='flame'?.045:.14);
-    ctx.damageEnemy(state,enemy,shot.kind==='flame'?4:12,events);
+  // Wyrmspout: sticky liquid fire. The Gout bursts into a wide splash; a glob sticks where it lands.
+  if(shot.gout){goutBurst(state,shot,point,ctx,events);return events;}
+  const W=WYRMSPOUT,owner=state.players.find(p=>p.id===shot.ownerId),spray=sprayTuning(owner);
+  applyHeat(state,point,.8,1,ctx);
+  const enemy=state.enemies.find(e=>e.id===hit.targetId),remains=!enemy&&state.detachedParts?.find(d=>d.id===hit.targetId);
+  if(enemy){
+    stickGlob(state,enemy,hit.part||'torso',shot.ownerId,spray.burnTicks);
+    applyEnemyScorch(enemy,hit.part||'torso',W.scorch);
+    events.push({kind:'goo_stick',id:enemy.id,by:shot.ownerId,part:hit.part||'torso',burn:spray.burnTicks,position:[...point],normal:[...hit.normal]});
+    ctx.damageEnemy(state,enemy,W.damage,events,shot.ownerId);
+    return events;
   }
+  if(remains){remains.burnUntil=state.tick+spray.burnTicks;remains.burnPart=remains.part;remains.scorch=clamp((remains.scorch||0)+W.scorch,0,1);}
+  else if(Math.abs(point[1]-ground)<.4)addFuel(state,[point[0],ground,point[2]],W.groundFuel.radius,W.groundFuel.amount,true);
+  else if(['world','terrain'].includes(hit.targetId)){
+    // Clings to walls, trunks and rock: a burning patch on the contact normal.
+    let patch=state.fireSurfaces.find(p=>Math.hypot(...p.position.map((n,i)=>n-point[i]))<.35);
+    if(patch)patch.expiresTick=Math.max(patch.expiresTick,state.tick+W.surfaceTicks);
+    else if(state.fireSurfaces.length<FIRE_LIMITS.surfaces)state.fireSurfaces.push({id:ctx.nextId(state,'f'),position:[...point],normal:[...hit.normal],expiresTick:state.tick+W.surfaceTicks});
+  }
+  events.push({kind:'goo_splat',id:shot.id,by:shot.ownerId,position:[...point],normal:[...hit.normal]});
   return events;
 }
 
@@ -132,11 +142,7 @@ export function flameExposure(points, sources){
 }
 
 export function stepFire(state,ctx,events){
-  for(const player of state.players){
-    if((player.overheatUntil||0)>state.tick)player.heat=1;
-    else if(player.overheatUntil){player.overheatUntil=0;player.heat=.4;}
-    else if(state.tick-(player.flameTick??-1000)>9)player.heat=Math.max(0,(player.heat||0)-.18/60);
-  }
+  for(const player of state.players)stepTank(state,player);
   if(state.tick%6)return;
   // Ecology queries the same cell/neighbor repeatedly. This cache lives only
   // for this step, so deformation, bridges and restored worlds cannot go stale.
@@ -203,7 +209,8 @@ export function stepFire(state,ctx,events){
     }
     // Ents are dry timber: flames catch on them, they burn twice as hard and drop burning litter where they walk.
     if(enemy.kind==='ent'){if(exposed&&!burning){enemy.burnUntil=state.tick+240;enemy.burnPart='torso';}if(burning)addFuel(state,enemy.position,.6,.3,true);}
-    if(exposed||burning)ctx.damageEnemy(state,enemy,(burning?7:6)*(enemy.kind==='ent'?2:1),events);
+    if(exposed||burning)ctx.damageEnemy(state,enemy,(burning?7+WYRMSPOUT.gooDamage*(enemy.goo||0):6)*(enemy.kind==='ent'?2:1),events,burning?enemy.gooBy:undefined);
+    if(!burning&&enemy.goo){delete enemy.goo;delete enemy.cling;}
   }
   for(const d of state.detachedParts||[])if((d.burnUntil||0)>state.tick)d.scorch=clamp((d.scorch||0)+.095,0,1);
   for(const player of state.players)if(player.role==='hero'&&flameExposure([[player.position[0],player.position[1]+.12,player.position[2]]],hot)>0)ctx.damageHero(state,player,2,events);

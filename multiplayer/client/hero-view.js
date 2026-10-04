@@ -157,7 +157,8 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   /** Attributed authoritative event for this hero (event.by === its player id). Returns the reaction or null. */
   function event(group, ev, data = {}) {
     const u = group?.userData; if (!u?.hero || !ev) return null;
-    if (ev.kind === 'embed') { u.embedAt = u.clock; return null; }        // same-frame hits are a projectile contact relayed by the host
+    if (ev.kind === 'embed') { u.embedAt = u.clock; return null; }
+    if (ev.kind === 'gout_launch') { u.goutAt = u.clock; return 'recoil'; }        // same-frame hits are a projectile contact relayed by the host
     if (ev.kind === 'shoot' && ['bow', 'crossbow'].includes(ev.weapon)) {
       u.recoil = 1;
       if (ev.weapon === 'crossbow') {
@@ -300,6 +301,14 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
         else if (sb && flock.loadedGolden(u.weapon) !== sb.golden) flock.rest(u.weapon, sb.golden);
         if (u.weapon.visible) flock.update(u.weapon, u.clock, {viewer: cameraPosition, dt});
       }
+    }
+    if (u.weaponTool === 'wyrmspout' && u.weapon) {
+      // Jaw, tank and gauge from the hero's authoritative spray and tank, smoothed so they move every frame.
+      if (data.flameTick !== u.flameTick) { if (u.flameTick !== undefined) u.sprayAt = u.clock; u.flameTick = data.flameTick; }
+      const spraying = u.clock - (u.sprayAt ?? -Infinity) < .2, target = 1 - Math.min(1, Math.max(0, data.heat || 0));
+      u.spray = (u.spray || 0) + ((spraying ? 1 : 0) - (u.spray || 0)) * (1 - Math.exp(-dt * (spraying ? 20 : 7)));
+      u.fill = (u.fill ?? target) + (target - (u.fill ?? target)) * (1 - Math.exp(-dt * 6));
+      updateWeaponPresentation(u.weapon, 'wyrmspout', {spray: u.spray, fill: u.fill, gout: Math.max(0, 1 - (u.clock - (u.goutAt ?? -Infinity)) / .35), time: u.clock});
     }
     if (data.head) placeBody(u, data, root, dt);
     else { u.torsoYaw = null; u.crouch = 0; u.look = null; if (u.model.rotation.y || u.model.position.x || u.model.position.z) { u.model.rotation.y = 0; u.model.position.set(0, 0, 0); } }
