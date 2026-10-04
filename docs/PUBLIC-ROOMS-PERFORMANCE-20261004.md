@@ -4,29 +4,29 @@ Baseline: `origin/main` at `0aa1770`. Branch: `codex/public-rooms-performance`.
 
 ## Delivery state
 
-The cloud directory, network-only discovery controller, packet preparation improvements
-and incremental terrain updates are implemented. **The player-facing room-browser UI is
-not integrated yet; this is not a completed server-browser release.**
+Public-world discovery, the mobile-first Opus browser, optional Battle controls,
+32-human room capacity, compatibility negotiation, bounded voice and exact recovery
+deltas are integrated on PR #39. Release verification is in progress; production
+status must be checked before calling this live.
 
-Required Opus UI commission verified personal `fauxgrady@gmail.com`, Claude.ai Max,
-and actual `claude-opus-5-5`, but failed at the subscription session limit after 2.482 s.
-CLI reported reset at 19:20 Australia/Sydney on October 4. No other account/model,
-API billing or extra usage used. Isolated brief/output folder:
-`work/opus-public-room-browser-20261004`. User was asked whether to reuse existing
-themed controls or wait for Opus; no answer received at this checkpoint. Do not
-claim an authored Opus design or substitute one silently.
+The initial Opus call hit its session quota after 2.482 seconds. After the supported
+reset, the completed commission verified personal `fauxgrady@gmail.com`, Claude.ai
+Max and actual `claude-opus-5-5`; it took 235.275 seconds. No API billing, extra usage
+or account/model workaround. Outputs: `work/opus-public-room-browser-20261004`.
+Codex integrated the concrete UI files and corrected mobile space, focus, pending
+join and stale-confirmation behavior. Actual 390x650 and 844x340 layouts passed.
 
-Next: obtain the design/override, integrate Find a world in lobby and menu, wire the
-discovery controller to it, verify mobile/desktop browse-and-join, then deploy the
-backward-compatible Worker v2 migration before the website. No production deployment
-performed in this checkpoint. Keep this branch draft until that flow is complete.
+Deploy the backward-compatible Worker v2 before this frontend. The live deployment
+workflow now checks both directory readiness and 32-seat service capacity first.
+Old clients retain eight-seat compatibility; new Battle mode requires all retained
+room members to refresh. No existing members are evicted to change capacity.
 
 ## Public directory
 
 `GET /peer/rooms` returns at most 50 rooms and a nextCursor. Room coordinators publish
 display names, counts and availability; they never expose connection secrets, peer
 IDs, ICE or saves. Everyone can discover multiplayer games; there is no privacy toggle.
-Solo remains local. Full and waiting-for-host rooms cannot be joined from the planned
+Solo remains local. Full and waiting-for-host rooms cannot be joined from the
 browser. Existing join-by-code validation remains authoritative if a list changes.
 
 Directory updates on membership/handoff and every minute while occupied. Entries expire
@@ -39,7 +39,7 @@ See `multiplayer/cloud/README.md` for deployment, migration and operational deta
 `client/public-room-directory.js` owns fetch/pagination/cancel/error logic separately
 from UI. It polls only while opened/visible, aborts on close, ignores stale responses,
 times out at 8 seconds and preserves the last good list on failure. It does not poll
-during ordinary gameplay. This controller needs a visual client before players use it.
+during ordinary gameplay. It is wired to the public-world dialog.
 
 ## Performance changes and measurements
 
@@ -106,10 +106,20 @@ remain unverified. Do not claim all graphics issues or frame drops have been fix
   test bindings are not runtime rendering failures; preserve their behavioral assertions.
 - The first monolithic shell edit was rejected by automatic review. Ordinary apply_patch
   file edits succeeded; no service/policy bypass was attempted. Use focused file edits.
+- PowerShell nested Python quotes caused a syntax error in an attempted CI-list edit.
+  Use apply_patch or a single-quoted here-string piped into Python; do not build nested
+  shell quoting for multi-line edits.
+- A successful UI component render does not establish mobile integration. The existing
+  lobby/footer and menu tabs consume real space: verify actual game layouts at390x650
+  and844x340. Keyed rows must retain focus through refreshes; stale confirmations must
+  cancel when authority, connection or Expedition state changes.
 
-## Expanded 32-player battle work (in progress)
+## Expanded 32-player battle work
 
-The user extended this pass to32 human seats plus bots and an optional opposing-wave mode. Capacity and battle authority are committed on the same draft PR; UI and final integration remain in progress. Current milestones: crowd animation a6d5c66, capacity bad399a, battle authority cbbd07c, objective presentation0f24295. Existing upstream proximity voice4878b54 was integrated as27cc2f3, retaining both sets of CI checks. These commits are pushed to private origin/codex/public-rooms-performance; none establishes a production release.
+The requested 32 human seats and optional opposing waves are implemented. Browse
+public worlds from the welcome screen; hosts use Menu > Battle to enable, reset or
+disable waves. Every multiplayer room is public; solo is local. This is a supported
+capacity with bounded resources, not an unconditional device performance guarantee.
 
 Battle mode uses Dawn/party and Dusk/rivals, existing authored skeletons and sanctuary models, four soldiers per side every15seconds,16 living soldiers per side. Wave bots have separate human-slot accounting but share the existing64-enemy safety cap with neutral creatures. Bases have400HP. The host can start/reset/disable; disabling cleans only battle content. Normal melee/projectiles, Timberline and God offensive spells damage opposing objectives. Healing/blessing supports allied soldiers. Existing environmental fire remains dangerous to either side; existing summon spells remain neutral. Human-versus-human weapon combat is not introduced: this is team objective combat with bots, not a complete competitive MOBA.
 
@@ -117,6 +127,39 @@ Gameplay evidence:11 battle regressions, actual authored-world navigation/combat
 
 Rendering: remote Hero CPU mean0.757->0.310ms with32 Heroes (16VR) and64 skeletons.97,280 bone matrices matched reference;96.3% fewer redundant hierarchy refreshes. Actual RTX3080Ti browser crowd fixture800x450:1,025 actor draw calls,1.279Mtriangles; mean interval8.405ms over25frames. This excludes full world/effects/network/shadows and exposes a remaining mobile draw-call risk.
 
-32 real lightweight Chromium sessions passed both direct and forced-relay connections, all-player input, replication and host transfer. No codec rejects. Direct worst arrival gap240.6ms; relay one peer below20Hz. Full exact checkpoints still create substantial uplink load; a separately verified delta recovery stream is being implemented. No promise of hitch-free32-phone or32-headset sessions.
+32 real lightweight Chromium sessions passed direct and forced-relay connections,
+all-player input, replication and host transfer. After exact checkpoint deltas:
+direct peers received120 snapshots in6seconds, worst peer p95 arrival gap57.8ms;
+relay120-121, p95 <=60.2ms. No codec rejects. Final compatibility changes require a
+fresh release run. This tests real transport, not32 full renderers or WAN latency.
+
+Exact recovery deltas reduce measured checkpoint traffic63.17->10.65MB (83.1%)
+and total heavy31-guest wire traffic104.08->51.56MB (50.5%), preserving values and
+cadence; extra checkpoint CPU0.36ms. Voice is bounded to eight nearby edges/client
+(127 pairs instead of496 full mesh), with moving2Hz/static0.5Hz presence. Measured
+forwarded voice presence traffic fell81%; actual three-browser synthetic-audio
+recovery passed17.224s. Physical microphones remain unverified.
+
+### Loading and actual full-scene rendering
+
+The empty lobby prepares the real default terrain, vegetation, character and bot
+materials, textures and shadow shaders before reporting ready. No art reduction,
+world stepping or network authority occurs in the render-only preview. Deferred
+activation honors cancellation. Asset errors remain visible in diagnostics.
+
+On RTX3080Ti at960x540, empty lobby ->32heroes/32bots measured startup2.503s,
+132texture uploads; worst postready render CPU1851->89ms, largest frame interval
+342ms. First populated snapshot still costs261ms. FPS view retains2241draws and
+3.47Mtriangles. This moves compilation into honest loading; it does not prove a
+steady FPS gain. The latest shared-machine steady p95 CPU15.3ms/GPU15.32ms must
+not be compared as an isolated-device speedup. Custom saves, unusual effects,
+phone/headset GPUs and first-join actor creation can still hitch.
+
+Browser benchmark: `node tests/browser-battle-render-load.mjs`, wait for
+`canvas.brannDiagnostics().startup.ready`; final run39.853s. Local evidence:
+`logs/performance-render-32/warmup-preview-sync/`. The failed compile-only and
+populated-before-loading approaches missed real empty-lobby behavior. Always test
+empty-lobby -> joined world; compileAsync alone omits shadow warmup and late
+material variants. Avoid concurrent full-game browser tests during GPU measurement.
 
 New lessons: use actual model world elevation for sanctuary ray fixtures; y=0 assumptions can miss valid geometry. Shared battle helpers require their real nextId context. A test literal saying eight players is obsolete when room capacity changes; retain actionable error assertions. Voice requires spatially bounded topology, not a32-person full mesh. Preserve all CI lists when incorporating another feature's runner changes.
