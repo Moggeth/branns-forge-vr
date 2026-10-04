@@ -34,6 +34,9 @@ import { adventureView } from './shared/adventure.js';
 import { createAdventureBanner, nextStep, actionModel } from './client/adventure-view.js';
 import { createInteractionCueController } from './client/interaction-cue-controller.js';
 import { rewardBanner } from './client/reward-moments.js';
+import {createPatchNotes} from './client/patch-notes.js';
+import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
+import './client/patch-notes.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -808,9 +811,11 @@ lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.ope
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
+const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
 for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(type, event => {
+  if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
     const trayKey=/^Digit[1-6]$/.test(event.code)||['KeyB','KeyC','Escape','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.code);
@@ -893,6 +898,7 @@ bindObjectiveActions(document, {onStart: () => objectiveHooks.onStart?.(), onRes
 export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
+patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
 window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
