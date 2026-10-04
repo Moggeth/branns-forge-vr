@@ -1,8 +1,10 @@
+import {createTerrainGeometryUpdater} from './terrain-geometry.js';
 import {validateInventionPlacement} from '../shared/inventions.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
 import {createSiegebirdAim} from './siegebird-aim.js';
 import {createInventionView} from './invention-view.js';
-import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo} from '../shared/inventions.js';
+import {createInventionModel} from './invention-art.js';
+import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo,STRUCTURES} from '../shared/inventions.js';
 import {createPresentationClock} from './presentation-clock.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
@@ -33,7 +35,8 @@ import {createTrajectoryGuide,shouldShowTrajectory} from './ranged-trajectory.js
 import {attachEmberdew,setEmberdewTime} from './emberdew-presentation.js';
 import './ranged-reticle.css';
 import {createTimberlineSight} from './timberline-sight.js';
-import {createTimberlineScope,createTimberlineAmmoHud,timberlineAmmoText,TIMBERLINE_SCOPE} from './timberline-scope.js';
+import {createColliderDebug} from './collider-debug.js';
+import {createTimberlineAmmoHud,TIMBERLINE_SCOPE} from './timberline-scope.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {specialPose, SPECIAL_MOTION} from './weapon-special-motion.js';
@@ -65,7 +68,7 @@ import {dressSkeleton} from './skeleton-look.js';
 import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
-import {terrainHeight as simulationHeight} from '../shared/simulation.js';
+import {terrainHeight as simulationHeight,createSimulation} from '../shared/simulation.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createVRAdventurePanel} from './vr-adventure-panel.js';
 import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} from './vr-input-policy.js';
@@ -97,7 +100,11 @@ export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainH
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
-  let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
+  let requestedActive=false;
+  const startup={ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
+  // Non-authoritative lobby preview only: never stepped, published or saved.
+  // Real room/save snapshots replace it through applySnapshot below.
+  let snapshot = createSimulation({room:'PREVIEW',seed:41}).snapshot();
   const frameMetrics=createFrameMetrics();
   const terrainSampler=createTerrainSampler(snapshot);
   const heightAt=(x,z,edits=snapshot.edits)=>edits===snapshot.edits?terrainSampler.height(x,z):terrainHeight(x,z,edits,snapshot.tick??Infinity);
@@ -156,15 +163,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const rig = new THREE.Group();
   rig.add(camera);
   scene.add(rig);
-  // Manned Timberline aids: forecast arcs in the world, the scope eyepiece on the camera, and the ammo plate.
-  const timberlineSight=createTimberlineSight({scene}),timberlineScope=createTimberlineScope({camera}),timberlineAmmoHud=createTimberlineAmmoHud();
-  let scoping=false,scopeAmount=0,scopeRangeAt=0,scopeRange='—';const scopeEye=new THREE.Vector3(),sightEye=new THREE.Vector3();
+  // Manned Timberline aids: forecast arcs in the world (while sighting along the ladder) and the ammo plate.
+  const colliderMode=new URLSearchParams(location.search).get('colliders');
+  const colliderDebug=colliderMode!==null?createColliderDebug({scene,terrainHeight:(st,x,z)=>terrainHeight(x,z,st.edits,st.tick??Infinity),legacy:colliderMode==='legacy',structureRadius:type=>STRUCTURES[type]?.radius||1.5}):null;
+  const timberlineSight=createTimberlineSight({scene}),timberlineAmmoHud=createTimberlineAmmoHud();
+  let scoping=false,scopeAmount=0;const scopeEye=new THREE.Vector3(),sightEye=new THREE.Vector3();
   scene.add(new THREE.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2));
   const sun = new THREE.DirectionalLight(0xffe3ad, 2.2);
   sun.position.set(-22, 38, 15);
   scene.add(sun);
   const groundGeometry = new THREE.PlaneGeometry(120, 120, 160, 160);
   groundGeometry.rotateX(-Math.PI / 2);
+  const terrainGeometry=createTerrainGeometryUpdater(groundGeometry);
   const ground = new THREE.Mesh(groundGeometry, new THREE.MeshStandardMaterial({ color: 0x667b43, roughness: 1, metalness: 0 }));
   scene.add(ground);
   // World-space orchard ground/sky/lighting. It owns the meadow textures (no separate loader) and reads the same
@@ -385,12 +395,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     terrainPreviousEdits=snapshot.edits;terrainPreviousTick=snapshot.tick;
     terrainSignature = signature;terrainFoundationKey=foundations;
     fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;mountainArena.sync(snapshot);alpineForest.sync();
-    const positions = groundGeometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) {const x=positions.getX(i),z=positions.getZ(i);if(!dirty||dirty.some(e=>Math.hypot(x-e.x,z-e.z)<=e.radius+.75))positions.setY(i,terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)));}
-    positions.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
-    groundGeometry.computeBoundingSphere();
-    groundGeometry.computeBoundingBox();
+    terrainGeometry.update((x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)),dirty);
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
     meadow.terrainChanged({edits: snapshot.edits, terrainTick: snapshot.tick, dirty: foundationChanged ? null : dirty});
     orchard.groundChanged({edits: snapshot.edits,terrainTick:snapshot.tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
@@ -555,7 +560,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       scene.remove(warning.group); disposeResources(warning.group); warnings.delete(id);
     }
   }
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader(),assetInstalls=[];
+  const loadAsset=loader.load.bind(loader);
+  // Include async installation, not only downloads: clones add material variants.
+  loader.load=(url,install,progress,failed)=>{
+    const pending=new Promise(resolve=>loadAsset(url,async gltf=>{
+      try{await install(gltf);}catch(error){startup.error=String(error.message||error);report(`Asset preparation: ${startup.error}`);}finally{resolve();}
+    },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}}));
+    assetInstalls.push(pending);return pending;
+  };
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}
     try{await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Timberline material preparation failed: ${error.message}`);}
@@ -884,7 +897,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const useEarth=earth&&(!prop||earth.distance<=prop.distance);
     if(!prop&&!earth)return null;
     const point=useEarth?earth.point:prop.point.toArray(),normal=useEarth?earth.normal:hitNormal(prop).toArray();
-    return {targetId:'world',part:'torso',point,normal,localPoint:point,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
+    const resolved=useEarth?null:resolveHit(prop);
+    const base=snapshot.battle?.bases?.find(b=>b.hp>0&&b.id===resolved?.targetId),targetId=base?base.id:'world';
+    // Battle bases have a local contact envelope like creatures; world-space
+    // coordinates at the ±40 m bases fail that envelope even for a direct hit.
+    const localPoint=base?point.map((v,i)=>v-base.position[i]):point;
+    return {targetId,part:'torso',point,normal,localPoint,localQuaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),delta).toArray(),distance:useEarth?earth.distance:prop.distance};
   }
   let lastPhysicalTip=null,lastPhysicalHit=-Infinity;
   function tickPhysicalMelee(now,dt){
@@ -892,7 +910,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const tip=modelTip(axeModel,tool,new THREE.Vector3());
     if(lastPhysicalTip){const travel=tip.distanceTo(lastPhysicalTip);if(travel>.018&&travel<1&&travel/Math.max(dt,.001)>1.15&&now-lastPhysicalHit>(SWING_PROFILES[tool]?.cooldown||.5)*1000){
       const from=lastPhysicalTip.toArray(),to=tip.toArray(),enemy=combat.segmentContacts(from,to)[0],world=worldContact(from,to);let hit=enemy;
-      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));if(h){const r=resolveHit(h);hit=r?{...world,...r}:null;}else hit=null;}
+      if(world&&(!enemy||world.distance<enemy.distance)){const ray=new THREE.Raycaster(lastPhysicalTip,tip.clone().sub(lastPhysicalTip).normalize(),0,travel);const h=ray.intersectObjects(content.targets().concat(inventionVisual.targets(),[shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));if(h){const r=resolveHit(h);hit=r?{...world,...r}:null;}else hit=null;}
       if(hit){lastPhysicalHit=now;unlockAudio();feedback.contact({...hit,tool,material:contactMaterial(hit.targetId),speed:travel/Math.max(dt,.001),direction:tip.clone().sub(lastPhysicalTip).toArray()});onAction('strike',{...hit,tool});}
     }}lastPhysicalTip=tip;
   }
@@ -1016,7 +1034,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function mannedMachine(){return manned?snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0):null;}
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
     manned={id:b.id,yaw:b.aimYaw||0,pitch:b.aimPitch||0,yawRate:0,sentAt:0,sent:'',sinceTick:snapshot.tick??0};yaw=(b.yaw||0)+manned.yaw;pitch=manned.pitch;
-    onAction('inventionMount',{structureId:b.id});report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Scope zooms, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click for the scope, hold R to wind faster, E or Esc steps off.');}
+    onAction('inventionMount',{structureId:b.id});report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
   function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
   function fireManned(){const b=mannedMachine();if(!b)return;unlockAudio();onAction('inventionUse',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   // Heavy traverse: the wanted aim is the mouse; the carriage accelerates toward it and tops out near 50 degrees/s.
@@ -1035,7 +1053,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const key=manned.yaw.toFixed(3)+','+manned.pitch.toFixed(3);
     if(key!==manned.sent&&now-manned.sentAt>=100){manned.sent=key;manned.sentAt=now;onAction('inventionSteer',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   }
-  // Scope: hold right mouse while manning. The eye glides from the seat to the scope's eye socket as the view narrows.
+  // Sighting: hold right mouse (or Q) while manning. The eye glides from the seat to the peep ring as the view narrows a little.
   function updateTimberlineScope(dt,b){
     scopeAmount=THREE.MathUtils.clamp(scopeAmount+(scoping?dt/.16:-dt/.12),0,1);
     if(scopeAmount>0&&inventionVisual.scopeEye(b.id,scopeEye)){const k=THREE.MathUtils.smoothstep(scopeAmount,0,1);camera.position.lerp(scopeEye.sub(rig.position),k);}
@@ -1045,14 +1063,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function updateTimberlineAids(now){
     const b=manned&&!renderer.xr.isPresenting&&role==='hero'&&active?mannedMachine():null;
     document.body.classList.toggle('timberline-manned',!!b);
-    if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}timberlineScope.update(0);inventionVisual.setScoped(null);return;}
+    if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}inventionVisual.setScoped(null);return;}
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
-    const forecast=timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits});
+    // The forecast arcs only show while sighting along the ladder, and fade in with it.
+    if(scopeAmount>0)timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits,amount:scopeAmount});else timberlineSight.hide();
     timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5});
-    // Range under the cross: march the view ray over the shared ground a few times a second.
-    if(scopeAmount>0&&now>=scopeRangeAt){scopeRangeAt=now+120;const dir=camera.getWorldDirection(scopeEye);let hit=null,prev=0;for(let d=2;d<=400;d+=d<60?1:3){const y=sightEye.y+dir.y*d,g=terrainHeight(sightEye.x+dir.x*d,sightEye.z+dir.z*d,snapshot.edits,snapshot.tick??Infinity);if(y<=g){let lo=prev,hi=d;for(let i=0;i<6;i++){const m=(lo+hi)/2;if(sightEye.y+dir.y*m<=terrainHeight(sightEye.x+dir.x*m,sightEye.z+dir.z*m,snapshot.edits,snapshot.tick??Infinity))hi=m;else lo=m;}hit=hi;break;}prev=d;}scopeRange=hit?`${Math.round(hit)} m`:'—';}
-    timberlineScope.update(scopeAmount,{range:scopeRange,impact:forecast?.impact?`${Math.round(forecast.distance)} m`:'beyond',time:forecast?.impact?`${forecast.impact.t.toFixed(1)} s`:'',ammo:timberlineAmmoText(ammo),state:ammo.total?ready.state:'Out of ammo',reload:ready.reload,ready:ready.ready});
   }
   // Hold R to wind: the operator doubles the reload; a second Hero cranking beside it quadruples it.
   function crankNearby(now){
@@ -1077,7 +1093,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
-    if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); }
+    if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); else if (event.code === 'KeyQ') special(); }
     else if (role === 'hero' && !event.repeat) {const slot=Number(event.code.replace('Digit',''))-1;if(slot>=0&&slot<equipment.length)equip(equipment[slot]);if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();}
     if(role==='god'&&!inventionPlacement&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
@@ -1199,7 +1215,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     contactFrame++;
     if (disposed) return;
     const frameStarted=performance.now();
-    frameMetrics.record('frameInterval',now-previous);
+    if(startup.ready)frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
     previous = now; renderTick=presentationClock.sample(now);
     if (active && !renderer.xr.isPresenting) {
@@ -1272,6 +1288,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     setEmberdewTime(now/1000);
     if(tool==='flask'&&axeModel){flaskModel.updateWorldMatrix(true,false);bottleFx.update({dt,time:now/1000,lit:!!snapshot.players.find(p=>p.id===playerId)?.flaskLit,worldPosition:flaskModel.getWorldPosition(bottlePosition),worldQuaternion:flaskModel.getWorldQuaternion(bottleRotation)});}
     updateTimberlineAids(now);
+    colliderDebug?.update(snapshot,now);
     const ranged=rangedReticle.set({tool,role,menuOpen:!active||(tool==='crossbow'&&adsAmount>.5),presenting:renderer.xr.isPresenting,...weaponState});
     document.body.classList.toggle('ranged-aim-active',!!ranged||adsAmount>.5);
     if(shouldShowTrajectory({tool,role,menuOpen:!active,...weaponState})){
@@ -1343,6 +1360,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
     skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
+    // Update poses during loading, but don't compile new variants in a play frame.
+    if(!startup.ready)return;
     renderer.render(scene, camera);
     if (onVoicePose && playerId) {
       // After render, WebXR's viewer camera includes this frame's head pose.
@@ -1366,12 +1385,41 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     geometries.forEach(value => value.dispose()); textures.forEach(value => value.dispose()); materials.forEach(value => value.dispose());
   }
   rebuildGround(); resize(); renderer.setAnimationLoop(frame);
-  void spellVisual.prepareShaders(renderer, camera, scene).then(() => expedition.prepare(renderer,camera,scene)).then(() => {
-    if (!disposed) return renderer.compileAsync(scene, camera);
-  }).catch(error => {
-    if (!disposed) report(`Shader preparation: ${error.message}`);
-  });
-  report(`World renderer ready (${Math.round(performance.now() - started)} ms).`);
+  report('Preparing world assets and materials…');
+  void (async()=>{
+    const representatives=new THREE.Group(),warmHeroes=[];
+    try{
+      await Promise.all(assetInstalls);if(disposed)return;
+      // Build the default render-only world before compiling, even in the empty
+      // lobby. Do not initialize a player or step/publish this preview state.
+      content.sync(snapshot);syncWorldSignals();syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
+      // Lobby startup has no roster. Prepare the actual clone/rig variants now,
+      // so the first remote players and bot wave don't move compilation to join.
+      for(const [i,name] of ['axe','pick','hammer','crossbow','bow','wyrmspout','flask'].entries()){
+        const data={id:`warm-hero-${i}`,role:'hero',tool:name,hp:100},visual=heroView.create(data,{variant:i%2?'mosswarden':'emberwright'});
+        if(visual){const root=new THREE.Group();root.position.set(i*2-6,0,0);root.add(visual);representatives.add(root);heroView.update(visual,data,root,1/60,camera.position);warmHeroes.push(visual);}
+      }
+      for(let i=0;i<6;i++){const visual=instantiate('skeleton',1.7,i);if(visual){visual.position.set(i*2-5,0,-3);representatives.add(visual);}}
+      const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
+      scene.add(representatives);scene.updateMatrixWorld(true);
+      startup.phase='shaders';report('Preparing world shaders and textures…');
+      await spellVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
+      await expedition.prepare(renderer,camera,scene);if(disposed)return;
+      await renderer.compileAsync(scene,camera);if(disposed)return;
+      const textures=new Set();scene.traverse(object=>{for(const material of [object.material,object.customDepthMaterial,object.customDistanceMaterial].flat())if(material)for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);});
+      // Small upload batches let the loading interface update between them.
+      for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;if(startup.textureCount%8===0)await new Promise(resolve=>setTimeout(resolve,0));}
+      if(disposed)return;
+      startup.phase='shadows';
+      // compileAsync omits the shadow render pass. Warm both camera families once.
+      const warmCamera=camera.clone();warmCamera.position.set(0,48,38);warmCamera.lookAt(0,0,0);
+      const warmStarted=performance.now();renderer.render(scene,camera);renderer.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
+      await renderer.compileAsync(scene,camera);if(disposed)return;
+    }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
+    finally{for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
+    if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
+    report(`World renderer ready (${Math.round(startup.readyMs)} ms).`);
+  })();
   // Read-only presentation evidence for browser QA (no input, state or credentials).
   Object.defineProperty(canvas, 'brannDiagnostics', {configurable: true, value: () => disposed ? null : api.diagnostics()});
   const api = {
@@ -1439,12 +1487,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {startup:{...startup},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
     setExpeditionPointerHand(hand) { adventurePanel.setPointerHand(hand); },
-    controlsSnapshot() {return {pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,range:scopeRange,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
+    controlsSnapshot() {return {pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');
@@ -1455,6 +1503,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     },
     setActive(value) {
       if (disposed) return;
+      requestedActive=!!value;if(!startup.ready)return;
       if(active===!!value)return;
       clearInput(); active = !!value;if(!active)cancelInventionPlacement();
       if (!active && document.pointerLockElement === canvas) document.exitPointerLock();
@@ -1467,7 +1516,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();timberlineScope.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

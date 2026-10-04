@@ -189,7 +189,20 @@ export class WorldSession extends EventTarget {
     else this.connection.send(this.connection.hostId, {kind:'command',epoch:this.connection.epoch,message});
     return true;
   }
+  get battleCompatible() { return this.connection.local === true || this.connection.maxPeers >= MAX_PLAYERS; }
   applyCommand(id, message) {
+    if (message?.type === 'battle' && ['start','stop','reset'].includes(message.action) && id !== this.connection.hostId) {
+      const detail={code:'host_required',message:'Only the world host can change battle mode. Ask the host to start or reset the battle.'};
+      if (id===this.identity?.peerId) this.emit('error',detail);
+      else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
+      return;
+    }
+    if (message?.type==='battle' && ['start','reset'].includes(message.action) && !this.battleCompatible) {
+      const detail={code:'client_update_required',message:'Everyone in this world must refresh the game before starting Battle mode. Older players can leave instead; ordinary exploration remains available.'};
+      if (id===this.identity?.peerId) this.emit('error',detail);
+      else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
+      return;
+    }
     const result = this.simulation.command(id,message);
     if (!result.ok) {
       const detail = {code:result.code,message:result.code.replaceAll('_',' '),...(typeof result.reason==='string'?{reason:result.reason.slice(0,280)}:{}),...(result.missing?{missing:result.missing}:{}),...(result.obstacle?{obstacle:result.obstacle}:{})};
@@ -254,14 +267,17 @@ export class WorldSession extends EventTarget {
     const now = performance.now(), elapsed = Math.max(0, Math.min(100,now-this.last)); this.last = now;
     if (!this.running || !this.simulation) return;
     this.accumulator += elapsed;
-    let steps = 0;
+    let steps = 0, publishDue = false;
     while(this.accumulator >= 1000/HZ && steps < 6) {
       const start = performance.now();
       for(const event of this.simulation.step()) this.event(event);
       this.metrics.maxStepMs = Math.max(this.metrics.maxStepMs,performance.now()-start);
       this.metrics.steps++; this.accumulator -= 1000/HZ; steps++;
-      if(this.metrics.steps % 3 === 0) this.publish();
+      if(this.metrics.steps % 3 === 0) publishDue = true;
     }
+    // Keep every 60 Hz simulation step/event, but don't serialize obsolete intermediate
+    // states when catching up after a delayed browser timer. Publish the freshest state once.
+    if (publishDue) this.publish();
     if(this.accumulator >= 1000/HZ) { this.metrics.overruns++; this.accumulator = 0; }
   }
   publish(force = false) {
@@ -272,18 +288,26 @@ export class WorldSession extends EventTarget {
     this.emit('snapshot',snapshot);
     // Exact sweep history is host-only; guests need current flight state, not16 old poses.
     // Millimetre rounding keeps the same JSON shape; checkpoints below stay exact.
-    if(!this.connection.local){
+    const peers = this.connection.peers;
+    if(!this.connection.local && (!(peers instanceof Map) || peers.size)){
     const wireSnapshot=quantizeWire({...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)});
     const legacy = {kind:'snapshot',epoch:this.connection.epoch,snapshot:wireSnapshot};
-    const peers = this.connection.peers;
     if (!this.codec.size || !(peers instanceof Map)) this.connection.broadcast(legacy);
     else {
       // Capable peers get a delta against the frame they last received (or a keyframe); others stay legacy.
       let encoded = true; try { this.codec.publish(wireSnapshot); } catch { encoded = false; }
+      const prepared = new Map(), canPrepare = typeof this.connection.prepareMessage === 'function' && typeof this.connection.sendPrepared === 'function';
       for (const id of peers.keys()) {
         const frame = encoded ? this.codec.frame(id, this.connection.epoch) : null;
-        if (!frame) this.connection.send(id, legacy);
-        else if (!this.connection.send(id, frame)) this.codec.resync(id);
+        let sent;
+        if (canPrepare) {
+          // Within one publication all keyframes are identical, as are all deltas.
+          // Preserve each peer's base bookkeeping while encoding each payload just once.
+          const key = frame ? frame.b : 'legacy';
+          if (!prepared.has(key)) prepared.set(key, this.connection.prepareMessage(frame || legacy));
+          sent = this.connection.sendPrepared(id, prepared.get(key));
+        } else sent = this.connection.send(id, frame || legacy);
+        if (frame && !sent) this.codec.resync(id);
       }
     }
     }

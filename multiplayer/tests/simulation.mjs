@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
+import {createSimulation, loadSimulation, terrainHeight, MAX_PLAYERS} from '../shared/simulation.js';
 
 const sim = createSimulation({room: 'TEST'});
 assert.equal(sim.addPlayer({id: 'hero', name: 'A', role: 'hero'}).ok, true);
 assert.equal(sim.addPlayer({id: 'god', role: 'god'}).ok, true);
-for (let i = 2; i < 8; i++) assert.equal(sim.addPlayer({id: `p${i}`}).ok, true);
-assert.equal(sim.addPlayer({id: 'ninth'}).code, 'room_full');
-assert.equal(sim.snapshot().maxPlayers, 8);
+for (let i = 2; i < MAX_PLAYERS; i++) assert.equal(sim.addPlayer({id: `p${i}`}).ok, true);
+assert.equal(sim.addPlayer({id: 'overflow'}).code, 'room_full');
+assert.equal(sim.snapshot().maxPlayers, MAX_PLAYERS);
 assert.equal(sim.snapshot().players[0].position[2], 8);
 
 // A fixed tick lasts exactly 1/60 second. Input expires after 300 ms.

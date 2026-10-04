@@ -7,9 +7,10 @@
 const COMPACT_QUERY = '(max-width: 760px), (max-height: 560px)';
 const PAGES = [
   { id: 'play', label: 'Play' },
-  { id: 'controls', label: 'Controls' },
+  { id: 'controls', label: 'Input' },
   { id: 'world', label: 'World' },
-  { id: 'supplies', label: 'Supplies' },
+  { id: 'supplies', label: 'Stock' },
+  { id: 'battle', label: 'Battle' },
 ];
 const FIXED = new Set(['resumePlay', 'leave']);
 
