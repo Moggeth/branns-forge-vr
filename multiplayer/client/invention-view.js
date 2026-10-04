@@ -1,4 +1,5 @@
 import {createTimberlineBallista} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
+import {addLadderPlates} from './timberline-ladder-plates.js';
 import {createTimberlineBoltPair,collectMaterials} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-bolts.js';
 import {createTimberlineFx} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-fx.js';
 import {timberlineFlight,timberlineLaunch,timberlineVelocity,TIMBERLINE_RELEASE_TICKS} from '../shared/timberline-flight.js';
@@ -24,7 +25,7 @@ export function createInventionView({scene}){
 
  function installTimberline(name,gltf){assets[name]=gltf;if(name==='timberline_ballista')for(const e of entries.values())if(e.data.type==='timberline')upgrade(e);
   if(assets.timberline_bolts&&assets.timberline_ballista&&!stuck){stuck=createTimberlineStuck({scene,gltf:assets.timberline_bolts,sharedMaterials:collectMaterials(assets.timberline_ballista.scene),ground:(x,z)=>terrainHeight(snapshot,x,z,false)});if(snapshot)stuck.sync(snapshot);}}
- function upgrade(e){if(e.machine||!assets.timberline_ballista)return;e.machine=createTimberlineBallista(assets.timberline_ballista,{castShadow:false});e.root.add(e.machine.object);e.root.traverse(n=>{if(n.isMesh)n.userData.targetId=e.data.id;});}
+ function upgrade(e){if(e.machine||!assets.timberline_ballista)return;e.machine=createTimberlineBallista(assets.timberline_ballista,{castShadow:false});e.root.add(e.machine.object);addLadderPlates(e.machine.nodes);e.root.traverse(n=>{if(n.isMesh)n.userData.targetId=e.data.id;});}
  function sync(s){snapshot=s;stuck?.sync(s);const ids=new Set();
   if(s.inventions&&!refinery){refinery=createForgeWorks();scene.add(refinery.root);}
   if(refinery)refinery.place(terrainHeight(s,FORGE_WORKS_ORIGIN[0],FORGE_WORKS_ORIGIN[1],false));
@@ -56,7 +57,7 @@ export function createInventionView({scene}){
   }
   tracers.end();
   for(const[id,v]of shots)if(!ids.has(id)){v.pair?.dispose();v.root.removeFromParent();shots.delete(id);}
-for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Math.sin(b.yaw-e.root.rotation.y),Math.cos(b.yaw-e.root.rotation.y))*Math.min(1,dt*9);if(e.field){e.field.position.copy(e.root.position);e.field.position.y+=.08;e.field.visible=b.hp>0&&b.charge>0;}if(e.machine){e.root.rotation.y=b.yaw;const local=localAim.get(b.id);e.machine.aimImmediate(local?local.yaw:b.aimYaw||0,local?local.pitch:b.aimPitch||0);const viewer=viewerId&&snapshot?.players?.find(p=>p.id===viewerId),armed=!viewer||viewer.role!=='hero'||(viewer.side==='rivals'?'rivals':'party')!==b.side||timberlineAmmo(snapshot,viewer).total>0;e.armed=armed;e.machine.seekCycle(machineCycleAge({...b,fireTick:e.fireTick},tick),camera,viewportHeight,{ammo:armed});if(e.machine.nodes.Scope)e.machine.nodes.Scope.visible=!(scoped&&scoped.id===b.id&&scoped.amount>.3);}else animateInventionModel(e.root,{time:tick/60,fireAge:(tick-e.fireTick)/60,damage:1-b.hp/Math.max(1,b.maxHp||STRUCTURES[b.type]?.hp||100),progress:Math.max(0,Math.min(1,1-(b.readyTick-tick)/(b.type==='launcher'?360:240))),active:b.hp>0,yaw:b.aimYaw??0,open:b.open?1:0,armed:b.armed,charge:b.charge/240});e.root.scale.y=b.hp<=0?.24:1;if(b.type==='foundation'){e.root.rotation.z=0;e.root.visible=b.hp>0;}}
+for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Math.sin(b.yaw-e.root.rotation.y),Math.cos(b.yaw-e.root.rotation.y))*Math.min(1,dt*9);if(e.field){e.field.position.copy(e.root.position);e.field.position.y+=.08;e.field.visible=b.hp>0&&b.charge>0;}if(e.machine){e.root.rotation.y=b.yaw;const local=localAim.get(b.id);e.machine.aimImmediate(local?local.yaw:b.aimYaw||0,local?local.pitch:b.aimPitch||0);const viewer=viewerId&&snapshot?.players?.find(p=>p.id===viewerId),armed=!viewer||viewer.role!=='hero'||(viewer.side==='rivals'?'rivals':'party')!==b.side||timberlineAmmo(snapshot,viewer).total>0;e.armed=armed;e.machine.seekCycle(machineCycleAge({...b,fireTick:e.fireTick},tick),camera,viewportHeight,{ammo:armed});}else animateInventionModel(e.root,{time:tick/60,fireAge:(tick-e.fireTick)/60,damage:1-b.hp/Math.max(1,b.maxHp||STRUCTURES[b.type]?.hp||100),progress:Math.max(0,Math.min(1,1-(b.readyTick-tick)/(b.type==='launcher'?360:240))),active:b.hp>0,yaw:b.aimYaw??0,open:b.open?1:0,armed:b.armed,charge:b.charge/240});e.root.scale.y=b.hp<=0?.24:1;if(b.type==='foundation'){e.root.rotation.z=0;e.root.visible=b.hp>0;}}
   if(refinery){const bay={};for(const q of snapshot?.pickups||[])if(isBayStack(q))bay[q.kind]=(bay[q.kind]||0)+q.amount;
    const feedReady=(snapshot?.players||[]).some(p=>p.role==='hero'&&p.hp>0&&Math.hypot(p.position[0],p.position[2])<12&&Object.keys(p.resources||{}).some(k=>/Ore$/.test(k)&&p.resources[k]>0));
    refinery.animate({time:tick/60,dt,jobs:snapshot?.inventions?.refining?.length||0,feedReady,bay});}
@@ -65,7 +66,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
  return {installTimberline,sync,event,update,
   // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
   setLocalAim(id,aim){if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
-  // The operator looking through the scope: its body would fill the narrow view, so it hides for that viewer only.
+  // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
   setScoped(id,amount=0){scoped=id&&amount>0?{id,amount}:null;},
   scopeEye(id,out=new THREE.Vector3()){const e=entries.get(id);if(!e?.machine)return null;e.root.updateWorldMatrix(true,true);return e.machine.nodes.Socket_ScopeEye?.getWorldPosition(out)||null;},
   targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root),preview(point,type,validation=null){
