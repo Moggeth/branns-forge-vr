@@ -2,6 +2,8 @@
 
 # Brann's Forge - current browser game
 
+Combined PR review: [landmarks, earth presentation, apples and Siegebird](docs/MERGE-REVIEW-20261004.md).
+
 **Start here:** [Claude takeover handoff](docs/CLAUDE-HANDOFF-20261003.md).
 Latest engineering review: [2026-10-04 robustness findings, fixes and remaining save-recovery limitation](docs/CODE-QUALITY-REVIEW-20261004.md).
 In progress: [public room directory and measured multiplayer/terrain performance work](docs/PUBLIC-ROOMS-PERFORMANCE-20261004.md) (room-browser UI pending design).

@@ -1,5 +1,13 @@
 # Multiplayer protocol checks
 
+Browser acceptance scripts using `browser-acceptance-lib.mjs` disable WebXR by
+default so desktop testing cannot wake SteamVR/OpenXR merely by checking headset
+availability. Use `BROWSER_QA_XR=1` only for deliberate XR acceptance. Always close
+owned browser contexts in `finally`, end any XR session, and close any VR runtime
+the test started when finished. Do not leave test browser windows or headsets
+running. Set `PW_CORE`, `PW_CHROME` and `ACCEPT_BASE` to the existing local runtime
+and disposable review server; capture evidence under ignored `logs/`.
+
 Run against an owned disposable proof server, never the native forge/voice service:
 
 ```powershell

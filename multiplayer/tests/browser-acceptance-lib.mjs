@@ -21,8 +21,12 @@ export const sleep = t => new Promise(r => setTimeout(r, t));
 
 export async function launch({viewport = {width: 1280, height: 720}, headless = process.env.HEADED ? false : true, touch = false} = {}) {
   if (CHROME && !existsSync(CHROME)) throw Error(`Chromium not found at ${CHROME}`);
-  const browser = await chromium.launch({...(CHROME?{executablePath:CHROME}:{}), headless, args: ['--enable-unsafe-swiftshader']});
+  // Desktop acceptance must not probe OpenXR and wake a connected headset runtime.
+  // Physical XR acceptance is a separate, deliberate opt-in.
+  const xr = process.env.BROWSER_QA_XR === '1';
+  const browser = await chromium.launch({...(CHROME?{executablePath:CHROME}:{}), headless, args: ['--enable-unsafe-swiftshader', ...(!xr ? ['--disable-features=WebXR'] : [])]});
   const context = await browser.newContext({viewport, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1});
+  if (!xr) await context.addInitScript(() => Object.defineProperty(navigator, 'xr', {value: undefined, configurable: true}));
   const page = await context.newPage();
   const log = join(here, 'logs', 'browser-console.log'); mkdirSync(dirname(log), {recursive: true});
   page.errors = []; page.missing = [];

@@ -49,6 +49,8 @@ async function look(at, n = 20) {
 async function walkTo(at, near) {
  for (let i = 0; i < 120; i++) { const {me} = await harness(); if (Math.hypot(at[0] - me.position[0], at[2] - me.position[2]) < near) return true;
   await look(at, 2); await page.keyboard.down('KeyW'); await frames(4); await page.keyboard.up('KeyW'); }
+ const {me, c} = await harness();
+ record('walk-blocked', 'fail', {position: me.position, target: at, near, controls: c});
  return false;
 }
 // Look and attack need the pointer captured, as on desktop; the first click only captures it.
@@ -85,14 +87,23 @@ try {
  assert.ok(halves.length >= 2, 'the wire cut an apple into two halves');
  await frames(60);
  recording = false; await page.keyboard.press('KeyE'); await frames(30);
+ // Step sideways off the firing line before walking toward the orchard;
+ // this straight-line test driver cannot pathfind around intervening trunks.
+ assert.equal((await harness()).c.manned, null, 'stepped off the Timberline');
+ await page.keyboard.down('KeyD'); await frames(40); await page.keyboard.up('KeyD');
  const half = (await harness()).s.fruit.drops.filter(d => d.half && d.mode === 'rest').sort((a, b) => a.id < b.id ? -1 : 1)[0]; assert.ok(half, 'a half came to rest');
- assert.ok(await walkTo(half.position, 1.2), 'walked to a half');
+ // These halves land on the far side of tree1. Approach from that side so E
+ // has a clear line of sight; proximity alone must not collect through a trunk.
+ assert.ok(await walkTo([tree.x + 2, half.position[1], tree.z - 2], .7), 'walked around the tree');
+ assert.ok(await walkTo([half.position[0], half.position[1], half.position[2] - .8], .5), 'walked to a half');
  recording = true; await look(half.position, 16); await frames(20); await shot(page, 'timberline-apple-half');
  const hp0 = (await harness()).me.hp;
  // E takes the nearest pickup first (the Orchard's gift basket can sit closer than the halves), so press until a half is in hand.
  const mine = async () => (await harness()).s.fruit.drops.find(d => d.half && d.heldBy === id);
  for (let k = 0; k < 4 && !(await mine()); k++) { await look(half.position, 4); await page.keyboard.press('KeyE'); await frames(30); }
- await frames(15); let held = await mine(); assert.ok(held, 'took a half'); record('take-half', 'pass', {id: held.id});
+ await frames(15); let held = await mine();
+ if (!held) { const {s, me} = await harness(); record('pickup-blocked', 'fail', {position: me.position, tree: [tree.x, tree.z], half, drops: s.fruit.drops, heldOre: me.heldOre}); }
+ assert.ok(held, 'took a half'); record('take-half', 'pass', {id: held.id});
  await look([held.position[0], held.position[1] + 1.6, held.position[2] - 6], 12); await frames(15);
  await capture(); for (let b = 0; b < 2 && (await mine()); b++) { await page.mouse.down(); await page.mouse.up(); await frames(68); if (!b) await shot(page, 'timberline-apple-half-bite'); }
  await frames(60);
