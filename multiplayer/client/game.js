@@ -24,6 +24,7 @@ import {createAxeReadyCue} from './axe-ready-cue.js';
 import {createAxeCleaveView,playCleaveSound} from './axe-cleave-view.js';
 import {spellUnavailable} from './spell-availability.js';
 import {expeditionRunning} from '../shared/adventure.js';
+import {swiftFactor} from '../shared/god-boons.js';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTerrainRaycaster} from './terrain-ray.js';
@@ -65,6 +66,7 @@ import {createAlpineSkyline} from './alpine-skyline.js';
 import {createAlpineForest} from './alpine-forest.js';
 import {createHeroView} from './hero-view.js';
 import {createWoodAudio} from './wood-audio.js';
+import {createSpellAudio} from './spell-audio.js';
 import {createMaterialAudio} from './material-audio.js';
 import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from './siegebird-flock.js';
 import {createSiegebirdAudio} from './siegebird-audio.js';
@@ -73,7 +75,9 @@ import {specialCooldown} from '../shared/special-cooldowns.js';
 import {worldTrees} from '../shared/world-content.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
-export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick},x,z,false);}
+// Presentation helpers pass only edits; the baked ground (old settled earthworks) comes from the latest snapshot.
+let currentTerrainBake;
+export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null }) {
   const started = performance.now();
@@ -92,7 +96,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
-  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyO:'awaken',KeyP:'wildwake'};
+  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
@@ -632,7 +636,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Geode golems: crystal light, footfall/slam dust and resonance ring, procedural sound; rumble only reaches a nearby Hero.
   const golemFx=createGolemPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),
     haptic:(amplitude,ms)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:Math.min(1,amplitude),duration:ms}]);else if(touchEnabled&&amplitude>.3)try{navigator.vibrate?.(Math.round(ms*amplitude));}catch{}}});
-  let audioContext=null;let lastSound=0;let woodAudio=null;let materialAudio=null;
+  let audioContext=null;let lastSound=0;let woodAudio=null;let materialAudio=null;let spellAudio=null;
   // Wins (raids, rewards, crafting, building, loot) answer with light, chimes and rumble; presentation only.
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
@@ -665,8 +669,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Wood kit shares this one context (bounded 16-voice pool); it is created only inside the existing gesture unlock.
   const ear={position:[0,0,0],forward:[0,0,-1],up:[0,1,0]},earVector=new THREE.Vector3(),earQuaternion=new THREE.Quaternion();
+  function earXZ(){const p=listenerPose().position;return {x:p[0],z:p[2]};}
   function listenerPose(){camera.getWorldPosition(earVector);earVector.toArray(ear.position);camera.getWorldDirection(earVector);earVector.toArray(ear.forward);earVector.set(0,1,0).applyQuaternion(camera.getWorldQuaternion(earQuaternion)).toArray(ear.up);return ear;}
-  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();wallAudio??=createCrystalWallAudio({context:audioContext});}catch{}}
+  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
   let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
@@ -703,7 +708,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
-    if(event.kind==='spell')spellVisual.play(event);
+    if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');}
+    // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
+    if(event.kind==='bloom_level'){const at=event.position||[0,0,0];spellVisual.play({spell:'bloom_level',position:at,id:`bloom:${event.level}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift({...event,gift:'bloom_level',position:at},earXZ(),true);if(touchEnabled)try{navigator.vibrate?.([20,40,20,40,40]);}catch{}}
+    if(event.kind==='god_gift'||event.kind==='charged_strike'){const boon=event.kind==='charged_strike'?'charged_strike':['charge','swift'].includes(event.gift)?event.gift:event.gift==='blessing'?'blessed':'gift',mine=event.id===playerId||event.by===playerId;
+      spellVisual.play({spell:boon,position:event.position,id:`${event.kind}:${event.id}:${event.gift||''}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift(event,earXZ(),mine);
+      if(mine&&renderer.xr.isPresenting)feedback.pattern?.((boon==='charge'||boon==='blessed')?[{at:0,amplitude:.8,duration:60},{at:100,amplitude:.5,duration:30}]:[{at:0,amplitude:boon==='charged_strike'?.7:.3,duration:30}]);
+      else if(mine&&touchEnabled)try{navigator.vibrate?.(boon==='charge'||boon==='blessed'?[60,40,30]:boon==='charged_strike'?[35]:boon==='swift'?[20,30,20]:[12]);}catch{}}
     if(event.kind==='pick_burst'){wallAudio?.cast(event,listenerPose());
       // The caster feels the wave roll away from them: pulses fade as the front travels, then one crack as it blooms.
       if(event.id===playerId){const ms=(event.durationTicks||50)/.06,steps=[];for(let t=0;t<ms;t+=110)steps.push({at:t,amplitude:.55-.35*t/ms,duration:38});steps.push({at:ms+60,amplitude:.7,duration:60});feedback.pattern?.(steps);
@@ -1059,7 +1070,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
-      const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*dt*5,move.z*dt*5);localPosition.fromArray(predicted);
+      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{});const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(snapshot, localPosition.x, localPosition.z)),localPosition.y);
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
@@ -1192,7 +1203,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
-      terrainSampler.setState(snapshot);
+      currentTerrainBake=snapshot.terrainBake;terrainSampler.setState(snapshot);
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
       presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});
@@ -1276,7 +1287,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();rewards.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();

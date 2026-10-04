@@ -1,4 +1,4 @@
-import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront} from './terrain.js';
+import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront,makeTerrainRoom} from './terrain.js';
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
 export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:80}); // cooldown: pick (see special-cooldowns.js)
@@ -33,6 +33,7 @@ function crystalWall(state,p,ctx,m) {
   const plan=planCrystalWall(p.position,p.yaw,m.point);
   if([plan.start,plan.end].some(q=>Math.abs(q[0])>46||Math.abs(q[1])>46))return fail('outside_world');
   const n=plan.segments.length;
+  makeTerrainRoom(state,n+state.pendingStarfalls.length);
   if(state.edits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.edits||state.deposits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.deposits)return fail('world_limit');
   const position=[p.position[0],terrainHeight(state,p.position[0],p.position[2]),p.position[2]],editIds=[],depositIds=[],events=[];
   // At most PICK_WALL.standing of a caster's walls stand: the oldest still-standing one shatters to make room.

@@ -402,6 +402,24 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       gS(poly(6, 0.6, Math.PI / 6), 0.07, PAL.white); gS(poly(6, R * 0.2, 0), 0.04, PAL.frost, { dash: 2, flow: 0.4, fine: true });
       cross(R * 0.25); moteField(36, R, PAL.ice, -1.8, 0.14, 61);
     },
+    spring(R) { // welling pool: double water rim, inward ripples, a rising bead at the centre
+      gS(wave(R, 22, 0.04, 0, 160), 0.08, PAL.water, { flow: 0.3 }); gS(circ(R * 0.82, 64), 0.045, PAL.mint, { dash: 1.2, flow: -0.6, fine: true });
+      for (const q of [0.25, 0.5]) gS(circ(R * q, 48), 0.04, PAL.water, { dash: 0.8, flow: 0.8, fine: true });
+      gS(drop(0, 0, Math.PI / 2, 0.9), 0.07, PAL.mint, OK());
+      cross(R * 0.3); moteField(18, R * 0.8, PAL.water, 1.4, 0.14, 71);
+    },
+    blessing(R) { // radiant star: gold-and-blue rays out to a fine rim, a halo above the centre
+      gS(circ(R, 96), 0.07, PAL.star, { flow: 0.3 }); gS(circ(R * 0.94, 96), 0.035, PAL.crystal, { dash: 1.4, flow: -0.4, fine: true });
+      for (let i = 0; i < 8; i++) { const a = (i * TAU) / 8; gS(radial(a, 0.5, R * (i % 2 ? 0.6 : 0.88)), i % 2 ? 0.045 : 0.07, i % 2 ? PAL.crystal : PAL.star, { prop: true, flow: 0.8 }); }
+      const g = G(0, 0), halo = []; for (let i = 0; i <= 32; i++) { const a = (i * TAU) / 32; halo.push([g[0] + Math.cos(a) * 0.6, g[1] + 2.2, g[2] + Math.sin(a) * 0.6]); }
+      aS(halo, 0.06, PAL.star, OK());
+      cross(R * 0.3); moteField(26, R, PAL.star, 1.6, 0.14, 73);
+    },
+    quake(R) { // concentric fault rings with jagged cracks running out from the centre
+      const r = rng(79); for (const [q, w] of [[1, 0.08], [0.7, 0.05], [0.4, 0.045]]) gS(wave(R * q, 14, 0.06, q * 3, 140), w, q === 1 ? PAL.crystal : PAL.amethyst, { flow: q === 1 ? 0.4 : -0.3, fine: q !== 1 });
+      for (let i = 0; i < 7; i++) { const a = (i * TAU) / 7 + 0.3; gS(jag(Math.cos(a) * 0.5, Math.sin(a) * 0.5, Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95, 8, 0.4, r), 0.055, PAL.crystal, { prop: true, flow: 1.2 }); }
+      cross(R * 0.25); moteField(24, R, PAL.crystal, 0.8, 0.14, 83);
+    },
   };
   function invSmooth(f) { let a = 0, b = 1; for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if (smooth(m) < f) a = m; else b = m; } return (a + b) / 2; }
 

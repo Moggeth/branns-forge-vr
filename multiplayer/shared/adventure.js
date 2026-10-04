@@ -3,6 +3,8 @@
 // steps it once per 60 Hz simulation tick, and applies the returned intents to the simulation state.
 // Stages: idle -> camp (prepare camp) -> star (recover the fallen star) -> rekindle (survive) -> victory | defeat.
 
+import {makeTerrainRoom} from './terrain.js';
+
 export const ADVENTURE_VERSION = 1;
 export const HZ = 60;
 export const STAGES = Object.freeze(['idle', 'camp', 'star', 'rekindle', 'victory', 'defeat']);
@@ -372,6 +374,7 @@ export function applyAdventureIntents(state, intents, {createEnemy, terrainHeigh
       if (full() || taken(it.id)) { skipped.push(it.id); continue; }
       state.deposits.push(it.kind === 'stone' ? {id: it.id, x: it.x, z: it.z, kind: 'stone', hits: 0, maxHits: 3, depleted: false} : {id: it.id, x: it.x, z: it.z, kind: 'meteor', hits: 0, maxHits: 5, depleted: false}); applied++;
     } else if (it.type === 'crater') {
+      makeTerrainRoom(state, 1 + state.pendingStarfalls.length);
       if (state.edits.length + state.pendingStarfalls.length >= 64 || taken(it.id)) { skipped.push(it.id); continue; }
       state.edits.push({id: it.id, kind: 'starfall', x: it.x, z: it.z, radius: it.radius, height: it.height});
       for (const a of [...state.players, ...state.enemies]) a.position[1] = Math.max(a.position[1], terrainHeight(state, a.position[0], a.position[2]));

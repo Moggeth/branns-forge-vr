@@ -109,7 +109,8 @@ export function triangleHeight(sample,x,z) {
 export function baseHeight(x,z) {return triangleHeight(rawBaseHeight,x,z);}
 // Foundation tops are recorded at placement, independent of future terrain edits.
 export const FOUNDATION_HALF=3,FOUNDATION_BLEND=2;
-export function foundationTerrainKey(state) {return (state.inventions?.structures||[]).filter(b=>b.type==='foundation').map(b=>`${b.id}:${b.hp>0?1:0}:${b.position.join(',')}`).join(';');}
+// Terrain that is not in the edit list: foundation tops and the baked-edit revision. Any change here is a full refresh.
+export function foundationTerrainKey(state) {return (state.inventions?.structures||[]).filter(b=>b.type==='foundation').map(b=>`${b.id}:${b.hp>0?1:0}:${b.position.join(',')}`).join(';')+(state.terrainBake?`|bake${state.terrainBake.rev}`:'');}
 export function foundationAt(state,x,z,radius=0,owner=null) {return (state.inventions?.structures||[]).find(b=>b.type==='foundation'&&b.hp>0&&(!owner||b.side===owner)&&Math.abs(x-b.position[0])+radius<=FOUNDATION_HALF&&Math.abs(z-b.position[2])+radius<=FOUNDATION_HALF);}
 function foundationHeight(state,x,z,y) {
   // Blend independent of structure ordering. Odds weighting tends to the exact
@@ -127,6 +128,7 @@ function foundationHeight(state,x,z,y) {
 }
 export function rawTerrainHeight(state,x,z) {
   let earth=0,scar=0,wall=0;
+  if(state.terrainBake&&sampleBake(state.terrainBake,x,z)){earth=BAKED[0];scar=BAKED[1];}
   for(const edit of state.edits||[]) {
     const dx=x-edit.x,dz=z-edit.z;
     // Most kernels do not cover this vertex. Reject before the costly hypot,
@@ -196,4 +198,92 @@ export function resolveTerrainBoundary(position,radius=.28) {
 export function settleTerrainContents(state) {
   for(const actor of [...state.players,...state.enemies])actor.position[1]=Math.max(actor.position[1],terrainHeight(state,actor.position[0],actor.position[2]));
   for(const q of state.pickups)q.y=terrainHeight(state,q.x,q.z,false);
+}
+
+// ---- Baked terrain: unlimited settled edits at a constant reading cost ----
+// The live edit list keeps at most TERRAIN_BAKE.live entries for animation and presentation. When a new
+// edit needs room, the oldest settled permanent edits are folded into a per-vertex grid (the ground mesh's
+// own 161 x 161 lattice, so the surface is unchanged) and leave the list. The grid is stored as 16 x 16
+// vertex tiles of little-endian Int16 millimetres in base64, one map per channel; empty tiles are omitted.
+// Channels hold unclamped sums (bounded to +/-limitMm), so the usual clamps apply exactly as before.
+export const TERRAIN_BAKE=Object.freeze({tile:16,tiles:11,live:48,bakeTo:32,limitMm:30000});
+const SIDE=TERRAIN_GRID.segments+1,TILE=TERRAIN_BAKE.tile,TILE_CELLS=TILE*TILE,CHANNELS=['earth','scar'];
+const BAKED=[0,0],tileCache=new Map(),gridCache=new WeakMap();
+const TILE_KEY=/^(\d|10),(\d|10)$/;
+function decodeTile(text) {
+  let a=tileCache.get(text);if(a)return a;
+  const bin=atob(text);a=new Int16Array(TILE_CELLS);
+  for(let i=0;i<TILE_CELLS;i++)a[i]=(bin.charCodeAt(2*i)|bin.charCodeAt(2*i+1)<<8)<<16>>16;
+  if(tileCache.size>=2048)tileCache.clear();tileCache.set(text,a);return a;
+}
+function encodeTile(a) {let bin='';for(let i=0;i<TILE_CELLS;i++){const v=a[i]&0xffff;bin+=String.fromCharCode(v&255,v>>8);}return btoa(bin);}
+function bakedGrid(bake) {
+  let g=gridCache.get(bake);if(g)return g;
+  g={earth:new Int16Array(SIDE*SIDE),scar:new Int16Array(SIDE*SIDE)};
+  for(const ch of CHANNELS)for(const [key,text] of Object.entries(bake[ch]||{})){
+    const [ti,tj]=key.split(',').map(Number),a=decodeTile(text);
+    for(let v=0;v<TILE;v++){const iz=tj*TILE+v;if(iz>=SIDE)break;for(let u=0;u<TILE;u++){const ix=ti*TILE+u;if(ix>=SIDE)break;g[ch][iz*SIDE+ix]=a[v*TILE+u];}}
+  }
+  gridCache.set(bake,g);return g;
+}
+// Writes metres into BAKED; vertices read directly, other points use the mesh's triangle split.
+function sampleBake(bake,x,z) {
+  const g=bakedGrid(bake),{half,step}=TERRAIN_GRID,fx=(x+half)/step,fz=(z+half)/step;
+  if(!(fx>=0&&fz>=0&&fx<=SIDE-1&&fz<=SIDE-1))return false;
+  const rx=Math.round(fx),rz=Math.round(fz);
+  if(Math.abs(fx-rx)<1e-6&&Math.abs(fz-rz)<1e-6){const i=rz*SIDE+rx;BAKED[0]=g.earth[i]/1000;BAKED[1]=g.scar[i]/1000;return true;}
+  const ix=Math.min(SIDE-2,Math.floor(fx)),iz=Math.min(SIDE-2,Math.floor(fz)),u=fx-ix,v=fz-iz,i=iz*SIDE+ix;
+  for(let c=0;c<2;c++){const a=g[CHANNELS[c]];BAKED[c]=(u+v<=1?a[i]*(1-u-v)+a[i+1]*u+a[i+SIDE]*v:a[i+SIDE+1]*(u+v-1)+a[i+1]*(1-v)+a[i+SIDE]*(1-u))/1000;}
+  return true;
+}
+export const terrainEditBakeable=(e,tick)=>e.kind!=='pick_wall'&&!e.wall&&(!e.rupture||tick>=e.rupture.startTick+e.rupture.durationTicks);
+/** Pure: which edits makeTerrainRoom would fold so `needed` more fit under the live limit. */
+export function planTerrainBake(edits=[],tick=0,needed=1) {
+  if(edits.length+needed<=TERRAIN_BAKE.live)return [];
+  let excess=edits.length+needed-TERRAIN_BAKE.bakeTo;const chosen=[];
+  for(const e of edits){if(excess<=0)break;if(terrainEditBakeable(e,tick)){chosen.push(e);excess--;}}
+  return chosen;
+}
+/** Authority: fold the oldest settled edits into the baked grid. Returns the number folded. */
+export function makeTerrainRoom(state,needed=1) {
+  const chosen=planTerrainBake(state.edits,state.tick??0,needed);if(!chosen.length)return 0;
+  const old=state.terrainBake,g=old?bakedGrid(old):null,work={},touched=new Set(),{half,step}=TERRAIN_GRID;
+  for(const ch of CHANNELS){work[ch]=new Float64Array(SIDE*SIDE);if(g)for(let i=0;i<SIDE*SIDE;i++)work[ch][i]=g[ch][i]/1000;}
+  for(const e of chosen){
+    const ch=e.kind==='axe_sunder'?'scar':'earth',a=work[ch];
+    const x0=Math.max(0,Math.ceil((e.x-e.radius+half)/step)),x1=Math.min(SIDE-1,Math.floor((e.x+e.radius+half)/step));
+    const z0=Math.max(0,Math.ceil((e.z-e.radius+half)/step)),z1=Math.min(SIDE-1,Math.floor((e.z+e.radius+half)/step));
+    for(let iz=z0;iz<=z1;iz++)for(let ix=x0;ix<=x1;ix++){
+      const x=ix*step-half,z=iz*step-half,dx=x-e.x,dz=z-e.z;
+      if(Math.abs(dx)>=e.radius||Math.abs(dz)>=e.radius)continue;
+      const t=clamp(1-Math.hypot(dx,dz)/e.radius,0,1);if(t<=0)continue;
+      a[iz*SIDE+ix]+=e.height*smooth(t)*terrainEditScale(e,state.tick??Infinity,x,z);
+      touched.add(`${Math.floor(ix/TILE)},${Math.floor(iz/TILE)}`);
+    }
+  }
+  const next={rev:(old?.rev||0)+1,earth:{...(old?.earth||{})},scar:{...(old?.scar||{})}},lim=TERRAIN_BAKE.limitMm;
+  for(const key of touched){
+    const [ti,tj]=key.split(',').map(Number);
+    for(const ch of CHANNELS){
+      const tile=new Int16Array(TILE_CELLS);let any=false;
+      for(let v=0;v<TILE;v++){const iz=tj*TILE+v;if(iz>=SIDE)break;for(let u=0;u<TILE;u++){const ix=ti*TILE+u;if(ix>=SIDE)break;const mm=clamp(Math.round(work[ch][iz*SIDE+ix]*1000),-lim,lim);tile[v*TILE+u]=mm;if(mm)any=true;}}
+      if(any)next[ch][key]=encodeTile(tile);else delete next[ch][key];
+    }
+  }
+  const gone=new Set(chosen);state.edits=state.edits.filter(e=>!gone.has(e));state.terrainBake=next;
+  return chosen.length;
+}
+export function restoreTerrainBake(bake) {
+  if(bake===undefined)return undefined;
+  if(!bake||typeof bake!=='object'||Array.isArray(bake)||!Number.isSafeInteger(bake.rev)||bake.rev<1||Object.keys(bake).some(k=>!['rev',...CHANNELS].includes(k)))throw Error('Invalid baked terrain');
+  const out={rev:bake.rev,earth:{},scar:{}};
+  for(const ch of CHANNELS){
+    const tiles=bake[ch]??{};if(!tiles||typeof tiles!=='object'||Array.isArray(tiles))throw Error('Invalid baked terrain');
+    for(const [key,text] of Object.entries(tiles)){
+      if(!TILE_KEY.test(key)||typeof text!=='string'||text.length!==Math.ceil(TILE_CELLS*2/3)*4||!/^[A-Za-z0-9+/]+=*$/.test(text))throw Error('Invalid baked tile');
+      const a=decodeTile(text);if(a.some(v=>Math.abs(v)>TERRAIN_BAKE.limitMm))throw Error('Invalid baked tile');
+      out[ch][key]=text;
+    }
+  }
+  return out;
 }

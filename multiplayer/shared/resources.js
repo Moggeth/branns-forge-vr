@@ -1,4 +1,5 @@
 import {isTestingGift,giftContents} from './testing-supplies.js';
+import {BLOOM,addBloom} from './bloom.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
 import {isVein} from './ore-veins.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
@@ -56,7 +57,9 @@ export function collectTarget(state,p,m,ctx){
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
   if(q.kind==='apple')p.hp=Math.min(100,p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
-  return ok([{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}]);
+  const events=[{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}];
+  if(q.kind==='apple')addBloom(state,BLOOM.apple,events,[q.x,q.y,q.z]); // Fruit eaten spreads the seed.
+  return ok(events);
  }
  const log=state.looseLogs.find(l=>l.id===m.targetId);
  if(log){

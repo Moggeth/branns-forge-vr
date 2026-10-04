@@ -29,6 +29,9 @@ export const SPELL_ICONS = Object.freeze({
   frost: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
     + [0, 60, 120].map(a => `<g transform="rotate(${a} 12 12)"><path d="M12 1.5v21M9 4l3 2.6L15 4M9 20l3-2.6 3 2.6"/></g>`).join('')
     + '</g><circle cx="12" cy="12" r="2.4"/>',
+  spring: '<path d="M12 2.5c2.6 3.4 4.4 6 4.4 8.2a4.4 4.4 0 0 1-8.8 0c0-2.2 1.8-4.8 4.4-8.2z"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M3 18.5c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M5 22c1.7-1.2 3.3-1.2 5 0s3.3 1.2 5 0 3.3-1.2 4 0"/>',
+  blessing: '<path d="M12 1.5l2.3 6.6 6.9.2-5.5 4.2 2 6.7L12 15.2l-5.7 4 2-6.7-5.5-4.2 6.9-.2z"/><ellipse cx="12" cy="21.5" rx="6" ry="1.5" opacity=".55"/>',
+  quake: '<path d="M1.5 16h21V22h-21z" opacity=".45"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M12 16l-1.5 2.5 2 1.5-1 2M12 16l3.5 1.5 1 3M12 16l-4 1.2-1.5 2.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 10.5c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0M5 5.5c1.2-1.5 2.5-1.5 3.7 0s2.5 1.5 3.7 0 2.5-1.5 3.7 0"/>',
   // A tree with two eyes in its trunk and root feet; Wild Awakening adds two smaller woken trees behind it.
   awaken: '<path fill-rule="evenodd" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
   wildwake: '<g opacity=".7"><path transform="translate(-4.2 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/>'
@@ -209,6 +212,7 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
       c.btn.classList.toggle('sb-cooling', s.cooling);
       c.btn.classList.toggle('sb-nomana', s.noMana);
       c.btn.classList.toggle('sb-blocked',!!reason&&!s.cooling&&!s.noMana);
+      c.btn.classList.toggle('sb-locked',/^Unlocks/.test(reason));
       c.btn.style.setProperty('--sb-cd', s.cooling ? s.fraction.toFixed(3) : '0');
       c.secs.textContent = secText;
       const status = s.cooling ? ` · recharging ${secText}s` : s.noMana ? ` · needs ${Math.ceil(s.short)} more mana` : reason?` · ${reason}`:' · ready';

@@ -18,6 +18,7 @@ import './client/invention-panel.css';
 import './client/spellbook.css';
 import './client/forge-panel.css';
 import {SPELLS} from './shared/spells.js';
+import {BLOOM,bloomLevel,nextBloom} from './shared/bloom.js';
 import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
@@ -296,7 +297,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.'); if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
@@ -476,6 +477,7 @@ function onSnapshot(snapshot) {
   if (snapshots % 15 === 0) refreshHostControls();
   if (menuOpen && $('techDetails').open && snapshots % 10 === 0) renderTech();
   refreshFieldModel();
+  updateBloomMeter(snapshot.bloom||0);
   if(self)spellbook?.update({...spellbookReadiness(self,snapshot.tick,spell,connected&&currentRole==='god'),blocked:Object.fromEntries(SPELLS.map(s=>[s.id,spellUnavailable(snapshot,self,s.id)]))});
   if(forgeOpen)forgePanel?.update(workshopModel(snapshot));
   if(quickBuildOpen)quickBuild?.show(quickBuildModel(snapshot));
@@ -542,6 +544,20 @@ function removeNotice(id) { document.querySelector(`[data-notice="${id}"]`)?.rem
 function clearNotices() { $('notices').replaceChildren(); }
 
 let toastTimer = 0;
+// God spells leave Hero boons (shared/god-boons.js). Tell the Hero who got one, and the caster what the spell left.
+const GIFT_TEXT={stone_boulder:'a stone boulder to mine',iron_seam:'an iron seam to mine',crystal:'crystal shards along the crack',apple:'fruit that heals',ore:'ore shaken loose'};
+let lastGiftToast=0;
+const BLOOM_UNLOCKS=Object.fromEntries(SPELLS.filter(s=>s.bloom).map(s=>[s.bloom,s.label]));
+function bloomToast(e){toast(`The world blooms: level ${e.level}. ${BLOOM_UNLOCKS[e.level]?`${BLOOM_UNLOCKS[e.level]} is unlocked for the God.`:''}`.trim());const m=$('bloomMeter');if(m){m.classList.remove('bf-bloom-up');void m.offsetWidth;m.classList.add('bf-bloom-up');}}
+let lastBloomText='';
+function updateBloomMeter(points=0){const m=$('bloomMeter');if(!m)return;const level=bloomLevel(points),next=nextBloom(points),prev=level?BLOOM.levels[level-1]:0,text=next?`Bloom ${level} · ${points}/${next}`:`Bloom ${level} · full`;if(text===lastBloomText)return;lastBloomText=text;
+  m.style.setProperty('--bloom',`${next?Math.round((points-prev)/(next-prev)*100):100}%`);m.setAttribute('aria-valuenow',String(points));m.querySelector('.bf-bloom-text').textContent=text;m.title=next?`Bloom grows as life thrives: groves, fruit eaten, foes felled by Heroes. ${next-points} more unlocks ${BLOOM_UNLOCKS[level+1]||'the next spell'}.`:'Every Bloom spell is unlocked.';}
+function giftToast(e) {
+  if(e.gift==='charge'&&e.id===playerId)return toast(`Lightning struck close: your weapon is charged for ${e.hits} heavy hits.`);
+  if(e.gift==='swift'&&e.id===playerId)return toast('Frost quickens your step for six seconds.');
+  if(e.gift==='blessing'&&e.id===playerId)return toast(`Blessed: health restored and your weapon charged for ${e.hits} heavy hits.`);
+  if(e.by===playerId&&GIFT_TEXT[e.gift]&&performance.now()-lastGiftToast>4000){lastGiftToast=performance.now();toast(`Your spell left the Heroes ${GIFT_TEXT[e.gift]}.`);}
+}
 function toast(text) {
   const el = $('toast');
   setText(el, text);
