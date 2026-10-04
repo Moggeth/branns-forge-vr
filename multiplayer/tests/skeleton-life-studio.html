@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Skeleton life studio</title>
+<style>body{margin:0;background:#a9c0cc}canvas{display:block}#cap{position:fixed;left:12px;bottom:10px;font:600 18px system-ui;color:#fff;text-shadow:0 1px 3px #000}</style>
+<div id="cap"></div>
+<script type="module">
+// Skeleton life review on the shipped layers (enemy-motion + skeleton-motion + creature-life-death + skeleton-fx) and the
+// real shared physics (combat.js remains). Deterministic: window.studio.frame(i) renders frame i at 30 fps.
+// ?scene=emerge   crawl out of the ground (summon), then stand and idle
+// ?scene=fidgets  every idle fidget in turn
+// ?scene=crowd    eight skeletons walking abreast: gait variety (no lock-step)
+// ?scene=flinch   arrows wear a shield down, the last one splinters it; the skeleton reels
+// ?scene=golden   a golden Siegebird bolt bursts through a file of three skeletons; ragdoll remains
+// ?scene=held     first-person view of a picked-up skull turning its grin to you (combat-view poseLocalHeld)
+// ?cam=front|side|threeq  ?variant=N  ?play. Not shipped.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import {applyEnemyMotion, enemyMotionState} from '../client/enemy-motion.js';
+import {forceFidget, FIDGET_NAMES} from '../client/skeleton-motion.js';
+import {dressSkeleton, setShieldBroken} from '../client/skeleton-look.js';
+import {createCreatureLifeDeath} from '../client/creature-life-death.js';
+import {createSkeletonFx} from '../client/skeleton-fx.js';
+import {snapshotDetachedPart, capturePartPoses, faceToward} from '../client/combat-view.js';
+import {createEnemy, projectileContact, stepCombat} from '../shared/combat.js';
+const q=new URLSearchParams(location.search),W=innerWidth,H=innerHeight,scene=q.get('scene')||'fidgets';
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.shadowMap.enabled=true;document.body.append(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0xa9c0cc);s.fog=new THREE.Fog(s.background,18,40);
+s.add(new THREE.HemisphereLight(0xc6e0ed,0x5e5139,1.2));
+const sun=new THREE.DirectionalLight(0xffe3ad,2.2);sun.position.set(6,10,4);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-7,right:7,top:7,bottom:-7});s.add(sun,sun.target);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x6f7d3d,roughness:1}));ground.receiveShadow=true;s.add(ground);
+const cam=new THREE.PerspectiveCamera(40,W/H,.05,80),cap=document.getElementById('cap'),DT=1/30;
+const life=createCreatureLifeDeath({scene:s,height:()=>0}),fx=createSkeletonFx({scene:s,height:()=>0});
+const height=()=>0,actors=[];let template;
+function spawn(id,x,z,yaw,variant){
+ const root=new THREE.Group();root.position.set(x,0,z);root.rotation.y=yaw;s.add(root);
+ const visual=prepareAsset(template,'skeleton',1.7).visual;visual.traverse(n=>{if(n.isMesh)n.castShadow=true;});
+ dressSkeleton(visual,id,variant);root.add(visual);
+ const e={enemy:true,root,visual,data:{...createEnemy(id,[x,0,z]),yaw}};actors.push(e);return e;}
+function pose(e,t,threats=[]){applyEnemyMotion(e,{tick:t*60,dt:DT,height,threats});}
+const SCENES={
+ emerge:{dur:7,setup(){spawn('summoned-7',0,0,-Math.PI/2+.4,+(q.get('variant')||0)).data.emergeTick=Math.round(.6*60);},
+  step(t){const e=actors[0];life.beginFrame();pose(e,t);life.sync(e,t*60,DT);life.tick(DT);return t<.6?'The God calls...':t<3.8?'A skeleton claws its way out':'Risen';},cam:[2.4,1.4,2.8,0,.8,0]},
+ fidgets:{dur:FIDGET_NAMES.length*3.4+1,setup(){spawn('fidgeter',0,0,-Math.PI/2+.5,+(q.get('variant')||0));},
+  step(t){const e=actors[0],k=Math.floor((t-.5)/3.4),st=enemyMotionState(e.visual);
+   if(st&&k>=0&&k<FIDGET_NAMES.length&&st.lastForced!==k){st.lastForced=k;forceFidget(st,FIDGET_NAMES[k],t);}
+   pose(e,t);return k>=0&&k<FIDGET_NAMES.length?`Idle fidget: ${FIDGET_NAMES[k]}`:'Idle';},cam:[2.2,1.45,2.2,0,1,0]},
+ crowd:{dur:8,setup(){for(let i=0;i<8;i++)spawn(`camp_${i+3}`,-6,(i-3.5)*1.15,-Math.PI/2,i%6);},
+  step(t){for(const e of actors){e.root.position.x=-6+Math.max(0,t-.5)*2;pose(e,t);}return 'Eight skeletons, same speed, own gaits';},
+  cam:null},
+ flinch:{dur:6,setup(){spawn('flinch-2',0,0,-Math.PI/2+.6,+(q.get('variant')||1));},
+  step(t){const e=actors[0];if(t>=2&&!e.data.shieldBroken){e.data.shieldBroken=true;e.data.flinchTick=Math.round(t*60);setShieldBroken(e.visual,true);
+   const hand=e.visual.getObjectByName('LeftHand').getWorldPosition(new THREE.Vector3());fx.handle({kind:'shield_break',id:e.data.id,position:hand.toArray(),normal:[1,0,.3],material:'wood',golden:q.has('gold')});}
+   pose(e,t,t<2?[[3,0,0]]:[]);return t<2?'Shield up':'Shield splinters: it reels';},cam:[2.6,1.4,1.8,0,.9,0]},
+ held:{dur:3,setup(){const e=spawn('held-'+(q.get('variant')||0),0,0,0,+(q.get('variant')||0));e.root.updateWorldMatrix(true,true);G.skull=snapshotDetachedPart(e.visual,'head');e.root.removeFromParent();s.add(G.skull);},
+  step(t){const sk=G.skull,eye=new THREE.Vector3(0,1.6,0),grip=new THREE.Vector3(.16+.03*Math.sin(t*2),1.42+.02*Math.sin(t*3.1),-.5);
+   const q=faceToward(new THREE.Quaternion(),sk.userData.faceLocal,eye.clone().sub(grip).normalize().applyAxisAngle(new THREE.Vector3(0,1,0),.32),new THREE.Vector3(0,1,0));
+   sk.quaternion.copy(q);sk.position.copy(grip);cam.position.copy(eye);cam.lookAt(0,1.5,-1);cam.fov=70;cam.updateProjectionMatrix();return 'Alas, poor skeleton';},cam:null},
+ golden:{dur:6,setup(){for(let i=0;i<3;i++)spawn(`file-${i}`,-1.2*i,0,-Math.PI/2+(i-1)*.25,i*2%6);},
+  step(t){return golden(t);},cam:[1.5,1.6,5.2,-1.6,.8,0]},
+};
+// Golden pierce: real shared combat (projectileContact + stepCombat) drives contacts, deaths and the ragdolls.
+const G={state:null,parts:new Map(),bolt:null,fired:false};
+function golden(t){
+ const ctx={nextId:(st,p)=>`${p}${++G.n}`,terrainHeight:()=>0,fireContact:()=>[]};
+ if(!G.state){G.n=0;G.state={tick:0,players:[{id:'hero',stats:{contribution:0,kills:0}}],enemies:actors.map(a=>a.data),projectiles:[],embeds:[],detachedParts:[],pickups:[]};
+  const geo=new THREE.CylinderGeometry(.012,.012,.6,6).rotateZ(Math.PI/2);G.bolt=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xffd060}));G.bolt.visible=false;s.add(G.bolt);}
+ const S=G.state,targetTick=Math.round(t*60);
+ while(S.tick<targetTick){S.tick++;
+  if(S.tick===60){S.projectiles.push({id:'gold',ownerId:'hero',kind:'bolt',golden:true,position:[3,1.12,0],previousPosition:[3,1.12,0],velocity:[-42,0,0],curve:[0,0,0],bornTick:60,trail:[[3,1.12,0]]});G.fired=true;}
+  const shot=S.projectiles[0];
+  if(shot){const x0=shot.position[0];shot.position=[x0-42/60,1.12,0];
+   for(const a of actors){if(!S.enemies.includes(a.data))continue;const ex=a.data.position[0];if(ex<x0&&ex>=shot.position[0]){
+     a.root.updateWorldMatrix(true,true);const poses=capturePartPoses(a.visual);
+     const ev=projectileContact(S,{projectileId:'gold',targetId:a.data.id,part:'torso',point:[ex,1.12,0],normal:[1,0,0],localPoint:[0,0,0],localQuaternion:[0,0,0,1],partPoses:poses},ctx);
+     shot.trail=[[x0,1.12,0],[...shot.position]];
+     for(const e of ev.events||[]){fx.handle(e);if(e.kind==='death'){a.dead=true;}}}}
+   shot.trail=[[...shot.position]];if(shot.position[0]<-8)S.projectiles.length=0;}
+  stepCombat(S,ctx,[]);
+ }
+ const shot=S.projectiles[0];G.bolt.visible=!!shot;if(shot)G.bolt.position.fromArray(shot.position);
+ for(const a of actors){if(a.dead&&a.root.parent){
+   for(const d of S.detachedParts.filter(d=>d.sourceId===a.data.id)){const node=snapshotDetachedPart(a.visual,d.part);node.traverse(n=>{if(n.isMesh)n.castShadow=true;});s.add(node);G.parts.set(d.id,node);}
+   a.root.removeFromParent();}
+  else if(!a.dead)pose(a,t);}
+ for(const d of S.detachedParts){const n=G.parts.get(d.id);if(n){n.position.fromArray(d.position);n.quaternion.fromArray(d.quaternion);}}
+ fx.update(DT,{camera:cam,golden:shot?[{id:'gold',position:G.bolt.position}]:[],viewportHeight:H});
+ return !G.fired?'A file of three...':shot?'Golden bolt: radiant pierce':'Ragdoll remains (shared physics)';}
+const SC=SCENES[scene];
+window.studio={actors,THREE,ready:false,frames:Math.round(SC.dur*30),frame(i){
+ const t=i*DT;const label=SC.step(t);if(scene!=='golden')fx.update(DT,{camera:cam,viewportHeight:H});
+ const c=SC.cam,cm=q.get('cam');
+ if(scene==='held'){}
+ else if(scene==='crowd'){const x=-6+Math.max(0,t-.5)*2;cam.position.set(x+5.5,1.6,2.5);cam.lookAt(x,.9,0);}
+ else if(cm==='claw')cam.position.set(1.1,1.5,-2.5),cam.lookAt(0,1.05,0);
+ else if(cm==='side')cam.position.set(c[3],1.2,4.4),cam.lookAt(c[3],.9,0);
+ else cam.position.set(c[0],c[1],c[2]),cam.lookAt(c[3],c[4],c[5]);
+ cap.textContent=label;r.render(s,cam);return t;}};
+new GLTFLoader().load('/assets/skeleton.glb',gltf=>{template=gltf;SC.setup();for(let i=0;i<2;i++)window.studio.frame(0);window.studio.ready=true;document.title='ready';
+ if(q.has('play')){let i=0;setInterval(()=>{window.studio.frame(i);i=(i+1)%window.studio.frames;},1000/30);}});
+</script></html>

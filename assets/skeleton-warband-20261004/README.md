@@ -11,7 +11,8 @@ cp skeleton.glb ../../multiplayer/public/assets/skeleton.glb
 ```
 
 What is in the file
-- One shared body (about 13.9k triangles): sculpted skull with a hinged jaw (`HeadJaw`), glowing eye sockets,
+- One shared body (about 16.7k triangles): a round cartoon skull (big dark eye sockets with a small glow, soft brows,
+  heart nose, chunky grinning teeth) with a hinged jaw (`HeadJaw`) whose dark mouth shows when it opens,
   ribs, sternum, pelvis, two-bone arms with elbows (`LeftForearm`/`RightForearm`), two-bone legs, loincloth.
 - Six warband looks, each a set of optional nodes the game keeps or drops (`multiplayer/client/skeleton-look.js`):
 
@@ -24,7 +25,7 @@ What is in the file
   | Bloomcaller | `Gear_FlowerCrown` | `Shield_Living` (bark, leaves, moss) |
   | Antlerbound | `Gear_Antlers` | `Shield_Tower` (skull trophy) |
 
-  A dressed skeleton draws 14.7k to 17.8k triangles (the old one drew 17.1k).
+  A dressed skeleton draws 17.5k to 20.6k triangles (the old one drew 17.1k).
 - The variant is picked from the enemy id, so every peer sees the same look with no network or save change.
   Bone, cloth and eye tints plus a small size and shade jitter are applied per variant.
 - Materials: `Bone`, `Cloth` (tinted in JS), `Fabric` (vertex coloured moss, leather, petals), `Wood`, `Iron`,

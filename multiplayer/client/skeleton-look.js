@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {hashId} from './enemy-motion.js';
+import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
 
 // Skeleton warband: six authored archetypes on one rig (assets/skeleton-warband-20261004/build_skeleton.py), like the
 // Siegebird songbirds. Each skeleton keeps its archetype's headgear and shield, drops the rest, and takes the
@@ -18,7 +19,7 @@ const unit = (seed, n) => { let h = Math.imul(seed ^ Math.imul(n, 0x9e3779b1), 0
 
 export function skeletonVariant(id) {
   const seed = hashId(id);
-  return {index: seed % SKELETON_VARIANTS.length, seed, scale: .95 + unit(seed, 1) * .1, shade: .95 + unit(seed, 2) * .08};
+  return {index: skeletonKindIndex(id), seed, scale: .95 + unit(seed, 1) * .1, shade: .95 + unit(seed, 2) * .08};
 }
 
 // Shared per-archetype material clones (bounded: 6 archetypes x 3 materials per template).
@@ -52,6 +53,26 @@ export function dressSkeleton(visual, id = 0, index) {
   const norm = visual.children[0];
   if (norm && pick.scale !== 1) norm.scale.multiplyScalar(pick.scale), norm.position.multiplyScalar(pick.scale);
   visual.userData.skeletonLook = {variant: v.id, index: pick.index, seed: pick.seed};
+  steadyBounds(visual);
   return v;
 }
+// three.js measures a skinned mesh's culling sphere once, in whatever pose it is first drawn. A summoned skeleton is
+// first drawn buried by the crawl-out, so its legs kept a sphere two metres underground and vanished whenever the
+// ground below them left the view. Every part gets one sphere around the whole standing body instead.
+const _box = new THREE.Box3(), _sphere = new THREE.Sphere(), _toVisual = new THREE.Matrix4(), _toMesh = new THREE.Matrix4();
+function steadyBounds(visual) {
+  const meshes = []; visual.traverse(n => { if (n.isSkinnedMesh) meshes.push(n); }); if (!meshes.length) return;
+  visual.updateWorldMatrix(true, true); const inv = _toVisual.copy(visual.matrixWorld).invert(); _box.makeEmpty();
+  for (const m of meshes) { m.computeBoundingSphere(); _sphere.copy(m.boundingSphere).applyMatrix4(_toMesh.multiplyMatrices(inv, m.matrixWorld)); _box.expandByPoint(_sphere.center.clone().addScalar(_sphere.radius)).expandByPoint(_sphere.center.clone().addScalar(-_sphere.radius)); }
+  _box.getBoundingSphere(_sphere); _sphere.radius *= 1.25; // reach, lean and a stagger stay inside
+  for (const m of meshes) m.boundingSphere.copy(_sphere).applyMatrix4(_toMesh.multiplyMatrices(inv, m.matrixWorld).invert());
+}
 export function prepareSkeletonTemplate() {}
+
+// A splintered shield is gone for good (shared/combat.js shieldBroken). Hidden meshes drop out of contacts and of
+// the detached-arm snapshot, so arrows pass and a severed arm carries no ghost shield.
+export function setShieldBroken(visual, broken) {
+  const look = visual?.userData.skeletonLook; if (!look || look.shieldBroken === broken) return;
+  look.shieldBroken = broken;
+  visual.traverse(n => { if (/^Shield_/.test(n.name)) n.visible = !broken; });
+}

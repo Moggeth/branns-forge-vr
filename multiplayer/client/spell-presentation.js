@@ -437,7 +437,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     bloom_level(ev, c) { ev.dur = 3.2; let acc = 0; for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(i % 2 ? PAL.leaf : PAL.teal, PAL.mint, 0, 1), 0.5, 9 + i * 3, i * 0.35, i * 0.35 + 1.6, 0.45);
       ev.fx.push((age, dt) => { if (age > 2.6) return; acc += dt * 40 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 7, c.R() < 0.4 ? PAL.leaf : c.R() < 0.5 ? PAL.mint : PAL.teal, 0.24, 2.6); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
-    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
+    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 4; i++) summon(ev, c, c.x + (i % 2 ? 1 : -1) * 1.4, c.z + (i < 2 ? -1 : 1) * 1.4, 0.75, i * 0.2); /* the four graves shared/simulation.js digs */ pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
     // The former six-box stand-in duplicated that actor and obscured its pieces.
     golem(ev) { ev.dur = .01; },
