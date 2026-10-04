@@ -495,7 +495,7 @@ export function loadSimulation(saved) {
     } else if(d.editId!==undefined)throw Error('Invalid wall linkage');
   }
   if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall'); // Raise Wall quarry stone is optional
-  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || (q.side!==undefined&&!['party','rivals'].includes(q.side)) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > 10) throw Error('Invalid pickup'); else contentIds.add(q.id);
+  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || (q.side!==undefined&&!['party','rivals'].includes(q.side)) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > (/^ingot/.test(q.id) ? 999 : 10)) throw Error('Invalid pickup'); else contentIds.add(q.id);
   for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
   const meteorRewards=saved.meteorRewards??[];
   if(!Array.isArray(meteorRewards)||meteorRewards.length>64)throw Error('Invalid meteor rewards');
