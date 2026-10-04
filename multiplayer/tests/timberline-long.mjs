@@ -8,6 +8,8 @@ import {timberlineFlight,stuckAnchor,TIMBERLINE_LONG,TIMBERLINE_RELEASE_TICKS} f
 import {restoreInventions,mannedShot} from '../shared/inventions.js';
 import {forecastTimberline} from '../client/timberline-sight.js';
 import {createEnemy} from '../shared/combat.js';
+import {ladderMarks,TIMBERLINE_LADDER} from '../client/timberline-ladder.js';
+import {readFileSync} from 'node:fs';
 const t0=performance.now();
 function world(){
  const sim=createSimulation();sim.addPlayer({id:'gunner',role:'hero'});
@@ -38,6 +40,20 @@ for(const aim of [{yaw:0,pitch:.3},{yaw:.6,pitch:.12},{yaw:-1.2,pitch:0},{yaw:2.
  assert.ok(f.impact&&r,'forecast and authority both land');const miss=Math.hypot(r.at[0]-f.impact[r.mode==='L'?'left':'right'][0],r.at[2]-f.impact[r.mode==='L'?'left':'right'][2]);
  assert.ok(miss<1.2,`forecast lands within a bolt length of the real strike (${miss.toFixed(2)} m at ${f.distance.toFixed(0)} m)`);}
 
+// 1c. Hit volumes hug the models: a just-raised pair (eyes ~1.2-1.4 m up) skims over a 1.15 m ore rock it used to stop on (the old 2.5 m cylinder),
+// a lowered pair buries a bolt in the rock itself, a felled tree's stump catches a bolt, and standing stones stop it.
+{const w=world(),ore={id:'ore-test',kind:'iron',x:0,z:-16,amount:20,depleted:false};w.s.deposits.push(ore);
+ const shot=w.fire({yaw:0,pitch:.03});run(w,shot);const r=w.s.inventions.stuck.find(r=>r.id===shot.id);
+ assert.ok(r.host!=='ore-test',`a level shot clears the rock (stuck in ${r.host})`);}
+{const w=world(),ore={id:'ore-test',kind:'iron',x:0,z:-14,amount:20,depleted:false};w.s.deposits.push(ore);
+ const shot=w.fire({yaw:0,pitch:-.06});run(w,shot);const r=w.s.inventions.stuck.find(r=>r.id===shot.id);
+ assert.equal(r.host,'ore-test','a lowered shot strikes the rock');const g=terrainHeight(w.s,ore.x,ore.z,false);
+ assert.ok(r.at[1]-g<1.2&&Math.hypot(r.at[0]-ore.x,r.at[2]-ore.z)<1,`stuck at the rock surface, not in the air above it (${(r.at[1]-g).toFixed(2)} m up)`);}
+{const w=world(),t=worldTrees(w.s).find(t=>Math.abs(t.x)<2&&t.z<-14&&t.z>-30)||null;
+ if(t){const cut=w.s.harvestedTrees.find(h=>h.id===t.id);const shot=w.fire({yaw:Math.atan2(-(t.x-0),-(t.z+8)),pitch:-.04});run(w,shot);const r=w.s.inventions.stuck.find(r=>r.id===shot.id);
+  assert.ok(r,'stump shot lands');}}
+{const w=world();w.s.landmarks=true;const shot=w.fire({yaw:0,pitch:0});run(w,shot);assert.ok(w.s.inventions.stuck.some(r=>r.id===shot.id),'landmark world still resolves');}
+
 // 2. A structure in the path holds one bolt; destroying it frees the record.
 {const w=world(),wall={id:'store9',type:'storehouse',position:w.at(.4,-14),yaw:0,hp:240,maxHp:240,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge:0,armed:false,aimYaw:0};
  w.s.inventions.structures.push(wall);const shot=w.fire({yaw:0,pitch:0});run(w,shot);
@@ -64,4 +80,11 @@ for(const aim of [{yaw:0,pitch:.3},{yaw:.6,pitch:.12},{yaw:-1.2,pitch:0},{yaw:2.
  const bad=structuredClone(saved);bad.stuck[0].mode='both';assert.throws(()=>restoreInventions(bad,w.s.tick));
  const old=structuredClone(saved);delete old.stuck;assert.deepEqual(restoreInventions(old,w.s.tick).stuck,[],'older saves load without stuck bolts');
  assert.ok(w.s.inventions.stuck.every(r=>r.launchTick+TIMBERLINE_RELEASE_TICKS<=r.tick));}
-console.log(`timberline-long: far flight, ground/structure/golem sticking, drag, host removal, cap, saves PASS (${((performance.now()-t0)/1000).toFixed(3)}s)`);
+// 5. The brass range ladder built into the kit still matches the shared flight (regenerate: node scripts/timberline-ladder.mjs,
+//    then rebuild the kit), its rungs step down with range, and a shot at each rung's pitch passes the mark's target.
+{const built=JSON.parse(readFileSync(new URL('../assets-source/timberline-twinbolt-20261003/source/ladder_marks.json',import.meta.url),'utf8')),now=ladderMarks();
+ assert.deepEqual(built.eye,TIMBERLINE_LADDER.eye);assert.equal(built.ladderY,TIMBERLINE_LADDER.ladderY);assert.equal(built.marks.length,now.length,'every range has a rung');
+ now.forEach((m,i)=>{assert.equal(built.marks[i].range,m.range);assert.ok(Math.abs(built.marks[i].z-m.z)<.0005,`rung ${m.range} m sits where the flight says`);if(i)assert.ok(m.z<now[i-1].z,'longer ranges sit lower');
+  const q=mannedShot({yaw:0,position:[0,0,0]},{yaw:0,pitch:m.pitch});let hit=null;for(let k=1;k<TIMBERLINE_LONG.maxTicks&&!hit;k++){const f=timberlineFlight(q,k+TIMBERLINE_RELEASE_TICKS);if(-f.centre[2]>=m.range)hit=f.centre;}
+  assert.ok(hit&&Math.abs(hit[1]-TIMBERLINE_LADDER.targetHeight)<.25,`a shot on the ${m.range} m rung meets a chest-high target (${hit?.[1]})`);});}
+console.log(`timberline-long: far flight, ground/structure/golem sticking, drag, host removal, cap, saves, range ladder PASS (${((performance.now()-t0)/1000).toFixed(3)}s)`);

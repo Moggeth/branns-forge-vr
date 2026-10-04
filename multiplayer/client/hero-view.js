@@ -40,6 +40,14 @@ const _S = new THREE.Vector3(), _F = new THREE.Vector3(), _P = new THREE.Vector3
 const _want = new THREE.Quaternion(), _feet = [new THREE.Vector3(), new THREE.Vector3()], _feetQ = [new THREE.Quaternion(), new THREE.Quaternion()];
 // Tracked grip -Z (pointing) maps to socket +Y (haft): socket = grip * GRIP_TO_SOCKET.
 export const GRIP_TO_SOCKET = Object.freeze(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2));
+// Procedural layers run only after update() refreshes the entire model hierarchy.
+// Each layer updates the changed bone subtree, so reading its existing matrix
+// avoids repeatedly recomputing every unchanged ancestor for every IK query.
+const _matrixPosition=new THREE.Vector3(),_matrixScale=new THREE.Vector3();
+const _modelQ=new THREE.Quaternion(),_leanQ=new THREE.Quaternion(),_lookQ=new THREE.Quaternion();
+const _ikTarget=new THREE.Vector3(),_ikMid=new THREE.Vector3();
+function preparedPosition(node,out){return out.setFromMatrixPosition(node.matrixWorld);}
+function preparedQuaternion(node,out){node.matrixWorld.decompose(_matrixPosition,out,_matrixScale);return out;}
 const SOCKET_TO_GRIP = GRIP_TO_SOCKET.clone().invert();
 
 /** Pose a canonical weapon visual in a WeaponGrip socket exactly as the local XR hand holds it. */
@@ -95,6 +103,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     // `placeholder:false` keeps game.js disposePlaceholder() away from shared GPU resources.
     group.userData = {hero: true, placeholder: false, variant, model, high, low, head, bones, rest, posed: false, sockets, heroMixer: mixer, heroActions: actions,
       speed: 0, last: null, hp: data.hp, lod: false, firstPerson, clock: 0, attackAt: -Infinity, embedAt: -Infinity, recoil: 0,
+      legs:['L','R'].map(s=>[bones[`UpperLeg${s}`],bones[`LowerLeg${s}`],bones[`Foot${s}`]]),
       weapons: new Map(), weapon: null, weaponTool: null, crouch: 0, torsoYaw: null};
     if (firstPerson) setFirstPerson(group, true);
     setLod(group, false);
@@ -194,22 +203,22 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     a.reset().setEffectiveWeight(1).fadeIn(.06).play(); return true;
   }
 
-  function setWorldQuaternion(bone, q) { bone.parent.getWorldQuaternion(_q3).invert(); bone.quaternion.copy(_q3.multiply(q)); bone.updateMatrixWorld(true); }
+  function setWorldQuaternion(bone, q) { preparedQuaternion(bone.parent,_q3).invert(); bone.quaternion.copy(_q3.multiply(q)); bone.updateMatrixWorld(true); }
   function aimBone(bone, child, target) {
-    bone.getWorldPosition(_s); child.getWorldPosition(_e);
+    preparedPosition(bone,_s); preparedPosition(child,_e);
     _q.setFromUnitVectors(_w.subVectors(_e, _s).normalize(), _t.subVectors(target, _s).normalize());
-    bone.getWorldQuaternion(_q2); _q2.premultiply(_q); setWorldQuaternion(bone, _q2);
+    preparedQuaternion(bone,_q2); _q2.premultiply(_q); setWorldQuaternion(bone, _q2);
   }
   // Rigid two-bone chain (shoulder/elbow or hip/knee) reaching `end`, bending toward world-space `pole`.
   function twoBone(upper, middle, last, end, pole) {
-    upper.getWorldPosition(_S); middle.getWorldPosition(_F); last.getWorldPosition(_P);
+    preparedPosition(upper,_S); preparedPosition(middle,_F); preparedPosition(last,_P);
     const a = _S.distanceTo(_F), b = _F.distanceTo(_P); _dir.subVectors(end, _S);
     const d = THREE.MathUtils.clamp(_dir.length(), .05, a + b - 1e-3); _dir.normalize();
     const cos = THREE.MathUtils.clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1);
     _perp.copy(pole).addScaledVector(_dir, -pole.dot(_dir)).normalize();
     _mid.copy(_S).addScaledVector(_dir, a * cos).addScaledVector(_perp, a * Math.sqrt(1 - cos * cos));
-    const target = end.clone();                       // aimBone reuses the _s/_e/_t scratch vectors
-    aimBone(upper, middle, _mid.clone()); aimBone(middle, last, target);
+    const target = _ikTarget.copy(end);                       // aimBone reuses the _s/_e/_t scratch vectors
+    aimBone(upper, middle, _ikMid.copy(_mid)); aimBone(middle, last, target);
   }
   // Arm reach toward a tracked controller (presentation-only); the palm takes the tracked grip orientation.
   function reach(u, side, pose, root) {
@@ -217,10 +226,10 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const grip = u.sockets[side];
     if (!up || !fore || !palm || !grip) return;
     const target = _t.fromArray(pose.position); root.localToWorld(target);
-    root.getWorldQuaternion(_q2); _want.fromArray(pose.quaternion).premultiply(_q2).multiply(GRIP_TO_SOCKET);
+    preparedQuaternion(root,_q2); _want.fromArray(pose.quaternion).premultiply(_q2).multiply(GRIP_TO_SOCKET);
     _want.multiply(_q.copy(grip.quaternion).invert());                       // palm world orientation
     _wrist.copy(target).sub(_v.copy(grip.position).applyQuaternion(_want));
-    _pole.set(side === 'L' ? -.4 : .4, -1, .3).applyQuaternion(u.model.getWorldQuaternion(_q2));
+    _pole.set(side === 'L' ? -.4 : .4, -1, .3).applyQuaternion(preparedQuaternion(u.model,_q2));
     twoBone(up, fore, palm, _wrist, _pole);
     setWorldQuaternion(palm, _want);
   }
@@ -228,7 +237,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   function turnBone(bone, local, amount, modelQ) {
     if (!bone) return;
     _q.identity().slerp(local, amount); _q.premultiply(modelQ).multiply(_q2.copy(modelQ).invert());
-    bone.getWorldQuaternion(_q2).premultiply(_q); setWorldQuaternion(bone, _q2);
+    preparedQuaternion(bone,_q2).premultiply(_q); setWorldQuaternion(bone, _q2);
   }
 
   // VR remote: the torso follows the tracked head yaw with lag; the neck/skull carry the remainder (bounded).
@@ -248,27 +257,27 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   }
   function crouch(u) {
     const hips = u.bones.Hips, c = u.crouch; if (!hips || c < 1e-3) return;
-    const legs = ['L', 'R'].map(s => [u.bones[`UpperLeg${s}`], u.bones[`LowerLeg${s}`], u.bones[`Foot${s}`]]);
-    legs.forEach(([, , f], i) => { if (f) { f.getWorldPosition(_feet[i]); f.getWorldQuaternion(_feetQ[i]); } });
-    hips.getWorldPosition(_v); _v.y -= c; hips.parent.worldToLocal(_v); hips.position.copy(_v); hips.updateMatrixWorld(true);
-    const modelQ = u.model.getWorldQuaternion(new THREE.Quaternion());
-    turnBone(u.bones.Spine, new THREE.Quaternion().setFromAxisAngle(_w.set(1, 0, 0), -HERO_CROUCH.lean * c / HERO_CROUCH.maxDrop), 1, modelQ);
+    const legs = u.legs;
+    legs.forEach(([, , f], i) => { if (f) { preparedPosition(f,_feet[i]); preparedQuaternion(f,_feetQ[i]); } });
+    preparedPosition(hips,_v); _v.y -= c; hips.parent.worldToLocal(_v); hips.position.copy(_v); hips.updateMatrixWorld(true);
+    const modelQ = preparedQuaternion(u.model,_modelQ);
+    turnBone(u.bones.Spine, _leanQ.setFromAxisAngle(_w.set(1, 0, 0), -HERO_CROUCH.lean * c / HERO_CROUCH.maxDrop), 1, modelQ);
     legs.forEach(([up, low, foot], i) => { if (!up || !low || !foot) return;
       _pole.set(i ? .15 : -.15, 0, -1).applyQuaternion(modelQ);                // knees forward, slightly out
       twoBone(up, low, foot, _feet[i], _pole); setWorldQuaternion(foot, _feetQ[i]); });
   }
   function headLook(u, data, root) {
-    const H = HERO_HEADLOOK, modelQ = u.model.getWorldQuaternion(new THREE.Quaternion());
-    root.getWorldQuaternion(_q2); _q.fromArray(data.head.quaternion).premultiply(_q2);   // tracked head in world (root yaw is zeroed for VR)
+    const H = HERO_HEADLOOK, modelQ = preparedQuaternion(u.model,_modelQ);
+    preparedQuaternion(root,_q2); _q.fromArray(data.head.quaternion).premultiply(_q2);   // tracked head in world (root yaw is zeroed for VR)
     _q.premultiply(_q2.copy(modelQ).invert());                                          // relative to the torso facing
     _euler.setFromQuaternion(_q, 'YXZ');
     const lean = -HERO_CROUCH.lean * u.crouch / HERO_CROUCH.maxDrop;                     // spine lean already pitched the head
     _euler.set(THREE.MathUtils.clamp(_euler.x - lean, -H.pitchDown, H.pitchUp), THREE.MathUtils.clamp(_euler.y, -H.yaw, H.yaw),
       THREE.MathUtils.clamp(_euler.z, -H.roll, H.roll), 'YXZ');
-    const local = new THREE.Quaternion().setFromEuler(_euler);
+    const local = _lookQ.setFromEuler(_euler);
     turnBone(u.bones.Neck, local, H.neckShare, modelQ);
     turnBone(u.bones.Skull, local, 1 - H.neckShare, modelQ);
-    u.look = {yaw: _euler.y, pitch: _euler.x, roll: _euler.z};
+    const look=u.look ||= {yaw:0,pitch:0,roll:0};look.yaw=_euler.y;look.pitch=_euler.x;look.roll=_euler.z;
   }
 
   /** Per frame. root: game actor root (position/yaw already applied by game.js). */

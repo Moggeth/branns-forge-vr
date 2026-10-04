@@ -1,6 +1,35 @@
 Current takeover guide: [Claude handoff](../docs/CLAUDE-HANDOFF-20261003.md). This supersedes older proof/scope notes.
 
+Touch fullscreen controls, browser capability limits and verification: [fullscreen acceptance](../docs/TOUCH-FULLSCREEN-20261004.md).
+
 # Browser multiplayer proof
+
+## Public worlds and optional Battle mode — 2026-10-04
+
+Choose **Browse public worlds** at the welcome screen to see hosts, participant
+names and available seats, then join directly. All multiplayer worlds are public;
+there is no private-game switch. Solo stays local. The browser refreshes while open
+and visible, cancels requests on close and keeps the last list if a refresh fails.
+
+In **Menu → Battle** on a phone (the Battle mode section on desktop), the host can
+enable the optional mode. Choose Dawn or Dusk, defend your sanctuary, and advance
+with your soldiers to destroy the other sanctuary. Four soldiers per side spawn
+every 15 seconds, capped at 16 per side, separately from the 32 human seats. This is
+team-objective combat against bots and bases; direct human-versus-human attacks are
+not enabled. Expedition and Battle cannot run together. Disabling Battle removes
+its soldiers and objectives without clearing the ordinary world. Deposit carried
+materials and finish your side's refining jobs before changing sides.
+
+Heroes use their existing attacks; Gods support allied soldiers and strike enemy
+soldiers/objectives. Existing neutral creatures and environmental fire remain
+dangerous. Host migration and recovery saves retain battle progress. Desktop menu,
+phone controls and the VR quest panel use the same shared state; physical headset
+acceptance is still outstanding.
+
+For release and measurements, read
+[the performance handoff](../docs/PUBLIC-ROOMS-PERFORMANCE-20261004.md).
+Deploy the matching [cloud service](cloud/README.md) before publishing this client.
+Capacity is a supported limit, not a guarantee of 60 FPS on every host or phone.
 
 ## Cloud multiplayer is live - 2026-10-03
 
@@ -104,6 +133,13 @@ host signaling independently of this PC. WebRTC carries game state directly wher
 possible; a bounded secure WebSocket relay covers blocked direct connections. The
 personal Workers Free plan was verified and no paid TURN service was enabled. Free
 daily capacity limits apply; this is a friends playtest, not unlimited hosting.
+
+Public room listings advertise the negotiated room size, up to 32 humans. During a
+mixed-version rollout, rooms with any retained older eight-player client stay at
+eight until those players refresh or leave. Older tabs joining a new 32-capable
+room receive a refresh instruction; existing members are never evicted for an
+upgrade. Bots do not consume player seats. See the mixed-version checks in the
+peer README for release verification.
 
 See [peer/README.md](peer/README.md) for lifecycle/configuration and
 [PEER-PLAYTEST.md](PEER-PLAYTEST.md) for deployment and verification.

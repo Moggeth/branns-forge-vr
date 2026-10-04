@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { WebSocket } from 'ws';
+import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
 
 const port = 20000 + randomInt(20000);
 const origin = 'http://127.0.0.1:5178';
@@ -36,7 +37,7 @@ function connect() {
   return { ws, inbox, wait(type, predicate = () => true) {
     const found = inbox.find(message => message.type === type && predicate(message)); if (found) return Promise.resolve(found);
     return new Promise((resolve, reject) => { const waiter = { predicate: m => m.type === type && predicate(m), resolve }; waiters.push(waiter); setTimeout(() => { const at = waiters.indexOf(waiter); if (at >= 0) { waiters.splice(at, 1); reject(new Error(`Timed out: ${type}`)); } }, 2000).unref(); });
-  }, send(value) { ws.send(JSON.stringify(value)); } };
+  }, send(value) { ws.send(JSON.stringify({...(['create','join'].includes(value.type)?{simCapacity:MAX_PLAYERS}:{}),...value})); } };
 }
 try {
   await ready();
@@ -85,9 +86,13 @@ try {
   const rejoin = connect(); await once(rejoin.ws, 'open');
   rejoin.send({ type: 'join', room: first.room, name: 'God', role: 'god', desktop: true, secret: joined.secret });
   assert.equal((await rejoin.wait('welcome')).peerId, joined.peerId);
-  for (let i = 0; i < 6; i++) { const p = connect(); await once(p.ws, 'open'); p.send({ type: 'join', room: first.room, name: `P${i}`, role: 'hero', desktop: true }); await p.wait('welcome'); }
+  for (let i = 0; i < MAX_PLAYERS-2; i++) { const p = connect(); await once(p.ws, 'open'); p.send({ type: 'join', room: first.room, name: `P${i}`, role: 'hero', desktop: true }); await p.wait('welcome'); }
   const ninth = connect(); await once(ninth.ws, 'open'); ninth.send({ type: 'join', room: first.room, name: 'Ninth', role: 'hero', desktop: true });
   assert.equal((await ninth.wait('error')).code, 'room_full');
+  // Full-room ICE fanout must not hit the former one-edge 120/10s host limit.
+  for(let i=0;i<MAX_PLAYERS*5;i++)host.send({type:'signal',to:joined.peerId,epoch:3,signal:{type:'ice',candidate:{testSequence:i}}});
+  await rejoin.wait('signal',m=>m.signal?.candidate?.testSequence===MAX_PLAYERS*5-1);
+  assert.equal(host.ws.readyState,WebSocket.OPEN);
   console.log('peer signaling: passed');
 } finally {
   for (const ws of all) ws.terminate();

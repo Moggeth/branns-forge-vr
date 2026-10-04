@@ -1,3 +1,5 @@
+import {ProximityVoice} from './client/proximity-voice.js';
+import {createVoiceControls} from './client/voice-controls.js';
 import {mountQuietHud} from './mobile-quiet.js';
 import {createFieldOverlays,createBuildTag} from './client/field-overlays.js';
 import {equipmentHelp} from './client/equipment-help.js';
@@ -32,6 +34,12 @@ import { WorldSaves, parseSave } from './client/world-saves.js';
 import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.js';
 import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
 import { adventureView } from './shared/adventure.js';
+import {battlePanelModel,battleQuestView} from './client/battle-model.js';
+import {createRoomDirectory} from './client/public-room-directory.js';
+import {createPublicRoomBrowser,createPublicRoomsLauncher} from './client/public-rooms.js';
+import {createBattlePanel} from './client/battle-panel.js';
+import './client/public-rooms.css';
+import './client/battle-panel.css';
 import { createAdventureBanner, nextStep, actionModel } from './client/adventure-view.js';
 import { createInteractionCueController } from './client/interaction-cue-controller.js';
 import { rewardBanner } from './client/reward-moments.js';
@@ -90,7 +98,7 @@ function friendlyError(detail) {
   if (code === 'out_of_reach') return 'Move closer to collect that item.';
   const inventionErrors={protected_forge:'Keep the forge work area clear. Build outside its protected apron.',occupied:'Leave room around trees, rocks and buildings.',uneven_ground:'Choose flatter ground for this invention.',not_your_structure:'That structure belongs to the other side.',no_influence:'Build or repair an Influence source near this area.',machine_loading:'The machine is loading or turning. Wait a moment.',turn_machine:'Turn the machine in Workshop / Built, then aim again.',refinery_full:'The furnace is full. Collect bars from the output bay as batches finish, then smelt the rest.',nothing_to_smelt:'You have no ore to smelt. Mine ore seams with the pick, then bring it to the Forge.',output_empty:'No finished bars in the output bay yet.',deposit_before_switch:'Deposit carried resources and finish refining before changing side.',machine_manned:'Someone is already manning that Timberline.',rack_full:'Your bolt rack is full (99 bolts).',not_operator:'Step onto the Timberline first (E).'};
   if(inventionErrors[code])return inventionErrors[code];
-  if (/full/.test(code)) return 'That world already has eight players. Try again when someone leaves.';
+  if (/full/.test(code)) return 'That world has no free player slots. Choose another world or try again when someone leaves.';
   if (/version|protocol/.test(code)) return 'Your page is out of date. Refresh the page and try again.';
   if (code === 'save_failed') return raw && raw.length < 140 ? raw : 'This browser couldn’t save the world. Download a backup from the Menu.';
   if (raw && raw.length < 140 && !/undefined|null|\bat\s+\S+:\d+/.test(raw)) return raw.replace(/^\w/, c => c.toUpperCase()).replace(/([^.!?])$/, '$1.');
@@ -103,6 +111,8 @@ let mobile = null, xrActive = false;
 let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
 let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
+let voice = null;
+const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;
@@ -112,6 +122,27 @@ let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting',
 let lastGameplayCommand={};
 function command(type,payload={}){lastGameplayCommand={type,...payload};return session?.command(type,payload);}
 const shown = {};             // cache of last rendered HUD values
+
+// Public discovery owns no game state. Close cancels a pending join and polling;
+// successful joins close only after clearing the pending marker.
+let directoryPending=null;
+const roomBrowser=createPublicRoomBrowser({
+  onJoin:code=>{directoryPending=code;roomInput.value=code;roomBrowser.render({pendingCode:code,error:''});start({create:false,room:code});},
+  onCreate:()=>{roomBrowser.close();start({create:true});},
+  onRefresh:()=>directory.refresh(),onMore:()=>directory.more(),
+  onClose:()=>{directory.close();if(directoryPending){directoryPending=null;teardown();hideLobbyStatus();setPhase('lobby');}roomBrowser.render({pendingCode:null});}
+});
+const directory=createRoomDirectory({endpoint:peerEndpoint,onChange:state=>roomBrowser.render({...state,pendingCode:directoryPending})});
+const browseButton=createPublicRoomsLauncher({onOpen:button=>{roomBrowser.open(button);directory.open();}});
+browseButton.id='browseWorlds';$('create').after(browseButton);
+const publicNotice=document.createElement('p');publicNotice.className='bf-pr-lobby-notice';publicNotice.textContent='Multiplayer worlds are public. Anyone can join.';browseButton.after(publicNotice);
+const battlePanel=createBattlePanel({mount:document.querySelector('#menu .menu-card'),onAction:({action,side})=>{
+  if(!connected)return;
+  if(action==='side')command('action',{action:'inventionSide',side});
+  else if(isHost())command('battle',{action});
+}});
+battlePanel.element.dataset.mcPage='battle';
+function refreshBattlePanel(){battlePanel.update(battlePanelModel(lastSnapshot,playerId,{isHost:isHost(),connected,battleCompatible:!!session?.connection.local||session?.connection.maxPeers>=32}));}
 
 // ---------------------------------------------------------------- lobby form
 const nameInput = $('name');
@@ -236,6 +267,7 @@ function showLobbyStatus(text, {busy = false, retry = false, back = false, cance
 }
 function showLobbyProblem(text, {retry = false, back = true} = {}) {
   showLobbyStatus(text, {retry, back});
+  if(roomBrowser.isOpen){directoryPending=null;roomBrowser.render({pendingCode:null,error:text});return;}
   ($('statusRetry').hidden ? $('statusBack') : $('statusRetry')).focus({preventScroll: true});
 }
 function hideLobbyStatus() { $('lobbyStatus').hidden = true; body.classList.remove('lobby-busy'); $('lobbyForm').inert = false; $('savedWorlds').inert = false; savedChooser.finish(); }
@@ -269,6 +301,7 @@ function syncActive() {
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  voice?.dispose(); voice = null; voiceControls.update();
   closeQuickBuild();closeForge();
   restoreFieldLock=false;holdOverlays?.close();
   clearTimeout(joinTimer);
@@ -299,6 +332,8 @@ function start(attempt) {
   try { next = session = new WorldSession(attempt.solo?{connection:new LocalRoomConnection()}:{url:peerEndpoint()}); }
   catch (error) { recordProblem(error); showLobbyProblem('We couldn’t open a connection to the forge. Please try again in a moment.', {retry: true}); return; }
 
+  if (!attempt.solo) { voice = new ProximityVoice(next.connection); voice.addEventListener('change', voiceControls.update); }
+  voiceControls.update();
   const mine = handler => event => { if (session === next) handler(event.detail); };
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
@@ -351,6 +386,7 @@ function start(attempt) {
 }
 
 function onWelcome(detail) {
+  directoryPending=null;roomBrowser.close();
   playerId = detail.peerId;
   room = String(detail.room || '');
   const url = new URL(location.href);
@@ -377,6 +413,7 @@ function onStatus(detail) {
   lastStatus = state || 'unknown';
   connected = state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
   syncActive();
+  refreshBattlePanel();
   if (phase === 'connecting' && !playerId && state === 'closed') {
     teardown(); setPhase('lobby');
     showLobbyProblem('We couldn’t reach the forge. Check your internet connection and try again.', {retry: true});
@@ -463,7 +500,7 @@ function onSnapshot(snapshot) {
   }
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
   if (snapshot.adventure) try {
-    const view = adventureView(snapshot.adventure, snapshot, playerId);
+    const view = battleQuestView(snapshot,playerId)||adventureView(snapshot.adventure, snapshot, playerId);
     if (!expeditionBanner) expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction});
     expeditionBanner.update(view, {held: self?.resources, mana: self?.mana});
     // DOM is invisible in WebXR: the same view drives the in-world wrist panel (it repaints only when its model changes).
@@ -471,7 +508,7 @@ function onSnapshot(snapshot) {
   } catch (error) { recordProblem(error); }
   else if (xrActive) game.setExpedition(null);
 
-  const count = session?.connection.local?'This device':`${snapshot.players.length} of ${snapshot.maxPlayers ?? 8} here`;
+  const count = session?.connection.local?'This device':`${snapshot.players.length} of ${session?.connection.maxPeers ?? snapshot.maxPlayers ?? 32} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
@@ -487,6 +524,7 @@ function onSnapshot(snapshot) {
   if(self)spellbook?.update({...spellbookReadiness(self,snapshot.tick,spell,connected&&currentRole==='god'),blocked:Object.fromEntries(SPELLS.map(s=>[s.id,spellUnavailable(snapshot,self,s.id)]))});
   if(forgeOpen)forgePanel?.update(workshopModel(snapshot));
   if(quickBuildOpen)quickBuild?.show(quickBuildModel(snapshot));
+  if(menuOpen)refreshBattlePanel();
 }
 
 function meter(kind, value, max) {
@@ -519,6 +557,7 @@ function applyRoleUi(role) {
 
 function isHost() { return !!session?.simulation; }
 function refreshHostControls() {
+  refreshBattlePanel();
   const host = isHost();
   $('resetArea').hidden = !host;
   $('resetNote').hidden = host;
@@ -770,6 +809,8 @@ function fieldModel() {
   const inputMode=xrActive?'vr':mobile?.enabled?'touch':'desktop',tool=game?.weaponState()?.tool||self?.tool||'axe';
   const help=equipmentHelp(tool,inputMode,role),adv=lastSnapshot?.adventure;
   const model={tool,role,inputMode,name:help.title,help:{...help,title:'Field guide'},players:(lastSnapshot?.players||[]).map(p=>({id:p.id,name:p.name,role:p.role,kills:p.stats?.kills??0,deaths:p.stats?.deaths??0,contribution:p.stats?.contribution??0,isSelf:p.id===playerId})),disabledActions:[]};
+  const battle=battleQuestView(lastSnapshot,playerId);
+  if(battle){model.quest={title:battle.title,summary:`${battle.nextStep} ${battle.notice}`};model.disabledActions.push('start-expedition');return model;}
   if(!adv||!self){model.quest={title:'Prepare an expedition',summary:phase==='game'?'The world is arriving. Gather your party at the forge.':'Create or join a world, then gather your party at the forge.'};model.disabledActions.push('start-expedition');return model;}
   const view=adventureView(adv,lastSnapshot,playerId),actions=actionModel(view,{held:self.resources,mana:self.mana});
   const primary=actions.find(a=>['retry','rematch','start','deposit','lodestar','tithe'].includes(a.id));
@@ -824,6 +865,8 @@ const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 // Capture phase on window runs before the game's listeners: typing never moves your hero.
 for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(type, event => {
+  if(roomBrowser.isOpen)return;
+  if(event.key==='Escape'&&event.target.closest?.('.bf-bt-confirm'))return;
   if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
@@ -866,10 +909,11 @@ try {
   game = createGame({
     canvas,
     isHost, onSelection: chooseSpell,
+    onVoicePose: pose => voice?.updatePose(pose),
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
-    onStatus: status => { rendererStatus = String(status); if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
+    onStatus: status => { rendererStatus = String(status); if(/^World renderer ready/.test(rendererStatus))rendererReady=true; if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
     onXRChange: value => { closeQuickBuild();restoreFieldLock=false;holdOverlays?.close();xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,
     onExpeditionAction: expeditionAction,
@@ -883,7 +927,6 @@ try {
   createMenuTabs();
   quietHud=mountQuietHud();
   const touchBuild=document.createElement('button');touchBuild.type='button';touchBuild.className='mui-btn mui-util qb-entry';touchBuild.dataset.qbToggle='';touchBuild.setAttribute('aria-label','Quick build');touchBuild.setAttribute('title','Quick build');touchBuild.innerHTML='<svg class="mui-icon" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span>';touchBuild.addEventListener('click',openQuickBuild);document.querySelector('#touchControls .mui-util-bar')?.append(touchBuild);
-  rendererReady = true;
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
   Promise.resolve().then(() => game.canVR()).then(supported => {
@@ -910,11 +953,12 @@ setPhase('lobby');
 patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
-window.addEventListener('beforeunload', () => { try { quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
   state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  voice: () => voice ? structuredClone({...voice.state(), pose:voice.pose}) : null,
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,
 });

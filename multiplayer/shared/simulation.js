@@ -1,3 +1,6 @@
+import {battleAction,createBattle,stepBattle,restoreBattle,battleActive,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
+import {MAX_PLAYERS} from './multiplayer-limits.js';
+export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {createTestingSupplies} from './testing-supplies.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
@@ -12,6 +15,7 @@ import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint} from './spells.js';
 import {BLOOM,bloomLevel,addBloom,stepBloom,restoreBloom} from './bloom.js';
+import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
@@ -23,7 +27,7 @@ import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,res
 import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 export const HZ = 60;
-export const MAX_PLAYERS = 8;
+
 const BOUND = 55, MAX_WORLD = 64;
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -52,11 +56,12 @@ function pose(value) {
 
 
 function spawn(state, ignored = '') {
-  let best = [0, 0, 8], clearance = -1;
+  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=base?[base.position[0]+sign*4,base.position[2]]:[0,8];
+  let best = [origin[0], 0, origin[1]], clearance = -1;
   const trees=createTreeIndex();trees.update(state);const cuts=treeCutMap(state),forgeY=terrainHeight(state,0,0,false);
   for (let i = 0; i < 128; i++) {
     const theta = i * 2.3999632297, radius = 2.8 * Math.sqrt(i);
-    const candidate = [clamp(Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(8 + Math.sin(theta) * radius, -BOUND, BOUND)];
+    const candidate = [clamp(origin[0] + Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(origin[1] + Math.sin(theta) * radius, -BOUND, BOUND)];
     candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
     resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));
     if(candidate.some((v,k)=>k!==1&&Math.abs(v)>49.5))continue;
@@ -75,8 +80,8 @@ function nextId(state, prefix) {
   const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[]),...(state.settlement?.workers||[]),...(state.awakenedTrees||[]),...(state.wildTrees||[])].flatMap(x=>x.editId?[x.id,x.editId]:[x.id]);
   let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
 }
-function damageEnemy(state, enemy, amount, events, ownerId) {
-  return hitEnemyPart(state,enemy,'torso',amount,ownerId?{ownerId}:null,{nextId,terrainHeight},events);
+function damageEnemy(state, enemy, amount, events, ownerId, side) {
+  return hitEnemyPart(state,enemy,'torso',amount,ownerId||side?{ownerId,side}:null,{nextId,terrainHeight},events);
 
 }
 function damageHero(state, hero, amount, events) {
@@ -99,7 +104,7 @@ function newState({room = 'LOCAL', seed = 41} = {}) {
     ...createTestingSupplies(STRUCTURES.timberline.cost,baseHeight),
     {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
-    meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
+    meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
 }
 
 function instantiate(state) {
@@ -139,7 +144,13 @@ function instantiate(state) {
     },
     command(id, message) {
       const p = player(id);
+      if (p && message?.type === 'battle') {
+        if (!safeSeq(message.seq)) return fail('invalid_sequence');
+        if (message.seq <= p.seq) return fail('duplicate_sequence');
+        p.seq=message.seq;return battleAction(state,p,message,{createEnemy,terrainHeight});
+      }
       if (p && message?.type === 'adventure') {
+        if (state.battle.status!=='off' && ['start','retry'].includes(message.action)) return fail('battle_active');
         if (!safeSeq(message.seq)) return fail('invalid_sequence');
         if (message.seq <= p.seq) return fail('duplicate_sequence');
         p.seq = message.seq;
@@ -257,15 +268,16 @@ function instantiate(state) {
           if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,reward.amount);if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
+          if(state.battle.bases.some(b=>b.id===message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
-          if(hitEnemy && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point)){const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:hitEnemy.id,by:p.id,position:[...message.point],hits:p.charge?.hits||0});hitEnemyPart(state,hitEnemy,message.part||'torso',(requestedTool==='hammer'?70:requestedTool==='limb'?30:34)+charge,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);}
+          if(hitEnemy && enemyHostileTo(hitEnemy,p.side) && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point)){const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:hitEnemy.id,by:p.id,position:[...message.point],hits:p.charge?.hits||0});hitEnemyPart(state,hitEnemy,message.part||'torso',(requestedTool==='hammer'?70:requestedTool==='limb'?30:34)+charge,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);}
           else if(message.targetId==='shrine')return fail('permanent_forge');
           return ok(events); // No fallback to another target when a precise surface missed.
         }
-        const enemy = state.enemies.map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
+        const enemy = state.enemies.filter(e=>enemyHostileTo(e,p.side)).map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
         if (enemy && Number.isFinite(enemy[1])) {const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:enemy[0].id,by:p.id,position:[...enemy[0].position],hits:p.charge?.hits||0});damageEnemy(state, enemy[0], 34+charge, events,p.id);}
         return ok(events);
       }
@@ -273,6 +285,7 @@ function instantiate(state) {
       const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
       if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
+      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)))return fail('invalid_cast');
       const lineCount=line?earthLineEdits(message.start,message.end):1;
       if (!Object.hasOwn(COST, spell) || !validPoint(message.point)) return fail('invalid_cast');
       // Mana is the only rule that refuses a cast; placement rules move it instead.
@@ -283,10 +296,13 @@ function instantiate(state) {
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
       if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
-          ((spell === 'grove' || spell === 'ring') && state.groves.length >= MAX_WORLD) ||
+          (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
           (spell === 'starfall' && (state.pendingStarfalls.length >= 8 || state.deposits.length+state.pendingStarfalls.length>=80))) return fail('world_limit');
+      // Growth spells grow each tree on the open ground nearest its aim; only a spot with no room at all refuses.
+      const grown=['grove','ring','wave'].includes(spell)?growthPlan(state,spell,point,{start:message.start,end:message.end}):null;
+      if(grown&&!grown.length)return fail('no_room');
       // Ents: the God awakens trees that already stand. Nothing to wake is the only refusal besides mana and world limits.
       const entTrees=ENT_SPELLS.includes(spell)?entTargets(worldTrees(state),state.harvestedTrees,spell,point):null;
       if(entTrees&&!entTrees.length)return fail('no_tree');
@@ -307,12 +323,14 @@ function instantiate(state) {
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
       if(spell==='rainfall'){events.push(castRainfall(state,at,p.id));quenchFire(state,at,RAINFALL.quenchRadius);}
       if(spell==='spring'){if(state.springs.length>=BLOOM.spring.cap)state.springs.shift();state.springs.push({id:idNew,x,z,expireTick:state.tick+BLOOM.spring.ticks});quenchFire(state,at,BLOOM.spring.radius);}
-      if(spell==='quake')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=8){enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+180);damageEnemy(state,enemy,30,events,p.id);}
+      if(spell==='quake')for(const enemy of [...state.enemies])if(enemyHostileTo(enemy,p.side)&&distance(enemy.position,at)<=8){enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+180);damageEnemy(state,enemy,30,events,p.id);}
       if(spell==='lightning')for(const b of state.inventions.structures)if(distance(b.position,at)<=3)damageInvention(state,b.id,65,p.id,events);
-      if(spell==='lightning')applyHeat(state,at,3,1,fireContext);
-      if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
+      if(spell==='lightning'&&!battleActive(state))applyHeat(state,at,3,1,fireContext);
+      if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&(!battleActive(state)||(hero.side||'party')===(p.side||'party'))&&distance(hero.position,at)<=7)hero.hp=Math.min(100,hero.hp+40);
+      if(battleActive(state)&&['heal','blessing'].includes(spell))for(const enemy of state.enemies)if(enemy.battleRun&&enemy.side===(p.side||'party')&&distance(enemy.position,at)<=(spell==='heal'?7:6))enemy.hp=Math.min(enemyMaxHp(enemy),enemy.hp+(spell==='heal'?40:20));
+      if(['lightning','quake'].includes(spell))for(const base of state.battle.bases)if(distance(base.position,at)<=(spell==='lightning'?3:8))damageBattleBase(state,base.id,spell==='lightning'?65:30,p.side||'party',events);
       if(spell==='lightning')for(const enemy of [...state.enemies])if(distance(enemy.position,at)<=3)damageEnemy(state,enemy,80,events,p.id);
-      if(spell==='frost')for(const enemy of state.enemies)if(distance(enemy.position,at)<=7)enemy.slowUntil=state.tick+300;
+      if(spell==='frost')for(const enemy of state.enemies)if(enemyHostileTo(enemy,p.side)&&distance(enemy.position,at)<=7)enemy.slowUntil=state.tick+300;
       if(entTrees)for(const [i,tree] of entTrees.slice(0,entRoom).entries()){
         if(!rememberAwakened(state,tree,state.enemies))break;
         const ent=createEnt(`${idNew}_${i}`,tree,[tree.x,terrainHeight(state,tree.x,tree.z),tree.z],state.tick);
@@ -321,7 +339,12 @@ function instantiate(state) {
         if(hero)ent.yaw=Math.atan2(-(hero.position[0]-tree.x),-(hero.position[2]-tree.z));
         state.enemies.push(ent);events.push({kind:'ent_wake',id:ent.id,treeId:tree.id,size:ent.size,position:[...ent.position],tick:state.tick,material:'wood'});
       }
-      if (spell === 'grove' || spell === 'ring') {state.groves.push({id: idNew, x, z, ...(spell === 'ring' ? {kind:'ring'} : {})});addBloom(state,BLOOM.grove,events,at);}
+      if (grown) {
+        const [ws,we]=spell==='wave'?waveLine(point,message.start,message.end):[], gx=spell==='wave'?+((ws[0]+we[0])/2).toFixed(3):x, gz=spell==='wave'?+((ws[2]+we[2])/2).toFixed(3):z;
+        state.groves.push({id: idNew, x: gx, z: gz, ...(spell !== 'grove' ? {kind: spell} : {}), trees: grown.map(t => [t.x, t.z, t.height, t.variant, ...(t.delay ? [state.tick + t.delay] : [])])});
+        Object.assign(events.find(e=>e.kind==='spell'),{sites:grown.map(t=>[t.x,t.z,t.delay||0]),radius:spell==='ring'?4.6:4.2,...(spell==='wave'?{start:ws,end:we}:{})});
+        addBloom(state,spell==='wave'?BLOOM.wave:BLOOM.grove,events,at);
+      }
       if (spell === 'raise'||spell==='lower') {
         state.edits.push({id: idNew, kind: spell, x, z, radius: 6, height: spell==='raise'?2:-2});
         liftActors(state);
@@ -361,22 +384,24 @@ function instantiate(state) {
         if (pending.impactTick > state.tick) continue;
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
         const at = [pending.x, terrainHeight(state, pending.x, pending.z), pending.z];
-        for (const e of [...state.enemies]) if (distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
-        for (const p of state.players) if (p.role === 'hero' && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
+        for (const e of [...state.enemies]) if (enemyHostileTo(e,pending.side) && distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
+        for (const p of state.players) if (p.role === 'hero' && (!battleActive(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
+        for(const base of state.battle.bases)if(distance(base.position,at)<=5)damageBattleBase(state,base.id,90,pending.side||'party',events);
         for(const b of state.inventions.structures)if(distance(b.position,at)<=5)damageInvention(state,b.id,90,null,events,pending.side||'party');
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
         const awakens = meteorAwakens(state.seed,pending.id) && state.enemies.length < MAX_WORLD;
         if (!awakens && state.deposits.length < 80) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
-        addFuel(state,at,2,.35,true);applyHeat(state,at,5,1,fireContext);
+        addFuel(state,at,2,.35,!battleActive(state));if(!battleActive(state))applyHeat(state,at,5,1,fireContext);
         if (awakens) { const enemy=createEnemy(`${pending.id}_creature`,[pending.x,terrainHeight(state,pending.x,pending.z),pending.z],'golem'); Object.assign(enemy,{meteorBorn:true,unfurlTick:state.tick}); state.enemies.push(enemy); events.push({kind:'meteor_unfurl',id:enemy.id,position:[...enemy.position],tick:state.tick}); }
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       stepCrystalWalls(state,combatContext,hitEnemyPart,events);
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
+      stepBattle(state,{createEnemy,terrainHeight,nextId},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;},
-        damageHero,damageStructure:(id,n,ev)=>damageInvention(state,id,n,null,ev),events
+        damageHero,damageEnemy:(enemy,n,ev,side)=>hitEnemyPart(state,enemy,'torso',n,{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
@@ -406,7 +431,7 @@ function instantiate(state) {
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
-        fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
+        fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
         awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
@@ -477,7 +502,7 @@ export function loadSimulation(saved) {
       throw Error('Invalid simulation edit');
   }
   for (const g of saved.groves) {
-    if (!record(g) || !unique(g.id) || !validXZ(g) || (g.kind !== undefined && g.kind !== 'ring')) throw Error('Invalid simulation grove');
+    if (!record(g) || !unique(g.id) || !validXZ(g) || (g.kind !== undefined && g.kind !== 'ring' && g.kind !== 'wave') || (g.trees !== undefined && !validGroveTrees(g.trees, saved.tick)) || (g.kind === 'wave' && g.trees === undefined)) throw Error('Invalid simulation grove');
   }
   const treeIds=new Set(worldTrees(saved).map(t=>t.id));
   for (const t of entTrees.wildTrees) if (!treeIds.has(t.id)) throw Error('Invalid rooted tree'); // an id cannot be both awake and rooted
@@ -524,13 +549,14 @@ export function loadSimulation(saved) {
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
   state.edits = saved.edits.map(restoreTerrainEdit); const bake = restoreTerrainBake(saved.terrainBake); if (bake) state.terrainBake = bake; state.groves = copy(saved.groves);
   state.pendingStarfalls = copy(saved.pendingStarfalls); Object.assign(state, restoreBloom(saved, ids), restoreWeather(saved));
   state.harvestedTrees = harvestedTrees; state.looseLogs = looseLogs; Object.assign(state, entTrees);
   if (saved.adventure !== undefined) { const restored = restoreAdventure(saved.adventure); if (!restored.ok) throw Error('Invalid expedition: ' + restored.code); state.adventure = restored.adventure; }
+  state.battle=restoreBattle(saved);
   state.settlement=restoreSettlement(saved.settlement,saved.tick,contentIds,new Set(saved.enemies.map(e=>e.id)));
   state.inventions=restoreInventions(saved.inventions,saved.tick);
   for(const b of state.inventions.structures){if(contentIds.has(b.id))throw Error('Duplicate structure');contentIds.add(b.id);}

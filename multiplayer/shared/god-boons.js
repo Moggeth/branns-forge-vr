@@ -1,3 +1,4 @@
+import {battleActive} from './battle-mode.js';
 // God spells feed the Heroes. Every cast leaves something a Hero can use: real materials to mine or pick
 // up, fruit that heals, or a short boon. Pure and deterministic (authority state only, no clock or RNG).
 // Feeding is its own reward: nothing here pays the God back.
@@ -7,7 +8,7 @@ import {SUNDER} from './terrain.js';
 export const BOONS = Object.freeze({
   charge: {hits: 3, ticks: 900, bonus: 40, strikeDamage: 25, radius: 3}, // Lightning near a Hero
   swift: {ticks: 360, speed: 1.4, radius: 7},                              // Frost Nova around a Hero
-  sanctuary: {radius: 4.5, hpPerSecond: 3},                               // standing inside a Tree Ring
+  sanctuary: {radius: 5, hpPerSecond: 3},                               // standing inside a Tree Ring
   blessing: {hits: 8, ticks: 1800, heal: 20, radius: 6},                  // Blessing: a long weapon charge
   quake: {radius: 8, heroDamage: 8, ores: ['ironOre', 'copperOre']},       // Quake shakes ore loose
   seamSpacing: 4, apples: 2, rainApples: 3,
@@ -49,7 +50,7 @@ export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId
     const t = k / (SUNDER.seams + 1), px = start[0] + (end[0] - start[0]) * t, pz = start[2] + (end[2] - start[2]) * t, id = addDeposit(state, 'crystal', px, pz, ctx);
     if (id) gift('crystal_seam', id, [px, ctx.terrainHeight(state, px, pz), pz]);
   }
-  if (spell === 'grove') for (let i = 0; i < BOONS.apples; i++) {
+  if (spell === 'grove' || spell === 'wave') for (let i = 0; i < BOONS.apples; i++) {
     const a = i * Math.PI + .6, px = x + Math.cos(a) * 1.2, pz = z + Math.sin(a) * 1.2, id = addPickup(state, 'apple', px, pz, 1, ctx);
     if (id) gift('apple', id, [px, ctx.terrainHeight(state, px, pz), pz]);
   }
@@ -66,19 +67,21 @@ export function castBoons(state, caster, spell, at, ctx, {start, end, id: castId
   });
   for (const hero of state.players) {
     if (hero.role !== 'hero') continue;
-    if (spell === 'quake' && flat(hero.position, at) <= BOONS.quake.radius) ctx.damageHero(state, hero, BOONS.quake.heroDamage, events);
-    if (spell === 'blessing' && flat(hero.position, at) <= BOONS.blessing.radius) {
+    const allied=!battleActive(state)||(hero.side||'party')===(caster.side||'party');
+    if (spell === 'quake' && (!battleActive(state)||!allied) && flat(hero.position, at) <= BOONS.quake.radius) ctx.damageHero(state, hero, BOONS.quake.heroDamage, events);
+    if (spell === 'blessing' && allied && flat(hero.position, at) <= BOONS.blessing.radius) {
       hero.hp = Math.min(100, hero.hp + BOONS.blessing.heal);
       hero.charge = {hits: Math.max(BOONS.blessing.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.blessing.ticks, hero.charge?.until || 0)};
       gift('blessing', hero.id, [...hero.position], {hits: hero.charge.hits, until: hero.charge.until});
     }
     if (spell === 'lightning' && flat(hero.position, at) <= BOONS.charge.radius) {
       // A near miss hurts, but the Hero's weapon drinks the charge.
-      ctx.damageHero(state, hero, BOONS.charge.strikeDamage, events);
+      if(!battleActive(state)||!allied)ctx.damageHero(state, hero, BOONS.charge.strikeDamage, events);
+      if(!allied)continue;
       hero.charge = {hits: Math.max(BOONS.charge.hits, hero.charge?.hits || 0), until: Math.max(state.tick + BOONS.charge.ticks, hero.charge?.until || 0)};
       gift('charge', hero.id, [...hero.position], {hits: hero.charge.hits, until: hero.charge.until});
     }
-    if (spell === 'frost' && flat(hero.position, at) <= BOONS.swift.radius) {
+    if (spell === 'frost' && allied && flat(hero.position, at) <= BOONS.swift.radius) {
       hero.swiftUntil = state.tick + BOONS.swift.ticks;
       gift('swift', hero.id, [...hero.position], {until: hero.swiftUntil});
     }

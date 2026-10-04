@@ -19,8 +19,10 @@
 .timberline-ammo.is-empty .timberline-ammo-glyph::before, .timberline-ammo.is-empty .timberline-ammo-glyph::after { border-color: #c07a6c; box-shadow: none; }
 .timberline-ammo.is-empty .timberline-ammo-glyph::before { border-right-color: transparent; }
 .timberline-ammo.is-empty .timberline-ammo-glyph::after { border-left-color: transparent; }
-/* Inside the scope the lens carries the count; the plate steps aside. */
-.timberline-ammo.is-scoped { opacity: 0; transition: opacity .12s; }
+/* Sighting along the ladder keeps the world in view, so the plate only dims a little. */
+.timberline-ammo.is-scoped { opacity: .8; transition: opacity .12s; }
 @media (pointer: coarse) { .timberline-ammo { top: calc(env(safe-area-inset-top, 0px) + 56px); font-size: 14px; } }
 /* Seated at the machine the hand weapons can't be used, so their bar steps out of the sight line. */
 body.timberline-manned .bf-equip, body.timberline-manned .mui-weapons { visibility: hidden; }
+/* No screen-centre mark while seated: the operator aims with the brass ladder on the machine. */
+body.timberline-manned .mui-reticle, body.timberline-manned .rr-root { visibility: hidden; }

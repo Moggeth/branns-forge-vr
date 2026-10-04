@@ -1,3 +1,4 @@
+import {friendlyEnemyHit} from './battle-mode.js';
 import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront,makeTerrainRoom,wallSpec} from './terrain.js';
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
@@ -81,7 +82,7 @@ export function stepCrystalWalls(state,ctx,hitEnemyPart,events) {
       const now=sunderFront(r,state.tick),before=sunderFront(r,state.tick-1);
       // The earth is moving where the front has passed by ~half the settle band.
       const crossed=q=>{const along=alongOf(q),lead=.55;return Math.abs(sideOf(q))<spec.width&&along>=-.3&&along<=len+.3&&along>before.distance-lead&&along<=now.distance-lead;};
-      for(const enemy of [...state.enemies])if(crossed(enemy.position)&&standing){
+      for(const enemy of [...state.enemies])if(crossed(enemy.position)&&standing&&!friendlyEnemyHit(state,enemy,{ownerId:owner})){
         hitEnemyPart(state,enemy,'torso',spec.damage,{tool:kind==='pick_wall'?'pick':'spell',point:[...enemy.position],ownerId:owner},ctx,events);
         if(!state.enemies.includes(enemy))continue;
         if(kind==='sunder')enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+spec.slowTicks);else enemy.launchTick=state.tick;
