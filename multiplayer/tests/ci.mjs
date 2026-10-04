@@ -31,7 +31,7 @@ const suite = [
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
-  'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
+  'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','grove-growth','remains-physics',
   'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','apple-snack',
 ];
