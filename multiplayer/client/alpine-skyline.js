@@ -41,6 +41,8 @@ export function createAlpineSkyline({scene, sky = null, columns = 480, rows = 6}
     uSunColor: U.sunColor || {value: new THREE.Color(1, .82, .56)},
     uHorizon: U.horizon || {value: new THREE.Color(.9, .66, .33)},
     uZenith: U.zenith || {value: new THREE.Color(.11, .27, .52)},
+    // Day/night + weather (client/day-night-weather.js drives these through the shared sky uniforms).
+    uNight: U.night || {value: 0}, uOvercast: U.overcast || {value: 0}, uMoonDir: U.moonDir || {value: new THREE.Vector3(0, -1, 0)},
   };
   // Each layer is a real heightfield ridge band (cross-ridge rows), so faces carry true normals: sunlit faces,
   // shaded couloirs and spurs read like mountains, and snow settles on up-facing high ground.
@@ -78,7 +80,7 @@ export function createAlpineSkyline({scene, sky = null, columns = 480, rows = 6}
       void main(){ vRidge = ridge; vWorld = position; vN = normal;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */`
-      uniform vec3 uSunDir, uSunColor, uHorizon, uZenith; uniform float uHaze[3], uSnow[3];
+      uniform vec3 uSunDir, uSunColor, uHorizon, uZenith, uMoonDir; uniform float uHaze[3], uSnow[3], uNight, uOvercast;
       varying vec4 vRidge; varying vec3 vWorld; varying vec3 vN;
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -101,10 +103,12 @@ export function createAlpineSkyline({scene, sky = null, columns = 480, rows = 6}
         vec3 rock = mix(vec3(.05, .056, .066), vec3(.11, .108, .11), rocky);
         rock = mix(rock, vec3(.025, .045, .03), smoothstep(.32, .12, t) * smoothstep(.4, .7, n.y)); // forested lower flanks
         vec3 alb = mix(rock, vec3(.85, .89, .96), snow);
-        vec3 amb = mix(vec3(.22, .3, .44), vec3(.32, .42, .58), n.y * .5 + .5);
-        vec3 col = alb * (amb + uSunColor * 1.25 * sun);
+        vec3 amb = mix(vec3(.22, .3, .44), vec3(.32, .42, .58), n.y * .5 + .5) * mix(1.0, .1, uNight) * (1.0 - .35 * uOvercast);
+        float moon = clamp(dot(n, normalize(uMoonDir)), 0.0, 1.0) * uNight * (1.0 - .7 * uOvercast);
+        vec3 col = alb * (amb + uSunColor * 1.25 * sun * (1.0 - .7 * uOvercast) + vec3(.32, .4, .62) * moon);
         float k = clamp(haze + (1.0 - t) * .3 * (1.0 - haze), 0.0, .96);
-        vec3 air = mix(mix(uHorizon, vec3(.42, .55, .76), .6), uZenith, t * .25);
+        k = mix(k, .97, uOvercast * .7);
+        vec3 air = mix(mix(uHorizon, vec3(.42, .55, .76), .6 * (1.0 - uNight) * (1.0 - uOvercast)), uZenith, t * .25);
         col = mix(col, air, k);
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>

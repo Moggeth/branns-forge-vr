@@ -614,6 +614,16 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         acc += dt * (age < 2.2 ? 22 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.5, c.R() < 0.5 ? PAL.gold : PAL.mint, 0.22, 1.8); }
       });
     },
+    // Rainfall: three water ribbons spiral up into the sky to seed the clouds while wide ripples run out over the land.
+    rainfall(ev, c) {
+      ev.dur = 3.6; const hs = [0, 1, 2].map((i) => ({ rb: mk(ev, 44, i % 2 ? ribMat(PAL.ice, PAL.resonanceHi, 0, 1.4) : ribMat(PAL.resonanceHi, PAL.teal, 0, 1.2), null), o: (i * TAU) / 3 })); let acc = 0;
+      for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(PAL.resonanceHi, PAL.ice, 0, 1), 0.5, 10 + i * 5, 0.3 + i * 0.4, 2.2 + i * 0.4, 0.35);
+      ev.fx.push((age, dt) => {
+        const rv = easeOut(age / 1.6), fade = 1 - sstep(2.6, 3.6, age), gy = H(c.x, c.z);
+        for (const h of hs) { for (let i = 0; i < 44; i++) { const u = i / 43, a = u * TAU * 2 + h.o + age * 2 * MO.swirl, r = 0.8 + 2.2 * u * u; h.rb.set(i, c.x + Math.cos(a) * r, gy + 0.2 + u * 14 * rv, c.z + Math.sin(a) * r); } h.rb.commit(0.28, rv, fade); }
+        acc += dt * (age < 2.6 ? 26 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 3, c.R() < 0.5 ? PAL.resonanceHi : PAL.ice, 0.22, 4); }
+      });
+    },
     lightning(ev, c) {
       ev.dur = 1.9; const { x, z, y, R } = c, top = c.hasLine ? [c.ax, c.ay, c.az] : [x + (R() - 0.5) * 5, y + 30, z + (R() - 0.5) * 5], bot = c.hasLine ? [c.bx, c.by, c.bz] : [x, y, z], N = 26;
       const m0 = ribMat(0xffffff, PAL.bolt, 0, 0), m1 = ribMat(PAL.purple, 0x6fb7ff, 0, 3), sides = [[1, 0], [0, 1]];
