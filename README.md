@@ -2,6 +2,8 @@
 
 # Brann's Forge - current browser game
 
+Opt-in local [Leap Motion God prototype](docs/LEAP-GOD-PROTOTYPE.md).
+
 Current gameplay fixes: [Stumpling roots, Phoenix aim/fire, gold recovery and first-use preparation](docs/GAMEPLAY-CONTACT-FIXES-20261004.md).
 
 Tree chopping fix: [standing ghost tree diagnosis and regression](docs/TREE-GHOST-FIX-20261004.md).

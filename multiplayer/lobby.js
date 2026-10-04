@@ -28,6 +28,7 @@ import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
+import {mountLeapControls} from './client/leap-controls.js';
 import {LocalRoomConnection} from './client/local-room.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
@@ -114,6 +115,9 @@ let forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpe
 let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
+let leapControls=null;
+const leapPrototype=import.meta.env.DEV&&location.hostname==='127.0.0.1'&&new URLSearchParams(location.search).has('leap');
+window.addEventListener('beforeunload',()=>leapControls?.dispose());
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
@@ -930,7 +934,8 @@ try {
   const touchBuild=document.createElement('button');touchBuild.type='button';touchBuild.className='mui-btn mui-util qb-entry';touchBuild.dataset.qbToggle='';touchBuild.setAttribute('aria-label','Quick build');touchBuild.setAttribute('title','Quick build');touchBuild.innerHTML='<svg class="mui-icon" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span>';touchBuild.addEventListener('click',openQuickBuild);document.querySelector('#touchControls .mui-util-bar')?.append(touchBuild);
   game.setActive(false);
   chooseSpell(spell);game.setQuickCast($('quickCast')?.checked||false);
-  Promise.resolve().then(() => game.canVR()).then(supported => {
+  if(leapPrototype)leapControls=mountLeapControls({game,canvas,notify:toast,canControl:()=>phase==='game'&&connected&&rendererReady&&currentRole==='god'&&!menuOpen&&!patchNotesOpen&&!forgeOpen&&!quickBuildOpen&&!fieldKind&&!xrActive});
+  Promise.resolve().then(() => leapPrototype?false:game.canVR()).then(supported => {
     vrSupported = !!supported; vrChecked = true;
     applyRoleUi(currentRole);
   }).catch(() => { vrSupported = false; vrChecked = true; applyRoleUi(currentRole); });
