@@ -33,8 +33,9 @@ export function createSpellAudio(context) {
     golem: (o, t) => { rumble(o, t, 55, 32, 1.4, .16); noise(o, t + .3, {type: 'bandpass', f0: 420, f1: 260, q: 1.5, attack: .2, peak: .05, release: .9}); },
     raise: (o, t) => { rumble(o, t, 38, 92, 1.1); noise(o, t + .45, {type: 'bandpass', f0: 600, f1: 300, q: 1, attack: .05, peak: .06, release: .6}); },
     lower: (o, t) => { rumble(o, t, 95, 34, 1.1); for (let i = 0; i < 5; i++) noise(o, t + .3 + i * .09, {type: 'bandpass', f0: 700, q: 3, attack: .005, peak: .04, release: .12}); },
-    sunder: (o, t) => { noise(o, t, {type: 'highpass', f0: 2500, f1: 1200, attack: .002, peak: .16, release: .12}); rumble(o, t + .05, 70, 40, 1.6, .12); },
-    wall: (o, t) => { noise(o, t, {type: 'bandpass', f0: 220, f1: 640, q: 2, attack: .2, peak: .08, release: .7}); tone(o, t + .75, {f0: 90, f1: 50, attack: .01, peak: .12, release: .35}); },
+    // Earth lines: the rolling groan comes from crystal-wall-audio (line); these are the casting moments.
+    sunder: (o, t) => { noise(o, t, {type: 'highpass', f0: 2500, f1: 1200, attack: .002, peak: .16, release: .12}); tone(o, t + .02, {f0: 62, f1: 30, attack: .01, peak: .16, release: .6}); chord(o, t + .1, [370, 554], {attack: .02, peak: .014, release: 1.3, bend: .97}); },
+    wall: (o, t) => { noise(o, t, {type: 'bandpass', f0: 220, f1: 640, q: 2, attack: .2, peak: .08, release: .7}); tone(o, t, {f0: 48, f1: 82, attack: .3, peak: .14, release: .7}); chord(o, t + .25, [440, 659], {attack: .05, peak: .014, release: 1.4, bend: 1.01}); },
     grove: (o, t) => { noise(o, t, {type: 'highpass', f0: 3000, f1: 4500, attack: .3, peak: .025, release: 1.1}); chord(o, t + .1, [523, 659, 784], {attack: .25, peak: .02, release: 1.4, stagger: .12}); },
     ring: (o, t) => { noise(o, t, {type: 'highpass', f0: 3000, attack: .4, peak: .02, release: 1.2}); chord(o, t, [392, 494, 587, 784, 988], {attack: .08, peak: .018, release: 1.1, stagger: .09}); },
     starfall: (o, t, e) => e.phase === 'impact'

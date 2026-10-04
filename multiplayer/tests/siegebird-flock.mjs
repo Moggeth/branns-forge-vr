@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
-import {createEnemy,partPosition,SIEGEBIRD,siegebirdGoldenChance,siegebirdRoll} from '../shared/combat.js';
+import {createEnemy,partPosition,SIEGEBIRD,siegebirdGoldenChance,siegebirdRoll,siegebirdPerfect} from '../shared/combat.js';
 import {weaponReadiness} from '../client/ability-readiness.js';
 // Shared Siegebird rules: 1.0 s bird reload, deterministic golden bird roll, quad-damage golden bolts and mastery.
 const begin=performance.now();
@@ -40,4 +40,26 @@ s=fixture('golem',c=>{c.players[0].tool='crossbow';c.players[0].siegebird={n:0,g
 const saved=s.checkpoint();assert.equal(saved.projectiles[0].golden,true);assert.equal(loadSimulation(saved).snapshot().projectiles[0].golden,true);
 for(const bad of [{n:-1,golden:false,hits:0},{n:1,golden:'yes',hits:0},{n:1,golden:false,hits:0,extra:1}])assert.throws(()=>loadSimulation({...saved,players:saved.players.map(p=>({...p,siegebird:bad}))}));
 assert.throws(()=>loadSimulation({...saved,projectiles:saved.projectiles.map(p=>({...p,golden:false}))}));
-console.log(`siegebird-flock: reload window, golden roll, quad damage, mastery and persistence pass (${((performance.now()-begin)/1000).toFixed(3)} s)`);
+// Perfect wind: the first press during a reload is judged against the latch; a hit makes the next reload quick.
+const L=Math.round(SIEGEBIRD.latch*SIEGEBIRD.reloadTicks),W=SIEGEBIRD.windowTicks;
+assert.ok(siegebirdPerfect(L)&&siegebirdPerfect(L-W)&&siegebirdPerfect(L+W)&&!siegebirdPerfect(L+W+1)&&!siegebirdPerfect(L-W-1));
+assert.ok(siegebirdPerfect(Math.round(SIEGEBIRD.latch*SIEGEBIRD.quickTicks),{quick:true}),'quick reloads latch earlier');
+assert.ok(siegebirdPerfect(30,{hand:true})&&siegebirdPerfect(Math.round(SIEGEBIRD.handLatch*60)+W,{hand:true})&&!siegebirdPerfect(10,{hand:true})&&!siegebirdPerfect(60,{hand:true}),'hand winding beats the bird');
+const sb=s=>s.snapshot().players[0].siegebird;
+function cycle(pressAt,hand){const w=fixture('golem',c=>{c.players[0].tool='crossbow';});assert.equal(fire(w).result.ok,true);advance(w,pressAt);
+  assert.equal(act(w,'wind',hand?{hand:true}:{}).ok,true);return w;}
+let w=cycle(L,false);assert.equal(sb(w).wind,1,'press on the latch is perfect');
+assert.equal(act(w,'wind').ok,true);assert.equal(sb(w).wind,1,'repeat presses change nothing');
+advance(w,SIEGEBIRD.acceptTicks-L);const quick=fire(w);assert.equal(quick.result.ok,true);assert.equal(quick.result.events[0].reload.quick,true,'the next reload is quick');
+assert.deepEqual([sb(w).quick,sb(w).wind],[true,0]);
+advance(w,SIEGEBIRD.quickAcceptTicks-1);assert.equal(fire(w).result.code,'cooldown');advance(w,1);const after=fire(w);assert.equal(after.result.ok,true,'quick reload accepted from 40 ticks');
+assert.equal(after.result.events[0].reload.quick,undefined,'without another perfect wind the reload is normal again');assert.equal(sb(w).quick,false);
+w=cycle(L-W-2,false);assert.equal(sb(w).wind,-1,'an early press forfeits it');assert.equal(act(w,'wind').ok,true);assert.equal(sb(w).wind,-1,'no second try');
+advance(w,SIEGEBIRD.acceptTicks);assert.equal(fire(w).result.events[0].reload.quick,undefined);
+w=cycle(40,true);assert.equal(sb(w).wind,1,'hand-wound latch before the bird seats');
+w=fixture('golem',c=>{c.players[0].tool='crossbow';});assert.equal(act(w,'wind').ok,true);assert.equal(sb(w),undefined,'no reload, nothing to judge');
+assert.equal(act(w,'wind',{hand:'yes'}).ok,false);
+w=cycle(L,false);const quickSave=w.checkpoint();assert.deepEqual(loadSimulation(quickSave).snapshot(),w.snapshot(),'wind verdict survives save/restore');
+assert.deepEqual(Object.keys(quickSave.players[0].siegebird).sort(),['golden','hits','n','quick','wind']);
+for(const bad of [{n:1,golden:false,hits:0,quick:true},{n:1,golden:false,hits:0,quick:1,wind:0},{n:1,golden:false,hits:0,quick:false,wind:2}])assert.throws(()=>loadSimulation({...quickSave,players:quickSave.players.map(p=>({...p,siegebird:bad}))}));
+console.log(`siegebird-flock: reload window, golden roll, quad damage, mastery, perfect wind and persistence pass (${((performance.now()-begin)/1000).toFixed(3)} s)`);

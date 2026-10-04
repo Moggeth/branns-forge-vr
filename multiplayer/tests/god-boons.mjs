@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {BOONS} from '../shared/god-boons.js';
+import {earthLineSegments} from '../shared/terrain.js';
 
 const sim = createSimulation({seed: 4}); sim.addPlayer({id: 'g', role: 'god'}); sim.addPlayer({id: 'h', role: 'hero'});
 const S = sim.adventureWorld(), hero = S.players.find(p => p.id === 'h'); hero.position = [20, 0, 20];
@@ -14,10 +15,15 @@ let before = S.deposits.length;
 assert.equal(gifts(cast('raise', [30, 0, -20])), 'stone_boulder'); assert.equal(S.deposits.at(-1).kind, 'stone');
 assert.equal(gifts(cast('lower', [-30, 0, 20])), 'iron_seam'); assert.equal(S.deposits.at(-1).kind, 'iron');
 assert.equal(gifts(cast('raise', [30.5, 0, -20])), '', 'no second seam stacked on the first');
-assert.equal(gifts(cast('wall', [10, 0, -30], {start: [10, 0, -30], end: [18, 0, -30]})), 'stone_boulder');
-assert.equal(S.deposits.length, before + 3);
+assert.equal(gifts(cast('wall', [10, 0, -30], {start: [10, 0, -30], end: [18, 0, -30]})), 'quarry_wall');
+// The rampart itself is quarryable: one stone deposit per segment, linked to its edit.
+const quarry = S.deposits.filter(d => d.special === 'wall'); assert.equal(quarry.length, earthLineSegments(8));
+assert.ok(quarry.every(d => S.edits.some(e => e.id === d.editId && e.kind === 'wall' && e.wall)));
+assert.equal(S.deposits.length, before + 2 + earthLineSegments(8));
 assert.equal(gifts(cast('raise', [3, 0, 3])), '', 'nothing is left on the forge apron');
-assert.equal(gifts(cast('sunder', [-20, 0, -20], {start: [-20, 0, -20], end: [-12, 0, -20]})), 'crystal,crystal');
+// The chasm lays bare crystal seams on its floor, spaced like other seams: one on a short line, two on a long one.
+assert.equal(gifts(cast('sunder', [-20, 0, -20], {start: [-20, 0, -20], end: [-12, 0, -20]})), 'crystal_seam'); assert.equal(S.deposits.at(-1).kind, 'crystal');
+assert.equal(gifts(cast('sunder', [-20, 0, 35], {start: [-28, 0, 35], end: [-12, 0, 35]})), 'crystal_seam,crystal_seam');
 assert.equal(gifts(cast('grove', [-25, 0, 30])), 'apple,apple');
 assert.equal(gifts(cast('heal', [-25, 0, 30])), 'apple', 'rain ripens fruit on the grove');
 
@@ -56,4 +62,4 @@ cast('golem', [-10, 0, 35]); const golem = S.enemies.at(-1); golem.hp = 1; golem
 const pickupsBefore = S.pickups.length;
 S.players[0].mana = 100; sim.command('g', {type: 'cast', seq: ++seq, spell: 'lightning', point: golem.position});
 assert.ok(!S.enemies.includes(golem)); assert.deepEqual(S.pickups.slice(pickupsBefore).map(q => [q.kind, q.amount]), [['iron', 1]], 'a felled golem drops its iron bracers');
-console.log('god-boons: raise/lower/wall seams, sunder crystal, grove and rain fruit, lightning charge, frost swift, ring sanctuary, golem iron passed');
+console.log('god-boons: raise/lower seams, quarryable wall, sunder crystal seams, grove and rain fruit, lightning charge, frost swift, ring sanctuary, golem iron passed');
