@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {PHOENIX_DEADZONE} from './weapon-controller.js';
 // Emberwing curved-draw forecast. The integrator mirrors shared/combat.js
 // stepCombat() term for term (dt, curl fraction, drag, gravity, trapezoid
 // position, lifetime and +/-55 bounds). No aim assist: it only draws the path.
@@ -15,7 +16,7 @@ export function bowShotFromAim(aimDirection, curveBase, draw, out = {direction: 
     const base = new THREE.Vector3().fromArray(curveBase).normalize();
     const angle = Math.min(1.1, Math.acos(THREE.MathUtils.clamp(base.dot(d), -1, 1)));
     const c = new THREE.Vector3().crossVectors(base, d);
-    if (c.lengthSq() > 1e-8) c.normalize().multiplyScalar(angle); else c.set(0, 0, 0);
+    if (angle >= PHOENIX_DEADZONE && c.lengthSq() > 1e-8) c.normalize().multiplyScalar(angle); else c.set(0, 0, 0);
     base.toArray(out.direction); c.toArray(out.curve);
   } else { d.toArray(out.direction); out.curve[0] = out.curve[1] = out.curve[2] = 0; }
   out.speed = 18 + 18 * Math.max(.2, draw ?? .67);
@@ -26,9 +27,11 @@ export function bowShotFromAim(aimDirection, curveBase, draw, out = {direction: 
 // `sampleEvery` ticks plus the final point. `hit(from, to)` is the root's world
 // query (terrain/enemy/prop) returning {point:[x,y,z], normal?:[x,y,z]} or null.
 // `terrainHeight(x,z)` optionally mirrors the authoritative under-terrain cull.
+// `hitWindow` [first, last] (tick indices) limits the world query to those steps: the per-frame
+// guide re-integrates the whole path every frame but only re-queries around last scan's contact.
 // Returns {count, ticks, hit, reason}; reason: 'hit'|'terrain'|'bounds'|'life'|'capacity'.
 const _from = [0, 0, 0], _to = [0, 0, 0];
-export function forecastTrajectory({origin, velocity, curve = [0, 0, 0], kind = 'arrow', out, sampleEvery = 3, hit = null, terrainHeight = null, maxTicks = LIFE[kind] ?? 480}) {
+export function forecastTrajectory({origin, velocity, curve = [0, 0, 0], kind = 'arrow', out, sampleEvery = 3, hit = null, hitWindow = null, terrainHeight = null, maxTicks = LIFE[kind] ?? 480}) {
   const cap = Math.floor(out.length / 3), g = GRAVITY[kind] ?? 3, dt = RANGED_DT, drag = Math.exp(-.045 * dt);
   let px = origin[0], py = origin[1], pz = origin[2], vx = velocity[0], vy = velocity[1], vz = velocity[2];
   const len = Math.hypot(curve[0], curve[1], curve[2]);
@@ -48,7 +51,7 @@ export function forecastTrajectory({origin, velocity, curve = [0, 0, 0], kind = 
     const qx = px + (vx + nx) * .5 * dt, qy = py + (vy + ny) * .5 * dt, qz = pz + (vz + nz) * .5 * dt;
     vx = nx; vy = ny; vz = nz;
     let reason = null, contact = null;
-    if (hit) { _from[0] = px; _from[1] = py; _from[2] = pz; _to[0] = qx; _to[1] = qy; _to[2] = qz; contact = hit(_from, _to); if (contact) reason = 'hit'; }
+    if (hit && (!hitWindow || (k >= hitWindow[0] && k <= hitWindow[1]))) { _from[0] = px; _from[1] = py; _from[2] = pz; _to[0] = qx; _to[1] = qy; _to[2] = qz; contact = hit(_from, _to); if (contact) reason = 'hit'; }
     px = qx; py = qy; pz = qz;
     if (!reason && (Math.abs(px) > 55 || Math.abs(pz) > 55)) reason = 'bounds';
     if (!reason && terrainHeight && py < terrainHeight(px, pz) - .5) reason = 'terrain';
@@ -319,10 +322,10 @@ export function createTrajectoryGuide({maxPoints = 192, color = 0xfff1cf, tail =
     group.visible = count > 1;
   }
   // Convenience: local forecast from the live aim (same equation as server).
-  function update({origin, aimDirection, curveBase, draw, hit = null, terrainHeight = null, sampleEvery = 1}) {
+  function update({origin, aimDirection, curveBase, draw, hit = null, hitWindow = null, terrainHeight = null, sampleEvery = 1}) {
     bowShotFromAim(aimDirection, curveBase, draw, shot);
     for (let i = 0; i < 3; i++) velocity[i] = shot.direction[i] * shot.speed;
-    const r = forecastTrajectory({origin, velocity, curve: shot.curve, kind: 'arrow', out: positions, sampleEvery, hit, terrainHeight});
+    const r = forecastTrajectory({origin, velocity, curve: shot.curve, kind: 'arrow', out: positions, sampleEvery, hit, hitWindow, terrainHeight});
     setPoints(positions, r.count, r.hit); return r;
   }
   function hide() { group.visible = false; ring.visible = false; spark.visible = false; geometry.setDrawRange(0, 0); }

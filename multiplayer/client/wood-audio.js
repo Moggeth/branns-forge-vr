@@ -23,7 +23,7 @@ export const WOOD_SOUNDS = Object.freeze({
  log_toss:       {files: ['log_toss'], priority: 2, cap: 2, duration: .38, rate: .08}
 });
 export const WOOD_EVENT_KINDS = Object.freeze(['wood_hit', 'tree_fell', 'tree_land', 'log_bounce', 'log_throw', 'grab', 'pickup',
- 'ent_wake', 'ent_slam', 'ent_swipe', 'ent_limb', 'ent_fall', 'ent_root', 'ent_fade']);
+ 'ent_wake', 'ent_slam', 'ent_swipe', 'ent_limb', 'ent_fall', 'ent_root', 'ent_fade', 'stump_wake', 'stump_burrow', 'stump_loot']);
 export const DEFAULT_LAND_DELAY = 2.5; // s; typical treeFall landTicks/60 for the authored trees (2.0-2.8 s)
 
 /** FNV-1a -> [0,1). Same event on every client gives the same pitch/gain/variant. */
@@ -72,6 +72,10 @@ export function woodLayersFor(event, scheduledLandings = null) {
   if (k === 'ent_fade') return [{sound: 'log_settle', delay: 0, gain: .8, rateBase: .8}];
   return [];
  }
+ // Stumplings: small and light. Roots crackle free, a scrabble of soil going down, a woody pop when felled.
+ if (k === 'stump_wake') return [{sound: 'bark_glance', delay: 0, gain: .9, rateBase: 1.25}, {sound: 'log_bounce', delay: .35, gain: .55, rateBase: 1.5}, {sound: 'foliage_rustle', delay: .2, gain: .5, rateBase: 1.3}];
+ if (k === 'stump_burrow') return [{sound: 'foliage_rustle', delay: 0, gain: .6, rateBase: 1.2}, {sound: 'log_settle', delay: .5, gain: .5, rateBase: 1.3}];
+ if (k === 'stump_loot') return [{sound: 'axe_bite_deep', delay: 0, gain: .8, rateBase: 1.2}, {sound: 'log_bounce', delay: .3, gain: .8, rateBase: 1.1}];
  if (k === 'log_bounce') return [{sound: 'log_bounce', delay: 0, gain: 1}];
  if (k === 'log_throw') return [{sound: 'log_toss', delay: 0, gain: 1}];
  if (k === 'grab' && String(event.id ?? '').startsWith('log')) return [{sound: 'log_grab', delay: 0, gain: 1}];
