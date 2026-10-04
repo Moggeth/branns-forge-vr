@@ -6,6 +6,7 @@ import {siegebirdMechanism, SIEGEBIRD_WINCH} from './siegebird-reload.js';
 // authored facts, never inferred from a bounding box or camera angle.
 export const ASSET_POSES = Object.freeze({
   skeleton: {forward: [0, 0, 1], up: [0, 1, 0], pivot: 'feet', height: 1.7},
+  forgeling: {forward: [0, 0, 1], up: [0, 1, 0], pivot: 'feet', height: 1.81}, // the skeleton's rig at the skeleton's scale (its chimney stands taller)
   golem: {forward: [0, 0, 1], up: [0, 1, 0], pivot: 'feet', height: 2.2},
   crossbow: {forward: [0, 1, 0], up: [0, 0, 1], pivot: 'GripAnchor', height: 1, nativeScale: 1, tip: 'BoltSeat'},
   bow: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'Grip', height: 1.48, nativeScale: 1, tip: 'ArrowGuide'},
