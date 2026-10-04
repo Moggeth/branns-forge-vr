@@ -10,6 +10,7 @@
 // A felled apple tree sheds the apples it still carried around its crown when it lands.
 // Drops are collectibles: take one, then each bite heals (BITE_HEAL) and three bites reach the core.
 // The apple grows back on its branch after REGROW_TICKS; the last GROW_TICKS of that wait are its visible swelling.
+import {heroMaxHp} from './hero-progress.js';
 import {worldTrees} from './world-content.js';
 import {treeScale,isFelled} from './trees.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -278,7 +279,7 @@ export function snackAction(state, p, m) {
  if (op === 'bite') {
   if (state.tick - d.biteTick < FRUIT.biteTicks) return {ok: false, code: 'cooldown', events: []};
   d.biteTick = state.tick; d.bites++;
-  const before = p.hp; p.hp = Math.min(100, p.hp + (d.half ? FRUIT.halfHeal : FRUIT.biteHeal)[d.bites - 1]);
+  const before = p.hp; p.hp = Math.min(heroMaxHp(p), p.hp + (d.half ? FRUIT.halfHeal : FRUIT.biteHeal)[d.bites - 1]);
   const events = [{kind: 'snack_bite', id: d.id, by: p.id, bite: d.bites, of: bitesFor(d), ...(d.half ? {half: true} : {}), apples: d.apples, heal: +(p.hp - before).toFixed(2), stick: d.stick, position: [p.position[0], p.position[1] + 1.55, p.position[2]]}];
   if (d.bites >= bitesFor(d)) {
    d.apples--; d.bites = 0; addBloom(state, BLOOM.apple, events, [...p.position]); // fruit eaten spreads the seed

@@ -7,11 +7,12 @@
 // (player.overheatUntil) while it refills; letting go early starts refilling after a short pause.
 // Both fields predate the tank (they were heat and overheat), so saves stay compatible.
 //
-// Specialties (hero talents, see hero-progress.js when it lands):
+// Specialties (hero talents, shared/hero-progress.js):
 //   flood: the burst lasts longer, throws more globs and reaches further.
 //   cling: globs stuck to a foe burn twice as long; a clinging foe that dies splashes sticky fire on its neighbours.
 import {addFuel,applyHeat} from './fire.js';
 import {applyEnemyScorch,partPosition} from './combat.js';
+import {hasTalent} from './hero-progress.js';
 
 export const WYRMSPOUT = Object.freeze({
   burstTicks: 105,        // a full tank sprays for 1.75 s
@@ -29,8 +30,7 @@ export const WYRMSPOUT = Object.freeze({
   cling: Object.freeze({burn: 2, splashRadius: 2.5, splashFuel: .5}),
 });
 
-// Stub until shared/hero-progress.js lands; it exposes the same signature.
-export const hasTalent = (p, weapon, id) => !!p?.talents?.[weapon]?.includes(id);
+export {hasTalent};
 
 /** Per-player spray tuning: the base table with the player's specialties applied. */
 export function sprayTuning(p) {

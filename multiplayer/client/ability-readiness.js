@@ -12,7 +12,7 @@ export function readiness(lastTick, duration, tick) {
 export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
   // A Siegebird reload after a perfect wind runs quick (shared/combat.js SIEGEBIRD).
   const basic = tool === 'crossbow' && player.siegebird?.quick ? SIEGEBIRD.quickTicks : WEAPONS.find(w => w.id === tool)?.cooldown || 0;
-  const secondary = specialCooldown(tool);
+  const secondary = specialCooldown(tool, player);
   const overheated = (player.overheatUntil || 0) > tick;
   return {
     attackReady: overheated ? clamp(1 - (player.overheatUntil - tick) / WYRMSPOUT.refillTicks) : readiness(player.attackTick, basic, tick),

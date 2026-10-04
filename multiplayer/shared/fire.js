@@ -1,6 +1,7 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
-import {applyEnemyScorch,partPosition,PARTS} from './combat.js';
+import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart} from './combat.js';
+import {hasTalent} from './hero-progress.js';
 import {entHeight} from './ents.js';
 import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
@@ -8,7 +9,7 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
 const validVector=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=200);
 
-export function addFuel(state,point,radius=1,amount=.8,lit=false) {
+export function addFuel(state,point,radius=1,amount=.8,lit=false,tar=false) {
   const cells=state.fireCells, map=new Map(cells.map(c=>[key(c.x,c.z),c]));
   const x0=Math.round(point[0]*2)/2,z0=Math.round(point[2]*2)/2,n=Math.ceil(radius*2);
   let changed=0;
@@ -18,6 +19,7 @@ export function addFuel(state,point,radius=1,amount=.8,lit=false) {
     let cell=map.get(key(x,z));
     if(!cell){if(cells.length>=FIRE_LIMITS.cells)continue;cell={x,z,fuel:0,heat:0,burning:false,wetUntil:0,expiresTick:state.tick+1800};cells.push(cell);map.set(key(x,z),cell);}
     cell.fuel=clamp(cell.fuel+amount*(.5+.5*(1-d/radius)),0,1);cell.expiresTick=state.tick+1800;
+    if(tar)cell.tar=true;
     if(lit&&cell.wetUntil<=state.tick){cell.heat=1;cell.burning=true;}changed++;
   }
   return changed;
@@ -39,15 +41,20 @@ export function quenchFire(state,point,radius){
 // Phoenix Flare burst (Emberwing Q). The flare lights the area (presentation) and rains embers straight down:
 // the ground under it takes lit fuel, and creatures and remains under it catch fire. Bounded by FIRE_LIMITS.
 export const FLARE_BURST=Object.freeze({radius:3.2,fuelRadius:1.8,fuel:.32,reach:9,burn:240,scorch:.12});
+// Firestorm (Emberwing talent): the blaze covers twice the ground (radius x1.41).
+export const FIRESTORM_BURST=Object.freeze({...FLARE_BURST,radius:4.5,fuelRadius:2.6});
+// Emberdew talents. Firebomb: a lit flask explodes on landing. Tar Pit: far bigger spills that slow foes wading in them.
+export const FIREBOMB=Object.freeze({radius:2.6,damage:45,push:1.4,burn:180});
+export const TAR_PIT=Object.freeze({radius:2.1,slowTicks:30});
 export function flareBurst(state,point,ownerId,ctx){
-  const B=FLARE_BURST,ground=ctx.terrainHeight(state,point[0],point[2]),below=[point[0],ground,point[2]];
+  const firestorm=hasTalent(state.players.find(p=>p.id===ownerId),'bow','firestorm'),B=firestorm?FIRESTORM_BURST:FLARE_BURST,ground=ctx.terrainHeight(state,point[0],point[2]),below=[point[0],ground,point[2]];
   // Only a flare close enough above the ground rains embers that still burn when they land.
   const lit=point[1]-ground<=B.reach;
   if(lit){addFuel(state,below,B.fuelRadius,B.fuel,true);applyHeat(state,below,B.radius,1,ctx);
     for(const e of [...state.enemies,...(state.detachedParts||[])])if(Math.hypot(e.position[0]-point[0],e.position[2]-point[2])<=B.radius){
       e.burnUntil=state.tick+B.burn;e.burnPart=e.part||'torso';if(e.parts)applyEnemyScorch(e,'torso',B.scorch);else e.scorch=clamp((e.scorch||0)+B.scorch,0,1);
     }}
-  return [{kind:'phoenix_flare',position:[...point],ground:below,by:ownerId,lit}];
+  return [{kind:'phoenix_flare',position:[...point],ground:below,by:ownerId,lit,...(firestorm?{radius:B.radius,firestorm:true}:{})}];
 }
 export function fireContact(state,shot,hit,ctx){
   const events=[],point=hit.point,ground=ctx.terrainHeight(state,point[0],point[2]);
@@ -69,9 +76,22 @@ export function fireContact(state,shot,hit,ctx){
     return [{kind:'phoenix_ignite',id:hit.targetId,position:[...point],normal:[...hit.normal],part:hit.part}];
   }
   if(shot.kind==='fuel'){
-    addFuel(state,[point[0],ground,point[2]],1.2,.85,!!shot.lit);
-    if(shot.lit)applyHeat(state,point,1.5,1,ctx);
-    events.push({kind:'fuel_spill',id:shot.id,position:[...point],normal:[...hit.normal]});
+    const owner=state.players.find(p=>p.id===shot.ownerId),tar=hasTalent(owner,'flask','tar'),bomb=shot.lit&&hasTalent(owner,'flask','firebomb');
+    addFuel(state,[point[0],ground,point[2]],tar?TAR_PIT.radius:1.2,.85,!!shot.lit,tar);
+    if(shot.lit)applyHeat(state,point,bomb?FIREBOMB.radius:1.5,1,ctx);
+    events.push({kind:'fuel_spill',id:shot.id,position:[...point],normal:[...hit.normal],...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
+    if(bomb){
+      const hits=[];
+      for(const enemy of [...state.enemies]){
+        const dx=enemy.position[0]-point[0],dz=enemy.position[2]-point[2],d=Math.hypot(dx,dz);
+        if(d>FIREBOMB.radius||Math.abs(enemy.position[1]-ground)>2.5)continue;
+        enemy.burnUntil=state.tick+FIREBOMB.burn;enemy.burnPart='torso';
+        hitEnemyPart(state,enemy,'torso',FIREBOMB.damage,{point:[...point],normal:[0,1,0],ownerId:shot.ownerId,side:shot.side,energy:1.6},ctx,events);
+        hits.push(enemy.id);
+        if(state.enemies.includes(enemy)){const k=FIREBOMB.push*(1-d/FIREBOMB.radius*.5),nx=d>1e-3?dx/d:1,nz=d>1e-3?dz/d:0;enemy.position[0]=clamp(enemy.position[0]+nx*k,-49,49);enemy.position[2]=clamp(enemy.position[2]+nz*k,-49,49);enemy.launchTick=state.tick;}
+      }
+      events.push({kind:'firebomb',id:shot.id,by:shot.ownerId,position:[point[0],ground,point[2]],radius:FIREBOMB.radius,hits});
+    }
     const enemy=state.enemies.find(e=>e.id===hit.targetId);
     if(enemy&&shot.lit){applyEnemyScorch(enemy,hit.part||'torso',.14);ctx.damageEnemy(state,enemy,12,events,shot.ownerId);}
     return events;
@@ -131,6 +151,8 @@ export function stepFire(state,ctx,events){
   state.fireSurfaces=state.fireSurfaces.filter(p=>p.expiresTick>state.tick);
   state.fireCells=state.fireCells.filter(c=>c.expiresTick>state.tick&&c.fuel>.001);
   const map=new Map(state.fireCells.map(c=>[key(c.x,c.z),c])),heat=new Map(),flows=[];
+  // Tar Pit: foes wading through tar-laid fuel are slowed while they stay in it.
+  for(const enemy of state.enemies){const c=map.get(key(Math.round(enemy.position[0]*2)/2,Math.round(enemy.position[2]*2)/2));if(c?.tar&&c.fuel>.08)enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+TAR_PIT.slowTicks);}
   // The real forge hearth shares ignition with packets and burning liquid.
   if(state.shrine.hp>0)applyHeat(state,[.3,ctx.terrainHeight(state,0,0)+1.05,-.12],1.25,.35,ctx);
   for(const cell of state.fireCells){
@@ -200,7 +222,7 @@ export function restoreFire(saved,ids){
   const tick=(n,max)=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick+max;
   for(const c of cells){
     if(!c||![c.x,c.z].every(n=>Number.isFinite(n)&&Math.abs(n)<=55&&Number.isInteger(n*2))||
-      ![c.fuel,c.heat].every(n=>Number.isFinite(n)&&n>=0&&n<=1)||typeof c.burning!=='boolean'||!tick(c.wetUntil,300)||!tick(c.expiresTick,1800)||seen.has(key(c.x,c.z)))throw Error('Invalid fuel cell');
+      ![c.fuel,c.heat].every(n=>Number.isFinite(n)&&n>=0&&n<=1)||typeof c.burning!=='boolean'||(c.tar!==undefined&&c.tar!==true)||!tick(c.wetUntil,300)||!tick(c.expiresTick,1800)||seen.has(key(c.x,c.z)))throw Error('Invalid fuel cell');
     seen.add(key(c.x,c.z));
   }
   for(const p of surfaces){
@@ -208,5 +230,5 @@ export function restoreFire(saved,ids){
     ids.add(p.id);
   }
   for(const p of saved.players)if(p.heat!==undefined&&(!Number.isFinite(p.heat)||p.heat<0||p.heat>1)||p.overheatUntil!==undefined&&!tick(p.overheatUntil,180)||p.flameTick!==undefined&&(!Number.isSafeInteger(p.flameTick)||p.flameTick< -1000||p.flameTick>saved.tick)||p.flaskLit!==undefined&&typeof p.flaskLit!=='boolean')throw Error('Invalid fire equipment state');
-  return {fireCells:cells.map(({x,z,fuel,heat,burning,wetUntil,expiresTick})=>({x,z,fuel,heat,burning,wetUntil,expiresTick})),fireSurfaces:surfaces.map(({id,position,normal,expiresTick,emberTick})=>({id,position:[...position],normal:[...normal],expiresTick,...(emberTick!==undefined?{emberTick}:{})}))};
+  return {fireCells:cells.map(({x,z,fuel,heat,burning,wetUntil,expiresTick,tar})=>({x,z,fuel,heat,burning,wetUntil,expiresTick,...(tar?{tar:true}:{})})),fireSurfaces:surfaces.map(({id,position,normal,expiresTick,emberTick})=>({id,position:[...position],normal:[...normal],expiresTick,...(emberTick!==undefined?{emberTick}:{})}))};
 }
