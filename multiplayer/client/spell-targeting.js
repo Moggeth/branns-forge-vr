@@ -1,11 +1,12 @@
-// Spell targeting: in-world, terrain-conforming previews of all 14 spatial spells.
+// Spell targeting: in-world, terrain-conforming previews of all 16 spatial spells.
 // Y-up metres. Self-contained ES module (only depends on 'three'); no DOM, no lights,
 // no textures. Three pooled draws at most (packed glyph ribbons, translucent topo
 // surface, motes); every buffer is preallocated once and rewritten in place.
 //
 // createSpellTargeting({scene,height,quality,reducedMotion}) ->
 //   {root,setTarget,update,configure,stats,dispose,prepareShaders}
-// setTarget({spell,point,start,end,radius?,valid}) | null. Vectors: [x,y,z] or {x,y,z}.
+// setTarget({spell,point,start,end,radius?,valid,trees?}) | null. Vectors: [x,y,z] or {x,y,z}.
+// trees: ent spells only, [{x,z,height}] of the exact trees the authority would wake (ringed and lit).
 // The footprint is rebuilt synchronously at the EXACT target; only fade/glow animate.
 import * as THREE from 'three';
 import {SPELL_TARGET_SHAPES} from '../shared/spells.js';
@@ -216,8 +217,37 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     MU.uRise.value = rise; MU.uC.value.set(color); mg.setDrawRange(0, n); mg.attributes.position.needsUpdate = true; mg.attributes.seed.needsUpdate = true; motesOn = true;
   }
 
-  // ---------- the 14 designs ----------
+  // Ent spells mark the exact trees that would wake: a root-knot ring round each trunk, two blue eyes on the bark
+  // and a resonance vein up into the crown. Awaken centres on its tree; Wild Awakening also draws its catch circle.
+  function entTree(x, z, h, i) {
+    const rr = 0.9 + Math.min(0.5, h * 0.04);
+    gS(wave(rr, 7, 0.1, i * 1.3, 72).map(([px, pz]) => [px + x, pz + z]), 0.08, PAL.bark, { flow: 0.3 });
+    gS(circ(rr * 0.72, 40, 0, TAU, x, z), 0.05, PAL.water, { dash: 1.1, flow: -0.8, fine: true });
+    for (let k = 0; k < 5; k++) { const a = (k * TAU) / 5 + i; gS(rot2([[rr * 0.95, 0], [rr * 1.25, 0.12], [rr * 1.5, -0.05]], a, x, z), 0.05, PAL.bark, { fine: true }); }
+    const eye = Math.max(1.1, Math.min(2.2, h * 0.3));
+    for (const s of [-1, 1]) { const g = G(x + s * 0.13, z - 0.42, eye); aS([[g[0] - s * 0.09, g[1] + 0.03, g[2]], [g[0] + s * 0.09, g[1] - 0.02, g[2]]], 0.07, PAL.crystal, OK()); }
+    aS(vertical(x, z - 0.38, 0.15, Math.max(2.5, h * 0.55), 4), 0.05, PAL.water, OK({ dash: 0.7, flow: -2.5 }));
+  }
+  function entTargets() { return want.trees.length ? want.trees : null; }
+
+  // ---------- the 16 designs ----------
   const D = {
+    awaken(R) { // one tree: its root ring and eyes. With no tree in reach, a bare seed glyph and the invalid cross.
+      const t = entTargets();
+      if (t) for (const [x, z, h] of t) entTree(x, z, h, 0);
+      else { gS(circ(R, 48), 0.07, PAL.bark, { dash: 1.2, flow: 0.4 }); for (let k = 0; k < 3; k++) gS(leafShape(0, 0, (k * TAU) / 3 + 0.3, 0.6), 0.04, PAL.leaf, { fine: true }); }
+      cross(R * 0.5); moteField(14, R, PAL.crystal, 1.4, 0.15, 71);
+    },
+    wildwake(R) { // catch circle of roots; tendrils run from the heart to each tree that will rise
+      gS(wave(R, 11, 0.16, 0, 176), 0.08, PAL.bark, { flow: 0.3 }); gS(circ(R * 0.94, 96), 0.04, PAL.water, { dash: 1.4, flow: -0.5, fine: true });
+      for (let i = 0; i < 3; i++) gS(spiral(0.3, R * 0.45, 0.6, (i * TAU) / 3, 40), 0.05, PAL.moss, { prop: true, fine: true });
+      gS(circ(0.35, 16), 0.06, PAL.crystal);
+      const t = entTargets();
+      if (t) t.forEach(([x, z, h], i) => { const a = Math.atan2(z, x), d = Math.hypot(x, z), nx = -Math.sin(a), nz = Math.cos(a);
+        gS(Array.from({ length: 15 }, (_, j) => { const u = j / 14, w = Math.sin(u * Math.PI * 2) * 0.3; return [Math.cos(a) * (0.35 + (d - 1.3) * u) + nx * w, Math.sin(a) * (0.35 + (d - 1.3) * u) + nz * w]; }), 0.06, PAL.water, { prop: true, flow: 1.5 });
+        entTree(x, z, h, i + 1); });
+      cross(R * 0.4); moteField(26, R, PAL.crystal, 1.3, 0.16, 73);
+    },
     skeleton(R) { // grave sigil: rune ring + restrained line-art skull
       gS(circ(R), 0.1, PAL.bone, { closed: false, flow: 0.4 });
       gS(circ(R * 0.82), 0.05, PAL.purple, { dash: 1.3, flow: -0.6, fine: true });
@@ -394,7 +424,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   function invSmooth(f) { let a = 0, b = 1; for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if (smooth(m) < f) a = m; else b = m; } return (a + b) / 2; }
 
   // ---------- target state ----------
-  const want = { on: false, spell: '', valid: true, cx: 0, cz: 0, ang: 0, len: 0, rad: 0, fb: false, ax: 0, az: 0, bx: 0, bz: 0 };
+  const want = { on: false, spell: '', valid: true, cx: 0, cz: 0, ang: 0, len: 0, rad: 0, fb: false, ax: 0, az: 0, bx: 0, bz: 0, trees: [], treeKey: '' };
   let builtKey = '', fade = 0, clock = 0, builds = 0, lastBuildMs = 0, lastSamples = 0, committed = null, suppressed = false;
   function setTarget(t) {
     if (disposed) return false;
@@ -413,6 +443,9 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       if (!p) { want.on = false; return false; }
       const r = Number(t.radius); want.rad = Number.isFinite(r) && r > 0.05 && r < 60 ? r : spec.r; want.cx = p[0]; want.cz = p[2]; want.ang = 0; want.len = 0; want.fb = false;
     }
+    want.trees = spec.count && Array.isArray(t.trees) ? t.trees.slice(0, spec.count).map(vec2 => [Number(vec2?.x), Number(vec2?.z), Number(vec2?.height) || 6])
+      .filter(([x, z]) => Number.isFinite(x) && Number.isFinite(z) && Math.hypot(x - want.cx, z - want.cz) < 30).map(([x, z, h]) => [+(x - want.cx).toFixed(2), +(z - want.cz).toFixed(2), +h.toFixed(1)]) : [];
+    want.treeKey = want.trees.join(';');
     const aim = p || b;
     if (committed && (want.spell !== committed.spell || !aim || Math.hypot(aim[0]-committed.x,aim[2]-committed.z) > .4)) committed=null;
     suppressed=!!committed;
@@ -447,7 +480,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     lg.index.clearUpdateRanges(); lg.index.addUpdateRange(0, B.ni); lg.index.needsUpdate = true;
     builds++; lastSamples = samples - s0; lastBuildMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
   }
-  const keyOf = () => `${want.spell}|${want.cx}|${want.cz}|${want.ax}|${want.az}|${want.bx}|${want.bz}|${want.rad}|${want.fb}|${qName}`;
+  const keyOf = () => `${want.spell}|${want.cx}|${want.cz}|${want.ax}|${want.az}|${want.bx}|${want.bz}|${want.rad}|${want.fb}|${want.treeKey}|${qName}`;
   function update(nowMs, dt) {
     if (disposed) return; dt = clamp(Number.isFinite(dt) ? dt : 0, 0, 0.1); clock += dt;
     if (want.on) { const k = keyOf(); if (k !== builtKey) { builtKey = k; build(); } }

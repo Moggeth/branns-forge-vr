@@ -17,6 +17,9 @@ import * as THREE from 'three';
 
 export const TICK_RATE = 60;
 export const STRIKE_TICK = 18; // shared/simulation.js: damage at attackTick + 18.
+// Golem gait: one full L+R cycle per GOLEM_CYCLE metres travelled (stride-locked, so feet never skate),
+// rigid legs swing about the hip and the body drops by the chord so both soles stay on the ground.
+export const GOLEM_CYCLE = 1.75, GOLEM_SWING = .36, GOLEM_HIP = 1.18;
 
 // ---------------------------------------------------------------------------
 // Pure deterministic math (no THREE, no Math.random, no wall clock).
@@ -119,7 +122,7 @@ export function poseSignals(s, out) {
   out.headPitch = 0; out.headYaw = 0; out.headRoll = 0;
   out.armL = 0; out.armR = 0; out.elbow = 0; out.armSwingL = 0; out.armSwingR = 0;
   out.drop = 0; out.sideShift = 0; out.bodyPitch = 0; out.bodyRoll = 0; out.bodyLift = 0;
-  out.lunge = 0;
+  out.lunge = 0; out.legL = 0; out.legR = 0;
 
   // Idle personality: breath, slouch, look-around, weight shift.
   const breath = Math.sin(t * tr.breathHz * Math.PI * 2 + tr.breathPhase);
@@ -135,13 +138,26 @@ export function poseSignals(s, out) {
   // Attack layer.
   const {coil, strike, impact} = attack;
   if (heavy) {
-    const raise = coil * 2.35 + strike * .6;         // overhead -> down in front (slam)
+    // Gait: stride-locked rigid-leg walk. walk is a smoothed 0..1 weight, gait the stride phase (radians).
+    const w = s.walk || 0, ph = s.gait || 0, swing = Math.sin(ph) * GOLEM_SWING * w;
+    out.legL += swing; out.legR -= swing;
+    out.bodyLift -= (1 - Math.cos(swing)) * GOLEM_HIP + Math.pow(Math.abs(Math.sin(ph)), 6) * .035 * w; // chord drop + footfall settle
+    out.bodyRoll += -Math.cos(ph) * .05 * w;          // weight rolls over the stance leg, lifting the swing foot
+    out.bodyPitch += .07 * w;                         // leans into the walk
+    out.armSwingL -= Math.sin(ph - .35) * .3 * w; out.armSwingR += Math.sin(ph - .35) * .3 * w; // heavy, lagging counter-swing
+    out.headRoll += Math.cos(ph) * .03 * w; out.headPitch -= .05 * w;
+    // Idle weight: slow breath lifts the shoulders, the body settles side to side.
+    out.bodyLift += breath * .014 * (1 - w); out.armL -= breath * .025; out.armR -= breath * .025;
+    out.bodyRoll += noise1(tr.seed, 11, t * .12) * .025 * (1 - w) * calm;
+    // Slam: arms overhead with bent elbows and a back-leaning brace, then the whole body drives both fists down.
+    const raise = coil * 2.5 + strike * .82;
     out.armL += raise; out.armR += raise;
-    out.elbow += coil * .55;
-    out.bodyPitch += -coil * .12 + strike * .2;
-    out.bodyLift += coil * .03 - strike * .09 + impact * .035;
-    out.headPitch += -coil * .18 + strike * .12;
-    if (attack.phase === 'hold') { const q = noise1(tr.seed, 9, t * 22) * .035; out.armL += q; out.armR -= q; } // straining tremble
+    out.elbow += coil * .7 - strike * .12;
+    out.bodyPitch += -coil * .16 + strike * .3;
+    out.bodyLift += coil * .05 - strike * .15 + impact * .05;
+    out.headPitch += -coil * .26 + strike * .16;
+    out.legL += (coil + strike) * .16; out.legR -= (coil + strike) * .1; // stagger the stance
+    if (attack.phase === 'hold') { const q = noise1(tr.seed, 9, t * 22) * .045; out.armL += q; out.armR -= q; out.bodyLift += q * .3; } // straining tremble
   } else {
     out.torsoYaw += -coil * .32 + strike * .22;       // coil to weapon (right) side, swing through left
     out.torsoPitch += -coil * .1 + strike * .2;
@@ -154,7 +170,7 @@ export function poseSignals(s, out) {
   // Hit recoil, local to struck part. dir = actor-space push (x right, z back).
   const r = recoil.value, px = recoil.pushX, pz = recoil.pushZ, part = recoil.part;
   if (r) {
-    const amp = heavy ? .35 : 1;
+    const amp = heavy ? .55 : 1;
     const back = pz * r * amp, side = px * r * amp;
     if (part === 'head') { out.headPitch -= back * .55; out.headRoll += side * .5; out.torsoPitch -= back * .1; }
     else if (part === 'leftArm') { out.armSwingL -= back * .7; out.torsoYaw += side * .15 + back * .12; }
@@ -163,7 +179,7 @@ export function poseSignals(s, out) {
       out.drop += Math.abs(r) * .09 * amp; out.sideShift += Math.abs(r) * .04 * amp * (part === 'leftLeg' ? -1 : 1); // buckle onto struck leg
       out.torsoPitch += Math.abs(r) * .12 * amp; out.torsoRoll += (part === 'leftLeg' ? -1 : 1) * Math.abs(r) * .1 * amp;
     } else { out.torsoPitch -= back * .32; out.torsoRoll += side * .22; out.headPitch -= back * .2; out.drop += Math.abs(r) * .03 * amp; }
-    if (heavy) { out.bodyPitch -= back * .18; out.bodyRoll += side * .12; }
+    if (heavy) { out.bodyPitch -= back * .2; out.bodyRoll += side * .14; out.bodyLift -= Math.abs(r) * .05; }
   }
 
   // Missing limbs: hobble over the remaining leg, drag with none.
@@ -179,6 +195,15 @@ export function poseSignals(s, out) {
     out.drop += 1; // adapter clamps to leg length: torso rests at ground
     out.torsoPitch += .55 + Math.sin(s.stride * Math.PI * 2) * .06;
     out.headPitch -= .35;
+  }
+  if (heavy && legL !== legR) {                     // one leg: lurch over the survivor, hip sags on the stump side
+    const limp = Math.abs(Math.sin(s.gait || 0)) * (s.walk || 0);
+    out.bodyRoll += (legL ? 1 : -1) * (.1 + limp * .06);
+    out.bodyLift -= .1 + limp * .07; out.bodyPitch += .08;
+  } else if (heavy && legL && legR) {               // no legs: chest on the ground, hauling itself by the arms
+    const pull = Math.sin((s.gait || 0) * 2) * (s.walk || 0);
+    out.bodyLift -= GOLEM_HIP * .82; out.bodyPitch += .5; out.headPitch -= .4;
+    out.armL += 1.1 + pull * .5; out.armR += 1.1 - pull * .5;
   }
   if (missing.head) { out.headPitch = 0; out.headYaw = 0; out.headRoll = 0; }
   if (missing.leftArm) { out.armL = 0; out.armSwingL = 0; }
@@ -206,7 +231,7 @@ const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), thighW = new THR
 const envelope = {coil: 0, strike: 0, impact: 0, phase: 'none'};
 const sig = {}, recoilSig = {value: 0, pushX: 0, pushZ: 0, part: 'torso'}, missingSig = {};
 const PARTS5 = ['head', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
-const sigIn = {kind: 'skeleton', tr: null, t: 0, attack: envelope, recoil: recoilSig, missing: missingSig, moving: false, stride: 0}; // reused: no per-frame allocation
+const sigIn = {kind: 'skeleton', tr: null, t: 0, attack: envelope, recoil: recoilSig, missing: missingSig, moving: false, stride: 0, walk: 0, gait: 0}; // reused: no per-frame allocation
 
 // Bones win over same-named mesh/group nodes (skeleton.glb has both a "Head"
 // mesh node and a "Head" joint; GLTFLoader may uniquify one as "Head_1").
@@ -294,7 +319,7 @@ export function noteEnemyHit(entry, event, fallbackTick) {
 // entry: {root, visual, data}; ctx: {tick: float interpolated sim tick, height(x,z), dt}
 export function applyEnemyMotion(entry, ctx) {
   const visual = entry.visual, data = entry.data;
-  if (!visual || visual.userData.placeholder || !data || !entry.root) return null;
+  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || visual.userData.released) return null; // ents pose in ent-view
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) { st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st); }
@@ -311,6 +336,17 @@ export function applyEnemyMotion(entry, ctx) {
   if (!teleport) st.stride = (st.stride + travel / .9) % 1024;
   st.lastPos.copy(_v);
   const moving = travel > .0008;
+  if (kind === 'golem') {
+    // Presentation speed from the rendered root; smoothed so network jitter and stops never pop the stride.
+    const speed = teleport || !st.init ? 0 : travel / Math.max(dt, 1e-3);
+    st.speed = (st.speed || 0) + (speed - (st.speed || 0)) * (1 - Math.exp(-dt / .12));
+    const want = st.speed > .2 ? 1 : 0;
+    st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .2 : .35)));
+    visual.getWorldScale(_ws);
+    if (!teleport) st.gait = ((st.gait || 0) + travel / (GOLEM_CYCLE * Math.max(.2, _ws.y / 1.24)) * Math.PI * 2) % (Math.PI * 4096);
+    // Unweighted, the legs keep easing toward the nearest planted pose rather than freezing mid-swing.
+    if (st.walk < .5 && !teleport) { const target = Math.round(st.gait / Math.PI) * Math.PI; st.gait += (target - st.gait) * (1 - Math.exp(-dt / .25)); }
+  }
 
   if (data.hurtTick !== undefined && data.hurtTick !== st.lastHurt) {
     // Spawned already-hurt actors do not replay an old flinch.
@@ -326,11 +362,12 @@ export function applyEnemyMotion(entry, ctx) {
   }
   for (const p of PARTS5) missingSig[p] = !!data.missingParts?.includes(p);
   attackEnvelope(tick - (data.attackTick ?? -1000), kind, envelope);
-  sigIn.kind = kind; sigIn.tr = st.traits; sigIn.t = t; sigIn.moving = moving; sigIn.stride = st.stride;
+  sigIn.kind = kind; sigIn.tr = st.traits; sigIn.t = t; sigIn.moving = moving; sigIn.stride = st.stride; sigIn.walk = st.walk || 0; sigIn.gait = st.gait || 0;
   poseSignals(sigIn, sig);
 
   visual.getWorldScale(_ws); const scale = _ws.y;
   if (kind === 'golem') applyGolem(st, ctx);
+  if (kind === 'golem') golemEvents(st, data, tick);
   else applySkeleton(st, ctx, scale, teleport, dt);
   commit(st);
   st.init = true;
@@ -370,7 +407,25 @@ function applyGolem(st, ctx) {
   applyHead(N);
   if (N.armL && !missingSig.leftArm) rotateWorld(N.armL.node, aR, sig.armL + sig.armSwingL);
   if (N.armR && !missingSig.rightArm) rotateWorld(N.armR.node, aR, sig.armR + sig.armSwingR);
+  // Legs carry the gait; +bodyPitch keeps them planted vertically while the body above tips.
+  if (N.footL && !missingSig.leftLeg) rotateWorld(N.footL.node, aR, sig.legL + sig.bodyPitch * .8);
+  if (N.footR && !missingSig.rightLeg) rotateWorld(N.footR.node, aR, sig.legR + sig.bodyPitch * .8);
   if (sig.elbow) { if (N.elbowL && !missingSig.leftArm) rotateWorld(N.elbowL.node, aR, sig.elbow); if (N.elbowR && !missingSig.rightArm) rotateWorld(N.elbowR.node, aR, sig.elbow); }
+}
+
+// Presentation cues for golem-presentation.js (dust, sound, rumble, crystal light). Cleared every frame; each cue fires
+// once per crossing of the shared tick/stride, so every peer sees the same beats and late joiners get no stale replay.
+function golemEvents(st, data, tick) {
+  const ev = st.events || (st.events = []); ev.length = 0;
+  const half = Math.floor((st.gait || 0) / Math.PI + .5);           // footfalls land at sin(gait) = +-1
+  if (st.init && st.half !== undefined && half !== st.half && st.walk > .45 && !(missingSig.leftLeg && missingSig.rightLeg))
+    ev.push({type: 'step', side: half & 1 ? 'right' : 'left', strength: st.walk});
+  st.half = half;
+  const age = tick - (data.attackTick ?? -1000), prev = st.attackAge ?? age;
+  if (st.init && prev < 0 && age >= 0 && age < 8) ev.push({type: 'telegraph'});
+  if (st.init && prev < STRIKE_TICK && age >= STRIKE_TICK && age < STRIKE_TICK + 8) ev.push({type: 'slam'});
+  st.attackAge = age;
+  st.telegraph = envelope.coil; st.recoil = Math.abs(recoilSig.value);
 }
 
 function applySkeleton(st, ctx, scale, teleport, dt) {

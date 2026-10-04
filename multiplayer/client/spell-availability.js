@@ -1,12 +1,14 @@
 import {SPELLS} from '../shared/spells.js';
 import {depositCapacityUsed} from '../shared/resources.js';
+import {ENT, ENT_SPELLS, entTargets} from '../shared/ents.js';
+import {worldTrees} from '../shared/world-content.js';
 import {planTerrainBake} from '../shared/terrain.js';
 import {bloomLevel} from '../shared/bloom.js';
 
 // Presentation-only explanation of authoritative cast limits. The server still
 // validates every command; this prevents a green preview promising an impossible cast.
 // Mana is the only game rule once Bloom has unlocked a spell; the rest are malformed points and world capacity caps.
-export function spellUnavailable(world,player,id,{point,lineCount=3}={}) {
+export function spellUnavailable(world,player,id,{point,lineCount=3,trees}={}) {
   const spec=SPELLS.find(s=>s.id===id);if(!spec||!player||player.role!=='god')return 'God role required';
   if(bloomLevel(world.bloom)<(spec.bloom||0))return `Unlocks at Bloom ${spec.bloom}`;
   if((player.mana??0)<spec.cost)return 'Not enough mana';
@@ -17,6 +19,10 @@ export function spellUnavailable(world,player,id,{point,lineCount=3}={}) {
   if(['skeleton','squad','golem'].includes(id)&&enemies+(id==='squad'?4:1)>64)return 'Creature limit reached';
   if(['grove','ring'].includes(id)&&(world.groves?.length||0)>=64)return 'Grove limit reached';
   if((['raise','lower','sunder','wall'].includes(id)&&edits+pending+(spec.target==='line'?lineCount:1)>64)||(id==='starfall'&&edits+pending>=64))return 'Terrain edit limit reached';
+  if(ENT_SPELLS.includes(id)){
+    if(point&&!(trees??entTargets(worldTrees(world),world.harvestedTrees,id,point)).length)return id==='awaken'?'Aim at a standing tree':'No standing trees in the circle';
+    if((world.enemies||[]).filter(e=>e.kind==='ent').length>=ENT.maxAwake||enemies>=64)return 'Ent limit reached';
+  }
   if(id==='starfall'&&pending>=8)return 'Meteor limit reached';
   if(['crystal','starfall'].includes(id)&&depositCapacityUsed(world)>=80)return 'Deposit limit reached';
   return '';

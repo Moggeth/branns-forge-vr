@@ -1,6 +1,6 @@
-import {SPELLS} from '../shared/spells.js';
 import assert from 'node:assert/strict';
 import {weaponReadiness, spellbookReadiness} from '../client/ability-readiness.js';
+import {SPELLS} from '../shared/spells.js';
 const p = {attackTick:100, specialTick:100, castTick:100, mana:30};
 assert.equal(weaponReadiness(p,'axe',280).specialReady,.5);
 assert.equal(weaponReadiness(p,'pick',220).specialSeconds,2);

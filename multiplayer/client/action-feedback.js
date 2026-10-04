@@ -44,7 +44,9 @@ const RECOVERY = {
  "invalid_input": "That input was not accepted. Release the controls, then try again.",
  "invalid_sequence": "Your connection is out of sync. Reconnect through Menu if retrying does not recover.",
  "duplicate_sequence": "That request was already processed. Wait for the world to catch up before retrying.",
- "invalid_player": "Your player state is unavailable. Rejoin using the room code."
+ "invalid_player": "Your player state is unavailable. Rejoin using the room code.",
+ "no_tree": "No standing tree is close enough to wake. Aim at a tree (stumps and felled trees cannot wake); no mana was spent.",
+ "ent_limit": "Twelve ents are already awake. Wait for some to root again or fall before waking more; no mana was spent."
 };
 
 export function actionError(code,{world={},player={},command={}}={}){
@@ -63,6 +65,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if((world.pickups?.length||0)>=256)return 'Too many loose resources are on the ground. Collect a few before breaking another deposit.';
   if(command.action==='buildBridge')return 'The world already has 32 bridges. This world cannot accept another bridge.';
   if((world.enemies?.length||0)>=61&&['skeleton','squad','golem'].includes(command.spell))return 'The world has reached its creature limit. Defeat some enemies before summoning more.';
+  if(['awaken','wildwake'].includes(command.spell))return 'The forest has too many trees resting from awakening. Wait for some to root again before waking more.';
   if((world.groves?.length||0)>=64&&['grove','ring'].includes(command.spell))return 'The grove limit is reached. This world cannot accept another grove.';
   if((world.pendingStarfalls?.length||0)>=8&&command.spell==='starfall')return 'Eight meteors are already descending. Wait for an impact before calling another.';
   if((world.deposits?.length||0)+(world.pendingStarfalls?.length||0)>=80)return 'Too many mineral sites are reserved. Finish mining existing deposits before creating more.';

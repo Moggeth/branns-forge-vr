@@ -661,6 +661,10 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         gRing(scar, bot[0], bot[2], 1.1 + 0.5 * easeOut(age), 0, 0.05, 0.25, 3); scar.commit(0.9, 1, 0.5 * (1 - sstep(0.4, 1.9, age)));
       });
     },
+    // Ent spells: a resonance call through the roots. Blue rings run outward along the ground and root ribbons
+    // corkscrew up; each woken tree's own wake (shudder, leaf burst, eyes) belongs to ent-view.
+    awaken(ev, c) { entCall(ev, c, 1.6, 2); },
+    wildwake(ev, c) { entCall(ev, c, c.radius ?? 7, 3); },
     frost(ev, c) {
       ev.dur = 3.8; const R = c.R, r = c.radius ?? 3, fp = dens(flake(), r, r, 0.35), fr = mk(ev, fp.length, ribMat(PAL.ice, PAL.teal, 0, 1.2)), rim = mk(ev, 64, ribMat(PAL.teal, PAL.ice, 8, 0.8));
       const sp = Array.from({ length: 12 }, (_, i) => { const a = Math.floor(i / 2) * (TAU / 6) + (i % 2 ? 0.2 : 0), q = i % 2 ? 0.55 : 0.98; return { m: mesh(ev, G.crystal, solid(PAL.ice, PAL.deepTeal, 0.7)), x: c.x + Math.cos(a) * r * q, z: c.z + Math.sin(a) * r * q, h: (i % 2 ? 0.9 : 1.6) * (0.8 + R() * 0.5), t0: 0.5 + R() * 0.5, d: new THREE.Vector3((R() - 0.5) * 0.5, 1, (R() - 0.5) * 0.5).normalize(), puffed: false }; });
@@ -683,6 +687,17 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       acc += dt * 5 * Q.n * fade; while (acc >= 1) { acc--; motes(c, c.x, c.z, c.r * .8, c.R() < .5 ? PAL.teal : PAL.ice, .16, 1.4); }
     });
   };
+  function entCall(ev, c, r, n) {
+    ev.dur = 2.4; const roots = Array.from({ length: n }, (_, i) => ({ rb: mk(ev, 30, ribMat(PAL.barkHi, 0x7fd8ff, 0, 1.4)), o: (i * TAU) / n + c.R() })), sigil = mk(ev, 96, ribMat(0x7fd8ff, PAL.leaf, 6, 1)); let acc = 0;
+    pulse(ev, c, ribMat(0x7fd8ff, PAL.ice, 0, 1), 0.25, r * 1.1, 0, 0.9, 0.4); pulse(ev, c, ribMat(PAL.leaf, 0x7fd8ff, 0, 1), 0.2, r * 0.8, 0.25, 1.2, 0.3);
+    decal(ev, c, soilM(), 0.1, Math.min(2.2, r * 0.4), 0.3, 0, 0.5, 2.4);
+    ev.fx.push((age, dt) => {
+      const rv = easeOut(age / 0.9), fade = 1 - sstep(1.7, 2.4, age), gy = H(c.x, c.z);
+      for (const h of roots) { for (let i = 0; i < 30; i++) { const u = i / 29, a = u * TAU * 1.2 + h.o + age * 1.4 * MO.swirl, q = 0.5 + u * 0.4; h.rb.set(i, c.x + Math.cos(a) * q, gy + 0.05 + u * 2.4, c.z + Math.sin(a) * q); } h.rb.commit(0.12, rv, fade); }
+      gRing(sigil, c.x, c.z, Math.min(r, 1.6 + age * 2), -age * 0.5 * MO.swirl, 0.1, 0.1, 0); sigil.commit(0.1, 1, fade * sstep(0, 0.3, age));
+      acc += dt * (age < 1.8 ? 18 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, Math.min(r, 2), c.R() < 0.7 ? 0x7fd8ff : PAL.leaf, 0.2, 1.6); }
+    });
+  }
   const q2r = new THREE.Quaternion();
   const WARN = (ev, c) => { // Subtle danger outline, not a second targeting graphic.
     ev.info = { x:c.x,z:c.z,r:c.radius,at:c.at };

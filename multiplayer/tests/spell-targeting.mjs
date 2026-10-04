@@ -4,7 +4,7 @@ import * as T from 'three';
 import {terrainHeight,createSunderRupture} from '../shared/terrain.js';
 import { createSpellTargeting, createMarkerTerrainSampler, SPELL_SHAPES, lineKernels } from '../client/spell-targeting.js';
 
-const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake'];
+const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake', 'awaken', 'wildwake'];
 assert.deepEqual(Object.keys(SPELL_SHAPES).sort(), [...IDS].sort());
 const slope = (x, z) => 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07) + 0.35 * x + 0.2 * z + 0.6 * Math.sin(z * 0.8); // steep, rippled
 const t0 = performance.now(), timings = {};
@@ -22,7 +22,7 @@ function check(fx, spell, quality, label) {
   return s;
 }
 
-// 1) all 14 IDs, valid/invalid, three qualities, sloped terrain
+// 1) all 16 IDs, valid/invalid, three qualities, sloped terrain
 const table = [];
 for (const quality of ['high', 'medium', 'low']) {
   const scene = new T.Scene(), fx = createSpellTargeting({ scene, height: slope, quality });
@@ -78,7 +78,7 @@ for (const quality of ['high', 'medium', 'low']) {
   const g = fx.root.getObjectByName('SpellTargetingGlyphs').geometry, arr = g.attributes.position.array, idx = g.index.array, mats = new Set();
   fx.root.traverse((o) => o.material && mats.add(o.material));
   const a = performance.now(); let n = 0;
-  for (let i = 0; i < 1400; i++) { const spell = IDS[i % 14]; fx.setTarget({ spell, point: [Math.sin(i) * 30, 0, Math.cos(i * 0.7) * 30], start: [i % 20 - 10, 0, 0], end: [i % 20 - 10 + (i % 17) + 0.5, 0, 3], valid: i % 3 > 0 }); fx.update(i * 16.7, 1 / 60); n++;
+  for (let i = 0; i < 1400; i++) { const spell = IDS[i % IDS.length]; fx.setTarget({ spell, point: [Math.sin(i) * 30, 0, Math.cos(i * 0.7) * 30], start: [i % 20 - 10, 0, 0], end: [i % 20 - 10 + (i % 17) + 0.5, 0, 3], valid: i % 3 > 0 }); fx.update(i * 16.7, 1 / 60); n++;
     if (i === 700) fx.configure({ quality: 'low', reducedMotion: true }); if (i === 1000) fx.configure({ quality: 'medium', reducedMotion: false }); }
   timings.repeated1400ms = +(performance.now() - a).toFixed(1); timings.perUpdateMs = +(timings.repeated1400ms / n).toFixed(3);
   assert.equal(g.attributes.position.array, arr, 'buffers reused'); assert.equal(g.index.array, idx);
@@ -120,9 +120,23 @@ for(let i=0;i<5;i++)assert.deepEqual(SPELL_SHAPES.grove.trees[i],[+(Math.cos(i*M
   timings.realTerrain64EditMeanMs=+(times.reduce((a,b)=>a+b,0)/times.length).toFixed(3);timings.realTerrain64EditMaxMs=+Math.max(...times).toFixed(3);assert.ok(fx.stats().draws<=3);assert.ok(sampler.stats().vertices<=sampler.stats().limit);fx.dispose();
 }
 
+// 6) ent spells ring the exact trees the authority would wake, cap at the spell's count, and rebuild when targets change.
+{
+  const scene = new T.Scene(), fx = createSpellTargeting({ scene, height: slope, quality: 'high' });
+  fx.setTarget({ spell: 'wildwake', point: [0, 0, 0], valid: true }); fx.update(0, 1 / 60); const bare = check(fx, 'wildwake', 'high', 'wildwake bare');
+  const trees = [{ x: 2, z: 1, height: 6 }, { x: -3, z: 2, height: 3 }, { x: 1, z: -4, height: 7 }, { x: 5, z: 5, height: 6 }];
+  fx.setTarget({ spell: 'wildwake', point: [0, 0, 0], valid: true, trees }); fx.update(16, 1 / 60); const three = check(fx, 'wildwake', 'high', 'wildwake trees');
+  assert.ok(three.strands > bare.strands + 3 * 6, 'three trees marked'); assert.equal(three.builds, bare.builds + 1);
+  fx.setTarget({ spell: 'wildwake', point: [0, 0, 0], valid: true, trees: trees.slice(0, 3) }); fx.update(32, 1 / 60); assert.equal(fx.stats().builds, three.builds, 'fourth tree ignored (count 3)');
+  fx.setTarget({ spell: 'awaken', point: [2, 0, 1], valid: true, trees: [trees[0], trees[1]] }); fx.update(48, 1 / 60); const one = check(fx, 'awaken', 'high', 'awaken tree');
+  fx.setTarget({ spell: 'awaken', point: [2, 0, 1], valid: true, trees: [{ x: NaN, z: 0 }, 'x', null] }); fx.update(64, 1 / 60); check(fx, 'awaken', 'high', 'awaken junk');
+  assert.ok(one.strands > fx.stats().strands, 'awaken marks its one tree');
+  fx.dispose();
+}
+
 timings.totalMs = +(performance.now() - t0).toFixed(1);
 const worst = (q) => table.filter((r) => r.quality === q).reduce((m, r) => ({ draws: Math.max(m.draws, r.draws), tris: Math.max(m.tris, r.tris), dropped: m.dropped + r.dropped }), { draws: 0, tris: 0, dropped: 0 });
 console.table(table.filter((r) => r.quality === 'high'));
 console.log('worst high', worst('high'), 'medium', worst('medium'), 'low', worst('low'));
 console.log('timings', timings);
-console.log('spell-targeting: 14 spells x valid/invalid x 3 qualities, exact footprint/conformance, input safety, repeated updates, disposal PASS');
+console.log('spell-targeting: 16 spells x valid/invalid x 3 qualities, exact footprint/conformance, input safety, repeated updates, disposal PASS');

@@ -55,5 +55,5 @@ assert.ok(Math.abs(hero.hp - (50 + 2 * BOONS.sanctuary.hpPerSecond)) < .01, `rin
 cast('golem', [-10, 0, 35]); const golem = S.enemies.at(-1); golem.hp = 1; golem.emergeTick = 0;
 const pickupsBefore = S.pickups.length;
 S.players[0].mana = 100; sim.command('g', {type: 'cast', seq: ++seq, spell: 'lightning', point: golem.position});
-assert.ok(!S.enemies.includes(golem)); assert.deepEqual(S.pickups.slice(pickupsBefore).map(q => [q.kind, q.amount]), [['iron', 2], ['gems', 1]]);
-console.log('god-boons: raise/lower/wall seams, sunder crystal, grove and rain fruit, lightning charge, frost swift, ring sanctuary, golem core passed');
+assert.ok(!S.enemies.includes(golem)); assert.deepEqual(S.pickups.slice(pickupsBefore).map(q => [q.kind, q.amount]), [['iron', 1]], 'a felled golem drops its iron bracers');
+console.log('god-boons: raise/lower/wall seams, sunder crystal, grove and rain fruit, lightning charge, frost swift, ring sanctuary, golem iron passed');

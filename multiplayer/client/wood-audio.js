@@ -22,7 +22,8 @@ export const WOOD_SOUNDS = Object.freeze({
  log_stow:       {files: ['log_stow'], priority: 5, cap: 2, duration: .5, rate: .03},
  log_toss:       {files: ['log_toss'], priority: 2, cap: 2, duration: .38, rate: .08}
 });
-export const WOOD_EVENT_KINDS = Object.freeze(['wood_hit', 'tree_fell', 'tree_land', 'log_bounce', 'log_throw', 'grab', 'pickup']);
+export const WOOD_EVENT_KINDS = Object.freeze(['wood_hit', 'tree_fell', 'tree_land', 'log_bounce', 'log_throw', 'grab', 'pickup',
+ 'ent_wake', 'ent_slam', 'ent_swipe', 'ent_limb', 'ent_fall', 'ent_root', 'ent_fade']);
 export const DEFAULT_LAND_DELAY = 2.5; // s; typical treeFall landTicks/60 for the authored trees (2.0-2.8 s)
 
 /** FNV-1a -> [0,1). Same event on every client gives the same pitch/gain/variant. */
@@ -57,6 +58,19 @@ export function woodLayersFor(event, scheduledLandings = null) {
  if (k === 'tree_land') { // authoritative settle event (doneTicks = landTicks + settleTicks)
   const pre = scheduledLandings?.get(String(event.id)); scheduledLandings?.delete(String(event.id));
   return [{sound: pre ? 'log_settle' : 'log_land_heavy', delay: 0, gain: 1}];
+ }
+ // Ents reuse the authored timber kit pitched down: a groaning trunk, a crown shaking loose, roots tearing free.
+ if (k?.startsWith('ent_')) {
+  const elder = event.size !== 'sapling', p = elder ? .72 : 1.12;
+  if (k === 'ent_wake') return [{sound: 'trunk_fracture', delay: 0, gain: elder ? 1 : .7, rateBase: p * .85}, {sound: 'foliage_rustle', delay: .15, gain: .9, rateBase: p},
+   {sound: 'log_land_heavy', delay: .95, gain: elder ? .8 : .45, rateBase: p}];
+  if (k === 'ent_slam') return [{sound: 'log_land_heavy', delay: 0, gain: .85, rateBase: .8}];
+  if (k === 'ent_swipe') return [{sound: 'log_bounce', delay: 0, gain: .9, rateBase: 1.1}];
+  if (k === 'ent_limb') return [{sound: 'axe_bite_deep', delay: 0, gain: 1, rateBase: p}, {sound: 'log_bounce', delay: .35, gain: .8, rateBase: p}];
+  if (k === 'ent_fall') return [{sound: 'trunk_fracture', delay: 0, gain: 1, rateBase: p}, {sound: 'log_land_heavy', delay: .7, gain: elder ? 1 : .6, rateBase: p}, {sound: 'foliage_rustle', delay: .6, gain: .8}];
+  if (k === 'ent_root') return [{sound: 'foliage_rustle', delay: 0, gain: .8, rateBase: .9}, {sound: 'log_settle', delay: .4, gain: .9, rateBase: .7}];
+  if (k === 'ent_fade') return [{sound: 'log_settle', delay: 0, gain: .8, rateBase: .8}];
+  return [];
  }
  if (k === 'log_bounce') return [{sound: 'log_bounce', delay: 0, gain: 1}];
  if (k === 'log_throw') return [{sound: 'log_toss', delay: 0, gain: 1}];

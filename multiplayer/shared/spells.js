@@ -1,4 +1,5 @@
 // Shared catalogue: the tray and authoritative cast validation use one vocabulary.
+import {ENT} from './ents.js';
 export const SPELLS = Object.freeze([
   {id:'skeleton',label:'Skeleton',cost:15,target:'point',icon:'☠'},
   {id:'squad',label:'Skeleton Squad',cost:38,target:'point',icon:'☠'},
@@ -14,6 +15,8 @@ export const SPELLS = Object.freeze([
   {id:'heal',label:'Healing Rain',cost:18,target:'point',icon:'✚'},
   {id:'lightning',label:'Lightning',cost:22,target:'point',icon:'ϟ'},
   {id:'frost',label:'Frost Nova',cost:20,target:'point',icon:'❄'},
+  {id:'awaken',label:'Awaken',cost:18,target:'point',icon:'❦'},
+  {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
   // Bloom spells open as the world fills with life (shared/bloom.js).
   {id:'spring',label:'Life Spring',cost:16,target:'point',icon:'❀',bloom:1},
   {id:'blessing',label:'Blessing',cost:20,target:'point',icon:'✦',bloom:2},
@@ -49,4 +52,6 @@ export const SPELL_TARGET_SHAPES = Object.freeze({
   grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
   spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 },
+  // Ents wake standing trees: Awaken snaps to the nearest tree within reach; Wild Awakening takes up to three in its circle.
+  awaken: { r: 1.5, reach: ENT.awakenRadius, count: 1 }, wildwake: { r: ENT.wildRadius, count: ENT.wildCount },
 });
