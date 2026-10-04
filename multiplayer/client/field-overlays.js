@@ -17,6 +17,7 @@ const ACTION_ICONS = {
   'current-quest': 'M6 3h9l3 3v15H6z M9 9h6 M9 13h6 M9 17h4',
   'start-expedition': 'M5 21V4 M5 4h11l-2 4 2 4H5',
   menu: 'M4 7h16 M4 12h16 M4 17h16',
+  'patch-notes': 'M7 4h11v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M9 9h6 M9 12h6 M9 15h4',
   'switch-role': 'M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.8z',
   build: 'M14 4l6 6-3 3-6-6z M11 7L4 14v3h3l7-7 M4 20h16',
   close: 'M6 6l12 12 M18 6L6 18',
@@ -338,7 +339,7 @@ export function createFieldOverlays({ mount, onAction } = {}) {
       bar.setAttribute('aria-label', 'Party actions');
       const disabled = new Set(m.disabledActions || []);
       const roleLabel = m.role === 'god' ? 'Play as Hero' : 'Play as God';
-      for (const [id, label] of [['switch-role', roleLabel], ['build', 'Build'], ['forge', 'Manage forge'], ['current-quest', 'Current quest'], ['start-expedition', 'Start expedition'], ['menu', 'Menu']]) {
+      for (const [id, label] of [['switch-role', roleLabel], ['build', 'Build'], ['forge', 'Manage forge'], ['current-quest', 'Current quest'], ['start-expedition', 'Start expedition'], ['patch-notes', 'Patch notes'], ['menu', 'Menu']]) {
         const b = el('button', 'fo-btn fo-btn-icon');
         b.type = 'button';
         b.dataset.foAction = id;
