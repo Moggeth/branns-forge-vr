@@ -9,6 +9,8 @@ import {settlementView} from './shared/resources.js';
 import {spellbookReadiness} from './client/ability-readiness.js';
 import {spellUnavailable} from './client/spell-availability.js';
 import {actionError} from './client/action-feedback.js';
+import {createCallouts} from './client/callouts.js';
+import './client/callouts.css';
 import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
@@ -393,7 +395,7 @@ function onSessionError(detail) {
   if (phase === 'connecting' && !playerId) {
     teardown(); setPhase('lobby');
     showLobbyProblem(message, {retry: true});
-  } else if (phase === 'game') toast(message);
+  } else if (phase === 'game') fail(message);
 }
 
 function recordProblem(problem) {
@@ -543,7 +545,6 @@ function notice(id, text, action, tone = 'info') {
 function removeNotice(id) { document.querySelector(`[data-notice="${id}"]`)?.remove(); }
 function clearNotices() { $('notices').replaceChildren(); }
 
-let toastTimer = 0;
 // God spells leave Hero boons (shared/god-boons.js). Tell the Hero who got one, and the caster what the spell left.
 const GIFT_TEXT={stone_boulder:'a stone boulder to mine',iron_seam:'an iron seam to mine',crystal:'crystal shards along the crack',apple:'fruit that heals',ore:'ore shaken loose'};
 let lastGiftToast=0;
@@ -558,13 +559,12 @@ function giftToast(e) {
   if(e.gift==='blessing'&&e.id===playerId)return toast(`Blessed: health restored and your weapon charged for ${e.hits} heavy hits.`);
   if(e.by===playerId&&GIFT_TEXT[e.gift]&&performance.now()-lastGiftToast>4000){lastGiftToast=performance.now();toast(`Your spell left the Heroes ${GIFT_TEXT[e.gift]}.`);}
 }
-function toast(text) {
-  const el = $('toast');
-  setText(el, text);
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3800);
-}
+// Info and failures share one floating lane high in the centre (client/callouts.js), clear of the hotbar.
+let callouts=null;
+const calloutLane=()=>callouts??=createCallouts({mount:$('hud'),info:$('toast')});
+function toast(text) { calloutLane().info(text); }
+// Failures: short red standalone text that fades on its own (the recovery hint sits small beneath).
+function fail(text) { if (text) calloutLane().error(text); }
 
 // ---------------------------------------------------------------- clipboard (user-initiated only)
 function inviteUrl() {
@@ -643,9 +643,9 @@ $('leave').addEventListener('click', () => {
 
 function changePerspective(role=currentRole==='hero'?'god':'hero'){
   if(!connected||phase!=='game')return;
-  if(xrActive){toast('Leave VR before switching perspective.');return;}
+  if(xrActive){fail('Leave VR before switching perspective.');return;}
   const self=lastSnapshot?.players.find(p=>p.id===playerId);
-  if(self&&lastSnapshot.tick-self.roleTick<120){toast(actionError('cooldown',{world:lastSnapshot,player:self,command:{type:'role'}}));return;}
+  if(self&&lastSnapshot.tick-self.roleTick<120){fail(actionError('cooldown',{world:lastSnapshot,player:self,command:{type:'role'}}));return;}
   game?.clearControls();closeQuickBuild();if(forgeOpen)closeForge();holdOverlays?.close();if(menuOpen)closeMenu(false);
   if(role==='hero'&&!mobile?.enabled){try{canvas.requestPointerLock?.()?.catch?.(()=>{});}catch{}}
   store.set(ROLE_KEY, role);
@@ -717,7 +717,7 @@ function openQuickBuild(){
 function directTimberline(){
   if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;
   const recipe=quickBuildModel(lastSnapshot).recipes.find(r=>r.id==='timberline');
-  if(!recipe?.enabled){openQuickBuild();toast('Gather the highlighted Timberline materials first.');return;}
+  if(!recipe?.enabled){openQuickBuild();fail('Gather the highlighted Timberline materials first.');return;}
   closeQuickBuild();game.beginInventionPlacement('timberline');
 }
 quickBuild=createQuickBuild({parent:body,onPlace:id=>{closeQuickBuild();if(id==='bridge')game.buildBridge();else game.beginInventionPlacement(id);},onCatalog:()=>{closeQuickBuild();openForge();forgePanel.setTab('build');},onClose:closeQuickBuild});
@@ -787,6 +787,8 @@ function fieldChanged(kind) {
 }
 function fieldAction(a){
   if(a.id==='forge'){openForge();return;}
+  if(a.id==='switch-role'){changePerspective();return;}
+  if(a.id==='build'){openQuickBuild();return;}
   if(a.id==='open'){fieldPinned=true;holdOverlays.open(a.kind==='help'?'equipment':'party');return;}
   if(a.id==='close'){holdOverlays.close();return;}
   if(a.id==='menu'){openMenu();return;}
@@ -839,7 +841,7 @@ function updateLookHint() {
 
 $('vr').addEventListener('click', async () => {
   try { await game.enterVR(); }
-  catch (error) { recordProblem(error); toast('VR couldn’t start. Make sure your headset is connected and awake, then try again.'); }
+  catch (error) { recordProblem(error); fail('VR couldn’t start. Make sure your headset is connected and awake, then try again.'); }
 });
 
 // ---------------------------------------------------------------- startup
@@ -850,7 +852,7 @@ try {
   game = createGame({
     canvas,
     isHost, onSelection: chooseSpell,
-    onAction: (action, details = {}) => action==='placementFeedback'?toast(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
+    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onStatus: status => { rendererStatus = String(status); if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
