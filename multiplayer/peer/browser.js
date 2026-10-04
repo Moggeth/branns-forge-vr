@@ -1,4 +1,5 @@
 // Browser WebRTC star transport. The signaling service sees membership and SDP, never game state.
+import {SnapshotDeltaEncoder,SnapshotDeltaDecoder,supportsCodec} from '../client/state-codec.js';
 const FRAME_BYTES = 12_000;
 const MAX_MESSAGE_BYTES = 512 * 1024;
 const encoder = new TextEncoder();
@@ -23,6 +24,11 @@ export class PeerRoomConnection extends EventTarget {
     this.checkpoint = null; this.checkpointRevision = -1;
     this.reconnectAttempt = 0; this.closed = true; this.generation = 0;
     this.frameSequence = 0;
+    // Independent negotiated recovery stream. Never quantize checkpoints: host
+    // migration must recover exact simulation state, not the display snapshot.
+    this.checkpointEncoder = new SnapshotDeltaEncoder({keyframeEvery:20});
+    this.checkpointDecoder = new SnapshotDeltaDecoder();
+    this.checkpointHelloAt = 0;
   }
   connect({ room = '', name = 'Adventurer', role = 'hero', desktop = true, secret = '' } = {}) {
     this.close();
@@ -267,6 +273,19 @@ export class PeerRoomConnection extends EventTarget {
     emit(this, 'peer_connected', { peerId: id });
     emit(this, 'status', { state: this.isHost ? 'hosting' : 'connected', peerId: id, transport: this.peers.get(id)?.relay ? 'cloud-relay' : 'webrtc' });
     if (this.isHost && this.checkpoint) this.#sendEnvelope(id, { kind: 'checkpoint', revision: this.checkpointRevision, state: this.checkpoint });
+    if (!this.isHost && id === this.hostId) {this.checkpointDecoder.reset();this.#checkpointHello(true);}
+  }
+  #checkpointHello(force = false) {
+    if (this.isHost || !this.hostId || (!force && Date.now()-this.checkpointHelloAt<2000)) return;
+    if (this.#sendEnvelope(this.hostId,{kind:'checkpoint_codec',v:[1],need:'key'})) this.checkpointHelloAt=Date.now();
+  }
+  #acceptCheckpoint(id,state,revision) {
+    this.checkpoint = state; this.checkpointRevision = revision;
+    // Coordinator metadata needs only a periodic readiness update.
+    if (!this.checkpointAdvertisedAt || Date.now()-this.checkpointAdvertisedAt>10000) {
+      if (this.#signal({type:'checkpoint_ready',revision})) this.checkpointAdvertisedAt=Date.now();
+    }
+    emit(this,'checkpoint',{from:id,state,revision,epoch:this.epoch});
   }
   #receiveData(id, data) {
     const peer = this.peers.get(id); if (!peer || peer.epoch !== this.epoch) return;
@@ -291,14 +310,20 @@ export class PeerRoomConnection extends EventTarget {
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     let envelope; try { envelope = JSON.parse(decoder.decode(bytes)); } catch { return; }
     if (!envelope || typeof envelope !== 'object') return;
-    if (envelope.kind === 'checkpoint') {
+    if (envelope.kind === 'checkpoint_codec') {
+      if (!this.isHost || !supportsCodec(envelope)) return;
+      const now=Date.now();
+      if (peer.checkpointHelloAt !== undefined && now-peer.checkpointHelloAt<500) return;
+      peer.checkpointHelloAt=now;this.checkpointEncoder.enable(id);
+    } else if (envelope.kind === 'checkpoint_delta') {
+      if (id !== this.hostId || !Number.isSafeInteger(envelope.revision) || envelope.revision<0 || envelope.revision<this.checkpointRevision) return;
+      const result=this.checkpointDecoder.accept(envelope.frame);
+      if (result.request) this.#checkpointHello(true);
+      if (result.snapshot) this.#acceptCheckpoint(id,result.snapshot,envelope.revision);
+    } else if (envelope.kind === 'checkpoint') {
       if (id !== this.hostId || !Number.isSafeInteger(envelope.revision) || envelope.revision < 0 || envelope.revision < this.checkpointRevision) return;
-      this.checkpoint = envelope.state; this.checkpointRevision = envelope.revision;
-      // Checkpoints still arrive at 2 Hz. Coordinator metadata needs only a periodic readiness update.
-      if (!this.checkpointAdvertisedAt || Date.now() - this.checkpointAdvertisedAt > 10000) {
-        if (this.#signal({ type: 'checkpoint_ready', revision: envelope.revision })) this.checkpointAdvertisedAt = Date.now();
-      }
-      emit(this, 'checkpoint', { from: id, state: envelope.state, revision: envelope.revision, epoch: this.epoch });
+      this.#acceptCheckpoint(id,envelope.state,envelope.revision);
+      this.#checkpointHello(); // Old hosts safely ignore this; retry if initial negotiation was dropped.
     } else if (envelope.kind === 'message') {
       if (!this.isHost && id !== this.hostId) return;
       const now = Date.now();
@@ -348,11 +373,18 @@ export class PeerRoomConnection extends EventTarget {
     // Only desktop peers can be offered the world, so only they need 2 Hz recovery points. Others
     // keep a local backup at the 10 s autosave cadence instead of ~130 KB/s of unused checkpoints.
     const now = Date.now();
-    let prepared;
+    let encoded=false;
+    if (this.checkpointEncoder.size) {
+      try {this.checkpointEncoder.publish(state);encoded=true;} catch {/* Old/oversized schema keeps legacy recovery. */}
+    }
+    const prepared=new Map();
     for (const [id, peer] of this.peers) {
       if (this.roster.get(id)?.desktop !== true && now - (peer.checkpointAt || 0) < 10_000) continue;
-      prepared ??= this.#prepareEnvelope({kind:'checkpoint', state, revision});
-      if (this.#sendPreparedEnvelope(id, prepared)) peer.checkpointAt = now;
+      const frame=encoded?this.checkpointEncoder.frame(id,this.epoch):null;
+      const key=frame?frame.b:'legacy';
+      if (!prepared.has(key)) prepared.set(key,this.#prepareEnvelope(frame?{kind:'checkpoint_delta',revision,frame}:{kind:'checkpoint',state,revision}));
+      if (this.#sendPreparedEnvelope(id,prepared.get(key))) peer.checkpointAt=now;
+      else if (frame) this.checkpointEncoder.resync(id);
     }
     return true;
   }
@@ -360,8 +392,8 @@ export class PeerRoomConnection extends EventTarget {
   declineWorld() { return this.#signal({ type: 'decline_world', epoch: this.epoch }); }
   retryWorld() { return this.#signal({ type: 'retry_world', epoch: this.epoch }); }
   transferHost(peerId) { if (!this.isHost) return false; return this.#signal({ type: 'transfer_host', to: peerId }); }
-  #removePeer(id) { const peer = this.peers.get(id); if (!peer) return; this.peers.delete(id); clearTimeout(peer.relayTimer); peer.channel?.close(); peer.connection.close(); }
-  #resetPeers() { for (const id of this.peers.keys()) this.#removePeer(id); }
+  #removePeer(id) { const peer = this.peers.get(id); if (!peer) return; this.peers.delete(id); this.checkpointEncoder.forget(id); clearTimeout(peer.relayTimer); peer.channel?.close(); peer.connection.close(); }
+  #resetPeers() { for (const id of this.peers.keys()) this.#removePeer(id); this.checkpointEncoder.reset();this.checkpointDecoder.reset();this.checkpointHelloAt=0; }
   close() {
     // Tell the room this is deliberate so it can free the seat or hand the world over immediately.
     if (this.joined && this.socket?.readyState === WebSocket.OPEN) { try { this.socket.send(JSON.stringify({ type: 'leave' })); } catch { /* closing */ } }

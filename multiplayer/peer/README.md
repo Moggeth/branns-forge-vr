@@ -19,3 +19,11 @@ If the host disconnects, `owner_lost` tells every client to pause simulation. Si
 
 The service rejects origins outside the configured exact list, limits room creation per IP, message rate and size, enforces room capacity, removes idle rooms, and closes dead sockets using heartbeats. Treat every game command as untrusted in the host simulation and use the authenticated `message.detail.from` sender ID; never accept a sender ID from packet content.
 
+
+### Recovery checkpoint transport
+
+Desktop recovery checkpoints keep their 2 Hz cadence (other devices receive them every 10 seconds). New clients negotiate `checkpoint_codec` version 1 on the authenticated game edge. Checkpoints then use an independent `checkpoint_delta` stream built on the bounded, hashed JSON delta codec. They are never quantized: positions, simulation clocks, inventories, unknown forward-compatible fields, and battle state retain their exact JSON values. A full keyframe is sent for a new peer, missing/corrupt base, failed send, stream/host change, and periodically every 20 recovery publications. Legacy guests/hosts keep full `checkpoint` envelopes. The last verified checkpoint remains usable while a delta resynchronizes; live display snapshots cannot overwrite this recovery base.
+
+Room capacity is 32 human identities; simulation bots consume no room seats. Host signaling and relay budgets scale with actual online star edges (up to 31), while guest budgets stay at one edge. Cloud room sockets remain bounded at 32 joined plus 8 pending/reconnect attempts, and the shared-IP join allowance is 64/minute. Public listing joinability respects the five-second reserved-seat reconnect grace.
+
+`node tests/network-capacity.mjs` and `node tests/checkpoint-delta.mjs` verify capacity/routing budgets and exact recovery. `node tests/32-player-transport.mjs` runs a manual 32-page Chromium transport test against local Vite and the cloud emulator, including active battle bots and host transfer. Set `FORCE_RELAY=1` to force the WebSocket fallback. This lightweight harness does not render the game and is not a phone/headset FPS guarantee. Disable development hot reload during concurrent source edits so it cannot restart acceptance sessions mid-measurement.
