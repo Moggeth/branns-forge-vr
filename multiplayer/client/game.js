@@ -1,3 +1,4 @@
+import {createTerrainGeometryUpdater} from './terrain-geometry.js';
 import {validateInventionPlacement} from '../shared/inventions.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
 import {createSiegebirdAim} from './siegebird-aim.js';
@@ -163,6 +164,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   scene.add(sun);
   const groundGeometry = new THREE.PlaneGeometry(120, 120, 160, 160);
   groundGeometry.rotateX(-Math.PI / 2);
+  const terrainGeometry=createTerrainGeometryUpdater(groundGeometry);
   const ground = new THREE.Mesh(groundGeometry, new THREE.MeshStandardMaterial({ color: 0x667b43, roughness: 1, metalness: 0 }));
   scene.add(ground);
   // World-space orchard ground/sky/lighting. It owns the meadow textures (no separate loader) and reads the same
@@ -378,12 +380,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     terrainPreviousEdits=snapshot.edits;terrainPreviousTick=snapshot.tick;
     terrainSignature = signature;terrainFoundationKey=foundations;
     fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;mountainArena.sync(snapshot);alpineForest.sync();
-    const positions = groundGeometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) {const x=positions.getX(i),z=positions.getZ(i);if(!dirty||dirty.some(e=>Math.hypot(x-e.x,z-e.z)<=e.radius+.75))positions.setY(i,terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)));}
-    positions.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
-    groundGeometry.computeBoundingSphere();
-    groundGeometry.computeBoundingBox();
+    terrainGeometry.update((x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)),dirty);
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
     meadow.terrainChanged({edits: snapshot.edits, terrainTick: snapshot.tick, dirty: foundationChanged ? null : dirty});
     orchard.groundChanged({edits: snapshot.edits,terrainTick:snapshot.tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
@@ -1419,7 +1416,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
