@@ -15,6 +15,7 @@ import {BLOOM,bloomLevel,addBloom,stepBloom,restoreBloom} from './bloom.js';
 import {strikeWaygate,stepWaygate,restoreWaygate} from './waygate.js';
 import {strikeGeode,stepGeodes,restoreGeodes} from './geode-outcrop.js';
 import {strikeBeacon,stepBeacon,beaconHearth,restoreBeacon} from './watch-beacon.js';
+import {stepHeartstones} from './heartstone.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
@@ -398,7 +399,7 @@ function instantiate(state) {
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.24,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;}
       },events,adventureEvents);
-      stepInventions(state,inventionContext,events);
+      stepInventions(state,inventionContext,events);stepHeartstones(state);
       const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
       if (expedition.intents.length) applyAdventureIntents(state, expedition.intents, adventureContext);
       events.push(...expedition.events);

@@ -18,7 +18,7 @@ export const STRUCTURES=Object.freeze({
  palisade:def('Palisade & Gate','Physical timber barrier. Open your gate for passage; repair its damaged frame.',{wood:5,stone:1},180,2,'Open / close gate'),
  launcher:def('Heavy Launcher','Lob a heavy Stone shot into enemies and fortifications; impact deforms earth.',{wood:10,stone:8,iron:5,starMetal:2},260,1.5,'Aim & fire'),
  ward:def('Crystal Ward','Charge a bounded six-metre protective field using one Crystal.',{stone:6,iron:2,gems:4},180,1.3,'Charge ward'),
- influence:def('God Influence','Destructible source of local divine power. Opponents can cut off nearby destructive spells.',{stone:5,gems:3},180,1.3,'Restore influence'),
+ influence:def('Heartstone','A living geode heart. Your Heroes near it recover health and mana, faster as the world blooms. Opponents can break it; restore it with Crystal.',{stone:5,gems:3},180,1.3,'Restore with Crystal'),
  trap:def('Mechanical Trap','Armed jaws strike nearby threats once. Reset deliberately using one Iron.',{wood:3,iron:4},120,1.1,'Reset trap')
 });
 const clone=v=>structuredClone(v),flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]),clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
