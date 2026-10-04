@@ -43,7 +43,7 @@ export class WorldSession extends EventTarget {
       const resume = this.identity?.peerId === d.peerId && this.identity?.room === d.room;
       this.identity = d; if (!resume) { this.sequence = sequenceFloor(); this.decoder.reset(); }
       this.emit('welcome', d);
-      if (d.hostId === d.peerId && !(resume && d.resume && this.simulation)) this.promote(resume ? this.latest : this.initialCheckpoint);
+      if (d.hostId === d.peerId && !(resume && d.resume && this.simulation)) this.promote(resume ? this.latest : this.initialCheckpoint, {restoringSave:!resume && !!this.initialCheckpoint});
       else if (d.hostId !== d.peerId && this.simulation) this.simulation = null;
     });
     on('message', ({detail}) => this.receive(detail));
@@ -112,8 +112,15 @@ export class WorldSession extends EventTarget {
         this.simulation.removePlayer(player.id); // Releases any held part and drops the pack as pickups first.
         if (record) {
           // The record keeps only what could not be dropped (pickup cap), so nothing is duplicated or lost.
-          const after = pickupTotals(this.simulation), carried = record.resources || {};
+          const after = pickupTotals(this.simulation), carried = {...record.resources};
+          // removePlayer first folds the held ore into the pack before dropping it.
+          // Include it in this balance too, otherwise the parked held slot duplicates
+          // a dropped ore. Keep a held remainder separate from a possibly full pack.
+          const heldOre = record.heldOre;
+          if (heldOre) carried[heldOre] = (carried[heldOre] || 0) + 1;
           record.resources = Object.fromEntries(PACK.map(k => [k, Math.max(0, (carried[k] | 0) - (after[k] - before[k]))]));
+          if (heldOre && record.resources[heldOre] > 0) record.resources[heldOre]--;
+          else delete record.heldOre;
           this.parked.delete(player.id); this.parked.set(player.id, {record, at:now});
         }
       }
@@ -149,16 +156,31 @@ export class WorldSession extends EventTarget {
       if (ids.includes(id) && !present.has(id)) this.simulation.addPlayer({id,name:p.name,role:p.role || 'hero'});
     }
   }
-  promote(checkpoint) {
+  promote(checkpoint, {restoringSave = false} = {}) {
     if (!this.identity) return;
     try {
       this.codec = new SnapshotDeltaEncoder(); // New stream id; guests re-announce after one legacy snapshot.
       this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation({room:this.identity.room,seed:41});
       this.reconcile(); this.last = performance.now(); this.accumulator = 0;
+      let recovery;
+      if (restoringSave && [...this.parked.values()].some(({record}) => record.heldOre || PACK.some(k => record.resources?.[k] > 0))) {
+        // A newly created room has new peer IDs. Undropped packs parked under the
+        // old IDs cannot be claimed, and autosave would otherwise erase them.
+        // Preserve the original checkpoint before publishing the resumed world.
+        try { recovery = this.saves.put(makeSave(checkpoint, {name:`${this.name.slice(0,43)} (inventory recovery)`})); }
+        catch {
+          throw Object.assign(new Error('Could not save the inventory recovery copy. Download your original save, free browser storage, then retry.'), {code:'resume_backup_failed'});
+        }
+      }
       const own = this.simulation.checkpoint().players?.find(p => p.id === this.identity.peerId);
       this.sequence = Math.max(this.sequence, own?.seq || 0, own?.lastSeq || 0);
       this.publish(true); this.emit('hosting',{hz:HZ});
-    } catch(error) { this.simulation = null; this.emit('error',{message:`Cannot recover this world: ${error.message}`}); }
+      if (recovery) this.emit('error', {code:'inventory_recovery_saved',reason:`The ground pickup limit left some supplies in your recovery copy, not your new pack. Download "${recovery.name}" from Saved Worlds to keep them.`,recoveryId:recovery.id});
+    } catch(error) {
+      this.simulation = null;
+      if (error.code === 'resume_backup_failed') { this.running = false; clearInterval(this.timer); this.connection.close(); }
+      this.emit('error',{...(error.code ? {code:error.code,reason:error.message} : {}),message:`Cannot recover this world: ${error.message}`});
+    }
   }
   command(type, payload = {}) {
     if (!this.identity || !this.running) return false;
@@ -167,7 +189,20 @@ export class WorldSession extends EventTarget {
     else this.connection.send(this.connection.hostId, {kind:'command',epoch:this.connection.epoch,message});
     return true;
   }
+  get battleCompatible() { return this.connection.local === true || this.connection.maxPeers >= MAX_PLAYERS; }
   applyCommand(id, message) {
+    if (message?.type === 'battle' && ['start','stop','reset'].includes(message.action) && id !== this.connection.hostId) {
+      const detail={code:'host_required',message:'Only the world host can change battle mode. Ask the host to start or reset the battle.'};
+      if (id===this.identity?.peerId) this.emit('error',detail);
+      else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
+      return;
+    }
+    if (message?.type==='battle' && ['start','reset'].includes(message.action) && !this.battleCompatible) {
+      const detail={code:'client_update_required',message:'Everyone in this world must refresh the game before starting Battle mode. Older players can leave instead; ordinary exploration remains available.'};
+      if (id===this.identity?.peerId) this.emit('error',detail);
+      else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
+      return;
+    }
     const result = this.simulation.command(id,message);
     if (!result.ok) {
       const detail = {code:result.code,message:result.code.replaceAll('_',' '),...(typeof result.reason==='string'?{reason:result.reason.slice(0,280)}:{}),...(result.missing?{missing:result.missing}:{}),...(result.obstacle?{obstacle:result.obstacle}:{})};
@@ -232,14 +267,17 @@ export class WorldSession extends EventTarget {
     const now = performance.now(), elapsed = Math.max(0, Math.min(100,now-this.last)); this.last = now;
     if (!this.running || !this.simulation) return;
     this.accumulator += elapsed;
-    let steps = 0;
+    let steps = 0, publishDue = false;
     while(this.accumulator >= 1000/HZ && steps < 6) {
       const start = performance.now();
       for(const event of this.simulation.step()) this.event(event);
       this.metrics.maxStepMs = Math.max(this.metrics.maxStepMs,performance.now()-start);
       this.metrics.steps++; this.accumulator -= 1000/HZ; steps++;
-      if(this.metrics.steps % 3 === 0) this.publish();
+      if(this.metrics.steps % 3 === 0) publishDue = true;
     }
+    // Keep every 60 Hz simulation step/event, but don't serialize obsolete intermediate
+    // states when catching up after a delayed browser timer. Publish the freshest state once.
+    if (publishDue) this.publish();
     if(this.accumulator >= 1000/HZ) { this.metrics.overruns++; this.accumulator = 0; }
   }
   publish(force = false) {
@@ -250,18 +288,26 @@ export class WorldSession extends EventTarget {
     this.emit('snapshot',snapshot);
     // Exact sweep history is host-only; guests need current flight state, not16 old poses.
     // Millimetre rounding keeps the same JSON shape; checkpoints below stay exact.
-    if(!this.connection.local){
+    const peers = this.connection.peers;
+    if(!this.connection.local && (!(peers instanceof Map) || peers.size)){
     const wireSnapshot=quantizeWire({...snapshot,projectiles:snapshot.projectiles.map(({trail,...shot})=>shot)});
     const legacy = {kind:'snapshot',epoch:this.connection.epoch,snapshot:wireSnapshot};
-    const peers = this.connection.peers;
     if (!this.codec.size || !(peers instanceof Map)) this.connection.broadcast(legacy);
     else {
       // Capable peers get a delta against the frame they last received (or a keyframe); others stay legacy.
       let encoded = true; try { this.codec.publish(wireSnapshot); } catch { encoded = false; }
+      const prepared = new Map(), canPrepare = typeof this.connection.prepareMessage === 'function' && typeof this.connection.sendPrepared === 'function';
       for (const id of peers.keys()) {
         const frame = encoded ? this.codec.frame(id, this.connection.epoch) : null;
-        if (!frame) this.connection.send(id, legacy);
-        else if (!this.connection.send(id, frame)) this.codec.resync(id);
+        let sent;
+        if (canPrepare) {
+          // Within one publication all keyframes are identical, as are all deltas.
+          // Preserve each peer's base bookkeeping while encoding each payload just once.
+          const key = frame ? frame.b : 'legacy';
+          if (!prepared.has(key)) prepared.set(key, this.connection.prepareMessage(frame || legacy));
+          sent = this.connection.sendPrepared(id, prepared.get(key));
+        } else sent = this.connection.send(id, frame || legacy);
+        if (frame && !sent) this.codec.resync(id);
       }
     }
     }

@@ -109,7 +109,9 @@ const GEM_FRAGMENT = /* glsl */`
   float twinkle = pow(max(0., sin(h * 6.2832 + dot(pickV, vec3(7., 5., 9.)) * 2.4 + uPickTime * uPickMotion * (.6 + h))), 16.);
   vec3 core = mix(uPickDormant, uPickGlow, lit);
   float facetTone = .55 + .45 * fract(h * 7.31);   // neighbouring facets differ, so the cut reads
-  totalEmissiveRadiance = core * (.2 + lit * (.36 * facetTone + .28 * pickNdv + .36 * pickRim))
+  // Slow light rising through the crystal (frozen when motion is reduced or on remote picks).
+  float rise = pow(.5 + .5 * sin(vPickPos.y * 140. + dot(vPickPos.xz, vec2(60., 45.)) - uPickTime * uPickMotion * 1.4 + vPickGem.y * 6.3), 3.);
+  totalEmissiveRadiance = core * (.2 + lit * (.36 * facetTone + .28 * pickNdv + .36 * pickRim + .2 * rise))
     + uPickFlareColor * (twinkle * .4 * lit * lit + ignite * .9 + uPickFlare * (.35 + .2 * lit) + uPickDrain * .6);
   diffuseColor.rgb *= mix(.55, 1., lit);
 }

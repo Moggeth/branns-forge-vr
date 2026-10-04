@@ -1,7 +1,7 @@
 // Executable checks for shared/adventure.js against the unmodified reference simulation.
 // Run: node tests/adventure.mjs   (from the commission folder)
 import assert from 'node:assert/strict';
-import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
+import {createSimulation, loadSimulation, terrainHeight, MAX_PLAYERS} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
 import {settleCastPoint} from '../shared/spells.js';
 import {createAdventure, stepAdventure, adventureAction, expeditionRunning, validateRestore,
@@ -226,7 +226,7 @@ test('hostile payloads and corrupt saves are rejected', () => {
   assert.ok(validateRestore(good).ok);
   const mutate = fn => { const c = JSON.parse(JSON.stringify(good)); fn(c); return validateRestore(c); };
   const cases = [c => { c.stock.wood = 999; }, c => { c.flame = 101; }, c => { c.extra = 1; }, c => { delete c.need; },
-    c => { c.stage = 'boss'; }, c => { c.run = -1; }, c => { c.renown = Object.fromEntries(Array.from({length: 17}, (_, i) => [`p${i}`, 1])); },
+    c => { c.stage = 'boss'; }, c => { c.run = -1; }, c => { c.renown = Object.fromEntries(Array.from({length: MAX_PLAYERS * 2 + 1}, (_, i) => [`p${i}`, 1])); },
     c => { c.foes = Array.from({length: 17}, (_, i) => ({id: `xv1w0${i}`, kind: 'skeleton', tag: 'w0', seen: true, age: 1})); },
     c => { c.foes = [{id: 'h1', kind: 'skeleton', tag: 'w0', seen: true, age: 1}]; }, c => { c.notice = 'x'.repeat(97); },
     c => { c.seqs = JSON.parse('{"__proto__":{"polluted":1}}'); }, c => { c.rewardedRun = c.run + 1; }, c => { c.flame = '50'; },
@@ -245,7 +245,7 @@ test('caps: foes, telegraphs and ledgers stay bounded', () => {
   assert.ok(maxFoes <= 16 && maxFoes > 8, `max ${maxFoes}`);
   assert.ok(r.world().enemies.length <= 64);
   for (let i = 0; i < 30; i++) adventureAction(r.adv, 'h0', {seq: 1e6 + i, action: 'leave'}, r.world());
-  assert.ok(Object.keys(r.adv.seqs).length <= 16 && r.adv.votes.length <= 8);
+  assert.ok(Object.keys(r.adv.seqs).length <= MAX_PLAYERS * 2 && r.adv.votes.length <= MAX_PLAYERS);
 });
 
 test('determinism: identical inputs give identical state, empty room pauses', () => {
@@ -256,8 +256,8 @@ test('determinism: identical inputs give identical state, empty room pauses', ()
 });
 
 // Current compact HUD behavior is covered by tests/expedition-hud.mjs and vr-adventure-panel.mjs.
-test('stepAdventure cost at world caps (8 players, 64 enemies)', () => {
-  const r = new Room(); for (let i = 0; i < 8; i++) r.add(`h${i}`, 'hero');
+test('stepAdventure cost at world caps (32 players, 64 enemies)', () => {
+  const r = new Room(); for (let i = 0; i < MAX_PLAYERS; i++) r.add(`h${i}`, 'hero');
   r.act('h0', {action: 'start'}); r.adv.stage = 'rekindle'; r.adv.flame = 50;
   r.edit(s => { for (let i = 0; i < 64; i++) s.enemies.push(createEnemy(`b${i}`, [Math.cos(i) * 20, 0, Math.sin(i) * 20])); });
   const world = r.world(), events = [{kind: 'spell', spell: 'raise', position: [1, 0, 1]}];

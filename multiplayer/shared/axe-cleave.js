@@ -1,3 +1,4 @@
+import {enemyHostileTo} from './battle-mode.js';
 // Orchard's Edge special: the cleave (2026-10-03, replaces the axe's Sunder line). One wide horizontal sweep in front
 // of the hero. Every skeleton inside the arc is cut down in one hit (armoured golems take a heavy blow and are thrown
 // back), and every standing tree inside it is felled away from the hero with the usual log yield. No terrain edits,
@@ -32,7 +33,7 @@ export function inCleave(p, x, z, radius = 0) {
 /** Targets of a cleave from the current state, without changing anything. */
 export function planCleave(state, p) {
   const y = p.position[1];
-  const enemies = state.enemies.filter(e => Math.abs(e.position[1] - y) < AXE_CLEAVE.height && inCleave(p, e.position[0], e.position[2], AXE_CLEAVE.body));
+  const enemies = state.enemies.filter(e => enemyHostileTo(e,p.side)&&Math.abs(e.position[1] - y) < AXE_CLEAVE.height && inCleave(p, e.position[0], e.position[2], AXE_CLEAVE.body));
   const felled = new Set(state.harvestedTrees.filter(isFelled).map(h => h.id));
   const trees = worldTrees(state).filter(t => !felled.has(t.id))
     .map(t => ({t, floor: terrainHeight(state, t.x, t.z), d: Math.hypot(t.x - p.position[0], t.z - p.position[2])}))

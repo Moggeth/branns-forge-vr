@@ -1,0 +1,31 @@
+/* Fullscreen remains a direct action while gameplay is paused or touch sticks are off. */
+.mui-fs .mui-btn-label { font-size: 9px; line-height: 10px; letter-spacing: 0; text-transform: none; max-width: 42px; }
+.mui-btn.mui-fs { transform: none !important; } /* Keep the 44px target during the activating tap. */
+.mui-fullscreen-surface[hidden] { display: none !important; }
+.mui-fullscreen-surface {
+  position: fixed; z-index: 150;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  right: calc(env(safe-area-inset-right, 0px) + 8px);
+}
+.mui-fullscreen-surface .mui-fs {
+  width: 44px; height: 44px; min-width: 44px;
+  background: rgba(22, 17, 12, .96); border: 1px solid var(--brass, #c9a45c);
+  color: var(--brass-hi, #ecd29a);
+}
+/* A filtered/animated card otherwise makes fixed children relative to the card. */
+body.touch-fullscreen-surface .menu-card {
+  animation: none !important; transform: none !important; filter: none !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+/* Reserve the surface's row; no cover over menu tabs, Leave, or lobby fields. */
+body.touch-fullscreen-surface #lobby.lobby,
+body.touch-fullscreen-surface #menu.menu-backdrop,
+body.touch-fullscreen-surface .pn-backdrop {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 56px) !important;
+}
+
+/* Animated workshop/guide panels own the containing block. Keep their action in
+   the persistent header instead of fixing it over the close button. */
+.ip-head > .mui-fullscreen-surface,
+.fo-head > .mui-fullscreen-surface,
+.hud-room > .mui-fullscreen-surface { position: static; flex: none; }

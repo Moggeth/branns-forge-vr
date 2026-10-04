@@ -233,6 +233,21 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     aS(vertical(x, z - 0.38, 0.15, Math.max(2.5, h * 0.55), 4), 0.05, PAL.water, OK({ dash: 0.7, flow: -2.5 }));
   }
   function entTargets() { return want.trees.length ? want.trees : null; }
+  // Growth spells mark each site the authority will plant: a leaf ring, a sapling and the crown it will spread to.
+  // Sites arrive as world offsets from the centre; line spells (the wave) draw in their rotated local frame.
+  function growthSites(fallback) {
+    if (!want.trees.length) return fallback.map(([x, z]) => [x, z, 6]);
+    return spec().line ? want.trees.map(([x, z, h]) => [B.ca * x + B.sa * z, -B.sa * x + B.ca * z, h]) : want.trees;
+  }
+  const spec = () => SPELL_SHAPES[want.spell];
+  function sapling(x, z, h, i) {
+    const crown = Math.max(1.4, h * 0.36);
+    gS(circ(0.5, 20, 0, TAU, x, z), 0.07, PAL.leaf);
+    gS(circ(crown, 40, i * 0.7, i * 0.7 + TAU, x, z), 0.035, PAL.moss, { dash: 0.9, flow: 0.25, fine: true });
+    for (let k = 0; k < 4; k++) gS(leafShape(x, z, (k * TAU) / 4 + i, 0.36), 0.035, PAL.moss, { fine: true });
+    aS(vertical(x, z, 0, 1.2, 3), 0.07, PAL.bark, OK());
+    const t = G(x, z, 1.2); for (const s of [-1, 1]) aS([[t[0], t[1] - 0.3, t[2]], [t[0] + s * 0.3, t[1] - 0.04, t[2]], [t[0] + s * 0.42, t[1] + 0.12, t[2]]], 0.05, PAL.leaf, OK({ fine: true }));
+  }
 
   // ---------- the 16 designs ----------
   const D = {
@@ -331,7 +346,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       gS(wave(R, 14, 0.1, 0, 168), 0.09, PAL.leaf, { flow: 0.4 });
       for (const s of [0, Math.PI]) gS(spiral(0.35, R * 0.62, 0.9, s, 70), 0.06, PAL.moss, { prop: true });
       gS(rot2([...circ(0.45, 12, -1.1, 1.1, -0.18, 0), ...circ(0.45, 12, Math.PI - 1.1, Math.PI + 1.1, 0.18, 0)], Math.PI / 2), 0.06, PAL.gold); // seed
-      for (const [x, z] of SPELL_SHAPES.grove.trees) {
+      for (const [x, z] of growthSites(SPELL_SHAPES.grove.trees)) {
         const a = Math.atan2(z, x), d = Math.hypot(x, z), nx = -Math.sin(a), nz = Math.cos(a);
         gS(Array.from({ length: 13 }, (_, i) => { const u = i / 12, w = Math.sin(u * Math.PI * 1.5) * 0.35; return [Math.cos(a) * d * u * 0.82 + nx * w, Math.sin(a) * d * u * 0.82 + nz * w]; }), 0.06, PAL.bark, { prop: true });
         for (const s of [-1, 1]) { const bx = Math.cos(a) * d * 0.5, bz = Math.sin(a) * d * 0.5; gS([[bx, bz], ...spiral(0.05, 0.3, 0.8 * s, a + s * 1.2, 12).map(([px, pz]) => [bx + nx * s * 0.55 + px, bz + nz * s * 0.55 + pz])], 0.04, PAL.bark, { fine: true }); }
@@ -347,10 +362,19 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       gS(circ(R, 96), 0.05, PAL.teal, { dash: 1.4, flow: 0.5 });
       gS(wave(tr, n * 2, 0.22, 0, 192), 0.07, PAL.leaf, { prop: true }); gS(wave(tr, n * 2, 0.22, Math.PI, 192), 0.05, PAL.moss, { prop: true, fine: true });
       gS(circ(tr * 0.6, 64), 0.04, PAL.teal, { flow: -0.4, fine: true });
-      for (let i = 0; i < n; i++) { const a = (i * TAU) / n, x = Math.cos(a) * tr, z = Math.sin(a) * tr;
+      for (const [i, [x, z]] of growthSites(Array.from({ length: n }, (_, k) => [Math.cos((k * TAU) / n) * tr, Math.sin((k * TAU) / n) * tr])).entries()) { const a = Math.atan2(z, x);
         gS(circ(0.38, 18, 0, TAU, x, z), 0.07, PAL.leaf); gS(leafShape(Math.cos(a + 0.4) * tr, Math.sin(a + 0.4) * tr, a + Math.PI / 2, 0.5), 0.04, PAL.moss, { fine: true });
         aS(vertical(x, z, 0, 1.1, 2), 0.06, PAL.bark, OK()); const t = G(x, z, 1.1); aS([[t[0] - 0.25, t[1] - 0.25, t[2]], t, [t[0] + 0.25, t[1] - 0.25, t[2]]], 0.05, PAL.leaf, OK({ fine: true })); }
       cross(R * 0.3); moteField(24, tr, PAL.leaf, 1.3, 0.17, 29, 1);
+    },
+    wave(R, L) { // a growth band: leafy rectangle edges, forward-rolling chevrons, one sapling per planted site
+      const half = Math.max(0.5, L) / 2, w = SPELL_SHAPES.wave.band;
+      for (const s of [-1, 1]) gS(Array.from({ length: 41 }, (_, i) => { const x = lp(-half, half, i / 40); return [x, s * (w + 0.12 * Math.sin(x * 3))]; }), 0.07, PAL.leaf, { flow: 0.6 });
+      for (const x of [-half, half]) gS([[x, -w], [x, w]], 0.05, PAL.moss, { fine: true });
+      for (let x = -half + 1.2; x < half - 0.6; x += 2.2) gS(chevron(x, 0, 0, 0.5), 0.05, PAL.moss, { fine: true, flow: 1.2 });
+      for (const [i, [x, z, h]] of growthSites([]).entries()) sapling(x, z, h, i);
+      if (!want.trees.length) cross(1, 0, 0);
+      moteField(20, Math.max(2, half), PAL.leaf, 1.1, 0.16, 31);
     },
     starfall(R) { // celestial compass rose aligned to world axes, converging orbits, fixed strike crosshair + sky beam
       gS(circ(R, 96), 0.11, PAL.star, { flow: 0.3 }); gS(circ(R * 1.07, 96), 0.04, PAL.astral, { dash: 0.9, flow: -0.8, fine: true });
@@ -419,6 +443,13 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       aS(halo, 0.06, PAL.star, OK());
       cross(R * 0.3); moteField(26, R, PAL.star, 1.6, 0.14, 73);
     },
+    rainfall(R) { // gathering storm: slow water rims, falling streaks and a cloud ring hanging overhead
+      gS(wave(R, 30, 0.05, 1, 200), 0.08, PAL.water, { flow: 0.25 }); gS(circ(R * 0.7, 72), 0.04, PAL.ice, { dash: 1.4, flow: -0.4, fine: true });
+      for (let i = 0; i < 10; i++) { const a = (i * TAU) / 10 + 0.2, q = R * (i % 2 ? 0.45 : 0.82); gS(drop(Math.cos(a) * q, Math.sin(a) * q, Math.PI / 2, 0.7), 0.05, PAL.water); }
+      const g = G(0, 0), cloud = []; for (let i = 0; i <= 40; i++) { const a = (i * TAU) / 40, r = 2.4 + 0.35 * Math.sin(a * 5); cloud.push([g[0] + Math.cos(a) * r, g[1] + 6, g[2] + Math.sin(a) * r]); }
+      aS(cloud, 0.08, PAL.ice, OK());
+      cross(R * 0.2); moteField(48, R, PAL.water, -3, 0.14, 89);
+    },
     quake(R) { // concentric fault rings with jagged cracks running out from the centre
       const r = rng(79); for (const [q, w] of [[1, 0.08], [0.7, 0.05], [0.4, 0.045]]) gS(wave(R * q, 14, 0.06, q * 3, 140), w, q === 1 ? PAL.crystal : PAL.amethyst, { flow: q === 1 ? 0.4 : -0.3, fine: q !== 1 });
       for (let i = 0; i < 7; i++) { const a = (i * TAU) / 7 + 0.3; gS(jag(Math.cos(a) * 0.5, Math.sin(a) * 0.5, Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95, 8, 0.4, r), 0.055, PAL.crystal, { prop: true, flow: 1.2 }); }
@@ -447,7 +478,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       if (!p) { want.on = false; return false; }
       const r = Number(t.radius); want.rad = Number.isFinite(r) && r > 0.05 && r < 60 ? r : spec.r; want.cx = p[0]; want.cz = p[2]; want.ang = 0; want.len = 0; want.fb = false;
     }
-    want.trees = spec.count && Array.isArray(t.trees) ? t.trees.slice(0, spec.count).map(vec2 => [Number(vec2?.x), Number(vec2?.z), Number(vec2?.height) || 6])
+    want.trees = (spec.count || spec.sites) && Array.isArray(t.trees) ? t.trees.slice(0, spec.count || 12).map(vec2 => [Number(vec2?.x), Number(vec2?.z), Number(vec2?.height) || 6])
       .filter(([x, z]) => Number.isFinite(x) && Number.isFinite(z) && Math.hypot(x - want.cx, z - want.cz) < 30).map(([x, z, h]) => [+(x - want.cx).toFixed(2), +(z - want.cz).toFixed(2), +h.toFixed(1)]) : [];
     want.treeKey = want.trees.join(';');
     const aim = p || b;
@@ -467,7 +498,7 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
   // Rebuild only when changed earth intersects this marker's footprint.
   function invalidateTerrain(dirty = null) {
     if (!want.on || disposed) return false;
-    const spec = SPELL_SHAPES[want.spell], r = spec.line ? spec.bank ?? spec.kr : want.rad * 1.25;
+    const spec = SPELL_SHAPES[want.spell], r = spec.line ? spec.band ?? spec.bank ?? spec.kr : want.rad * 1.25;
     const minX = (spec.line ? Math.min(want.ax,want.bx) : want.cx)-r, maxX = (spec.line ? Math.max(want.ax,want.bx) : want.cx)+r;
     const minZ = (spec.line ? Math.min(want.az,want.bz) : want.cz)-r, maxZ = (spec.line ? Math.max(want.az,want.bz) : want.cz)+r;
     if (dirty && !dirty.some(e => e.x+e.radius+.75>=minX && e.x-e.radius-.75<=maxX && e.z+e.radius+.75>=minZ && e.z-e.radius-.75<=maxZ)) return false;
@@ -478,7 +509,8 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
     B.np = 0; B.ni = 0; B.strands = 0; B.dropped = 0; B.cx = want.cx; B.cz = want.cz; B.ca = Math.cos(want.ang); B.sa = Math.sin(want.ang);
     surfOn = false; motesOn = false; mg.setDrawRange(0, 0);
     const spec = SPELL_SHAPES[want.spell];
-    if (spec.line) { KR = spec.kr; KH = spec.kh; KL = want.len; KIND = want.spell; const L = Math.max(KL, 0.5), plan = planEarthLine(KIND, [-L / 2, 0], [L / 2, 0]); SEGS = plan.segments; K = SEGS.map((g) => g.x); }
+    if (spec.line && spec.band) { KL = want.len; KIND = want.spell; }
+    else if (spec.line) { KR = spec.kr; KH = spec.kh; KL = want.len; KIND = want.spell; const L = Math.max(KL, 0.5), plan = planEarthLine(KIND, [-L / 2, 0], [L / 2, 0]); SEGS = plan.segments; K = SEGS.map((g) => g.x); }
     D[want.spell](want.rad, want.len, want.fb);
     lg.setDrawRange(0, B.ni); for (const k of ['position', 'tng', 'col', 'aux', 'fx']) { const at = lg.attributes[k]; at.clearUpdateRanges(); at.addUpdateRange(0, B.np * 2 * at.itemSize); at.needsUpdate = true; }
     lg.index.clearUpdateRanges(); lg.index.addUpdateRange(0, B.ni); lg.index.needsUpdate = true;

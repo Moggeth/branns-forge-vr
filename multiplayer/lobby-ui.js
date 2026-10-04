@@ -11,7 +11,7 @@ export const SCHEMES = Object.freeze(['desktop', 'touch', 'vr']);
 // regex fallbacks describe wrongly or vaguely. Returns null when unknown so
 // lobby.js's friendlyError() keeps its existing behaviour for everything else.
 const CODE_TEXT = Object.freeze({
-  room_full: 'That world already has eight players. Try again when someone leaves.',
+  room_full: 'That world has no free player slots. Choose another world or try again when someone leaves.',
   server_full: 'The forge is hosting as many worlds as it can right now. Wait a minute and try again.',
   room_not_found: 'We couldn’t find a world with that code. Check the digits with your friend.',
   invalid_role: 'That role isn’t available in this world. Pick Hero or God and try again.',

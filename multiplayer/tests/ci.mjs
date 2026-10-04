@@ -7,8 +7,11 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'ability-readiness','action-feedback','callouts','axe-cleave','axe-luminance','meadow-cover','ore-veins',
-  'timberline-manned','adventure','asset-dependencies','asset-pose','combat',
+  'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
+  'proximity-voice','voice-recovery','voice-topology','battle-model','checkpoint-delta','adventure-capacity','battle-renderer-contact',
+  'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
+  'ability-readiness','action-feedback','callouts','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
+  'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
@@ -29,7 +32,8 @@ const suite = [
   'throw-momentum-capacity','timber-continuity','timberline-integration','touch-input',
   'tree-growth','tree-integration','tree-land-timing','tree-materials','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-readiness','wood-audio',
-  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','pick-wall-motion',
+  'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','grove-growth','remains-physics',
+  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).
@@ -47,7 +51,7 @@ const failures = [];
 const started = performance.now();
 for (const name of names) {
   const t = performance.now();
-  const run = spawnSync(process.execPath, [`tests/${name}.mjs`], {encoding: 'utf8', timeout: 180_000});
+  const run = spawnSync(process.execPath, [`tests/${name}.mjs`], {cwd: new URL('../', import.meta.url), encoding: 'utf8', timeout: 180_000});
   const ok = run.status === 0;
   console.log(`${ok ? 'pass' : 'FAIL'} ${((performance.now() - t) / 1000).toFixed(1).padStart(5)}s ${name}`);
   if (!ok) {

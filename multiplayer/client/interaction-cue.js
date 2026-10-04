@@ -1,5 +1,5 @@
 import {isTestingGift,giftContents} from '../shared/testing-supplies.js';
-import {STRUCTURES, MACHINE_AMMO, inventionAvailable} from '../shared/inventions.js';
+import {STRUCTURES, MACHINE_AMMO, inventionAvailable, timberlineAmmo} from '../shared/inventions.js';
 import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
@@ -8,6 +8,8 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
+const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
+const titleCase = t => String(t).replace(/\b\w/g, ch => ch.toUpperCase());
 export const CUE_RULES = Object.freeze({
   strikeReach: 3.2,     // game.js contactRay far, simulation.js targetOK horizontal limit
   facingDot: .45,       // simulation.js targetOK / inReach
@@ -29,8 +31,8 @@ const KIND_WORD = {wood: 'timber', stone: 'stone', gems: 'gems'}; // adventure-v
 // Control names exactly as visible: compact HUD chips/drawer (index.html), mobile Attack button (mobile-ui.js),
 // objective banner Deliver (adventure-view.js SHORT), VR bindings (vr-input-policy.js, docs/VR-CONTROLS.md).
 export const CONTROLS = Object.freeze({
-  desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver', crank: 'Hold R'},
-  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver'},
+  desktop: {strike: 'Click', axe: '1', pick: '2', grab: 'F', stow: 'E', drop: 'G', throw: 'X', collect: 'E', deliver: 'Deliver', crank: 'Hold R', wind: 'hold R', scope: 'right-click'},
+  touch: {strike: 'Attack', axe: 'Axe', pick: 'Pick', grab: 'Actions › Grab', stow: 'Actions › Collect', drop: 'Drop', throw: 'Actions › Throw', collect: 'Collect', deliver: 'Deliver', wind: 'hold Wind', scope: 'Sight'},
   xr: {strike: 'Swing', axe: 'Left grip', pick: 'Left grip', grab: 'Right grip', stow: 'Left stick click', drop: 'Right grip', throw: 'Trigger', collect: 'Left stick click', deliver: 'Wrist panel'},
 });
 
@@ -89,7 +91,10 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     const wall=Math.min(aim.hit?.distance??Infinity,ctx.height?terrainDistance(aim.origin,aim.direction,ctx.height,CUE_RULES.probeRange):Infinity);
     return t<=wall+.05;
   }});
-  const pickupCue = c => isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||'');
+  // Ore and finished bars read as one rewarding stack: "Pick up 7 Iron Bars", "Pick up 4 Mithril Ore".
+  const stackCue = c => { const metal = METAL_BARS.has(c.kind), ore = /Ore$/.test(c.kind); if (!metal && !ore) return null; const n = c.amount | 0, label = titleCase(materialLabel(c.kind)), noun = metal ? `${label} Bar${n === 1 ? '' : 's'}` : label;
+    return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, materialInfo(c.kind)?.use || ''); };
+  const pickupCue = c => (c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Eat':'Collect',keys.collect,materialInfo(c.kind)?.use||''));
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
@@ -159,15 +164,20 @@ function structureCue(b, self, snapshot, keys, make) {
   if (!ammo) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect);
   // Desktop Timberlines are manned (game.js mountMachine); a loading one can be cranked by anyone beside it.
   const manned = b.type === 'timberline' && keys === CONTROLS.desktop;
-  if (manned && b.operator === self.id) return make('pickup', 'ready', b.id, def.name, 'Step off', keys.collect, 'Click fires · hold R winds faster');
+  const cost = Object.entries(ammo).map(([k, n]) => `${n} ${materialLabel(k)}`).join(' + ');
+  if (b.type === 'timberline') {
+    // Crafted bolts are spent first (inventions.js fire), then whole Wood + Iron loads the Hero can pay for.
+    const count = snapshot.inventions ? timberlineAmmo(snapshot, self) : {bolts: 0, raw: 0, total: 0};
+    const shots = count.total ? `${count.total} shot${count.total === 1 ? '' : 's'}${count.bolts ? ` · ${count.bolts} crafted bolt${count.bolts === 1 ? '' : 's'}` : ''}` : '';
+    if (manned && b.operator === self.id) return make('pickup', count.total ? 'ready' : 'short', b.id, def.name, 'Step off', keys.collect, count.total ? `${keys.strike} fires · ${keys.wind || 'hold R'} winds · ${keys.scope || 'right-click'} sights · ${shots}` : `Out of ammo · ${cost} per shot`);
+    if (manned && b.operator) return make('pickup', 'busy', b.id, def.name, 'Manned', '');
+    if (!count.total) return make('pickup', 'short', b.id, def.name, def.use, keys.collect, `Out of ammo · needs ${cost} per shot or crafted bolts`);
+    if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', keys.crank || '', keys.crank ? `Crank to wind it faster · ${shots}` : shots);
+    return make('pickup', 'ready', b.id, def.name, def.use, keys.collect, `${shots} · ${count.bolts ? 'bolts first, then ' : ''}${cost} each`);
+  }
   if (Number.isFinite(snapshot.tick) && snapshot.tick < b.readyTick) return make('pickup', 'busy', b.id, def.name, 'Reloading', keys.crank || '', keys.crank ? 'Crank to wind it faster' : '');
-  if (manned && b.operator) return make('pickup', 'busy', b.id, def.name, 'Manned', '');
-  // Crafted bolts on the side's rack are spent first (inventions.js fire), then raw materials.
-  const bolts = b.type === 'timberline' ? (snapshot.inventions?.bolts?.[b.side] | 0) : 0;
-  if (bolts > 0) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect, `${bolts} crafted bolt${bolts === 1 ? '' : 's'} ready`);
   // inventions.js pay: carried materials first, then the side's store when it is reachable.
   const have = snapshot.inventions?.stockpiles ? inventionAvailable(snapshot, self) : (self.resources || {});
-  const cost = Object.entries(ammo).map(([k, n]) => `${n} ${materialLabel(k)}`).join(' + ');
   if (Object.entries(ammo).every(([k, n]) => (have[k] | 0) >= n)) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect, `${cost} per shot`);
   return make('pickup', 'short', b.id, def.name, def.use, keys.collect,
     `Needs ${cost} per shot · you have ${Object.keys(ammo).map(k => `${have[k] | 0} ${materialLabel(k)}`).join(', ')}`);
@@ -175,6 +185,13 @@ function structureCue(b, self, snapshot, keys, make) {
 
 function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) {
   const id = hit.targetId, pt = hit.point, p = self.position;
+  const base=snapshot.battle?.status==='running'&&snapshot.battle.bases?.find(b=>b.id===id&&b.hp>0);
+  if(base){
+    const friendly=base.side===(self.side==='rivals'?'rivals':'party');
+    return make('structure',friendly?'friendly':'ready',id,`${base.side==='party'?'Dawn':'Dusk'} sanctuary`,friendly?'Defend this sanctuary':'Attack this sanctuary',friendly?'':keys.strike,`${Math.ceil(base.hp)} / ${base.maxHp} health`,{done:base.hp,total:base.maxHp});
+  }
+  const bot=snapshot.enemies?.find(e=>e.id===id&&e.battleRun!==undefined);
+  if(bot){const friendly=bot.side===(self.side==='rivals'?'rivals':'party');return make('enemy',friendly?'friendly':'ready',id,`${bot.side==='party'?'Dawn':'Dusk'} soldier`,friendly?'Ally — fights alongside you':'Enemy — attack',friendly?'':keys.strike);}
   const facing = Number.isFinite(yaw) ? [-Math.sin(yaw), -Math.cos(yaw)] : null;
   const reachable = (x, z, y) => {   // simulation.js targetOK, from the authoritative position
     const dx = x - p[0], dz = z - p[2], dist = Math.hypot(dx, dz);

@@ -36,6 +36,17 @@ try{
  await until(()=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').aimYaw>.05);
  const mid=await aimYaw();await until(m=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').aimYaw>m+.05,mid);
  const late=await aimYaw();record('heavy-swing','pass',{mid,late});await capture('timberline-manned-swung');
+ // Seated, no forecast arcs or centre mark; the plate counts shots from the shared ammo.
+ const seated=await page.evaluate(()=>window.brannHarness.controls().timberlineAim);
+ assert.ok(!seated.sight,'no arcs until sighting');assert.match(seated.ammoHud||'',/\d+ (shots )?from Wood\/Iron/);
+ record('ammo-plate-no-arcs-when-seated','pass',seated);
+ // Hold right mouse: the eye moves to the peep ring with a light zoom; the thin forecast arcs appear along the ladder.
+ await page.mouse.down({button:'right'});
+ await until(()=>{const a=window.brannHarness.controls().timberlineAim;return a?.scope>=1&&a.fov<50&&a.forecast?.points>10;});
+ const scoped=await page.evaluate(()=>window.brannHarness.controls().timberlineAim);await capture('timberline-manned-sight');
+ assert.ok(scoped.sight&&scoped.fov>40,'light zoom, arcs drawn while sighting');
+ await page.mouse.up({button:'right'});await until(()=>window.brannHarness.controls().timberlineAim?.scope===0);
+ record('right-mouse-ladder-sight','pass',scoped);
  await page.mouse.down();await page.mouse.up();
  await until(()=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').fireTick>1);
  const fired=await machine();record('click-fires-along-barrel','pass',{aimYaw:fired.aimYaw,aimPitch:fired.aimPitch});await capture('timberline-manned-fired');

@@ -29,6 +29,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run build:check
       - run: node tests/ci.mjs
+      - name: Patch notes entry for game changes
+        if: github.event_name == 'pull_request'
+        run: node tests/patch-notes-required.mjs
 
   stale-checks:
     # Known failures on main; visible here but not blocking.

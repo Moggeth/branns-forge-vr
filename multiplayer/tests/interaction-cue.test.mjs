@@ -187,11 +187,13 @@ test('Timberline cue when looked at within 5 m: ammo cost, shortfall, reload, re
   assert.equal(decideCue(view(),at(24.5),s(),null,ctx()),null);                 // not looking at it: no cue
   let c=decideCue(view(),at(24.5),s(),look(24.5),ctx());
   assert.deepEqual([c.target,c.name,c.action,c.control,c.state],['tl1','Timberline','Aim & fire','E','short']);
-  assert.equal(c.note,'Needs 2 Wood + 1 Iron per shot · you have 0 Wood, 0 Iron');
+  assert.equal(c.note,'Out of ammo · needs 2 Wood + 1 Iron per shot or crafted bolts');
   c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:3,iron:1}}),s(),look(24.5),ctx());
-  assert.deepEqual([c.state,c.note],['ready','2 Wood + 1 Iron per shot']);
+  assert.deepEqual([c.state,c.note],['ready','1 shot · 2 Wood + 1 Iron each']);
+  c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:5,iron:2}}),s({readyTick:300}),look(24.5),ctx());
+  assert.deepEqual([c.state,c.action,c.control,c.note],['busy','Reloading','Hold R','Crank to wind it faster · 2 shots']);
   c=decideCue(view(),at(24.5),s({readyTick:300}),look(24.5),ctx());
-  assert.deepEqual([c.state,c.action,c.control,c.note],['busy','Reloading','Hold R','Crank to wind it faster']);
+  assert.deepEqual([c.state,c.note],['short','Out of ammo · needs 2 Wood + 1 Iron per shot or crafted bolts'],'an empty machine says so instead of reloading')
   c=decideCue(view(),at(24.5),s({operator:'p1'}),look(24.5),ctx());
   assert.deepEqual([c.action,c.control],['Step off','E'],'the operator is told how to step off');
   c=decideCue(view(),at(24.5),s({operator:'p2'}),look(24.5),ctx());

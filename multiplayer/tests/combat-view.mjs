@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {segmentSurfaceContacts, snapshotDetachedPart, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
+import {segmentSurfaceContacts, snapshotDetachedPart, faceToward, maskMissingParts, createCombatView, capturePartPoses, updateGolemArmor} from '../client/combat-view.js';
 import {assetBasis, ASSET_POSES, prepareAsset, weaponTip, weaponForward, updateWeaponPresentation} from '../client/asset-pose.js';
 import {loadGlb} from './glb-node.mjs';
-import {dressSkeleton} from '../client/skeleton-look.js';
+import {dressSkeleton, setShieldBroken} from '../client/skeleton-look.js';
 
 const started = performance.now();
 const material = new THREE.MeshBasicMaterial({side: THREE.DoubleSide});
@@ -39,12 +39,48 @@ maskMissingParts(root, []); assert.equal(mesh.geometry, geometry);
 
 // Actual shipped animated skeleton: complete leg and material topology survive.
 const template = await loadGlb(new URL('../public/assets/skeleton.glb', import.meta.url));
+// Dismemberment allocates instance-owned masks. A shield can break (hide) after allocation;
+// both that shield and a completely hidden actor must release masks on teardown.
+for (const hideActor of [false, true]) {
+  const visual = prepareAsset(template, 'skeleton').visual; dressSkeleton(visual, 0);
+  const originals = new Map(), listeners = new Map(), masks = [], templateDisposals = [];
+  visual.traverse(m => { if (m.isMesh) originals.set(m, m.geometry); });
+  for (const geometry of new Set(originals.values())) {
+    const onDispose = () => templateDisposals.push(geometry);
+    geometry.addEventListener('dispose', onDispose);
+    listeners.set(geometry, onDispose);
+  }
+  maskMissingParts(visual, ['rightLeg']);
+  visual.traverse(m => {
+    if (!m.isMesh || m.geometry === originals.get(m)) return;
+    const record = {mesh: m, geometry: m.geometry, disposed: 0};
+    m.geometry.addEventListener('dispose', () => record.disposed++); masks.push(record);
+  });
+  assert.ok(masks.some(r => /^Shield_/.test(r.mesh.name)), 'fixture has allocated shield masks');
+  setShieldBroken(visual, true); if (hideActor) visual.visible = false;
+  maskMissingParts(visual, []); maskMissingParts(visual, []);
+  assert.ok(masks.every(r => r.disposed === 1), 'hidden mask buffers disposed exactly once');
+  assert.ok(masks.every(r => r.mesh.geometry === originals.get(r.mesh)), 'restores borrowed template geometry');
+  assert.equal(templateDisposals.length, 0, 'shared template geometries are never disposed by mask reset');
+  for (const [geometry, listener] of listeners) geometry.removeEventListener('dispose', listener);
+}
 const skeleton = prepareAsset(template, 'skeleton').visual; dressSkeleton(skeleton, 0);
 const actualLeg = snapshotDetachedPart(skeleton, 'leftLeg');
 const bounds = new THREE.Box3().setFromObject(actualLeg), size = bounds.getSize(new THREE.Vector3());
 assert.ok(size.y > .55, `actual detached leg includes foot; height=${size.y}`);
 assert.ok(actualLeg.children.some(n => n.isMesh && n.material), 'authored materials preserved');
 assert.ok(actualLeg.getObjectByName('LeftFoot'), 'actual lower limb attachment retained');
+// A severed skull knows where its face is, and a held skull turns that face to the viewer.
+{
+  skeleton.updateWorldMatrix(true, true);
+  const skull = snapshotDetachedPart(skeleton, 'head'), face = skull.userData.faceLocal;
+  assert.ok(face, 'skull remembers its face');
+  const worldFace = face.clone().applyQuaternion(skull.quaternion);
+  assert.ok(Math.abs(worldFace.z) > .9 && Math.abs(worldFace.y) < .35, 'the face looks out level along the authored facing axis');
+  const q = faceToward(new THREE.Quaternion(), face, new THREE.Vector3(.6, .1, .8).normalize(), new THREE.Vector3(0, 1, 0));
+  assert.ok(face.clone().applyQuaternion(q).dot(new THREE.Vector3(.6, .1, .8).normalize()) > .999, 'faceToward aims the face');
+  assert.ok(new THREE.Vector3(0, 1, 0).applyQuaternion(q).y > .9, 'and keeps the skull upright');
+}
 
 // Load native geometry without decoding raster textures in this Node test.
 async function geometryTemplate(name) {

@@ -3,6 +3,7 @@ import {earthLineEdits} from '../shared/earth-spells.js';
 import {earthLineSegments} from '../shared/terrain.js';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
+import {createTerrainGeometryUpdater} from '../client/terrain-geometry.js';
 import {spellUnavailable} from '../client/spell-availability.js';
 import {SPELLS,settleCastPoint} from '../shared/spells.js';
 import {expeditionRunning} from '../shared/adventure.js';
@@ -13,13 +14,14 @@ import {terrainHeight,terrainFrameKey,terrainDirtyEdits,createSunderRupture,foun
 import {lineKernels} from '../client/spell-targeting.js';
 import {ENT_SPELLS,entTargets} from '../shared/ents.js';
 import {worldTrees} from '../shared/world-content.js';
+import {GROWTH,growthPlan,waveLine} from '../shared/grove-growth.js';
 
 // Capacity previews use the same protected-reference predicate as authority
 // reclamation. Fixture-only references below test protection without pretending
 // to be independently loadable combat/worker records. The 80-deposit command
 // matrix separately verifies actual cast acceptance after reclamation.
 // If a game closure gains another dependency, expose it in its controlled env:
-// terrainRay/worldMatricesAt were required by the October 3 ground-cache update.
+// terrainRay/worldMatricesAt and the real terrainGeometry updater are dependencies of the ground-cache closure.
 const started=performance.now(),failures=[];let cases=0;
 const check=(label,fn)=>{cases++;try{fn();}catch(error){failures.push({label,error:error.message});}};
 function fixture(){const sim=createSimulation();sim.addPlayer({id:'g',role:'god'});const world=sim.adventureWorld();world.tick=100;world.players[0].castTick=0;return {sim,world,player:world.players[0]};}
@@ -53,7 +55,7 @@ for(const stage of ['idle','camp','star','rekindle','victory'])for(const id of [
 // This tests the integration code itself rather than copying its endpoint or dirty-region algorithm.
 const game=readFileSync(new URL('../client/game.js',import.meta.url),'utf8');
 function closure(name,until,env){const start=game.indexOf('function '+name+'('),end=game.indexOf(until,start);assert.ok(start>=0&&end>start,name+' source boundary');return new Function('env','with(env){return '+game.slice(start,end).trim()+';}')(env);}
-function previewFixture(id,point,castStart=null){const f=fixture();const env={THREE,active:true,role:'god',cursor:{visible:true},snapshot:f.world,playerId:'g',spell:id,hitPoint:new THREE.Vector3(...point),castStart:castStart?new THREE.Vector3(...castStart):null,spellUnavailable,isLineSpell:()=>['sunder','wall'].includes(id),earthLineEdits};Object.assign(env,{ENT_SPELLS,entPreviewTrees:p=>entTargets(worldTrees(f.world),f.world.harvestedTrees,id,p),settleCastPoint,expeditionRunning,heightAt:(x,z,edits)=>terrainHeight({...f.world,edits},x,z)});env.settledPoint=closure('settledPoint','function fitLine',env);env.fitLine=closure('fitLine','function targetPreview',env);return {...f,env,preview:closure('targetPreview','function cancelCast',env)};}
+function previewFixture(id,point,castStart=null){const f=fixture();const env={THREE,active:true,role:'god',cursor:{visible:true},snapshot:f.world,playerId:'g',spell:id,hitPoint:new THREE.Vector3(...point),castStart:castStart?new THREE.Vector3(...castStart):null,spellUnavailable,isLineSpell:()=>['sunder','wall','wave'].includes(id),earthLineEdits,GROWTH_SPELLS:['grove','ring','wave'],GROWTH,waveLine,growthPreview:(p,a,b)=>growthPlan(f.world,id,p,{start:a,end:b})};Object.assign(env,{ENT_SPELLS,entPreviewTrees:p=>entTargets(worldTrees(f.world),f.world.harvestedTrees,id,p),settleCastPoint,expeditionRunning,heightAt:(x,z,edits)=>terrainHeight({...f.world,edits},x,z)});env.settledPoint=closure('settledPoint','function fitLine',env);env.waveTap=closure('waveTap','function fitLine',env);env.fitLine=closure('fitLine','function targetPreview',env);return {...f,env,preview:closure('targetPreview','function cancelCast',env)};}
 // Lines are never refused: under 0.5 m becomes the default 6 m line, over 18 m is shortened.
 for(const id of ['sunder','wall'])for(const n of [.499,.5,2.5,2.501,17.999,18,18.001,30])check(id+'/explicit-length/'+n,()=>{const f=previewFixture(id,[n,30,16],[0,-30,16]),p=f.preview(),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point:p.point,...(p.fallback?{}:{start:p.start,end:p.end})});assert.equal(p.valid,true);assert.equal(p.valid,result.ok,result.code);if(result.ok){assert.equal(f.world.edits.length,earthLineSegments(n<.5?6:Math.min(n,17.99)));assert.equal(p.fallback,n<.5);assert.equal(lineKernels(p.start[0],p.start[2],p.end[0],p.end[2],p.fallback).length,f.world.edits.length);}});
 for(const id of ['sunder','wall'])for(const point of [[16,0,16],[55,0,55],[0,0,0],[.0001,0,0]])check(id+'/fallback/'+point,()=>{const f=previewFixture(id,point);f.player.position=[0,0,0];f.player.yaw=.7;const p=f.preview(),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point});assert.equal(p.valid,result.ok);assert.equal(p.fallback,true);assert.equal(f.world.edits.length,earthLineSegments(6));const event=result.events.find(e=>e.kind==='spell');for(const k of ['start','end'])for(const axis of [0,2])assert.ok(Math.abs(p[k][axis]-event[k][axis])<1e-12,`${k} XZ preview must match authority`);assert.equal(lineKernels(p.start[0],p.start[2],p.end[0],p.end[2],p.fallback).length,earthLineSegments(6));});
@@ -62,11 +64,15 @@ check('outside quick-cast start is invalid',()=>{const f=previewFixture('sunder'
 // Ent spells: the preview rings exactly the trees the authority wakes, and is invalid exactly when the cast is refused.
 for(const id of ['awaken','wildwake'])for(const point of [[1.8,0,6.5],[0,0,9],[3,0,3],[40,0,-40],[-30,0,30],[16,0,16]])check(id+'/ent-parity/'+point,()=>{const f=previewFixture(id,point),p=f.preview(),want=entTargets(worldTrees(f.world),f.world.harvestedTrees,id,point),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point:p.point});
  assert.equal(p.valid,result.ok,JSON.stringify(result));assert.deepEqual(p.trees.map(t=>t.id),want.map(t=>t.id));if(result.ok)assert.deepEqual(f.sim.snapshot().enemies.filter(e=>e.kind==='ent').map(e=>e.treeId).sort(),want.map(t=>t.id).sort());});
+// Growth spells: the preview saplings are exactly the trees the authority plants, taps and drags alike.
+for(const id of ['grove','ring','wave'])for(const [point,from] of [[[16,0,16]],[[-30,0,30]],[[0,0,9]],[[53,0,-53]],[[20,0,-20],[5,0,-20]],[[12,0,16],[10,0,16]]])check(id+'/growth-parity/'+point+'/'+from,()=>{
+ const f=previewFixture(id,point,id==='wave'?from:null);f.player.position=[0,0,0];const p=f.preview(),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point:p.point,...(id==='wave'?{start:p.start,end:p.end}:{})});
+ assert.equal(p.valid,result.ok,JSON.stringify(result));if(result.ok)assert.deepEqual(f.world.groves.at(-1).trees.map(t=>[t[0],t[1]]),p.trees.map(t=>[t.x,t.z]));});
 for(const flag of ['active','role','cursor'])check('hidden-preview/'+flag,()=>{const f=previewFixture('raise',[10,0,10]);if(flag==='active')f.env.active=false;if(flag==='role')f.env.role='hero';if(flag==='cursor')f.env.cursor.visible=false;assert.equal(f.preview(),null);});
 
 check('initial empty-edits actual ground rebuild plus progressive collision parity',()=>{
  const segments=game.match(/const groundGeometry = new THREE.PlaneGeometry\(([^)]+)\)/)[1].split(',').map(Number),groundGeometry=new THREE.PlaneGeometry(...segments);groundGeometry.rotateX(-Math.PI/2);
- const initial=game.match(/let terrainSignature = ([^,;]+)/)[1],env={THREE,snapshot:{edits:[],tick:0},terrainSignature:new Function('return '+initial)(),terrainPreviousEdits:[],terrainPreviousTick:Infinity,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,terrainFoundationKey:'',frameMetrics:{record(){}},groundGeometry,fireVisual:{invalidateTerrain(){}},terrainRay:{invalidateTerrain(){}},worldMatricesAt:0,mountainArena:{sync(){}},alpineForest:{sync(){}},meadow:{terrainChanged(){}},orchard:{groundChanged(){}},heightAt:(x,z,edits)=>terrainHeight({edits,tick:env.snapshot.tick},x,z,false)};
+ const initial=game.match(/let terrainSignature = ([^,;]+)/)[1],env={THREE,snapshot:{edits:[],tick:0},terrainSignature:new Function('return '+initial)(),terrainPreviousEdits:[],terrainPreviousTick:Infinity,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,terrainFoundationKey:'',frameMetrics:{record(){}},groundGeometry,terrainGeometry:createTerrainGeometryUpdater(groundGeometry),fireVisual:{invalidateTerrain(){}},terrainRay:{invalidateTerrain(){}},worldMatricesAt:0,mountainArena:{sync(){}},alpineForest:{sync(){}},meadow:{terrainChanged(){}},orchard:{groundChanged(){}},heightAt:(x,z,edits)=>terrainHeight({edits,tick:env.snapshot.tick},x,z,false)};
  const rebuild=closure('rebuildGround','// Stone/canopy',env),mesh=new THREE.Mesh(groundGeometry,new THREE.MeshBasicMaterial()),ray=new THREE.Raycaster();mesh.updateMatrixWorld(true);rebuild();assert.equal(env.terrainSignature,'|',"empty edits plus no foundations");assert.equal(env.worldMatricesAt,-1);
  const phases=[{edits:[],tick:0},...Array.from({length:4},(_,i)=>({tick:i*24,edits:[{id:'s',kind:'sunder',x:16,z:16,radius:2.5,height:-1.5,rupture:createSunderRupture('s',[10,0,16],[22,0,16],0)}]}))];
  for(const state of phases){env.snapshot=state;rebuild();for(const [x,z] of [[10.1,4.2],[-30.6,30.2],[48.2,-47.7],[54.1,20.8],[15.7,16.1]]){ray.set(new THREE.Vector3(x,100,z),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(mesh)[0];assert.ok(hit);assert.ok(Math.abs(hit.point.y-terrainHeight(state,x,z,false))<1e-6,`ground parity ${x},${z} tick${state.tick}`);}}

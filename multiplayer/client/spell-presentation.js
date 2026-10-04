@@ -437,7 +437,7 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     bloom_level(ev, c) { ev.dur = 3.2; let acc = 0; for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(i % 2 ? PAL.leaf : PAL.teal, PAL.mint, 0, 1), 0.5, 9 + i * 3, i * 0.35, i * 0.35 + 1.6, 0.45);
       ev.fx.push((age, dt) => { if (age > 2.6) return; acc += dt * 40 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 7, c.R() < 0.4 ? PAL.leaf : c.R() < 0.5 ? PAL.mint : PAL.teal, 0.24, 2.6); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
-    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; summon(ev, c, c.x + Math.cos(a) * 1.7, c.z + Math.sin(a) * 1.7, 0.75, i * 0.25); } pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
+    squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 4; i++) summon(ev, c, c.x + (i % 2 ? 1 : -1) * 1.4, c.z + (i < 2 ? -1 : 1) * 1.4, 0.75, i * 0.2); /* the four graves shared/simulation.js digs */ pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
     // The former six-box stand-in duplicated that actor and obscured its pieces.
     golem(ev) { ev.dur = .01; },
@@ -522,6 +522,21 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
       decal(ev, c, soilM(), 0.05, 0.9, 0.55, 0, 0.3, 3.6);
       groveRoots(ev, c, qk(7, 4), r, 0.05, 0.95); leafSwirl(ev, c, 0.4, r * 0.7, 1.4, 2.6, 12, 0.6);
       for (let i = 0; i < qn(10); i++) { const a = c.R() * TAU; dustDir(c, c.x + Math.cos(a) * 0.5, c.z + Math.sin(a) * 0.5, Math.cos(a), Math.sin(a), 1.4, 0.75, PAL.clay, 0.25, 1.4, 0.3, 0.4); }
+    },
+    // GROWTH WAVE: a green front rolls along the band; each site it passes bursts with soil and leaves as its tree rises.
+    wave(ev, c) {
+      const sites = (c.sites || []).slice(0, 12), last = sites.reduce((m, s) => Math.max(m, s[2] || 0), 0) / 60;
+      ev.dur = last + 2.6; const L = c.len, ux = Math.cos(c.ang), uz = Math.sin(c.ang), half = 3.2, front = [0, 1].map((i) => mk(ev, 24, i ? ribMat(PAL.leaf, PAL.gold, 0, 1) : greenM()));
+      decal(ev, c, ribMat(PAL.moss, 0x3d6b2a, 0, 0.4, false), 0.2, Math.max(2, L * 0.5), 0.16, 0.1, last + 0.8, ev.dur);
+      for (const [x, z, d] of sites) { const t0 = (d || 0) / 60; pulse(ev, c, greenM(), 0.2, 2.2, t0, t0 + 0.9, 0.28, x, z); decal(ev, c, soilM(), 0.05, 0.8, 0.5, t0, t0 + 0.3, t0 + 2.4, x, z); }
+      const fired = new Set();
+      ev.fx.push((age) => {
+        const k = clamp(age / Math.max(0.3, last + 0.3)), fade = 1 - sstep(last + 0.6, last + 1.4, age), px = c.ax + ux * L * k, pz = c.az + uz * L * k;
+        front.forEach((rb, i) => { const w = half * (1 - i * 0.15); gLine(rb, px - uz * w, pz + ux * w, px + uz * w, pz - ux * w, 0.12 + i * 0.05); rb.commit(0.32 - i * 0.12, 1, fade * 0.85); });
+        for (const [j, [x, z, d]] of sites.entries()) if (!fired.has(j) && age >= (d || 0) / 60) { fired.add(j);
+          for (let i = 0; i < qn(4); i++) { const a = c.R() * TAU; dustDir(c, x + Math.cos(a) * 0.4, z + Math.sin(a) * 0.4, Math.cos(a), Math.sin(a), 1.3, 0.7, PAL.clay, 0.28, 1.3, 0.3, 0.4); }
+          for (let i = 0; i < qn(8); i++) motes(c, x, z, 1.2, c.R() < 0.5 ? PAL.leaf : PAL.mint, 0.2, 2.2); }
+      });
     },
     // TREE RING: standing stones heave up one after another around the circle; roots knit each stone to the next.
     ring(ev, c) {
@@ -614,6 +629,16 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
         acc += dt * (age < 2.2 ? 22 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.5, c.R() < 0.5 ? PAL.gold : PAL.mint, 0.22, 1.8); }
       });
     },
+    // Rainfall: three water ribbons spiral up into the sky to seed the clouds while wide ripples run out over the land.
+    rainfall(ev, c) {
+      ev.dur = 3.6; const hs = [0, 1, 2].map((i) => ({ rb: mk(ev, 44, i % 2 ? ribMat(PAL.ice, PAL.resonanceHi, 0, 1.4) : ribMat(PAL.resonanceHi, PAL.teal, 0, 1.2), null), o: (i * TAU) / 3 })); let acc = 0;
+      for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(PAL.resonanceHi, PAL.ice, 0, 1), 0.5, 10 + i * 5, 0.3 + i * 0.4, 2.2 + i * 0.4, 0.35);
+      ev.fx.push((age, dt) => {
+        const rv = easeOut(age / 1.6), fade = 1 - sstep(2.6, 3.6, age), gy = H(c.x, c.z);
+        for (const h of hs) { for (let i = 0; i < 44; i++) { const u = i / 43, a = u * TAU * 2 + h.o + age * 2 * MO.swirl, r = 0.8 + 2.2 * u * u; h.rb.set(i, c.x + Math.cos(a) * r, gy + 0.2 + u * 14 * rv, c.z + Math.sin(a) * r); } h.rb.commit(0.28, rv, fade); }
+        acc += dt * (age < 2.6 ? 26 * Q.n : 0); while (acc >= 1) { acc--; motes(c, c.x, c.z, 3, c.R() < 0.5 ? PAL.resonanceHi : PAL.ice, 0.22, 4); }
+      });
+    },
     lightning(ev, c) {
       ev.dur = 1.9; const { x, z, y, R } = c, top = c.hasLine ? [c.ax, c.ay, c.az] : [x + (R() - 0.5) * 5, y + 30, z + (R() - 0.5) * 5], bot = c.hasLine ? [c.bx, c.by, c.bz] : [x, y, z], N = 26;
       const m0 = ribMat(0xffffff, PAL.bolt, 0, 0), m1 = ribMat(PAL.purple, 0x6fb7ff, 0, 3), sides = [[1, 0], [0, 1]];
@@ -683,13 +708,13 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
   };
 
   // ---------- public play / sync ----------
-  const LINE = { sunder: 1, wall: 1 };
-  function play({ spell, position, start, end, id, tick, phase, radius, flight, rupture } = {}) {
+  const LINE = { sunder: 1, wall: 1, wave: 1 };
+  function play({ spell, position, start, end, id, tick, phase, radius, flight, rupture, sites } = {}) {
     const fn = FX[spell]; if (!fn || disposed) return false;
     const p = vec(position), a = vec(start), b = vec(end), ctr = p || (a && b ? [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2] : b || a || [0, 0, 0]);
     const key = spell === 'starfall' && id != null ? `sf:${id}` : `${spell}:${id ?? `${tick}:${ctr[0].toFixed(2)}:${ctr[2].toFixed(2)}`}`;
     if (spell === 'starfall' && phase === 'impact' && (events.has(key) || recent.has(key))) return false;
-    const c = { x: ctr[0], z: ctr[2], y: H(ctr[0], ctr[2]), R: mulberry(hashStr(key)), radius, flight: clamp(flight ?? LAUNCH, 0.15, LAUNCH), hasLine: !!(a && b), tick,rupture };
+    const c = { x: ctr[0], z: ctr[2], y: H(ctr[0], ctr[2]), R: mulberry(hashStr(key)), radius, flight: clamp(flight ?? LAUNCH, 0.15, LAUNCH), hasLine: !!(a && b), tick,rupture, sites: Array.isArray(sites) ? sites : null };
     if (c.hasLine) Object.assign(c, { ax: a[0], ay: a[1], az: a[2], bx: b[0], by: b[1], bz: b[2] });
     else if (LINE[spell]) { const q = 3; Object.assign(c, { ax: c.x - q, az: c.z, bx: c.x + q, bz: c.z }); }
     else Object.assign(c, { ax: c.x, ay: c.y, az: c.z, bx: c.x, by: c.y, bz: c.z });
