@@ -1,3 +1,4 @@
+import {snackAction,isFruitDrop} from './fruit.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
@@ -66,6 +67,7 @@ export function collectTarget(state,p,m,ctx){
   if(!collectibleCandidate(state,p,log.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
   return collectLog(state,p,log);
  }
+ if(isFruitDrop(state,m.targetId))return snackAction(state,p,{op:'take',id:m.targetId}); // take it, or bite the one in hand
  if(state.detachedParts.some(d=>d.id===m.targetId)){
   if(state.looseLogs.some(l=>l.heldBy===p.id))return fail('hands_full');
   return ctx.combatAction(state,p,{action:'grab',id:m.targetId},ctx.combatContext);

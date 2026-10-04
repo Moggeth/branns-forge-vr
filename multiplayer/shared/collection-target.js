@@ -1,6 +1,7 @@
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,materialLabel} from './material-catalog.js';
 import {capsuleDistance, TREE_LIMITS} from './trees.js';
+import {fruitCandidate} from './fruit.js';
 
 export const COLLECTION_REACH = TREE_LIMITS.reach;
 export const INVENTORY_CAP = 999;
@@ -10,6 +11,7 @@ export const collectionEye = p => [p.position[0],p.position[1]+1.1,p.position[2]
 /** Read-only shared target contract. ctx.height(x,z) follows current terrain; visible(from,to,id) may further restrict client presentation. */
 export function collectibleCandidate(state,p,id,ctx={}) {
  if(p?.role!=='hero'||!p.position||p.hp<=0)return null;
+ if(state.fruit?.drops?.some(d=>d.id===id))return fruitCandidate(state,p,id,ctx); // apple on a stick (shared/fruit.js)
  const log=(state.looseLogs||[]).find(l=>l.id===id);
  const q=log||(state.pickups||[]).find(q=>q.id===id);
  if(!q||q.side&&q.side!==(p.side||'party'))return null;
@@ -41,7 +43,8 @@ function candidateFor(p,q,log,ctx,state) {
 export function nearestCollectible(state,p,ctx={}) {
  const held=(state.looseLogs||[]).find(l=>l.heldBy===p?.id);
  if(held)return collectibleCandidate(state,p,held.id,ctx);
- let best=null;
+ let best=fruitCandidate(state,p,null,ctx); // the held snack first, else the nearest apple drop
+ if(best?.held)return best;
  for(const q of [...(state.pickups||[]),...(state.looseLogs||[])]){
   const c=candidateFor(p,q,Array.isArray(q.position),ctx,state);if(!c||c.full||c.unnecessary)continue;
   if(!best||c.distance<best.distance||c.distance===best.distance&&c.id<best.id)best=c;

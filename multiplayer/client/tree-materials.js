@@ -8,7 +8,26 @@ import * as T from 'three';
 export const TREE_ROLE_OF_PART = {Trunk: 'bark', Roots: 'roots', Branches: 'branch', Leaves: 'leaf', Fruit: 'fruit'};
 // sway: 0 static (trunk/roots stay exact for axe raycasts and notch carving), 1 crown sway, 2 sway + leaf flutter
 const ROLES = {bark: {sway: 0, bark: 1}, roots: {sway: 0, bark: 1}, branch: {sway: 1, bark: 1}, leaf: {sway: 2, leaf: 1}, fruit: {sway: 1}};
-const VERSION = 'tree-mat-v3';
+const VERSION = 'tree-mat-v4';
+// Shot apples (client/tree-fruit-mask.js): one RGBA8 texel per instanced apple tree, one bit per apple slot.
+export const FRUIT_MASK = {texture: {value: null}, enabled: {value: 0}};
+const VERT_FRUIT_HEAD = /* glsl */`
+#ifdef TREE_FRUIT
+attribute float appleSlot; uniform sampler2D uFruitMask; uniform float uFruitMaskOn;
+#endif
+`;
+const VERT_FRUIT_HIDE = /* glsl */`
+#if defined(TREE_FRUIT) && defined(USE_INSTANCING)
+ if (uFruitMaskOn > .5 && appleSlot > .5) {
+  ivec2 sz = textureSize(uFruitMask, 0); int id = gl_InstanceID;
+  if (id < sz.x * sz.y) {
+   vec4 m = texelFetch(uFruitMask, ivec2(id % sz.x, id / sz.x), 0); int s = int(appleSlot + .5) - 1, k = s / 8;
+   float ch = k == 0 ? m.r : k == 1 ? m.g : k == 2 ? m.b : m.a;
+   if (((int(ch * 255.0 + .5) >> (s - k * 8)) & 1) == 1) transformed = vec3(0.0); // a shot apple collapses to nothing
+  }
+ }
+#endif
+`;
 
 const COMMON = /* glsl */`
 uniform float uTreeTime; uniform vec3 uTreeWind; uniform float uTreeWindStrength;
@@ -110,8 +129,8 @@ function patchSurface(m, role, cfg) {
  m.onBeforeCompile = shader => {
   Object.assign(shader.uniforms, cfg.uniforms);
   shader.vertexShader = shader.vertexShader
-   .replace('#include <common>', `#include <common>\n${COMMON}\nvarying vec3 vTreeObj; varying vec3 vTreeSeed; varying float vTreeH; varying float vTreeUp;`)
-   .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_FRAME}\n vTreeObj = position; vTreeSeed = treeO; vTreeH = treeH; vTreeUp = normalize(mat3(treeM)*(objectNormal/treeS2)).y;\n${VERT_SWAY}`);
+   .replace('#include <common>', `#include <common>\n${COMMON}\n${VERT_FRUIT_HEAD}\nvarying vec3 vTreeObj; varying vec3 vTreeSeed; varying float vTreeH; varying float vTreeUp;`)
+   .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_FRUIT_HIDE}\n${VERT_FRAME}\n vTreeObj = position; vTreeSeed = treeO; vTreeH = treeH; vTreeUp = normalize(mat3(treeM)*(objectNormal/treeS2)).y;\n${VERT_SWAY}`);
   shader.fragmentShader = shader.fragmentShader
    .replace('#include <common>', `#include <common>\n${COMMON}\nvarying vec3 vTreeObj; varying vec3 vTreeSeed; varying float vTreeH; varying float vTreeUp;`)
    .replace('#include <color_fragment>', `#include <color_fragment>\n${FRAG_COLOR}`)
@@ -123,7 +142,7 @@ function patchSurface(m, role, cfg) {
 }
 function patchDepth(m, role, cfg) {
  m.onBeforeCompile = shader => { Object.assign(shader.uniforms, cfg.uniforms);
-  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${COMMON}`).replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_FRAME}\n${VERT_SWAY}`); };
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${COMMON}\n${VERT_FRUIT_HEAD}`).replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_FRUIT_HIDE}\n${VERT_FRAME}\n${VERT_SWAY}`); };
  m.customProgramCacheKey = () => `${VERSION}:depth:${role}`;
 }
 
@@ -131,7 +150,7 @@ function patchDepth(m, role, cfg) {
  *  {material(base, role), attach(kit), decorate(mesh), update(seconds), setWind(strength, dir), stats(), dispose()}.
  *  attach() rewrites the kit's part materials (and kit.lod / kit.trunkMaterial) in place to shared patched clones. */
 export function createTreeMaterials({windStrength = 1, maxSway = .05, leafSway = .07, bump = .9, windDirection = [1, 0, .35]} = {}) {
- const uniforms = {uTreeTime: {value: 0}, uTreeWind: {value: new T.Vector3(...windDirection).normalize()}, uTreeWindStrength: {value: windStrength}};
+ const uniforms = {uTreeTime: {value: 0}, uTreeWind: {value: new T.Vector3(...windDirection).normalize()}, uTreeWindStrength: {value: windStrength}, uFruitMask: FRUIT_MASK.texture, uFruitMaskOn: FRUIT_MASK.enabled};
  const cfg = {uniforms}, cache = new Map(), owned = new Set(); let unpatched = 0;
  function defines(role) { const r = ROLES[role] || ROLES.bark, d = {TREE_SWAY: r.sway, TREE_MAX_SWAY: (r.sway > 1 ? leafSway : maxSway).toFixed(4), TREE_BUMP: (role === 'leaf' ? bump*.35 : role === 'roots' ? bump*.02 : bump*.05).toFixed(4), TREE_TRANSLUCENCY: '.85'}; // curved roots alias with full bump
   if (r.bark) d.TREE_BARK = ''; if (r.leaf) d.TREE_LEAF = ''; if (role === 'fruit') d.TREE_FRUIT = ''; return d; }
@@ -148,7 +167,7 @@ export function createTreeMaterials({windStrength = 1, maxSway = .05, leafSway =
    const cutout = {map: m.alphaTest > 0 ? m.map : null, alphaMap: m.alphaMap, alphaTest: m.alphaTest, side: m.side};
    const depth = new T.MeshDepthMaterial({depthPacking: T.RGBADepthPacking, ...cutout});
    const distance = new T.MeshDistanceMaterial(cutout);
-   for (const d of [depth, distance]) { d.defines = {TREE_SWAY: defines(role).TREE_SWAY, TREE_MAX_SWAY: defines(role).TREE_MAX_SWAY}; patchDepth(d, role, cfg); owned.add(d); }
+   for (const d of [depth, distance]) { d.defines = {TREE_SWAY: defines(role).TREE_SWAY, TREE_MAX_SWAY: defines(role).TREE_MAX_SWAY, ...(role === 'fruit' ? {TREE_FRUIT: ''} : {})}; patchDepth(d, role, cfg); owned.add(d); }
    m.userData.treeDepth = depth; m.userData.treeDistance = distance;
   }
   cache.set(key, m); return m;
