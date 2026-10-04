@@ -15,7 +15,7 @@ const fixture = (() => { const sim = createSimulation({room: 'SOLO'}), w = sim.a
  return Buffer.from(JSON.stringify(makeSave(sim.checkpoint()))); })();
 const CLIP = process.env.CLIP_DIR || '', TOUCH = !!process.env.TOUCH;
 const viewport = TOUCH ? {width: 844, height: 390} : {width: 640, height: 360};
-const {browser, page} = await launch({viewport, touch: TOUCH});
+const {browser, page} = await launch({viewport, touch: TOUCH, pointerLock: true});
 // Virtual clock: performance.now and requestAnimationFrame only move when the test advances a frame.
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];

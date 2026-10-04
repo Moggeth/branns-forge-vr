@@ -19,7 +19,11 @@ export function record(id, status, detail = {}) { const r = {...detail, id, stat
 export function save(name) { writeFileSync(join(here, `${name}-results.json`), JSON.stringify({harness: name, monotonicMs: ms(), results}, null, 2)); }
 export const sleep = t => new Promise(r => setTimeout(r, t));
 
-export async function launch({viewport = {width: 1280, height: 720}, headless = process.env.HEADED ? false : true, touch = false} = {}) {
+export async function launch({viewport = {width: 1280, height: 720}, headless = process.env.HEADED ? false : true, touch = false, pointerLock = false} = {}) {
+  // Headless Chromium can still confine the Windows desktop cursor. Capture tests
+  // belong on an isolated runner unless the local user explicitly opts in.
+  const nativePointerLock = process.platform !== 'win32' || process.env.BROWSER_QA_POINTER_LOCK === '1';
+  if (pointerLock && !nativePointerLock) throw Error('Pointer-lock acceptance is disabled on this Windows desktop. Use an isolated runner, or explicitly opt in with BROWSER_QA_POINTER_LOCK=1 when the desktop is not in use.');
   if (CHROME && !existsSync(CHROME)) throw Error(`Chromium not found at ${CHROME}`);
   // Desktop acceptance must not probe OpenXR and wake a connected headset runtime.
   // Physical XR acceptance is a separate, deliberate opt-in.
@@ -27,6 +31,11 @@ export async function launch({viewport = {width: 1280, height: 720}, headless = 
   const browser = await chromium.launch({...(CHROME?{executablePath:CHROME}:{}), headless, args: ['--enable-unsafe-swiftshader', ...(!xr ? ['--disable-features=WebXR'] : [])]});
   const context = await browser.newContext({viewport, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1});
   if (!xr) await context.addInitScript(() => Object.defineProperty(navigator, 'xr', {value: undefined, configurable: true}));
+  if (!nativePointerLock) await context.addInitScript(() => {
+    Element.prototype.requestPointerLock = function () {
+      return Promise.reject(new DOMException('Desktop QA pointer capture is disabled; use an isolated runner.', 'NotAllowedError'));
+    };
+  });
   const page = await context.newPage();
   const log = join(here, 'logs', 'browser-console.log'); mkdirSync(dirname(log), {recursive: true});
   page.errors = []; page.missing = [];

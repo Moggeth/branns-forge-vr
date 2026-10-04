@@ -79,6 +79,13 @@ runtime. Headless mode alone does not prevent that. The shared browser launcher
 now disables XR and hides `navigator.xr` in ordinary acceptance contexts. SteamVR
 was closed and stayed closed during subsequent desktop acceptance.
 
+The user also reported cursor confinement during capture acceptance. No test
+browser remained running after the completed tests, and the owned port-5198 Vite
+server was stopped. Native pointer lock is now blocked by default in the shared
+Windows QA launcher. Capture-dependent apple tests fail before opening Chromium
+unless explicitly opted in; prefer an isolated runner for those tests. This
+prevents a repeat rather than relying only on closing the browser afterward.
+
 Conflict editing lesson: never use a DOTALL `.*` to delimit conflict-marker
 headers; it can consume multiple blocks. Restrict headers to `[^\n]*`, inspect
 diff sizes and run syntax checks before a full suite. Restore only owned

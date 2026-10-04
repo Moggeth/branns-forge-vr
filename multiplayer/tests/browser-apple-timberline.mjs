@@ -19,7 +19,7 @@ s.inventions.structures.push({id: 'apple-line', type: 'timberline', position: [p
 const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 
 const CLIP = process.env.CLIP_DIR || '';
-const {browser, page} = await launch({viewport: {width: 640, height: 360}});
+const {browser, page} = await launch({viewport: {width: 640, height: 360}, pointerLock: true});
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
  performance.now = () => on ? vt : real();

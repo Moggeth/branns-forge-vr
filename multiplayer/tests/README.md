@@ -8,6 +8,13 @@ the test started when finished. Do not leave test browser windows or headsets
 running. Set `PW_CORE`, `PW_CHROME` and `ACCEPT_BASE` to the existing local runtime
 and disposable review server; capture evidence under ignored `logs/`.
 
+On Windows, native pointer capture is also blocked by default: even headless
+Chromium can trap the user's desktop cursor. Tests requiring capture must declare
+`launch({pointerLock: true})`; the launcher refuses before opening Chromium unless
+`BROWSER_QA_POINTER_LOCK=1` was explicitly set. Prefer running these tests on an
+isolated machine. Do not opt in while the user is working at this desktop. Other
+tests using the shared launcher cannot silently acquire native pointer lock.
+
 Run against an owned disposable proof server, never the native forge/voice service:
 
 ```powershell
