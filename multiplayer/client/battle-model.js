@@ -9,7 +9,7 @@ export const BATTLE_LABELS=Object.freeze({party:'Dawn',rivals:'Dusk'});
 const sideOf=p=>p?.side==='rivals'?'rivals':'party';
 const nonnegative=(value,fallback=0)=>Number.isFinite(value)?Math.max(0,value):fallback;
 
-export function battlePanelModel(snapshot,playerId,{isHost=false,connected=false}={}) {
+export function battlePanelModel(snapshot,playerId,{isHost=false,connected=false,battleCompatible=true}={}) {
   const player=snapshot?.players?.find(p=>p.id===playerId),selfSide=sideOf(player),battle=snapshot?.battle;
   const status=['running','victory'].includes(battle?.status)?battle.status:'off';
   // Mirror inventionSide exactly: any carried material, lifted ore, or job
@@ -25,7 +25,7 @@ export function battlePanelModel(snapshot,playerId,{isHost=false,connected=false
     const maxHp=nonnegative(base.maxHp,BATTLE.baseHp);
     return [{side,hp:Math.min(nonnegative(base.hp),maxHp),maxHp}];
   });
-  return {status,isHost:!!isHost,connected:!!connected,selfSide,
+  return {status,isHost:!!isHost,connected:!!connected,battleCompatible,selfSide,
     canChangeSide:!!connected&&!!player&&!carries&&!refining,
     expeditionActive:expeditionRunning(snapshot?.adventure),
     wave:status==='off'?0:nonnegative(battle.wave),
