@@ -71,7 +71,8 @@ for(const sample of samples){
   for(let i=0;i<2;i++){
     const [outer,inner]=[...sample.native[i]].sort((p,q)=>Math.abs(q.x)-Math.abs(p.x));
     const reach=new THREE.Vector3(Math.abs(outer.x),outer.y,outer.z).distanceTo(sample.wing);
-    assert.ok(reach>.09&&reach<.12,`${names[i]} outer end follows the limb at recoil ${sample.recoil} (${reach.toFixed(3)} m from the wing tip)`);
+    const reach0=(()=>{const [o]=[...first.native[i]].sort((p,q)=>Math.abs(q.x)-Math.abs(p.x));return new THREE.Vector3(Math.abs(o.x),o.y,o.z).distanceTo(first.wing);})();
+    assert.ok(reach>.09&&reach<.16&&Math.abs(reach-reach0)<.012,`${names[i]} outer end follows the limb at recoil ${sample.recoil} (${reach.toFixed(3)} m from the wing tip, ${reach0.toFixed(3)} at rest)`);
     assert.ok(inner.distanceTo(new THREE.Vector3(0,sample.sled,.179))<.006,`${names[i]} inner end on the nock (arm overshoot and hum aside) at recoil ${sample.recoil}`);
   }
   {

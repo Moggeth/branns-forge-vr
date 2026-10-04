@@ -97,6 +97,10 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
     if (node) { hidden.push([node, node.visible]); node.visible = false; }
   }
 
+  // A crossbow whose peep and moon hood are modelled into Body carries a SightArt marker
+  // (assets-source/siegebird-v4); the code then adds only the reticle carrier.
+  const authored = !!canonicalWeaponVisual.getObjectByName('SightArt');
+
   // The original front tower is baked into Body's material primitives (builder
   // lines418-447), not a named node. Remove just its reviewed canonical region.
   // Preserve source buffers and restore them on tool change; this is a retrofit,
@@ -105,7 +109,7 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
   const toAnchor=new THREE.Matrix4(),centroid=new THREE.Vector3(),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
   const anchorInverse=new THREE.Matrix4().copy(canonicalWeaponVisual.parent.matrixWorld).invert();
   canonicalWeaponVisual.traverse(node=>{
-    if(!node.isMesh||!/^Body(?:_|$)/.test(node.name))return;
+    if(authored||!node.isMesh||!/^Body(?:_|$)/.test(node.name))return;
     const source=node.geometry,index=source.index,pos=source.attributes.position,kept=[];let removed=0;
     toAnchor.multiplyMatrices(anchorInverse,node.matrixWorld);
     for(let i=0;i<(index?index.count:pos.count);i+=3){
@@ -132,6 +136,7 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
 
   // --- Rear: hawk ghost-ring peep on a saddle post -----------------------------
   const rear = new THREE.Group(); rear.name = 'SBS_RearPeep'; rear.position.set(bore.x, axisY + zeroRise(G.rearZ), G.rearZ); root.add(rear);
+  rear.visible = !authored;
   const ringR = (G.rearInner + G.rearOuter) / 2, ringT = (G.rearOuter - G.rearInner) / 2;
   rear.add(faceZ(mesh(new THREE.TorusGeometry(ringR, ringT, 10, 48), brass, 'SBS_RearRing')));
   rear.add(mesh(new THREE.TorusGeometry(G.rearInner + .0006, .0007, 6, 48), ivory, 'SBS_RearIvoryLip'));
@@ -148,6 +153,7 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
 
   // --- Front: moon hood on the prod irons ---------------------------------------
   const front = new THREE.Group(); front.name = 'SBS_MoonHood'; front.position.set(bore.x, axisY, G.frontZ); root.add(front);
+  front.visible = !authored;
   front.add(mesh(new THREE.TorusGeometry(G.hoodRadius, .0032, 10, 64), brass, 'SBS_HoodRing'));
   const hoodBand = mesh(new THREE.CylinderGeometry(G.hoodRadius + .0018, G.hoodRadius + .0018, .012, 48, 1, true), darkBrass, 'SBS_HoodBand');
   hoodBand.rotation.x = Math.PI / 2; hoodBand.position.z = .006; front.add(hoodBand);
@@ -172,7 +178,7 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
 
   // --- Muzzle collar marks the true bore at BoltSeat (does not touch the bolt) --
   const collar = mesh(new THREE.TorusGeometry(.0145, .0022, 8, 32), brass, 'SBS_BoreCollar');
-  collar.position.copy(bore); root.add(collar);
+  collar.position.copy(bore); collar.visible = !authored; root.add(collar);
 
   // --- Reticle carrier: ivory vane on an elevation slide inside the hood --------
   // Carrier origin == zero pearl. Range ticks are children, placed from angles.
@@ -253,5 +259,5 @@ export function createSiegebirdSight(THREE, canonicalWeaponVisual) {
     for (const d of disposables) d.dispose?.();
     if (engraveTex) releaseEngraving();
   }
-  return {eye, bore: bore.clone(), object: root, state, apply, dispose};
+  return {eye, bore: bore.clone(), object: root, state, apply, dispose, authored};
 }
