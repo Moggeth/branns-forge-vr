@@ -36,6 +36,17 @@ try{
  await until(()=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').aimYaw>.05);
  const mid=await aimYaw();await until(m=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').aimYaw>m+.05,mid);
  const late=await aimYaw();record('heavy-swing','pass',{mid,late});await capture('timberline-manned-swung');
+ // Aiming aids: the forecast arcs and landing mark follow the aim, and the plate counts shots from the shared ammo.
+ await until(()=>window.brannHarness.controls().timberlineAim?.forecast?.points>10);
+ const aid=await page.evaluate(()=>window.brannHarness.controls().timberlineAim);
+ assert.ok(aid.sight,'forecast arcs are drawn while manned');assert.match(aid.ammoHud||'',/\d+ (shots )?from Wood\/Iron/);
+ record('twin-arc-forecast-and-ammo-plate','pass',aid);
+ // Hold right mouse: the view narrows through the brass scope and the rangefinder reads the ground under the cross.
+ await page.mouse.down({button:'right'});
+ await until(()=>{const a=window.brannHarness.controls().timberlineAim;return a?.scope>=1&&a.fov<30;});
+ const scoped=await page.evaluate(()=>window.brannHarness.controls().timberlineAim);await capture('timberline-manned-scope');
+ await page.mouse.up({button:'right'});await until(()=>window.brannHarness.controls().timberlineAim?.scope===0);
+ record('right-mouse-scope','pass',scoped);
  await page.mouse.down();await page.mouse.up();
  await until(()=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='manned-check').fireTick>1);
  const fired=await machine();record('click-fires-along-barrel','pass',{aimYaw:fired.aimYaw,aimPitch:fired.aimPitch});await capture('timberline-manned-fired');

@@ -31,6 +31,9 @@ const ground=(s,x,z,c)=>c.terrainHeight(s,x,z,false);
 // Manned Timberline: one Hero operates it in first person; aim is relative to the pedestal yaw (full 360 degrees).
 export const MANNED=Object.freeze({pitchMin:-8*Math.PI/180,pitchMax:25*Math.PI/180,seat:1.5,crankReach:3.5,crankHold:12,reloadTicks:240,fireTicks:45,range:39.9,operatorBoost:2,helperBoost:4});
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+// The shot a manned Timberline would release for this aim (same frame fire() builds), for presentation forecasts.
+export function mannedShot(b,aim){const y=(b.yaw||0)+aim.yaw,p=clampPitch(aim.pitch);return {v:3,type:'timberline',origin:[b.position[0],b.position[1]+1.3,b.position[2]],target:[b.position[0]-Math.sin(y)*10,b.position[1],b.position[2]-Math.cos(y)*10],launchTick:0,...(p?{pitch:p}:{})};}
+const clampPitch=p=>Math.min(MANNED.pitchMax,Math.max(MANNED.pitchMin,p||0));
 export const operatorSeat=(b,aimYaw=b.aimYaw||0)=>{const y=(b.yaw||0)+aimYaw;return [b.position[0]+Math.sin(y)*MANNED.seat,b.position[1],b.position[2]+Math.cos(y)*MANNED.seat];};
 // Presentation age of the Fire+Reload cycle: cranking shortens the remaining reload, so the clip seeks ahead.
 export function machineCycleAge(b,tick){const boost=clamp((b.fireTick+MANNED.reloadTicks)-b.readyTick,0,MANNED.reloadTicks-MANNED.fireTicks);return (tick-b.fireTick+boost)/60;}

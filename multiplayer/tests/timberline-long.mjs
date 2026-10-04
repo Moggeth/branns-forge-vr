@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {worldTrees} from '../shared/world-content.js';
 import {timberlineFlight,stuckAnchor,TIMBERLINE_LONG,TIMBERLINE_RELEASE_TICKS} from '../shared/timberline-flight.js';
-import {restoreInventions} from '../shared/inventions.js';
+import {restoreInventions,mannedShot} from '../shared/inventions.js';
+import {forecastTimberline} from '../client/timberline-sight.js';
 import {createEnemy} from '../shared/combat.js';
 const t0=performance.now();
 function world(){
@@ -29,6 +30,13 @@ const run=(w,shot,limit=900)=>{for(let k=0;k<limit&&w.s.inventions.shots.include
  const r=w.s.inventions.stuck.find(r=>r.id===shot.id);assert.ok(r,'a stuck record remains');assert.ok(['L','R'].includes(r.mode));assert.equal(r.hostKind,'ground');
  assert.ok(Math.abs(r.at[1]-terrainHeight(w.s,r.at[0],r.at[2],false))<.9&&r.at[1]>8,'the stuck eye is in the mountainside');
  for(let k=0;k<1200;k++)w.sim.step();assert.ok(w.s.inventions.stuck.some(r=>r.id===shot.id),'ground bolts persist');}
+
+// 1b. The operator's forecast arcs replay the same flight: the predicted landing is where the authority sticks the bolt.
+for(const aim of [{yaw:0,pitch:.3},{yaw:.6,pitch:.12},{yaw:-1.2,pitch:0},{yaw:2.4,pitch:.2}]){const w=world();w.b.aimYaw=aim.yaw;w.b.aimPitch=aim.pitch;
+ const f=forecastTimberline(mannedShot(w.b,aim),(x,z)=>terrainHeight(w.s,x,z,false));const shot=w.fire(aim);
+ assert.deepEqual(mannedShot(w.b,aim).origin,shot.origin);run(w,shot);const r=w.s.inventions.stuck.find(r=>r.id===shot.id);
+ assert.ok(f.impact&&r,'forecast and authority both land');const miss=Math.hypot(r.at[0]-f.impact[r.mode==='L'?'left':'right'][0],r.at[2]-f.impact[r.mode==='L'?'left':'right'][2]);
+ assert.ok(miss<1.2,`forecast lands within a bolt length of the real strike (${miss.toFixed(2)} m at ${f.distance.toFixed(0)} m)`);}
 
 // 2. A structure in the path holds one bolt; destroying it frees the record.
 {const w=world(),wall={id:'store9',type:'storehouse',position:w.at(.4,-14),yaw:0,hp:240,maxHp:240,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge:0,armed:false,aimYaw:0};
