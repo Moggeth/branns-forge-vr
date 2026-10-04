@@ -1,7 +1,8 @@
-// Dawnhold's troops: the skeleton rig re-dressed as stone-and-brass forgelings with
-// blue crystal eyes, and Dawnhold golems with blue resonance crystals. Combat surfaces,
-// parts and animation stay those of the shared rigs; only materials and gear change.
+// Dawnhold's troops. With /assets/forgeling.glb loaded (assets/forgeling-20261005) a forgeling is its own
+// stone-and-brass model on the skeleton's rig, so motion, hit parts and lost limbs work unchanged; until then
+// (and for Dawnhold golems) the shared rigs are re-dressed in stone, brass and blue resonance crystal.
 import * as THREE from 'three';
+import {steadyBounds} from './skeleton-look.js';
 
 const cache = new Map();
 function shared(name, make) { if (!cache.has(name)) cache.set(name, make()); return cache.get(name); }
@@ -31,4 +32,25 @@ export function dressForgeling(visual, kind) {
   });
   visual.userData.forgeling = true;
   return true;
+}
+
+// The forgeling model: one of three looks from the enemy id (same on every peer), the forge shield always.
+export const FORGELING_LOOKS = Object.freeze([
+  Object.freeze(['Gear_Chimney', 'Gear_Toolbelt']), Object.freeze(['Gear_Goggles', 'Gear_Toolbelt']), Object.freeze(['Gear_Chimney', 'Gear_Goggles'])]);
+const hash = id => { let h = 2166136261; for (const c of String(id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+export function forgelingLook(id) { return FORGELING_LOOKS[hash(id) % FORGELING_LOOKS.length]; }
+
+/** Once per loaded template: resonance-blue crystal glow. */
+export function prepareForgelingTemplate(scene) {
+  scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^Crystal/.test(m.name)) { m.emissive.setRGB(.35, .68, 1); m.emissiveIntensity = 2.2; } });
+}
+
+/** Keeps the id's gear on a cloned forgeling and drops the rest. */
+export function dressForgelingModel(visual, id) {
+  const keep = forgelingLook(id), drop = [];
+  visual.traverse(n => { const name = n.name.replace(/_\d+$/, ''); if (/^Gear_/.test(name) && !keep.includes(name) && !/^Gear_/.test(n.parent?.name || '')) drop.push(n); });
+  for (const n of drop) n.removeFromParent();
+  visual.userData.forgeling = true; visual.userData.forgelingLook = keep;
+  steadyBounds(visual); // one culling sphere round the standing body, as for skeletons (crawl-outs start buried)
+  return keep;
 }

@@ -1,5 +1,7 @@
 import {nextEntityId as nextId} from './entity-id.js';
 import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,battleActive,battleSkirmish,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
+import {homeBallistaAction,isHomeBallistaId} from './home-ballista.js';
+import {homeAction,isHomeAction} from './home-interact.js';
 import {HOME,findHomeTarget,homeBattle,homePoint,resolveHomeDomes,resolveHomeStructures} from './home-bases.js';
 // Melee damage one hero deals another (out of 100 health).
 const PVP_DAMAGE=Object.freeze({axe:22,pick:20,hammer:34,limb:18});
@@ -215,6 +217,8 @@ function instantiate(state) {
         return ok();
       }
       if (message.type === 'action') {
+        if(isHomeAction(message.action))return homeAction(state,p,message,{createEnemy,nextId,terrainHeight});
+        if(typeof message.action==='string'&&message.action.startsWith('invention')&&isHomeBallistaId(message.structureId))return homeBallistaAction(state,p,message,{terrainHeight,damageHero,damageEnemy});
         if(typeof message.action==='string'&&message.action.startsWith('invention'))return inventionAction(state,p,message,inventionContext);
         if(typeof message.action==='string'&&message.action.startsWith('forge')&&p.side==='rivals')return fail('not_your_structure');
         if(typeof message.action==='string'&&message.action.startsWith('forge'))return settlementAction(state,p,message,{nextId,terrainHeight,createEnemy});

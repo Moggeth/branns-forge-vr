@@ -6,6 +6,7 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 // It never mutates the snapshot and never fires actions. Rules mirror the authoritative simulation; each mirrored
 // constant names its source so a rule change is a one-line audit (test/interaction-cue.test.mjs checks the text).
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
+import {HOME, HOME_LAYOUT, HOME_MANNED, bellPostAt, homePoint} from '../shared/home-bases.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
 const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
@@ -131,6 +132,10 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     if(c?.full)return make('pickup','full',q.id,`${materialLabel(q.kind)} ×${q.amount}`,'Pack full','');
   }
 
+  // Your own home base's hands-on pieces: man a gate ballista, drink at the fountain, ring the barracks bell.
+  const home = homeCue(self, snapshot, keys, make);
+  if (home) return home;
+
   // The permanent forge is a usable world object, not a menu hidden behind Tab. Other structures are cued
   // when looked at (aimedTarget). Loose collectibles and aimed work targets retain priority over proximity use.
   const forge = snapshot.inventions?.structures.find(b => b.type === 'forge' && b.hp > 0);
@@ -142,6 +147,28 @@ export function decideCue(view, self, snapshot, aim, ctx) {
   if (deliver?.kinds?.length && flat(p, [0, 0, 0]) <= CUE_RULES.forgeRange) {
     const note = deliver.kinds.map(k => `${deliver.held?.[k] | 0} ${KIND_WORD[k] || k}`).join(' · ');
     return make('forge', 'ready', 'forge', 'Forge', 'Deliver', keys.deliver, note);
+  }
+  return null;
+}
+
+function homeCue(self, snapshot, keys, make) {
+  const b = snapshot.battle; if (b?.v !== 2 || b.status !== 'running') return null;
+  const base = b.bases.find(x => x.side === (self.side || 'party')), p = self.position, tick = snapshot.tick ?? 0;
+  if (!base || base.fallenUntil > tick) return null;
+  const at = (xz, r) => Math.hypot(p[0] - xz[0], p[2] - xz[1]) <= r;
+  const wait = t => `${Math.ceil((t - tick) / 60)} s`;
+  for (const part of base.parts) if (part.kind === 'ballista' && part.hp > 0 && at([part.position[0], part.position[2]], HOME_MANNED.reach)) {
+    if (part.operator === self.id) return make('home', 'manned', part.id, 'Ballista', 'Step off', keys.collect);
+    const other = part.operator && part.operator !== self.id;
+    return other ? make('home', 'busy', part.id, 'Ballista', 'Manned', '') : make('home', 'ready', part.id, 'Ballista', 'Man it', keys.collect, `then aim, click to fire, ${keys.crank || keys.wind || 'crank'} to wind`);
+  }
+  if (at(homePoint(base.side, HOME_LAYOUT.fountain), HOME.drink.reach)) {
+    if (tick < (base.drinkReadyTick ?? 0)) return make('home', 'wait', 'fountain', 'Fountain', 'Refilling', '', wait(base.drinkReadyTick));
+    return (self.hp ?? 100) < 100 ? make('home', 'ready', 'fountain', 'Fountain', 'Drink', keys.collect, `heals ${HOME.drink.heal}`) : make('home', 'full', 'fountain', 'Fountain', 'Full health', '');
+  }
+  if (at(bellPostAt(base.side), HOME.bell.reach)) {
+    if (tick < (base.bellReadyTick ?? 0)) return make('home', 'wait', 'bell', 'Barracks bell', 'Still ringing', '', wait(base.bellReadyTick));
+    return make('home', 'ready', 'bell', 'Barracks bell', 'Ring it', keys.collect, 'sends a squad out now');
   }
   return null;
 }
@@ -200,7 +227,7 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     return make('structure',friendly?'friendly':'ready',id,`${base.side==='party'?'Dawn':'Dusk'} sanctuary`,friendly?'Defend this sanctuary':'Attack this sanctuary',friendly?'':keys.strike,`${Math.ceil(base.hp)} / ${base.maxHp} health`,{done:base.hp,total:base.maxHp});
   }
   const bot=snapshot.enemies?.find(e=>e.id===id&&e.battleRun!==undefined);
-  if(bot){const friendly=bot.side===(self.side==='rivals'?'rivals':'party');return make('enemy',friendly?'friendly':'ready',id,`${bot.side==='party'?'Dawn':'Dusk'} soldier`,friendly?'Ally — fights alongside you':'Enemy — attack',friendly?'':keys.strike);}
+  if(bot){const friendly=bot.side===(self.side==='rivals'?'rivals':'party');return make('enemy',friendly?'friendly':'ready',id,bot.side==='party'?(bot.kind==='golem'?'Dawnhold golem':'Forgeling'):`Dusk ${bot.kind==='golem'?'golem':'skeleton'}`,friendly?'Ally — fights alongside you':'Enemy — attack',friendly?'':keys.strike);}
   const facing = Number.isFinite(yaw) ? [-Math.sin(yaw), -Math.cos(yaw)] : null;
   const reachable = (x, z, y) => {   // simulation.js targetOK, from the authoritative position
     const dx = x - p[0], dz = z - p[2], dist = Math.hypot(dx, dz);
