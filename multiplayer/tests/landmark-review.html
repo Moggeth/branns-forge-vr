@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Landmark review</title>
+<style>html,body{margin:0;height:100%;background:#111}canvas{display:block;width:100%;height:100%}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// Review fixture for the starting-meadow landmarks: the game's renderer settings, lights and fog around the real
+// createStartingWorld() art on a flat green floor. ?at=x,y,z&look=x,y,z frames a camera; ?lit=0..1 lights the sanctuary
+// runes; ?night dims the sky; ?mod overrides the module path. window.review.frame(at, look, lit, t) drives captures. Not shipped.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search), night = q.has('night');
+const {createStartingWorld} = await import(/* @vite-ignore */ new URL(q.get('mod') || '../client/starting-world.js', import.meta.url).href);
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias: true});
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(night ? 0x141b2a : 0xabc5c2); scene.fog = new THREE.Fog(scene.background, 58, 125);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+scene.environmentIntensity = night ? .18 : .55;
+scene.add(new THREE.HemisphereLight(night ? 0x34466e : 0xc6e0ed, night ? 0x1a1610 : 0x5e5139, night ? .45 : 1.2));
+const sun = new THREE.DirectionalLight(night ? 0x8aa4ff : 0xffe3ad, night ? .35 : 2.2); sun.position.set(-22, 38, 15); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, {left: -40, right: 40, top: 40, bottom: -40, far: 120}); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({color: 0x6f8f3e, roughness: 1}));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const world = createStartingWorld({THREE, scene, height: () => 0});
+const {createWaygateView} = await import('../client/waygate-view.js');
+const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .05, 200);
+const v = s => s.split(',').map(Number);
+// open: 0 shut, 1 open (the portal animates in over ~2 s of review time, stepped here at 30 fps).
+function frame(at = [-13, 1.7, 4], look = [-25, 1.6, 8], lit = 0, t = 1, open = 0) {
+  camera.position.set(...at); camera.lookAt(...look);
+  const tick = 1000, snapshot = {landmarks: true, tick, waygate: {lit: Array(8).fill(lit ? tick + Math.round(lit * 600) : 0), openUntil: open ? tick + 3000 : 0, dest: 0}};
+  for (let i = 0; i < Math.max(1, t * 30); i++) gate.update(snapshot, 1 / 30);
+  renderer.render(scene, camera);
+}
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+renderer.setSize(innerWidth, innerHeight, false);
+frame(q.get('at') ? v(q.get('at')) : undefined, q.get('look') ? v(q.get('look')) : undefined, +(q.get('lit') || 0), 1, +(q.get('open') || 0));
+window.review = {frame, stats: () => world.stats()};
+</script>
