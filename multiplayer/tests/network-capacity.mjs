@@ -10,12 +10,13 @@ source=source.replace("import { DurableObject } from 'cloudflare:workers';",'cla
 source=source.replace("export {ForgeDirectory} from './directory.js';",'');
 source=source.replace("'./room-directory.js'",JSON.stringify(new URL('../cloud/room-directory.js',import.meta.url).href));
 source=source.replace("'../shared/multiplayer-limits.js'",JSON.stringify(new URL('../shared/multiplayer-limits.js',import.meta.url).href));
+source=source.replace("'../peer/room-capacity.js'",JSON.stringify(new URL('../peer/room-capacity.js',import.meta.url).href));
 const {ForgeRoom}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 function socket(id){let a={id,at:Date.now(),messages:0};return{readyState:1,sent:[],deserializeAttachment(){return a;},serializeAttachment(value){a=value;},send(value){this.sent.push(JSON.parse(value));},close(code){this.closedCode=code;this.readyState=3;}};}
 async function roomFixture(count=MAX_PLAYERS){
   const old=globalThis.WebSocketRequestResponsePair;globalThis.WebSocketRequestResponsePair=class{};
   const sockets=Array.from({length:count},(_,i)=>socket(`p${i}`));let ready;
-  const room={code:'12345678',peers:sockets.map((_,i)=>({id:`p${i}`,name:`P${i}`,role:'hero'})),hostId:'p0',epoch:1};
+  const room={code:'12345678',peers:sockets.map((_,i)=>({id:`p${i}`,name:`P${i}`,role:'hero',simCapacity:MAX_PLAYERS})),hostId:'p0',epoch:1};
   const ctx={storage:{async get(){return room;},async put(){}},getWebSockets:()=>sockets,blockConcurrencyWhile(fn){ready=fn();},setWebSocketAutoResponse(){}};
   const service=new ForgeRoom(ctx,{});await ready;globalThis.WebSocketRequestResponsePair=old;
   return{service,sockets,ctx};
@@ -46,7 +47,7 @@ test('pending sockets remain bounded above32joined seats',async()=>{
   const response=await service.fetch(new Request('https://room/peer/cloud?mode=join&room=12345678'));assert.equal(response.status,429);
 });
 test('battle lifecycle controls are host-only; hero base attacks still reach simulation',()=>{
-  class Connection extends EventTarget {constructor(){super();this.hostId='host';this.epoch=1;this.sent=[];}send(id,data){this.sent.push({id,data});}broadcast(){}}
+  class Connection extends EventTarget {constructor(){super();this.hostId='host';this.maxPeers=MAX_PLAYERS;this.epoch=1;this.sent=[];}send(id,data){this.sent.push({id,data});}broadcast(){}}
   const connection=new Connection(),s=new WorldSession({connection,storage:{getItem(){},setItem(){}}}),commands=[];s.identity={peerId:'host'};s.simulation={command(id,message){commands.push({id,message});return{ok:true};}};
   for(const action of ['start','stop','reset'])s.applyCommand('guest',{type:'battle',action,seq:1});assert.equal(commands.length,0);assert.equal(connection.sent.length,3);assert.ok(connection.sent.every(x=>x.data.code==='host_required'));
   s.applyCommand('host',{type:'battle',action:'start',seq:2});s.applyCommand('guest',{type:'battle',action:'attack_base',targetId:'enemy',seq:2});assert.equal(commands.length,2);

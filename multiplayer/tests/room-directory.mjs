@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {roomListing,DIRECTORY_TTL} from '../cloud/room-directory.js';
 import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
 
-const now=Date.now(), peers=Array.from({length:MAX_PLAYERS},(_,i)=>({id:String(i),name:'Player '+i,role:i?'hero':'god',secret:'hidden',revision:123,offlineAt:now-6000}));
+const now=Date.now(), peers=Array.from({length:MAX_PLAYERS},(_,i)=>({id:String(i),name:'Player '+i,role:i?'hero':'god',simCapacity:MAX_PLAYERS,secret:'hidden',revision:123,offlineAt:now-6000}));
 const room={code:'01234567',peers,hostId:'0',created:now,secret:'hidden'};
 const listing=roomListing(room,()=>true,now);
 assert.equal(listing.status,'full');assert.equal(listing.joinable,false);

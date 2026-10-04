@@ -1,5 +1,7 @@
 // Browser WebRTC star transport. The signaling service sees membership and SDP, never game state.
 import {SnapshotDeltaEncoder,SnapshotDeltaDecoder,supportsCodec} from '../client/state-codec.js';
+import {clientCapacity} from './room-capacity.js';
+import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
 const FRAME_BYTES = 12_000;
 const MAX_MESSAGE_BYTES = 512 * 1024;
 const encoder = new TextEncoder();
@@ -8,7 +10,7 @@ const preparedOwner = new WeakMap();
 const emit = (target, type, detail) => target.dispatchEvent(new CustomEvent(type, { detail }));
 const open = channel => channel?.readyState === 'open';
 // Pre-welcome rejections that no automatic retry can fix.
-const TERMINAL_JOIN_ERRORS = new Set(['room_not_found', 'room_full', 'invalid_room', 'invalid_identity', 'server_full', 'rate_limited']);
+const TERMINAL_JOIN_ERRORS = new Set(['room_not_found', 'room_full', 'invalid_room', 'invalid_identity', 'server_full', 'rate_limited', 'client_update_required']);
 
 export class PeerRoomConnection extends EventTarget {
   get identity() { return { room: this.room, peerId: this.peerId, role: this.role, secret: this.secret }; }
@@ -20,6 +22,7 @@ export class PeerRoomConnection extends EventTarget {
     this.peers = new Map();
     this.roster = new Map();
     this.room = ''; this.peerId = ''; this.secret = ''; this.hostId = ''; this.epoch = 0;
+    this.maxPeers = 8;
     this.role = 'hero'; this.isHost = false; this.relayConfigured = false;
     this.checkpoint = null; this.checkpointRevision = -1;
     this.reconnectAttempt = 0; this.closed = true; this.generation = 0;
@@ -33,6 +36,7 @@ export class PeerRoomConnection extends EventTarget {
   connect({ room = '', name = 'Adventurer', role = 'hero', desktop = true, secret = '' } = {}) {
     this.close();
     this.checkpoint = null; this.checkpointRevision = -1;
+    this.maxPeers = 8;
     this.peerId = ''; this.hostId = ''; this.epoch = 0; this.isHost = false; this.roster.clear();
     this.checkpointAdvertisedAt = 0;
     this.closed = false; this.room = room.toUpperCase(); this.secret = secret;
@@ -57,8 +61,8 @@ export class PeerRoomConnection extends EventTarget {
     const timeout = setTimeout(() => { if (generation === this.generation) socket.close(4000, 'Signaling timeout'); }, 12_000);
     socket.addEventListener('open', () => {
       if (generation !== this.generation) return socket.close();
-      this.#signal(this.room ? { type: 'join', room: this.room, name: this.name, role: this.role, desktop: this.desktop, ...(this.secret ? { secret: this.secret } : {}) }
-        : { type: 'create', name: this.name, role: this.role, desktop: this.desktop });
+      this.#signal(this.room ? { type: 'join', room: this.room, name: this.name, role: this.role, desktop: this.desktop, simCapacity:MAX_PLAYERS, ...(this.secret ? { secret: this.secret } : {}) }
+        : { type: 'create', name: this.name, role: this.role, desktop: this.desktop, simCapacity:MAX_PLAYERS });
     });
     socket.addEventListener('message', event => {
       if (generation !== this.generation || typeof event.data !== 'string' || event.data.length > 64 * 1024) return;
@@ -67,6 +71,7 @@ export class PeerRoomConnection extends EventTarget {
         const resume = this.peerId === message.peerId && this.epoch === message.epoch && this.hostId === message.hostId;
         if (!resume) this.#resetPeers();
         clearTimeout(timeout); this.reconnectAttempt = 0; this.joined = true;
+        this.maxPeers = clientCapacity(message.maxPeers);
         this.room = message.room; this.peerId = message.peerId; this.secret = message.secret;
         this.hostId = message.hostId; this.epoch = message.epoch; this.isHost = this.hostId === this.peerId;
         this.iceServers = this.iceServers || message.iceServers;
@@ -77,8 +82,8 @@ export class PeerRoomConnection extends EventTarget {
           const member = this.roster.get(id); member.signalingOnline = member.online; member.online = true;
         }
         this.roster.set(this.peerId, { id: this.peerId, name: this.name, role: this.role, desktop: this.desktop, online: true });
-        emit(this, 'welcome', { room: this.room, peerId: this.peerId, secret: this.secret, epoch: this.epoch, hostId: this.hostId, role: this.role, isHost: this.isHost, peers: [...this.roster.values()], relayConfigured: this.relayConfigured, resume });
-        emit(this, 'roster', { peers: [...this.roster.values()], epoch: this.epoch });
+        emit(this, 'welcome', { maxPeers:this.maxPeers, room: this.room, peerId: this.peerId, secret: this.secret, epoch: this.epoch, hostId: this.hostId, role: this.role, isHost: this.isHost, peers: [...this.roster.values()], relayConfigured: this.relayConfigured, resume });
+        emit(this, 'roster', { maxPeers:this.maxPeers, peers: [...this.roster.values()], epoch: this.epoch });
         emit(this, 'status', { state: this.isHost ? 'hosting' : this.#playable() ? 'connected' : 'connecting_to_host', relayConfigured: this.relayConfigured });
         if (!this.isHost && this.roster.get(this.hostId)?.online === false) emit(this, 'owner_lost', { epoch: this.epoch });
         if (this.isHost) for (const peer of this.roster.values()) if (peer.id !== this.peerId && peer.online) this.#connectPeer(peer.id, true);
@@ -125,7 +130,7 @@ export class PeerRoomConnection extends EventTarget {
         // instead of retrying a dead credential forever.
         this.secret = '';
         emit(this, 'status', { state: 'rejoining', reason: 'seat_expired' });
-        this.#signal({ type: 'join', room: this.room, name: this.name, role: this.role, desktop: this.desktop });
+        this.#signal({ type: 'join', room: this.room, name: this.name, role: this.role, desktop: this.desktop, simCapacity:MAX_PLAYERS });
         return;
       }
       emit(this, 'error', message);
@@ -134,11 +139,13 @@ export class PeerRoomConnection extends EventTarget {
     }
     if (message.type === 'peer_joined') {
       if (message.epoch !== this.epoch) return;
+      this.maxPeers = clientCapacity(message.maxPeers);
       this.roster.set(message.peer.id, message.peer);
-      emit(this, 'peer_joined', message.peer); emit(this, 'roster', { peers: [...this.roster.values()], epoch: this.epoch });
+      emit(this, 'peer_joined', message.peer); emit(this, 'roster', { maxPeers:this.maxPeers, peers: [...this.roster.values()], epoch: this.epoch });
       if (this.isHost) this.#connectPeer(message.peer.id, true);
     } else if (message.type === 'peer_left') {
       if (message.epoch !== this.epoch) return;
+      this.maxPeers = clientCapacity(message.maxPeers);
       const edge = this.peers.get(message.peerId);
       if (!message.deliberate && !message.removed && !edge?.relay && open(edge?.channel)) {
         const member = this.roster.get(message.peerId); if (member) member.signalingOnline = false; return;
@@ -146,7 +153,7 @@ export class PeerRoomConnection extends EventTarget {
       const peer = this.roster.get(message.peerId); if (peer) peer.online = false;
       if (message.removed === true && message.peerId !== this.peerId) this.roster.delete(message.peerId);
       this.#removePeer(message.peerId);
-      emit(this, 'peer_left', { peerId: message.peerId }); emit(this, 'roster', { peers: [...this.roster.values()], epoch: this.epoch });
+      emit(this, 'peer_left', { peerId: message.peerId }); emit(this, 'roster', { maxPeers:this.maxPeers, peers: [...this.roster.values()], epoch: this.epoch });
     } else if (message.type === 'signal') {
       if (message.epoch !== this.epoch || !this.roster.has(message.from)) return;
       this.#receiveSignal(message.from, message.signal).catch(error => emit(this, 'error', { code: 'webrtc_signal', message: String(error) }));
@@ -161,9 +168,10 @@ export class PeerRoomConnection extends EventTarget {
       emit(this, 'continue_world_offer', { epoch: this.epoch, revision: message.revision, graceful: !!message.graceful, checkpoint: this.checkpoint });
     } else if (message.type === 'host_changed') {
       if (message.epoch !== this.epoch + 1) return;
+      this.maxPeers = clientCapacity(message.maxPeers);
       this.#resetPeers(); this.epoch = message.epoch; this.hostId = message.hostId; this.isHost = this.peerId === this.hostId;
       const host = this.roster.get(this.hostId); if (host) host.online = true;
-      emit(this, 'host_changed', { hostId: this.hostId, previousHostId: message.previousHostId, epoch: this.epoch, isHost: this.isHost });
+      emit(this, 'host_changed', { maxPeers:this.maxPeers, hostId: this.hostId, previousHostId: message.previousHostId, epoch: this.epoch, isHost: this.isHost });
       if (this.isHost) {
         emit(this, 'host_promoted', { epoch: this.epoch, checkpoint: this.checkpoint, revision: this.checkpointRevision, peers: [...this.roster.values()] });
         emit(this, 'status', { state: 'hosting' });

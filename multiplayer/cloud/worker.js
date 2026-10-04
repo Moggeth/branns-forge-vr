@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import {clientCapacity,roomCapacity} from '../peer/room-capacity.js';
 import {roomListing, DIRECTORY_REFRESH} from './room-directory.js';
 import {MAX_PLAYERS, MAX_PENDING_ROOM_SOCKETS, OFFLINE_SEAT_GRACE_MS, SIGNAL_MESSAGES_PER_EDGE, RELAY_BYTES_PER_EDGE, RELAY_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
 export {ForgeDirectory} from './directory.js';
@@ -62,7 +63,7 @@ export class ForgeRoom extends DurableObject {
   broadcast(message, except) { for (const [id, ws] of this.sockets) if (id !== except) send(ws, message); }
   seatReleaseDeadlines() {
     const r=this.room;
-    if(!r||r.peers.length<MAX_PEERS)return [];
+    if(!r||r.peers.length<roomCapacity(r))return [];
     return r.peers.filter(p=>p.id!==r.hostId&&p.id!==r.offer?.peerId&&!this.online(p.id))
       .map(p=>p.offlineAt+OFFLINE_SEAT_GRACE_MS);
   }
@@ -118,15 +119,15 @@ export class ForgeRoom extends DurableObject {
     await this.save();
     await this.updateDirectory(true);
     send(ws, { type: 'welcome', protocol: 1, room: r.code, peerId: p.id, secret: p.secret, role: p.role, hostId: r.hostId, epoch: r.epoch,
-      maxPeers: MAX_PEERS, peers: this.peers().filter(q => q.id !== p.id).map(q => this.publicPeer(q)),
+      maxPeers: roomCapacity(r), peers: this.peers().filter(q => q.id !== p.id).map(q => this.publicPeer(q)),
       iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }], relayConfigured: true, relayTransport: 'websocket' });
-    this.broadcast({ type: 'peer_joined', peer: this.publicPeer(p), epoch: r.epoch }, p.id);
+    this.broadcast({ type: 'peer_joined', maxPeers:roomCapacity(r), peer: this.publicPeer(p), epoch: r.epoch }, p.id);
     await this.schedule();
     console.log(JSON.stringify({ event: 'peer_connected', room: r.code, count: this.sockets.size }));
   }
   async nextOffer() {
     const r = this.room; r.offer = null;
-    const candidate = this.peers().filter(p => p.id !== r.hostId && p.desktop && p.revision >= 0 && this.online(p.id) && !r.tried.includes(p.id))
+    const candidate = this.peers().filter(p => p.id !== r.hostId && p.desktop && clientCapacity(p.simCapacity)>=r.peers.length && p.revision >= 0 && this.online(p.id) && !r.tried.includes(p.id))
       .sort((a, b) => b.revision - a.revision || a.id.localeCompare(b.id))[0];
     if (!candidate) this.broadcast({ type: 'world_waiting', epoch: r.epoch, message: 'Waiting for a desktop player with a recovery checkpoint.' });
     else {
@@ -152,19 +153,22 @@ export class ForgeRoom extends DurableObject {
         this.room = { code: a.code, peers: [], hostId: '', epoch: 1, created: now, lastActivity: now, tried: [], migrating: false, offer: null, graceAt: 0 };
       } else if (cleanCode(m.room) !== a.code || !/^\d{8}$/.test(a.code)) return error(ws, 'invalid_room', 'Enter the eight-digit room code.');
       else if (!this.room) return error(ws, 'room_not_found', 'Room not found or expired.');
-      const r = this.room;
+      const r = this.room, capacity=clientCapacity(m.simCapacity);
       if (m.secret) {
         const p = this.peers().find(q => q.secret === m.secret);
         if (!p) return error(ws, 'invalid_secret', 'This reconnect credential expired.');
-        p.name = m.name.trim(); p.role = m.role; p.desktop = m.desktop === true;
+        if (capacity<r.peers.length) return error(ws,'client_update_required','Refresh the game before rejoining: this world has more players than your version supports.');
+        p.simCapacity=capacity; p.name = m.name.trim(); p.role = m.role; p.desktop = m.desktop === true;
         return this.attach(ws, p);
       }
-      if (this.peers().length >= MAX_PEERS) {
+      if (r.peers.length && capacity<roomCapacity(r)) return error(ws,'client_update_required','Refresh the game to join this 32-player world, then enter the room code again.');
+      const limit=roomCapacity(r);
+      if (this.peers().length >= limit) {
         const stale = this.peers().filter(p => p.id !== r.hostId && p.id !== r.offer?.peerId && !this.online(p.id) && now - p.offlineAt >= OFFLINE_SEAT_GRACE_MS).sort((a, b) => a.offlineAt - b.offlineAt)[0];
-        if (!stale) return error(ws, 'room_full', `All ${MAX_PEERS} seats are occupied or reconnecting. Choose another world or retry shortly.`);
-        r.peers = r.peers.filter(p => p !== stale); this.broadcast({ type: 'peer_left', peerId: stale.id, epoch: r.epoch, removed: true });
+        if (!stale || r.peers.length>limit) return error(ws, 'room_full', `All ${limit} seats are occupied or reconnecting. Choose another world or retry shortly.`);
+        r.peers = r.peers.filter(p => p !== stale); this.broadcast({ type: 'peer_left', maxPeers:roomCapacity(r), peerId: stale.id, epoch: r.epoch, removed: true });
       }
-      const p = { id: token().slice(0, 16), secret: token(), name: m.name.trim(), role: m.role, desktop: m.desktop === true, revision: -1, offlineAt: 0 };
+      const p = { id: token().slice(0, 16), secret: token(), name: m.name.trim(), role: m.role, desktop: m.desktop === true, simCapacity:capacity, revision: -1, offlineAt: 0 };
       r.peers.push(p); if (!r.hostId) r.hostId = p.id;
       return this.attach(ws, p);
     }
@@ -203,13 +207,15 @@ export class ForgeRoom extends DurableObject {
     } else if (m.type === 'transfer_host') {
       if (p.id !== r.hostId) return error(ws, 'not_host', 'Only the host can transfer ownership.');
       const target = this.peers().find(q => q.id === m.to && q.desktop && q.revision >= 0 && this.online(q.id));
+      if (target && clientCapacity(target.simCapacity)<r.peers.length) return error(ws,'client_update_required','That player must refresh the game before hosting this many players.');
       if (!target || target.id === p.id) return error(ws, 'no_checkpoint', 'That player needs a checkpoint first.');
       r.offer = { peerId: target.id, epoch: r.epoch, graceful: true, expires: now + Number(this.env.OFFER_MS || 120000) };
       send(this.sockets.get(target.id), { type: 'continue_world_offer', epoch: r.epoch, revision: target.revision, graceful: true });
     } else if (m.type === 'continue_world') {
       if (r.offer?.peerId !== p.id || m.epoch !== r.epoch || p.revision < 0) return error(ws, 'no_offer', 'No current continuation offer.');
+      if (clientCapacity(p.simCapacity)<r.peers.length) return error(ws,'client_update_required','Refresh the game before hosting this many players.');
       const previousHostId = r.hostId; r.hostId = p.id; r.epoch++; r.offer = null; r.migrating = false; r.graceAt = 0;
-      await this.save(); await this.updateDirectory(true); this.broadcast({ type: 'host_changed', hostId: p.id, previousHostId, epoch: r.epoch });
+      await this.save(); await this.updateDirectory(true); this.broadcast({ type: 'host_changed', maxPeers:roomCapacity(r), hostId: p.id, previousHostId, epoch: r.epoch });
     } else if (m.type === 'decline_world') {
       if (r.offer?.peerId !== p.id) return;
       const graceful = r.offer.graceful; r.offer = null;
@@ -228,7 +234,7 @@ export class ForgeRoom extends DurableObject {
     this.sockets.delete(id); p.offlineAt = Date.now(); r.lastActivity = Date.now();
     const removed = p.leaving && id !== r.hostId;
     if (removed) r.peers = r.peers.filter(q => q !== p);
-    this.broadcast({ type: 'peer_left', peerId: id, epoch: r.epoch, removed: !!removed, deliberate: !!p.leaving });
+    this.broadcast({ type: 'peer_left', maxPeers:roomCapacity(r), peerId: id, epoch: r.epoch, removed: !!removed, deliberate: !!p.leaving });
     if (id === r.hostId) {
       this.broadcast({ type: 'owner_lost', epoch: r.epoch, deliberate: !!p.leaving });
       r.graceAt = Date.now() + (p.leaving ? 50 : Number(this.env.DISCONNECT_GRACE_MS || 15000));

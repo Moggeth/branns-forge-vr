@@ -8,7 +8,7 @@ async function list(){const r=await fetch(base+'/peer/rooms',{headers:{Origin:or
 async function connect(room){const url=new URL('/peer/cloud',base);url.protocol=url.protocol==='https:'?'wss:':'ws:';if(room)url.searchParams.set('room',room);
  const ws=new WebSocket(url,{origin});sockets.push(ws);const messages=[];ws.on('message',raw=>{if(raw.toString()!=='pong')messages.push(JSON.parse(raw));});await once(ws,'open');
  const send=m=>ws.send(JSON.stringify(m));const wait=async predicate=>{for(let i=0;i<100;i++){const m=messages.find(predicate);if(m)return m;await new Promise(r=>setTimeout(r,30));}throw Error('Timed out waiting for room state');};
- send({type:room?'join':'create',room,name:room?'Guest':'Directory host',role:'hero',desktop:true});return{ws,send,wait,welcome:await wait(m=>m.type==='welcome')};}
+ send({type:room?'join':'create',room,name:room?'Guest':'Directory host',role:'hero',desktop:true,simCapacity:MAX_PLAYERS});return{ws,send,wait,welcome:await wait(m=>m.type==='welcome')};}
 try{
  assert.equal((await fetch(base+'/peer/rooms',{headers:{Origin:'https://evil.example'}})).status,403);
  assert.equal((await fetch(base+'/peer/rooms',{method:'POST',headers:{Origin:origin}})).status,405);

@@ -19,7 +19,7 @@ async function connect(room = '') {
     return new Promise((resolve, reject) => { const w = { match, resolve }; w.timer = setTimeout(() => reject(Error(`Timeout ${type}`)), 10000); waiters.push(w); });
   }};
 }
-const identity = { name: 'Cloud verification', role: 'hero', desktop: true };
+const identity = { simCapacity:MAX_PLAYERS, name: 'Cloud verification', role: 'hero', desktop: true };
 try {
   assert.equal((await (await fetch(base + '/peer/health')).json()).service, 'cloud-rooms');
   assert.equal((await fetch(base + '/peer/cloud', { headers: { Origin: 'https://evil.example' } })).status, 403);

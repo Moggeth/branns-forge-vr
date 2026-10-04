@@ -4,6 +4,7 @@ import { mkdirSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
+import {clientCapacity,roomCapacity} from './room-capacity.js';
 import {MAX_PLAYERS,SIGNAL_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,12 +59,12 @@ function iceServers(peerId) {
 }
 function welcome(peer, room) {
   send(peer.ws, { type: 'welcome', protocol: 1, room: room.code, peerId: peer.id, secret: peer.secret, role: peer.role,
-    hostId: room.hostId, epoch: room.epoch, maxPeers: config.maxPeers, peers: [...room.peers.values()].filter(p => p !== peer).map(publicPeer),
+    hostId: room.hostId, epoch: room.epoch, maxPeers: roomCapacity(room,config.maxPeers), peers: [...room.peers.values()].filter(p => p !== peer).map(publicPeer),
     iceServers: iceServers(peer.id), relayConfigured: !!(config.turnUrl && config.turnSecret) });
 }
 function connected(room, peer) { return peer?.ws?.readyState === WebSocket.OPEN && room.peers.get(peer.id) === peer; }
 function clearOffer(room) { clearTimeout(room.offerTimer); room.offer = null; }
-function eligible(room) { return [...room.peers.values()].filter(p => p.id !== room.hostId && p.desktop && connected(room, p) && p.revision >= 0).sort((a,b) => b.revision - a.revision || a.id.localeCompare(b.id)); }
+function eligible(room) { return [...room.peers.values()].filter(p => p.id !== room.hostId && p.desktop && clientCapacity(p.simCapacity)>=room.peers.size && connected(room, p) && p.revision >= 0).sort((a,b) => b.revision - a.revision || a.id.localeCompare(b.id)); }
 function nextOffer(room) {
   clearOffer(room);
   if (!rooms.has(room.code)) return;
@@ -90,7 +91,7 @@ function onDeparture(peer, ws) {
   // An explicit leave releases a guest seat at once; a crash keeps it for reconnect.
   const removed = !!peer.leaving && room.hostId !== peer.id;
   if (removed) room.peers.delete(peer.id);
-  broadcast(room, { type: 'peer_left', peerId: peer.id, epoch: room.epoch, ...(removed ? { removed: true } : {}) });
+  broadcast(room, { type: 'peer_left', maxPeers:roomCapacity(room,config.maxPeers), peerId: peer.id, epoch: room.epoch, ...(removed ? { removed: true } : {}) });
   if (room.hostId === peer.id) {
     broadcast(room, { type: 'owner_lost', epoch: room.epoch });
     clearTimeout(room.hostGraceTimer);
@@ -116,7 +117,7 @@ function attach(ws, room, peer) {
   if (room.hostId === peer.id) clearTimeout(room.hostGraceTimer);
   if (room.hostId === peer.id && !room.migrating) clearOffer(room);
   welcome(peer, room);
-  broadcast(room, { type: 'peer_joined', peer: publicPeer(peer), epoch: room.epoch }, ws);
+  broadcast(room, { type: 'peer_joined', maxPeers:roomCapacity(room,config.maxPeers), peer: publicPeer(peer), epoch: room.epoch }, ws);
   if (room.migrating && !room.offer && peer.desktop && peer.revision >= 0) { room.tried.delete(peer.id); nextOffer(room); }
   log('peer_connected', { room: room.code, peerId: peer.id, role: peer.role, host: room.hostId === peer.id });
 }
@@ -127,12 +128,13 @@ function handle(ws, message) {
   if (!ws.peer) {
     if (message.type !== 'create' && message.type !== 'join') return fail(ws, 'not_joined', 'Create or join a room first.');
     if (!validName(message.name) || !validRole(message.role)) return fail(ws, 'invalid_identity', 'Choose a valid name and role.');
+    const capacity=clientCapacity(message.simCapacity);
     if (message.type === 'create') {
       if (!bucket(ipBuckets, ws.ip, 12, 60_000)) return fail(ws, 'rate_limited', 'Too many room requests.');
       if (rooms.size >= config.maxRooms) return fail(ws, 'server_full', 'Room service is full.');
       let roomCode; do roomCode = code(); while (rooms.has(roomCode));
       const room = { code: roomCode, peers: new Map(), hostId: null, epoch: 1, created: Date.now(), lastActivity: Date.now(), tried: new Set(), offer: null, migrating: false };
-      const peer = { id: secret().slice(0, 16), secret: secret(), name: message.name.trim(), role: message.role, desktop: message.desktop === true, revision: -1, ws: null, room };
+      const peer = { id: secret().slice(0, 16), secret: secret(), name: message.name.trim(), role: message.role, desktop: message.desktop === true, simCapacity:capacity, revision: -1, ws: null, room };
       room.hostId = peer.id; room.peers.set(peer.id, peer); rooms.set(roomCode, room); attach(ws, room, peer);
       log('room_created', { room: roomCode }); return;
     }
@@ -144,20 +146,23 @@ function handle(ws, message) {
     if (message.secret) {
       const peer = [...room.peers.values()].find(p => safeEqual(p.secret, message.secret));
       if (!peer) return fail(ws, 'invalid_secret', 'This reconnect credential is invalid.');
-      peer.name = message.name.trim(); peer.role = message.role; peer.desktop = message.desktop === true;
+      if (capacity<room.peers.size) return fail(ws,'client_update_required','Refresh the game before rejoining: this world has more players than your version supports.');
+      peer.simCapacity=capacity; peer.name = message.name.trim(); peer.role = message.role; peer.desktop = message.desktop === true;
       attach(ws, room, peer); return;
     }
-    if (room.peers.size >= config.maxPeers) {
+    if (capacity<roomCapacity(room,config.maxPeers)) return fail(ws,'client_update_required','Refresh the game to join this 32-player world, then enter the room code again.');
+    const limit=roomCapacity(room,config.maxPeers);
+    if (room.peers.size >= limit) {
       // Crashed or reloaded guests keep a seat; reclaim the longest-offline one for a new arrival.
       const now = Date.now();
       const stale = [...room.peers.values()].filter(p => p.id !== room.hostId && !p.ws && room.offer?.peerId !== p.id && now - (p.offlineAt || 0) >= config.evictOfflineMs)
         .sort((a, b) => (a.offlineAt || 0) - (b.offlineAt || 0))[0];
-      if (!stale) return fail(ws, 'room_full', `All ${config.maxPeers} seats are occupied or reconnecting. Choose another world or retry shortly.`);
+      if (!stale || room.peers.size>limit) return fail(ws, 'room_full', `All ${limit} seats are occupied or reconnecting. Choose another world or retry shortly.`);
       room.peers.delete(stale.id);
-      broadcast(room, { type: 'peer_left', peerId: stale.id, epoch: room.epoch, removed: true });
+      broadcast(room, { type: 'peer_left', maxPeers:roomCapacity(room,config.maxPeers), peerId: stale.id, epoch: room.epoch, removed: true });
       log('peer_evicted', { room: room.code, peerId: stale.id });
     }
-    const peer = { id: secret().slice(0, 16), secret: secret(), name: message.name.trim(), role: message.role, desktop: message.desktop === true, revision: -1, ws: null, room };
+    const peer = { id: secret().slice(0, 16), secret: secret(), name: message.name.trim(), role: message.role, desktop: message.desktop === true, simCapacity:capacity, revision: -1, ws: null, room };
     room.peers.set(peer.id, peer); attach(ws, room, peer); return;
   }
   const peer = ws.peer, room = peer.room;
@@ -178,14 +183,16 @@ function handle(ws, message) {
     if (peer.id !== room.hostId) return fail(ws, 'not_host', 'Only the host can transfer ownership.');
     const target = room.peers.get(message.to);
     if (!target?.desktop || !connected(room, target) || target.revision < 0) return fail(ws, 'no_checkpoint', 'That desktop player needs a checkpoint before transfer.');
+    if (clientCapacity(target.simCapacity)<room.peers.size) return fail(ws,'client_update_required','That player must refresh the game before hosting this many players.');
     clearOffer(room); room.offer = { peerId: target.id, epoch: room.epoch, graceful: true };
     send(target.ws, { type: 'continue_world_offer', epoch: room.epoch, revision: target.revision, graceful: true });
     room.offerTimer = setTimeout(() => { send(target.ws, { type: 'continue_offer_expired', epoch: room.epoch, graceful: true }); clearOffer(room); send(peer.ws, { type: 'transfer_timeout' }); }, config.offerMs).unref();
   } else if (message.type === 'continue_world') {
     if (!room.offer || room.offer.peerId !== peer.id || message.epoch !== room.epoch || peer.revision < 0) return fail(ws, 'no_offer', 'No current world continuation offer.');
+    if (clientCapacity(peer.simCapacity)<room.peers.size) return fail(ws,'client_update_required','Refresh the game before hosting this many players.');
     clearOffer(room); clearTimeout(room.hostGraceTimer); room.migrating = false;
     const previousHostId = room.hostId; room.hostId = peer.id; room.epoch++;
-    broadcast(room, { type: 'host_changed', hostId: peer.id, previousHostId, epoch: room.epoch });
+    broadcast(room, { type: 'host_changed', maxPeers:roomCapacity(room,config.maxPeers), hostId: peer.id, previousHostId, epoch: room.epoch });
     log('host_changed', { room: room.code, hostId: peer.id, epoch: room.epoch });
   } else if (message.type === 'decline_world') {
     if (room.offer?.peerId !== peer.id) return;
@@ -232,7 +239,10 @@ const maintenance = setInterval(() => {
   if (rooms.size > 0) lastRoomTime = now;
   for (const ws of wss.clients) { if (now - ws.lastPong > 90_000) ws.terminate(); else ws.ping(); }
   for (const room of rooms.values()) {
-    for (const peer of room.peers.values()) if (!peer.ws && peer.id !== room.hostId && now - (peer.lastSeen || room.created) > 60_000) room.peers.delete(peer.id);
+    for (const peer of room.peers.values()) if (!peer.ws && peer.id !== room.hostId && room.offer?.peerId !== peer.id && now - (peer.lastSeen || room.created) > 60_000) {
+      room.peers.delete(peer.id);
+      broadcast(room,{type:'peer_left',peerId:peer.id,epoch:room.epoch,removed:true,maxPeers:roomCapacity(room,config.maxPeers)});
+    }
     if (now - room.lastActivity > config.idleMs || now - room.created > config.maxAgeMs) {
       clearOffer(room); clearTimeout(room.hostGraceTimer); broadcast(room, { type: 'room_expired' });
       for (const peer of room.peers.values()) peer.ws?.close(4000, 'Room expired'); rooms.delete(room.code); log('room_expired', { room: room.code });

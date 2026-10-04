@@ -189,9 +189,16 @@ export class WorldSession extends EventTarget {
     else this.connection.send(this.connection.hostId, {kind:'command',epoch:this.connection.epoch,message});
     return true;
   }
+  get battleCompatible() { return this.connection.local === true || this.connection.maxPeers >= MAX_PLAYERS; }
   applyCommand(id, message) {
     if (message?.type === 'battle' && ['start','stop','reset'].includes(message.action) && id !== this.connection.hostId) {
       const detail={code:'host_required',message:'Only the world host can change battle mode. Ask the host to start or reset the battle.'};
+      if (id===this.identity?.peerId) this.emit('error',detail);
+      else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
+      return;
+    }
+    if (message?.type==='battle' && ['start','reset'].includes(message.action) && !this.battleCompatible) {
+      const detail={code:'client_update_required',message:'Everyone in this world must refresh the game before starting Battle mode. Older players can leave instead; ordinary exploration remains available.'};
       if (id===this.identity?.peerId) this.emit('error',detail);
       else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
       return;

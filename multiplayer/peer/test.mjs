@@ -37,7 +37,7 @@ function connect() {
   return { ws, inbox, wait(type, predicate = () => true) {
     const found = inbox.find(message => message.type === type && predicate(message)); if (found) return Promise.resolve(found);
     return new Promise((resolve, reject) => { const waiter = { predicate: m => m.type === type && predicate(m), resolve }; waiters.push(waiter); setTimeout(() => { const at = waiters.indexOf(waiter); if (at >= 0) { waiters.splice(at, 1); reject(new Error(`Timed out: ${type}`)); } }, 2000).unref(); });
-  }, send(value) { ws.send(JSON.stringify(value)); } };
+  }, send(value) { ws.send(JSON.stringify({...(['create','join'].includes(value.type)?{simCapacity:MAX_PLAYERS}:{}),...value})); } };
 }
 try {
   await ready();
