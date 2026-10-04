@@ -5,7 +5,7 @@ const {browser,context,page:host}=await launch();const a=await context.newPage()
 const pages=[host,a,b], endpoint=process.env.VOICE_WS_URL||'ws://127.0.0.1:8796/peer/ws';
 const errors=[];for(const page of pages)page.on('pageerror',error=>errors.push(error.message));
 const readPair=()=>Promise.all([a,b].map(page=>page.evaluate(()=>voiceConnectionSnapshot())));
-const pose=async(page,position,forward=[0,0,-1])=>{await page.evaluate(({position,forward})=>v.updatePose({position,forward,up:[0,1,0]}),{position,forward});await sleep(450);};
+const pose=async(page,position,forward=[0,0,-1])=>{await page.evaluate(({position,forward})=>v.updatePose({position,forward,up:[0,1,0]}),{position,forward});await sleep(650);};
 try {
   for(const page of pages){await page.goto(BASE+'/tests/voice-harness.html');await page.waitForFunction(()=>window.makeVoice);}
   await host.evaluate(url=>makeVoice(url,{name:'Host',desktop:true}),endpoint);await host.waitForFunction(()=>c.room&&c.peerId);

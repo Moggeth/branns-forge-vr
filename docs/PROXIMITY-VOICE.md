@@ -43,7 +43,8 @@ the overview camera. A VR God uses the actual viewer head, like a Hero. The rend
 emits pose after rendering so the XR viewer matrix includes that frame's head pose.
 God/Hero role changes use the next rendered pose without reconnecting voice.
 
-Remote positions are ephemeral 10 Hz voice metadata, smoothly applied to audio
+Remote positions are ephemeral voice metadata (up to 2 Hz while moving, a
+2-second heartbeat while stationary), smoothly applied to audio
 parameters. A missing position heartbeat silences the source after 3 seconds and
 cleans up the participant after 12 seconds. These are presentation positions,
 not authoritative gameplay movement or competitive anti-cheat data.
@@ -65,8 +66,13 @@ queues and rates are bounded; host batches stay below 32 KB and 10 messages/s pe
 edge, preserving the game's existing 80 message/s allowance for snapshots. No
 cloud Worker, signaling server or gameplay protocol deployment is required.
 
-Audio uses a separate WebRTC mesh (at most seven audio connections per participant
-in the existing eight-player room). Peer-ID ordering chooses the offerer; async
+Audio uses a host-selected symmetric proximity graph for up to 32 room members,
+with at most eight audio connections per participant (128 pairs rather than 496).
+New pairs enter within 32 metres; existing pairs remain until 40 metres to avoid
+edge chatter. Balanced deterministic selection avoids excluding roster-tail
+players in dense gatherings. Only the authenticated current host can choose
+neighbors, scoped to the game epoch and each voice session. New negotiations
+start at most once per 100ms per client. Peer-ID ordering chooses the offerer; async
 SDP/ICE operations are serialized and scoped to voice-session and negotiation IDs.
 Stopped microphones use replaceTrack(null); re-enabling replaces the audio track
 without renegotiating. Failed connections retry at bounded intervals, up to three
@@ -125,3 +131,25 @@ do not verify physical microphones, phones, headsets or internet NAT traversal.
 
 API references: [WebRTC](https://www.w3.org/TR/webrtc/),
 [Web Audio](https://www.w3.org/TR/webaudio/).
+
+## 32-member topology verification
+
+Run `node multiplayer/tests/voice-topology.mjs`, `proximity-voice.mjs` and
+`voice-recovery.mjs` from the repository root (use the same tests-directory prefix).
+The 32-member synthetic transport check covers symmetric bounded selection,
+coincident-position fairness, spatial hysteresis, low-rate presence, stale-host
+and session rejection, retry, moving out of range, host migration and no automatic
+microphone capture. It observed 127 active pairs and 19,220 moving-state forwards
+over 10 seconds, versus 99,200 for an unbounded 10Hz full mesh. These are metadata
+and topology checks, not 32 real microphones, WAN/TURN or physical device acceptance.
+
+Recovery lesson: a new-session topology message includes current selected peer
+presence. A retry clears local membership; delivering just neighbor IDs would
+allow an immediate SDP offer to arrive before the next position heartbeat and be
+discarded. Session-bound presence seeding prevents that race.
+
+The existing real-browser voice acceptance also passed with this topology: three
+Chromium pages, guest-to-guest synthetic audio while the host stays out of voice,
+left/right/head-turn positioning, distance cutoff, mute/deafen, track release,
+offerer and answerer retries, failed-connection recovery and departure cleanup.
+No physical microphone was accessed. This does not establish 32 live media feeds.

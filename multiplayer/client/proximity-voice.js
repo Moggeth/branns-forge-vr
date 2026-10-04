@@ -1,5 +1,6 @@
 import {VoiceRoute} from './voice-route.js';
 import {VoiceAudio} from './voice-audio.js';
+import {VOICE_NEIGHBORS} from './voice-topology.js';
 
 const errorText = error => ({
   NotAllowedError:'Microphone permission was denied. Allow the microphone in site settings, then press Enable microphone again.',
@@ -11,6 +12,7 @@ export class ProximityVoice extends EventTarget {
   constructor(connection, {mediaDevices = globalThis.navigator?.mediaDevices, createContext = () => new (globalThis.AudioContext || globalThis.webkitAudioContext)(), createPeer = options => new RTCPeerConnection(options), now = () => Date.now()} = {}) {
     super(); this.connection = connection; this.mediaDevices = mediaDevices; this.createContext = createContext; this.createPeer = createPeer; this.now = now;
     this.active = false; this.disposed = false; this.pending = false; this.captureGeneration = 0; this.joinGeneration = 0; this.session = crypto.randomUUID();
+    this.selected=new Map();this.lastPresence=null;this.nextOfferAt=0;
     this.peers = new Map(); this.members = new Map(); this.muted = new Set(); this.removers = [];
     this.route = new VoiceRoute(connection, (id, body) => this.receive(id, body));
     const on = (type, fn) => { connection.addEventListener(type, fn); this.removers.push(() => connection.removeEventListener(type, fn)); };
@@ -79,24 +81,39 @@ export class ProximityVoice extends EventTarget {
   }
   deafen(value) { if (value) this.stopMicrophone(); this.audio?.deafen(value); this.changed(); }
   mute(id, value) { value ? this.muted.add(id) : this.muted.delete(id); this.audio?.mute(id, value); this.changed(); }
-  announce() {
+  announce(force=true) {
     if (this.disposed || this.active && !this.pose) return;
-    this.route.send('*', {type:'state', session:this.session, active:this.active, mic:!!this.stream, position:this.pose?.position});
+    const now=this.now(),position=this.pose?.position,last=this.lastPresence;
+    const moved=position&&last?.position&&Math.hypot(...position.map((v,i)=>v-last.position[i]))>.25;
+    if(!force&&last&&now-last.at<(moved?500:2000))return;
+    this.lastPresence={at:now,position:position?[...position]:null};
+    this.route.send('*', {type:'state', session:this.session, active:this.active, mic:!!this.stream, position});
   }
   tick() {
     if (!this.active || this.disposed) return;
-    this.announce();
+    this.announce(false);
     const now = this.now();
     for (const [id, m] of this.members) {
       if (!this.route.member(id) || now - m.seen > 12000) { this.remove(id); continue; }
       this.audio?.position(id, m.position, now - m.seen < 3000 && m.mic);
       const p = this.peers.get(id);
       if (p && now - p.started > 15000 && p.pc.connectionState !== 'connected') this.fail(id, p);
-      if (!this.peers.has(id) && this.connection.peerId < id && now >= m.retryAt && m.attempts < 3) void this.offer(id);
+      if (this.eligible(id)&&!this.peers.has(id) && this.connection.peerId < id && now >= m.retryAt && m.attempts < 3&&now>=this.nextOfferAt) {this.nextOfferAt=now+100;void this.offer(id);}
     }
   }
   receive(id, b) {
-    if (!this.active || this.disposed || id === this.connection.peerId) return;
+    if (!this.active || this.disposed) return;
+    if(b.type==='neighbors'){
+      if(id!==this.connection.hostId||b.session!==this.session)return;
+      // A retry cleared local presence. Seed selected members from the host's
+      // current generation before early SDP arrives, rather than discard it.
+      for(const peer of b.peers)this.receive(peer.id,{type:'state',active:true,...peer});
+      const next=new Map(b.peers.map(p=>[p.id,p.session]));
+      for(const peerId of this.peers.keys())if(next.get(peerId)!==this.members.get(peerId)?.session)this.closePeer(peerId);
+      for(const [peerId,session]of next)if(this.selected.get(peerId)!==session){const m=this.members.get(peerId);if(m){m.attempts=0;m.retryAt=this.now()+Math.abs([...peerId].reduce((n,c)=>n+c.charCodeAt(0),0)%150);}}
+      this.selected=next;this.changed();return;
+    }
+    if(id === this.connection.peerId) return;
     if (b.type === 'state') {
       if (!b.active) { this.remove(id); return; }
       let m = this.members.get(id);
@@ -104,7 +121,7 @@ export class ProximityVoice extends EventTarget {
       const fresh = !m, changed = m?.mic !== b.mic;
       if (!m) { m = {session:b.session, attempts:0, retryAt:0}; this.members.set(id, m); }
       Object.assign(m, {position:b.position, mic:b.mic, seen:this.now()});
-      if (fresh) this.announce();
+      if (fresh) this.announce(false);
       if (fresh || changed) this.changed();
       return;
     }
@@ -117,6 +134,7 @@ export class ProximityVoice extends EventTarget {
       const p = this.peers.get(id); if (this.members.get(id) === m && p?.negotiation === b.negotiation) this.fail(id, p);
     }).finally(() => { m.pendingSignals--; });
   }
+  eligible(id){return this.selected.get(id)===this.members.get(id)?.session&&this.selected.has(id);}
   sendSignal(id, body) {
     const m = this.members.get(id); if (!m) return false;
     return this.route.send(id, {...body, session:this.session, targetSession:m.session, negotiation:this.peers.get(id)?.negotiation});
@@ -148,7 +166,7 @@ export class ProximityVoice extends EventTarget {
   }
   flushIce(id, p) { p.descriptionSent = true; for (const candidate of p.localIce) this.sendSignal(id, {type:'ice', candidate}); p.localIce = []; }
   async offer(id) {
-    const m = this.members.get(id); if (!m || this.peers.has(id)) return;
+    const m = this.members.get(id); if (!m || this.peers.has(id)||!this.eligible(id)||this.peers.size>=VOICE_NEIGHBORS) return;
     m.attempts++;
     let p;
     try {
@@ -160,11 +178,11 @@ export class ProximityVoice extends EventTarget {
   }
   async signal(id, b) {
     const m = this.members.get(id);
-    if (!this.active || !m || m.session !== b.session || b.targetSession !== this.session) return;
+    if (!this.active || !m || m.session !== b.session || b.targetSession !== this.session||!this.eligible(id)) return;
     let p = this.peers.get(id);
     if (b.type !== 'offer' && p?.negotiation !== b.negotiation) return;
     if (b.type === 'offer') {
-      if (id >= this.connection.peerId) return;
+      if (id >= this.connection.peerId||!this.peers.has(id)&&this.peers.size>=VOICE_NEIGHBORS) return;
       this.closePeer(id); p = this.makePeer(id, false, b.negotiation);
       await p.pc.setRemoteDescription(b.description); if (!p.alive()) return;
       const transceiver = p.pc.getTransceivers().find(t => t.receiver.track.kind === 'audio');
@@ -189,7 +207,7 @@ export class ProximityVoice extends EventTarget {
   }
   closePeer(id) { const p = this.peers.get(id); this.peers.delete(id); if (p) { p.pc.ontrack = p.pc.onicecandidate = p.pc.onconnectionstatechange = null; p.pc.close(); } this.audio?.remove(id); }
   remove(id) { this.closePeer(id); if (this.members.delete(id)) this.changed(); }
-  clearPeers() { for (const id of this.peers.keys()) this.closePeer(id); this.members.clear(); }
+  clearPeers() { for (const id of this.peers.keys()) this.closePeer(id); this.members.clear();this.selected.clear();this.lastPresence=null;this.nextOfferAt=0; }
   reset() { this.stopMicrophone(); this.clearPeers(); this.session = crypto.randomUUID(); this.announce(); this.changed(); }
   async retry() { this.reset(); await this.join(); }
   leave() {
