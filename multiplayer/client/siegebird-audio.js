@@ -82,6 +82,13 @@ export function createSiegebirdAudio({context, volume = 1} = {}) {
       if (golden) { tone({from: 2637, length: .6, gain: .03, at: .02}); tone({from: 3951, length: .5, gain: .018, at: .05}); }
     },
     ready() { tone({from: 2350, length: .07, gain: .012}); },
+    // Perfect wind: the pawl rings true. A bright resonant fifth over a soft shimmer (blue resonance in sound).
+    perfect() {
+      for (const [f, a, at] of [[1760, .045, 0], [2637, .035, .03], [3520, .02, .06]]) tone({from: f, length: .55, gain: a, at, attack: .006});
+      hiss({length: .35, gain: .025, freq: 6500, q: .8});
+    },
+    // A mistimed press: the trigger knocks against the held pawl.
+    fumble() { tone({type: 'triangle', from: 300, to: 190, length: .05, gain: .035}); hiss({length: .02, gain: .04, freq: 1400, q: 2}); },
     stats,
     dispose() { try { out.disconnect(); } catch { /* already gone */ } },
   };

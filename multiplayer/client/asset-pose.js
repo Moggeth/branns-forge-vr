@@ -188,7 +188,7 @@ function showWound(wrap, wound) {
   wrap.userData.siegebirdWrapCount = segs * w.radial * 6;
 }
 
-export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, time = 0, templates} = {}) {
+export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
   if (tool === 'bow') {
     const upper = visual.getObjectByName('UpperLimb'), lower = visual.getObjectByName('LowerLimb');
@@ -219,9 +219,9 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, re
     // Reload time (seconds since the shot) drives the whole Siegebird cycle (siegebird-reload.js): the string
     // throws the sled forward and the drum freewheels back, the clutch bites, two crank turns wind one drum turn
     // through the 10:20 gears while the pawl clicks over the ratchet, the cable winds on, the arms fold back, and
-    // the songbird seats the next bolt. Callers without a clock pass legacy recoil 0..1.
+    // the songbird seats the next bolt. Callers without a clock pass legacy recoil 0..1. hand: a VR hand's wind.
     const t = Number.isFinite(reload) ? reload : recoil > 0 ? (1 - THREE.MathUtils.clamp(recoil, 0, 1)) * .45 : Infinity;
-    const m = siegebirdMechanism(t), cocked = m.cocked;
+    const m = siegebirdMechanism(t, hand), cocked = m.cocked;
     const parts = visual.userData.crossbowParts ||= Object.fromEntries(['Pinion', 'Reduction', 'Drum', 'Crank', 'CrankKnob', 'Clutch', 'Trigger', 'Latch', 'Sled', 'Bolt'].map(n => [n, visual.getObjectByName(n)]));
     const rotate = (name, axis, value) => { const node = parts[name]; if (node) node.rotation[axis] = value; };
     rotate('Pinion', 'x', m.pinion); rotate('Reduction', 'x', m.drum + Math.PI / 20); rotate('Drum', 'x', m.drum);

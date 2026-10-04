@@ -240,10 +240,11 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
   }
 
   // A reload began: n is the shared reload index (side + plumage), golden may still be unknown (null).
-  function shot(visual, {n, golden = null, playerId = '', time}) {
+  // quick: a perfect wind earned a fast reload, so the whole bird timeline plays at 1/SIEGEBIRD_RELOAD.quick.
+  function shot(visual, {n, golden = null, playerId = '', time, quick = false}) {
     const rig = rigFor(visual);
-    rig.reloads = rig.reloads.filter(r => time - r.start < R.gone && r.n !== n).slice(-1);
-    rig.reloads.push({n, golden, playerId, start: time, side: siegebirdSide(n), plumage: siegebirdPlumage(playerId, n), seated: false, last: -1});
+    rig.reloads = rig.reloads.filter(r => r.last < R.gone && r.n !== n).slice(-1);
+    rig.reloads.push({n, golden, playerId, start: time, rate: quick ? 1 / R.quick : 1, side: siegebirdSide(n), plumage: siegebirdPlumage(playerId, n), seated: false, last: -1});
     if (rig.boltGlow) rig.boltGlow.visible = false;
     rig.loadedGolden = false;
   }
@@ -255,16 +256,19 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
 
   // Advance every active reload on this crossbow. viewer (world Vector3) culls remote birds by distance.
   // Returns {cues:[{cue, n, side, plumage, golden}], bird: world position of the nearest active bird or null}.
-  function update(visual, time, {viewer = null, dt = 1 / 60} = {}) {
+  // reloadTime (optional): the local player's presentation clock for the newest reload (siegebird-wind.js), which
+  // holds the bird beside the rail while a hand is still winding. Wings always beat on the real clock.
+  function update(visual, time, {viewer = null, dt = 1 / 60, reloadTime = null} = {}) {
     const rig = visual.userData.siegebirdFlock; if (!rig) return null;
     let near = true;
     if (viewer) { rig.group.getWorldPosition(tmp.world); near = tmp.world.distanceTo(viewer) < maxDistance; }
     const cues = []; let active = null;
-    rig.reloads = rig.reloads.filter(r => time - r.start <= R.gone + .05);
+    rig.reloads.forEach((r, i) => { r.wing = (time - r.start) * r.rate; r.t = i === rig.reloads.length - 1 && reloadTime !== null ? reloadTime : r.wing; });
+    rig.reloads = rig.reloads.filter(r => r.t <= R.gone + .05 && time - r.start < 8);
     // A bird whose reload has expired (or a hitch skipped past its exit) never lingers in place.
     rig.birds.forEach((b, slot) => { if (b && !rig.reloads.some(r => r.n % 2 === slot)) b.root.visible = false; });
     rig.reloads.forEach((r, i) => {
-      const t = time - r.start;
+      const t = r.t;
       // Bird slot follows reload parity so a fresh shot never steals the bird still flying off.
       const bird = rig.birds[r.n % 2] ||= makeBird(rig);
       // Once clear of the sight picture the bird leaves the crossbow for the world: a tree perch or the mountains.
@@ -273,8 +277,8 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       if (!pose) { bird.root.visible = false; }
       else {
         dress(bird, r.plumage, r.golden === true);
-        bird.root.visible = true; placeBird(bird, pose, t); active = bird;
-        if (r.golden === true && bird.halo) bird.halo.material.opacity = .75 + .25 * Math.sin(t * 19);
+        bird.root.visible = true; placeBird(bird, pose, r.wing); active = bird;
+        if (r.golden === true && bird.halo) bird.halo.material.opacity = .75 + .25 * Math.sin(r.wing * 19);
       }
       if (t >= R.enter && r.last < R.enter) cues.push({cue: 'enter', n: r.n, side: r.side, plumage: r.plumage, golden: r.golden === true});
       if (t >= R.seat && !r.seated) {
@@ -319,7 +323,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     bird.root.updateWorldMatrix(true, false); bird.root.matrixWorld.decompose(wtmp.a, wtmp.q, wtmp.s);
     // Launch velocity from the authored exit curve, carried into world space.
     const p0 = siegebirdBirdPose(t, r.side, {pos: new THREE.Vector3(), forward: new THREE.Vector3(), flap: {}}).pos, p1 = siegebirdBirdPose(Math.min(R.gone, t + .02), r.side, {pos: new THREE.Vector3(), forward: new THREE.Vector3(), flap: {}}).pos;
-    const v = rig.native.localToWorld(p1.clone()).sub(rig.native.localToWorld(p0.clone())).divideScalar(.02);
+    const v = rig.native.localToWorld(p1.clone()).sub(rig.native.localToWorld(p0.clone())).divideScalar(.02 / r.rate);
     if (roost.length >= ROOST.max) evict();
     if (roost.length >= ROOST.max) return false;
     const w = {bird: pool.pop() || makeBird(null, world.group), key, h, golden: r.golden === true, plumage: r.plumage, scale: wtmp.s.x, pos: wtmp.a.clone(), vel: v, born: lastWorldTime, state: 'fly', path: null, perch: null};
@@ -434,6 +438,11 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       s.points.visible = live > 0; s.points.geometry.attributes.position.needsUpdate = live > 0;
       s.points.material.opacity = .95;
     }
+    for (const r of rig.resonance || []) if (r.visible) {
+      if (r.userData.fresh) { r.userData.fresh = false; r.userData.at = time; }
+      const age = time - r.userData.at; if (age > .45) { r.visible = false; continue; }
+      r.scale.setScalar(r.userData.size * (1 + age * 7)); r.material.opacity = (1 - age / .45) ** 1.6;
+    }
     const b = rig.burst;
     if (b?.visible) { const age = time - b.userData.at; if (age > .4) b.visible = false; else { b.scale.setScalar(.12 + age * 1.6); b.material.opacity = (1 - age / .4) ** 1.5; } }
   }
@@ -443,6 +452,18 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     const rig = rigFor(visual); setLoadedBolt(rig, false);
     if (!golden) return; goldenFx(rig);
     if (rig.burst) { rig.burst.position.set(0, 1.06, .185); rig.burst.visible = true; rig.burst.userData.at = rig.lastTime ?? 0; rig.burst.userData.fresh = true; }
+  }
+  // Perfect wind: the pawl rings with blue resonance light (ring + core at the ratchet) as the next reload quickens.
+  function perfect(visual) {
+    const rig = rigFor(visual), fx = fxTextures(); if (!fx) return;
+    if (!rig.resonance) {
+      const make = (map, size) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({map, color: 0x7fd8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false}));
+        s.userData.ignoreContact = true; s.userData.size = size; s.visible = false; rig.group.add(s); return s; };
+      rig.resonance = [make(fx.ring, .05), make(fx.glow, .07)];
+    }
+    const latch = visual.getObjectByName('Latch'); visual.updateWorldMatrix(true, true);
+    if (latch) rig.native.worldToLocal(latch.getWorldPosition(tmp.world)); else tmp.world.set(.12, .648, 0);
+    for (const s of rig.resonance) { s.position.copy(tmp.world); s.visible = true; s.userData.at = rig.lastTime ?? 0; s.userData.fresh = true; }
   }
   function loadedGolden(visual) { return !!visual.userData.siegebirdFlock?.loadedGolden; }
   // Equip / respawn with a bolt already on the rail (no bird).
@@ -454,5 +475,5 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     shimmerMask.dispose();
     goldenMaterial.map.dispose(); goldenMaterial.emissiveMap.dispose(); goldenMaterial.dispose();
   }
-  return {shot, inform, update, updateWorld, attachWorld, rest, fired, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
+  return {shot, inform, update, updateWorld, attachWorld, rest, fired, perfect, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
 }

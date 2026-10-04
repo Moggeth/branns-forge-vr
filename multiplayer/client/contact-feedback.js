@@ -150,9 +150,13 @@ export function createContactFeedback({sources = () => [], playerId = () => null
       return false;
     },
     // Siegebird reload on the weapon hand: every other ratchet tooth, the latch, and the bird seating the bolt.
-    siegebird(cue, {golden = false, index = 0} = {}) {
+    // crank: a VR hand is winding, so the ratchet clicks land in that (free) hand instead.
+    siegebird(cue, {golden = false, index = 0, crank = false} = {}) {
       if (disposed || tool() !== 'crossbow') return false;
       const hand = toolHand('crossbow', weaponHand());
+      if (crank && cue === 'click') return index % 2 === 0 && pulse(otherHand(hand), {amplitude: .16, duration: 9});
+      if (crank && cue === 'latch') return pulse(otherHand(hand), {amplitude: .3, duration: 16});
+      if (cue === 'perfect') return pulse(hand, {amplitude: .45, duration: 30});
       if (cue === 'click') return index % 3 === 0 && pulse(hand, {amplitude: .1, duration: 8});   // 17 ratchet teeth: every third, inside the pulse budget
       if (cue === 'latch') return pulse(hand, {amplitude: .22, duration: 14});
       if (cue === 'seat') return pulse(hand, golden ? {amplitude: .6, duration: 55} : {amplitude: .3, duration: 18});

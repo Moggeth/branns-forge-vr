@@ -12,6 +12,7 @@ export const SIEGEBIRD_RELOAD = Object.freeze({
   seat: .80,                 // bolt released into the channel; the crossbow's own Bolt shows from here
   settle: .09,               // seated bolt's little drop-and-bounce
   gone: 1.6,                 // bird has flown off the far side
+  quick: .75,                // a perfect wind makes the next reload run in 0.75 s (shared/combat.js quickTicks)
 });
 
 // Reload n=1 (the first) comes from the right, n=2 from the left, alternating after that.
@@ -37,10 +38,11 @@ export const SIEGEBIRD_WINCH = Object.freeze({
 // Mechanism pose for a reload time t (Infinity = fully loaded at rest). Angles in radians about each part's axle.
 // cocked: sled draw 0 forward .. 1 drawn and latched. flex: bow-arm overshoot after release (negative = forward).
 // string: decaying string hum. clutch: 0 engaged .. 1 slid out. wound: cable turns on the drum.
-export function siegebirdMechanism(t) {
+// hand (0..1, optional): a VR hand turning the crank drives the wind instead of the clock (siegebird-wind.js).
+export function siegebirdMechanism(t, hand = null) {
   const R = SIEGEBIRD_RELOAD, W = SIEGEBIRD_WINCH;
   if (!Number.isFinite(t) || t < 0) return {cocked: 1, crank: 0, pinion: 0, drum: 0, clutch: 0, latch: 0, trigger: 0, string: 0, flex: 0, wound: W.baseWraps + 1, bolt: true, boltDrop: 0, kick: 0};
-  const wind = easeInOut((t - R.windStart) / (R.windEnd - R.windStart));
+  const wind = Number.isFinite(hand) && t >= R.windStart ? clamp01(hand) : easeInOut((t - R.windStart) / (R.windEnd - R.windStart));
   const cocked = t < W.release ? 1 - (t / W.release) ** 2 : wind;
   const u = t - W.release;
   const flex = u > 0 && u < .5 ? -.26 * Math.exp(-u * 16) * Math.sin(Math.PI * 2 * 7 * u) * (1 - cocked) ** 2 : 0;
@@ -59,6 +61,15 @@ export function siegebirdMechanism(t) {
   const drumTurns = cocked, crank = t < R.windStart ? 0 : wind * W.crankTurns * Math.PI * 2;
   return {cocked, crank, pinion: drumTurns * W.crankTurns * Math.PI * 2, drum: -drumTurns * Math.PI * 2, clutch, latch, trigger, string, flex,
     wound: W.baseWraps + cocked, bolt: t >= R.seat, boltDrop, kick};
+}
+
+// Ratchet cues crossed while a hand winds from draw a to draw b: one click per tooth, then the latch.
+export function siegebirdHandCues(a, b) {
+  const W = SIEGEBIRD_WINCH, out = [];
+  if (!(b > a)) return out;
+  for (let i = Math.floor(a * W.ratchetTeeth) + 1; i < W.ratchetTeeth && i / W.ratchetTeeth <= b; i++) out.push({cue: 'click', index: i});
+  if (a < 1 && b >= 1) out.push({cue: 'latch'});
+  return out;
 }
 
 // Reload time at which the winding reaches a given draw (inverse of the eased wind).

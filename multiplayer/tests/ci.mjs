@@ -22,7 +22,7 @@ const suite = [
   'placement-rotation','placement-session','progressive-sunder','quality-performance',
   'ranged-fx','saved-worlds-chooser.test','session','session-reload','settlement-budget',
   'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
-  'siegebird-flock','siegebird-songbird','simulation','skeleton-performance','skin-bounds',
+  'siegebird-flock','siegebird-songbird','siegebird-wind','simulation','skeleton-performance','skin-bounds',
   'skull-surface-regression','solo-session','spell-presentation','spell-spectacle',
   'spell-availability','spell-targeting','starting-world','state-codec','terrain-presentation','terrain-ray',
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',

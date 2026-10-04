@@ -36,7 +36,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {specialPose, SPECIAL_MOTION} from './weapon-special-motion.js';
 import {createWeaponController} from './weapon-controller.js';
-import {createContactFeedback} from './contact-feedback.js';
+import {createContactFeedback, otherHand} from './contact-feedback.js';
 import {createCombatView} from './combat-view.js';
 import {createEntView} from './ent-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
@@ -71,6 +71,7 @@ import {createMaterialAudio} from './material-audio.js';
 import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from './siegebird-flock.js';
 import {createSiegebirdAudio} from './siegebird-audio.js';
 import {siegebirdMechanism, siegebirdCues} from './siegebird-reload.js';
+import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {worldTrees} from '../shared/world-content.js';
 
@@ -188,7 +189,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   shrine.visible = false;
   scene.add(shrine);
   let resumeCapture=false,deliberateRelease=false,wasCaptured=false,lastCaptureLost=-Infinity;
-  let aiming=false,adsAmount=0,siegebirdSight=null,siegebirdAim=null;
+  let aiming=false,adsAmount=0,siegebirdSight=null,siegebirdAim=null;const siegebirdWind=createSiegebirdWind();
   const weaponAnchor = new THREE.Group();
   weaponAnchor.position.fromArray(FPS_WEAPON_POSE.position);
   weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);
@@ -304,7 +305,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function sendSpecial(){const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=heightAt(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}
   function requestSpecial(){if(!active||specialSwing)return;if(tool==='pick'){beginWallAim();return;}if(tool==='axe'&&!renderer.xr.isPresenting){const p=snapshot.players.find(p=>p.id===playerId);if((snapshot.tick||0)-(p?.specialTick??-1000)<specialCooldown('axe'))return;specialSwing={at:performance.now(),sent:false,rest:{position:weaponAnchor.position.clone(),quaternion:weaponAnchor.quaternion.clone()}};swingContact=true;swingAt=-Infinity;}else sendSpecial();}
-  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();const golden=tool==='crossbow'&&!!siegebirdFlock?.loadedGolden(axeModel);feedback.release(tool,{golden});onAction('fire',details);if(tool==='crossbow')siegebirdFired(golden);},emitFlame:details=>{unlockAudio();onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0;},special:requestSpecial});
+  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();const golden=tool==='crossbow'&&!!siegebirdFlock?.loadedGolden(axeModel);feedback.release(tool,{golden});onAction('fire',details);if(tool==='crossbow')siegebirdFired(golden);},emitFlame:details=>{unlockAudio();onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},reload:{time:()=>siegebirdWind.time(),press:()=>siegebirdWindVerdict(siegebirdWind.press())},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0;},special:requestSpecial});
   function attachWeapon() {
     if (!axeModel) return;
     const tracked = [...controllerSources.entries()].filter(([, source]) => source.targetRayMode === 'tracked-pointer');
@@ -667,9 +668,37 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function siegebirdSound(){if(!audioContext)return null;try{return siegebirdAudio??=createSiegebirdAudio({context:audioContext});}catch{return null;}}
   function siegebirdFired(golden){
     // Predict the reload index from authority (one shot per >=0.9 s, far slower than snapshots); the host's roll arrives with it.
-    const me=snapshot.players.find(p=>p.id===playerId),n=(me?.siegebird?.n??0)+1;siegebirdLocal.n=n;siegebirdLocal.prevT=0;
-    const flock=siegebirdFlockReady();if(flock&&axeModel){flock.fired(axeModel,golden);flock.shot(axeModel,{n,golden:null,playerId,time:performance.now()/1000});}
+    const me=snapshot.players.find(p=>p.id===playerId),n=(me?.siegebird?.n??0)+1;
+    // Perfect wind on the reload that just finished makes this one quick: the host's verdict once it has arrived, else ours.
+    const sb=me?.siegebird,quick=sb&&sb.n===siegebirdLocal.n&&sb.wind?sb.wind===1:siegebirdWind.verdict()===1;
+    siegebirdLocal.n=n;siegebirdLocal.prevT=0;siegebirdWind.fired({quick});
+    const flock=siegebirdFlockReady();if(flock&&axeModel){flock.fired(axeModel,golden);flock.shot(axeModel,{n,golden:null,playerId,time:performance.now()/1000,quick});}
     siegebirdSound()?.fire(golden);
+  }
+  // Perfect wind verdict (fire pressed on the latch, or a VR hand latched the crank before the bird seats): the host
+  // judges it again from its own clock; the chime and resonance glint are immediate.
+  function siegebirdWindVerdict(v){
+    if(!v)return;onAction('wind',v.hand?{hand:true}:{});
+    const a=siegebirdSound();
+    if(v.perfect){a?.perfect?.();feedback.siegebird?.('perfect');if(axeModel)siegebirdFlock?.perfect(axeModel);}else if(!v.hand)a?.fumble?.();
+  }
+  // VR: the free hand squeezes on the crank knob and turns it about the crank axle (siegebird-wind.js).
+  const siegebirdGripState={held:false,angle:0},siegebirdHandPos=new THREE.Vector3(),siegebirdCenter=new THREE.Vector3(),siegebirdKnob=new THREE.Vector3(),siegebirdAxisU=new THREE.Vector3(),siegebirdAxisV=new THREE.Vector3();
+  function siegebirdGrip(){
+    const g=siegebirdGripState;
+    const crank=axeModel?.getObjectByName('Crank'),knob=axeModel?.getObjectByName('CrankKnob');
+    const index=weaponHand&&[...controllerSources.entries()].find(([,s])=>s.handedness===otherHand(weaponHand))?.[0];
+    if(!renderer.xr.isPresenting||tool!=='crossbow'||!crank?.parent||!knob||index===undefined||index===null){g.held=false;return null;}
+    const squeeze=!!controllerSources.get(index)?.gamepad?.buttons?.[1]?.pressed;
+    grips[index].getWorldPosition(siegebirdHandPos);knob.getWorldPosition(siegebirdKnob);crank.getWorldPosition(siegebirdCenter);
+    const m=crank.parent.matrixWorld;siegebirdAxisU.setFromMatrixColumn(m,1).normalize();siegebirdAxisV.setFromMatrixColumn(m,2).normalize();
+    const off=siegebirdHandPos.sub(siegebirdCenter),angle=Math.atan2(off.dot(siegebirdAxisV),off.dot(siegebirdAxisU));
+    const reach=siegebirdHandPos.add(siegebirdCenter).distanceTo(siegebirdKnob);
+    if(!g.held&&squeeze&&siegebirdWind.winding()&&reach<SIEGEBIRD_WIND.grabReach){g.held=true;g.angle=angle;return {held:true,delta:0};}
+    if(g.held&&(!squeeze||reach>SIEGEBIRD_WIND.holdReach||!siegebirdWind.winding())){g.held=false;return null;}
+    if(!g.held)return null;
+    let delta=angle-g.angle;delta-=Math.round(delta/(Math.PI*2))*Math.PI*2;g.angle=angle;
+    return {held:true,delta};
   }
   function siegebirdCue(c){
     const a=siegebirdSound();
@@ -685,8 +714,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const sb=snapshot.players.find(p=>p.id===playerId)?.siegebird,live=reload<=1.7;
     if(sb&&live&&sb.n===siegebirdLocal.n)flock.inform(axeModel,{n:sb.n,golden:sb.golden});
     else if(sb&&!live&&flock.loadedGolden(axeModel)!==sb.golden)flock.rest(axeModel,sb.golden);
-    const result=flock.update(axeModel,now/1000,{});
-    for(const c of siegebirdCues(siegebirdLocal.prevT,reload))if(!['enter','arrive','seat','leave'].includes(c.cue))siegebirdCue(c);
+    const result=flock.update(axeModel,now/1000,{reloadTime:reload});
+    // A hand on the crank plays its own ratchet clicks and latch (frame loop); the clock plays everything else.
+    const hand=siegebirdWind.hand()!==null;
+    for(const c of siegebirdCues(siegebirdLocal.prevT,reload))if(!['enter','arrive','seat','leave'].includes(c.cue)&&!(hand&&['click','latch'].includes(c.cue)))siegebirdCue(c);
     for(const c of result?.cues||[])siegebirdCue(c);
     siegebirdLocal.prevT=reload;
   }
@@ -1132,7 +1163,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!swingContact&&progress>=.5){swingContact=true;const hit=contactRay();onAction('strike',hit?{...hit,tool}:{targetId:'miss',point:localPosition.toArray(),normal:[0,1,0],tool});}
     if(specialSwing){const progress=(now-specialSwing.at)/(SPECIAL_MOTION.axe.duration*1000);if(!specialSwing.sent&&progress>=SPECIAL_MOTION.axe.release){specialSwing.sent=true;sendSpecial();}const pose=specialPose('axe',progress,specialSwing.rest);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);if(progress>=1)specialSwing=null;}
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
-    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
+    {const wound=siegebirdWind.update(dt,siegebirdGrip());for(const c of wound.cues)siegebirdCue({...c,crank:true});siegebirdWindVerdict(wound.wind);}
+    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
     siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);updateFireAudio(weaponState.firing);

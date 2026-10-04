@@ -18,11 +18,21 @@ const partPose = p => p&&vec(p.position)&&quat(p.quaternion)&&(p.localBounds===u
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 // Siegebird reload: a songbird brings each bolt (client presentation, 1.0 s). The host accepts a
 // shot slightly early so network jitter never swallows a click the bird visibly allowed.
-export const SIEGEBIRD=Object.freeze({reloadTicks:60,acceptTicks:54,damage:48,goldenMultiplier:4,goldenBase:.03,goldenPerHit:.0015,goldenMax:.15,hitCap:1e6});
+// Perfect wind: the first fire press during a reload is judged against the pawl latching (60% of the reload);
+// within windowTicks of it, the next reload runs quick (45 ticks). VR hands that wind the crank themselves earn it
+// by latching before the bird seats the bolt (80%). A press outside the window forfeits it for this reload.
+export const SIEGEBIRD=Object.freeze({reloadTicks:60,acceptTicks:54,quickTicks:45,quickAcceptTicks:40,latch:.6,handLatch:.8,handMin:.3,windowTicks:6,damage:48,goldenMultiplier:4,goldenBase:.03,goldenPerHit:.0015,goldenMax:.15,hitCap:1e6});
+export const siegebirdReloadTicks=quick=>quick?SIEGEBIRD.quickTicks:SIEGEBIRD.reloadTicks;
+// Judge a wind press `elapsed` ticks into a reload. window narrows for client-side prediction.
+export function siegebirdPerfect(elapsed,{quick=false,hand=false,window=SIEGEBIRD.windowTicks}={}){
+  const d=siegebirdReloadTicks(quick);
+  return hand?elapsed>=Math.round(SIEGEBIRD.handMin*d)&&elapsed<=Math.round(SIEGEBIRD.handLatch*d)+window:Math.abs(elapsed-Math.round(SIEGEBIRD.latch*d))<=window;
+}
 export function siegebirdGoldenChance(hits=0){return Math.min(SIEGEBIRD.goldenMax,SIEGEBIRD.goldenBase+Math.max(0,hits)*SIEGEBIRD.goldenPerHit);}
 // Deterministic per-reload roll (FNV-1a of player, reload index and tick): every peer replays it identically.
 export function siegebirdRoll(id,n,tick){let h=0x811c9dc5;for(const c of `${id}:${n}:${tick}`){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193);}return (h>>>0)/4294967296;}
-export const validSiegebird=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===3&&Number.isSafeInteger(v.n)&&v.n>=0&&v.n<=1e9&&typeof v.golden==='boolean'&&Number.isSafeInteger(v.hits)&&v.hits>=0&&v.hits<=SIEGEBIRD.hitCap;
+// quick/wind are optional together (saves from before perfect wind carry only n, golden and hits).
+export const validSiegebird=v=>v&&typeof v==='object'&&!Array.isArray(v)&&(Object.keys(v).length===3||Object.keys(v).length===5&&typeof v.quick==='boolean'&&[-1,0,1].includes(v.wind))&&Number.isSafeInteger(v.n)&&v.n>=0&&v.n<=1e9&&typeof v.golden==='boolean'&&Number.isSafeInteger(v.hits)&&v.hits>=0&&v.hits<=SIEGEBIRD.hitCap;
 const depth = n => Number.isFinite(n)&&n>=0&&n<=.25;
 const thickness = n => Number.isFinite(n)&&n>=0&&n<=.8;
 const rotate = (v,q) => {const [x,y,z,w]=q,[a,b,c]=v,tx=2*(y*c-z*b),ty=2*(z*a-x*c),tz=2*(x*b-y*a);return [a+w*tx+y*tz-z*ty,b+w*ty+z*tx-x*tz,c+w*tz+x*ty-y*tx];};
@@ -185,12 +195,19 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='fire'){
     if(!['bow','crossbow'].includes(p.tool)||!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
     const curve=m.curve===undefined?[0,0,0]:m.curve;if(!vec(curve,1.31)||Math.hypot(...curve)>1.31||m.draw!==undefined&&(!Number.isFinite(m.draw)||m.draw<0||m.draw>1))return fail('invalid_action');
-    if(state.tick-p.attackTick<(p.tool==='bow'?33:SIEGEBIRD.acceptTicks))return fail('cooldown');if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
+    if(state.tick-p.attackTick<(p.tool==='bow'?33:p.siegebird?.quick?SIEGEBIRD.quickAcceptTicks:SIEGEBIRD.acceptTicks))return fail('cooldown');if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.attackTick=state.tick;const id=ctx.nextId(state,'q'),speed=p.tool==='bow'?18+18*Math.max(.2,m.draw??.67):42;
     // The bolt on the rail was decided when the previous bird was sent; roll the next bird now.
     let golden=false,reload;
-    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits);reload={n:sb.n,golden:sb.golden};}
+    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits);sb.quick=sb.wind===1;sb.wind=0;reload={n:sb.n,golden:sb.golden,...(sb.quick?{quick:true}:{})};}
     state.projectiles.push({id,ownerId:p.id,kind:p.tool==='bow'?'arrow':'bolt',position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*speed),curve:p.tool==='bow'?[...curve]:[0,0,0],bornTick:state.tick,trail:[[...m.origin]],...(golden?{golden:true}:{})});return ok([{kind:'shoot',weapon:p.tool,phoenix:p.tool==='bow'&&Math.hypot(...curve)>.000001,position:[...m.origin],id,...(golden?{golden:true}:{}),...(reload?{reload}:{})}]);
+  }
+  // Perfect wind press (see SIEGEBIRD). Never fails visibly: a late, early or repeated press just changes nothing.
+  if(m.action==='wind'){
+    if(p.tool!=='crossbow'||m.hand!==undefined&&typeof m.hand!=='boolean')return fail('invalid_action');
+    const sb=p.siegebird,elapsed=state.tick-p.attackTick;
+    if(sb&&!sb.wind&&elapsed<siegebirdReloadTicks(sb.quick)){sb.quick=!!sb.quick;sb.wind=siegebirdPerfect(elapsed,{quick:sb.quick,hand:m.hand===true})?1:-1;}
+    return ok([]);
   }
   if(m.action==='projectileHit')return fail('host_required');
   if(m.action==='grab'){const d=state.detachedParts.find(q=>q.id===m.id);if(!d||d.heldBy||state.detachedParts.some(q=>q.heldBy===p.id)||dist(d.position,p.position.map((n,i)=>n+(i===1?1:0)))>2.8)return fail('out_of_reach');d.heldBy=p.id;d.velocity=[0,0,0];d.angularVelocity=[0,0,0];heldPose(d,p);p.tool='limb';return ok([{kind:'grab',id:d.id,position:[...d.position]}]);}
