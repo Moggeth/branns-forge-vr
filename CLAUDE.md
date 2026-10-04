@@ -16,3 +16,6 @@ Current truth is code + latest verification, not an old milestone paragraph. A s
 render or passing geometry check does not establish in-game, mobile or headset quality.
 Keep shared authority, presentation and input distinct; preserve save compatibility.
 Use hidden/no-window background processes. Never open recurring terminal windows.
+
+Every PR that changes the game adds a player-facing patch notes entry: one new file in
+`multiplayer/patch-notes/` (format and tone in its README). CI fails a game-changing PR without one.
