@@ -181,7 +181,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
       if (s.p.y < height(s.p.x, s.p.z) + .03) { s.age = Math.max(s.age, FLOW_TIME); return; }
       if (!s.streak && q >= .5 && s.p.distanceToSquared(s.mark) > .14 * .14) {
         const free = splats.find(o => !o.live);
-        if (free) { const at = _c.copy(s.mark), r = s.r * .55, seed = s.seed; s.mark.copy(s.p); addSplat(at, s.n, r, seed); free.age = s.age; free.life = s.life - s.age; free.streak = true; }
+        if (free) { const at = _c.copy(s.mark), r = s.r * .55, seed = s.seed; s.mark.copy(s.p); addSplat(at, s.n, r, seed); free.age = s.age; free.life = s.life; /* fades with the splat that left it */ free.streak = true; }
       }
       return;
     }
