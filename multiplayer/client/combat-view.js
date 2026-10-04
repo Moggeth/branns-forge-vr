@@ -256,7 +256,8 @@ export function snapshotDetachedPart(root, part) {
 export function maskMissingParts(root, missing = []) {
   const signature = [...missing].sort().join(',');
   root.traverse(mesh => {
-    if (!mesh.isMesh || !isVisible(mesh, root)) return;
+    // Reset also runs during actor teardown: broken shields and hidden actors can still own mask buffers.
+    if (!mesh.isMesh || (missing.length && !isVisible(mesh, root))) return;
     // An untouched enemy needs no expensive per-triangle dismemberment map.
     if (!missing.length && !geometryRecords.has(mesh)) return;
     const record = recordGeometry(mesh);

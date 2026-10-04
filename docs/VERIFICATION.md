@@ -2254,3 +2254,7 @@ Baseline simulation.mjs failed because its Grove cap fixture targeted the protec
 ### Touch fullscreen surface - 2026-10-04
 
 Isolated main f1c1c55: persistent touch fullscreen control, menu/lobby surface, real fullscreen state and honest unsupported/denied recovery. Browser, build evidence, fixed overlap/containing-block failures, Windows patch-notes LF limitation, screenshots and physical-device gaps: [fullscreen acceptance](TOUCH-FULLSCREEN-20261004.md). No voice/audio, permissions, merge or deployment changes.
+
+## Browser robustness review — 2026-10-04
+
+See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 130 suites pass. CI anchors its child working directory and patch-note checks normalize Windows line endings. Immediate save roundtrips, held-item material conservation and hidden-geometry disposal now have regressions. Original saved-player ownership restoration remains unresolved; an inventory recovery copy prevents destructive autosave in the reproduced capped-pickup case. No production deployment or physical-device acceptance is claimed.
