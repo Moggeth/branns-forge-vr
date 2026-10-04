@@ -7,6 +7,7 @@ import {terrainHeight} from './terrain.js';
 import {worldTrees} from './world-content.js';
 import {chopTree, trunkRadius, treeScale, isFelled, CUT_RANGE} from './trees.js';
 import {specialCooldown} from './special-cooldowns.js';
+import {hasTalent} from './hero-progress.js';
 
 // Tunable; room for mastery to grow reach, arc and the tree cap later.
 export const AXE_CLEAVE = Object.freeze({
@@ -21,13 +22,16 @@ export const AXE_CLEAVE = Object.freeze({
   cutHeight: .85,      // felling cut, authored metres above the root flare (inside CUT_RANGE)
 });
 
+// Whirlwind (axe talent): a full spin with 30% more reach.
+export const WHIRLWIND = Object.freeze({reach: AXE_CLEAVE.reach * 1.3, arc: 360});
+export const cleaveSpec = p => hasTalent(p, 'axe', 'whirlwind') ? WHIRLWIND : AXE_CLEAVE;
 const facingOf = p => [-Math.sin(p.yaw) || 0, -Math.cos(p.yaw) || 0];
 // Inside the sweep: within reach (plus a target radius) and within half the arc of facing, or right at the hero's feet.
-export function inCleave(p, x, z, radius = 0) {
+export function inCleave(p, x, z, radius = 0, spec = cleaveSpec(p)) {
   const [fx, fz] = facingOf(p), dx = x - p.position[0], dz = z - p.position[2], d = Math.hypot(dx, dz);
-  if (d > AXE_CLEAVE.reach + radius) return false;
-  if (d < AXE_CLEAVE.inner + radius) return true;
-  return (fx * dx + fz * dz) / d >= Math.cos(AXE_CLEAVE.arc / 2 * Math.PI / 180) - radius / d;
+  if (d > spec.reach + radius) return false;
+  if (d < AXE_CLEAVE.inner + radius || spec.arc >= 360) return true;
+  return (fx * dx + fz * dz) / d >= Math.cos(spec.arc / 2 * Math.PI / 180) - radius / d;
 }
 
 /** Targets of a cleave from the current state, without changing anything. */
@@ -43,7 +47,7 @@ export function planCleave(state, p) {
 }
 
 export function axeCleave(state, p, ctx, hitEnemyPart) {
-  if (state.tick - (p.specialTick ?? -1000) < specialCooldown('axe')) return {ok: false, code: 'cooldown', events: []};
+  if (state.tick - (p.specialTick ?? -1000) < specialCooldown('axe', p)) return {ok: false, code: 'cooldown', events: []};
   const {enemies, trees} = planCleave(state, p), [fx, fz] = facingOf(p), events = [], hits = [], felled = [];
   const position = [p.position[0], terrainHeight(state, p.position[0], p.position[2]), p.position[2]];
   p.specialTick = state.tick;
@@ -72,6 +76,6 @@ export function axeCleave(state, p, ctx, hitEnemyPart) {
     if (fell) felled.push(t.id);
   }
   events.unshift({kind: 'axe_cleave', weapon: 'axe', id: p.id, tick: state.tick, position, direction: [fx, 0, fz],
-    reach: AXE_CLEAVE.reach, arc: AXE_CLEAVE.arc, hits, trees: felled});
+    reach: cleaveSpec(p).reach, arc: cleaveSpec(p).arc, hits, trees: felled});
   return {ok: true, events};
 }

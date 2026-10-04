@@ -1,4 +1,4 @@
-/* Brann's Forge — desktop hotbar. Square slots in one iron-and-brass frame: [God/Hero] | weapons 1-8 | Special | Actions.
+/* Brann's Forge — desktop hotbar. Square slots in one iron-and-brass frame: [God/Hero] | weapons 1-7 | Special | Actions.
    Names live in a tooltip above each slot (the selected weapon's name and use stay in the hint line below the bar).
    Touch layouts (body.touch-controls-active) keep their own compact HUD from mobile-quiet.css; only the role
    medallion styling below is shared. */
