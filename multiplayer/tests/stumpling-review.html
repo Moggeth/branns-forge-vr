@@ -39,7 +39,7 @@ window.review={
  step,fell,run:(seconds=1)=>new Promise(done=>{let left=Math.round(seconds*60);const timer=setInterval(()=>{step(Math.min(4,left));left-=4;if(left<=0){clearInterval(timer);done(sim.snapshot().tick);}},1000/15);}),
  chop(){const s=sim.adventureWorld(),h=s.players[0],e=s.enemies.filter(e=>e.kind==='stumpling').sort((a,b)=>Math.hypot(a.position[0]-h.position[0],a.position[2]-h.position[2])-Math.hypot(b.position[0]-h.position[0],b.position[2]-h.position[2]))[0];if(!e)return false;
   const ev=[];hitEnemyPart(s,e,'torso',40,{tool:'axe',point:e.position,ownerId:'hero'},{nextId:(st,p)=>`${p}${++st.idCounter}`,terrainHeight},ev);for(const x of ev)game.handleEvent(x);publish();return ev.map(x=>x.kind);},
- skipToBurrow(){const s=sim.checkpoint();for(const e of s.enemies)if(e.kind==='stumpling')e.wakeTick=Math.max(0,s.tick-STUMPLING.lifeTicks+30);sim=loadSimulation(s);publish();},
+ skipToBurrow(){const s=sim.checkpoint(),c=s.enemies.filter(e=>e.kind==='stumpling');if(!c.length)return 0;s.tick=Math.max(s.tick,Math.max(...c.map(e=>e.wakeTick))+STUMPLING.lifeTicks-30);sim=loadSimulation(s);publish();return s.tick;},
  hero:(x,z,y)=>{const s=sim.checkpoint();s.players[0].position=[x,terrainHeight(s,x,z),z];if(y!==undefined)s.players[0].yaw=y;sim=loadSimulation(s);publish();},
  look:(x,y)=>game.lookByPixels(x,y),view(next){role=next;publish();game.setRole(next);if(next==='god')game.centerView();},
  /** Wake every felled stump that is not already walking, staggered a few ticks apart. */
