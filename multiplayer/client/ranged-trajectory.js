@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {PHOENIX_DEADZONE} from './weapon-controller.js';
+import {bowShotFromAim} from './bow-shot.js';
+export {bowShotFromAim} from './bow-shot.js';
 // Emberwing curved-draw forecast. The integrator mirrors shared/combat.js
 // stepCombat() term for term (dt, curl fraction, drag, gravity, trapezoid
 // position, lifetime and +/-55 bounds). No aim assist: it only draws the path.
@@ -7,21 +8,6 @@ import {PHOENIX_DEADZONE} from './weapon-controller.js';
 export const RANGED_DT = 1 / 60;
 const GRAVITY = Object.freeze({arrow: 5.8, flame: 5.2, fuel: 15, bolt: 3});
 const LIFE = Object.freeze({flame: 48, fuel: 180, arrow: 480, bolt: 480});
-
-// Same shot the weapon controller's end() would send for the current aim.
-// curveBase is the controller's latched direction (null when not curving).
-export function bowShotFromAim(aimDirection, curveBase, draw, out = {direction: [0, 0, 0], curve: [0, 0, 0], speed: 0}) {
-  const d = new THREE.Vector3().fromArray(aimDirection).normalize();
-  if (curveBase) {
-    const base = new THREE.Vector3().fromArray(curveBase).normalize();
-    const angle = Math.min(1.1, Math.acos(THREE.MathUtils.clamp(base.dot(d), -1, 1)));
-    const c = new THREE.Vector3().crossVectors(base, d);
-    if (angle >= PHOENIX_DEADZONE && c.lengthSq() > 1e-8) c.normalize().multiplyScalar(angle); else c.set(0, 0, 0);
-    base.toArray(out.direction); c.toArray(out.curve);
-  } else { d.toArray(out.direction); out.curve[0] = out.curve[1] = out.curve[2] = 0; }
-  out.speed = 18 + 18 * Math.max(.2, draw ?? .67);
-  return out;
-}
 
 // Integrates one projectile. Writes xyz samples into `out` (Float32Array) every
 // `sampleEvery` ticks plus the final point. `hit(from, to)` is the root's world
