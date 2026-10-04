@@ -1,10 +1,11 @@
 // Dawnhold and Grumblekeep presentation. Reads the authoritative home bases from
 // the snapshot (shared/home-bases.js) and animates everything on the frame clock:
 // dome shimmer and fades, heart bob, turret aim, zaps and ballista bolts.
-// Code-built stand-ins sized from the concept; a Blender kit can replace the parts later.
+// Code-built stand-ins draw until the Blender kit (client/home-base-art.js) loads, then the bases rebuild from it.
 import * as THREE from 'three';
 import {HOME, HOME_LAYOUT, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
 import {terrainHeight} from '../shared/terrain.js';
+import {buildKitBase, prepareHomeKit} from './home-base-art.js';
 
 const STYLE = {
   party: {stone: 0xb9ad97, trim: 0xc49a52, glow: 0x5fb4ff, wood: 0x8a6440, roof: 0x3d4a5c, accent: 0x2f6fd0, dome: new THREE.Color(0x58b4ff)},
@@ -33,7 +34,9 @@ function glowMat(color, intensity = 1.4) { return new THREE.MeshStandardMaterial
 export function createHomeBaseView({scene}) {
   const root = new THREE.Group(); root.name = 'home-bases'; scene.add(root);
   const bases = new Map(), effects = [], effectPool = [];
-  let snapshot = null, enabled = false;
+  let snapshot = null, enabled = false, kit = null;
+  const waterMats = {party: new THREE.MeshStandardMaterial({color: 0x2a6fb8, emissive: 0x3d9cff, emissiveIntensity: .55, roughness: .08, metalness: .1, transparent: true, opacity: .82}),
+    rivals: new THREE.MeshStandardMaterial({color: 0x3c8f12, emissive: 0x8cff4a, emissiveIntensity: .9, roughness: .3, transparent: true, opacity: .92})};
   const shared = {};
   for (const side of ['party', 'rivals']) {
     const s = STYLE[side];
@@ -137,7 +140,19 @@ export function createHomeBaseView({scene}) {
     return {group: g, head, aim: 0, targetAim: 0};
   }
 
+  function domeFor(side) {
+    const dome = new THREE.Mesh(geo.dome, new THREE.ShaderMaterial({vertexShader: domeVertex, fragmentShader: domeFragment, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: {uColor: {value: STYLE[side].dome}, uTime: {value: 0}, uAlpha: {value: 1}, uFlash: {value: 1}, uFlashAt: {value: new THREE.Vector3()}}}));
+    dome.renderOrder = 5; const [x, z] = homePoint(side, [0, 0]); dome.position.set(x, terrainHeight(snapshot, x, z, false) - .3, z); return dome;
+  }
+
   function buildBase(data) {
+    if (kit) {
+      const built = buildKitBase(kit, data, {height: (x, z) => terrainHeight(snapshot, x, z, false), glowColor: STYLE[data.side].glow, ball: geo.ball, ooze: shared.rivals.ooze, glow: shared[data.side].glow, ring: geo.ring});
+      built.water.traverse(n => { if (n.isMesh) n.material = waterMats[data.side]; });
+      root.add(built.group); const dome = domeFor(data.side); built.group.add(dome);
+      return {side: data.side, id: data.id, ...built, dome, domeAlpha: 1, heartAlive: 1, data, bellSwing: 0};
+    }
     const side = data.side, M = shared[side], group = new THREE.Group();
     group.name = `home-${side}`; root.add(group);
     const gateYaw = baseGateYaw(side); // local +Z points out of the gate
@@ -152,9 +167,7 @@ export function createHomeBaseView({scene}) {
       const built = part.kind === 'pylon' ? buildPylon(side, M) : part.kind === 'spire' ? buildSpire(side, M) : buildBallista(side, M);
       place(built.group, local); tag(built.group, part.id); built.kind = part.kind; built.alive = 1; built.data = part; parts.set(part.id, built);
     }
-    const dome = new THREE.Mesh(geo.dome, new THREE.ShaderMaterial({vertexShader: domeVertex, fragmentShader: domeFragment, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      uniforms: {uColor: {value: STYLE[side].dome}, uTime: {value: 0}, uAlpha: {value: 1}, uFlash: {value: 1}, uFlashAt: {value: new THREE.Vector3()}}}));
-    dome.renderOrder = 5; place(dome, [0, 0]); dome.position.y -= .3;
+    const dome = domeFor(side); group.add(dome);
     return {side, id: data.id, group, heart, fountain, parts, dome, domeAlpha: 1, heartAlive: 1, data};
   }
 
@@ -181,11 +194,26 @@ export function createHomeBaseView({scene}) {
     }
   }
 
+  function disposeBase(b) {
+    b.group.removeFromParent(); b.dome.material.dispose();
+    for (const m of b.baked || []) m.geometry.dispose();
+    if (b.heart.proxy) { b.heart.proxy.geometry.dispose(); b.heart.proxy.material.dispose(); }
+  }
+
+  function installKit(gltf) {
+    const k = prepareHomeKit(gltf); if (!k) return false;
+    kit = k; for (const b of bases.values()) disposeBase(b); bases.clear();
+    if (snapshot) sync(snapshot);
+    return true;
+  }
+
   function event(ev) {
     if (!enabled) return;
+    if (ev.kind === 'battle_wave') for (const b of bases.values()) b.bellSwing = 1;
     if (ev.kind === 'home_turret_fire') {
       const b = bases.get(ev.side), color = STYLE[ev.side]?.glow ?? 0xffffff, from = [...ev.from];
-      from[1] += ev.turret === 'spire' ? (ev.side === 'rivals' ? 5.2 : 6.6) : 1.4;
+      const tp = b?.parts.get(ev.id);
+      from[1] += ev.turret === 'spire' ? (tp?.tipY ?? (ev.side === 'rivals' ? 5.2 : 6.6)) : 1.45;
       const to = [ev.to[0], ev.to[1] + 1.1, ev.to[2]];
       spawnEffect(ev.turret === 'spire' ? 'zap' : 'bolt', from, to, color);
       const p = b?.parts.get(ev.id); if (p?.head) p.targetAim = Math.atan2(ev.to[0] - ev.from[0], ev.to[2] - ev.from[2]);
@@ -206,15 +234,21 @@ export function createHomeBaseView({scene}) {
       const u = b.dome.material.uniforms; u.uTime.value = t; u.uAlpha.value = b.domeAlpha * (0.85 + Math.sin(t * 2.1) * .05); b.dome.visible = b.domeAlpha > .01;
       if (b.flashStart) { u.uFlash.value = Math.min(1, (now - b.flashStart) / 700); if (u.uFlash.value >= 1) b.flashStart = 0; }
       const heartUp = fallen ? 0 : 1; b.heartAlive += (heartUp - b.heartAlive) * k;
-      const h = b.heart; h.heart.position.y = 4.6 + Math.sin(t * 1.3) * .18; h.core.rotation.y = t * .6;
-      h.rings[0].rotation.z = t * .7; h.rings[1].rotation.x = -t * .5;
+      const h = b.heart; h.heart.position.y = (h.heartY ?? 4.6) + Math.sin(t * 1.3) * .18; h.core.rotation.y = t * .6;
+      if (h.kit) { h.rings[0].rotation.set(.55, t * .8, 0); h.rings[1].rotation.set(-.42 + Math.sin(t * .4) * .1, -t * .55, .3); }
+      else { h.rings[0].rotation.z = t * .7; h.rings[1].rotation.x = -t * .5; }
+      if (b.bell) { b.bellSwing = Math.max(0, b.bellSwing - dt * .25); b.bell.rotation.x = Math.sin(t * 6.5) * .55 * b.bellSwing + Math.sin(t * .9) * .03; }
+      if (b.water) { b.water.position.y = Math.sin(t * 1.7) * .012; waterMats[b.side].emissiveIntensity = (b.side === 'rivals' ? .9 : .55) + Math.sin(t * 2.3) * .12; }
       const hurt = 1 - data.hp / data.maxHp; h.heart.scale.setScalar(.15 + .85 * b.heartAlive); h.light.intensity = 6 * b.heartAlive * (1 + hurt * Math.max(0, Math.sin(t * 9)));
-      for (const bubble of b.fountain.userData.bubbles || []) { bubble.position.y = (b.side === 'rivals' ? 1.75 : 2.6) + Math.abs(Math.sin(t * 2 + bubble.id)) * .25; }
+      for (const bubble of b.fountain.userData.bubbles || []) { bubble.position.y = (bubble.userData.baseY ?? (b.side === 'rivals' ? 1.75 : 2.6)) + Math.abs(Math.sin(t * 2 + bubble.id)) * .25; }
       for (const p of b.parts.values()) {
         const alive = p.data.hp > 0 && !fallen ? 1 : 0; p.alive += (alive - p.alive) * k;
-        if (p.kind === 'pylon') { p.column.scale.y = .25 + .75 * p.alive; p.crown.visible = p.alive > .2; p.orb.position.y = .7 + Math.sin(t * 2 + p.group.position.x) * .12; }
+        if (p.kind === 'pylon') { p.column.scale.y = .25 + .75 * p.alive; p.crown.visible = p.alive > .2; p.orb.position.y = (p.orbY ?? .7) + Math.sin(t * 2 + p.group.position.x) * .12; if (p.orbY !== undefined) p.orb.rotation.y = t * .8; }
         else if (p.kind === 'spire') { p.tip.visible = p.alive > .2; p.halo.rotation.z = t * 1.5; p.tip.position.y = p.tipY * (.35 + .65 * p.alive); }
-        else { p.aim += Math.atan2(Math.sin(p.targetAim - p.group.rotation.y - p.aim), Math.cos(p.targetAim - p.group.rotation.y - p.aim)) * k; p.head.rotation.y = p.aim; p.head.visible = p.alive > .2; }
+        else {
+          p.aim += Math.atan2(Math.sin(p.targetAim - p.group.rotation.y - p.aim), Math.cos(p.targetAim - p.group.rotation.y - p.aim)) * k; p.head.rotation.y = p.aim; p.head.visible = p.alive > .2;
+          if (p.bolt) { const loaded = snapshot.tick >= (p.data.readyTick ?? 0) - 60 ? 1 : 0; p.boltShow = (p.boltShow ?? 1) + (loaded - (p.boltShow ?? 1)) * k; p.bolt.scale.setScalar(Math.max(.001, p.boltShow)); }
+        }
       }
     }
     for (let i = effects.length - 1; i >= 0; i--) {
@@ -236,11 +270,11 @@ export function createHomeBaseView({scene}) {
     for (const b of bases.values()) {
       if (b.data.fallenUntil > snapshot.tick) continue;
       for (const p of b.parts.values()) if (p.data.hp > 0) out.push(p.group);
-      if (!b.data.parts.some(p => p.kind === 'pylon' && p.hp > 0)) out.push(b.heart.group);
+      if (!b.data.parts.some(p => p.kind === 'pylon' && p.hp > 0)) out.push(b.heart.proxy || b.heart.group);
     }
     return out;
   }
 
-  return {sync, event, update, targets, object: root,
+  return {sync, event, update, targets, installKit, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
     dispose() { root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }

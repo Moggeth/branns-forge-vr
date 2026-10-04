@@ -115,7 +115,7 @@ function stepHomeBattle(state,ctx,events) {
     kinds.forEach((kind,n)=>{
       if(state.enemies.length>=64||state.enemies.filter(e=>battleBot(e)&&e.side===base.side).length>=BATTLE.perSideCap)return;
       // March out of the barracks door, fanned across the plaza.
-      const [x,z]=homePoint(base.side,[-2.6+(n%3)*1.3,6.4+Math.floor(n/3)*1.3]);
+      const [x,z]=homePoint(base.side,[-1.3+(n%3)*1.3,6.4+Math.floor(n/3)*1.3]);
       const e=ctx.createEnemy(ctx.nextId(state,`battle${b.run}_${b.wave}_${base.side}_`),[x,ctx.terrainHeight(state,x,z),z],kind);
       Object.assign(e,{side:base.side,battleRun:b.run,battleWaypoint:index?lane.length-2:1});
       state.enemies.push(e);spawned++;

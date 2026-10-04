@@ -25,6 +25,11 @@ export const HOME_LAYOUT = Object.freeze({
   pylons: Object.freeze([[6.6, 11.43], [-6.6, 11.43], [0, -13.2]].map(Object.freeze)),
   spires: Object.freeze([[-4, 16], [4, 16]].map(Object.freeze)),
   ballistas: Object.freeze([[-9.5, 14.5], [9.5, 14.5]].map(Object.freeze)),
+  gate: Object.freeze([0, 13.5]), gatePillars: Object.freeze([[-2.6, 13.5], [2.6, 13.5]].map(Object.freeze)),
+  // Boundary wards ring the dome every 22.5 degrees, leaving the gate and the three pylons clear.
+  wards: Object.freeze([45, 67.5, 90, 112.5, 135, 157.5, -157.5, -135, -112.5, -90, -67.5, -45]
+    .map(d => Object.freeze([+(Math.sin(d * Math.PI / 180) * 14).toFixed(3), +(Math.cos(d * Math.PI / 180) * 14).toFixed(3)]))),
+  bellPost: Object.freeze([2.95, 2.75]), // in the barracks' own frame (three.js x, z)
 });
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
@@ -184,6 +189,7 @@ export function resolveHomeDomes(state, position, side, radius = .3) {
 const SOLIDS = Object.freeze([
   {at: [0, 0], r: 3.3}, {at: HOME_LAYOUT.fountain, r: 2.0},
   ...HOME_LAYOUT.pylons.map(at => ({at, r: .9})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95})),
+  ...HOME_LAYOUT.gatePillars.map(at => ({at, r: .85})), ...HOME_LAYOUT.wards.map(at => ({at, r: .45})),
 ]);
 const BARRACKS = Object.freeze({half: [3.2, 2.2], yaw: .55});
 /** World yaw (three.js, about +Y) of a base's gate; local +Z of a piece points out of the gate. */
@@ -208,6 +214,8 @@ export function resolveHomeStructures(state, position, radius = .3) {
       if (hu - Math.abs(u) < hv - Math.abs(v)) nu = Math.sign(u || 1) * hu; else nv = Math.sign(v || 1) * hv;
       position[0] = bx + nu * c + nv * sn; position[2] = bz - nu * sn + nv * c;
     }
+    const [px, pz] = HOME_LAYOUT.bellPost, postX = bx + px * c + pz * sn, postZ = bz - px * sn + pz * c, ex = position[0] - postX, ez = position[2] - postZ, ed = Math.hypot(ex, ez), em = .3 + radius;
+    if (ed < em && ed > 1e-4) { position[0] = postX + ex / ed * em; position[2] = postZ + ez / ed * em; }
   }
   return position;
 }
