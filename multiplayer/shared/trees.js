@@ -126,7 +126,8 @@ export function resolveTrees(position, index, cuts, ground, radius = .28, bodyHe
   // contact below remains unchanged, including both separation passes.
   const maxRadius=widestRing.get(treeProfile(tree))*treeScale(tree)+radius;
   if(Math.abs(position[0]-tree.x)>=maxRadius||Math.abs(position[2]-tree.z)>=maxRadius)continue;
-  const cut = cuts.get(tree.id), floor = ground(tree.x, tree.z), top = isFelled(cut) ? cutLocalHeight(tree, cut, floor) : treeProfile(tree).firstLimb*treeScale(tree);
+  const cut = cuts.get(tree.id); if (cut?.awake) continue; // the stump is off walking (shared/stumplings.js)
+  const floor = ground(tree.x, tree.z), top = isFelled(cut) ? cutLocalHeight(tree, cut, floor) : treeProfile(tree).firstLimb*treeScale(tree);
   if (position[1] >= floor + top - .03 || position[1] + bodyHeight < floor) continue;
   const yLocal = clamp(position[1] - floor + .3, .3, top), dx = position[0]-tree.x, dz = position[2]-tree.z, d = Math.hypot(dx, dz), r = trunkRadius(tree, yLocal) + radius;
   if (d < r) { const ux = d > 1e-5 ? dx/d : 1, uz = d > 1e-5 ? dz/d : 0; position[0] = tree.x + ux*(r+.001); position[2] = tree.z + uz*(r+.001); }
