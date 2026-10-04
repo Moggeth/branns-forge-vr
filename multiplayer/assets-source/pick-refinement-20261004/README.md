@@ -18,11 +18,17 @@ max .32,.718,.0428).
 
 ## What changed
 
-- PickHead: smooth swept arms (was a 200-triangle faceted mesh); the 4 crown side gems now sit on the arm cheeks.
+- PickHead and HeadSocket keep the authored crisp hexagon / octagon sections (Mitch prefers the faceted styling). They
+  are swept smoothly along the arm with a narrow bevel on every ridge, and shaded with `autoSmooth(20)`, so the
+  facets stay sharp while the curve is smooth.
+- Gems keep their shapes but are rotated and moved rigidly to sit square in their settings: arm crystals stand on the
+  ridge normal in a cup whose four claws touch the crystal's own flanks; the ridge gems become the glowing bed of each
+  cup (the outermost is a cabochon in its own cup outboard of the tip band); cheek gems face out along the cheek
+  normal inside their bezels; the heart gems face straight out, centred and narrowed to clear the oval bezel wire.
 - All brass is generated as an offset of the arm, socket or haft surface: arm bands follow the arm tangent, socket
   collar, petals, throat, heart-gem bezels, strap plates, ferrules and spiral wire no longer intersect each other.
 - Textures: blued steel (hammer pitting), ash wood (two-frequency rings), wrapped leather (stitches), patinated brass.
 
 ## Budget
 
-29,194 triangles, 1.53 MB (textures about 850 KB). The previous pick was about 6k triangles and 292 KB.
+27,066 triangles, 1.54 MB (textures about 850 KB). The previous pick was about 6k triangles and 292 KB.

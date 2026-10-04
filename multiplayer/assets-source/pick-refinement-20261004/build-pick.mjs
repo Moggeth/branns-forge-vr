@@ -4,8 +4,8 @@
 //   node build-pick.mjs <input pick.glb> <texDir> <output pick.glb>
 //
 // Keeps the shipped silhouette, materials (names/factors), every node name/order/transform, every socket and the
-// exact bounds that prepareAsset normalises. Gems (ResonanceCrystal, Embellish_Crystal_Crown) keep their geometry;
-// only the four crown side gems that floated ~2 cm off the arm cheeks are moved onto the cheeks.
+// exact bounds that prepareAsset normalises. Gems (ResonanceCrystal, Embellish_Crystal_Crown) keep their shapes; the arm
+// crystals, ridge gems and cheek gems are rotated and moved rigidly so each sits square in its setting.
 // Rebuilt meshes are generated FROM THE SURFACE THEY SIT ON: every band, plate, strap, bezel and wire is an offset of
 // the arm / socket / haft surface function, so nothing can clip through or float off what it decorates.
 import {readFileSync, writeFileSync} from 'node:fs';
@@ -67,6 +67,31 @@ class Mesh {
     }
     return this;
   }
+  // Crisp facets: each corner averages only the faces (at the same welded position) within `degrees` of its own face,
+  // so flat facets and narrow edge bevels stay sharp while gentle curvature along an arm stays smooth.
+  autoSmooth(degrees) {
+    const P = this.p, key = new Map(), weld = new Int32Array(this.count), cos = Math.cos(degrees * Math.PI / 180);
+    for (let i = 0; i < this.count; i++) {
+      const k = `${Math.round(P[i * 3] * 2e5)},${Math.round(P[i * 3 + 1] * 2e5)},${Math.round(P[i * 3 + 2] * 2e5)}`;
+      weld[i] = key.has(k) ? key.get(k) : (key.set(k, i), i);
+    }
+    const tris = this.idx.length / 3, F = [], U = [], incident = new Map(), a = new Vector3(), b = new Vector3(), c = new Vector3();
+    for (let t = 0; t < tris; t++) {
+      a.fromArray(P, this.idx[t * 3] * 3); b.fromArray(P, this.idx[t * 3 + 1] * 3); c.fromArray(P, this.idx[t * 3 + 2] * 3);
+      const f = b.clone().sub(a).cross(c.clone().sub(a)); F.push(f); U.push(f.clone().normalize());
+      for (let k = 0; k < 3; k++) { const w = weld[this.idx[t * 3 + k]]; if (!incident.has(w)) incident.set(w, []); incident.get(w).push(t); }
+    }
+    const out = new Mesh(), made = new Map();
+    for (let t = 0; t < tris; t++) for (let k = 0; k < 3; k++) {
+      const v = this.idx[t * 3 + k], n = new Vector3();
+      for (const o of incident.get(weld[v])) if (U[o].dot(U[t]) > cos) n.add(F[o]);
+      n.normalize();
+      const id = `${v}|${Math.round(n.x * 1e4)},${Math.round(n.y * 1e4)},${Math.round(n.z * 1e4)}`;
+      if (!made.has(id)) { made.set(id, out.vertex(new Vector3().fromArray(P, v * 3), [this.uv[v * 2], this.uv[v * 2 + 1]])); out.n.splice(-3, 3, n.x, n.y, n.z); }
+      out.idx.push(made.get(id));
+    }
+    return out;
+  }
   // Flip every triangle from `fromTri` on if, on balance, faces point against outward(vertexIndex).
   orient(outward, fromTri = 0) {
     const P = this.p, a = new Vector3(), b = new Vector3(), c = new Vector3(); let score = 0;
@@ -85,6 +110,19 @@ class Mesh {
   }
 }
 const mesh = () => new Mesh();
+// Faceted crystal normals after re-seating: one face normal per triangle, signed to agree with the authored normals.
+function flatNormals(position, index, authored) {
+  const N = new Float32Array(position.length), a = new Vector3(), b = new Vector3(), c = new Vector3();
+  for (let t = 0; t < index.length; t += 3) {
+    const [i, j, k] = [index[t], index[t + 1], index[t + 2]];
+    a.fromArray(position, i * 3); b.fromArray(position, j * 3); c.fromArray(position, k * 3);
+    const f = b.sub(a).cross(c.sub(a)).normalize(), o = new Vector3();
+    for (const v of [i, j, k]) o.add(new Vector3().fromArray(authored, v * 3));
+    if (f.dot(o) < 0) f.negate();
+    for (const v of [i, j, k]) { N[v * 3] = f.x; N[v * 3 + 1] = f.y; N[v * 3 + 2] = f.z; }
+  }
+  return N;
+}
 const lerp = (a, b, t) => a + (b - a) * t, clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const smooth = t => t * t * (3 - 2 * t);
 
@@ -108,8 +146,8 @@ function surfaceNormal(fn, a, s, outward) {
   return {p, n};
 }
 
-// Arm: the shipped hexagonal sections (measured from the input at 4 cm steps), interpolated smoothly along x and
-// splined around. top/upper shoulder/lower shoulder/bottom keep the authored ridge heights, so gems stay seated.
+// Arm: the shipped hexagonal sections (measured from the input at 4 cm steps), interpolated smoothly along x. The
+// section stays a crisp hexagon, as authored; each ridge gets a narrow bevel that catches a highlight line.
 const ARM = [ // |x|, yTop, yUpper, zUpper, yLower, zLower, yBottom
   [.04, .660, .637, .022, .604, .026, .584], [.08, .651, .631, .020, .602, .024, .584], [.12, .639, .622, .018, .597, .021, .582],
   [.16, .624, .610, .016, .590, .018, .577], [.20, .607, .596, .013, .580, .015, .569], [.24, .587, .579, .011, .567, .012, .559],
@@ -120,17 +158,27 @@ function armParams(x) {
   const A = ARM[Math.max(0, i - 1)], B = ARM[i], C = ARM[i + 1], D = ARM[Math.min(ARM.length - 1, i + 2)], t = (ax - B[0]) / (C[0] - B[0]);
   return B.map((_, k) => .5 * (2 * B[k] + (-A[k] + C[k]) * t + (2 * A[k] - 5 * B[k] + 4 * C[k] - D[k]) * t * t + (-A[k] + 3 * B[k] - 3 * C[k] + D[k]) * t * t * t));
 }
-const ARM_AROUND = 28;
+// Chamfer a closed polygon: every corner becomes [A, mid, B] on a narrow bevel (A on the edge from the previous corner).
+// Index 3i+1 is corner i's bevel centre; 3i+2.5 is the middle of the flat face after corner i.
+function chamfer(points, bevel) {
+  const out = [], n = points.length;
+  for (let i = 0; i < n; i++) {
+    const p = points[i], prev = points[(i + n - 1) % n], next = points[(i + 1) % n];
+    const toward = (q) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); const t = d > 1e-9 ? Math.min(bevel, d * .12) / d : 0; return [lerp(p[0], q[0], t), lerp(p[1], q[1], t)]; };
+    const A = toward(prev), B = toward(next);
+    out.push(A, [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], B);
+  }
+  return out;
+}
+const ARM_AROUND = 18; // 6 corners × [A, mid, B]; s = 0 is the centre of the top ridge bevel
 function armSection(x) {
   const [, yt, yu, zu, yl, zl, yb] = armParams(x);
-  // Width taper to an honest point: the last 2 cm pinch smoothly instead of collapsing a hexagon.
-  const tip = smooth(clamp((.32 - Math.abs(x)) / .02)), w = Math.max(tip, 1e-4);
-  const yc = (yt + yb) / 2, s = (y) => yc + (y - yc) * Math.max(w, .02);
-  return closedSpline([[0, s(yt)], [zu * w * 1.04, s(yu)], [zl * w * 1.06, s(yl)], [0, s(yb)], [-zl * w * 1.06, s(yl)], [-zu * w * 1.04, s(yu)]], 120);
+  const hex = chamfer([[0, yt], [zu, yu], [zl, yl], [0, yb], [-zl, yl], [-zu, yu]], .0011);
+  return hex.slice(1).concat(hex.slice(0, 1)); // rotate so index 0 is the top bevel centre
 }
 const armCenterY = x => { const [, yt, , , , , yb] = armParams(x); return (yt + yb) / 2; };
 function armPoint(x, s) {
-  const sec = armSection(x), f = ((s % 1) + 1) % 1 * sec.length, k = Math.floor(f), t = f - k;
+  const sec = armSection(x), f = ((s % 1) + 1) % 1 * sec.length, k = Math.floor(f + 1e-9), t = Math.max(0, f - k);
   const a = sec[k % sec.length], b = sec[(k + 1) % sec.length];
   return new Vector3(x, lerp(a[1], b[1], t), lerp(a[0], b[0], t));
 }
@@ -140,14 +188,7 @@ const armSlope = x => (armCenterY(x + 1e-3) - armCenterY(x - 1e-3)) / 2e-3;
 
 // Socket ("eye" block): rounded octagon, wide band .568–.655, tapering below to the haft and above to the crown point.
 const OCT = [[.035, .016], [.015, .038], [-.015, .038], [-.035, .016], [-.035, -.016], [-.015, -.038], [.015, -.038], [.035, -.016]];
-const OCT_ROUND = (() => { // rounded corners: each corner becomes a short arc
-  const pts = [];
-  for (let i = 0; i < 8; i++) {
-    const p = OCT[i], prev = OCT[(i + 7) % 8], next = OCT[(i + 1) % 8], r = .18;
-    pts.push([lerp(p[0], prev[0], r), lerp(p[1], prev[1], r)], [p[0] * .985, p[1] * .985], [lerp(p[0], next[0], r), lerp(p[1], next[1], r)]);
-  }
-  return closedSpline(pts, 96);
-})();
+const OCT_ROUND = chamfer(OCT, .0013); // crisp authored octagon with narrow edge bevels (24 points)
 const SOCKET_PROFILE = [[.545, .74], [.556, .9], [.568, 1], [.655, 1], [.668, .86], [.680, .69], [.693, .55], [.705, .38], [.713, .2], [.718, 0]];
 function socketScale(y) {
   if (y <= SOCKET_PROFILE[0][0]) return SOCKET_PROFILE[0][1];
@@ -158,7 +199,7 @@ function socketScale(y) {
   return 0;
 }
 function socketPoint(y, s) {
-  const f = ((s % 1) + 1) % 1 * OCT_ROUND.length, k = Math.floor(f), t = f - k;
+  const f = ((s % 1) + 1) % 1 * OCT_ROUND.length, k = Math.floor(f + 1e-9), t = Math.max(0, f - k);
   const a = OCT_ROUND[k % OCT_ROUND.length], b = OCT_ROUND[(k + 1) % OCT_ROUND.length], sc = socketScale(y);
   return new Vector3(lerp(a[0], b[0], t) * sc, y, lerp(a[1], b[1], t) * sc);
 }
@@ -270,12 +311,12 @@ function buildPickHead() {
     for (let j = 0; j <= ARM_AROUND; j++) m.vertex(armPoint(x, j / ARM_AROUND), [u * 8, j / ARM_AROUND]);
   }
   m.grid(start, xs.length, ARM_AROUND + 1, true);
-  return m.orient(i => new Vector3(0, m.p[i * 3 + 1] - armCenterY(m.p[i * 3]), m.p[i * 3 + 2])).computeNormals();
+  return m.orient(i => new Vector3(0, m.p[i * 3 + 1] - armCenterY(m.p[i * 3]), m.p[i * 3 + 2])).autoSmooth(20);
 }
 
 // ------------------------------------------------------------------ HeadSocket (blued steel eye block)
 function buildSocket() {
-  const m = mesh(), ys = [], start = m.count, around = 40;
+  const m = mesh(), ys = [], start = m.count, around = OCT_ROUND.length;
   for (let i = 0; i < SOCKET_PROFILE.length - 1; i++) {
     const [y0] = SOCKET_PROFILE[i], [y1] = SOCKET_PROFILE[i + 1], n = Math.max(2, Math.round((y1 - y0) / .006));
     for (let k = 0; k < n; k++) ys.push(lerp(y0, y1, k / n));
@@ -288,7 +329,7 @@ function buildSocket() {
   const c = m.vertex(new Vector3(0, .545, 0), [.5, 0]);
   const capFrom = m.idx.length / 3;
   for (let j = 0; j < around; j++) m.tri(start + j + 1, start + j, c);
-  return m.orient(() => new Vector3(0, -1, 0), capFrom).computeNormals();
+  return m.orient(() => new Vector3(0, -1, 0), capFrom).autoSmooth(20);
 }
 
 // ------------------------------------------------------------------ brass
@@ -302,7 +343,7 @@ function armBand(x0, width) {
     for (let it = 0; it < 4; it++) x = x0 + across * width / 2 * k - m0 * (armPoint(x, s).y - yc);
     return armSurf(x, s);
   };
-  return sleeve({place, height: ferrule(.0026), acrossSteps: 8, aroundSteps: 32, uvScale: [6, .6]});
+  return sleeve({place, height: ferrule(.0026), acrossSteps: 8, aroundSteps: 36, uvScale: [6, .6]});
 }
 for (const x of [-.235, -.155, -.05, .05, .155, .235]) BRASS.push(['bands', armBand(x, x === .05 || x === -.05 ? .011 : .009)]);
 
@@ -371,7 +412,6 @@ BRASS.push(['bands', wire({steps: 120, sides: 5, radius: .0012, sink: .2, curve:
   return {p: p.addScaledVector(n, plateLift(y, s)), n};
 }})]);
 
-// Arm shard settings: cups on the arm ridge under each crown arm crystal, axis = ridge normal.
 const crown = inputMesh('Embellish_Crystal_Crown');
 function clusters(m) {
   const n = m.position.length / 3, parent = Int32Array.from({length: n}, (_, i) => i);
@@ -386,33 +426,99 @@ function clusters(m) {
     return {v, box, c: box.getCenter(new Vector3()), size: box.getSize(new Vector3())};
   });
 }
-const SETTINGS = mesh();
-const crownGroups = clusters(crown);
+// Principal axes of one crystal: centroid, longest axis (major) and thinnest axis (minor). Deterministic power iteration.
+function principal(pos, v) {
+  const c = new Vector3(); for (const i of v) c.add(new Vector3().fromArray(pos, i * 3)); c.divideScalar(v.length);
+  const C = new THREE.Matrix3(), e = C.elements; e.fill(0);
+  for (const i of v) {
+    const d = [pos[i * 3] - c.x, pos[i * 3 + 1] - c.y, pos[i * 3 + 2] - c.z];
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) e[k * 3 + r] += d[r] * d[k];
+  }
+  const power = (M, seed) => { const x = seed.clone(); for (let k = 0; k < 96; k++) x.applyMatrix3(M).normalize(); return x; };
+  const major = power(C, new Vector3(.31, .87, .37)), l1 = major.clone().applyMatrix3(C).dot(major);
+  const D = C.clone(); for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) D.elements[k * 3 + r] -= l1 * major.getComponent(r) * major.getComponent(k);
+  const mid = power(D, new Vector3(.62, -.21, .75)), minor = new Vector3().crossVectors(major, mid).normalize();
+  return {c, major, minor};
+}
+// Re-seat a crystal: rotate `from` onto `to` about `pivot`, then move the pivot to `target`.
+function reseat(pos, v, pivot, from, to, target, scale = 1) {
+  const q = new THREE.Quaternion().setFromUnitVectors(from.clone().normalize(), to.clone().normalize());
+  for (const i of v) {
+    const d = new Vector3().fromArray(pos, i * 3).sub(pivot), sv = typeof scale === 'number' ? new Vector3(scale, scale, scale) : scale;
+    d.multiply(sv).applyQuaternion(q).add(target);
+    pos[i * 3] = d.x; pos[i * 3 + 1] = d.y; pos[i * 3 + 2] = d.z;
+  }
+}
+const radial = (pos, v, origin, axis, filter = () => true) => { // widest distance from an axis (optionally a height band)
+  let r = 0;
+  for (const i of v) { const d = new Vector3().fromArray(pos, i * 3).sub(origin), h = d.dot(axis); if (filter(h)) r = Math.max(r, d.addScaledVector(axis, -h).length()); }
+  return r;
+};
+const SETTINGS = mesh(), moved = [];
+const crownGroups = clusters(crown), crownPos = Float32Array.from(crown.position);
+const resonance = inputMesh('ResonanceCrystal'), resonanceGroups = clusters(resonance), resonancePos = Float32Array.from(resonance.position);
+// Arm crystals: each stands exactly on the ridge normal, its base in a cup sized to it, four claws closing on its sides.
+const cups = [];
 for (const g of crownGroups) {
   const ax = Math.abs(g.c.x);
   if (ax < .06 || ax > .2 || Math.abs(g.c.z) > .01) continue; // arm ridge crystals only
-  const {p, n} = armSurf(g.c.x, 0); // s = 0 is the top ridge
-  SETTINGS.append(lathe([[.0068, -.0035], [.0086, -.0004], [.0094, .0018], [.0088, .0042], [.0074, .0052], [.0066, .0044], [.0062, .0026]],
+  const {c, major} = principal(crown.position, g.v);
+  if (major.dot(new Vector3(0, c.y - armCenterY(c.x), c.z)) < 0) major.negate();
+  let tmin = Infinity; for (const i of g.v) tmin = Math.min(tmin, new Vector3().fromArray(crown.position, i * 3).sub(c).dot(major));
+  const base = c.clone().addScaledVector(major, tmin), {p, n} = armSurf(base.x, 0);
+  const R = radial(crown.position, g.v, base, major);
+  const k = Math.max(1, (R + .0007) / .0062), seat = .0012;
+  reseat(crownPos, g.v, base, major, n, p.clone().addScaledVector(n, seat));
+  const flank = dir => { // the crystal's own extent toward `dir` around claw-tip height (after seating)
+    let r = 0;
+    for (const i of g.v) { const d = new Vector3().fromArray(crownPos, i * 3).sub(p), h = d.dot(n); if (h > .008 && h < .0135) r = Math.max(r, d.dot(dir)); }
+    return r || R;
+  };
+  moved.push({gem: 'arm crystal', from: g.c.toArray(), to: p.toArray()});
+  cups.push({p, n, k, x: base.x});
+  SETTINGS.append(lathe([[.0068, -.0035], [.0086, -.0004], [.0094, .0018], [.0088, .0042], [.0074, .0052], [.0066, .0044], [.0062, .0026]].map(([r, h]) => [r * k, h]),
     {origin: p, up: n, sides: 12, uvScale: 2}));
-  for (let k = 0; k < 4; k++) { // four claws gripping the crystal
-    const a = k / 4 * Math.PI * 2 + Math.PI / 4, X = new Vector3(1, 0, 0).addScaledVector(n, -n.x).normalize(), Z = new Vector3().crossVectors(X, n);
-    const dir = X.clone().multiplyScalar(Math.cos(a)).addScaledVector(Z, Math.sin(a));
+  const X = new Vector3(0, 0, 1).addScaledVector(n, -n.z).normalize(), Z = new Vector3().crossVectors(X, n);
+  for (let j = 0; j < 4; j++) { // four claws: from the cup rim up to the crystal's own flank
+    const a = j / 4 * Math.PI * 2 + Math.PI / 4, dir = X.clone().multiplyScalar(Math.cos(a)).addScaledVector(Z, Math.sin(a));
+    const r0 = .0063 * k, r1 = flank(dir) - .0002; // wire() lifts its centre one radius along dir
     SETTINGS.append(wire({steps: 4, sides: 4, radius: .0011, sink: 0, curve: t => ({
-      p: p.clone().addScaledVector(n, .004 + t * .0075).addScaledVector(dir, .0078 - t * .0032), n: dir.clone()})}));
+      p: p.clone().addScaledVector(n, .0046 + t * (.0068 + seat)).addScaledVector(dir, lerp(r0, r1, t)), n: dir.clone()})}));
   }
 }
-// Crown side gems: seat them on the arm cheeks (they floated ~2 cm off), each in a small bezel ring.
-const crownPos = Float32Array.from(crown.position), moved = [];
+// Heart gems: thinnest axis straight out of the socket face, centred on the bezel, narrowed to clear the wire.
+for (const g of resonanceGroups) {
+  if (Math.abs(g.c.x) > .01 || Math.abs(g.c.z) < .02) continue;
+  const {c, minor} = principal(resonance.position, g.v), out = new Vector3(0, 0, Math.sign(g.c.z));
+  if (minor.dot(out) < 0) minor.negate();
+  reseat(resonancePos, g.v, c, minor, out, new Vector3(0, .614, c.z), new Vector3(.9, .9, 1)); // depth kept: it sets the bounds
+  moved.push({gem: 'heart', from: g.c.toArray(), to: [0, .614, c.z]});
+}
+// Ridge gems (ResonanceCrystal): where an arm crystal stands, the gem becomes the glowing bed of its cup; the outermost
+// one sits flush on the ridge in its own bezel. Thinnest axis = ridge normal.
+for (const g of resonanceGroups) {
+  if (Math.abs(g.c.z) > .01 || Math.abs(g.c.x) < .06) continue;
+  const {c, minor} = principal(resonance.position, g.v), cup = cups.find(q => Math.abs(q.x - g.c.x) < .016 && Math.sign(q.x) === Math.sign(g.c.x));
+  const R = radial(resonance.position, g.v, c, minor), at = cup ?? {...armSurf(Math.sign(g.c.x) * .262, 0), k: Math.max(.7, (R + .0005) / .0062)}; // just outboard of the .235 band
+  if (minor.dot(at.n) < 0) minor.negate();
+  const fit = Math.min(1, .0058 * at.k / R);
+  reseat(resonancePos, g.v, c, minor, at.n, at.p.clone().addScaledVector(at.n, cup ? .0016 : .0034), fit);
+  moved.push({gem: cup ? 'cup bed' : 'cabochon', from: g.c.toArray(), to: at.p.toArray()});
+  if (!cup) SETTINGS.append(lathe([[.0068, -.0035], [.0086, -.0004], [.0094, .0018], [.0088, .0042], [.0074, .0052], [.0066, .0044], [.0062, .0026]].map(([r, h]) => [r * at.k, h * .8]),
+    {origin: at.p, up: at.n, sides: 12, uvScale: 2}));
+}
+// Crown side gems: seat them on the arm cheeks (they floated ~2 cm off), face-out along the cheek normal, in a bezel.
 for (const g of crownGroups) {
   if (Math.abs(g.c.z) < .025) continue;
   const side = Math.sign(g.c.z), s = side > 0 ? .25 : .75; // cheek directions
-  // Find the cheek point at this x nearest the crystal's height.
   let best = null;
   for (let k = -40; k <= 40; k++) { const q = armSurf(g.c.x, s + k / 400); if (!best || Math.abs(q.p.y - g.c.y) < Math.abs(best.p.y - g.c.y)) best = q; }
-  const target = best.p.clone().addScaledVector(best.n, g.size.z * .32), d = target.clone().sub(g.c);
-  for (const i of g.v) { crownPos[i * 3] += d.x; crownPos[i * 3 + 1] += d.y; crownPos[i * 3 + 2] += d.z; }
-  moved.push({from: g.c.toArray(), to: target.toArray()});
-  SETTINGS.append(lathe([[.0074, -.0012], [.0086, .0004], [.0086, .0016], [.0076, .0024], [.0066, .0018]], {origin: best.p, up: best.n, sides: 12, uvScale: 2}));
+  const out = new Vector3(0, 0, side), R = radial(crown.position, g.v, g.c, out);
+  const target = best.p.clone().addScaledVector(best.n, .0018);
+  reseat(crownPos, g.v, g.c, out, best.n, target);
+  moved.push({gem: 'cheek gem', from: g.c.toArray(), to: target.toArray()});
+  const k = (R * .92 + .0004) / .0066;
+  SETTINGS.append(lathe([[.0074, -.0012], [.0086, .0004], [.0086, .0016], [.0076, .0024], [.0066, .0018]].map(([r, h]) => [r * k, h]), {origin: best.p, up: best.n, sides: 16, uvScale: 2}));
 }
 
 // ------------------------------------------------------------------ wood haft and leather grip
@@ -485,7 +591,8 @@ for (const node of nodes) {
   if (out[name]) { const m = out[name]; data = {position: m.p, normal: m.n, uv: m.uv, index: m.idx}; }
   else {
     const m = inputMesh(name);
-    data = {position: name === 'Embellish_Crystal_Crown' ? crownPos : m.position, normal: m.normal, uv: m.uv, index: m.index};
+    const position = name === 'Embellish_Crystal_Crown' ? crownPos : name === 'ResonanceCrystal' ? resonancePos : m.position;
+    data = {position, normal: name === 'Embellish_Crystal_Crown' || name === 'ResonanceCrystal' ? flatNormals(position, m.index, m.normal) : m.normal, uv: m.uv, index: m.index};
   }
   const material = original.primitives[0].material;
   meshes.push({name: original.name, primitives: [primitive(data, material)]});
@@ -528,4 +635,4 @@ const bh = Buffer.alloc(8); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x
 writeFileSync(output, Buffer.concat([header, jh, json, bh, bin]));
 const tris = Object.fromEntries(meshes.map(m => [m.name, accessors[m.primitives[0].indices].count / 3]));
 console.log(JSON.stringify({output: path.basename(output), bytes: 12 + 16 + json.length + bin.length, triangles: tris, total: Object.values(tris).reduce((a, b) => a + b, 0),
-  bounds: {min: box.min.toArray(), max: box.max.toArray()}, movedSideGems: moved}, null, 1));
+  bounds: {min: box.min.toArray(), max: box.max.toArray()}, movedGems: moved}, null, 1));
