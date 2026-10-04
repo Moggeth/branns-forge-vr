@@ -351,10 +351,27 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   const l=legacy.stats();
   return {walls:walls.size,segments:[...walls.values()].reduce((n,w)=>n+w.segments.length,0)+l.segments,crystals:crystals+l.crystals,plates,growing,triangles:tris+l.triangles,draws:draws+l.draws+(shardMesh.count?1:0)+(sparks.mesh.visible?1:0)+(dust.mesh.visible?1:0),
    shards:shardMesh.count,sparks:sparks.liveCount||0,dust:dust.liveCount||0,debris:l.debris,sharedGeometries:shapes.length+1,sharedMaterials:Object.keys(mats).length+2};}
+ // Retained runtime materials keep these shader programs alive after loading.
+ // These variants do not exist in the scene until the first earth spell.
+ function prepareWarmup(){
+  const group=new T.Group(),instances=[];group.name='CrystalWallWarmup';
+  for(const [i,geometry] of [...shapes,plateGeo].entries()){
+   const mesh=new T.InstancedMesh(geometry,i<3?shapeMaterial[i]:crust,1);
+   mesh.setMatrixAt(0,new T.Matrix4().makeTranslation(i-1,1,-3));
+   if(i<3)mesh.setColorAt(0,new T.Color(1,1,1));
+   mesh.frustumCulled=false;group.add(mesh);instances.push(mesh);
+  }
+  const geometry=new T.BufferGeometry();
+  geometry.setAttribute('position',new T.Float32BufferAttribute([-1,0,-3,1,0,-3,0,0,-5],3));
+  geometry.setAttribute('aWall',new T.Float32BufferAttribute([0,-1,0,1,2,0],2));
+  const mesh=new T.Mesh(geometry,strip);mesh.frustumCulled=false;group.add(mesh);
+  let disposed=false;
+  return {group,dispose(){if(disposed)return;disposed=true;group.removeFromParent();geometry.dispose();for(const m of instances)m.dispose();group.clear();}};
+ }
  function dispose(){for(const [id,w] of walls)retire(id,w);root.removeFromParent();legacy.dispose();shardMesh.dispose();for(const p of [sparks,dust]){p.mesh.geometry.dispose();p.mesh.material.dispose();}
   for(const g of shapes)g.dispose();plateGeo.dispose();for(const m of Object.values(mats))m.dispose();crust.dispose();strip.dispose();}
  const legacy=createLegacyWalls({T,scene:root,height,mats,shapes});
- return {sync,update,dispose,stats,targets,resolveTarget,drainEvents,root,materials:mats};
+ return {sync,update,dispose,stats,targets,resolveTarget,drainEvents,prepareWarmup,root,materials:mats};
 }
 
 // Pre-v2 saves: permanent point-kernel walls (radius 1, height 2.4, no rupture). Static, mature crystal clusters with the

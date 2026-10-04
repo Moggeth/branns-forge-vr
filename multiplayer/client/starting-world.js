@@ -3,6 +3,7 @@
 // Draw calls: one merged mesh per shared material (<= 6) plus the sanctuary's live pieces (runes, hoop, tuning
 // crystal: 4). Triangles are capped (see stats()).
 import * as art from './sanctuary-art.js';
+import {installPieceRaycast} from './piece-raycast.js';
 import * as oc from './outcrop-art.js';
 import {GEODES} from '../shared/geode-outcrop.js';
 import * as wa from './watch-arch-art.js';
@@ -235,10 +236,13 @@ export function createStartingWorld({ THREE, scene, height }) {
   for (const s of pathStones) P('path', 'rock', s.x, s.z, 0.02, [s.s, 0.08, s.s * 0.85], [0, s.ry, 0]);
 
   const group = new THREE.Group(); group.name = 'StartingWorld';
-  const meshes = {}; let tris = 0, dropped = 0;
+  const meshes = {}; let tris = 0, dropped = 0, builds = 0, refits = 0;
+  let liveHeights = [];
+  const liveAnchors = [...runes, ...clusters, hoopAt, tuneAt].filter(Boolean);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
 
   function build() {
+    builds++;
     for (const k in meshes) { group.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
     tris = 0; dropped = 0; const buckets = {};
     for (const base of pieces) {
@@ -254,12 +258,14 @@ export function createStartingWorld({ THREE, scene, height }) {
       m4.compose(v.set(p.x, gy + p.y, p.z), q.setFromEuler(e.set(p.r[0], p.r[1], p.r[2])), sc.set(p.s[0], p.s[1], p.s[2]));
       const anchor = g.userData.anchor; // kit crystals set into a stretched boulder: placed with it, but kept in proportion
       if (anchor) { const u = Math.cbrt(p.s[0] * p.s[1] * p.s[2]) * 0.8; v.copy(anchor).applyMatrix4(m4); m4.compose(v, q, sc.set(u, u, u)); }
-      const b = (buckets[p.mat] ||= { pos: [], nor: [], uv: [], targets: [] });
+      const b = (buckets[p.mat] ||= { pos: [], nor: [], uv: [], targets: [], pieces: [] });
+      const piece = {x:p.x, z:p.z, height:gy + .15, initialHeight:gy + .15, start:b.pos.length / 3, count:src.attributes.position.count, box:new THREE.Box3()};
+      b.pieces.push(piece);
       if (p.id) b.targets.push([b.pos.length / 9, b.pos.length / 9 + triCount, p.id]);
       const pa = src.attributes.position, na = src.attributes.normal, ca = src.attributes.color, ua = src.attributes.uv, nm = new THREE.Matrix3().getNormalMatrix(m4);
       const b2 = (b.col ||= []);
       for (let i = 0; i < pa.count; i++) {
-        v.fromBufferAttribute(pa, i).applyMatrix4(m4); b.pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(pa, i).applyMatrix4(m4); b.pos.push(v.x, v.y, v.z); piece.box.expandByPoint(v);
         v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); b.nor.push(v.x, v.y, v.z);
         if (ca) b2.push(ca.getX(i), ca.getY(i), ca.getZ(i)); else b2.push(1, 1, 1);
         if (ua) b.uv.push(ua.getX(i), ua.getY(i)); else b.uv.push(0, 0);
@@ -277,6 +283,11 @@ export function createStartingWorld({ THREE, scene, height }) {
       mesh.castShadow = k !== 'path'; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       // Struck surfaces that matter to gameplay resolve to their shared target id by triangle (see game.js resolveHit).
       const targets = buckets[k].targets; if (targets.length) mesh.userData.faceTarget = f => targets.find(([a, z]) => f >= a && f < z)?.[2] || null;
+      mesh.userData.terrainPieces = buckets[k].pieces;
+      // Bounds come from the uploaded Float32 positions, not the pre-rounding doubles.
+      for (const p of mesh.userData.terrainPieces) { p.box.makeEmpty(); for (let i=p.start;i<p.start+p.count;i++) p.box.expandByPoint(v.fromBufferAttribute(geo.attributes.position,i)); }
+      mesh.userData.baseY = Float32Array.from(buckets[k].pos.filter((_, i) => i % 3 === 1));
+      installPieceRaycast(THREE, mesh, buckets[k].pieces);
       meshes[k] = mesh; group.add(mesh);
     }
     for (const s of STARTING_SITES) s.y = H(s.x, s.z);
@@ -293,6 +304,7 @@ export function createStartingWorld({ THREE, scene, height }) {
   let runeMesh = null, clusterMesh = null; const lit = rune.uLit.value;
   const geode = oc.clusterMaterial(GEODES.length), geodeGrow = geode.uGrow.value, geodeGlow = geode.uGlow.value;
   function buildLive() {
+    liveHeights = liveAnchors.map(p => H(p.x, p.z));
     if (runeMesh) { live.remove(runeMesh); runeMesh.geometry.dispose(); runeMesh = null; }
     const parts = [], stoneIds = [], mm = new THREE.Matrix4(), local = new THREE.Matrix4(), qq = new THREE.Quaternion();
     for (const r of runes) {
@@ -379,17 +391,27 @@ export function createStartingWorld({ THREE, scene, height }) {
   build();
   scene.add(group);
 
-  // edits: optional array of {x,z,radius}. Rebuild only if an edit touches a site or path; otherwise no-op.
-  function update(edits) {
-    if (Array.isArray(edits) && edits.length) {
-      const near = edits.some((ed) => {
-        const rr = (ed.radius || 3) + 1;
-        if (STARTING_SITES.some((s) => Math.hypot(ed.x - s.x, ed.z - s.z) < s.radius + rr + 6)) return true;
-        return pathStones.some((p) => Math.hypot(ed.x - p.x, ed.z - p.z) < rr);
-      });
-      if (!near) return false;
+  // Terrain spells change only each piece's anchor height, not its topology.
+  // Retain the merged buffers/materials; a remote edit now does no geometry work.
+  function update() {
+    let changed = false;
+    for (const mesh of Object.values(meshes)) {
+      const position = mesh.geometry.attributes.position, base = mesh.userData.baseY;
+      let dirty = false;
+      for (const p of mesh.userData.terrainPieces) {
+        const h = H(p.x, p.z); if (h === p.height) continue;
+        const shift = h - p.initialHeight; p.height = h; p.box.makeEmpty();
+        for (let i = p.start; i < p.start + p.count; i++) { position.setY(i, base[i] + shift); p.box.expandByPoint(v.fromBufferAttribute(position,i)); }
+        dirty = true;
+      }
+      if (dirty) {
+        position.needsUpdate = true; mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere(); changed = true;
+      }
     }
-    build(); return true;
+    if (liveAnchors.some((p, i) => H(p.x, p.z) !== liveHeights[i])) { buildLive(); changed = true; }
+    for (const site of STARTING_SITES) site.y = H(site.x, site.z);
+    if (changed) refits++;
+    return changed;
   }
   function dispose() {
     scene.remove(group);
@@ -400,7 +422,7 @@ export function createStartingWorld({ THREE, scene, height }) {
     if (kit) { hoopBronze.geometry.dispose(); hoopGlow.geometry.dispose(); for (const g of kitRunes) g.dispose();
       for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal', 'kWood']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
   }
-  function stats() { return { kit: !!kit, draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
+  function stats() { return { kit: !!kit, builds, refits, draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
   // Beacon fire anchor (world space, follows terrain edits): where client/beacon-view.js draws the flame and beam.
   const beacon = () => beaconAt && {x: beaconAt.x, y: H(beaconAt.x, beaconAt.z) - 0.15 + beaconAt.y, z: beaconAt.z};
   return { group, update, tick, setLit, setGeodes, beacon, installKit, dispose, stats, sites: STARTING_SITES, paths: PATHS };
