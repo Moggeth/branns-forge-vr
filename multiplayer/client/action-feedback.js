@@ -47,12 +47,17 @@ const RECOVERY = {
  "invalid_player": "Your player state is unavailable. Rejoin using the room code.",
  "no_room": "There is no open ground for a tree here: rocks, buildings, Heroes or other trees fill it. Aim at clearer ground; no mana was spent.",
  "no_tree": "No standing tree is close enough to wake. Aim at a tree (stumps and felled trees cannot wake); no mana was spent.",
+ "machine_broken": "That ballista is broken. Mend it with your hammer, then man it again.",
+ "squad_full": "Your side already has a full army in the field. Ring the bell again when some troops have fallen.",
+ "base_fallen": "Your home base is rebuilding. Its fountain and bell wake up again when it is back.",
  "ent_limit": "Twelve ents are already awake. Wait for some to root again or fall before waking more; no mana was spent."
 };
 
 export function actionError(code,{world={},player={},command={}}={}){
  const tick=world.tick||0,wait=(last,duration)=>Math.max(.1,(duration-(tick-(last??-1000)))/60).toFixed(1);
  if(code==='cooldown'){
+  if(command.action==='homeDrink')return `The fountain is refilling: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.drinkReadyTick||tick)-tick)/60).toFixed(0)}s.`;
+  if(command.action==='homeBell')return `The bell is still ringing out: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.bellReadyTick||tick)-tick)/60).toFixed(0)}s until the next squad can be called.`;
   if(command.type==='role')return `Perspective switch is recovering: ${wait(player.roleTick,120)}s.`;
   if(command.type==='cast')return `Magic is recovering: ${wait(player.castTick,45)}s.`;
   if(command.action==='forgeEncounter')return `The next raid is ready in ${Math.max(.1,((world.settlement?.cooldownUntil||tick)-tick)/60).toFixed(1)}s.`;

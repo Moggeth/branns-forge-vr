@@ -18,7 +18,7 @@ export function createTimberlineAmmoHud({parent=document.body}={}){
  el.innerHTML='<span class="timberline-ammo-glyph" aria-hidden="true"></span><span class="timberline-ammo-count"></span><span class="timberline-ammo-state"></span>';parent.appendChild(el);
  const count=el.querySelector('.timberline-ammo-count'),state=el.querySelector('.timberline-ammo-state');let last='';
  return {element:el,
-  set(info){if(!info){if(!el.hidden)el.hidden=true;last='';return;}const t=timberlineAmmoText(info),s=info.state||'';const key=`${t}|${s}|${!!info.scoped}`;if(key===last)return;last=key;el.hidden=false;
+  set(info){if(!info){if(!el.hidden)el.hidden=true;last='';return;}const t=info.label||timberlineAmmoText(info),s=info.state||'';const key=`${t}|${s}|${!!info.scoped}`;if(key===last)return;last=key;el.hidden=false;
    count.textContent=t;state.textContent=s;el.classList.toggle('is-empty',!info.bolts&&!info.raw);el.classList.toggle('is-scoped',!!info.scoped);},
   dispose(){el.remove();}};
 }

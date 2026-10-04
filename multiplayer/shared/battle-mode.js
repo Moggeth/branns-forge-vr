@@ -1,6 +1,7 @@
 // Optional host-controlled lane battle. All clocks and IDs belong to the simulation.
 import {expeditionRunning} from './adventure.js';
-import {HOME,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
+import {stepHomeBallista} from './home-ballista.js';
+import {HOME,repairHome,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
 
 export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTicks:900,baseHp:400,aggroRange:12});
 export const BATTLE_SIDES = Object.freeze(['party','rivals']);
@@ -71,7 +72,12 @@ export function attackBattleBase(state,player,id,ctx,{cooldown=true}={}) {
   const base=state.battle.v===2?findHomeTarget(state,id)?.target:state.battle.bases.find(b=>b.id===id);
   if(!base)return fail('invalid_battle_target');
   if(player.role!=='hero')return fail('hero_required');
-  if(base.side===(player.side||'party'))return fail('friendly_target');
+  if(base.side===(player.side||'party')){
+    if(state.battle.v!==2||player.tool!=='hammer'||player.role!=='hero'||base===findHomeTarget(state,id)?.base)return fail('friendly_target');
+    if(flat(player.position,base.position)>4.2)return fail('out_of_reach');
+    if(cooldown&&state.tick-player.attackTick<40)return fail('cooldown');
+    const events=[];if(!repairHome(state,id,base.side,events))return fail('not_needed');player.attackTick=state.tick;return {ok:true,events};
+  }
   if(!['axe','pick','hammer','limb'].includes(player.tool))return fail('melee_required');
   const d=flat(player.position,base.position),dot=(-Math.sin(player.yaw)*(base.position[0]-player.position[0])-Math.cos(player.yaw)*(base.position[2]-player.position[2]))/Math.max(.001,d);
   if(d>(state.battle.v===2?4.2:3.2)||Math.abs(player.position[1]-base.position[1])>2.5||(d>.5&&dot<.45))return fail('out_of_reach');
@@ -104,23 +110,26 @@ export function stepBattle(state,ctx,events) {
   events.push({kind:'battle_wave',wave:b.wave,count:spawned,nextWaveTick:b.nextWaveTick});
 }
 
+/** One barracks squad marches out of a home base's door, fanned across the plaza. Returns how many fit under the caps. */
+export function spawnSquad(state,ctx,base,tag) {
+  const b=state.battle,index=BATTLE_SIDES.indexOf(base.side);let spawned=0;
+  squadFor(base).forEach((kind,n)=>{
+    if(state.enemies.length>=64||state.enemies.filter(e=>battleBot(e)&&e.side===base.side).length>=BATTLE.perSideCap)return;
+    const [x,z]=homePoint(base.side,[-1.3+(n%3)*1.3,6.4+Math.floor(n/3)*1.3]);
+    const e=ctx.createEnemy(ctx.nextId(state,`battle${b.run}_${tag}_${base.side}_`),[x,ctx.terrainHeight(state,x,z),z],kind);
+    Object.assign(e,{side:base.side,battleRun:b.run,battleWaypoint:index?lane.length-2:1});
+    state.enemies.push(e);spawned++;
+  });
+  return spawned;
+}
+
 function stepHomeBattle(state,ctx,events) {
+  if(homeBattle(state))for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part);
   stepHomeBases(state,ctx,events);
   if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
   const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;
   let spawned=0;
-  for(const base of b.bases){
-    if(baseFallen(state,base))continue;
-    const index=BATTLE_SIDES.indexOf(base.side),kinds=squadFor(base);
-    kinds.forEach((kind,n)=>{
-      if(state.enemies.length>=64||state.enemies.filter(e=>battleBot(e)&&e.side===base.side).length>=BATTLE.perSideCap)return;
-      // March out of the barracks door, fanned across the plaza.
-      const [x,z]=homePoint(base.side,[-1.3+(n%3)*1.3,6.4+Math.floor(n/3)*1.3]);
-      const e=ctx.createEnemy(ctx.nextId(state,`battle${b.run}_${b.wave}_${base.side}_`),[x,ctx.terrainHeight(state,x,z),z],kind);
-      Object.assign(e,{side:base.side,battleRun:b.run,battleWaypoint:index?lane.length-2:1});
-      state.enemies.push(e);spawned++;
-    });
-  }
+  for(const base of b.bases)if(!baseFallen(state,base))spawned+=spawnSquad(state,ctx,base,String(b.wave));
   events.push({kind:'battle_wave',wave:b.wave,count:spawned,nextWaveTick:b.nextWaveTick});
 }
 
@@ -156,7 +165,7 @@ export function restoreBattle(saved) {
     if(b.status==='victory'&&(!BATTLE_SIDES.includes(b.winner)||bots.length||b.bases.find(x=>x.side!==b.winner).hp!==0||b.bases.find(x=>x.side===b.winner).hp<=0))bad();
   }
   for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
-  for(const e of bots)if(b.status!=='running'||e.battleRun!==b.run||e.kind!=='skeleton'||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_[1-9][0-9]*_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave)bad();
+  for(const e of bots)if(b.status!=='running'||e.battleRun!==b.run||e.kind!=='skeleton'||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_([1-9][0-9]*|b[0-9]+)_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave||Number(e.id.split('_')[1].slice(1))>saved.tick)bad(); // b<tick>: rung out early by a barracks bell
   for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
   return {v:1,status:b.status,run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,bases:b.bases.map(({id,side,position,hp,maxHp})=>({id,side,position:[...position],hp,maxHp}))};
 }
@@ -165,7 +174,7 @@ function restoreHomeBattle(saved,bots) {
   const b=saved.battle,bad=()=>{throw Error('Invalid battle state');};
   if(b.status!=='running'||!int(b.run,1,1e9)||!int(b.wave,0,1e9)||!int(b.nextWaveTick,0,saved.tick+HOME.waveTicks)||(b.winner!==null&&!BATTLE_SIDES.includes(b.winner))||!int(b.sieges,0,1e9)||bots.length>BATTLE.botCap)bad();
   for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
-  for(const e of bots)if(e.battleRun!==b.run||!['skeleton','golem'].includes(e.kind)||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_[1-9][0-9]*_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave)bad();
+  for(const e of bots)if(e.battleRun!==b.run||!['skeleton','golem'].includes(e.kind)||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_([1-9][0-9]*|b[0-9]+)_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave||Number(e.id.split('_')[1].slice(1))>saved.tick)bad(); // b<tick>: rung out early by a barracks bell
   for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
   return {v:2,status:'running',run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,sieges:b.sieges,bases:restoreHomeBases(b.bases,saved.tick)};
 }

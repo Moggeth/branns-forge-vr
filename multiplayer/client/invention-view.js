@@ -71,7 +71,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
  }
  return {installTimberline,installHomeKit:gltf=>homeBases.installKit(gltf),homeBaseStats:()=>homeBases.stats(),sync,event,update,
   // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
-  setLocalAim(id,aim){if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
+  setLocalAim(id,aim){homeBases.setLocalAim(id,aim);if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
   setScoped(id,amount=0){scoped=id&&amount>0?{id,amount}:null;},
   scopeEye(id,out=new THREE.Vector3()){const e=entries.get(id);if(!e?.machine)return null;e.root.updateWorldMatrix(true,true);return e.machine.nodes.Socket_ScopeEye?.getWorldPosition(out)||null;},

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {HOME, HOME_LAYOUT, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
 import {terrainHeight} from '../shared/terrain.js';
 import {buildKitBase, prepareHomeKit} from './home-base-art.js';
+import {homeBallistaYaw} from '../shared/home-ballista.js';
 
 const STYLE = {
   party: {stone: 0xb9ad97, trim: 0xc49a52, glow: 0x5fb4ff, wood: 0x8a6440, roof: 0x3d4a5c, accent: 0x2f6fd0, dome: new THREE.Color(0x58b4ff)},
@@ -33,7 +34,7 @@ function glowMat(color, intensity = 1.4) { return new THREE.MeshStandardMaterial
 
 export function createHomeBaseView({scene}) {
   const root = new THREE.Group(); root.name = 'home-bases'; scene.add(root);
-  const bases = new Map(), effects = [], effectPool = [];
+  const bases = new Map(), effects = [], effectPool = [], localAim = new Map();
   let snapshot = null, enabled = false, kit = null;
   const waterMats = {party: new THREE.MeshStandardMaterial({color: 0x2a6fb8, emissive: 0x3d9cff, emissiveIntensity: .55, roughness: .08, metalness: .1, transparent: true, opacity: .82}),
     rivals: new THREE.MeshStandardMaterial({color: 0x3c8f12, emissive: 0x8cff4a, emissiveIntensity: .9, roughness: .3, transparent: true, opacity: .92})};
@@ -180,7 +181,7 @@ export function createHomeBaseView({scene}) {
     }
     fx.kind = kind; fx.from = new THREE.Vector3(...from); fx.to = new THREE.Vector3(...to); fx.start = performance.now(); fx.life = kind === 'zap' ? 220 : 420;
     fx.line.material.color.set(color); fx.bolt.material.color.set(color); fx.bolt.material.emissive.set(color);
-    fx.line.visible = kind === 'zap'; fx.bolt.visible = kind === 'bolt'; effects.push(fx);
+    fx.line.visible = kind === 'zap'; fx.bolt.visible = kind === 'bolt' || kind === 'burst'; if (kind === 'burst') fx.life = 700; effects.push(fx);
   }
 
   function sync(s) {
@@ -210,6 +211,9 @@ export function createHomeBaseView({scene}) {
   function event(ev) {
     if (!enabled) return;
     if (ev.kind === 'battle_wave') for (const b of bases.values()) b.bellSwing = 1;
+    if (ev.kind === 'home_bell') { const b = bases.get(ev.side); if (b) b.bellSwing = 1.4; }
+    // A drink lifts a ring of the fountain's own glow; a mend sparkles once up the mended piece.
+    if (ev.kind === 'home_drink' || ev.kind === 'home_part_repaired') spawnEffect('burst', ev.position, ev.position, STYLE[ev.side]?.glow ?? 0xffffff);
     if (ev.kind === 'home_turret_fire') {
       const b = bases.get(ev.side), color = STYLE[ev.side]?.glow ?? 0xffffff, from = [...ev.from];
       const tp = b?.parts.get(ev.id);
@@ -246,7 +250,11 @@ export function createHomeBaseView({scene}) {
         if (p.kind === 'pylon') { p.column.scale.y = .25 + .75 * p.alive; p.crown.visible = p.alive > .2; p.orb.position.y = (p.orbY ?? .7) + Math.sin(t * 2 + p.group.position.x) * .12; if (p.orbY !== undefined) p.orb.rotation.y = t * .8; }
         else if (p.kind === 'spire') { p.tip.visible = p.alive > .2; p.halo.rotation.z = t * 1.5; p.tip.position.y = p.tipY * (.35 + .65 * p.alive); }
         else {
-          p.aim += Math.atan2(Math.sin(p.targetAim - p.group.rotation.y - p.aim), Math.cos(p.targetAim - p.group.rotation.y - p.aim)) * k; p.head.rotation.y = p.aim; p.head.visible = p.alive > .2;
+          // Manned: the operator's own predicted aim drives it at once; others see the replicated aim, eased. Unmanned: it tracks its last target.
+          const mine = localAim.get(p.data.id), aim = mine || (p.data.operator ? {yaw: p.data.aimYaw || 0, pitch: p.data.aimPitch || 0} : null);
+          const want = aim ? homeBallistaYaw(b.side) + aim.yaw + Math.PI : p.targetAim, wantPitch = aim ? aim.pitch : 0, kk = mine ? 1 : k;
+          p.aim += Math.atan2(Math.sin(want - p.group.rotation.y - p.aim), Math.cos(want - p.group.rotation.y - p.aim)) * kk; p.head.rotation.y = p.aim; p.head.visible = p.alive > .2;
+          p.pitch = (p.pitch ?? 0) + (wantPitch - (p.pitch ?? 0)) * kk; if (p.bow) p.bow.rotation.x = -p.pitch;
           if (p.bolt) { const loaded = snapshot.tick >= (p.data.readyTick ?? 0) - 60 ? 1 : 0; p.boltShow = (p.boltShow ?? 1) + (loaded - (p.boltShow ?? 1)) * k; p.bolt.scale.setScalar(Math.max(.001, p.boltShow)); }
         }
       }
@@ -257,7 +265,11 @@ export function createHomeBaseView({scene}) {
       if (fx.kind === 'zap') {
         const pos = fx.line.geometry.attributes.position; pos.setXYZ(0, ...fx.from.toArray()); pos.setXYZ(1, fx.to.x + Math.sin(now) * .1, fx.to.y, fx.to.z); pos.needsUpdate = true;
         fx.line.material.opacity = 1 - u;
+      } else if (fx.kind === 'burst') {
+        fx.bolt.position.set(fx.from.x, fx.from.y + .4 + u * 2.2, fx.from.z); fx.bolt.rotation.set(0, 0, 0);
+        fx.bolt.scale.set(.05 + u * .5, .9 * (1 - u) + .05, .05 + u * .5); fx.bolt.material.opacity = 1 - u; fx.bolt.material.transparent = true;
       } else {
+        fx.bolt.scale.set(.05, .9, .05); fx.bolt.material.opacity = 1;
         fx.bolt.position.lerpVectors(fx.from, fx.to, Math.min(1, u * 1.2)); fx.bolt.lookAt(fx.to); fx.bolt.rotateX(Math.PI / 2);
       }
     }
@@ -275,6 +287,7 @@ export function createHomeBaseView({scene}) {
     return out;
   }
 
-  return {sync, event, update, targets, installKit, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
+  const setLocalAim = (id, aim) => { if (aim) localAim.set(id, aim); else localAim.delete(id); };
+  return {sync, event, update, targets, installKit, setLocalAim, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
     dispose() { root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }
