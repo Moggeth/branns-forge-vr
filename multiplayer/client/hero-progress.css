@@ -44,7 +44,7 @@ body[data-role="god"] .meter.hp-xp { display: none; }
 
 /* ---------- talents panel ---------- */
 .hp-backdrop {
-  position: fixed; inset: 0; z-index: 96; display: grid; place-items: center;
+  position: fixed; inset: 0; z-index: 160; display: grid; place-items: center; /* above the phone full-screen button */
   padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   background: radial-gradient(80% 80% at 50% 40%, rgba(20, 16, 12, .55), rgba(6, 5, 4, .85));
   animation: hp-fade .18s ease both;
@@ -103,7 +103,8 @@ body[data-role="god"] .meter.hp-xp { display: none; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
   .hp-head { padding: 10px 14px 8px; } .hp-title { font-size: 1.25rem; } .hp-lede { margin-bottom: 6px; }
-  .hp-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; } .hp-foot { padding: 8px 14px 10px; }
+  .hp-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .hp-foot { padding: 6px 14px 8px; justify-content: flex-end; } .hp-foot-note { display: none; } .hp-reset { min-height: 36px; }
 }
 
 /* ---------- level-up banner ---------- */
