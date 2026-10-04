@@ -60,12 +60,19 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   const nextFoundationKey=foundationTerrainKey(s),nextTerrainKey=terrainFrameKey(s.edits,s.tick)+'|'+nextFoundationKey;if(nextTerrainKey!==terrainKey){
    const full=terrainKey===null||nextFoundationKey!==foundationKey,dirty=terrainDirtyEdits(previousTerrainEdits,s.edits,previousTerrainTick,s.tick),touched=p=>full||dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step);
    terrainKey=nextTerrainKey;foundationKey=nextFoundationKey;
-   for(const f of formations)if(touched(f))f.mesh.position.y=height(f.x,f.z,s.edits)-.1;
-   for(const b of batches){let changed=false;for(let i=0;i<b.points.length;i++){const p=b.points[i];if(!touched(p))continue;dummy.position.set(p.x,height(p.x,p.z,s.edits),p.z);dummy.rotation.y=p.angle;dummy.scale.setScalar(p.scale);dummy.updateMatrix();matrix.multiplyMatrices(dummy.matrix,b.local);b.mesh.setMatrixAt(i,matrix);changed=true;}if(changed){b.mesh.instanceMatrix.needsUpdate=true;b.mesh.computeBoundingSphere();}}
+   reground(touched,s.edits);
   }
   previousTerrainEdits=s.edits;previousTerrainTick=s.tick;
 
  }
+ // Ground clutter and resources follow the ground whenever it moves; game.js also calls terrainMoved on every
+ // presentation frame while earth is animating, so nothing on a rising wall or opening chasm steps at snapshot rate.
+ function reground(touched,edits){
+   for(const f of formations)if(touched(f))f.mesh.position.y=height(f.x,f.z,edits)-.1;
+   for(const b of batches){let changed=false;for(let i=0;i<b.points.length;i++){const p=b.points[i];if(!touched(p))continue;dummy.position.set(p.x,height(p.x,p.z,edits),p.z);dummy.rotation.y=p.angle;dummy.scale.setScalar(p.scale);dummy.updateMatrix();matrix.multiplyMatrices(dummy.matrix,b.local);b.mesh.setMatrixAt(i,matrix);changed=true;}if(changed){b.mesh.instanceMatrix.needsUpdate=true;b.mesh.computeBoundingSphere();}}
+  for(const e of objects.values())if(e.data.type!=='bridge'&&touched(e.data))e.root.position.y=height(e.data.x,e.data.z,edits)+(e.data.type==='pickup'?pickupLift(e):0);
+ }
+ function terrainMoved(dirty){if(!last||!dirty?.length)return;reground(p=>dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step),last.edits);}
  function scatter(s){
   for(const [name,x,z,size,angle]of [['bank',-18,-18,1.4,.8],['bank',-21,-16,1.1,1.2],['ridge',20,-22,3.1,-.5],['ridge',23,-24,2.4,.5],['roots',-13,-10,.65,1.2]]){const mesh=authored(name,size);if(mesh){mesh.position.set(x,height(x,z,s.edits)-.1,z);mesh.rotation.y=angle;scene.add(mesh);formations.push({mesh,x,z});}}
   const names=['grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle'];
@@ -83,7 +90,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   for(const e of objects.values())if(e.light&&e.lightRank>=GEODE_LIGHT_BUDGET)e.light.update(dt,camera,false);
   for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].light.update(dt,camera);
   for(const e of objects.values())if(e.data.type==='pickup'&&!e.bay){e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007;}}
- return {sync,tick,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
+ return {sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
   // Raycast hit -> {id, point, normal (world), instanced}: instanced tree batches map instanceId to the tree id; deposits/entities use userData.targetId.
   resolveTarget(hit){const t=treeView.resolveTarget(hit)||crystalWall.resolveTarget(hit);if(t)return t;let n=hit?.object;while(n&&!n.userData.targetId)n=n.parent;if(!n)return null;
    return {id:n.userData.targetId,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:false};},
