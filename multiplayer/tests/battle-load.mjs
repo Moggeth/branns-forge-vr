@@ -4,7 +4,7 @@ import {performance} from 'node:perf_hooks';
 import {createSimulation,MAX_PLAYERS,terrainHeight} from '../shared/simulation.js';
 import {BATTLE,stepBattle,battleBot} from '../shared/battle-mode.js';
 import {createEnemy} from '../shared/combat.js';
-const sim=createSimulation({seed:4}),world=sim.adventureWorld(),sequence=Array(MAX_PLAYERS).fill(0);
+const sim=createSimulation({legacyBattle:true,seed:4}),world=sim.adventureWorld(),sequence=Array(MAX_PLAYERS).fill(0);
 for(let i=0;i<MAX_PLAYERS;i++){
  assert.ok(sim.addPlayer({id:`load${i}`,name:`Player ${i}`}).ok);
  const p=world.players[i];p.side=i%2?'rivals':'party';

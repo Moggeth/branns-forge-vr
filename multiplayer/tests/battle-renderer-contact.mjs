@@ -14,7 +14,7 @@ assert.ok(functions.includes('function worldContact('));
 const makeContact=new Function('THREE','content','inventionVisual','shrine','startingWorld','terrainRay','snapshot',
   `let worldTargets=[],worldMatricesAt=-1,contactFrame=1;${functions};return worldContact;`);
 for(const targetSide of ['party','rivals']){
-  const sim=createSimulation();sim.addPlayer({id:'shooter'});
+  const sim=createSimulation({legacyBattle:true,legacyBattle:true});sim.addPlayer({id:'shooter'});
   sim.command('shooter',{type:'battle',action:'start',seq:1});
   const world=sim.adventureWorld(),base=world.battle.bases.find(b=>b.side===targetSide),player=world.players[0];
   player.side=targetSide==='party'?'rivals':'party';

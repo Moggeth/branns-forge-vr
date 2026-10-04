@@ -48,7 +48,7 @@ export function createAppleGeometry({seed = 1, quality = 'high', half = false} =
  const lastRing = ringStart + (ring.length - 1)*radial;
  for (let i = 0; i < radial; i++) idx.push(last, lastRing + i, lastRing + (i + 1) % radial);
  for (let f = 0; f < idx.length; f += 3) [idx[f + 1], idx[f + 2]] = [idx[f + 2], idx[f + 1]]; // wind outward (counter-clockwise from outside)
- const g = half ? halfGeometry(pos, idx) : new T.BufferGeometry(); if (!half) { g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); }
+ const g = half ? halfGeometry(pos, idx) : new T.BufferGeometry(); if (!half) { g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); g.setAttribute('cut', new T.BufferAttribute(new Float32Array(pos.length/3), 1)); }
  g.computeBoundingSphere(); g.boundingSphere.radius = 1.25; // bites only ever move vertices inward
  g.userData.apple = {seed, tall, stemTop: profile.at(-1)[1]*tall, lean}; return g;
 }
@@ -107,8 +107,8 @@ const STEM_MATERIAL = new T.MeshStandardMaterial({color: 0x4a3018, roughness: .8
 const LEAF_MATERIAL = new T.MeshStandardMaterial({vertexColors: true, roughness: .5, side: T.DoubleSide}); LEAF_MATERIAL.name = 'AppleLeaf';
 
 const VERT_HEAD = /* glsl */`
-uniform vec4 uBite[3]; uniform vec3 uBiteAxis; uniform vec3 uShaft; uniform vec4 uCut; attribute float cut;
-varying vec3 vApple; varying float vFlesh; varying float vCut; varying vec3 vBiteAxisDist;
+uniform vec4 uBite[3]; uniform vec3 uBiteAxis; uniform vec4 uCut; attribute float cut;
+varying vec3 vApple; varying float vFlesh; varying float vCut;
 `;
 // Scoop: any vertex inside a bite sphere moves to the sphere surface on the far side from its centre (into the apple).
 // Grooves: incisors drag parallel scrapes across the scoop (along uBiteAxis).
@@ -120,10 +120,10 @@ const VERT_BITE = /* glsl */`
   vec3 d = appleP - b.xyz; float l = length(d);
   vec3 u = d / max(l, 1e-4);
   float groove = 1.0 + .03 * sin(dot(u, uBiteAxis) * 24.0 + float(i) * 1.7);
-  float rad = b.w * groove;
+  float rad = max(b.w * groove, 1e-4);
   vFlesh = min(vFlesh, l / rad - 1.0); // signed distance to the bite, interpolated so the skin edge is per-pixel smooth
   if (l < rad) { // project from a point beyond the bite centre onto the sphere's far (inner) wall: continuous at the rim, never outward
-   vec3 o = b.xyz + normalize(b.xyz) * rad * 1.25, dir = normalize(appleP - o), m = o - b.xyz;
+   vec3 o = b.xyz + b.xyz * (rad * 1.25 / max(length(b.xyz), 1e-4)), dir = normalize(appleP - o), m = o - b.xyz;
    float bb = dot(m, dir), t = -bb + sqrt(max(bb*bb - dot(m, m) + rad*rad, 0.0));
    appleP = o + dir * t; appleN = normalize(b.xyz - appleP); }
  }
@@ -136,62 +136,67 @@ float aH(vec3 p) { p = fract(p*.3183099 + .1); p *= 17.0; return fract(p.x*p.y*p
 float aN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
  return mix(mix(mix(aH(i), aH(i + vec3(1,0,0)), f.x), mix(aH(i + vec3(0,1,0)), aH(i + vec3(1,1,0)), f.x), f.y),
             mix(mix(aH(i + vec3(0,0,1)), aH(i + vec3(1,0,1)), f.x), mix(aH(i + vec3(0,1,1)), aH(i + vec3(1,1,1)), f.x), f.y), f.z); }
-float appleRough = 1.0; float appleFlesh = 0.0;
+// smoothstep with falling edges allowed: GLSL leaves smoothstep(a, b, x) undefined for a >= b, and GPUs differ
+float aS(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+vec3 aNorm(vec3 v) { return v * inversesqrt(max(dot(v, v), 1e-12)); }
 `;
 const FRAG_COLOR = /* glsl */`
+ float appleRough = 1.0; float appleFlesh = 0.0;
  {
-  vec3 p = vApple; vec3 n = normalize(p); float az = atan(p.z, p.x); float flesh01 = smoothstep(.012, -.012, vFlesh);
+  vec3 p = vApple; vec3 n = aNorm(p); float az = atan(p.z, p.x + 1e-6); float flesh01 = aS(.012, -.012, vFlesh);
   // skin: ground colour, sun-side blush broken by meridian streaks and speckle; russet well; lenticels
-  float sun = dot(n, normalize(uSunSide)) * .5 + .5;
+  float sun = dot(n, aNorm(uSunSide)) * .5 + .5;
   float mottle = aN(p * 3.1 + uSeed * 7.0);
-  float blush = smoothstep(.05, .6, sun * .8 + mottle * .35 + .22);
-  float streak = smoothstep(.35, .85, aN(vec3(az * 7.0, p.y * 1.4, uSeed * 3.0))) * smoothstep(-.9, -.2, p.y) * smoothstep(1.0, .55, p.y);
+  float blush = aS(.05, .6, sun * .8 + mottle * .35 + .22);
+  float streak = aS(.35, .85, aN(vec3(az * 7.0, p.y * 1.4, uSeed * 3.0))) * aS(-.9, -.2, p.y) * aS(1.0, .55, p.y);
   vec3 skin = mix(uGround, mix(uSkinBright, uSkinDeep, .55 + .45 * aN(p * 9.0)), blush);
   skin = mix(skin, uSkinDeep * .62, streak * blush * .55);
-  float well = smoothstep(.5, .3, length(p.xz)) * smoothstep(.35, .55, p.y);
+  float well = aS(.5, .3, length(p.xz)) * aS(.35, .55, p.y);
   skin = mix(skin, vec3(.3, .24, .07) * (.8 + .4 * aN(vec3(az * 9.0, p.y * 20.0, 1.0))), well * .5);
-  float calyx = smoothstep(.36, .12, length(p.xz)) * smoothstep(-.4, -.7, p.y);
+  float calyx = aS(.36, .12, length(p.xz)) * aS(-.4, -.7, p.y);
   skin = mix(skin, vec3(.17, .12, .05), calyx * .8);
   vec3 q = n * 30.0; vec3 cell = floor(q); vec3 f = fract(q) - .5; float h = aH(cell + uSeed);
-  float dotL = smoothstep(.12, .05, length(f - (vec3(aH(cell + 1.7), aH(cell + 3.1), aH(cell + 5.3)) - .5) * .5)) * step(.62, h) * (1.0 - well);
+  float dotL = aS(.12, .05, length(f - (vec3(aH(cell + 1.7), aH(cell + 3.1), aH(cell + 5.3)) - .5) * .5)) * step(.62, h) * (1.0 - well);
   skin = mix(skin, mix(vec3(.62, .42, .16), vec3(.75, .62, .3), 1.0 - blush), dotL * .45);
   // shaft hole: torn skin and a bruise ring where the arrow went through
-  vec3 sa = normalize(uShaft); float axisDist = length(p - sa * dot(p, sa));
-  float hole = smoothstep(.17, .07, axisDist);
+  vec3 sa = aNorm(uShaft); float axisDist = length(p - sa * dot(p, sa));
+  float hole = aS(.17, .07, axisDist);
   skin = mix(skin, vec3(.24, .08, .03), hole * .7);
   // flesh: cream, fibrous toward the core, wet when fresh, browning with age; seeds in five pockets round the axis
   float along = dot(p, sa); vec3 perp = p - sa * along; float coreR = length(perp);
-  vec3 b1 = normalize(cross(sa, vec3(1.0, 0.0, 0.0))), b2 = cross(sa, b1);
-  vec3 flesh = vec3(.8, .63, .28) * (.93 + .1 * aN(p * 22.0)) * mix(vec3(1.0), vec3(.98, .9, .72), smoothstep(.55, .25, coreR));
+  vec3 b1 = aNorm(cross(sa, vec3(1.0, 0.0, 0.0))), b2 = cross(sa, b1);
+  vec3 flesh = vec3(.8, .63, .28) * (.93 + .1 * aN(p * 22.0)) * mix(vec3(1.0), vec3(.98, .9, .72), aS(.55, .25, coreR));
   flesh = mix(flesh, vec3(.66, .48, .24), uBrown);
-  float seedA = mod(atan(dot(perp, b2), dot(perp, b1)) + uSeed, 1.2566) - .6283;
-  float seed = smoothstep(.075, .04, length(vec2(seedA * coreR * 1.5, (coreR - .2) * 1.4)) + abs(along) * .12) * step(abs(along), .3);
+  float seedA = mod(atan(dot(perp, b2), dot(perp, b1) + 1e-6) + uSeed, 1.2566) - .6283;
+  float seed = aS(.075, .04, length(vec2(seedA * coreR * 1.5, (coreR - .2) * 1.4)) + abs(along) * .12) * step(abs(along), .3);
   flesh = mix(flesh, vec3(.18, .09, .04), seed);
   if (uCut.w > 0.0) { // the lengthwise section: (u across, v along the stem axis) on the cut face
-   vec3 cu = normalize(cross(uCut.xyz, vec3(0.0, 1.0, 0.0))); float u = dot(p, cu), v = p.y;
+   vec3 cu = aNorm(cross(uCut.xyz, vec3(0.0, 1.0, 0.0))); float u = dot(p, cu), v = p.y;
    float ring = abs(length(vec2(u * 1.05, (v - .02) * .92)) - .5);                       // the vascular bundle ring
    float core = length(vec2(u * 1.7, (v + .02) * .95));                                   // papery core: a soft heart
    float pocket = length(vec2((abs(u) - .13) * 2.4, (v + .02) * 1.1));                   // two carpel pockets
    vec2 sd = vec2(abs(u) - .12, v + .03); sd = vec2(sd.x * .94 - sd.y * .34, sd.x * .34 + sd.y * .94); // tilted inward
-   float seedS = length(vec2(sd.x / (.05 + .025 * smoothstep(.1, -.1, sd.y)), sd.y / .1));      // tear-drop, broad end down
-   float channel = smoothstep(.035, .012, abs(u)) * smoothstep(.15, .5, v);              // stem channel
-   float calyxTube = smoothstep(.04, .015, abs(u)) * smoothstep(-.32, -.6, v);
+   float seedS = length(vec2(sd.x / (.05 + .025 * aS(.1, -.1, sd.y)), sd.y / .1));      // tear-drop, broad end down
+   float channel = aS(.035, .012, abs(u)) * aS(.15, .5, v);              // stem channel
+   float calyxTube = aS(.04, .015, abs(u)) * aS(-.32, -.6, v);
    vec3 sect = vec3(.86, .7, .36) * (.95 + .07 * aN(vec3(u * 26.0, v * 26.0, uSeed)));
-   sect = mix(sect, vec3(.95, .84, .52), smoothstep(.03, .008, ring) * .6);
-   sect = mix(sect, vec3(.93, .8, .48), smoothstep(.36, .3, core) * .7);
-   sect = mix(sect, vec3(.74, .58, .3), smoothstep(.36, .34, core) * smoothstep(.3, .34, core) * .8); // core membrane line
-   sect = mix(sect, vec3(.62, .48, .24), smoothstep(.2, .15, pocket));
-   sect = mix(sect, vec3(.2, .085, .03) * (1.0 + .9 * smoothstep(.7, .0, length(sd / vec2(.03, .05) - vec2(-.4, .5)))), smoothstep(1.0, .85, seedS));
+   sect = mix(sect, vec3(.95, .84, .52), aS(.03, .008, ring) * .6);
+   sect = mix(sect, vec3(.93, .8, .48), aS(.36, .3, core) * .7);
+   sect = mix(sect, vec3(.74, .58, .3), aS(.36, .34, core) * aS(.3, .34, core) * .8); // core membrane line
+   sect = mix(sect, vec3(.62, .48, .24), aS(.2, .15, pocket));
+   sect = mix(sect, vec3(.2, .085, .03) * (1.0 + .9 * aS(.7, .0, length(sd / vec2(.03, .05) - vec2(-.4, .5)))), aS(1.0, .85, seedS));
    sect = mix(sect, vec3(.66, .54, .28), max(channel, calyxTube) * .7);
    sect = mix(sect, vec3(.66, .48, .24), uBrown);
    flesh = mix(flesh, sect, vCut);
   }
   vec3 c = mix(skin, flesh, flesh01);
-  c = mix(c, vec3(.86, .78, .5), flesh01 * smoothstep(-.05, -.008, vFlesh) * .45 * (1.0 - vCut)); // a bright, fresh-cut lip
-  c *= mix(1.0, .7, flesh01 * smoothstep(-.04, -.3, vFlesh) * (1.0 - vCut)); // the deep of a scoop sits in its own shade (not a flat cut)
+  c = mix(c, vec3(.86, .78, .5), flesh01 * aS(-.05, -.008, vFlesh) * .45 * (1.0 - vCut)); // a bright, fresh-cut lip
+  c *= mix(1.0, .7, flesh01 * aS(-.04, -.3, vFlesh) * (1.0 - vCut)); // the deep of a scoop sits in its own shade (not a flat cut)
+  c = clamp(c, 0.0, 1.0); if (!(c.r + c.g + c.b >= 0.0)) c = vec3(.4, .03, .02); // never feed lighting a NaN (renders black)
   diffuseColor.rgb = c;
   appleRough = mix(mix(.42, .55, mottle) * (1.0 - dotL * .2), mix(.6, .86, 1.0 - uWet) * (.9 + .2 * aN(p * 40.0)), flesh01);
-  appleFlesh = flesh01;
+  appleRough = clamp(appleRough, .05, 1.0); if (!(appleRough >= 0.0)) appleRough = .5;
+  appleFlesh = clamp(flesh01, 0.0, 1.0);
  }
 `;
 
@@ -215,7 +220,7 @@ export function createAppleMaterial({physical = false, seed = 1, sunSide = [.4, 
    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = appleRough;')
    .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\n material.clearcoat *= 1.0 - appleFlesh;\n#endif\n#ifdef USE_SHEEN\n material.sheenColor *= 1.0 - appleFlesh;\n#endif');
  };
- m.customProgramCacheKey = () => 'apple-v2' + (physical ? 'p' : 's');
+ m.customProgramCacheKey = () => 'apple-v3' + (physical ? 'p' : 's');
  return m;
 }
 

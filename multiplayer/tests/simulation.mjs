@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight, MAX_PLAYERS} from '../shared/simulation.js';
 
-const sim = createSimulation({room: 'TEST'});
+const sim = createSimulation({legacyBattle:true,room: 'TEST'});
 assert.equal(sim.addPlayer({id: 'hero', name: 'A', role: 'hero'}).ok, true);
 assert.equal(sim.addPlayer({id: 'god', role: 'god'}).ok, true);
 for (let i = 2; i < MAX_PLAYERS; i++) assert.equal(sim.addPlayer({id: `p${i}`}).ok, true);
@@ -51,7 +51,7 @@ assert.equal(sim.snapshot().players[0].hp, 82);
 assert.ok(terrainHeight(sim.checkpoint(), before[0], before[2]) < terrainHeight(saved, before[0], before[2]));
 
 // Summoned enemies attack, kill, and cause a bounded authoritative respawn.
-const duel = createSimulation();
+const duel = createSimulation({legacyBattle:true,legacyBattle:true});
 duel.addPlayer({id: 'h'}); duel.addPlayer({id: 'g', role: 'god'});
 let sequence = 1;
 for (let n = 0; n < 5; n++) {
@@ -65,7 +65,7 @@ assert.ok(duel.snapshot().players[0].hp > 0);
 assert.ok(duel.snapshot().players[0].position.every(Number.isFinite));
 
 // Limits are authoritative even when clients bypass the UI.
-const capped = createSimulation(); capped.addPlayer({id: 'g', role: 'god'});
+const capped = createSimulation({legacyBattle:true,legacyBattle:true}); capped.addPlayer({id: 'g', role: 'god'});
 let cp = capped.checkpoint();
 cp.groves = Array.from({length: 64}, (_, i) => ({id: `t${i}`, x: i % 55, z: 0}));
 const loaded = loadSimulation(cp);
@@ -75,7 +75,7 @@ assert.equal(loaded.removePlayer('g').ok, true);
 assert.equal(loaded.snapshot().players.length, 0);
 
 // The central Forge is permanent. Its apron remains protected after hits and reload.
-const shrineSeed = createSimulation();
+const shrineSeed = createSimulation({legacyBattle:true,legacyBattle:true});
 shrineSeed.addPlayer({id: 'h'}); shrineSeed.addPlayer({id: 'g', role: 'god'});
 const shrineState = shrineSeed.checkpoint();
 shrineState.players[0].position = [0, terrainHeight(shrineState, 0, 2), 2];
@@ -112,12 +112,12 @@ for (const mutate of corruption) {
   const candidate = structuredClone(safe); mutate(candidate);
   assert.throws(() => loadSimulation(candidate));
 }
-const godStay = createSimulation(); godStay.addPlayer({id: 'g', role: 'god'});
+const godStay = createSimulation({legacyBattle:true,legacyBattle:true}); godStay.addPlayer({id: 'g', role: 'god'});
 const godBefore = godStay.snapshot().players[0].position;
 assert.equal(godStay.command('g', {type: 'input', seq: 1, move: {x: 1, z: 0}, yaw: 0}).ok, true);
 for (let t = 0; t < 18; t++) godStay.step();
 assert.deepEqual(godStay.snapshot().players[0].position, godBefore);
-const cliffSeed = createSimulation(); cliffSeed.addPlayer({id: 'h'});
+const cliffSeed = createSimulation({legacyBattle:true,legacyBattle:true}); cliffSeed.addPlayer({id: 'h'});
 const cliffState = cliffSeed.checkpoint();
 cliffState.enemies.push({id: 'e1', position: [0, 10, 7], yaw: 0, hp: 100, attackTick: -1000});
 const cliff = loadSimulation(cliffState);

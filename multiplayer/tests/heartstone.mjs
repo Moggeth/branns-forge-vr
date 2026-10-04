@@ -3,7 +3,7 @@ import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulatio
 import {HEARTSTONE,heartstoneLevel} from '../shared/heartstone.js';
 import {BLOOM} from '../shared/bloom.js';
 
-const sim=createSimulation({seed:37});sim.addPlayer({id:'hero',role:'hero'});sim.addPlayer({id:'rival',role:'hero'});
+const sim=createSimulation({legacyBattle:true,seed:37});sim.addPlayer({id:'hero',role:'hero'});sim.addPlayer({id:'rival',role:'hero'});
 const w=sim.adventureWorld(),[hero,rival]=w.players;rival.side='rivals';w.enemies=[];
 const stone=w.inventions.structures.find(b=>b.id==='party-influence'),theirs=w.inventions.structures.find(b=>b.id==='rival-influence');
 const at=(p,b,d)=>{p.position=[b.position[0]+d,terrainHeight(w,b.position[0]+d,b.position[2]),b.position[2]];};

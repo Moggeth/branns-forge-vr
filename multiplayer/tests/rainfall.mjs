@@ -6,7 +6,7 @@ import {RAINFALL, raining} from '../shared/weather-spell.js';
 import {weatherAt} from '../shared/world-clock.js';
 import {BLOOM} from '../shared/bloom.js';
 
-const world = () => { const s = createSimulation({seed: 9}); s.addPlayer({id: 'g', role: 'god'}); s.addPlayer({id: 'h', role: 'hero'}); return s; };
+const world = () => { const s = createSimulation({legacyBattle:true,seed: 9}); s.addPlayer({id: 'g', role: 'god'}); s.addPlayer({id: 'h', role: 'hero'}); return s; };
 const step = (s, n) => { const events = []; for (let i = 0; i < n; i++) events.push(...s.step()); return events; };
 let seq = 0;
 const cast = (s, spell, point = [10, 0, 10]) => { s.adventureWorld().players.find(p => p.id === 'g').mana = 100; return s.command('g', {type: 'cast', seq: ++seq, spell, point}); };
