@@ -14,7 +14,9 @@ When gameplay input is paused, the same button moves to a safe-area-aware surfac
 above the menu/lobby. The menu and patch-notes dialog reserve this row. In dialogs
 it stays inside their focus scope. Menu card transform/blur effects are suppressed
 only while this touch surface is visible: those effects otherwise turn the card
-into the containing block for the fixed control. Desktop cards retain their style.
+into the containing block for the fixed control. Desktop cards retain their style. Workshop and field-guide dialogs keep the button
+in their visible headers; a scoped observer reattaches the owned surface when the
+field guide replaces its header, retaining dialog focus access and close buttons.
 
 Fullscreen entry occurs synchronously in the activating pointer/keyboard gesture.
 No automatic entry, delayed first request, orientation lock or second tap is used.
@@ -68,7 +70,7 @@ using document.exitFullscreen. No browser security/permission settings were chan
 
 ## Verification notes
 
-- Final focused browser pass: 64 checks passed in 14.881s; native
+- Final focused browser pass: 70 checks passed in 15.785s; native
   Escape remains explicitly unverified. [Machine-readable results](screenshots/touch-fullscreen/results.json).
 
 - Production build and build:check pass (existing large-bundle warning remains).
@@ -79,7 +81,8 @@ using document.exitFullscreen. No browser security/permission settings were chan
   No unrelated test or patch-note changes are included.
 - Browser investigation found and fixed an initial patch-notes close-button overlap,
   active-button scaling below 44px, and menu-card transforms displacing the fixed
-  surface. Fullscreen assertions await the asynchronous fullscreenchange event.
+  surface, plus an animated workshop close-button overlap. Quick-build, workshop
+  and field-guide checks now pass in both orientations. Fullscreen assertions await the asynchronous fullscreenchange event.
 
 ## Screenshots (Chromium emulation, not physical devices)
 

@@ -7,9 +7,13 @@ page.setDefaultTimeout(20000);
 const fs = () => page.locator('.mui-fs');
 const check = (name, ok, detail={}) => { record(name, ok?'pass':'fail', detail); assert.ok(ok,name); };
 async function surface(name) {
+  await fs().evaluate(async el => {
+    const animations=[];for(let node=el;node;node=node.parentElement)animations.push(...node.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity));
+    await Promise.all(animations.map(a=>a.finished.catch(()=>{})));
+  });
   const result = await fs().evaluate(el => {
     const r=el.getBoundingClientRect(), hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-    const other=[...document.querySelectorAll('.mui-util, .hud-self, .xhud, .mui-stick, #resumePlay, #leave, .mc-tabs')]
+    const other=[...document.querySelectorAll('.mui-util, .hud-self, .xhud, .mui-stick, #resumePlay, #leave, .mc-tabs, .ip-x, .fo-close')]
       .filter(e=>e!==el&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden')
       .filter(e=>{const b=e.getBoundingClientRect();return b.width&&b.height&&r.left<b.right&&r.right>b.left&&r.top<b.bottom&&r.bottom>b.top;})
       .map(e=>e.className||e.id);
@@ -59,6 +63,21 @@ try {
   await enter(); await exit();
   await page.locator('#resumePlay').tap();
   await surface('resumed');
+  for(const size of [{width:390,height:844},{width:844,height:390}]) {
+    await page.setViewportSize(size);
+    await page.locator('.qb-entry').tap();await surface('quick-build-'+size.width);await page.keyboard.press('Escape');
+    await page.locator('[data-touch-action=menu]').tap();
+    await page.locator('[data-mc-tab=play]').tap();
+    await page.locator('#menu [data-open-forge]').tap();
+    await surface('forge-'+size.width);
+    await page.locator('.ip-x').tap();
+    if(await page.locator('#resumePlay').isVisible())await page.locator('#resumePlay').tap();
+    await page.locator('.mq-more').tap();
+    await page.locator('[data-fo-open=help]').tap();
+    await surface('field-guide-'+size.width);
+    await page.locator('.fo-close').tap();
+  }
+  await page.setViewportSize({width:390,height:844});
   await enter();
   await page.keyboard.press('Escape');
   try {
