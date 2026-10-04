@@ -172,7 +172,9 @@ export function createTreeMaterials({windStrength = 1, maxSway = .05, leafSway =
   }
   cache.set(key, m); return m;
  }
- function attachParts(kit) { for (const [part, list] of Object.entries(kit?.parts || {})) for (const p of list) p.material = material(p.material, TREE_ROLE_OF_PART[part] || 'bark'); }
+ // Ivy (oak trunks, from the walk photo) rides under Trunk/Roots but shades as foliage: no bark grooves on its leaves.
+ const roleOf = (part, m) => /^Ivy\b/.test(m?.name || '') ? 'leaf' : TREE_ROLE_OF_PART[part] || 'bark';
+ function attachParts(kit) { for (const [part, list] of Object.entries(kit?.parts || {})) for (const p of list) p.material = material(p.material, roleOf(part, p.material)); }
  /** Rewrite a tree-view kit ({parts, trunkMaterial, lod}) to shared tree materials. */
  function attach(kit) { if (!kit) return kit; attachParts(kit); if (kit.trunkMaterial) kit.trunkMaterial = material(kit.trunkMaterial, 'bark'); if (kit.lod) attach(kit.lod); return kit; }
  /** Give a mesh/InstancedMesh the wind-matched shadow materials of its tree material (no-op otherwise). */

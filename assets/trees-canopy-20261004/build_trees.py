@@ -30,7 +30,7 @@ SPECIES = {
         leaf_cell=1, limbs=6, limb_elev=(18, 38), limb_len=(2.4, 3.1), limb_radius=.12, upturn=.4, droop=0.0,
         child=(3, 5), child_len=(.42, .58), twigs=(3, 5), twig_len=(.3, .45), leader=.7,
         crown=(2.7, 2.7, 1.8), crown_center=(.09, -.3, 4.35), clusters=380, card=(.9, 1.15), fruit=34, fruit_style='acorn',
-        leaf_tint=(1.0, 1.0, 1.0), seed=23, roots=(7, .62, .85, .21)),
+        leaf_tint=(1.0, 1.0, 1.0), seed=23, bark='oak_bark', ivy=True, roots=(7, .62, .85, .21)),
     'tree_young': dict(  # Silver birch: slender, upright, airy with gently drooping tips
         leaf_cell=2, limbs=7, limb_elev=(48, 66), limb_len=(1.2, 1.7), limb_radius=.05, upturn=.1, droop=.35,
         child=(2, 3), child_len=(.4, .55), twigs=(2, 4), twig_len=(.28, .38), leader=.9,
@@ -204,6 +204,58 @@ def root_flare(spec, base_r, lod, rng, tint=(1, 1, 1)):
             roots.col[fi] = [(lambda g: (tint[0] * g, tint[1] * g * .96, tint[2] * g * .9, 1))(.6 + .4 * min(1, max(0, (roots.v[vi].z + .02) / .3))) for vi in roots.f[fi]]
     return roots
 
+# ---------------------------------------------------------------- ivy (from Mitch's fence photo)
+def ivy_cover(tv, lod, rng, bands=3, top=(1.5, 2.4), carpet=1.3):
+    """Ivy climbing the lower trunk in a few ragged bands, plus a carpet spreading over the soil around the roots.
+    Returns (climb, ground) meshes. Vertex alpha shapes the ragged outline; the ivy texture's own alpha (lit leaves
+    kept, gaps dropped) makes those edges break along real leaf shapes under the material's alpha cutoff."""
+    def ring_at(z):  # trunk centre and radius at height z, from the authored trunk vertices
+        near = [v for v in tv if abs(v.z - z) < .09] or sorted(tv, key=lambda v: abs(v.z - z))[:12]
+        cx = sum(v.x for v in near) / len(near); cy = sum(v.y for v in near) / len(near)
+        return cx, cy, max(((v.x - cx) ** 2 + (v.y - cy) ** 2) ** .5 for v in near)
+    TILE = .55; climb, ground = Mesh(), Mesh()
+    noise = lambda k, x: .5 + .25 * math.sin(x * 2.3 + k * 1.7) + .25 * math.sin(x * 5.1 + k * 3.1)
+    for b in range(bands if not lod else 2):
+        az0 = (b + rng.uniform(-.2, .2)) / bands * math.tau; w0 = rng.uniform(.75, 1.15); h = rng.uniform(*top)
+        rows = int((h + .35) / (.16 if lod else .1)) + 1; cols = 7 if lod else 14
+        verts, uvs, cols_rgba, nrms, faces = [], [], [], [], []
+        for i in range(rows):
+            z = -.05 + (h + .35) * i / (rows - 1); cx, cy, r = ring_at(max(.02, z)); r += .022
+            w = w0 * (1 - .4 * min(1, z / h)) * (.85 + .3 * noise(b, z * 3))
+            for j in range(cols):
+                t = j / (cols - 1) * 2 - 1; az = az0 + t * w * 1.25
+                edge = (w - abs(az - az0)) / max(.05, w0)
+                topz = h * (.8 + .35 * noise(b + 7, az * 6))
+                a = max(0, min(1, edge / .3)) * max(0, min(1, (topz - z) / .35))
+                n = Vector((math.cos(az), math.sin(az), .12)).normalized()
+                verts.append(Vector((cx + math.cos(az) * r, cy + math.sin(az) * r, z)))
+                uvs.append((az * r / TILE + b * .37, z / TILE)); cols_rgba.append((.56, .6, .52, a)); nrms.append(tuple(n))  # photo albedo reads lime in game light: pull it toward deep ivy green
+        for i in range(rows - 1):
+            for j in range(cols - 1):
+                a, c = i * cols + j, (i + 1) * cols + j; faces.append((a, a + 1, c + 1, c))
+        climb.add(verts, faces, uvs, cols_rgba, nrms)
+    # carpet: a ragged disc over the root collar, slightly domed so it rides over the buttress roots
+    cx, cy, r0 = ring_at(.05); segs, rings = (14, 3) if lod else (28, 6)
+    verts, uvs, cols_rgba, nrms, faces = [], [], [], [], []
+    for i in range(rings + 1):
+        for j in range(segs + 1):
+            az = j / segs * math.tau; t = i / rings; R = carpet * (.75 + .5 * noise(11, az * 1.5))
+            r = r0 * .9 + (R - r0 * .9) * t * 1.15
+            a = max(0, min(1, (R - r) / (.35 * carpet))) * (.65 + .35 * noise(5, az * 3 + t * 4))
+            verts.append(Vector((cx + math.cos(az) * r, cy + math.sin(az) * r, .1 * (1 - t) ** 2 + .015)))
+            uvs.append(((cx + math.cos(az) * r) / TILE, (cy + math.sin(az) * r) / TILE)); cols_rgba.append((.5, .52, .48, a)); nrms.append((0, 0, 1))  # sunlit from above: keep it as dark as the turf
+    for i in range(rings):
+        for j in range(segs):
+            a, c = i * (segs + 1) + j, (i + 1) * (segs + 1) + j; faces.append((a, a + 1, c + 1, c))
+    ground.add(verts, faces, uvs, cols_rgba, nrms)
+    return climb, ground
+
+def ivy_material(img):
+    m = bpy.data.materials.new('Ivy'); m.use_nodes = True; nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img
+    nt.links.new(tex.outputs['Color'], b.inputs['Base Color']); nt.links.new(tex.outputs['Alpha'], b.inputs['Alpha'])
+    b.inputs['Roughness'].default_value = 1.0; return m  # matte: a glossy mat of leaves on the ground sheens white at grazing angles
+
 # ---------------------------------------------------------------- crown growth
 def grow(spec, trunk_top, trunk_r, first_limb, lod, rng):
     sides = LOD['sides'] if lod else 6
@@ -361,6 +413,7 @@ def fit_glb_materials(path, cutoff=.42):
     for m in j['materials']:
         m['name'] = m.get('name', '').split('.')[0]
         if m['name'] == 'Leaves': m['alphaMode'] = 'MASK'; m['alphaCutoff'] = cutoff
+        if m['name'] == 'Ivy': m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5  # texture alpha x vertex alpha (ragged edge)
         m['doubleSided'] = True
     js = json.dumps(j, separators=(',', ':')).encode(); js += b' ' * ((4 - len(js) % 4) % 4)
     rest = data[20 + jl:]; total = 12 + 8 + len(js) + len(rest)
@@ -385,9 +438,12 @@ def build(variant, lod, atlas_arr, birch_arr):
     first_limb = {'tree': 2.514, 'tree_b': 2.418, 'tree_young': 2.255}[variant]
     rng = random.Random(spec['seed'] + (1000 if lod else 0))
     bark = trunk.active_material
-    if spec.get('bark') == 'birch' and bark and bark.use_nodes:
+    photo = spec.get('bark') not in (None, 'birch') and os.path.join(os.path.dirname(os.path.abspath(__file__)), 'photo', spec['bark'] + ('_half' if lod else '') + '.jpg')
+    if photo:  # bark photographed on Mitch's walk (photo_textures.py); JPEG stays JPEG inside the GLB
+        photo_img = bpy.data.images.load(photo); photo_img.pack()
+    if spec.get('bark') and bark and bark.use_nodes:
         for n in bark.node_tree.nodes:
-            if n.type == 'TEX_IMAGE': n.image = birch_img
+            if n.type == 'TEX_IMAGE': n.image = photo_img if photo else birch_img
     # Roots: replace the flat wedge flares with rounded buttresses (the stump keeps them; the trunk ring is untouched)
     old_roots = bpy.data.objects['Roots']; roots_mat = old_roots.active_material; bpy.data.objects.remove(old_roots, do_unlink=True)
     base = [v for v in tv if v.z < min(x.z for x in tv) + .02]; base_r = sum((v.x ** 2 + v.y ** 2) ** .5 for v in base) / len(base)
@@ -395,6 +451,13 @@ def build(variant, lod, atlas_arr, birch_arr):
     tint = tuple(sum(c.color[i] for c in tc) / max(1, len(tc)) for i in range(3)) if len(tc) else (1, 1, 1)  # match trunk bark tone
     roots_ob = root_flare(spec, base_r, lod, random.Random(spec['seed'] * 5 + (1 if lod else 0)), tint).build('Roots', roots_mat)
     bpy.context.scene.collection.objects.link(roots_ob); roots_ob.parent = tree
+    if spec.get('ivy'):  # climbing bands ride with the Trunk part (gone when felled); the carpet stays with the stump
+        ivy_img = bpy.data.images.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'photo', 'ivy.png')); ivy_img.pack()
+        if lod: ivy_img.scale(256, 256); ivy_img.pack()
+        imat = ivy_material(ivy_img); climb, ground = ivy_cover(tv, lod, random.Random(spec['seed'] * 3 + (1 if lod else 0)))
+        for mesh, label, parent in ((climb, 'IvyClimb', trunk), (ground, 'IvyGround', roots_ob)):
+            o = mesh.build(label, imat); bpy.context.scene.collection.objects.link(o); o.parent = parent
+            o.matrix_parent_inverse = parent.matrix_world.inverted()
     branches, tips = grow(spec, top, top_r, first_limb, lod, rng)
     rng_leaf = random.Random(spec['seed'] * 7 + (1 if lod else 0))
     leaves = foliage(spec, tips, lod, rng_leaf)

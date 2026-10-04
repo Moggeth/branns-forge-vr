@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {cloneSkinnedAsset as clone} from './clone-skinned-asset.js';
 import {siegebirdMechanism, SIEGEBIRD_WINCH} from './siegebird-reload.js';
 
 // Engine contract: metres, +Y up, -Z forward. Model axes are independently

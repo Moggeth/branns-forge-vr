@@ -2,8 +2,9 @@
 // Presentation only. Never changes heights, collision, raycast targets or gameplay; reads the caller's
 // authoritative height(x, z) and the same orchard layout/dryness/disturbance functions the ground shader uses,
 // so grass parts around paths, the forge yard, fresh craters, structures and landmarks.
-// Budget: three draws (grass, flowers, motes), fixed-capacity instance buffers refilled around the view focus
-// only after it moves, cells rebuilt lazily after terrain/structure changes. No textures, lights or shadow casters.
+// Budget: four draws (grass, flowers, lawn daisies, motes), fixed-capacity instance buffers refilled around the view
+// focus only after it moves, cells rebuilt lazily after terrain/structure changes. One small texture (the daisy heads,
+// cut from Mitch's walk photo: assets/trees-canopy-20261004/photo_textures.py); no lights or shadow casters.
 import * as THREE from 'three';
 import {ORCHARD_LAYOUT, valueNoise, hash2, dryness, disturbanceAt} from './orchard-presentation.js';
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
@@ -12,9 +13,9 @@ import {FOUNDATION_HALF} from '../shared/terrain.js';
 
 export const MEADOW_VERSION = 1;
 export const MEADOW_QUALITY = Object.freeze({
-  high: {grass: 9000, flowers: 1600, motes: 96, radius: 22, spacing: .42, blades: 12},
-  low: {grass: 3200, flowers: 700, motes: 40, radius: 14, spacing: .55, blades: 8},
-  xr: {grass: 3500, flowers: 800, radius: 14}, // per-eye cost while presenting in a headset
+  high: {grass: 9000, flowers: 1600, daisies: 320, motes: 96, radius: 22, spacing: .42, blades: 12},
+  low: {grass: 3200, flowers: 700, daisies: 140, motes: 40, radius: 14, spacing: .55, blades: 8},
+  xr: {grass: 3500, flowers: 800, daisies: 140, radius: 14}, // per-eye cost while presenting in a headset
 });
 export const FILL_BUDGET_MS = 1.5; // cell baking per frame; nearest cells first, the rest fill in over following frames
 const CELL = 8, EXTENT = 44, CELLS = Math.ceil(EXTENT * 2 / CELL), MARGIN = 3, REFILL_MOVE = 2;
@@ -51,7 +52,7 @@ const FLOWERS = [
 
 // Static candidates per cell: deterministic from position only (identical for every peer and reload).
 export function bakeCellStatic(ci, cj, cfg, landmarks) {
-  const x0 = -EXTENT + ci * CELL, z0 = -EXTENT + cj * CELL, grass = [], flowers = [];
+  const x0 = -EXTENT + ci * CELL, z0 = -EXTENT + cj * CELL, grass = [], flowers = [], daisies = [];
   const n = Math.round(CELL / cfg.spacing), step = CELL / n;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const gi = ci * n + i, gj = cj * n + j, x = x0 + (i + hash2(gi, gj * 3 + 1)) * step, z = z0 + (j + hash2(gi * 5 + 2, gj)) * step;
@@ -78,8 +79,13 @@ export function bakeCellStatic(ci, cj, cfg, landmarks) {
       const ox = (hash2(gi + 5, gj + 15) - .5) * step * .6, oz = (hash2(gi + 25, gj + 35) - .5) * step * .6;
       flowers.push(x + ox, z + oz, fh, kind, hash2(gi + 41, gj + 43) * Math.PI * 2);
     }
+    // Lawn daisies like short, foot-worn turf: path fringes and the odd grazed patch, in low clumps of photo heads.
+    const fringe = smooth(.1, .4, trodden) * (1 - smooth(.7, .98, trodden)), lawn = smooth(.6, .78, valueNoise(x * .11 - 60, z * .11 + 12));
+    if (hash2(gi * 17 + 11, gj * 5 + 3) < .14 * fringe + .06 * lawn * (1 - dry)) {
+      daisies.push(x + (hash2(gi + 71, gj + 3) - .5) * step * .5, z + (hash2(gi + 9, gj + 81) - .5) * step * .5, .8 + .45 * hash2(gi + 33, gj + 77), Math.floor(hash2(gi + 13, gj + 19) * 8), hash2(gi + 57, gj + 59) * Math.PI * 2);
+    }
   }
-  return {grass: new Float32Array(grass), flowers: new Float32Array(flowers)};
+  return {grass: new Float32Array(grass), flowers: new Float32Array(flowers), daisies: new Float32Array(daisies)};
 }
 
 // ---------- geometry ----------
@@ -127,6 +133,37 @@ function flowerGeometry() {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
+// Lawn daisy clump: seven photo daisy heads facing the sky on short stems. aDaisy = (part 0 stem / 1 head, sprite cell,
+// height fraction); uv is the head's 0..1 square inside its sprite cell. Heads tilt a little so the clump catches light.
+export const DAISY_SHEET = Object.freeze({cols: 4, rows: 2, url: 'daisies.png'});
+function daisyClumpGeometry() {
+  const pos = [], uv = [], nrm = [], dz = [], idx = [];
+  const v = (x, y, z, u, w, part, cell, t, n = [0, 1, 0]) => { pos.push(x, y, z); uv.push(u, w); nrm.push(...n); dz.push(part, cell, t); return pos.length / 3 - 1; };
+  for (let k = 0; k < 7; k++) {
+    const a = k * 2.4 + hash2(k, 3) * .8, r = k ? .08 + .22 * hash2(k, 5) : 0, cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+    const h = .16 + .16 * hash2(k, 7), size = .05 + .028 * hash2(k, 11), cell = k % 8; // stand clear of the tufts, heads big enough to read from eye height
+    for (const [dx, dzz] of [[1, 0], [0, 1]]) { // crossed stem quads, ground to head
+      const w = .005, s0 = v(cx - dx * w, 0, cz - dzz * w, .5, .5, 0, cell, 0), s1 = v(cx + dx * w, 0, cz + dzz * w, .5, .5, 0, cell, 0);
+      const s2 = v(cx - dx * w, h, cz - dzz * w, .5, .5, 0, cell, 1), s3 = v(cx + dx * w, h, cz + dzz * w, .5, .5, 0, cell, 1);
+      idx.push(s0, s1, s2, s1, s3, s2);
+    }
+    const tilt = .2 + .45 * hash2(k, 13), ta = hash2(k, 17) * Math.PI * 2, tx = Math.cos(ta) * tilt, tz = Math.sin(ta) * tilt; // tilt toward a random side
+    const n = [-tx, 1, -tz], nl = Math.hypot(...n), nn = n.map(c => c / nl), spin = hash2(k, 19) * Math.PI * 2, cs = Math.cos(spin), sn = Math.sin(spin), base = [];
+    for (const [u, w] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+      const lx = (u - .5) * 2 * size, lz = (w - .5) * 2 * size, x = lx * cs - lz * sn, z = lx * sn + lz * cs;
+      base.push(v(cx + x, h + .003 + x * tx + z * tz, cz + z, u, w, 1, cell, 1, nn));
+    }
+    idx.push(base[0], base[1], base[2], base[0], base[2], base[3]);
+  }
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aDaisy', new THREE.Float32BufferAttribute(dz, 3));
   g.setIndex(idx);
   return g;
 }
@@ -204,6 +241,29 @@ function patchFlowers(shader, U) {
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vMeadowTint * vFlowerGlow * .9;');
 }
 
+function patchDaisies(shader, U) {
+  Object.assign(shader.uniforms, U);
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + COMMON_VERT + 'attribute vec3 aDaisy;\nvarying float vDaisyPart;')
+    .replace('#include <uv_vertex>', /* glsl */`#include <uv_vertex>
+    #ifdef USE_MAP
+    { float cell = mod(aDaisy.y + aMeadowTint.x, ${DAISY_SHEET.cols * DAISY_SHEET.rows}.0); // per-clump shuffle of the photo heads
+      vec2 c = vec2(mod(cell, ${DAISY_SHEET.cols}.0), floor(cell / ${DAISY_SHEET.cols}.0));
+      vMapUv = vec2((c.x + uv.x) / ${DAISY_SHEET.cols}.0, 1.0 - (c.y + 1.0 - uv.y) / ${DAISY_SHEET.rows}.0); }
+    #endif`)
+    .replace('#include <begin_vertex>', /* glsl */`
+    float mH = aDaisy.z; vMeadowUv = uv; vDaisyPart = aDaisy.x;
+    float mFade = smoothstep(uMeadowRadius, uMeadowRadius - 6.0, distance(aMeadowPos.xz, uMeadowFocus.xz));
+    float mC = cos(aMeadowTint.w), mS = sin(aMeadowTint.w);
+    vec3 transformed = vec3(mC * position.x - mS * position.z, position.y, mS * position.x + mC * position.z) * aMeadowPos.w * mFade;
+    transformed.xz += meadowSway(aMeadowPos.xz + 7.7, mH, 3.0) * .25;
+    transformed = meadowTrample(transformed, aMeadowPos.xz, mH);
+    transformed += aMeadowPos.xyz;
+    vMeadowTint = vec3(0.0);`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vMeadowTint;\nvarying vec2 vMeadowUv;\nvarying float vDaisyPart;')
+    .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);')
+    .replace('#include <alphatest_fragment>', '#include <alphatest_fragment>\nif (vDaisyPart < .5) diffuseColor.rgb = vec3(.06, .14, .03) * (.7 + .5 * vMeadowUv.y);'); // stems: plain green, never cut
+}
+
 // Pollen and drifting light motes: a wrapped box of points that follows the focus, so it never needs CPU updates.
 function createMotes(count, U) {
   const seeds = new Float32Array(count * 4);
@@ -238,32 +298,41 @@ function createMotes(count, U) {
   return points;
 }
 
-export function createMeadowCover({scene, height, quality = 'high', renderer = null, landmarks = true, wind = [.55, .22]} = {}) {
+export function createMeadowCover({scene, height, quality = 'high', renderer = null, landmarks = true, wind = [.55, .22], assetBase = '/assets/', daisyTexture = null} = {}) {
   if (!scene || typeof height !== 'function') throw new Error('createMeadowCover requires scene and height(x, z)');
   const q = MEADOW_QUALITY[quality] ? quality : 'high', cfg = MEADOW_QUALITY[q];
   const U = {uMeadowTime: {value: 0}, uMeadowRadius: {value: cfg.radius}, uMeadowFocus: {value: new THREE.Vector3(0, 0, 8)},
     uMeadowWind: {value: new THREE.Vector2(...wind)}, uMeadowPush: {value: [0, 1, 2, 3].map(() => new THREE.Vector4())}};
   const FU = {...U, uFlowerPetal: {value: FLOWERS.map(f => new THREE.Vector3(...f.petal))}, uFlowerCentre: {value: FLOWERS.map(f => new THREE.Vector3(...f.centre))}, uFlowerSize: {value: FLOWERS.map(f => f.size)}};
 
-  const grassGeo = grassTuftGeometry(cfg.blades), flowerGeo = flowerGeometry();
+  const grassGeo = grassTuftGeometry(cfg.blades), flowerGeo = flowerGeometry(), daisyGeo = daisyClumpGeometry();
   const grassPos = new THREE.InstancedBufferAttribute(new Float32Array(cfg.grass * 4), 4), grassTint = new THREE.InstancedBufferAttribute(new Float32Array(cfg.grass * 4), 4);
   const flowerPos = new THREE.InstancedBufferAttribute(new Float32Array(cfg.flowers * 4), 4), flowerTint = new THREE.InstancedBufferAttribute(new Float32Array(cfg.flowers * 4), 4);
-  for (const a of [grassPos, grassTint, flowerPos, flowerTint]) a.setUsage(THREE.DynamicDrawUsage);
+  const daisyPos = new THREE.InstancedBufferAttribute(new Float32Array(cfg.daisies * 4), 4), daisyTint = new THREE.InstancedBufferAttribute(new Float32Array(cfg.daisies * 4), 4);
+  for (const a of [grassPos, grassTint, flowerPos, flowerTint, daisyPos, daisyTint]) a.setUsage(THREE.DynamicDrawUsage);
+  daisyGeo.setAttribute('aMeadowPos', daisyPos); daisyGeo.setAttribute('aMeadowTint', daisyTint); daisyGeo.instanceCount = 0;
   grassGeo.setAttribute('aMeadowPos', grassPos); grassGeo.setAttribute('aMeadowTint', grassTint); grassGeo.instanceCount = 0;
   flowerGeo.setAttribute('aMeadowPos', flowerPos); flowerGeo.setAttribute('aMeadowTint', flowerTint); flowerGeo.instanceCount = 0;
   const grassMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .82, metalness: 0, side: THREE.DoubleSide});
   grassMat.onBeforeCompile = s => patchGrass(s, U); grassMat.customProgramCacheKey = () => `meadow-grass-v${MEADOW_VERSION}`;
   const flowerMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .6, metalness: 0, side: THREE.DoubleSide, emissive: 0x000000});
   flowerMat.onBeforeCompile = s => patchFlowers(s, FU); flowerMat.customProgramCacheKey = () => `meadow-flowers-v${MEADOW_VERSION}`;
-  const grass = new THREE.Mesh(grassGeo, grassMat), flowers = new THREE.Mesh(flowerGeo, flowerMat);
-  for (const [m, name] of [[grass, 'meadow-grass'], [flowers, 'meadow-flowers']]) { m.name = name; m.frustumCulled = false; m.receiveShadow = true; m.raycast = () => {}; scene.add(m); }
+  // Daisy heads are alpha-cut photo sprites; the clump stays hidden until the sheet arrives (never white squares).
+  const daisyMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .75, metalness: 0, side: THREE.DoubleSide, alphaTest: .5});
+  daisyMat.onBeforeCompile = s => patchDaisies(s, U); daisyMat.customProgramCacheKey = () => `meadow-daisies-v${MEADOW_VERSION}`;
+  const grass = new THREE.Mesh(grassGeo, grassMat), flowers = new THREE.Mesh(flowerGeo, flowerMat), daisies = new THREE.Mesh(daisyGeo, daisyMat);
+  for (const [m, name] of [[grass, 'meadow-grass'], [flowers, 'meadow-flowers'], [daisies, 'meadow-daisies']]) { m.name = name; m.frustumCulled = false; m.receiveShadow = true; m.raycast = () => {}; scene.add(m); }
+  daisies.visible = false; let daisyTex = daisyTexture || null, disposed = false;
+  const useDaisyTex = tex => { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = Math.min(4, renderer?.capabilities?.getMaxAnisotropy?.() || 1); daisyMat.map = tex; daisyMat.needsUpdate = true; daisies.visible = true; };
+  if (daisyTex) useDaisyTex(daisyTex);
+  else if (typeof document !== 'undefined') new THREE.TextureLoader().load(assetBase + DAISY_SHEET.url, tex => { if (disposed) { tex.dispose(); return; } daisyTex = tex; useDaisyTex(tex); }, undefined, () => {}); // decorative: the meadow reads fine without them
   const motes = cfg.motes ? createMotes(cfg.motes, U) : null; if (motes) scene.add(motes);
 
   // Lazy per-cell state: static candidates (deterministic) + dynamic visibility/heights (terrain, structures).
   const cells = Array.from({length: CELLS * CELLS}, () => null);
   let edits = [], terrainTick = Infinity, blockers = [], deposits = [], blockerKey = '', terrainVersion = 0, blockerVersion = 0;
   let xr = false;
-  const limits = () => xr ? {grass: Math.min(cfg.grass, MEADOW_QUALITY.xr.grass), flowers: Math.min(cfg.flowers, MEADOW_QUALITY.xr.flowers), radius: Math.min(cfg.radius, MEADOW_QUALITY.xr.radius)} : cfg;
+  const limits = () => xr ? {grass: Math.min(cfg.grass, MEADOW_QUALITY.xr.grass), flowers: Math.min(cfg.flowers, MEADOW_QUALITY.xr.flowers), daisies: Math.min(cfg.daisies, MEADOW_QUALITY.xr.daisies), radius: Math.min(cfg.radius, MEADOW_QUALITY.xr.radius)} : cfg;
   let filledAt = null, forceFill = true, fills = 0, lastFillMs = 0, maxFillMs = 0, rebuiltCells = 0, time = 0;
   const focus = new THREE.Vector3(), camPos = new THREE.Vector3(), camDir = new THREE.Vector3();
   function cellAt(ci, cj, deadline = Infinity) {
@@ -287,8 +356,8 @@ export function createMeadowCover({scene, height, quality = 'high', renderer = n
         out[o] = (nearEdit.length && disturbanceAt(x, z, nearEdit, terrainTick) > .3) || (nearBlock && blocked(x, z)) ? NaN : height(x, z);
       }
     };
-    c.gy ||= new Float32Array(c.grass.length / 7); c.fy ||= new Float32Array(c.flowers.length / 5);
-    fill(c.grass, 7, c.gy); fill(c.flowers, 5, c.fy);
+    c.gy ||= new Float32Array(c.grass.length / 7); c.fy ||= new Float32Array(c.flowers.length / 5); c.dy ||= new Float32Array(c.daisies.length / 5);
+    fill(c.grass, 7, c.gy); fill(c.flowers, 5, c.fy); fill(c.daisies, 5, c.dy);
     c.terrain = terrainVersion; c.blockers = blockerVersion; rebuiltCells++;
   }
   function refill() {
@@ -301,8 +370,8 @@ export function createMeadowCover({scene, height, quality = 'high', renderer = n
       const d = Math.hypot(cx - fx, cz - fz); if (d < R) order.push([d, i, j]);
     }
     order.sort((a, b) => a[0] - b[0]);
-    let g = 0, f = 0, reach = R;
-    const gp = grassPos.array, gt = grassTint.array, fp = flowerPos.array, ft = flowerTint.array, R2 = R * R;
+    let g = 0, f = 0, n = 0, reach = R;
+    const gp = grassPos.array, gt = grassTint.array, fp = flowerPos.array, ft = flowerTint.array, dp = daisyPos.array, dt = daisyTint.array, R2 = R * R;
     let pending = false;
     for (const [d, i, j] of order) {
       if (g >= lim.grass) { reach = Math.min(reach, d); break; }
@@ -318,11 +387,16 @@ export function createMeadowCover({scene, height, quality = 'high', renderer = n
         const y = c.fy[k], x = c.flowers[s], z = c.flowers[s + 1]; if (y !== y || (x - fx) ** 2 + (z - fz) ** 2 > R2) continue;
         const o = f * 4; fp[o] = x; fp[o + 1] = y - .02; fp[o + 2] = z; fp[o + 3] = c.flowers[s + 2]; ft[o] = c.flowers[s + 3]; ft[o + 3] = c.flowers[s + 4]; f++;
       }
+      for (let s = 0, k = 0; s < c.daisies.length && n < lim.daisies; s += 5, k++) {
+        const y = c.dy[k], x = c.daisies[s], z = c.daisies[s + 1]; if (y !== y || (x - fx) ** 2 + (z - fz) ** 2 > R2) continue;
+        const o = n * 4; dp[o] = x; dp[o + 1] = y - .01; dp[o + 2] = z; dp[o + 3] = c.daisies[s + 2]; dt[o] = c.daisies[s + 3]; dt[o + 3] = c.daisies[s + 4]; n++;
+      }
     }
     U.uMeadowRadius.value = Math.min(lim.radius, reach - MARGIN);
-    grassGeo.instanceCount = g; flowerGeo.instanceCount = f;
+    grassGeo.instanceCount = g; flowerGeo.instanceCount = f; daisyGeo.instanceCount = n;
     for (const a of [grassPos, grassTint]) { a.clearUpdateRanges(); a.addUpdateRange(0, g * 4); a.needsUpdate = true; }
     for (const a of [flowerPos, flowerTint]) { a.clearUpdateRanges(); a.addUpdateRange(0, f * 4); a.needsUpdate = true; }
+    for (const a of [daisyPos, daisyTint]) { a.clearUpdateRanges(); a.addUpdateRange(0, n * 4); a.needsUpdate = true; }
     filledAt = focus.clone(); forceFill = pending; fills++; lastFillMs = performance.now() - t0; maxFillMs = Math.max(maxFillMs, lastFillMs);
   }
 
@@ -367,11 +441,12 @@ export function createMeadowCover({scene, height, quality = 'high', renderer = n
   }
   function stats() {
     const tris = g => (g.index.count / 3) * g.instanceCount;
-    return {version: MEADOW_VERSION, quality: q, xr, grass: grassGeo.instanceCount, flowers: flowerGeo.instanceCount, motes: cfg.motes, radius: +U.uMeadowRadius.value.toFixed(2),
-      triangles: tris(grassGeo) + tris(flowerGeo), drawCalls: 2 + (motes ? 1 : 0), fills, lastFillMs: +lastFillMs.toFixed(3), maxFillMs: +maxFillMs.toFixed(3), pending: forceFill, rebuiltCells, cachedCells: cells.filter(Boolean).length};
+    return {version: MEADOW_VERSION, quality: q, xr, grass: grassGeo.instanceCount, flowers: flowerGeo.instanceCount, daisies: daisyGeo.instanceCount, motes: cfg.motes, radius: +U.uMeadowRadius.value.toFixed(2),
+      triangles: tris(grassGeo) + tris(flowerGeo) + tris(daisyGeo), drawCalls: 3 + (motes ? 1 : 0), fills, lastFillMs: +lastFillMs.toFixed(3), maxFillMs: +maxFillMs.toFixed(3), pending: forceFill, rebuiltCells, cachedCells: cells.filter(Boolean).length};
   }
   function dispose() {
-    for (const o of [grass, flowers, motes]) if (o) { scene.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    disposed = true; if (daisyTex && !daisyTexture) daisyTex.dispose();
+    for (const o of [grass, flowers, daisies, motes]) if (o) { scene.remove(o); o.geometry.dispose(); o.material.dispose(); }
   }
-  return {update, terrainChanged, sync, stats, dispose, objects: {grass, flowers, motes}};
+  return {update, terrainChanged, sync, stats, dispose, objects: {grass, flowers, daisies, motes}};
 }
