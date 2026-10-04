@@ -1,3 +1,4 @@
+import {nextEntityId as nextId} from './entity-id.js';
 import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,battleActive,battleSkirmish,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
 import {HOME,findHomeTarget,homeBattle,homePoint,resolveHomeDomes,resolveHomeStructures} from './home-bases.js';
 // Melee damage one hero deals another (out of 100 health).
@@ -84,10 +85,7 @@ function spawn(state, ignored = '') {
 }
 
 function event(kind, position, id) { return {kind, position: [...position], id}; }
-function nextId(state, prefix) {
-  const ids=[...state.players,...state.enemies,...state.edits,...state.groves,...state.pendingStarfalls,...state.deposits,...state.pickups,...state.bridges,...state.projectiles,...state.embeds,...state.detachedParts,...(state.fireSurfaces||[]),...(state.looseLogs||[]),...(state.meteorRewards||[]),...(state.settlement?.workers||[]),...(state.awakenedTrees||[]),...(state.wildTrees||[]),...(state.fruit?.drops||[])].flatMap(x=>x.editId?[x.id,x.editId]:[x.id]);
-  let id; do{id=`${prefix}${++state.idCounter}`;}while(ids.some(x=>x===id||x.startsWith(id+'_')||x.startsWith(id+'-')));return id;
-}
+
 function damageEnemy(state, enemy, amount, events, ownerId, side) {
   return hitEnemyPart(state,enemy,'torso',amount,ownerId||side?{ownerId,side}:null,{nextId,terrainHeight},events);
 

@@ -146,10 +146,14 @@ export function fruitSlice(state, ctx, from, to, {by = null, push = [0, 0, 0], b
 }
 // A felled apple tree sheds a handful of its remaining apples where its crown lands; the rest are lost with the crown.
 function shedFelled(state, ctx, events) {
- const f = fruitOf(state), shed = f.shed ??= [];
- for (const h of state.harvestedTrees || []) {
+  const f = fruitOf(state), shed = f.shed ??= [];
+  // A busy saved world can have hundreds of landed cuts.  The tree list is pure for
+  // this tick, so build its id lookup once instead of reconstructing every tree for
+  // each cut that is ready to shed fruit.
+  let treesById = null;
+  for (const h of state.harvestedTrees || []) {
   if (!isFelled(h) || !h.landed || shed.includes(h.id) || state.tick - h.felledTick > 900) continue; // old saves' felled trees stay bare
-  const tree = worldTrees(state).find(t => t.id === h.id); shed.push(h.id); if (shed.length > 128) shed.shift();
+  const tree = (treesById ??= new Map(worldTrees(state).map(t => [t.id, t]))).get(h.id); shed.push(h.id); if (shed.length > 128) shed.shift();
   if (!tree || !isAppleTree(tree)) continue;
   const gone = missingSet(f), s = treeScale(tree), yaw = h.fallYaw || 0, dir = [-Math.sin(yaw), 0, -Math.cos(yaw)];
   let n = 0;

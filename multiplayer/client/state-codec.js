@@ -104,6 +104,27 @@ function diffObject(a, b) {
 function diffArray(a, b) {
   if (!b.length) return a.length ? [SET, b] : undefined;
   const kind = arrayKind(b);
+  // Most 20 Hz snapshots move existing entities without changing membership/order.
+  // b already has validated unique keys; matching keys prove the same for a.
+  // Avoid rebuilding maps/sets and membership/order arrays for that common case.
+  if (kind !== null && a.length === b.length) {
+    const key = keyFn(kind);
+    let stable = true;
+    for (let i = 0; i < a.length; i++) {
+      const e = a[i];
+      if (!isRecord(e) || (kind === KIND_XZ && (hasOwn(e, 'id') || typeof e.x !== 'number' || typeof e.z !== 'number')) || key(e) !== key(b[i])) {
+        stable = false; break;
+      }
+    }
+    if (stable) {
+      const upd = [];
+      for (let i = 0; i < b.length; i++) {
+        const p = diff(a[i], b[i]);
+        if (p !== undefined) upd.push([key(b[i]), p]);
+      }
+      return upd.length ? [KEYED, kind, upd] : undefined;
+    }
+  }
   if (kind !== null && (a.length === 0 || arrayKind(a) === kind)) {
     const key = keyFn(kind), old = new Map(a.map(e => [key(e), e])), upd = [], expected = [], present = new Set();
     const bKeys = b.map(key);
