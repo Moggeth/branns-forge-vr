@@ -153,7 +153,7 @@ export function createContactFeedback({sources = () => [], playerId = () => null
     siegebird(cue, {golden = false, index = 0} = {}) {
       if (disposed || tool() !== 'crossbow') return false;
       const hand = toolHand('crossbow', weaponHand());
-      if (cue === 'click') return index % 2 === 0 && pulse(hand, {amplitude: .1, duration: 8});
+      if (cue === 'click') return index % 3 === 0 && pulse(hand, {amplitude: .1, duration: 8});   // 17 ratchet teeth: every third, inside the pulse budget
       if (cue === 'latch') return pulse(hand, {amplitude: .22, duration: 14});
       if (cue === 'seat') return pulse(hand, golden ? {amplitude: .6, duration: 55} : {amplitude: .3, duration: 18});
       return false;

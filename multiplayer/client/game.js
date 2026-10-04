@@ -8,7 +8,7 @@ import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
 import {createPickupHighlight} from './pickup-highlight.js';
 import {nearestCollectible} from '../shared/collection-target.js';
-import {waistPouchPosition,POUCH_RULES,capsuleDistance} from '../shared/trees.js';
+import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled} from '../shared/trees.js';
 import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
 import {createStartingWorld} from './starting-world.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
@@ -641,7 +641,29 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
   let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity};
-  function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird'))siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});return siegebirdFlock;}
+  function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding});}return siegebirdFlock;}
+  // Reload birds linger: perches on standing trees near where the bird leaves the crossbow, ahead of its flight first.
+  let siegebirdTreeCache=null,siegebirdTreeSnapshot=null;const siegebirdViewer=new THREE.Vector3();
+  function siegebirdTrees(){if(siegebirdTreeSnapshot!==snapshot){siegebirdTreeSnapshot=snapshot;const felled=new Set((snapshot.harvestedTrees||[]).filter(isFelled).map(h=>h.id));siegebirdTreeCache=worldTrees(snapshot).filter(t=>!felled.has(t.id));}return siegebirdTreeCache;}
+  function siegebirdTreeStanding(id){return siegebirdTrees().some(t=>t.id===id);}
+  // The perch is the outer face of the actual crown (or a bough) on the side facing the bird, found by a ray toward the
+  // trunk, so it works for any tree species; it falls back to a bough-height point when nothing is hit.
+  const siegebirdRay=new THREE.Raycaster(),siegebirdRayFrom=new THREE.Vector3(),siegebirdRayDir=new THREE.Vector3();
+  function siegebirdPerches(from,heading){
+    const near=[];for(const t of siegebirdTrees()){const dx=t.x-from.x,dz=t.z-from.z,d=Math.hypot(dx,dz);if(d<4||d>26)continue;near.push({t,d,score:d*(1.35-.6*(dx*heading.x+dz*heading.z)/d)});}
+    near.sort((a,b)=>a.score-b.score);const targets=content.targets(),out=[];
+    for(const {t,d} of near.slice(0,4)){
+      const ox=(from.x-t.x)/d,oz=(from.z-t.z)/d,floor=heightAt(t.x,t.z);let position=null;
+      for(const k of [.72,.62,.82]){
+        siegebirdRayFrom.set(t.x+ox*5,floor+t.height*k,t.z+oz*5);siegebirdRayDir.set(-ox,0,-oz);siegebirdRay.set(siegebirdRayFrom,siegebirdRayDir);siegebirdRay.far=5;
+        const h=siegebirdRay.intersectObjects(targets,true).find(h=>surfaceVisible(h.object)&&resolveHit(h)?.targetId===t.id);
+        if(h&&Math.hypot(h.point.x-t.x,h.point.z-t.z)>.45){position=[h.point.x+ox*.05,h.point.y,h.point.z+oz*.05];break;}
+      }
+      position??=[t.x+ox*Math.min(1.5,Math.max(.7,t.height*.16)),floor+t.height*.62,t.z+oz*Math.min(1.5,Math.max(.7,t.height*.16))];
+      out.push({id:t.id,position,facing:[ox,oz]});
+    }
+    siegebirdRay.far=Infinity;return out;
+  }
   function siegebirdSound(){if(!audioContext)return null;try{return siegebirdAudio??=createSiegebirdAudio({context:audioContext});}catch{return null;}}
   function siegebirdFired(golden){
     // Predict the reload index from authority (one shot per >=0.9 s, far slower than snapshots); the host's roll arrives with it.
@@ -652,6 +674,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function siegebirdCue(c){
     const a=siegebirdSound();
     if(c.cue==='click'){a?.click(c.index);feedback.siegebird?.('click',c);}
+    else if(c.cue==='engage')a?.engage?.();
     else if(c.cue==='latch'){a?.latch();feedback.siegebird?.('latch',c);}
     else if(c.cue==='ready')a?.ready();
     else if(c.cue==='enter'&&c.plumage!==undefined){a?.call(SIEGEBIRD_PLUMAGES[c.plumage]?.id,c.side,c.golden,.12);a?.flutter(c.side,.3,15,.3);}
@@ -1111,6 +1134,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
+    siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);updateFireAudio(weaponState.firing);
     setEmberdewTime(now/1000);
     if(tool==='flask'&&axeModel){flaskModel.updateWorldMatrix(true,false);bottleFx.update({dt,time:now/1000,lit:!!snapshot.players.find(p=>p.id===playerId)?.flaskLit,worldPosition:flaskModel.getWorldPosition(bottlePosition),worldQuaternion:flaskModel.getWorldQuaternion(bottleRotation)});}

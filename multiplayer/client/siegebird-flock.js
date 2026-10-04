@@ -32,6 +32,12 @@ const ENTER = s => [new THREE.Vector3(s * 2.3, .15, .95), new THREE.Vector3(s * 
 const EXIT = s => [SEAT.clone(), SEAT.clone().add(new THREE.Vector3(-s * .22, .16, .26)), new THREE.Vector3(-s * .75, 1.25, .95), new THREE.Vector3(-s * 2.1, 2.9, 1.7)];
 export const SIEGEBIRD_BIRD_SCALE = .82;               // a little bird: ~24 cm beak to tail, ~41 cm wingspan
 const FORWARD = new THREE.Vector3(0, 1, 0), UP = new THREE.Vector3(0, 0, 1);
+// Lingering birds: hand-off after the shot is ready again, flight speeds (m/s), perch stay (s), live cap.
+export const SIEGEBIRD_ROOST = Object.freeze({handoff: 1.1, max: 6, perchChance: 65, perchMin: 18, perchMax: 36, speed: 7, far: 85, climb: 18, cull: 75,
+  foldSweep: 1.4, foldAngle: -.1, foldTipYaw: .35, foldTip: 0});
+const ROOST = SIEGEBIRD_ROOST;
+function hashKey(text) { let h = 0x811c9dc5; for (const c of String(text)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+function seeded(seed) { let a = seed >>> 0 || 1; return () => { a = Math.imul(a ^ (a >>> 15), 0x2c1b3c6d) >>> 0; a = (a + 0x6d2b79f5) >>> 0; return (a >>> 8) / 16777216; }; }
 
 function bezier(p, u, out) {
   const a = 1 - u;
@@ -137,12 +143,12 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     emissiveMap: shimmerMask, emissive: 0x7fbfff, emissiveIntensity: .18, roughness: .62, metalness: 0}));
   const goldenMaterial = new THREE.MeshStandardMaterial({name: 'SB_Plumage_golden', map: paletteTexture(SIEGEBIRD_GOLDEN.palette), emissiveMap: paletteTexture(SIEGEBIRD_GOLDEN.emissive), emissive: 0xffffff, emissiveIntensity: 1.25, roughness: .28, metalness: .6});
   const boltSource = crossbowTemplate?.scene.getObjectByName('Bolt') || null;
-  const stats = {rigs: 0, birds: 0, visibleBirds: 0};
+  const stats = {rigs: 0, birds: 0, visibleBirds: 0, worldBirds: 0, perched: 0};
   const tmp = {pose: {pos: new THREE.Vector3(), forward: new THREE.Vector3(), pitch: 0, roll: 0, carrying: true, phase: '', flap: {}},
     m: new THREE.Matrix4(), right: new THREE.Vector3(), up: new THREE.Vector3(), back: new THREE.Vector3(), q: new THREE.Quaternion(), qr: new THREE.Quaternion(),
     world: new THREE.Vector3(), axis: new THREE.Vector3()};
 
-  function makeBird(rig) {
+  function makeBird(rig, parent = rig.group) {
     const root = clone(birdTemplate.scene); root.name = 'SiegebirdSongbird'; root.scale.setScalar(SIEGEBIRD_BIRD_SCALE);
     root.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; n.userData.ignoreContact = true; } });
     const bird = {root, wings: ['SongbirdWingL', 'SongbirdWingR', 'SongbirdWingL_Tip', 'SongbirdWingR_Tip'].map(n => root.getObjectByName(n)), plumage: -1, carry: null, halo: null};
@@ -157,7 +163,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       bird.carry = pivot; bird.carryMeshes = []; shaft.traverse(n => { if (n.isMesh) { n.userData.ignoreContact = true; bird.carryMeshes.push([n, n.material]); } });
     }
     bird.plumageMeshes = []; root.traverse(n => { if (n.isMesh && /^Songbird/.test(n.name)) bird.plumageMeshes.push(n); });
-    root.visible = false; rig.group.add(root); stats.birds++;
+    root.visible = false; parent.add(root); if (rig) stats.birds++;
     return bird;
   }
   function dress(bird, plumage, golden) {
@@ -261,7 +267,9 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       const t = time - r.start;
       // Bird slot follows reload parity so a fresh shot never steals the bird still flying off.
       const bird = rig.birds[r.n % 2] ||= makeBird(rig);
-      const pose = near ? siegebirdBirdPose(t, r.side, tmp.pose) : null;
+      // Once clear of the sight picture the bird leaves the crossbow for the world: a tree perch or the mountains.
+      if (!r.handed && t >= ROOST.handoff && t <= R.gone && world && near && handoff(rig, bird, r, t)) r.handed = true;
+      const pose = near && !r.handed ? siegebirdBirdPose(t, r.side, tmp.pose) : null;
       if (!pose) { bird.root.visible = false; }
       else {
         dress(bird, r.plumage, r.golden === true);
@@ -287,6 +295,130 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       for (const s of rig.boltGlow.children) { s.material.opacity = s.userData.base.opacity * k; s.scale.setScalar(s.userData.base.size * (.92 + .08 * k)); } }
     if (active) stats.visibleBirds = Math.max(stats.visibleBirds, 1);
     return {cues, bird: active ? active.root.getWorldPosition(new THREE.Vector3()) : null};
+  }
+
+  // ---- Lingering birds (world space) ------------------------------------------------------------------------
+  // After the hand-off each songbird flies on in the world: most settle on a nearby tree for a while, preen and
+  // hop, then leave for the mountains; the rest head straight for the distant peaks. Choices are seeded by the
+  // player and reload so every peer sees the same bird take the same branch. At most ROOST.max birds live at once
+  // (oldest perched bird leaves first); none of this touches the simulation.
+  let world = null; const roost = [], pool = [], WUP = new THREE.Vector3(0, 1, 0);
+  const wtmp = {a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3(), m: new THREE.Matrix4(), right: new THREE.Vector3(), up: new THREE.Vector3(), f: new THREE.Vector3()};
+  // scene: where birds live. perch(from, heading) -> perches by preference [{id, position:[x,y,z], facing:[x,z]}] on
+  // nearby standing trees (any species: only positions and heights are used).
+  // standing(id) -> false once that tree is felled or gone. Call once the world exists; detach with attachWorld(null).
+  function attachWorld(options) {
+    if (!options) { for (const w of roost.splice(0)) release(w); world = null; return; }
+    if (!world) { const group = new THREE.Group(); group.name = 'SiegebirdRoost'; options.scene.add(group); world = {group}; }
+    Object.assign(world, options);
+  }
+  function release(w) { w.bird.root.visible = false; pool.push(w.bird); }
+  function handoff(rig, bird, r, t) {
+    if (!bird.root.visible) return false;
+    const key = `${r.playerId}:${r.n}`, h = hashKey(key);
+    bird.root.updateWorldMatrix(true, false); bird.root.matrixWorld.decompose(wtmp.a, wtmp.q, wtmp.s);
+    // Launch velocity from the authored exit curve, carried into world space.
+    const p0 = siegebirdBirdPose(t, r.side, {pos: new THREE.Vector3(), forward: new THREE.Vector3(), flap: {}}).pos, p1 = siegebirdBirdPose(Math.min(R.gone, t + .02), r.side, {pos: new THREE.Vector3(), forward: new THREE.Vector3(), flap: {}}).pos;
+    const v = rig.native.localToWorld(p1.clone()).sub(rig.native.localToWorld(p0.clone())).divideScalar(.02);
+    if (roost.length >= ROOST.max) evict();
+    if (roost.length >= ROOST.max) return false;
+    const w = {bird: pool.pop() || makeBird(null, world.group), key, h, golden: r.golden === true, plumage: r.plumage, scale: wtmp.s.x, pos: wtmp.a.clone(), vel: v, born: lastWorldTime, state: 'fly', path: null, perch: null};
+    if (!w.bird.root.parent) world.group.add(w.bird.root);
+    dress(w.bird, r.plumage, w.golden); w.bird.root.scale.setScalar(w.scale); if (w.bird.carry) w.bird.carry.visible = false;
+    const heading = wtmp.b.set(v.x, 0, v.z); if (heading.lengthSq() < 1e-6) heading.set(0, 0, -1); heading.normalize();
+    const options = (h % 100) < ROOST.perchChance ? world.perch?.(w.pos.clone(), heading.clone()) || [] : [];
+    const perch = options.length ? options[(h >>> 12) % Math.min(3, options.length)] : null;
+    if (perch) { w.perch = perch; flyTo(w, new THREE.Vector3(...perch.position), ROOST.speed, true); }
+    else flyAway(w, heading);
+    w.bird.root.visible = true; roost.push(w); stats.worldBirds = Math.max(stats.worldBirds, roost.length);
+    return true;
+  }
+  function evict() {
+    const perched = roost.filter(w => w.state === 'perched').sort((a, b) => a.born - b.born)[0];
+    if (perched) { flyAway(perched, wtmp.b.set(perched.pos.x, 0, perched.pos.z).normalize()); perched.leaving = true; }
+    const oldest = roost.filter(w => w.state !== 'perched').sort((a, b) => a.born - b.born)[0];
+    if (roost.length >= ROOST.max && oldest) { roost.splice(roost.indexOf(oldest), 1); release(oldest); }
+  }
+  // Cubic Hermite from the bird's position and velocity to a target, arriving slowly when landing.
+  function flyTo(w, target, speed, landing) {
+    const dist = w.pos.distanceTo(target), duration = THREE.MathUtils.clamp(dist / speed, 1.1, 7);
+    const arrive = landing ? target.clone().sub(w.pos).setY(0).normalize().multiplyScalar(.6).setY(-.4) : target.clone().sub(w.pos).normalize().multiplyScalar(speed);
+    w.path = {p0: w.pos.clone(), v0: w.vel.clone().clampLength(0, speed * 1.4), p1: target, v1: arrive, start: lastWorldTime, duration, landing};
+    w.state = landing ? 'fly-perch' : 'fly-away';
+  }
+  function flyAway(w, heading) {
+    // Out over the valley towards the far ridges, climbing, then gone.
+    const side = (w.h >>> 8) % 2 ? 1 : -1, dir = heading.clone().applyAxisAngle(WUP, side * (.25 + ((w.h >>> 4) % 40) / 100));
+    const target = w.pos.clone().addScaledVector(dir, ROOST.far).setY(w.pos.y + ROOST.climb + (w.h % 12));
+    if (w.state === 'perched') w.vel.copy(dir).multiplyScalar(2.5).setY(2.2);
+    flyTo(w, target, ROOST.speed * 1.25, false);
+  }
+  function hermite(path, u, pos, vel) {
+    const u2 = u * u, u3 = u2 * u, D = path.duration;
+    pos.copy(path.p0).multiplyScalar(2 * u3 - 3 * u2 + 1).addScaledVector(path.v0, (u3 - 2 * u2 + u) * D).addScaledVector(path.p1, -2 * u3 + 3 * u2).addScaledVector(path.v1, (u3 - u2) * D);
+    vel.copy(path.p0).multiplyScalar(6 * u2 - 6 * u).addScaledVector(path.v0, (3 * u2 - 4 * u + 1) * D).addScaledVector(path.p1, -6 * u2 + 6 * u).addScaledVector(path.v1, (3 * u2 - 2 * u) * D).divideScalar(D);
+  }
+  function orient(w, forward, pitch, roll) {
+    const {right, up, f, m, q} = wtmp;
+    f.copy(forward); f.y = 0; if (f.lengthSq() < 1e-8) f.set(0, 0, -1); f.normalize();
+    right.crossVectors(f, WUP).normalize(); f.applyAxisAngle(right, pitch);
+    up.crossVectors(right, f).normalize(); m.makeBasis(right, up, wtmp.c.copy(f).negate()); q.setFromRotationMatrix(m);
+    w.bird.root.quaternion.setFromAxisAngle(f, roll).multiply(q);
+  }
+  function flap(w, rate, amp, dihedral, hover, time) {
+    const phase = time * rate * Math.PI * 2, beat = Math.sin(phase + .35 * Math.sin(phase)), angle = dihedral + amp * .62 * beat, tip = .55 * amp * Math.sin(phase - 1.1), sweep = hover * .45 * Math.cos(phase);
+    const [wl, wr, tl, tr] = w.bird.wings;
+    wr?.rotation.set(0, -sweep, angle); wl?.rotation.set(0, sweep, -angle); tr?.rotation.set(0, -sweep * .4, tip); tl?.rotation.set(0, sweep * .4, -tip);
+  }
+  function fold(w, flick) {
+    // Wings swept back along the flanks (yaw about the shoulder; glTF -Z is forward, so the right wing sweeps by -yaw)
+    // with the primaries tucked over the tail; a flick half-opens them for a beat.
+    const [wl, wr, tl, tr] = w.bird.wings, k = 1 - .45 * flick, open = .35 * flick;
+    wr?.rotation.set(0, -ROOST.foldSweep * k, ROOST.foldAngle * k + open); wl?.rotation.set(0, ROOST.foldSweep * k, -(ROOST.foldAngle * k + open));
+    tr?.rotation.set(0, -ROOST.foldTipYaw * k, ROOST.foldTip * k); tl?.rotation.set(0, ROOST.foldTipYaw * k, -ROOST.foldTip * k);
+  }
+  let lastWorldTime = 0;
+  // Advance the lingering birds once per frame (seconds clock shared with update). viewer: world position to cull from.
+  function updateWorld(time, {viewer = null} = {}) {
+    lastWorldTime = time; if (!world) return;
+    let perchedCount = 0;
+    for (let i = roost.length - 1; i >= 0; i--) {
+      const w = roost[i], root = w.bird.root;
+      if (w.state === 'fly-perch' && w.perch && world.standing && !world.standing(w.perch.id)) flyAway(w, wtmp.b.set(w.vel.x, 0, w.vel.z).normalize());
+      if (w.state === 'perched') {
+        perchedCount++;
+        if (!w.leaving && (time - w.landed > w.stay || (world.standing && !world.standing(w.perch.id)))) { w.leaving = true; flyAway(w, wtmp.b.set(w.facing.x, 0, w.facing.z)); }
+        else {
+          const k = time - w.landed, hop = w.hops.find(e => k >= e.at && k < e.at + .28);
+          if (hop) { const u = (k - hop.at) / .28; w.yaw = hop.from + (hop.to - hop.from) * easeInOut(u); root.position.y = w.pos.y + .045 * Math.sin(Math.PI * u); }
+          else { w.yaw = w.hops.filter(e => k >= e.at + .28).at(-1)?.to ?? w.yaw0; root.position.y = w.pos.y; }
+          const dir = wtmp.f.set(Math.sin(w.yaw), 0, Math.cos(w.yaw)); orient(w, dir, .22 + .05 * Math.sin(k * 1.7 + w.h), 0);
+          const flick = w.flicks.find(e => k >= e && k < e + .35); fold(w, flick === undefined ? 0 : Math.sin(Math.PI * (k - flick) / .35));
+          if (w.golden && w.bird.halo) w.bird.halo.material.opacity = .55 + .2 * Math.sin(k * 3.1);
+          continue;
+        }
+      }
+      const path = w.path, u = Math.min(1, (time - path.start) / path.duration);
+      hermite(path, u, w.pos, w.vel); root.position.copy(w.pos);
+      const speed = w.vel.length(), climb = speed > 1e-3 ? Math.asin(THREE.MathUtils.clamp(w.vel.y / speed, -1, 1)) : 0;
+      const landing = path.landing ? THREE.MathUtils.smoothstep(u, .72, 1) : 0, launch = THREE.MathUtils.smoothstep(time - path.start, 0, .6);
+      // Bank into the turn: heading change rate from the path tangent a moment ahead.
+      hermite(path, Math.min(1, u + .02), wtmp.a, wtmp.c); const turn = Math.atan2(wtmp.c.x * w.vel.z - wtmp.c.z * w.vel.x, wtmp.c.x * w.vel.x + wtmp.c.z * w.vel.z);
+      orient(w, w.vel, climb * .7 + landing * .55, THREE.MathUtils.clamp(-turn * 14, -.7, .7) * (1 - landing));
+      flap(w, 11 + 5 * landing, (climb > .15 || landing || launch < 1 ? 1 : .55 + .45 * Math.max(0, Math.sin(time * 1.3 + w.h))), .14 + .12 * landing, landing, time);
+      if (w.golden && w.bird.halo) w.bird.halo.material.opacity = .75 + .25 * Math.sin(time * 19);
+      if (u >= 1) {
+        if (path.landing && w.perch) {
+          w.state = 'perched'; w.landed = time; w.pos.copy(path.p1); w.vel.set(0, 0, 0);
+          w.facing = new THREE.Vector3(w.perch.facing[0], 0, w.perch.facing[1]).normalize(); w.yaw0 = w.yaw = Math.atan2(w.facing.x, w.facing.z);
+          const rng = seeded(w.h); w.stay = ROOST.perchMin + rng() * (ROOST.perchMax - ROOST.perchMin);
+          w.hops = []; let at = 1.5 + rng() * 2; while (at < w.stay) { const last = w.hops.at(-1)?.to ?? w.yaw0; w.hops.push({at, from: last, to: w.yaw0 + (rng() - .5) * 1.6}); at += 2.5 + rng() * 4; }
+          w.flicks = []; at = .8 + rng() * 3; while (at < w.stay) { w.flicks.push(at); at += 4 + rng() * 6; }
+        } else { roost.splice(i, 1); release(w); continue; }
+      }
+      if (viewer && root.position.distanceTo(viewer) > ROOST.cull) { roost.splice(i, 1); release(w); }
+    }
+    stats.perched = perchedCount;
   }
 
   function emitSpark(rig, at, time) {
@@ -317,9 +449,10 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
   function rest(visual, golden = false) { const rig = rigFor(visual); rig.reloads = []; for (const b of rig.birds) b.root.visible = false; setLoadedBolt(rig, golden); }
 
   function dispose() {
+    if (world) { world.group.removeFromParent(); roost.length = 0; world = null; }
     for (const m of plumageMaterials) { m.map.dispose(); m.dispose(); }
     shimmerMask.dispose();
     goldenMaterial.map.dispose(); goldenMaterial.emissiveMap.dispose(); goldenMaterial.dispose();
   }
-  return {shot, inform, update, rest, fired, loadedGolden, dispose, stats, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
+  return {shot, inform, update, updateWorld, attachWorld, rest, fired, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
 }

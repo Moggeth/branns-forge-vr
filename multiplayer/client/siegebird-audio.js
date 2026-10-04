@@ -57,9 +57,11 @@ export function createSiegebirdAudio({context, volume = 1} = {}) {
     },
     // One ratchet tooth on the crank.
     click(index = 0) {
-      hiss({length: .018, gain: .07, freq: 4200 + (index % 3) * 300, q: 3});
-      tone({type: 'square', from: 2600, to: 1900, length: .014, gain: .012});
+      hiss({length: .014, gain: .055, freq: 4200 + (index % 3) * 300, q: 3});
+      tone({type: 'square', from: 2600, to: 1900, length: .011, gain: .009});
     },
+    // Cone clutch biting back onto the pinion shaft before the wind: a dull bronze clunk.
+    engage() { tone({type: 'triangle', from: 210, to: 120, length: .07, gain: .05}); hiss({length: .04, gain: .05, freq: 900, q: 1.2}); },
     latch() { tone({type: 'square', from: 1300, to: 640, length: .035, gain: .03}); hiss({length: .03, gain: .09, freq: 2500, q: 2}); },
     // The bird's call as it swoops in from its side.
     call(plumage = 'kingfisher', side = 1, golden = false, delay = 0) {
