@@ -238,6 +238,14 @@ export class PeerRoomConnection extends EventTarget {
     };
     channel.onclose = () => {
       if (this.peers.get(id) !== peer || peer.relay) return;
+      // A failed data channel does not mean the member left the signaling room.
+      // Keep the edge until the relay handshake completes; removing it here
+      // strands both sides because retry_world cannot replace an online host.
+      if (this.relayTransport === 'websocket' && this.roster.get(id)?.online &&
+          this.#signal({ type: 'relay_request', to: id, epoch: this.epoch })) {
+        emit(this, 'peer_connection_state', { peerId: id, state: 'reconnecting', relayConfigured: this.relayConfigured });
+        return;
+      }
       this.#removePeer(id);
       const roster = this.roster.get(id); if (roster) roster.online = false;
       emit(this, 'peer_left', { peerId: id });

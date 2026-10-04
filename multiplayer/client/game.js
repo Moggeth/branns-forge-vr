@@ -52,6 +52,7 @@ import {createSpellPresentation} from './spell-presentation.js';
 import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {earthLineEdits} from '../shared/earth-spells.js';
+import {acousticPosition} from './voice-audio.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -93,7 +94,7 @@ import {worldTrees} from '../shared/world-content.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let snapshot = { players: [], enemies: [], edits: [], groves: [], pendingStarfalls: [] };
@@ -155,7 +156,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const rig = new THREE.Group();
   rig.add(camera);
   scene.add(rig);
-  // Manned Timberline aids: forecast arcs in the world, the scope eyepiece on the camera, and the ammo plate.
+  // Manned Timberline aids: forecast arcs in the world (while sighting along the ladder) and the ammo plate.
   const colliderMode=new URLSearchParams(location.search).get('colliders');
   const colliderDebug=colliderMode!==null?createColliderDebug({scene,terrainHeight:(st,x,z)=>terrainHeight(x,z,st.edits,st.tick??Infinity),legacy:colliderMode==='legacy',structureRadius:type=>STRUCTURES[type]?.radius||1.5}):null;
   const timberlineSight=createTimberlineSight({scene}),timberlineAmmoHud=createTimberlineAmmoHud();
@@ -993,7 +994,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
-    aiming=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
+    aiming=false;scoping=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }
@@ -1044,7 +1045,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
     // The forecast arcs only show while sighting along the ladder, and fade in with it.
-    if(scopeAmount>0)timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:snapshot.edits?.length||0,amount:scopeAmount});else timberlineSight.hide();
+    if(scopeAmount>0)timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits,amount:scopeAmount});else timberlineSight.hide();
     timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5});
   }
   // Hold R to wind: the operator doubles the reload; a second Hero cranking beside it quadruples it.
@@ -1335,6 +1336,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
     renderer.render(scene, camera);
+    if (onVoicePose && playerId) {
+      // After render, WebXR's viewer camera includes this frame's head pose.
+      const earCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+      earCamera.getWorldPosition(earVector);
+      const position = acousticPosition({role, xr:renderer.xr.isPresenting, position:earVector.toArray(), focus:[pan.x,heightAt(pan.x,pan.z,snapshot.edits),pan.z]});
+      earCamera.getWorldDirection(earVector); const forward = earVector.toArray();
+      earVector.set(0,1,0).applyQuaternion(earCamera.getWorldQuaternion(earQuaternion));
+      onVoicePose({position, forward, up:earVector.toArray()});
+    }
     frameMetrics.record('frameCpu',performance.now()-frameStarted);
   }
   function disposeResources(root) {
