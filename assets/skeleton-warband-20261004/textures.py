@@ -78,11 +78,11 @@ def bone(n=512):
     ivory = np.array([0.93, 0.88, 0.76], np.float32)
     aged = np.array([0.80, 0.71, 0.52], np.float32)
     grime = np.array([0.52, 0.44, 0.33], np.float32)
-    c = mix(np.broadcast_to(ivory, (n, n, 3)), np.broadcast_to(aged, (n, n, 3)), smooth(0.35, 0.75, low) * 0.85)
+    c = mix(np.broadcast_to(ivory, (n, n, 3)), np.broadcast_to(aged, (n, n, 3)), smooth(0.35, 0.75, low) * 0.45)  # even ivory: box-UV seams stay invisible on the round skull
     c = mix(c, np.broadcast_to(grime, (n, n, 3)), smooth(0.62, 0.9, mid) * 0.35)
     c = c * (0.94 + 0.08 * fib[..., None])
-    c = c * (1 - 0.32 * pits[..., None])
-    h = low * 0.6 + fib * 0.5 - pits * 0.9 + mid * 0.3
+    c = c * (1 - 0.14 * pits[..., None])  # cartoon bone: smooth ivory, only faint pores
+    h = low * 0.6 + fib * 0.35 - pits * 0.35 + mid * 0.3
     return np.clip(c, 0, 1), normal_from_height(h, 3.5)
 
 

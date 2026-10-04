@@ -29,8 +29,14 @@ assert.ok(golden>80&&golden<160,`novice golden rate near 3% (${golden}/4000)`);
 // Golden bolt does quad damage and is carried by projectile, embed and events; regular bolts count mastery.
 const damage=goldenNext=>{const g=fixture('golem',c=>{c.players[0].tool='crossbow';c.players[0].siegebird={n:5,golden:goldenNext,hits:7};});const shot=fire(g);assert.equal(shot.result.ok,true);
  assert.equal(!!g.snapshot().projectiles[0].golden,goldenNext);assert.equal(!!shot.result.events[0].golden,goldenNext);
- const hp=g.snapshot().enemies[0].hp,hit=land(g,shot);assert.equal(hit.ok,true);assert.equal(!!hit.events.find(e=>e.kind==='embed').golden,goldenNext);
- assert.equal(!!g.snapshot().embeds[0].golden,goldenNext);assert.equal(g.snapshot().players[0].siegebird.hits,8,'a landed bolt grows mastery');
+ const hp=g.snapshot().enemies[0].hp,hit=land(g,shot);assert.equal(hit.ok,true);
+ if(goldenNext){
+  // Radiant: a golden bolt bursts through the golem (no embed in it), keeps flying, and only ever hits it once.
+  const pierce=hit.events.find(e=>e.kind==='pierce');assert.ok(pierce?.golden);assert.ok(hit.events.some(e=>e.kind==='radiant_burst'));
+  assert.equal(g.snapshot().embeds.length,0);assert.deepEqual(g.snapshot().projectiles[0].pierced,[g.snapshot().enemies[0].id]);
+  assert.equal(land(g,shot).ok,false,'a pierced target is never hit twice by the same bolt');
+ }else{assert.equal(!!hit.events.find(e=>e.kind==='embed').golden,false);assert.equal(!!g.snapshot().embeds[0].golden,false);}
+ assert.equal(g.snapshot().players[0].siegebird.hits,8,'a landed bolt grows mastery');
  const restored=loadSimulation(g.checkpoint());assert.deepEqual(restored.snapshot(),g.snapshot(),'golden state survives save/restore');
  return hp-g.snapshot().enemies[0].hp;};
 const plain=damage(false),gold=damage(true);assert.ok(Math.abs(gold-plain*SIEGEBIRD.goldenMultiplier)<1e-9,`golden ${gold} = 4 x ${plain}`);
