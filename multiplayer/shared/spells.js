@@ -1,4 +1,5 @@
 // Shared catalogue: the tray and authoritative cast validation use one vocabulary.
+import {ENT} from './ents.js';
 export const SPELLS = Object.freeze([
   {id:'skeleton',label:'Skeleton',cost:15,target:'point',icon:'☠'},
   {id:'squad',label:'Skeleton Squad',cost:38,target:'point',icon:'☠'},
@@ -14,6 +15,8 @@ export const SPELLS = Object.freeze([
   {id:'heal',label:'Healing Rain',cost:18,target:'point',icon:'✚'},
   {id:'lightning',label:'Lightning',cost:22,target:'point',icon:'ϟ'},
   {id:'frost',label:'Frost Nova',cost:20,target:'point',icon:'❄'},
+  {id:'awaken',label:'Awaken',cost:18,target:'point',icon:'❦'},
+  {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
 ].map(s=>Object.freeze({...s,cooldown:0})));  // Mana is the only gate on casting.
 export const SPELL_COST = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.cost])));
 export const WEAPONS = Object.freeze([
@@ -43,4 +46,6 @@ export const SPELL_TARGET_SHAPES = Object.freeze({
   sunder: { line: true, kr: 2.5, kh: -1.5 }, wall: { line: true, kr: 2.5, kh: 1.5 },
   grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
+  // Ents wake standing trees: Awaken snaps to the nearest tree within reach; Wild Awakening takes up to three in its circle.
+  awaken: { r: 1.5, reach: ENT.awakenRadius, count: 1 }, wildwake: { r: ENT.wildRadius, count: ENT.wildCount },
 });

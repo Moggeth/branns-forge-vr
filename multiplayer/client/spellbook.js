@@ -29,6 +29,11 @@ export const SPELL_ICONS = Object.freeze({
   frost: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
     + [0, 60, 120].map(a => `<g transform="rotate(${a} 12 12)"><path d="M12 1.5v21M9 4l3 2.6L15 4M9 20l3-2.6 3 2.6"/></g>`).join('')
     + '</g><circle cx="12" cy="12" r="2.4"/>',
+  // A tree with two eyes in its trunk and root feet; Wild Awakening adds two smaller woken trees behind it.
+  awaken: '<path fill-rule="evenodd" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
+  wildwake: '<g opacity=".7"><path transform="translate(-4.2 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/>'
+    + '<path transform="translate(14.6 3) scale(.55)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1z"/></g>'
+    + '<path fill-rule="evenodd" stroke="var(--sb-icon-ink,#1a140f)" stroke-width="1.4" paint-order="stroke" transform="translate(3.6 1) scale(.7)" d="M12 1c-3.3 0-5.6 2.3-5.6 5 0 1.6.8 3 2 3.9V15l-2.6 3.4L4 22h3.3l1.6-2.8L10.4 22h3.2l1.5-2.8 1.6 2.8H20l-1.8-3.6L15.6 15V9.9c1.2-.9 2-2.3 2-3.9C17.6 3.3 15.3 1 12 1zM9.6 11.2l2 .8-.4 1.1-2-.6zM14.4 11.2l-2 .8.4 1.1 2-.6z"/>',
 });
 const QUICK_ICON = '<path d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm0 2.2a8.3 8.3 0 1 1 0 16.6 8.3 8.3 0 0 1 0-16.6z" opacity=".55"/><path d="M13.4 4.5L7 13.2h4.3l-1.6 6.3 7.3-9h-4.4l2.3-6z"/>';
 const ARROW = { prev: '<path d="M15.5 4.5L8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',

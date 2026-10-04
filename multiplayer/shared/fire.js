@@ -1,6 +1,7 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
 import {applyEnemyScorch,partPosition,PARTS} from './combat.js';
+import {entHeight} from './ents.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
@@ -74,7 +75,7 @@ export function fireSamples(enemy, supplied) {
     if(enemy.missingParts?.includes(part))continue;
     const points=supplied?.[part];
     out[part]=Array.isArray(points)&&points.length<=8&&points.length&&points.every(p=>validVector(p)&&Math.hypot(...p.map((n,i)=>n-enemy.position[i]))<5)?points: [partPosition({...enemy,yaw:enemy.yaw||0},part)];
-    if(out[part]!==points&&part.endsWith('Leg'))out[part]=[.12,.42,.8].map(h=>{const p=[...out[part][0]];p[1]=enemy.position[1]+h*(enemy.kind==='golem'?1.45:1);return p;});
+    if(out[part]!==points&&part.endsWith('Leg'))out[part]=[.12,.42,.8].map(h=>{const p=[...out[part][0]];p[1]=enemy.position[1]+h*(enemy.kind==='golem'?1.45:enemy.kind==='ent'?entHeight(enemy)*.36:1);return p;});
   }
   return out;
 }
@@ -141,7 +142,9 @@ export function stepFire(state,ctx,events){
       if(heat>0){applyEnemyScorch(enemy,part,.16*heat);exposed=true;}
     }
     if(burning)applyEnemyScorch(enemy,enemy.burnPart||'torso',.095);
-    if(exposed||burning)ctx.damageEnemy(state,enemy,burning?7:6,events);
+    // Ents are dry timber: flames catch on them, they burn twice as hard and drop burning litter where they walk.
+    if(enemy.kind==='ent'){if(exposed&&!burning){enemy.burnUntil=state.tick+240;enemy.burnPart='torso';}if(burning)addFuel(state,enemy.position,.6,.3,true);}
+    if(exposed||burning)ctx.damageEnemy(state,enemy,(burning?7:6)*(enemy.kind==='ent'?2:1),events);
   }
   for(const d of state.detachedParts||[])if((d.burnUntil||0)>state.tick)d.scorch=clamp((d.scorch||0)+.095,0,1);
   for(const player of state.players)if(player.role==='hero'&&flameExposure([[player.position[0],player.position[1]+.12,player.position[2]]],hot)>0)ctx.damageHero(state,player,2,events);
