@@ -60,6 +60,9 @@ async function capture() {
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
+ // A fresh browser opens release notes; dismiss them through the real UI before expecting controls.
+ const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
+ if (await whatsNew.isVisible()) await whatsNew.click();
  // The Orchard world with two falling stars timed to land beside the spawn, so the hero is hurt (about 64 HP) and the
  // apple's healing shows. Starfalls this small leave no golem behind.
  await page.fill('#name', 'Orchard QA'); await page.check('input[name="role"][value="hero"]', {force: true});

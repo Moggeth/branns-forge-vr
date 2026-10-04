@@ -60,6 +60,9 @@ async function capture() {
 try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady);
+ // A fresh browser opens release notes; dismiss them through the real UI before expecting controls.
+ const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
+ if (await whatsNew.isVisible()) await whatsNew.click();
  await page.fill('#name', 'Orchard QA'); await page.check('input[name="role"][value="hero"]', {force: true});
  await page.locator('#import').setInputFiles({name: 'orchard-line.json', mimeType: 'application/json', buffer: fixture});
  await page.waitForFunction(() => window.brannHarness?.state().phase === 'game');
