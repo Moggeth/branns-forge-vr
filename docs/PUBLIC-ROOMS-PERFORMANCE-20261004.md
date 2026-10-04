@@ -65,6 +65,12 @@ arrive. No resolution, animation rate, object-count, art or shader reductions.
 
 ## Verification
 
+- Final blocking CI: **136/136 suites passed**, 72.3 s runner time. Initial run was
+  134/136: two tests extracted rebuildGround without providing its new dependency.
+  Both now instantiate the actual terrain updater; all original assertions remain.
+- Integrated desktop and touch-emulation solo/render smoke passed in 13.269 s.
+- Draft review: https://github.com/Moggeth/branns-forge-vr/pull/39. Owned local
+  Wrangler and Vite QA processes were stopped after verification.
 - Room metadata/expiry/pagination pure tests and actual DO storage logic checks pass.
 - Live local Worker directory create, list, names/no secrets, full, handoff, waiting,
   empty removal, CORS and public-write rejection: 1.057 s command wall time.
@@ -96,5 +102,7 @@ remain unverified. Do not claim all graphics issues or frame drops have been fix
   a first-mismatch report; huge typed-array assertion dumps obscure useful evidence.
 - CPU-correct partial geometry can still render incorrectly if pending full GPU uploads
   are overwritten by partial ranges. Test multiple snapshots before a rendered frame.
+- Source-extraction fixtures must provide newly introduced real dependencies. Missing
+  test bindings are not runtime rendering failures; preserve their behavioral assertions.
 - The first monolithic shell edit was rejected by automatic review. Ordinary apply_patch
   file edits succeeded; no service/policy bypass was attempted. Use focused file edits.
