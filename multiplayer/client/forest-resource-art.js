@@ -270,6 +270,7 @@ function inferStyle(root, trunk, leaves) { const tb = new T.Box3().setFromBuffer
 /** Merge authored-style detail into a tree template once. Returns {style, before, after, added}. */
 export function enhanceTreeTemplate(scene, {lod = false, variant = null} = {}) {
  const root = scene?.getObjectByName?.('Tree') || scene; if (!root) return null;
+ if (root.userData?.authoredFoliage) return null; // rebuilt species kits (assets/trees-canopy-20261004) carry their own sprays
  const mesh = n => firstMesh(root.getObjectByName(n)), trunk = mesh('Trunk'), leaves = mesh('Leaves'), branches = mesh('Branches'), roots = mesh('Roots');
  if (!trunk || !leaves) return null;
  if (leaves.geometry.userData.forestEnhanced) return leaves.geometry.userData.forestReport || null;
