@@ -116,9 +116,9 @@ class Acc:
 
 
 ACCS = {}            # (node, lod) -> Acc
-MAT_ORDER = ["TL_Wood", "TL_WoodDark", "TL_Iron", "TL_Brass", "TL_Mithril", "TL_Rope"]
+MAT_ORDER = ["TL_Wood", "TL_WoodDark", "TL_Iron", "TL_Brass", "TL_Mithril", "TL_Rope", "TL_Resonance"]
 UV_SCALE = {"TL_Wood": 1 / 0.75, "TL_WoodDark": 1 / 0.75, "TL_Iron": 1 / 0.6,
-            "TL_Brass": 1.0, "TL_Mithril": 1.0, "TL_Rope": 1 / 0.10}
+            "TL_Brass": 1 / 0.25, "TL_Mithril": 1 / 0.3, "TL_Rope": 1 / 0.10, "TL_Resonance": 1.0}
 _uvseed = [0]
 
 
@@ -442,6 +442,36 @@ def build_carriage():
          bevel=0.004)
 
 
+SCOPE_Z = 0.42                  # sight line above the trunnion (Elevation frame), parallel to the rails
+SCOPE_EYE_Y, SCOPE_LENS_Y = -0.36, 0.47
+
+
+def build_scope():
+    """Brass sighting telescope on two iron standards over the keel (Elevation frame, so it pitches with the
+    rails but stays still under the firing recoil). The objective holds a resonance lens that glows blue."""
+    N = "Scope"
+    for yy in (-0.16, 0.28):
+        beam(N, "TL_Iron", (0, yy, 0.0), (0, yy, SCOPE_Z - 0.03), 0.035, 0.03, bevel=0.006, up=Vector((0, 1, 0)))
+        for lod in (0, 1):
+            torus(N, "TL_Iron", T((0, yy, SCOPE_Z), (math.pi / 2, 0, 0)), 0.034, 0.007, 14 if lod == 0 else 8, 5 if lod == 0 else 4, lod)
+        box(N, "TL_Iron", (0.07, 0.04, 0.012), T((0, yy, 0.006)), bevel=0.003)
+        stud(N, "TL_Brass", T((0.026, yy, 0.012)), s=0.012, h=0.006)
+        stud(N, "TL_Brass", T((-0.026, yy, 0.012)), s=0.012, h=0.006)
+    # Tube: eyepiece, draw tube, main body, objective bell.
+    cyl(N, "TL_WoodDark", 0.036, 0.075, T((0, SCOPE_EYE_Y + 0.0375, SCOPE_Z)), seg=(14, 8), axis='Y')
+    cyl(N, "TL_Brass", 0.040, 0.012, T((0, SCOPE_EYE_Y + 0.006, SCOPE_Z)), seg=(14, 8), axis='Y')
+    cyl(N, "TL_Brass", 0.026, 0.12, T((0, SCOPE_EYE_Y + 0.135, SCOPE_Z)), seg=(14, 8), axis='Y')
+    cyl(N, "TL_Brass", 0.031, 0.50, T((0, 0.10, SCOPE_Z)), seg=(16, 8), axis='Y')
+    cyl(N, "TL_Brass", 0.031, 0.06, T((0, 0.38, SCOPE_Z)), seg=(16, 8), axis='Y', r2=0.044)
+    cyl(N, "TL_Brass", 0.046, 0.05, T((0, 0.435, SCOPE_Z)), seg=(16, 8), axis='Y')
+    for yy in (-0.12, 0.02, 0.32):
+        cyl(N, "TL_Brass", 0.035, 0.012, T((0, yy, SCOPE_Z)), seg=(16, 8), axis='Y', lods=(0,))
+    # Resonance lens and a crystal range dial on the left of the body.
+    cyl(N, "TL_Resonance", 0.040, 0.006, T((0, SCOPE_LENS_Y - 0.005, SCOPE_Z)), seg=(16, 8), axis='Y')
+    cyl(N, "TL_Brass", 0.022, 0.03, T((-0.045, 0.12, SCOPE_Z)), seg=(12, 6), axis='X')
+    cyl(N, "TL_Resonance", 0.016, 0.004, T((-0.061, 0.12, SCOPE_Z)), seg=(12, 6), axis='X')
+
+
 def build_launch_frame():
     """Static part of the elevating launch assembly (Recoil frame)."""
     N = "LaunchFrame"
@@ -715,48 +745,95 @@ def vane_frame(side, ang):
     return m
 
 
+def shaft_radius(y):
+    """Barrelled ash shaft: true to SHAFT_R under the folded vanes, swelling mid-length, slimming to the nock."""
+    if y >= -0.30:
+        return SHAFT_R
+    if y >= -0.48:
+        return SHAFT_R + 0.0025 * math.sin((y + 0.30) / -0.18 * math.pi / 2)
+    return SHAFT_R + 0.0025 - 0.0065 * ((y + 0.48) / -(BOLT_LEN_AFT - 0.48)) ** 1.4
+
+
 def build_bolt(prefix, side, lods=(0, 1)):
-    """prefix: node prefix, side: +1 for the left bolt (eye toward +X)."""
+    """Timberline bolt (second pass, 2026-10-04). prefix: node prefix, side: +1 for the left bolt (eye toward +X).
+    Leaf broadhead with a glowing rune fuller and swept barbs, barrelled ash shaft with brass wire binding,
+    a resonance crystal in the collar, feathered iron fins edged in blue light and a tracer glow in the nock."""
     B = prefix
+    X, Z = Vector((1, 0, 0)), Vector((0, 0, 1))
     for lod in lods:
-        seg = 8 if lod == 0 else 6
-        # Octagonal hardwood shaft from nock to collar.
-        emit(acc(B, lod), hull(cyl_pts(SHAFT_R, BOLT_LEN_AFT + 0.02, seg, axis='Y')), "TL_WoodDark",
-             T((0, -(BOLT_LEN_AFT - 0.02) / 2, 0), (0, 0, 0)), True)
-        # Broadhead: flat diamond, cutting edges along X.
-        pts = [Vector((0, BOLT_LEN_FWD, 0)), Vector((0.052, 0.085, 0)), Vector((-0.052, 0.085, 0)),
-               Vector((0.0, 0.085, 0.016)), Vector((0.0, 0.085, -0.016)),
-               Vector((0.020, 0.035, 0)), Vector((-0.020, 0.035, 0)), Vector((0, 0.035, 0.022)), Vector((0, 0.035, -0.022))]
+        seg = 10 if lod == 0 else 6
+        # Shaft: lofted rings so the profile can barrel and taper.
+        ys = [-BOLT_LEN_AFT + 0.025 + (BOLT_LEN_AFT - 0.045) * k / (12 if lod == 0 else 4) for k in range((12 if lod == 0 else 4) + 1)]
+        loft(B, "TL_WoodDark", [ring_section(Vector((0, y, 0)), X, Z, shaft_radius(y), shaft_radius(y), seg, 0.5) for y in ys], lod)
+        # Broadhead: socket neck, then a leaf blade with a raised spine (cutting edges along X).
+        emit(acc(B, lod), hull(cyl_pts(0.021, 0.04, 8 if lod == 0 else 6, r2=0.014, axis='Y')), "TL_Mithril", T((0, 0.045, 0)), lod == 0)
+        outline = [(0, BOLT_LEN_FWD), (0.030, 0.160), (0.058, 0.100), (0.050, 0.074), (0.020, 0.060)]
+        pts = [Vector((sx * x, y, 0)) for (x, y) in outline for sx in (-1, 1)]
+        pts += [Vector((0, y, sz * 0.0105)) for y in (0.066, 0.172) for sz in (-1, 1)]
         emit(acc(B, lod), hull(pts), "TL_Mithril", Matrix.Identity(4), False)
-        # Collar (brass) with the filament eyelet on the inboard side.
+        if lod == 0:
+            # Swept-back barbs at the blade shoulders.
+            for sx in (-1, 1):
+                bp = [Vector((sx * 0.050, 0.076, 0)), Vector((sx * 0.069, 0.032, 0)), Vector((sx * 0.036, 0.064, 0)),
+                      Vector((sx * 0.044, 0.068, 0.004)), Vector((sx * 0.044, 0.068, -0.004))]
+                emit(acc(B, lod), hull(bp), "TL_Mithril", Matrix.Identity(4), False)
+            # Rune fuller: a glowing inlay down the spine on both faces, plus two rune lozenges at the shoulders.
+            for sz in (-1, 1):
+                fp = [Vector((0, 0.078, sz * 0.0104)), Vector((0, 0.166, sz * 0.0104)), Vector((0.0045, 0.12, sz * 0.0099)),
+                      Vector((-0.0045, 0.12, sz * 0.0099)), Vector((0, 0.078, sz * 0.0118)), Vector((0, 0.166, sz * 0.0118)),
+                      Vector((0.0045, 0.12, sz * 0.0113)), Vector((-0.0045, 0.12, sz * 0.0113))]
+                emit(acc(B, lod), hull(fp), "TL_Resonance", Matrix.Identity(4), False)
+                for sx in (-1, 1):
+                    c = Vector((sx * 0.026, 0.088, sz * 0.0066))
+                    lp = [c + Vector((0.006, 0, 0)), c - Vector((0.006, 0, 0)), c + Vector((0, 0.009, 0)), c - Vector((0, 0.009, 0)),
+                          c + Vector((0, 0, sz * 0.0016))]
+                    emit(acc(B, lod), hull(lp), "TL_Resonance", Matrix.Identity(4), False)
+        # Collar (brass ferrule) with raised rims, and a resonance crystal set in its crown.
         emit(acc(B, lod), hull(cyl_pts(0.036, 0.05, 10 if lod == 0 else 6, axis='Y')), "TL_Brass", T((0, 0.005, 0)), lod == 0)
-        # Tail fins (+ configuration): forged iron.
+        if lod == 0:
+            for yy in (-0.021, 0.031):
+                cyl(B, "TL_Brass", 0.039, 0.007, T((0, yy, 0)), seg=(12, 6), axis='Y', lods=(0,))
+        gem = [Vector((0, 0.005, 0.036 + 0.017)), Vector((0.010, 0.005, 0.040)), Vector((-0.010, 0.005, 0.040)),
+               Vector((0, 0.019, 0.040)), Vector((0, -0.009, 0.040)), Vector((0, 0.005, 0.033))]
+        emit(acc(B, lod), hull(gem), "TL_Resonance", Matrix.Identity(4), False)
+        if lod == 0:
+            torus(B, "TL_Brass", T((0, 0.005, 0.041), (0, 0, 0)), 0.0115, 0.0028, 10, 4, 0)
+        # Feathered iron fins in an X (clears the rib and lets the string pass between them), edged in blue light.
         for k in range(4):
-            a = math.pi / 4 + math.pi / 2 * k   # X fletching: clears the rib and lets the string pass between fins
+            a = math.pi / 4 + math.pi / 2 * k
             m = T((0, 0, 0), (0, a, 0))
-            pts = [Vector((0, -0.69, SHAFT_R * 0.8)), Vector((0, -0.70, 0.078)), Vector((0, -0.86, 0.086)),
-                   Vector((0, -0.88, SHAFT_R * 0.8))]
-            ptsw = [p + Vector((d, 0, 0)) for p in pts for d in (-0.004, 0.004)]
+            prof = [(-0.615, SHAFT_R * 0.75), (-0.665, 0.070), (-0.745, 0.090), (-0.835, 0.094), (-0.874, 0.086), (-0.884, SHAFT_R * 0.75)]
+            ptsw = [Vector((d, y, r)) for (y, r) in prof for d in (-0.0032, 0.0032)]
             emit(acc(B, lod), hull(ptsw), "TL_Iron", m, False)
-        # Nock cap and fin band.
-        emit(acc(B, lod), hull(cyl_pts(0.031, 0.04, 8 if lod == 0 else 6, axis='Y')), "TL_Brass", T((0, -BOLT_LEN_AFT + 0.02, 0)), lod == 0)
+            if lod == 0:
+                edge = [Vector((d, y, r + 0.0045)) for (y, r) in prof[1:5] for d in (-0.0022, 0.0022)] + \
+                       [Vector((d, y, r + 0.0005)) for (y, r) in prof[1:5] for d in (-0.0022, 0.0022)]
+                emit(acc(B, lod), hull(edge), "TL_Resonance", m, False)
+                for dz in (-1, 1):
+                    stud(B, "TL_Brass", m @ T((dz * 0.0034, -0.80, 0.058), (0, dz * math.pi / 2, 0)), s=0.009, h=0.004)
+        # Nock: flared brass cap with a tracer glow facing aft, so the pair reads in flight from the operator's seat.
+        emit(acc(B, lod), hull(cyl_pts(0.030, 0.042, 8 if lod == 0 else 6, r2=0.035, axis='Y')), "TL_Brass", T((0, -BOLT_LEN_AFT + 0.02, 0)), lod == 0)
+        emit(acc(B, lod), hull(cyl_pts(0.017, 0.006, 8 if lod == 0 else 6, axis='Y')), "TL_Resonance", T((0, -BOLT_LEN_AFT - 0.0025, 0)), False)
     if 0 in lods:
-        cyl(B, "TL_Brass", 0.031, 0.022, T((0, -0.64, 0)), seg=(8, 6), axis='Y', lods=(0,))
-        cyl(B, "TL_Brass", 0.031, 0.02, T((0, VANE_Y0 - 0.012, 0)), seg=(8, 6), axis='Y', lods=(0,))
+        # Brass wire binding: tight turns behind the folded vanes, and a pair ahead of the fins.
+        for yy in [-0.315 - 0.0062 * k for k in range(7)] + [-0.585, -0.5975]:
+            torus(B, "TL_Brass", T((0, yy, 0), (math.pi / 2, 0, 0)), shaft_radius(yy) + 0.0012, 0.0029, 10, 3, 0)
         # Eyelet ring: hole axis along X so the filament passes laterally.
         torus(B, "TL_Mithril", T((side * EYE_OFF, 0.005, 0), (0, math.pi / 2, 0)), 0.016, 0.0055, 12, 6, 0)
     if 1 in lods:
         torus(B, "TL_Mithril", T((side * EYE_OFF, 0.005, 0), (0, math.pi / 2, 0)), 0.016, 0.006, 6, 4, 1)
-    # Vanes: separate hinge nodes.
+    # Vanes: separate hinge nodes. Mithril leaves with a glowing spine on the outer face.
     for vi, ang in enumerate(VANE_ANG):
         V = f"{prefix}_Vane{'Upper' if vi == 0 else 'Lower'}"
         for lod in lods:
             L = VANE_Y0 - VANE_Y1
-            # Leaf-shaped plate lying along -Y from the hinge (local frame: Y fwd, Z radial)
             pts = [Vector((0, 0.0, 0)), Vector((VANE_W / 2, -0.03, 0)), Vector((VANE_W / 2, -L * 0.8, 0)),
                    Vector((0.0, -L, 0)), Vector((-VANE_W / 2, -L * 0.8, 0)), Vector((-VANE_W / 2, -0.03, 0))]
             ptsw = [p + Vector((0, 0, dz)) for p in pts for dz in (0.0, 0.004)]
             emit(acc(V, lod), hull(ptsw), "TL_Mithril", Matrix.Identity(4), False)
+            if lod == 0:
+                sp = [Vector((dx, y, z)) for y in (-0.025, -L * 0.86) for dx in (-0.0026, 0.0026) for z in (0.0041, 0.0056)]
+                emit(acc(V, lod), hull(sp), "TL_Resonance", Matrix.Identity(4), False)
         cyl(V, "TL_Brass", 0.006, VANE_W * 0.9, T((0, 0, 0.002)), seg=(6, 4), lods=lods)
 
 
@@ -772,13 +849,17 @@ def make_materials(tex_dir):
         im.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'
         return im
 
+    # Second texture pass (2026-10-04): every surface has a normal map, and wood, iron and brass carry packed
+    # occlusion/roughness/metal maps so rust, tarnish, wax and scratches catch light differently.
     spec = {
-        "TL_Wood": dict(tex="tl_wood_basecolor.jpg", nrm="tl_wood_normal.jpg", tint=(1, 1, 1), metal=0.0, rough=0.62, nstr=0.8),
-        "TL_WoodDark": dict(tex="tl_wood_basecolor.jpg", nrm="tl_wood_normal.jpg", tint=(0.50, 0.40, 0.34), metal=0.0, rough=0.48, nstr=0.6),
-        "TL_Iron": dict(tex="tl_iron_basecolor.jpg", nrm="tl_iron_normal.jpg", tint=(1, 1, 1), metal=0.45, rough=0.5, nstr=0.8),
-        "TL_Brass": dict(col=(0.80, 0.55, 0.22), metal=1.0, rough=0.34),
-        "TL_Mithril": dict(col=(0.84, 0.89, 0.95), metal=1.0, rough=0.2),
-        "TL_Rope": dict(tex="tl_rope_basecolor.jpg", tint=(1, 1, 1), metal=0.0, rough=0.9),
+        "TL_Wood": dict(tex="tl_wood_basecolor.jpg", nrm="tl_wood_normal.jpg", orm="tl_wood_orm.jpg", tint=(1, 1, 1), metal=0.0, rough=0.62, nstr=0.9),
+        "TL_WoodDark": dict(tex="tl_wood_basecolor.jpg", nrm="tl_wood_normal.jpg", orm="tl_wood_orm.jpg", tint=(0.46, 0.36, 0.31), metal=0.0, rough=0.48, nstr=0.7),
+        "TL_Iron": dict(tex="tl_iron_basecolor.jpg", nrm="tl_iron_normal.jpg", orm="tl_iron_orm.jpg", tint=(1, 1, 1), metal=0.85, rough=0.5, nstr=0.9),
+        "TL_Brass": dict(tex="tl_brass_basecolor.jpg", nrm="tl_brass_normal.jpg", orm="tl_brass_orm.jpg", tint=(1, 1, 1), metal=1.0, rough=0.34, nstr=0.5),
+        "TL_Mithril": dict(tex="tl_mithril_basecolor.jpg", nrm="tl_mithril_normal.jpg", tint=(1, 1, 1), metal=1.0, rough=0.18, nstr=0.4),
+        "TL_Rope": dict(tex="tl_rope_basecolor.jpg", nrm="tl_rope_normal.jpg", tint=(1, 1, 1), metal=0.0, rough=0.92, nstr=1.0),
+        # Blue resonance light: rune inlays, crystals and edge lines. Emissive, so it reads at dusk and at range.
+        "TL_Resonance": dict(col=(0.04, 0.22, 0.55), metal=0.0, rough=0.25, emit=(0.06, 0.48, 1.0), emit_strength=1.0),
     }
     for name in MAT_ORDER:
         sp = spec[name]
@@ -810,6 +891,17 @@ def make_materials(tex_dir):
             nm.inputs["Strength"].default_value = sp["nstr"]
             nt.links.new(t.outputs["Color"], nm.inputs["Color"])
             nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+        if "orm" in sp:
+            # glTF packing: G roughness, B metalness. The exporter keeps the image as one metallicRoughness texture.
+            t = nt.nodes.new("ShaderNodeTexImage")
+            t.image = img(sp["orm"], srgb=False)
+            sep = nt.nodes.new("ShaderNodeSeparateColor")
+            nt.links.new(t.outputs["Color"], sep.inputs["Color"])
+            nt.links.new(sep.outputs["Green"], bsdf.inputs["Roughness"])
+            nt.links.new(sep.outputs["Blue"], bsdf.inputs["Metallic"])
+        if "emit" in sp:
+            bsdf.inputs["Emission Color"].default_value = (*sp["emit"], 1)
+            bsdf.inputs["Emission Strength"].default_value = sp["emit_strength"]
         mats[name] = m
     return mats
 
@@ -1100,6 +1192,10 @@ def build_ballista(mats):
     nodes.update(Elevation=elev, Recoil=rec)
     lf = empty("LaunchFrame", rec)
     attach_meshes("LaunchFrame", lf, mats)
+    build_scope()
+    sc = empty("Scope", elev)
+    attach_meshes("Scope", sc, mats)
+    nodes["Scope"] = sc
     for tag, sx in (("L", -RX), ("R", RX)):
         for inner, lt in ((False, "Outer"), (True, "Inner")):
             n = f"Limb_{tag}_{lt}"
@@ -1168,6 +1264,8 @@ def build_ballista(mats):
     sock("Socket_FilamentHorn", rec, tuple(HORN))
     sock("Socket_Trigger", nodes["Trigger"], (0, -0.84, -0.045))
     sock("Socket_OperatorEye", root, (0, -1.25, 1.62))
+    sock("Socket_ScopeEye", elev, (0, SCOPE_EYE_Y - 0.03, SCOPE_Z))
+    sock("Socket_ScopeLens", elev, (0, SCOPE_LENS_Y, SCOPE_Z))
     sock("Socket_RTSAnchor", root, (0, 0, 1.4))
     for k in range(4):
         a = math.radians(45 + 90 * k)
