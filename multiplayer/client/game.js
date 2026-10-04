@@ -1119,13 +1119,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!renderer.xr.isPresenting){const fov=70+((tool==='bow'?56:SIEGEBIRD_PRESENTATION.zoomFov)-70)*adsAmount;if(Math.abs(camera.fov-fov)>.001){camera.fov=fov;camera.updateProjectionMatrix();}}
     if(!swingContact&&progress>=.5){swingContact=true;const hit=contactRay();onAction('strike',hit?{...hit,tool}:{targetId:'miss',point:localPosition.toArray(),normal:[0,1,0],tool});}
     if(specialSwing){const progress=(now-specialSwing.at)/(SPECIAL_MOTION.axe.duration*1000);if(!specialSwing.sent&&progress>=SPECIAL_MOTION.axe.release){specialSwing.sent=true;sendSpecial();}const pose=specialPose('axe',progress,specialSwing.rest);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);if(progress>=1)specialSwing=null;}
-<<<<<<< HEAD
-    // Crystal wall wind-up / hold / slam rides on top of the pick's current pose (rest, bob, any sway layer).
+    // Crystal wall wind-up / hold / slam rides on the pick's base pose; the sway layer below then applies on top.
     if(tool==='pick'&&!renderer.xr.isPresenting){const layer=pickWallMotion.pose(performance.now()/1000);if(layer){weaponAnchor.position.add(layer.offset);weaponAnchor.quaternion.premultiply(layer.quaternion);}}else pickWallMotion.reset();
-=======
     // The crossbow bore is solved onto the reticle, so it takes the positional sway only (above).
     if(tool!=='crossbow'&&weaponAnchor.visible){weaponAnchor.position.add(sway.position);weaponAnchor.quaternion.premultiply(sway.quaternion);}
->>>>>>> origin/main
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),time:now/1000,templates});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
