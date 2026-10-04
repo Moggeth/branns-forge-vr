@@ -106,3 +106,17 @@ remain unverified. Do not claim all graphics issues or frame drops have been fix
   test bindings are not runtime rendering failures; preserve their behavioral assertions.
 - The first monolithic shell edit was rejected by automatic review. Ordinary apply_patch
   file edits succeeded; no service/policy bypass was attempted. Use focused file edits.
+
+## Expanded 32-player battle work (in progress)
+
+The user extended this pass to32 human seats plus bots and an optional opposing-wave mode. Capacity and battle authority are committed on the same draft PR; UI and final integration remain in progress. Current milestones: crowd animation a6d5c66, capacity bad399a, battle authority cbbd07c, objective presentation0f24295. Existing upstream proximity voice4878b54 was integrated as27cc2f3, retaining both sets of CI checks. These commits are pushed to private origin/codex/public-rooms-performance; none establishes a production release.
+
+Battle mode uses Dawn/party and Dusk/rivals, existing authored skeletons and sanctuary models, four soldiers per side every15seconds,16 living soldiers per side. Wave bots have separate human-slot accounting but share the existing64-enemy safety cap with neutral creatures. Bases have400HP. The host can start/reset/disable; disabling cleans only battle content. Normal melee/projectiles, Timberline and God offensive spells damage opposing objectives. Healing/blessing supports allied soldiers. Existing environmental fire remains dangerous to either side; existing summon spells remain neutral. Human-versus-human weapon combat is not introduced: this is team objective combat with bots, not a complete competitive MOBA.
+
+Gameplay evidence:11 battle regressions, actual authored-world navigation/combat/victory, checkpoint continuation, malformed save refusal, faction protection, paired spawn fairness at world cap, ownership after disconnect.32 humans+32bots+64terrain edits averaged0.435ms/tick in600 CPU-only steps. Root1200-tick input/projectile fixture: mean0.385ms,p95.564ms,max3.954ms,0over16.7ms; no GPU/WAN claim.
+
+Rendering: remote Hero CPU mean0.757->0.310ms with32 Heroes (16VR) and64 skeletons.97,280 bone matrices matched reference;96.3% fewer redundant hierarchy refreshes. Actual RTX3080Ti browser crowd fixture800x450:1,025 actor draw calls,1.279Mtriangles; mean interval8.405ms over25frames. This excludes full world/effects/network/shadows and exposes a remaining mobile draw-call risk.
+
+32 real lightweight Chromium sessions passed both direct and forced-relay connections, all-player input, replication and host transfer. No codec rejects. Direct worst arrival gap240.6ms; relay one peer below20Hz. Full exact checkpoints still create substantial uplink load; a separately verified delta recovery stream is being implemented. No promise of hitch-free32-phone or32-headset sessions.
+
+New lessons: use actual model world elevation for sanctuary ray fixtures; y=0 assumptions can miss valid geometry. Shared battle helpers require their real nextId context. A test literal saying eight players is obsolete when room capacity changes; retain actionable error assertions. Voice requires spatially bounded topology, not a32-person full mesh. Preserve all CI lists when incorporating another feature's runner changes.

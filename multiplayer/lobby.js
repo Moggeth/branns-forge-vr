@@ -34,6 +34,7 @@ import { WorldSaves, parseSave } from './client/world-saves.js';
 import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.js';
 import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
 import { adventureView } from './shared/adventure.js';
+import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import { createAdventureBanner, nextStep, actionModel } from './client/adventure-view.js';
 import { createInteractionCueController } from './client/interaction-cue-controller.js';
 import { rewardBanner } from './client/reward-moments.js';
@@ -470,7 +471,7 @@ function onSnapshot(snapshot) {
   }
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
   if (snapshot.adventure) try {
-    const view = adventureView(snapshot.adventure, snapshot, playerId);
+    const view = battleQuestView(snapshot,playerId)||adventureView(snapshot.adventure, snapshot, playerId);
     if (!expeditionBanner) expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction});
     expeditionBanner.update(view, {held: self?.resources, mana: self?.mana});
     // DOM is invisible in WebXR: the same view drives the in-world wrist panel (it repaints only when its model changes).
@@ -777,6 +778,8 @@ function fieldModel() {
   const inputMode=xrActive?'vr':mobile?.enabled?'touch':'desktop',tool=game?.weaponState()?.tool||self?.tool||'axe';
   const help=equipmentHelp(tool,inputMode,role),adv=lastSnapshot?.adventure;
   const model={tool,role,inputMode,name:help.title,help:{...help,title:'Field guide'},players:(lastSnapshot?.players||[]).map(p=>({id:p.id,name:p.name,role:p.role,kills:p.stats?.kills??0,deaths:p.stats?.deaths??0,contribution:p.stats?.contribution??0,isSelf:p.id===playerId})),disabledActions:[]};
+  const battle=battleQuestView(lastSnapshot,playerId);
+  if(battle){model.quest={title:battle.title,summary:`${battle.nextStep} ${battle.notice}`};model.disabledActions.push('start-expedition');return model;}
   if(!adv||!self){model.quest={title:'Prepare an expedition',summary:phase==='game'?'The world is arriving. Gather your party at the forge.':'Create or join a world, then gather your party at the forge.'};model.disabledActions.push('start-expedition');return model;}
   const view=adventureView(adv,lastSnapshot,playerId),actions=actionModel(view,{held:self.resources,mana:self.mana});
   const primary=actions.find(a=>['retry','rematch','start','deposit','lodestar','tithe'].includes(a.id));

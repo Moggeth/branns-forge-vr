@@ -57,6 +57,7 @@ export function deliverableKinds(stage, held = {}) {
 
 // One short, role-specific next step from the authoritative view (plus carried resources when the caller supplies them).
 export function nextStep(view, held = null) {
+  if(typeof view.nextStep==='string')return view.nextStep;
   const open = id => view.objectives.find(o => o.id === id && !o.done);
   const more = o => o.need - o.have;
   const god = view.role === 'god';
@@ -295,7 +296,7 @@ export function createAdventureBanner(root, {onAction = () => {}, expanded = sto
     // Expanded body.
     const stageIndex = TRACK.findIndex(([s]) => s === v.stage);
     trackItems.forEach((li, i) => { li.dataset.state = v.stage === 'victory' || (stageIndex >= 0 && i < stageIndex) ? 'done' : i === stageIndex ? 'now' : 'todo'; setAttr(li, 'aria-current', i === stageIndex ? 'step' : null); });
-    track.hidden = v.stage === 'idle';
+    track.hidden = v.stage === 'idle'||v.mode==='battle';
     setText(notice, v.notice && v.notice !== v.title ? v.notice : ''); notice.hidden = !notice.textContent;
     const goalItems = v.objectives.map(o => ({...o, key: o.id, waived: !!o.waived}));
     const goalMake = () => { const li = el('li', 'xhud-goal'); li.append(el('span', 'xhud-goal-icon'), el('span', 'xhud-goal-label'), el('span', 'xhud-goal-who'), el('span', 'xhud-goal-num'), el('span', 'xhud-chip-bar')); li.lastChild.append(el('span')); return li; };
