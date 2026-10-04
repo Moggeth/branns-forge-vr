@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Home base lab</title><style>body{margin:0;background:#20242a}canvas{display:block}</style>
+<script type="module">
+// Review page for Dawnhold and Grumblekeep (client/home-base-view.js) on the real terrain heights.
+import * as T from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createSimulation} from '../shared/simulation.js';
+import {createHomeBaseView} from '../client/home-base-view.js';
+const q=new URLSearchParams(location.search),W=+q.get('w')||1280,H=+q.get('h')||720;
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.5;room.dispose();scene.background=new T.Color(0xa9c3d8);scene.fog=new T.Fog(0xa9c3d8,60,160);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x4a5a2a,1.3));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.position.set(-30,50,20);scene.add(sun);
+const ground=new T.Mesh(new T.PlaneGeometry(240,240).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x5f7a3a,roughness:1}));ground.position.y=-.05;scene.add(ground);
+const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene});
+const cam=new T.PerspectiveCamera(50,W/H,.1,400);let last=performance.now();
+function frame(){const now=performance.now();view.update(Math.min(.05,(now-last)/1000),cam);last=now;renderer.render(scene,cam);}
+window.lab={sim,view,
+ at:(side='party',mode='aerial')=>{const c=side==='party'?[-36,-36]:[36,36],f=side==='party'?[1,1]:[-1,-1];const n=Math.SQRT1_2;
+  if(mode==='aerial'){cam.position.set(c[0]+f[0]*n*30+f[1]*n*14,18,c[1]+f[1]*n*30-f[0]*n*14);cam.lookAt(c[0]+f[0]*n*2,2,c[1]+f[1]*n*2);}
+  else{cam.position.set(c[0]+f[0]*n*24,3,c[1]+f[1]*n*24);cam.lookAt(c[0],3.5,c[1]);}
+  view.sync(sim.snapshot());frame();},
+ step:n=>{const ev=[];for(let i=0;i<n;i++)ev.push(...sim.step());for(const e of ev)view.event(e);view.sync(sim.snapshot());return ev.length;},
+ frame};
+</script>

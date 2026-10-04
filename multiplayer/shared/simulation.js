@@ -1,5 +1,7 @@
 import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,battleActive,battleSkirmish,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
-import {findHomeTarget,resolveHomeDomes} from './home-bases.js';
+import {HOME,findHomeTarget,homeBattle,homePoint,resolveHomeDomes,resolveHomeStructures} from './home-bases.js';
+// Melee damage one hero deals another (out of 100 health).
+const PVP_DAMAGE=Object.freeze({axe:22,pick:20,hammer:34,limb:18});
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
@@ -61,14 +63,14 @@ function pose(value) {
 
 
 function spawn(state, ignored = '') {
-  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=base?[base.position[0]+sign*4,base.position[2]]:[0,8];
+  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=homeBattle(state)?homePoint(team,[0,7]):base?[base.position[0]+sign*4,base.position[2]]:[0,8];
   let best = [origin[0], 0, origin[1]], clearance = -1;
   const trees=createTreeIndex();trees.update(state);const cuts=treeCutMap(state),forgeY=terrainHeight(state,0,0,false);
   for (let i = 0; i < 128; i++) {
     const theta = i * 2.3999632297, radius = 2.8 * Math.sqrt(i);
     const candidate = [clamp(origin[0] + Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(origin[1] + Math.sin(theta) * radius, -BOUND, BOUND)];
     candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
-    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));
+    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,candidate);
     if(candidate.some((v,k)=>k!==1&&Math.abs(v)>49.5))continue;
     const others = [...state.players.filter(p => p.role === 'hero' && p.id !== ignored), ...state.enemies];
     const hazards=state.fireCells.filter(c=>c.burning);
@@ -117,7 +119,7 @@ function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
 function instantiate(state) {
   let fireSampleProvider=null;
   const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events)=>{const start=events.length;damageEnemy(s,e,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
+  const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev)=>damageHero(s,hero,n,ev),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
@@ -284,6 +286,9 @@ function instantiate(state) {
           if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,reward.amount);if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
+          // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
+          const rival=homeBattle(state)&&state.players.find(h=>h.id===message.targetId&&h.id!==p.id&&h.role==='hero'&&(h.side||'party')!==(p.side||'party'));
+          if(rival){if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,PVP_DAMAGE[requestedTool]||20,events);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
           if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
@@ -386,7 +391,7 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -416,7 +421,7 @@ function instantiate(state) {
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side)=>hitEnemyPart(state,enemy,'torso',n,{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveHomeStructures(state,position,radius);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side)=>hitEnemyPart(state,enemy,'torso',n,{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
@@ -424,7 +429,7 @@ function instantiate(state) {
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
       flushMeteorRewards(state,terrainHeight);
       renewGeology(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)},events);
-      stepVeins(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5),retained:d=>retainedDepositPredicate(state)(d)},events);
+      stepVeins(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)&&!(homeBattle(state)&&state.battle.bases.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<HOME.domeRadius+1.5)),retained:d=>retainedDepositPredicate(state)(d)},events);
       stepCombat(state,combatContext,events);
       stepFruit(state,{nextId,terrainHeight},events);
       stepFire(state,fireContext,events);

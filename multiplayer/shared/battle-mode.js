@@ -74,7 +74,7 @@ export function attackBattleBase(state,player,id,ctx,{cooldown=true}={}) {
   if(base.side===(player.side||'party'))return fail('friendly_target');
   if(!['axe','pick','hammer','limb'].includes(player.tool))return fail('melee_required');
   const d=flat(player.position,base.position),dot=(-Math.sin(player.yaw)*(base.position[0]-player.position[0])-Math.cos(player.yaw)*(base.position[2]-player.position[2]))/Math.max(.001,d);
-  if(d>3.2||Math.abs(player.position[1]-base.position[1])>2.5||(d>.5&&dot<.45))return fail('out_of_reach');
+  if(d>(state.battle.v===2?4.2:3.2)||Math.abs(player.position[1]-base.position[1])>2.5||(d>.5&&dot<.45))return fail('out_of_reach');
   if(cooldown&&state.tick-player.attackTick<({axe:27,pick:29,hammer:40,limb:32}[player.tool]))return fail('cooldown');
   player.attackTick=state.tick;const events=[];
   damageBattleBase(state,id,player.tool==='hammer'?55:25,player.side||'party',events);
@@ -115,7 +115,7 @@ function stepHomeBattle(state,ctx,events) {
     kinds.forEach((kind,n)=>{
       if(state.enemies.length>=64||state.enemies.filter(e=>battleBot(e)&&e.side===base.side).length>=BATTLE.perSideCap)return;
       // March out of the barracks door, fanned across the plaza.
-      const [x,z]=homePoint(base.side,[-3.6+(n%3)*1.3,4.6+Math.floor(n/3)*1.3]);
+      const [x,z]=homePoint(base.side,[-2.6+(n%3)*1.3,6.4+Math.floor(n/3)*1.3]);
       const e=ctx.createEnemy(ctx.nextId(state,`battle${b.run}_${b.wave}_${base.side}_`),[x,ctx.terrainHeight(state,x,z),z],kind);
       Object.assign(e,{side:base.side,battleRun:b.run,battleWaypoint:index?lane.length-2:1});
       state.enemies.push(e);spawned++;

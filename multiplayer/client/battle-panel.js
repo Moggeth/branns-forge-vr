@@ -5,7 +5,10 @@
 // The root routes {action:'side'} through the existing inventionSide control.
 
 export const SIDE_NAME = Object.freeze({party: 'Dawn', rivals: 'Dusk'});
+const HOME_NAME = Object.freeze({party: 'Dawnhold', rivals: 'Grumblekeep'});
+const HOME_OBJECTIVE = 'Dawnhold and Grumblekeep fight from opposite corners. Pick a side, push with your troops, break the enemy’s three shield pylons, then smash its heart.';
 const BOT_CAP = 16;
+const SIDE_NAMES_LEGACY = SIDE_NAME;
 const otherSide = side => (side === 'rivals' ? 'party' : 'rivals');
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
@@ -26,7 +29,7 @@ export function normalizeBattle(m = {}) {
     wave: Math.max(0, Math.floor(num(m?.wave))),
     nextWaveSeconds: Number.isFinite(Number(m?.nextWaveSeconds)) ? Math.max(0, Math.ceil(Number(m.nextWaveSeconds))) : null,
     bots: {party: Math.max(0, Math.floor(num(m?.bots?.party))), rivals: Math.max(0, Math.floor(num(m?.bots?.rivals)))},
-    bases, winner: m?.winner === 'party' || m?.winner === 'rivals' ? m.winner : null,
+    bases, winner: m?.winner === 'party' || m?.winner === 'rivals' ? m.winner : null, home: m?.home === true,
   };
 }
 
@@ -148,6 +151,10 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
 
   function paint() {
     const v = view, running = v.status === 'running', victory = v.status === 'victory', active = running || victory;
+    const SIDE_NAME = v.home ? HOME_NAME : SIDE_NAMES_LEGACY;
+    setText(h, v.home ? 'Home bases' : 'Battle mode'); setText(objective, v.home ? HOME_OBJECTIVE : OBJECTIVE);
+    show(beta, !v.home); show(betaNote, !v.home);
+    for (const side of ['party', 'rivals']) { setText(sideBtns[side], SIDE_NAME[side]); setText(sideRows[side].row.firstChild, SIDE_NAME[side]); }
     root.dataset.status = v.status;
     root.dataset.confirming = String(!!pending);
     setText(pill, running ? 'Running' : victory ? 'Battle over' : 'Off');
@@ -195,8 +202,8 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
     show(sideReason, !!sideMsg);
 
     // host controls
-    show(hostBox, v.isHost);
-    show(guestNote, !v.isHost);
+    show(hostBox, v.isHost && !v.home);
+    show(guestNote, !v.isHost && !v.home);
     show(hostRow, !pending);
     show(confirmBox, !!pending);
     if (v.isHost) {

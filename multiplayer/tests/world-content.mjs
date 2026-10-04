@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
 import {isTestingGift} from '../shared/testing-supplies.js';
 import {worldTrees} from '../shared/world-content.js';
-let sim=createSimulation({seed:9}); sim.addPlayer({id:'h'});
+let sim=createSimulation({legacyBattle:true,seed:9}); sim.addPlayer({id:'h'});
 let state=sim.checkpoint(), h=state.players[0], tree=worldTrees(state)[0];
 h.position=[tree.x,terrainHeight(state,tree.x,tree.z),tree.z+1]; h.yaw=0; sim=loadSimulation(state);
 // Wrong tool cannot damage tree; explicit misses do not hit another cone target.
@@ -36,7 +36,7 @@ for (const corrupt of [s=>s.deposits.push({...s.deposits[0]}),s=>s.deposits[0].d
 }
 const extras=structuredClone(checkpoint);extras.deposits[0].surprise='discard';assert.equal(loadSimulation(extras).checkpoint().deposits[0].surprise,undefined);
 // Spells use bounded edits; Starfall becomes mineable and survives a save.
-const magic=createSimulation({seed:3});magic.addPlayer({id:'g',role:'god'});
+const magic=createSimulation({legacyBattle:true,seed:3});magic.addPlayer({id:'g',role:'god'});
 const originalMeteors=magic.snapshot().deposits.filter(d=>d.kind==='meteor').length;
 let sequence=0;for(const spell of ['sunder','wall','ring','starfall']){assert.equal(magic.command('g',{type:'cast',seq:++sequence,spell,point:[10,0,10]}).ok,true);for(let i=0;i<60;i++)magic.step();}
 assert.equal(magic.snapshot().edits.length,5);{const ring=magic.snapshot().groves.at(-1).trees;assert.ok(ring.length>=6,'ring grows around the wall');assert.equal(worldTrees(magic.snapshot()).length,25+ring.length);}assert.equal(magic.snapshot().deposits.filter(d=>d.kind==='meteor').length,originalMeteors+1);

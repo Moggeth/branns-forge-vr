@@ -1,3 +1,4 @@
+import {dressForgeling} from './forgeling-look.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
 import {validateInventionPlacement} from '../shared/inventions.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
@@ -315,7 +316,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null,localSide:()=>snapshot.players?.find(p=>p.id===playerId)?.side||'party', onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   // Apple on a stick (client/apple-snack.js, shared/fruit.js): shot apples fall on their shaft; take one, then bite.
   const appleSnack=createAppleSnack({scene,camera,templates,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),reducedMotion:reducedWeaponMotion,send:(action,detail)=>onAction(action,detail),
     haptic:kind=>{if(renderer.xr.isPresenting)feedback.pattern?.(kind==='bite'?[{at:0,amplitude:.55,duration:28},{at:55,amplitude:.3,duration:18}]:[{at:0,amplitude:.25,duration:20}]);else if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[16,34,10]:[10]);}catch{}}});
@@ -462,6 +463,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     disposePlaceholder(entry.visual);
     entry.visual = model;
     entry.root.add(model);
+    if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }
   // Remote Heroes swap the placeholder for the shared hero body; Gods and the local player keep their existing visuals.
   function upgradeHero(entry) {
@@ -846,7 +848,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
-    if(event.kind==='respawn'&&event.id===playerId){clearInput();localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
+    if(event.kind==='respawn'&&event.id===playerId){clearInput();if(snapshot.battle?.v===2){yaw=Math.atan2(event.position[0],event.position[2]);pitch=0;}localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
     waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);
     feedback.handleEvent(event);
@@ -930,7 +932,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!prop&&!earth)return null;
     const point=useEarth?earth.point:prop.point.toArray(),normal=useEarth?earth.normal:hitNormal(prop).toArray();
     const resolved=useEarth?null:resolveHit(prop);
-    const base=snapshot.battle?.bases?.find(b=>b.hp>0&&b.id===resolved?.targetId),targetId=base?base.id:'world';
+    const base=snapshot.battle?.bases?.find(b=>b.hp>0&&b.id===resolved?.targetId)||snapshot.battle?.bases?.flatMap(b=>b.parts||[]).find(q=>q.hp>0&&q.id===resolved?.targetId),targetId=base?base.id:'world';
     // Battle bases have a local contact envelope like creatures; world-space
     // coordinates at the ±40 m bases fail that envelope even for a direct hit.
     const localPoint=base?point.map((v,i)=>v-base.position[i]):point;
@@ -1476,6 +1478,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if(self.tool && self.tool!==tool)equipVisual(self.tool);
         const authoritative = new THREE.Vector3().fromArray(self.position);
         if (!initialized || authoritative.distanceTo(localPosition) > 4) {
+          if(!initialized&&snapshot.battle?.v===2){yaw=Math.atan2(self.position[0],self.position[2]);pitch=0;}
           localPosition.copy(authoritative); correction.set(0, 0, 0); initialized = true;
           verticalSpeed = 0; grounded = authoritative.y <= forgeFloor(authoritative.x,authoritative.z,heightAt(0,0,snapshot.edits),simulationHeight(snapshot,authoritative.x,authoritative.z)) + 0.05;
         }

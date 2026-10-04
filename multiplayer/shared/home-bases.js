@@ -16,12 +16,12 @@ export const HOME = Object.freeze({
   reward: Object.freeze({iron: 12, wood: 12, gems: 6, starOre: 3}),
 });
 export const HOME_NAMES = Object.freeze({party: 'Dawnhold', rivals: 'Grumblekeep'});
-export const HOME_SITES = Object.freeze({party: Object.freeze([-40, -40]), rivals: Object.freeze([40, 40])});
+export const HOME_SITES = Object.freeze({party: Object.freeze([-36, -36]), rivals: Object.freeze([36, 36])});
 
 // Base-local layout in metres: x is to the right of the gate, y points out of the
 // gate toward the world centre. The client builds the same pieces from this table.
 export const HOME_LAYOUT = Object.freeze({
-  barracks: Object.freeze([-5.4, 2.6]), fountain: Object.freeze([5.2, 3.2]),
+  barracks: Object.freeze([-7, 3.4]), fountain: Object.freeze([5.2, 3.2]),
   pylons: Object.freeze([[6.6, 11.43], [-6.6, 11.43], [0, -13.2]].map(Object.freeze)),
   spires: Object.freeze([[-4, 16], [4, 16]].map(Object.freeze)),
   ballistas: Object.freeze([[-9.5, 14.5], [9.5, 14.5]].map(Object.freeze)),
@@ -176,6 +176,38 @@ export function resolveHomeDomes(state, position, side, radius = .3) {
     if (d >= min) continue;
     const x = d > 1e-4 ? dx / d : base.side === 'party' ? 1 : -1, z = d > 1e-4 ? dz / d : base.side === 'party' ? 1 : -1;
     position[0] = base.position[0] + x * min; position[2] = base.position[2] + z * min;
+  }
+  return position;
+}
+
+// Solid footprints (base-local circles and the barracks box) so nobody walks through the buildings.
+const SOLIDS = Object.freeze([
+  {at: [0, 0], r: 3.3}, {at: HOME_LAYOUT.fountain, r: 2.0},
+  ...HOME_LAYOUT.pylons.map(at => ({at, r: .9})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95})),
+]);
+const BARRACKS = Object.freeze({half: [3.2, 2.2], yaw: .55});
+/** World yaw (three.js, about +Y) of a base's gate; local +Z of a piece points out of the gate. */
+export const gateYaw = side => { const {forward} = homeFrame(side); return Math.atan2(forward[0], forward[1]); };
+export const barracksYaw = side => gateYaw(side) + (side === 'rivals' ? BARRACKS.yaw : -BARRACKS.yaw);
+export function resolveHomeStructures(state, position, radius = .3) {
+  if (!homeBattle(state)) return position;
+  for (const side of ['party', 'rivals']) {
+    const [cx, cz] = HOME_SITES[side];
+    if (Math.abs(position[0] - cx) > 20 || Math.abs(position[2] - cz) > 20) continue;
+    for (const {at, r} of SOLIDS) {
+      const [x, z] = homePoint(side, at), dx = position[0] - x, dz = position[2] - z, d = Math.hypot(dx, dz), min = r + radius;
+      if (d >= min) continue;
+      const k = d > 1e-4 ? min / d : 0;
+      position[0] = d > 1e-4 ? x + dx * k : x + min; position[2] = d > 1e-4 ? z + dz * k : z;
+    }
+    // Barracks: the same oriented box the client draws (three.js yaw about +Y).
+    const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks), t = barracksYaw(side), c = Math.cos(t), sn = Math.sin(t);
+    const dx = position[0] - bx, dz = position[2] - bz, u = dx * c - dz * sn, v = dx * sn + dz * c, hu = BARRACKS.half[0] + radius, hv = BARRACKS.half[1] + radius;
+    if (Math.abs(u) < hu && Math.abs(v) < hv) {
+      let nu = u, nv = v;
+      if (hu - Math.abs(u) < hv - Math.abs(v)) nu = Math.sign(u || 1) * hu; else nv = Math.sign(v || 1) * hv;
+      position[0] = bx + nu * c + nv * sn; position[2] = bz - nu * sn + nv * c;
+    }
   }
   return position;
 }
