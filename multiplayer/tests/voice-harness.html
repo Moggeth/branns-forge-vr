@@ -25,5 +25,5 @@ window.meter = async () => {
   const values=[0,0];for(let n=0;n<8;n++){await new Promise(r=>setTimeout(r,50));analysers.forEach((a,i)=>{const f=new Float32Array(2048);a.getFloatTimeDomainData(f);values[i]+=Math.sqrt(f.reduce((s,x)=>s+x*x,0)/f.length)/8;});}
   v.audio.output.disconnect(split);split.disconnect();return values;
 };
-window.cleanup=()=>{v.dispose();c.close();for(const ctx of toneContexts)void ctx.close();};
+window.cleanup=async()=>{v.dispose();c.close();await Promise.all(toneContexts.map(ctx=>ctx.state==='closed'?null:ctx.close().catch(()=>{})));};
 </script>

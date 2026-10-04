@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {launch,BASE,record,save,sleep} from './browser-acceptance-lib.mjs';
 const {browser,context,page:host}=await launch();const a=await context.newPage(),b=await context.newPage();
 const pages=[host,a,b], endpoint=process.env.VOICE_WS_URL||'ws://127.0.0.1:8796/peer/ws';
+const errors=[];for(const page of pages)page.on('pageerror',error=>errors.push(error.message));
 const pose=async(page,position,forward=[0,0,-1])=>{await page.evaluate(({position,forward})=>v.updatePose({position,forward,up:[0,1,0]}),{position,forward});await sleep(450);};
 try {
   for(const page of pages){await page.goto(BASE+'/tests/voice-harness.html');await page.waitForFunction(()=>window.makeVoice);}
@@ -37,6 +38,7 @@ try {
   await sleep(700);assert(Math.max(...await a.evaluate(()=>meter()))>.001);
   record('retry-and-failed-connection-recovery','pass');
   await b.evaluate(()=>cleanup());await a.waitForFunction(()=>v.peers.size===0&&v.members.size===0,null,{timeout:15000});assert.equal(await a.evaluate(()=>v.audio.sources.size),0);
+  await b.evaluate(()=>cleanup());assert.deepEqual(errors,[],'including repeated cleanup, no unhandled browser errors');
   record('peer-departure-cleans-audio-and-rtc','pass');
 } catch(error){record('exception','fail',{message:error.message});for(const p of pages)console.log(JSON.stringify(await p.evaluate(async()=>({state:window.v?.state(),tones:window.toneContexts?.map(c=>({state:c.state,time:c.currentTime})),audio:window.v?.audio?[...v.audio.sources].map(([id,s])=>({id,gain:s.gain.gain.value,position:[s.panner.positionX.value,s.panner.positionY.value,s.panner.positionZ.value],tracks:s.source.mediaStream.getTracks().map(t=>({muted:t.muted,state:t.readyState}))})):[],peers:window.v?await Promise.all([...v.peers].map(async([id,p])=>({id,connection:p.pc.connectionState,signal:p.pc.signalingState,stats:[...await p.pc.getStats()].filter(([,s])=>['inbound-rtp','outbound-rtp'].includes(s.type)).map(([,s])=>s)}))):[]})).catch(()=>null)));process.exitCode=1;}
 finally{save('voice');for(const p of pages)await p.evaluate(()=>window.cleanup?.()).catch(()=>{});await browser.close();}
