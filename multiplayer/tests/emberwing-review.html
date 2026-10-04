@@ -1,0 +1,132 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Emberwing review</title>
+<style>html,body{margin:0;height:100%;background:#1a1d16}canvas{display:block;width:100%;height:100%}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// Review fixture for Emberwing phoenix flight and the skull carry-off, driven by the REAL shared simulation and the
+// REAL combat view (projectiles, wings, contrails, embeds, detached parts, carry rig). Deterministic: the page only
+// advances when window.review.step(frames) is called, so a capture script can grab frame sequences on a slow
+// software GPU. Scenes (?scene=): carry (phoenix headshot, skull hauled away), volley (curved arrows crossing the
+// view with wing contrails), arrows (embedded arrows close up), flare (Phoenix Flare
+// bursting over a skeleton). Not shipped.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulation.js';
+import {createEnemy, partPosition} from '../shared/combat.js';
+import {createCombatView} from '../client/combat-view.js';
+import {prepareAsset} from '../client/asset-pose.js';
+const q = new URLSearchParams(location.search), sceneName = q.get('scene') || 'carry';
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.setSize(innerWidth, innerHeight, false);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9c3d6); scene.fog = new THREE.Fog(0xa9c3d6, 30, 90);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+scene.add(new THREE.HemisphereLight(0xdfeeff, 0x5a6b3a, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.2); sun.position.set(8, 14, 6); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .05, 200);
+const loader = new GLTFLoader(), templates = new Map();
+await Promise.all(['arrow', 'wings', 'skeleton'].map(name => loader.loadAsync(`/assets/${name}.glb`).then(g => templates.set(name, g))));
+
+// World: the real simulation in a fixed state; its terrain drives a simple ground mesh.
+const base = createSimulation({seed: 7}); base.addPlayer({id: 'h'});
+const check = base.checkpoint();
+const H = (x, z) => terrainHeight(check, x, z);
+const ground = new THREE.PlaneGeometry(120, 120, 120, 120); ground.rotateX(-Math.PI / 2);
+const gp = ground.attributes.position; for (let i = 0; i < gp.count; i++) gp.setY(i, H(gp.getX(i), gp.getZ(i)));
+ground.computeVertexNormals();
+scene.add(new THREE.Mesh(ground, new THREE.MeshStandardMaterial({color: 0x5f7a3a, roughness: .95})));
+
+let sim, view, actors = new Map(), tick = 0, frame = 0;
+const enemyVisual = new Map();
+function syncActors(snap) {
+  for (const e of snap.enemies) {
+    let entry = actors.get(`e:${e.id}`);
+    if (!entry) {
+      const {visual} = prepareAsset(templates.get('skeleton'), 'skeleton');
+      const root = new THREE.Group(); root.add(visual); scene.add(root);
+      entry = {root, visual, enemy: true, data: e, target: new THREE.Vector3()}; actors.set(`e:${e.id}`, entry);
+      visual.userData.targetId = e.id;
+    }
+    entry.data = e; entry.root.position.fromArray(e.position); entry.root.rotation.y = e.yaw || 0;
+  }
+  for (const [key, entry] of actors) if (!snap.enemies.some(e => `e:${e.id}` === key)) { entry.root.removeFromParent(); actors.delete(key); }
+}
+function setup() {
+  const c = structuredClone(check);
+  const enemyAt = sceneName === 'carry' ? [0, 0, -2] : sceneName === 'flare' ? [1.5, 0, -15] : [0, 0, -6];
+  c.enemies = [createEnemy('enemy', [enemyAt[0], H(enemyAt[0], enemyAt[2]), enemyAt[2]], 'skeleton')];
+  sim = loadSimulation(c);
+  view = createCombatView({scene, templates, actors, camera, height: H});
+  syncActors(sim.snapshot()); view.sync(sim.snapshot());
+  tick = sim.snapshot().tick;
+}
+const act = (seq, action, extra = {}) => sim.command('h', {type: 'action', seq, action, ...extra});
+let seq = 1, pending = null;
+function fire(origin, direction, curve) {
+  const p = sim.checkpoint(); const player = p.players[0];
+  // Keep the archer beside the launch point (the simulation checks the bow is in reach).
+  player.position = [origin[0], H(origin[0], origin[2]), origin[2]]; player.attackTick = -1000;
+  sim = loadSimulation(p);
+  act(seq++, 'equip', {tool: 'bow'});
+  const l = Math.hypot(...direction);
+  return act(seq++, 'fire', {origin, direction: direction.map(n => n / l), curve, draw: 1});
+}
+function headContact() {
+  const s = sim.snapshot(), shot = s.projectiles[0], e = s.enemies[0]; if (!shot || !e) return null;
+  const head = [e.position[0], e.position[1] + 1.5, e.position[2]];
+  const near = shot.trail.reduce((b, p) => Math.hypot(...p.map((n, i) => n - head[i])) < Math.hypot(...b.map((n, i) => n - head[i])) ? p : b);
+  if (Math.hypot(...near.map((n, i) => n - head[i])) > .3) return null;
+  return {targetId: e.id, part: 'head', point: near, normal: [0, 0, 1], localPoint: [0, .12, .06], localQuaternion: [0, 0, 0, 1], boneName: 'head', projectileId: shot.id};
+}
+const hitCount = {n: 0};
+function step(frames = 1) {
+  for (let f = 0; f < frames; f++) {
+    for (const e of sim.step() || []) view.handleEvent(e); frame++;
+    if (pending === 'head') { const hit = headContact(); if (hit) { const r = sim.projectileContact(hit); if (r.ok) { pending = null; hitCount.n++; r.events.forEach(view.handleEvent); } } }
+    if (sceneName === 'volley' && frame % 24 === 1 && frame < 200) {
+      const k = (frame / 24) | 0, side = k % 2 ? 1 : -1;
+      fire([side * 6, H(side * 6, 4) + 1.6, 4], [-side * .55, .12, -1], [0, side * .9, 0]);
+    }
+    const snap = sim.snapshot(); syncActors(snap); view.prepareActors(snap); view.sync(snap, {prepared: true});
+    view.tick(1 / 60, false, frame / 60, snap.tick);
+    for (const entry of actors.values()) entry.visual.updateMatrixWorld(true);
+    aimCamera();
+  }
+  aimCamera(); renderer.render(scene, camera);
+  return {frame, hits: hitCount.n, carried: (sim.snapshot().detachedParts || []).filter(d => d.carry).length, contrails: view.rangedEffectStats().contrails};
+}
+const follow = new THREE.Vector3(0, 1.5, -2), camTarget = new THREE.Vector3();
+function aimCamera() {
+  const s = sim.snapshot();
+  if (sceneName === 'carry') {
+    const skull = (s.detachedParts || []).find(d => d.part === 'head'), node = skull && view.detached.get(skull.id);
+    if (node) { new THREE.Box3().setFromObject(node).getCenter(camTarget); follow.lerp(camTarget, .06); }
+    camera.position.set(follow.x + 3.1, follow.y + .5, follow.z + 2.2); camera.lookAt(follow.x, follow.y + .05, follow.z);
+  } else if (sceneName === 'volley') { camera.position.set(0, H(0, 7) + 2.2, 7.5); camera.lookAt(0, H(0, -6) + 1.6, -6); }
+  else if (sceneName === 'flare') { camera.position.set(9, H(9, 1) + 2.4, 1); camera.lookAt(0, H(0, -15) + 3.2, -15); }
+  else { camera.position.set(.9, H(0, -6) + 1.7, -4.6); camera.lookAt(0, H(0, -6) + 1.4, -6); }
+}
+setup();
+if (sceneName === 'carry') {
+  const e = sim.snapshot().enemies[0], at = partPosition(e, 'head'), origin = [1.2, at[1] - .2, 8];
+  fire(origin, at.map((n, i) => n - origin[i] + (i === 1 ? -.18 : 0)), [0, -.004, 0]); pending = 'head';
+} else if (sceneName === 'flare') {
+  const p = sim.checkpoint(), player = p.players[0];
+  player.position = [0, H(0, 8), 8]; delete player.specialTick; sim = loadSimulation(p);
+  act(seq++, 'equip', {tool: 'bow'});
+  const origin = [0, H(0, 8) + 1.6, 8], d = [0, .12, -1], l = Math.hypot(...d);
+  window.flareResult = act(seq++, 'special', {origin, direction: d.map(n => n / l)}); window.flareResult.events.forEach(view.handleEvent);
+} else if (sceneName === 'arrows') {
+  // Six arrows into the skeleton, then it is frozen for close inspection.
+  const e = sim.snapshot().enemies[0];
+  for (let i = 0; i < 6; i++) {
+    const at = partPosition(sim.snapshot().enemies[0], 'torso'), origin = [Math.sin(i) * 1.5, at[1] + .3 * Math.cos(i * 1.7), 6];
+    fire(origin, at.map((n, k) => n - origin[k]), [0, 0, 0]);
+    for (let f = 0; f < 40; f++) { sim.step(); const shot = sim.snapshot().projectiles[0]; const ee = sim.snapshot().enemies[0]; if (!shot || !ee) break;
+      const tor = partPosition(ee, 'torso'); const near = shot.trail.find(p => Math.hypot(p[0] - tor[0], p[2] - tor[2]) < .35);
+      if (near) { sim.projectileContact({targetId: ee.id, part: 'torso', point: near, normal: [0, 0, 1], localPoint: [0, .05 * i, .1], localQuaternion: [0, 0, 0, 1], boneName: 'torso', projectileId: shot.id}); break; } }
+  }
+}
+window.review = {step, ready: true, rig: () => { const out = []; scene.traverse(o => { if (o.name === 'wings:canonical') { const b = new THREE.Box3().setFromObject(o); out.push({wings: b.getCenter(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)), size: b.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)), visible: o.visible}); } }); const sk = (sim.snapshot().detachedParts || []).find(d => d.part === 'head'); const n = sk && view.detached.get(sk.id); if (n) out.push({skull: new THREE.Box3().setFromObject(n).getCenter(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)), size: new THREE.Box3().setFromObject(n).getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2))}); return out; }, probe: () => [...view.detached.entries()].map(([id, n]) => { const b = new THREE.Box3().setFromObject(n), c = b.getCenter(new THREE.Vector3()); return {id, part: n.userData.detachedPart, carry: !!n.userData.carry, node: n.position.toArray().map(v => +v.toFixed(2)), center: c.toArray().map(v => +v.toFixed(2)), data: sim.snapshot().detachedParts.find(d => d.id === id)?.position.map(v => +v.toFixed(2))}; }), info: () => ({scene: sceneName, frame, snapshot: sim.snapshot()})};
+step(0);
+</script></html>
