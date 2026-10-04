@@ -1,3 +1,5 @@
+**Directional proximity voice (draft, 2026-10-04):** opt-in nearby voice for browser Hero/God play on desktop, touch and WebXR. See [design, privacy, verification and network limits](docs/PROXIMITY-VOICE.md). Not deployed.
+
 # Brann's Forge - current browser game
 
 **Start here:** [Claude takeover handoff](docs/CLAUDE-HANDOFF-20261003.md).
