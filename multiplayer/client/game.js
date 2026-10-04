@@ -45,6 +45,8 @@ import {createCombatView} from './combat-view.js';
 import {createEntView} from './ent-view.js';
 import {createStumplingView} from './stumpling-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
+import {GROWTH, growthPlan, waveLine} from '../shared/grove-growth.js';
+const GROWTH_SPELLS=['grove','ring','wave'];
 import {createSpellPresentation} from './spell-presentation.js';
 import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
@@ -107,7 +109,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
-  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake',KeyR:'rainfall'};
+  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake',KeyR:'rainfall',KeyH:'wave'};
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
@@ -390,7 +392,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // 0.3-0.75 s in headless SwiftShader; ecosystem changes now rebuild in bounded frame slices, never per chop.
   function syncOrchardContent() {
     const trees = worldTrees(snapshot), deposits = Array.isArray(snapshot.deposits) ? snapshot.deposits : null;
-    const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.id).join() + '|' + (snapshot.awakenedTrees || []).join() + '|' + (snapshot.wildTrees || []).map(t => t.id).join() + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();
+    const key = snapshot.seed + ':' + (snapshot.groves || []).map(g => g.trees ? `${g.id}:${g.trees.filter(t => (t[4] ?? 0) <= snapshot.tick).length}` : g.id).join() + '|' + (snapshot.awakenedTrees || []).join() + '|' + (snapshot.wildTrees || []).map(t => t.id).join() + '|' + (deposits || []).map(d => d.id + (d.depleted ? '-' : '')).join();
     if (key === orchardContentKey) return; orchardContentKey = key;
     orchard.groundChanged(deposits ? {trees, deposits} : {trees});
   }
@@ -603,10 +605,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Ent spells preview the exact trees the authority would wake (same pure selection); Awaken snaps onto its tree.
   let entTreeCache=null,entTreeSnapshot=null;
   function entPreviewTrees(point){if(entTreeSnapshot!==snapshot){entTreeSnapshot=snapshot;entTreeCache=worldTrees(snapshot);}return entTargets(entTreeCache,snapshot.harvestedTrees,spell,point);}
-  function isLineSpell(){return spell==='sunder'||spell==='wall';}
+  function isLineSpell(){return spell==='sunder'||spell==='wall'||spell==='wave';}
+  // Growth spells preview the exact sites the authority will plant (same pure plan on the same world).
+  let growthCache={key:'',snapshot:null,trees:[]};
+  function growthPreview(point,start,end){const key=`${spell}|${point}|${start}|${end}`;if(growthCache.key!==key||growthCache.snapshot!==snapshot)growthCache={key,snapshot,trees:growthPlan(snapshot,spell,point,{start,end})};return growthCache.trees;}
   // Casting never refuses a placement. Point spells settle where authority will put them;
   // a drawn line longer than 18 m is shortened and a tiny one becomes the default line.
   function settledPoint(id,x,z){const [sx,,sz]=settleCastPoint(id,[x,0,z],{expedition:expeditionRunning(snapshot.adventure)});return [sx,heightAt(sx,sz,snapshot.edits),sz];}
+  // A Growth Wave tap grows a full band across the view, sent as an explicit line so the authority plants the same band.
+  function waveTap(point){const player=snapshot.players.find(p=>p.id===playerId),dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),h=GROWTH.wave.tapLength/2,c=v=>THREE.MathUtils.clamp(v,-55,55);return [[c(point[0]-uz*h),point[1],c(point[2]+ux*h)],[c(point[0]+uz*h),point[1],c(point[2]-ux*h)]];}
   function fitLine(start,end){const dx=end[0]-start[0],dz=end[2]-start[2],d=Math.hypot(dx,dz);return d<=18?end:[start[0]+dx/d*17.99,end[1],start[2]+dz/d*17.99];}
   function targetPreview(){
     if(!active||role!=='god'||!cursor.visible)return null;
@@ -618,6 +625,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         start=[clamp(point[0]-uz*3),point[1],clamp(point[2]+ux*3)];end=[clamp(point[0]+uz*3),point[1],clamp(point[2]-ux*3)];fallback=true;}
     }
     let trees;if(ENT_SPELLS.includes(spell)){trees=entPreviewTrees(point);if(spell==='awaken'&&trees[0])point=[trees[0].x,heightAt(trees[0].x,trees[0].z,snapshot.edits),trees[0].z];}
+    if(GROWTH_SPELLS.includes(spell)){const drawn=spell==='wave'?(fallback||Math.hypot(end[0]-start[0],end[2]-start[2])<GROWTH.wave.minLength?waveTap(point):[start,end]):[];if(spell==='wave'){[start,end]=waveLine(point,drawn[0],drawn[1]);fallback=false;}trees=growthPreview(point,drawn[0],drawn[1]);}
     return {spell,point,start,end,fallback,trees,valid:(fallback||(Math.abs(start?.[0]??0)<=55&&Math.abs(start?.[2]??0)<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount,trees})};
   }
   function cancelCast() { castStart = null; quickKey = null; castRevision++; }
@@ -627,7 +635,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     let at=isLineSpell()?[x,heightAt(x,z,snapshot.edits),z]:settledPoint(spell,x,z);
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
     let extra={};
-    if(castStart&&Math.hypot(castStart.x-at[0],castStart.z-at[2])>=.5){at=fitLine(castStart.toArray(),at);extra={start:castStart.toArray(),end:at};}
+    if(spell==='wave'){const drag=castStart&&Math.hypot(castStart.x-at[0],castStart.z-at[2])>=GROWTH.wave.minLength;if(drag)at=fitLine(castStart.toArray(),at);const [a,b]=drag?[castStart.toArray(),at]:waveTap(at);extra={start:a,end:b};}
+    else if(castStart&&Math.hypot(castStart.x-at[0],castStart.z-at[2])>=.5){at=fitLine(castStart.toArray(),at);extra={start:castStart.toArray(),end:at};}
     pendingCastPreview={spell,point:at};onCast(spell,at,extra);castStart=null;quickKey=null;
   }
   function lookBy(dx, dy) {

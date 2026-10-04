@@ -12,6 +12,7 @@ import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint} from './spells.js';
 import {BLOOM,bloomLevel,addBloom,stepBloom,restoreBloom} from './bloom.js';
+import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
@@ -273,6 +274,7 @@ function instantiate(state) {
       const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
       if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
+      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)))return fail('invalid_cast');
       const lineCount=line?earthLineEdits(message.start,message.end):1;
       if (!Object.hasOwn(COST, spell) || !validPoint(message.point)) return fail('invalid_cast');
       // Mana is the only rule that refuses a cast; placement rules move it instead.
@@ -283,10 +285,13 @@ function instantiate(state) {
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
       if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
-          ((spell === 'grove' || spell === 'ring') && state.groves.length >= MAX_WORLD) ||
+          (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
           (spell === 'starfall' && (state.pendingStarfalls.length >= 8 || state.deposits.length+state.pendingStarfalls.length>=80))) return fail('world_limit');
+      // Growth spells grow each tree on the open ground nearest its aim; only a spot with no room at all refuses.
+      const grown=['grove','ring','wave'].includes(spell)?growthPlan(state,spell,point,{start:message.start,end:message.end}):null;
+      if(grown&&!grown.length)return fail('no_room');
       // Ents: the God awakens trees that already stand. Nothing to wake is the only refusal besides mana and world limits.
       const entTrees=ENT_SPELLS.includes(spell)?entTargets(worldTrees(state),state.harvestedTrees,spell,point):null;
       if(entTrees&&!entTrees.length)return fail('no_tree');
@@ -321,7 +326,12 @@ function instantiate(state) {
         if(hero)ent.yaw=Math.atan2(-(hero.position[0]-tree.x),-(hero.position[2]-tree.z));
         state.enemies.push(ent);events.push({kind:'ent_wake',id:ent.id,treeId:tree.id,size:ent.size,position:[...ent.position],tick:state.tick,material:'wood'});
       }
-      if (spell === 'grove' || spell === 'ring') {state.groves.push({id: idNew, x, z, ...(spell === 'ring' ? {kind:'ring'} : {})});addBloom(state,BLOOM.grove,events,at);}
+      if (grown) {
+        const [ws,we]=spell==='wave'?waveLine(point,message.start,message.end):[], gx=spell==='wave'?+((ws[0]+we[0])/2).toFixed(3):x, gz=spell==='wave'?+((ws[2]+we[2])/2).toFixed(3):z;
+        state.groves.push({id: idNew, x: gx, z: gz, ...(spell !== 'grove' ? {kind: spell} : {}), trees: grown.map(t => [t.x, t.z, t.height, t.variant, ...(t.delay ? [state.tick + t.delay] : [])])});
+        Object.assign(events.find(e=>e.kind==='spell'),{sites:grown.map(t=>[t.x,t.z,t.delay||0]),radius:spell==='ring'?4.6:4.2,...(spell==='wave'?{start:ws,end:we}:{})});
+        addBloom(state,spell==='wave'?BLOOM.wave:BLOOM.grove,events,at);
+      }
       if (spell === 'raise'||spell==='lower') {
         state.edits.push({id: idNew, kind: spell, x, z, radius: 6, height: spell==='raise'?2:-2});
         liftActors(state);
@@ -477,7 +487,7 @@ export function loadSimulation(saved) {
       throw Error('Invalid simulation edit');
   }
   for (const g of saved.groves) {
-    if (!record(g) || !unique(g.id) || !validXZ(g) || (g.kind !== undefined && g.kind !== 'ring')) throw Error('Invalid simulation grove');
+    if (!record(g) || !unique(g.id) || !validXZ(g) || (g.kind !== undefined && g.kind !== 'ring' && g.kind !== 'wave') || (g.trees !== undefined && !validGroveTrees(g.trees, saved.tick)) || (g.kind === 'wave' && g.trees === undefined)) throw Error('Invalid simulation grove');
   }
   const treeIds=new Set(worldTrees(saved).map(t=>t.id));
   for (const t of entTrees.wildTrees) if (!treeIds.has(t.id)) throw Error('Invalid rooted tree'); // an id cannot be both awake and rooted

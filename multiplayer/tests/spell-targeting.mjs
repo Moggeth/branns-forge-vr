@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {terrainHeight,createSunderRupture} from '../shared/terrain.js';
+import {GROWTH} from '../shared/grove-growth.js';
 import { createSpellTargeting, createMarkerTerrainSampler, SPELL_SHAPES, lineKernels } from '../client/spell-targeting.js';
 
-const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake', 'awaken', 'wildwake', 'rainfall'];
+const IDS = ['skeleton', 'squad', 'golem', 'raise', 'lower', 'sunder', 'wall', 'grove', 'ring', 'starfall', 'crystal', 'heal', 'lightning', 'frost', 'spring', 'blessing', 'quake', 'awaken', 'wildwake', 'rainfall', 'wave'];
 assert.deepEqual(Object.keys(SPELL_SHAPES).sort(), [...IDS].sort());
 const slope = (x, z) => 0.45 * Math.sin(x * 0.09) * Math.cos(z * 0.07) + 0.35 * x + 0.2 * z + 0.6 * Math.sin(z * 0.8); // steep, rippled
 const t0 = performance.now(), timings = {};
@@ -107,9 +108,10 @@ for (const quality of ['high', 'medium', 'low']) {
   assert.equal(fx.invalidateTerrain([{x:10,z:10,radius:3}]),true);fx.update(32,1/60);assert.equal(fx.stats().builds,builds+1);assert.ok(Math.abs(geometry.attributes.position.getY(0)-beforeY+1)<1e-6);
   fx.setTarget({spell:'wall',start:[10,0,7],end:[10,0,13],fallback:true});fx.update(48,1/60);assert.equal(fx.stats().surface,true);fx.dispose();
 }
-// Match actual plant locations; authored motif sites cannot drift from gameplay.
-assert.equal(SPELL_SHAPES.grove.trees.length,5);assert.equal(SPELL_SHAPES.ring.trees,8);assert.equal(SPELL_SHAPES.ring.treeRing,4);
-for(let i=0;i<5;i++)assert.deepEqual(SPELL_SHAPES.grove.trees[i],[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]);
+// Fallback motif matches the growth pattern; live previews draw the exact planned sites instead.
+assert.equal(SPELL_SHAPES.grove.trees.length,GROWTH.grove.count);assert.equal(SPELL_SHAPES.ring.trees,GROWTH.ring.count);assert.equal(SPELL_SHAPES.ring.treeRing,GROWTH.ring.spread);
+for(const [x,z] of SPELL_SHAPES.grove.trees)assert.ok(Math.abs(Math.hypot(x,z)-GROWTH.grove.spread)<1e-2);
+assert.ok(SPELL_SHAPES.grove.sites&&SPELL_SHAPES.ring.sites&&SPELL_SHAPES.wave.sites&&SPELL_SHAPES.wave.band);
 // Exercise the real shared terrain at the 64-edit cap, including an active rupture.
 {
   const edits=Array.from({length:64},(_,i)=>({id:'e'+i,kind:'raise',x:(i%8)*2-8,z:Math.floor(i/8)*2-8,radius:6,height:i%2?2:-2}));
