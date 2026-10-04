@@ -1,5 +1,5 @@
 {
- "bytes": 2683372,
+ "bytes": 3648976,
  "nodes": [
   "Menhir_A_Rune",
   "Menhir_A",
@@ -24,15 +24,28 @@
   "Moss_C",
   "Rubble_A",
   "Rubble_B",
-  "Rubble_C"
+  "Rubble_C",
+  "GeodeBoulder_A_Crystals",
+  "GeodeBoulder_A",
+  "GeodeBoulder_B_Crystals",
+  "GeodeBoulder_B",
+  "GeodeBoulder_C_Crystals",
+  "GeodeBoulder_C",
+  "Cup",
+  "MineHead_Iron",
+  "MineHead",
+  "OreCart_Crystals",
+  "OreCart_Iron",
+  "OreCart"
  ],
  "materials": [
   "Stone",
   "Crystal",
   "Bronze",
-  "Moss"
+  "Moss",
+  "Wood"
  ],
- "images": 13,
+ "images": 16,
  "triangles": {
   "Menhir_A": 1016,
   "Menhir_B": 1016,
@@ -53,14 +66,27 @@
   "Moss_C": 268,
   "Rubble_A": 58,
   "Rubble_B": 66,
-  "Rubble_C": 74
+  "Rubble_C": 74,
+  "GeodeBoulder_A_Crystals": 396,
+  "GeodeBoulder_A": 986,
+  "GeodeBoulder_B_Crystals": 396,
+  "GeodeBoulder_B": 986,
+  "GeodeBoulder_C_Crystals": 396,
+  "GeodeBoulder_C": 986,
+  "Cup": 390,
+  "MineHead_Iron": 572,
+  "MineHead": 1564,
+  "OreCart_Crystals": 360,
+  "OreCart_Iron": 1024,
+  "OreCart": 2736
  },
- "total_triangles": 12692,
+ "total_triangles": 23484,
  "texture_luminance": {
   "Stone": 0.513,
   "Moss": 0.228,
   "Bronze": 0.378,
-  "Crystal": 0.443
+  "Crystal": 0.443,
+  "Wood": 0.307
  },
- "seconds": 4.8
+ "seconds": 5.8
 }

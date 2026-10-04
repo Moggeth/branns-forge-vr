@@ -21,7 +21,7 @@ sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, {left: -40,
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({color: 0x6f8f3e, roughness: 1}));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const world = createStartingWorld({THREE, scene, height: () => 0});
-if (!q.has('nokit')) { const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js'); world.installKit(await new GLTFLoader().loadAsync('/assets/sanctuary_kit.glb')); } // ?nokit shows the code-built stand-ins
+if (!q.has('nokit')) { const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js'); world.installKit(await new GLTFLoader().loadAsync('/assets/landmarks_kit.glb')); } // ?nokit shows the code-built stand-ins
 const {createWaygateView} = await import('../client/waygate-view.js');
 const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
 const {createBeaconView} = await import('../client/beacon-view.js');

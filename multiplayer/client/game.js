@@ -558,7 +558,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
-  loader.load('/assets/sanctuary_kit.glb',gltf=>{ // Blender-built sanctuary stones; the code-built ones stand in until then
+  loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built sanctuary stones; the code-built ones stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
     if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Sanctuary stone models are incomplete; the simpler stones stay in place.');return;}
     gltf.scene.traverse(o=>o.geometry?.dispose()); // the world keeps copies of the geometry and the materials themselves

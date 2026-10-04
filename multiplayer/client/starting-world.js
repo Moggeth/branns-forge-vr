@@ -24,7 +24,7 @@ export const PATHS = [
   { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
 ];
 
-const TRI_CAP = 34000; // ~15k code-built, ~27k once the sanctuary kit is in; the cap guards against runaway layouts
+const TRI_CAP = 48000; // ~15k code-built, ~38k with the landmark kit; the cap guards against runaway layouts
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -62,6 +62,7 @@ export function createStartingWorld({ THREE, scene, height }) {
   // kit is installed (null hides it); PK adds a piece that only exists with the kit. Kit materials: kStone, kMoss, ...
   const K = (alt) => { pieces[pieces.length - 1].alt = alt; };
   const PK = (...a) => { P(...a); pieces[pieces.length - 1].kitOnly = true; };
+  const KC = (mat, geo) => { const last = pieces[pieces.length - 1]; pieces.push({...last, ...last.alt, alt: undefined, mat, geo, kitOnly: true}); }; // kit companion on the same transform
   const KIT_MENHIRS = [['Menhir_A', 3.0], ['Menhir_B', 3.5], ['Menhir_C', 3.9], ['Menhir_D', 4.3]];
   const foot = (site, kind, x, z, w, d, rotY = 0, h = 2) => site.footprints.push({ kind, x, z, w, d, rotY, h });
 
@@ -127,11 +128,12 @@ export function createStartingWorld({ THREE, scene, height }) {
     mound.forEach(([dx, dz, w, h], i) => {
       const k = 'geodeBoulder' + i; prim[k] = oc.geodeBoulderGeometry(300 + i * 13);
       P('stone', k, site.x + dx, site.z + dz, h * 0.3, [w * 0.95, h * 0.72, w * 0.88], [r() * 0.3, r() * 6, r() * 0.3]);
+      K({mat: 'kStone', geo: 'k:GeodeBoulder_' + 'ABC'[i % 3]}); KC('kCrystal', 'k:GeodeBoulder_' + 'ABC'[i % 3] + '_Crystals');
       foot(site, 'rock', site.x + dx, site.z + dz, w * 1.6, w * 1.5, 0, h);
     });
     prim.geodeCup = oc.cupGeometry(41);
     for (const g of GEODES) {
-      P('stone', 'geodeCup', g.x, g.z, g.lift + 0.12, [g.size * 0.42, g.size * 0.36, g.size * 0.42], [0, g.index, 0], g.id);
+      P('stone', 'geodeCup', g.x, g.z, g.lift + 0.12, [g.size * 0.42, g.size * 0.36, g.size * 0.42], [0, g.index, 0], g.id); K({mat: 'kStone', geo: 'k:Cup'});
       clusters.push({x: g.x, z: g.z, lift: g.lift + 0.05, size: g.size, id: g.id});
     }
     for (const g of GEODES) if (!g.lift) foot(site, 'crystal', g.x, g.z, g.size * 0.9, g.size * 0.9, 0, g.size * 1.4); // ground clusters are solid
@@ -141,12 +143,14 @@ export function createStartingWorld({ THREE, scene, height }) {
     prim.mineBrace = oc.timberGeometry(0.14, 1.3, 0.14, 9); prim.shaftRim = oc.timberGeometry(1.5, 0.22, 0.22, 10, 3);
     prim.shaftHole = new THREE.PlaneGeometry(1.25, 1.25); prim.shaftHole.rotateX(-Math.PI / 2);
     prim.shaftHole.setAttribute('color', new THREE.Float32BufferAttribute(Array(prim.shaftHole.attributes.position.count * 3).fill(0.08), 3));
+    const mineFrom = pieces.length;
     for (const s of [-1, 1]) {
       P('wood', 'minePost', mx, mz + s, 1.3, [1, 1, 1]);
       P('wood', 'mineBrace', mx, mz + s * 0.62, 2.15, [1, 1, 1], [s * 0.75, 0, 0]);
     }
     P('wood', 'mineBeam', mx, mz, 2.82, [1, 1, 1]);
     for (const [ox, oz, ry] of [[0, -0.64, 0], [0, 0.64, 0], [-0.64, 0, Math.PI / 2], [0.64, 0, Math.PI / 2]]) P('wood', 'shaftRim', mx + ox, mz + oz, 0.1, [1, 1, 1], [0, ry, 0]);
+    PK('kWood', 'k:MineHead', mx, mz, 0.1, [1, 1, 1]); KC('kBronze', 'k:MineHead_Iron');
     P('stone', 'shaftHole', mx, mz, 0.17, [1, 1, 1]);
     const pulley = oc.wheelGeometries(0.42, 0.12, 6); prim.pulleyWood = pulley.wood; prim.pulleyTyre = pulley.tyre;
     P('wood', 'pulleyWood', mx, mz, 2.45, [1, 1, 1], [0, Math.PI / 2, 0]); P('bronze', 'pulleyTyre', mx, mz, 2.45, [1, 1, 1], [0, Math.PI / 2, 0]);
@@ -161,6 +165,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const sx of [-0.42, 0.42]) for (const sz of [-0.47, 0.47]) { P('wood', 'cartWheel', ...at(sx, sz), 0.27, [1, 1, 1], [0, yaw, 0]); P('bronze', 'cartTyre', ...at(sx, sz), 0.27, [1, 1, 1], [0, yaw, 0]); }
     prim.cartHeap = art.crystalPointGeometry(1, 0.12);
     for (let k = 0; k < 6; k++) { const [hx, hz] = at((k % 3 - 1) * 0.35, (k < 3 ? -0.15 : 0.18)); P('crystal', 'cartHeap', hx, hz, cy + 0.2, [1, 0.35 + (k % 2) * 0.2, 1], [(r() - 0.5) * 1.2, r() * 6, (r() - 0.5) * 1.2]); }
+    PK('kWood', 'k:OreCart', cx, cz, 0.15, [1, 1, 1], [0, yaw, 0]); KC('kBronze', 'k:OreCart_Iron'); KC('kCrystal', 'k:OreCart_Crystals');
+    for (let k = mineFrom; k < pieces.length; k++) if (!pieces[k].kitOnly && pieces[k].geo !== 'shaftHole') pieces[k].alt = {hide: 'k:MineHead'}; // the kit's mine head and cart replace these
     foot(site, 'post', mx, mz - 1, 0.3, 0.3, 0, 2.6); foot(site, 'post', mx, mz + 1, 0.3, 0.3, 0, 2.6);
   }
 
@@ -231,7 +237,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in meshes) { group.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
     tris = 0; dropped = 0; const buckets = {};
     for (const base of pieces) {
-      const p = kit ? (base.alt === null ? null : base.alt ? {...base, ...base.alt} : base) : base.kitOnly ? null : base;
+      const a = kit ? base.alt : undefined, alt = a === null || (a?.hide ? prim[a.hide] : a && prim[a.geo]) ? (a?.hide ? null : a) : undefined; // pieces the loaded kit lacks keep the code-built one
+      const p = alt === null ? null : alt ? {...base, ...alt} : base.kitOnly && !(kit && prim[base.geo]) ? null : base;
       if (!p) continue;
       const g = prim[p.geo]; const src = g.index ? g.toNonIndexed() : g;
       const triCount = src.attributes.position.count / 3;
@@ -240,6 +247,8 @@ export function createStartingWorld({ THREE, scene, height }) {
       // Anchor: sink 0.15 into the ground so slopes never show floating bases.
       const gy = H(p.x, p.z) - 0.15;
       m4.compose(v.set(p.x, gy + p.y, p.z), q.setFromEuler(e.set(p.r[0], p.r[1], p.r[2])), sc.set(p.s[0], p.s[1], p.s[2]));
+      const anchor = g.userData.anchor; // kit crystals set into a stretched boulder: placed with it, but kept in proportion
+      if (anchor) { const u = Math.cbrt(p.s[0] * p.s[1] * p.s[2]) * 0.8; v.copy(anchor).applyMatrix4(m4); m4.compose(v, q, sc.set(u, u, u)); }
       const b = (buckets[p.mat] ||= { pos: [], nor: [], uv: [], targets: [] });
       if (p.id) b.targets.push([b.pos.length / 9, b.pos.length / 9 + triCount, p.id]);
       const pa = src.attributes.position, na = src.attributes.normal, ca = src.attributes.color, ua = src.attributes.uv, nm = new THREE.Matrix3().getNormalMatrix(m4);
@@ -322,22 +331,25 @@ export function createStartingWorld({ THREE, scene, height }) {
   // levels: per-stone 0..1 resonance (index order = ring order, gap skipped).
   function setLit(levels = []) { for (let i = 0; i < lit.length; i++) lit[i] = Math.max(0, Math.min(1, +levels[i] || 0)); }
   // Sanctuary kit: the Blender-authored, textured version of the stones, trilithon, altar, hoop and chains
-  // (assets/landmarks-20261004/build_sanctuary.py). The code-built pieces stand in until it loads; ids, footprints
+  // (assets/landmarks-20261004/build_landmarks.py). The code-built pieces stand in until it loads; ids, footprints
   // and live behaviour are the same either way.
   let kit = null, kitRunes = null;
   function installKit(gltf) {
     if (kit) return false;
     const found = {}; gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => { if (o.isMesh) found[o.name] = o; });
+    const optional = ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'Cup', 'MineHead', 'MineHead_Iron', 'OreCart', 'OreCart_Iron', 'OreCart_Crystals'];
     const need = ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 'Post_B', 'Lintel', 'LintelSeam', 'Altar', 'AltarCrystals', 'Hoop', 'HoopInlay', 'Chain', 'TuneCrystal', 'Moss_A', 'Moss_B', 'Moss_C', 'Rubble_A', 'Rubble_B', 'Rubble_C'];
     if (need.some(n => !found[n])) return false;
     const kitMats = {};
-    for (const n of need) {
+    for (const n of [...need, ...optional.filter(n => found[n])]) {
       const o = found[n], m = o.material, key = 'k' + m.name; // Stone, Moss, Bronze, Crystal
-      prim['k:' + n] = o.geometry.clone().applyMatrix4(o.matrixWorld); // children (seams, inlay) keep their offset
+      if (/^GeodeBoulder_._Crystals$/.test(n)) { // origin at the geode window; build() keeps them unstretched
+        prim['k:' + n] = o.geometry.clone().applyMatrix4(new THREE.Matrix4().extractRotation(o.matrixWorld)); prim['k:' + n].userData.anchor = o.position.clone();
+      } else prim['k:' + n] = o.geometry.clone().applyMatrix4(o.matrixWorld); // children (seams, inlay) keep their offset
       if (!kitMats[key]) { m.vertexColors = !!o.geometry.attributes.color; m.needsUpdate = true; kitMats[key] = m; }
     }
-    if (!kitMats.kStone || !kitMats.kCrystal || !kitMats.kBronze || !kitMats.kMoss) return false;
+    if (!kitMats.kStone || !kitMats.kCrystal || !kitMats.kBronze || !kitMats.kMoss) { for (const k in prim) if (k.startsWith('k:')) { prim[k].dispose(); delete prim[k]; } return false; }
     Object.assign(mats, kitMats);
     // Runes follow the hewn face: each stroke vertex is pressed onto the stone's inner (-Z) surface.
     const probe = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial()), ray = new THREE.Raycaster(), from = new THREE.Vector3(), dir = new THREE.Vector3(0, 0, 1);
@@ -380,7 +392,7 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in mats) mats[k].dispose();
     runeMesh?.geometry.dispose(); rune.material.dispose(); clusterMesh?.geometry.dispose(); geode.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
     if (kit) { hoopBronze.geometry.dispose(); hoopGlow.geometry.dispose(); for (const g of kitRunes) g.dispose();
-      for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
+      for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal', 'kWood']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
   }
   function stats() { return { kit: !!kit, draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
   // Beacon fire anchor (world space, follows terrain edits): where client/beacon-view.js draws the flame and beam.

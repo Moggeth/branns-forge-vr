@@ -2,8 +2,8 @@
 
 Run (no Blender install needed):
   pip install bpy==4.5.*
-  python3 build_sanctuary.py          # writes sanctuary_kit.glb, textures/, build_report.json here
-  cp sanctuary_kit.glb ../../multiplayer/public/assets/sanctuary_kit.glb
+  python3 build_landmarks.py          # writes landmarks_kit.glb, textures/, build_report.json here
+  cp landmarks_kit.glb ../../multiplayer/public/assets/landmarks_kit.glb
 
 The game places the pieces itself (client/starting-world.js keeps the layout and the collision footprints in
 shared/starting-layout.json), so every piece is modelled at the origin, foot centre on the ground:
@@ -122,6 +122,16 @@ def tex_bronze(name, n, seed):
     rough = 0.38 + 0.12 * scr + 0.45 * vg
     metal = 0.55 - 0.45 * vg
     return save_set(name, base, 0.6 * ham + 0.2 * scr + 0.3 * vg, np.clip(rough, 0.2, 1), metal, 0.6, ao=0.8 + 0.2 * sm(-0.6, 0.6, ham))
+
+def tex_wood(name, n, seed):
+    """Weathered mine timber: grain streaks running along V, a few knots, silvered where the sun hits."""
+    grain = fnoise(n, 1.1, seed, ay=0.05, hi=n / 3); streak = fnoise(n, 0.5, seed + 1, ay=0.03); big = fnoise(n, 1.6, seed + 2, hi=8)
+    knot = sm(0.72, 0.92, fnoise(n, 1.8, seed + 3, hi=14)); checks = np.exp(-(fnoise(n, 1.0, seed + 4, ay=0.04, hi=n / 4) / 0.02) ** 2)
+    base = mix([0.27, 0.18, 0.11], [0.55, 0.40, 0.25], sm(-0.7, 0.7, 0.7 * grain + 0.4 * streak))
+    base = mix(base, [0.52, 0.50, 0.46], sm(-0.2, 0.7, big) * 0.35)  # sun-silvered
+    base = base * (1 - 0.45 * knot - 0.5 * checks)[..., None]
+    h = 0.5 * grain + 0.3 * streak - 0.4 * knot - 0.6 * checks
+    return save_set(name, base, h, 0.78 + 0.1 * streak, np.zeros((n, n)), 2.2, ao=1 - 0.3 * checks)
 
 def tex_crystal(name, n, seed):
     veins = np.clip(1 - np.abs(fnoise(n, 1.1, seed, lo=3, hi=n / 6) * 2.4), 0, 1) ** 4
@@ -272,7 +282,7 @@ def stone_tone(seed, height, moss_foot=0.35):
         g = fbm(p, seed, 1.3, 3)
         v = 0.80 + 0.16 * t + 0.25 * g
         c = np.stack([v * 1.0, v * 0.985, v * 0.96], -1)
-        foot = np.clip(1 - z / moss_foot, 0, 1)[:, None]
+        foot = np.clip(1 - z / max(moss_foot, 1e-3), 0, 1)[:, None]
         c = c * (1 - foot) + foot * np.array([0.42, 0.52, 0.30])
         up = np.clip(n[:, 2], 0, 1)[:, None]
         c = c * (1 - 0.12 * up * (g[:, None] > 0.05))
@@ -435,6 +445,129 @@ def rubble(name, seed, s):
     ob = make_mesh(name, P, F, MATS["Stone"])
     return finalize(ob, stone_tone(seed, s, 0.1), planar=8)
 
+# ---- Crystal Outcrop ------------------------------------------------------------------------------
+def geode_boulder(name, seed, window=(0.6, -0.5, 0.3)):
+    """Crust boulder around the origin (radius ~1, flat base at z = -0.35) with a broken-open geode window lined with
+    dark amethyst and a cluster of crystal points (child <name>_Crystals) growing out of it."""
+    V, F = grid_box(14, 14, 14)
+    d = V / np.linalg.norm(V, axis=1, keepdims=True)
+    P = d * (1 + 0.32 * fbm(d, seed, 1.1, 3) + 0.08 * fbm(d, seed + 1, 3.5, 2))[:, None]
+    ridge, f1 = cellular(P, seed + 2, 2.4)
+    P += d * (0.05 * np.clip(ridge * 2, 0, 1) - 0.04 * f1)[:, None]
+    w = np.asarray(window, float); w /= np.linalg.norm(w)
+    cosang = d @ w; cav = sm(0.80, 0.93, cosang)
+    jag = 0.06 * fbm(d, seed + 3, 6.0)
+    P -= d * (cav * (0.42 + jag))[:, None]
+    P[:, 2] = np.maximum(P[:, 2], -0.35)
+    ob = make_mesh(name, P, F, MATS["Stone"])
+    def tone(p, n):
+        c = stone_tone(seed, 1.2, 0.0)(p + np.array([0, 0, 0.35]), n)
+        dd = p / (np.linalg.norm(p, axis=1, keepdims=True) + 1e-6); inside = sm(0.84, 0.95, dd @ w)[:, None]
+        rim = np.exp(-((dd @ w - 0.82) / 0.03) ** 2)[:, None]
+        c = c * (1 - inside) + inside * np.array([0.30, 0.24, 0.55])
+        c = c * (1 - 0.6 * rim) + 0.6 * rim * np.array([0.92, 0.90, 0.86])  # pale banded agate rim
+        foot = np.clip((-0.15 - p[:, 2]) / 0.2, 0, 1)[:, None]
+        return np.clip(c * (1 - 0.5 * foot) + 0.5 * foot * np.array([0.40, 0.48, 0.28]), 0, 1)
+    finalize(ob, tone, decimate=0.42)
+    # crystals in the window: origin at the window (child offset), so the game can keep them in proportion on a
+    # stretched boulder
+    cl = crystal_cluster(name + "_Crystals", seed + 9, 0.26, 11, 0.55, spread=0.45, lift=-0.08)
+    cl.data.transform(Vector((0, 0, 1)).rotation_difference(Vector(w)).to_matrix().to_4x4())
+    cl.parent = ob; cl.location = Vector(w * 0.6)
+    return ob
+
+def geode_cup(name, seed):
+    """Broken crust cup that stays when a cluster is mined out: radius 1, rim ~0.25 up, base -0.25 (game scales it)."""
+    out = [(0.70, -0.25), (0.95, -0.12), (1.04, 0.08), (1.0, 0.24)]
+    inn = [(0.86, 0.22), (0.80, 0.02), (0.55, -0.12), (0.0, -0.16)]
+    V, F = lathe(out + inn, 28)
+    ang = np.arctan2(V[:, 1], V[:, 0]); top = V[:, 2] > 0.2
+    V[top, 2] += 0.16 * np.abs(np.sin(ang[top] * 3.5 + seed)) + 0.06 * fbm(V[top], seed, 4.0) - 0.08
+    V += (V / (np.linalg.norm(V, axis=1, keepdims=True) + 1e-6)) * (0.05 * fbm(V, seed + 1, 3.0))[:, None]
+    ob = make_mesh(name, V, F, MATS["Stone"])
+    def tone(p, n):
+        c = stone_tone(seed, 0.5, 0.0)(p + np.array([0, 0, 0.25]), n); r = np.linalg.norm(p[:, :2], axis=1)
+        inside = ((r < 0.9) & (p[:, 2] > -0.2))[:, None] * 1.0
+        return c * (1 - inside) + inside * np.array([0.30, 0.27, 0.56])
+    return finalize(ob, tone, planar=3)
+
+def timber(seed, w, d, L, bevel=0.22):
+    """Vertical squared beam, foot at the origin, grain up its length (UVs are fixed before it is moved)."""
+    V, F = grid_box(2, 2, max(2, int(L / 0.3)))
+    P = V * np.array([w / 2, d / 2, L / 2]); P[:, 2] += L / 2
+    corner = (np.abs(V[:, 0]) > 0.99) & (np.abs(V[:, 1]) > 0.99)
+    P[corner, :2] *= 1 - bevel * 0.5
+    P[:, :2] += 0.012 * np.stack([fbm(P, seed, 2.0), fbm(P, seed + 1, 2.0)], -1)
+    ob = make_mesh(f"t{seed}", P, F, MATS["Wood"])
+    return finalize(ob, lambda p, n: np.clip(np.stack([0.9 + 0.25 * fbm(p, seed, 0.8, 2)] * 3, -1), 0, 1), tile=1.1, smooth_angle=30)
+
+def between(a, b):
+    """Matrix taking a vertical part (foot at origin, up Z, length |b-a|) onto the segment a -> b."""
+    a, b = Vector(a), Vector(b)
+    return Matrix.Translation(a) @ Vector((0, 0, 1)).rotation_difference((b - a).normalized()).to_matrix().to_4x4()
+
+def assemble(name, parts, mat):
+    """Join finalized parts (object, matrix) into one mesh object; UVs and colours ride along."""
+    import bmesh
+    bm = bmesh.new()
+    for ob, M in parts:
+        me = ob.data.copy(); me.transform(M); bm.from_mesh(me); bpy.data.meshes.remove(me); bpy.data.objects.remove(ob)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free(); me.materials.clear(); me.materials.append(mat)
+    ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob); return ob
+
+def bronze_band(seed, r, h, t=0.02, seg=20):
+    V, F = lathe([(r, 0), (r + t, 0.0), (r + t, h), (r, h), (r, 0)], seg)
+    return finalize(make_mesh(f"b{seed}", V, F, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.85), tile=0.4, smooth_angle=40)
+
+def wheel(seed, radius, width, spokes=6):
+    """Wood wheel (rim segments, hub, spokes) round the Z axis; returns (wood parts, iron parts) with matrices."""
+    wood, iron = [], []
+    for k in range(spokes):
+        a = k / spokes * 2 * math.pi
+        wood.append((timber(seed + k, radius * 0.1, width * 0.45, radius * 0.86), Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(-math.pi / 2, 4, "X")))
+    rim, rf = lathe([(radius * 0.80, -width / 2), (radius * 0.97, -width / 2), (radius * 0.97, width / 2), (radius * 0.80, width / 2), (radius * 0.80, -width / 2)], 16)
+    wood.append((finalize(make_mesh(f"r{seed}", rim, rf, MATS["Wood"]), lambda p, n: np.full((len(p), 3), 0.85), tile=0.7, smooth_angle=30), Matrix()))
+    hub, hf = lathe([(0.0, -width * 0.7), (radius * 0.2, -width * 0.7), (radius * 0.2, width * 0.7), (0.0, width * 0.7)], 10)
+    wood.append((finalize(make_mesh(f"h{seed}", hub, hf, MATS["Wood"]), None, tile=0.5, smooth_angle=30), Matrix()))
+    iron.append((bronze_band(seed, radius * 0.97, width * 1.05, 0.025, 16), Matrix.Translation((0, 0, -width * 0.525))))
+    iron.append((bronze_band(seed + 1, radius * 0.2, width * 1.5, 0.02, 10), Matrix.Translation((0, 0, -width * 0.75))))
+    return wood, iron
+
+def build_outcrop():
+    for i, w in enumerate([(0.6, -0.55, 0.35), (-0.4, -0.7, 0.45), (0.75, 0.3, 0.4)]): geode_boulder(f"GeodeBoulder_{'ABC'[i]}", 300 + i * 13, w)
+    geode_cup("Cup", 41)
+    # Mine head: two posts, a cap beam along Y, knee braces, iron straps, a pulley wheel on an iron yoke, a rope down to a
+    # bronze pail, and a square timber collar round the shaft. Origin at the shaft centre on the ground.
+    wood, iron = [], []
+    for s in (-1, 1):
+        wood.append((timber(500 + s, 0.3, 0.3, 2.9), Matrix.Translation((0, s, -0.15))))
+        wood.append((timber(510 + s, 0.15, 0.15, 1.15), between((0, s * 0.98, 1.85), (0, s * 0.3, 2.67))))
+        for z in (2.45, 1.0): iron.append((bronze_band(520 + s, 0.16, 0.12, 0.018, 4), Matrix.Translation((0, s, z)) @ Matrix.Rotation(math.pi / 4, 4, "Z") @ Matrix.Scale(1.33, 4)))
+    wood.append((timber(530, 0.34, 0.3, 2.7), between((0, -1.35, 2.82), (0, 1.35, 2.82)) @ Matrix.Rotation(math.pi / 2, 4, "Z")))
+    for k, (ox, oy, ry) in enumerate([(0, -0.64, 0), (0, 0.64, 0), (-0.64, 0, 1), (0.64, 0, 1)]):
+        a, b = ((-0.75, oy, 0.1), (0.75, oy, 0.1)) if not ry else ((ox, -0.75, 0.1), (ox, 0.75, 0.1))
+        wood.append((timber(540 + k, 0.22, 0.22, 1.5), between(a, b)))
+    pw, pi = wheel(560, 0.34, 0.1, 6); spin = Matrix.Translation((0, 0, 2.2)) @ Matrix.Rotation(math.pi / 2, 4, "Y")
+    wood += [(o, spin @ M) for o, M in pw]; iron += [(o, spin @ M) for o, M in pi]
+    for s in (-1, 1): iron.append((timber(570 + s, 0.035, 0.08, 0.5), Matrix.Translation((s * 0.09, 0, 2.2))))  # yoke straps up to the beam
+    rope = timber(580, 0.03, 0.03, 1.6); rope.data.materials[0] = MATS["Wood"]; wood.append((rope, Matrix.Translation((0, -0.34, 0.58))))
+    pail, pf = lathe([(0.0, 0.0), (0.12, 0.0), (0.16, 0.28), (0.15, 0.29), (0.11, 0.02), (0.0, 0.02)], 14)
+    iron.append((finalize(make_mesh("pail", pail, pf, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.9), tile=0.4, smooth_angle=40), Matrix.Translation((0, -0.34, 0.3))))
+    assemble("MineHead", wood, MATS["Wood"]); ir = assemble("MineHead_Iron", iron, MATS["Bronze"]); ir.parent = bpy.data.objects["MineHead"]
+    # Ore cart: plank tub (length X, width Y), four spoked wheels on iron tyres, corner straps, heaped with crystal.
+    wood, iron = [], []
+    for k in range(4): wood.append((timber(600 + k, 0.2, 0.06, 1.3), between((-0.65, -0.315 + k * 0.21, 0.42), (0.65, -0.315 + k * 0.21, 0.42))))
+    for s in (-1, 1):
+        for k in range(2): wood.append((timber(610 + k + s, 0.06, 0.24, 1.36), between((-0.68, s * 0.42, 0.52 + k * 0.25), (0.68, s * 0.42, 0.52 + k * 0.25))))
+        for k in range(2): wood.append((timber(620 + k + s, 0.24, 0.06, 0.84), between((s * 0.66, -0.42, 0.52 + k * 0.25), (s * 0.66, 0.42, 0.52 + k * 0.25))))
+        for t in (-1, 1): iron.append((timber(630 + s + t, 0.05, 0.05, 0.56), Matrix.Translation((s * 0.68, t * 0.44, 0.38))))
+    for sx in (-0.42, 0.42):
+        for sy in (-0.47, 0.47):
+            ww, wi = wheel(640 + int(sx * 10 + sy * 100), 0.27, 0.08, 6); M = Matrix.Translation((sx, sy, 0.27)) @ Matrix.Rotation(math.pi / 2, 4, "X")
+            wood += [(o, M @ m) for o, m in ww]; iron += [(o, M @ m) for o, m in wi]
+    cart = assemble("OreCart", wood, MATS["Wood"]); ir = assemble("OreCart_Iron", iron, MATS["Bronze"]); ir.parent = cart
+    heap = crystal_cluster("OreCart_Crystals", 650, 0.36, 10, 0.42, lift=0.5, spread=0.9); heap.data.transform(Matrix.Scale(1.0, 4)); heap.parent = cart
+
 def empty(name, loc, parent):
     e = bpy.data.objects.new(name, None); e.empty_display_size = 0.1; bpy.context.scene.collection.objects.link(e)
     e.parent = parent; e.location = loc; return e
@@ -444,8 +577,9 @@ MATS = {}
 
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    lum = {"Stone": tex_stone("Stone", 1024, 41), "Moss": tex_moss("Moss", 512, 52), "Bronze": tex_bronze("Bronze", 512, 63), "Crystal": tex_crystal("Crystal", 256, 74)}
-    for n in ("Stone", "Moss", "Bronze"): MATS[n] = make_material(n)
+    lum = {"Stone": tex_stone("Stone", 1024, 41), "Moss": tex_moss("Moss", 512, 52), "Bronze": tex_bronze("Bronze", 512, 63), "Crystal": tex_crystal("Crystal", 256, 74),
+           "Wood": tex_wood("Wood", 512, 85)}
+    for n in ("Stone", "Moss", "Bronze", "Wood"): MATS[n] = make_material(n)
     MATS["Crystal"] = make_material("Crystal", emissive=True)
     objs = []
     for i, (h, w, d, tp) in enumerate([(3.0, 0.98, 0.62, 0.66), (3.5, 0.92, 0.58, 0.70), (3.9, 1.0, 0.64, 0.62), (4.3, 0.95, 0.6, 0.72)]):
@@ -462,6 +596,7 @@ def build():
     tc = crystal_cluster("TuneCrystal", 330, 0.0, 1, 0.9, lift=-0.45, spread=0.0); objs.append(tc)
     for i, (rx, ry, h) in enumerate([(0.7, 0.5, 0.16), (0.55, 0.42, 0.12), (0.9, 0.6, 0.2)]): objs.append(moss_cushion(f"Moss_{'ABC'[i]}", 40 + i, rx, ry, h))
     for i, s in enumerate([0.35, 0.25, 0.45]): objs.append(rubble(f"Rubble_{'ABC'[i]}", 70 + i, s))
+    build_outcrop()
     # spread pieces out in the .blend for inspection (the game reads each piece's own geometry, not this offset)
     for k, ob in enumerate([o for o in bpy.data.objects if o.parent is None and o.type == "MESH"]):
         ob.location = ((k % 6) * 3.0, (k // 6) * 3.0, 0)
@@ -487,7 +622,7 @@ def inspect(path):
 
 if __name__ == "__main__":
     lum = build()
-    glb = os.path.join(HERE, "sanctuary_kit.glb"); export_glb(glb)
+    glb = os.path.join(HERE, "landmarks_kit.glb"); export_glb(glb)
     rep = inspect(glb); rep["texture_luminance"] = {k: round(v, 3) for k, v in lum.items()}; rep["seconds"] = round(time.time() - T0, 1)
     json.dump(rep, open(os.path.join(HERE, "build_report.json"), "w"), indent=1)
     print(json.dumps({k: rep[k] for k in ("bytes", "images", "total_triangles", "seconds")}), json.dumps(rep["triangles"]))
