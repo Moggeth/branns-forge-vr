@@ -74,12 +74,20 @@ try {
  const slot = [...Array(26).keys()].map(i => ({i, w: appleWorld(tree, i, floor)})).filter(q => q.w.position[1] < floor + 3.9).sort((a, b) => Math.hypot(a.w.position[0] - me.position[0], a.w.position[2] - me.position[2]) - Math.hypot(b.w.position[0] - me.position[0], b.w.position[2] - me.position[2]))[0];
  const target = slot.w.position; record('target', 'pass', {tree: tree.id, slot: slot.i, target, vantage});
  recording = true;
- await look(target, 40, .02);
- await capture(); await page.mouse.down(); await frames(10);
- const drawing = (await harness()).c.weapon; record('draw', drawing.drawing ? 'pass' : 'fail', {weapon: drawing, locked: await page.evaluate(() => !!document.pointerLockElement)});
- await frames(40); await page.mouse.up();
- let pierced = null;
- await frames(40, async () => { if (!pierced) { const {s} = await harness(); pierced = s.fruit?.drops?.[0] || null; } });
+ // Aim like a player: shoot, watch where the arrow passes the apple, correct and shoot again (up to four arrows).
+ let pierced = null, aimAt = [...target]; aimAt[1] += .25; // a first allowance for the arrow's drop
+ for (let shotNo = 0; shotNo < 4 && !pierced; shotNo++) {
+  await look(aimAt, shotNo ? 14 : 40);
+  await capture(); await page.mouse.down(); await frames(10);
+  const w = (await harness()).c.weapon; record('draw-' + shotNo, w.drawing ? 'pass' : 'fail', {draw: w.draw});
+  await frames(40); const before = (await harness()).s.projectiles.map(q => q.id); await page.mouse.up();
+  let best = null, gone = null;
+  await frames(45, async () => { if (pierced) return; const {s} = await harness(); pierced = s.fruit?.drops?.[0] || null; if (pierced) return;
+   const q = s.projectiles.find(q => !before.includes(q.id) && q.kind === 'arrow');
+   if (q) { const d = Math.hypot(...q.position.map((n, k) => n - target[k])); if (!best || d < best.d) best = {d, at: q.position}; gone = null; } else if (best && !gone) gone = best.at; });
+  record('shot-' + shotNo, pierced ? 'pass' : 'miss', {closest: best, stoppedNear: gone});
+  if (!pierced && best) aimAt = aimAt.map((n, k) => n + (target[k] - best.at[k])*.9);
+ }
  assert.ok(pierced, 'the apple came off on the arrow'); record('pierce', 'pass', {drop: pierced.id, stick: pierced.stick});
  // follow it down
  for (let i = 0; i < 6; i++) { const {s} = await harness(); const d = s.fruit.drops[0]; await look(d.position, 8); }
