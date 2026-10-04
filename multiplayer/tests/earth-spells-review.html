@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Earth spells review</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:13px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:6px 10px}button{padding:8px;margin:2px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}body.clean header{display:none}</style>
+<header>Sunder and Raise Wall — actual game renderer, local authority.
+<button id="wall">Raise Wall</button><button id="sunder">Sunder</button><button id="both">Moat + rampart</button><button id="run">Run 1 s</button><button id="end">Skip to last 3 s</button><button id="god">God view</button><button id="hero">Hero view</button>
+<span id="status"></span><div id="error"></div></header><canvas id="world" aria-label="Earth spells review world"></canvas>
+<script type="module">
+// Deterministic review fixture: the real createGame renderer driven by a local shared simulation that only advances when
+// asked (review.run), so captures land on exact ticks. ?clean hides the toolbar; ?foes adds skeletons on the line. Not shipped.
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
+const $=id=>document.getElementById(id),q=new URLSearchParams(location.search);if(q.has('clean'))document.body.classList.add('clean');
+const at=(q.get('at')||'24,-16').split(',').map(Number);
+let sim=createSimulation({room:'EARTH_REVIEW'}),seq=0,role='god';
+sim.addPlayer({id:'hero',name:'Reviewer'});sim.addPlayer({id:'god',name:'Camera',role:'god'});
+let save=sim.checkpoint();
+save.players[0].position=[at[0]+1,terrainHeight(save,at[0]+1,at[1]+14),at[1]+14];save.players[0].yaw=0;save.players[0].tool='pick';
+save.players[1].position=[at[0],terrainHeight(save,at[0],at[1]),at[1]];save.players[1].mana=100;
+if(q.has('foes'))save.enemies=[[at[0]-1,at[1]-2.8],[at[0]+2,at[1]-1.6]].map(([x,z],i)=>Object.assign(createEnemy('foe'+i,[x,terrainHeight(save,x,z),z]),{yaw:0}));
+sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
+ onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);publish();},
+ onCast:(spell,point,extra)=>cast(spell,point,extra),
+ onInput:input=>sim.command(role==='god'?'god':'hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
+function publish(){game.applySnapshot(sim.snapshot(),role);}
+function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
+function cast(spell,point,extra={}){const s=sim.checkpoint();s.players.find(p=>p.id==='god').mana=100;sim=loadSimulation(s);
+ const r=sim.command('god',{type:'cast',seq:++seq,spell,point,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=spell+': '+(r.ok?'ok':r.code);publish();return r.ok?true:r.code;}
+const H=(x,z)=>terrainHeight(sim.snapshot(),x,z);
+const line=(spell,ax,az,bx,bz)=>cast(spell,[(ax+bx)/2,H((ax+bx)/2,(az+bz)/2),(az+bz)/2],{start:[ax,H(ax,az),az],end:[bx,H(bx,bz),bz]});
+publish();game.setRole('god');game.setActive(true);game.centerView();
+window.review={
+ step,run:(seconds=1)=>new Promise(done=>{let left=Math.round(seconds*60);const timer=setInterval(()=>{step(Math.min(4,left));left-=4;if(left<=0){clearInterval(timer);done(sim.snapshot().tick);}},1000/15);}),
+ wall:(o=0)=>line('wall',at[0]-6,at[1]-o,at[0]+6,at[1]-o),sunder:(o=0)=>line('sunder',at[0]-6,at[1]-o,at[0]+6,at[1]-o),line,cast,
+ look:(x,y)=>game.lookByPixels(x,y),zoom:a=>game.zoomBy(a),
+ view(next){role=next;publish();game.setRole(next);if(next==='god')game.centerView();},
+ skip(ticks){const s=sim.checkpoint();s.tick+=ticks;for(const e of s.edits){if(e.rupture)e.rupture.startTick=Math.max(0,e.rupture.startTick);}sim=loadSimulation(s);publish();},
+ controls:()=>game.controlsSnapshot(),face(yaw){const c=game.controlsSnapshot();game.lookByPixels((c.yaw-yaw)/.003,0);},tick:()=>sim.snapshot().tick,stats:()=>game.diagnostics(),snapshot:()=>sim.snapshot(),height:H,
+};
+$('wall').onclick=()=>review.wall();$('sunder').onclick=()=>review.sunder();$('both').onclick=()=>{review.sunder(0);review.wall(4.5);};$('run').onclick=()=>review.run(1);
+$('god').onclick=()=>review.view('god');$('hero').onclick=()=>review.view('hero');
+if(q.has('auto'))setInterval(()=>step(1),1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>

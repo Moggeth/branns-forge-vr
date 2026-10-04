@@ -16,7 +16,7 @@ const start=performance.now(),step=(s,n)=>{for(let i=0;i<n;i++)s.step();};
  assert.equal(s.command('g',{type:'cast',seq:1,spell:'sunder',point:[10,0,10],start:[10,0,10],end:[10,4,10]}).ok,false);
  assert.deepEqual(s.checkpoint().edits,before.edits);assert.equal(s.snapshot().players[0].mana,100);
  assert.equal(s.command('g',{type:'cast',seq:2,spell:'sunder',point:[10,0,10],start:[8,-5,10],end:[12,5,10]}).ok,true);
- assert.equal(s.snapshot().edits.length,3);assert.doesNotThrow(()=>loadSimulation(s.checkpoint()));
+ assert.equal(s.snapshot().edits.length,2);assert.doesNotThrow(()=>loadSimulation(s.checkpoint()));
 }
 
 const sim=createSimulation();sim.addPlayer({id:'g',role:'god'});sim.addPlayer({id:'h'});
@@ -29,7 +29,7 @@ field.setEdits(current.edits,current.tick);field.flush();assert.equal(field.samp
 const scene=new T.Scene(),fx=createSpellPresentation({scene,height:(x,z)=>terrainHeight(current,x,z),tickSeconds:1/60,getTerrainTick:()=>current.tick});
 fx.sync(current);assert.equal(fx.stats().events,1,'snapshot alone recreates active rupture');assert.equal(fx.play(event),false,'event after snapshot dedupes');
 step(sim,18);current=sim.snapshot();fx.sync(current);fx.update(300,.016);
-assert.ok(terrainHeight(current,10,10)<baseHeight(10,10)-.5);assert.equal(terrainHeight(current,22,10),baseHeight(22,10));
+assert.ok(terrainHeight(current,12,10)<baseHeight(12,10)-.5);assert.equal(terrainHeight(current,22,10),baseHeight(22,10));
 assert.equal(fx.stats().ruptureFronts[0].fraction,sunderFront(rupture,current.tick).fraction,'visible front uses exact same tick');
 field.setEdits(current.edits,current.tick);field.flush();assert.equal(field.sample(22,10).d,0);
 assert.equal(disturbanceAt(22,10,current.edits,current.tick),0,'no finished soil ahead of rupture');
@@ -47,7 +47,7 @@ const legacy={...current,edits:current.edits.map(({rupture,...e})=>e)};
 {
  const s=createSimulation();for(const id of ['a','b'])s.addPlayer({id,role:'god'});
  for(const id of ['a','b'])assert.equal(s.command(id,{type:'cast',seq:1,spell:'sunder',point:[16,0,10],start:[10,0,10],end:[22,0,10]}).ok,true);
- assert.equal(s.snapshot().edits.length,12);const restored=loadSimulation(s.checkpoint());
+ assert.equal(s.snapshot().edits.length,10);const restored=loadSimulation(s.checkpoint());
  step(s,72);step(restored,72);assert.deepEqual(s.snapshot(),restored.snapshot());
  for(let x=8;x<24;x+=.2)assert.ok(terrainHeight(s.snapshot(),x,10)-baseHeight(x,10)>=-6.000001);
  const capped=s.checkpoint();while(capped.edits.length<63)capped.edits.push({id:'cap'+capped.edits.length,kind:'raise',x:30,z:30,radius:6,height:2});
@@ -60,9 +60,10 @@ const legacy={...current,edits:current.edits.map(({rupture,...e})=>e)};
 }
 
 for(let x=8;x<=24;x+=.3)assert.equal(terrainHeight(current,x,10),terrainHeight(legacy,x,10),'completed earth is permanently identical to final state');
-assert.equal(terrainFrameKey(current.edits,current.tick+1),terrainFrameKey(current.edits,current.tick+10000));
+// Settled earth stays quiet (no render work) until the chasm begins to close at the end of its lifetime.
+assert.equal(terrainFrameKey(current.edits,current.tick+1),terrainFrameKey(current.edits,current.edits[0].wall.expireTick));assert.notEqual(terrainFrameKey(current.edits,current.tick+1),terrainFrameKey(current.edits,current.edits[0].wall.expireTick+10));
 assert.equal(hasActiveTerrain(current.edits,current.tick+1),false);
-field.setEdits(current.edits,current.tick);field.flush();assert.ok(field.sample(22,10).d<-.5);
+field.setEdits(current.edits,current.tick);field.flush();assert.ok(field.sample(20,10).d<-.5);
 const late=new T.Scene(),lateFX=createSpellPresentation({scene:late,height:()=>0,tickSeconds:1/60});lateFX.sync(current);assert.equal(lateFX.stats().events,0,'completed joins do not replay a rupture');lateFX.dispose();
 // A paused/rewound checkpoint restarts from its saved front, not a stuck clock or full line.
 current=middle;fx.sync(current);fx.update(600,.016);assert.equal(fx.stats().ruptureFronts[0].fraction,sunderFront(rupture,current.tick).fraction);
@@ -77,9 +78,9 @@ assert.ok(maxError<1e-6);geometry.dispose();mesh.material.dispose();
  const templates=new Map([['boulder',{scene:template}],['bank',{scene:template}],['grass_tuft',{scene:template}]]);
  const content=createWorldContent({scene,templates,height:(x,z)=>terrainHeight(current,x,z,false)});
  const blank={...middle,tick:0,edits:[]};current=blank;content.sync(blank);const scatter=scene.children.find(n=>n.isInstancedMesh&&n.count>0);assert.ok(scatter);const matrix=new T.Matrix4();scatter.getMatrixAt(0,matrix);assert.ok(Math.hypot(matrix.elements[12],matrix.elements[14])>1,'fresh empty-edits scatter receives its transforms');
- current={...middle,tick:0,deposits:[{id:'ore',kind:'stone',x:10,z:10,hits:0,maxHits:3,depleted:false}]};content.sync(current);
+ current={...middle,tick:0,deposits:[{id:'ore',kind:'stone',x:13,z:10,hits:0,maxHits:3,depleted:false}]};content.sync(current);
  const target=content.targets().find(x=>x.userData.targetId==='ore');assert.ok(target);const before=target.position.y;
- current={...current,tick:36};content.sync(current);assert.equal(content.targets().find(x=>x.userData.targetId==='ore'),target);assert.ok(target.position.y<before-.5);assert.equal(target.position.y,terrainHeight(current,10,10,false));content.dispose();template.children[0].geometry.dispose();template.children[0].material.dispose();
+ current={...current,tick:36};content.sync(current);assert.equal(content.targets().find(x=>x.userData.targetId==='ore'),target);assert.ok(target.position.y<before-.5);assert.equal(target.position.y,terrainHeight(current,13,10,false));content.dispose();template.children[0].geometry.dispose();template.children[0].material.dispose();
 }
 // Temporal soil changes update bounded patches without rebaking the whole mask.
 const orchardScene=new T.Scene(),sun=new T.DirectionalLight(),ground=new T.Mesh(new T.PlaneGeometry(120,120,2,2),new T.MeshStandardMaterial());orchardScene.add(sun,ground);

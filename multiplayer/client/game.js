@@ -43,6 +43,7 @@ import {createEntView} from './ent-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
 import {createSpellPresentation} from './spell-presentation.js';
 import {createWallPreview} from './crystal-wall-preview.js';
+import {earthLineEdits} from '../shared/earth-spells.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -603,9 +604,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function targetPreview(){
     if(!active||role!=='god'||!cursor.visible)return null;
     const player=snapshot.players.find(p=>p.id===playerId),hit=hitPoint.toArray();
-    let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=3;
+    let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=earthLineEdits();
     if(isLineSpell()){
-      if(castStart&&Math.hypot(castStart.x-hit[0],castStart.z-hit[2])>=.5){start=castStart.toArray();end=point=fitLine(start,hit);lineCount=Math.ceil(Math.hypot(start[0]-end[0],start[2]-end[2])/2.5)+1;}
+      if(castStart&&Math.hypot(castStart.x-hit[0],castStart.z-hit[2])>=.5){start=castStart.toArray();end=point=fitLine(start,hit);lineCount=earthLineEdits(start,end);}
       else {const dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),clamp=v=>THREE.MathUtils.clamp(v,-55,55);
         start=[clamp(point[0]-uz*3),point[1],clamp(point[2]+ux*3)];end=[clamp(point[0]+uz*3),point[1],clamp(point[2]-ux*3)];fallback=true;}
     }
@@ -733,6 +734,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const ear={position:[0,0,0],forward:[0,0,-1],up:[0,1,0]},earVector=new THREE.Vector3(),earQuaternion=new THREE.Quaternion();
   function earXZ(){const p=listenerPose().position;return {x:p[0],z:p[2]};}
   function listenerPose(){camera.getWorldPosition(earVector);earVector.toArray(ear.position);camera.getWorldDirection(earVector);earVector.toArray(ear.forward);earVector.set(0,1,0).applyQuaternion(camera.getWorldQuaternion(earQuaternion)).toArray(ear.up);return ear;}
+  // Raise Wall and Sunder: one rolling groan along the line while the front travels (everyone nearby hears it), and the
+  // casting God feels it roll away: pulses that swell for the rampart, rough and stuttering for the tearing chasm.
+  function earthLineFeel(event){
+    const r=event.rupture,ms=r.durationTicks/.06,mid=[(r.start[0]+r.end[0])/2,event.position?.[1]??0,(r.start[1]+r.end[1])/2];
+    wallAudio?.line?.({kind:event.spell,position:mid,seconds:r.durationTicks/60},listenerPose());
+    if(event.by!==playerId)return;
+    const wall=event.spell==='wall',steps=[];
+    for(let t=0;t<ms;t+=wall?120:70)steps.push({at:t,amplitude:wall?.3+.4*t/ms:.65-.3*t/ms,duration:wall?50:28});
+    steps.push({at:ms+40,amplitude:.8,duration:wall?80:50});
+    if(renderer.xr.isPresenting)feedback.pattern?.(steps);
+    else if(touchEnabled)try{const v=[];let last=0;for(const s of steps){v.push(Math.max(0,Math.round(s.at-last)),s.duration);last=s.at+s.duration;}v[0]=0;navigator.vibrate?.(v.slice(1));}catch{}
+  }
   function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
@@ -770,7 +783,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
-    if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');}
+    if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');if((event.spell==='wall'||event.spell==='sunder')&&event.rupture)earthLineFeel(event);}
     // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
     if(event.kind==='bloom_level'){const at=event.position||[0,0,0];spellVisual.play({spell:'bloom_level',position:at,id:`bloom:${event.level}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift({...event,gift:'bloom_level',position:at},earXZ(),true);if(touchEnabled)try{navigator.vibrate?.([20,40,20,40,40]);}catch{}}
     if(event.kind==='god_gift'||event.kind==='charged_strike'){const boon=event.kind==='charged_strike'?'charged_strike':['charge','swift'].includes(event.gift)?event.gift:event.gift==='blessing'?'blessed':'gift',mine=event.id===playerId||event.by===playerId;

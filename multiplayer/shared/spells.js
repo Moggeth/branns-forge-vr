@@ -1,5 +1,6 @@
 // Shared catalogue: the tray and authoritative cast validation use one vocabulary.
 import {ENT} from './ents.js';
+import {RAISE_WALL,SUNDER} from './terrain.js';
 export const SPELLS = Object.freeze([
   {id:'skeleton',label:'Skeleton',cost:15,target:'point',icon:'☠'},
   {id:'squad',label:'Skeleton Squad',cost:38,target:'point',icon:'☠'},
@@ -7,7 +8,7 @@ export const SPELLS = Object.freeze([
   {id:'raise',label:'Raise Earth',cost:12,target:'point',icon:'▲'},
   {id:'lower',label:'Lower Earth',cost:12,target:'point',icon:'▼'},
   {id:'sunder',label:'Sunder',cost:14,target:'line',icon:'ϟ'},
-  {id:'wall',label:'Stone Wall',cost:14,target:'line',icon:'▰'},
+  {id:'wall',label:'Raise Wall',cost:14,target:'line',icon:'▰'},
   {id:'grove',label:'Grove',cost:10,target:'point',icon:'♣'},
   {id:'ring',label:'Tree Ring',cost:12,target:'point',icon:'◉'},
   {id:'starfall',label:'Starfall',cost:25,target:'point',icon:'☄'},
@@ -48,7 +49,8 @@ export function settleCastPoint(spell, point, {expedition = false} = {}) {
 export const SPELL_TARGET_SHAPES = Object.freeze({
   skeleton: { r: 2 }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 },
   raise: { r: 6, h: 2 }, lower: { r: 6, h: -2 },
-  sunder: { line: true, kr: 2.5, kh: -1.5 }, wall: { line: true, kr: 2.5, kh: 1.5 },
+  // Earth lines: kr is the trench lip / wall foot half-width, kh the full depth/height, bank the chasm's outer spoil edge.
+  sunder: { line: true, kr: SUNDER.width, kh: -SUNDER.depth, bank: SUNDER.bankOut }, wall: { line: true, kr: RAISE_WALL.width, kh: RAISE_WALL.peak },
   grove: { r: 4, trees: Array.from({length:5},(_,i)=>[+(Math.cos(i*Math.PI*2/5)*2.5).toFixed(3),+(Math.sin(i*Math.PI*2/5)*2.5).toFixed(3)]) }, ring: { r: 4.5, treeRing: 4, trees: 8 },
   starfall: { r: 5 }, crystal: { r: 2.6 }, heal: { r: 7 }, lightning: { r: 3 }, frost: { r: 7 },
   spring: { r: 3 }, blessing: { r: 6 }, quake: { r: 8 },
