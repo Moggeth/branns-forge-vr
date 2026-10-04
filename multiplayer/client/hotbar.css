@@ -1,0 +1,119 @@
+/* Brann's Forge — desktop hotbar. Square slots in one iron-and-brass frame: [God/Hero] | weapons 1-8 | Special | Actions.
+   Names live in a tooltip above each slot (the selected weapon's name and use stay in the hint line below the bar).
+   Touch layouts (body.touch-controls-active) keep their own compact HUD from mobile-quiet.css; only the role
+   medallion styling below is shared. */
+:root {
+  --hb-slot: 56px; --hb-gap: 4px;
+  --hb-iron: #241d17; --hb-iron-2: #342920; --hb-brass: #c9a25e; --hb-brass-lo: rgba(201, 162, 94, .32);
+  --hb-gold-hi: #ffd690; --hb-ember: #f08a3c;
+}
+
+/* ---- God / Hero medallion (first slot of both hotbars) ---- */
+.bf-roleswitch {
+  position: relative; flex: none; display: grid; place-items: center; box-sizing: border-box;
+  width: calc(var(--hb-slot) + 6px); height: calc(var(--hb-slot) + 6px); padding: 0; margin: 0 6px 0 2px;
+  border: 0; border-radius: 50%; cursor: pointer; color: #ffe2a8; background: none; pointer-events: auto;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.bf-roleswitch-ring {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; box-sizing: border-box;
+  background: radial-gradient(circle at 50% 38%, #4a3826, #1d150e 70%);
+  border: 2px solid var(--hb-brass);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .55), inset 0 -8px 14px rgba(0, 0, 0, .35), 0 0 0 3px rgba(20, 15, 10, .85), 0 4px 12px rgba(0, 0, 0, .5);
+  transition: border-color .15s, box-shadow .2s, transform .12s;
+}
+.bf-roleswitch svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 0 #000) drop-shadow(0 0 4px rgba(255, 190, 110, .35)); }
+.bf-roleswitch[data-next="hero"] svg { filter: drop-shadow(0 1px 0 #000) drop-shadow(0 0 4px rgba(150, 200, 255, .4)); }
+.bf-roleswitch .bf-name {
+  position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%); z-index: 2;
+  padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  font: 700 10px/1.3 Georgia, serif; letter-spacing: .06em; text-transform: uppercase;
+  color: #2a1b08; background: linear-gradient(180deg, #ffe0a0, #c99a45); box-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+.bf-roleswitch kbd {
+  position: absolute; top: -2px; left: -2px; z-index: 2; padding: 1px 3px; font-size: 9px; line-height: 1;
+  border-radius: 4px; background: rgba(10, 8, 6, .85); color: #f3dfb4; border: 1px solid rgba(231, 194, 122, .4);
+}
+.bf-roleswitch:hover .bf-roleswitch-ring { border-color: var(--hb-gold-hi); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .55), 0 0 0 3px rgba(20, 15, 10, .85), 0 0 14px rgba(255, 190, 100, .55); }
+.bf-roleswitch:active .bf-roleswitch-ring { transform: scale(.95); }
+.bf-roleswitch:focus-visible { outline: none; }
+.bf-roleswitch:focus-visible .bf-roleswitch-ring { box-shadow: 0 0 0 3px #14110e, 0 0 0 5px #ffb35a; }
+body.touch-controls-active .bf-roleswitch { display: none; } /* touch: the ⋯ tray carries Switch to God / Hero */
+.sb-bar > .bf-roleswitch { align-self: center; margin: 0 4px 0 2px; }
+
+/* ---- desktop hero hotbar ---- */
+body:not(.touch-controls-active) .hero-tools {
+  display: grid; justify-content: center; align-items: center; column-gap: 6px; row-gap: 6px;
+  grid-template-columns: auto auto auto; grid-template-areas: "bar special help" "sub sub sub";
+}
+body:not(.touch-controls-active) .hero-tools > .bf-bar {
+  grid-area: bar; display: flex; align-items: center; gap: var(--hb-gap); padding: 4px 5px;
+  border-radius: 14px; background: linear-gradient(180deg, rgba(50, 40, 31, .93), rgba(22, 18, 14, .95));
+  border: 1px solid var(--hb-brass-lo); box-shadow: inset 0 1px 0 rgba(255, 225, 170, .1), 0 4px 14px rgba(0, 0, 0, .45);
+}
+body:not(.touch-controls-active) .hero-tools > .bf-special { grid-area: special; }
+body:not(.touch-controls-active) .hero-tools > .bf-help { grid-area: help; }
+body:not(.touch-controls-active) .hero-tools > .bf-sub { grid-area: sub; justify-content: center; }
+body:not(.touch-controls-active) .hero-tools .bf-equip { display: flex; gap: var(--hb-gap); overflow: visible; padding: 0 0 0 8px; border-left: 1px solid var(--hb-brass-lo); }
+
+body:not(.touch-controls-active) .hero-tools .bf-chip,
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer > summary,
+body:not(.touch-controls-active) .hero-tools > .bf-special {
+  position: relative; box-sizing: border-box; display: grid; place-items: center;
+  width: var(--hb-slot); height: var(--hb-slot); min-width: 0; min-height: 0; padding: 0; gap: 0;
+  border-radius: 10px; outline: none;
+  background: radial-gradient(120% 90% at 50% 20%, rgba(255, 255, 255, .07), transparent 60%), linear-gradient(180deg, var(--hb-iron-2), var(--hb-iron));
+  border: 1px solid rgba(201, 162, 94, .3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5), inset 0 -10px 16px rgba(0, 0, 0, .28);
+  color: #e9d7b0; transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+body:not(.touch-controls-active) .hero-tools .bf-chip svg,
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer > summary svg { width: 28px; height: 28px; filter: drop-shadow(0 1px 0 #000); }
+body:not(.touch-controls-active) .hero-tools .bf-chip:hover,
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer > summary:hover { border-color: var(--hb-brass); }
+body:not(.touch-controls-active) .hero-tools .bf-chip[aria-pressed="true"] {
+  color: #ffe2a8; border-color: var(--hb-gold-hi); outline: none;
+  background: radial-gradient(110% 90% at 50% 25%, rgba(255, 179, 90, .34), transparent 65%), linear-gradient(180deg, #3f2f1f, #22190f);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 144, .55), 0 0 12px rgba(240, 138, 60, .5);
+}
+body:not(.touch-controls-active) .hero-tools .bf-chip[aria-pressed="true"]::after {
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--hb-gold-hi); box-shadow: 0 0 6px #ffb35a;
+}
+body:not(.touch-controls-active) .hero-tools .bf-chip kbd,
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer > summary kbd,
+body:not(.touch-controls-active) .hero-tools > .bf-special kbd {
+  position: absolute; top: 3px; left: 3px; margin: 0; padding: 1px 3px; font-size: 9px; line-height: 1;
+  background: rgba(10, 8, 6, .8); color: #f3dfb4; border: 1px solid rgba(231, 194, 122, .4); border-radius: 4px;
+}
+/* name tooltip above the slot */
+body:not(.touch-controls-active) .hero-tools .bf-chip .bf-name,
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer > summary .bf-name,
+body:not(.touch-controls-active) .hero-tools > .bf-special .bf-name {
+  position: absolute; left: 50%; bottom: calc(100% + 9px); transform: translate(-50%, 4px); z-index: 5;
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none; opacity: 0;
+  font: 600 12px/1.2 system-ui, "Segoe UI", sans-serif; color: #f4e8cc;
+  background: rgba(16, 12, 8, .94); border: 1px solid rgba(231, 194, 122, .45); box-shadow: 0 3px 10px rgba(0, 0, 0, .5);
+  transition: opacity .12s, transform .12s;
+}
+body:not(.touch-controls-active) .hero-tools :is(.bf-chip, .bf-actions-drawer > summary, .bf-special):is(:hover, :focus-visible) .bf-name { opacity: 1; transform: translate(-50%, 0); }
+body:not(.touch-controls-active) .hero-tools .bf-actions-drawer[open] > summary .bf-name { opacity: 0; }
+
+body:not(.touch-controls-active) .hero-tools > .bf-special {
+  color: #fff3dc; border-color: #ffc27a;
+  background: radial-gradient(circle at 50% 35%, #ffb062, var(--hb-ember) 48%, #7a2c0d);
+  box-shadow: inset 0 0 0 1px rgba(60, 20, 0, .5), inset 0 -10px 14px rgba(80, 20, 0, .35), 0 0 12px rgba(240, 138, 60, .45);
+}
+body:not(.touch-controls-active) .hero-tools > .bf-special svg { width: 30px; height: 30px; filter: drop-shadow(0 1px 1px rgba(60, 20, 0, .8)); }
+body:not(.touch-controls-active) .hero-tools > .bf-special:hover { filter: brightness(1.08); }
+body:not(.touch-controls-active) .hero-tools > .bf-help > summary { width: 34px; height: 34px; min-width: 0; min-height: 0; border-radius: 50%; display: grid; place-items: center; padding: 0; }
+
+body:not(.touch-controls-active) .hero-tools .bf-actions { bottom: calc(100% + 8px); top: auto; }
+@media (max-width: 900px) {
+  :root { --hb-slot: 48px; }
+  body:not(.touch-controls-active) .hero-tools .bf-chip svg { width: 24px; height: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf-roleswitch-ring, body:not(.touch-controls-active) .hero-tools .bf-chip { transition: none; }
+}
+/* desktop: the medallion in the hotbar replaces the small top-right switch; touch keeps it in the ⋯ tray */
+body:not(.touch-controls-active) #perspectiveButton { display: none; }

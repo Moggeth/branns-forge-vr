@@ -1,5 +1,5 @@
 // Brann's Forge — physical invention workshop panel. No framework, no deps. Self-contained ip-* classes.
-// Three quiet tabs: Build (catalogue of 12), Stores (inventory, deposit, refine), Built (use/repair/operate).
+// Three quiet tabs: Build (one-screen tile grid of 12), Stores (smelting, inventory, deposit), Built (use/repair/operate).
 // The panel never mutates game state itself: buttons call onAction(action, detail) or onPlace(type);
 // the integrated root owns world placement, aiming and authority.
 
@@ -122,6 +122,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
   mount.append(host);
 
   let model = null, shown = false, returnFocus = null, tab = 'build', scrolls = {}, last = { tabs: '', purse: '', body: '' };
+  let filter = 'all', pick = null, entries = [], lastDetail = '';
   // Freeze rerenders while a pointer is down inside the panel so the pointerup lands on the same node.
   let held = false, pending = false, thawT = 0;
   const freeze = () => { clearTimeout(thawT); held = true; };
@@ -156,63 +157,84 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     return `<button type="button" class="ip-btn ${cls}" data-ip-key="${esc(k)}" ${attrs} aria-disabled="${enabled ? 'false' : 'true'}"${why ? ` aria-describedby="${id}-w-${esc(k)}"` : ''}>${inner}</button>${why}`;
   };
 
-  function buildTab(m, d) {
+  // Build: one screen of icon tiles (no scrolling). A ready tile places on press; hovering, focusing or
+  // pressing any tile fills the details strip below the grid with its purpose, cost and what is missing.
+  function buildEntries(m, d) {
     const recipes = Array.isArray(m.recipes) ? m.recipes : [];
     const byId = new Map(recipes.filter(r => r && has(r.id)).map(r => [key(String(r.id)), r]));
-    const ids = [...STRUCTURES.map(s => s[0]), ...[...byId.keys()].filter(k => !STRUCT[k])];
+    const ids = [...STRUCTURES.map(s => s[0]), ...[...byId.keys()].filter(k => !STRUCT[k])].filter(k => k !== 'forge');
     const built = Array.isArray(m.structures) ? m.structures : [];
-    const jobs = (Array.isArray(m.jobs) ? m.jobs : []).filter(j => j && /build|construct|place/i.test(String(j.kind)));
-    const out = [];
-    if (jobs.length) out.push(`<ul class="ip-jobs" aria-label="Under construction">${jobs.map(j => `<li>${icon(STRUCT[key(j.type ?? j.structureType ?? '')]?.ico || 'hammer')}<span>${esc(j.label || j.name || STRUCT[key(j.type ?? '')]?.name || 'Building')}</span><b>${esc(fmtTime(j.remaining))}</b></li>`).join('')}</ul>`);
-    out.push('<ul class="ip-grid">');
-    for (const sid of ids) {
-      const s = STRUCT[sid] || { id: sid, name: sid, purpose: '', ico: 'scroll' };
-      const r = byId.get(sid);
-      const count = built.filter(b => key(String(b.type)) === sid).length;
-      if (sid === 'forge') {
-        out.push(`<li class="ip-card ip-perm">${icon(s.ico, 'ip-ico ip-big')}<div class="ip-card-main"><h3>${esc(s.name)}</h3><p>${esc(s.purpose)}</p>
-          <p class="ip-tag">${icon('lock')} Permanent${count ? ' · standing' : ''}</p></div></li>`);
-        continue;
-      }
+    return ids.map(sid => {
+      const s = STRUCT[sid] || { id: sid, name: sid, purpose: '', ico: 'scroll' }, r = byId.get(sid);
       const name = r?.name || s.name, desc = r?.description || s.purpose;
-      const rows = r ? costRows(r.cost, r.missing, d) : [];
-      const short = rows.filter(x => x.short > 0);
+      const rows = r ? costRows(r.cost, r.missing, d) : [], short = rows.filter(x => x.short > 0);
       const enabled = !!r && r.enabled !== false && (r.enabled === true || !short.length);
       const reason = !r ? 'Not offered at this workshop yet'
         : enabled ? '' : (has(r.reason) ? r.reason : short.length ? `Missing ${short.map(x => `${x.short} ${RES_NAME[x.k] || x.k}`).join(', ')}` : 'Unavailable right now');
-      const limit = has(r?.limit) ? ` of ${esc(r.limit)}` : '';
-      out.push(`<li class="ip-card${enabled ? ' ip-ready' : ''}">${icon(s.ico, 'ip-ico ip-big')}<div class="ip-card-main">
-        <h3>${esc(name)}${count || limit ? ` <span class="ip-count">${count}${limit} built</span>` : ''}</h3><p>${esc(desc)}</p>
-        ${r ? costHTML(rows, `${name} cost`) : ''}
-        ${btn(`place-${sid}`, `data-ip-place="${esc(sid)}"`, `${icon('hammer')}<span>Place ${esc(name)}</span>`, enabled, reason, 'ip-primary')}</div></li>`);
-    }
-    out.push('</ul>');
+      return { sid, ico: s.ico, name, desc, rows, enabled, reason, count: built.filter(b => key(String(b.type)) === sid).length, limit: r?.limit };
+    });
+  }
+  function buildTab(m, d) {
+    const all = buildEntries(m, d), ready = all.filter(e => e.enabled);
+    if (filter === 'ready' && !ready.length) filter = 'all';
+    const list = filter === 'ready' ? ready : all;
+    entries = all;
+    const jobs = (Array.isArray(m.jobs) ? m.jobs : []).filter(j => j && /build|construct|place/i.test(String(j.kind)));
+    const out = [];
+    if (jobs.length) out.push(`<ul class="ip-jobs" aria-label="Under construction">${jobs.map(j => `<li>${icon(STRUCT[key(j.type ?? j.structureType ?? '')]?.ico || 'hammer')}<span>${esc(j.label || j.name || STRUCT[key(j.type ?? '')]?.name || 'Building')}</span><b>${esc(fmtTime(j.remaining))}</b></li>`).join('')}</ul>`);
+    const chip = (k, label, n) => `<button type="button" class="ip-chip" data-ip-filter="${k}" data-ip-key="filter-${k}" aria-pressed="${filter === k}">${label} <em>${n}</em></button>`;
+    out.push(`<div class="ip-filters" role="group" aria-label="Show builds">${chip('all', 'All', all.length)}${chip('ready', 'Ready', ready.length)}
+      <span class="ip-filters-hint">${ready.length ? 'Press a lit tile to place it' : 'Nothing ready yet: tiles show what each build needs'}</span></div>`);
+    out.push(`<ul class="ip-bgrid" aria-label="Builds">${list.map(e => `<li><button type="button" class="ip-btn ip-tile${e.enabled ? ' ip-ready' : ''}" data-ip-key="place-${esc(e.sid)}" data-ip-place="${esc(e.sid)}" data-ip-pick="${esc(e.sid)}" aria-disabled="${e.enabled ? 'false' : 'true'}" aria-describedby="${id}-detail">
+        ${icon(e.ico, 'ip-ico ip-big')}<span class="ip-tile-name">${esc(e.name)}</span>
+        <span class="ip-tile-cost">${e.rows.map(r => `<span class="${r.short > 0 ? 'ip-short' : ''}">${icon(RES_ICO[r.k] || 'ore', 'ip-ico ip-r-' + r.k)}${r.need}</span>`).join('') || '<span>Free</span>'}</span>
+        ${e.count ? `<span class="ip-tile-n" title="${e.count} built">${e.count}</span>` : ''}</button></li>`).join('')}</ul>`);
+    out.push(`<div class="ip-detail" id="${id}-detail"></div>`);
     return out.join('');
   }
+  function paintDetail() {
+    const el = body.querySelector('.ip-detail'); if (!el || !entries.length) return;
+    const shownIds = new Set([...body.querySelectorAll('[data-ip-pick]')].map(b => b.dataset.ipPick));
+    const e = entries.find(x => x.sid === pick && shownIds.has(x.sid)) || entries.find(x => x.enabled && shownIds.has(x.sid)) || entries.find(x => shownIds.has(x.sid)) || entries[0];
+    for (const b of body.querySelectorAll('[data-ip-pick]')) b.classList.toggle('ip-sel', b.dataset.ipPick === e.sid);
+    const limit = has(e.limit) ? ` of ${esc(e.limit)}` : '';
+    const html = `<span class="ip-detail-ico">${icon(e.ico, 'ip-ico ip-big')}</span>
+      <div class="ip-detail-main"><h3>${esc(e.name)}${e.count || limit ? ` <span class="ip-count">${e.count}${limit} built</span>` : ''}</h3><p>${esc(e.desc)}</p>
+        ${e.rows.length ? `<ul class="ip-dcost" aria-label="${esc(e.name)} cost">${e.rows.map(r => `<li class="${r.short > 0 ? 'ip-short' : ''}">${icon(RES_ICO[r.k] || 'ore', 'ip-ico ip-r-' + r.k)}<b>${r.need}</b> ${esc(RES_NAME[r.k] || r.k)}<small>${r.short > 0 ? `need ${r.short} more` : `have ${r.have}`}</small></li>`).join('')}</ul>` : '<p class="ip-free">No materials needed</p>'}
+        ${e.enabled ? '' : `<p class="ip-dwhy">${esc(e.reason)}</p>`}</div>
+      <button type="button" class="ip-btn ip-primary" data-ip-key="placesel" data-ip-placesel="${esc(e.sid)}" aria-disabled="${e.enabled ? 'false' : 'true'}">${icon('hammer')}<span>Place</span></button>`;
+    if (html !== lastDetail) { el.innerHTML = html; lastDetail = html; }
+  }
+  function pickTile(sid) { if (sid && sid !== pick) { pick = sid; paintDetail(); } }
 
   function storesTab(m, d) {
     const out = [];
+    const oreTotal = ORES.reduce((n, [k]) => n + d.avail(k), 0);
+    const sm = m.smelt && typeof m.smelt === 'object' ? m.smelt : { ore: oreTotal, enabled: oreTotal > 0, reason: 'No ore carried or stored' };
+    const rjobs = (Array.isArray(m.jobs) ? m.jobs : []).filter(j => j && /refin|smelt/i.test(String(j.kind)));
+    const ores = ORES.filter(([k]) => d.avail(k) > 0);
+    out.push(`<section class="ip-smelt" aria-label="Smelting"><div class="ip-smelt-head">${icon('flame', 'ip-ico ip-big')}<div><h3>Smelting</h3>
+      <p>Ore smelts by itself while a hero stands at the Forge. Bars come out in the output bay, one stack per metal.</p></div></div>
+      <div class="ip-orechips">${ores.length ? ores.map(([k, name]) => `<span class="ip-orechip">${icon('ore', 'ip-ico ip-r-' + k)}<b>${d.avail(k)}</b> ${esc(name)}</span>`).join('') : '<span class="ip-empty">No ore carried or stored. Mine ore seams with the pick.</span>'}</div>
+      ${btn('smelt-all', 'data-ip-act="inventionSmeltAll"', `${icon('flame')}<span>Smelt all ore${num(sm.ore) ? ` (${num(sm.ore)})` : ''}</span>`, !!sm.enabled, sm.reason || 'Nothing to smelt', 'ip-primary ip-wide')}`);
+    if (rjobs.length) out.push(`<ul class="ip-sjobs" aria-label="In the furnace">${rjobs.map(j => {
+      const total = Math.max(1 / 60, (num(j.finishTick) - num(j.startedTick)) / 60), pct = Math.round(100 * Math.min(1, Math.max(0, 1 - num(j.remaining) / total)));
+      const into = key(String(j.output ?? '')), n = num(j.amount) || 1;
+      return `<li>${icon(RES_ICO[into] || 'ingot', 'ip-ico ip-r-' + into)}<span>${n} ${esc(RES_NAME[into] || into)}</span><i class="ip-sbar"><i style="width:${pct}%"></i></i><b>${esc(fmtTime(j.remaining))}</b></li>`;
+    }).join('')}</ul>`);
+    const bay = Array.isArray(m.bay) ? m.bay.filter(b => b && num(b.amount) > 0) : [];
+    if (bay.length) out.push(`<div class="ip-bay"><span class="ip-bay-label">Output bay</span>${bay.map(b => `<span class="ip-orechip ip-barchip">${icon(RES_ICO[b.kind] || 'ingot', 'ip-ico ip-r-' + b.kind)}<b>${num(b.amount)}</b> ${esc(RES_NAME[b.kind] || b.kind)} bar${num(b.amount) === 1 ? '' : 's'}</span>`).join('')}
+      ${btn('collect-bars', 'data-ip-act="inventionCollectOutput"', `${icon('chest')}<span>Collect all</span>`, true, '')}</div>`);
+    out.push('</section>');
     const anyCarried = Object.values(d.carried).some(n => n > 0);
     const depEnabled = has(m.canDeposit) ? !!m.canDeposit : anyCarried;
     out.push(`<div class="ip-deposit">${btn('deposit', 'data-ip-act="inventionDeposit"', `${icon('chest')}<span>Deposit everything carried</span>`, depEnabled,
-      m.depositReason || (anyCarried ? 'Storehouse unavailable' : 'You are not carrying anything'), 'ip-primary ip-wide')}</div>`);
+      m.depositReason || (anyCarried ? 'Storehouse unavailable' : 'You are not carrying anything'), 'ip-wide')}</div>`);
     out.push(`<table class="ip-inv"><caption class="ip-sr">Materials</caption><thead><tr><th scope="col">Material</th><th scope="col">Carried</th><th scope="col">Stored</th></tr></thead><tbody>`);
     for (const [k, name, purpose, ico] of RESOURCES) {
       out.push(`<tr><th scope="row">${icon(ico, 'ip-ico ip-r-' + k)}<span><b>${name}</b><small>${purpose}</small></span></th><td>${num(d.carried[k])}</td><td>${num(d.stored[k])}</td></tr>`);
     }
     out.push('</tbody></table>');
-    const refine = m.refine && typeof m.refine === 'object' ? m.refine : {};
-    const rjobs = (Array.isArray(m.jobs) ? m.jobs : []).filter(j => j && /refin|smelt/i.test(String(j.kind)));
-    out.push(`<h3 class="ip-h3">${icon('flame')} Refine at the forge</h3><ul class="ip-refine">`);
-    for (const [k, name, into, hint] of ORES) {
-      const have = d.avail(k), r = refine[k] || {}, job = rjobs.find(j => key(String(j.ore ?? j.resource ?? j.input ?? '')) === k);
-      const enabled = has(r.enabled) ? !!r.enabled : have >= 1;
-      const reason = r.reason || (have < 1 ? `No ${name.toLowerCase()} carried or stored` : 'Forge busy');
-      out.push(`<li class="ip-ore">${icon('ore', 'ip-ico ip-r-' + k)}<div class="ip-ore-main"><b>${name}</b>
-        <small>${num(d.carried[k])} carried + ${num(d.stored[k])} stored${job ? ` · refining ${esc(fmtTime(job.remaining))}` : ''}</small><small>${hint}${has(r.yield) ? ` (×${esc(r.yield)})` : ''}</small></div>
-        ${btn(`refine-${k}`, `data-ip-act="inventionRefine" data-ip-kind="${k}"`, `${icon(RES_ICO[into])}<span>Refine 1</span>`, enabled, reason)}</li>`);
-    }
-    out.push('</ul>');
     const craft = Array.isArray(m.craft) ? m.craft : [];
     if (craft.length) {
       out.push(`<h3 class="ip-h3">${icon('flame')} Craft at the forge</h3><ul class="ip-refine">`);
@@ -293,8 +315,9 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     if (purseHTML !== last.purse) { purseEl.innerHTML = purseHTML; last.purse = purseHTML; }
     body.setAttribute('aria-labelledby', `${id}-tab-${tab}`);
     if (bodyHTML !== last.body) {
-      const st = body.scrollTop; body.innerHTML = bodyHTML; last.body = bodyHTML; body.scrollTop = st;
+      const st = body.scrollTop; body.innerHTML = bodyHTML; last.body = bodyHTML; body.scrollTop = st; lastDetail = '';
     }
+    if (tab === 'build') paintDetail();
     if (focusKey && document.activeElement !== ae) {
       const el = panel.querySelector(`[data-ip-key="${CSS.escape(focusKey)}"]`);
       (el || body).focus({ preventScroll: true });
@@ -315,15 +338,19 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     const t = e.target;
     if (t.closest('[data-ip-close]')) { e.preventDefault(); close(); return; }
     const tb = t.closest('[data-ip-tab]'); if (tb) { setTab(tb.dataset.ipTab, true); return; }
+    const fb = t.closest('[data-ip-filter]'); if (fb) { filter = fb.dataset.ipFilter; last.body = ''; render(); return; }
     const b = t.closest('button.ip-btn'); if (!b) return;
+    if (b.dataset.ipPick) pickTile(b.dataset.ipPick);
     if (b.getAttribute('aria-disabled') === 'true') { nudge(b); return; }
     const ds = b.dataset;
+    if (ds.ipPlacesel) { onPlace(ds.ipPlacesel); return; }
     if (ds.ipPlace) { onPlace(ds.ipPlace); return; }
     if (ds.ipOperate) { onPlace(`operate:${ds.ipOperate}`); return; }
     if (ds.ipTurn) { onAction('inventionTurn', { structureId: realId(ds.ipTurn) }); return; }
     if (ds.ipUse) { onAction('inventionUse', { structureId: realId(ds.ipUse) }); return; }
     if (ds.ipRepair) { onAction('inventionRepair', { structureId: realId(ds.ipRepair) }); return; }
     if (ds.ipAct === 'inventionDeposit') { onAction('inventionDeposit', {}); return; }
+    if (ds.ipAct === 'inventionSmeltAll' || ds.ipAct === 'inventionCollectOutput') { onAction(ds.ipAct, {}); return; }
     if (ds.ipAct === 'inventionRefine') { onAction('inventionRefine', { kind: ds.ipKind, amount: 1 }); return; }
     if (ds.ipAct === 'inventionCraft') { onAction('inventionCraft', { recipe: ds.ipRecipe }); return; }
     if (has(ds.ipLegacy)) { const a = model?.legacyActions?.[+ds.ipLegacy]; if (a) onAction(a.action, legacyDetail(a)); }
@@ -354,7 +381,10 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
       e.stopPropagation(); // keep game hotkeys out while the workshop has focus
     }
   }
+  const onHover = e => pickTile(e.target.closest?.('[data-ip-pick]')?.dataset.ipPick);
   host.addEventListener('click', onClick);
+  host.addEventListener('pointerover', onHover);
+  host.addEventListener('focusin', onHover);
   document.addEventListener('keydown', onKey, true);
 
   function show(next) {
@@ -374,7 +404,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
   function close() { hide(); onClose(); }
   function dispose() {
     hide(); host.removeEventListener('pointerdown', freeze); window.removeEventListener('pointerup', releaseSoon); window.removeEventListener('pointercancel', thaw);
-    host.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey, true); host.remove(); model = null;
+    host.removeEventListener('click', onClick); host.removeEventListener('pointerover', onHover); host.removeEventListener('focusin', onHover); document.removeEventListener('keydown', onKey, true); host.remove(); model = null;
   }
   return { show, update, hide, dispose, visible: () => shown, get isOpen() { return shown; }, setTab: k => setTab(k, false) };
 }
