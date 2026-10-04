@@ -1,4 +1,5 @@
 import {createStoneFoundation,disposeStoneFoundationArt} from './foundation-art.js';
+import {buildHeartstone,animateHeartstone,disposeHeartstoneArt} from './heartstone-art.js';
 // Procedural invention art for Brann's Forge. +Y up, -Z forward, metres, base at y=0.
 // Only dependency: three. Materials and geometries are shared across every model.
 import * as THREE from 'three';
@@ -305,19 +306,8 @@ const BUILDERS = {
     P.trigger = part(root, 'crystal', 'crystal', [0.12, 0.08, 0.12], [0, 0.16, 0]);
   },
 
-  influence(root, P) {
-    part(root, 'cyl6', 'stoneDark', [2.4, 0.2, 2.4], [0, 0.1, 0]);
-    part(root, 'cyl6', 'stone', [1.8, 0.2, 1.8], [0, 0.3, 0]);
-    part(root, 'box', 'stone', [0.7, 2.4, 0.7], [0, 1.6, 0], [0, Math.PI / 4, 0]);
-    part(root, 'cone', 'stone', [1.0, 0.5, 1.0], [0, 3.05, 0], [0, Math.PI / 4, 0]);
-    for (const y of [0.9, 2.1]) part(root, 'box', 'brass', [0.74, 0.08, 0.74], [0, y, 0], [0, Math.PI / 4, 0]);
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      part(root, 'crystal', 'crystal', [0.12, 0.3, 0.12], [Math.cos(a) * 0.36, 1.5, Math.sin(a) * 0.36]);
-      part(root, 'box', 'stoneDark', [0.25, 0.4, 0.25], [Math.cos(a) * 1.05, 0.45, Math.sin(a) * 1.05]);
-    }
-    P.crystal = part(root, 'crystal', 'crystal', [0.4, 0.75, 0.4], [0, 3.7, 0]);
-  },
+  // Heartstone: a living geode heart (client/heartstone-art.js); shared/heartstone.js has its rules.
+  influence(root, P) { Object.assign(P, buildHeartstone(root)); },
 
   forgeRefinery(root, P) {
     // stone furnace chamber
@@ -510,8 +500,7 @@ export function animateInventionModel(root, o = {}) {
       break;
     }
     case 'influence':
-      P.crystal.rotation.y = time * 0.5;
-      P.crystal.position.y = 3.7 + Math.sin(time) * 0.1;
+      animateHeartstone(P, {time, bloom: o.bloom ?? 0, damage, active, mending: !!o.mending});
       break;
     case 'forgeRefinery':
       M.ember.emissiveIntensity = active ? 1.2 + 0.6 * pulse : 0.2;
@@ -570,6 +559,7 @@ export function countInventionMeshes(root) {
 
 export function disposeInventionArt() {
   disposeStoneFoundationArt();
+  disposeHeartstoneArt();
   if (G) for (const g of Object.values(G)) g.dispose();
   if (M) for (const m of Object.values(M)) m.dispose();
   G = null;

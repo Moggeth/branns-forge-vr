@@ -913,6 +913,7 @@ try {
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
+    onNotice: text => toast(text),
     onStatus: status => { rendererStatus = String(status); if(/^World renderer ready/.test(rendererStatus))rendererReady=true; if(/capture.*(blocked|failed)|requires a gesture|could not load|unavailable|preparation failed/i.test(rendererStatus))toast(rendererStatus); },
     onXRChange: value => { closeQuickBuild();restoreFieldLock=false;holdOverlays?.close();xrActive = value; if (!value) game?.setExpedition(null); body.classList.toggle('xr',value); syncActive(); },
     onMenu: openMenu,

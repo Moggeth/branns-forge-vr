@@ -1,7 +1,6 @@
 import {battleAction,createBattle,stepBattle,restoreBattle,battleActive,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 export {MAX_PLAYERS} from './multiplayer-limits.js';
-import {createTestingSupplies} from './testing-supplies.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
@@ -15,6 +14,10 @@ import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire
 import {worldTrees, initialDeposits, renewGeology} from './world-content.js';
 import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint} from './spells.js';
 import {BLOOM,bloomLevel,addBloom,stepBloom,restoreBloom} from './bloom.js';
+import {strikeWaygate,stepWaygate,restoreWaygate} from './waygate.js';
+import {strikeGeode,stepGeodes,restoreGeodes} from './geode-outcrop.js';
+import {strikeBeacon,stepBeacon,beaconHearth,restoreBeacon} from './watch-beacon.js';
+import {stepHeartstones} from './heartstone.js';
 import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
@@ -93,7 +96,7 @@ function damageHero(state, hero, amount, events) {
     events.push(event('death', hero.position, hero.id));
     releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero);
     const rally=state.inventions?.structures.find(b=>b.id===hero.rally&&b.type==='sanctuary'&&b.hp>0&&b.side===(hero.side||'party'));
-    hero.hp = 100; hero.position = rally?[rally.position[0]+2.4,terrainHeight(state,rally.position[0]+2.4,rally.position[2]),rally.position[2]]:spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];hero.velocity=[0,0,0]; hero.protectedUntil=state.tick+180;
+    hero.hp = 100; hero.position = rally?[rally.position[0]+2.4,terrainHeight(state,rally.position[0]+2.4,rally.position[2]),rally.position[2]]:beaconHearth(state,terrainHeight)||spawn(state, hero.id); hero.vy = 0; hero.move = [0, 0];hero.velocity=[0,0,0]; hero.protectedUntil=state.tick+180;
     events.push({...event('respawn',hero.position,hero.id),protectedUntil:hero.protectedUntil});
   }
 }
@@ -101,7 +104,6 @@ function damageHero(state, hero, amount, events) {
 function newState({room = 'LOCAL', seed = 41} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
   return {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-21,z:11,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:22,z:18,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:24,z:20,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
-    ...createTestingSupplies(STRUCTURES.timberline.cost,baseHeight),
     {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
@@ -249,6 +251,13 @@ function instantiate(state) {
         const targetOK = q => { const dx=q.x-p.position[0], dz=q.z-p.position[2], d=Math.hypot(dx,dz); return d<=3.2 && (d<.5 || (facing[0]*dx+facing[1]*dz)/d>=.45) && Math.abs((q.y ?? terrainHeight(state,q.x,q.z))-p.position[1])<=3; };
         const events = [];
         const makePickup = (kind,x,z,amount) => { if (state.pickups.length < 256) { const idNew=nextId(state,'p'); state.pickups.push({id:idNew,kind,x,z,y:terrainHeight(state,x,z),amount}); return idNew; } return null; };
+        const sanctuary = supplied ? strikeWaygate(state, p, message, events) : null;
+        if (sanctuary) return ok(sanctuary);
+        const geode = supplied ? strikeGeode(state, p, message, events, {terrainHeight, addPickup}) : null;
+        if (geode === 'world_limit') return fail('world_limit');
+        if (geode) return ok(geode);
+        const beacon = supplied ? strikeBeacon(state, p, message, events) : null;
+        if (beacon) return ok(beacon);
         const tree = worldTrees(state).find(t => t.id === message.targetId);
         const ore = state.deposits.find(d => d.id === message.targetId);
         if (supplied && tree) {
@@ -379,7 +388,7 @@ function instantiate(state) {
         const speed=Math.hypot(vx,vz);if(speed>5){vx*=5/speed;vz*=5/speed;}
         p.velocity=p.role==='hero'?[vx,p.vy,vz]:[0,0,0];
       }
-      stepBoons(state); stepBloom(state, events); stepRain(state, events);
+      stepBoons(state); stepBloom(state, events); stepRain(state, events); stepWaygate(state, {terrainHeight}, events); stepGeodes(state, events); stepBeacon(state, events);
       for (const pending of [...state.pendingStarfalls]) {
         if (pending.impactTick > state.tick) continue;
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
@@ -415,7 +424,7 @@ function instantiate(state) {
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.24,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTerrainBoundary(position,radius);return position;}
       },events,adventureEvents);
-      stepInventions(state,inventionContext,events);
+      stepInventions(state,inventionContext,events);stepHeartstones(state);
       const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
       if (expedition.intents.length) applyAdventureIntents(state, expedition.intents, adventureContext);
       events.push(...expedition.events);
@@ -429,7 +438,7 @@ function instantiate(state) {
         players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands}) =>
           ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
-        edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.weather?{weather:state.weather}:{}),
+        edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
         awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
@@ -566,6 +575,7 @@ export function loadSimulation(saved) {
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
   if(saved.landmarks!==undefined&&typeof saved.landmarks!=='boolean')throw Error('Invalid landmark version');
   state.landmarks=saved.landmarks===true;
+  const waygate=restoreWaygate(saved);if(waygate)state.waygate=waygate;const geodes=restoreGeodes(saved);if(geodes)state.geodes=geodes;const beacon=restoreBeacon(saved);if(beacon)state.beacon=beacon;
   state.shrine = copy(saved.shrine); // Includes break/restore timer.
   return instantiate(state);
 }

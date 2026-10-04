@@ -1,4 +1,5 @@
-// Temporary playtest gift, represented by ordinary saved pickups: no respawn timer or per-join grant.
+// Retired playtest gift (one Timberline's worth of materials by the forge). New worlds no longer get it; worlds saved
+// while it existed keep their pile, which still collects as one bundle. Represented by ordinary saved pickups.
 export const GIFT_POSITION=Object.freeze([-1.2,6.2]);
 export const GIFT_IDS=Object.freeze(['timberlineGift_wood','timberlineGift_iron','timberlineGift_mithril']);
 export const isTestingGift=q=>GIFT_IDS.includes(typeof q==='string'?q:q?.id);

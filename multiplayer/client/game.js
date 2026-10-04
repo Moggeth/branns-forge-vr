@@ -13,6 +13,10 @@ import {nearestCollectible} from '../shared/collection-target.js';
 import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} from '../shared/trees.js';
 import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
 import {createStartingWorld} from './starting-world.js';
+import {installHeartstoneKit} from './heartstone-art.js';
+import {createWaygateView} from './waygate-view.js';
+import {createGeodeView} from './geode-view.js';
+import {createBeaconView} from './beacon-view.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
@@ -96,7 +100,7 @@ import {worldTrees} from '../shared/world-content.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, onNotice = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
   let requestedActive=false;
@@ -230,6 +234,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Haptics only for local contacts/releases/damage, on the hand that actually holds the weapon (by handedness).
   let weaponHand = null;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
+  const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
+  const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
+  const beaconView=createBeaconView({scene,startingWorld,audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
@@ -570,6 +577,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
+  loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built landmarks and Heartstone shells; the code-built ones stand in until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Landmark models are incomplete; the simpler versions stay in place.');return;}
+    installHeartstoneKit(gltf);
+    gltf.scene.traverse(o=>o.geometry?.dispose()); // the world keeps copies of the geometry and the materials themselves
+  },undefined,()=>report('Landmark models unavailable; the simpler versions stay in place.'));
   loader.load('/assets/waist_pouch.glb',gltf=>{if(disposed){disposeResources(gltf.scene);return;}waistPouch=gltf.scene;waistPouch.visible=false;rig.add(waistPouch);},undefined,()=>report('Pouch visual unavailable; collection remains available.'));
   loader.load('/assets/hero.glb', async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
@@ -811,6 +824,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
     if(event.kind==='respawn'&&event.id===playerId){clearInput();localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
+    if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
+    waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);
     feedback.handleEvent(event);
     combat.handleEvent(event);
     golemFx.handleEvent(event);
@@ -879,7 +894,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function surfaceVisible(object){for(let n=object;n;n=n.parent)if(!n.visible||n.userData.ignoreContact)return false;return true;}
   // Every FPS/VR/projectile/physical-melee ray resolves content hits here: instanced trees have no per-tree node, and their
   // face normals need the instance matrix, so tree ids and world normals come from content.resolveTarget.
-  function resolveHit(h){const t=content.resolveTarget?.(h);if(t?.id)return {targetId:t.id,point:t.point,normal:t.normal||[0,1,0]};let n=h.object;while(n&&!n.userData.targetId)n=n.parent;
+  function resolveHit(h){const t=content.resolveTarget?.(h);if(t?.id)return {targetId:t.id,point:t.point,normal:t.normal||[0,1,0]};const faceTarget=h.object.userData.faceTarget?.(h.faceIndex);if(faceTarget)return {targetId:faceTarget,point:h.point.toArray(),normal:(h.face?.normal.clone().transformDirection(h.object.matrixWorld)||new THREE.Vector3(0,1,0)).toArray()};let n=h.object;while(n&&!n.userData.targetId)n=n.parent;
     return n?{targetId:n.userData.targetId,point:h.point.toArray(),normal:(h.face?.normal.clone().transformDirection(h.object.matrixWorld)||new THREE.Vector3(0,1,0)).toArray()}:null;}
   function hitNormal(h){const t=h.object.userData.treeBatch?content.resolveTarget?.(h):null;return t?.normal?new THREE.Vector3(...t.normal):h.face?.normal.clone().transformDirection(h.object.matrixWorld)||new THREE.Vector3(0,1,0);}
   function worldContact(from,to){
@@ -1211,6 +1226,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(startup.ready)frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
     previous = now; renderTick=presentationClock.sample(now);
+    if(startingWorld.group.visible){waygateView.update(snapshot,dt);geodeView.update(snapshot,dt);beaconView.update(snapshot,dt);}
     if (active && !renderer.xr.isPresenting) {
       lookBy(touchAxes.right.x * dt * 2.1, touchAxes.right.y * dt * 1.6);
     }
@@ -1507,6 +1523,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
       heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
