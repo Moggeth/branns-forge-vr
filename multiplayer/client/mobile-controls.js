@@ -13,7 +13,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     if(msg.id==='bandage')game.useResource('wood');
     if(msg.id==='drop')game.release(false);
   }});
-  direct.setQuick([{id:'bandage',icon:'âœš',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'â™œ',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'â†“',label:'Drop held item gently'}]);
+  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'}]);
   document.querySelector('.menu-card').insertBefore(ui.settings, document.getElementById('leave'));
   const coarse = matchMedia('(any-pointer: coarse)'), app = matchMedia('(display-mode: standalone)');
   let state = {active:false, role:'hero', xr:false}, mode = read('mode','auto'), sensitivity = Number(read('sensitivity','1')) || 1;

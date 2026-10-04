@@ -1,10 +1,10 @@
-// Brann's Forge â€” mobile touch HUD (view layer only).
+// Brann's Forge — mobile touch HUD (view layer only).
 // Builds DOM; owns no input handling, timers or animation frames.
 // Codex owns pointer identity/capture, gameplay mapping, Fullscreen API and cleanup.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// Original 24Ã—24 stroke icons; currentColor so CSS controls tint.
+// Original 24×24 stroke icons; currentColor so CSS controls tint.
 const ICONS = {
   strike: '<path d="M19.5 4.5l-.7 3.4-8.4 8.4-2.7-2.7 8.4-8.4z"/><path d="M6.2 12.4l5.4 5.4M4.5 19.5l3.2-3.2"/>',
   jump: '<path d="M12 15V5"/><path d="M7.5 9.5L12 5l4.5 4.5"/><path d="M5 19c2.2-1.6 4.5-2.4 7-2.4s4.8.8 7 2.4"/>',
@@ -97,7 +97,7 @@ function buildSettings() {
   }, [icon('fullscreen'), el('span', { class: 'mui-btn-label', text: 'Full screen' })]);
   const fsNote = el('p', { class: 'hint mui-fs-note', hidden: true });
 
-  const sensOut = el('output', { class: 'mui-sens-value', for: 'touchSensitivity', text: '1.0Ã—' });
+  const sensOut = el('output', { class: 'mui-sens-value', for: 'touchSensitivity', text: '1.0×' });
 
   const section = el('section', { id: 'touchSettings', class: 'menu-section mui-settings', 'aria-labelledby': 'touchSettingsTitle' }, [
     el('h3', { id: 'touchSettingsTitle', text: 'Display & controls' }),
@@ -125,43 +125,43 @@ function buildSettings() {
     el('details', { class: 'mui-guide' }, [
       el('summary', { text: 'Controls guide' }),
       el('div', { class: 'mui-guide-body' }, [
-        guideBlock('Hero Â· touch', [
+        guideBlock('Hero · touch', [
           ['Left stick', 'Move'],
           ['Right stick', 'Look (or drag the world)'],
           ['Tap the world', 'Collect loose loot; tap an enemy to swing. Trees need the axe; ore and golem remains need the pick.'],
           ['Attack', 'Tap to swing; hold to draw Emberwing or breathe Wyrmspout fire'],
-          ['â˜… Special', 'Weapon special; reachable while holding Attack'],
+          ['★ Special', 'Weapon special; reachable while holding Attack'],
           ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
-          ['Actions â‹¯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
+          ['Actions ⋯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
           ['Collect / Eat', 'Pick up nearby loot or heal with an apple'],
           ['Bridge', 'Spend 3 wood to build ahead'],
           ['Jump', 'Jump'],
         ]),
-        guideBlock('God Â· touch', [
+        guideBlock('God · touch', [
           ['Left stick', 'Pan'],
           ['Right stick', 'Orbit and tilt'],
-          ['ï¼‹ / âˆ’ or pinch', 'Zoom'],
+          ['＋ / − or pinch', 'Zoom'],
           ['Tap the world', 'Quick cast: cast immediately. Otherwise set the aim, then press Cast.'],
           ['Sunder / Wall', 'Drag a line (or tap its two ends). Quick cast fires on release; otherwise press Cast.'],
           ['Cancel', 'Clear the aim or a started line; return to centre aim'],
           ['Spell drawer', 'Choose one of fourteen spells'],
           ['Centre', 'Centre on your hero'],
         ]),
-        guideBlock('Hero Â· desktop', [
+        guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1â€“8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
+          ['1–8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),
-        guideBlock('God Â· desktop', [
+        guideBlock('God · desktop', [
           ['WASD', 'Pan'],
           ['Right-drag', 'Orbit and tilt'],
           ['Wheel', 'Zoom'],
-          ['1â€“9, 0, âˆ’, =, backtick, T', 'Choose spell (quick-cast toggle available)'],
+          ['1–9, 0, −, =, backtick, T', 'Choose spell (quick-cast toggle available)'],
           ['Click', 'Cast'],
         ]),
-        guideBlock('Hero Â· VR', [
+        guideBlock('Hero · VR', [
           ['Left stick', 'Move'],
           ['Swing melee weapon', 'Tip collision strikes the target'],
           ['Right trigger', 'Shoot crossbow; hold bow arrow, physically draw, release; throw a held bone'], ['Left trigger while bow drawn', 'Lock initial direction; move bow to set curve'], ['Trigger with melee weapon', 'Weapon special'],
@@ -236,7 +236,7 @@ export function createMobileUI({ mount = true } = {}) {
   const utilBar = root.querySelector('.mui-util-bar');
   const settings = buildSettings();
   const sens = settings.querySelector('#touchSensitivity');
-  const onSens = () => { settings._sensOut.textContent = `${Number(sens.value).toFixed(1)}Ã—`; };
+  const onSens = () => { settings._sensOut.textContent = `${Number(sens.value).toFixed(1)}×`; };
   sens.addEventListener('input', onSens); // display-only echo of the slider value
 
   if (mount) {
@@ -250,7 +250,8 @@ export function createMobileUI({ mount = true } = {}) {
     if (!mount || fullscreenSurface.hidden) return;
     const dialog = [...document.querySelectorAll('[role=dialog][aria-modal=true]')].filter(el => el.getClientRects().length).at(-1);
     // Workshop/field-guide headers remain visible while their bodies scroll.
-    const parent = dialog?.querySelector('.menu-head, .ip-head, .fo-head') || dialog || document.body;
+    const room = document.body.dataset.phase === 'game' && !document.body.classList.contains('quick-build-open') ? document.querySelector('#hud .hud-room') : null;
+    const parent = dialog?.querySelector('.menu-head, .ip-head, .fo-head') || dialog || room || document.body;
     if (fullscreenSurface.parentElement !== parent) parent.append(fullscreenSurface);
   }
   // Field-guide updates replace their header. Reattach our owned surface without
@@ -273,7 +274,7 @@ export function createMobileUI({ mount = true } = {}) {
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
     const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',flask:'Pour',limb:'Swing'})[state.tool]||'Attack';
-    if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' â€” hold for bow or stream');
+    if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
     cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';
     cast.setAttribute('aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');

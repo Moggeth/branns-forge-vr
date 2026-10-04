@@ -27,4 +27,5 @@ body.touch-fullscreen-surface .pn-backdrop {
 /* Animated workshop/guide panels own the containing block. Keep their action in
    the persistent header instead of fixing it over the close button. */
 .ip-head > .mui-fullscreen-surface,
-.fo-head > .mui-fullscreen-surface { position: static; flex: none; }
+.fo-head > .mui-fullscreen-surface,
+.hud-room > .mui-fullscreen-surface { position: static; flex: none; }

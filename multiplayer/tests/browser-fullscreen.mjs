@@ -12,9 +12,10 @@ async function surface(name) {
     await Promise.all(animations.map(a=>a.finished.catch(()=>{})));
   });
   const result = await fs().evaluate(el => {
+    const dialog=el.closest('[role=dialog]');
     const r=el.getBoundingClientRect(), hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-    const other=[...document.querySelectorAll('.mui-util, .hud-self, .xhud, .mui-stick, #resumePlay, #leave, .mc-tabs, .ip-x, .fo-close')]
-      .filter(e=>e!==el&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden')
+    const other=[...document.querySelectorAll('.mui-util, .hud-self, .xhud, .mui-stick, #resumePlay, #leave, #menuButton, #quickBuildButton, .mc-tabs, .ip-x, .fo-close')]
+      .filter(e=>(!dialog||dialog.contains(e))&&e!==el&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden')
       .filter(e=>{const b=e.getBoundingClientRect();return b.width&&b.height&&r.left<b.right&&r.right>b.left&&r.top<b.bottom&&r.bottom>b.top;})
       .map(e=>e.className||e.id);
     return {width:r.width,height:r.height,x:r.x,y:r.y,right:r.right,bottom:r.bottom,viewport:[innerWidth,innerHeight],hit:hit===el||el.contains(hit),other};
@@ -118,7 +119,12 @@ try {
   await page.locator('[data-mc-tab=controls]').tap();
   await page.locator('#touchMode').selectOption('off');
   await surface('touch-sticks-off');
+  await page.locator('#resumePlay').tap();
+  for(const size of [{width:390,height:844},{width:844,height:390}]) {await page.setViewportSize(size);await surface('touch-sticks-off-game-'+size.width);}
+  await page.locator('#menuButton').tap();
+  await page.locator('[data-mc-tab=controls]').tap();
   await page.locator('#touchMode').selectOption('auto');
+  await page.setViewportSize({width:390,height:844});
   await page.locator('#touchLeftHanded').check();
   await page.locator('#resumePlay').tap();
   await surface('left-handed');

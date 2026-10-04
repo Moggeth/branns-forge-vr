@@ -8,7 +8,8 @@ The existing Full screen button is now permanently in the touch HUD utility area
 including when the tools tray is closed. Portrait layouts use a two-column utility
 grid to keep its 44 x 44 CSS pixel target clear of vitals, quests, Build, camera
 controls and sticks. It retains the existing icon and gains a visible text label.
-It remains available on touch devices even if touch sticks are disabled.
+It remains available on touch devices even if touch sticks are disabled, using a
+slot in the regular HUD rather than covering its controls.
 
 When gameplay input is paused, the same button moves to a safe-area-aware surface
 above the menu/lobby. The menu and patch-notes dialog reserve this row. In dialogs
@@ -70,7 +71,7 @@ using document.exitFullscreen. No browser security/permission settings were chan
 
 ## Verification notes
 
-- Final focused browser pass: 70 checks passed in 15.785s; native
+- Final focused browser pass: 72 checks passed in 15.671s; native
   Escape remains explicitly unverified. [Machine-readable results](screenshots/touch-fullscreen/results.json).
 
 - Production build and build:check pass (existing large-bundle warning remains).

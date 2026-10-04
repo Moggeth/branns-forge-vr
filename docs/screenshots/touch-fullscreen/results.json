@@ -1,16 +1,16 @@
 {
   "harness": "fullscreen",
-  "monotonicMs": 15785,
+  "monotonicMs": 15671.2,
   "results": [
     {
       "id": "loaded",
       "status": "pass",
-      "atMs": 1197.3
+      "atMs": 1194.8
     },
     {
       "id": "harness-ready",
       "status": "pass",
-      "atMs": 2754.8
+      "atMs": 2756.4
     },
     {
       "width": 44,
@@ -27,7 +27,7 @@
       "other": [],
       "id": "patch-notes",
       "status": "pass",
-      "atMs": 3315
+      "atMs": 3303.3
     },
     {
       "width": 44,
@@ -44,27 +44,27 @@
       "other": [],
       "id": "lobby",
       "status": "pass",
-      "atMs": 3360.5
+      "atMs": 3351.1
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 3409.6
+      "atMs": 3401.3
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 3417.8
+      "atMs": 3409.3
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 5742.6
+      "atMs": 5753.5
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 5752.4
+      "atMs": 5767.2
     },
     {
       "width": 44,
@@ -81,7 +81,7 @@
       "other": [],
       "id": "hero-320x640",
       "status": "pass",
-      "atMs": 5818.4
+      "atMs": 5825.4
     },
     {
       "width": 44,
@@ -98,7 +98,7 @@
       "other": [],
       "id": "hero-tools-320",
       "status": "pass",
-      "atMs": 5869.4
+      "atMs": 5873.1
     },
     {
       "width": 44,
@@ -115,7 +115,7 @@
       "other": [],
       "id": "hero-390x844",
       "status": "pass",
-      "atMs": 5925.2
+      "atMs": 5933.9
     },
     {
       "width": 44,
@@ -132,7 +132,7 @@
       "other": [],
       "id": "hero-tools-390",
       "status": "pass",
-      "atMs": 6030.5
+      "atMs": 6043.1
     },
     {
       "width": 44,
@@ -149,7 +149,7 @@
       "other": [],
       "id": "hero-640x360",
       "status": "pass",
-      "atMs": 6442.6
+      "atMs": 6458
     },
     {
       "width": 44,
@@ -166,7 +166,7 @@
       "other": [],
       "id": "hero-tools-640",
       "status": "pass",
-      "atMs": 6492
+      "atMs": 6501.4
     },
     {
       "width": 44,
@@ -183,7 +183,7 @@
       "other": [],
       "id": "hero-844x390",
       "status": "pass",
-      "atMs": 6841.4
+      "atMs": 6865.6
     },
     {
       "width": 44,
@@ -200,7 +200,7 @@
       "other": [],
       "id": "hero-tools-844",
       "status": "pass",
-      "atMs": 6952.4
+      "atMs": 6975.1
     },
     {
       "width": 44,
@@ -217,7 +217,7 @@
       "other": [],
       "id": "hero-1024x768",
       "status": "pass",
-      "atMs": 7017.6
+      "atMs": 7035.8
     },
     {
       "width": 44,
@@ -234,7 +234,7 @@
       "other": [],
       "id": "hero-tools-1024",
       "status": "pass",
-      "atMs": 7052.6
+      "atMs": 7075.5
     },
     {
       "width": 44,
@@ -251,7 +251,7 @@
       "other": [],
       "id": "god-320x640",
       "status": "pass",
-      "atMs": 7315.9
+      "atMs": 7326
     },
     {
       "width": 44,
@@ -268,7 +268,7 @@
       "other": [],
       "id": "god-tools-320",
       "status": "pass",
-      "atMs": 7361.2
+      "atMs": 7376
     },
     {
       "width": 44,
@@ -285,7 +285,7 @@
       "other": [],
       "id": "god-390x844",
       "status": "pass",
-      "atMs": 7425.5
+      "atMs": 7439.4
     },
     {
       "width": 44,
@@ -302,7 +302,7 @@
       "other": [],
       "id": "god-tools-390",
       "status": "pass",
-      "atMs": 7536.3
+      "atMs": 7556.4
     },
     {
       "width": 44,
@@ -319,7 +319,7 @@
       "other": [],
       "id": "god-640x360",
       "status": "pass",
-      "atMs": 7593.3
+      "atMs": 7608
     },
     {
       "width": 44,
@@ -336,7 +336,7 @@
       "other": [],
       "id": "god-tools-640",
       "status": "pass",
-      "atMs": 7637
+      "atMs": 7643.4
     },
     {
       "width": 44,
@@ -353,7 +353,7 @@
       "other": [],
       "id": "god-844x390",
       "status": "pass",
-      "atMs": 7691.4
+      "atMs": 7698.9
     },
     {
       "width": 44,
@@ -370,7 +370,7 @@
       "other": [],
       "id": "god-tools-844",
       "status": "pass",
-      "atMs": 7803.8
+      "atMs": 7810.9
     },
     {
       "width": 44,
@@ -387,7 +387,7 @@
       "other": [],
       "id": "god-1024x768",
       "status": "pass",
-      "atMs": 7862.1
+      "atMs": 7867.3
     },
     {
       "width": 44,
@@ -404,7 +404,7 @@
       "other": [],
       "id": "god-tools-1024",
       "status": "pass",
-      "atMs": 7903.7
+      "atMs": 7910
     },
     {
       "width": 44,
@@ -421,7 +421,7 @@
       "other": [],
       "id": "menu-play",
       "status": "pass",
-      "atMs": 8250.3
+      "atMs": 8257.5
     },
     {
       "width": 44,
@@ -438,7 +438,7 @@
       "other": [],
       "id": "menu-controls",
       "status": "pass",
-      "atMs": 8294
+      "atMs": 8300.6
     },
     {
       "width": 44,
@@ -455,7 +455,7 @@
       "other": [],
       "id": "menu-world",
       "status": "pass",
-      "atMs": 8344.5
+      "atMs": 8350.3
     },
     {
       "width": 44,
@@ -472,7 +472,7 @@
       "other": [],
       "id": "menu-supplies",
       "status": "pass",
-      "atMs": 8393.4
+      "atMs": 8391.3
     },
     {
       "width": 44,
@@ -489,17 +489,17 @@
       "other": [],
       "id": "menu-landscape",
       "status": "pass",
-      "atMs": 8486.7
+      "atMs": 8476.1
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 8566.6
+      "atMs": 8539.5
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 8583.2
+      "atMs": 8551.7
     },
     {
       "width": 44,
@@ -516,7 +516,7 @@
       "other": [],
       "id": "resumed",
       "status": "pass",
-      "atMs": 8636.8
+      "atMs": 8606.3
     },
     {
       "width": 44,
@@ -533,7 +533,7 @@
       "other": [],
       "id": "quick-build-390",
       "status": "pass",
-      "atMs": 8701
+      "atMs": 8665.4
     },
     {
       "width": 44,
@@ -550,7 +550,7 @@
       "other": [],
       "id": "forge-390",
       "status": "pass",
-      "atMs": 9094.2
+      "atMs": 9033.6
     },
     {
       "width": 44,
@@ -567,7 +567,7 @@
       "other": [],
       "id": "field-guide-390",
       "status": "pass",
-      "atMs": 9409.9
+      "atMs": 9307.6
     },
     {
       "width": 44,
@@ -584,7 +584,7 @@
       "other": [],
       "id": "quick-build-844",
       "status": "pass",
-      "atMs": 9526.5
+      "atMs": 9423.8
     },
     {
       "width": 44,
@@ -601,7 +601,7 @@
       "other": [],
       "id": "forge-844",
       "status": "pass",
-      "atMs": 9903
+      "atMs": 9800.1
     },
     {
       "width": 44,
@@ -618,23 +618,23 @@
       "other": [],
       "id": "field-guide-844",
       "status": "pass",
-      "atMs": 10184.5
+      "atMs": 10075
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 10278.4
+      "atMs": 10161.1
     },
     {
       "reason": "Playwright key injection did not exit browser fullscreen; physical OS input is not available here.",
       "id": "native-escape",
       "status": "unverified",
-      "atMs": 11798.7
+      "atMs": 11672.5
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 11808.8
+      "atMs": 11681.9
     },
     {
       "width": 44,
@@ -651,12 +651,12 @@
       "other": [],
       "id": "simulated-safe-area",
       "status": "pass",
-      "atMs": 11826.3
+      "atMs": 11698.1
     },
     {
       "id": "resume-does-not-request",
       "status": "pass",
-      "atMs": 11908.2
+      "atMs": 11782.5
     },
     {
       "width": 44,
@@ -673,17 +673,17 @@
       "other": [],
       "id": "denied-still-reachable",
       "status": "pass",
-      "atMs": 11959.4
+      "atMs": 11834.4
     },
     {
       "id": "denial-truthful",
       "status": "pass",
-      "atMs": 12033.4
+      "atMs": 11916.7
     },
     {
       "id": "unsupported-label",
       "status": "pass",
-      "atMs": 12035.5
+      "atMs": 11918.4
     },
     {
       "width": 44,
@@ -700,27 +700,27 @@
       "other": [],
       "id": "unsupported-still-reachable",
       "status": "pass",
-      "atMs": 12084.3
+      "atMs": 11975
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 12194.4
+      "atMs": 12093.2
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 12208.7
+      "atMs": 12109.4
     },
     {
       "id": "keyboard-entry",
       "status": "pass",
-      "atMs": 12229.2
+      "atMs": 12127.4
     },
     {
       "id": "one-tap-button-exit",
       "status": "pass",
-      "atMs": 12269.3
+      "atMs": 12167.4
     },
     {
       "width": 44,
@@ -737,7 +737,41 @@
       "other": [],
       "id": "touch-sticks-off",
       "status": "pass",
-      "atMs": 12583.7
+      "atMs": 12482.7
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 336,
+      "y": 164.390625,
+      "right": 380,
+      "bottom": 208.390625,
+      "viewport": [
+        390,
+        844
+      ],
+      "hit": true,
+      "other": [],
+      "id": "touch-sticks-off-game-390",
+      "status": "pass",
+      "atMs": 12531.7
+    },
+    {
+      "width": 44,
+      "height": 44,
+      "x": 595.78125,
+      "y": 118.390625,
+      "right": 639.78125,
+      "bottom": 162.390625,
+      "viewport": [
+        844,
+        390
+      ],
+      "hit": true,
+      "other": [],
+      "id": "touch-sticks-off-game-844",
+      "status": "pass",
+      "atMs": 12568.2
     },
     {
       "width": 44,
@@ -754,7 +788,7 @@
       "other": [],
       "id": "left-handed",
       "status": "pass",
-      "atMs": 12682.4
+      "atMs": 12752.9
     },
     {
       "width": 44,
@@ -771,73 +805,73 @@
       "other": [],
       "id": "standalone",
       "status": "pass",
-      "atMs": 12693.4
+      "atMs": 12768.4
     },
     {
       "id": "standalone-is-not-fullscreen",
       "status": "pass",
-      "atMs": 12694.2
+      "atMs": 12772.4
     },
     {
       "id": "real-fullscreen-entered",
       "status": "pass",
-      "atMs": 12736
+      "atMs": 12811
     },
     {
       "id": "external-exit-state",
       "status": "pass",
-      "atMs": 12745.4
+      "atMs": 12828.1
     },
     {
       "id": "no-double-request",
       "status": "pass",
-      "atMs": 12748
+      "atMs": 12830.8
     },
     {
       "id": "void-return-no-double-request",
       "status": "pass",
-      "atMs": 12784.7
+      "atMs": 12868.3
     },
     {
       "id": "void-return-does-not-fake-state",
       "status": "pass",
-      "atMs": 12785.8
+      "atMs": 12869.6
     },
     {
       "id": "legacy-request-once",
       "status": "pass",
-      "atMs": 12826.5
+      "atMs": 12909
     },
     {
       "id": "legacy-waits-for-real-state",
       "status": "pass",
-      "atMs": 12827.6
+      "atMs": 12910.2
     },
     {
       "id": "legacy-change-state",
       "status": "pass",
-      "atMs": 12832.9
+      "atMs": 12915.6
     },
     {
       "id": "legacy-exit-state",
       "status": "pass",
-      "atMs": 12869.4
+      "atMs": 12951.7
     },
     {
       "id": "legacy-error-message",
       "status": "pass",
-      "atMs": 12875.1
+      "atMs": 12957.3
     },
     {
       "errors": [],
       "id": "no-page-errors",
       "status": "pass",
-      "atMs": 12875.2
+      "atMs": 12957.3
     },
     {
       "id": "desktop-no-touch-fullscreen",
       "status": "pass",
-      "atMs": 15396.1
+      "atMs": 15621.3
     }
   ]
 }
