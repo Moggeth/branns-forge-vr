@@ -57,6 +57,17 @@ const started = performance.now();
   assert.ok(glb.length < 600_000, 'small download');
 }
 
+// --- presentation: the rope from the nozzle holds together on slow frames (phones, software rendering)
+for (const dt of [1 / 60, 1 / 30, .1]) {
+  const scene = new THREE.Scene(); let t = 0;
+  const view = createWyrmspoutStream({scene, height: () => -1.7, now: () => t});
+  const camera = new THREE.PerspectiveCamera(70, 16 / 9, .05, 180); camera.updateMatrixWorld();
+  const muzzle = new THREE.Vector3(.22, -.17, -.8), dir = new THREE.Vector3(0, 0, -40).sub(muzzle).normalize().toArray();
+  for (let f = 0; f < Math.round(.6 / dt); f++) { t += dt; view.emitLocal('p:me', muzzle.clone(), dir, sprayTuning({}), dt); view.update(dt, camera); }
+  assert.equal(view.stats().ribbons, 1, `rope visible at ${Math.round(1 / dt)} fps`);
+  view.dispose();
+}
+
 // --- presentation: the stream stays inside its fixed budgets under a long burst, remote globs and many hits
 {
   const scene = new THREE.Scene(); let t = 0;

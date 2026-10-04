@@ -349,7 +349,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
     }
     splatMesh.count = sc; splatMesh.instanceMatrix.needsUpdate = true; splatData.needsUpdate = true; splatMesh.visible = sc > 0;
     licks.count = lickCount; licks.instanceMatrix.needsUpdate = true; lickData.needsUpdate = true; licks.visible = lickCount > 0;
-    updateRibbons(camera, time);
+    updateRibbons(camera, time, dt);
     for (const [key, s] of streams) {
       if (!s.local && (s.quietFor += dt) > .35) s.firing = false;   // remote: no new glob for a while means they let go
       if (s.firing) s.idle = 0; else if ((s.idle = (s.idle || 0) + dt) > 2) streams.delete(key);
@@ -358,7 +358,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
 
   // The rope: from the nozzle through the stream's youngest drops, until the first one that has broken away.
   const chain = [], _sm = Array.from({length: 128}, () => new THREE.Vector3());
-  function updateRibbons(camera, time) {
+  function updateRibbons(camera, time, dt) {
     const camPos = camera ? camera.getWorldPosition(_c) : _c.set(0, 2, 5);
     let r = 0, verts = 0;
     for (const [key, s] of streams) {
@@ -368,7 +368,10 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
       const list = pool.filter(d => d.live && d.stream === key && d.rope && d.delay <= 0 && d.age < RIBBON_AGE).sort((a, b) => b.order - a.order);
       for (const d of list) {
         const last = chain[chain.length - 1];
-        if (last && last.p.distanceToSquared(d.p) > .55 * .55) break;
+        // A gap means the stream broke (let go, or a wall); allow for how far a drop travels in one frame so a
+        // slow phone frame does not snap the rope.
+        const gap = Math.max(.55, d.v.length() * dt * 1.4);
+        if (last && last.p.distanceToSquared(d.p) > gap * gap) break;
         chain.push({p: d.p, age: d.age});
         if (chain.length >= STREAM_CAPS.ribbonPoints) break;
       }
