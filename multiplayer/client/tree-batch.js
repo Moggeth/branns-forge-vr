@@ -11,7 +11,11 @@ export function createTreeBatches({group, minCapacity = 64, decorate = null}) {
  const batches = new Map(), where = new Map(); let writes = 0, moves = 0;
  const keyOf = (variant, level) => variant + ':' + level;
  function makeMeshes(b, capacity) {
-  return b.parts.map(p => { const im = new T.InstancedMesh(p.geometry, p.material, capacity); im.instanceMatrix.setUsage(T.DynamicDrawUsage); im.count = 0; decorate?.(im);
+  return b.parts.map(p => { const im = new T.InstancedMesh(p.geometry, p.material, capacity); im.instanceMatrix.setUsage(T.DynamicDrawUsage);
+   // Initial buffer creation uploads everything but Three does not clear its
+   // update ranges then. Acknowledge them only once an upload really happened.
+   im.instanceMatrix.onUpload(function () { this.clearUpdateRanges(); });
+   im.count = 0; decorate?.(im);
    im.name = `TreeBatch:${b.key}:${p.part}`; im.matrixAutoUpdate = false; im.userData.treeBatch = b; im.userData.part = p.part; group.add(im); return im; });
  }
  function batch(variant, level, kit) {
@@ -44,7 +48,14 @@ export function createTreeBatches({group, minCapacity = 64, decorate = null}) {
   write(w.batch, w.slot, root, local); w.batch.bounds = true;
  }
  function flush() { // one contiguous update range per batch (bounded upload); lazily recomputed bounds for culling/raycast
-  for (const b of batches.values()) { if (b.dirtyMax >= b.dirtyMin) { for (const im of b.meshes) { const a = im.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(b.dirtyMin*16, (b.dirtyMax - b.dirtyMin + 1)*16); a.needsUpdate = true; } b.dirtyMin = Infinity; b.dirtyMax = -1; }
+  for (const b of batches.values()) { if (b.dirtyMax >= b.dirtyMin) { for (const im of b.meshes) {
+    const a = im.instanceMatrix; let start = b.dirtyMin*16, end = (b.dirtyMax + 1)*16;
+    // Snapshot sync, growth and LOD can all flush before a render (or while a
+    // batch is culled). Preserve every pending swap; otherwise GPU trees stay
+    // at old positions while CPU raycasts already target their replacements.
+    for (const r of a.updateRanges) { start = Math.min(start, r.start); end = Math.max(end, r.start + r.count); }
+    a.clearUpdateRanges(); a.addUpdateRange(start, end - start); a.needsUpdate = true;
+   } b.dirtyMin = Infinity; b.dirtyMax = -1; }
    if (b.bounds) { for (const im of b.meshes) im.boundingSphere = null; b.bounds = false; } }
  }
  /** Logical tree id for an InstancedMesh raycast hit, or null. */

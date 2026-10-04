@@ -2,6 +2,8 @@
 
 # Brann's Forge - current browser game
 
+Tree chopping fix: [standing ghost tree diagnosis and regression](docs/TREE-GHOST-FIX-20261004.md).
+
 Combined PR review: [landmarks, earth presentation, apples and Siegebird](docs/MERGE-REVIEW-20261004.md).
 
 **Start here:** [Claude takeover handoff](docs/CLAUDE-HANDOFF-20261003.md).
