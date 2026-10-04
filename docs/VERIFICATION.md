@@ -2279,3 +2279,30 @@ while only the spatial graph is audible. The real browser output test caught thi
 The first touch UI run targeted the desktop menu button; corrected to the existing
 touch menu. Visual QA then caught compact-menu clipping; scoped voice controls
 styles fix it without changing shared touch/fullscreen files.
+
+
+### Voice retry acceptance audit follow-up - 2026-10-04
+
+The independent audit reproduced a flaky acceptance assertion, not an established
+runtime fault: Retry could satisfy the other browser's old connected peer before
+the new session arrived, and then assume 700ms was enough for replacement audio.
+Only test fixtures/helpers, the CI list and documentation changed in this follow-up.
+
+Acceptance now records both endpoints before Retry, requires the remote to observe
+the new session, checks matching fresh negotiation IDs with both peers connected,
+and polls measured audio until the unchanged RMS threshold (>0.001) is met within
+8s. The negotiation deadline remains 20s. Measurements are checked against the same
+connection both before and after sampling. Both offerer and answerer retries run
+every time. Failure injection cannot accidentally close a newly negotiating peer.
+
+Deterministic regression uses the same helpers with delayed session propagation,
+both-end connection readiness and delayed audio. It rejects stale connected peers,
+continued silence and samples crossing another connection replacement. Added to CI.
+Six consecutive actual three-client Chromium synthetic-audio runs all passed, each
+covering both retry roles (12 successful retry/recovery cases) plus failed-connection
+recovery and the original spatial/privacy/lifecycle checks. The six runs took
+14.968s, 15.229s, 14.948s, 14.848s, 14.623s, 14.761s.
+Artifacts: logs/voice-recovery-final-{1..6}/voice-results.json and
+logs/voice-recovery-repeat-summary.json. No real microphone was accessed.
+Aggregate Windows checks: 125/126 pass in 67.8s; the sole failure is the unchanged
+historical CRLF patch-notes check documented above. No unrelated fix was added.

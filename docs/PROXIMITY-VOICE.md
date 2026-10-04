@@ -99,6 +99,16 @@ are not established by same-machine tests.
   guest-to-guest RTP and measured stereo output, movement/head turning, attenuation,
   hard range cutoff, mute/deafen, permission denial, track release, failed connection
   recovery, retry and participant departure. No call can reach a physical microphone.
+- Retry verification requires the remote member to observe the new voice session,
+  both endpoints to connect with the same fresh negotiation ID, and audible samples
+  from that connection within an 8-second deadline. Every run retries both the
+  lower-ID offerer and higher-ID answerer. The 20-second negotiation deadline and
+  original RMS threshold are retained; a fixed 700ms delay is no longer used as
+  evidence of recovery. The failed-connection test uses the same replacement check.
+- `node tests/voice-recovery.mjs`: deterministic delayed-session/connection/audio
+  timelines for both retry roles. It rejects an old connected peer, continued
+  silence, and samples from a connection replaced during measurement. These checks
+  exercise the same waiting helpers as the real-browser test and run in CI.
 - `node tests/browser-voice-game.mjs`: actual Hero desktop + God phone-sized touch UI,
   explicit join/microphone buttons, denial/retry, touch camera orbit and God focus,
   quick mute, deafen, leave, and console checks. Uses a synthetic microphone API mock.

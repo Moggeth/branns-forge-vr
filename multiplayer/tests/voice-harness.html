@@ -19,6 +19,10 @@ window.makeVoice = (url,options) => {
   c.connect(options);
 };
 document.querySelector('#listen').onclick=()=>v.join();document.querySelector('#mic').onclick=()=>v.enableMicrophone();
+window.voiceConnectionSnapshot=()=>{
+  const [remoteId,member]=[...v.members][0]||[],peer=v.peers.get(remoteId);
+  return {id:c.peerId,session:v.session,remoteId,remoteSession:member?.session,negotiation:peer?.negotiation,connectionState:peer?.pc.connectionState};
+};
 window.meter = async () => {
   const ctx=v.audio.context, split=ctx.createChannelSplitter(2), analysers=[ctx.createAnalyser(),ctx.createAnalyser()];
   v.audio.output.connect(split);analysers.forEach((a,i)=>{a.fftSize=2048;split.connect(a,i);});
