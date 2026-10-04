@@ -91,6 +91,61 @@ export function footCycle(p, out = {fwd: 0, lift: 0, toe: 0, stance: true}) {
 }
 const fc = {fwd: 0, lift: 0, toe: 0, stance: true}, fcO = {fwd: 0, lift: 0, toe: 0, stance: true};
 
+// ---- per-skeleton gait: no two warband members walk alike, and a column of them never falls into step.
+const h01 = (seed, n) => { let h = Math.imul(seed ^ Math.imul(n + 7, 0x9e3779b1), 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+const range = (seed, n, a, b) => a + (b - a) * h01(seed, n);
+// kind: warband archetype index (shared/skeleton-kinds.js). Old Bones (3) mostly limp; Rustguard (1) marches.
+export function gaitProfile(seed, kind = 0) {
+  const limping = h01(seed, 9) < (kind === 3 ? .7 : .14);
+  return {
+    phase0: h01(seed, 1),                         // where in its stride it starts
+    stride: range(seed, 2, .88, 1.13),            // step length (and so cadence at the same speed)
+    drift: range(seed, 3, .025, .06),             // slow stride wander: identical walkers still drift apart
+    armSwing: range(seed, 4, .55, 1.45) * (kind === 1 ? .7 : 1),
+    bob: range(seed, 5, .6, 1.6), sway: range(seed, 6, .5, 1.6), lift: range(seed, 7, .8, 1.35) * (kind === 1 ? 1.15 : 1),
+    lean: range(seed, 8, -.03, .1) + (kind === 3 ? .08 : 0), nod: range(seed, 10, .4, 1.6), swagger: range(seed, 11, .5, 1.6),
+    toeOut: range(seed, 12, -.04, .16), elbow: range(seed, 13, .75, 1.35), headCock: range(seed, 14, -.12, .12),
+    limp: limping ? range(seed, 15, .3, .65) : 0, limpSide: h01(seed, 16) < .5 ? -1 : 1,
+  };
+}
+
+// ---- idle fidgets: every few seconds an idle skeleton does something small and odd, now and then something odder.
+const FIDGETS = {
+  yawn: 2.4, scratch: 2.6, look: 3, rattle: 1.4, knock: 2.4, jawdrop: 2.6, neck: 1.8, stretch: 2.6, fingers: 2.4, spin: 2.2,
+};
+// Weights per archetype (shared/skeleton-kinds.js order): personality in what they fidget with.
+const FIDGET_WEIGHTS = [
+  {yawn: 2, scratch: 3, look: 3, rattle: 1, knock: 1, jawdrop: 1, neck: 2, stretch: 2, fingers: 2},            // Mossward: scratches its moss
+  {yawn: 1, scratch: 1, look: 3, rattle: 1, knock: 4, jawdrop: 1, neck: 3, stretch: 2, fingers: 1},            // Rustguard: drums on its shield
+  {yawn: 1, scratch: 1, look: 4, rattle: 2, knock: 1, jawdrop: 1, neck: 2, stretch: 1, fingers: 3},            // Thornhood: watchful, picks at its claws
+  {yawn: 3, scratch: 2, look: 1, rattle: 3, knock: 1, jawdrop: 4, neck: 3, stretch: 1, fingers: 1},            // Old Bones: falls apart a little
+  {yawn: 2, scratch: 1, look: 3, rattle: 1, knock: 1, jawdrop: 1, neck: 1, stretch: 4, fingers: 2},            // Bloomcaller: stretches in the sun
+  {yawn: 1, scratch: 4, look: 3, rattle: 1, knock: 2, jawdrop: 1, neck: 3, stretch: 1, fingers: 1},            // Antlerbound: scratches round its antlers
+];
+function pickFidget(seed, n, kind) {
+  if (h01(seed, 500 + n) < .06) return 'spin';                               // rare: the skull turns all the way round
+  const w = FIDGET_WEIGHTS[kind] || FIDGET_WEIGHTS[0], total = Object.values(w).reduce((a, b) => a + b, 0);
+  let r = h01(seed, 600 + n) * total;
+  for (const [k, v] of Object.entries(w)) if ((r -= v) < 0) return k;
+  return 'look';
+}
+// Studios: start a named fidget now (st from enemyMotionState).
+export function forceFidget(st, type, t) { if (!FIDGETS[type]) return false; st.fidget = {n: (st.fidget?.n || 0) + 1, type, start: t, next: t + 99, w: 1}; return true; }
+export const FIDGET_NAMES = Object.keys(FIDGETS);
+const bell = (u, a, b) => smooth((u - a) / .14) * (1 - smooth((u - b) / .16));
+// Advance the fidget clock; returns {type, u, w} or null. idle: 0..1 how idle the skeleton is now.
+function fidgetFor(st, t, idle, seed, kind) {
+  const f = st.fidget ||= {n: 0, type: null, start: 0, next: t + range(seed, 700, 2, 7), w: 0};
+  if (f.type) {
+    const u = (t - f.start) / FIDGETS[f.type];
+    if (u >= 1 || u < 0) { f.type = null; f.next = t + range(seed, 800 + f.n, 4, 11); }
+  }
+  if (!f.type && t >= f.next && idle > .9) { f.type = pickFidget(seed, f.n++, kind); f.start = t; }
+  if (!f.type) { if (t >= f.next) f.next = t + 1.5; return null; }
+  f.w = idle; // any call to action (a Hero steps up, a hit) drops the fidget at once
+  return {type: f.type, u: (t - f.start) / FIDGETS[f.type], w: idle};
+}
+
 // env: {sig, attack, recoilValue, missing, t, dt, teleport, aR, aU, aF, rootQ, rootPos, height, guard, walk, phase, traits}
 export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   const N = st.nodes, {sig, attack, missing, t, aR, aU, aF, walk: w} = env, tr = env.traits;
@@ -102,34 +157,40 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   const fwdBy = {}; for (const leg of st.legs) { footCycle(phase + (leg.side > 0 ? 0 : .5), fc); fwdBy[leg.side] = fc.fwd * w; }
   const fwdR = fwdBy[1] || 0, fwdL = fwdBy[-1] || 0;
   const style = tr.gaitStyle || 0; // 0 brisk .. 1 shambling
+  const P = st.gaitP ||= gaitProfile(tr.seed || 0, env.kind || 0);
+  // Limp: the bad leg's stance dips the pelvis toward it.
+  let dip = 0;
+  if (P.limp) { footCycle(phase + (P.limpSide > 0 ? 0 : .5), fcO); dip = fcO.stance ? 1 - fcO.fwd * fcO.fwd : 0; }
+  const fl = env.flinch >= 0 ? env.flinch : -1, flinch = fl >= 0 ? smooth(fl / .1) * (1 - smooth((fl - .35) / .65)) : 0;
 
   // ---- pelvis (rig Root joint): drop, bob, sway, roll, yaw
   if (N.root) {
-    const bob = .028 * sc * w * (.5 + .5 * Math.cos(phase * TAU * 2)) * (1 + style * .4);
-    const drop = Math.min(sig.drop * legLen, legLen * .88) + bob + (coil * .03 + strike * .05 + g * .03) * sc;
-    _v.copy(aU).multiplyScalar(-drop).addScaledVector(aR, sig.sideShift + Math.sin(phase * TAU) * .022 * sc * w).addScaledVector(aF, sig.lunge + strike * .06 * sc);
+    const bob = .028 * sc * w * (.5 + .5 * Math.cos(phase * TAU * 2)) * (1 + style * .4) * P.bob;
+    const drop = Math.min(sig.drop * legLen, legLen * .88) + bob + (coil * .03 + strike * .05 + g * .03) * sc + P.limp * .05 * sc * w * dip + flinch * .05 * sc;
+    _v.copy(aU).multiplyScalar(-drop).addScaledVector(aR, sig.sideShift + Math.sin(phase * TAU) * .022 * sc * w * P.sway).addScaledVector(aF, sig.lunge + strike * .06 * sc - flinch * .09 * sc);
     offsetWorld(N.root.node, _v);
-    turn(N.root, 1, .1 * (fwdR - fwdL) * .5 * (1 - g * .5));
-    turn(N.root, 2, -.045 * Math.sin(phase * TAU) * w + sig.bodyRoll);
+    turn(N.root, 1, .1 * (fwdR - fwdL) * .5 * (1 - g * .5) * P.swagger);
+    turn(N.root, 2, -.045 * Math.sin(phase * TAU) * w * P.sway + sig.bodyRoll + P.limpSide * P.limp * .09 * dip * w);
     if (legsGone) turn(N.root, 0, -.5);
   }
   // ---- spine
   if (N.torso) {
-    const lean = sig.torsoPitch + .07 * w + style * .12 * w + g * .12 + strike * .1;
+    const lean = sig.torsoPitch + .07 * w + style * .12 * w + P.lean * w + g * .12 + strike * .1 - flinch * .42;
     turn(N.torso, 0, -lean);
     turn(N.torso, 1, sig.torsoYaw - .07 * (fwdR - fwdL) * .5 + (N.armR ? N.armR.side : -1) * (.38 * coil - .42 * strike));
     turn(N.torso, 2, -sig.torsoRoll + .03 * Math.sin(phase * TAU) * w);
   }
   // ---- head and jaw: the head stays level against the stride, looks about at idle, tucks behind a raised shield
   if (N.head && !missing.head) {
-    turn(N.head, 1, sig.headYaw + .06 * (fwdR - fwdL) * .5);
-    turn(N.head, 0, sig.headPitch * -1 + .05 * w + g * .14 - coil * .08 + strike * .06 + Math.cos(phase * TAU * 2) * .025 * w);
-    turn(N.head, 2, -sig.headRoll);
+    const sh = N.armL ? N.armL.side : 1, look = fl >= 0 ? smooth((fl - .25) / .2) * (1 - smooth((fl - .75) / .25)) : 0;
+    turn(N.head, 1, sig.headYaw + .06 * (fwdR - fwdL) * .5 + sh * (.25 * flinch + .75 * look));   // looks to the empty shield hand
+    turn(N.head, 0, sig.headPitch * -1 + .05 * w + g * .14 - coil * .08 + strike * .06 + Math.cos(phase * TAU * 2) * .025 * w * P.nod - flinch * .35 + look * .3);
+    turn(N.head, 2, -sig.headRoll + P.headCock * (1 - w * .5));
   }
   if (N.jaw && !missing.head) {
     const chatter = Math.max(0, Math.sin(t * 1.3 + tr.breathPhase) - .82) / .18;
     const clack = chatter * (.5 + .5 * Math.sin(t * 34)) * .16;
-    const gape = coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU);
+    const gape = coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU) + flinch * .55;
     turn(N.jaw, 0, -(gape + clack));
   }
   // ---- arms
@@ -137,10 +198,11 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   const shield = N.armL, claw = N.armR;
   if (shield && !missing.leftArm) {
     const s = shield.side;
-    const relaxed = .06 + .12 * swing(s) + Math.sin(t * tr.breathHz * TAU) * .015;
-    turn(shield, 0, mix(relaxed + sig.armSwingL, .62, g));
-    turn(shield, 2, s * mix(.1 + .03 * w, -.38, g));
-    turn(N.foreL, 0, mix(.32 + .08 * w, 1.25, g));
+    const relaxed = .06 + .12 * swing(s) * P.armSwing + Math.sin(t * tr.breathHz * TAU) * .015;
+    turn(shield, 0, mix(relaxed + sig.armSwingL, .62, g) - flinch * .75);                      // flinch: arm flung back where the shield burst
+    turn(shield, 2, s * (mix(.1 + .03 * w, -.38, g) + flinch * .55));
+    turn(N.foreL, 0, mix((.32 + .08 * w) * P.elbow, 1.25, g) + flinch * .3);
+    if (flinch > 0) turn(N.handL, 2, Math.sin(t * 31) * .5 * flinch * (1 - fl));               // shaking the sting out
     turn(N.handL, 0, .05 * (1 - g));
     // Guard: the arm brings the shield across the chest; the wrist squares it to the front, upright, top tipped back.
     if (g > .001 && N.handL) {
@@ -154,9 +216,9 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   }
   if (claw && !missing.rightArm) {
     const s = claw.side, ready = g * (1 - Math.max(coil, strike));
-    turn(claw, 0, .04 + .38 * swing(s) + sig.armSwingR + sig.armR * .6 + ready * .45);
-    turn(claw, 2, s * (.08 + ready * .12));
-    turn(N.foreR, 0, .28 + .18 * Math.max(0, swing(s)) * w + ready * .9);
+    turn(claw, 0, .04 + .38 * swing(s) * P.armSwing + sig.armSwingR + sig.armR * .6 + ready * .45 + flinch * .5);
+    turn(claw, 2, s * (.08 + ready * .12 + flinch * .45));
+    turn(N.foreR, 0, (.28 + .18 * Math.max(0, swing(s)) * w) * P.elbow + ready * .9);
     // Claw swipe: cock the arm high and back beside the skull, then rake down and across the front.
     const k = coil + strike;
     if (k > 1e-3) {
@@ -170,6 +232,11 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     }
     turn(N.handR, 0, -.35 * coil + .4 * strike);
   }
+  // Idle fidgets (presentation only; any reason to act cancels them at once).
+  const idleNow = (1 - w) * (1 - g) * (1 - Math.min(1, (coil + strike) * 4)) * (1 - Math.min(1, Math.abs(env.recoilValue) * 3)) * (fl >= 0 ? 0 : 1) * (legsGone || missing.head ? 0 : 1);
+  st.idleW = (st.idleW ?? idleNow) + (idleNow - (st.idleW ?? idleNow)) * (idleNow < (st.idleW ?? 0) ? 1 : 1 - Math.exp(-(env.dt || 1 / 60) / .4));
+  const fid = env.teleport ? null : fidgetFor(st, t, st.idleW, (tr.seed || 0) ^ 0x5f3759df, env.kind || 0);
+  if (fid) fidget(st, N, fid, env, missing);
   // Legless: haul the body along on the arms.
   if (legsGone) {
     const pull = Math.sin(phase * TAU * 2);
@@ -181,7 +248,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
 // Foot targets: stride-locked gait while walking, planted feet with little re-squaring steps at idle.
 export function placeFeet(st, env) {
   const {aR, aF, rootPos, height, dt, teleport, walk: w, phase} = env;
-  const sc = st.legScale || 1, span = (st.legLenRest || .78) * SKELETON_STRIDE * SKELETON_STANCE * .5;
+  const P = st.gaitP, sc = st.legScale || 1, span = (st.legLenRest || .78) * SKELETON_STRIDE * SKELETON_STANCE * .5 * (P?.stride || 1);
   const groundY = rootPos.y;
   let stepping = st.legs.some(l => l.step);
   for (const leg of st.legs) {
@@ -204,7 +271,7 @@ export function placeFeet(st, env) {
       if (s.u >= 1) { leg.lock.set(s.tx, 0, s.tz); leg.step = null; }
     }
     const tx = mix(ix, gwx, smooth(w)), tz = mix(iz, gwz, smooth(w));
-    const lift = mix(ilift, fc.lift * .11 * sc, smooth(w));
+    const lift = mix(ilift, fc.lift * .11 * sc * (P?.lift || 1) * (P?.limp && leg.side === P.limpSide ? 1 - .6 * P.limp : 1), smooth(w));
     leg.toe = mix(itoe, fc.toe, smooth(w));
     const gy = height ? height(tx, tz) : NaN, legLen = leg.a + leg.b;
     const ground = Number.isFinite(gy) && Math.abs(gy - groundY) < .4 * legLen ? gy : groundY;
@@ -214,9 +281,87 @@ export function placeFeet(st, env) {
 }
 
 // Foot world orientation: rest orientation in actor space, pitched heel-toe about the actor's right axis.
-export function orientFoot(leg, rootQ, aRworld) {
+export function orientFoot(leg, rootQ, aRworld, toeOut = 0) {
   const foot = leg.foot.node;
   _q2.copy(rootQ).multiply(leg.foot.restRel);                         // rest world orientation
+  if (toeOut) _q2.premultiply(_q.setFromAxisAngle(Y, -leg.side * toeOut)); // splayed toes (actor up is world up)
   _q.setFromAxisAngle(aRworld, leg.toe || 0); _q2.premultiply(_q);     // toe up (+) / down (-)
   foot.parent.getWorldQuaternion(_q); foot.quaternion.copy(_q.invert().multiply(_q2));
+}
+
+// Fidget poses. u: 0..1 through the fidget; W: idle weight. All layered on top of the idle pose.
+const _f = new THREE.Vector3();
+function fidget(st, N, f, env, missing) {
+  const u = f.u, W = f.w, t = env.t, claw = !missing.rightArm && N.armR, cs = N.armR ? N.armR.side : -1, ss = N.armL ? N.armL.side : 1;
+  const env1 = smooth(u / .16) * (1 - smooth((u - .78) / .22)) * W;
+  const jaw = a => N.jaw && turn(N.jaw, 0, -a * W), headRaw = (yaw, pitch, roll) => { if (N.head) { turn(N.head, 1, yaw); turn(N.head, 0, pitch); turn(N.head, 2, roll); } }, head = (yaw, pitch, roll) => headRaw(yaw * W, pitch * W, roll * W);
+  switch (f.type) {
+    case 'yawn': {
+      const open = bell(u, .12, .62);
+      jaw(.75 * open); head(0, -.38 * open, .08 * open); turn(N.torso, 0, .1 * open * W);
+      if (claw) { turn(N.armR, 0, .35 * open * W); turn(N.foreR, 0, .8 * open * W); }
+      if (u > .62 && u < .72) jaw(-.1 * Math.sin((u - .62) * 60));  // clack shut
+      break;
+    }
+    case 'scratch': {
+      if (claw) { aim(N.armR, _f.set(cs * .5, .85, -.25), env1, env.rootQ); turn(N.foreR, 0, 2.2 * env1); turn(N.handR, 0, Math.sin(t * 19) * .45 * bell(u, .25, .7)); turn(N.handR, 2, Math.sin(t * 13) * .25 * env1); }
+      headRaw(.22 * cs * env1, .12 * env1, -.28 * cs * env1);
+      break;
+    }
+    case 'look': {
+      const yaw = 1.05 * (smooth((u - .05) / .2) - 2 * smooth((u - .4) / .22) + smooth((u - .8) / .17));
+      head(yaw, -.08 * Math.abs(yaw), 0); if (N.torso) turn(N.torso, 1, yaw * .22 * W);
+      if (Math.abs(u - .52) < .04) jaw(.2);
+      break;
+    }
+    case 'rattle': {
+      const r = bell(u, .05, .8);
+      if (N.torso) { turn(N.torso, 2, Math.sin(t * 41) * .06 * r * W); turn(N.torso, 1, Math.sin(t * 37) * .05 * r * W); }
+      head(Math.sin(t * 33) * .14 * r, Math.sin(t * 29) * .06 * r, 0); jaw(Math.abs(Math.sin(t * 30)) * .2 * r);
+      if (claw) turn(N.armR, 2, Math.sin(t * 39) * .12 * r * W);
+      if (N.armL && !missing.leftArm) turn(N.armL, 2, Math.sin(t * 35) * .1 * r * W);
+      break;
+    }
+    case 'knock': {
+      if (claw && !missing.leftArm && !env.shieldBroken) {
+        aim(N.armR, _f.set(-cs * .62, -.28, -.74), env1, env.rootQ);
+        const tap = u > .32 && u < .74 ? Math.max(0, Math.sin((u - .32) * 46)) : 0;
+        turn(N.foreR, 0, (1.15 + .45 * tap) * env1);
+        if (N.armL) turn(N.armL, 0, .3 * env1);
+      }
+      headRaw(-cs * .35 * env1, .28 * env1, 0);
+      break;
+    }
+    case 'jawdrop': {
+      const hang = u < .08 ? smooth(u / .08) : u < .6 ? 1 + .1 * Math.sin(u * 40) * (1 - u) : 1 - smooth((u - .6) / .05);
+      jaw(.95 * hang); head(.1 * Math.sin(u * 22) * bell(u, .1, .5), .3 * bell(u, .05, .65), 0);
+      if (claw) { const lift = bell(u, .38, .64); aim(N.armR, _f.set(cs * .22, .2, -.95), lift * W, env.rootQ); turn(N.foreR, 0, 2.05 * lift * W); }
+      if (u > .6 && u < .66) head(0, -.25, 0); // snapped back into place
+      break;
+    }
+    case 'neck': {
+      const a = bell(u, .05, .4), b = bell(u, .45, .85);
+      head(0, .05 * (a + b), .5 * ss * a - .5 * ss * b);
+      if (Math.abs(u - .38) < .03 || Math.abs(u - .82) < .03) jaw(.15);
+      break;
+    }
+    case 'stretch': {
+      const up = bell(u, .1, .7);
+      if (claw) { aim(N.armR, _f.set(cs * .45, .9, .1), up * W, env.rootQ); turn(N.foreR, 0, .3 * up * W); }
+      if (N.armL && !missing.leftArm) turn(N.armL, 0, 1.2 * up * W);
+      if (N.torso) turn(N.torso, 0, .2 * up * W); head(0, -.3 * up, 0); jaw(.35 * up);
+      break;
+    }
+    case 'fingers': {
+      if (claw) { aim(N.armR, _f.set(cs * .18, .25, -.95), env1, env.rootQ); turn(N.foreR, 0, 1.95 * env1); turn(N.handR, 1, Math.sin(t * 3.1) * .5 * env1); turn(N.handR, 0, Math.sin(t * 7) * .3 * env1); }
+      headRaw(.12 * cs * env1, .32 * env1, .2 * cs * env1);
+      break;
+    }
+    case 'spin': {
+      // The skull turns a full circle on its neck, then carries on as if nothing happened.
+      if (N.head) turn(N.head, 1, Math.PI * 2 * smooth((u - .12) / .62)); // always completes: a half-turned skull never snaps back
+      if (N.jaw) turn(N.jaw, 0, -.25 * bell(u, .7, .9));
+      break;
+    }
+  }
 }

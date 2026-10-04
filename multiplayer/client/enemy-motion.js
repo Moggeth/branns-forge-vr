@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, SKELETON_STRIDE} from './skeleton-motion.js';
+import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE} from './skeleton-motion.js';
+import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
+import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
+const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
 
 // Enemy presentation polish layered AFTER AnimationMixer.update() and BEFORE
 // combat.tick() contact sweeps. It never moves entry.root (simulation-owned),
@@ -352,7 +355,11 @@ export function applyEnemyMotion(entry, ctx) {
     st.speed = (st.speed || 0) + (speed - (st.speed || 0)) * (1 - Math.exp(-dt / .1));
     const want = st.speed > .25 ? 1 : 0;
     st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .12 : .22)));
-    if (!teleport) st.phase = ((st.phase || 0) + travel / ((st.legLenRest || .78) * SKELETON_STRIDE)) % 4096;
+    // Each skeleton starts at its own point in the stride, steps its own length and wanders a little, so a crowd never marches in step.
+    const P = st.gaitP ||= gaitProfile(st.traits.seed, skeletonKindIndex(data.id));
+    if (st.phase === undefined) st.phase = P.phase0;
+    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
+    if (!teleport) st.phase = (st.phase + travel / stride) % 4096;
     if (st.walk < .5 && !teleport) { const target = Math.round(st.phase * 2) / 2; st.phase += (target - st.phase) * (1 - Math.exp(-dt / .18)); }
     // Guard: the shield comes up while winding up or recoiling, and when a Hero is close in front.
     let threat = 0;
@@ -361,7 +368,9 @@ export function applyEnemyMotion(entry, ctx) {
       if (d < 6 && d > 1e-3) threat = Math.max(threat, smooth((5.5 - d) / 2.5) * smooth(((dx * aF.x + dz * aF.z) / d - .25) / .5));
     }
     const age = tick - (data.attackTick ?? -1000), hurt = tick - (data.hurtTick ?? -1000);
-    const guardWant = Math.max(threat * .85, age >= 0 && age < 40 ? .4 : 0, hurt >= 0 && hurt < 50 ? .8 : 0) * (data.missingParts?.includes('leftArm') ? 0 : 1);
+    // No shield to raise (lost arm, splintered shield) or still clawing out of the ground: no guard.
+    const emerging = tick - (data.emergeTick ?? -1e9) < EMERGE_TICKS;
+    const guardWant = Math.max(threat * .85, age >= 0 && age < 40 ? .4 : 0, hurt >= 0 && hurt < 50 ? .8 : 0) * (data.missingParts?.includes('leftArm') || data.shieldBroken || emerging ? 0 : 1);
     st.guard = (st.guard || 0) + (guardWant - (st.guard || 0)) * (1 - Math.exp(-dt / (guardWant > (st.guard || 0) ? .14 : .55)));
   }
 
@@ -385,7 +394,7 @@ export function applyEnemyMotion(entry, ctx) {
   visual.getWorldScale(_ws); const scale = _ws.y;
   if (kind === 'golem') applyGolem(st, ctx);
   if (kind === 'golem') golemEvents(st, data, tick);
-  else applySkeleton(st, ctx, scale, teleport, dt, tick);
+  else applySkeleton(st, ctx, scale, teleport, dt, tick, data);
   commit(st);
   st.init = true;
   return st;
@@ -457,11 +466,13 @@ function measureLegs(st) {
 }
 
 const bodyEnv = {};
-function applySkeleton(st, ctx, scale, teleport, dt, tick) {
+function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
   const N = st.nodes;
   for (const leg of st.legs) leg.active = !missingSig[leg.part];
   Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t: tick / TICK_RATE, dt, teleport, aR, aU, aF, rootQ,
-    rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits});
+    rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits,
+    kind: skeletonKindIndex(data.id), shieldBroken: !!data.shieldBroken,
+    flinch: Number.isFinite(data.flinchTick) && tick >= data.flinchTick && tick - data.flinchTick < FLINCH_SHOW ? (tick - data.flinchTick) / FLINCH_SHOW : -1});
   poseSkeletonBody(st, bodyEnv, offsetWorld, solveLeg);
   if (!ctx.height || !N.root || !st.legs.length) return;
   N.root.node.updateWorldMatrix(true, true);
@@ -478,7 +489,7 @@ function applySkeleton(st, ctx, scale, teleport, dt, tick) {
   const want = clamp(extraDrop, 0, .25 * legLen), prev = teleport || !st.init ? want : st.pelvisDrop ?? want;
   extraDrop = st.pelvisDrop = want > prev ? want : prev + (want - prev) * (1 - Math.exp(-dt / .12)); // drops at once (no knee snap), recovers smoothly
   if (extraDrop > 0) { _v.copy(aU).multiplyScalar(-extraDrop); offsetWorld(N.root.node, _v); N.root.node.updateWorldMatrix(true, true); }
-  for (const leg of st.legs) if (leg.active) { orientFoot(leg, rootQ, aR); solveLeg(leg); }
+  for (const leg of st.legs) if (leg.active) { orientFoot(leg, rootQ, aR, (st.gaitP?.toeOut || 0) * (1 - (st.guard || 0) * .5)); solveLeg(leg); }
 }
 
 function solveLeg(leg) {

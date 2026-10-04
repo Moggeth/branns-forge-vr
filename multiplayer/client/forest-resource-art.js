@@ -146,6 +146,7 @@ const DEPOSIT = {
 };
 for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
 const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
+export const BAR_STACK_MAX = 24;
 export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold']);
 export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star']);
 export const HELD_SCALE = .5; // hero/held ore: same asset at half scale
@@ -185,6 +186,18 @@ export function createResourceArt() {
    if (kind === 'starMetal') { const gold = top * .85 + clamp01(edge * 2 - 1.2) + fbm(p.x * 40, p.y * 40, p.z * 40) * .25; const c = mixc([.07, .055, .05], [1, .74, .32], clamp01(gold)); out[0] = c[0]; out[1] = c[1]; out[2] = c[2]; }
    else { const k = (.86 + .14 * top) * (stamp ? .7 : 1); out[0] = out[1] = out[2] = k; } });
   sitOnFloor(g, .22);
+  return {parts: [[own(g), metalMat(kind, m.color, kind === 'iron' ? .85 : 1, m.rough, m.tone, kind === 'starMetal' ? 0x3a1c00 : 0)]]};
+ }
+ // Output-bay stack: real cast bars cribbed three to a course, alternating direction, so the pile visibly grows with
+ // the count (up to BAR_STACK_MAX bars shown). Bars are 40 % larger than a loose pickup so a stack reads from across the yard.
+ function barStackKit(kind, n) { const m = METAL[kind], h = .073, one = ingotGeo(.28, .12, h), list = [], gap = .132;
+  for (let i = 0; i < n; i++) { const layer = Math.floor(i / 3), slot = i % 3, ry = layer % 2 ? Math.PI / 2 : 0, g = one.clone();
+   g.rotateY(ry + (((i * 37) % 7) - 3) * .014); const off = (slot - 1) * gap; g.translate(ry ? (((i * 13) % 5) - 2) * .004 : off, layer * h, ry ? off : (((i * 11) % 5) - 2) * .004); list.push(g); }
+  const g = mergeFlat(list); g.computeVertexNormals();
+  paint(g, (p, nrm, i, out) => { const top = Math.max(0, nrm.y), edge = 1 - Math.abs(nrm.y) - Math.abs(nrm.x) * .2;
+   if (kind === 'starMetal') { const gold = top * .85 + clamp01(edge * 2 - 1.2) + fbm(p.x * 30, p.y * 30, p.z * 30) * .25; const c = mixc([.07, .055, .05], [1, .74, .32], clamp01(gold)); out[0] = c[0]; out[1] = c[1]; out[2] = c[2]; }
+   else { const k = .84 + .16 * top; out[0] = out[1] = out[2] = k; } });
+  g.computeBoundingBox(); const b = g.boundingBox; g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
   return {parts: [[own(g), metalMat(kind, m.color, kind === 'iron' ? .85 : 1, m.rough, m.tone, kind === 'starMetal' ? 0x3a1c00 : 0)]]};
  }
  function crystalPickup() { const seed = 4242, base = rockLump({detail: 1, sx: 1, sy: .35, sz: .85, seed, cuts: 3, rough: .3, bed: -.4});
@@ -231,6 +244,9 @@ export function createResourceArt() {
   pickup(kind) { if (!PICKUP_KINDS.includes(kind)) return null; let kit = pickups.get(kind);
    if (!kit) { kit = kind.endsWith('Ore') ? orePickup(kind) : kind === 'crystal' ? crystalPickup() : ingotPickup(kind); pickups.set(kind, kit); }
    const g = build(kit.parts, 'Pickup:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; return g; },
+  barStack(kind, count) { if (!METAL[kind]) return null; const n = Math.max(1, Math.min(BAR_STACK_MAX, count | 0)), k = 'stack:' + kind + ':' + n; let kit = pickups.get(k);
+   if (!kit) { kit = barStackKit(kind, n); pickups.set(k, kit); }
+   const g = build(kit.parts, 'BarStack:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; g.userData.barStack = n; return g; },
   deposit(kind, {variant = 0} = {}) { const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
    if (!kit) { kit = depositKit(k, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Deposit:' + k); g.userData.authoredDeposit = true; g.userData.resourceArt = k; return g; },
   update(seconds) { if (Number.isFinite(seconds)) time.value = seconds; },
