@@ -24,7 +24,7 @@ export const PATHS = [
   { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
 ];
 
-const TRI_CAP = 20000; // all three landmarks plus paths sit near 15k; the cap guards against runaway layouts
+const TRI_CAP = 34000; // ~15k code-built, ~27k once the sanctuary kit is in; the cap guards against runaway layouts
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -58,6 +58,11 @@ export function createStartingWorld({ THREE, scene, height }) {
   // Piece list: {mat, geo, x, z, y (above ground), sx,sy,sz, rx,ry,rz}. Ground sampled per piece at build.
   const pieces = [];
   const P = (mat, geo, x, z, y, s, r = [0, 0, 0], id = null) => pieces.push({ mat, geo, x, z, y, s, r, id });
+  // Sanctuary kit (assets/landmarks-20261004, loaded by game.js): K swaps the last piece for its kit version once the
+  // kit is installed (null hides it); PK adds a piece that only exists with the kit. Kit materials: kStone, kMoss, ...
+  const K = (alt) => { pieces[pieces.length - 1].alt = alt; };
+  const PK = (...a) => { P(...a); pieces[pieces.length - 1].kitOnly = true; };
+  const KIT_MENHIRS = [['Menhir_A', 3.0], ['Menhir_B', 3.5], ['Menhir_C', 3.9], ['Menhir_D', 4.3]];
   const foot = (site, kind, x, z, w, d, rotY = 0, h = 2) => site.footprints.push({ kind, x, z, w, d, rotY, h });
 
   // --- West: Ancient Stone Sanctuary. Eight hewn menhirs facing the altar, each carved with a resonance rune; a
@@ -71,10 +76,13 @@ export function createStartingWorld({ THREE, scene, height }) {
       const h = 2.6 + r() * 1.8, lean = (r() - 0.5) * 0.18, roll = (r() - 0.5) * 0.12, rotY = -a + Math.PI / 2; // broad face to the altar
       const geo = 'menhir' + i; prim[geo] = art.menhirGeometry(900 + i * 17, {w: 0.92, h: h + 0.3, d: 0.6, taper: 0.66 + (i % 3) * 0.05});
       P('stone', geo, x, z, -0.3, [1, 1, 1], [lean * 0.5, rotY, roll * 0.6], 'waystone' + runes.length); // struck to ring it (shared/waygate.js)
+      const [kitName, kitH] = KIT_MENHIRS.reduce((b, m) => Math.abs(m[1] - h - 0.3) < Math.abs(b[1] - h - 0.3) ? m : b), sy = (h + 0.3) / kitH;
+      K({mat: 'kStone', geo: 'k:' + kitName, s: [1, sy, 1]});
       const moss = 'moss' + i; prim[moss] ||= art.mossGeometry(40 + i);
       P('moss', moss, x + Math.cos(a) * 0.15, z + Math.sin(a) * 0.15, 0.02, [0.85, 0.32, 0.6], [0, r() * 6, 0]);
-      if (i % 3 === 0) P('moss', moss, x, z, h - 0.45, [0.5, 0.22, 0.36], [lean * 0.5, rotY, 0]);
-      runes.push({stone: runes.length, x, z, rotY, tilt: [lean * 0.5, roll * 0.6], face: prim[geo].userData.face});
+      K({mat: 'kMoss', geo: 'k:Moss_' + 'ABC'[i % 3], x: x + Math.cos(a) * 0.4, z: z + Math.sin(a) * 0.4, y: 0.05, s: [1, 1, 1]});
+      if (i % 3 === 0) { P('moss', moss, x, z, h - 0.45, [0.5, 0.22, 0.36], [lean * 0.5, rotY, 0]); K(null); }
+      runes.push({stone: runes.length, x, z, rotY, tilt: [lean * 0.5, roll * 0.6], face: prim[geo].userData.face, kit: {name: kitName, sy}});
       foot(site, 'stone', x, z, 0.9, 0.55, rotY, h);
     }
     // Trilithon gateway on the east side, toward the path. Hoop hangs in the opening (live group).
@@ -84,26 +92,30 @@ export function createStartingWorld({ THREE, scene, height }) {
     prim.lintel = art.lintelGeometry(613, {w: 1.0, h: 0.62, len: 3.5});
     prim.seam = art.crystalPointGeometry(1, 0.1);
     prim.mossCap = art.mossGeometry(77);
-    P('stone', 'post0', gx, gz - 1.2, -0.3, [1, 1, 1], [0, Math.PI / 2, 0]);
-    P('stone', 'post1', gx, gz + 1.2, -0.3, [1, 1, 1], [0, -Math.PI / 2, 0]);
-    P('stone', 'lintel', gx, gz, 3.95, [1, 1, 1], [0, 0, 0.03]);
-    P('moss', 'mossCap', gx + 0.05, gz - 0.5, 4.22, [0.55, 0.2, 1.25], [0, 0.1, 0]);
+    P('stone', 'post0', gx, gz - 1.2, -0.3, [1, 1, 1], [0, Math.PI / 2, 0]); K({mat: 'kStone', geo: 'k:Post_A', y: 0});
+    P('stone', 'post1', gx, gz + 1.2, -0.3, [1, 1, 1], [0, -Math.PI / 2, 0]); K({mat: 'kStone', geo: 'k:Post_B', y: 0});
+    P('stone', 'lintel', gx, gz, 3.95, [1, 1, 1], [0, 0, 0.03]); K({mat: 'kStone', geo: 'k:Lintel', y: 4.2, r: [0, Math.PI / 2, 0]});
+    PK('kCrystal', 'k:LintelSeam', gx, gz, 4.2, [1, 1, 1], [0, Math.PI / 2, 0]);
+    P('moss', 'mossCap', gx + 0.05, gz - 0.5, 4.22, [0.55, 0.2, 1.25], [0, 0.1, 0]); K({mat: 'kMoss', geo: 'k:Moss_B', y: 4.78, s: [0.9, 0.9, 1.5]});
     for (let k = 0; k < 7; k++) { const t = (k - 3) / 3, len = 0.42 - Math.abs(t) * 0.22;
-      P('crystal', 'seam', gx + (k % 2 ? 0.07 : -0.07), gz + t * 1.15, 3.78, [1, len, 1], [Math.PI + (k % 2 ? 0.25 : -0.25), 0, t * 0.4]); }
+      P('crystal', 'seam', gx + (k % 2 ? 0.07 : -0.07), gz + t * 1.15, 3.78, [1, len, 1], [Math.PI + (k % 2 ? 0.25 : -0.25), 0, t * 0.4]); K(null); }
+    for (const side of [-1, 1]) PK('kBronze', 'k:Chain', gx - 0.05, gz + side * 0.49, 4.22, [1, 1.1, 1]); // the hoop's chains (the hoop itself is live)
     hoopAt = {x: gx - 0.05, z: gz, y: 2.5};
     foot(site, 'stone', gx, gz - 1.2, 0.8, 0.7, 0, 4); foot(site, 'stone', gx, gz + 1.2, 0.8, 0.7, 0, 4);
     // Geode altar with crystal points in its bowl; the tuning crystal floats above it (live).
     prim.altar = art.altarGeometry(321); prim.bowlPoint = art.crystalPointGeometry(1, 0.11);
-    P('stone', 'altar', site.x, site.z, -0.05, [1, 1, 1], [0, 0.2, 0], 'waygateAltar');
+    P('stone', 'altar', site.x, site.z, -0.05, [1, 1, 1], [0, 0.2, 0], 'waygateAltar'); K({mat: 'kStone', geo: 'k:Altar', y: 0});
+    PK('kCrystal', 'k:AltarCrystals', site.x, site.z, 0, [1, 1, 1], [0, 0.2, 0], 'waygateAltar');
     for (let k = 0; k < 9; k++) { const b = k / 9 * Math.PI * 2, rr = k % 2 ? 0.42 : 0.6, len = k % 2 ? 0.55 : 0.36;
-      P('crystal', 'bowlPoint', site.x + Math.cos(b) * rr, site.z + Math.sin(b) * rr, 1.02, [1, len, 1], [Math.sin(b) * 0.55, 0, -Math.cos(b) * 0.55], 'waygateAltar'); }
+      P('crystal', 'bowlPoint', site.x + Math.cos(b) * rr, site.z + Math.sin(b) * rr, 1.02, [1, len, 1], [Math.sin(b) * 0.55, 0, -Math.cos(b) * 0.55], 'waygateAltar'); K(null); }
     tuneAt = {x: site.x, z: site.z, y: 2.05};
     foot(site, 'altar', site.x, site.z, 2.8, 2.8, 0, 1);
     for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = 8 + r() * 3, k = 'mossRock' + i; prim[k] = art.mossGeometry(60 + i);
-      P('moss', k, site.x + Math.cos(a) * d, site.z + Math.sin(a) * d, 0.0, [0.5 + r() * 0.5, 0.26, 0.5 + r() * 0.4], [0, r() * 6, 0]); }
+      P('moss', k, site.x + Math.cos(a) * d, site.z + Math.sin(a) * d, 0.0, [0.5 + r() * 0.5, 0.26, 0.5 + r() * 0.4], [0, r() * 6, 0]);
+      const big = 0.9 + (i % 3) * 0.2; K(i % 2 ? {mat: 'kMoss', geo: 'k:Moss_' + 'ABC'[i % 3], s: [big * 0.8, 1, big * 0.8]} : {mat: 'kStone', geo: 'k:Rubble_' + 'ABC'[i % 3], y: 0.05, s: [big, big, big]}); }
     // A toppled menhir fragment by the open gap, half sunk in the turf.
     prim.fallen = art.menhirGeometry(955, {w: 0.8, h: 1.9, d: 0.5, taper: 0.8});
-    P('stone', 'fallen', site.x + 3.6, site.z - 4.4, 0.18, [1, 1, 1], [Math.PI / 2 - 0.08, 0.7, 0.1]);
+    P('stone', 'fallen', site.x + 3.6, site.z - 4.4, 0.18, [1, 1, 1], [Math.PI / 2 - 0.08, 0.7, 0.1]); K({mat: 'kStone', geo: 'k:Menhir_A', y: 0.22, s: [0.85, 0.62, 0.85]});
   }
 
   // --- East: Crystal Outcrop, a living geode. Geode boulders split along violet seams; six crystal clusters in crust
@@ -218,7 +230,9 @@ export function createStartingWorld({ THREE, scene, height }) {
   function build() {
     for (const k in meshes) { group.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
     tris = 0; dropped = 0; const buckets = {};
-    for (const p of pieces) {
+    for (const base of pieces) {
+      const p = kit ? (base.alt === null ? null : base.alt ? {...base, ...base.alt} : base) : base.kitOnly ? null : base;
+      if (!p) continue;
       const g = prim[p.geo]; const src = g.index ? g.toNonIndexed() : g;
       const triCount = src.attributes.position.count / 3;
       if (tris + triCount > TRI_CAP) { dropped++; if (src !== g) src.dispose(); continue; }
@@ -226,14 +240,15 @@ export function createStartingWorld({ THREE, scene, height }) {
       // Anchor: sink 0.15 into the ground so slopes never show floating bases.
       const gy = H(p.x, p.z) - 0.15;
       m4.compose(v.set(p.x, gy + p.y, p.z), q.setFromEuler(e.set(p.r[0], p.r[1], p.r[2])), sc.set(p.s[0], p.s[1], p.s[2]));
-      const b = (buckets[p.mat] ||= { pos: [], nor: [], targets: [] });
+      const b = (buckets[p.mat] ||= { pos: [], nor: [], uv: [], targets: [] });
       if (p.id) b.targets.push([b.pos.length / 9, b.pos.length / 9 + triCount, p.id]);
-      const pa = src.attributes.position, na = src.attributes.normal, ca = src.attributes.color, nm = new THREE.Matrix3().getNormalMatrix(m4);
+      const pa = src.attributes.position, na = src.attributes.normal, ca = src.attributes.color, ua = src.attributes.uv, nm = new THREE.Matrix3().getNormalMatrix(m4);
       const b2 = (b.col ||= []);
       for (let i = 0; i < pa.count; i++) {
         v.fromBufferAttribute(pa, i).applyMatrix4(m4); b.pos.push(v.x, v.y, v.z);
         v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); b.nor.push(v.x, v.y, v.z);
         if (ca) b2.push(ca.getX(i), ca.getY(i), ca.getZ(i)); else b2.push(1, 1, 1);
+        if (ua) b.uv.push(ua.getX(i), ua.getY(i)); else b.uv.push(0, 0);
       }
       if (src !== g) src.dispose();
     }
@@ -242,6 +257,7 @@ export function createStartingWorld({ THREE, scene, height }) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(buckets[k].pos, 3));
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(buckets[k].nor, 3));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(buckets[k].col, 3));
+      if (k.startsWith('k')) geo.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[k].uv, 2)); // only kit materials are textured
       geo.computeBoundingSphere(); geo.computeBoundingBox();
       const mesh = new THREE.Mesh(geo, mats[k]); mesh.name = 'StartingWorld_' + k;
       mesh.castShadow = k !== 'path'; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
@@ -266,10 +282,10 @@ export function createStartingWorld({ THREE, scene, height }) {
     if (runeMesh) { live.remove(runeMesh); runeMesh.geometry.dispose(); runeMesh = null; }
     const parts = [], stoneIds = [], mm = new THREE.Matrix4(), local = new THREE.Matrix4(), qq = new THREE.Quaternion();
     for (const r of runes) {
-      const g = art.runeGeometry(r.stone); const f = r.face;
+      const f = r.face, g = kit ? kitRunes[r.stone].clone() : art.runeGeometry(r.stone);
       mm.compose(v.set(r.x, H(r.x, r.z) - 0.15 - 0.3, r.z), qq.setFromEuler(e.set(r.tilt[0], r.rotY, r.tilt[1])), sc.set(1, 1, 1));
-      local.compose(new THREE.Vector3(f.x, f.y, f.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, f.rotY, 0)), sc.set(1, 1, 1));
-      g.applyMatrix4(mm.multiply(local)); parts.push(g);
+      if (!kit) { local.compose(new THREE.Vector3(f.x, f.y, f.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, f.rotY, 0)), sc.set(1, 1, 1)); mm.multiply(local); }
+      g.applyMatrix4(mm); parts.push(g);
       for (let i = 0; i < g.attributes.position.count; i++) stoneIds.push(r.stone);
     }
     if (parts.length) {
@@ -305,6 +321,42 @@ export function createStartingWorld({ THREE, scene, height }) {
   function setGeodes(grow = [], glow = []) { for (let i = 0; i < geodeGrow.length; i++) { geodeGrow[i] = Math.max(0.12, Math.min(1, grow[i] ?? 1)); geodeGlow[i] = Math.max(0, Math.min(1, glow[i] || 0)); } }
   // levels: per-stone 0..1 resonance (index order = ring order, gap skipped).
   function setLit(levels = []) { for (let i = 0; i < lit.length; i++) lit[i] = Math.max(0, Math.min(1, +levels[i] || 0)); }
+  // Sanctuary kit: the Blender-authored, textured version of the stones, trilithon, altar, hoop and chains
+  // (assets/landmarks-20261004/build_sanctuary.py). The code-built pieces stand in until it loads; ids, footprints
+  // and live behaviour are the same either way.
+  let kit = null, kitRunes = null;
+  function installKit(gltf) {
+    if (kit) return false;
+    const found = {}; gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse(o => { if (o.isMesh) found[o.name] = o; });
+    const need = ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 'Post_B', 'Lintel', 'LintelSeam', 'Altar', 'AltarCrystals', 'Hoop', 'HoopInlay', 'Chain', 'TuneCrystal', 'Moss_A', 'Moss_B', 'Moss_C', 'Rubble_A', 'Rubble_B', 'Rubble_C'];
+    if (need.some(n => !found[n])) return false;
+    const kitMats = {};
+    for (const n of need) {
+      const o = found[n], m = o.material, key = 'k' + m.name; // Stone, Moss, Bronze, Crystal
+      prim['k:' + n] = o.geometry.clone().applyMatrix4(o.matrixWorld); // children (seams, inlay) keep their offset
+      if (!kitMats[key]) { m.vertexColors = !!o.geometry.attributes.color; m.needsUpdate = true; kitMats[key] = m; }
+    }
+    if (!kitMats.kStone || !kitMats.kCrystal || !kitMats.kBronze || !kitMats.kMoss) return false;
+    Object.assign(mats, kitMats);
+    // Runes follow the hewn face: each stroke vertex is pressed onto the stone's inner (-Z) surface.
+    const probe = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial()), ray = new THREE.Raycaster(), from = new THREE.Vector3(), dir = new THREE.Vector3(0, 0, 1);
+    kitRunes = runes.map(rr => {
+      const anchor = found[rr.kit.name].children.find(c => c.name === rr.kit.name + '_Rune'), g = art.runeGeometry(rr.stone, 0.62, 0.055, 6);
+      probe.geometry = prim['k:' + rr.kit.name]; g.rotateY(Math.PI); g.translate(anchor?.position.x || 0, (anchor?.position.y ?? 1.6) * rr.kit.sy, 0);
+      const pos = g.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        ray.set(from.set(pos.getX(i), pos.getY(i) / rr.kit.sy, -3), dir); const hit = ray.intersectObject(probe, false)[0];
+        pos.setZ(i, (hit ? hit.point.z : anchor?.position.z ?? -0.3) - 0.006 + pos.getZ(i));
+      }
+      g.computeVertexNormals(); return g;
+    });
+    probe.material.dispose();
+    hoopBronze.geometry = prim['k:Hoop'].clone().rotateX(Math.PI / 2); hoopBronze.material = mats.kBronze;
+    hoopGlow.geometry = prim['k:HoopInlay'].clone().rotateX(Math.PI / 2); hoopGlow.material = mats.kCrystal;
+    tune.geometry = prim['k:TuneCrystal']; tune.material = mats.kCrystal; tune.scale.set(1, 1, 1);
+    kit = gltf; build(); return true;
+  }
   group.add(live);
   build();
   scene.add(group);
@@ -327,9 +379,11 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in prim) prim[k].dispose();
     for (const k in mats) mats[k].dispose();
     runeMesh?.geometry.dispose(); rune.material.dispose(); clusterMesh?.geometry.dispose(); geode.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
+    if (kit) { hoopBronze.geometry.dispose(); hoopGlow.geometry.dispose(); for (const g of kitRunes) g.dispose();
+      for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
   }
-  function stats() { return { draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
+  function stats() { return { kit: !!kit, draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
   // Beacon fire anchor (world space, follows terrain edits): where client/beacon-view.js draws the flame and beam.
   const beacon = () => beaconAt && {x: beaconAt.x, y: H(beaconAt.x, beaconAt.z) - 0.15 + beaconAt.y, z: beaconAt.z};
-  return { group, update, tick, setLit, setGeodes, beacon, dispose, stats, sites: STARTING_SITES, paths: PATHS };
+  return { group, update, tick, setLit, setGeodes, beacon, installKit, dispose, stats, sites: STARTING_SITES, paths: PATHS };
 }

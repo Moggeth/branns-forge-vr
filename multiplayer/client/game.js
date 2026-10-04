@@ -558,6 +558,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
+  loader.load('/assets/sanctuary_kit.glb',gltf=>{ // Blender-built sanctuary stones; the code-built ones stand in until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Sanctuary stone models are incomplete; the simpler stones stay in place.');return;}
+    gltf.scene.traverse(o=>o.geometry?.dispose()); // the world keeps copies of the geometry and the materials themselves
+  },undefined,()=>report('Sanctuary stone models unavailable; the simpler stones stay in place.'));
   loader.load('/assets/waist_pouch.glb',gltf=>{if(disposed){disposeResources(gltf.scene);return;}waistPouch=gltf.scene;waistPouch.visible=false;rig.add(waistPouch);},undefined,()=>report('Pouch visual unavailable; collection remains available.'));
   loader.load('/assets/hero.glb', async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }

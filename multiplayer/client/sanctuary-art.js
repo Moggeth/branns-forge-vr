@@ -177,10 +177,10 @@ const GLYPHS = [
   [[0, -0.5, 0, 0.5], [-0.3, 0.5, 0, 0.2], [0.3, 0.5, 0, 0.2], [-0.2, -0.25, 0.2, -0.25]],
   [[-0.22, 0.5, 0.22, 0.1], [0.22, 0.1, -0.22, -0.3], [-0.22, -0.3, 0.22, -0.5], [0, 0.5, 0, -0.5]],
 ];
-export function runeGeometry(index, scale = 0.62, stroke = 0.055) {
+export function runeGeometry(index, scale = 0.62, stroke = 0.055, segs = 1) {
   const strokes = GLYPHS[index % GLYPHS.length], parts = [];
   for (const [x0, y0, x1, y1] of strokes) {
-    const len = Math.hypot(x1 - x0, y1 - y0) * scale, b = new THREE.BoxGeometry(stroke, len + stroke * 0.6, 0.012);
+    const len = Math.hypot(x1 - x0, y1 - y0) * scale, b = new THREE.BoxGeometry(stroke, len + stroke * 0.6, 0.012, 1, segs, 1);
     b.rotateZ(-Math.atan2(x1 - x0, y1 - y0)); b.translate((x0 + x1) / 2 * scale, (y0 + y1) / 2 * scale, 0); parts.push(b);
   }
   return mergeGeometries(parts);

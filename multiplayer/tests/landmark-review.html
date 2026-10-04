@@ -4,7 +4,7 @@
 <script type="module">
 // Review fixture for the starting-meadow landmarks: the game's renderer settings, lights and fog around the real
 // createStartingWorld() art on a flat green floor. ?at=x,y,z&look=x,y,z frames a camera; ?lit=0..1 lights the sanctuary
-// runes; ?night dims the sky; ?mod overrides the module path. window.review.frame(at, look, lit, t) drives captures. Not shipped.
+// runes; ?night dims the sky; ?mod overrides the module path; ?nokit skips the sanctuary kit. window.review.frame(at, look, lit, t) drives captures. Not shipped.
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 const q = new URLSearchParams(location.search), night = q.has('night');
@@ -21,6 +21,7 @@ sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, {left: -40,
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({color: 0x6f8f3e, roughness: 1}));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const world = createStartingWorld({THREE, scene, height: () => 0});
+if (!q.has('nokit')) { const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js'); world.installKit(await new GLTFLoader().loadAsync('/assets/sanctuary_kit.glb')); } // ?nokit shows the code-built stand-ins
 const {createWaygateView} = await import('../client/waygate-view.js');
 const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
 const {createBeaconView} = await import('../client/beacon-view.js');
