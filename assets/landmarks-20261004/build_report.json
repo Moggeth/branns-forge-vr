@@ -1,5 +1,5 @@
 {
- "bytes": 3648976,
+ "bytes": 4343008,
  "nodes": [
   "Menhir_A_Rune",
   "Menhir_A",
@@ -36,7 +36,23 @@
   "MineHead",
   "OreCart_Crystals",
   "OreCart_Iron",
-  "OreCart"
+  "OreCart",
+  "Pier_L",
+  "Pier_R",
+  "Voussoir",
+  "Voussoir_Loose",
+  "Keystone_Crystals",
+  "Keystone",
+  "Tower_Vein",
+  "Tower",
+  "Basket_Coals",
+  "Basket",
+  "Dish",
+  "Dish_Crystal",
+  "Plinth",
+  "HeartShell_Lining",
+  "HeartShell_Roots",
+  "HeartShell"
  ],
  "materials": [
   "Stone",
@@ -78,9 +94,25 @@
   "MineHead": 1564,
   "OreCart_Crystals": 360,
   "OreCart_Iron": 1024,
-  "OreCart": 2736
+  "OreCart": 2736,
+  "Pier_L": 1024,
+  "Pier_R": 640,
+  "Voussoir": 80,
+  "Voussoir_Loose": 80,
+  "Keystone_Crystals": 144,
+  "Keystone": 80,
+  "Tower_Vein": 360,
+  "Tower": 3168,
+  "Basket_Coals": 324,
+  "Basket": 1244,
+  "Dish": 252,
+  "Dish_Crystal": 108,
+  "Plinth": 64,
+  "HeartShell_Lining": 576,
+  "HeartShell_Roots": 2016,
+  "HeartShell": 527
  },
- "total_triangles": 23484,
+ "total_triangles": 34171,
  "texture_luminance": {
   "Stone": 0.513,
   "Moss": 0.228,
@@ -88,5 +120,5 @@
   "Crystal": 0.443,
   "Wood": 0.307
  },
- "seconds": 5.8
+ "seconds": 6.6
 }

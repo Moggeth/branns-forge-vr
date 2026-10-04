@@ -11,6 +11,7 @@ import {nearestCollectible} from '../shared/collection-target.js';
 import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} from '../shared/trees.js';
 import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
 import {createStartingWorld} from './starting-world.js';
+import {installHeartstoneKit} from './heartstone-art.js';
 import {createWaygateView} from './waygate-view.js';
 import {createGeodeView} from './geode-view.js';
 import {createBeaconView} from './beacon-view.js';
@@ -558,11 +559,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
-  loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built sanctuary stones; the code-built ones stand in until then
+  loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built landmarks and Heartstone shells; the code-built ones stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
-    if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Sanctuary stone models are incomplete; the simpler stones stay in place.');return;}
+    if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Landmark models are incomplete; the simpler versions stay in place.');return;}
+    installHeartstoneKit(gltf);
     gltf.scene.traverse(o=>o.geometry?.dispose()); // the world keeps copies of the geometry and the materials themselves
-  },undefined,()=>report('Sanctuary stone models unavailable; the simpler stones stay in place.'));
+  },undefined,()=>report('Landmark models unavailable; the simpler versions stay in place.'));
   loader.load('/assets/waist_pouch.glb',gltf=>{if(disposed){disposeResources(gltf.scene);return;}waistPouch=gltf.scene;waistPouch.visible=false;rig.add(waistPouch);},undefined,()=>report('Pouch visual unavailable; collection remains available.'));
   loader.load('/assets/hero.glb', async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }

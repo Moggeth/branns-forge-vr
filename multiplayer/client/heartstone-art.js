@@ -2,7 +2,8 @@
 // A geode split open like an egg, gripped by old roots, lined with blue-violet crystal, with a green-gold heart crystal
 // floating over the hollow. A ring of wildflowers round its foot grows in as the world's Bloom rises, and a soft ring
 // of light breathes on the ground while it is mending Heroes. +Y up, metres, base at y = 0; footprint radius ~1.3.
-// Geometries and materials are built once and shared by every Heartstone: five draws each, no lights or textures.
+// Geometries and materials are built once and shared by every Heartstone: five draws each (six with the landmark kit's
+// textured shell, roots and lining; installHeartstoneKit).
 import * as THREE from 'three';
 import {rng, noise3, finish, mergeGeometries, crystalPointGeometry} from './sanctuary-art.js';
 
@@ -147,15 +148,31 @@ function assets() {
 /** Build one Heartstone into root; returns the live parts for animateHeartstone. */
 export function buildHeartstone(root) {
   const a = assets(), mesh = (g, m, shadow = true) => { const o = new THREE.Mesh(g, m); o.castShadow = shadow; o.receiveShadow = true; root.add(o); return o; };
-  mesh(a.shell, a.stone); mesh(a.lining, a.crystal); mesh(a.flowers, a.flowerMat, false);
+  const shell = mesh(a.shell, a.stone), lining = mesh(a.lining, a.crystal); mesh(a.flowers, a.flowerMat, false);
+  const roots = mesh(a.shell, a.stone); roots.visible = false; // filled from the landmark kit
   const heart = mesh(a.heart, a.heartMat); heart.position.y = HEART_Y;
   const ring = mesh(a.ring, a.ringMat, false); ring.position.y = 0.06; ring.receiveShadow = false; ring.visible = false; ring.renderOrder = 4; ring.raycast = () => {};
-  return {heart, ring};
+  const P = {heart, ring, shell, lining, roots}; useKit(P); return P;
+}
+
+// Landmark kit (assets/landmarks-20261004): a Blender-built, textured shell, roots and lining. Heartstones built before
+// it loads switch over on their next frame. Materials stay owned by the starting world that adopted them.
+export function installHeartstoneKit(gltf) {
+  const a = assets(); if (a.kit) return false;
+  const found = {}; gltf.scene.updateMatrixWorld(true); gltf.scene.traverse(o => { if (o.isMesh) found[o.name] = o; });
+  const parts = ['HeartShell', 'HeartShell_Roots', 'HeartShell_Lining'].map(n => found[n]);
+  if (parts.some(o => !o)) return false;
+  const [shell, roots, lining] = parts.map(o => ({geometry: o.geometry.clone().applyMatrix4(o.matrixWorld), material: o.material}));
+  a.kit = {shell, roots, lining}; return true;
+}
+function useKit(P) {
+  const k = A?.kit; if (!k || P.shell.geometry === k.shell.geometry) return;
+  for (const n of ['shell', 'roots', 'lining']) { P[n].geometry = k[n].geometry; P[n].material = k[n].material; P[n].visible = true; }
 }
 
 /** Per frame. bloom: world Bloom points; damage 0..1; active: hp > 0; mending: a Hero of its side is in reach. */
 export function animateHeartstone(P, {time = 0, bloom = 0, damage = 0, active = true, mending = false} = {}) {
-  const a = assets();
+  const a = assets(); useKit(P);
   a.uCount.value = 4 + (FLOWERS - 4) * Math.min(1, bloom / 180); // shared by every Heartstone: Bloom is world-wide
   a.ringMat.uniforms.uTime.value = time;
   const beat = Math.pow(Math.max(0, Math.sin(time * 2.2)), 8) * (active ? 1 : 0);
@@ -169,5 +186,6 @@ export function animateHeartstone(P, {time = 0, bloom = 0, damage = 0, active = 
 export function disposeHeartstoneArt() {
   if (!A) return;
   for (const k of ['shell', 'lining', 'heart', 'flowers', 'ring', 'stone', 'crystal', 'heartMat', 'flowerMat', 'ringMat']) A[k].dispose();
+  if (A.kit) for (const k of ['shell', 'roots', 'lining']) A.kit[k].geometry.dispose();
   A = null;
 }

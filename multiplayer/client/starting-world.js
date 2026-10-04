@@ -24,7 +24,7 @@ export const PATHS = [
   { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
 ];
 
-const TRI_CAP = 48000; // ~15k code-built, ~38k with the landmark kit; the cap guards against runaway layouts
+const TRI_CAP = 64000; // ~15k code-built, ~45k with the landmark kit; the cap guards against runaway layouts
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -178,44 +178,49 @@ export function createStartingWorld({ THREE, scene, height }) {
     const site = STARTING_SITES[2]; site.footprints.length = 0; const r = rng(303);
     const ax = site.x, az = site.z, ys = 4.84, inner = 3.3, outer = 4.05, step = Math.PI / 3 / 5;
     prim.pierL = wa.pierGeometry(311, {w: 1.1, h: 4.6, d: 1.0}); prim.pierR = wa.pierGeometry(312, {w: 1.1, h: 3.2, d: 1.0, broken: true});
-    P('stone', 'pierL', ax - 2.2, az, 0, [1, 1, 1]); P('stone', 'pierR', ax + 2.2, az, 0, [1, 1, 1], [0, 0, -0.03]);
+    P('stone', 'pierL', ax - 2.2, az, 0, [1, 1, 1]); K({mat: 'kStone', geo: 'k:Pier_L'});
+    P('stone', 'pierR', ax + 2.2, az, 0, [1, 1, 1], [0, 0, -0.03]); K({mat: 'kStone', geo: 'k:Pier_R'});
     for (let k = 0; k < 4; k++) { // left half: four of its five voussoirs still lean to the crown
       const g = 'vous' + k; prim[g] = wa.voussoirGeometry(320 + k, inner, outer, Math.PI - (k + 1) * step, Math.PI - k * step, 1.0);
-      P('stone', g, ax + 1.65, az, ys, [1, 1, 1], [0, 0, -k * 0.004]);
+      P('stone', g, ax + 1.65, az, ys, [1, 1, 1], [0, 0, -k * 0.004]); K({mat: 'kStone', geo: 'k:Voussoir', r: [0, 0, Math.PI - (k + 1) * step - k * 0.004]});
     }
-    prim.mossPier = art.mossGeometry(81); P('moss', 'mossPier', ax - 2.3, az, ys - 0.05, [0.5, 0.18, 0.55], [0, 0.4, 0.1]);
+    prim.mossPier = art.mossGeometry(81); P('moss', 'mossPier', ax - 2.3, az, ys - 0.05, [0.5, 0.18, 0.55], [0, 0.4, 0.1]); K({mat: 'kMoss', geo: 'k:Moss_A', y: ys - 0.08, s: [0.75, 1, 0.75]});
     // Fallen voussoirs and the keystone in the grass east of the arch; the keystone carries a crystal inlay.
     const fallen = (k, seed) => { const g = wa.voussoirGeometry(seed, inner, outer, k * step, (k + 1) * step, 1.0); g.computeBoundingBox();
       const c = g.boundingBox.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); return g; };
     for (let i = 0; i < 4; i++) { const g = 'fallenVous' + i; prim[g] = fallen(i, 340 + i);
-      P('stone', g, ax + 3.1 + r() * 2.4, az + (r() - 0.5) * 3.2, 0.32, [1, 1, 1], [Math.PI / 2 + (r() - 0.5) * 0.4, r() * 6, (r() - 0.5) * 0.5]);
-      if (i % 2) P('moss', 'mossPier', ax + 3.1 + i * 0.5, az - 1 + i * 0.4, 0.05, [0.4, 0.2, 0.35], [0, r() * 6, 0]); }
+      P('stone', g, ax + 3.1 + r() * 2.4, az + (r() - 0.5) * 3.2, 0.32, [1, 1, 1], [Math.PI / 2 + (r() - 0.5) * 0.4, r() * 6, (r() - 0.5) * 0.5]); K({mat: 'kStone', geo: 'k:Voussoir_Loose'});
+      if (i % 2) { P('moss', 'mossPier', ax + 3.1 + i * 0.5, az - 1 + i * 0.4, 0.05, [0.4, 0.2, 0.35], [0, r() * 6, 0]); K({mat: 'kMoss', geo: 'k:Moss_C', s: [0.6, 1, 0.6]}); } }
     prim.keystone = fallen(4.5, 349); prim.inlay = art.crystalPointGeometry(1, 0.06);
     const kx = ax + 2.6, kz = az + 2.3; P('stone', 'keystone', kx, kz, 0.3, [1.05, 1.05, 1.05], [0.15, 0.9, Math.PI / 2 - 0.1]);
-    for (let k = 0; k < 3; k++) P('crystal', 'inlay', kx + (k - 1) * 0.12, kz + 0.1, 0.62, [1, 0.3 + k % 2 * 0.15, 1], [(k - 1) * 0.4, 0, 0.2]);
+    K({mat: 'kStone', geo: 'k:Keystone', y: 0.45, s: [1, 1, 1], r: [Math.PI / 2 - 0.12, 0.9, 0.1]}); KC('kCrystal', 'k:Keystone_Crystals');
+    for (let k = 0; k < 3; k++) { P('crystal', 'inlay', kx + (k - 1) * 0.12, kz + 0.1, 0.62, [1, 0.3 + k % 2 * 0.15, 1], [(k - 1) * 0.4, 0, 0.2]); K(null); }
     foot(site, 'pier', ax - 2.2, az, 1.1, 1.1, 0, 5); foot(site, 'pier', ax + 2.2, az, 1.1, 1.1, 0, 3.2);
     // Watch-tower stump behind the arch (north), the beacon basket on its rubble top, struck/fed as 'watchBeacon'.
     const tx = ax + 0.5, tz = az - 4.5, th = 3.2;
     prim.tower = wa.towerGeometry(361, {r: 1.6, h: th}); P('stone', 'tower', tx, tz, 0, [1, 1, 1], [0, 0.3, 0], 'watchBeacon');
+    K({mat: 'kStone', geo: 'k:Tower', r: [0, 0, 0]}); KC('kCrystal', 'k:Tower_Vein'); // the kit tower carries its vein, facing the arch
     prim.basket = wa.basketGeometry(); P('bronze', 'basket', tx, tz, th - 0.25, [1, 1, 1], [0, 0.2, 0], 'watchBeacon');
+    K({mat: 'kBronze', geo: 'k:Basket'}); KC('kCrystal', 'k:Basket_Coals');
     prim.coal = art.crystalPointGeometry(1, 0.08);
     for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, d = k ? 0.26 : 0;
-      P('crystal', 'coal', tx + Math.cos(a) * d, tz + Math.sin(a) * d, th - 0.25 + wa.BASKET.height - 0.12, [1, k ? 0.28 : 0.4, 1], [Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6]); }
+      P('crystal', 'coal', tx + Math.cos(a) * d, tz + Math.sin(a) * d, th - 0.25 + wa.BASKET.height - 0.12, [1, k ? 0.28 : 0.4, 1], [Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6]); K({hide: 'k:Basket_Coals'}); }
     // Crystal vein up the arch-facing side, from the dish to the basket.
     for (let k = 0; k < 9; k++) { const y = 0.75 + k * 0.29, wob = Math.sin(k * 1.7) * 0.18;
-      P('crystal', 'inlay', tx + wob, tz + 1.62, y, [1, 0.22 + (k % 3) * 0.07, 1], [Math.PI / 2 - 0.25, 0, (r() - 0.5) * 0.8], 'watchBeacon'); }
+      P('crystal', 'inlay', tx + wob, tz + 1.62, y, [1, 0.22 + (k % 3) * 0.07, 1], [Math.PI / 2 - 0.25, 0, (r() - 0.5) * 0.8], 'watchBeacon'); K({hide: 'k:Tower_Vein'}); }
     prim.plinth = wa.plinthGeometry(371); prim.dish = wa.dishGeometry();
-    P('stone', 'plinth', tx, tz + 1.85, 0, [1, 1, 1], [0, 0.1, 0], 'watchBeacon'); P('bronze', 'dish', tx, tz + 1.85, 0, [1, 1, 1], [0, 0, 0], 'watchBeacon');
-    P('crystal', 'inlay', tx, tz + 1.85, 0.8, [1, 0.25, 1], [0.3, 0, 0], 'watchBeacon');
+    P('stone', 'plinth', tx, tz + 1.85, 0, [1, 1, 1], [0, 0.1, 0], 'watchBeacon'); K({mat: 'kStone', geo: 'k:Plinth'});
+    P('bronze', 'dish', tx, tz + 1.85, 0, [1, 1, 1], [0, 0, 0], 'watchBeacon'); K({mat: 'kBronze', geo: 'k:Dish'});
+    P('crystal', 'inlay', tx, tz + 1.85, 0.8, [1, 0.25, 1], [0.3, 0, 0], 'watchBeacon'); K({mat: 'kCrystal', geo: 'k:Dish_Crystal', y: 0, r: [0, 0, 0]});
     beaconAt = {x: tx, z: tz, y: th - 0.25 + wa.BASKET.fire};
     foot(site, 'tower', tx, tz, 3.4, 3.4, 0, 3.4); foot(site, 'plinth', tx, tz + 1.85, 0.5, 0.5, 0, 0.9);
     for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = 2.1 + r() * 0.6; // fallen tower stones round its foot
-      P('stone', 'rock', tx + Math.cos(a) * d, tz + Math.sin(a) * d * 0.8, 0.1, [0.32 + r() * 0.2, 0.22, 0.3], [0, r() * 6, 0]); }
+      P('stone', 'rock', tx + Math.cos(a) * d, tz + Math.sin(a) * d * 0.8, 0.1, [0.32 + r() * 0.2, 0.22, 0.3], [0, r() * 6, 0]); K({mat: 'kStone', geo: 'k:Rubble_' + 'ABC'[i % 3], y: 0.05, s: [1.4, 1.4, 1.4]}); }
     // Hearth ring in front of the arch, where the beacon raises fallen Heroes.
     for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2;
-      P('stone', 'rock', BEACON_HEARTH.x + Math.cos(a) * 0.85, BEACON_HEARTH.z + Math.sin(a) * 0.9, 0.08, [0.34, 0.16, 0.26], [0, a, 0]); }
+      P('stone', 'rock', BEACON_HEARTH.x + Math.cos(a) * 0.85, BEACON_HEARTH.z + Math.sin(a) * 0.9, 0.08, [0.34, 0.16, 0.26], [0, a, 0]); K({mat: 'kStone', geo: 'k:Rubble_' + 'ABC'[i % 3], y: 0.0, s: [1.0, 0.7, 1.0]}); }
     for (let i = 0; i < 5; i++) { const a = r() * 6.28, d = 6.5 + r() * 2.5;
-      P('stone', 'rock', ax + Math.cos(a) * d, az + Math.sin(a) * d, 0.1, [0.6 + r() * 0.5, 0.4, 0.6], [0, r() * 6, 0]); }
+      P('stone', 'rock', ax + Math.cos(a) * d, az + Math.sin(a) * d, 0.1, [0.6 + r() * 0.5, 0.4, 0.6], [0, r() * 6, 0]); K({mat: 'kStone', geo: 'k:Rubble_' + 'ABC'[i % 3], y: 0.05, s: [2.2, 1.8, 2.2]}); }
   }
 
   // Path stepping stones: bounded count, flattened rocks.
@@ -338,7 +343,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     if (kit) return false;
     const found = {}; gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => { if (o.isMesh) found[o.name] = o; });
-    const optional = ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'Cup', 'MineHead', 'MineHead_Iron', 'OreCart', 'OreCart_Iron', 'OreCart_Crystals'];
+    const optional = ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'Cup', 'MineHead', 'MineHead_Iron', 'OreCart', 'OreCart_Iron', 'OreCart_Crystals',
+      'Pier_L', 'Pier_R', 'Voussoir', 'Voussoir_Loose', 'Keystone', 'Keystone_Crystals', 'Tower', 'Tower_Vein', 'Basket', 'Basket_Coals', 'Plinth', 'Dish', 'Dish_Crystal'];
     const need = ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 'Post_B', 'Lintel', 'LintelSeam', 'Altar', 'AltarCrystals', 'Hoop', 'HoopInlay', 'Chain', 'TuneCrystal', 'Moss_A', 'Moss_B', 'Moss_C', 'Rubble_A', 'Rubble_B', 'Rubble_C'];
     if (need.some(n => !found[n])) return false;
     const kitMats = {};

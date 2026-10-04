@@ -568,6 +568,180 @@ def build_outcrop():
     cart = assemble("OreCart", wood, MATS["Wood"]); ir = assemble("OreCart_Iron", iron, MATS["Bronze"]); ir.parent = cart
     heap = crystal_cluster("OreCart_Crystals", 650, 0.36, 10, 0.42, lift=0.5, spread=0.9); heap.data.transform(Matrix.Scale(1.0, 4)); heap.parent = cart
 
+# ---- Ruined Watch-Arch ----------------------------------------------------------------------------
+def ashlar_tone(seed, top=None):
+    """Dressed sandstone: a warm per-block tone, darker weathered arrises, soot on a broken top, grass stain at the foot."""
+    r = np.random.default_rng(seed); tone = 0.86 + 0.18 * r.random(); warm = r.random()
+    def f(p, n):
+        g = fbm(p, seed, 2.2, 3); v = tone * (0.86 + 0.3 * g)
+        c = np.stack([v * (1.02 + 0.05 * warm), v * (0.97 + 0.01 * warm), v * (0.90 - 0.04 * warm)], -1)
+        up = np.clip(n[:, 2], 0, 1)[:, None]; lich = sm(0.12, 0.3, fbm(p, seed + 4, 1.4, 2))[:, None] * up
+        c = c * (1 - 0.5 * lich) + 0.5 * lich * np.array([0.55, 0.62, 0.38])
+        return np.clip(c, 0, 1)
+    return f
+
+def block(seed, w, d, h, chip=0.045, seg=(3, 2, 2), tone=None):
+    """Chamfered, lightly weathered block, centred on the origin (w along X, d along Y, h up Z)."""
+    V, F = grid_box(*seg); P = V * np.array([w / 2, d / 2, h / 2])
+    edges = (np.abs(V) > 0.999).sum(1)
+    P -= np.sign(V) * (chip * (edges >= 2) * (1 + 0.4 * (edges == 3)))[:, None]
+    P += 0.012 * np.stack([fbm(P, seed + k, 3.0, 2) for k in range(3)], -1)
+    ob = make_mesh(f"blk{seed}", P, F, MATS["Stone"])
+    return finalize(ob, tone or ashlar_tone(seed), tile=1.2, smooth_angle=35)
+
+def pier(name, seed, w=1.1, h=4.6, d=1.0, course=0.46, broken=False):
+    r = np.random.default_rng(seed); parts = []; n = round(h / course)
+    for k in range(n):
+        z = (k + 0.5) * h / n; ch = h / n * 0.97; ragged = broken and k == n - 1
+        split = 0.42 + r.random() * 0.16 if k % 2 else 0; deep = 0.8 + r.random() * 0.15 if broken and k >= n - 2 else 1
+        if split:
+            parts.append((block(seed + k * 7, w * split - 0.015, d * deep, ch), Matrix.Translation((-w / 2 + w * split / 2, 0, z))))
+            if not ragged or r.random() > 0.4:
+                hh = ch * (0.6 if ragged else 1)
+                parts.append((block(seed + k * 7 + 3, w * (1 - split) - 0.015, d * deep, hh), Matrix.Translation((w / 2 - w * (1 - split) / 2, 0, z - (ch - hh) / 2))))
+        else:
+            hh = ch * (0.65 if ragged else 1)
+            parts.append((block(seed + k * 7, w, d * deep, hh), Matrix.Translation(((r.random() - 0.5) * 0.03, 0, z - (ch - hh) / 2)) @ Matrix.Rotation((r.random() - 0.5) * 0.04, 4, "Z")))
+    if not broken: parts.append((block(seed + 99, w * 1.18, d * 1.14, 0.24, 0.035), Matrix.Translation((0, 0, h + 0.12))))
+    return assemble(name, parts, MATS["Stone"])
+
+def voussoir(name, seed, inner=3.3, outer=4.05, span=math.pi / 15, depth=1.0, centred=False):
+    """One arch stone between angles 0..span on a circle round the origin, in Blender XZ (three.js XY), depth along Y."""
+    V, F = grid_box(4, 2, 2); gap = 0.012
+    a = gap + (span - 2 * gap) * (V[:, 0] + 1) / 2; rad = inner + (outer - inner) * (V[:, 2] + 1) / 2
+    P = np.stack([np.cos(a) * rad, V[:, 1] * depth / 2 * (1 - 0.04 * np.abs(V[:, 2])), np.sin(a) * rad], -1)
+    edges = (np.abs(V) > 0.999).sum(1)
+    P -= (np.stack([np.zeros(len(V)), np.sign(V[:, 1]), np.zeros(len(V))], -1) * 0.03 * (edges >= 2)[:, None])
+    P += 0.015 * np.stack([fbm(P, seed + k, 2.5, 2) for k in range(3)], -1)
+    if centred: P -= (P.min(0) + P.max(0)) / 2
+    ob = make_mesh(name, P, F, MATS["Stone"])
+    return finalize(ob, ashlar_tone(seed), tile=1.2, smooth_angle=35)
+
+def rod(seed, a, b, r=0.03, seg=6, mat="Bronze"):
+    L = (Vector(b) - Vector(a)).length; V, F = lathe([(0.0, 0.0), (r, 0.0), (r, L), (0.0, L)], seg)
+    ob = finalize(make_mesh(f"rod{seed}", V, F, MATS[mat]), lambda p, n: np.full((len(p), 3), 0.85), tile=0.4, smooth_angle=50)
+    return ob, between(a, b)
+
+def build_watch_arch():
+    pier("Pier_L", 311, h=4.6); pier("Pier_R", 312, h=3.2, broken=True)
+    voussoir("Voussoir", 320); voussoir("Voussoir_Loose", 340, centred=True)
+    ks = voussoir("Keystone", 349, inner=3.25, outer=4.15, span=math.pi / 13, centred=True)
+    cl = crystal_cluster("Keystone_Crystals", 350, 0.12, 4, 0.28, spread=0.5); cl.data.transform(Matrix.Rotation(math.pi / 2, 4, "X") @ Matrix.Translation((0, 0, -0.02)))
+    cl.parent = ks; cl.location = (0, -0.5, 0)
+    # Watch-tower stump: rings of dressed blocks round a rubble core, top courses robbed out, two arrow slits (north and
+    # west), a crystal vein climbing the arch-facing side (three.js +Z = Blender -Y) from the offering dish to the basket.
+    R, H, per = 1.6, 3.2, 13; n = round(H / 0.4); r = np.random.default_rng(361); parts = []
+    for k in range(n):
+        z = (k + 0.5) * H / n; ch = H / n * 0.96; off = 0.5 if k % 2 else 0
+        for j in range(per):
+            if k >= n - 2 and r.random() < (0.45 if k == n - 1 else 0.15): continue
+            a = (j + off) / per * 2 * math.pi; L = 2 * math.pi * R / per * 0.96
+            slit = 3 <= k <= 5 and min(abs(math.atan2(math.sin(a - t), math.cos(a - t))) for t in (math.pi / 2, math.pi)) < math.pi / per * 0.8
+            tone = (lambda p, nn: np.full((len(p), 3), 0.16)) if slit else None
+            parts.append((block(4000 + k * 41 + j, L, 0.46, ch, 0.04, seg=(2, 1, 2), tone=tone), Matrix.Rotation(a + math.pi / 2, 4, "Z") @ Matrix.Translation((0, -(R - 0.23 + (0.12 if slit else 0)), z))))
+    core, cf = lathe([(0.0, 0.0), (R - 0.4, 0.0), (R - 0.4, H - 0.3), (R - 0.7, H - 0.15), (0.0, H - 0.2)], 12)
+    core += 0.06 * np.stack([fbm(core, 362 + k, 2.0, 2) for k in range(3)], -1)
+    parts.append((finalize(make_mesh("core", core, cf, MATS["Stone"]), lambda p, nn: np.clip(np.stack([0.45 + 0.2 * fbm(p, 363, 2, 2)] * 3, -1), 0, 1), tile=1.2), Matrix()))
+    tw = assemble("Tower", parts, MATS["Stone"])
+    vein = []
+    for k in range(10):
+        z = 0.72 + k * 0.27; wob = math.sin(k * 1.7) * 0.18; L = 0.2 + (k % 3) * 0.06
+        v, f = crystal_point(L, L * 0.2); axis = (wob * 0.5, -1.0, 0.6 + 0.2 * math.sin(k))
+        vein.append((place(v, (wob, -(R + 0.02), z), axis, spin=k), f))
+    V, F = merge(vein); vo = finalize(make_mesh("Tower_Vein", V, F, MATS["Crystal"]), None, tile=1.4, smooth_angle=20); vo.parent = tw
+    # Bronze fire basket on a tripod (BASKET in client/watch-arch-art.js: bowl top 0.95, fire 1.05, rim radius 0.62).
+    Rb, Hb = 0.62, 0.95; parts = []
+    bowl, bf = lathe([(0.08, 0.0), (0.32, 0.04), (0.56, 0.16), (Rb, 0.34), (Rb + 0.05, 0.38), (Rb - 0.02, 0.40), (0.5, 0.2), (0.26, 0.08), (0.06, 0.06)], 18)
+    parts.append((finalize(make_mesh("bowl", bowl, bf, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.9), tile=0.6, smooth_angle=40), Matrix.Translation((0, 0, Hb - 0.2))))
+    for i in range(3):
+        a = i / 3 * 2 * math.pi; ca, sa = math.cos(a), math.sin(a)
+        parts.append(rod(700 + i, (0.62 * ca, 0.62 * sa, 0.0), (0.2 * ca, 0.2 * sa, Hb - 0.14), 0.04))
+        foot, ff = lathe([(0.0, 0.0), (0.08, 0.0), (0.06, 0.05), (0.0, 0.06)], 8)
+        parts.append((finalize(make_mesh("foot", foot, ff, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0.62 * ca, 0.62 * sa, 0))))
+    ring, rf = lathe([(0.24, -0.02), (0.27, -0.02), (0.27, 0.02), (0.24, 0.02), (0.24, -0.02)], 14)
+    parts.append((finalize(make_mesh("ring", ring, rf, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0, 0, Hb * 0.45))))
+    for i in range(4):  # strap bars from the rim up to a crown ring over the fire
+        a = i / 4 * 2 * math.pi + math.pi / 4; ca, sa = math.cos(a), math.sin(a); pts = []
+        for t in np.linspace(0, 1, 5): rr = Rb + 0.03 - (Rb - 0.17) * t ** 1.6; pts.append((rr * ca, rr * sa, Hb + 0.18 + 0.5 * math.sin(t * math.pi / 2)))
+        for k in range(4): parts.append(rod(720 + i * 5 + k, pts[k], pts[k + 1], 0.024, 5))
+    crown, cf = lathe([(0.16, -0.025), (0.2, -0.025), (0.2, 0.025), (0.16, 0.025), (0.16, -0.025)], 14)
+    parts.append((finalize(make_mesh("crown", crown, cf, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0, 0, Hb + 0.68))))
+    bk = assemble("Basket", parts, MATS["Bronze"])
+    coals = crystal_cluster("Basket_Coals", 730, 0.32, 9, 0.3, lift=Hb - 0.16, spread=0.8); coals.parent = bk
+    # Offering dish on a short plinth at the tower foot.
+    pl = block(371, 0.5, 0.5, 0.78, 0.05); pl.data.transform(Matrix.Translation((0, 0, 0.39))); pl.name = "Plinth"; pl.data.name = "Plinth"
+    dish, df = lathe([(0.04, 0.0), (0.24, 0.02), (0.36, 0.08), (0.40, 0.12), (0.37, 0.125), (0.33, 0.1), (0.2, 0.05), (0.02, 0.04)], 18)
+    do = finalize(make_mesh("Dish", dish, df, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.92), tile=0.5, smooth_angle=40)
+    do.data.transform(Matrix.Translation((0, 0, 0.78))); do.parent = pl
+    di = crystal_cluster("Dish_Crystal", 372, 0.05, 3, 0.2, lift=0.82, spread=0.5); di.parent = pl
+
+# ---- Heartstone (the God side's living geode heart; client/heartstone-art.js) -----------------------
+def tube(name, pts, r0, r1, mat, sides=7, seed=0):
+    """Tapered tube along a polyline (Catmull-Rom smoothed), radius r0 at the start to r1 at the end."""
+    P = np.array(pts, float); S = []
+    for i in range(len(P) - 1):
+        p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
+        for t in np.linspace(0, 1, 5)[:-1]:
+            S.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    S.append(P[-1]); S = np.array(S); n = len(S); V, F = [], []
+    for i in range(n):
+        tg = S[min(i + 1, n - 1)] - S[max(i - 1, 0)]; tg /= np.linalg.norm(tg)
+        a = np.cross(tg, [0, 0, 1.0]); a = a if np.linalg.norm(a) > 1e-3 else np.cross(tg, [1.0, 0, 0]); a /= np.linalg.norm(a); b = np.cross(tg, a)
+        rr = r0 + (r1 - r0) * i / (n - 1)
+        for k in range(sides):
+            ang = k / sides * 2 * math.pi; V.append(S[i] + rr * (1 + 0.15 * math.sin(ang * 3 + i)) * (math.cos(ang) * a + math.sin(ang) * b))
+    for i in range(n - 1):
+        for k in range(sides): k2 = (k + 1) % sides; F.append([i * sides + k, i * sides + k2, (i + 1) * sides + k2, (i + 1) * sides + k])
+    return make_mesh(name, np.array(V), F, MATS[mat])
+
+def build_heartstone():
+    # Split geode shell: an open egg with a jagged rim (higher at the back), crust outside, dark amethyst lining inside,
+    # a floor at 0.35, set 0.22 into the turf. Origin at the foot centre; three.js +Y up after export.
+    outer = [(0.70, 0.0), (0.92, 0.22), (1.18, 0.55), (1.26, 0.80), (1.18, 1.10), (1.0, 1.35)]
+    inner = [(0.84, 1.31), (0.98, 1.08), (1.04, 0.80), (0.96, 0.56), (0.62, 0.36), (0.0, 0.35)]
+    V, F = lathe(outer + inner, 40)
+    ang = np.arctan2(V[:, 1], V[:, 0]); d = V / (np.linalg.norm(V, axis=1, keepdims=True) + 1e-6)
+    top = V[:, 2] > 1.3
+    V[top, 2] += (np.abs(np.sin(ang[top] * 3.5)) * 0.42 + 0.25 * fbm(V[top], 71, 3.0)) * (0.6 + 0.4 * np.cos(ang[top] - 0.6))
+    rad = np.linalg.norm(V[:, :2], axis=1, keepdims=True) + 1e-6
+    V[:, :2] += V[:, :2] / rad * (0.07 * fbm(V, 72, 2.2) + 0.03 * fbm(V, 73, 7.0))[:, None] * (rad > 0.3)
+    V[:, 2] -= 0.22
+    ob = make_mesh("HeartShell", V, F, MATS["Stone"])
+    def tone(p, n):
+        c = stone_tone(75, 1.4, 0.2)(p + np.array([0, 0, 0.22]), n)
+        r = np.linalg.norm(p[:, :2], axis=1); zz = p[:, 2] + 0.22
+        # inside the hollow (radius below the wall at that height): amethyst dark, flecked pale blue
+        wall = np.interp(zz, [0.35, 0.56, 0.8, 1.08, 1.35], [0.62, 0.96, 1.04, 0.98, 0.84]) - 0.02
+        inside = ((r < wall + 0.08) & (zz > 0.3) & (n[:, 2] > -0.95))
+        inside &= (r < 0.6) | (np.einsum("ij,ij->i", n[:, :2], p[:, :2] / (r[:, None] + 1e-6)) < 0)
+        fleck = sm(0.15, 0.35, fbm(p, 77, 4.0, 2))[:, None]
+        c[inside] = (np.array([0.30, 0.25, 0.62]) * (1 - fleck[inside]) + fleck[inside] * np.array([0.55, 0.80, 1.0]))
+        seam = np.abs(fbm(p, 76, 1.6, 2)); glow = (seam < 0.025) & (zz > 0.25) & ~inside  # cracks where the heart's light leaks
+        c[glow] = np.array([0.62, 1.0, 0.78])
+        rim = (zz > 1.28) & ~inside; c[rim] = c[rim] * 0.6 + 0.4 * np.array([0.86, 0.83, 0.77])
+        return np.clip(c, 0, 1)
+    finalize(ob, tone, decimate=0.6)
+    # Old roots gripping the flanks and diving into the turf.
+    r = np.random.default_rng(73); parts = []
+    for k in range(6):
+        # hug the shell from high on its flank down to the turf (drifting sideways as roots do), then splay out and dive
+        a = k / 6 * 2 * math.pi + r.random() * 0.5; top = 0.75 + r.random() * 0.35; drift = (r.random() - 0.5) * 0.7; out = 1.75 + r.random() * 0.4
+        shell_r = lambda z: np.interp(z + 0.22, [o[1] for o in outer], [o[0] for o in outer]) + 0.1
+        pts = []
+        for i, z in enumerate(np.linspace(top, 0.05, 5)):
+            aa = a + drift * i / 4; rr = shell_r(z); pts.append((rr * math.cos(aa), rr * math.sin(aa), z))
+        aa = a + drift; pts += [((out - 0.25) * math.cos(aa + 0.1), (out - 0.25) * math.sin(aa + 0.1), -0.05), (out * math.cos(aa + 0.18), out * math.sin(aa + 0.18), -0.3)]
+        t = tube(f"root{k}", pts, 0.08 + r.random() * 0.035, 0.03, "Wood", seed=k)
+        parts.append((finalize(t, lambda p, n: np.clip(np.stack([0.62 + 0.2 * fbm(p, 74, 3, 2)] * 3, -1) * np.array([0.9, 0.78, 0.66]), 0, 1), tile=0.6, smooth_angle=60), Matrix()))
+    rt = assemble("HeartShell_Roots", parts, MATS["Wood"]); rt.parent = ob
+    # Crystal points lining the hollow, leaning inward and up.
+    pts = []
+    for k in range(16):
+        a = k / 16 * 2 * math.pi + r.random() * 0.3; dd = 0.48 + r.random() * 0.22; L = 0.28 + r.random() * 0.36
+        v, f = crystal_point(L, L * 0.2); axis = (-math.cos(a) * 0.55, -math.sin(a) * 0.55, 1.0)
+        pts.append((place(v, (math.cos(a) * dd, math.sin(a) * dd, 0.16 + r.random() * 0.25), axis, spin=k), f))
+    V, F = merge(pts); li = finalize(make_mesh("HeartShell_Lining", V, F, MATS["Crystal"]), None, tile=1.4, smooth_angle=20); li.parent = ob
+
 def empty(name, loc, parent):
     e = bpy.data.objects.new(name, None); e.empty_display_size = 0.1; bpy.context.scene.collection.objects.link(e)
     e.parent = parent; e.location = loc; return e
@@ -597,6 +771,8 @@ def build():
     for i, (rx, ry, h) in enumerate([(0.7, 0.5, 0.16), (0.55, 0.42, 0.12), (0.9, 0.6, 0.2)]): objs.append(moss_cushion(f"Moss_{'ABC'[i]}", 40 + i, rx, ry, h))
     for i, s in enumerate([0.35, 0.25, 0.45]): objs.append(rubble(f"Rubble_{'ABC'[i]}", 70 + i, s))
     build_outcrop()
+    build_watch_arch()
+    build_heartstone()
     # spread pieces out in the .blend for inspection (the game reads each piece's own geometry, not this offset)
     for k, ob in enumerate([o for o in bpy.data.objects if o.parent is None and o.type == "MESH"]):
         ob.location = ((k % 6) * 3.0, (k // 6) * 3.0, 0)

@@ -12,7 +12,9 @@ const want = {Stone: ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 
   Moss: ['Moss_A', 'Moss_B', 'Moss_C'], Bronze: ['Hoop', 'Chain'], Crystal: ['LintelSeam', 'AltarCrystals', 'HoopInlay', 'TuneCrystal']};
 const outcrop = {Stone: ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'Cup'], Wood: ['MineHead', 'OreCart'], Bronze: ['MineHead_Iron', 'OreCart_Iron'],
   Crystal: ['GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'OreCart_Crystals']};
-for (const [mat, names] of [...Object.entries(want), ...Object.entries(outcrop)]) for (const n of names) { assert.ok(node(n), n + ' in kit'); assert.equal(matOf(n), mat, n + ' material'); }
+const arch = {Stone: ['Pier_L', 'Pier_R', 'Voussoir', 'Voussoir_Loose', 'Keystone', 'Tower', 'Plinth', 'HeartShell'], Bronze: ['Basket', 'Dish'], Wood: ['HeartShell_Roots'],
+  Crystal: ['Keystone_Crystals', 'Tower_Vein', 'Basket_Coals', 'Dish_Crystal', 'HeartShell_Lining']};
+for (const [mat, names] of [...Object.entries(want), ...Object.entries(outcrop), ...Object.entries(arch)]) for (const n of names) { assert.ok(node(n), n + ' in kit'); assert.equal(matOf(n), mat, n + ' material'); }
 for (const n of 'ABCD') assert.ok(node(`Menhir_${n}`).children.some(i => json.nodes[i].name === `Menhir_${n}_Rune`), `Menhir_${n} rune anchor`);
 assert.ok(glb.length < 4.5e6, 'kit stays small enough for phones');
 
@@ -42,4 +44,4 @@ assert.equal(meshes.wood?.geometry.attributes.position.count, codeBuilt.Starting
 assert.ok(!meshes.kWood);
 world.update(); assert.equal(world.stats().kit, true, 'terrain rebuilds keep the kit');
 world.dispose(); assert.equal(scene.children.length, 0);
-console.log('PASS: kit contract (sanctuary + outcrop) (pieces, materials, rune anchors, size); install swaps pieces, keeps ids, textured buckets, runes; rebuild + dispose.');
+console.log('PASS: kit contract (sanctuary, outcrop, watch-arch, heartstone) (pieces, materials, rune anchors, size); install swaps pieces, keeps ids, textured buckets, runes; rebuild + dispose.');
