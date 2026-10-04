@@ -16,6 +16,7 @@ const RIBBON_AGE = .26;       // seconds a drop stays part of the continuous rop
 const LOCAL_RATE = 110;        // visual drops per second from the local nozzle (scaled by quality)
 const REMOTE_DROPS = 5;       // visual drops per remote authoritative glob
 const SPLAT_LIFE = 2.6, STUCK_FADE = .5;
+const FLOW_TIME = 1.3;          // seconds a fresh splat keeps creeping: downhill on the ground, down the face of a wall
 
 const hash = n => { n |= 0; n = Math.imul(n ^ (n >>> 16), 0x7feb352d); n = Math.imul(n ^ (n >>> 15), 0x846ca68b); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 const idSeed = id => { let h = 2166136261; for (const c of String(id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h | 0; };
@@ -146,7 +147,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
 
   // ---------------------------------------------------------------- state pools
   const pool = Array.from({length: STREAM_CAPS.drops}, () => ({live: false, p: new THREE.Vector3(), v: new THREE.Vector3(), age: 0, life: 1, size: .03, seed: 0, stream: null, order: 0, delay: 0, gravity: WYRMSPOUT.gravity, heat: 1, splat: true, rope: true}));
-  const splats = Array.from({length: STREAM_CAPS.splats}, () => ({live: false, p: new THREE.Vector3(), n: new THREE.Vector3(0, 1, 0), r: .1, age: 0, life: SPLAT_LIFE, seed: 0}));
+  const splats = Array.from({length: STREAM_CAPS.splats}, () => ({live: false, p: new THREE.Vector3(), n: new THREE.Vector3(0, 1, 0), r: .1, age: 0, life: SPLAT_LIFE, seed: 0, mark: new THREE.Vector3(), streak: false}));
   const stuck = Array.from({length: STREAM_CAPS.stuck}, () => ({live: false, target: null, key: '', local: new THREE.Vector3(), until: 0, size: .05, seed: 0, drip: 0}));
   const gouts = new Map();   // id -> {p, v, age, delay, owner, local}
   const remoteGlobs = new Set();
@@ -167,7 +168,29 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
   function addSplat(p, n, r, seed = Math.random()) {
     let best = null, oldest = -1;
     for (const s of splats) { if (!s.live) { best = s; break; } if (s.age > oldest) { oldest = s.age; best = s; } }
-    best.live = true; best.p.copy(p); best.n.copy(n).normalize(); best.r = r; best.age = 0; best.life = SPLAT_LIFE * (.8 + .4 * seed); best.seed = seed;
+    best.live = true; best.p.copy(p); best.n.copy(n).normalize(); best.r = r; best.age = 0; best.life = SPLAT_LIFE * (.8 + .4 * seed); best.seed = seed; best.mark.copy(p); best.streak = false;
+  }
+  // Liquid creep (presentation only; the burning fuel stays where the host put it, so the creep is kept short).
+  // Ground puddles slide downhill and spread a little; splats on a wall run down its face, leaving a thin streak.
+  function flowSplat(s, dt) {
+    const k = 1 - s.age / FLOW_TIME;
+    if (s.n.y < .7) {
+      _b.set(0, -1, 0).addScaledVector(s.n, s.n.y);                 // gravity along the wall's face
+      if (_b.lengthSq() < 1e-4) return;
+      s.p.addScaledVector(_b.normalize(), (.4 + .25 * s.seed) * k * dt);
+      if (s.p.y < height(s.p.x, s.p.z) + .03) { s.age = Math.max(s.age, FLOW_TIME); return; }
+      if (!s.streak && q >= .5 && s.p.distanceToSquared(s.mark) > .14 * .14) {
+        const free = splats.find(o => !o.live);
+        if (free) { const at = _c.copy(s.mark), r = s.r * .55, seed = s.seed; s.mark.copy(s.p); addSplat(at, s.n, r, seed); free.age = s.age; free.life = s.life - s.age; free.streak = true; }
+      }
+      return;
+    }
+    const e = .25, hx = height(s.p.x + e, s.p.z) - height(s.p.x - e, s.p.z), hz = height(s.p.x, s.p.z + e) - height(s.p.x, s.p.z - e);
+    const slope = Math.hypot(hx, hz) / (2 * e);
+    if (slope > .04) {
+      const step = Math.min(.45, slope * 1.2) * k * dt / (slope * 2 * e);
+      s.p.x -= hx * step; s.p.z -= hz * step; s.p.y = height(s.p.x, s.p.z) + .012;
+    }
   }
   // Merge into a nearby young splat instead of stacking dozens of discs in one puddle.
   function splatAt(p, n, r) {
@@ -334,7 +357,7 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
       const pulse = 1 + .1 * Math.sin(time * 6 + s.seed * 30);
       pushDrop(p, _y, s.size * pulse * fade, s.size * 1.15 * fade, .75 + .25 * Math.sin(time * 3 + s.seed * 9));
       pushLick(p, .22 + s.size * 2, s.seed, .95 * fade);
-      if (q >= .5 && (s.drip += dt * (.8 + s.seed)) > 1) { s.drip = 0; spawnDrop(p, _b.set(0, -.2, 0), {life: 1.2, size: s.size * .35, rope: false}); }
+      if (q >= .5 && (s.drip += dt * (.8 + s.seed)) > 1) { s.drip = 0; spawnDrop(p, _b.set(0, -.4, 0), {life: 1.2, size: s.size * .55, rope: false}); }
     }
     drops.count = dropCount; drops.instanceMatrix.needsUpdate = true; dropHeat.needsUpdate = true; drops.visible = dropCount > 0;
     // splats
@@ -342,8 +365,9 @@ export function createWyrmspoutStream({scene, height = () => 0, quality = 1, now
     for (const s of splats) {
       if (!s.live) continue;
       s.age += dt; if (s.age > s.life) { s.live = false; continue; }
-      _q.setFromUnitVectors(_z, s.n); const grow = Math.min(1, s.age / .12);
-      _s.set(s.r * (.6 + .4 * grow), s.r * (.6 + .4 * grow), 1); _m.compose(s.p, _q, _s); splatMesh.setMatrixAt(sc, _m);
+      if (s.age < FLOW_TIME && !s.streak) flowSplat(s, dt);
+      _q.setFromUnitVectors(_z, s.n); const grow = Math.min(1, s.age / .12), spread = 1 + .2 * Math.min(1, s.age / FLOW_TIME);
+      _s.set(s.r * (.6 + .4 * grow) * spread, s.r * (.6 + .4 * grow) * spread, 1); _m.compose(s.p, _q, _s); splatMesh.setMatrixAt(sc, _m);
       splatData.array[sc * 2] = s.age / s.life; splatData.array[sc * 2 + 1] = s.seed; sc++;
       if (s.age < s.life * .55) pushLick(_a.copy(s.p).addScaledVector(s.n, .02), .14 + s.r * .9, s.seed, .8 * (1 - s.age / (s.life * .55)));
     }

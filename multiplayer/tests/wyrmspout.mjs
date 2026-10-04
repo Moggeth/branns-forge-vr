@@ -68,6 +68,21 @@ for (const dt of [1 / 60, 1 / 30, .1]) {
   view.dispose();
 }
 
+// --- presentation: liquid creep. Puddles slide a short way downhill; splats on a wall run down it and leave a streak.
+{
+  const slope = .3, scene = new THREE.Scene(); let t = 0;
+  const view = createWyrmspoutStream({scene, height: (x) => -x * slope, now: () => t});
+  const splatAt = () => { const m = new THREE.Matrix4(), p = new THREE.Vector3(), out = []; const mesh = view.group.children.find(c => c.name === 'WyrmspoutSplats'); for (let i = 0; i < mesh.count; i++) { mesh.getMatrixAt(i, m); out.push(p.setFromMatrixPosition(m).clone()); } return out; };
+  view.handleEvent({kind: 'goo_splat', by: 'x', position: [0, 0, 0], normal: [0, 1, 0]});
+  view.handleEvent({kind: 'goo_splat', by: 'x', position: [-5, 6, 0], normal: [1, 0, 0]});       // on a wall face, well above the ground
+  for (let f = 0; f < 120; f++) { t += 1 / 60; view.update(1 / 60); }
+  const after = splatAt(), puddle = after.find(p => Math.abs(p.x) < 1), wall = after.filter(p => p.x < -4);
+  assert.ok(puddle.x > .05 && puddle.x < .45, `puddle creeps a short way downhill (${puddle.x.toFixed(2)} m)`);
+  assert.ok(Math.abs(puddle.y + puddle.x * slope) < .03, 'and stays on the ground');
+  assert.ok(Math.min(...wall.map(p => p.y)) < 5.8 && Math.min(...wall.map(p => p.y)) > 5.3, 'wall splat runs down the face'); assert.ok(wall.length >= 2, 'leaving a streak');
+  view.dispose();
+}
+
 // --- presentation: the stream stays inside its fixed budgets under a long burst, remote globs and many hits
 {
   const scene = new THREE.Scene(); let t = 0;
