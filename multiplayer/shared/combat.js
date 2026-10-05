@@ -9,7 +9,7 @@ import {STUMPLING,stumplingParts,dropStumplingLoot} from './stumplings.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
 import {WYRMSPOUT,sprayTuning,spendGlob,clingSplash} from './wyrmspout.js';
-import {EMBERDEW,cinderVelocities} from './emberdew.js';
+import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 // Phoenix Flare: launch speed and extra upward loft (m/s), and the fuse before it bursts (ticks).
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
@@ -305,13 +305,12 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='wick'&&p.tool==='flask'){if(typeof m.lit!=='boolean')return fail('invalid_action');p.flaskLit=m.lit;return ok([]);}
   // Cinder Cluster (Emberdew Q): a big lit jug lobbed high; stepCombat pops it at the top of its arc into a ring of lit bottles.
   if(m.action==='special'&&p.tool==='flask'){
-    const C=EMBERDEW.cinder;
     if(state.tick-(p.specialTick??-1000)<specialCooldown('flask',p))return fail('cooldown');
     if(!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
     if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.specialTick=state.tick;
     const id=ctx.nextId(state,'q'),motion=ctx.playerVelocity?.(p),inherited=vec(motion,100)?motion:[0,0,0];
-    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'fuel',lit:true,cluster:true,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*C.speed+(i===1?C.loft:0)+inherited[i]),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'fuel',lit:true,cluster:true,position:[...m.origin],previousPosition:[...m.origin],velocity:cinderLaunch(m.direction,inherited),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
     return ok([{kind:'cinder_throw',weapon:'flask',by:p.id,position:[...m.origin],id}]);
   }
   // Phoenix Flare (Emberwing Q): a flare arrow climbs along the aim, bursts overhead, lights the area and rains

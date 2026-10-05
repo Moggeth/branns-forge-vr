@@ -361,8 +361,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // arc and where each of its little bottles will land; release lobs the jug.
   const emberdewHand=createEmberdewHand({reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const emberdewFx=createEmberdewFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
-  const flaskGuide=createTrajectoryGuide({maxPoints:128,width:6,coreWidth:1.6,color:0xffe9c4,tail:0xffb35a,halo:0xff6a1e,haloTail:0xb8341a,markerRadius:.42,sparkPx:16});scene.add(flaskGuide.object);
-  const cinderMarkers=createLandingMarkers();scene.add(cinderMarkers.object);
+  const flaskGuide=createTrajectoryGuide({maxPoints:128,width:8,coreWidth:2.2,color:0xffe9c4,tail:0xffb35a,halo:0xff6a1e,haloTail:0xb8341a,markerRadius:.42,sparkPx:16});scene.add(flaskGuide.object);
+  const cinderMarkers=createLandingMarkers({radius:.6});scene.add(cinderMarkers.object);
   let cinderAim=false,wickSentAt=-Infinity,lastFlaskThrow=-Infinity,nextFlaskScan=0,flaskHitTick=null;const flaskVelocity=[0,0,0],flaskInherited=[0,0,0],cinderLandings=new Float32Array(18);
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
@@ -1472,7 +1472,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const swinging=(progress>=0&&progress<1&&!!swingRest)||!!specialSwing||(tool==='pick'&&pickWallMotion.slamming),swayMe=snapshot.players.find(p=>p.id===playerId);
     const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
-    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='wyrmspout'?[.22,-.25,-.46]:tool==='flask'?[.23,-.27,-.46]:tool==='crossbow'?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
+    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='wyrmspout'?[.22,-.25,-.46]:tool==='flask'?[.24,-.21,-.45]:tool==='crossbow'?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000).add(sway.position));
       // Release kick: the stock shoves back and the muzzle climbs, then springs home (the bolt has already left).
       const kick=siegebirdMechanism(weapons.state().reload).kick;if(kick){weaponAnchor.position.z+=.05*kick;weaponAnchor.position.y+=.012*kick;weaponAnchor.rotateX(.075*kick);}}else if(tool==='bow'&&!renderer.xr.isPresenting){adsAmount=THREE.MathUtils.lerp(adsAmount,active&&role==='hero'&&aiming?1:0,1-Math.exp(-14*dt));weaponAnchor.position.lerp(new THREE.Vector3(-.22*Math.min(1,camera.aspect/.9),-.29,-.51),adsAmount);weaponAnchor.rotation.z=THREE.MathUtils.lerp(-.08,-.025,adsAmount);}else adsAmount=0;
@@ -1488,7 +1488,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(tool==='wyrmspout'&&weaponAnchor.visible&&!renderer.xr.isPresenting){const sp=wyrmFeel.spray(),k=wyrmFeel.goutKick(),t=now/1000;
       weaponAnchor.position.z+=.014*sp+.06*k*k;weaponAnchor.position.x+=.0025*sp*Math.sin(t*53);weaponAnchor.position.y+=.003*sp*Math.sin(t*41)+.012*k*k;weaponAnchor.rotateX(.025*sp+.008*sp*Math.sin(t*37)+.16*k*k);}
     // Emberdew: cocked at the shoulder while aiming; the throw snaps forward and a fresh bottle bobs up (emberdew-hand.js).
-    {const layer=emberdewHand.update(now/1000,dt,{aiming:tool==='flask'&&active&&role==='hero'&&aiming&&!renderer.xr.isPresenting});
+    {const layer=emberdewHand.update(now/1000,dt,{aiming:tool==='flask'&&active&&role==='hero'&&(aiming||cinderAim)&&!renderer.xr.isPresenting});
       flaskModel.visible=layer.visible;
       if(tool==='flask'&&weaponAnchor.visible&&!renderer.xr.isPresenting){adsAmount=layer.ads;weaponAnchor.position.add(layer.offset);weaponAnchor.quaternion.multiply(layer.quaternion);}
       if(layer.kick&&tool==='flask'){const [side,backward]=layer.kick,c=Math.cos(yaw),n=Math.sin(yaw);bottleFx.kick(side*c+backward*n,-side*n+backward*c);}}

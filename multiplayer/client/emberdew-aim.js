@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {EMBERDEW, cinderVelocities} from '../shared/emberdew.js';
+import {EMBERDEW, cinderLaunch, cinderVelocities} from '../shared/emberdew.js';
 import {RANGED_DT} from './ranged-trajectory.js';
 // Emberdew landing forecast. Re-integrates the host's flight (shared/combat.js stepCombat for kind 'fuel': drag,
 // gravity, trapezoid position) from the live bottle and aim every rendered frame, so the arc never steps with
@@ -10,7 +10,8 @@ const DRAG = Math.exp(-.045 * RANGED_DT), _from = [0, 0, 0], _to = [0, 0, 0], _p
 
 // mode: 'toss' (hip), 'hurl' (aimed), 'cinder' (Cinder Cluster). inherited: the thrower's own velocity [x,y,z] (m/s).
 export function flaskLaunch(mode, direction, inherited = [0, 0, 0], out = [0, 0, 0]) {
-  const t = mode === 'cinder' ? EMBERDEW.cinder : mode === 'hurl' ? EMBERDEW.hurl : EMBERDEW.toss;
+  if (mode === 'cinder') return cinderLaunch(direction, inherited, out);
+  const t = mode === 'hurl' ? EMBERDEW.hurl : EMBERDEW.toss;
   for (let i = 0; i < 3; i++) out[i] = direction[i] * t.speed + (i === 1 ? t.loft : 0) + (inherited[i] || 0);
   return out;
 }

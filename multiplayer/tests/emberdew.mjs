@@ -29,7 +29,7 @@ function land(sim){const st=sim.checkpoint(),events=[];for(const q of sim.snapsh
  assert.equal(hurl.lit,true,'an aimed throw lights the rag');assert.ok(speed(hurl.velocity)>speed(toss.velocity)*1.8,'aimed throws fly much further');}
 
 // Cinder Cluster: a big lit jug that pops at the top of its arc into five lit bottles; the Q has a 12 s recharge.
-const s=make(),p=s.snapshot().players[0],origin=[p.position[0],p.position[1]+1.4,p.position[2]],direction=[0,.1,-1].map((n,i,a)=>n/Math.hypot(...a));
+const s=make(),p=s.snapshot().players[0],origin=[p.position[0],p.position[1]+1.4,p.position[2]],direction=[0,-.1,-1].map((n,i,a)=>n/Math.hypot(...a));
 assert.equal(specialCooldown('flask',p),EMBERDEW.cinder.cooldown);
 assert.equal(action(s,'special',{origin:[NaN,0,0],direction}).code,'invalid_action','a Cinder Cluster needs an aim');
 const launched=action(s,'special',{origin,direction});assert.equal(launched.ok,true);assert.equal(launched.events[0].kind,'cinder_throw');
@@ -45,7 +45,7 @@ for(let i=0;i<400;i++){for(const e of [...s.step(),...land(s)]){if(e.kind==='cin
   if(pop&&spills.length>=EMBERDEW.cinder.bottles)break;}
 assert.ok(pop,'the jug pops');assert.equal(pop.bottles.length,EMBERDEW.cinder.bottles);
 assert.ok(Math.hypot(pop.position[0]-forecast.apex[0],pop.position[1]-forecast.apex[1],pop.position[2]-forecast.apex[2])<.01,'it pops where the forecast drew the top of the arc');
-assert.ok(pop.position[1]>origin[1]+.5,'high in the air');
+assert.ok(pop.position[1]>origin[1]+2.5,'high in the air, even aimed a little down');
 assert.equal(spills.length,EMBERDEW.cinder.bottles,'five bottles smash');assert.ok(spills.every(e=>e.lit),'each one lit');
 for(const e of spills){let best=Infinity;for(let k=0;k<forecast.landed;k++)best=Math.min(best,Math.hypot(e.position[0]-landings[k*3],e.position[2]-landings[k*3+2]));assert.ok(best<.05,`a bottle lands on its marker (${best.toFixed(3)} m)`);}
 // They rain in a ring rather than a single splat.
