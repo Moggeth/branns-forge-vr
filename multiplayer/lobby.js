@@ -38,6 +38,7 @@ import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindO
 import { adventureView } from './shared/adventure.js';
 import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import {createRoomDirectory} from './client/public-room-directory.js';
+import {findWorlds} from './client/quick-play.js';
 import {createPublicRoomBrowser,createPublicRoomsLauncher} from './client/public-rooms.js';
 import {createBattlePanel} from './client/battle-panel.js';
 import './client/public-rooms.css';
@@ -175,6 +176,7 @@ const invited = (new URLSearchParams(location.search).get('room') || '').trim();
 if (ROOM_PATTERN.test(invited)) {
   roomInput.value = invited;
   $('joinBlock').classList.add('invited');
+  $('joinBlock').hidden = false;
   body.classList.add('has-invite');
   $('inviteNote').hidden = false;
   setText($('inviteNote'), 'You’ve been invited! Pick a name and role, then join.');
@@ -182,10 +184,31 @@ if (ROOM_PATTERN.test(invited)) {
 
 $('lobbyForm').addEventListener('submit', event => {
   event.preventDefault();
+  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
-$('create').addEventListener('click', () => start({create: true}));
+$('create').addEventListener('click', () => quickPlay());
+
+// Quick play: join the fullest open world in your region, or start one if none has room.
+// A world that turns out full or gone is skipped; after three misses we just light a new one.
+let quickSearch = 0;
+async function quickPlay(tried = []) {
+  if (rendererFailed || !game) { start({create: true}); return; }
+  const search = ++quickSearch;
+  teardown(); phase = 'connecting'; body.dataset.phase = 'connecting';
+  showLobbyStatus('Finding a world near you…', {busy: true, cancel: true});
+  const {codes} = tried.length >= 3 ? {codes: []} : await findWorlds({endpoint: peerEndpoint, exclude: tried});
+  if (search !== quickSearch || phase !== 'connecting') return;   // cancelled meanwhile
+  if (codes.length) start({create: false, room: codes[0], quick: {tried: [...tried, codes[0]]}});
+  else start({create: true, quick: {tried}});
+}
+function quickFallback() {
+  if (!lastAttempt?.quick || lastAttempt.create) return false;
+  const tried = lastAttempt.quick.tried;
+  teardown(); quickPlay(tried);
+  return true;
+}
 $('solo').addEventListener('click',()=>start({create:true,solo:true}));
 $('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save}));
 
@@ -275,13 +298,13 @@ function showLobbyProblem(text, {retry = false, back = true} = {}) {
   ($('statusRetry').hidden ? $('statusBack') : $('statusRetry')).focus({preventScroll: true});
 }
 function hideLobbyStatus() { $('lobbyStatus').hidden = true; body.classList.remove('lobby-busy'); $('lobbyForm').inert = false; $('savedWorlds').inert = false; savedChooser.finish(); }
-$('statusRetry').addEventListener('click', () => { if (lastAttempt) start(lastAttempt); });
+$('statusRetry').addEventListener('click', () => { if (lastAttempt?.quick) quickPlay(); else if (lastAttempt) start(lastAttempt); });
 $('statusBack').addEventListener('click', () => {
   hideLobbyStatus();
   if (lastAttempt?.fromChooser) savedChooser.focus({action: true});   // selection was kept; Resume selected retries
-  else (lastAttempt?.create === false ? roomInput : $('create')).focus();
+  else (lastAttempt?.create === false && !lastAttempt.quick ? roomInput : $('create')).focus();
 });
-$('statusCancel').addEventListener('click', () => { teardown(); hideLobbyStatus(); setPhase('lobby'); });
+$('statusCancel').addEventListener('click', () => { quickSearch++; teardown(); hideLobbyStatus(); setPhase('lobby'); });
 
 // ---------------------------------------------------------------- phases
 function setPhase(next) {
@@ -367,11 +390,12 @@ function start(attempt) {
   }));
 
   phase = 'connecting'; body.dataset.phase = 'connecting';
-  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : `Looking for world ${attempt.room}…`;
+  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? 'Joining a world near you…' : `Looking for world ${attempt.room}…`;
   showLobbyStatus(verb, {busy: true, cancel: true});
 
   joinTimer = setTimeout(() => {
     if (session !== next || lastSnapshot) return;
+    if (quickFallback()) return;
     teardown();
     setPhase('lobby');
     showLobbyProblem(attempt.create
@@ -438,6 +462,7 @@ function onSessionError(detail) {
   recordProblem(detail);
   const message = friendlyError(detail);
   if (phase === 'connecting' && !playerId) {
+    if (quickFallback()) return;
     teardown(); setPhase('lobby');
     showLobbyProblem(message, {retry: true});
   } else if (phase === 'game') fail(message);
@@ -863,7 +888,7 @@ const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='un
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
 holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
-const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.textContent='Equipment guide';
+const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.innerHTML='<svg aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Equipment</span>';lobbyFieldButton.setAttribute('aria-label','Equipment guide');
 lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
