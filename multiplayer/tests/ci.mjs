@@ -15,7 +15,7 @@ const suite = [
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
-  'expedition-presentation.test','fire','wyrmspout','fire-authored-samples','fire-performance',
+  'expedition-presentation.test','fire','wyrmspout','emberdew','fire-authored-samples','fire-performance',
   'fire-spatial-phoenix','fire-warmup','forest-resource-integration','forge-protection','foundation-tiles',
   'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
   'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',

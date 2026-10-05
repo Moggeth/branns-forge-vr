@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>Emberdew lab</title><style>body{margin:0;background:#20242a}canvas{display:block}</style>
+<script type="module">
+// Review page for the Emberdew bottle (client/emberdew-model.js) with its sloshing dew and lit rag (client/emberdew-presentation.js).
+// lab.studio(lit, yaw, tilt) renders one bottle; lab.lineup() shows unlit / lit / sloshing side by side; lab.old() the previous flask.
+import * as T from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createEmberdewModel} from '../client/emberdew-model.js';
+import {attachEmberdew} from '../client/emberdew-presentation.js';
+const W=1280,H=800,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.6;room.dispose();scene.background=new T.Color(0x2b2f36);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x5a4b2a,1));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.position.set(-2,4,3);scene.add(sun);const rim=new T.DirectionalLight(0xffb070,1.4);rim.position.set(2,1,-3);scene.add(rim);
+const ground=new T.Mesh(new T.CircleGeometry(2,48).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x3a3530,roughness:.9}));ground.position.y=-.1;scene.add(ground);
+const cam=new T.PerspectiveCamera(30,W/H,.01,100);const bottles=[];
+function clear(){for(const b of bottles){b.root.removeFromParent();b.fx.dispose();}bottles.length=0;}
+function add(x,yaw,lit,tilt=0,slosh=0){const root=createEmberdewModel();root.position.set(x,0,0);root.rotation.set(0,yaw,tilt);scene.add(root);const fx=attachEmberdew({root});bottles.push({root,fx});
+  // settle the dew, then optionally shove it so the surface is caught mid-slosh
+  const p=new T.Vector3(),q=new T.Quaternion();root.updateWorldMatrix(true,true);root.getWorldPosition(p);root.getWorldQuaternion(q);
+  for(let i=0;i<240;i++)fx.update({dt:1/60,time:i/60,lit,worldPosition:p,worldQuaternion:q});
+  if(slosh){fx.kick(slosh,slosh*.4);for(let i=0;i<9;i++)fx.update({dt:1/60,time:4+i/60,lit,worldPosition:p,worldQuaternion:q});}
+  return {root,fx};}
+window.lab={bottles,
+ studio:(lit=false,yaw=.5,tilt=0,dist=.55)=>{clear();add(0,yaw,lit,tilt);cam.position.set(0,.05,dist);cam.lookAt(0,0,0);renderer.render(scene,cam);},
+ lineup:()=>{clear();add(-.15,.4,false);add(0,.15,true);add(.15,-.3,true,0,2.2);cam.position.set(0,.06,.85);cam.lookAt(0,0,0);renderer.render(scene,cam);},
+ face:(lit=true)=>{clear();add(0,0,lit);cam.position.set(0,-.02,.3);cam.lookAt(0,-.025,0);renderer.render(scene,cam);},
+};
+document.title='ready';
+</script>

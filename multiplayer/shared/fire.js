@@ -79,7 +79,7 @@ export function fireContact(state,shot,hit,ctx){
     const owner=state.players.find(p=>p.id===shot.ownerId),tar=hasTalent(owner,'flask','tar'),bomb=shot.lit&&hasTalent(owner,'flask','firebomb');
     addFuel(state,[point[0],ground,point[2]],tar?TAR_PIT.radius:1.2,.85,!!shot.lit,tar);
     if(shot.lit)applyHeat(state,point,bomb?FIREBOMB.radius:1.5,1,ctx);
-    events.push({kind:'fuel_spill',id:shot.id,position:[...point],normal:[...hit.normal],...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
+    events.push({kind:'fuel_spill',id:shot.id,by:shot.ownerId,position:[...point],normal:[...hit.normal],...(shot.lit?{lit:true}:{}),...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
     if(bomb){
       const hits=[];
       for(const enemy of [...state.enemies]){

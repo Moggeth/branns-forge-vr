@@ -30,8 +30,9 @@ const contact={projectileId:q.id,targetId:'world',part:'torso',point,normal:[0,1
 assert.equal(s.projectileContact({...contact,point:[40,0,40]}).ok,false);
 assert.equal(s.projectileContact(contact).ok,true);assert.equal(s.snapshot().embeds.length,0);assert.ok(s.snapshot().fireCells.some(c=>c.burning));
 // Emberdew supports unlit fuel and lit throws; all state round-trips deterministically.
-action(s,'equip',{tool:'flask'});advance(s,60);action(s,'special');assert.equal(s.snapshot().players[0].flaskLit,true);
-assert.equal(action(s,'pour',{origin,direction}).ok,true);assert.equal(s.snapshot().projectiles.at(-1).kind,'fuel');assert.equal(s.snapshot().projectiles.at(-1).lit,true);
+action(s,'equip',{tool:'flask'});advance(s,60);assert.equal(action(s,'pour',{origin,direction}).ok,true);assert.equal(s.snapshot().projectiles.at(-1).lit,false,'a hip toss is unlit');
+assert.equal(action(s,'wick',{lit:'yes'}).code,'invalid_action');assert.equal(action(s,'wick',{lit:true}).ok,true);assert.equal(s.snapshot().players[0].flaskLit,true);
+advance(s,60);assert.equal(action(s,'pour',{origin,direction}).ok,true);assert.equal(s.snapshot().projectiles.at(-1).kind,'fuel');assert.equal(s.snapshot().projectiles.at(-1).lit,true);
 let restored=loadSimulation(s.checkpoint());assert.deepEqual(restored.snapshot(),s.snapshot());advance(s,120);advance(restored,120);assert.deepEqual(s.snapshot(),restored.snapshot());
 const state={tick:0,fireCells:[],fireSurfaces:[],players:[],enemies:[],shrine:{hp:0}},ctx={terrainHeight:()=>0,damageEnemy:()=>{},damageHero:()=>{}};
 addFuel(state,[10,0,10],1.5,.8);applyHeat(state,[10,0,10],.1,1,ctx);assert.equal(state.fireCells.filter(c=>c.burning).length,1);
