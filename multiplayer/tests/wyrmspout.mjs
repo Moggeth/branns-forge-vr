@@ -52,7 +52,10 @@ const started = performance.now();
   const glb = fs.readFileSync(new URL('../public/assets/wyrmspout.glb', import.meta.url));
   const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString());
   const names = new Set(json.nodes.map(n => n.name));
-  for (const n of ['GripAnchor', 'Muzzle', 'Jaw', 'Head', 'FuelLiquid', 'Gauge_Needle', 'EmberCore', 'Neck_Scales', 'Trigger', ...['L', 'R'].flatMap(s => [1, 2, 3].map(k => `HeatVent_${s}${k}`))]) assert.ok(names.has(n), `wyrmspout.glb keeps ${n}`);
+  for (const n of ['GripAnchor', 'Muzzle', 'Jaw', 'Head', 'FuelLiquid', 'EmberCore', 'EyeGauge', 'Eye_Pupil', 'Eye_LidUpper', 'Eye_LidLower', 'Eye_Glow',
+    'FinVein_1', 'FinVein_2', 'FinVein_3', 'NostrilFlame_L', 'NostrilFlame_R', ...['L', 'R'].flatMap(s => [1, 2, 3].map(k => `HeatVent_${s}${k}`))]) assert.ok(names.has(n), `wyrmspout.glb keeps ${n}`);
+  const mats = new Set(json.materials.map(m => m.name));
+  for (const m of ['LiquidFire', 'WyrmHide', 'ScaleSteel', 'Brass', 'TankGlass', 'VeinGlow']) assert.ok(mats.has(m), `wyrmspout.glb keeps material ${m} (wyrmspout-look.js patches it by name)`);
   assert.ok(json.meshes.length <= 40, `draw-friendly mesh count (${json.meshes.length})`);
   assert.ok(glb.length < 600_000, 'small download');
 }
