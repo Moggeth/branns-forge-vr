@@ -48,6 +48,19 @@ The index introduces one refresh/alarm per occupied room per minute, separate fr
 gameplay traffic. Pagination and cleanup bound individual operations; it is not an
 unlimited-capacity lobby service.
 
+### Quick play regions (2026-10-05)
+
+The welcome screen's **Play** button reads the directory and joins the fullest joinable
+room in the player's region, else creates one (`client/quick-play.js`). Regions are
+coarse ping buckets from Cloudflare's `request.cf.continent`, never from the client:
+`na`, `sa`, `eu` (Europe + Africa), `as`, `oc` (Oceania + Antarctica). The Worker stamps
+a room's region at creation (any client-supplied `region` parameter is discarded) and
+the room's listing carries it; `GET /peer/rooms` also returns the caller's own `region`.
+No code changes are needed in the Durable Object migrations. Until this Worker version
+is deployed, rows and callers have no region, so quick play matches every room
+(fullest first) instead of by region. Rooms created before the deploy stay unregioned
+and only match unregioned callers.
+
 A full room reserves a disconnected guest's seat for five seconds. Its coordinator
 refreshes the listing at that deadline, so the vacancy does not wait for the next
 minute heartbeat. Host and pending continuation seats retain their separate recovery

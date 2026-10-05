@@ -16,7 +16,7 @@ try {
   const [hero,god]=pages;
   await hero.fill('#name','Voice Hero');await hero.click('#create');await hero.waitForFunction(()=>brannHarness.state().phase==='game',null,{timeout:60000});
   const room=await hero.evaluate(()=>brannHarness.snapshot().room);
-  await god.fill('#name','Voice God');await god.check('input[name="role"][value="god"]',{force:true});await god.fill('#room',room);await god.locator('#join').tap();
+  await god.fill('#name','Voice God');await god.check('input[name="role"][value="god"]',{force:true});await god.evaluate(r=>{document.getElementById('joinBlock').hidden=false;document.getElementById('room').value=r;},room);await god.locator('#join').tap();
   for(const page of pages)await page.waitForFunction(()=>brannHarness.snapshot()?.players.length===2,null,{timeout:60000});
   for(const page of pages){assert.equal(await page.evaluate(()=>captureCalls),0);await page.locator(page===god?'[data-touch-action="menu"]':'#menuButton').click();await page.locator('[data-voice="join"]').click();}
   await hero.waitForFunction(()=>brannHarness.voice()?.peers[0]?.state==='connected',null,{timeout:30000});
