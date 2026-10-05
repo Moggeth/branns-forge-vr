@@ -102,7 +102,8 @@ export function createPhoenixContrails({capacity = CONTRAIL.trails, samples = CO
 
   // key -> {points: [{p, t, s, seed}], live}
   const trails = new Map(), pool = [];
-  const head = new THREE.Color(0xfff2d2), mid = new THREE.Color(0xff8c16), tail = new THREE.Color(0xf03c08), tmp = new THREE.Color();
+  // Gold to orange, never red: a thin red at partial alpha over sunlit grass reads as a brown smear.
+  const head = new THREE.Color(0xfff6d0), mid = new THREE.Color(0xffbc30), tail = new THREE.Color(0xff7a14), tmp = new THREE.Color();
   const side = new THREE.Vector3(), along = new THREE.Vector3(), view = new THREE.Vector3(), cam = new THREE.Vector3();
   const lift = new THREE.Vector3(), place = new THREE.Vector3();
   let clock = 0, seeded = 0, moteDebt = 0;
