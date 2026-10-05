@@ -7,7 +7,7 @@
 // advances when window.review.step(frames) is called, so a capture script can grab frame sequences on a slow
 // software GPU. Scenes (?scene=): carry (phoenix headshot, skull hauled away), volley (curved arrows crossing the
 // view with wing contrails), arrows (embedded arrows close up), flare (Phoenix Flare
-// bursting over a skeleton). Not shipped.
+// bursting over a skeleton), ignite (one phoenix arrow biting a skeleton, close up). Not shipped.
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
@@ -78,11 +78,19 @@ function headContact() {
   if (Math.hypot(...near.map((n, i) => n - head[i])) > .3) return null;
   return {targetId: e.id, part: 'head', point: near, normal: [0, 0, 1], localPoint: [0, .12, .06], localQuaternion: [0, 0, 0, 1], boneName: 'head', projectileId: shot.id};
 }
+function torsoContact() {
+  const s = sim.snapshot(), shot = s.projectiles[0], e = s.enemies[0]; if (!shot || !e) return null;
+  const at = partPosition(e, 'torso');
+  const near = shot.trail.reduce((b, p) => Math.hypot(...p.map((n, i) => n - at[i])) < Math.hypot(...b.map((n, i) => n - at[i])) ? p : b);
+  if (Math.hypot(...near.map((n, i) => n - at[i])) > .35) return null;
+  return {targetId: e.id, part: 'torso', point: near, normal: [0, 0, 1], localPoint: [0, .05, .1], localQuaternion: [0, 0, 0, 1], boneName: 'torso', projectileId: shot.id};
+}
 const hitCount = {n: 0};
 function step(frames = 1) {
   for (let f = 0; f < frames; f++) {
     for (const e of sim.step() || []) view.handleEvent(e); frame++;
     if (pending === 'head') { const hit = headContact(); if (hit) { const r = sim.projectileContact(hit); if (r.ok) { pending = null; hitCount.n++; r.events.forEach(view.handleEvent); } } }
+    if (pending === 'torso') { const hit = torsoContact(); if (hit) { const r = sim.projectileContact(hit); if (r.ok) { pending = null; hitCount.n++; r.events.forEach(view.handleEvent); } } }
     if (sceneName === 'volley' && frame % 24 === 1 && frame < 200) {
       const k = (frame / 24) | 0, side = k % 2 ? 1 : -1;
       fire([side * 6, H(side * 6, 4) + 1.6, 4], [-side * .55, .12, -1], [0, side * .9, 0]);
@@ -93,7 +101,7 @@ function step(frames = 1) {
     aimCamera();
   }
   aimCamera(); renderer.render(scene, camera);
-  return {frame, hits: hitCount.n, carried: (sim.snapshot().detachedParts || []).filter(d => d.carry).length, contrails: view.rangedEffectStats().contrails};
+  return {frame, hits: hitCount.n, carried: (sim.snapshot().detachedParts || []).filter(d => d.carry).length, contrails: view.rangedEffectStats().contrails, ignites: view.rangedEffectStats().ignites};
 }
 const follow = new THREE.Vector3(0, 1.5, -2), camTarget = new THREE.Vector3();
 function aimCamera() {
@@ -104,6 +112,7 @@ function aimCamera() {
     camera.position.set(follow.x + 3.1, follow.y + .5, follow.z + 2.2); camera.lookAt(follow.x, follow.y + .05, follow.z);
   } else if (sceneName === 'volley') { camera.position.set(0, H(0, 7) + 2.2, 7.5); camera.lookAt(0, H(0, -6) + 1.6, -6); }
   else if (sceneName === 'flare') { camera.position.set(9, H(9, 1) + 2.4, 1); camera.lookAt(0, H(0, -15) + 3.2, -15); }
+  else if (sceneName === 'ignite') { camera.position.set(1.9, H(0, -6) + 1.9, -3.4); camera.lookAt(0, H(0, -6) + 1.2, -6); }
   else { camera.position.set(.9, H(0, -6) + 1.7, -4.6); camera.lookAt(0, H(0, -6) + 1.4, -6); }
 }
 setup();
@@ -116,6 +125,10 @@ if (sceneName === 'carry') {
   act(seq++, 'equip', {tool: 'bow'});
   const origin = [0, H(0, 8) + 1.6, 8], d = [0, .12, -1], l = Math.hypot(...d);
   window.flareResult = act(seq++, 'special', {origin, direction: d.map(n => n / l)}); window.flareResult.events.forEach(view.handleEvent);
+} else if (sceneName === 'ignite') {
+  // One curved (phoenix) arrow into the torso: the bite, its fire crown and the burn that follows.
+  const at = partPosition(sim.snapshot().enemies[0], 'torso'), origin = [2.6, at[1] + .7, 3.2];
+  fire(origin, at.map((n, i) => n - origin[i]), [0, -.55, 0]); pending = 'torso';
 } else if (sceneName === 'arrows') {
   // Six arrows into the skeleton, then it is frozen for close inspection.
   const e = sim.snapshot().enemies[0];

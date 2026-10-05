@@ -36,16 +36,44 @@ export function predictArrow(data, tick, ticks, outPosition, outVelocity) {
 }
 
 // ------------------------------------------------------------------ contrails
-// Two thin light ribbons streaming from the phoenix wing tips while the wings are out. One pooled, camera-
-// facing triangle-strip mesh (1 draw, additive, no lights); trails outlive their arrow until they fade.
-export const CONTRAIL = Object.freeze({life: .32, samples: 22, trails: 16, width: .012, spread: .06, minStep: .045, brightness: .6});
+// Light ribbons streaming from the phoenix wing tips while the wings are out. One pooled, camera-facing
+// mesh (1 draw, additive, no lights); trails outlive their arrow until they fade.
+//
+// Each sample is a row of four vertices, not two: a narrow white-hot core flanked by a wide soft haze,
+// so the ribbon has a glow falloff across its width instead of reading as a flat bar. The ribbon also
+// licks: every sample carries a seed that waves it across its own width and lifts it as it cools, so the
+// trail behaves like flame coming off a wing rather than a clean contrail. Ember motes shed from the
+// cooling half of each trail and drift up (a second pooled draw) — the wing is on fire, and it sheds.
+export const CONTRAIL = Object.freeze({life: .52, samples: 24, trails: 16, width: .02, spread: .16, minStep: .04,
+  brightness: 1.15, core: .3, lick: .05, rise: .3, motes: 160, moteRate: 26, moteLife: .75, moteSize: .1});
+// Offsets across the ribbon, and how bright each column is: soft haze, hot core, hot core, soft haze.
+const COLUMN_OFFSET = [-1, -CONTRAIL.core, CONTRAIL.core, 1], COLUMN_LIGHT = [.1, 1, 1, .1], COLUMNS = 4;
+// Three quads span the four columns of each segment.
+const SEGMENT_INDICES = (COLUMNS - 1) * 6;
+
+// Soft round spark, built in code so the module stays loadable under Node (tests) with no image decode.
+let sharedMote = null;
+function moteTexture(size = 32) {
+  if (sharedMote) return sharedMote;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const dx = (x + .5) / size * 2 - 1, dy = (y + .5) / size * 2 - 1, i = (y * size + x) * 4;
+    data[i] = data[i + 1] = data[i + 2] = 255;
+    data[i + 3] = Math.round(255 * Math.pow(Math.max(0, 1 - Math.hypot(dx, dy)), 2.4));
+  }
+  sharedMote = new THREE.DataTexture(data, size, size); sharedMote.needsUpdate = true;
+  sharedMote.colorSpace = THREE.SRGBColorSpace; return sharedMote;
+}
 
 export function createPhoenixContrails({capacity = CONTRAIL.trails, samples = CONTRAIL.samples} = {}) {
-  const verts = capacity * samples * 2;
+  const verts = capacity * samples * COLUMNS;
   const position = new Float32Array(verts * 3), color = new Float32Array(verts * 3);
-  const index = new Uint16Array(capacity * (samples - 1) * 6);
-  for (let t = 0, o = 0; t < capacity; t++) for (let i = 0; i < samples - 1; i++, o += 6) {
-    const a = (t * samples + i) * 2; index.set([a, a + 1, a + 2, a + 2, a + 1, a + 3], o);
+  const index = new Uint16Array(capacity * (samples - 1) * SEGMENT_INDICES);
+  for (let t = 0, o = 0; t < capacity; t++) for (let i = 0; i < samples - 1; i++) {
+    const a = (t * samples + i) * COLUMNS;
+    for (let c = 0; c < COLUMNS - 1; c++, o += 6) {
+      const l = a + c, r = l + COLUMNS; index.set([l, r, l + 1, l + 1, r, r + 1], o);
+    }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(position, 3).setUsage(THREE.DynamicDrawUsage));
@@ -54,11 +82,26 @@ export function createPhoenixContrails({capacity = CONTRAIL.trails, samples = CO
   const material = new THREE.MeshBasicMaterial({vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: true});
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'emberwing-contrails'; mesh.frustumCulled = false; mesh.renderOrder = 2; mesh.userData.ignoreContact = true;
-  // key -> {points: [{p: Vector3, t}], live}
+
+  // Ember motes: sparks shed from the cooling half of the ribbon, drifting up as they die (1 draw).
+  const moteGeometry = new THREE.BufferGeometry();
+  const motePosition = new Float32Array(CONTRAIL.motes * 3), moteColor = new Float32Array(CONTRAIL.motes * 3);
+  moteGeometry.setAttribute('position', new THREE.BufferAttribute(motePosition, 3).setUsage(THREE.DynamicDrawUsage));
+  moteGeometry.setAttribute('color', new THREE.BufferAttribute(moteColor, 3).setUsage(THREE.DynamicDrawUsage));
+  const moteMaterial = new THREE.PointsMaterial({size: CONTRAIL.moteSize, vertexColors: true, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, sizeAttenuation: true, map: moteTexture()});
+  const motes = new THREE.Points(moteGeometry, moteMaterial);
+  motes.name = 'emberwing-contrail-motes'; motes.frustumCulled = false; motes.renderOrder = 2; motes.userData.ignoreContact = true;
+  mesh.add(motes); // one object for the caller to add and dispose; motes keep their own draw
+  const live = []; // {p, v, age, life, seed}
+  const motePool = [];
+
+  // key -> {points: [{p, t, s, seed}], live}
   const trails = new Map(), pool = [];
-  const head = new THREE.Color(0xfff4d8), mid = new THREE.Color(0xffb347), tail = new THREE.Color(0xd9461c), tmp = new THREE.Color();
+  const head = new THREE.Color(0xfffaf0), mid = new THREE.Color(0xffb13c), tail = new THREE.Color(0xd93b12), tmp = new THREE.Color();
   const side = new THREE.Vector3(), along = new THREE.Vector3(), view = new THREE.Vector3(), cam = new THREE.Vector3();
-  let clock = 0;
+  const lift = new THREE.Vector3(), place = new THREE.Vector3();
+  let clock = 0, seeded = 0, moteDebt = 0;
   // Record a wing tip this frame. strength 0..1 scales the light (wings folding away dim their trails).
   function emit(key, point, strength = 1) {
     let trail = trails.get(key);
@@ -66,45 +109,91 @@ export function createPhoenixContrails({capacity = CONTRAIL.trails, samples = CO
     trail.live = true; trail.strength = strength;
     const last = trail.points[trail.points.length - 1];
     if (last && last.p.distanceToSquared(point) < CONTRAIL.minStep * CONTRAIL.minStep) { last.p.copy(point); last.t = clock; last.s = strength; return; }
-    const sample = pool.pop() || {p: new THREE.Vector3(), t: 0, s: 1};
-    sample.p.copy(point); sample.t = clock; sample.s = strength; trail.points.push(sample);
+    const sample = pool.pop() || {p: new THREE.Vector3(), t: 0, s: 1, seed: 0};
+    sample.p.copy(point); sample.t = clock; sample.s = strength; sample.seed = (seeded = (seeded * 9301 + 49297) % 233280) / 233280 * Math.PI * 2;
+    trail.points.push(sample);
     if (trail.points.length > samples) pool.push(trail.points.shift());
+  }
+  // Shed a spark from a point on the ribbon that has started to cool.
+  function shed(point, strength) {
+    if (live.length >= CONTRAIL.motes) return;
+    const mote = motePool.pop() || {p: new THREE.Vector3(), v: new THREE.Vector3(), age: 0, life: 1, seed: 0};
+    mote.p.copy(point); mote.age = 0; mote.seed = Math.random() * Math.PI * 2;
+    mote.life = CONTRAIL.moteLife * (.55 + .45 * Math.random()) * strength;
+    mote.v.set((Math.random() - .5) * .7, .5 + Math.random() * 1.1, (Math.random() - .5) * .7);
+    live.push(mote);
+  }
+  function updateMotes(dt) {
+    let n = 0;
+    for (let i = live.length - 1; i >= 0; i--) {
+      const mote = live[i]; mote.age += dt;
+      if (mote.age >= mote.life) { live.splice(i, 1); motePool.push(mote); continue; }
+      // Embers slow, float up on their own heat, and wander.
+      mote.v.multiplyScalar(Math.exp(-2.1 * dt)); mote.v.y += 1.35 * dt;
+      mote.p.addScaledVector(mote.v, dt);
+      mote.p.x += Math.sin(mote.age * 7 + mote.seed) * .22 * dt;
+      const k = 1 - mote.age / mote.life, o = n * 3;
+      motePosition[o] = mote.p.x; motePosition[o + 1] = mote.p.y; motePosition[o + 2] = mote.p.z;
+      tmp.setRGB(1, .42 + .45 * k, .12 * k * k).multiplyScalar(k * k * 1.5);
+      moteColor[o] = tmp.r; moteColor[o + 1] = tmp.g; moteColor[o + 2] = tmp.b; n++;
+    }
+    moteGeometry.setDrawRange(0, n);
+    for (const name of ['position', 'color']) { const a = moteGeometry.attributes[name]; a.clearUpdateRanges(); a.addUpdateRange(0, n * 3); a.needsUpdate = true; }
+    motes.visible = n > 0;
+    return n;
   }
   function update(dt, camera) {
     clock += dt; let n = 0;
     if (camera) camera.getWorldPosition(cam);
+    moteDebt += dt * CONTRAIL.moteRate;
     for (const [key, trail] of trails) {
       while (trail.points.length && clock - trail.points[0].t > CONTRAIL.life) pool.push(trail.points.shift());
       if (!trail.points.length) { trails.delete(key); continue; }
       trail.live = false;
       const pts = trail.points, count = pts.length; if (count < 2) continue;
       for (let i = 0; i < samples; i++) {
-        const sample = pts[Math.min(i, count - 1)], v = (n * samples + i) * 2;
+        const sample = pts[Math.min(i, count - 1)], row = (n * samples + i) * COLUMNS;
         const prev = pts[Math.max(0, Math.min(i, count - 1) - 1)].p, next = pts[Math.min(count - 1, i + 1)].p;
         along.subVectors(next, prev); if (along.lengthSq() < 1e-10) along.set(0, 0, 1);
         view.subVectors(cam, sample.p); side.crossVectors(along, view); if (side.lengthSq() < 1e-10) side.set(0, 1, 0);
-        // Age 0 at the wing tip: thin and bright; it widens and cools as it drifts back, then fades out.
+        // Age 0 at the wing tip: thin and bright; it widens, cools and rises as it drifts back, then fades out.
         const age = Math.min(1, (clock - sample.t) / CONTRAIL.life), fade = (1 - age) * (1 - age) * sample.s;
-        const width = (CONTRAIL.width + CONTRAIL.spread * age) * .5, rise = .12 * age * age;
-        side.normalize().multiplyScalar(width);
-        const live = i < count ? 1 : 0;
-        if (age < .35) tmp.copy(head).lerp(mid, age / .35); else tmp.copy(mid).lerp(tail, (age - .35) / .65);
+        const width = (CONTRAIL.width + CONTRAIL.spread * age * age) * .5;
+        side.normalize();
+        // Flame, not vapour: the cooling tail waves across its own width and floats upward.
+        lift.copy(side).multiplyScalar(Math.sin(clock * 9 + sample.seed) * CONTRAIL.lick * age);
+        lift.y += CONTRAIL.rise * age * age;
+        const alive = i < count ? 1 : 0;
+        if (age < .3) tmp.copy(head).lerp(mid, age / .3); else tmp.copy(mid).lerp(tail, (age - .3) / .7);
         // Fresh samples ease in so the trail never starts as a hard bar at the wing.
         const ease = Math.min(1, (count - 1 - Math.min(i, count - 1)) / 2 + .35);
-        tmp.multiplyScalar(fade * live * ease * CONTRAIL.brightness);
-        for (let s = 0; s < 2; s++) {
-          const o = (v + s) * 3, sign = s ? 1 : -1;
-          position[o] = sample.p.x + side.x * sign; position[o + 1] = sample.p.y + side.y * sign + rise; position[o + 2] = sample.p.z + side.z * sign;
-          color[o] = tmp.r; color[o + 1] = tmp.g; color[o + 2] = tmp.b;
+        tmp.multiplyScalar(fade * alive * ease * CONTRAIL.brightness);
+        for (let c = 0; c < COLUMNS; c++) {
+          const o = (row + c) * 3, reach = COLUMN_OFFSET[c] * width, light = COLUMN_LIGHT[c];
+          position[o] = sample.p.x + side.x * reach + lift.x;
+          position[o + 1] = sample.p.y + side.y * reach + lift.y;
+          position[o + 2] = sample.p.z + side.z * reach + lift.z;
+          color[o] = tmp.r * light; color[o + 1] = tmp.g * light; color[o + 2] = tmp.b * light;
+        }
+        // Sparks come off the half of the ribbon that has begun to cool, where the flame is breaking up.
+        if (alive && age > .35 && age < .8 && moteDebt >= 1 && trail.strength > .25) {
+          moteDebt -= 1; shed(place.copy(sample.p).add(lift), trail.strength);
         }
       }
       n++;
     }
-    geometry.setDrawRange(0, n * (samples - 1) * 6);
-    for (const name of ['position', 'color']) { const a = geometry.attributes[name]; a.clearUpdateRanges(); a.addUpdateRange(0, n * samples * 6); a.needsUpdate = true; }
-    mesh.visible = n > 0;
+    if (moteDebt > 4) moteDebt = 4;
+    geometry.setDrawRange(0, n * (samples - 1) * SEGMENT_INDICES);
+    for (const name of ['position', 'color']) { const a = geometry.attributes[name]; a.clearUpdateRanges(); a.addUpdateRange(0, n * samples * COLUMNS * 3); a.needsUpdate = true; }
+    const sparks = updateMotes(dt);
+    mesh.visible = n > 0 || sparks > 0;
+    if (!n) geometry.setDrawRange(0, 0);
     return n;
   }
-  function dispose() { mesh.removeFromParent(); geometry.dispose(); material.dispose(); trails.clear(); }
-  return {object: mesh, emit, update, dispose, stats: () => ({trails: trails.size, drawCalls: mesh.visible ? 1 : 0}), capacity};
+  function dispose() {
+    mesh.removeFromParent(); geometry.dispose(); material.dispose(); trails.clear();
+    motes.removeFromParent(); moteGeometry.dispose(); moteMaterial.dispose(); live.length = 0;
+  }
+  return {object: mesh, emit, update, dispose, capacity,
+    stats: () => ({trails: trails.size, motes: live.length, drawCalls: (geometry.drawRange.count > 0 ? 1 : 0) + (motes.visible ? 1 : 0)})};
 }
