@@ -1,4 +1,5 @@
 import {SPELLS, WEAPONS} from '../shared/spells.js';
+import {WYRMSPOUT} from '../shared/wyrmspout.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {SIEGEBIRD} from '../shared/combat.js';
 
@@ -11,10 +12,10 @@ export function readiness(lastTick, duration, tick) {
 export function weaponReadiness(player = {}, tool = 'axe', tick = 0) {
   // A Siegebird reload after a perfect wind runs quick (shared/combat.js SIEGEBIRD).
   const basic = tool === 'crossbow' && player.siegebird?.quick ? SIEGEBIRD.quickTicks : WEAPONS.find(w => w.id === tool)?.cooldown || 0;
-  const secondary = specialCooldown(tool);
+  const secondary = specialCooldown(tool, player);
   const overheated = (player.overheatUntil || 0) > tick;
   return {
-    attackReady: overheated ? clamp(1 - (player.overheatUntil - tick) / 180) : readiness(player.attackTick, basic, tick),
+    attackReady: overheated ? clamp(1 - (player.overheatUntil - tick) / WYRMSPOUT.refillTicks) : readiness(player.attackTick, basic, tick),
     specialReady: secondary ? readiness(player.specialTick, secondary, tick) : 1,
     hasSpecialCooldown: secondary > 0,
     heat: clamp(player.heat || 0), overheated,

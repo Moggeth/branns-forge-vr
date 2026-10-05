@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -14,6 +15,16 @@ export const HOME = Object.freeze({
     ballista: Object.freeze({hp: 300, range: 22, cooldown: 240, damage: 40, heroDamage: 20}),
   }),
   reward: Object.freeze({iron: 12, wood: 12, gems: 6, starOre: 3}),
+  // Hands-on pieces (shared/home-interact.js): drink at the fountain, ring the barracks bell, hammer-mend parts.
+  drink: Object.freeze({reach: 3, heal: 40, cooldown: 20 * 60}),
+  bell: Object.freeze({reach: 2.6, cooldown: 75 * 60}),
+  repair: 30,
+});
+// Manned home ballistas (shared/home-ballista.js): a Hero aims, fires and cranks one like a Timberline.
+export const HOME_MANNED = Object.freeze({
+  reach: 3.4, seat: 1.4, pitchMin: -8 * Math.PI / 180, pitchMax: 25 * Math.PI / 180,
+  range: 30, reloadTicks: 150, fireTicks: 30, crankHold: 12, operatorBoost: 2, helperBoost: 3,
+  damage: 60, heroDamage: 30, muzzle: 1.45,
 });
 export const HOME_NAMES = Object.freeze({party: 'Dawnhold', rivals: 'Grumblekeep'});
 export const HOME_SITES = Object.freeze({party: Object.freeze([-36, -36]), rivals: Object.freeze([36, 36])});
@@ -25,6 +36,11 @@ export const HOME_LAYOUT = Object.freeze({
   pylons: Object.freeze([[6.6, 11.43], [-6.6, 11.43], [0, -13.2]].map(Object.freeze)),
   spires: Object.freeze([[-4, 16], [4, 16]].map(Object.freeze)),
   ballistas: Object.freeze([[-9.5, 14.5], [9.5, 14.5]].map(Object.freeze)),
+  gate: Object.freeze([0, 13.5]), gatePillars: Object.freeze([[-2.6, 13.5], [2.6, 13.5]].map(Object.freeze)),
+  // Boundary wards ring the dome every 22.5 degrees, leaving the gate and the three pylons clear.
+  wards: Object.freeze([45, 67.5, 90, 112.5, 135, 157.5, -157.5, -135, -112.5, -90, -67.5, -45]
+    .map(d => Object.freeze([+(Math.sin(d * Math.PI / 180) * 14).toFixed(3), +(Math.cos(d * Math.PI / 180) * 14).toFixed(3)]))),
+  bellPost: Object.freeze([2.95, 2.75]), // in the barracks' own frame (three.js x, z)
 });
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
@@ -128,6 +144,19 @@ export function damageHome(state, id, amount, side, events) {
 }
 
 /** Per tick: rebuilds, pylon recovery, fountains and turret fire. */
+/** A Hero's hammer mends a damaged or broken pylon or turret of their own base. A mended pylon lifts a fallen dome. */
+export function repairHome(state, id, side, events) {
+  const found = findHomeTarget(state, id);
+  if (!homeBattle(state) || !found || found.target === found.base || found.base.side !== side || baseFallen(state, found.base)) return false;
+  const {base, target} = found;
+  if (target.hp >= target.maxHp) return false;
+  const was = target.hp, dome = shieldUp(state, base);
+  target.hp = Math.min(target.maxHp, target.hp + HOME.repair);
+  events.push({kind: 'home_part_repaired', id, part: target.kind, side, hp: target.hp, mended: was <= 0, position: [...target.position]});
+  if (!dome && target.kind === 'pylon' && shieldUp(state, base)) { base.shieldDownUntil = 0; events.push({kind: 'home_shield_up', id: base.id, side, position: [...base.position]}); }
+  return true;
+}
+
 export function stepHomeBases(state, ctx, events) {
   if (!homeBattle(state)) return;
   const heroes = state.players.filter(p => p.role === 'hero' && p.hp > 0);
@@ -147,11 +176,11 @@ export function stepHomeBases(state, ctx, events) {
     }
     // The fountain mends its own side inside the dome footprint.
     if (state.tick % HOME.fountainEvery === 0) {
-      for (const hero of heroes) if (sideKey(hero.side) === base.side && hero.hp < 100 && flat(hero.position, base.position) <= HOME.domeRadius) hero.hp = Math.min(100, hero.hp + HOME.fountainHeal);
+      for (const hero of heroes) if (sideKey(hero.side) === base.side && hero.hp < heroMaxHp(hero) && flat(hero.position, base.position) <= HOME.domeRadius) hero.hp = Math.min(heroMaxHp(hero), hero.hp + HOME.fountainHeal);
       for (const bot of state.enemies) if (bot.battleRun !== undefined && bot.side === base.side && bot.hp > 0 && flat(bot.position, base.position) <= HOME.domeRadius) bot.hp = Math.min(bot.kind === 'golem' ? 320 : 100, bot.hp + HOME.fountainHeal);
     }
     for (const turret of base.parts) {
-      if (turret.kind === 'pylon' || turret.hp <= 0 || state.tick < turret.readyTick) continue;
+      if (turret.kind === 'pylon' || turret.hp <= 0 || turret.operator || state.tick < turret.readyTick) continue;
       const spec = HOME.turrets[turret.kind];
       let best = null, range = spec.range;
       for (const bot of state.enemies) if (bot.hp > 0 && bot.battleRun !== undefined && bot.side !== base.side) { const d = flat(bot.position, turret.position); if (d <= range) { range = d; best = bot; } }
@@ -184,11 +213,17 @@ export function resolveHomeDomes(state, position, side, radius = .3) {
 const SOLIDS = Object.freeze([
   {at: [0, 0], r: 3.3}, {at: HOME_LAYOUT.fountain, r: 2.0},
   ...HOME_LAYOUT.pylons.map(at => ({at, r: .9})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95})),
+  ...HOME_LAYOUT.gatePillars.map(at => ({at, r: .85})), ...HOME_LAYOUT.wards.map(at => ({at, r: .45})),
 ]);
 const BARRACKS = Object.freeze({half: [3.2, 2.2], yaw: .55});
 /** World yaw (three.js, about +Y) of a base's gate; local +Z of a piece points out of the gate. */
 export const gateYaw = side => { const {forward} = homeFrame(side); return Math.atan2(forward[0], forward[1]); };
 export const barracksYaw = side => gateYaw(side) + (side === 'rivals' ? BARRACKS.yaw : -BARRACKS.yaw);
+/** World [x, z] of a base's bell post, beside the barracks door. */
+export function bellPostAt(side) {
+  const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks), t = barracksYaw(side), c = Math.cos(t), sn = Math.sin(t), [px, pz] = HOME_LAYOUT.bellPost;
+  return [bx + px * c + pz * sn, bz - px * sn + pz * c];
+}
 export function resolveHomeStructures(state, position, radius = .3) {
   if (!homeBattle(state)) return position;
   for (const side of ['party', 'rivals']) {
@@ -208,6 +243,8 @@ export function resolveHomeStructures(state, position, radius = .3) {
       if (hu - Math.abs(u) < hv - Math.abs(v)) nu = Math.sign(u || 1) * hu; else nv = Math.sign(v || 1) * hv;
       position[0] = bx + nu * c + nv * sn; position[2] = bz - nu * sn + nv * c;
     }
+    const [postX, postZ] = bellPostAt(side), ex = position[0] - postX, ez = position[2] - postZ, ed = Math.hypot(ex, ez), em = .3 + radius;
+    if (ed < em && ed > 1e-4) { position[0] = postX + ex / ed * em; position[2] = postZ + ez / ed * em; }
   }
   return position;
 }
@@ -222,6 +259,18 @@ const int = (n, a, b) => Number.isSafeInteger(n) && n >= a && n <= b;
 const num = (n, a, b) => Number.isFinite(n) && n >= a && n <= b;
 const vec = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
+// Optional manning fields a saved ballista may carry; anything out of range fails the restore.
+function manning(p, tick) {
+  const out = {}, M = HOME_MANNED;
+  if (p.operator != null) { if (typeof p.operator !== 'string' || !/^[-\w]{1,64}$/.test(p.operator)) throw Error('Invalid home bases'); out.operator = p.operator; }
+  for (const [k, a, b] of [['aimYaw', -Math.PI, Math.PI], ['aimPitch', M.pitchMin, M.pitchMax], ['fireTick', -1000, tick], ['crankUntil', 0, tick + M.crankHold], ['helpUntil', 0, tick + M.crankHold]]) {
+    if (p[k] === undefined) continue;
+    if (!num(p[k], a, b)) throw Error('Invalid home bases');
+    out[k] = p[k];
+  }
+  return out;
+}
+
 export function restoreHomeBases(bases, tick) {
   const bad = () => { throw Error('Invalid home bases'); };
   if (!Array.isArray(bases) || bases.length !== 2) bad();
@@ -234,8 +283,14 @@ export function restoreHomeBases(bases, tick) {
       const p = b.parts[n];
       if (!p || p.id !== id || p.kind !== kind || p.side !== side || p.maxHp !== partMaxHp(kind) || !num(p.hp, 0, p.maxHp) || !vec(p.position) || Math.abs(p.position[1]) > 200
         || (kind !== 'pylon' && !num(p.readyTick, 0, tick + 600))) bad();
-      return {id, kind, side, position: [...p.position], hp: p.hp, maxHp: p.maxHp, ...(kind === 'pylon' ? {} : {readyTick: p.readyTick})};
+      return {id, kind, side, position: [...p.position], hp: p.hp, maxHp: p.maxHp, ...(kind === 'pylon' ? {} : {readyTick: p.readyTick}), ...(kind === 'ballista' ? manning(p, tick) : {})};
     });
-    return {id: b.id, side, position: [...b.position], hp: b.hp, maxHp: b.maxHp, level: b.level, shieldDownUntil: b.shieldDownUntil, fallenUntil: b.fallenUntil, parts};
+    const extra = {};
+    for (const [k, span] of [['drinkReadyTick', HOME.drink.cooldown], ['bellReadyTick', HOME.bell.cooldown]]) {
+      if (b[k] === undefined) continue;
+      if (!num(b[k], 0, tick + span)) bad();
+      extra[k] = b[k];
+    }
+    return {id: b.id, side, position: [...b.position], hp: b.hp, maxHp: b.maxHp, level: b.level, shieldDownUntil: b.shieldDownUntil, fallenUntil: b.fallenUntil, parts, ...extra};
   });
 }

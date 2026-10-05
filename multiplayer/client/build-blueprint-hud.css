@@ -1,0 +1,48 @@
+/* Placement tooltip. Blueprint blue to match the ghost in the world; turns red with the refusal reason. */
+.bp-hud {
+  --bp-ink: #a6e4ff; --bp-glow: #4fb4ff; --bp-bad: #ffa196;
+  /* Desktop sits under the top bar so the ground in front of you, where the blueprint stands, stays clear. */
+  position: fixed; left: 50%; top: calc(66px + var(--bf-safe-t, 0px)); transform: translateX(-50%);
+  z-index: 6; display: flex; flex-direction: column-reverse; align-items: center; gap: 6px;
+  max-width: min(94vw, 760px); pointer-events: none; user-select: none;
+  font: 600 13px/1.25 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--bf-parch, #f1e4c8);
+}
+.bp-hud[hidden] { display: none; }
+.bp-bar {
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px 14px;
+  padding: 8px 14px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(14, 30, 46, .9), rgba(10, 20, 32, .92));
+  border: 1px solid color-mix(in srgb, var(--bp-glow) 55%, transparent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 0 18px rgba(79, 180, 255, .22), 0 6px 18px rgba(0, 0, 0, .35);
+}
+.bp-title { color: var(--bp-ink); letter-spacing: .02em; display: flex; flex-direction: column; }
+.bp-title small { font-weight: 500; font-size: 11px; opacity: .75; color: var(--bf-parch, #f1e4c8); }
+.bp-keys { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; font-weight: 500; }
+.bp-soft { opacity: .65; }
+.bp-hud kbd {
+  display: inline-block; min-width: 1.4em; padding: 1px 6px; border-radius: 5px; text-align: center;
+  font: 600 11px/1.5 system-ui, sans-serif; color: #0d1b28; background: var(--bp-ink);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+}
+.bp-why {
+  margin: 0; padding: 5px 12px; border-radius: 9px; max-width: 100%; text-align: center;
+  background: rgba(46, 14, 12, .9); border: 1px solid rgba(240, 100, 88, .6); color: var(--bp-bad); font-weight: 600;
+}
+.bp-bad .bp-bar { border-color: rgba(240, 100, 88, .6); box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 0 18px rgba(240, 100, 88, .2), 0 6px 18px rgba(0, 0, 0, .35); }
+.bp-bad .bp-title { color: var(--bp-bad); }
+.bp-btn {
+  pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: var(--bf-touch, 48px); min-height: var(--bf-touch, 48px); padding: 4px 10px; border-radius: 11px;
+  font: 700 11px/1 system-ui, sans-serif; color: var(--bf-parch, #f1e4c8);
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(166, 228, 255, .35);
+}
+.bp-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.bp-btn:active { transform: scale(.95); }
+.bp-go { color: #0d1b28; background: var(--bp-ink); border-color: var(--bp-ink); box-shadow: 0 0 12px rgba(79, 180, 255, .45); }
+.bp-go[aria-disabled="true"] { color: var(--bp-bad); background: rgba(46, 14, 12, .7); border-color: rgba(240, 100, 88, .6); box-shadow: none; }
+.bp-no { border-color: rgba(240, 100, 88, .45); }
+.bp-hud[data-mode="touch"] { top: auto; bottom: calc(14px + var(--bf-safe-b, 0px)); flex-direction: column; }
+.bp-hud[data-mode="touch"] .bp-bar { padding: 6px 8px 6px 12px; gap: 8px; flex-wrap: nowrap; }
+@media (max-width: 520px) { .bp-hud[data-mode="touch"] .bp-title small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .bp-btn:active { transform: none; } }

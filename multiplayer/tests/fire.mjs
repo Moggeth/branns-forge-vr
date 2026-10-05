@@ -2,19 +2,27 @@ import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {addFuel,applyHeat,quenchFire,stepFire,restoreFire,FIRE_LIMITS} from '../shared/fire.js';
 import {createWeaponController} from '../client/weapon-controller.js';
+import {WYRMSPOUT,sprayTuning} from '../shared/wyrmspout.js';
 const begin=performance.now(),advance=(s,n)=>{for(let i=0;i<n;i++)s.step();};
 let seq=0;const action=(s,action,rest={})=>s.command('h',{type:'action',seq:++seq,action,...rest});
 const make=()=>{const s=createSimulation({legacyBattle:true,legacyBattle:true});s.addPlayer({id:'h'});return s;};
 let s=make();assert.equal(action(s,'equip',{tool:'wyrmspout'}).ok,true);
 const origin=[0,1.5,8],direction=[0,0,-1];
+// Wyrmspout tank: 21 globs empty it (1.75 s at 12 per second); an empty tank locks for 3 s while it refills.
 assert.equal(action(s,'flame',{origin,direction}).ok,true);
 assert.equal(action(s,'flame',{origin,direction}).code,'cooldown');
-assert.equal(action(s,'special').code,'release_to_vent');
-for(let i=1;i<80;i++){advance(s,6);assert.equal(action(s,'flame',{origin,direction}).ok,true);}
+for(let i=1;i<WYRMSPOUT.globs;i++){advance(s,5);assert.equal(action(s,'flame',{origin,direction}).ok,true,`glob ${i}`);}
 assert.equal(s.snapshot().players[0].heat,1);assert.ok(s.snapshot().players[0].overheatUntil>s.snapshot().tick);
-assert.equal(action(s,'special').code,'overheated');assert.equal(action(s,'flame',{origin,direction}).code,'overheated');
-advance(s,180);assert.ok(s.snapshot().players[0].heat<.5);assert.equal(action(s,'flame',{origin,direction}).ok,true);
-advance(s,12);const heat=s.snapshot().players[0].heat;assert.equal(action(s,'special').ok,true);assert.ok(s.snapshot().players[0].heat<heat);
+assert.equal(action(s,'special',{origin,direction}).code,'overheated');assert.equal(action(s,'flame',{origin,direction}).code,'overheated');
+advance(s,WYRMSPOUT.refillTicks);assert.equal(s.snapshot().players[0].heat,0);assert.equal(action(s,'flame',{origin,direction}).ok,true);
+// Letting go early refills after a short pause.
+const early=s.snapshot().players[0].heat;advance(s,WYRMSPOUT.refillDelay);assert.equal(s.snapshot().players[0].heat,early);advance(s,20);assert.ok(s.snapshot().players[0].heat<early);
+// Gout: a lobbed splash that costs part of the tank and has its own cooldown.
+assert.equal(action(s,'special',{origin,direction}).ok,true);assert.ok(s.snapshot().projectiles.at(-1).gout);assert.ok(s.snapshot().players[0].heat>=WYRMSPOUT.gout.cost);
+advance(s,5);assert.equal(action(s,'special',{origin,direction}).code,'cooldown');
+// Wyrmflood: a longer burst with more globs that reach further.
+{const base=sprayTuning({}),flood=sprayTuning({talents:{wyrmspout:['flood']}});assert.ok(flood.burstTicks>=base.burstTicks*1.45&&flood.globs>base.globs&&flood.speed>base.speed&&flood.lifeTicks>base.lifeTicks);
+ const cling=sprayTuning({talents:{wyrmspout:['cling']}});assert.equal(cling.burnTicks,base.burnTicks*2);assert.ok(cling.burnTicks<=240);}
 // Only host-validated swept contacts ignite; flame packets do not become arrows.
 s=make();action(s,'equip',{tool:'wyrmspout'});action(s,'flame',{origin:[0,.3,8],direction:[0,-1,0]});advance(s,2);
 const q=s.snapshot().projectiles[0],point=q.position;

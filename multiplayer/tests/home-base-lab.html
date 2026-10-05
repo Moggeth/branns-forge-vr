@@ -5,6 +5,7 @@ import * as T from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createSimulation} from '../shared/simulation.js';
 import {createHomeBaseView} from '../client/home-base-view.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 const q=new URLSearchParams(location.search),W=+q.get('w')||1280,H=+q.get('h')||720;
 const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
 const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.5;room.dispose();scene.background=new T.Color(0xa9c3d8);scene.fog=new T.Fog(0xa9c3d8,60,160);
@@ -13,7 +14,9 @@ const ground=new T.Mesh(new T.PlaneGeometry(240,240).rotateX(-Math.PI/2),new T.M
 const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene});
 const cam=new T.PerspectiveCamera(50,W/H,.1,400);let last=performance.now();
 function frame(){const now=performance.now();view.update(Math.min(.05,(now-last)/1000),cam);last=now;renderer.render(scene,cam);}
-window.lab={sim,view,
+window.lab={sim,view,kit:null,
+ loadKit:()=>new Promise((ok,bad)=>new GLTFLoader().load('/assets/bases_kit.glb',g=>{window.lab.kit=view.installKit(g);view.sync(sim.snapshot());ok(window.lab.kit);},undefined,bad)),
+ look:(x,y,z,tx,ty,tz)=>{cam.position.set(x,y,z);cam.lookAt(tx,ty,tz);view.sync(sim.snapshot());frame();},
  at:(side='party',mode='aerial')=>{const c=side==='party'?[-36,-36]:[36,36],f=side==='party'?[1,1]:[-1,-1];const n=Math.SQRT1_2;
   if(mode==='aerial'){cam.position.set(c[0]+f[0]*n*30+f[1]*n*14,18,c[1]+f[1]*n*30-f[0]*n*14);cam.lookAt(c[0]+f[0]*n*2,2,c[1]+f[1]*n*2);}
   else{cam.position.set(c[0]+f[0]*n*24,3,c[1]+f[1]*n*24);cam.lookAt(c[0],3.5,c[1]);}

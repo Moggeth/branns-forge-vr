@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {createSiegebirdRune} from './siegebird-rune.js';
 import {SIEGEBIRD_RELOAD, siegebirdSide, siegebirdPlumage, easeInOut} from './siegebird-reload.js';
 
 // Siegebird reload songbirds. Each reload a small bird flies in from off-frame (right, then left, alternating),
@@ -489,6 +490,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       const age = time - r.userData.at; if (age > .45) { r.visible = false; continue; }
       r.scale.setScalar(r.userData.size * (1 + age * 7)); r.material.opacity = (1 - age / .45) ** 1.6;
     }
+    rig.rune?.update(time);
     const b = rig.burst;
     if (b?.visible) { const age = time - b.userData.at; if (age > .4) b.visible = false; else { b.scale.setScalar(.12 + age * 1.6); b.material.opacity = (1 - age / .4) ** 1.5; } }
   }
@@ -497,6 +499,9 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
   function fired(visual, golden) {
     const rig = rigFor(visual); setLoadedBolt(rig, false);
     if (!golden) return; goldenFx(rig);
+    // The marksman's rune snaps open at the beak and the bolt flies through it (falls back to the muzzle ring).
+    const fx = fxTextures(); if (fx && rig.rune === undefined) rig.rune = createSiegebirdRune(rig.group, {glowTexture: fx.glow});
+    if (rig.rune) { rig.rune.fire(); return; }
     if (rig.burst) { rig.burst.position.set(0, 1.06, .185); rig.burst.visible = true; rig.burst.userData.at = rig.lastTime ?? 0; rig.burst.userData.fresh = true; }
   }
   // Perfect wind: the latch rings with blue resonance light (ring + core) as the next reload quickens.

@@ -129,7 +129,7 @@ function buildSettings() {
           ['Left stick', 'Move'],
           ['Right stick', 'Look (or drag the world)'],
           ['Tap the world', 'Collect loose loot; tap an enemy to swing. Trees need the axe; ore and golem remains need the pick.'],
-          ['Attack', 'Tap to swing; hold to draw Emberwing or breathe Wyrmspout fire'],
+          ['Attack', 'Tap to swing; hold to draw Emberwing or spray Wyrmspout fire'],
           ['★ Special', 'Weapon special; reachable while holding Attack'],
           ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
           ['Actions ⋯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
@@ -150,7 +150,7 @@ function buildSettings() {
         guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1–8', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
+          ['1–7', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),
@@ -175,7 +175,7 @@ function buildSettings() {
           ['In a world', 'Switch role, copy code or invite, download a backup, reset (host, with confirmation), leave'],
           ['Lobby', 'Import or resume a save, create or join a world'],
         ]),
-        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to breathe fire; Special vents after releasing. Emberdew: Attack tosses fuel; Special toggles its wick. Left trigger performs these specials in VR.' }),
+        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack tosses fuel; Special toggles its wick. Left trigger performs these specials in VR.' }),
       ]),
     ]),
   ]);

@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 // Bloom: how much life the world holds. Groves, fruit eaten and foes the Heroes fell make it rise;
 // each level unlocks more God spells. Pure and deterministic (authority state only, no clock or RNG).
 export const BLOOM = Object.freeze({
@@ -27,8 +28,8 @@ export function stepBloom(state, events) {
   const live = state.springs.filter(s => s.expireTick > state.tick);
   if (live.length !== state.springs.length) state.springs = live;
   for (const hero of state.players) {
-    if (hero.role !== 'hero' || hero.hp >= 100) continue;
-    if (live.some(s => Math.hypot(hero.position[0] - s.x, hero.position[2] - s.z) <= BLOOM.spring.radius)) hero.hp = Math.min(100, hero.hp + BLOOM.spring.hpPerSecond / 60);
+    if (hero.role !== 'hero' || hero.hp >= heroMaxHp(hero)) continue;
+    if (live.some(s => Math.hypot(hero.position[0] - s.x, hero.position[2] - s.z) <= BLOOM.spring.radius)) hero.hp = Math.min(heroMaxHp(hero), hero.hp + BLOOM.spring.hpPerSecond / 60);
   }
 }
 

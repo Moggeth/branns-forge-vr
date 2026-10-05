@@ -1,12 +1,15 @@
-import {dressForgeling} from './forgeling-look.js';
+import {dressForgeling,dressForgelingModel,prepareForgelingTemplate} from './forgeling-look.js';
 import {createAbilityWarmup} from './ability-warmup.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
-import {validateInventionPlacement} from '../shared/inventions.js';
+import {validateInventionPlacement,STRUCTURES as INVENTION_TYPES} from '../shared/inventions.js';
+import {createBlueprintHud} from './build-blueprint-hud.js';
 import {createSiegebirdSight,SIEGEBIRD_PRESENTATION} from './siegebird-sight.js';
 import {createSiegebirdAim} from './siegebird-aim.js';
 import {createInventionView} from './invention-view.js';
 import {createInventionModel} from './invention-art.js';
 import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo,STRUCTURES} from '../shared/inventions.js';
+import {HOME_MANNED,homeBallistaSeat,homeBallistaYaw,isHomeBallistaId} from '../shared/home-ballista.js';
+import {HOME as HOME_RULES,HOME_LAYOUT,bellPostAt,homePoint} from '../shared/home-bases.js';
 import {createPresentationClock} from './presentation-clock.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
@@ -50,7 +53,10 @@ import {createPickWallMotion} from './pick-wall-motion.js';
 import {createEmberwingMotion} from './emberwing-motion.js';
 import {createWeaponController} from './weapon-controller.js';
 import {createContactFeedback, otherHand} from './contact-feedback.js';
-import {createCombatView} from './combat-view.js';
+import {createCombatView,partAnchor} from './combat-view.js';
+import {createWyrmspoutStream} from './wyrmspout-stream.js';
+import {createWyrmspoutFeel} from './wyrmspout-feel.js';
+import {WYRMSPOUT,sprayTuning,tankFill} from '../shared/wyrmspout.js';
 import {createEntView} from './ent-view.js';
 import {createStumplingView} from './stumpling-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
@@ -92,11 +98,13 @@ import {createHeroView} from './hero-view.js';
 import {createWoodAudio} from './wood-audio.js';
 import {createSpellAudio} from './spell-audio.js';
 import {createMaterialAudio} from './material-audio.js';
+import {createLandmarkAudio} from './landmark-audio.js';
 import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from './siegebird-flock.js';
 import {createSiegebirdAudio} from './siegebird-audio.js';
 import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD} from './siegebird-reload.js';
 import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
+import {createTalentFx,playTalentSound} from './talent-fx.js';
 import {worldTrees} from '../shared/world-content.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
@@ -128,6 +136,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let zeroInputTimer = null;
   let castStart=null,quickCast=false,quickKey=null,castRevision=0;
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
+  // Number keys pick from the hotbar; a held bone (limb) comes only from grabbing one (F), so it has no slot.
+  const hotbarSlots=equipment.filter(t=>t!=='limb');
   const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Digit0:'awaken',Minus:'wildwake',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
@@ -148,7 +158,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const scene = new THREE.Scene();
   const settlementVisual=createSettlementView({scene,heroView});
   const inventionVisual=createInventionView({scene});
-  let inventionPlacement=null,placementPointer=null;
+  let inventionPlacement=null,placementPointer=null,placementTurn=0,placementPin=null,placementCursor=null,placementHand=null,placementCheck={key:'',result:null},placementRepeat=false;
   // Manned Timberline (desktop first person): yaw/pitch become the wanted aim; the machine follows with weight.
   let manned=null,crankAt=0,crankHeld=false;
   const heldResourceArt=createResourceArt(),heldOreVisual=new THREE.Group();let heldOreKind=null;heldOreVisual.visible=false;scene.add(heldOreVisual);
@@ -241,6 +251,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Haptics only for local contacts/releases/damage, on the hand that actually holds the weapon (by handedness).
   let weaponHand = null;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
+  const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
   const beaconView=createBeaconView({scene,startingWorld,audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
@@ -275,12 +286,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (lost?.owner === 'panel') adventurePanel.handleSelectEnd(i);
       attachWeapon();
     });
+    // In build mode the blueprint follows whichever hand last moved its trigger; either grip backs out.
+    listen(controllers[i], 'squeezestart', () => {if(active&&inventionPlacement)cancelInventionPlacement();});
     listen(controllers[i], 'squeezeend', () => {if(active&&renderer.xr.isPresenting&&controllerSources.get(i)?.handedness==='right'&&snapshot.looseLogs?.some(l=>l.heldBy===playerId)&&pouchReady())release(false,i);});
     listen(controllers[i], 'selectstart', () => {
       if (active) unlockAudio();
       if (adventurePanel.handleSelectStart(i)) { presses.begin(i, 'panel'); return; }
       if (!active) return;
-      if(inventionPlacement){controllers[i].getWorldPosition(raycaster.ray.origin);controllers[i].getWorldQuaternion(poseQuaternion);raycaster.ray.direction.set(0,0,-1).applyQuaternion(poseQuaternion);const hit=raycaster.intersectObject(ground)[0];if(hit)placeInvention(hit.point);presses.begin(i,'cast');return;}
+      if(inventionPlacement){placementHand=i;placeInvention();presses.begin(i,'cast');return;}
       if (role === 'hero') {
         const kind = triggerRole({tool, hand: controllerSources.get(i)?.handedness, sources: controllerSources, holding: holdingLoose()});
         if (presses.begin(i, kind, tool)?.owner === 'primary') weapons.cancel(); // missed selectend: drop, never fire late
@@ -335,13 +348,19 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     onSound:event=>{if(event.kind==='stump_chirp'||event.kind==='stump_squeak')stumpChirp(event);else woodAudio?.play(event,listenerPose());},
     stumpOf:treeId=>{const cut=(snapshot.harvestedTrees||[]).find(h=>h.id===treeId),tree=cut&&worldTrees(snapshot).find(t=>t.id===treeId);return tree?{height:cutLocalHeight(tree,cut,heightAt(tree.x,tree.z,snapshot.edits))}:null;}});
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
-  const fireVisual=createFirePresentation({scene,terrainGrid:true,fireSamples:id=>combat.fireSamples(id),height:(x,z)=>heightAt(x,z,snapshot.edits)});
+  const wyrmStream=createWyrmspoutStream({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
+  // Wyrmspout rumble: controller pulses in VR, short buzzes on phones (phone may be null for a pulse phones skip).
+  const wyrmFeel=createWyrmspoutFeel({audio:()=>audioContext,haptic:(steps,phone)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.(steps);else if(touchEnabled&&phone)try{navigator.vibrate?.(phone);}catch{}}});
+  const fireVisual=createFirePresentation({scene,terrainGrid:true,drawPackets:false,fireSamples:id=>combat.fireSamples(id),height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const flaskModel=createEmberdewModel();templates.set('flask',{scene:createEmberdewModel(),animations:[]});weaponModels.set('flask',flaskModel);
   const bottleFx=attachEmberdew({root:flaskModel}),bottlePosition=new THREE.Vector3(),bottleRotation=new THREE.Quaternion();
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
+  // Level-ups and weapon-talent effects (client/talent-fx.js): the column rides the hero's presented position.
+  const talentFx=createTalentFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+    heroPosition:id=>id===playerId?(initialized&&role==='hero'?localPosition:null):actors.get(`p:${id}`)?.visual?.position||null,viewerInside:id=>id===playerId&&role==='hero'});
   let specialSwing=null, waistPouch=null;
   function selfPlayer(){return snapshot.players.find(p=>p.id===playerId);}
   // Ground point under the weapon aim (camera, or the VR controller holding the pick); open sky aims at full reach.
@@ -362,9 +381,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const at=initialized?localPosition.toArray():p.position;
     return wallPreview.show({position:at,yaw:initialized?yaw:p.yaw,point:wallAimPoint(),ready:(snapshot.tick||0)-(p.specialTick??-1000)>=240});
   }
-  function sendSpecial(){const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=heightAt(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}
-  function requestSpecial(){if(!active||specialSwing||weaponSwap.busy)return;if(tool==='pick'){beginWallAim();return;}if(tool==='axe'&&!renderer.xr.isPresenting){const p=snapshot.players.find(p=>p.id===playerId);if((snapshot.tick||0)-(p?.specialTick??-1000)<specialCooldown('axe'))return;specialSwing={at:performance.now(),sent:false,rest:{position:weaponAnchor.position.clone(),quaternion:weaponAnchor.quaternion.clone()}};swingContact=true;swingAt=-Infinity;}else sendSpecial();}
-  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();const golden=tool==='crossbow'&&!!siegebirdFlock?.loadedGolden(axeModel);feedback.release(tool,{golden});onAction('fire',details);if(tool==='crossbow')siegebirdFired(golden);},emitFlame:details=>{unlockAudio();onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},reload:{time:()=>siegebirdWind.time(),press:()=>siegebirdWindVerdict(siegebirdWind.press())},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0;},special:requestSpecial});
+  // Gout (Wyrmspout Q): lobbed from the mouth along the aim; the ball is drawn at once and the host's burst replaces it.
+  let goutSeq=0;
+  function sendGout(){const p=snapshot.players.find(p=>p.id===playerId);if(!p||(p.overheatUntil||0)>(snapshot.tick||0)||(snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('wyrmspout',p))return;
+    const aim=projectileAim();unlockAudio();wyrmStream.launchLocalGout(`local-gout:${++goutSeq}`,aim.origin,aim.direction);wyrmFeel.gout();onAction('special',{origin:aim.origin,direction:aim.direction});}
+  function sendSpecial(){if(tool==='wyrmspout'){sendGout();return;}const aim=weaponAim();const point=new THREE.Vector3(...aim.origin).addScaledVector(new THREE.Vector3(...aim.direction),3);point.y=heightAt(point.x,point.z,snapshot.edits);onAction('special',{point:point.toArray()});}
+  function requestSpecial(){if(!active||specialSwing||weaponSwap.busy)return;if(tool==='pick'){beginWallAim();return;}if(tool==='axe'&&!renderer.xr.isPresenting){const p=snapshot.players.find(p=>p.id===playerId);if((snapshot.tick||0)-(p?.specialTick??-1000)<specialCooldown('axe',p))return;specialSwing={at:performance.now(),sent:false,rest:{position:weaponAnchor.position.clone(),quaternion:weaponAnchor.quaternion.clone()}};swingContact=true;swingAt=-Infinity;}else sendSpecial();}
+  const weapons=createWeaponController({getTool:()=>tool,getAim:projectileAim,getDraw:()=>{if(!renderer.xr.isPresenting)return null;let left,right;for(const [i,source] of controllerSources){if(source.handedness==='left')left=grips[i];if(source.handedness==='right')right=grips[i];}return left&&right?THREE.MathUtils.clamp((left.getWorldPosition(new THREE.Vector3()).distanceTo(right.getWorldPosition(new THREE.Vector3()))-.08)/.65,0,1):null;},fire:details=>{unlockAudio();const golden=tool==='crossbow'&&!!siegebirdFlock?.loadedGolden(axeModel);feedback.release(tool,{golden});onAction('fire',details);if(tool==='crossbow')siegebirdFired(golden);},emitFlame:details=>{unlockAudio();wyrmFeel.spent(sprayTuning(snapshot.players.find(p=>p.id===playerId)).cost);onAction('flame',details);},pourFuel:details=>{unlockAudio();onAction('pour',details);},reload:{time:()=>siegebirdWind.time(),press:()=>siegebirdWindVerdict(siegebirdWind.press())},canFlame:()=>{const p=snapshot.players.find(p=>p.id===playerId);return !!p&&(p.overheatUntil||0)<=(snapshot.tick||0)&&p.hp>0&&wyrmFeel.fill()>.001;},flameInterval:()=>sprayTuning(snapshot.players.find(p=>p.id===playerId)).intervalMs,special:requestSpecial});
   function attachWeapon() {
     if (!axeModel) return;
     const tracked = [...controllerSources.entries()].filter(([, source]) => source.targetRayMode === 'tracked-pointer');
@@ -459,13 +482,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
-    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
+    const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
+    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
     if (!model) return;
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
     entry.visual = model;
     entry.root.add(model);
-    if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
+    if (forgeling) dressForgelingModel(model, entry.data.id);
+    else if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }
   // Remote Heroes swap the placeholder for the shared hero body; Gods and the local player keep their existing visuals.
   function upgradeHero(entry) {
@@ -604,6 +629,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
+  loader.load('/assets/bases_kit.glb',gltf=>{ // Blender-built Dawnhold and Grumblekeep; the code-built bases stand in until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!inventionVisual.installHomeKit(gltf)){disposeResources(gltf.scene);report('Home base models are incomplete; the simpler bases stay in place.');}
+  },undefined,()=>report('Home base models unavailable; the simpler bases stay in place.'));
   loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built landmarks and Heartstone shells; the code-built ones stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
     if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Landmark models are incomplete; the simpler versions stay in place.');return;}
@@ -627,9 +656,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
-  for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'forgeling', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
-    if (name === 'skeleton' || name === 'golem') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
+    if (name === 'forgeling') prepareForgelingTemplate(gltf.scene);
+    if (name === 'skeleton' || name === 'golem' || name === 'forgeling') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     if (name === 'golem') gltf.scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^crystal/i.test(m.name)) m.emissive.setRGB(.3, .62, 1); }); // resonance blue; also the assembly binding colour
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
     if (name === 'axe') enhanceAxeTemplate(gltf.scene); // shared edge/inlay/metal look before any clone renders
@@ -641,7 +671,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (!disposed) report(`Meteor shader preparation: ${error.message}`);
     });
     if (name === 'tree') { syncTrees(); }
-    if (name === 'skeleton'||name==='golem'||name.startsWith('tree')) for (const entry of actors.values()) upgradeActor(entry);
+    if (name === 'skeleton'||name==='golem'||name==='forgeling'||name.startsWith('tree')) for (const entry of actors.values()) upgradeActor(entry);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout'].includes(name)) {
       const model = instantiate(name, WEAPON_HEIGHTS[name]);weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
@@ -860,6 +890,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(level,now+.02);gain.gain.exponentialRampToValueAtTime(.0001,now+dur);
     osc.connect(gain).connect(audioContext.destination);osc.start(now);osc.stop(now+dur+.05);osc.onended=()=>{osc.disconnect();gain.disconnect();};
   }
+  // Level-up and talent effects: a synthesized cue (full for your own, fading with distance for others) and a buzz on your device.
+  function talentFeel(event){
+    const mine=event.id===playerId||event.by===playerId,ear=listenerPose().position,near=Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/35);
+    if(['talent_learned','talent_reset'].includes(event.kind)&&!mine)return;
+    playTalentSound(audioContext,event,mine?1:near*.8);
+    if(!mine)return;
+    const level=event.kind==='level_up';
+    if(renderer.xr.isPresenting)feedback.pattern?.(level?[{at:0,amplitude:.6,duration:60},{at:120,amplitude:.8,duration:80},{at:260,amplitude:1,duration:140}]:[{at:0,amplitude:.5,duration:40}]);
+    else if(touchEnabled)try{navigator.vibrate?.(level?[40,60,40,60,120]:event.kind==='firebomb'?[50]:[15]);}catch{}
+  }
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
     if(event.kind==='respawn'&&event.id===playerId){clearInput();if(snapshot.battle?.v===2){yaw=Math.atan2(event.position[0],event.position[2]);pitch=0;}localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
@@ -868,9 +908,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     feedback.handleEvent(event);
     if(appleSnack.event(event,playerId))return;
     combat.handleEvent(event);
+    wyrmStream.handleEvent(event,{localId:playerId,resolveTarget:(id,part)=>{const a=actors.get(`e:${id}`);return a?.visual?partAnchor(a.visual,part):null;}});wyrmFeel.event(event,playerId,listenerPose());
     golemFx.handleEvent(event);
     entView.event(event);stumplingView.event(event);
     settlementVisual.event(event);inventionVisual.event(event);
+    // Home base hands-on pieces: a deep bell, a bright drink chord, a hammer's chime as a part knits back together.
+    if(event.kind==='home_bell'){homeSound.chord(event.position,[-12,-5,0],.16,180,4.5);if(event.id===playerId)report(`The bell rings out: ${event.count} troops march from the barracks.`);}
+    if(event.kind==='home_drink'){homeSound.chord(event.position,[7,12,16],.08,60,1.6);if(event.id===playerId)report('A long cool drink. Health restored.');}
+    if(event.kind==='home_part_repaired'){homeSound.bell(event.position,event.mended?12:7,.08,1.2);if(event.mended&&event.by===playerId)report(`The ${event.part} is mended.`);}
+    if(event.kind==='home_turret_fire'&&event.turret==='ballista')materialAudio?.play({...event,kind:'hit',material:'metal',energy:event.manned?2:1.4,position:event.from},listenerPose(),snapshot.tick); // the bow string snaps
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
 
     // A Timberline bolt burying itself: a deep thunk in earth or stone, a thud in a body.
@@ -897,6 +943,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // The persistent crystal wall owns its growth effect. Replaying the older Crystal spell here doubled its geometry.
     const specialEffect={hammer_slam:'raise'}[event.kind];if(specialEffect)spellVisual.play({...event,kind:'spell',spell:specialEffect});
     // The axe cleave releases its edge light as one sweeping crescent; hits and felled trees arrive as their own events.
+    if(talentFx.handle(event))talentFeel(event);
     if(event.kind==='axe_cleave'){cleaveView.play(event,performance.now());const mine=event.id===playerId,ear=listenerPose().position;
       playCleaveSound(audioContext,mine?1:Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/30));
       if(mine&&touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([45,25,20]);}catch{}}
@@ -1006,6 +1053,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Direct touch selects a visible surface, then uses the normal animated tool and collision path.
   function tapAt(x,y){
+    if(active&&inventionPlacement&&!renderer.xr.isPresenting){pinPlacement(x,y);return true;}
     if(!active||role!=='hero'||renderer.xr.isPresenting||weapons.state().drawing||weapons.state().firing)return false;
     if(collectAt(x,y))return true;
     if(!['axe','pick','hammer','limb'].includes(tool))return false;
@@ -1035,7 +1083,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
   function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}
   function phoenixFlare(){
-    const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow')){onAction('special',{});return;} // the host explains the recharge
+    const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow',p)){onAction('special',{});return;} // the host explains the recharge
     const aim=projectileAim();weapons.cancel();emberwingMotion.loose(performance.now()/1000);onAction('special',{origin:aim.origin,direction:aim.direction});
   }
   function primaryUp(){if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
@@ -1044,8 +1092,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     return !ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).some(h=>surfaceVisible(h.object)&&resolveHit(h)?.targetId!==id);
   }
   function findCollectible(){const p=snapshot.players.find(p=>p.id===playerId);return p?nearestCollectible(snapshot,{...p,position:localPosition.toArray()},{height:(x,z)=>heightAt(x,z,snapshot.edits),visible:collectibleVisible}):null;}
-  function useInvention(id){const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
-  function interact(){if(!active||role!=='hero')return;if(appleSnack.holding()){unlockAudio();appleSnack.bite();return;}const c=findCollectible();if(c){onAction('collectTarget',{targetId:c.id});return;}const looked=aimProbe().hit?.targetId;if(looked&&snapshot.inventions?.structures.some(b=>b.id===looked)&&useInvention(looked))return;const b=snapshot.inventions?.structures.filter(b=>b.hp>0&&b.type!=='foundation').sort((a,b)=>Math.hypot(a.position[0]-localPosition.x,a.position[2]-localPosition.z)-Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z))[0];if(b)useInvention(b.id);}
+  // The gate ballistas of your own home base: walk up and press Use to man one, like a Timberline.
+  function homeBallista(id){if(!isHomeBallistaId(id))return null;for(const base of snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases:[]){const p=base.parts.find(p=>p.id===id);if(p)return base.fallenUntil>(snapshot.tick??0)?null:{id:p.id,type:'homeBallista',side:p.side,position:p.position,yaw:homeBallistaYaw(p.side),aimYaw:p.aimYaw||0,aimPitch:p.aimPitch||0,operator:p.operator||null,readyTick:p.readyTick,fireTick:p.fireTick,hp:p.hp};}return null;}
+  function nearHomeBallista(){const self=snapshot.players.find(p=>p.id===playerId);let best=null,d=HOME_MANNED.reach;for(const base of snapshot.battle?.v===2?snapshot.battle.bases:[])if(base.side===(self?.side||'party'))for(const p of base.parts){if(p.kind!=='ballista'||p.hp<=0)continue;const k=Math.hypot(p.position[0]-localPosition.x,p.position[2]-localPosition.z);if(k<=d){d=k;best=p.id;}}return best&&homeBallista(best);}
+  function useHomeBallista(id){const self=snapshot.players.find(p=>p.id===playerId),b=homeBallista(id);if(!self||!b||b.hp<=0||b.side!==(self.side||'party')||renderer.xr.isPresenting)return false;if(manned?.id===b.id){dismountMachine();return true;}if(Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>HOME_MANNED.reach){report('Step up to the ballista to man it.');return true;}mountMachine(b);return true;}
+  // Fountain (drink) and barracks bell (send a squad now) of your own base; the host decides cooldowns.
+  function useHomePiece(){const self=snapshot.players.find(p=>p.id===playerId),base=snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases.find(b=>b.side===(self?.side||'party')):null;if(!self||!base||base.fallenUntil>(snapshot.tick??0))return false;const near=([x,z],r)=>Math.hypot(x-localPosition.x,z-localPosition.z)<=r;
+    if(near(homePoint(base.side,HOME_LAYOUT.fountain),HOME_RULES.drink.reach)){unlockAudio();onAction('homeDrink',{});return true;}
+    if(near(bellPostAt(base.side),HOME_RULES.bell.reach)){unlockAudio();onAction('homeBell',{});return true;}return false;}
+  function useInvention(id){if(isHomeBallistaId(id))return useHomeBallista(id);const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
+  function interact(){if(!active||role!=='hero')return;if(appleSnack.holding()){unlockAudio();appleSnack.bite();return;}const c=findCollectible();if(c){onAction('collectTarget',{targetId:c.id});return;}const looked=aimProbe().hit?.targetId;if(looked&&isHomeBallistaId(looked)&&useHomeBallista(looked))return;if(looked&&snapshot.inventions?.structures.some(b=>b.id===looked)&&useInvention(looked))return;const hb=nearHomeBallista();if(hb&&useHomeBallista(hb.id))return;if(useHomePiece())return;const b=snapshot.inventions?.structures.filter(b=>b.hp>0&&b.type!=='foundation').sort((a,b)=>Math.hypot(a.position[0]-localPosition.x,a.position[2]-localPosition.z)-Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z))[0];if(b)useInvention(b.id);}
 
   function grab(pressIndex){if(!active||role!=='hero')return;const ore=findCollectible();if(ore&&Object.hasOwn(ORE_RECIPES,ore.kind)){sendInput(performance.now(),false,true);onAction('inventionLiftOre',{targetId:ore.id});return;}const aim=weaponAim(pressIndex);let nearLog=null;
     if(renderer.xr.isPresenting){const index=[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0];if(index!==undefined){const hand=grips[index].getWorldPosition(new THREE.Vector3()).toArray();nearLog=(snapshot.looseLogs||[]).filter(l=>!l.heldBy&&capsuleDistance(l,hand)<=POUCH_RULES.grabReach).sort((a,b)=>capsuleDistance(a,hand)-capsuleDistance(b,hand)||a.id.localeCompare(b.id))[0];}}
@@ -1080,12 +1136,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else zeroInputTimer = setTimeout(() => { if (!disposed) sendInput(performance.now(), true); }, 51 - (now - sentAt));
     }
   }
-  function cancelInventionPlacement(){inventionPlacement=null;placementPointer=null;inventionVisual.preview(null);}
+  function cancelInventionPlacement(){inventionPlacement=null;placementPointer=null;placementPin=null;placementHand=null;placementCheck={key:'',result:null};inventionVisual.preview(null);blueprintHud.set(null);}
   const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
-  function mannedMachine(){return manned?snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0):null;}
+  function mannedMachine(){if(!manned)return null;if(isHomeBallistaId(manned.id)){const b=homeBallista(manned.id);return b?.hp>0?b:null;}return snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0);}
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
     manned={id:b.id,yaw:b.aimYaw||0,pitch:b.aimPitch||0,yawRate:0,sentAt:0,sent:'',sinceTick:snapshot.tick??0};yaw=(b.yaw||0)+manned.yaw;pitch=manned.pitch;
-    onAction('inventionMount',{structureId:b.id});report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
+    onAction('inventionMount',{structureId:b.id});if(b.type==='homeBallista'){report(touchEnabled?'Manning the ballista. Drag to swing it, Attack fires, hold Wind to crank, Collect steps off.':'Manning the ballista. Mouse swings it, click fires, hold R to wind faster, E or Esc steps off.');return;}report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
   function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
   function fireManned(){const b=mannedMachine();if(!b)return;unlockAudio();onAction('inventionUse',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   // Heavy traverse: the wanted aim is the mouse; the carriage accelerates toward it and tops out near 50 degrees/s.
@@ -1100,7 +1156,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     manned.yawRate+=THREE.MathUtils.clamp(want-manned.yawRate,-2.4*dt,2.4*dt);manned.yaw=wrapAngle(manned.yaw+manned.yawRate*dt);
     manned.pitch+=THREE.MathUtils.clamp(pitch-manned.pitch,-.5*dt,.5*dt);
     inventionVisual.setLocalAim(b.id,{yaw:manned.yaw,pitch:manned.pitch});
-    const seat=operatorSeat(b,manned.yaw);localPosition.set(seat[0],heightAt(seat[0],seat[2],snapshot.edits),seat[2]);correction.set(0,0,0);verticalSpeed=0;grounded=true;
+    const seat=b.type==='homeBallista'?homeBallistaSeat(b,manned.yaw):operatorSeat(b,manned.yaw);localPosition.set(seat[0],heightAt(seat[0],seat[2],snapshot.edits),seat[2]);correction.set(0,0,0);verticalSpeed=0;grounded=true;
     const key=manned.yaw.toFixed(3)+','+manned.pitch.toFixed(3);
     if(key!==manned.sent&&now-manned.sentAt>=100){manned.sent=key;manned.sentAt=now;onAction('inventionSteer',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   }
@@ -1110,11 +1166,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(scopeAmount>0&&inventionVisual.scopeEye(b.id,scopeEye)){const k=THREE.MathUtils.smoothstep(scopeAmount,0,1);camera.position.lerp(scopeEye.sub(rig.position),k);}
     inventionVisual.setScoped(b.id,scopeAmount);
   }
-  function timberlineReadiness(b){const tick=snapshot.tick??0;if(tick>=b.readyTick)return {reload:1,ready:true,state:'Ready'};const left=b.readyTick-tick;return {reload:THREE.MathUtils.clamp(1-left/MANNED.reloadTicks,0,1),ready:false,state:`Winding · ${(left/60).toFixed(1)} s`};}
+  function timberlineReadiness(b){const tick=snapshot.tick??0;if(tick>=b.readyTick)return {reload:1,ready:true,state:'Ready'};const left=b.readyTick-tick;return {reload:THREE.MathUtils.clamp(1-left/(b.type==='homeBallista'?HOME_MANNED.reloadTicks:MANNED.reloadTicks),0,1),ready:false,state:`Winding · ${(left/60).toFixed(1)} s`};}
   function updateTimberlineAids(now){
     const b=manned&&!renderer.xr.isPresenting&&role==='hero'&&active?mannedMachine():null;
     document.body.classList.toggle('timberline-manned',!!b);
     if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}inventionVisual.setScoped(null);return;}
+    if(b.type==='homeBallista'){timberlineSight.hide();timberlineAmmoHud.set({label:'Ballista',bolts:1,state:timberlineReadiness(b).state,scoped:scopeAmount>.5});return;} // free bolts, no range ladder
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
     // The forecast arcs only show while sighting along the ladder, and fade in with it.
@@ -1124,16 +1181,71 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Hold R to wind: the operator doubles the reload; a second Hero cranking beside it quadruples it.
   function crankNearby(now){
     if(!active||role!=='hero'||!(keys.has('KeyR')||crankHeld)||now-crankAt<150)return;
-    const self=snapshot.players.find(p=>p.id===playerId),b=manned?mannedMachine():snapshot.inventions?.structures.find(b=>b.type==='timberline'&&b.hp>0&&b.side===(self?.side||'party')&&Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)<=MANNED.crankReach);
+    const self=snapshot.players.find(p=>p.id===playerId),b=manned?mannedMachine():snapshot.inventions?.structures.find(b=>b.type==='timberline'&&b.hp>0&&b.side===(self?.side||'party')&&Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)<=MANNED.crankReach)||nearHomeBallista();
     if(!b||!(snapshot.tick<b.readyTick))return;crankAt=now;onAction('inventionCrank',{structureId:b.id});
   }
-  function beginInventionPlacement(type){weapons.cancel();clearInput();cancelCast();inventionPlacement=type;document.exitPointerLock?.();report(type.startsWith('operate:')?'Aim at the target and tap/click to fire. Escape cancels.':'Tap/click clear ground to build. Escape cancels.');}
-  function placeInvention(point){if(!inventionPlacement)return;const mode=inventionPlacement,self=snapshot.players.find(p=>p.id===playerId);if(!mode.startsWith('operate:')&&self){const validation=validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:mode,position:point.toArray(),yaw},{terrainHeight:sharedTerrainHeight});if(!validation.ok){inventionVisual.preview(point,mode,validation);onAction('placementFeedback',{reason:validation.reason});return;}}cancelInventionPlacement();if(mode.startsWith('operate:'))onAction('inventionUse',{structureId:mode.slice(8),target:point.toArray()});else onAction('inventionBuild',{kind:mode,type:mode,position:point.toArray(),x:point.x,z:point.z,yaw});}
-  listen(canvas,'pointerdown',event=>{if(!active||!inventionPlacement)return;event.preventDefault();event.stopImmediatePropagation();placementPointer=event.pointerId;},true);
-  listen(canvas,'pointerup',event=>{if(!active||!inventionPlacement||event.pointerId!==placementPointer)return;event.preventDefault();event.stopImmediatePropagation();const hit=pointerHit(event);if(hit)placeInvention(hit.point);},true);
+  // Blueprint placement: the see-through model follows the aim every frame (crosshair while the mouse is captured,
+  // the cursor while it is free, the controller ray in VR, the screen centre or a tapped spot on touch).
+  // Left-click / trigger / Place confirms; right-click, Esc, grip or Cancel backs out. The authority re-validates.
+  const blueprintHud=createBlueprintHud({parent:canvas.parentElement||document.body,onPlace:()=>placeInvention(),onRotate:()=>turnPlacement(Math.PI/4),onCancel:()=>cancelInventionPlacement()});
+  const PLACE_REACH=7.6;// just inside the 8 m build reach, so the blueprint never strays out of range
+  function beginInventionPlacement(type){weapons.cancel();clearInput();cancelCast();if(manned)dismountMachine();inventionPlacement=type;placementPin=null;placementPointer=null;placementCheck={key:'',result:null};
+    // Keep (or regain) the crosshair on desktop: the menu click that chose the building is the gesture pointer lock needs.
+    if(role==='hero'&&!touchEnabled&&!renderer.xr.isPresenting&&document.pointerLockElement!==canvas){try{canvas.requestPointerLock?.()?.catch?.(()=>{});}catch{}}
+    report(type.startsWith('operate:')?'Aim at the target and click or tap to fire. Right-click or Esc cancels.':'Aim where it should stand. Click or tap Place to build; right-click or Esc cancels.');}
+  function turnPlacement(by){if(!inventionPlacement||inventionPlacement.startsWith('operate:')||inventionPlacement==='foundation')return;placementTurn=wrapAngle(placementTurn+by);}
+  // Touch: a tap on the ground moves the blueprint there; it stays put while the player looks around.
+  function pinPlacement(x,y){const point=screenGround(x,y);if(point)placementPin=point;}
+  function placementYaw(){return (role==='hero'?yaw:0)+placementTurn;}
+  function screenGround(x,y){const rect=canvas.getBoundingClientRect();pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);camera.updateMatrixWorld();raycaster.setFromCamera(pointer,camera);
+    const o=raycaster.ray.origin.toArray(),d=raycaster.ray.direction,far=role==='god'?160:24;return terrainRay.segment(o,[o[0]+d.x*far,o[1]+d.y*far,o[2]+d.z*far])?.point||null;}
+  function placementAim(){
+    let point=null;
+    if(renderer.xr.isPresenting){const i=placementHand??[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0]??0,c=controllers[i];if(!c)return null;
+      const o=c.getWorldPosition(new THREE.Vector3()),d=c.getWorldDirection(new THREE.Vector3()).negate();point=terrainRay.segment(o.toArray(),o.clone().addScaledVector(d,16).toArray())?.point||null;}
+    else if(placementPin)point=[...placementPin];
+    else if(touchEnabled||document.pointerLockElement===canvas||!placementCursor){const rect=canvas.getBoundingClientRect();point=screenGround(rect.left+rect.width/2,rect.top+rect.height/2);
+      // Looking up at the sky still offers a spot straight ahead at full reach.
+      if(!point&&role==='hero'){const d=camera.getWorldDirection(new THREE.Vector3()),h=Math.hypot(d.x,d.z)||1;point=[localPosition.x+d.x/h*PLACE_REACH,0,localPosition.z+d.z/h*PLACE_REACH];}}
+    else point=screenGround(placementCursor.x,placementCursor.y);
+    if(!point)return null;
+    if(role==='hero'&&!inventionPlacement.startsWith('operate:')){const dx=point[0]-localPosition.x,dz=point[2]-localPosition.z,r=Math.hypot(dx,dz);if(r>PLACE_REACH){point[0]=localPosition.x+dx/r*PLACE_REACH;point[2]=localPosition.z+dz/r*PLACE_REACH;}}
+    point[1]=heightAt(point[0],point[2],snapshot.edits);
+    return new THREE.Vector3(...point);
+  }
+  // The shared validator is pure but walks every tree and structure, so it reruns only when the spot, turn or world changes.
+  function placementValidation(point){const self=snapshot.players.find(p=>p.id===playerId),mode=inventionPlacement;if(!self||!point||mode.startsWith('operate:'))return null;
+    const key=`${mode}|${Math.round(point.x*20)}|${Math.round(point.z*20)}|${Math.round(placementYaw()*100)}|${Math.round(localPosition.x*4)}|${Math.round(localPosition.z*4)}`;
+    if(placementCheck.key===key&&placementCheck.snapshot===snapshot)return placementCheck.result;
+    const result=validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:mode,position:point.toArray(),yaw:placementYaw()},{terrainHeight:sharedTerrainHeight});
+    placementCheck={key,snapshot,result};return result;}
+  function updatePlacementPreview(dt){
+    if(!inventionPlacement){blueprintHud.set(null);return;}
+    if(!active){cancelInventionPlacement();return;}
+    const mode=inventionPlacement,point=placementAim(),validation=placementValidation(point),operate=mode.startsWith('operate:');
+    inventionVisual.preview(point,mode,validation,{yaw:placementYaw(),dt,time:renderTick/60,label:renderer.xr.isPresenting});
+    const type=operate?snapshot.inventions?.structures.find(b=>b.id===mode.slice(8))?.type:mode;
+    blueprintHud.set(renderer.xr.isPresenting?null:{name:INVENTION_TYPES[type]?.name||'Building',mode:touchEnabled?'touch':'desktop',valid:!!point&&validation?.ok!==false,reason:point?validation?.reason||'':'Aim at open ground.',operate,cursor:!touchEnabled&&document.pointerLockElement!==canvas});
+  }
+  function placeInvention(){if(!inventionPlacement)return;const mode=inventionPlacement,point=placementAim();if(!point){onAction('placementFeedback',{reason:'Aim at open ground.'});return;}
+    if(!mode.startsWith('operate:')){const validation=placementValidation(point);if(validation&&!validation.ok){onAction('placementFeedback',{reason:validation.reason});return;}}
+    const turn=placementYaw();if(placementRepeat&&!mode.startsWith('operate:'))placementPin=null;else cancelInventionPlacement();
+    if(mode.startsWith('operate:'))onAction('inventionUse',{structureId:mode.slice(8),target:point.toArray()});else onAction('inventionBuild',{kind:mode,type:mode,position:point.toArray(),x:point.x,z:point.z,yaw:turn});}
+  // Mouse: left places, right cancels. Touch is left to the world-touch layer (drag looks, a tap moves the blueprint).
+  listen(canvas,'pointerdown',event=>{if(!active||!inventionPlacement||event.pointerType!=='mouse')return;event.preventDefault();event.stopImmediatePropagation();placementCursor={x:event.clientX,y:event.clientY};
+    placementPointer=event.button===0?event.pointerId:event.button===2?'cancel':null;},true);
+  // Both act on release, so the matching mousedown still sees build mode and never swings, sights or casts.
+  listen(canvas,'pointerup',event=>{if(!active||!inventionPlacement||event.pointerType!=='mouse'||placementPointer===null)return;event.preventDefault();event.stopImmediatePropagation();
+    const press=placementPointer;placementPointer=null;if(press==='cancel'){if(event.button===2)cancelInventionPlacement();return;}if(event.button!==0)return;
+    placementRepeat=event.shiftKey;placementCursor={x:event.clientX,y:event.clientY};placeInvention();placementRepeat=false;},true);
   listen(canvas,'pointercancel',()=>{placementPointer=null;});
-  listen(canvas,'pointermove',event=>{if(!active||!inventionPlacement)return;const hit=pointerHit(event);const self=snapshot.players.find(p=>p.id===playerId),validation=hit&&self&&!inventionPlacement.startsWith('operate:')?validateInventionPlacement(snapshot,{...self,position:localPosition.toArray()},{kind:inventionPlacement,position:hit.point.toArray(),yaw},{terrainHeight:sharedTerrainHeight}):null;inventionVisual.preview(hit?.point||null,inventionPlacement,validation);},true);
-  listen(window,'keydown',event=>{if(inventionPlacement&&event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelInventionPlacement();}},true);
+  listen(canvas,'pointermove',event=>{if(event.pointerType==='mouse')placementCursor=event.target===canvas?{x:event.clientX,y:event.clientY}:null;},true);
+  listen(canvas,'wheel',event=>{if(!active||!inventionPlacement)return;event.preventDefault();event.stopImmediatePropagation();turnPlacement(Math.sign(event.deltaY||event.deltaX)*Math.PI/12);},{passive:false,capture:true});
+  listen(window,'keydown',event=>{if(!inventionPlacement)return;
+    if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelInventionPlacement();}
+    else if(event.code==='KeyR'&&active&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)turnPlacement((event.shiftKey?-1:1)*Math.PI/4);}},true);
+  // Esc while the mouse is captured is swallowed by the browser to release it; treat that release as the cancel.
+  listen(document,'pointerlockchange',()=>{if(document.pointerLockElement!==canvas&&inventionPlacement&&wasCaptured&&document.hasFocus()&&!document.hidden)cancelInventionPlacement();});
   // Prime both sound banks on the first game gesture, before the first physical impact.
   listen(window, 'pointerdown', () => { if (active) unlockAudio(); });
   listen(window, 'keydown', event => {
@@ -1145,7 +1257,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
     if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); else if (event.code === 'KeyQ') special(); }
-    else if (role === 'hero' && !event.repeat) {const slot=Number(event.code.replace('Digit',''))-1;if(slot>=0&&slot<equipment.length)equip(equipment[slot]);if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();}
+    else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();}
     if(role==='god'&&!inventionPlacement&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
   listen(window,'keyup',event=>{
@@ -1225,7 +1337,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         for (const action of actions) {
           if (action === 'menu') { weapons.cancel(); presses.invalidate(); void renderer.xr.getSession()?.end().then(onMenu); }
           else if (action === 'jump') jumpPending = true;
-          else if (action === 'cycle') { const choices=equipment.filter(t=>t!=='limb'); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
+          else if (action === 'cycle') { const choices=hotbarSlots; equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
           else if (action === 'hand') { if (holdingLoose()) release(false, index); else grab(index); }
           else if (action === 'bridge') onAction('buildBridge');
           else if (action === 'interact') interact();
@@ -1265,6 +1377,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function frame(now) {
     contactFrame++;
     if (disposed) return;
+    // Loading owns explicit representative poses and warm-up renders. Running
+    // the entire gameplay/terrain/IK pipeline while shaders are still compiling
+    // competes with downloads and the welcome screen without drawing a frame.
+    if (!startup.ready) { previous=now; return; }
     const frameStarted=performance.now();
     if(startup.ready)frameMetrics.record('frameInterval',now-previous);
     const dt = Math.min((now - previous) / 1000, 0.05);
@@ -1305,7 +1421,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     } else {
       rig.position.copy(localPosition);
       const b = manned && mannedMachine();
-      if (!renderer.xr.isPresenting) { camera.position.set(0, 1.65, 0); if (b) { camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
+      if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? 2.35 : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned;
@@ -1315,7 +1431,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const swinging=(progress>=0&&progress<1&&!!swingRest)||!!specialSwing||(tool==='pick'&&pickWallMotion.slamming),swayMe=snapshot.players.find(p=>p.id===playerId);
     const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
-    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:['crossbow','wyrmspout','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
+    else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='wyrmspout'?[.22,-.25,-.46]:['crossbow','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000).add(sway.position));
       // Release kick: the stock shoves back and the muzzle climbs, then springs home (the bolt has already left).
       const kick=siegebirdMechanism(weapons.state().reload).kick;if(kick){weaponAnchor.position.z+=.05*kick;weaponAnchor.position.y+=.012*kick;weaponAnchor.rotateX(.075*kick);}}else if(tool==='bow'&&!renderer.xr.isPresenting){adsAmount=THREE.MathUtils.lerp(adsAmount,active&&role==='hero'&&aiming?1:0,1-Math.exp(-14*dt));weaponAnchor.position.lerp(new THREE.Vector3(-.22*Math.min(1,camera.aspect/.9),-.29,-.51),adsAmount);weaponAnchor.rotation.z=THREE.MathUtils.lerp(-.08,-.025,adsAmount);}else adsAmount=0;
@@ -1327,6 +1443,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Emberwing equip / draw / phoenix flare / release kick ride on the bow's base pose; the sway layer then applies on top.
     {const shown=tool==='bow'&&weaponAnchor.visible;if(shown&&!bowLayerShown)emberwingMotion.equip(now/1000);else if(!shown&&bowLayerShown)emberwingMotion.reset();bowLayerShown=shown;
       bowLayer=shown?emberwingMotion.update(now/1000,dt,weapons.state(),adsAmount):null;if(bowLayer&&!renderer.xr.isPresenting){weaponAnchor.position.add(bowLayer.offset);weaponAnchor.quaternion.premultiply(bowLayer.quaternion);}}
+    // Wyrmspout: the jet shoves and shivers the gun while it sprays; a Gout bucks it up and back.
+    if(tool==='wyrmspout'&&weaponAnchor.visible&&!renderer.xr.isPresenting){const sp=wyrmFeel.spray(),k=wyrmFeel.goutKick(),t=now/1000;
+      weaponAnchor.position.z+=.014*sp+.06*k*k;weaponAnchor.position.x+=.0025*sp*Math.sin(t*53);weaponAnchor.position.y+=.003*sp*Math.sin(t*41)+.012*k*k;weaponAnchor.rotateX(.025*sp+.008*sp*Math.sin(t*37)+.16*k*k);}
     // The crossbow bore is solved onto the reticle, so it takes the positional sway only (above).
     if(tool!=='crossbow'&&weaponAnchor.visible){weaponAnchor.position.add(sway.position);weaponAnchor.quaternion.premultiply(sway.quaternion);}
     // Weapon swap: drop the old item out of frame, change models at the bottom, raise the new one.
@@ -1337,10 +1456,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if(snackBlend>0){weaponAnchor.position.y-=.6*snackBlend;weaponAnchor.rotateX(-.5*snackBlend);if(axeModel&&(snackBlend>.97||xr))axeModel.visible=false;}}
     if(waistPouch){waistPouch.visible=active&&role==='hero'&&renderer.xr.isPresenting;if(waistPouch.visible){const p=snapshot.players.find(p=>p.id===playerId);waistPouch.position.fromArray(waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())}));waistPouch.position.y-=.181;waistPouch.rotation.y=yaw;}}
     {const wound=siegebirdWind.update(dt,siegebirdGrip());for(const c of wound.cues)siegebirdCue({...c,crank:true});siegebirdWindVerdict(wound.wind);}
-    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates,ember:bowLayer?.ember??0,stringSnap:bowLayer?.string??0,stringGlow:bowLayer?.stringGlow??0});
+    if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates,ember:bowLayer?.ember??0,stringSnap:bowLayer?.string??0,stringGlow:bowLayer?.stringGlow??0,spray:wyrmFeel.spray(),fill:wyrmFeel.shown(),gout:wyrmFeel.goutKick()});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
     siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
-    weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);updateFireAudio(weaponState.firing);
+    weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);
+    {const me=snapshot.players.find(p=>p.id===playerId),spraying=tool==='wyrmspout'&&weaponState.firing&&!!axeModel&&role==='hero'&&active;
+      wyrmFeel.update(dt,{spraying,player:me,tick:snapshot.tick||0,tool});
+      if(spraying){const aim=projectileAim();wyrmStream.emitLocal(`p:${playerId}`,new THREE.Vector3().fromArray(aim.origin),aim.direction,sprayTuning(me),dt);}else wyrmStream.stopLocal(`p:${playerId}`);
+      updateFireAudio(spraying);}
     setEmberdewTime(now/1000);
     if(tool==='flask'&&axeModel){flaskModel.updateWorldMatrix(true,false);bottleFx.update({dt,time:now/1000,lit:!!snapshot.players.find(p=>p.id===playerId)?.flaskLit,worldPosition:flaskModel.getWorldPosition(bottlePosition),worldQuaternion:flaskModel.getWorldQuaternion(bottleRotation)});}
     updateTimberlineAids(now);
@@ -1356,7 +1479,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if(full||r.hit)guideHitTick=r.hit?r.ticks-1:null;
       guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;
     }else{trajectoryGuide.hide();nextGuideAt=0;guideHitTick=null;}
-    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);wyrmStream.update(dt,camera);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
@@ -1375,7 +1498,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
     }
-    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);
+    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);updatePlacementPreview(dt);
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
     combat.beginCreatureFrame?.();
     for(const entry of actors.values())if(entry.enemy)meteorCreatures.beforeMotion(entry);
@@ -1397,7 +1520,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     axeReadyCue.update(role==='hero'&&heldReadiness?tool:null,readiness.specialReady);
     enemyShadows.update(actors,role==='god'?pan:localPosition,now,{maxCasters:touchEnabled?4:8});
     spellVisual.setTarget(targetPreview());
-    spellVisual.update(now,dt);cleaveView.update(performance.now());
+    spellVisual.update(now,dt);cleaveView.update(performance.now());talentFx.update(dt);
     const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
     for (const warning of warnings.values()) {
       const remaining = Math.max(0, warning.impactTick - estimatedTick);
@@ -1509,7 +1632,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if (grounded) localPosition.y = authoritative.y;
       }
       startingWorld.group.visible=!!snapshot.landmarks;const nextStartingEdits=terrainFrameKey(snapshot.edits,snapshot.tick)+'|'+foundationTerrainKey(snapshot);if(startingEdits!==nextStartingEdits){startingEdits=nextStartingEdits;startingWorld.update();}
-      combat.prepareActors(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot,{prepared:true}); syncTrees(); syncWorldSignals();appleSnack.sync(snapshot,playerId);spellVisual.sync(snapshot);fireVisual.sync(snapshot);syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
+      combat.prepareActors(snapshot);rebuildGround(); syncActors(); combat.sync(snapshot,{prepared:true}); syncTrees(); syncWorldSignals();appleSnack.sync(snapshot,playerId);spellVisual.sync(snapshot);fireVisual.sync(snapshot);wyrmStream.sync(snapshot,{localId:playerId,renderTick});syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);expedition.applySnapshot(snapshot.adventure,snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
       frameMetrics.record('snapshotCpu',performance.now()-syncStarted);
     },
     setRole(next) {
@@ -1529,6 +1652,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     lookByPixels(x, y) { lookBy(x * 0.003, y * 0.003); },
     zoomBy(amount) { if (active && role === 'god') orbitRadius = THREE.MathUtils.clamp(orbitRadius + amount, 10, 70); },
     aimAt(x, y) {
+      if (active && inventionPlacement) { pinPlacement(x, y); return false; }
       if (!active || role !== 'god') return false;
       camera.updateMatrixWorld(); const hit = pointerHit({clientX:x, clientY:y});
       fixedAim = hit ? hit.point.clone() : null; aimTerrain = null; if(hit)updateTouchAim();else cursor.visible=false; return !!hit;
@@ -1549,7 +1673,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     buildBridge(){if(active&&role==='hero')onAction('buildBridge');},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {startup:{...startup},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {startup:{...startup},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1578,7 +1702,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
