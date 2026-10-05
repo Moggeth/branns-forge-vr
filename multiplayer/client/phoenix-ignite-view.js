@@ -9,15 +9,16 @@ import * as THREE from 'three';
 //   crown     a ring of fire opening outward across the struck surface, as if the bird landed there
 //   feathers  burning feather motes thrown back out of the wound, falling and cooling to deep red
 // The crown lies in the surface plane (from the contact normal) so it reads on a skull, a trunk or the ground.
-export const IGNITE = Object.freeze({max: 5, flash: .22, flashSize: 1.1, crown: .42, crownRadius: .62,
-  feathers: 34, featherLife: 1.2, featherSpeed: 2.8, featherSize: .19, gravity: 5.2});
+export const IGNITE = Object.freeze({max: 5, flash: .24, flashSize: 1.2, crown: .5, crownRadius: .7,
+  feathers: 44, featherLife: 1.25, featherSpeed: 3.2, featherSize: .24, gravity: 5.2});
 
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 function radial(size, falloff, inner = 0) {
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const dx = (x + .5) / size * 2 - 1, dy = (y + .5) / size * 2 - 1, r = Math.min(1, Math.hypot(dx, dy)), i = (y * size + x) * 4;
-    // inner > 0 cuts a hole: a ring rather than a disc.
-    const a = r < inner ? 0 : Math.pow(1 - r, falloff) * (inner ? Math.min(1, (r - inner) / .12) : 1);
+    // inner > 0 makes a solid ring with soft edges (the fire crown); otherwise a soft disc.
+    const a = inner ? smooth(inner - .1, inner + .06, r) * (1 - smooth(.86, 1, r)) : Math.pow(1 - r, falloff);
     data[i] = data[i + 1] = data[i + 2] = 255; data[i + 3] = Math.round(255 * Math.max(0, a));
   }
   const texture = new THREE.DataTexture(data, size, size); texture.needsUpdate = true;
@@ -25,9 +26,11 @@ function radial(size, falloff, inner = 0) {
 }
 
 export function createPhoenixIgniteView({scene}) {
-  const sparkMap = radial(32, 2.4), glowMap = radial(64, 2.2), ringMap = radial(64, 1.5, .62);
-  const flashMaterial = new THREE.SpriteMaterial({map: glowMap, color: 0xffd089, transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false});
+  const sparkMap = radial(32, 1.6), glowMap = radial(64, 1.2), ringMap = radial(64, 1, .58);
+  // Painted flash: an additive one vanishes against daylight. It ignores depth so the bite shows even
+  // when the arrow lands just behind a shield rim or a branch.
+  const flashMaterial = new THREE.SpriteMaterial({map: glowMap, color: 0xffe08a, transparent: true,
+    depthWrite: false, depthTest: false, toneMapped: false, fog: false});
   const crownGeometry = new THREE.PlaneGeometry(1, 1);
   const crownMaterial = new THREE.MeshBasicMaterial({map: ringMap, color: 0xff6a16, transparent: true, opacity: 0,
     depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false});
@@ -84,7 +87,7 @@ export function createPhoenixIgniteView({scene}) {
       // The flash is the strike; the crown opens behind it; the feathers outlive both.
       const f = a / IGNITE.flash;
       ignite.flash.visible = f < 1;
-      if (f < 1) { ignite.flash.scale.setScalar(.25 + IGNITE.flashSize * Math.sqrt(f)); ignite.flash.material.opacity = (1 - f) * (1 - f); }
+      if (f < 1) { ignite.flash.scale.setScalar(.25 + IGNITE.flashSize * Math.sqrt(f)); ignite.flash.material.opacity = .95 * (1 - f); }
       const c = a / IGNITE.crown;
       ignite.crown.visible = c < 1;
       if (c < 1) {

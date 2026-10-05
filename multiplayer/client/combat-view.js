@@ -340,7 +340,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (let i = 0; i < 2; i++) { const w = u.wingNodes[i]; if (w) w.quaternion.copy(w.userData.rest).multiply(flapTurn.setFromAxisAngle(flapAxis, i ? flap : -flap)); }
     group.updateWorldMatrix(false, true);
     // Frantic wing tips would scribble at carrying speed; one soft ember wisp streams from the tail instead.
-    contrails.emit(`carry:${rig.group.id}`, u.arrow.localToWorld(wingTip.set(0, 0, .78)), .5 * (u.fade ?? 1));
+    contrails.emit(`carry:${rig.group.id}`, u.arrow.localToWorld(wingTip.set(0, 0, .78)), .9 * (u.fade ?? 1));
   }
   function updateCarries(dt, tick) {
     const live = new Set();
