@@ -23,12 +23,10 @@ export const INSPECT_KEYS = Object.freeze([
 export const INSPECT_DURATION = INSPECT_KEYS.at(-1)[0];
 // Presenting orientation per weapon in the anchor frame (every model is prepared to face -Z, up +Y);
 // the choreography turns it from there. Missing means "as prepared" (the barrel weapons show their flank).
-// The axe and pick carry their faces on ±Z, so they are turned a quarter: the side moments show the blade and the
-// pick head, and the stare looks down the haft at the business end. All hafted tools lean into a diagonal so their
-// length fits the view (the hammer and the tall bow already show their sides as prepared, so they only lean).
-const quarter = () => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, .55, 'YXZ'));
+// The hafted tools (axe, pick, hammer, bow) are prepared with their faces to the side, so the choreography's side
+// moments already show the blade and head; they only lean into a diagonal so their length fits the view.
 const lean = a => new THREE.Quaternion().setFromEuler(new THREE.Euler(a, 0, 0, 'YXZ'));
-export const INSPECT_BASE = Object.freeze({axe: quarter(), pick: quarter(), hammer: lean(.5), bow: lean(.6)});
+export const INSPECT_BASE = Object.freeze({axe: lean(.5), pick: lean(.5), hammer: lean(.5), bow: lean(.6)});
 
 const ease = t => t * t * (3 - 2 * t);
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _v = new THREE.Vector3();
@@ -108,7 +106,7 @@ export function createWeaponInspect({reducedMotion = () => false} = {}) {
       pose.amount = ease(amount);
       const center = fit?.center || _v.set(0, 0, -.2), radius = Math.max(.12, fit?.radius || .3);
       // Hold it a comfortable arm's length away: far enough to fit the whole weapon, never pressed to the lens.
-      const distance = THREE.MathUtils.clamp(radius * 1.55 + .1, .36, 1.35);
+      const distance = THREE.MathUtils.clamp(radius * 1.8 + .08, .36, 1.7);
       const bob = mode ? .006 * Math.sin(performance.now() / 1000 * 1.7) : 0;
       target.set(0, .01 + bob, -distance);   // a little above centre: clear of the hotbar
       // Each weapon has a presenting orientation (fit.base, e.g. an axe held blade-up); the turn is applied on top of it.
