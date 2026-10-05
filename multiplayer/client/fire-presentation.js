@@ -224,7 +224,8 @@ function mkMat(vs, fs, uniforms, blending, extra = {}) {
 }
 
 // =====================================================================================
-export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null } = {}) {
+export function createFirePresentation({ scene, height = () => 0, quality = 1, lightIntensity = 6, terrainGrid = false, fireSamples = null, drawPackets = true } = {}) {
+  // drawPackets=false: Wyrmspout globs are drawn by wyrmspout-stream.js; packets here only steer the pooled lights.
   let q = clamp(quality, 0, 1);
   let disposed=false;
   const group = new THREE.Group(); group.name = 'FirePresentation';
@@ -509,7 +510,7 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
       p.x += (p.bx + p.vx * age - p.x) * kSmooth; p.y += (p.by + p.vy * age - p.y) * kSmooth; p.z += (p.bz + p.vz * age - p.z) * kSmooth;
       p.a = p.dying ? p.a - dt / 0.18 : Math.min(1, p.a + dt / 0.05);
       if (p.a <= 0 && p.dying) { p.used = false; pkMap.delete(p.id); continue; }
-      if (!emit) continue;
+      if (!emit || !drawPackets) continue;
       const a = clamp(p.a, 0, 1), sp2 = Math.hypot(p.vx, p.vy, p.vz), inv = sp2 > 0.05 ? 1 / sp2 : 0;
       const tx = inv ? -p.vx * inv : 0, ty = inv ? -p.vy * inv + 0.25 : 1, tz = inv ? -p.vz * inv : 0;
       const spd = 0.6 + 0.4 * Math.min(1, sp2 / 8);
@@ -611,20 +612,24 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
     // Idle layers are invisible, so the world's normal compile omits all four.
     // Compile the real materials, then upload the real buffers with one tiny
     // offscreen draw. No fake fire/simulation event and no visible warm-up flash.
-    const meshes=[flameMesh,emberMesh,smokeMesh,fuelMesh],preview=new THREE.Group();
-    for(const mesh of meshes){const clone=mesh.clone(false);clone.visible=true;preview.add(clone);}
-    try { await renderer.compileAsync(preview,camera,targetScene); }
-    finally { preview.clear(); }
+    const meshes=[flameMesh,emberMesh,smokeMesh,fuelMesh],preview=new THREE.Scene();
+    // Render ONLY the four fire layers. Rendering targetScene here used to
+    // synchronously link every still-cold world shader before world compileAsync
+    // ran, blocking the welcome screen for seconds. These are unlit shaders;
+    // preserve the fog/environment but do not draw or mutate any world objects.
+    preview.fog=targetScene.fog;preview.environment=targetScene.environment;
+    for(const mesh of meshes){const clone=mesh.clone(false);clone.visible=true;clone.frustumCulled=false;preview.add(clone);}
+    await renderer.compileAsync(preview,camera);
     if(disposed)return;
     const previous=meshes.map(mesh=>({visible:mesh.visible,count:mesh.geometry.instanceCount,start:mesh.geometry.drawRange.start,range:mesh.geometry.drawRange.count}));
     const output=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest();
     const target=new THREE.WebGLRenderTarget(1,1);
     try {
       for(const mesh of meshes){mesh.visible=true;if(mesh.geometry.isInstancedBufferGeometry)mesh.geometry.instanceCount=Math.max(1,mesh.geometry.instanceCount);else mesh.geometry.setDrawRange(0,Math.max(6,mesh.geometry.drawRange.count));}
-      renderer.setRenderTarget(target);renderer.setScissorTest(false);renderer.render(targetScene,camera);
+      renderer.setRenderTarget(target);renderer.setScissorTest(false);renderer.render(preview,camera);
     } finally {
       for(let i=0;i<meshes.length;i++){const mesh=meshes[i],saved=previous[i];mesh.visible=saved.visible;mesh.geometry.instanceCount=saved.count;mesh.geometry.setDrawRange(saved.start,saved.range);}
-      renderer.setRenderTarget(output);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);target.dispose();
+      renderer.setRenderTarget(output);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);target.dispose();preview.clear();
     }
   }
 

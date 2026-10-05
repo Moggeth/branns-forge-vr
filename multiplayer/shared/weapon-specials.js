@@ -2,6 +2,9 @@ import {friendlyEnemyHit} from './battle-mode.js';
 import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront,makeTerrainRoom,wallSpec} from './terrain.js';
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
+import {hasTalent} from './hero-progress.js';
+// Geode Burst (pick talent): an ending crystal wall bursts into shards that wound and toss foes beside it.
+export const GEODE_BURST=Object.freeze({radius:2.6,damage:70});
 export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:80}); // cooldown: pick (see special-cooldowns.js)
 const fail=code=>({ok:false,code,events:[]});
 /** Prepare the complete cast before allocating IDs, cooldown or damage. */
@@ -9,7 +12,7 @@ export function terrainSpecial(state,p,ctx,hitEnemyPart,m={}) {
   if(p.tool==='axe')return axeCleave(state,p,ctx,hitEnemyPart); // the cleave owns its own cooldown; old axe_sunder edits/deposits still load
   if(p.tool!=='pick')return null;
   if(state.tick-(p.specialTick??-1000)<specialCooldown('pick'))return fail('cooldown');
-  return crystalWall(state,p,ctx,m);
+  return crystalWall(state,p,ctx,m,hitEnemyPart);
 }
 /** Pure plan of a Stonewhisper wall from the caster toward an aimed ground point (same math drives the client preview).
  * Reach clamps to PICK_WALL.minReach..maxReach; no/degenerate aim falls back to facing at full reach. Segments start low
@@ -31,7 +34,7 @@ export function planCrystalWall(position,yaw,point) {
 }
 /** Timed segments grouped by cast (rupture id). Defaults to every timed kind; pass kind to narrow it. */
 export const wallCasts=(state,owner,kind)=>{const casts=new Map();for(const e of state.edits)if(e.wall&&(kind?e.kind===kind:true)&&(!owner||e.wall.owner===owner)){if(!casts.has(e.rupture.id))casts.set(e.rupture.id,[]);casts.get(e.rupture.id).push(e);}return casts;};
-function crystalWall(state,p,ctx,m) {
+function crystalWall(state,p,ctx,m,hitEnemyPart) {
   const plan=planCrystalWall(p.position,p.yaw,m.point);
   if([plan.start,plan.end].some(q=>Math.abs(q[0])>46||Math.abs(q[1])>46))return fail('outside_world');
   const n=plan.segments.length;
@@ -40,7 +43,7 @@ function crystalWall(state,p,ctx,m) {
   const position=[p.position[0],terrainHeight(state,p.position[0],p.position[2]),p.position[2]],editIds=[],depositIds=[],events=[];
   // At most PICK_WALL.standing of a caster's walls stand: the oldest still-standing one shatters to make room.
   const standing=[...wallCasts(state,p.id,'pick_wall').values()].filter(list=>list.some(e=>e.wall.expireTick>state.tick)).sort((a,b)=>a[0].rupture.startTick-b[0].rupture.startTick);
-  for(const list of standing.slice(0,Math.max(0,standing.length-PICK_WALL.standing+1)))shatterWall(state,list,ctx,events,'replaced');
+  for(const list of standing.slice(0,Math.max(0,standing.length-PICK_WALL.standing+1)))shatterWall(state,list,ctx,events,'replaced',hitEnemyPart);
   p.specialTick=state.tick;
   const castId=ctx.nextId(state,'w'),rupture=createSunderRupture(castId,plan.start,plan.end,state.tick,'pick_wall');
   for(const q of plan.segments){
@@ -55,7 +58,7 @@ function crystalWall(state,p,ctx,m) {
   return {ok:true,events};
 }
 /** Begin the sink of every segment of one timed cast now; deposits/edits retire after its sinkTicks in stepCrystalWalls. */
-export function shatterWall(state,list,ctx,events,reason) {
+export function shatterWall(state,list,ctx,events,reason,hitEnemyPart) {
   const live=list.filter(e=>e.wall.expireTick>=state.tick);if(!live.length)return;
   for(const e of live)e.wall.expireTick=state.tick;
   const kind=list[0].kind,r=list[0].rupture,mid=[(r.start[0]+r.end[0])/2,(r.start[1]+r.end[1])/2];
@@ -66,6 +69,15 @@ export function shatterWall(state,list,ctx,events,reason) {
   if(reason==='expired'&&kind==='wall')for(const [i,e] of live.entries()){if(i%2===0)drop('stone',e);if(i===live.length>>1)drop('gems',e);}
   const name=kind==='sunder'?'sunder_close':kind==='wall'?'raise_wall_shatter':'pick_wall_shatter';
   events.push({kind:name,cast:r.id,reason,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],editIds:live.map(e=>e.id)});
+  const owner=kind==='pick_wall'&&hitEnemyPart&&state.players.find(q=>q.id===list[0].wall.owner);
+  if(owner&&hasTalent(owner,'pick','geode')){
+    const near=e=>live.some(q=>Math.hypot(e.position[0]-q.x,e.position[2]-q.z)<=GEODE_BURST.radius),hits=[];
+    for(const enemy of [...state.enemies])if(near(enemy)&&!friendlyEnemyHit(state,enemy,{ownerId:owner.id})){
+      hitEnemyPart(state,enemy,'torso',GEODE_BURST.damage,{tool:'pick',point:[enemy.position[0],enemy.position[1]+1,enemy.position[2]],ownerId:owner.id},ctx,events);
+      hits.push(enemy.id);if(state.enemies.includes(enemy))enemy.launchTick=state.tick;
+    }
+    events.push({kind:'geode_burst',cast:r.id,by:owner.id,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],points:live.map(q=>[q.x,terrainHeight(state,q.x,q.z),q.z]),radius:GEODE_BURST.radius,hits});
+  }
 }
 /** Fixed-tick life of timed segments, deterministic, no clocks. The front acts exactly once as it passes:
  * crystal walls and Raise Walls toss enemies (damage + launch, Raise Wall also shoves them off its footprint) and lift
@@ -98,7 +110,7 @@ export function stepCrystalWalls(state,ctx,hitEnemyPart,events) {
       const push=Math.min(spec.shove,spec.width+.35-Math.abs(side)),sign=side>=0?1:-1;
       enemy.position[0]+=dz/len*push*sign;enemy.position[2]-=dx/len*push*sign;
     }
-    if(state.tick===r.startTick+spec.lifetimeTicks)shatterWall(state,list,ctx,events,'expired');
+    if(state.tick===r.startTick+spec.lifetimeTicks)shatterWall(state,list,ctx,events,'expired',hitEnemyPart);
   }
   const gone=new Set(state.edits.filter(e=>e.wall&&state.tick>=e.wall.expireTick+wallSpec(e.kind).sinkTicks).map(e=>e.id));
   if(!gone.size)return;

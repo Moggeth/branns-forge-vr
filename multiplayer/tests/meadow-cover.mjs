@@ -15,10 +15,11 @@ function settle(m, cam, opts) { for (let i = 0; i < 400; i++) { m.update(1 / 60,
 const instances = (m, kind = 'grass') => { const g = m.objects[kind].geometry, a = g.attributes.aMeadowPos.array; return Array.from({length: g.instanceCount}, (_, i) => [a[i * 4], a[i * 4 + 1], a[i * 4 + 2], a[i * 4 + 3]]); };
 
 test('static candidates are deterministic and keep paths, plaza and landmark ribbons clear', () => {
-  let grass = 0, flowers = 0;
+  let grass = 0, flowers = 0, daisies = 0;
   for (let cj = 0; cj < 11; cj++) for (let ci = 0; ci < 11; ci++) {
     const a = bakeCellStatic(ci, cj, MEADOW_QUALITY.high, true), b = bakeCellStatic(ci, cj, MEADOW_QUALITY.high, true);
-    assert.deepEqual(a.grass, b.grass); assert.deepEqual(a.flowers, b.flowers);
+    assert.deepEqual(a.grass, b.grass); assert.deepEqual(a.flowers, b.flowers); assert.deepEqual(a.daisies, b.daisies);
+    for (let s = 0; s < a.daisies.length; s += 5) { const x = a.daisies[s], z = a.daisies[s + 1]; daisies++; assert.ok(Math.hypot(x, z) >= 4.4 && meadowWear(x, z) <= .6, 'daisies stay off the plaza and worn paths'); }
     for (let s = 0; s < a.grass.length; s += 7) {
       const x = a.grass[s], z = a.grass[s + 1]; grass++;
       assert.ok(Math.hypot(x, z) >= 4.4, 'forge plaza bare');
@@ -27,21 +28,21 @@ test('static candidates are deterministic and keep paths, plaza and landmark rib
     }
     flowers += a.flowers.length / 5;
   }
-  assert.ok(grass > 20000 && flowers > 1500, `meadow populated (${grass} tufts, ${flowers} flowers)`);
-  return `${grass} tufts, ${flowers} flowers`;
+  assert.ok(grass > 20000 && flowers > 1500 && daisies > 100, `meadow populated (${grass} tufts, ${flowers} flowers, ${daisies} daisy clumps)`);
+  return `${grass} tufts, ${flowers} flowers, ${daisies} daisy clumps`;
 });
 
-test('bounded instances, three draws, nearest-first budgeted fill that converges', () => {
+test('bounded instances, four draws, nearest-first budgeted fill that converges', () => {
   const scene = new THREE.Scene(), m = createMeadowCover({scene, height});
   const cam = camAt(0, 1.65, 8, 0, 0); const frames = settle(m, cam), s = m.stats();
-  assert.equal(s.drawCalls, 3); assert.ok(s.grass > 3000 && s.grass <= MEADOW_QUALITY.high.grass); assert.ok(s.flowers <= MEADOW_QUALITY.high.flowers);
+  assert.equal(s.drawCalls, 4); assert.ok(s.grass > 3000 && s.grass <= MEADOW_QUALITY.high.grass); assert.ok(s.flowers <= MEADOW_QUALITY.high.flowers); assert.ok(s.daisies > 0 && s.daisies <= MEADOW_QUALITY.high.daisies, `daisies ${s.daisies}`);
   for (const [x, , z] of instances(m)) assert.ok(Math.hypot(x, z - 8) <= MEADOW_QUALITY.high.radius + 3.01, 'inside fill radius');
   const low = createMeadowCover({scene: new THREE.Scene(), height, quality: 'low'}); settle(low, cam);
   assert.ok(low.stats().grass <= MEADOW_QUALITY.low.grass && low.stats().triangles < s.triangles / 2.5, 'phone tier far lighter');
   // Walking 2.5 m triggers one refill whose cell baking stays in budget once neighbours are cached.
   const fills = s.fills; m.update(1 / 60, camAt(2.5, 1.65, 8)); const t = m.stats();
   assert.equal(t.fills, fills + 1); assert.ok(t.lastFillMs < FILL_BUDGET_MS + 6, `refill ${t.lastFillMs} ms`);
-  return `${frames} frames to settle, ${s.grass} tufts / ${s.triangles} tris high, ${low.stats().triangles} tris low, refill ${t.lastFillMs} ms`;
+  return `${frames} frames to settle, ${s.daisies} daisy clumps, ${s.grass} tufts / ${s.triangles} tris high, ${low.stats().triangles} tris low, refill ${t.lastFillMs} ms`;
 });
 
 test('RTS view centres grass on the view target; headset tier lowers the cap', () => {
@@ -86,7 +87,7 @@ test('shader anchors exist in the installed three; materials and dispose are cle
     assert.ok(!/\bflat\b/.test(shader.vertexShader.replace(/flatShading|FLAT_SHADED/g, '')), 'no GLSL-reserved identifiers');
     assert.equal(o.raycast(), undefined, 'never a raycast target');
   }
-  assert.equal(scene.children.length, 3); m.dispose(); assert.equal(scene.children.length, 0);
+  assert.equal(scene.children.length, 4); m.dispose(); assert.equal(scene.children.length, 0);
 });
 
 console.log(results.join('\n'));

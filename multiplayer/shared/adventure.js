@@ -1,3 +1,4 @@
+import {heroMaxHp} from './hero-progress.js';
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 // Forge Expedition: an optional, cooperative 10-15 minute run layered on the free sandbox.
 // Pure deterministic module (no DOM, clock, RNG or transport). The host owns one adventure per room,
@@ -371,7 +372,7 @@ export function applyAdventureIntents(state, intents, {createEnemy, terrainHeigh
   let applied = 0; const skipped = [];
   const taken = id => [...state.enemies, ...state.deposits, ...state.edits, ...state.pickups].some(x => x.id === id);
   for (const it of intents) {
-    if(it.type==='partyReward'){for(const p of state.players){p.hp=Math.min(100,p.hp+it.health);p.mana=Math.min(100,p.mana+it.mana);for(const k of ['wood','stone','gems'])p.resources[k]=Math.min(999,p.resources[k]+it[k]);}applied++;}
+    if(it.type==='partyReward'){for(const p of state.players){p.hp=Math.min(heroMaxHp(p),p.hp+it.health);p.mana=Math.min(100,p.mana+it.mana);for(const k of ['wood','stone','gems'])p.resources[k]=Math.min(999,p.resources[k]+it[k]);}applied++;}
     else if (it.type === 'spawn') {
       if (state.enemies.length >= 64 || taken(it.id)) { skipped.push(it.id); continue; }
       state.enemies.push({...createEnemy(it.id, [it.x, terrainHeight(state, it.x, it.z), it.z], it.kind),emergeTick:state.tick}); applied++;

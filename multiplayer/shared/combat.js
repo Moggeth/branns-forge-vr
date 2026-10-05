@@ -8,9 +8,11 @@ import {TREE_LIMITS} from './trees.js';
 import {STUMPLING,stumplingParts,dropStumplingLoot} from './stumplings.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
+import {WYRMSPOUT,sprayTuning,spendGlob,clingSplash} from './wyrmspout.js';
 // Phoenix Flare: launch speed and extra upward loft (m/s), and the fuse before it bursts (ticks).
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
+import {damageScale,grantXp,killXp,hasTalent} from './hero-progress.js';
 import {stepRemains,applyImpulse,partMass,linkRagdoll,wake,tear} from './remains-physics.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
@@ -36,7 +38,9 @@ export function siegebirdPerfect(elapsed,{quick=false,hand=false,window=SIEGEBIR
   const d=siegebirdReloadTicks(quick);
   return hand?elapsed>=Math.round(SIEGEBIRD.handMin*d)&&elapsed<=Math.round(SIEGEBIRD.handLatch*d)+window:Math.abs(elapsed-Math.round(SIEGEBIRD.latch*d))<=window;
 }
-export function siegebirdGoldenChance(hits=0){return Math.min(SIEGEBIRD.goldenMax,SIEGEBIRD.goldenBase+Math.max(0,hits)*SIEGEBIRD.goldenPerHit);}
+// Golden Flock (Siegebird talent) triples the chance and raises its ceiling.
+export const GOLDEN_FLOCK=Object.freeze({multiplier:3,max:.35});
+export function siegebirdGoldenChance(hits=0,flock=false){const c=SIEGEBIRD.goldenBase+Math.max(0,hits)*SIEGEBIRD.goldenPerHit;return flock?Math.min(GOLDEN_FLOCK.max,c*GOLDEN_FLOCK.multiplier):Math.min(SIEGEBIRD.goldenMax,c);}
 // Deterministic per-reload roll (FNV-1a of player, reload index and tick): every peer replays it identically.
 export function siegebirdRoll(id,n,tick){let h=0x811c9dc5;for(const c of `${id}:${n}:${tick}`){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193);}return (h>>>0)/4294967296;}
 // quick/wind are optional together (saves from before perfect wind carry only n, golden and hits).
@@ -137,6 +141,10 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(friendlyEnemyHit(state,enemy,hit)||enemy.battleRun&&state.inventions?.structures.some(b=>b.type==='ward'&&b.side===enemy.side&&b.hp>0&&b.charge>0&&Math.hypot(b.position[0]-enemy.position[0],b.position[2]-enemy.position[2])<=6))return false;
   if(!state.enemies.includes(enemy)||!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
   const armored=enemy.kind==='golem'&&(enemy.armor??3)>0;
+  const owner=state.players.find(p=>p.id===hit?.ownerId);
+  amount*=damageScale(owner); // +20% per hero level
+  // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
+  if(!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter'))amount=Math.max(amount,enemy.parts[part]);
   if((enemy.kind==='ent'||enemy.kind==='stumpling')&&hit?.tool==='axe')amount*=2; // the axe was made for wood
   if(armored){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
@@ -144,16 +152,16 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   // Body hits take normal damage: one arrow cannot kill a fresh skeleton, but
   // repeated body shots must not leave it immortal at one HP.
   const creditedDamage=Math.min(enemy.hp,headshot?enemy.hp:amount);
-  const owner=state.players.find(p=>p.id===hit?.ownerId);
   if(owner?.stats)owner.stats.contribution=Math.min(1e9,owner.stats.contribution+creditedDamage);
   enemy.hp-=headshot?enemy.hp:amount;
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':enemy.kind==='ent'||enemy.kind==='stumpling'?'wood':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   if(!projectile&&part!=='torso'&&enemy.parts[part]===0)detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);if(owner?.role==='hero'&&!enemy.battleRun)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(!enemy.battleRun)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);grantXp(state,owner,killXp(enemy),events,enemy.position);if(owner?.role==='hero'&&!enemy.battleRun)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(!enemy.battleRun)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
     // Detachment remaps arrows onto physical remains. Wooden creatures have no torso remains,
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
+    clingSplash(state,enemy,ctx,events);
     if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
@@ -180,7 +188,7 @@ export function projectileContact(state,m,ctx){
   if(rival){
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side||'party';
     if(!['arrow','bolt'].includes(shot.kind)||(rival.side||'party')===side||rival.id===shot.ownerId||Math.hypot(m.point[0]-rival.position[0],m.point[2]-rival.position[2])>1.2||m.point[1]<rival.position[1]-.3||m.point[1]>rival.position[1]+2.2)return fail('invalid_contact');
-    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,shot.kind==='bolt'?40:28,events);return ok(events);
+    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?40:28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events);return ok(events);
   }
   const home=findHomeTarget(state,m.targetId),base=home?.target||state.battle?.bases.find(b=>b.id===m.targetId);
   if(base){
@@ -204,18 +212,19 @@ export function projectileContact(state,m,ctx){
   if(shot.flare){state.projectiles.splice(state.projectiles.indexOf(shot),1);return ok(ctx.flareBurst(state,m.point,shot.ownerId));}
   // A golden bolt is radiant: it bursts through shields, bodies and remains (each once) and only a
   // world surface stops it. Every other projectile ends at its first contact.
-  const pierceKey=m.targetId+(shield?'#shield':''),piercing=shot.golden&&(enemy||detached)&&(shot.pierced?.length||0)<GOLDEN_PIERCE.max;
-  if(shot.golden&&shot.pierced?.includes(pierceKey))return fail('already_pierced');
+  // Skewer (Siegebird talent): an ordinary bolt passes through up to SKEWER.max bodies, without the radiant burst.
+  const pierceKey=m.targetId+(shield?'#shield':''),piercing=(shot.golden||shot.skewer)&&(enemy||detached)&&(shot.pierced?.length||0)<(shot.golden?GOLDEN_PIERCE.max:SKEWER.max);
+  if((shot.golden||shot.skewer)&&shot.pierced?.includes(pierceKey))return fail('already_pierced');
   if(piercing){(shot.pierced??=[]).push(pierceKey);if(vec(shot.velocity,100))shot.velocity=shot.velocity.map(v=>v*GOLDEN_PIERCE.keep);}
   else state.projectiles.splice(state.projectiles.indexOf(shot),1);
   if(['flame','fuel'].includes(shot.kind))return ok(ctx.fireContact(state,shot,m));
   const vel=vec(shot.velocity,100)?shot.velocity:[0,0,-1],dir=(n=>n>1e-6?vel.map(v=>v/n):[0,0,-1])(Math.hypot(...vel));
   if(detached)applyImpulse(state,detached,dir.map(v=>v*(shot.golden?5:shot.kind==='bolt'?1.6:.9)),m.point);
   if(piercing){
-    const events=[{kind:'pierce',id:shot.id,ownerId:shot.ownerId,position:[...m.point],direction:dir,targetId:m.targetId,normal:[...m.normal],golden:true,...(shield?{blocked:true}:{})}];
-    if(shield)breakShield(state,enemy,m,events,true);
+    const events=[{kind:'pierce',id:shot.id,ownerId:shot.ownerId,position:[...m.point],direction:dir,targetId:m.targetId,normal:[...m.normal],...(shot.golden?{golden:true}:{skewer:true}),...(shield?{blocked:true}:{})}];
+    if(shield)breakShield(state,enemy,m,events,!!shot.golden);
     else if(enemy)strikeEnemy(state,shot,enemy,m,ctx,events);
-    radiantBurst(state,shot,m,ctx,events);
+    if(shot.golden)radiantBurst(state,shot,m,ctx,events);
     return ok(events);
   }
   if(shield){
@@ -231,6 +240,9 @@ export function projectileContact(state,m,ctx){
   return ok(events);
 }
 export const GOLDEN_PIERCE=Object.freeze({max:6,keep:.85,radius:1.8,damage:24,push:2.2});
+export const SKEWER=Object.freeze({max:3});
+// Ember Volley: minimum draw for the extra arrows and their yaw either side of the aim (radians, about 7 degrees).
+export const VOLLEY=Object.freeze({draw:.95,spread:.12});
 function strikeEnemy(state,shot,enemy,m,ctx,events){
   // Siegebird mastery: every bolt that lands on a foe makes the golden bird a little more likely.
   const owner=shot.kind==='bolt'&&state.players.find(p=>p.id===shot.ownerId);if(owner?.siegebird)owner.siegebird.hits=Math.min(SIEGEBIRD.hitCap,owner.siegebird.hits+1);
@@ -264,26 +276,33 @@ export function combatAction(state,p,m,ctx){
     const flame=m.action==='flame';
     if(p.tool!==(flame?'wyrmspout':'flask')||!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
     if(flame&&(p.overheatUntil||0)>state.tick)return fail('overheated');
-    if(state.tick-p.attackTick<(flame?6:60))return fail('cooldown');
+    if(state.tick-p.attackTick<(flame?WYRMSPOUT.acceptTicks:60))return fail('cooldown');
     if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.attackTick=state.tick;
-    if(flame){p.flameTick=state.tick;p.heat=clamp((p.heat||0)+.0125,0,1);if(p.heat>=.999){p.heat=1;p.overheatUntil=state.tick+180;}}
-    const id=ctx.nextId(state,'q'),speed=flame?10.5:6,motion=flame?[0,0,0]:ctx.playerVelocity?.(p);
+    // Wyrmspout: one glob of sticky liquid fire from the tank (shared/wyrmspout.js).
+    const spray=flame?sprayTuning(p):null;if(flame)spendGlob(state,p,spray.cost);
+    const id=ctx.nextId(state,'q'),speed=flame?spray.speed:6,motion=flame?[0,0,0]:ctx.playerVelocity?.(p);
     const inherited=vec(motion,100)?motion:[0,0,0];
     state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:flame?'flame':'fuel',lit:!flame&&!!p.flaskLit,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(!flame&&i===1?2:0)+inherited[i]),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
-    return ok([{kind:flame?'flame_emit':'fuel_throw',weapon:p.tool,position:[...m.origin],id}]);
+    return ok([{kind:flame?'flame_emit':'fuel_throw',weapon:p.tool,position:[...m.origin],id,...(flame?{by:p.id}:{})}]);
   }
+  // Gout (Wyrmspout Q): one big lobbed ball of sticky fire that bursts into a wide burning splash. Costs part of the tank.
   if(m.action==='special'&&p.tool==='wyrmspout'){
+    const G=WYRMSPOUT.gout;
     if((p.overheatUntil||0)>state.tick)return fail('overheated');
-    if(state.tick-(p.flameTick??-1000)<10)return fail('release_to_vent');
-    if(state.tick-(p.specialTick??-1000)<specialCooldown('wyrmspout'))return fail('cooldown');
-    p.specialTick=state.tick;p.heat=Math.max(0,(p.heat||0)-.5);return ok([]);
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('wyrmspout',p))return fail('cooldown');
+    if(!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
+    if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
+    p.specialTick=state.tick;p.flameTick=state.tick;p.heat=Math.min(1,(p.heat||0)+G.cost);if(p.heat>=.999){p.heat=1;p.overheatUntil=state.tick+WYRMSPOUT.refillTicks;}
+    const id=ctx.nextId(state,'q');
+    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'flame',gout:true,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*G.speed+(i===1?G.loft:0)),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    return ok([{kind:'gout_launch',weapon:'wyrmspout',by:p.id,position:[...m.origin],id}]);
   }
   if(m.action==='special'&&p.tool==='flask'){p.flaskLit=!p.flaskLit;return ok([]);}
   // Phoenix Flare (Emberwing Q): a flare arrow climbs along the aim, bursts overhead, lights the area and rains
   // embers that set what is under it alight (fire.js flareBurst). Contact before the burst bursts it there.
   if(m.action==='special'&&p.tool==='bow'){
-    if(state.tick-(p.specialTick??-1000)<specialCooldown('bow'))return fail('cooldown');
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('bow',p))return fail('cooldown');
     if(!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
     if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.specialTick=state.tick;const id=ctx.nextId(state,'q'),speed=FLARE.speed;
@@ -297,8 +316,18 @@ export function combatAction(state,p,m,ctx){
     p.attackTick=state.tick;const id=ctx.nextId(state,'q'),speed=p.tool==='bow'?18+18*Math.max(.2,m.draw??.67):42;
     // The bolt on the rail was decided when the previous bird was sent; roll the next bird now.
     let golden=false,reload;
-    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits);sb.quick=sb.wind===1;sb.wind=0;reload={n:sb.n,golden:sb.golden,...(sb.quick?{quick:true}:{})};}
-    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:p.tool==='bow'?'arrow':'bolt',position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*speed),curve:p.tool==='bow'?[...curve]:[0,0,0],bornTick:state.tick,trail:[[...m.origin]],...(golden?{golden:true}:{})});return ok([{kind:'shoot',weapon:p.tool,phoenix:p.tool==='bow'&&Math.hypot(...curve)>.000001,position:[...m.origin],id,...(golden?{golden:true}:{}),...(reload?{reload}:{})}]);
+    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits,hasTalent(p,'crossbow','flock'));sb.quick=sb.wind===1;sb.wind=0;reload={n:sb.n,golden:sb.golden,...(sb.quick?{quick:true}:{})};}
+    const skewer=p.tool==='crossbow'&&!golden&&hasTalent(p,'crossbow','skewer');
+    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:p.tool==='bow'?'arrow':'bolt',position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*speed),curve:p.tool==='bow'?[...curve]:[0,0,0],bornTick:state.tick,trail:[[...m.origin]],...(golden?{golden:true}:{}),...(skewer?{skewer:true}:{})});
+    // Ember Volley (Emberwing talent): a full draw looses two more arrows fanned either side of the aim.
+    const volley=[];
+    if(p.tool==='bow'&&(m.draw??.67)>=VOLLEY.draw&&hasTalent(p,'bow','volley'))for(const sign of [-1,1]){
+      if(state.projectiles.length>=COMBAT_LIMITS.projectiles)break;
+      const a=sign*VOLLEY.spread,c=Math.cos(a),sn=Math.sin(a),[dx,dy,dz]=m.direction,extra=ctx.nextId(state,'q');
+      state.projectiles.push({id:extra,ownerId:p.id,side:p.side||'party',kind:'arrow',position:[...m.origin],previousPosition:[...m.origin],velocity:[dx*c+dz*sn,dy,-dx*sn+dz*c].map(n=>n*speed),curve:[...curve],bornTick:state.tick,trail:[[...m.origin]]});
+      volley.push(extra);
+    }
+    return ok([{kind:'shoot',weapon:p.tool,phoenix:p.tool==='bow'&&Math.hypot(...curve)>.000001,position:[...m.origin],id,...(golden?{golden:true}:{}),...(skewer?{skewer:true}:{}),...(volley.length?{volley}:{}),...(reload?{reload}:{})}]);
   }
   // Perfect wind press (see SIEGEBIRD). Never fails visibly: a late, early or repeated press just changes nothing.
   if(m.action==='wind'){
@@ -326,11 +355,11 @@ export function stepCombat(state,ctx,events){
   for(const p of [...state.projectiles]){
     p.previousPosition=[...p.position];const age=(state.tick-p.bornTick-1)*dt,len=Math.hypot(...p.curve),fraction=t=>1-Math.pow(1-clamp(t/.85,0,1),3),angle=len*(fraction(age+dt)-fraction(age));
     let v=p.velocity;if(len>.000001){const a=p.curve.map(n=>n/len),c=Math.cos(angle),s=Math.sin(angle),dot=a.reduce((n,q,i)=>n+q*v[i],0),cross=[a[1]*v[2]-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]-a[1]*v[0]];v=v.map((n,i)=>n*c+cross[i]*s+a[i]*dot*(1-c));}
-    const nv=v.map((n,i)=>n*Math.exp(-.045*dt)-(i===1?(p.kind==='arrow'?5.8:p.kind==='flame'?5.2:p.kind==='fuel'?15:3)*dt:0));p.position=p.position.map((n,i)=>n+(p.velocity[i]+nv[i])*.5*dt);p.velocity=nv;p.trail.push([...p.position]);if(p.trail.length>16)p.trail.shift();
+    const nv=v.map((n,i)=>n*Math.exp(-.045*dt)-(i===1?(p.kind==='arrow'?5.8:p.kind==='flame'?WYRMSPOUT.gravity:p.kind==='fuel'?15:3)*dt:0));p.position=p.position.map((n,i)=>n+(p.velocity[i]+nv[i])*.5*dt);p.velocity=nv;p.trail.push([...p.position]);if(p.trail.length>16)p.trail.shift();
     if(p.flare&&state.tick-p.bornTick>=FLARE.fuse){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(...ctx.flareBurst(state,p.position,p.ownerId));continue;}
     // Apple on a stick (shared/fruit.js): an arrow or bolt through a hanging apple takes it off the tree and stops.
     const fruit=ctx.fruitStrike?.(state,p.previousPosition,p.position,p);if(fruit){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(fruit);continue;}
-    if(state.tick-p.bornTick>(p.kind==='flame'?48:p.kind==='fuel'?180:480)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
+    if(state.tick-p.bornTick>(p.kind==='flame'?(p.gout?WYRMSPOUT.gout.lifeTicks:sprayTuning(state.players.find(q=>q.id===p.ownerId)).lifeTicks):p.kind==='fuel'?180:480)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
   }
   const before=new Map();
   for(const d of [...state.detachedParts]){
@@ -374,7 +403,7 @@ export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);
   const tick=n=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick;
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
-  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.pierced!==undefined&&(!p.golden||!Array.isArray(p.pierced)||p.pierced.length>GOLDEN_PIERCE.max||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
+  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.skewer!==undefined&&(p.skewer!==true||p.kind!=='bolt'||p.golden))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.gout!==undefined&&(p.gout!==true||p.kind!=='flame'))||(p.pierced!==undefined&&(!(p.golden||p.skewer)||!Array.isArray(p.pierced)||p.pierced.length>(p.golden?GOLDEN_PIERCE.max:SKEWER.max)||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   for(const e of [...saved.enemies,...(saved.detachedParts||[])])if(e.burnUntil!==undefined&&(!Number.isSafeInteger(e.burnUntil)||e.burnUntil<0||e.burnUntil>saved.tick+240||!PARTS.includes(e.burnPart))||e.burnPart!==undefined&&!PARTS.includes(e.burnPart))throw Error('Invalid burning part');
   for(const d of saved.detachedParts||[])if(d.scorch!==undefined&&(!Number.isFinite(d.scorch)||d.scorch<0||d.scorch>1))throw Error('Invalid detached scorch');
   for(const d of saved.detachedParts||[])if(d.rest!==undefined&&(!Number.isInteger(d.rest)||d.rest<0||d.rest>64)||d.joint!==undefined&&(!d.joint||typeof d.joint!=='object'||Object.keys(d.joint).length!==3||!vec(d.joint.a,4)||!vec(d.joint.b,4)||d.joint.to===d.id||(saved.detachedParts.find(o=>o.id===d.joint.to)?.sourceId)!==d.sourceId))throw Error('Invalid remains joint');
@@ -389,7 +418,7 @@ export function validateCombat(saved,ids){
 export function restoreCombat(saved){
   const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value[k]!==undefined).map(k=>[k,structuredClone(value[k])]));
   return {
-    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','side','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden','pierced','flare'])),
+    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','side','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden','skewer','pierced','flare','gout'])),
     embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','localNormal','penetration','boneName','surface','golden'])),
     detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','throwerSide','hitIds','miningHits','scorch','burnUntil','burnPart','rest']),...(d.joint?{joint:{to:d.joint.to,a:[...d.joint.a],b:[...d.joint.b]}}:{}),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
   };

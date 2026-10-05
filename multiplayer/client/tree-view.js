@@ -46,7 +46,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function kitFrom(name) {
   const src = templates.get(name)?.scene, root = src?.getObjectByName('Tree'); if (!root) { missing.add(name); return null; }
   root.updateMatrixWorld(true); const inv = new T.Matrix4().copy(root.matrixWorld).invert(), parts = {};
-  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: p === 'Fruit' && name === VARIANTS[APPLE_VARIANT] ? (g => (ownedGeometry.add(g), g))(tagAppleSlots(m.geometry, new T.Matrix4().multiplyMatrices(inv, m.matrixWorld))) : m.geometry, material: p === 'Leaves' && !mats ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)})); if (list.length) parts[p] = list; }
+  for (const p of PARTS) { const node = root.getObjectByName(p); const list = meshesUnder(node).map(m => ({geometry: p === 'Fruit' && name === VARIANTS[APPLE_VARIANT] ? (g => (ownedGeometry.add(g), g))(tagAppleSlots(m.geometry, new T.Matrix4().multiplyMatrices(inv, m.matrixWorld))) : m.geometry, material: p === 'Leaves' && !mats ? windMaterial(m.material) : m.material, matrix: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld), ...(/^Ivy/.test(m.name) ? {ivy: true} : {})})); if (list.length) parts[p] = list; }
   if (!parts.Trunk || !parts.Roots) { missing.add(name); return null; }
   const trunkMesh = meshesUnder(root.getObjectByName('Trunk'))[0];
   const kit = {name, parts, trunk: bakeTriangles(trunkMesh, root), trunkColor: !!trunkMesh.geometry.attributes.color, trunkMaterial: trunkMesh.material};
@@ -61,7 +61,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   const logSrc = templates.get('log')?.scene; if (logSrc) { logSrc.updateMatrixWorld(true); logs = meshesUnder(logSrc).map(m => { const im = new T.InstancedMesh(m.geometry, m.material, TREE_LIMITS.logs); im.userData.local = m.matrixWorld.clone(); im.count = 0; im.frustumCulled = false; im.name = 'TreeLogs'; group.add(im); return im; }); } else missing.add('log');
   if (!chips && woodMaterial) { const g = new T.BoxGeometry(.07, .014, .035); ownedGeometry.add(g); chips = {mesh: new T.InstancedMesh(g, woodMaterial, 40), list: []}; chips.mesh.count = 0; chips.mesh.frustumCulled = false; group.add(chips.mesh); }
  }
- const place = (parent, list, tag) => list.map(p => { const m = decorate(new T.Mesh(p.geometry, p.material)); m.matrixAutoUpdate = false; m.matrix.copy(p.matrix); if (tag) m.userData.targetId = tag; parent.add(m); return m; });
+ const place = (parent, list, tag) => list.map(p => { const m = decorate(new T.Mesh(p.geometry, p.material)); m.matrixAutoUpdate = false; m.matrix.copy(p.matrix); if (tag) m.userData.targetId = tag; if (p.ivy) m.userData.ivy = true; parent.add(m); return m; });
  function partsGroup(kit, id, skip = []) { const g = new T.Group(), byPart = {}; for (const p of PARTS) if (kit.parts[p] && !skip.includes(p)) byPart[p] = place(g, kit.parts[p], id); return {g, byPart}; }
  function owned(tris, color) { const g = toGeometry(tris, color); ownedGeometry.add(g); return g; }
  function release(g) { if (g && ownedGeometry.delete(g)) g.dispose(); }
@@ -162,7 +162,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   for(const [id,e] of logEntities)if(!liveLogs.has(id)){for(const m of e.root.children)release(m.geometry);e.root.removeFromParent();logEntities.delete(id);}
   if (logs) { const list = (s.looseLogs || []).filter(l=>!l.section).slice(0, TREE_LIMITS.logs), m = new T.Matrix4(), q = new T.Quaternion(), p = new T.Vector3(), one = new T.Vector3(1, 1, 1);
    for (const im of logs) { im.userData.logIds=list.map(l=>l.id);list.forEach((l, i) => { m.compose(p.fromArray(l.position), q.fromArray(l.quaternion), one).multiply(im.userData.local); im.setMatrixAt(i, m); }); im.count = list.length; im.instanceMatrix.needsUpdate = true; } }
-  targetList = batches.targets(); for (const e of trees.values()) if (!e.felled) targetList.push(...e.full.byPart.Trunk, ...(e.wound?.meshes || []));
+  targetList = batches.targets(); for (const e of trees.values()) if (!e.felled) targetList.push(...e.full.byPart.Trunk.filter(m => !m.userData.ivy), ...(e.wound?.meshes || [])); // ivy is cosmetic: the axe bites bark
   initialized = true;
  }
  const tmpQ = new T.Quaternion(), tmpV = new T.Vector3(), m4 = new T.Matrix4(), e3 = new T.Euler();
