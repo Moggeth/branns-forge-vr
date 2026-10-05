@@ -629,6 +629,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
 
+  loader.load('/assets/heavy_launcher.glb',async gltf=>{ // Blender-built spring catapult; the code-built launcher stands in until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    try{await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Heavy Launcher material preparation failed: ${error.message}`);}
+    if(disposed){disposeResources(gltf.scene);return;}
+    inventionVisual.installLauncher(gltf);
+  },undefined,()=>report('Could not load the Heavy Launcher model; the simple stand-in stays.'));
   loader.load('/assets/bases_kit.glb',gltf=>{ // Blender-built Dawnhold and Grumblekeep; the code-built bases stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
     if(!inventionVisual.installHomeKit(gltf)){disposeResources(gltf.scene);report('Home base models are incomplete; the simpler bases stay in place.');}
