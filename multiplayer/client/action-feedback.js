@@ -2,6 +2,10 @@ import {WEAPONS} from '../shared/spells.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const RECOVERY = {
+ "dragon_not_ready": "The dragon comes after 5 skeleton killing blows in a row. Keep going!",
+ "dragon_riding": "You are up on your dragon. Your weapons wait on the ground until the ride ends.",
+ "dragon_not_riding": "Your dragon has already flown home.",
+ "dragon_cooldown": "The dragon is catching its breath. Watch the button fill, then try again.",
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",
  "invalid_target": "That target is gone or cannot receive this action. Aim at another valid target.",
  "invalid_cast": "The spell target is not valid. Aim at ground inside the valley and try again.",
@@ -55,6 +59,7 @@ const RECOVERY = {
 
 export function actionError(code,{world={},player={},command={}}={}){
  const tick=world.tick||0,wait=(last,duration)=>Math.max(.1,(duration-(tick-(last??-1000)))/60).toFixed(1);
+ if(code==='out_of_reach'&&command.action==='dragon')return 'That spot is too far from your dragon. Aim at ground closer to the circle it flies.';
  if(code==='cooldown'){
   if(command.action==='homeDrink')return `The fountain is refilling: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.drinkReadyTick||tick)-tick)/60).toFixed(0)}s.`;
   if(command.action==='homeBell')return `The bell is still ringing out: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.bellReadyTick||tick)-tick)/60).toFixed(0)}s until the next squad can be called.`;

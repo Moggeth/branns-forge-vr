@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dragon ride lab</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// The real game renderer (client/game.js) on a real in-page simulation, with a Hero who has earned the dragon and a crowd
+// of skeletons nearby. window.lab drives it for review captures: lab.call(), lab.attack(kind,[x,y,z]), lab.step(ms).
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
+const params=new URLSearchParams(location.search),touch=params.has('touch'),manual=params.has('manual');
+let sim=createSimulation({room:'LAB',seed:41});sim.addPlayer({id:'me',name:'Lab',role:'hero'});
+{const c=sim.checkpoint(),p=c.players[0];p.position=[4,terrainHeight(c,4,14),14];p.yaw=0;p.dragonReady=true;
+ c.enemies=[[2,4],[3,3],[1,2.5],[6,5],[7,3.5],[-2,1],[0,0],[9,8],[-4,6],[5,-1]].map(([x,z],i)=>createEnemy('lab'+i,[x,terrainHeight(c,x,z),z]));sim=loadSimulation(c);}
+let seq=1,pending=[],last=performance.now();
+const canvas=document.getElementById('c');
+const game=createGame({canvas,isHost:()=>true,onAction:(action,d={})=>{const r=sim.command('me',{type:'action',seq:seq++,action,...d});if(!r.ok)console.log('refused',action,r.code);pending.push(...(r.events||[]));},
+  onInput:input=>sim.command('me',{type:'input',seq:seq++,...input}),onCast:()=>{},onStatus:m=>{window.lastStatus=m;console.log('status',m);}});
+game.setTouchEnabled(touch);
+function pump(){const now=performance.now();let n=Math.min(12,Math.round((now-last)/16.667));last+=n*16.667;for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+// ?manual freezes world time between lab.advance(n) calls, for captures on slow software renderers.
+function advance(n){for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+if(!manual)setInterval(pump,50);advance(1);
+window.lab={game,advance,sim:()=>sim,snapshot:()=>sim.snapshot(),call:()=>game.handleEvent&&window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyH'})),
+  attack:(attack,point)=>{const r=sim.command('me',{type:'action',seq:seq++,action:'dragon',attack,point});pending.push(...(r.events||[]));return r.ok||r.code;},
+  diag:()=>game.diagnostics().dragon,controls:()=>game.controlsSnapshot()};
+game.setActive(true);
+const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r();}},100);});
+await wait();game.setActive(true);document.title='ready';
+</script>

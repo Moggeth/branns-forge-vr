@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Dragon lab</title><style>body{margin:0;background:#8fb6d6}canvas{display:block}</style>
+<script type="module">
+// Review page for the streak dragon (client/dragon-art.js). window.lab.view(name, t) poses and renders one view.
+import * as T from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {buildDragon,animateDragon} from '../client/dragon-art.js';
+const W=1280,H=800,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.5;room.dispose();scene.background=new T.Color(0x9cc6e8);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x6a7a3a,1.3));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.position.set(-3,6,4);scene.add(sun);
+const cam=new T.PerspectiveCamera(40,W/H,.05,200);const dragon=buildDragon();scene.add(dragon);
+const views={three:[[9,4,9],[0,.5,0]],side:[[13,1,0],[0,.5,0]],front:[[0,1.5,12],[0,1,0]],below:[[3,-9,4],[0,0,0]],top:[[0,14,-1],[0,0,0]],face:[[2.2,3.2,8.5],[0,2,4]]};
+window.lab={view(name='three',t=0,opts={}){animateDragon(dragon,t,opts);const [p,l]=views[name];cam.position.set(...p);cam.lookAt(...l);renderer.render(scene,cam);}};
+document.title='ready';
+</script>
