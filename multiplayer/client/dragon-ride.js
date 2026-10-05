@@ -158,8 +158,9 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
     const speed = Math.min(60, len / .42), n = Math.ceil(110 * dt * amount);
     for (let i = 0; i < n; i++) {
       const j = .14 * speed;
-      fire.add(from.x + w.x * .3, from.y + w.y * .3, from.z + w.z * .3, w.x * speed + (Math.random() - .5) * j, w.y * speed + (Math.random() - .5) * j, w.z * speed + (Math.random() - .5) * j,
-        len / speed * (.8 + Math.random() * .35), .55 + Math.random() * .4, {growth: 5, damping: .25});
+      // Starts small at the lips and swells on the way down, so the rider's own flame never blows out the view.
+      fire.add(from.x + w.x * .8, from.y + w.y * .8, from.z + w.z * .8, w.x * speed + (Math.random() - .5) * j, w.y * speed + (Math.random() - .5) * j, w.z * speed + (Math.random() - .5) * j,
+        len / speed * (.8 + Math.random() * .35), .3 + Math.random() * .25, {growth: 9, damping: .25});
     }
     for (let i = 0; i < Math.ceil(30 * dt * amount); i++) { const a = Math.random() * Math.PI * 2, r = Math.random() * DRAGON.breath.radius; fire.add(to.x + Math.cos(a) * r, to.y + .2, to.z + Math.sin(a) * r, 0, 2 + Math.random() * 2.5, 0, .4 + Math.random() * .4, 1.1, {growth: .8, damping: 1.5, rise: 2}); }
     if (Math.random() < 6 * dt * amount) smoke.add(to.x, to.y + 1.5, to.z, 0, 1.6, 0, 1.8, 2.4, {growth: 2, damping: .8, rise: .6});

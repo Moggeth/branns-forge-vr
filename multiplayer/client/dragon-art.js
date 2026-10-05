@@ -9,7 +9,7 @@ import * as THREE from 'three';
 export const DRAGON_SCALE = 1.35;
 // Where the rider sits (on the neck, just behind the horns, ahead of the wings so the view down and to the side is clear),
 // and where the fire leaves the mouth, both in the dragon's unscaled local space.
-export const DRAGON_SEAT = Object.freeze([0, 2.75, 2.35]);
+export const DRAGON_SEAT = Object.freeze([0, 3.2, 2.3]);
 export const DRAGON_MOUTH = Object.freeze([0, 1.3, 4.45]);
 
 let shared = null;
@@ -106,8 +106,14 @@ export function buildDragon() {
   return root;
 }
 
-/** The rider's own dragon: the horns right under the camera are left out so they never cover the view. */
-export function setRiderView(root, riding) { for (const h of root.userData.dragon?.horns || []) h.visible = !riding; }
+/** The rider's own dragon: the horns right under the camera are left out so they never cover the view... */
+export function setRiderView(root, riding) {
+  const d = root.userData.dragon; if (!d) return;
+  for (const h of d.horns) h.visible = !riding;
+  // ...and the wings turn see-through, so the ground under them stays in view while you aim.
+  d.riderWing ??= Object.assign(materials().wing.clone(), {transparent: true, opacity: .42, depthWrite: false});
+  for (const w of d.wings) w.children[0].material = riding ? d.riderWing : materials().wing;
+}
 
 /** Wing beat, glide, sway and fire glow. amp < 1 glides with smaller strokes (the rider's own dragon). t in seconds; breath 0..1; dive 0..1 (folds the wings back). */
 export function animateDragon(root, t, {breath = 0, dive = 0, beat = 1, amp = 1} = {}) {
