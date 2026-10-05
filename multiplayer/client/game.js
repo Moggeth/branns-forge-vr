@@ -114,7 +114,7 @@ export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainH
 
 export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, onNotice = () => {} }) {
   const started = performance.now();
-  let disposed = false, active = false, role = 'hero', spell = 'skeleton', playerId = null;
+  let disposed = false, active = false, role = 'hero', spell = 'grove', playerId = null;
   let requestedActive=false;
   const startup={ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
   // Non-authoritative lobby preview only: never stepped, published or saved.
@@ -138,7 +138,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask'];
   // Number keys pick from the hotbar; a held bone (limb) comes only from grabbing one (F), so it has no slot.
   const hotbarSlots=equipment.filter(t=>t!=='limb');
-  const spellKeys={Digit1:'skeleton',Digit2:'raise',Digit3:'grove',Digit4:'starfall',Digit5:'sunder',Digit6:'wall',Digit7:'ring',Digit8:'golem',Digit9:'squad',Digit0:'crystal',Minus:'lower',Equal:'heal',Backquote:'lightning',KeyT:'frost',KeyY:'spring',KeyU:'blessing',KeyI:'quake',KeyO:'awaken',KeyP:'wildwake',KeyR:'rainfall',KeyH:'wave'};
+  const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Digit0:'awaken',Minus:'wildwake',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;

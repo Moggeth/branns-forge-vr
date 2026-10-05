@@ -24,7 +24,7 @@ import {inventionView} from './shared/inventions.js';
 import './client/invention-panel.css';
 import './client/spellbook.css';
 import './client/forge-panel.css';
-import {SPELLS} from './shared/spells.js';
+import {SPELLS,SPELL_SCHOOLS} from './shared/spells.js';
 import {BLOOM,bloomLevel,nextBloom} from './shared/bloom.js';
 import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
@@ -120,7 +120,7 @@ const voiceControls = createVoiceControls({card:document.querySelector('#menu .m
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
-let appliedRole = null, currentRole = 'hero', spell = 'skeleton', vrSupported = false, vrChecked = false;
+let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
 let lastGameplayCommand={};
@@ -742,7 +742,7 @@ $('techDetails').addEventListener('toggle', renderTech);
 $('damageNumbers').addEventListener('change',()=>{const enabled=$('damageNumbers').checked;store.set('branns-forge.damage-numbers',enabled?'on':'off');game?.setDamageNumbers(enabled);});
 
 // ---------------------------------------------------------------- spells
-spellbook=createSpellbook({root:$('godHelp'),spells:SPELLS});
+spellbook=createSpellbook({root:$('godHelp'),spells:SPELLS,schools:SPELL_SCHOOLS});
 // One-press God / Hero switch, the first slot of whichever hotbar is showing (F9 still works; touch keeps its tray entry).
 function makeRoleSwitch(){const b=document.createElement('button');b.type='button';b.className='bf-roleswitch';b.dataset.roleSwitch='';b.setAttribute('aria-keyshortcuts','F9');
  b.innerHTML='<span class="bf-roleswitch-ring"><svg aria-hidden="true"><use href="#i-god"/></svg></span><span class="bf-name">God</span><kbd>F9</kbd>';

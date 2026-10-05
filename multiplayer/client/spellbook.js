@@ -77,8 +77,9 @@ export function formatRemaining(sec) { return sec >= 10 ? String(Math.ceil(sec))
  *   root   : #godHelp (container holding .bf-spells and input#quickCast)
  *   spells : SPELLS catalogue [{id,label,cost,cooldown(ticks@60Hz),target,iconUrl?}]
  *   icons  : optional {spellId: url} for supplied generated art; falls back to SPELL_ICONS vectors.
+ *   schools: optional [{id,label,spells:[id]}] — groups the cards under labelled school panels, in that order.
  */
-export function createSpellbook({ root, spells = [], icons = {} } = {}) {
+export function createSpellbook({ root, spells = [], icons = {}, schools = [] } = {}) {
   const list = root?.querySelector('.bf-spells');
   if (!list) throw new Error('createSpellbook: root must contain .bf-spells');
   const byId = new Map(spells.map(s => [s.id, s]));
@@ -117,6 +118,27 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
     btn.title = desc;
   }
 
+  // ---- schools: each school is a labelled panel holding its cards. The buttons keep their order, ids and
+  // listeners; only their parent changes. Two rows per school on the full deck (columns = half the cards).
+  const panels = new Map(), original = [...list.querySelectorAll('[data-spell]')];
+  for (const school of schools) {
+    const ids = (school.spells || []).filter(id => cards.has(id));
+    if (!ids.length) continue;
+    const panel = document.createElement('div'); panel.className = 'sb-school'; panel.dataset.school = school.id;
+    panel.setAttribute('role', 'group'); panel.setAttribute('aria-label', `${school.label} spells`);
+    panel.style.setProperty('--sb-cols', String(Math.ceil(ids.length / 2)));
+    panel.style.setProperty('--sb-count', String(ids.length));
+    const name = span('sb-school-name', school.label); name.setAttribute('aria-hidden', 'true'); if (school.job) name.title = school.job;
+    const grid = document.createElement('div'); grid.className = 'sb-school-grid';
+    for (const id of ids) { grid.append(cards.get(id).btn); cards.get(id).school = school.id; }
+    panel.append(name, grid); list.append(panel); panels.set(school.id, panel);
+  }
+  // Ungrouped cards (a spell missing from every school) stay visible after the panels.
+  for (const c of cards.values()) if (!c.school && panels.size) list.append(c.btn);
+  if (panels.size) shell.classList.add('sb-deck');
+
+  // Card position inside the scrolling row, measured from layout (cards may sit inside school panels).
+  const left = btn => btn.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
   // ---- paging arrows + edge state (never a mask that hides reachable items)
   const pageBy = dir => list.scrollBy({ left: dir * Math.max(64, list.clientWidth * 0.8), behavior: reduceMotion?.matches ? 'auto' : 'smooth' });
   on(prev, 'click', e => { e.stopPropagation(); pageBy(-1); });
@@ -168,7 +190,7 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
   // ---- keyboard: whatever gets focus is scrolled fully clear of the arrows
   on(list, 'focusin', e => {
     const btn = e.target.closest?.('[data-spell]'); if (!btn) return;
-    const l = btn.offsetLeft, r = l + btn.offsetWidth, pad = 6;
+    const l = left(btn), r = l + btn.offsetWidth, pad = 6;
     if (l < list.scrollLeft + pad) list.scrollLeft = l - pad;
     else if (r > list.scrollLeft + list.clientWidth - pad) list.scrollLeft = r - list.clientWidth + pad;
   });
@@ -200,7 +222,7 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
     legend = document.createElement('li'); legend.className = 'sb-legend';
     legend.innerHTML = '<b>Spell cards</b> — <span class="sb-lg-cost">red cost</span> means not enough mana yet. '
       + 'Mana is the only limit: aim anywhere and the spell lands. Every card stays selectable. '
-      + 'Scroll the row with ‹ ›, mouse wheel, drag or arrow keys.';
+      + (panels.size ? 'Spells are grouped into four schools: Grow, Shape, Summon and Sky. Each school has its own row of keys.' : 'Scroll the row with ‹ ›, mouse wheel, drag or arrow keys.');
     helpList.append(legend);
   }
 
@@ -235,7 +257,7 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
   }
   function scrollToSpell(id, onlyIfHidden = false) {
     const c = cards.get(id); if (!c) return;
-    const l = c.btn.offsetLeft, r = l + c.btn.offsetWidth;
+    const l = left(c.btn), r = l + c.btn.offsetWidth;
     const visible = l >= list.scrollLeft - 1 && r <= list.scrollLeft + list.clientWidth + 1;
     if (onlyIfHidden && visible) return;
     list.scrollLeft = l < list.scrollLeft ? l - 6 : r - list.clientWidth + 6;
@@ -247,6 +269,8 @@ export function createSpellbook({ root, spells = [], icons = {} } = {}) {
       c.btn.classList.remove('sb-card', 'sb-cooling', 'sb-nomana', 'sb-selected');
       c.btn.style.removeProperty('--sb-cd'); c.btn.removeAttribute('aria-description'); delete c.btn.dataset.sbLine;
     }
+    if (panels.size) for (const btn of original) list.append(btn);
+    for (const panel of panels.values()) panel.remove();
     shell.before(list); shell.remove(); list.classList.remove('sb-track'); root.classList.remove('sb-root');
     quickIcon?.remove(); quickLabel?.classList.remove('sb-qc', 'sb-qc-on', 'sb-qc-pulse'); if (quickLabel) delete quickLabel.dataset.sbState;
     legend?.remove();

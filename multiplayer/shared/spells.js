@@ -1,6 +1,14 @@
 // Shared catalogue: the tray and authoritative cast validation use one vocabulary.
 import {ENT} from './ents.js';
 import {RAISE_WALL,SUNDER} from './terrain.js';
+// The four schools of God magic, in spell-bar order. Each spell belongs to exactly one.
+export const SPELL_SCHOOLS = Object.freeze([
+  {id:'grow',label:'Grow',job:'Make the world alive and feed the Heroes',spells:['grove','ring','wave','heal','spring','blessing']},
+  {id:'shape',label:'Shape',job:'Move the land: paths, cover and ore',spells:['raise','lower','wall','sunder','crystal','quake']},
+  {id:'summon',label:'Summon',job:'Call creatures: foes that drop loot, and allies',spells:['skeleton','squad','golem','awaken','wildwake']},
+  {id:'sky',label:'Sky',job:'Instant strikes and weather',spells:['lightning','frost','starfall','rainfall']},
+].map(s=>Object.freeze({...s,spells:Object.freeze(s.spells)})));
+const SCHOOL_OF = Object.fromEntries(SPELL_SCHOOLS.flatMap(s=>s.spells.map(id=>[id,s.id])));
 export const SPELLS = Object.freeze([
   {id:'skeleton',label:'Skeleton',cost:15,target:'point',icon:'☠'},
   {id:'squad',label:'Skeleton Squad',cost:38,target:'point',icon:'☠'},
@@ -25,7 +33,7 @@ export const SPELLS = Object.freeze([
   {id:'spring',label:'Life Spring',cost:16,target:'point',icon:'❀',bloom:1},
   {id:'blessing',label:'Blessing',cost:20,target:'point',icon:'✦',bloom:2},
   {id:'quake',label:'Quake',cost:24,target:'point',icon:'≋',bloom:3},
-].map(s=>Object.freeze({bloom:0,...s,cooldown:0})));  // Mana is the only gate on casting once a spell is unlocked.
+].map(s=>Object.freeze({bloom:0,...s,school:SCHOOL_OF[s.id],cooldown:0})));  // Mana is the only gate on casting once a spell is unlocked.
 export const SPELL_BLOOM = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.bloom])));
 export const SPELL_COST = Object.freeze(Object.fromEntries(SPELLS.map(s=>[s.id,s.cost])));
 export const WEAPONS = Object.freeze([
