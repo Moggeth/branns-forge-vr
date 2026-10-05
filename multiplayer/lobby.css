@@ -254,7 +254,13 @@ input[aria-invalid="true"] { border-color: var(--danger) !important; box-shadow:
   .lobby-form { gap: 14px; }
   .lobby .role-body { min-height: 112px; padding: 12px; }
   .lobby .role-icon { width: 36px; height: 36px; margin-bottom: 2px; }
-  .actions { grid-template-columns: 1fr 1fr; align-items: center; gap: 20px; }
+  /* One column: Create + Public worlds side by side, solo below, then Join full width (nothing squeezed). */
+  .actions { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .create-block { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+  .create-block > :not(#create):not(#browseWorlds) { grid-column: 1 / -1; margin: 0; }
+  .create-block #create, .create-block #browseWorlds { margin: 0; }
+  .create-block .bf-pr-lobby-notice { text-align: center; }
+  .create-block > .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .divider { display: none; }
   .join-block { padding: 12px; }
   .join-title { margin-bottom: 6px; }
@@ -419,7 +425,10 @@ body .hud-room .fo-entry {position:static;top:auto;right:auto;flex:none;pointer-
 body.field-overlay-open .fo-entry {display:none!important;}
 body.field-overlay-open #hud > :not(.hud-top) {visibility:hidden;}
 body.field-overlay-open .mui-root {pointer-events:none;}
+/* Lobby guide buttons: equal tiles on one line at every size (phones refine this in mobile-compact.css). */
 .howto-row {gap:8px;flex-wrap:wrap;}
+#lobby .howto-row {display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));}
+#lobby .howto-row .btn-howto {min-width:0;padding-left:8px;padding-right:8px;}
 @media(max-width:600px){body.touch-controls-active .hud-room .fo-entry{gap:4px;}.hud-room .fo-entry-btn{width:44px;height:44px;}}
 
 @media(max-width:600px) and (orientation:portrait){

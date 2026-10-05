@@ -133,7 +133,7 @@
     column-gap: 8px; row-gap: 0 !important; align-items: center !important; text-align: left !important; padding: 4px 8px 4px 4px !important;
   }
   #lobby .role-card-scene .role-scene { grid-row: 1 / 3; width: 64px; height: 42px; margin: 0; border: 0; border-radius: 9px; }
-  #lobby .role-card-scene .role-desc { -webkit-line-clamp: 1; padding: 0; }
+  #lobby .role-card-scene .role-desc { -webkit-line-clamp: 2; padding: 0; font-size: .72rem; line-height: 1.2; }
   #lobby .role-swap { top: 50%; }
   #lobby .role-switch-note { margin-top: 4px; }
 }

@@ -40,7 +40,8 @@ export function createPublicRoomsLauncher({doc = document, onOpen} = {}) {
   const button = doc.createElement('button');
   button.type = 'button';
   button.className = 'btn btn-secondary bf-pr-launch';
-  button.textContent = 'Browse public worlds';
+  button.textContent = 'Public worlds';
+  button.setAttribute('aria-label', 'Browse public worlds');
   button.addEventListener('click', () => onOpen?.(button));
   return button;
 }
