@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Emberdew guide lab</title><style>body{margin:0;background:#20242a}canvas{display:block}</style>
+<script type="module">
+// Review page for the Emberdew aim guides: lab.show('hurl'|'cinder', pitch) draws the forecast arc and Cinder landing rings.
+import * as T from 'three';
+import {createTrajectoryGuide} from '../client/ranged-trajectory.js';
+import {flaskLaunch,forecastFlask,forecastCinder,createLandingMarkers} from '../client/emberdew-aim.js';
+const W=960,H=540,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);document.body.append(renderer.domElement);
+const scene=new T.Scene();scene.background=new T.Color(0x9fc4e8);scene.add(new T.HemisphereLight(0xffffff,0x556633,2));
+const ground=new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x6f8f3a}));scene.add(ground);
+const cam=new T.PerspectiveCamera(70,W/H,.05,200);cam.position.set(0,1.6,0);
+const guide=createTrajectoryGuide({maxPoints:128,width:8,coreWidth:2.2,color:0xffe9c4,tail:0xffb35a,halo:0xff6a1e,haloTail:0xb8341a,markerRadius:.42,sparkPx:16});scene.add(guide.object);
+const markers=createLandingMarkers({radius:1});scene.add(markers.object);const land=new Float32Array(18);
+window.lab={show:(mode='cinder',pitch=-.15)=>{cam.rotation.set(pitch,0,0,'YXZ');cam.updateMatrixWorld();
+  const dir=new T.Vector3(0,0,-1).applyQuaternion(cam.quaternion).toArray(),origin=[.24,1.4,-.45],v=flaskLaunch(mode,dir,[0,0,0]);
+  const q={origin,velocity:v,out:guide.buffer,terrainHeight:()=>0};const r=mode==='cinder'?forecastCinder({...q,landings:land}):forecastFlask(q);
+  guide.setPoints(guide.buffer,r.count,r.apex?{point:r.apex,normal:[0,1,0]}:r.contact);if(mode==='cinder')markers.set(land,r.landed,1);else markers.hide();renderer.render(scene,cam);return {count:r.count,landed:r.landed,apex:r.apex};}};
+document.title='ready';
+</script>

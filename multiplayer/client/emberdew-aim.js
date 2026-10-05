@@ -71,7 +71,8 @@ export function forecastCinder({origin, velocity, out, hit = null, hitWindow = n
   return {...jug, landed};
 }
 
-// Small flush rings marking where each Cinder Cluster bottle lands (one InstancedMesh, one draw, additive, depth-tested).
+// Rings marking where each Cinder Cluster bottle lands (one InstancedMesh, one draw, additive). Drawn over grass and
+// clutter (no depth test) so the rain is always readable, like any area-of-effect marker.
 const RING_VS = /* glsl */`
 varying vec2 vUv;
 void main() { vUv = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`;
@@ -91,9 +92,8 @@ void main() {
 export function createLandingMarkers({max = 6, radius = .42, color = 0xffa040} = {}) {
   const uniforms = {time: {value: 0}, color: {value: new THREE.Color(color)}};
   const geometry = new THREE.PlaneGeometry(2, 2); geometry.rotateX(-Math.PI / 2);
-  const material = new THREE.ShaderMaterial({uniforms, vertexShader: RING_VS, fragmentShader: RING_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
-  const mesh = new THREE.InstancedMesh(geometry, material, max); mesh.count = 0; mesh.frustumCulled = false; mesh.renderOrder = 2;
+  const material = new THREE.ShaderMaterial({uniforms, vertexShader: RING_VS, fragmentShader: RING_FS, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, toneMapped: false});
+  const mesh = new THREE.InstancedMesh(geometry, material, max); mesh.count = 0; mesh.frustumCulled = false; mesh.renderOrder = 5;
   mesh.name = 'emberdew-landing-markers'; mesh.userData.ignoreContact = true;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   function set(points, n, time = 0) {
