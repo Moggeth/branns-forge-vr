@@ -22,8 +22,13 @@ export const INSPECT_KEYS = Object.freeze([
 ]);
 export const INSPECT_DURATION = INSPECT_KEYS.at(-1)[0];
 // Presenting orientation per weapon in the anchor frame (every model is prepared to face -Z, up +Y);
-// the choreography turns it from there. Empty means "as prepared".
-export const INSPECT_BASE = Object.freeze({});
+// the choreography turns it from there. Missing means "as prepared" (the barrel weapons show their flank).
+// The axe and pick carry their faces on ±Z, so they are turned a quarter: the side moments show the blade and the
+// pick head, and the stare looks down the haft at the business end. All hafted tools lean into a diagonal so their
+// length fits the view (the hammer and the tall bow already show their sides as prepared, so they only lean).
+const quarter = () => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, .55, 'YXZ'));
+const lean = a => new THREE.Quaternion().setFromEuler(new THREE.Euler(a, 0, 0, 'YXZ'));
+export const INSPECT_BASE = Object.freeze({axe: quarter(), pick: quarter(), hammer: lean(.5), bow: lean(.6)});
 
 const ease = t => t * t * (3 - 2 * t);
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _v = new THREE.Vector3();
@@ -105,7 +110,7 @@ export function createWeaponInspect({reducedMotion = () => false} = {}) {
       // Hold it a comfortable arm's length away: far enough to fit the whole weapon, never pressed to the lens.
       const distance = THREE.MathUtils.clamp(radius * 1.55 + .1, .36, 1.35);
       const bob = mode ? .006 * Math.sin(performance.now() / 1000 * 1.7) : 0;
-      target.set(0, -.03 + bob, -distance);
+      target.set(0, .01 + bob, -distance);   // a little above centre: clear of the hotbar
       // Each weapon has a presenting orientation (fit.base, e.g. an axe held blade-up); the turn is applied on top of it.
       pose.quaternion.copy(relative);
       if (fit?.base) pose.quaternion.multiply(fit.base);
@@ -121,8 +126,9 @@ export function measureWeapon(model, anchor) {
   if (!model) return null;
   anchor.updateWorldMatrix(true, true);
   const inv = new THREE.Matrix4().copy(anchor.matrixWorld).invert(), box = new THREE.Box3(), p = new THREE.Vector3();
-  model.traverse(o => {
-    if (!o.isMesh || !o.geometry) return;
+  // Only what is showing: hidden helpers (an un-nocked arrow, a spent effect) must not pull the frame off centre.
+  model.traverseVisible(o => {
+    if (!o.isMesh || !o.geometry || o.userData.readinessOwned) return;
     if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
     const b = o.geometry.boundingBox, m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
     for (let i = 0; i < 8; i++) box.expandByPoint(p.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(m));

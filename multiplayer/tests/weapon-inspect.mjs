@@ -15,7 +15,7 @@ const run = (inspect, seconds, opts = {}) => { let pose; for (let i = 0; i < Mat
   let pose = run(inspect, .5); assert.equal(inspect.mode(), 'auto'); assert.ok(pose.amount > .99, 'fully raised after the blend-in');
   // The model's centre sits on the line of sight, at arm's length.
   const c = fit.center.clone().applyQuaternion(pose.quaternion).add(pose.position);
-  assert.ok(Math.abs(c.x) < 1e-6 && Math.abs(c.y + .03) < .01 && c.z < -.35, `centre framed (${c.toArray().map(v => v.toFixed(3))})`);
+  assert.ok(Math.abs(c.x) < 1e-6 && Math.abs(c.y - .01) < .01 && c.z < -.35, `centre framed (${c.toArray().map(v => v.toFixed(3))})`);
   pose = run(inspect, INSPECT_DURATION); assert.equal(inspect.mode(), null, 'the turn ends on its own');
   pose = run(inspect, .5); assert.equal(pose.amount, 0); assert.equal(inspect.active(), false, 'and settles home');
 }
