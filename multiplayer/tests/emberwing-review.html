@@ -127,8 +127,9 @@ if (sceneName === 'carry') {
   window.flareResult = act(seq++, 'special', {origin, direction: d.map(n => n / l)}); window.flareResult.events.forEach(view.handleEvent);
 } else if (sceneName === 'ignite') {
   // One curved (phoenix) arrow into the torso: the bite, its fire crown and the burn that follows.
-  const at = partPosition(sim.snapshot().enemies[0], 'torso'), origin = [2.6, at[1] + .7, 3.2];
-  fire(origin, at.map((n, i) => n - origin[i]), [0, -.55, 0]); pending = 'torso';
+  // Aimed two metres wide so the curve carries it back in: the arrow arrives banking, as a phoenix shot should.
+  const at = partPosition(sim.snapshot().enemies[0], 'torso'), origin = [2.6, at[1] + .7, 3.2], lead = [at[0] - 2, at[1], at[2]];
+  fire(origin, lead.map((n, i) => n - origin[i]), [0, -.55, 0]); pending = 'torso';
 } else if (sceneName === 'arrows') {
   // Six arrows into the skeleton, then it is frozen for close inspection.
   const e = sim.snapshot().enemies[0];

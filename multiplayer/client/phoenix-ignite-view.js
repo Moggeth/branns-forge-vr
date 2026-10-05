@@ -9,8 +9,8 @@ import * as THREE from 'three';
 //   crown     a ring of fire opening outward across the struck surface, as if the bird landed there
 //   feathers  burning feather motes thrown back out of the wound, falling and cooling to deep red
 // The crown lies in the surface plane (from the contact normal) so it reads on a skull, a trunk or the ground.
-export const IGNITE = Object.freeze({max: 5, flash: .26, flashSize: 1.5, crown: .5, crownRadius: 1.15,
-  feathers: 26, featherLife: 1.15, featherSpeed: 3.4, featherSize: .13, gravity: 5.2});
+export const IGNITE = Object.freeze({max: 5, flash: .22, flashSize: 1.1, crown: .42, crownRadius: .62,
+  feathers: 34, featherLife: 1.2, featherSpeed: 2.8, featherSize: .19, gravity: 5.2});
 
 function radial(size, falloff, inner = 0) {
   const data = new Uint8Array(size * size * 4);
@@ -26,17 +26,18 @@ function radial(size, falloff, inner = 0) {
 
 export function createPhoenixIgniteView({scene}) {
   const sparkMap = radial(32, 2.4), glowMap = radial(64, 2.2), ringMap = radial(64, 1.5, .62);
-  const flashMaterial = new THREE.SpriteMaterial({map: glowMap, color: 0xfff0cc, transparent: true,
+  const flashMaterial = new THREE.SpriteMaterial({map: glowMap, color: 0xffd089, transparent: true,
     blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false});
   const crownGeometry = new THREE.PlaneGeometry(1, 1);
-  const crownMaterial = new THREE.MeshBasicMaterial({map: ringMap, color: 0xff8a2c, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false});
+  const crownMaterial = new THREE.MeshBasicMaterial({map: ringMap, color: 0xff6a16, transparent: true, opacity: 0,
+    depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false});
   const featherGeometry = new THREE.BufferGeometry();
-  const featherPosition = new Float32Array(IGNITE.max * IGNITE.feathers * 3), featherColor = new Float32Array(featherPosition.length);
+  const featherPosition = new Float32Array(IGNITE.max * IGNITE.feathers * 3);
+  const featherColor = new Float32Array(IGNITE.max * IGNITE.feathers * 4);
   featherGeometry.setAttribute('position', new THREE.BufferAttribute(featherPosition, 3).setUsage(THREE.DynamicDrawUsage));
-  featherGeometry.setAttribute('color', new THREE.BufferAttribute(featherColor, 3).setUsage(THREE.DynamicDrawUsage));
+  featherGeometry.setAttribute('color', new THREE.BufferAttribute(featherColor, 4).setUsage(THREE.DynamicDrawUsage));
   const featherMaterial = new THREE.PointsMaterial({size: IGNITE.featherSize, map: sparkMap, vertexColors: true,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, sizeAttenuation: true});
+    transparent: true, depthWrite: false, toneMapped: false, sizeAttenuation: true});
   const feathers = new THREE.Points(featherGeometry, featherMaterial);
   feathers.name = 'phoenix-ignite-feathers'; feathers.frustumCulled = false; feathers.userData.ignoreContact = true;
   scene.add(feathers);
@@ -89,7 +90,7 @@ export function createPhoenixIgniteView({scene}) {
       if (c < 1) {
         const open = 1 - (1 - c) * (1 - c) * (1 - c);
         ignite.crown.scale.setScalar(.2 + IGNITE.crownRadius * 2 * open);
-        ignite.crown.material.opacity = .85 * (1 - c) * (1 - c);
+        ignite.crown.material.opacity = (1 - c) * (1 - c);
       }
       let burning = false;
       for (const spark of ignite.sparks) {
@@ -97,15 +98,18 @@ export function createPhoenixIgniteView({scene}) {
         burning = true;
         spark.v.y -= IGNITE.gravity * dt; spark.v.multiplyScalar(Math.exp(-2.6 * dt));
         spark.p.addScaledVector(spark.v, dt);
-        const k = 1 - spark.age / spark.life, o = n * 3;
+        const k = 1 - spark.age / spark.life, o = n * 3, c = n * 4;
         featherPosition[o] = spark.p.x; featherPosition[o + 1] = spark.p.y; featherPosition[o + 2] = spark.p.z;
-        tint.setRGB(1, .3 + .55 * k, .1 * k * k).multiplyScalar((.35 + .65 * k) * k * 1.4);
-        featherColor[o] = tint.r; featherColor[o + 1] = tint.g; featherColor[o + 2] = tint.b; n++;
+        // White-hot as it leaves the wound, cooling through ember orange to a dull red as it falls.
+        tint.setRGB(1, .36 + .55 * k * k, .1 + .55 * k * k * k);
+        featherColor[c] = tint.r; featherColor[c + 1] = tint.g; featherColor[c + 2] = tint.b; featherColor[c + 3] = Math.min(1, k * 1.6); n++;
       }
       if (!burning && f >= 1 && c >= 1) retire(ignite);
     }
     featherGeometry.setDrawRange(0, n);
-    for (const name of ['position', 'color']) { const at = featherGeometry.attributes[name]; at.clearUpdateRanges(); at.addUpdateRange(0, n * 3); at.needsUpdate = true; }
+    featherGeometry.attributes.position.clearUpdateRanges(); featherGeometry.attributes.position.addUpdateRange(0, n * 3);
+    featherGeometry.attributes.color.clearUpdateRanges(); featherGeometry.attributes.color.addUpdateRange(0, n * 4);
+    featherGeometry.attributes.position.needsUpdate = featherGeometry.attributes.color.needsUpdate = true;
     feathers.visible = n > 0;
     return active.length;
   }
