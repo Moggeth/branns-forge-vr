@@ -1,6 +1,7 @@
 // Weapon Inspect: tap plays a turn and settles home, a held key spins it, the pose turns about the model's centre,
 // and the motion never snaps from one frame to the next.
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {createWeaponInspect, measureWeapon, choreography, INSPECT_DURATION} from '../client/weapon-inspect.js';
 
@@ -65,5 +66,13 @@ const run = (inspect, seconds, opts = {}) => { let pose; for (let i = 0; i < Mat
   const model = new THREE.Group(), mesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .2, .8)); mesh.position.set(0, 0, -.4); model.add(mesh); anchor.add(model);
   const m = measureWeapon(model, anchor);
   assert.ok(m.center.distanceTo(new THREE.Vector3(0, 0, -.4)) < 1e-6); assert.ok(Math.abs(m.radius - Math.hypot(.2, .2, .8) / 2) < 1e-6);
+}
+// I belongs to the hero: it must not collide with a god spell key, and it only starts an inspect in the hero branch.
+{
+  const game = readFileSync(new URL('../client/game.js', import.meta.url), 'utf8');
+  const spellKeys = game.match(/const spellKeys=\{[^}]*\}/)[0];
+  assert.ok(!/KeyI:/.test(spellKeys), 'I must stay free of the god spellbook');
+  const hero = game.slice(game.indexOf("else if (role === 'hero' && !event.repeat)"));
+  assert.ok(hero.indexOf("if(event.code==='KeyI')startInspect();") < hero.indexOf('\n'), 'I only inspects on the hero keydown line');
 }
 console.log('weapon inspect ok');
