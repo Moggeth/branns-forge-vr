@@ -197,14 +197,15 @@
 
       <div class="actions">
         <section class="create-block">
-          <button id="create" class="btn btn-primary btn-large" type="button">Create a world</button>
-          <p class="hint">Start fresh and invite friends with a code.</p>
+          <button id="create" class="btn btn-primary btn-large" type="button">Play</button>
+          <p class="hint">Joins the busiest world near you, or starts one if they’re all full.</p>
           <button id="solo" class="btn btn-quiet" type="button">Play solo · no room service needed</button>
         </section>
 
         <div class="divider" role="presentation"><span>or</span></div>
 
-        <section id="joinBlock" class="join-block" aria-labelledby="joinTitle">
+        <!-- Shown only for invite links (?room=…); quick play replaced typing codes. -->
+        <section id="joinBlock" class="join-block" aria-labelledby="joinTitle" hidden>
           <h2 id="joinTitle" class="join-title">Join a friend</h2>
           <p id="inviteNote" class="invite-note" hidden></p>
           <div class="join-row">
