@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4}</style></head><body>
+<script type="module">
+// Review of the Stormspire round 2 (Opus 5.5, 2026-10-06): red and blue packs on their hooks, the lizard crew, and a
+// live red-blue arc between two probes. Real presentation (stormspire-art.js, stormreel-view.js, lightning-fx.js) on flat
+// grass. lab.frame(n) advances n 60 Hz frames and renders; lab.view(name) picks a camera.
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createStormspireArt} from '../client/stormspire-art.js';
+import {createStormreelView} from '../client/stormreel-view.js';
+import {createLightningFx} from '../client/lightning-fx.js';
+const W=960,H=540,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.55;room.dispose();scene.background=new T.Color(0xabc5c2);
+scene.add(new T.HemisphereLight(0xc6e0ed,0x5e5139,1.2));const sun=new T.DirectionalLight(0xffe3ad,2.2);sun.position.set(-22,38,15);scene.add(sun);
+scene.add(new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x667b43,roughness:1})));
+const cam=new T.PerspectiveCamera(55,W/H,.05,200);scene.add(cam);
+const lightning=createLightningFx({scene}),art=createStormspireArt({lightning}),loader=new GLTFLoader();
+const [tower,pack,bow]=await Promise.all(['stormspire','reel_pack','stormreel'].map(n=>loader.loadAsync(`/assets/${n}.glb`)));
+art.install(tower);art.installPack(pack);
+const b={id:'s1',type:'stormspire',position:[0,0,0],yaw:0,hp:240,charge:200,operator:null,operator2:null,side:'party'};
+const e={root:new T.Group(),data:b};scene.add(e.root);art.attach(e);
+const view=createStormreelView({scene,lightning,height:()=>0,localId:()=>'me',actorPose:()=>null,localPose:()=>({position:new T.Vector3(0,0,30),yaw:0}),localMuzzle:()=>null,spireEntry:id=>id==='s1'?e:null,spireArt:art,audio:()=>null});
+view.installPack(pack);view.installCrossbow(bow);
+const snap={tick:0,enemies:[],players:[],inventions:{structures:[b]}};view.sync(snap);
+let frame=0;
+window.lab={
+ frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);view.update(1/60,t);lightning.update(1/60,cam);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
+ view(name){const v={front:[[3.2,2.4,-5.4],[0,2.2,0]],hat:[[1.6,5.9,-2.6],[0,5.2,-.6]],hopper:[[1.4,1.6,-3],[0,1.1,-1.5]],side:[[-5.5,2.6,.5],[0,2,0]],arc:[[7,3.2,-9],[3,.8,-6]]}[name];cam.position.fromArray(v[0]);cam.lookAt(...v[1]);},
+ arc(){b.probes={red:{at:[-1,.05,-8],tick:0},blue:{at:[7,.05,-4],tick:0}};b.arc={tick:0,until:9999};view.event({kind:'storm_arc',id:'s1',red:b.probes.red.at,blue:b.probes.blue.at});},
+};
+document.title='ready';
+</script></body></html>

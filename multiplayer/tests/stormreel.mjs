@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
 import {STRUCTURES} from '../shared/inventions.js';
-import {STORMREEL,terminalPoint,wornTower} from '../shared/stormreel.js';
+import {STORMREEL,terminalPoint,wornTower,cableLength,leash} from '../shared/stormreel.js';
 
 // Fixture: a hero beside a Stormspire at (8, 20) with optional skeletons `ahead` metres along -Z of the hero (a clear line).
 function fixture({charge=240,gems=3,foes=[],heroAt=[10,24]}={}) {
@@ -33,10 +33,20 @@ assert.equal(r.ok,true,r.code);assert.equal(hero(s).tool,'stormreel');assert.equ
 assert.ok(r.events.some(e=>e.kind==='storm_pack_take'));
 assert.equal(tower(s).charge,180,'taking the pack drops in one Crystal when a whole one fits');assert.equal(hero(s).resources.gems,1);
 
-// The cable is the range limit: walking away stops at 30 m flat from the terminal.
-for(let i=0;i<60*12;i++){s.command('h',{type:'input',seq:seq++,move:{x:-1,z:0},yaw:0});s.step();}
-const t=terminalPoint(tower(s)),d=Math.hypot(hero(s).position[0]-t[0],hero(s).position[2]-t[2]);
+// The cable is the range limit: walking away stops when 45 m of cable (measured round any trees) is paid out.
+for(let i=0;i<60*14;i++){s.command('h',{type:'input',seq:seq++,move:{x:-1,z:0},yaw:0});s.step();}
+const d=cableLength(tower(s),hero(s).position);
 assert.ok(d<=STORMREEL.cable+1e-6&&d>STORMREEL.cable-.5,`held at the end of the cable (was ${d.toFixed(2)} m)`);
+
+// Trees are pegs: walking round a trunk wraps the cable (using some of it up), walking back round unwraps it.
+{const b={id:'spire1',type:'stormspire',position:[0,0,0],yaw:0,hp:240,charge:0,operator:'h',wraps:[]},t=terminalPoint(b);
+ const peg=[t[0],t[2]+10],st={seed:41,tick:0,players:[],groves:[{id:'peg',trees:[[peg[0],peg[1],5,0,0]]}],inventions:{structures:[b]}};
+ const me={id:'h',tool:'stormreel',position:[t[0]+2,0,t[2]+5]};b.wrapAt=[me.position[0],me.position[2]];
+ const walk=(x,z)=>{for(let i=1;i<=30;i++){const pos=[me.position[0]+(x-me.position[0])/(31-i),0,me.position[2]+(z-me.position[2])/(31-i)];leash(st,me,pos);me.position=pos;}};
+ walk(t[0]+2,t[2]+15);walk(t[0]-2,t[2]+15);
+ assert.ok(b.wraps.some(w=>w.id==='peg-tree0'),'swinging behind the trunk wraps the cable round it');
+ const around=cableLength(b,me.position);assert.ok(Math.abs(around-(10+Math.hypot(2,5)))<.05,`wrapped length counts the run to the tree (${around.toFixed(2)})`);
+ walk(t[0]+2,t[2]+15);assert.ok(!b.wraps.some(w=>w.id==='peg-tree0'),'walking back round unwraps it');}
 
 // Switching to another weapon sends the pack home.
 r=act(s,{action:'equip',tool:'pick'});
@@ -63,13 +73,13 @@ c=s.checkpoint();foe=c.enemies[0];aim=aimAt(s,[foe.position[0],foe.position[1]+1
 r=act(s,{action:'storm',...aim,charge:1});
 assert.equal(r.events.find(e=>e.kind==='storm_bolt').blockedId,'shed');assert.equal(s.checkpoint().enemies[0].hp,100,'the skeleton behind the wall is untouched');
 
-// A target off the ground has no path to earth: no shock, only the bolt and static.
+// A target off the ground: the arc still finds it, but no current spreads through the soil.
 s=fixture({foes:[[0,-8,4]]});
 act(s,{action:'inventionUse',structureId:'spire1'});
 c=s.checkpoint();foe=c.enemies[0];aim=aimAt(s,[foe.position[0],foe.position[1]+1.1,foe.position[2]]);
 r=act(s,{action:'storm',...aim,charge:1});
 assert.equal(r.events.find(e=>e.kind==='storm_bolt').grounded,false);
-assert.ok(s.checkpoint().enemies[0].hp>40,'airborne foe survives the static');
+assert.ok(!s.checkpoint().enemies.some(e=>e.id==='foe0'),'the arc jumps to a flying foe too');
 
 // An empty tower still throws the bolt, without lightning.
 s=fixture({charge:0,gems:0,foes:[8]});
@@ -89,6 +99,33 @@ assert.ok(s.checkpoint().enemies[0].hp>=60,'bolt only');
   const b=g.checkpoint().inventions.structures.find(b=>b.id==='spire1');
   assert.equal(b.charge,240);assert.equal(b.hp,240);
 }
+
+// Every home base has its own charged Stormspire from the start, its cable terminal facing out of the gate.
+{const sim=createSimulation({room:'SOLO'});sim.adventureWorld();sim.step();const k=sim.checkpoint();
+ for(const side of ['party','rivals']){const b=k.inventions.structures.find(b=>b.id===`home-stormspire-${side}`);assert.ok(b,`${side} base Stormspire`);assert.equal(b.side,side);assert.equal(b.charge,STORMREEL.maxCharge);
+  const t=terminalPoint(b),base=k.battle.bases.find(x=>x.side===side);assert.ok(Math.hypot(t[0],t[2])<Math.hypot(b.position[0],b.position[2]),'terminal on the field side');void base;}
+ const again=loadSimulation(JSON.parse(JSON.stringify(k)));again.step();assert.equal(again.checkpoint().inventions.structures.filter(b=>b.type==='stormspire').length,2,'never duplicated');}
+
+// The red-blue circuit: alone, live bolts alternate red then blue; once both probes are out, lightning runs between
+// them and fries foes on the line, draining the tower, until it is severed.
+{s=fixture({foes:[[0,-9],[-.4,-14]]});act(s,{action:'inventionUse',structureId:'spire1'});
+ const h=hero(s),at=(dx,dz)=>{const x=h.position[0]+dx,z=h.position[2]+dz;return [x,terrainHeight(s.checkpoint(),x,z),z];};
+ let r1=act(s,{action:'storm',...aimAt(s,at(-1.5,-6)),charge:1});assert.equal(r1.events.find(e=>e.kind==='storm_bolt').probe,'red');
+ run(s,STORMREEL.cooldownTicks);
+ let r2=act(s,{action:'storm',...aimAt(s,at(1.2,-17)),charge:1});assert.equal(r2.events.find(e=>e.kind==='storm_bolt').probe,'blue');
+ assert.ok(r2.events.some(e=>e.kind==='storm_arc'),'red and blue probes close the circuit');
+ const before=tower(s).charge;run(s,60);
+ const k=s.checkpoint();assert.ok(!k.enemies.some(e=>e.id==='foe0')||k.enemies.find(e=>e.id==='foe0').hp<100,'a foe on the line is fried');
+ assert.ok(tower(s).charge<before,'the circuit drains the tower');assert.ok(tower(s).arc,'still live');
+ const sv=act(s,{action:'stormSever'});assert.equal(sv.ok,true);assert.ok(sv.events.some(e=>e.kind==='storm_arc_end'&&e.why==='severed'));assert.equal(tower(s).arc,undefined);}
+
+// Two Heroes: the second takes the blue pack, and each Hero's bolts keep their own pack's colour.
+{s=fixture();const k=s.checkpoint();s=loadSimulation(k);s.addPlayer({id:'h2',name:'Friend'});const k2=s.checkpoint(),p2=k2.players.find(p=>p.id==='h2');p2.position=[11,terrainHeight(k2,11,24),24];s=loadSimulation(k2);
+ act(s,{action:'inventionUse',structureId:'spire1'});const t2=s.command('h2',{type:'action',seq:1,action:'inventionUse',structureId:'spire1'});
+ assert.equal(t2.ok,true,t2.code);assert.equal(tower(s).operator,'h');assert.equal(tower(s).operator2,'h2');assert.equal(t2.events.find(e=>e.kind==='storm_pack_take').pack,'blue');
+ const x=10,z=17,pt=[x,terrainHeight(s.checkpoint(),x,z),z];
+ for(let i=0;i<2;i++){const r=act(s,{action:'storm',...aimAt(s,pt),charge:1});assert.equal(r.events.find(e=>e.kind==='storm_bolt').probe,'red','partnered: always your own colour');run(s,STORMREEL.cooldownTicks);}
+ assert.equal(s.command('h',{type:'action',seq:seq++,action:'equip',tool:'pick'}).ok,true);assert.equal(tower(s).operator,null);assert.equal(tower(s).operator2,'h2','the blue pack stays on its wearer');}
 
 // Saves round-trip a worn pack.
 s=fixture();act(s,{action:'inventionUse',structureId:'spire1'});

@@ -15,3 +15,11 @@
 .stormreel-hud.sr-empty { border-color: rgba(255,160,140,.6); color: #ffc9bd; }
 .stormreel-hud.sr-empty .sr-bolt { color: #9aa3ad; text-shadow: none; }
 @media (pointer: coarse) { .stormreel-hud { top: calc(env(safe-area-inset-top, 0px) + 56px); font-size: 14px; } }
+/* Red-blue circuit: the pack you wear tints the rim, a dot shows the colour your next bolt lays, and a live arc says so. */
+.stormreel-hud[data-pack="red"] { border-color: rgba(255,120,96,.75); }
+.stormreel-hud[data-pack="blue"] { border-color: rgba(111,184,255,.8); }
+.stormreel-hud .sr-probe { width: 11px; height: 11px; border-radius: 50%; flex: none; background: #9aa3ad; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
+.stormreel-hud .sr-probe[data-next="red"] { background: #ff6a4a; box-shadow: 0 0 8px rgba(255,106,74,.9); }
+.stormreel-hud .sr-probe[data-next="blue"] { background: #6fb8ff; box-shadow: 0 0 8px rgba(111,184,255,.9); }
+.stormreel-hud .sr-arc { color: #bfe6ff; font-weight: 600; font-size: 13px; }
+.stormreel-hud .sr-arc:empty { display: none; }

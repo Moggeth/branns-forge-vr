@@ -2,11 +2,13 @@
 // every frame from the local aim, release to fire. The authority resolves the shot (shared/stormreel.js stormShot);
 // this file only predicts what the player sees and hears before the result returns.
 import * as THREE from 'three';
-import {STORMREEL,rayEnemy,rayGround,rayWorld,chargeShots,cableStrain,terminalPoint} from '../shared/stormreel.js';
+import {STORMREEL,rayEnemy,rayGround,rayWorld,chargeShots,cableStrain,cableLength,packOf} from '../shared/stormreel.js';
 import './stormreel-hud.css';
 
 export const STORMREEL_FEEL = Object.freeze({chargeSeconds: STORMREEL.chargeTicks / 60, cooldownSeconds: STORMREEL.cooldownTicks / 60, kick: .05});
-const COLORS = Object.freeze({circuit: 0x5cc8ff, open: 0xffc35c, dead: 0x9aa3ad});
+const COLORS = Object.freeze({circuit: 0x5cc8ff, red: 0xff6a4a, blue: 0x6fb8ff, dead: 0x9aa3ad});
+/** The colour the next live bolt lays (shared/stormreel.js layProbe): your pack's when partnered, else alternating. */
+export function nextProbe(b, id) { const mine = packOf(b, id), partner = b[mine === 'red' ? 'operator2' : 'operator']; return partner && partner !== id ? mine : b.lastProbe === 'red' ? 'blue' : 'red'; }
 
 /**
  * ctx: scene, lightning, send(action, payload), aim() -> {origin, direction}, snapshot(), playerId(), height(x,z),
@@ -28,7 +30,7 @@ export function createStormreelWeapon(ctx) {
   let hud = null;
   if (typeof document !== 'undefined' && ctx.hud) {
     hud = document.createElement('div'); hud.className = 'stormreel-hud'; hud.hidden = true;
-    hud.innerHTML = '<span class="sr-bolt" aria-hidden="true">ϟ</span><span class="sr-shots"></span><span class="sr-cable"><i></i></span>';
+    hud.innerHTML = '<span class="sr-bolt" aria-hidden="true">ϟ</span><span class="sr-shots"></span><span class="sr-probe" title="Next bolt"></span><span class="sr-arc"></span><span class="sr-cable"><i></i></span>';
     ctx.hud.appendChild(hud);
   }
   let hudText = '';
@@ -109,7 +111,7 @@ export function createStormreelWeapon(ctx) {
       if (hitEnemy) { const e = hitEnemy.enemy, fl = height(e.position[0], e.position[2]); grounded = e.position[1] - fl <= STORMREEL.arcGap; earth = [e.position[0], fl, e.position[2]]; }
       else if (wall) { earth = [wall.point[0], height(wall.point[0], wall.point[2]), wall.point[2]]; grounded = true; }
       else if (ground) { earth = ground.point; grounded = true; }
-      const color = !live ? COLORS.dead : hitEnemy ? (grounded ? COLORS.circuit : COLORS.open) : COLORS.circuit;
+      const color = live ? COLORS[nextProbe(t, ctx.playerId())] : COLORS.dead;
       const p = lineGeo.attributes.position.array; p.set([muzzle.x, muzzle.y, muzzle.z, end.x, end.y, end.z]); lineGeo.attributes.position.needsUpdate = true; line.computeLineDistances();
       lineMat.color.setHex(color); lineMat.opacity = .35 + .5 * charge; line.visible = true;
       if (earth) {
@@ -122,14 +124,17 @@ export function createStormreelWeapon(ctx) {
     if (hud) {
       hud.hidden = !wearing;
       if (wearing) {
-        const me = ctx.localPosition(), d = Math.hypot(me.x - terminalPoint(t)[0], me.z - terminalPoint(t)[2]), left = Math.max(0, STORMREEL.cable - d), strain = cableStrain(t, [me.x, 0, me.z]);
-        const text = `${shots}|${Math.round(left)}|${strain > .01 ? 1 : 0}`;
+        const me = ctx.localPosition(), pack = packOf(t, ctx.playerId()) || 'red', d = cableLength(t, [me.x, 0, me.z], pack), left = Math.max(0, STORMREEL.cable - d), strain = cableStrain(t, [me.x, 0, me.z], pack);
+        const next = nextProbe(t, ctx.playerId()), arc = t.arc ? 'live' : t.probes?.red || t.probes?.blue ? 'half' : '';
+        const text = `${shots}|${Math.round(left)}|${strain > .01 ? 1 : 0}|${next}|${arc}|${pack}`;
         if (text !== hudText) {
           hudText = text;
           hud.querySelector('.sr-shots').textContent = shots ? `${shots} shot${shots === 1 ? '' : 's'}` : 'Tower empty: feed it Crystal';
           hud.querySelector('.sr-cable i').style.width = `${Math.round(left / STORMREEL.cable * 100)}%`;
           hud.querySelector('.sr-cable').title = `${Math.round(left)} m of cable left`;
           hud.classList.toggle('sr-strain', strain > .01); hud.classList.toggle('sr-empty', !shots);
+          hud.dataset.pack = pack; hud.querySelector('.sr-probe').dataset.next = next;
+          hud.querySelector('.sr-arc').textContent = arc === 'live' ? `Arc live · ${ctx.severKey?.() || 'Q'} sever` : arc === 'half' ? `${t.probes?.red ? 'Red' : 'Blue'} probe out` : '';
         }
       }
     }

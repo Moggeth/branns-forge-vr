@@ -23,7 +23,7 @@ export const STRUCTURES=Object.freeze({
  ward:def('Crystal Ward','Charge a bounded six-metre protective field using one Crystal.',{stone:6,iron:2,gems:4},180,1.3,'Charge ward'),
  influence:def('Heartstone','A living geode heart. Your Heroes near it recover health and mana, faster as the world blooms. Opponents can break it; restore it with Crystal.',{stone:5,gems:3},180,1.3,'Restore with Crystal'),
  trap:def('Mechanical Trap','Armed jaws strike nearby threats once. Reset deliberately using one Iron.',{wood:3,iron:4},120,1.1,'Reset trap'),
- stormspire:def('Stormspire','A crystal-charged lightning tower. Feed it Crystal, then shoulder its cable-reel pack to fire the Stormreel lightning crossbow within 30 metres.',{stone:8,copper:6,gold:1,gems:2},240,1.45,'Take Stormreel')
+ stormspire:def('Stormspire','A crystal-charged lightning tower. Feed it Crystal, then shoulder its cable-reel pack to fire the Stormreel lightning crossbow within 45 metres of cable.',{stone:8,copper:6,gold:1,gems:2},240,1.45,'Take Stormreel')
 });
 const clone=v=>structuredClone(v),flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]),clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const side=p=>p.side==='rivals'?'rivals':'party';

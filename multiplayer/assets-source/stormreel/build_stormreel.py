@@ -42,6 +42,7 @@ MAT_DEF = {
     "Rubber":     dict(c="1b1c1f", m=0.0, r=0.78),
     "Hazard":     dict(c="f2c230", m=0.0, r=0.55),
     "Cable":      dict(c="e8622a", m=0.0, r=0.55),
+    "CeramicRed": dict(c="d8463a", m=0.0, r=0.12),
     "Ceramic":    dict(c="efe8d8", m=0.0, r=0.16),
     "CeramicBlue":dict(c="5d86c8", m=0.0, r=0.12),
     "Glass":      dict(c="e8f4ff", m=0.0, r=0.03, a=0.16),
@@ -637,17 +638,21 @@ def build_tower():
     mesh_obj('Rod', cyl((0, 0, .6), (0, 0, 1.05), .02, sides=6, r2=.004), 'Copper', parent=cap, local=True)
     cap.rotation_euler = Vector((0, 0, 1)).rotation_difference(tdir.lerp(Vector((0, 0, 1)), .5).normalized()).to_euler()
     bpy.context.view_layer.update(); print('capacitor', cap.matrix_world.translation, 'tip', tip)
-    # cable terminal and pack hook on the east face (the pack hangs here between uses)
+    # Two circuits' ends: the red (+) terminal and hook on the east face, the blue (-) pair on the west face.
+    # Each reel pack hangs on its own hook between uses (Mitch, 2026-10-06: one red pack and one blue pack).
     tz = 1.3; tr = R0 + (R1 - R0) * ((tz - Z0) / (Z1 - Z0))
-    term = Vector((tr + .04, 0, tz + .55))
-    mesh_obj('Terminal_Bushing', lathe([(0, 0), (.09, 0), (.13, .06), (.08, .1), (.12, .15), (.07, .2), (.10, .25), (.05, .3), (0, .3)], 'X', term, segs=10), 'CeramicBlue', flat=False)
-    mesh_obj('Terminal_Lug', cyl(term + Vector((.3, 0, 0)), term + Vector((.38, 0, 0)), .045, sides=8), 'Copper', flat=False)
-    empty('CableTerminal', term + Vector((.38, 0, 0)))
-    hook = Vector((tr + .05, 0, tz))
-    mesh_obj('Hook_Plate', box(hook + Vector((.02, 0, 0)), (.05, .4, .24), .02), 'Steel')
-    hk = bezier(hook + Vector((.03, 0, .02)), hook + Vector((.22, 0, -.02)), hook + Vector((.30, 0, .06)), hook + Vector((.28, 0, .16)), 8)
-    mesh_obj('Hook', sweep(hk, .03, sides=6), 'Steel')
-    empty('PackHook', hk[-2])
+    for sgn, tag, bush in ((1, '', 'CeramicRed'), (-1, '_B', 'CeramicBlue')):
+        term = Vector((sgn * (tr + .04), 0, tz + .55))
+        prof = [(0, 0), (.09, 0), (.13, .06), (.08, .1), (.12, .15), (.07, .2), (.10, .25), (.05, .3), (0, .3)]
+        turn = Matrix.Rotation(0 if sgn > 0 else math.pi, 3, 'Z')   # the west pair is the east pair turned half round
+        mesh_obj(f'Terminal_Bushing{tag}', xform(lathe(prof, 'X', (0, 0, 0), segs=10), turn, term), bush, flat=False)
+        mesh_obj(f'Terminal_Lug{tag}', cyl(term + Vector((sgn * .3, 0, 0)), term + Vector((sgn * .38, 0, 0)), .045, sides=8), 'Copper', flat=False)
+        empty(f'CableTerminal{tag}', term + Vector((sgn * .38, 0, 0)))
+        hook = Vector((sgn * (tr + .05), 0, tz))
+        mesh_obj(f'Hook_Plate{tag}', box(hook + Vector((sgn * .02, 0, 0)), (.05, .4, .24), .02), 'Steel')
+        hk = bezier(hook + Vector((sgn * .03, 0, .02)), hook + Vector((sgn * .22, 0, -.02)), hook + Vector((sgn * .30, 0, .06)), hook + Vector((sgn * .28, 0, .16)), 8)
+        mesh_obj(f'Hook{tag}', sweep(hk, .03, sides=6), 'Steel')
+        empty(f'PackHook{tag}', hk[-2])
     for parent in (ROOT, cap): merge_children(parent)
     bpy.context.view_layer.update()
     lo, hi = bounds()

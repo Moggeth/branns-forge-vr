@@ -194,9 +194,11 @@ function structureCue(b, self, snapshot, keys, make) {
     // shared/stormreel.js useStormspire: take or hang the pack (a whole Crystal drops in when it fits), R feeds one more.
     const shots = chargeShots(b), store = shots ? `${shots} shot${shots === 1 ? '' : 's'} stored` : 'Empty: feed it Crystal';
     const crystal = (self.resources?.gems | 0) > 0 && (b.charge || 0) <= STORMREEL.maxCharge - STORMREEL.crystalCharge ? ' · a Crystal drops in' : '';
-    if (b.operator === self.id) return make('pickup', 'ready', b.id, def.name, 'Hang up the pack', keys.collect, `${store}${crystal}${keys === CONTROLS.desktop ? ' · R feeds Crystal' : ''}`);
-    if (b.operator) return make('pickup', 'busy', b.id, def.name, 'Pack in use', '', store);
-    return make('pickup', shots || crystal ? 'ready' : 'short', b.id, def.name, def.use, keys.collect, `${store}${crystal} · 30 m of cable`);
+    if (b.operator === self.id || b.operator2 === self.id) return make('pickup', 'ready', b.id, def.name, `Hang up the ${b.operator === self.id ? 'red' : 'blue'} pack`, keys.collect, `${store}${crystal}${keys === CONTROLS.desktop ? ' · R feeds Crystal' : ''}`);
+    const worn = id => !!id && snapshot.players?.some(h => h.id === id && h.tool === 'stormreel');
+    const free = !worn(b.operator) ? 'red' : !worn(b.operator2) ? 'blue' : null;
+    if (!free) return make('pickup', 'busy', b.id, def.name, 'Both packs in use', '', store);
+    return make('pickup', shots || crystal ? 'ready' : 'short', b.id, def.name, `Take the ${free} pack`, keys.collect, `${store}${crystal} · 45 m of cable`);
   }
   const ammo = MACHINE_AMMO[b.type];
   if (!ammo) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect);

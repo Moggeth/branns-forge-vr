@@ -386,14 +386,18 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const stormView=createStormreelView({scene,lightning,height:(x,z)=>heightAt(x,z,snapshot.edits),localId:()=>playerId,
     actorPose:id=>{const e=actors.get(`p:${id}`);return e?{position:e.root.position,yaw:e.data.yaw||0}:null;},
     localPose:()=>({position:localPosition,yaw}),
+    probeAnchor:(id,part,out)=>{const a=actors.get(`e:${id}`),n=a?.visual?partAnchor(a.visual,part||'torso'):null;return n?n.getWorldPosition(out):null;},
     localMuzzle:out=>{if(tool!=='stormreel'||!axeModel?.visible)return null;const m=axeModel.getObjectByName('Muzzle');return m?m.getWorldPosition(out):null;},
     spireEntry:id=>inventionVisual.spireEntry(id),spireArt:inventionVisual.spires,audio:()=>audioContext});
   const stormWeapon=createStormreelWeapon({scene,lightning,send:(action,payload)=>{unlockAudio();onAction(action,payload);},aim:()=>weaponAim(),snapshot:()=>snapshot,playerId:()=>playerId,
-    height:(x,z)=>heightAt(x,z,snapshot.edits),localPosition:()=>localPosition,audio:()=>audioContext,now:()=>performance.now()/1000,hud:globalThis.document?.body});
+    height:(x,z)=>heightAt(x,z,snapshot.edits),localPosition:()=>localPosition,audio:()=>audioContext,now:()=>performance.now()/1000,hud:globalThis.document?.body,severKey:()=>touchEnabled?'Special':'Q'});
   // R beside the tower while wearing its pack drops in another Crystal (taking or hanging the pack does this too).
   function feedStormspire(){const me=selfPlayer(),b=wornTower(snapshot,me);if(!b)return;if(Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>STORMREEL.takeReach+1.45){report('Walk back to the Stormspire to feed it Crystal.');return;}unlockAudio();onAction('inventionUse',{structureId:b.id,feed:true});}
+  // Q / Special: cut this tower's live red-blue circuit (shared/stormreel.js stormSever).
+  function severStorm(){const b=wornTower(snapshot,selfPlayer());if(!b?.probes){report('No circuit to sever yet. Land a red bolt and a blue bolt to close one.');return;}unlockAudio();onAction('stormSever',{});}
   function stormFeel(event){
-    if(event.kind==='storm_pack_take'&&event.by===playerId)report(touchEnabled?'Stormreel shouldered. Hold Zap to charge, release to fire. 30 m of cable.':'Stormreel shouldered. Hold click to charge, release to fire. 30 m of cable; R at the tower feeds it Crystal.');
+    if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue':'Red'} Stormreel pack shouldered. ${touchEnabled?'Hold Zap to charge, release to fire':'Hold click to charge, release to fire'}. Land a red bolt and a blue bolt to run lightning between them; ${touchEnabled?'Special':'Q'} severs it.`);
+    if(event.kind==='storm_arc'&&event.by===playerId&&touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([30,20,30,20,60]);}catch{}
     if(event.kind==='storm_bolt'&&event.by===playerId){const strong=event.live&&event.grounded;
       if(renderer.xr.isPresenting)feedback.pattern?.(strong?[{at:0,amplitude:1,duration:70},{at:90,amplitude:.5,duration:120}]:[{at:0,amplitude:.5,duration:40}]);
       else if(touchEnabled)try{navigator.vibrate?.(strong?[40,30,70]:[20]);}catch{}}
@@ -1141,7 +1145,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function wyrmIndicators(){const r=weaponReadiness(snapshot.players.find(p=>p.id===playerId),'wyrmspout',snapshot.tick||0);return {charge:r.specialReady,locked:r.overheated};}
   function startInspect(){const st=weapons.state();inspectBlocked=!active?'inactive':role!=='hero'?'role':renderer.xr.isPresenting?'xr':manned?'manned':tool==='limb'?'limb':!weaponAnchor.visible?'hidden':!axeModel?'loading':weaponSwap.busy?'swapping':st.firing?'firing':st.drawing?'drawing':null;if(inspectBlocked)return;unlockAudio();inspect.press();if(Number.isFinite(inspectPinAt))inspect.pin(inspectPinAt);}
   function primaryDown(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){fireManned();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(tool==='stormreel'){stormWeapon.begin();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
-  function special(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='stormreel')return;if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
+  function special(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='stormreel'){severStorm();return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
   // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
   // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
   function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}

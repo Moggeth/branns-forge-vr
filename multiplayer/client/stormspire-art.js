@@ -3,8 +3,27 @@
 // Reads authoritative structure data only (charge 0..240, operator); writes nothing back.
 import * as THREE from 'three';
 import {STORMREEL} from '../shared/stormreel.js';
+import {createLizardCrew} from './stormspire-lizards.js';
 
 const GLOW_NAMES = ['Charge', 'CrystalCore', 'Crystal', 'Window'];
+// The two packs: red (+) and blue (-). Their cable, reel windings and lamp take the pack's colour.
+export const PACK_COLORS = Object.freeze({red: 0xd8402e, blue: 0x2f74e0});
+const tinted = new Map();
+export function tintPack(root, pack) {
+  root.traverse(n => {
+    if (!n.isMesh) return;
+    const m = n.material, lamp = n.name === 'Lamp_Glow' || n.parent?.name === 'Lamp_Glow';
+    if (!m || !lamp && !['Cable', 'CeramicBlue'].includes(m.name)) return;
+    const key = `${m.uuid}:${pack}:${lamp}`;
+    if (!tinted.has(key)) {
+      const c = m.clone(), hex = PACK_COLORS[pack];
+      if (lamp) { c.emissive?.setHex(hex); c.color?.setHex(hex); } else c.color?.setHex(m.name === 'Cable' ? hex : pack === 'red' ? 0xd8463a : 0x5d86c8);
+      tinted.set(key, c);
+    }
+    n.material = tinted.get(key);
+  });
+  return root;
+}
 export function createStormspireArt({lightning = null} = {}) {
   let tower = null, pack = null;
   const live = new Set(), v = new THREE.Vector3(), w = new THREE.Vector3();
@@ -30,30 +49,35 @@ export function createStormspireArt({lightning = null} = {}) {
     const glow = ownMaterials(root);
     for (const c of e.root.children) c.visible = false;   // the code-built stand-in
     e.root.add(root);
-    e.spire = {root, nodes, glow, shown: e.data.charge || 0, arcAt: 0, flash: 0, hang: null};
+    e.spire = {root, nodes, glow, shown: e.data.charge || 0, arcAt: 0, flash: 0, hang: {red: null, blue: null}};
+    e.spire.crew = createLizardCrew(); root.add(e.spire.crew.group);
     attachPack(e);
   }
   function attachPack(e) {
-    if (!pack || !e.spire || e.spire.hang) return;
-    const hang = pack.scene.clone(true); hang.name = 'HangingReelPack';
-    hang.traverse(n => { if (n.isMesh) { n.castShadow = true; n.userData.targetId = e.data.id; } });
-    // The pack's back faces the tower; its hang point sits on the hook.
-    const hook = e.spire.nodes.PackHook, hp = hang.getObjectByName('HangPoint');
-    hang.rotation.y = Math.PI / 2; hang.updateMatrixWorld(true);
-    const off = hp ? hp.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
-    hang.position.copy(hook.position).sub(off);
-    e.spire.root.add(hang); e.spire.hang = hang;
+    if (!pack || !e.spire) return;
+    for (const colour of ['red', 'blue']) {
+      const hook = e.spire.nodes[colour === 'blue' ? 'PackHook_B' : 'PackHook'];
+      if (e.spire.hang[colour] || !hook) continue;
+      const hang = tintPack(pack.scene.clone(true), colour); hang.name = `HangingReelPack_${colour}`;
+      hang.traverse(n => { if (n.isMesh) { n.castShadow = true; n.userData.targetId = e.data.id; } });
+      // The pack's back faces the tower wall; its hang point sits on the hook (east hook for red, west for blue).
+      const hp = hang.getObjectByName('HangPoint');
+      hang.rotation.y = colour === 'blue' ? -Math.PI / 2 : Math.PI / 2; hang.updateMatrixWorld(true);
+      const off = hp ? hp.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+      hang.position.copy(hook.position).sub(off);
+      e.spire.root.add(hang); e.spire.hang[colour] = hang;
+    }
   }
   function detach(e) { live.delete(e); e.spire?.root.removeFromParent(); for (const m of e.spire?.glow || []) m.dispose(); e.spire = null; }
   /** Where a cable leaves the tower, world space (falls back to the shared constant before the model loads). */
-  function terminal(e, out = new THREE.Vector3()) {
-    const n = e.spire?.nodes.CableTerminal; if (!n) return null;
+  function terminal(e, out = new THREE.Vector3(), colour = 'red') {
+    const n = e.spire?.nodes[colour === 'blue' ? 'CableTerminal_B' : 'CableTerminal']; if (!n) return null;
     return n.getWorldPosition(out);
   }
-  function hookPoint(e, out = new THREE.Vector3()) { return e.spire?.nodes.PackHook?.getWorldPosition(out) || null; }
+  function hookPoint(e, out = new THREE.Vector3(), colour = 'red') { return e.spire?.nodes[colour === 'blue' ? 'PackHook_B' : 'PackHook']?.getWorldPosition(out) || null; }
   /** Presentation pulse when Crystal or a God's bolt charges it. */
   function charged(e, {lightning: fromSky = false} = {}) {
-    if (!e.spire) return; e.spire.flash = 1;
+    if (!e.spire) return; e.spire.flash = 1; e.spire.crew?.cheer();
     const top = e.spire.nodes.Capacitor?.getWorldPosition(new THREE.Vector3()), hop = e.spire.nodes.Hopper?.getWorldPosition(new THREE.Vector3());
     if (!lightning || !top) return;
     if (fromSky) { lightning.glow(top, {size: 5, life: .6}); lightning.burst(top, {count: 40, speed: 6}); }
@@ -78,7 +102,9 @@ export function createStormspireArt({lightning = null} = {}) {
       else if (m.name === 'Window') m.emissiveIntensity = base * (.4 + .8 * fill);
     }
     if (s.nodes.Capacitor_Crystal) s.nodes.Capacitor_Crystal.rotation.y = time * .4;
-    if (s.hang) s.hang.visible = !b.operator && !e.packAway;
+    s.crew?.update(time, dt);
+    if (s.hang.red) s.hang.red.visible = !b.operator && !e.packAway?.red;
+    if (s.hang.blue) s.hang.blue.visible = !b.operator2 && !e.packAway?.blue;
     // Full and idle: little arcs leap between the torus brim and the hat tip.
     if (lightning && fill > .66 && b.hp > 0) {
       s.arcAt -= dt;
