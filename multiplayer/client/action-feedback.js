@@ -2,7 +2,7 @@ import {WEAPONS} from '../shared/spells.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 
 const RECOVERY = {
- "dragon_not_ready": "Skyfire comes after 5 skeleton killing blows in a row. Keep going!",
+ "dragon_not_ready": "Slay Thee, Sun Birdy Above comes after 5 skeleton killing blows in a row. Keep going!",
  "dragon_riding": "You are up on your dragon. Your weapons wait on the ground until the ride ends.",
  "dragon_not_riding": "Your dragon has already flown home.",
  "dragon_cooldown": "The dragon is catching its breath. Watch the button fill, then try again.",
