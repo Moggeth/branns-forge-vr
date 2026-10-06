@@ -19,7 +19,7 @@ export function record(id, status, detail = {}) { const r = {...detail, id, stat
 export function save(name) { writeFileSync(join(here, `${name}-results.json`), JSON.stringify({harness: name, monotonicMs: ms(), results}, null, 2)); }
 export const sleep = t => new Promise(r => setTimeout(r, t));
 
-export async function launch({viewport = {width: 1280, height: 720}, headless = process.env.HEADED ? false : true, touch = false, pointerLock = false} = {}) {
+export async function launch({viewport = {width: 1280, height: 720}, headless = process.env.HEADED ? false : true, touch = false, pointerLock = false, turnPrompt = false} = {}) {
   // Headless Chromium can still confine the Windows desktop cursor. Capture tests
   // belong on an isolated runner unless the local user explicitly opts in.
   const nativePointerLock = process.platform !== 'win32' || process.env.BROWSER_QA_POINTER_LOCK === '1';
@@ -30,6 +30,8 @@ export async function launch({viewport = {width: 1280, height: 720}, headless = 
   const xr = process.env.BROWSER_QA_XR === '1';
   const browser = await chromium.launch({...(CHROME?{executablePath:CHROME}:{}), headless, args: ['--enable-unsafe-swiftshader', ...(!xr ? ['--disable-features=WebXR'] : [])]});
   const context = await browser.newContext({viewport, hasTouch: touch, isMobile: touch, deviceScaleFactor: 1});
+  // The portrait "turn your phone" prompt and first-tap fullscreen would cover or resize every phone check.
+  if (!turnPrompt) await context.addInitScript(() => { window.__brannQuietTurnPrompt = true; });
   if (!xr) await context.addInitScript(() => Object.defineProperty(navigator, 'xr', {value: undefined, configurable: true}));
   if (!nativePointerLock) await context.addInitScript(() => {
     Element.prototype.requestPointerLock = function () {
