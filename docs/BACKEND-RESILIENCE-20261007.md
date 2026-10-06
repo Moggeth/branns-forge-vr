@@ -105,3 +105,9 @@ own page route before clicking it, to create an owned room instead of joining
 real players. Room creation, transport and gameplay still use the live service.
 A repeated test launch also followed a Python edit with the wrong CWD; use absolute
 paths for scripted edits and check exit status before launching another test.
+
+Visual evidence correction: the first 23.522 s rendered-flow capture showed the
+loading backdrop despite working networking. Added an explicit wait for both
+renderers' startup.ready flags; the next screenshot was inspected and shows the
+actual world, weapon, terrain and HUD. Never infer model/shader readiness from
+membership, HUD presence, or advancing snapshots alone.

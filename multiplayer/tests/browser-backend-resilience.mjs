@@ -16,6 +16,9 @@ try {
   await b.page.evaluate(r=>{document.getElementById('joinBlock').hidden=false;document.getElementById('room').value=r;},room);
   await b.page.locator('#join').tap();
   await Promise.all([a.page,b.page].map(page=>page.waitForFunction(()=>window.brannHarness.snapshot()?.players.length===2,null,{timeout:30000})));
+  // A connected world can precede asynchronous model/shader warm-up. Do not
+  // mistake a working HUD over the loading backdrop for rendered-game acceptance.
+  await Promise.all([a.page,b.page].map(page=>page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics?.().startup.ready,null,{timeout:120000})));
   await b.page.waitForFunction(()=>window.brannHarness.network()?.transport?.recovery.accepted>=2,null,{timeout:15000});
   for(const page of [a.page,b.page]) {
     const d=await page.evaluate(()=>window.brannHarness.network());
