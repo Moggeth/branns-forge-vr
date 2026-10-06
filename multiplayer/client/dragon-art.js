@@ -1,136 +1,189 @@
-// The streak dragon: a chubby, cheerful, faceted red dragon with a golden belly, big round eyes, cream horns and
-// scalloped orange wings. Built procedurally (no download) from a handful of low-poly, flat-shaded pieces that share six
-// materials, so every dragon in the sky costs the same few draw calls' worth of state changes and nothing to load.
+// Skyfire, the streak dragon (level 2). A chubby-but-powerful red dragon with a golden belly, big amber eyes, cream
+// horns, a golden crest and orange bat wings, built in Blender (assets-source/skyfire-dragon/build_skyfire_dragon.py ->
+// /assets/skyfire-dragon.glb): one skinned mesh, three materials, 31 bones. Signature features: the golden belly plates
+// smoulder and light up in a wave that runs up the throat into the open jaw while it breathes fire, and the crest ends
+// in a glowing flame-shaped tail tip.
 //
-// Faces +Z, origin at the centre of the body. animateDragon() drives the wing beat, neck and tail sway, jaw and the
-// glow in the throat every frame from the presentation clock. Presentation only: the host never sees any of this.
+// The GLB loads once per page; every dragon is a clone with its own skeleton. Until it arrives (or if it never does)
+// buildDragon() returns a tiny procedural stand-in that is swapped for the model in place. Faces +Z, +Y up, origin at
+// the centre of the body. animateDragon() poses the bones every frame from the presentation clock: the stroke phase and
+// a few lag filters are integrated from the change in t (exact exponential decay, so smooth at any frame rate).
+// Presentation only: the host never sees any of this.
 import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {cloneSkinnedAsset} from './clone-skinned-asset.js';
 
-export const DRAGON_SCALE = 1.35;
-// Where the rider sits (on the neck, just behind the horns, ahead of the wings so the view down and to the side is clear),
-// and where the fire leaves the mouth, both in the dragon's unscaled local space.
-export const DRAGON_SEAT = Object.freeze([0, 3.2, 2.3]);
-export const DRAGON_MOUTH = Object.freeze([0, 1.3, 4.45]);
+export const DRAGON_SCALE = 1.15; // wingspan 12.8 model units = 14.7 m
+// Where the rider sits (above the base of the neck, ahead of the wings, so the view forward and down is clear) and
+// where the fire leaves the mouth (the jaw tip in the breathing pose), both in the dragon's unscaled local space.
+// The seat is fixed to the dragon's body frame, not to the neck bone, so head and neck motion never shakes the camera.
+export const DRAGON_SEAT = Object.freeze([0, 3.35, 2.15]);
+export const DRAGON_MOUTH = Object.freeze([0, .45, 4.85]);
 
-let shared = null;
-function materials() {
-  if (shared) return shared;
-  const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({color, roughness: .62, metalness: .02, flatShading: true, ...extra});
-  shared = {
-    hide: mat(0xe0533a, {emissive: 0x3a0c04, emissiveIntensity: .35}),
-    belly: mat(0xf6c45a, {emissive: 0x3d2606, emissiveIntensity: .3}),
-    wing: mat(0xff9446, {side: THREE.DoubleSide, emissive: 0x5a1c04, emissiveIntensity: .45, roughness: .8}),
-    strut: mat(0xb8362a),
-    horn: mat(0xfff1d0, {roughness: .45}),
-    eye: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: .25, emissive: 0x333333}),
-    pupil: new THREE.MeshStandardMaterial({color: 0x1b1410, roughness: .2}),
-    cheek: mat(0xff8f86, {emissive: 0x401010, emissiveIntensity: .4}),
-    glow: new THREE.MeshBasicMaterial({color: 0xffc04a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false}),
+const MODEL_URL = '/assets/skyfire-dragon.glb', TAU = Math.PI * 2;
+const clamp01 = x => Math.max(0, Math.min(1, x)), smooth = x => { x = clamp01(x); return x * x * (3 - 2 * x); };
+
+// --- Shading: scale tile only where the mask says, a warm rim so it separates from the sky, and the ember glow. -----
+function patchMaterial(material, kind) {
+  material.userData.skyfire = {
+    uRim: {value: new THREE.Color(kind === 'wing' ? 0xffb070 : 0xff9a66).multiplyScalar(kind === 'wing' ? .35 : .45)},
+    uBreath: {value: 0}, uTime: {value: 0}, uEmber: {value: new THREE.Color(0xff4a0a)},
   };
-  return shared;
+  material.onBeforeCompile = function (shader) {
+    Object.assign(shader.uniforms, this.userData.skyfire);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying vec2 vSkyMask;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSkyMask = uv1;');
+    let frag = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vSkyMask;\nuniform vec3 uRim, uEmber; uniform float uBreath, uTime;');
+    if (kind === 'hide') frag = frag.replace('#include <map_fragment>',
+      '#ifdef USE_MAP\n diffuseColor.rgb *= mix(vec3(1.0), texture2D(map, vMapUv).rgb, vSkyMask.x);\n#endif');
+    const rim = 'float skyRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);';
+    if (kind === 'ember') frag = frag.replace('#include <color_fragment>', `#include <color_fragment>
+      float along = vSkyMask.y * 2.5 - 1.0, glow, lit = 0.0;
+      if (along < -0.5) glow = 0.75 + 0.18 * sin(uTime * 7.0) + 0.12 * sin(uTime * 12.7 + 1.3) + 0.6 * uBreath; // the tail flame
+      else {
+        float fill = uBreath * 1.55;                                       // the glow climbs from chest to jaw as the breath builds
+        lit = (1.0 - smoothstep(fill - 0.3, fill, along)) * vSkyMask.x;
+        glow = 0.14 + 0.06 * sin(uTime * 2.1 - along * 5.0) + lit * (1.4 + 0.45 * sin(uTime * 15.0 - along * 10.0));
+      }
+      diffuseColor.rgb *= 1.0 - 0.6 * lit;                                 // lit plates read as hot orange, not washed-out gold`)
+      .replace('#include <emissivemap_fragment>', `${rim}
+      totalEmissiveRadiance = uEmber * glow * vSkyMask.x + uRim * skyRim * 0.6;`);
+    else frag = frag.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${rim}\ntotalEmissiveRadiance += uRim * skyRim${kind === 'wing' ? ' + diffuseColor.rgb * 0.16' : ''};`);
+    shader.fragmentShader = frag;
+  };
+  material.customProgramCacheKey = () => 'skyfire-' + kind;
+  return material;
 }
-const geo = {};
-function sphere(detail = 1) { return geo['s' + detail] ??= new THREE.IcosahedronGeometry(1, detail); }
-function cone() { return geo.cone ??= new THREE.ConeGeometry(1, 1, 6).translate(0, .5, 0); }
-function cyl() { return geo.cyl ??= new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, .5, 0); }
-function membrane() {
-  if (geo.membrane) return geo.membrane;
-  // Wing in the XZ plane, extending to +X from the shoulder, leading edge towards +Z, with a scalloped trailing edge.
-  const pts = [[0, .55], [1.3, .95], [2.6, .9], [3.9, .45], [5.2, -.25], [4.35, -1.0], [3.7, -.75], [3.1, -1.95], [2.35, -1.25], [1.6, -2.35], [.95, -1.45], [0, -1.6]];
-  const shape = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, z)));
-  return geo.membrane = new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2);
-}
-function piece(parent, geometry, material, position, scale, rotation) {
-  const m = new THREE.Mesh(geometry, material);
-  m.position.fromArray(position); if (typeof scale === 'number') m.scale.setScalar(scale); else m.scale.fromArray(scale);
-  if (rotation) m.rotation.set(...rotation);
-  m.castShadow = false; m.receiveShadow = false; parent.add(m); return m;
+const kindOf = material => material.name === 'SkyfireEmber' ? 'ember' : material.name === 'SkyfireWing' ? 'wing' : 'hide';
+
+// --- Loading: once per page, then every waiting dragon swaps its stand-in for a clone. -------------------------------
+let template = null, loading = null;
+const waiting = new Set();
+function load() {
+  if (loading || typeof window === 'undefined') return;
+  loading = new GLTFLoader().loadAsync(MODEL_URL).then(gltf => {
+    const scene = gltf.scene;
+    scene.traverse(o => { if (o.isMesh) { patchMaterial(o.material, kindOf(o.material)); o.castShadow = o.receiveShadow = false; } });
+    template = scene;
+    for (const root of waiting) attachModel(root);
+  }).catch(error => console.warn('Skyfire model unavailable; flying the simple dragon.', error)).finally(() => waiting.clear());
 }
 
-const UP = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3();
-function strut(parent, from, to, radius, material) {
-  dir.set(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
-  const m = piece(parent, cyl(), material, from, [radius, dir.length(), radius]);
-  m.quaternion.setFromUnitVectors(UP, dir.normalize()); return m;
+function attachModel(root) {
+  const holder = root.userData.body;
+  holder.clear();
+  const model = cloneSkinnedAsset(template); holder.add(model);
+  const bones = {}, rest = {}, meshes = [];
+  model.traverse(o => { if (o.isBone) bones[o.name] = o; if (o.isMesh) { meshes.push(o); o.frustumCulled = false; } });
+  for (const [name, bone] of Object.entries(bones)) {
+    // Rest orientation in the model frame, so each pose angle is about the dragon's own X (pitch), Y (yaw), Z (roll).
+    const world = bone.quaternion.clone(); let p = bone.parent;
+    while (p && p !== model) { world.premultiply(p.quaternion); p = p.parent; }
+    const inv = world.clone().invert(), parentInv = world.clone().multiply(bone.quaternion.clone().invert()).invert();
+    rest[name] = {q: bone.quaternion.clone(), p: bone.position.clone(), parentInv,
+      x: new THREE.Vector3(1, 0, 0).applyQuaternion(inv), y: new THREE.Vector3(0, 1, 0).applyQuaternion(inv), z: new THREE.Vector3(0, 0, 1).applyQuaternion(inv)};
+  }
+  // Breath drives this dragon's own ember material; the wing material is shared until the rider needs a see-through copy.
+  const ember = meshes.find(m => m.material.name === 'SkyfireEmber');
+  if (ember) ember.material = patchMaterial(ember.material.clone(), 'ember');
+  root.userData.dragon = {model: true, bones, rest, meshes, ember: ember?.material, wings: meshes.filter(m => m.material.name === 'SkyfireWing'),
+    phase: (root.id % 7) * .9, lastT: null, lagBreath: 0, lagDive: 0, seed: (root.id % 13) * 1.7, riding: false, riderWing: null, sharedWing: null};
+  if (root.userData.riding) setRiderView(root, true);
+}
+
+// --- The stand-in: a few flat-shaded pieces, used only until the model loads (or offline). ---------------------------
+let simple = null;
+function buildStandIn(holder) {
+  simple ??= {hide: new THREE.MeshStandardMaterial({color: 0xd8432c, flatShading: true}), belly: new THREE.MeshStandardMaterial({color: 0xffc24a, flatShading: true}),
+    wing: new THREE.MeshStandardMaterial({color: 0xff7c2e, side: THREE.DoubleSide, flatShading: true}), ball: new THREE.IcosahedronGeometry(1, 1),
+    membrane: new THREE.ShapeGeometry(new THREE.Shape([[0, .6], [3.8, 1.0], [6.4, -.3], [5.3, -1.8], [3.4, -2.6], [0, -1.6]].map(([x, z]) => new THREE.Vector2(x, z)))).rotateX(Math.PI / 2)};
+  const piece = (mat, pos, scale) => { const m = new THREE.Mesh(simple.ball, mat); m.position.fromArray(pos); m.scale.fromArray(scale); holder.add(m); return m; };
+  piece(simple.hide, [0, 0, 0], [1.1, 1.05, 1.9]); piece(simple.belly, [0, -.35, .2], [.9, .75, 1.6]);
+  piece(simple.hide, [0, 1.0, 2.5], [.45, .45, .9]); piece(simple.hide, [0, 1.55, 3.9], [.6, .52, .85]); piece(simple.hide, [0, .1, -3.6], [.4, .35, 2.6]);
+  const wings = [-1, 1].map(s => { const w = new THREE.Mesh(simple.membrane, simple.wing); w.position.set(s * .7, .75, .9); w.scale.x = s; holder.add(w); return w; });
+  return {model: false, wings};
 }
 
 export function buildDragon() {
-  const M = materials(), root = new THREE.Group(), body = new THREE.Group();
-  root.name = 'streakDragon'; body.scale.setScalar(DRAGON_SCALE); root.add(body);
-  // Torso and belly.
-  piece(body, sphere(1), M.hide, [0, 0, 0], [1.15, 1.0, 1.95]);
-  piece(body, sphere(1), M.belly, [0, -.32, .1], [.92, .72, 1.68]);
-  // Back spikes down the spine.
-  for (let i = 0; i < 5; i++) piece(body, cone(), M.belly, [0, .92 - i * .04, 1.1 - i * .65], [.16 - i * .015, .42 - i * .04, .16 - i * .015], [-.35, 0, 0]);
-  // Neck: three beads rising to the head.
-  const neck = new THREE.Group(); neck.position.set(0, .45, 1.45); body.add(neck);
-  const beads = [[0, .1, .3, .66], [0, .5, .85, .56], [0, .9, 1.35, .5]].map(([x, y, z, r]) => piece(neck, sphere(1), M.hide, [x, y, z], [r, r, r * 1.1]));
-  for (const [y, z] of [[.15, .45], [.55, .95]]) piece(neck, sphere(0), M.belly, [0, y - .32, z + .12], [.34, .2, .36]);
-  // Head.
-  const head = new THREE.Group(), horns = []; head.position.set(0, 1.12, 1.95); neck.add(head);
-  piece(head, sphere(1), M.hide, [0, .1, 0], [.72, .62, .78]);
-  piece(head, sphere(1), M.hide, [0, -.05, .66], [.52, .4, .62]); // snout
-  for (const s of [-1, 1]) {
-    piece(head, sphere(0), M.pupil, [s * .17, .12, 1.18], .06); // nostrils
-    piece(head, sphere(1), M.eye, [s * .4, .3, .34], .27);
-    piece(head, sphere(1), M.pupil, [s * .5, .32, .52], .13);
-    piece(head, sphere(0), M.hide, [s * .37, .52, .36], [.26, .09, .2]); // brow
-    piece(head, sphere(0), M.cheek, [s * .5, -.08, .42], [.14, .09, .1]);
-    horns.push(piece(head, cone(), M.horn, [s * .32, .48, -.2], [.12, .78, .12], [-1.05, 0, s * -.32]));
-    horns.push(piece(head, cone(), M.horn, [s * .58, .18, -.28], [.07, .38, .07], [-1.2, 0, s * -1.0])); // ear frill
-  }
-  const jaw = new THREE.Group(); jaw.position.set(0, -.28, .1); head.add(jaw);
-  piece(jaw, sphere(1), M.belly, [0, -.08, .5], [.42, .17, .56]);
-  const glow = piece(head, sphere(1), M.glow.clone(), [0, -.2, .82], [.32, .2, .3]);
-  // Wings.
-  const wings = [-1, 1].map(s => {
-    const shoulder = new THREE.Group(); shoulder.position.set(s * .85, .62, .55); shoulder.scale.x = s; body.add(shoulder);
-    piece(shoulder, membrane(), M.wing, [0, 0, 0], 1);
-    // Arm, forearm and three fingers fanning back to the scallops of the trailing edge.
-    for (const [from, to, r] of [[[0, 0, .4], [2.55, 0, .85], .1], [[2.55, 0, .85], [5.2, 0, -.25], .08], [[2.55, 0, .85], [4.35, 0, -1.0], .055], [[2.55, 0, .85], [3.1, 0, -1.95], .05], [[2.55, 0, .85], [1.6, 0, -2.35], .05]]) strut(shoulder, from, to, r, M.strut);
-    piece(shoulder, cone(), M.horn, [5.2, 0, -.25], [.07, .3, .07], [0, 0, -Math.PI / 2]);
-    return shoulder;
-  });
-  // Tail: a chain of shrinking beads ending in a heart-shaped spade.
-  const tail = []; let parent = body, at = [0, .1, -1.6];
-  for (let i = 0; i < 6; i++) {
-    const link = new THREE.Group(); link.position.fromArray(at); parent.add(link);
-    const r = .62 - i * .085; piece(link, sphere(1), M.hide, [0, 0, -.35], [r, r * .9, r * 1.25]);
-    tail.push(link); parent = link; at = [0, .04, -.62];
-  }
-  for (const side of [-1, 1]) piece(parent, sphere(0), M.belly, [side * .22, .05, -.8], [.36, .07, .42], [0, side * .55, 0]);
-  piece(parent, cone(), M.belly, [0, .05, -.95], [.18, .55, .05], [-Math.PI / 2, 0, 0]);
-  // Little tucked legs.
-  for (const [x, z] of [[-.6, .9], [.6, .9], [-.65, -.85], [.65, -.85]]) piece(body, sphere(0), M.hide, [x, -.85, z], [.26, .32, .34]);
-  root.userData.dragon = {body, neck, head, jaw, glow, wings, tail, beads, horns};
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.name = 'streakDragon'; body.scale.setScalar(DRAGON_SCALE); root.add(body); root.userData.body = body;
+  if (template) attachModel(root);
+  else { root.userData.dragon = buildStandIn(body); waiting.add(root); load(); }
   return root;
 }
 
-/** The rider's own dragon: the horns right under the camera are left out so they never cover the view... */
+/** The rider's own dragon: horns, head crest and brows (right under the camera) shrink away and the wings go see-through. */
 export function setRiderView(root, riding) {
+  root.userData.riding = riding;
   const d = root.userData.dragon; if (!d) return;
-  for (const h of d.horns) h.visible = !riding;
-  // ...and the wings turn see-through, so the ground under them stays in view while you aim.
-  d.riderWing ??= Object.assign(materials().wing.clone(), {transparent: true, opacity: .42, depthWrite: false});
-  for (const w of d.wings) w.children[0].material = riding ? d.riderWing : materials().wing;
+  if (!d.model) { for (const w of d.wings) { w.material = riding ? (d.riderWing ??= Object.assign(simple.wing.clone(), {transparent: true, opacity: .42, depthWrite: false})) : simple.wing; } return; }
+  d.riding = riding;
+  for (const name of ['Horns', 'BrowL', 'BrowR']) d.bones[name]?.scale.setScalar(riding ? 1e-3 : 1);
+  for (const mesh of d.wings) {
+    d.sharedWing ??= mesh.material;
+    if (riding && !d.riderWing) d.riderWing = Object.assign(patchMaterial(d.sharedWing.clone(), 'wing'), {transparent: true, opacity: .4, depthWrite: false});
+    mesh.material = riding ? d.riderWing : d.sharedWing;
+  }
 }
 
-/** Wing beat, glide, sway and fire glow. amp < 1 glides with smaller strokes (the rider's own dragon). t in seconds; breath 0..1; dive 0..1 (folds the wings back). */
+// Pose one bone: angles in radians about the dragon's own axes (x pitch nose-down, y yaw to its left, z roll left side up).
+const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion(), off = new THREE.Vector3();
+function turn(d, name, x = 0, y = 0, z = 0) {
+  const b = d.bones[name], r = d.rest[name]; if (!b) return;
+  b.quaternion.copy(r.q).multiply(qa.setFromAxisAngle(r.y, y)).multiply(qb.setFromAxisAngle(r.z, z)).multiply(qc.setFromAxisAngle(r.x, x));
+}
+
+/** Wing beat, glide, sway, breath and dive. t in seconds; breath 0..1; dive 0..1 folds the wings into a stoop; beat scales the
+ * stroke rate; amp < 1 is calmer and shallower (the rider's own dragon). */
 export function animateDragon(root, t, {breath = 0, dive = 0, beat = 1, amp = 1} = {}) {
   const d = root.userData.dragon; if (!d) return;
-  // A slow, lazy flap with a short glide: the down-stroke is quicker than the up-stroke.
-  const phase = t * 2.4 * beat, flap = amp * (Math.sin(phase) + .25 * Math.sin(phase * 2 - .6));
-  const fold = Math.min(1, dive * 1.3);
-  for (const w of d.wings) {
-    const side = w.scale.x; // the left wing is mirrored, so its angles mirror too
-    w.rotation.z = side * ((.18 + .55 * flap) * (1 - fold) - .25 * fold);
-    w.rotation.y = side * .5 * fold; w.scale.z = 1 - .35 * fold;
+  if (!d.model) { // stand-in: a plain sine flap
+    const flap = amp * Math.sin(t * 2.6 * beat), fold = clamp01(dive * 1.3);
+    for (const w of d.wings) { const s = w.scale.x; w.rotation.z = s * ((.15 + .55 * flap) * (1 - fold) - .25 * fold); w.rotation.y = s * .5 * fold; }
+    return;
   }
-  d.body.position.y = -.12 * flap;
-  d.neck.rotation.x = -.08 * Math.sin(phase - .8) + .25 * breath + .45 * dive;
-  d.head.rotation.x = .12 * breath + .1 * Math.sin(t * 1.3);
-  d.head.rotation.y = .1 * Math.sin(t * .7);
-  d.jaw.rotation.x = .55 * breath + .06 * Math.max(0, Math.sin(t * 3));
-  d.glow.material.opacity = Math.max(d.glow.material.opacity * .9, .9 * breath);
-  d.tail.forEach((link, i) => { link.rotation.y = .16 * Math.sin(t * 1.7 - i * .6); link.rotation.x = .06 * Math.sin(t * 2.4 - i * .5) - .03 * i * dive; });
+  let dt = d.lastT === null ? 0 : t - d.lastT; d.lastT = t;
+  if (!(dt > 0)) dt = 0; else if (dt > .25) dt = .25;
+  // Integrated stroke phase (a changing beat never makes the wings jump) and lagging copies of breath and dive.
+  d.phase = (d.phase + dt * TAU * .44 * beat) % TAU;
+  d.lagBreath += (breath - d.lagBreath) * (1 - Math.exp(-dt * 3.2));
+  d.lagDive += (dive - d.lagDive) * (1 - Math.exp(-dt * 2.4));
+  const ph = d.phase, fold = smooth(dive * 1.15), lag = d.lagDive;
+  // Mostly flapping, with a lazy glide now and then; diving folds the stroke away.
+  const glide = smooth((Math.sin(t * .29 + d.seed) - .35) / .5);
+  const A = amp * (1 - .82 * glide) * (1 - fold) * (1 - .55 * breath); // breathing fire, it hangs on spread wings
+  // Fast down-stroke, slower up-stroke: x runs 0..pi through the down-stroke in about 40% of the cycle.
+  const x = ph + .35 * (1 - Math.cos(ph)), stroke = k => Math.cos(x - k);
+  // Wings: the arm leads, the forearm and fingers follow later and further (follow-through), feathering on the up-stroke.
+  for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
+    turn(d, 'WingArm' + side, 0, s * (.85 * fold - .12 * A * Math.sin(x)), s * (.1 + .14 * glide * amp + A * (.56 * stroke(0) + .08) + .32 * fold));
+    turn(d, 'WingFore' + side, 0, s * 1.35 * fold, s * (A * .3 * stroke(.55) - .15 * fold + .04 * glide));
+    const feather = -A * .2 * Math.max(0, -Math.sin(x - .7));
+    for (const [k, spread] of [[1, .5], [2, .35], [3, .2]]) turn(d, `WingF${k}${side}`, feather * (1.2 - k * .2), s * spread * fold, s * (A * (.34 + .04 * k) * stroke(1.0 + .1 * k) + .03 * glide));
+  }
+  // Body: rises on the down-stroke and pitches a little; the neck and head counter it so the face stays steady (weight).
+  const steady = 1 - .85 * breath, bob = -.1 * A * Math.cos(x - .45), pitch = .045 * A * Math.sin(x - .8) * steady;
+  const body = d.bones.Body, rb = d.rest.Body;
+  if (body) { body.position.copy(rb.p).add(off.set(0, bob, 0).applyQuaternion(rb.parentInv)); turn(d, 'Body', pitch + .05 * lag); }
+  turn(d, 'Chest', .5 * pitch);
+  // Breath: a quick rear-back while the breath builds (anticipation), then the neck thrusts the open jaw forward and down;
+  // when it stops the head wobbles and settles as the lagging copy catches up.
+  const rear = clamp01(breath - d.lagBreath) * 1.6, settle = clamp01(d.lagBreath - breath), quiet = 1 - breath;
+  const carry = d.riding ? .2 * quiet : 0; // the rider's own dragon carries its head a little lower, below the aim point
+  const lookYaw = .13 * Math.sin(t * .53 + d.seed) * quiet, lookPitch = .06 * Math.sin(t * .71 + d.seed) * quiet;
+  turn(d, 'Neck1', -.9 * pitch + .08 * breath - .22 * rear + .1 * fold + carry, .35 * lookYaw);
+  turn(d, 'Neck2', .06 * A * Math.cos(x - 1.2) * steady + .06 * breath - .12 * rear + .07 * fold + .5 * carry, .35 * lookYaw);
+  turn(d, 'Neck3', .05 * breath + .03 * Math.sin(t * .9) * quiet, .3 * lookYaw);
+  turn(d, 'Head', -.35 * pitch - .2 * rear - .17 * fold - .4 * carry + lookPitch + .12 * settle * Math.sin(t * 11), lookYaw * .6, .05 * Math.sin(t * .37 + d.seed) * quiet);
+  turn(d, 'Jaw', .45 * breath + .25 * rear + .05 * Math.max(0, Math.sin(t * .8 + d.seed)) ** 6);
+  for (const [s, side] of [[1, 'L'], [-1, 'R']]) turn(d, 'Brow' + side, 0, 0, s * (.2 * Math.max(breath, rear) - .07 * quiet + .03 * Math.sin(t * .6)));
+  // Tail: a slow swish that travels down the chain, plus the stroke's wave arriving later at each link; straight in a dive.
+  for (let i = 1; i <= 6; i++) {
+    const loose = 1 - .75 * lag;
+    turn(d, 'Tail' + i, (.06 * A * Math.cos(x - 1.6 - i * .45) - .04 * lag + .02 * i * glide * .5) * loose, (.06 + .02 * i) * Math.sin(t * 1.05 - i * .55 + d.seed) * loose);
+  }
+  // Legs tuck back in the dive and dangle a little behind the stroke.
+  for (const side of ['L', 'R']) { turn(d, 'LegF' + side, .12 * A * Math.cos(x - 2) + .55 * lag); turn(d, 'LegH' + side, .1 * A * Math.cos(x - 2.3) + .45 * lag); }
+  if (d.ember) { const u = d.ember.userData.skyfire; u.uBreath.value = breath; u.uTime.value = t % 1000; }
 }

@@ -83,4 +83,5 @@ The extra mile. Only for things that are already level 2 and that players love o
 
 | Asset | Level | Notes |
 |---|---|---|
-| Kill-streak dragon ("Slay Thee, Sun Birdy Above") and fire (first version) | 1 | Primitive faceted dragon, plain particle fire. Level 2 pass in progress. |
+| Kill-streak dragon ("Slay Thee, Sun Birdy Above") | 2 | Blender builder in multiplayer/assets-source/skyfire-dragon: lofted body, baked AO, scale tile, 31-bone rig posed in closed form, ember belly and golden crest. 8.7k triangles, 3 materials, 292 KB. Level 3 left: blinks, saddle, normal map, LODs, take-off and landing clips, real device checks. |
+| Kill-streak fire | 2 | client/dragon-fire.js: noise-shaped premultiplied flames, flame stream, fireballs, smoke, embers, debris, shock rings, scorch marks; 7 draws. Level 3 left: heat haze, lingering ground fire decals per device tier. |
