@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>Emberdew lab</title><style>body{margin:0;background:#20242a}canvas{display:block}</style>
 <script type="module">
 // Review page for the Emberdew bottle (client/emberdew-model.js) with its sloshing dew and lit rag (client/emberdew-presentation.js).
-// lab.studio(lit, yaw, tilt) renders one bottle; lab.lineup() shows unlit / lit / sloshing side by side; lab.old() the previous flask.
+// lab.studio(lit, yaw, tilt) renders one bottle; lab.lineup() shows unlit / lit / sloshing side by side; lab.cork(lit) is a close-up of Corky.
 import * as T from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createEmberdewModel} from '../client/emberdew-model.js';
@@ -21,6 +21,7 @@ function add(x,yaw,lit,tilt=0,slosh=0){const root=createEmberdewModel();root.pos
 window.lab={bottles,
  studio:(lit=false,yaw=.5,tilt=0,dist=.55)=>{clear();add(0,yaw,lit,tilt);cam.position.set(0,.05,dist);cam.lookAt(0,0,0);renderer.render(scene,cam);},
  lineup:()=>{clear();add(-.15,.4,false);add(0,.15,true);add(.15,-.3,true,0,2.2);cam.position.set(0,.06,.85);cam.lookAt(0,0,0);renderer.render(scene,cam);},
+ cork:(lit=false,yaw=.25)=>{clear();add(0,yaw,lit);cam.position.set(0,.1,.2);cam.lookAt(0,.09,0);renderer.render(scene,cam);},
  face:(lit=true)=>{clear();add(0,0,lit);cam.position.set(0,-.02,.3);cam.lookAt(0,-.025,0);renderer.render(scene,cam);},
 };
 document.title='ready';

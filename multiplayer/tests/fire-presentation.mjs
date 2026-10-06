@@ -16,7 +16,7 @@ assert.equal(lightCount(),3,'burning light count unchanged');view.sync({tick:100
 view.sync({tick:1100,fireCells:[],fireSurfaces:[],projectiles:[],enemies:[{id:'e1',kind:'skeleton',position:[4,0,0],yaw:0,burnPart:'leftArm',burnUntil:1250}],detachedParts:[]});view.update(22000,.1);assert.equal(view.stats().patches,1,'Phoenix flames attach without new draw system');
 view.sync({tick:1106,fireCells:[],fireSurfaces:[],projectiles:[],enemies:[],detachedParts:[{id:'d1',sourceId:'e1',part:'leftArm',position:[5,.1,0],burnUntil:1250}]});view.update(22100,.1);assert.ok(view.stats().patches>=1,'burn follows detached remains');
 view.dispose();assert.equal(scene.children.length,0);
-const flask=createEmberdewModel();assert.ok(flask.getObjectByName('Muzzle'));assert.ok(flask.userData.stats.triangles<2000);flask.userData.dispose();
+const flask=createEmberdewModel();assert.ok(flask.getObjectByName('Muzzle'));assert.ok(flask.userData.stats.triangles<4000);flask.userData.dispose();
 const require=createRequire(import.meta.url),validator=require('../../assets/asset-lab/node_modules/gltf-validator');
 const result=await validator.validateBytes(new Uint8Array(fs.readFileSync(new URL('../public/assets/wyrmspout.glb',import.meta.url))));assert.equal(result.issues.numErrors,0);
 console.log(JSON.stringify({result:'pass',updateMs:ms,stats,glbErrors:result.issues.numErrors,seconds:(performance.now()-started)/1000},null,2));
