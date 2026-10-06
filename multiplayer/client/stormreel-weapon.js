@@ -3,16 +3,18 @@
 // this file only predicts what the player sees and hears before the result returns.
 import * as THREE from 'three';
 import {STORMREEL,rayEnemy,rayGround,rayWorld,chargeShots,cableStrain,cableLength,packOf} from '../shared/stormreel.js';
+import {POLE,finishCrossbow,glyphTexture,flicker} from './stormreel-look.js';
 import './stormreel-hud.css';
 
 export const STORMREEL_FEEL = Object.freeze({chargeSeconds: STORMREEL.chargeTicks / 60, cooldownSeconds: STORMREEL.cooldownTicks / 60, kick: .05});
 const COLORS = Object.freeze({circuit: 0x5cc8ff, red: 0xff6a4a, blue: 0x6fb8ff, dead: 0x9aa3ad});
-/** The colour the next live bolt lays (shared/stormreel.js layProbe): your pack's when partnered, else alternating. */
-export function nextProbe(b, id) { const mine = packOf(b, id), partner = b[mine === 'red' ? 'operator2' : 'operator']; return partner && partner !== id ? mine : b.lastProbe === 'red' ? 'blue' : 'red'; }
+/** The pole your next live bolt lays (shared/stormreel.js layProbe): always your pack's, red (+) or blue (-). */
+export function nextProbe(b, id) { return packOf(b, id) || 'red'; }
 
 /**
  * ctx: scene, lightning, send(action, payload), aim() -> {origin, direction}, snapshot(), playerId(), height(x,z),
- *      localPosition() -> Vector3, audio() -> AudioContext|null, now() -> seconds, hud (HTMLElement parent) optional
+ *      localPosition() -> Vector3, audio() -> AudioContext|null, now() -> seconds, hud (HTMLElement parent) optional,
+ *      sfx (stormreel-audio) optional: charge whine and ready ping
  */
 export function createStormreelWeapon(ctx) {
   const {scene, lightning} = ctx;
@@ -30,14 +32,14 @@ export function createStormreelWeapon(ctx) {
   let hud = null;
   if (typeof document !== 'undefined' && ctx.hud) {
     hud = document.createElement('div'); hud.className = 'stormreel-hud'; hud.hidden = true;
-    hud.innerHTML = '<span class="sr-bolt" aria-hidden="true">ϟ</span><span class="sr-shots"></span><span class="sr-probe" title="Next bolt"></span><span class="sr-arc"></span><span class="sr-cable"><i></i></span>';
+    hud.innerHTML = '<span class="sr-bolt" aria-hidden="true">ϟ</span><span class="sr-pole"></span><span class="sr-shots"></span><span class="sr-probe" title="Next bolt"></span><span class="sr-arc"></span><span class="sr-cable"><i></i></span>';
     ctx.hud.appendChild(hud);
   }
   let hudText = '';
 
   function tower() {
     const s = ctx.snapshot(), id = ctx.playerId();
-    return s?.inventions?.structures?.find(b => b.type === 'stormspire' && b.operator === id && b.hp > 0) || null;
+    return s?.inventions?.structures?.find(b => b.type === 'stormspire' && (b.operator === id || b.operator2 === id) && b.hp > 0) || null;
   }
   function setModel(m) {
     model = m; nodes = {};
@@ -58,29 +60,41 @@ export function createStormreelWeapon(ctx) {
   }
   function cancel() { started = null; charge = 0; stopHum(); }
 
-  function startHum() {
-    const ac = ctx.audio?.(); if (!ac || ac.state !== 'running' || hum) return;
-    const o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
-    o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = 60; o2.frequency.value = 121; g.gain.value = 0;
-    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 500;
-    o.connect(f); o2.connect(f); f.connect(g).connect(ac.destination); o.start(); o2.start();
-    hum = {o, o2, g, f, ac};
-  }
-  function stopHum() { if (!hum) return; const {o, o2, g, ac} = hum, t = ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, .03); o.stop(t + .2); o2.stop(t + .2); hum = null; }
+  // Charge sound: a capacitor whine that climbs with the hold, crackle clicks, a ping at full charge (stormreel-audio.js charger).
+  function startHum() { if (!hum) hum = ctx.sfx?.charger?.() || null; }
+  function stopHum() { hum?.stop(); hum = null; }
 
   const tmp = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
+  const pole = () => { const t = tower(); return t ? nextProbe(t, ctx.playerId()) : 'red'; };
+  /** At high charge the muzzle itself crackles: little arcs reach out from the nose in the pole's colour. */
+  function muzzleCrackle(scale) {
+    const M = nodes.Muzzle; if (!M || !lightning) return; M.getWorldPosition(a);
+    const reach = .05 + .12 * scale; b.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize().multiplyScalar(reach).add(a);
+    lightning.strike(a.clone(), b.clone(), {life: .06, width: .003 + .004 * scale, rough: .4, depth: 3, branches: 0, restrikes: 0, intensity: .9 + .5 * scale, hue: POLE[pole()].hue});
+  }
   function hornArc(scale) {
     const L = nodes.ArcHorn_L, R = nodes.ArcHorn_R; if (!L || !R || !lightning) return;
     // The arc climbs the horns as it charges: start low between the bases, finish across the tips.
     const climb = .25 + .75 * scale;
-    lightning.strike(L.getWorldPosition(a), R.getWorldPosition(b), {life: .07 + .05 * Math.random(), width: .0035 + .004 * scale, rough: .3, depth: 3, branches: 0, restrikes: 0, intensity: .6 + .5 * scale,
+    lightning.strike(L.getWorldPosition(a), R.getWorldPosition(b), {life: .07 + .05 * Math.random(), width: .0035 + .004 * scale, rough: .3, depth: 3, branches: 0, restrikes: 0, intensity: .6 + .5 * scale, hue: POLE[pole()].hue,
       follow: () => { L.getWorldPosition(a); R.getWorldPosition(b); const base = (nodes.Horn_Base || L); base.getWorldPosition(tmp); a.lerp(tmp, 1 - climb); b.lerp(tmp, 1 - climb); return [a, b]; }});
+  }
+  // A glowing polarity badge (+ or -) on the receiver, so the crossbow in your hands tells you which pole it is.
+  let badge = null;
+  function polarityBadge() {
+    const p = pole();
+    if (badge && badge.userData.model === model && badge.userData.pole === p) { badge.material.opacity = .75 + .25 * flicker(ctx.now(), 2); return; }
+    badge?.removeFromParent(); badge?.material.map?.dispose(); badge?.material.dispose();
+    const root = nodes.Stormreel || model; if (!root) return;
+    badge = new THREE.Mesh(new THREE.PlaneGeometry(.038, .038).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({map: glyphTexture(p), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false}));
+    badge.position.set(0, .1045, .11); badge.userData = {model, pole: p}; badge.name = 'PolarityBadge'; badge.raycast = () => {}; badge.renderOrder = 15; root.add(badge);
   }
   function update(dt) {
     const t = tower(), wearing = !!t && !!model;
     if (!t && started !== null) cancel();
     if (started !== null) charge = Math.min(1, (ctx.now() - started) / STORMREEL_FEEL.chargeSeconds);
     kick = Math.max(0, kick - dt * 6);
+    if (model) { finishCrossbow(model, pole()); polarityBadge(); }
     const shots = t ? chargeShots(t) : 0, live = !!t && t.charge >= Math.max(1, Math.round(STORMREEL.shotCost * Math.max(STORMREEL.minCharge, charge || 1)));
     // Capacitor tubes: dim with the tower's store, fill with the hold.
     for (const side of ['L', 'R']) {
@@ -88,11 +102,12 @@ export function createStormreelWeapon(ctx) {
       core.scale.z = Math.max(.05, started !== null ? charge : live ? .18 + .06 * Math.sin(ctx.now() * 6) : .05);
       core.visible = live || started !== null;
     }
-    if (hum) { const tt = hum.ac.currentTime; hum.o.frequency.setTargetAtTime(60 + 140 * charge, tt, .05); hum.o2.frequency.setTargetAtTime(121 + 300 * charge, tt, .05); hum.f.frequency.setTargetAtTime(400 + 2400 * charge, tt, .05); hum.g.gain.setTargetAtTime(live ? .05 + .07 * charge : .015, tt, .05); }
+    hum?.set(charge, live, dt);
     if (wearing && lightning) {
       idleArc -= dt;
       const rate = started !== null ? (live ? 1 / (24 + 30 * charge) : .4) : live ? 1.4 : Infinity;
       if (idleArc <= 0 && rate < Infinity) { idleArc = rate * (.6 + Math.random() * .8); hornArc(started !== null ? charge : .15); }
+      if (started !== null && live && charge > .45 && Math.random() < dt * (10 + 40 * charge)) muzzleCrackle(charge);
     }
     // Aim preview, only while charging so it never clutters the screen.
     const showPreview = wearing && started !== null;
@@ -126,7 +141,7 @@ export function createStormreelWeapon(ctx) {
       if (wearing) {
         const me = ctx.localPosition(), pack = packOf(t, ctx.playerId()) || 'red', d = cableLength(t, [me.x, 0, me.z], pack), left = Math.max(0, STORMREEL.cable - d), strain = cableStrain(t, [me.x, 0, me.z], pack);
         const next = nextProbe(t, ctx.playerId()), arc = t.arc ? 'live' : t.probes?.red || t.probes?.blue ? 'half' : '';
-        const text = `${shots}|${Math.round(left)}|${strain > .01 ? 1 : 0}|${next}|${arc}|${pack}`;
+        const out = t.probes?.red || t.probes?.blue ? 1 : 0, text = `${shots}|${Math.round(left)}|${strain > .01 ? 1 : 0}|${next}|${arc}|${pack}|${out}`;
         if (text !== hudText) {
           hudText = text;
           hud.querySelector('.sr-shots').textContent = shots ? `${shots} shot${shots === 1 ? '' : 's'}` : 'Tower empty: feed it Crystal';
@@ -134,7 +149,9 @@ export function createStormreelWeapon(ctx) {
           hud.querySelector('.sr-cable').title = `${Math.round(left)} m of cable left`;
           hud.classList.toggle('sr-strain', strain > .01); hud.classList.toggle('sr-empty', !shots);
           hud.dataset.pack = pack; hud.querySelector('.sr-probe').dataset.next = next;
-          hud.querySelector('.sr-arc').textContent = arc === 'live' ? `Arc live · ${ctx.severKey?.() || 'Q'} sever` : arc === 'half' ? `${t.probes?.red ? 'Red' : 'Blue'} probe out` : '';
+          const reelKey = ctx.severKey?.() || 'Q', lodged = t.probes?.red ? 'positive' : 'negative';
+          hud.querySelector('.sr-pole').textContent = pack === 'red' ? '+' : '\u2212'; hud.querySelector('.sr-pole').title = pack === 'red' ? 'Positive (red) crossbow' : 'Negative (blue) crossbow';
+          hud.querySelector('.sr-arc').textContent = arc === 'live' ? `Arc live · ${reelKey} reel in` : arc === 'half' ? `${t.probes?.red && t.probes?.blue ? 'Both' : lodged} lodged · ${reelKey} reel in` : '';
         }
       }
     }
@@ -146,5 +163,5 @@ export function createStormreelWeapon(ctx) {
   }
   return {begin, end, cancel, update, setModel, poseOffset, charging: () => started !== null, charge: () => charge,
     stats: () => ({charging: started !== null, charge, preview: line.visible, wearing: !!tower()}),
-    dispose() { cancel(); for (const o of [line, ring, step]) { o.removeFromParent(); o.geometry.dispose(); o.material.dispose(); } hud?.remove(); }};
+    dispose() { cancel(); badge?.removeFromParent(); badge?.material.map?.dispose(); badge?.material.dispose(); for (const o of [line, ring, step]) { o.removeFromParent(); o.geometry.dispose(); o.material.dispose(); } hud?.remove(); }};
 }

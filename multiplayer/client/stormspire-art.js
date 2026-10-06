@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import {STORMREEL} from '../shared/stormreel.js';
 import {createLizardCrew} from './stormspire-lizards.js';
+import {POLE,MIXED_HUE,glyphTexture,coronaTexture,makeSprite,flicker} from './stormreel-look.js';
 
 const GLOW_NAMES = ['Charge', 'CrystalCore', 'Crystal', 'Window'];
 // The two packs: red (+) and blue (-). Their cable, reel windings and lamp take the pack's colour.
@@ -27,6 +28,7 @@ export function tintPack(root, pack) {
 export function createStormspireArt({lightning = null} = {}) {
   let tower = null, pack = null;
   const live = new Set(), v = new THREE.Vector3(), w = new THREE.Vector3();
+  const glyphs = {red: glyphTexture('red'), blue: glyphTexture('blue')}, corona = coronaTexture(3);
   function install(gltf) { tower = gltf; for (const e of live) attach(e); }
   function installPack(gltf) { pack = gltf; for (const e of live) attachPack(e); }
   /** Per-tower glow materials, so one tower's charge never lights another (two or three towers at most). */
@@ -49,7 +51,15 @@ export function createStormspireArt({lightning = null} = {}) {
     const glow = ownMaterials(root);
     for (const c of e.root.children) c.visible = false;   // the code-built stand-in
     e.root.add(root);
-    e.spire = {root, nodes, glow, shown: e.data.charge || 0, arcAt: 0, flash: 0, hang: {red: null, blue: null}};
+    e.spire = {root, nodes, glow, shown: e.data.charge || 0, arcAt: 0, flash: 0, hang: {red: null, blue: null}, badges: {}, topAt: 0};
+    // Polarity badges on the two cable terminals: red (+) on the east face, blue (-) on the west, so the poles read at a glance.
+    for (const colour of ['red', 'blue']) {
+      const node = nodes[colour === 'blue' ? 'CableTerminal_B' : 'CableTerminal']; if (!node) continue;
+      const badge = new THREE.Sprite(new THREE.SpriteMaterial({map: glyphs[colour], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false}));
+      badge.position.set(0, .34, 0); badge.scale.setScalar(.3); badge.renderOrder = 15; badge.raycast = () => {}; node.add(badge);
+      const flare = new THREE.Sprite(new THREE.SpriteMaterial({map: corona, color: POLE[colour].glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false}));
+      flare.scale.setScalar(.6); flare.renderOrder = 14; flare.raycast = () => {}; node.add(flare); e.spire.badges[colour] = {badge, flare};
+    }
     e.spire.crew = createLizardCrew(); root.add(e.spire.crew.group);
     attachPack(e);
   }
@@ -68,7 +78,11 @@ export function createStormspireArt({lightning = null} = {}) {
       e.spire.root.add(hang); e.spire.hang[colour] = hang;
     }
   }
-  function detach(e) { live.delete(e); e.spire?.root.removeFromParent(); for (const m of e.spire?.glow || []) m.dispose(); e.spire = null; }
+  function detach(e) {
+    live.delete(e); e.spire?.root.removeFromParent(); for (const m of e.spire?.glow || []) m.dispose();
+    for (const {badge, flare} of Object.values(e.spire?.badges || {})) { badge.material.dispose(); flare.material.dispose(); }
+    e.spire = null;
+  }
   /** Where a cable leaves the tower, world space (falls back to the shared constant before the model loads). */
   function terminal(e, out = new THREE.Vector3(), colour = 'red') {
     const n = e.spire?.nodes[colour === 'blue' ? 'CableTerminal_B' : 'CableTerminal']; if (!n) return null;
@@ -89,7 +103,7 @@ export function createStormspireArt({lightning = null} = {}) {
   }
   function animate(e, time, dt) {
     const s = e.spire; if (!s) return;
-    const b = e.data, target = Math.max(0, Math.min(1, (b.charge || 0) / STORMREEL.maxCharge));
+    const b = e.data, working = !!b.arc, target = Math.max(0, Math.min(1, (b.charge || 0) / STORMREEL.maxCharge));
     s.shown += (target * STORMREEL.maxCharge - s.shown) * Math.min(1, dt * 4);   // drains and fills smoothly between snapshots
     const fill = s.shown / STORMREEL.maxCharge;
     const core = s.nodes.ChargeColumn_Core; if (core) { core.scale.y = Math.max(.02, fill); core.visible = fill > .01; }
@@ -98,11 +112,27 @@ export function createStormspireArt({lightning = null} = {}) {
     for (const m of s.glow) {
       const base = m.userData.base;
       if (m.name === 'CrystalCore') m.emissiveIntensity = base * (.25 + 1.6 * fill * (.8 + .2 * hum) + 2 * s.flash);
-      else if (m.name === 'Charge') m.emissiveIntensity = base * (.6 + .4 * hum + 1.5 * s.flash);
+      else if (m.name === 'Charge') m.emissiveIntensity = base * (.6 + .4 * hum + 1.5 * s.flash + (working ? 1.4 : 0));
       else if (m.name === 'Window') m.emissiveIntensity = base * (.4 + .8 * fill);
     }
     if (s.nodes.Capacitor_Crystal) s.nodes.Capacitor_Crystal.rotation.y = time * .4;
     s.crew?.update(time, dt);
+    // Terminal badges glow with the flow: faint at idle, hot while a pack is worn or the circuit runs.
+    for (const [colour, {badge, flare}] of Object.entries(s.badges)) {
+      const worn = !!b[colour === 'red' ? 'operator' : 'operator2'], k = (fill > .02 ? .35 : .12) + (worn ? .3 : 0) + (working ? .45 : 0) + .2 * s.flash;
+      badge.material.opacity = Math.min(1, k + .12 * flicker(time, colour === 'red' ? 0 : 2)); flare.material.opacity = Math.min(1, (worn ? .35 : .12) + (working ? .6 : 0) + s.flash * .5);
+      flare.scale.setScalar(.5 + .5 * flicker(time * 1.3, colour === 'red' ? 1 : 4) + (working ? .5 : 0)); flare.material.rotation = time * (colour === 'red' ? 1.5 : -1.5);
+    }
+    // While the circuit runs the whole tower works: streamers leap from the hat into the air and the capacitor roars.
+    if (lightning && working && b.hp > 0) {
+      s.topAt -= dt;
+      if (s.topAt <= 0 && s.nodes.TopLoad) {
+        s.topAt = .09 + Math.random() * .16; s.nodes.TopLoad.getWorldPosition(v);
+        const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * 1.6;
+        w.set(v.x + Math.cos(a) * r, v.y + .6 + Math.random() * 2.2, v.z + Math.sin(a) * r);
+        lightning.strike(v.clone(), w.clone(), {life: .12, width: .05, rough: .2, depth: 4, branches: 1, restrikes: 1, intensity: 1.1, hue: MIXED_HUE});
+      }
+    }
     if (s.hang.red) s.hang.red.visible = !b.operator && !e.packAway?.red;
     if (s.hang.blue) s.hang.blue.visible = !b.operator2 && !e.packAway?.blue;
     // Full and idle: little arcs leap between the torus brim and the hat tip.

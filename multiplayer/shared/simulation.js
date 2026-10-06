@@ -29,7 +29,7 @@ import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
-import {stormShot,stormSever,leash,releasePack,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
+import {stormShot,stormReel,leash,releasePack,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
@@ -245,7 +245,7 @@ function instantiate(state) {
         const logResult=logAction(state,p,message);if(logResult)return logResult;
         if(message.action==='special'&&['axe','pick'].includes(p.tool))reclaimDepletedDeposits(state);
         if (message.action === 'storm') return stormShot(state,p,message,{...combatContext,hitEnemyPart});
-        if (message.action === 'stormSever') return stormSever(state,p);
+        if (message.action === 'stormReel') return stormReel(state,p);
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const target=nearestCollectible(state,p,{height:(x,z)=>terrainHeight(state,x,z,false)});

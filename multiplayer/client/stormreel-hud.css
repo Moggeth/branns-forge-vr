@@ -23,3 +23,7 @@
 .stormreel-hud .sr-probe[data-next="blue"] { background: #6fb8ff; box-shadow: 0 0 8px rgba(111,184,255,.9); }
 .stormreel-hud .sr-arc { color: #bfe6ff; font-weight: 600; font-size: 13px; }
 .stormreel-hud .sr-arc:empty { display: none; }
+/* Pole badge: the crossbow you wear is the positive (red, +) or negative (blue, -) terminal. */
+.stormreel-hud .sr-pole { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; font: 800 17px/1 system-ui, sans-serif; color: #fff; background: #3a3d44; box-shadow: 0 0 0 2px rgba(255,255,255,.2); }
+.stormreel-hud[data-pack="red"] .sr-pole { background: #c8412b; box-shadow: 0 0 10px rgba(255,106,74,.85), 0 0 0 2px rgba(255,200,180,.5); }
+.stormreel-hud[data-pack="blue"] .sr-pole { background: #1f4fb0; box-shadow: 0 0 10px rgba(111,184,255,.85), 0 0 0 2px rgba(190,220,255,.5); }

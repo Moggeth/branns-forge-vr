@@ -7,7 +7,7 @@
 // follows a strike-and-restrike envelope. Positions are world space; time comes from the caller's frame dt.
 import * as THREE from 'three';
 
-export const LIGHTNING_CAPS = Object.freeze({quads: 1400, arcs: 24, sparks: 260, glows: 16, rings: 8});
+export const LIGHTNING_CAPS = Object.freeze({quads: 1800, arcs: 40, sparks: 320, glows: 24, rings: 12});   // headroom for a live Stormreel circuit (arc channels, crawling fire on its victims)
 const BLUE = new THREE.Color(0x58c8ff), CORE = new THREE.Color(0xeefbff);
 
 function gradientTexture() {

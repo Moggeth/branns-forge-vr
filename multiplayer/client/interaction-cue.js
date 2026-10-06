@@ -1,6 +1,6 @@
 import {isTestingGift,giftContents} from '../shared/testing-supplies.js';
 import {STRUCTURES, MACHINE_AMMO, inventionAvailable, timberlineAmmo} from '../shared/inventions.js';
-import {STORMREEL, chargeShots} from '../shared/stormreel.js';
+import {STORMREEL, chargeShots, nearestFreePack} from '../shared/stormreel.js';
 import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
@@ -194,11 +194,10 @@ function structureCue(b, self, snapshot, keys, make) {
     // shared/stormreel.js useStormspire: take or hang the pack (a whole Crystal drops in when it fits), R feeds one more.
     const shots = chargeShots(b), store = shots ? `${shots} shot${shots === 1 ? '' : 's'} stored` : 'Empty: feed it Crystal';
     const crystal = (self.resources?.gems | 0) > 0 && (b.charge || 0) <= STORMREEL.maxCharge - STORMREEL.crystalCharge ? ' · a Crystal drops in' : '';
-    if (b.operator === self.id || b.operator2 === self.id) return make('pickup', 'ready', b.id, def.name, `Hang up the ${b.operator === self.id ? 'red' : 'blue'} pack`, keys.collect, `${store}${crystal}${keys === CONTROLS.desktop ? ' · R feeds Crystal' : ''}`);
-    const worn = id => !!id && snapshot.players?.some(h => h.id === id && h.tool === 'stormreel');
-    const free = !worn(b.operator) ? 'red' : !worn(b.operator2) ? 'blue' : null;
+    if (b.operator === self.id || b.operator2 === self.id) return make('pickup', 'ready', b.id, def.name, `Hang up the ${b.operator === self.id ? 'red (+)' : 'blue (\u2212)'} pack`, keys.collect, `${store}${crystal}${keys === CONTROLS.desktop ? ' · R feeds Crystal' : ''}`);
+    const free = nearestFreePack({players: snapshot.players || []}, b, self);
     if (!free) return make('pickup', 'busy', b.id, def.name, 'Both packs in use', '', store);
-    return make('pickup', shots || crystal ? 'ready' : 'short', b.id, def.name, `Take the ${free} pack`, keys.collect, `${store}${crystal} · 45 m of cable`);
+    return make('pickup', shots || crystal ? 'ready' : 'short', b.id, def.name, `Take the ${free === 'red' ? 'red (+)' : 'blue (\u2212)'} pack`, keys.collect, `${store}${crystal} · 45 m of cable`);
   }
   const ammo = MACHINE_AMMO[b.type];
   if (!ammo) return make('pickup', 'ready', b.id, def.name, def.use, keys.collect);

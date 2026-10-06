@@ -176,7 +176,7 @@ function buildSettings() {
           ['In a world', 'Switch role, copy code or invite, download a backup, reset (host, with confirmation), leave'],
           ['Lobby', 'Import or resume a save, create or join a world'],
         ]),
-        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack tosses fuel; Special toggles its wick. Left trigger performs these specials in VR.' }),
+        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack tosses fuel; Special toggles its wick. Stormreel: hold Attack to charge a bolt, Special reels it back in along its tether. Left trigger performs these specials in VR.' }),
       ]),
     ]),
   ]);
