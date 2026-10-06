@@ -1,3 +1,4 @@
+import {mergeCreatureSkins} from '../client/merge-creature-skins.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
@@ -22,6 +23,8 @@ function untextured(name){
 const load=name=>new Promise((ok,fail)=>new GLTFLoader().parse(untextured(name),'',ok,fail));
 
 const skeletonTemplate=await load('skeleton');
+mergeCreatureSkins(skeletonTemplate); // actual runtime preparation: validate contact/damage on batched skins
+
 const {visual}=prepareAsset(skeletonTemplate,'skeleton',1.7);
 const scene=new THREE.Scene(), root=new THREE.Group();root.add(visual);scene.add(root);root.updateMatrixWorld(true);
 let count=0,previouslyRejected=0;

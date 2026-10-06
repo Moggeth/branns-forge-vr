@@ -4,7 +4,7 @@
 // onAction({type:'context', kind, targetId}) — host should AIM + start a real swing at targetId
 //   (same path as the existing primary Attack), never instant server damage. Held bow draw is untouched:
 //   host should ignore context taps while a draw is held.
-// setQuick([{id, icon, label, badge?}]) — up to 3 always-reachable actions (e.g. forge, expedition, ping).
+// setQuick([{id, icon, label, badge?}]) — up to 4 always-reachable actions (e.g. forge, expedition, ping).
 const ICON = { attack: '⚔', mine: '⛏', collect: '✋', talk: '✉' };
 
 export function mountTouchActions({ root = document.body, onAction }) {
@@ -30,9 +30,9 @@ export function mountTouchActions({ root = document.body, onAction }) {
     chip.style.setProperty('--ta-p', String(Math.max(0, Math.min(1, ctx.progress ?? 0))));
   }
   function setQuick(list = []) {
-    quick.replaceChildren(...list.slice(0, 3).map((q) => { const b = document.createElement('button');
+    quick.replaceChildren(...list.slice(0, 4).map((q) => { const b = document.createElement('button');
       b.type = 'button'; b.className = 'ta-q'; b.dataset.id = q.id; b.setAttribute('aria-label', q.label);
-      b.innerHTML = `<span>${q.icon || ''}</span><small>${({bandage:'Heal',deliver:'Deliver',drop:'Drop'})[q.id]||q.id}</small>`; return b; }));
+      b.innerHTML = `<span>${q.icon || ''}</span><small>${({bandage:'Heal',deliver:'Deliver',drop:'Drop',inspect:'Inspect'})[q.id]||q.id}</small>`; return b; }));
   }
   function dispose() { wrap.remove(); }
   return { setContext, setQuick, dispose };

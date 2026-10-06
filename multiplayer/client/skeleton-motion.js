@@ -47,18 +47,20 @@ export function rigSkeleton(st, root) {
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qi = new THREE.Quaternion();
 // With `sweep` (an actor-space rotation) the segment is first aimed at `dir`, then carried by `sweep`: a
 // swing far past the segment's own axis then follows one continuous arc instead of a re-solved shortest one.
+const matrixPosition = new THREE.Vector3(), matrixScale = new THREE.Vector3();
 function aim(rec, dir, weight, rootQ, sweep = null) {
   if (!rec?.restDir || !(weight > 1e-4)) return;
   const node = rec.node;
   node.updateWorldMatrix(true, false);
   _qi.copy(rootQ).invert();
-  _qa.copy(_qi).multiply(node.getWorldQuaternion(_q));                       // current actor-relative orientation
+  node.matrixWorld.decompose(matrixPosition, _q, matrixScale);
+  _qa.copy(_qi).multiply(_q);                       // current actor-relative orientation
   _a.copy(rec.restDir).applyQuaternion(_q2.copy(rec.restRel).invert()).applyQuaternion(_qa).normalize();
   _b.copy(dir).normalize();
   _qd.setFromUnitVectors(_a, _b); if (sweep) _qd.premultiply(sweep);
   _qd.slerp(_q.identity(), 1 - clamp(weight, 0, 1));
   _q2.copy(rootQ).multiply(_qd).multiply(_qa);                                 // desired world orientation
-  node.parent.getWorldQuaternion(_q); node.quaternion.copy(_q.invert().multiply(_q2)).normalize();
+  node.parent.matrixWorld.decompose(matrixPosition, _q, matrixScale); node.quaternion.copy(_q.invert().multiply(_q2)).normalize();
 }
 const _c1 = new THREE.Vector3(), _c2 = new THREE.Vector3();
 const _s1 = new THREE.Vector3(), _sq = new THREE.Quaternion();

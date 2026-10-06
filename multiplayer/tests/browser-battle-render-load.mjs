@@ -15,14 +15,14 @@ assert.equal(state.players.length,32);assert.equal(state.enemies.length,32,'do n
 for(const [i,p] of state.players.entries()){const x=(i%8-3.5)*2,z=12-Math.floor(i/8)*2;p.position=[x,terrainHeight(state,x,z),z];p.side=i%2?'party':'rivals';p.yaw=Math.PI;p.tool=['axe','pick','hammer','crossbow','bow'][i%5];}
 state.players[0].position=[0,terrainHeight(state,0,20),20];state.players[0].yaw=0;
 for(const [i,e] of state.enemies.entries()){const x=(i%8-3.5)*2,z=3-Math.floor(i/8)*2;e.position=[x,terrainHeight(state,x,z),z];e.yaw=0;}
-loadSimulation(sim.checkpoint());const fixture=sim.snapshot();
-const {browser,page}=await launch({viewport:{width:960,height:540}});
+loadSimulation(sim.checkpoint());const fixture=sim.snapshot();if(process.env.PERF_BASES==='1')fixture.battle=createSimulation({seed:41}).snapshot().battle;
+const {browser,page}=await launch({touch:process.env.PERF_TOUCH==='1',viewport:{width:Number(process.env.PERF_WIDTH)||960,height:Number(process.env.PERF_HEIGHT)||540}});
 try{
  // This isolated fixture has no HMR lifecycle. Remove Vite's dev websocket only;
  // all game modules/assets still come from the running Vite server unchanged.
  await page.route('**/@vite/client',route=>route.fulfill({contentType:'application/javascript',body:'export const createHotContext=()=>({accept(){},dispose(){},prune(){},invalidate(){},on(){},send(){},data:{}}); export const injectQuery=u=>u; export const updateStyle=()=>{}; export const removeStyle=()=>{};'}));
- const profiler=await page.context().newCDPSession(page);await profiler.send('Profiler.enable');await profiler.send('Profiler.start');
- await page.route('**/client/game.js*',async route=>{const response=await route.fetch(),body=await response.text();if(!body.includes('renderer.render(scene, camera);'))throw Error('Render instrumentation marker missing');await route.fulfill({response,body:body.replace('renderer.render(scene, camera);','window.profileRender(renderer, scene, camera);')});});
+ const profiler=await page.context().newCDPSession(page);await profiler.send('Profiler.enable');if(process.env.PERF_CPU_RATE)await profiler.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.PERF_CPU_RATE)});await profiler.send('Profiler.start');
+ await page.route('**/client/game.js*',async route=>{const response=await route.fetch(),body=await response.text();if(!body.includes('renderer.render(scene, camera);'))throw Error('Render instrumentation marker missing');await route.fulfill({response,body:body.replace('renderer.render(scene, camera);','window.profileRender(renderer, scene, camera);').replace("startup.ready=true;","window.warmPrograms=renderer.info.programs.map(p=>p.cacheKey); window.warmLights=[];scene.traverseVisible(n=>{if(n.isLight)window.warmLights.push(n.type+':'+n.name)});startup.ready=true;")});});
  await page.route('**/tests/battle-render-load.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="game"></canvas><script type="module">
  import {createGame} from '/client/game.js';
  window.measure={submit:[],gpu:[],pending:[],backend:null,gpuSupported:false,frames:0};
@@ -30,7 +30,7 @@ try{
  if(!m.backend){const debug=gl.getExtension('WEBGL_debug_renderer_info');m.backend=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);m.gpuSupported=!!ext;}
  if(ext)for(let i=m.pending.length-1;i>=0;i--){const q=m.pending[i];if(gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE)){if(!gl.getParameter(ext.GPU_DISJOINT_EXT))m.gpu.push(gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6);gl.deleteQuery(q);m.pending.splice(i,1);}}
  const q=ext&&++m.frames%15===0&&m.pending.length<4?gl.createQuery():null;if(q)gl.beginQuery(ext.TIME_ELAPSED_EXT,q);
- const t=performance.now();renderer.render(scene,camera);m.submit.push(performance.now()-t);if(m.submit.length>2000)m.submit.shift();if(q){gl.endQuery(ext.TIME_ELAPSED_EXT);m.pending.push(q);}}
+ const t=performance.now();renderer.render(scene,camera);m.submit.push(performance.now()-t);if(!window.programKeys&&window.fixture){window.programKeys=renderer.info.programs.map(p=>p.cacheKey);window.joinedLights=[];scene.traverseVisible(n=>{if(n.isLight)window.joinedLights.push(n.type+':'+n.name)});}if(m.submit.length>2000)m.submit.shift();if(q){gl.endQuery(ext.TIME_ELAPSED_EXT);m.pending.push(q);}}
  window.game=createGame({canvas:document.querySelector('canvas'),isHost:()=>false});window.ready=true;
  </script>`}));
  await page.goto(BASE+'/tests/battle-render-load.html');await page.waitForFunction(()=>window.ready,null,{timeout:120000});
@@ -43,6 +43,7 @@ try{
  await page.waitForTimeout(12000);
  const {profile}=await profiler.send('Profiler.stop');writeFileSync(join(here,'startup.cpuprofile'),JSON.stringify(profile));
  const nodes=new Map(profile.nodes.map(n=>[n.id,n.callFrame])),totals=new Map();for(let i=0;i<(profile.samples||[]).length;i++){const f=nodes.get(profile.samples[i]),key=`${f?.functionName||'(anonymous)'} ${f?.url||''}:${(f?.lineNumber??-1)+1}`;totals.set(key,(totals.get(key)||0)+(profile.timeDeltas?.[i]||0));}
+ record('shader-variants','measured',await page.evaluate(()=>({warmCount:window.warmPrograms?.length,lights:window.warmLights,joinedCount:window.programKeys?.length,newPrograms:window.programKeys?.filter(k=>!window.warmPrograms?.includes(k)).length,joinedLights:window.joinedLights})));
  record('startup-profile','measured',{topSelfMs:[...totals].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([frame,us])=>({frame,ms:us/1000}))});
  for(const role of ['hero','god']){
   await page.evaluate(role=>{window.game.setRole(role);if(role==='god')window.game.zoomBy(8);window.measure.submit=[];window.measure.gpu=[];},role);
