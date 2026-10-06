@@ -32,6 +32,7 @@ export class WorldSession extends EventTarget {
     this.accumulator = 0; this.last = 0; this.lastSave = 0; this.lastCheckpoint = 0;
     this.metrics = {steps:0, overruns:0, maxStepMs:0};
     this.parked = new Map();
+    this.autoContinue = true;
     // Delta snapshot stream (state-codec.js): one encoder while hosting, one decoder while a guest.
     this.codec = new SnapshotDeltaEncoder(); this.decoder = new SnapshotDeltaDecoder(); this.helloAt = 0;
     this.listeners = [];
@@ -73,6 +74,11 @@ export class WorldSession extends EventTarget {
       this.simulation = null;
       const recoverySaved = this.autoSave(true);
       this.emit(type, {...detail, recoverySaved});
+      // Take the world over at once so nobody has to press anything. A page in the background
+      // could not run it, so it passes and the room offers the next player instead.
+      if (type === 'continue_world_offer' && this.autoContinue) {
+        if (globalThis.document?.hidden) this.declineWorld(); else this.continueWorld();
+      }
     });
     for (const type of ['continue_offer_expired','world_waiting','peer_connection_state']) on(type,({detail})=>this.emit(type,detail));
     on('status', ({detail}) => {
@@ -331,6 +337,15 @@ export class WorldSession extends EventTarget {
   retryWorld() { this.connection.retryWorld(); }
   declineWorld() { this.connection.declineWorld(); }
   transferHost(id) { this.connection.transferHost(id); }
+  // Pass the world on while this host can still speak (closing, or a hidden tab whose timers
+  // are about to be throttled). A fresh recovery point goes out first so nothing rolls back.
+  handOver() {
+    if (!this.simulation || this.connection.local || !this.identity || this.connection.hostId !== this.identity.peerId) return false;
+    const successor = this.connection.successor?.();
+    if (!successor) return false;
+    this.publish(true);
+    return this.connection.transferHost(successor) !== false;
+  }
   resetWorld() {
     if (!this.simulation) throw new Error('Only the current host can reset the world.');
     // A failed recovery write must abort reset; the confirmation promises a backup.
@@ -339,6 +354,7 @@ export class WorldSession extends EventTarget {
     this.simulation = createSimulation({room:this.identity.room,seed:41}); this.codec.reset();
     this.reconcile(); this.publish(true);
   }
-  stop() { this.autoSave(true); this.running=false; clearInterval(this.timer); this.simulation=null; this.connection.close(); }
+  stop() { if (this.running && this.simulation && !this.connection.local) try { this.publish(true); } catch { /* closing */ }
+    this.autoSave(true); this.running=false; clearInterval(this.timer); this.simulation=null; this.connection.close(); }
   dispose() { this.stop(); this.listeners.forEach(remove=>remove()); }
 }

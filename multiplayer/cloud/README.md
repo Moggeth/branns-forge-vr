@@ -101,7 +101,12 @@ The Worker uses a hibernating WebSocket API, persisted membership/authority and 
 instead of polling timers. Closed rooms expire after 30 minutes with no signaling
 sockets; all rooms have an eight-hour lifetime. Worlds remain recoverable from client
 saves. An explicit host departure offers continuation immediately; network loss gets
-15 seconds of grace. A continuation offer lasts two minutes. Healthy direct peers
+15 seconds of grace, cut short as soon as a guest reports it stopped hearing the host
+(`retry_world`, sent every 2 s while the host is silent). If the host's socket stays open but
+every other online player reports silence (a frozen background tab), the world moves on too,
+at most once per 30 s. Browsers accept offers automatically (no button) unless their page is
+hidden, and every current client advertises `desktop: true` ("can carry the world"), so phones
+and headsets are candidates. A continuation offer lasts two minutes. Healthy direct peers
 decline unnecessary migration offers after a signaling-only interruption.
 
 Origins are explicitly allowlisted; signaling/relay routes are restricted to the

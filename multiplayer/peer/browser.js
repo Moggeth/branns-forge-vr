@@ -93,8 +93,11 @@ export class PeerRoomConnection extends EventTarget {
         clearInterval(this.liveness);
         this.liveness = setInterval(() => {
           const host = this.peers.get(this.hostId);
-          if (this.isHost || !host?.everReady || host.awaitingHost || this.#playable()) return;
-          host.awaitingHost = true;
+          if (this.isHost || !host?.everReady || this.#playable()) return;
+          // Keep reporting a silent host: the room may only notice its socket dropped later,
+          // and a host frozen in a background tab never closes its socket at all.
+          if (host.awaitingHost) { if (Date.now() - host.awaitingHost >= 2000) { host.awaitingHost = Date.now(); this.retryWorld(); } return; }
+          host.awaitingHost = Date.now();
           emit(this, 'owner_lost', { epoch: this.epoch }); emit(this, 'status', { state: 'owner_lost' }); this.retryWorld();
         }, 1000);
       } else this.#handleSignal(message);
@@ -378,8 +381,8 @@ export class PeerRoomConnection extends EventTarget {
   setCheckpoint(state, revision) {
     if (!this.isHost || !Number.isSafeInteger(revision) || revision < 0 || revision < this.checkpointRevision) return false;
     this.checkpoint = state; this.checkpointRevision = revision;
-    // Only desktop peers can be offered the world, so only they need 2 Hz recovery points. Others
-    // keep a local backup at the 10 s autosave cadence instead of ~130 KB/s of unused checkpoints.
+    // Only peers that can be offered the world need 2 Hz recovery points. Every current client
+    // can (deltas cost a few KB/s); a peer that cannot keeps the 10 s autosave cadence.
     const now = Date.now();
     let encoded=false;
     if (this.checkpointEncoder.size) {
@@ -400,6 +403,16 @@ export class PeerRoomConnection extends EventTarget {
   declineWorld() { return this.#signal({ type: 'decline_world', epoch: this.epoch }); }
   retryWorld() { return this.#signal({ type: 'retry_world', epoch: this.epoch }); }
   transferHost(peerId) { if (!this.isHost) return false; return this.#signal({ type: 'transfer_host', to: peerId }); }
+  // The online guest best placed to carry the world on: an open edge with the freshest traffic.
+  successor() {
+    let best = null, bestAt = -Infinity;
+    for (const [id, peer] of this.peers) {
+      if (id === this.peerId || this.roster.get(id)?.online === false) continue;
+      if (!(peer.relay ? this.socket?.readyState === WebSocket.OPEN : open(peer.channel))) continue;
+      if ((peer.receivedAt || 0) > bestAt) { best = id; bestAt = peer.receivedAt || 0; }
+    }
+    return best;
+  }
   #removePeer(id) { const peer = this.peers.get(id); if (!peer) return; this.peers.delete(id); this.checkpointEncoder.forget(id); clearTimeout(peer.relayTimer); peer.channel?.close(); peer.connection.close(); }
   #resetPeers() { for (const id of this.peers.keys()) this.#removePeer(id); this.checkpointEncoder.reset();this.checkpointDecoder.reset();this.checkpointHelloAt=0; }
   close() {
