@@ -2329,3 +2329,6 @@ injection verifies rejection of repeated and sustained slowdown; 38 baseline
 and candidate comparisons behaved as expected. Build and 181/181 required local
 suites passed. No runtime files, remote CI, publication or deployment changed.
 See [method, evidence and review limits](MEADOW-TIMING-20261005.md).
+
+### Mobile profiling (2026-10-06)
+Changing visible home-base light counts invalidated 67 shaders after the lobby warm-up; fixed slots with zero intensity avoid this. Model warm-up alone did not solve it. Keep benchmark CPU measurements separate from simultaneous regression tests. Use PERF_BASES=1 for current base-mode stress and the default legacy fixture for light-count transition coverage. See docs/MOBILE-PERFORMANCE-20261006.md.

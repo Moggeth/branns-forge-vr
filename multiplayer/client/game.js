@@ -1,3 +1,4 @@
+import {mergeCreatureSkins} from './merge-creature-skins.js';
 import {dressForgeling,dressForgelingModel,prepareForgelingTemplate} from './forgeling-look.js';
 import {createAbilityWarmup} from './ability-warmup.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
@@ -686,6 +687,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'forgeling', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'forgeling') prepareForgelingTemplate(gltf.scene);
+    if (name === 'skeleton' || name === 'forgeling') mergeCreatureSkins(gltf);
     if (name === 'skeleton' || name === 'golem' || name === 'forgeling') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     if (name === 'golem') gltf.scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^crystal/i.test(m.name)) m.emissive.setRGB(.3, .62, 1); }); // resonance blue; also the assembly binding colour
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
@@ -1628,6 +1630,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if(visual){const root=new THREE.Group();root.position.set(i*2-6,0,0);root.add(visual);representatives.add(root);heroView.update(visual,data,root,1/60,camera.position);warmHeroes.push(visual);}
       }
       for(let i=0;i<6;i++){const visual=instantiate('skeleton',1.7,i);if(visual){visual.position.set(i*2-5,0,-3);representatives.add(visual);}}
+      // Allied waves use a distinct stone/brass rig, not the skeleton material set.
+      // Compile that exact template before the first populated snapshot reaches the renderer.
+      for(let i=0;i<3;i++){const visual=instantiate('forgeling',1.81,i);if(visual){dressForgelingModel(visual,i);visual.position.set(i*2,0,-5);representatives.add(visual);}}
       const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
       treeWarmup=content.trees.prepareWarmup();representatives.add(treeWarmup.group);startup.treeHarvestWarmup=treeWarmup.stats;
       miningWarmup=content.prepareMiningWarmup();representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
