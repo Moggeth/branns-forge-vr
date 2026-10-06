@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PeerRoomConnection} from '../peer/browser.js';
 import {SnapshotDeltaDecoder} from '../client/state-codec.js';
+import {WorldSession} from '../client/session.js';
+import {createSimulation,loadSimulation} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
 class Socket extends EventTarget {
   static OPEN=1;constructor(){super();this.readyState=1;this.sent=[];this.bufferedAmount=0;}
   send(text){this.sent.push(JSON.parse(text));}close(){this.readyState=3;}
@@ -71,4 +74,56 @@ test('31-peer exact checkpoint deltas materially reduce a mostly static recovery
   for(let i=1;i<32;i++){const id=`p${i}`;decoders.set(id,new SnapshotDeltaDecoder());host.checkpointEncoder.enable(id);host.roster.set(id,{desktop:true});host.peers.set(id,{channel:{readyState:'open',bufferedAmount:0,send(text){const packet=JSON.parse(text);bytes+=text.length;if(packet.total!==1)return;const e=envelope(packet);assert.ok(decoders.get(id).accept(e.frame).snapshot);}}});}
   for(let tick=1;tick<=40;tick++){const s={...state(tick),geology:Array.from({length:80},(_,i)=>({id:`rock${i}`,position:[i*.123456789,0,1],resources:100}))};host.setCheckpoint(s,tick);baseline+=Buffer.byteLength(JSON.stringify({kind:'checkpoint',state:s,revision:tick}))*4/3*31;}
   assert.ok(bytes<baseline*.3,`exact deltas ${bytes} versus full lower-bound ${baseline}`);
+});
+
+for(const legacy of [false,true])test(`invalid simulation checkpoints cannot replace recovery state or its saved copy (${legacy?'legacy':'delta'})`,async()=>{
+  const p=await pair({legacy}),saved=new Map(),session=new WorldSession({connection:p.guest,storage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)}});
+  try{
+    const sim=createSimulation({room:'12345678',seed:41});sim.addPlayer({id:'host'});sim.addPlayer({id:'guest'});
+    const good=sim.checkpoint();p.host.setCheckpoint(good,1);
+    assert.equal(p.guest.checkpointRevision,1);assert.equal(session.saves.list().length,1);
+    const before=session.saves.list()[0].checkpoint,errors=[];session.addEventListener('error',e=>errors.push(e.detail));
+    for(let n=2;n<7;n++){
+      const broken=structuredClone(good);broken.players[0].position=[1e99,0,0];
+      p.guest.checkpointAdvertisedAt=0;session.lastSave=0;p.host.setCheckpoint(broken,n);
+      assert.equal(p.guest.checkpointRevision,1);assert.deepEqual(session.latest,good);
+      assert.deepEqual(session.saves.list()[0].checkpoint,before);
+    }
+    assert.equal(errors.length,1,'throttle repeated failure notices');
+    assert.ok(!p.guest.socket.sent.some(m=>m.type==='checkpoint_ready'&&m.revision>1));
+    assert.equal(p.guest.diagnostics().recovery.rejected,5);
+    sim.step();const corrected=sim.checkpoint();p.host.setCheckpoint(corrected,7);
+    assert.equal(p.guest.checkpointRevision,7);assert.deepEqual(loadSimulation(session.latest).checkpoint(),loadSimulation(corrected).checkpoint());
+    assert.ok(p.guest.socket.sent.some(m=>m.type==='checkpoint_ready'&&m.revision===7));
+    const diagnostic=JSON.stringify(p.guest.diagnostics());assert.ok(!diagnostic.includes('secret'));assert.ok(!diagnostic.includes('12345678'));
+  }finally{session.dispose();p.cleanup();}
+});
+
+test('real transport refuses fragment floods without faking host liveness and admits legitimate recovery afterwards',async()=>{
+  const p=await pair();try{
+    const edge=p.guest.peers.get('host');edge.receivedAt=123;
+    edge.channel.onmessage({data:'x'.repeat(2_000_000)});
+    edge.channel.onmessage({data:JSON.stringify({id:'partial',epoch:1,part:0,total:2,body:Buffer.from('{"unfinished":').toString('base64')})});
+    assert.equal(edge.receivedAt,123,'partial/malformed bytes are not a functioning host');
+    assert.equal(p.guest.diagnostics().ingress[0].reasons.frame_size,1);
+    p.host.setCheckpoint(state(1),1);assert.equal(p.guest.checkpointRevision,1);assert.ok(edge.receivedAt>123);
+    const hostEdge=p.host.peers.get('guest');
+    hostEdge.channel.onmessage({data:JSON.stringify({id:'guest-world',epoch:1,part:0,total:44,body:'e30='})});
+    assert.equal(hostEdge.inbox.stats().pending,0,'guests cannot reserve world-sized assembly buffers');
+  }finally{p.cleanup();}
+});
+
+test('busy host combat events are not silently dropped at the guest-input limit',async()=>{
+  const p=await pair();try{
+    const received=[];p.guest.addEventListener('message',e=>received.push(e.detail));
+    for(let n=0;n<180;n++)p.host.send('guest',{kind:'event',epoch:1,event:{type:'hit',n}});
+    assert.equal(received.length,180);assert.equal(p.guest.diagnostics().ingress[0].rejected,0);
+  }finally{p.cleanup();}
+});
+
+test('semantic recovery validation cost is measured on a 32-human busy world',()=>{
+  const sim=createSimulation({room:'12345678',seed:41});for(let i=0;i<32;i++)sim.addPlayer({id:`p${i}`});
+  const checkpoint=sim.checkpoint();checkpoint.enemies=Array.from({length:64},(_,i)=>createEnemy(`enemy-${i}`,[i%8*5-20,0,Math.floor(i/8)*5-20],i%3?'skeleton':'golem'));
+  const samples=[];for(let i=0;i<50;i++){const start=performance.now();loadSimulation(checkpoint);samples.push(performance.now()-start);}
+  samples.sort((a,b)=>a-b);console.log(JSON.stringify({recoveryValidation:{bytes:JSON.stringify(checkpoint).length,p95Ms:samples[47],maxMs:samples.at(-1),cadenceHz:2,scope:'local Node CPU, not phone FPS'}}));
 });

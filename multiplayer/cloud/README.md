@@ -186,3 +186,11 @@ Fixtures are excluded from the public deployment. `cloud/test.mjs` accepts
 `CLOUD_TEST_URL` / `CLOUD_TEST_ORIGIN`. Logs/captures/results go under ignored `logs/`.
 Physical headset, physical phone and two independent household networks remain manual
 acceptance items; forced-relay tests demonstrate the fallback, not those devices.
+
+
+### Browser authority resilience (2026-10-07)
+
+[Backend resilience notes](../../docs/BACKEND-RESILIENCE-20261007.md) document
+bounded RTC/relay intake, simulation-loadable recovery checkpoints and the
+read-only `window.brannHarness.network()` counters. These changes are in the
+browser; no Worker migration or deployment is needed. Refresh clients to apply.

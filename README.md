@@ -1,3 +1,5 @@
+Backend recovery and transport limits: [resilience notes](docs/BACKEND-RESILIENCE-20261007.md).
+
 **Directional proximity voice (draft, 2026-10-04):** opt-in nearby voice for browser Hero/God play on desktop, touch and WebXR. See [design, privacy, verification and network limits](docs/PROXIMITY-VOICE.md). Not deployed.
 
 # Brann's Forge - current browser game

@@ -2,10 +2,8 @@
 import {SnapshotDeltaEncoder,SnapshotDeltaDecoder,supportsCodec} from '../client/state-codec.js';
 import {clientCapacity} from './room-capacity.js';
 import {MAX_PLAYERS} from '../shared/multiplayer-limits.js';
-const FRAME_BYTES = 12_000;
-const MAX_MESSAGE_BYTES = 512 * 1024;
+import {FrameInbox, FRAME_BYTES, MAX_MESSAGE_BYTES} from './frame-inbox.js';
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 const preparedOwner = new WeakMap();
 const emit = (target, type, detail) => target.dispatchEvent(new CustomEvent(type, { detail }));
 const open = channel => channel?.readyState === 'open';
@@ -32,6 +30,9 @@ export class PeerRoomConnection extends EventTarget {
     this.checkpointEncoder = new SnapshotDeltaEncoder({keyframeEvery:20});
     this.checkpointDecoder = new SnapshotDeltaDecoder();
     this.checkpointHelloAt = 0;
+    this.validateCheckpoint = null;
+    this.recoveryMetrics = {accepted:0, rejected:0, maxValidationMs:0};
+    this.lastRecoveryErrorAt = -Infinity;
   }
   connect({ room = '', name = 'Adventurer', role = 'hero', desktop = true, secret = '' } = {}) {
     this.close();
@@ -196,7 +197,7 @@ export class PeerRoomConnection extends EventTarget {
     if (this.peers.has(id)) return;
     if (typeof RTCPeerConnection !== 'function') { emit(this, 'error', { code: 'webrtc_unavailable', message: 'This browser does not support peer connections.' }); return; }
     const connection = new RTCPeerConnection({ iceServers: this.iceServers || [] });
-    const peer = { connection, channel: null, pending: new Map(), epoch: this.epoch, messagesAt: 0, messagesCount: 0, offerSent: !initiator, localIceQueue: [] };
+    const peer = { connection, channel: null, inbox: new FrameInbox({fromHost:id === this.hostId}), epoch: this.epoch, messagesAt: 0, messagesCount: 0, offerSent: !initiator, localIceQueue: [] };
     this.peers.set(id, peer);
     if (this.relayTransport === 'websocket') peer.relayTimer = setTimeout(() => {
       if (this.peers.get(id) === peer && !open(peer.channel) && !peer.relay) this.#signal({ type: 'relay_request', to: id, epoch: this.epoch });
@@ -291,6 +292,19 @@ export class PeerRoomConnection extends EventTarget {
     if (this.#sendEnvelope(this.hostId,{kind:'checkpoint_codec',v:[1],need:'key'})) this.checkpointHelloAt=Date.now();
   }
   #acceptCheckpoint(id,state,revision) {
+    // A complete/checksummed payload is not necessarily a world we can resume.
+    // Keep the prior checkpoint and readiness revision until semantic validation succeeds.
+    const started = performance.now();
+    try { this.validateCheckpoint?.(state); }
+    catch {
+      this.recoveryMetrics.rejected++;
+      if (started - this.lastRecoveryErrorAt >= 10_000) {
+        this.lastRecoveryErrorAt = started;
+        emit(this, 'error', {code:'checkpoint_rejected', message:'A recovery update could not be loaded. Your last working backup is kept; if this repeats, ask the host to refresh after downloading a save.'});
+      }
+      return false;
+    } finally { this.recoveryMetrics.maxValidationMs = Math.max(this.recoveryMetrics.maxValidationMs, performance.now()-started); }
+    this.recoveryMetrics.accepted++;
     this.checkpoint = state; this.checkpointRevision = revision;
     // Coordinator metadata needs only a periodic readiness update.
     if (!this.checkpointAdvertisedAt || Date.now()-this.checkpointAdvertisedAt>10000) {
@@ -300,27 +314,13 @@ export class PeerRoomConnection extends EventTarget {
   }
   #receiveData(id, data) {
     const peer = this.peers.get(id); if (!peer || peer.epoch !== this.epoch) return;
-    let frame; try { frame = JSON.parse(typeof data === 'string' ? data : decoder.decode(data)); } catch { return; }
-    if (!frame || frame.epoch !== this.epoch || !Number.isSafeInteger(frame.part) || !Number.isSafeInteger(frame.total) || frame.total < 1 || frame.total > 64 || frame.part < 0 || frame.part >= frame.total || typeof frame.body !== 'string' || frame.body.length > FRAME_BYTES * 2) return;
+    const envelope = peer.inbox.accept(data, this.epoch);
+    if (!envelope) return;
+    // Incomplete/malformed traffic cannot masquerade as a healthy game host.
+    const permitted = this.isHost ? ['message','checkpoint_codec'] : ['message','checkpoint','checkpoint_delta'];
+    if (!permitted.includes(envelope.kind)) return;
     peer.receivedAt = Date.now();
     if (peer.awaitingHost && id === this.hostId) { peer.awaitingHost = false; emit(this, 'status', { state: 'connected' }); }
-    const key = String(frame.id);
-    let entry = peer.pending.get(key);
-    if (!entry) {
-      for (const [pendingId, pending] of peer.pending) if (Date.now() - pending.started > 15_000) peer.pending.delete(pendingId);
-      if (peer.pending.size >= 8) return;
-      entry = { parts: Array(frame.total), count: 0, started: Date.now() }; peer.pending.set(key, entry);
-    }
-    if (entry.parts.length !== frame.total || Date.now() - entry.started > 15_000) { peer.pending.delete(key); return; }
-    if (entry.parts[frame.part] === undefined) { entry.parts[frame.part] = frame.body; entry.count++; }
-    if (entry.count !== frame.total) return;
-    peer.pending.delete(key);
-    let chunks; try { chunks = entry.parts.map(part => Uint8Array.from(atob(part), character => character.charCodeAt(0))); } catch { return; }
-    const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0); if (length > MAX_MESSAGE_BYTES) return;
-    const bytes = new Uint8Array(length); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-    let envelope; try { envelope = JSON.parse(decoder.decode(bytes)); } catch { return; }
-    if (!envelope || typeof envelope !== 'object') return;
     if (envelope.kind === 'checkpoint_codec') {
       if (!this.isHost || !supportsCodec(envelope)) return;
       const now=Date.now();
@@ -339,9 +339,14 @@ export class PeerRoomConnection extends EventTarget {
       if (!this.isHost && id !== this.hostId) return;
       const now = Date.now();
       if (now - peer.messagesAt >= 1000) { peer.messagesAt = now; peer.messagesCount = 0; }
-      if (++peer.messagesCount > 80) return;
+      if (++peer.messagesCount > (this.isHost ? 80 : 512)) return; // Host also emits combat events for the whole room.
       emit(this, 'message', { from: id, data: envelope.data });
     }
+  }
+  diagnostics() {
+    // Counts only: no names, room codes, reconnect secrets, packet contents or SDP.
+    return {edges:this.peers.size, recovery:{...this.recoveryMetrics},
+      ingress:[...this.peers.values()].map(peer => peer.inbox?.stats()).filter(Boolean)};
   }
   #prepareEnvelope(envelope) {
     let serialized; try { serialized = encoder.encode(JSON.stringify(envelope)); } catch { return false; }

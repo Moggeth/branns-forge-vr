@@ -19,11 +19,15 @@ try {
   await guest.evaluate(()=>window.s.command('cast',{spell:'raise',point:[10,0,10]}));
   await host.waitForFunction(()=>window.s.simulation.snapshot().edits.length>0);
   record('two-real-sessions-and-replication','pass',{room,transport:relay?'cloud-relay':'direct-rtc'});
+  for(const page of [host,guest]) {
+    const d=await page.evaluate(()=>window.s.connection.diagnostics());
+    assert.ok(d.edges>0 && d.ingress.length>0);assert.ok(d.ingress.every(edge=>edge.rejected===0));assert.equal(d.recovery.rejected,0);
+  }
   if (process.env.HOST_CRASH === '1') {
     await guest.waitForFunction(()=>window.s.connection.checkpoint?.edits.length===1);
     await host.close();
     await guest.waitForFunction(()=>window.events.some(e=>e.name==='continue_world_offer'),null,{timeout:25000});
-    await guest.evaluate(()=>window.s.connection.continueWorld());
+    // WorldSession now accepts continuation automatically; a second request is an error.
     await guest.waitForFunction(()=>window.s.simulation && window.s.connection.epoch===2);
     assert.equal(await guest.evaluate(()=>window.s.simulation.snapshot().edits.length),1);
     record('unexpected-host-tab-loss-recovers-checkpoint','pass');
@@ -45,7 +49,7 @@ try {
   const guestId=await guest.evaluate(()=>window.s.identity.peerId);
   await host.evaluate(id=>window.s.connection.transferHost(id),guestId);
   await guest.waitForFunction(()=>window.events.some(e=>e.name==='continue_world_offer'));
-  await guest.evaluate(()=>window.s.connection.continueWorld());
+  // WorldSession accepts continuation automatically.
   await guest.waitForFunction(()=>window.s.simulation && window.s.connection.epoch===2);
   await host.waitForFunction(()=>window.s.latest?.players.length===2 && !window.s.simulation,null,{timeout:20000});
   await host.waitForFunction(()=>window.events.some(e=>e.name==='status' && e.detail.state==='connected'),null,{timeout:20000});
@@ -58,6 +62,10 @@ try {
   await guest.waitForFunction(t=>window.s.simulation.snapshot().tick>t+15,tick);
   record('host-transfer-and-original-host-offline','pass');
   }
+  const diagnostics=await guest.evaluate(()=>({transport:window.s.connection.diagnostics(),simulation:window.s.metrics}));
+  assert.equal(diagnostics.transport.recovery.rejected,0);assert.equal(diagnostics.simulation.rejectedCheckpoints,0);
+  assert.ok(diagnostics.transport.ingress.every(edge=>edge.rejected===0));
+  record('bounded-ingress-and-loadable-recovery','pass',diagnostics);
   const errors=await guest.evaluate(()=>window.events.filter(e=>e.name==='error').map(e=>e.detail)); assert.deepEqual(errors,[]);
 } catch(e) {
   record('exception','fail',{message:e.message});
