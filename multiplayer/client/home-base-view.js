@@ -36,6 +36,19 @@ export function createHomeBaseView({scene}) {
   const root = new THREE.Group(); root.name = 'home-bases'; scene.add(root);
   const bases = new Map(), effects = [], effectPool = [], localAim = new Map();
   let snapshot = null, enabled = false, kit = null;
+  // Lights stay in the renderer even when the bases are hidden. Changing the
+  // visible light count invalidates EVERY lit shader (including terrain/trees).
+  // Two fixed slots keep join/leave/mode changes from recompiling the whole world.
+  const heartLights = new Map(['party', 'rivals'].map(side => {
+    const light = new THREE.PointLight(STYLE[side].glow, 0, 16, 2);
+    light.name = `HomeHeart:${side}`; scene.add(light); return [side, light];
+  }));
+  function syncHeartLight(b) {
+    const source = b.heart.light, light = heartLights.get(b.side);
+    source.visible = false; // the authored attachment remains a pose/intensity source
+    source.getWorldPosition(light.position); light.color.copy(source.color);
+    light.intensity = source.intensity; light.distance = source.distance; light.decay = source.decay;
+  }
   const waterMats = {party: new THREE.MeshStandardMaterial({color: 0x2a6fb8, emissive: 0x3d9cff, emissiveIntensity: .55, roughness: .08, metalness: .1, transparent: true, opacity: .82}),
     rivals: new THREE.MeshStandardMaterial({color: 0x3c8f12, emissive: 0x8cff4a, emissiveIntensity: .9, roughness: .3, transparent: true, opacity: .92})};
   const shared = {};
@@ -186,11 +199,11 @@ export function createHomeBaseView({scene}) {
 
   function sync(s) {
     snapshot = s; enabled = s?.battle?.v === 2 && s.battle.status === 'running'; root.visible = enabled;
-    if (!enabled) return;
+    if (!enabled) { for (const light of heartLights.values()) light.intensity = 0; return; }
     for (const data of s.battle.bases) {
       let b = bases.get(data.side);
       if (!b) { b = buildBase(data); bases.set(data.side, b); }
-      b.data = data;
+      b.data = data; syncHeartLight(b);
       for (const part of data.parts) { const p = b.parts.get(part.id); if (p) p.data = part; }
     }
   }
@@ -244,6 +257,7 @@ export function createHomeBaseView({scene}) {
       if (b.bell) { b.bellSwing = Math.max(0, b.bellSwing - dt * .25); b.bell.rotation.x = Math.sin(t * 6.5) * .55 * b.bellSwing + Math.sin(t * .9) * .03; }
       if (b.water) { b.water.position.y = Math.sin(t * 1.7) * .012; waterMats[b.side].emissiveIntensity = (b.side === 'rivals' ? .9 : .55) + Math.sin(t * 2.3) * .12; }
       const hurt = 1 - data.hp / data.maxHp; h.heart.scale.setScalar(.15 + .85 * b.heartAlive); h.light.intensity = 6 * b.heartAlive * (1 + hurt * Math.max(0, Math.sin(t * 9)));
+      syncHeartLight(b);
       for (const bubble of b.fountain.userData.bubbles || []) { bubble.position.y = (bubble.userData.baseY ?? (b.side === 'rivals' ? 1.75 : 2.6)) + Math.abs(Math.sin(t * 2 + bubble.id)) * .25; }
       for (const p of b.parts.values()) {
         const alive = p.data.hp > 0 && !fallen ? 1 : 0; p.alive += (alive - p.alive) * k;
@@ -289,5 +303,5 @@ export function createHomeBaseView({scene}) {
 
   const setLocalAim = (id, aim) => { if (aim) localAim.set(id, aim); else localAim.delete(id); };
   return {sync, event, update, targets, installKit, setLocalAim, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
-    dispose() { root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
+    dispose() { for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }

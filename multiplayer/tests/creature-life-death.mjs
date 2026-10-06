@@ -1,3 +1,4 @@
+import {mergeCreatureSkins} from '../client/merge-creature-skins.js';
 // Mechanical checks for client/creature-life-death.js against the ACTUAL
 // shipped GLBs, the actual prepareAsset wrapper and actual enemy-motion layer.
 // Visual quality still requires a GPU capture review (see ART_HANDOFF.md).
@@ -29,6 +30,8 @@ function untextured(path) {
 }
 const load = path => new Promise((ok, fail) => new GLTFLoader().parse(untextured(path), '', ok, fail));
 const templates = {skeleton: await load('../public/assets/skeleton.glb'), golem: await load('../public/assets/golem.glb')};
+mergeCreatureSkins(templates.skeleton); // actual runtime preparation: validate contact/damage on batched skins
+
 
 // --- pure helpers ---------------------------------------------------------
 assert.equal(crawlWeight(0), 1); assert.equal(crawlWeight(1), 0); assert.ok(crawlWeight(.93) > 0 && crawlWeight(.93) < 1);
