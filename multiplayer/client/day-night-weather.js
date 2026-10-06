@@ -1,9 +1,14 @@
 // Day/night cycle and weather presentation. Reads the shared world clock (shared/world-clock.js), so every client in
 // a room renders the same hour, front and lightning strike from the authoritative tick. Presentation only: no lights
-// are added (the existing sun becomes the moon at night), no bloom; rain, snow and night motes are one draw each,
-// animated entirely in the vertex shader around the viewer.
+// are added (the existing sun becomes the moon at night); rain, snow and night motes are one draw each, animated
+// entirely in the vertex shader around the viewer. Atmosphere (ground mist, sun glow in the haze, wet and snowy
+// surfaces) rides every material through client/atmosphere-materials.js; shafts through the trees are one more draw
+// (client/sunbeams.js); desktop adds light shafts, glow and a grade (client/atmosphere-post.js).
 import * as THREE from 'three';
 import {worldClock, solarAngle, nightAmount, DAYLIGHT_SHARE} from '../shared/world-clock.js';
+import {ATMOSPHERE, adoptAtmosphere, atmosphereStats} from './atmosphere-materials.js';
+import {createAtmospherePost} from './atmosphere-post.js';
+import {createSunbeams} from './sunbeams.js';
 
 const C = hex => new THREE.Color(hex);
 // Palette keyed on sun elevation (sin of the solar angle). Colours sRGB hex -> linear working space via THREE.Color.
@@ -18,7 +23,7 @@ const KEYS = [
   {e: 1.0, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
 ].map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
 const COLOR_FIELDS = ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'];
-const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .78;
+const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .6; // a lower sun: long shadows and slanted shafts all day
 const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xd4dce4);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -107,8 +112,15 @@ function createWeatherAudio(context) {
   };
 }
 
-export function createDayNightWeather({scene, orchard, quality = 'high', preview = previewFromUrl()}) {
+const approach = (v, target, dt, up, down) => v + (target - v) * (1 - Math.exp(-dt / (target > v ? up : down)));
+
+export function createDayNightWeather({scene, orchard, quality = 'high', preview = previewFromUrl(), renderer = null, height = null, postTier}) {
   const low = quality === 'low';
+  const post = renderer ? createAtmospherePost(postTier ? {renderer, tier: postTier} : {renderer}) : null;
+  const beams = height ? createSunbeams({scene, height, quality}) : null;
+  const beamColor = new THREE.Color(), rayColor = new THREE.Color(), lift = new THREE.Color(), gain = new THREE.Color(), scatter = new THREE.Color(), lightDir = new THREE.Vector3();
+  let wet = 0, snowCover = 0, mistBase = null, adopted = false;
+  ATMOSPHERE.bfMistNoise.value = low ? .55 : 1;
   const rain = createRain(low ? 650 : 1600), snow = createSnow(low ? 500 : 1300), motes = createMotes(low ? 70 : 160);
   for (const p of [rain, snow, motes]) scene.add(p.mesh);
   const env = {sunDir: new THREE.Vector3(), moonDir: new THREE.Vector3(), skySunDir: new THREE.Vector3(), skySun: new THREE.Color(), sunI: 0, hemiI: 0, exposure: 1, envI: .4, night: 0, overcast: 0, clouds: .22, flash: 0, time: 0, fogScale: 1,
@@ -124,7 +136,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
   }
 
   function update({tick = 0, seed = 41, override = null, time = 0, dt = 0, camera, groundY = 0, rts = false} = {}) {
-    let clock = worldClock(tick, seed, override);
+    camera_ = camera; let clock = worldClock(tick, seed, override);
     if (preview) {
       const phase = preview.phase ?? clock.phase;
       const forced = preview.weather ? {...clock.weather, weights: {clear: 0, fog: 0, rain: 0, storm: 0, snow: 0, [preview.weather]: 1}, kind: preview.weather} : clock.weather;
@@ -155,7 +167,11 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     const melt = 1 - env.fogScale; env.horizon.lerp(env.haze, Math.min(1, melt * 1.1)); env.zenith.lerp(env.haze, melt * .55);
     if (rts) env.fogScale = .5 + env.fogScale * .5;
     env.flash = clock.lightning; env.hemiI += clock.lightning * 2.2; env.time = time;
+    // Mood over clarity: a little haze always hangs in the air, thicker in the low light of dawn, dusk and night.
+    const lowSun = 1 - smooth(.08, .5, Math.abs(env.skySunDir.y)), dawn = clock.phase < .2 ? 1 - smooth(.04, .2, clock.phase) : 0;
+    env.fogScale *= .86 - lowSun * .14 - night * .1;
     orchard.applyEnvironment(env);
+    atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts});
 
     // Particles follow the viewer; from the god camera they fill a taller, wider column toward the board.
     camera.getWorldPosition(center);
@@ -189,12 +205,53 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     return clock;
   }
 
+  // Ground mist, sun glow in the haze, wet ground and settling snow (every material), shafts through the canopy, and
+  // on desktop the screen-space shafts, glow and grade. Weather-driven surfaces ease in and out over real time.
+  function atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts}) {
+    const first = frames === 1 || !(dt > 0), step = Math.min(dt || 0, .25), rainW = Math.min(1, w.rain + w.storm);
+    wet = first ? rainW : approach(wet, rainW, step, 14, 80);
+    snowCover = first ? w.snow : approach(snowCover, w.snow, step, 40, 110);
+    const A = ATMOSPHERE;
+    A.bfTime.value = time % 3600; A.bfWet.value = Math.min(1, wet * 1.1); A.bfSnow.value = Math.min(1, snowCover);
+    mistBase = mistBase == null || first ? groundY : approach(mistBase, groundY, step, 6, 6);
+    A.bfMistBase.value = Math.min(mistBase, 1.5) - .4;
+    A.bfMistHeight.value = 2.2 + w.fog * 2.6 + rainW * 1.2 + (rts ? 1.5 : 0);
+    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .026) * (rts ? .55 : 1);
+    A.bfWind.value.set(.35 + w.storm * 1.2, .12 + w.storm * .5);
+    const sunSide = e >= 0;
+    lightDir.copy(sunSide ? env.skySunDir : env.moonDir);
+    A.bfSunDir.value.copy(lightDir);
+    scatter.copy(env.skySun).multiplyScalar((sunSide ? sunUp * (.4 + lowSun * .4) : moonUp * .12) * (1 - overcast * .75));
+    A.bfSunScatter.value.copy(scatter);
+    // Shafts falling through the crowns: golden in low sun, a faint cool silver under a clear moon, gone under cloud.
+    const clear = (1 - overcast) ** 2;
+    const beamStrength = sunSide ? sunUp * clear * (.22 + lowSun * .5 + dawn * .2) : moonUp * clear * .1;
+    if (sunSide) beamColor.copy(env.skySun); else beamColor.setRGB(.55, .68, 1);
+    if (beams && camera_) beams.update({camera: camera_, light: lightDir, strength: beamStrength * (rts ? .5 : 1), color: beamColor, time});
+    if (post) {
+      rayColor.copy(env.skySun).multiplyScalar(sunSide ? 1.3 : .5);
+      lift.setRGB(.008 + .004 * lowSun, .01, .018 + .03 * night);
+      gain.setRGB(1 + .05 * lowSun * sunUp, 1, 1 - .05 * lowSun * sunUp + .03 * night);
+      post.set({sun: lightDir, rays: (sunSide ? sunUp * (.7 + lowSun * .6) : moonUp * .25) * (1 - overcast * .8), rayColor,
+        bloom: .3 + night * .22 + w.storm * .1, bloomThreshold: .95, vignette: .2 + night * .14 + w.fog * .06,
+        lift, gain, saturation: 1.06 - night * .14 - overcast * .1, contrast: 1.04 + lowSun * .03});
+    }
+  }
+  let camera_ = null;
+  function render(scene_, camera) {
+    if (!adopted) { adopted = true; adoptAtmosphere(scene_); }
+    if (post) post.render(scene_, camera); else renderer.render(scene_, camera);
+  }
+
   return {
-    update,
+    update, render,
+    setTrees(list) { beams?.setTrees(list); },
     // Call once the AudioContext exists (after a user gesture); safe to call repeatedly.
     attachAudio(context) { if (!audio && context) { try { audio = createWeatherAudio(context); } catch { audio = null; } } },
     stats() { const w = last?.weather; return {frames, phase: last ? +last.phase.toFixed(4) : null, hour: last ? +last.hour?.toFixed(2) : null, night: last ? +last.night.toFixed(3) : null, weather: w?.kind ?? null, weights: w ? Object.fromEntries(Object.entries(w.weights).map(([k, v]) => [k, +v.toFixed(3)])) : null,
-      preview: preview ? {...preview} : null, rain: rain.mesh.visible ? rain.mesh.geometry.drawRange.count / 2 : 0, snow: snow.mesh.visible ? snow.mesh.geometry.drawRange.count : 0, motes: motes.mesh.visible ? motes.count : 0}; },
-    dispose() { for (const p of [rain, snow, motes]) { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); } audio?.dispose(); audio = null; },
+      preview: preview ? {...preview} : null, rain: rain.mesh.visible ? rain.mesh.geometry.drawRange.count / 2 : 0, snow: snow.mesh.visible ? snow.mesh.geometry.drawRange.count : 0, motes: motes.mesh.visible ? motes.count : 0,
+      atmosphere: {mist: +ATMOSPHERE.bfMist.value.toFixed(4), wet: +ATMOSPHERE.bfWet.value.toFixed(3), snow: +ATMOSPHERE.bfSnow.value.toFixed(3), ...atmosphereStats()},
+      sunbeams: beams?.stats() ?? null, post: post?.stats() ?? null}; },
+    dispose() { for (const p of [rain, snow, motes]) { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); } audio?.dispose(); audio = null; beams?.dispose(); post?.dispose(); },
   };
 }
