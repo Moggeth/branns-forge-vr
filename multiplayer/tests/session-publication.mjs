@@ -15,6 +15,7 @@ class Connection extends EventTarget {
 function fixture(){
   const connection=new Connection(),session=new WorldSession({connection,storage:{getItem(){},setItem(){}}});
   let tick=0,reads=0;
+  session.connection.validateCheckpoint=()=>{}; // This scheduling fixture intentionally uses a partial simulation stub.
   session.identity={peerId:'host'};session.running=true;session.last=performance.now();session.lastCheckpoint=performance.now();
   session.simulation={step(){tick++;return [{type:'step',tick}];},snapshot(){reads++;return {tick,players:[],projectiles:[]};},checkpoint(){return {tick,players:[]};}};
   return {session,connection,getTick:()=>tick,getReads:()=>reads};

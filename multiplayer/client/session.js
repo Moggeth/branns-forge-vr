@@ -26,11 +26,14 @@ export class WorldSession extends EventTarget {
   constructor({url, connection, storage} = {}) {
     super();
     this.connection = connection || new PeerRoomConnection({url});
+    // Recovery readiness means loadable simulation state, not merely valid transport JSON.
+    this.connection.validateCheckpoint = checkpoint => { loadSimulation(checkpoint); };
     this.saves = new WorldSaves(storage);
     this.simulation = null; this.identity = null; this.latest = null; this.sequence = 0;
     this.running = false; this.worldId = crypto.randomUUID(); this.name = 'Little Orchard';
     this.accumulator = 0; this.last = 0; this.lastSave = 0; this.lastCheckpoint = 0;
-    this.metrics = {steps:0, overruns:0, maxStepMs:0};
+    this.metrics = {steps:0, overruns:0, maxStepMs:0, rejectedCheckpoints:0, maxCheckpointValidationMs:0};
+    this.lastRecoveryErrorAt = -Infinity;
     this.parked = new Map();
     this.autoContinue = true;
     // Delta snapshot stream (state-codec.js): one encoder while hosting, one decoder while a guest.
@@ -319,7 +322,18 @@ export class WorldSession extends EventTarget {
     }
     const now = performance.now();
     if(force || now-this.lastCheckpoint > 500) {
-      this.latest = this.simulation.checkpoint();
+      const checkpoint = this.simulation.checkpoint(), started = performance.now();
+      try { this.connection.validateCheckpoint(checkpoint); }
+      catch {
+        this.metrics.rejectedCheckpoints++;
+        if (started-this.lastRecoveryErrorAt >= 10_000) {
+          this.lastRecoveryErrorAt = started;
+          this.emit('error',{code:'checkpoint_rejected',message:'This world produced an invalid recovery update. Your last working backup is kept. Download it from Saved Worlds before reloading.'});
+        }
+        this.lastCheckpoint = now; // Do not repeat an expensive failed validation every frame.
+        return;
+      } finally { this.metrics.maxCheckpointValidationMs = Math.max(this.metrics.maxCheckpointValidationMs,performance.now()-started); }
+      this.latest = checkpoint;
       // Revision is monotonic even when a confirmed reset starts simulation tick 0.
       const revision = Math.max(0, (this.connection.checkpointRevision ?? -1) + 1);
       this.connection.setCheckpoint(this.latest,revision); this.lastCheckpoint = now;
@@ -328,7 +342,7 @@ export class WorldSession extends EventTarget {
   }
   autoSave(force = false) {
     if(!this.latest || (!force && Date.now()-this.lastSave < 10000)) return false;
-    try { this.saves.put(this.exportSave()); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); return true; }
+    try { this.saves.put(makeSave(this.latest,{id:this.worldId,name:this.name})); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); return true; }
     catch(error) { this.lastSave = Date.now(); this.emit('error',{code:'save_failed',message:error.message}); return false; }
   }
   exportSave() { return makeSave(this.simulation?.checkpoint() || this.latest,{id:this.worldId,name:this.name}); }
@@ -354,7 +368,7 @@ export class WorldSession extends EventTarget {
     this.simulation = createSimulation({room:this.identity.room,seed:41}); this.codec.reset();
     this.reconcile(); this.publish(true);
   }
-  stop() { if (this.running && this.simulation && !this.connection.local) try { this.publish(true); } catch { /* closing */ }
+  stop() { if (this.running && this.simulation) try { this.publish(true); } catch { /* closing */ }
     this.autoSave(true); this.running=false; clearInterval(this.timer); this.simulation=null; this.connection.close(); }
   dispose() { this.stop(); this.listeners.forEach(remove=>remove()); }
 }
