@@ -271,6 +271,14 @@ const BUILDERS = {
     part(root, 'sphere', 'stone', [0.26, 0.26, 0.26], [0.9, 0.42, 0.7]);
   },
 
+  // Stand-in until the authored Stormspire (assets-source/stormreel) loads: same footprint, height and silhouette.
+  stormspire(root, P) {
+    part(root, 'cyl6', 'stoneDark', [2.9, 0.5, 2.9], [0, 0.25, 0]);
+    part(root, 'frustum', 'stone', [1.9, 4.2, 1.9], [0, 2.9, 0]);
+    part(root, 'torus', 'brass', [2.2, 2.2, 2.2], [0, 5.35, 0], [Math.PI / 2, 0, 0]);
+    part(root, 'cone', 'iron', [2.0, 3.2, 2.0], [0, 6.9, 0]);
+    part(root, 'crystal', 'crystal', [0.35, 0.6, 0.35], [0, 8.7, 0]);
+  },
   ward(root, P) {
     part(root, 'cyl6', 'stoneDark', [2.4, 0.3, 2.4], [0, 0.15, 0]);
     part(root, 'frustum', 'stone', [1.2, 1.8, 1.2], [0, 1.2, 0]);

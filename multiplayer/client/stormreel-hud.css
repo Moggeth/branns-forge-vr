@@ -1,0 +1,17 @@
+/* Stormreel plate: shots stored in the tower and cable left, top centre under the world pill (same seat as the
+   Timberline ammo plate, never shown together). Rubber-black with a hazard-yellow rim and an orange cable bar. */
+.stormreel-hud {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 10px; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(34,36,40,.9), rgba(18,19,22,.92)); border: 1px solid rgba(255,206,74,.6);
+  box-shadow: 0 0 0 1px rgba(8,8,10,.6), 0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  color: #eef6ff; font: 600 15px/1.2 system-ui, sans-serif; pointer-events: none; user-select: none; z-index: 6; white-space: nowrap;
+}
+.stormreel-hud[hidden] { display: none; }
+.stormreel-hud .sr-bolt { color: #6fd2ff; font-size: 18px; text-shadow: 0 0 8px rgba(92,200,255,.9); }
+.stormreel-hud .sr-cable { width: 64px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; flex: none; }
+.stormreel-hud .sr-cable i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #c94f1d, #f07a3a); border-radius: 3px; transition: width .15s linear; }
+.stormreel-hud.sr-strain .sr-cable i { background: #ffce4a; box-shadow: 0 0 6px rgba(255,206,74,.8); }
+.stormreel-hud.sr-empty { border-color: rgba(255,160,140,.6); color: #ffc9bd; }
+.stormreel-hud.sr-empty .sr-bolt { color: #9aa3ad; text-shadow: none; }
+@media (pointer: coarse) { .stormreel-hud { top: calc(env(safe-area-inset-top, 0px) + 56px); font-size: 14px; } }

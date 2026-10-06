@@ -29,6 +29,7 @@ import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
+import {stormShot,leash,releasePack,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
@@ -193,7 +194,7 @@ function instantiate(state) {
         if (!['hero', 'god'].includes(message.role)) return fail('invalid_role');
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
-          releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p);
+          releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p); releasePack(state,p);
           p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];dismissDragon(p);
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
@@ -232,6 +233,9 @@ function instantiate(state) {
         if (p.dragon && message.action !== 'equip') return fail('dragon_riding');
         if (message.action === 'equip') {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
+          // The Stormreel only comes off a Stormspire's hook; putting it away sends the pack winding home.
+          if (message.tool==='stormreel') return wornTower(state,p)?ok():fail('no_pack');
+          if (p.tool==='stormreel') { const events=releasePack(state,p); p.tool=message.tool; releaseHeld(state,p,[0,0,0]); return ok(events); }
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           if(message.tool!==p.tool)releaseSnack(state,p);
           p.tool = message.tool; return ok();
@@ -240,6 +244,7 @@ function instantiate(state) {
         if (message.action === 'snack') return snackAction(state,p,message);
         const logResult=logAction(state,p,message);if(logResult)return logResult;
         if(message.action==='special'&&['axe','pick'].includes(p.tool))reclaimDepletedDeposits(state);
+        if (message.action === 'storm') return stormShot(state,p,message,{...combatContext,hitEnemyPart});
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const target=nearestCollectible(state,p,{height:(x,z)=>terrainHeight(state,x,z,false)});
@@ -360,7 +365,8 @@ function instantiate(state) {
       if(spell==='rainfall'){events.push(castRainfall(state,at,p.id));quenchFire(state,at,RAINFALL.quenchRadius);}
       if(spell==='spring'){if(state.springs.length>=BLOOM.spring.cap)state.springs.shift();state.springs.push({id:idNew,x,z,expireTick:state.tick+BLOOM.spring.ticks});quenchFire(state,at,BLOOM.spring.radius);}
       if(spell==='quake')for(const enemy of [...state.enemies])if(enemyHostileTo(enemy,p.side)&&distance(enemy.position,at)<=8){enemy.slowUntil=Math.max(enemy.slowUntil??0,state.tick+180);damageEnemy(state,enemy,30,events,p.id);}
-      if(spell==='lightning')for(const b of state.inventions.structures)if(distance(b.position,at)<=3)damageInvention(state,b.id,65,p.id,events);
+      const charged=spell==='lightning'?lightningCharge(state,at,events):[];
+      if(spell==='lightning')for(const b of state.inventions.structures)if(!charged.includes(b.id)&&distance(b.position,at)<=3)damageInvention(state,b.id,65,p.id,events);
       if(spell==='lightning'&&!battleSkirmish(state))applyHeat(state,at,3,1,fireContext);
       if(spell==='heal')for(const hero of state.players)if(hero.role==='hero'&&(!battleActive(state)||(hero.side||'party')===(p.side||'party'))&&distance(hero.position,at)<=7)hero.hp=Math.min(heroMaxHp(hero),hero.hp+40);
       if(battleActive(state)&&['heal','blessing'].includes(spell))for(const enemy of state.enemies)if(enemy.battleRun&&enemy.side===(p.side||'party')&&distance(enemy.position,at)<=(spell==='heal'?7:6))enemy.hp=Math.min(enemyMaxHp(enemy),enemy.hp+(spell==='heal'?40:20));
@@ -403,6 +409,7 @@ function instantiate(state) {
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
           const pace=5*swiftFactor(state,p)/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
+          leash(state,p,p.position);
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
@@ -415,6 +422,7 @@ function instantiate(state) {
         const speed=Math.hypot(vx,vz);if(speed>5){vx*=5/speed;vz*=5/speed;}
         p.velocity=p.role==='hero'?[vx,p.vy,vz]:[0,0,0];
       }
+      stepStormspires(state, events);
       stepBoons(state); stepBloom(state, events); stepRain(state, events); stepWaygate(state, {terrainHeight}, events); stepGeodes(state, events); stepBeacon(state, events);
       for (const pending of [...state.pendingStarfalls]) {
         if (pending.impactTick > state.tick) continue;

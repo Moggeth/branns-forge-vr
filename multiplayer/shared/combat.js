@@ -17,7 +17,7 @@ import {noteKill} from './dragon-streak.js';
 import {stepRemains,applyImpulse,partMass,linkRagdoll,wake,tear} from './remains-physics.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
-export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask']);
+export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel']);
 export const PARTS = Object.freeze(['head','torso','leftArm','rightArm','leftLeg','rightLeg']);
 export const COMBAT_LIMITS = Object.freeze({projectiles:96, embeds:192, detachedParts:96});
 const vec = (v,limit=200) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);

@@ -32,6 +32,10 @@ export const WEAPON_SWAP_STYLES = Object.freeze({
   wyrmspout: {lower: .24, raise: .32,
     stash: [K(0), K(.3, [0, .04, 0], [.38, 0, 0]), K(1, [.1, -.5, .1], [-1.2, 0, .6])],
     draw: [K(0, [.1, -.5, .1], [-1.2, 0, .6]), K(.6, [0, .012, 0], [.1, 0, 0]), K(.7, [0, 0, 0], [-.04, 0, .05]), K(.78, [0, 0, 0], [.03, 0, -.05]), K(.87, [0, 0, 0], [-.015, 0, .025]), K(1)]},
+  // Stormreel: swung down to the hip on its cable, then brought up with a little snap that settles the capacitors.
+  stormreel: {lower: .22, raise: .3,
+    stash: [K(0), K(.3, [0, .03, 0], [.2, 0, -.1]), K(1, [.18, -.5, .1], [-.9, .3, .5])],
+    draw: [K(0, [.18, -.5, .1], [-.9, .3, .5]), K(.6, [0, .015, 0], [.08, 0, 0]), K(.8, [0, -.004, .006], [-.03, 0, 0]), K(1)]},
   // Flask: tucked into the belt; drawn with a toss that spins it once and a catch.
   flask: {lower: .2, raise: .4,
     stash: [K(0), K(.25, [.01, .02, 0], [0, 0, -.15]), K(1, [-.26, -.45, .2], [-.6, 0, .9])],

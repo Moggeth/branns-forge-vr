@@ -273,7 +273,7 @@ export function createMobileUI({ mount = true } = {}) {
     leftStick._caption.textContent = god ? 'Pan' : 'Move';
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
-    const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',flask:'Pour',limb:'Swing'})[state.tool]||'Attack';
+    const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',stormreel:'Zap',flask:'Pour',limb:'Swing'})[state.tool]||'Attack';
     if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
     cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';

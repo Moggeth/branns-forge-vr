@@ -6,6 +6,7 @@ import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,ORE_RECIPES,materialLabel}
 import {worldTrees} from './world-content.js';
 import {foundationAt,FOUNDATION_HALF} from './terrain.js';
 import {STARTING_SITES} from './starting-world.js';
+import {useStormspire} from './stormreel.js';
 const def=(name,description,cost,hp,radius,use)=>Object.freeze({name,description,cost,hp,radius,use});
 export const STRUCTURES=Object.freeze({
  forge:def('Central Forge','Permanent hearth. Drop ore in the hopper or refine from Stores. Outputs arrive in the tray.',{},100,3,'Refine'),
@@ -21,7 +22,8 @@ export const STRUCTURES=Object.freeze({
  launcher:def('Heavy Launcher','Lob a heavy Stone shot into enemies and fortifications; impact deforms earth.',{wood:10,stone:8,iron:5,starMetal:2},260,1.5,'Aim & fire'),
  ward:def('Crystal Ward','Charge a bounded six-metre protective field using one Crystal.',{stone:6,iron:2,gems:4},180,1.3,'Charge ward'),
  influence:def('Heartstone','A living geode heart. Your Heroes near it recover health and mana, faster as the world blooms. Opponents can break it; restore it with Crystal.',{stone:5,gems:3},180,1.3,'Restore with Crystal'),
- trap:def('Mechanical Trap','Armed jaws strike nearby threats once. Reset deliberately using one Iron.',{wood:3,iron:4},120,1.1,'Reset trap')
+ trap:def('Mechanical Trap','Armed jaws strike nearby threats once. Reset deliberately using one Iron.',{wood:3,iron:4},120,1.1,'Reset trap'),
+ stormspire:def('Stormspire','A crystal-charged lightning tower. Feed it Crystal, then shoulder its cable-reel pack to fire the Stormreel lightning crossbow within 30 metres.',{stone:8,copper:6,gold:1,gems:2},240,1.45,'Take Stormreel')
 });
 const clone=v=>structuredClone(v),flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]),clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const side=p=>p.side==='rivals'?'rivals':'party';
@@ -52,7 +54,7 @@ export function outputSlot(metal,owner='party'){const n=OUTPUT_BAY.order.indexOf
 export const isBayStack=q=>typeof q?.id==='string'&&q.id.startsWith('ingot')&&OUTPUT_BAY.order.includes(q.kind)&&(()=>{const at=outputSlot(q.kind,q.side);return Math.abs(q.x-at.x)<.01&&Math.abs(q.z-at.z)<.01;})();
 // Ammunition per shot for operated machines (fire below; the interaction cue shows it).
 export const MACHINE_AMMO=Object.freeze({timberline:Object.freeze({wood:2,iron:1}),launcher:Object.freeze({stone:3,iron:1})});
-export const structureMaterial=type=>['foundation','sanctuary','ward','influence','forge'].includes(type)?'stone':['trap','loggingYard','timberline','launcher','prospector'].includes(type)?'metal':'wood';
+export const structureMaterial=type=>['foundation','sanctuary','ward','influence','forge','stormspire'].includes(type)?'stone':['trap','loggingYard','timberline','launcher','prospector'].includes(type)?'metal':'wood';
 const event=(kind,b,extra={})=>({kind,id:b.id,structureId:b.id,position:[...b.position],material:structureMaterial(b.type),sourceMaterial:extra.by?'weapon':'bone',...extra});
 function make(type,id,position,yaw,owner,tick){const d=STRUCTURES[type];return {id,type,position:[...position],yaw,hp:d?.hp||180,maxHp:d?.hp||180,side:owner,builtTick:tick,readyTick:0,fireTick:-1000,open:false,charge:0,armed:type==='trap',aimYaw:0};}
 export function createInventions(){return {v:1,seq:0,structures:[make('forge','central-forge',[0,0,0],0,'neutral',0),make('influence','party-influence',[-25,0,-25],0,'party',0),make('influence','rival-influence',[25,0,-25],0,'rivals',0)],stockpiles:{party:emptyMaterials(),rivals:emptyMaterials()},bolts:{party:0,rivals:0},refining:[],shots:[],stuck:[],fells:[],defenders:[],assault:null,nextRaid:10800,surveyTick:0};}
@@ -143,6 +145,7 @@ export function inventionAction(s,p,m,c){const i=state(s);p.resources={...emptyM
  if(action==='inventionRepair'){if(b.type==='forge'||b.hp>=b.maxHp)return fail('not_needed');if(!pay(s,p,{wood:2,stone:1}))return fail('insufficient_resources');b.hp=Math.min(b.maxHp,b.hp+75);return ok([event('invention_repair',b)]);}
  if(action!=='inventionUse')return fail('invalid_action');if(b.hp<=0)return fail('structure_destroyed');
  if(['timberline','launcher'].includes(b.type))return fire(s,p,b,m,c);
+ if(b.type==='stormspire')return useStormspire(s,p,b,m,cost=>pay(s,p,cost),ok,fail);
  if(b.type==='storehouse'||b.type==='forge')return deposit(s,p);
  if(b.type==='barracks')return recruit(s,p,b);
  if(b.type==='palisade'){b.open=!b.open;return ok([event('gate_move',b)]);}
