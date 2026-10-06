@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4}</style></head><body>
+<script type="module">
+// Review lab for the Stormreel and Stormspire (round 3, 2026-10-06): the real presentation (stormspire-art.js,
+// stormreel-view.js, stormreel-look.js, lightning-fx.js) on flat grass with stand-in heroes and skeletons.
+//   lab.frame(n)            advance n 60 Hz frames and render
+//   lab.view(name)          camera: front hat hopper side arc wear victims probe reel crossbows
+//   lab.scenario(name)      idle | worn | shot | half | circuit | reel | drop
+//   lab.audio()             render every sound offline and report levels (no speakers needed)
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createStormspireArt} from '../client/stormspire-art.js';
+import {createStormreelView} from '../client/stormreel-view.js';
+import {createLightningFx} from '../client/lightning-fx.js';
+import {createStormreelAudio} from '../client/stormreel-audio.js';
+import {createStormreelWeapon} from '../client/stormreel-weapon.js';
+import {finishCrossbow} from '../client/stormreel-look.js';
+const W=960,H=540,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.appendChild(renderer.domElement);
+const scene=new T.Scene();scene.background=new T.Color(0x9fb3c4);const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.55;room.dispose();
+scene.add(new T.HemisphereLight(0xc6e0ed,0x5e5139,1.2));const sun=new T.DirectionalLight(0xffe3ad,2.2);sun.position.set(-22,38,15);scene.add(sun);
+scene.add(new T.Mesh(new T.PlaneGeometry(120,120).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x667b43,roughness:1})));
+const cam=new T.PerspectiveCamera(55,W/H,.05,200);scene.add(cam);
+const lightning=createLightningFx({scene}),art=createStormspireArt({lightning}),loader=new GLTFLoader();
+const [tower,pack,bow]=await Promise.all(['stormspire','reel_pack','stormreel'].map(n=>loader.loadAsync(`/assets/${n}.glb`)));
+art.install(tower);art.installPack(pack);
+const b={id:'s1',type:'stormspire',position:[0,0,0],yaw:0,hp:240,charge:200,operator:null,operator2:null,side:'party'};
+const e={root:new T.Group(),data:b};scene.add(e.root);art.attach(e);
+// stand-ins: a hero in a pack and a crossbow, and skeletons (static bind pose) with approximate body anchors
+const heroPos=new T.Vector3(2.5,0,-7),hero=new T.Group();hero.position.copy(heroPos);scene.add(hero);
+hero.add(new T.Mesh(new T.CapsuleGeometry(.26,1,4,12),new T.MeshStandardMaterial({color:0x6b7f9a,roughness:.8})).translateY(.8));hero.add(new T.Mesh(new T.SphereGeometry(.2,16,12),new T.MeshStandardMaterial({color:0xe0b894})).translateY(1.7));
+const held=bow.scene.clone(true);held.name='RemoteWeapon:stormreel';held.scale.setScalar(.9);held.position.set(.22,1.15,-.4);hero.add(held);
+const foes=[],bone=new T.MeshStandardMaterial({color:0xe9e2cf,roughness:.7});
+function addFoe(id,x,z){const g=new T.Group(),mk=(geo,x,y,z)=>{const m=new T.Mesh(geo,bone);m.position.set(x,y,z);g.add(m);return m;};   // a bone-white stand-in (the real skeleton is checked in the game)
+  mk(new T.CapsuleGeometry(.17,.5,4,10),0,1.1,0);mk(new T.SphereGeometry(.15,12,10),0,1.65,0);for(const s of[-1,1]){mk(new T.CapsuleGeometry(.05,.55,3,8),s*.34,1.15,0);mk(new T.CapsuleGeometry(.06,.7,3,8),s*.12,.42,0);}
+  g.position.set(x,0,z);scene.add(g);foes.push({id,hp:100,kind:'skeleton',position:[x,0,z],m:g});}
+addFoe('f1',-3,-14);addFoe('f2',-1.4,-17);addFoe('f3',9,-6);
+const OFF={torso:[0,1.05,0],head:[0,1.62,0],leftArm:[-.4,1.2,0],rightArm:[.4,1.2,0],leftLeg:[-.14,.45,0],rightLeg:[.14,.45,0]};
+const foe=id=>foes.find(f=>f.id===id),offs=(id,part)=>{const f=foe(id);return f?[f.position[0]+OFF[part][0],f.position[1]+OFF[part][1],f.position[2]+OFF[part][2]]:null;};
+const snap={tick:0,enemies:foes,players:[],inventions:{structures:[b]}};
+const muzzle=()=>new T.Vector3(heroPos.x+.22,heroPos.y+1.3,heroPos.z-.9);
+const view=createStormreelView({scene,lightning,height:()=>0,localId:()=>'local',actorPose:id=>id==='me'?{position:heroPos,yaw:0}:null,localPose:()=>({position:new T.Vector3(0,0,30),yaw:0}),localMuzzle:()=>null,
+  remoteMuzzle:(id,out)=>id==='me'?out.copy(muzzle()):null,remoteCrossbow:id=>id==='me'?held:null,
+  probeAnchor:(id,part,out)=>{const p=offs(id,part||'torso');return p?out.fromArray(p):null;},bodyPoints:(id,out)=>{let n=0;for(const part of ['torso','head','leftArm','rightArm','leftLeg','rightLeg']){const p=offs(id,part);if(p)out[n++].fromArray(p);}return n;},
+  spireEntry:id=>id==='s1'?e:null,spireArt:art,audio:()=>null,listener:()=>null});
+view.installPack(pack);view.installCrossbow(bow);view.sync(snap);
+let frame=0,evs=[],weapon=null,fpModel=null;
+const labNow=()=>frame/60;
+let tickN=0;const probe=(pole,enemy,part='torso')=>({at:offs(enemy,part),tick:++tickN,enemy,part});
+const SCEN={
+  idle(){Object.assign(b,{operator:null,operator2:null,probes:undefined,arc:undefined});delete b.probes;delete b.arc;},
+  worn(){SCEN.idle();b.operator='me';},
+  shot(){SCEN.worn();const o=[muzzle().x,muzzle().y,muzzle().z],to=offs('f1','torso');view.event({kind:'storm_bolt',by:'me',structureId:'s1',pole:'red',origin:o,position:to,probe:'red',targetId:'f1',part:'torso',live:true,grounded:true,earth:[to[0],0,to[2]],charge:1,splash:['f2']});},
+  half(){SCEN.worn();b.probes={red:probe('red','f1'),blue:null};},
+  circuit(){SCEN.worn();b.probes={red:probe('red','f1'),blue:probe('blue','f2')};b.arc={tick:0,until:9999};view.event({kind:'storm_arc',id:'s1',red:offs('f1','torso'),blue:offs('f2','torso')});},
+  drop(){SCEN.idle();b.probes={red:probe('red','f1'),blue:null};},   // pack dropped: the cable runs on to the lodged bolt
+  reel(){SCEN.half();view.event({kind:'storm_reel',id:'s1',by:'me',pack:'red',position:offs('f1','torso'),refund:12,probeTick:tickN});delete b.probes;},
+};
+const VIEWS={front:[[3.2,2.4,-5.4],[0,2.2,0]],hat:[[1.6,5.9,-2.6],[0,5.2,-.6]],hopper:[[1.4,1.6,-3],[0,1.1,-1.5]],side:[[-5.5,2.6,.5],[0,2,0]],arc:[[7,3.2,-4],[-2,1.2,-15]],
+  wear:[[6.2,1.9,-3.5],[2.5,1.2,-7]],victims:[[-8,2.2,-9],[-2.2,1.2,-15.5]],probe:[[-1.2,1.8,-11.8],[-3,1.15,-14]],reel:[[5,1.8,-4.5],[0,1.2,-10]],crossbows:[[0,0,0],[0,0,0]]};
+window.lab={
+  foes:()=>foes.map(f=>({id:f.id,scale:f.m.scale.x,pos:f.m.position.toArray(),vis:f.m.visible,kids:f.m.children.length})),
+  frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);weapon?.update(1/60);view.update(1/60,t,cam.position);lightning.update(1/60,cam);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
+  view(name){const v=VIEWS[name];cam.position.fromArray(v[0]);cam.lookAt(...v[1]);},
+  scenario(name){SCEN[name]();view.sync(snap);},
+  look(pos,at){cam.position.fromArray(pos);cam.lookAt(...at);},
+  /** First-person: the real weapon module drives the hand-held crossbow (charge arcs, polarity badge, finish). hold: charge seconds. */
+  fp(pole='blue',hold=0){
+    SCEN.idle();b[pole==='red'?'operator':'operator2']='me';view.sync(snap);
+    if(!weapon){fpModel=bow.scene.clone(true);fpModel.scale.setScalar(.7);fpModel.position.set(.2,-.2,-.55);cam.add(fpModel);
+      weapon=createStormreelWeapon({scene,lightning,send(){},aim:()=>({origin:[cam.position.x,cam.position.y,cam.position.z],direction:[0,0,-1]}),snapshot:()=>snap,playerId:()=>'me',height:()=>0,localPosition:()=>heroPos,audio:()=>null,now:labNow});weapon.setModel(fpModel);}
+    cam.position.set(2.5,1.65,-7);cam.rotation.set(0,0,0);
+    if(hold>0){weapon.begin();} },
+  nan(){const bad=[];scene.traverse(o=>{if(o.geometry?.attributes?.position){const a=o.geometry.attributes.position.array;for(let i=0;i<a.length;i++)if(!Number.isFinite(a[i])){bad.push(o.name||o.type);break;}}});return bad;},
+  bounds(){const out={};bow.scene.updateMatrixWorld(true);bow.scene.traverse(o=>{if(o.isMesh&&/Steel|Rubber/.test(o.name)){const bb=new T.Box3().setFromObject(o);out[o.name]=[bb.min.toArray().map(v=>+v.toFixed(3)),bb.max.toArray().map(v=>+v.toFixed(3))];}});const all=new T.Box3().setFromObject(bow.scene);out.all=[all.min.toArray().map(v=>+v.toFixed(3)),all.max.toArray().map(v=>+v.toFixed(3))];out.root=bow.scene.children.map(c=>c.name+':'+c.scale.x);return out;},
+  crossbows(){   // a studio pair on a bench: the red (+) and the blue/black (-) crossbow
+    for(const [i,pole] of ['red','blue'].entries()){const m=bow.scene.clone(true);m.scale.setScalar(2.2);m.position.set(-1+i*2,1.1,-26);m.rotation.set(.35,i?.5:-.5,0);scene.add(m);finishCrossbow(m,pole);}
+    cam.position.set(0,1.7,-23.2);cam.lookAt(0,1.1,-26);},
+  async audio(){
+    const oc=new OfflineAudioContext(2,44100*6,44100);Object.defineProperty(oc,'state',{get:()=>'running'});
+    const sfx=createStormreelAudio({audio:()=>oc,listener:()=>({position:[0,0,0],forward:[0,0,-1]})}),at=[3,1,-4],res={};
+    const t0=[];const run=(name,fn)=>{t0.push(name);fn();};
+    run('fire red',()=>sfx.fire({pole:'red',charge:1,at,local:true}));run('plant',()=>sfx.plant({pole:'blue',at}));run('circuit',()=>sfx.circuitClose(at));run('reel',()=>sfx.reel({pole:'red',seconds:.4,at}));
+    const loop=sfx.arcLoop();for(let i=0;i<60;i++)loop.update(at,1/60,1);
+    const ch=sfx.charger();for(let i=0;i<30;i++)ch.set(i/30,true,1/60);sfx.snap(at);sfx.pack('take','blue',at);sfx.towerCharge({at});sfx.shock(at);
+    const buf=await oc.startRendering(),d=buf.getChannelData(0);let peak=0,sum=0;for(const x of d){peak=Math.max(peak,Math.abs(x));sum+=x*x;}
+    return {sounds:t0,peak:+peak.toFixed(3),rms:+Math.sqrt(sum/d.length).toFixed(4),voices:sfx.stats()};},
+};
+document.title='ready';
+</script></body></html>

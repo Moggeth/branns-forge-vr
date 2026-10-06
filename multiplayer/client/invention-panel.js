@@ -3,7 +3,7 @@
 // The panel never mutates game state itself: buttons call onAction(action, detail) or onPlace(type);
 // the integrated root owns world placement, aiming and authority.
 
-/** All twelve structures. forge is permanent (never placed from here). */
+/** Every structure. forge is permanent (never placed from here). */
 export const STRUCTURES = [
   ['forge', 'Forge', 'Permanent heart of the settlement. Refines ore and powers inventions.', 'anvil'],
   ['foundation', 'Stone Foundation', 'Anchored tile resists earth magic. Build machines on top.', 'stone'],
@@ -16,6 +16,7 @@ export const STRUCTURES = [
   ['watchtower', 'Watchtower', 'Climb the ramp to its elevated firing deck.', 'tower'],
   ['palisade', 'Palisade', 'Sharpened wall section that slows attackers.', 'palisade'],
   ['launcher', 'Launcher', 'Aimed siege arm. Hurls stone where you point it.', 'launcher'],
+  ['stormspire', 'Stormspire', 'Crystal-charged lightning tower. Take its cable-reel pack to wield the Stormreel.', 'stormspire'],
   ['ward', 'Ward', 'Crystal rune that shields structures inside its ring.', 'ward'],
   ['trap', 'Trap', 'Hidden jaws that spring on the first raider across.', 'trap'],
 ];
@@ -65,6 +66,7 @@ const ICON = {
   tower: `<path d="M7 21l1-12h8l1 12M6 9h12V5h-2v2h-2V5h-4v2H8V5H6z" ${S}/><path d="M11 13h2v3h-2z"/>`,
   palisade: `<path d="M5 21V7l1.5-3L8 7v14M10.5 21V6L12 3l1.5 3v15M16 21V7l1.5-3L19 7v14M3 12h18M3 17h18" ${S} stroke-width="1.4"/>`,
   launcher: `<path d="M4 20h14M7 20l4-6 4 6M11 14L19 5" ${S}/><circle cx="19.5" cy="4.5" r="2"/><path d="M14 9l3 3" ${S} stroke-width="1.3"/>`,
+  stormspire: `<path d="M8 21l1.5-11h5L16 21M6 21h12" ${S}/><circle cx="12" cy="7" r="3.2" ${S}/><path d="M12.6 2.5l-1.6 3h2l-1.6 3" ${S} stroke-width="1.2"/><path d="M16 14c2 0 3 1.5 3 3.5" ${S} stroke-width="1.2"/>`,
   ward: `<circle cx="12" cy="12" r="8.5" ${S} stroke-width="1.3"/><path d="M12 5l2.5 7L12 19l-2.5-7z"/><path d="M5 12h3M16 12h3" ${S} stroke-width="1.3"/>`,
   trap: `<path d="M3 15h18M5 15l1.5-4 1.5 4 1.5-4 1.5 4 1.5-4 1.5 4 1.5-4 1.5 4 1.5-4 1.5 4" ${S} stroke-width="1.3"/><path d="M4 18h16" ${S}/>`,
   hammer: '<path d="M4 20l9-9 2 2-9 9z"/><path d="M11 5l4-2 6 6-2 4-3-3-2 2-3-3 2-2z"/>',
