@@ -28,6 +28,7 @@ import {SPELLS,SPELL_SCHOOLS} from './shared/spells.js';
 import {BLOOM,bloomLevel,nextBloom} from './shared/bloom.js';
 import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
+import {mountTurnPhone} from './client/turn-phone.js';
 import './client/mobile-ui.css';
 import { createGame } from './client/game.js';
 import {LocalRoomConnection} from './client/local-room.js';
@@ -985,6 +986,7 @@ const controlsCard = bindControlsCard(document, {store,
   role: () => phase === 'game' ? currentRole : chosenRole(),
   scheme: () => detectControlScheme({xrPresenting: xrActive, touchMode: store.get('branns-forge.touch.mode') || 'auto', coarse: matchMedia('(any-pointer: coarse)').matches, maxTouchPoints: navigator.maxTouchPoints || 0})});
 bindConnectivity(document, window);
+mountTurnPhone();
 // Expedition integration point: the owning module assigns these; buttons stay hidden unless canStart/canRestart.
 export const objectiveHooks = {onStart: null, onRestart: null};
 bindObjectiveActions(document, {onStart: () => objectiveHooks.onStart?.(), onRestart: () => objectiveHooks.onRestart?.()});
