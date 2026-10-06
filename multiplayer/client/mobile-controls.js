@@ -12,8 +12,9 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     if(msg.id==='deliver')onExpeditionAction('deposit');
     if(msg.id==='bandage')game.useResource('wood');
     if(msg.id==='drop')game.release(false);
+    if(msg.id==='inspect')game.inspectWeapon();
   }});
-  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'}]);
+  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'},{id:'inspect',icon:'◈',label:'Inspect your weapon (drag to turn it, tap again to put it away)'}]);
   document.querySelector('.menu-card').insertBefore(ui.settings, document.getElementById('leave'));
   const coarse = matchMedia('(any-pointer: coarse)'), app = matchMedia('(display-mode: standalone)');
   let state = {active:false, role:'hero', xr:false}, mode = read('mode','auto'), sensitivity = Number(read('sensitivity','1')) || 1;
