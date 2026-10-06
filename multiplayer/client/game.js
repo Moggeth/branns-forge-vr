@@ -77,6 +77,7 @@ import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createHeldSway} from './held-sway.js';
 import {createWeaponSwap} from './weapon-swap.js';
 import {createAppleSnack} from './apple-snack.js';
+import {createDragonRide} from './dragon-ride.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
 import {dressSkeleton} from './skeleton-look.js';
@@ -338,6 +339,24 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const appleSnack=createAppleSnack({scene,camera,templates,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),reducedMotion:reducedWeaponMotion,send:(action,detail)=>onAction(action,detail),
     haptic:kind=>{if(renderer.xr.isPresenting)feedback.pattern?.(kind==='bite'?[{at:0,amplitude:.55,duration:28},{at:55,amplitude:.3,duration:18}]:[{at:0,amplitude:.25,duration:20}]);else if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[16,34,10]:[10]);}catch{}}});
   appleSnack.attachTrees(content.trees);
+  // Dragon kill streak: every dragon in the sky, its fire, and the rider's seat, aim and attack buttons.
+  const dragonRide=createDragonRide({scene,ray:terrainRay,send:detail=>{unlockAudio();onAction('dragon',detail);},report,audio:()=>audioContext,listener:()=>listenerPose(),touch:()=>touchEnabled,xr:()=>renderer.xr.isPresenting});
+  let dragonBlend=null,dragonLastEye=null,dragonFrame={seat:null,yawDrift:0,enter:false,shake:0}; // smooth camera hand-over between the body and the saddle (presentation only)
+  const dragonEyeAt=new THREE.Vector3(),dragonBodyEye=new THREE.Vector3();
+  // Places the camera while on the dragon, and for the glide up to the saddle and back down to the body. False otherwise.
+  function dragonEye(dt){
+    if(renderer.xr.isPresenting||role!=='hero'){dragonBlend=null;dragonLastEye=null;return false;}
+    const seat=dragonFrame.seat,body=dragonBodyEye.set(localPosition.x,localPosition.y+1.65,localPosition.z);
+    if(!!seat!==(dragonBlend?.to==='seat')){if(!seat&&!dragonLastEye){dragonBlend=null;return false;}dragonBlend={to:seat?'seat':'body',t:0,from:(dragonLastEye||body).clone()};}
+    if(!dragonBlend)return false;
+    dragonBlend.t=Math.min(1,dragonBlend.t+dt/(seat?.9:.7));
+    dragonEyeAt.copy(dragonBlend.from).lerp(seat||body,THREE.MathUtils.smootherstep(dragonBlend.t,0,1));
+    if(!seat&&dragonBlend.t>=1){dragonBlend=null;dragonLastEye=null;return false;}
+    rig.position.copy(dragonEyeAt);camera.position.set(0,0,0);
+    const k=dragonFrame.shake,t=performance.now();camera.rotation.set(pitch+k*.035*Math.sin(t*.061),yaw+k*.025*Math.sin(t*.047),0,'YXZ');
+    (dragonLastEye??=new THREE.Vector3()).copy(dragonEyeAt);
+    return true;
+  }
   const rightGrip=()=>{const i=[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0];return i===undefined?null:grips[i];};
   // Ents: awakened trees. Sound goes through the wood kit plus a low root rumble; touch and VR feel big ones nearby.
   const entView=createEntView({scene,templates,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
@@ -914,7 +933,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function handleEvent(event){
     if(event.kind==='respawn'&&event.id===playerId){clearInput();if(snapshot.battle?.v===2){yaw=Math.atan2(event.position[0],event.position[2]);pitch=0;}localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
-    waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);
+    waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);dragonRide.event(event,playerId);
     feedback.handleEvent(event);
     if(appleSnack.event(event,playerId))return;
     combat.handleEvent(event);
@@ -1093,8 +1112,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let inspectFit=null,inspectFitModel=null,inspectBlocked=null;
   function wyrmIndicators(){const r=weaponReadiness(snapshot.players.find(p=>p.id===playerId),'wyrmspout',snapshot.tick||0);return {charge:r.specialReady,locked:r.overheated};}
   function startInspect(){const st=weapons.state();inspectBlocked=!active?'inactive':role!=='hero'?'role':renderer.xr.isPresenting?'xr':manned?'manned':tool==='limb'?'limb':!weaponAnchor.visible?'hidden':!axeModel?'loading':weaponSwap.busy?'swapping':st.firing?'firing':st.drawing?'drawing':null;if(inspectBlocked)return;unlockAudio();inspect.press();if(Number.isFinite(inspectPinAt))inspect.pin(inspectPinAt);}
-  function primaryDown(){if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){fireManned();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
-  function special(){if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
+  function primaryDown(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){fireManned();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
+  function special(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
   // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
   // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
   function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}
@@ -1102,7 +1121,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow',p)){onAction('special',{});return;} // the host explains the recharge
     const aim=projectileAim();weapons.cancel();emberwingMotion.loose(performance.now()/1000);onAction('special',{origin:aim.origin,direction:aim.direction});
   }
-  function primaryUp(){if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
+  function primaryUp(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',false);return;}if(active&&role==='hero'){weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
   function collectibleVisible(from,to,id){const delta=new THREE.Vector3(...to).sub(new THREE.Vector3(...from)),length=delta.length();if(length<.01)return true;
     const ray=new THREE.Raycaster(new THREE.Vector3(...from),delta.multiplyScalar(1/length),0,Math.max(0,length-.06));
     return !ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).some(h=>surfaceVisible(h.object)&&resolveHit(h)?.targetId!==id);
@@ -1139,6 +1158,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     unlockAudio();
   }
   function clearInput() {
+    dragonRide.clearInput();
     aiming=false;scoping=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity;
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
@@ -1272,6 +1292,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
     keys.add(event.code);
     if (event.code === 'Space' && !event.repeat && role === 'hero') jumpPending = true;
+    if (role === 'hero' && dragonRide.riding()) { if (!event.repeat) dragonRide.key(event.code, true); jumpPending = false; return; }
+    if (role === 'hero' && !event.repeat && event.code === 'KeyH' && dragonRide.ready()) { dragonRide.call(); return; }
     if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); else if (event.code === 'KeyQ') special(); }
     else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyI')startInspect();if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();}
     if(role==='god'&&!inventionPlacement&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
@@ -1279,6 +1301,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   listen(window,'keyup',event=>{
     keys.delete(event.code);
     if(event.code==='KeyI')inspect.release();
+    if(role==='hero')dragonRide.key(event.code,false);
     if(event.code==='KeyQ'&&wallAim&&role==='hero')releaseWallAim();
     if(event.code===quickKey){
       if(castStart&&active&&role==='god'&&cursor.visible)castAt(hitPoint,true);
@@ -1306,6 +1329,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   listen(canvas,'mousedown',event=>{
     if(!active||role!=='hero'||inventionPlacement||event.sourceCapabilities?.firesTouchEvents)return;
     if(document.pointerLockElement!==canvas){void capturePointer();return;}
+    if(dragonRide.riding()){if(event.button===0)dragonRide.press('breath',true);if(event.button===2)dragonRide.press('fireball',true);return;}
     if(manned){if(event.button===0)fireManned();if(event.button===2)scoping=true;return;}
     if(event.button===0)primaryDown();
     if(event.button===2){if(['crossbow','bow'].includes(tool))aiming=true;else weapons.special();if(tool==='bow')weapons.special();}
@@ -1372,7 +1396,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const angle = role === 'god' && !renderer.xr.isPresenting ? orbitYaw : yaw;
     move.set(axisX * Math.cos(angle) + axisZ * Math.sin(angle), 0, -axisX * Math.sin(angle) + axisZ * Math.cos(angle));
     if (move.lengthSq() > 1) move.normalize();
-    if (!active || document.hidden || manned) move.set(0, 0, 0);
+    if (!active || document.hidden || manned || dragonRide.riding()) move.set(0, 0, 0);
   }
   function localPose(object) {
     object.updateWorldMatrix(true, false);
@@ -1430,19 +1454,22 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     }
     if (manned) updateManned(dt, now);
     crankNearby(now);
+    dragonFrame=dragonRide.update(dt,{snapshot,tick:renderTick,localId:playerId,now});
+    if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=-.62;}yaw+=dragonFrame.yawDrift;pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
     if (role === 'god' && !renderer.xr.isPresenting) {
       pan.addScaledVector(move, dt * 18);
       pan.x = THREE.MathUtils.clamp(pan.x, -45, 45); pan.z = THREE.MathUtils.clamp(pan.z, -45, 45);
       rig.position.set(0, 0, 0);
       camera.position.set(pan.x + Math.sin(orbitYaw) * orbitRadius * Math.cos(orbitTilt), heightAt(pan.x, pan.z, snapshot.edits) + orbitRadius * Math.sin(orbitTilt) + 3, pan.z + Math.cos(orbitYaw) * orbitRadius * Math.cos(orbitTilt));
       camera.lookAt(pan.x, heightAt(pan.x, pan.z, snapshot.edits), pan.z);
-    } else {
+    } else if (!dragonEye(dt)) {
       rig.position.copy(localPosition);
       const b = manned && mannedMachine();
       if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? 2.35 : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
+    dragonRide.setPointScale(renderer.domElement.height,camera.fov);dragonRide.aim(camera,now);
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
-    weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned;
+    weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned && !dragonBlend;
     if (axeModel) axeModel.visible = role === 'hero' && active;
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
     // Look inertia, gait bob and jump/land on the camera-held item (held-sway.js); presentation only, never aim.
@@ -1518,6 +1545,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (entry.enemy || !entry.data.head) entry.root.rotation.y = entry.data.yaw || 0;
       else entry.root.rotation.y = 0;
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
+      if (!entry.enemy && entry.data?.role) entry.root.visible = !entry.data.dragon; // a Hero on their dragon is up in the saddle
     }
     inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);updatePlacementPreview(dt);
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
@@ -1671,6 +1699,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       touchAxes[side].y = THREE.MathUtils.clamp(Number.isFinite(y) ? y : 0, side === 'right' ? -2 : -1, side === 'right' ? 2 : 1);
     },
     lookByPixels(x, y) { lookBy(x * 0.003, y * 0.003); },
+    dragonPress(kind, down) { if (active && role === 'hero') dragonRide.press(kind, down); },
     zoomBy(amount) { if (active && role === 'god') orbitRadius = THREE.MathUtils.clamp(orbitRadius + amount, 10, 70); },
     aimAt(x, y) {
       if (active && inventionPlacement) { pinPlacement(x, y); return false; }
@@ -1696,7 +1725,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inspectState(){return {mode:inspect.mode(),active:inspect.active()};},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {startup:{...startup},inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {startup:{...startup},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1719,7 +1748,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     },
     dispose() {
       if (disposed) return;
-      clearInput(); active = false; disposed = true;heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();
+      clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();
       clearTimeout(zeroInputTimer);
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());

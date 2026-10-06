@@ -4,8 +4,9 @@
 // a pierced apple leaves its tree with a spray of juice, a few fluttering leaves and a woody thwock, rides its shaft
 // down (extrapolated between snapshots, spinning about the shaft), and plants in the soil with a twang or settles.
 // Hand: taking one raises it into view; each bite turns the next fresh face to you, lunges in, crunches (a scoop is
-// carved at the contact frame, crumbs and juice fly, the view dips), tears away and chews; three bites leave a core
-// that is flicked away. Desktop/touch ride the camera with the held-item sway; in VR it sits in the right hand and
+// carved at the contact frame, crumbs and juice fly, the view dips), tears away and chews, then turns the eaten side
+// back to you so the apple visibly goes down bite by bite; three bites leave a core that drops to the ground, where a
+// few songbirds swoop in, peck it to nothing and fly off (apple-feast.js). Desktop/touch ride the camera with the held-item sway; in VR it sits in the right hand and
 // a bite happens when the apple reaches your mouth. Remote holders lift it to their face on each bite.
 // Timberline: the wire's cut halves spring apart and tumble down showing their section (two bites each); a bolt that
 // hits an apple bursts it in a spray of juice, skin and flesh chunks and seeds.
@@ -14,11 +15,12 @@ import * as T from 'three';
 import {createSnackModel,createApple,setBites} from './apple-art.js';
 import {prepareProjectile} from './asset-pose.js';
 import {createFruitMask} from './tree-fruit-mask.js';
+import {createAppleFeast} from './apple-feast.js';
 import {FRUIT,STICKS,appleWorld,APPLE_SLOTS,bitesFor} from '../shared/fruit.js';
 import {worldTrees} from '../shared/world-content.js';
 
 export const SNACK_MOTION = Object.freeze({
- raise: .5, bite: 1.05, contact: .34, finish: .75,
+ raise: .5, bite: 1.05, contact: .34, finish: .6, show: .5, linger: .12,
  idle: {position: [.1, -.085, -.38], tip: [-.5, .36, -.79]},     // camera space: apple centre and shaft direction (to the tip)
  near: {position: [.025, -.06, -.27], tip: [-.86, .2, -.47]},     // wind-up, the next face turning to you
  mouth: {position: [0, -.05, -.155], tip: [-.97, .12, -.2]},     // contact: the apple at your teeth
@@ -145,7 +147,24 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   },
   take() { const ctx = audio(); if (!ctx) return; burst(ctx, ctx.currentTime, {freq: 1200, q: 1, gain: .05, attack: .02, decay: .12}); },
   flick() { const ctx = audio(); if (!ctx) return; burst(ctx, ctx.currentTime, {type: 'highpass', freq: 2600, gain: .05, attack: .03, decay: .14}); },
+  // the core hits the grass: a soft, woody thud
+  thud(position, speed = 1) { const ctx = audio(), k = gainAt(position, .7)*Math.min(1, .35 + speed*.25); if (!ctx || k < .01) return; const t = ctx.currentTime;
+   tone(ctx, t, {from: 170, to: 90, gain: .09*k, decay: .06}); burst(ctx, t, {type: 'lowpass', freq: 650, gain: .06*k, decay: .05});
+  },
+  // a songbird: two or three quick rising whistles
+  chirp(position, level = 1) { const ctx = audio(), k = gainAt(position, .5)*level; if (!ctx || k < .01) return; const t = ctx.currentTime, n = 2 + Math.floor(Math.random()*2), f = 2600 + Math.random()*900;
+   for (let i = 0; i < n; i++) tone(ctx, t, {from: f*(.92 + Math.random()*.1), to: f*(1.25 + Math.random()*.2), gain: .028*k, decay: .05 + Math.random()*.03, type: 'triangle', offset: i*(.075 + Math.random()*.04)});
+  },
+  // a beak on the core: a tiny dry tick
+  peck(position, level = 1) { const ctx = audio(), k = gainAt(position, .45)*level; if (!ctx || k < .01) return; burst(ctx, ctx.currentTime, {freq: 3400 + Math.random()*900, q: 4, gain: .05*k, decay: .012}); },
+  // wings: a soft feathery flurry
+  flutter(position, level = 1) { const ctx = audio(), k = gainAt(position, .5)*level; if (!ctx || k < .01) return; const t = ctx.currentTime;
+   for (let i = 0; i < 4; i++) burst(ctx, t, {type: 'bandpass', freq: 900 + Math.random()*500, q: .8, gain: .03*k, attack: .01, decay: .045, offset: i*.055});
+  },
  };
+ const feast = createAppleFeast({group, birdTemplate: () => templates?.get?.('siegebird_songbird') || null, height,
+  effects: {crumbs: (at, dir, n, power) => crumbBurst(at, dir, n, power),
+   sounds: {thud: (p, s) => sounds.thud(p.toArray(), s), chirp: (p, l) => sounds.chirp(p.toArray(), l), peck: (p, l) => sounds.peck(p.toArray(), l), flutter: (p, l) => sounds.flutter(p.toArray(), l)}}});
 
  // ---------------------------------------------------------------- world drops
  function stickVisual(stick) { if (!STICKS[stick]) return null; const v = prepareProjectile(templates, stick); v?.traverse(o => { o.userData.ignoreContact = true; if (o.isMesh) o.castShadow = true; }); return v; }
@@ -221,12 +240,22 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   held.roll = rollFor(held, d.bites); heldId = d.id; sounds.take();
  }
  function disposeHeld() { if (!held) return; held.model.root.removeFromParent(); held.model.dispose(); held = null; heldId = null; }
- // Roll about the shaft so bite i's untouched face looks at the camera (camera +Z) from the mouth pose.
- function rollFor(h, i) {
-  const b = h.model.biteDirection(Math.min(h.of - 1, i), tmpV2); // spin space: perpendicular to the shaft (-Z)
+ // Roll about the shaft so a root-space direction looks at the camera (camera +Z) from the mouth pose.
+ function rollToward(b) {
   q0.setFromUnitVectors(FORWARD, P.mouth.d); const t = tmpV.copy(P.mouth.p).negate().normalize().applyQuaternion(q0.invert()); // camera direction in root space
   return Math.atan2(t.y, t.x) - Math.atan2(b.y, b.x);
  }
+ // Where the eaten side faces: the mean of the first k bites' directions (root space).
+ function eatenSide(h, k, out = new T.Vector3()) { out.set(0, 0, 0); for (let i = 0; i < Math.min(k, h.of); i++) out.add(h.model.biteDirection(i, tmpV2)); return out.lengthSq() > 1e-8 ? out.normalize() : out; }
+ // Bite i's face, turned a little toward what is already eaten so the old scoops stay in sight on the silhouette.
+ function rollFor(h, i) {
+  const b = h.model.biteDirection(Math.min(h.of - 1, i), new T.Vector3());
+  if (i > 0) b.addScaledVector(eatenSide(h, i, tmpV3), .45).normalize();
+  return rollToward(b);
+ }
+ // After a bite: show the eaten side (both scoops after two bites, so the apple reads two-thirds gone).
+ const tmpV3 = new T.Vector3(), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+ function showRoll(h) { return h.roll + wrap(rollToward(eatenSide(h, h.bites, tmpV3)) - h.roll); }
  const fromDir = new T.Vector3(), q0 = new T.Quaternion();
  function place(h, a, b, k, roll) {
   h.model.root.position.lerpVectors(a.p, b.p, k);
@@ -258,12 +287,14 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
    anchor.visible = false; if (h.model.root.parent !== xrHand) { xrHand.add(h.model.root); h.model.root.position.set(0, .02, -.16); h.model.root.quaternion.setFromEuler(new T.Euler(-.7, .3, 0)); }
    h.vrCooldown -= dt; if (h.phase === 'raise' && h.t > .3) h.phase = 'idle';
    if (xrHead && h.vrCooldown <= 0 && h.bites < h.of) { h.model.apple.root.getWorldPosition(tmpV); if (tmpV.distanceTo(xrHead.getWorldPosition(tmpV2)) < SNACK_MOTION.vrMouth) { h.vrCooldown = .6; h.sentBite = false; biteContact(h); if (h.bites >= h.of) { h.phase = 'finish'; h.t = 0; } } }
-   if (h.phase === 'finish' && h.t > .5) finishFlick(h);
+   if (h.phase === 'finish' && h.t > .5 && !h.flicked) dropCore(h);
+   if (h.phase === 'finish' && h.t > 1.2) h.done = true; // the bare shaft leaves the hand
    return 1;
   }
   if (h.model.root.parent !== anchor) anchor.add(h.model.root);
   anchor.visible = true; let blend = 1, dip = 0, chew = 0;
   if (h.phase === 'raise') { const k = clamp01(h.t/SNACK_MOTION.raise); place(h, P.low, idlePose, back(k), h.roll + (1 - k)*1.2); blend = k; if (k >= 1) h.phase = 'idle'; }
+  else if (h.phase === 'show') { const k = ease(clamp01(h.t/SNACK_MOTION.show)); h.roll = h.rollFrom + (h.rollTo - h.rollFrom)*k; place(h, idlePose, idlePose, 0, h.roll); if (k >= 1) { h.phase = 'idle'; h.t = 0; } }
   else if (h.phase === 'idle') place(h, idlePose, idlePose, 0, h.roll + Math.sin(h.t*1.3)*.03);
   else if (h.phase === 'bite') {
    const t = h.t, c = SNACK_MOTION.contact, roll = h.rollFrom + (h.rollTo - h.rollFrom)*ease(clamp01(t/c));
@@ -273,10 +304,10 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
    else { const k = ease(clamp01((t - c - .16)/(SNACK_MOTION.bite - c - .16))); place(h, P.tear, idlePose, k, roll); dip = .5*(1 - k); chew = clamp01((t - c)/(SNACK_MOTION.bite - c + .4)); }
    if (h.contacted && !h.chewed && t > c + .3) { h.chewed = 1; sounds.crunch(.7, true); }
    if (h.chewed === 1 && t > c + .5) { h.chewed = 2; sounds.crunch(.5, true); }
-   if (t >= SNACK_MOTION.bite) { h.contacted = false; h.chewed = 0; h.roll = h.rollTo; if (h.bites >= h.of) { h.phase = 'finish'; h.t = 0; } else { h.phase = 'idle'; h.t = 0; } }
+   if (t >= SNACK_MOTION.bite) { h.contacted = false; h.chewed = 0; h.roll = h.rollTo; if (h.bites >= h.of) { h.phase = 'finish'; h.t = 0; } else { h.phase = 'show'; h.t = 0; h.rollFrom = h.roll; h.rollTo = showRoll(h); } }
   }
-  else if (h.phase === 'finish') { // admire the core for a beat, then flick it away and lower the bare shaft
-   const t = h.t; if (t < .3) place(h, idlePose, idlePose, 0, h.roll); else { if (!h.flicked) finishFlick(h); const k = clamp01((t - .3)/(SNACK_MOTION.finish - .3)); place(h, idlePose, P.low, ease(k), h.roll); blend = 1 - k; }
+  else if (h.phase === 'finish') { // a beat to see the core, then it slides off the shaft and drops; the bare shaft lowers
+   const t = h.t, L = SNACK_MOTION.linger; if (t < L) place(h, idlePose, idlePose, 0, h.roll); else { if (!h.flicked) dropCore(h); const k = clamp01((t - L)/(SNACK_MOTION.finish - L)); place(h, idlePose, P.low, ease(k), h.roll); blend = 1 - k; }
    if (t >= SNACK_MOTION.finish) h.done = true;
   }
   // chewing: the view bobs gently a few times after each bite
@@ -285,23 +316,20 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   if (sway) { h.model.root.position.add(sway.position); h.model.root.quaternion.premultiply(sway.quaternion); }
   h.blend = blend; return blend;
  }
- function finishFlick(h) {
+ function coreModel(half, radius) { // the eaten core (or a half's eaten shell), as a free world object
+  const core = createApple({seed: 3, quality: 'low', half}); setBites(core.material, core.spheres, half ? FRUIT.halfBites : FRUIT.bites, {age: 40});
+  core.root.scale.setScalar(radius); core.root.userData.dispose = core.dispose; group.add(core.root); return core;
+ }
+ function dropCore(h) {
   h.flicked = true; sounds.flick(); h.model.root.updateMatrixWorld(true);
-  // the core leaves the shaft as a tumbling physics particle; the apple model hides
-  const core = h.model.apple.root; core.getWorldPosition(tmpV); const dir = camera.getWorldDirection(tmpV2).clone();
-  const flung = createApple({seed: 3, quality: 'low', half: h.model.half}); setBites(flung.material, flung.spheres, h.of, {age: 40}); flung.root.scale.setScalar(h.model.radius); flung.root.position.copy(tmpV); group.add(flung.root);
-  const right = v3([1, 0, 0]).applyQuaternion(camera.getWorldQuaternion(tmpQ));
-  flying.push({root: flung.root, dispose: flung.dispose, v: dir.multiplyScalar(2.5).addScaledVector(right, 2.2).add(v3([0, 2.6, 0])), spin: v3([7, 3, 5]), age: 0, r: h.model.radius*.45});
-  core.visible = false;
+  const apple = h.model.apple.root; apple.getWorldPosition(tmpV); apple.getWorldQuaternion(tmpQ);
+  const core = coreModel(h.model.half, h.model.radius); core.root.quaternion.copy(tmpQ);
+  const fwd = camera.getWorldDirection(tmpV2).clone(); fwd.y = 0; if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+  const right = v3([1, 0, 0]).applyQuaternion(camera.getWorldQuaternion(new T.Quaternion())); right.y = 0;
+  // it slips off the shaft and falls a little out in front, so you watch the birds come for it
+  feast.drop(core.root, {position: tmpV.clone(), velocity: fwd.multiplyScalar(.9).addScaledVector(right, .3).add(v3([0, .8, 0])).toArray(), radius: h.model.radius*.42, key: h.id, spin: [5, 1.5, 3]});
+  apple.visible = false;
  }
- const flying = [];
- function updateFlying(dt) {
-  for (let i = flying.length - 1; i >= 0; i--) { const f = flying[i]; f.age += dt; f.v.y -= 9.8*dt; f.root.position.addScaledVector(f.v, dt);
-   const g = height(f.root.position.x, f.root.position.z) + f.r; if (f.root.position.y < g) { f.root.position.y = g; f.v.set(f.v.x*.4, Math.abs(f.v.y)*.3, f.v.z*.4); f.spin.multiplyScalar(.5); }
-   f.root.rotation.x += f.spin.x*dt; f.root.rotation.y += f.spin.y*dt; f.root.rotation.z += f.spin.z*dt;
-   if (f.age > 6) { f.root.scale.multiplyScalar(Math.exp(-6*dt)); if (f.age > 7) { f.root.removeFromParent(); f.dispose(); flying.splice(i, 1); } } }
- }
-
  // ---------------------------------------------------------------- snapshots and events
  function sync(s, me) {
   snapshot = s; playerId = me; syncDrops(s); syncGrowth(s); mask.sync(s);
@@ -326,12 +354,15 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   if (e.kind === 'apple_burst' && at) { appleBurst(at, v3(e.direction || [0, 0, -1]), e.radius || .08); leafFlutter(at, 6); sounds.splat(e.position); if (e.by === me) haptic('pierce'); }
   if ((e.kind === 'apple_land' || e.kind === 'apple_bounce') && at) { sounds.land(e.position, !!e.planted); if (e.planted) crumbBurst(at.clone().add(v3([0, -.15, 0])), v3([0, 1, 0]), 4, .4); }
   if (e.kind === 'snack_bite' && e.by !== me && at) { const d = drops.get(e.id); if (d) d.lift = {t: 0}; setTimeout(() => sounds.crunch(gainAt(e.position, .9)), 200); }
-  if (e.kind === 'snack_done' && e.by !== me && at) sounds.flick();
+  if (e.kind === 'snack_done' && e.by !== me && at) { // someone else finished one: their core drops and the birds come too
+   sounds.flick(); const d = drops.get(e.id)?.data, core = coreModel(!!d?.half, d?.radius || .08);
+   feast.drop(core.root, {position: at.clone().add(v3([0, .1, 0])), velocity: [0, .6, 0], radius: (d?.radius || .08)*.42, key: e.id});
+  }
   return true;
  }
  /** Per frame. Returns how far the snack has taken over the hand (0..1): the caller lowers/hides its weapon by it. */
  function update(dt, {now = performance.now()/1000, renderTick = snapshot?.tick || 0, xrHand = null, xrHead = null, sway = null} = {}) {
-  stepParticles(dt); updateDrops(dt, now); updateGrowth(renderTick); updateFlying(dt); mask.flush();
+  stepParticles(dt); updateDrops(dt, now); updateGrowth(renderTick); feast.update(dt, now); mask.flush();
   const blend = updateHeld(dt, {xrHand, xrHead, sway});
   if (held?.done) disposeHeld();
   return blend;
@@ -341,7 +372,7 @@ export function createAppleSnack({scene, camera, templates, height, audio = () =
   /** Camera offsets to apply after the camera pose is set: the lean into a bite and the chew bob. */
   view: () => held ? {pitch: -(held.dip || 0), y: held.chew || 0} : null,
   attachTrees: treeView => mask.attach(treeView),
-  stats: () => ({drops: drops.size, held: !!held, crumbs: crumbs.list.length, chunks: chunks.list.length, juice: juice.list.length, leaves: leaves.list.length, growing: growing.count, masked: mask.stats()}),
-  dispose() { disposeHeld(); for (const e of drops.values()) e.model.dispose(); drops.clear(); for (const f of flying) f.dispose(); group.removeFromParent(); anchor.removeFromParent(); mask.dispose();
+  stats: () => ({drops: drops.size, held: !!held, crumbs: crumbs.list.length, chunks: chunks.list.length, juice: juice.list.length, leaves: leaves.list.length, growing: growing.count, masked: mask.stats(), feast: feast.state()}),
+  dispose() { disposeHeld(); for (const e of drops.values()) e.model.dispose(); drops.clear(); feast.dispose(); group.removeFromParent(); anchor.removeFromParent(); mask.dispose();
    for (const g of [crumbGeo, chunkGeo, dropGeo, leafGeo]) g.dispose(); for (const m of [crumbMat, chunkMat, juiceMat, leafMat, moteMat, growMaterial]) m.dispose(); }};
 }
