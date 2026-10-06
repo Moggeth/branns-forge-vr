@@ -119,13 +119,11 @@
   .bf-pr-placeholder[data-loading="true"] .bf-pr-placeholder-text::before { animation: none; }
   .bf-pr-toggle::before { transition: none; }
 }
-.bf-pr-lobby-notice { font-size:.75rem; color:var(--muted,#b9aa8e); margin:4px 0; }
+.bf-pr-lobby-notice { text-align:center; font-size:.75rem; color:var(--muted,#b9aa8e); margin:4px 0; }
 @media (max-width:760px), (max-height:560px) {
   #lobby .create-block { display:grid; grid-template-columns:1fr 1fr; gap:4px 8px; }
   #lobby .create-block #create,#lobby .create-block #browseWorlds { min-height:44px; font-size:.88rem; padding:6px 8px; margin:0; }
   #lobby .create-block .bf-pr-lobby-notice,#lobby .create-block #solo { grid-column:1 / -1; margin:0; }
   #lobby .create-block #solo { min-height:44px; padding:6px; font-size:.84rem; }
   #lobby .join-title { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-  #lobby .howto-row { flex-wrap:nowrap; }
-  #lobby .howto-row .btn { min-width:0; font-size:.76rem; padding:4px 6px; }
 }

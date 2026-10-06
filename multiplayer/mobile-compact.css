@@ -67,11 +67,20 @@
   #lobby #room { min-height: 48px; height: 48px; font-size: 1.15rem; letter-spacing: .14em; padding: 0 10px; box-sizing: border-box; flex: 1 1 auto; }
   #lobby #join { min-height: 48px; min-width: 84px; }
 
-  /* Footer row: saved worlds + how to play share one 44px line. */
-  #lobby > .card > #savedWorlds { grid-column: 1; margin: 0; padding: 0; border-top: 0; }
-  #lobby > .card > .howto-row { grid-column: 2; margin: 0; padding: 0; display: flex; justify-content: flex-end; }
-  #lobby #savedWorlds > summary { min-height: 44px; padding: 0 6px; font-size: .86rem; display: flex; align-items: center; gap: 8px; }
-  #lobby #howToPlay { min-height: 44px; padding: 0 12px; font-size: .86rem; }
+  /* Footer: saved worlds on its own line, then the three guide buttons as equal tiles.
+     Labels never truncate: they wrap at word breaks and stay centred. Icons are dropped here so nothing collides. */
+  #lobby > .card > #savedWorlds { grid-column: 1 / -1; margin: 0; padding: 0; border-top: 0; }
+  #lobby #savedWorlds > summary { min-height: 40px; padding: 0 6px; font-size: .86rem; line-height: 1.2; display: flex; align-items: center; gap: 8px; }
+  #lobby > .card > .howto-row {
+    grid-column: 1 / -1; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px;
+  }
+  #lobby .howto-row .btn-howto {
+    min-width: 0; min-height: 40px; margin: 0; padding: 4px 3px; box-sizing: border-box;
+    justify-content: center; text-align: center; font-size: .8rem; line-height: 1.15;
+    white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: none;
+  }
+  #lobby .howto-row .btn-howto svg { display: none; }
   /* Opened on request: saved-world drawer becomes a bottom sheet over the card instead of growing the page. */
   #lobby #savedWorlds[open] > .saved-body {
     position: fixed; z-index: 30; left: max(10px, var(--mc-safe-l)); right: max(10px, var(--mc-safe-r));
@@ -112,9 +121,9 @@
   #lobby #room { height: 46px; }
   #lobby .join-block { padding: 6px 8px 8px; }
   #lobby .join-title { margin-bottom: 4px; font-size: .9rem; }
-  #lobby > .card > #savedWorlds { grid-column: 2; }
-  #lobby > .card > .howto-row { grid-column: 3; }
-  #lobby > .card > #savedWorlds, #lobby > .card > .howto-row { margin-top: -2px; }
+  /* Footer shares one line: saved worlds under the left column, guide buttons under the right. */
+  #lobby > .card > #savedWorlds { grid-column: 1; }
+  #lobby > .card > .howto-row { grid-column: 2 / -1; }
 }
 
 /* =====================================================================

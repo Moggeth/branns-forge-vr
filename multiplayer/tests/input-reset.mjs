@@ -19,7 +19,7 @@ for (const active of [false, true]) {
     keys: new Set(['KeyW']), jumpPending: true, rightDrag: true, move: {set: noop},
     touchAxes: {left: {x: 1, y: 1}}, xrButtons: new Map(), presses: new Map(),
     zeroInputTimer: null, clearTimeout: noop, performance: {now: () => 100}, sentAt: 0,
-    sendInput: (now, zero) => sent.push({now, zero}),
+    sendInput: (now, zero) => sent.push({now, zero}), dragonRide: {clearInput: noop},
   };
   runInNewContext(source.slice(start, end) + '\nclearInput();', context);
   assert.equal(context.scoping, false, 'scope hold clears even when mouseup was lost');

@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import {clientCapacity,roomCapacity} from '../peer/room-capacity.js';
-import {roomListing, DIRECTORY_REFRESH} from './room-directory.js';
+import {roomListing, DIRECTORY_REFRESH, regionOf} from './room-directory.js';
 import {MAX_PLAYERS, MAX_PENDING_ROOM_SOCKETS, OFFLINE_SEAT_GRACE_MS, SIGNAL_MESSAGES_PER_EDGE, RELAY_BYTES_PER_EDGE, RELAY_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
 export {ForgeDirectory} from './directory.js';
 
@@ -28,7 +28,9 @@ export default {
       const cursor=url.searchParams.get('cursor') || '';
       if (cursor && !/^room:\d{8}$/.test(cursor)) return Response.json({error:'Refresh the world list to start again.'},{status:400,headers});
       const result=await env.DIRECTORY.get(env.DIRECTORY.idFromName('public')).fetch('https://directory/list?cursor='+encodeURIComponent(cursor));
-      return new Response(result.body,{status:result.status,headers:{...headers,'content-type':'application/json'}});
+      if (!result.ok) return new Response(result.body,{status:result.status,headers:{...headers,'content-type':'application/json'}});
+      // Quick play matches the browser's own region bucket (from Cloudflare, never from the client).
+      return Response.json({...await result.json(),region:regionOf(request.cf)},{headers});
     }
     if (url.pathname !== '/peer/cloud') return new Response('Not found', { status: 404 });
     if (!(env.ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'))) return new Response('Origin denied', { status: 403 });
@@ -40,6 +42,7 @@ export default {
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = requested ? cleanCode(requested) : roomCode();
       const target = new URL(request.url); target.searchParams.set('room', code); target.searchParams.set('mode', requested ? 'join' : 'create');
+      target.searchParams.delete('region'); if (!requested) target.searchParams.set('region', regionOf(request.cf));
       const response = await env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(new Request(target, request));
       if (response.status !== 409 || requested) return response;
     }
@@ -105,7 +108,7 @@ export class ForgeRoom extends DurableObject {
     if (this.ctx.getWebSockets().length >= MAX_PEERS + MAX_PENDING_ROOM_SOCKETS) return new Response('Room busy; wait a moment and retry.', { status: 429 });
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ opened: Date.now(), mode: create ? 'create' : 'join', code: url.searchParams.get('room'), messages: 0, at: Date.now() });
+    server.serializeAttachment({ opened: Date.now(), mode: create ? 'create' : 'join', code: url.searchParams.get('room'), region: create ? regionOf({continent:url.searchParams.get('region')}) : '', messages: 0, at: Date.now() });
     await this.schedule();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -150,7 +153,7 @@ export class ForgeRoom extends DurableObject {
       if (m.type !== a.mode) return error(ws, 'invalid_room', 'Please reconnect to this room.');
       if (m.type === 'create') {
         if (this.room) return error(ws, 'room_exists', 'Please try creating again.');
-        this.room = { code: a.code, peers: [], hostId: '', epoch: 1, created: now, lastActivity: now, tried: [], migrating: false, offer: null, graceAt: 0 };
+        this.room = { code: a.code, region: a.region || '', peers: [], hostId: '', epoch: 1, created: now, lastActivity: now, tried: [], migrating: false, offer: null, graceAt: 0 };
       } else if (cleanCode(m.room) !== a.code || !/^\d{8}$/.test(a.code)) return error(ws, 'invalid_room', 'Enter the eight-digit room code.');
       else if (!this.room) return error(ws, 'room_not_found', 'Room not found or expired.');
       const r = this.room, capacity=clientCapacity(m.simCapacity);

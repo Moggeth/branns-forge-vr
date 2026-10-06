@@ -6,7 +6,7 @@ const sockets=[];for(const p of [a.page,b.page])p.on('websocket',ws=>sockets.pus
 try{
  if(process.env.FORCE_RELAY==='1')await Promise.all([a.context,b.context].map(disableIce));
  await enterWorld(a.page,{name:'Friend Hero'});const room=await a.page.evaluate(()=>window.brannHarness.snapshot().room);
- await b.page.goto(BASE+'/?acceptanceProbe');await b.page.waitForFunction(()=>window.brannHarness);await b.page.fill('#name','Friend God');await b.page.check('input[name="role"][value="god"]',{force:true});await b.page.fill('#room',room);await b.page.locator('#join').tap();
+ await b.page.goto(BASE+'/?acceptanceProbe');await b.page.waitForFunction(()=>window.brannHarness);await b.page.fill('#name','Friend God');await b.page.check('input[name="role"][value="god"]',{force:true});await b.page.evaluate(r=>{document.getElementById('joinBlock').hidden=false;document.getElementById('room').value=r;},room);await b.page.locator('#join').tap();
  await Promise.all([a.page,b.page].map(p=>p.waitForFunction(()=>window.brannHarness.snapshot()?.players.length===2,null,{timeout:30000})));
  for(const p of [a.page,b.page])assert.equal(await p.evaluate(()=>window.brannHarness.snapshot().landmarks),true);
  record('two-friends-shared-starting-world','pass',{room});

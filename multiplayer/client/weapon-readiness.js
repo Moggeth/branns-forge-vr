@@ -343,7 +343,8 @@ const BUILD = {
     const mark = named(diamondGeometry(.0042, .021, .0008), 'limb-etching');
     return {attack: new Strip(owner, mark, glowMaterial({color: 0x6e5a40, metalness: 0, roughness: .8}), transforms, steps, PALETTES.bone)};
   },
-  // Ember slats beside the six authored heat vents (heat/overheat) + a cooling ring on the neck (vent).
+  // Ember slats beside the six authored cheek gills (heat/overheat): the wyrm runs hot as it spits. Gout charge is the
+  // model's own fin veins and nostril flames (asset-pose.js animateWyrmspout), so there is no ring here any more.
   wyrmspout(owner, host, find) {
     const slats = [], steps = [];
     for (const side of ['L', 'R']) for (let i = 1; i <= 3; i++) {
@@ -353,19 +354,7 @@ const BUILD = {
     }
     const slat = named(new THREE.CapsuleGeometry(.0021, .012, 2, 6), 'wyrmspout-slat');
     const heat = slats.length ? new Strip(owner, slat, glowMaterial({color: 0x3a2418, metalness: .5, roughness: .5}), slats, steps, PALETTES.heat) : null;
-    const neck = find('Neck_Scales'), band = find('Neck_BrassBand_1'), pts = collectPoints(host, [neck]);
-    const axisOrigin = hostPosition(host, neck), z = band ? hostPosition(host, band).z - .032 : axisOrigin.z + .038;
-    const r = radiusAt(pts, axisOrigin, new THREE.Vector3(0, 0, 1), z - axisOrigin.z - .005, z - axisOrigin.z + .005, .06, .03) + .0024;
-    const arcs = [], ringSteps = [], count = 8, arc = Math.PI * 2 / count * .74;
-    for (let i = 0; i < count; i++) {
-      const a = Math.PI / 2 + (i + .5) * Math.PI * 2 / count, n = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
-      // Scaly neck is not round: each arc is scaled to the measured surface in its own direction.
-      const local = castSurface(host, [neck], new THREE.Vector3(axisOrigin.x, axisOrigin.y, z), n, r - .0024) + .0024, k = local / r;
-      arcs.push([new THREE.Vector3(axisOrigin.x, axisOrigin.y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a - arc / 2), new THREE.Vector3(k, k, 1)]);
-      ringSteps.push(Math.min(i, count - 1 - i)); // fills from the top (eye side) down both flanks
-    }
-    const ring = named(new THREE.TorusGeometry(r, .0024, 5, 8, arc), 'wyrmspout-cool-ring');
-    return {heat, vent: new Strip(owner, ring, glowMaterial({color: 0x51606a, metalness: .9, roughness: .3}), arcs, ringSteps, PALETTES.cool)};
+    return {heat};
   },
   // Amber collar segments just under the copper neck collar; fill from the player-facing back, both ways.
   flask(owner, host, find) {
