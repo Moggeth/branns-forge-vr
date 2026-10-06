@@ -107,25 +107,31 @@ const STEM_MATERIAL = new T.MeshStandardMaterial({color: 0x4a3018, roughness: .8
 const LEAF_MATERIAL = new T.MeshStandardMaterial({vertexColors: true, roughness: .5, side: T.DoubleSide}); LEAF_MATERIAL.name = 'AppleLeaf';
 
 const VERT_HEAD = /* glsl */`
-uniform vec4 uBite[3]; uniform vec3 uBiteAxis; uniform vec4 uCut; attribute float cut;
+uniform vec4 uBite[6]; uniform vec3 uBiteAxis; uniform vec4 uBiteFrame; uniform vec4 uCut; attribute float cut;
 varying vec3 vApple; varying float vFlesh; varying float vCut;
 `;
-// Scoop: any vertex inside a bite sphere moves to the sphere surface on the far side from its centre (into the apple).
+// Scoop: any vertex inside a bite moves to the bite's surface on the far side from its centre (into the apple).
+// A bite is a sphere squashed along the core axis (uBiteFrame: xyz axis, w squash; 1 = round): wide and deep across the
+// apple but short along the core, so three bites round a whole apple leave a proper core with its two caps.
 // Grooves: incisors drag parallel scrapes across the scoop (along uBiteAxis).
 const VERT_BITE = /* glsl */`
  vec3 appleP = position; vec3 appleN = objectNormal; vFlesh = 1.0; vCut = 0.0;
  if (uCut.w > 0.0) { vCut = cut; vFlesh = cut > .5 ? -1.0 : 1.0; } // a half's flat cap is all flesh
- for (int i = 0; i < 3; i++) {
+ for (int i = 0; i < 6; i++) { // a bite is two overlapping scoops side by side (the arc of the teeth)
   vec4 b = uBite[i]; if (b.w <= 0.0) continue;
-  vec3 d = appleP - b.xyz; float l = length(d);
+  // bite space: stretch the core axis by 1/squash so the squashed bite is a sphere there
+  vec3 ax = uBiteFrame.xyz; float sq = clamp(uBiteFrame.w, .2, 1.0), st = 1.0 / sq - 1.0;
+  vec3 P = appleP + ax * (dot(appleP, ax) * st), C = b.xyz + ax * (dot(b.xyz, ax) * st);
+  vec3 d = P - C; float l = length(d);
   vec3 u = d / max(l, 1e-4);
   float groove = 1.0 + .03 * sin(dot(u, uBiteAxis) * 24.0 + float(i) * 1.7);
   float rad = max(b.w * groove, 1e-4);
   vFlesh = min(vFlesh, l / rad - 1.0); // signed distance to the bite, interpolated so the skin edge is per-pixel smooth
   if (l < rad) { // project from a point beyond the bite centre onto the sphere's far (inner) wall: continuous at the rim, never outward
-   vec3 o = b.xyz + b.xyz * (rad * 1.25 / max(length(b.xyz), 1e-4)), dir = normalize(appleP - o), m = o - b.xyz;
+   vec3 o = C + C * (rad * 1.25 / max(length(C), 1e-4)), dir = normalize(P - o), m = o - C;
    float bb = dot(m, dir), t = -bb + sqrt(max(bb*bb - dot(m, m) + rad*rad, 0.0));
-   appleP = o + dir * t; appleN = normalize(b.xyz - appleP); }
+   P = o + dir * t; appleP = P + ax * (dot(P, ax) * (sq - 1.0)); // back to apple space
+   vec3 g = C - P; appleN = normalize(g + ax * (dot(g, ax) * st)); } // the squashed surface's normal, into the scoop
  }
  objectNormal = appleN; vApple = appleP;
 `;
@@ -206,7 +212,7 @@ export function createAppleMaterial({physical = false, seed = 1, sunSide = [.4, 
  const m = new Base({color: 0xffffff, roughness: 1, metalness: 0, ...(physical ? {clearcoat: .35, clearcoatRoughness: .38, sheen: .15, sheenRoughness: .6, sheenColor: new T.Color(.9, .6, .5)} : {})});
  m.name = physical ? 'AppleSkinNear' : 'AppleSkin';
  const deep = new T.Color().setRGB(.17 + r()*.05, .008, .01), bright = new T.Color().setRGB(.42 + r()*.08, .03 + r()*.02, .015);
- const uniforms = {uBite: {value: [new T.Vector4(), new T.Vector4(), new T.Vector4()]}, uBiteAxis: {value: new T.Vector3(0, 1, 0)}, uShaft: {value: new T.Vector3(0, 1, 0)}, uCut: {value: new T.Vector4()},
+ const uniforms = {uBite: {value: Array.from({length: 6}, () => new T.Vector4())}, uBiteAxis: {value: new T.Vector3(0, 1, 0)}, uBiteFrame: {value: new T.Vector4(0, 1, 0, 1)}, uShaft: {value: new T.Vector3(0, 1, 0)}, uCut: {value: new T.Vector4()},
   uSkinDeep: {value: new T.Vector3(deep.r, deep.g, deep.b)}, uSkinBright: {value: new T.Vector3(bright.r, bright.g, bright.b)}, uGround: {value: new T.Vector3(.46, .36, .05)},
   uSunSide: {value: new T.Vector3(...sunSide)}, uSeed: {value: seed % 97}, uBrown: {value: 0}, uWet: {value: 1}};
  m.userData.apple = uniforms;
@@ -220,25 +226,31 @@ export function createAppleMaterial({physical = false, seed = 1, sunSide = [.4, 
    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = appleRough;')
    .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\n material.clearcoat *= 1.0 - appleFlesh;\n#endif\n#ifdef USE_SHEEN\n material.sheenColor *= 1.0 - appleFlesh;\n#endif');
  };
- m.customProgramCacheKey = () => 'apple-v3' + (physical ? 'p' : 's');
+ m.customProgramCacheKey = () => 'apple-v4' + (physical ? 'p' : 's');
  return m;
 }
 
 // Bite placement around the shaft: three scoops 120 degrees apart leave the core along the shaft.
 // shaftLocal: unit shaft direction in apple space. Returns centres/radii in apple space for bites 0..2.
+/** How flat a whole apple's bites are along the core (1 = round). */
+export const BITE_SQUASH = 1;
 export function biteSpheres(shaftLocal, seed = 1, half = false) {
  const a = new T.Vector3(...shaftLocal).normalize(), side = Math.abs(a.x) < .9 ? new T.Vector3(1, 0, 0) : new T.Vector3(0, 0, 1);
  const p1 = side.clone().sub(a.clone().multiplyScalar(side.dot(a))).normalize(), p2 = new T.Vector3().crossVectors(a, p1), start = (seed % 7)*.4;
  if (half) return [0, 1].map(i => { // a half is bitten round its dome, either side of its middle
-  const dir = new T.Vector3(-1, (i - .5)*.9, (i - .5)*.5).normalize(); return {centre: dir.clone().multiplyScalar(.97), radius: .5, direction: dir, angle: i}; });
- return [0, 1, 2].map(i => { const phi = start + i*Math.PI*2/3, dir = p1.clone().multiplyScalar(Math.cos(phi)).addScaledVector(p2, Math.sin(phi));
-  return {centre: dir.clone().multiplyScalar(.97).addScaledVector(a, (i - 1)*.07), radius: i === 2 ? .7 : .66, direction: dir, angle: phi}; });
+  const dir = new T.Vector3(-1, (i - .5)*.9, (i - .5)*.5).normalize(), centre = dir.clone().multiplyScalar(.97); return {centre, radius: .5, direction: dir, angle: i, scoops: [{centre, radius: .5}]}; });
+ // three bites round the core, each two overlapping scoops 60 degrees apart (squashed along the core by BITE_SQUASH):
+ // each bite takes a clean third of the way round, and the last leaves the core with its two caps
+ const at = phi => p1.clone().multiplyScalar(Math.cos(phi)).addScaledVector(p2, Math.sin(phi));
+ return [0, 1, 2].map(i => { const phi = start + i*Math.PI*2/3, dir = at(phi), along = (i - 1)*.03;
+  const scoops = [-1, 1].map(k => ({centre: at(phi + k*Math.PI/6).multiplyScalar(1.1).addScaledVector(a, along + k*.02), radius: .82 + (i === 2 ? .02 : 0)}));
+  return {centre: dir.clone().multiplyScalar(.92).addScaledVector(a, along), radius: .72, direction: dir, angle: phi, scoops}; });
 }
 
 /** Apply `count` bites (0-3) to an apple material; ages: seconds since each bite (browning, wetness). */
 export function setBites(material, spheres, count, {age = 0, axis = null} = {}) {
  const u = material.userData.apple; if (!u) return;
- for (let i = 0; i < 3; i++) { const s = spheres[i]; if (i < count && s) u.uBite.value[i].set(s.centre.x, s.centre.y, s.centre.z, s.radius); else u.uBite.value[i].set(0, 0, 0, 0); }
+ for (let i = 0; i < 6; i++) { const s = spheres[i >> 1]?.scoops[i & 1]; if ((i >> 1) < count && s) u.uBite.value[i].set(s.centre.x, s.centre.y, s.centre.z, s.radius); else u.uBite.value[i].set(0, 0, 0, 0); }
  if (axis) u.uBiteAxis.value.copy(axis);
  u.uBrown.value = Math.min(.75, Math.max(0, (age - 8)/90)); u.uWet.value = Math.max(0, 1 - age/25);
 }
@@ -251,7 +263,7 @@ export function createApple({seed = 1, quality = 'high', physical = false, shaft
  // the shaft runs close to the core (a candy-apple line), tilted so the stem stands beside it
  // a half is cut lengthwise through the stem: its flat face looks along +X, its stem axis is Y
  const shaftLocal = half ? new T.Vector3(0, 1, 0) : new T.Vector3(0, Math.cos(shaftTilt), Math.sin(shaftTilt));
- material.userData.apple.uShaft.value.copy(shaftLocal);
+ material.userData.apple.uShaft.value.copy(shaftLocal); material.userData.apple.uBiteFrame.value.set(shaftLocal.x, shaftLocal.y, shaftLocal.z, half ? 1 : BITE_SQUASH);
  if (half) { material.userData.apple.uCut.value.set(1, 0, 0, 1); stem.visible = seed % 2 === 0; stem.traverse(n => { if (n.name === 'Leaf') n.visible = false; }); }
  const spheres = biteSpheres(shaftLocal.toArray(), seed, half);
  return {root, body, stem, material, spheres, shaftLocal, dispose() { body.geometry.dispose(); material.dispose(); stem.traverse(n => { if (n.geometry) n.geometry.dispose(); }); }};

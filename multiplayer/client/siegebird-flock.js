@@ -90,7 +90,7 @@ export function siegebirdBirdPose(t, side, out = {pos: new THREE.Vector3(), forw
 }
 
 // --- shared resources ------------------------------------------------------------------------------------
-function paletteTexture(hexes) {
+export function paletteTexture(hexes) {
   const data = new Uint8Array(hexes.length * 4);
   hexes.forEach((h, i) => { data.set([parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 255], i * 4); });
   const texture = new THREE.DataTexture(data, hexes.length, 1, THREE.RGBAFormat);
