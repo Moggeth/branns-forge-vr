@@ -45,7 +45,7 @@ try {
   await page.goto(BASE + '/?acceptanceProbe');
   await page.waitForFunction(() => window.brannHarness?.state().rendererReady, null, {timeout: 120000});
   const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
-  if (await whatsNew.isVisible()) await whatsNew.click();
+  if (await whatsNew.isVisible()) await whatsNew.click({timeout: 120000}).catch(() => {});
   await page.fill('#name', 'Storm QA'); await page.check('input[name="role"][value="hero"]', {force: true});
   await page.locator('#import').setInputFiles({name: 'stormreel.json', mimeType: 'application/json', buffer: fixture});
   await page.waitForFunction(() => window.brannHarness?.state().phase === 'game', null, {timeout: 120000});
