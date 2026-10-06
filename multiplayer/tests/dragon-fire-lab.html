@@ -1,0 +1,44 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dragon fire lab</title>
+<style>html,body{margin:0;height:100%;background:#8fc3e8}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// The streak dragon's fire effects on their own (client/dragon-fire.js), over a plain grassy ground, for quick look reviews.
+// Time only moves through lab.step(seconds, frames), so captures are repeatable even on a slow software renderer.
+// lab.breath(on), lab.fireball(), lab.dive(), lab.view(name: 'ground' | 'saddle' | 'close').
+import * as THREE from 'three';
+import {createDragonFire} from '../client/dragon-fire.js';
+const canvas = document.getElementById('c'), renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fd0f0); scene.fog = new THREE.Fog(0x9fd0f0, 60, 160);
+scene.add(new THREE.HemisphereLight(0xdff3ff, 0x6b8a3a, 1.6)); const sun = new THREE.DirectionalLight(0xfff1d6, 2.2); sun.position.set(20, 40, 10); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200, 40, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({color: 0x6fa548, roughness: .95}));
+scene.add(ground);
+for (let i = 0; i < 14; i++) { const r = new THREE.Mesh(new THREE.IcosahedronGeometry(.6 + Math.random(), 0), new THREE.MeshStandardMaterial({color: 0x8a8378, flatShading: true})); r.position.set((Math.random() - .5) * 30, .2, (Math.random() - .5) * 30); scene.add(r); }
+const camera = new THREE.PerspectiveCamera(70, 1, .1, 400), group = new THREE.Group(); scene.add(group);
+const params = new URLSearchParams(location.search), fx = createDragonFire(group, {lowQuality: () => params.has('low')});
+const mouth = new THREE.Vector3(-6, 20, -10), target = new THREE.Vector3(2, 0, 2);
+let breathOn = false, amount = 0, t = 0; const balls = [];
+const views = {ground: [[14, 2.2, 16], [0, 4, 0]], saddle: [[-6.5, 21.5, -11.5], [2, 0, 2]], close: [[7, 3, 9], [1, 1, 1]]};
+function view(name) { const [p, l] = views[name]; camera.position.fromArray(p); camera.lookAt(...l); }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); fx.setPointScale(h * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))); }
+addEventListener('resize', resize); resize(); view('ground');
+function frame(dt) {
+  t += dt; amount += ((breathOn ? 1 : 0) - amount) * (1 - Math.exp(-dt * 14));
+  if (breathOn) target.set(2 + 3 * Math.sin(t * .7), 0, 2 + 2 * Math.cos(t * .5));
+  if (amount > .05) fx.breath('lab', mouth, target, amount, dt, 3); else fx.breathEnd('lab');
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i]; b.u += dt / .55;
+    if (b.u >= 1) { fx.impact(b.to.x, 0, b.to.z, b.big, b.big ? 7.5 : 3.6); balls.splice(i, 1); continue; }
+    if (!b.big) { const p = b.from.clone().lerp(b.to, b.u); p.y += Math.sin(Math.PI * b.u) * 2.2; fx.fireball(p, b.seed, dt); }
+  }
+  fx.update(dt); renderer.render(scene, camera);
+}
+window.lab = {
+  step(seconds = 1 / 60, frames = 1) { for (let i = 0; i < frames; i++) frame(seconds); return fx.stats(); },
+  breath(on) { breathOn = on; }, view,
+  fireball() { [[0, 0], [2.4, 1], [-1.5, 2]].forEach(([dx, dz], i) => balls.push({from: mouth.clone(), to: new THREE.Vector3(-2 + dx, 0, 4 + dz), u: -i * .15, seed: Math.random(), big: false})); },
+  dive() { balls.push({from: mouth.clone(), to: new THREE.Vector3(3, 0, -1), u: .5, seed: 0, big: true}); },
+  stats: () => fx.stats(),
+};
+lab.step(1 / 60); document.title = 'ready';
+</script>

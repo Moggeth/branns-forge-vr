@@ -37,6 +37,7 @@ import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,res
 import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
+import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 export const HZ = 60;
 
 const BOUND = 55, MAX_WORLD = 64;
@@ -93,11 +94,11 @@ function damageEnemy(state, enemy, amount, events, ownerId, side) {
 
 }
 function damageHero(state, hero, amount, events) {
-  if((hero.protectedUntil??0)>state.tick)return;
+  if((hero.protectedUntil??0)>state.tick||hero.dragon)return; // a Hero on their dragon is out of reach
   hero.hp -= amount;
   events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone'});
   if (hero.hp <= 0) {
-    if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);
+    if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);breakStreak(hero);
     events.push(event('death', hero.position, hero.id));
     releaseHeld(state,hero,[0,0,0]); releaseLog(state,hero); releaseSnack(state,hero);
     const rally=state.inventions?.structures.find(b=>b.id===hero.rally&&b.type==='sanctuary'&&b.hp>0&&b.side===(hero.side||'party'));
@@ -121,6 +122,7 @@ function instantiate(state) {
   let fireSampleProvider=null;
   const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
   const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev)=>damageHero(s,hero,n,ev),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
+  const dragonContext={...combatContext,hitEnemyPart,ignite:(s,at,radius)=>{addFuel(s,at,radius,.35,true);applyHeat(s,at,radius,1,fireContext);}};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
@@ -192,7 +194,7 @@ function instantiate(state) {
         if (state.tick - p.roleTick < 120) return fail('cooldown');
         if (p.role !== message.role) {
           releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p);
-          p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];
+          p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];dismissDragon(p);
           if (p.role === 'hero') p.position = spawn(state, p.id);
         }
         return ok();
@@ -208,10 +210,10 @@ function instantiate(state) {
             (message.hands !== undefined && (!Array.isArray(message.hands) || message.hands.length > 2 || !message.hands.every(h => pose(h))))) return fail('invalid_input');
         let x = clamp(m.x, -1, 1), z = clamp(m.z, -1, 1), size = Math.hypot(x, z);
         if (size > 1) { x /= size; z /= size; }
-        p.move = p.role === 'hero' ? [x, z] : [0, 0];
+        p.move = p.role === 'hero' && !p.dragon ? [x, z] : [0, 0];
         p.yaw = ((message.yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
         p.inputTick = state.tick;
-        if (message.jump === true && p.role === 'hero' && p.vy === 0) p.vy = 5.5;
+        if (message.jump === true && p.role === 'hero' && !p.dragon && p.vy === 0) p.vy = 5.5;
         if (message.head !== undefined) p.head = pose(message.head);
         if (message.hands !== undefined) p.hands = message.hands.map(pose);
         return ok();
@@ -226,6 +228,8 @@ function instantiate(state) {
         if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (message.action === 'talent') return talentAction(state,p,message);
         if (p.role !== 'hero') return fail('invalid_action');
+        if (message.action === 'dragon') return dragonAction(state,p,message,dragonContext);
+        if (p.dragon && message.action !== 'equip') return fail('dragon_riding');
         if (message.action === 'equip') {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
@@ -441,7 +445,7 @@ function instantiate(state) {
       flushMeteorRewards(state,terrainHeight);
       renewGeology(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)},events);
       stepVeins(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)&&!(homeBattle(state)&&state.battle.bases.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<HOME.domeRadius+1.5)),retained:d=>retainedDepositPredicate(state)(d)},events);
-      stepCombat(state,combatContext,events);
+      stepCombat(state,combatContext,events);stepDragons(state,dragonContext,events);
       stepFruit(state,{nextId,terrainHeight},events);
       stepFire(state,fireContext,events);
       stepTrees(state,treeContext,treeIndex,events);
@@ -460,8 +464,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp}), xp:xp||0, talents:talents||{}, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,streak,dragonReady,dragon}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp}), xp:xp||0, talents:talents||{}, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -501,7 +505,7 @@ export function loadSimulation(saved) {
   for (const p of saved.players) {
     if (!record(p) || !unique(p.id) || typeof p.name !== 'string' || !p.name || p.name.length > 24 ||
         !['hero', 'god'].includes(p.role) || !validPosition(p.position) || !finite(p.yaw) || Math.abs(p.yaw) > Math.PI + 0.000001 ||
-        !validProgress(p) || !finite(p.hp) || p.hp <= 0 || p.hp > heroMaxHp(p) || !finite(p.mana) || p.mana < 0 || p.mana > 100 ||
+        !validProgress(p) || !validDragonFields(p, saved.tick) || !finite(p.hp) || p.hp <= 0 || p.hp > heroMaxHp(p) || !finite(p.mana) || p.mana < 0 || p.mana > 100 ||
         !Array.isArray(p.move) || p.move.length !== 2 || !p.move.every(n => finite(n) && Math.abs(n) <= 1) ||
         Math.hypot(...p.move) > 1.000001 || (p.role === 'god' && Math.hypot(...p.move) > 0) ||
         !finite(p.vy) || Math.abs(p.vy) > 100 ||
@@ -585,7 +589,7 @@ export function loadSimulation(saved) {
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
-    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
+    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
