@@ -1428,7 +1428,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (!startup.ready) { previous=now; return; }
     const frameStarted=performance.now();
     if(startup.ready)frameMetrics.record('frameInterval',now-previous);
-    const dt = Math.min((now - previous) / 1000, 0.05);
+    // A queued RAF timestamp can precede the warm-up completion timestamp.
+    // Negative dt makes exponential easing explode (notably ballista bolt scale).
+    const dt = Math.max(0, Math.min((now - previous) / 1000, 0.05));
     previous = now; renderTick=presentationClock.sample(now);liveTerrain();
     if(startingWorld.group.visible){waygateView.update(snapshot,dt);geodeView.update(snapshot,dt);beaconView.update(snapshot,dt);}
     if (active && !renderer.xr.isPresenting) {
