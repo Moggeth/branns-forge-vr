@@ -1,3 +1,5 @@
+import './atmosphere-materials.js'; // installs the shared mist/wet/snow material layer before anything compiles
+import {mergeCreatureSkins} from './merge-creature-skins.js';
 import {dressForgeling,dressForgelingModel,prepareForgelingTemplate} from './forgeling-look.js';
 import {createAbilityWarmup} from './ability-warmup.js';
 import {createTerrainGeometryUpdater} from './terrain-geometry.js';
@@ -216,7 +218,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const oreGlint = createOreGlint({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits)});
   // Layered distant alpine ranges replace the low orchard silhouette backdrop.
   const skyline = createAlpineSkyline({scene, sky: orchard.objects.sky}); orchard.objects.backdrop.visible = false;
-  const skyCycle = createDayNightWeather({scene, orchard, quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
+  const skyCycle = createDayNightWeather({scene, orchard, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
   let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
@@ -716,6 +718,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'forgeling', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','stormreel','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'forgeling') prepareForgelingTemplate(gltf.scene);
+    if (name === 'skeleton' || name === 'forgeling') mergeCreatureSkins(gltf);
     if (name === 'skeleton' || name === 'golem' || name === 'forgeling') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     if (name === 'golem') gltf.scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^crystal/i.test(m.name)) m.emissive.setRGB(.3, .62, 1); }); // resonance blue; also the assembly binding colour
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
@@ -1621,11 +1624,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     for (const p of snapshot.players || []) { if (meadowPushers.length >= 4) break; if (p.id !== playerId && p.role === 'hero' && p.position) meadowPushers.push([p.position[0], p.position[1], p.position[2], .8]); }
     meadow.update(dt, camera, {pushers: meadowPushers}); oreGlint.update(dt, camera);
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
-    skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
+    skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
-    renderer.render(scene, camera);
+    skyCycle.render(scene, camera);
     if (onVoicePose && playerId) {
       // After render, WebXR's viewer camera includes this frame's head pose.
       const earCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
@@ -1663,6 +1666,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
         if(visual){const root=new THREE.Group();root.position.set(i*2-6,0,0);root.add(visual);representatives.add(root);heroView.update(visual,data,root,1/60,camera.position);warmHeroes.push(visual);}
       }
       for(let i=0;i<6;i++){const visual=instantiate('skeleton',1.7,i);if(visual){visual.position.set(i*2-5,0,-3);representatives.add(visual);}}
+      // Allied waves use a distinct stone/brass rig, not the skeleton material set.
+      // Compile that exact template before the first populated snapshot reaches the renderer.
+      for(let i=0;i<3;i++){const visual=instantiate('forgeling',1.81,i);if(visual){dressForgelingModel(visual,i);visual.position.set(i*2,0,-5);representatives.add(visual);}}
       const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
       treeWarmup=content.trees.prepareWarmup();representatives.add(treeWarmup.group);startup.treeHarvestWarmup=treeWarmup.stats;
       miningWarmup=content.prepareMiningWarmup();representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
@@ -1681,7 +1687,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       startup.phase='shadows';
       // compileAsync omits the shadow render pass. Warm both camera families once.
       const warmCamera=camera.clone();warmCamera.position.set(0,48,38);warmCamera.lookAt(0,0,0);
-      const warmStarted=performance.now();renderer.render(scene,camera);renderer.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
+      const warmStarted=performance.now();skyCycle.render(scene,camera);skyCycle.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
       await renderer.compileAsync(scene,camera);if(disposed)return;
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
     finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
