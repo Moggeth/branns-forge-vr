@@ -1,4 +1,4 @@
-// Dragon streak HUD (DOM, view only). Five flame pips that fill with each killing blow, a glowing "Call the dragon"
+// Dragon streak HUD (DOM, view only). Five flame pips that fill with each killing blow, a glowing "Call Skyfire"
 // button once it is earned, and while riding: a ride timer, and three attack buttons with their charge or recharge
 // shown as a fill. On touch the attack buttons are big thumb targets on the free (movement) side; on desktop they are a
 // compact key-hint bar. Writes to the DOM only when a shown value changes.
@@ -21,9 +21,9 @@ export function createDragonHud({root = document.body, onCall, onAttack}) {
   const wrap = document.createElement('div'); wrap.className = 'dragon-hud';
   wrap.innerHTML = `
     <div class="dragon-streak" hidden><span class="dragon-streak-pips"></span><span class="dragon-streak-text"></span></div>
-    <button type="button" class="dragon-call" hidden>${svg('dragon')}<span class="dragon-call-text">Call the Dragon</span><kbd>H</kbd></button>
+    <button type="button" class="dragon-call" hidden>${svg('dragon')}<span class="dragon-call-text">Call Skyfire</span><kbd>H</kbd></button>
     <div class="dragon-ride" hidden>
-      <div class="dragon-timer"><span class="dragon-timer-name">Dragon</span><span class="dragon-timer-bar"><i></i></span><span class="dragon-timer-left"></span></div>
+      <div class="dragon-timer"><span class="dragon-timer-name">Skyfire</span><span class="dragon-timer-bar"><i></i></span><span class="dragon-timer-left"></span></div>
       <div class="dragon-attacks">${['breath', 'fireball', 'dive'].map(k => `<button type="button" class="dragon-attack" data-attack="${k}" aria-label="${ATTACK_TEXT[k].name}"><span class="dragon-fill"></span>${svg(k)}<span class="dragon-attack-name">${ATTACK_TEXT[k].name}</span><kbd>${ATTACK_TEXT[k].key}</kbd></button>`).join('')}</div>
     </div>`;
   root.append(wrap);
@@ -49,7 +49,7 @@ export function createDragonHud({root = document.body, onCall, onAttack}) {
       set('streakShown', !m.riding && !m.ready && m.streak > 0, v => { streak.hidden = !v; });
       set('streak', `${m.streak}/${m.need}`, () => {
         pips.innerHTML = Array.from({length: m.need}, (_, i) => `<i class="${i < m.streak ? 'on' : ''}"></i>`).join('');
-        streakText.textContent = `${m.need - m.streak} more for the dragon`;
+        streakText.textContent = `${m.need - m.streak} more for Skyfire`;
         streak.classList.remove('bump'); void streak.offsetWidth; streak.classList.add('bump');
       });
       set('ready', !m.riding && !!m.ready, v => { call.hidden = !v; });

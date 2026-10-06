@@ -128,7 +128,7 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
   }
 
   function call() {
-    if (xr()) { report('The dragon only flies on screens for now. Take the headset off to ride it.'); return; }
+    if (xr()) { report('Skyfire only flies on screens for now. Take the headset off to ride the dragon.'); return; }
     if (!local.ride) send({call: true});
   }
   const attackOpen = () => !!local.ride && snapshot.tick >= local.ride.start + DRAGON.arriveTicks && snapshot.tick < local.ride.end - DRAGON.leaveTicks;
@@ -268,8 +268,8 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
   function event(ev, localId) {
     const lp = listener?.();
     if (ev.kind === 'streak' && ev.id === localId) sound.chime(ev.count);
-    if (ev.kind === 'dragon_ready' && ev.id === localId) { sound.fanfare(); report(touch() ? 'Five in a row! Tap Call the Dragon to take to the sky.' : 'Five in a row! Press H to call the dragon.'); }
-    if (ev.kind === 'dragon_summon') { sound.roar(ev.id === localId ? null : ev.centre, lp, {level: ev.id === localId ? .85 : .7}); if (ev.id === localId) report(touch() ? 'Dragon away! Drag to aim. Hold Fire Breath, tap Fireballs and Comet Dive.' : 'Dragon away! Aim with the mouse. Hold click to breathe fire, right-click for fireballs, Space to dive.'); }
+    if (ev.kind === 'dragon_ready' && ev.id === localId) { sound.fanfare(); report(touch() ? 'Five in a row! Skyfire is ready. Tap Call Skyfire to take to the sky.' : 'Five in a row! Skyfire is ready. Press H to call the dragon.'); }
+    if (ev.kind === 'dragon_summon') { sound.roar(ev.id === localId ? null : ev.centre, lp, {level: ev.id === localId ? .85 : .7}); if (ev.id === localId) report(touch() ? 'Skyfire! Drag to aim. Hold Fire Breath, tap Fireballs and Comet Dive.' : 'Skyfire! Aim with the mouse. Hold click to breathe fire, right-click for fireballs, Space to dive.'); }
     if (ev.kind === 'dragon_fireball') { for (const s of ev.shots || []) remember(ev.id, s); if (ev.id !== localId) sound.whoosh(ev.from, lp); }
     if (ev.kind === 'dragon_dive') { remember(ev.id, ev.strike); if (ev.id !== localId) sound.roar(ev.from, lp, {level: .8, pitch: 1.15}); }
     if (ev.kind === 'dragon_impact') {
@@ -277,7 +277,7 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
       const s = [...strikes.values()].find(s => s.owner === ev.id && s.kind === ev.strike && Math.abs(s.x - ev.position[0]) < .05 && Math.abs(s.z - ev.position[2]) < .05);
       if (!s) boom({owner: ev.id, kind: ev.strike, x: ev.position[0], y: ev.position[1], z: ev.position[2], at: tick, launch: tick});
     }
-    if (ev.kind === 'dragon_depart' && ev.id === localId) { sound.roar(null, null, {level: .5, pitch: 1.3}); report('The dragon sets you down. Five more and it will come back!'); }
+    if (ev.kind === 'dragon_depart' && ev.id === localId) { sound.roar(null, null, {level: .5, pitch: 1.3}); report('The dragon sets you down. Five more for another Skyfire!'); }
   }
 
   /** Keyboard while riding: 1 (hold) or click = breath, 2 or right-click = fireballs, 3 or Space = dive. */
