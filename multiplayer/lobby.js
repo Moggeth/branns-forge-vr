@@ -124,6 +124,7 @@ let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
+let handoverTimer = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
 let lastGameplayCommand={};
 function command(type,payload={}){lastGameplayCommand={type,...payload};return session?.command(type,payload);}
@@ -369,15 +370,19 @@ function start(attempt) {
   next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
-  next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
-  next.addEventListener('saved', mine(() => {}));
-  next.addEventListener('owner_lost', mine(detail => notice('owner', detail.recoverySaved
-    ? 'The host left. A recovery copy is saved in this browser.'
-    : 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, detail.recoverySaved ? 'info' : 'warn')));
-  next.addEventListener('continue_world_offer', mine(() => {
-    removeNotice('waiting');
-    notice('continue', 'The host has gone. You can keep this world running from your computer.', {label: 'Continue world here', run: () => { try { session?.continueWorld(); } catch (e) { onSessionError({message: e?.message}); } removeNotice('continue'); }}, 'action');
+  next.addEventListener('host_changed', mine(detail => {
+    refreshHostControls();
+    if (phase !== 'game') return;
+    const who = lastSnapshot?.players?.find(p => p.id === detail?.hostId)?.name;
+    toast(detail?.isHost ? 'You’re carrying the world now. Play on!' : who ? `${who} is carrying the world now.` : 'The world carries on with a new host.');
   }));
+  next.addEventListener('saved', mine(() => {}));
+  // The next player takes the world over by themselves, so a host leaving shows nothing unless
+  // the switch is unusually slow; then a quiet note explains the pause.
+  next.addEventListener('owner_lost', mine(detail => {
+    if (!detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
+  }));
+  next.addEventListener('continue_world_offer', mine(() => { removeNotice('waiting'); }));
   next.addEventListener('continue_offer_expired', mine(() => removeNotice('continue')));
   next.addEventListener('world_waiting', mine(() => {
     removeNotice('continue');
@@ -406,7 +411,8 @@ function start(attempt) {
 
   try {
     next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role,
-      desktop: !(/OculusBrowser|Quest|Mobile/i.test(navigator.userAgent))});
+      // Any device can carry the world on when the host leaves (phones and headsets host new worlds already).
+      desktop: true});
   } catch (error) {
     recordProblem(error);
     teardown(); setPhase('lobby');
@@ -440,7 +446,12 @@ const STATUS_TEXT = {
 function onStatus(detail) {
   const state = String(detail?.state || '');
   lastStatus = state || 'unknown';
-  connected = state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
+  // While the world moves to a new host the game stays live under your hands (no lost pointer
+  // lock or hidden controls); only a slow switch earns a note.
+  const handing = phase === 'game' && (state === 'owner_lost' || state === 'connecting_to_host');
+  if (handing && !handoverTimer) handoverTimer = setTimeout(() => { if (handoverTimer) notice('owner', 'The host left. Moving the world to another player…', null, 'info'); }, 6000);
+  if (!handing) { clearTimeout(handoverTimer); handoverTimer = 0; }
+  connected = handing || state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
   syncActive();
   refreshBattlePanel();
   if (phase === 'connecting' && !playerId && state === 'closed') {
@@ -452,6 +463,7 @@ function onStatus(detail) {
   if (state === 'signaling_reconnecting') {
     notice('net', detail.playable ? 'Game connected. Restoring invites…' : 'Restoring the room connection…', null, 'info'); return;
   }
+  if (handing) return;
   if (connected) { for (const id of ['net','owner','waiting','continue','relay']) removeNotice(id); return; }
   if (state === 'reconnecting' || state === 'connecting') notice('net', STATUS_TEXT[state], null, 'info');
   else if (state === 'disconnected' || state === 'closed') {
@@ -996,6 +1008,11 @@ setPhase('lobby');
 patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
+// A host stepping away hands the world to someone still playing before its timers are throttled.
+document.addEventListener('visibilitychange', () => { if (document.hidden) try { session?.handOver(); } catch { /* best effort */ } });
+// Phones often skip beforeunload; pagehide is the last chance to tell the room we left.
+window.addEventListener('pagehide', () => { try { session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('pageshow', event => { if (event.persisted && phase === 'game') location.reload(); });
 window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.

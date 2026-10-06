@@ -69,7 +69,7 @@ function nextOffer(room) {
   clearOffer(room);
   if (!rooms.has(room.code)) return;
   const candidate = eligible(room).find(p => !room.tried.has(p.id));
-  if (!candidate) { broadcast(room, { type: 'world_waiting', epoch: room.epoch, message: 'The host left. Waiting for a desktop player with a checkpoint.' }); return; }
+  if (!candidate) { broadcast(room, { type: 'world_waiting', epoch: room.epoch, message: 'The host left. Waiting for another player to carry the world on.' }); return; }
   room.tried.add(candidate.id);
   room.offer = { peerId: candidate.id, epoch: room.epoch, graceful: false };
   send(candidate.ws, { type: 'continue_world_offer', epoch: room.epoch, revision: candidate.revision, graceful: false });
@@ -191,7 +191,7 @@ function handle(ws, message) {
     if (!room.offer || room.offer.peerId !== peer.id || message.epoch !== room.epoch || peer.revision < 0) return fail(ws, 'no_offer', 'No current world continuation offer.');
     if (clientCapacity(peer.simCapacity)<room.peers.size) return fail(ws,'client_update_required','Refresh the game before hosting this many players.');
     clearOffer(room); clearTimeout(room.hostGraceTimer); room.migrating = false;
-    const previousHostId = room.hostId; room.hostId = peer.id; room.epoch++;
+    const previousHostId = room.hostId; room.hostId = peer.id; room.epoch++; room.changedAt = Date.now(); room.silent = new Map();
     broadcast(room, { type: 'host_changed', maxPeers:roomCapacity(room,config.maxPeers), hostId: peer.id, previousHostId, epoch: room.epoch });
     log('host_changed', { room: room.code, hostId: peer.id, epoch: room.epoch });
   } else if (message.type === 'decline_world') {
@@ -200,8 +200,27 @@ function handle(ws, message) {
     if (graceful) send(room.peers.get(room.hostId)?.ws, { type: 'transfer_declined', peerId: peer.id });
     else nextOffer(room);
   } else if (message.type === 'retry_world') {
-    if (!room.migrating || room.offer || connected(room, room.peers.get(room.hostId))) return;
-    room.tried.clear(); nextOffer(room);
+    // Sent by guests that stopped hearing the host's game traffic.
+    if (peer.id === room.hostId) return;
+    if (!connected(room, room.peers.get(room.hostId))) {
+      // Players already know the host is gone: skip the rest of the reconnect grace.
+      if (!room.migrating) { clearTimeout(room.hostGraceTimer); return hostGone(room); }
+      if (room.offer) return;
+      room.tried.clear(); return nextOffer(room);
+    }
+    // A host frozen in a background tab keeps its socket open but sends nothing. Once every
+    // other online player reports silence, move the world on (at most once per 30 s).
+    const now = Date.now();
+    if (room.migrating || room.offer || now - (room.changedAt || 0) <= 30_000) return;
+    room.silent ||= new Map();
+    for (const [id, at] of room.silent) if (now - at >= 10_000) room.silent.delete(id);
+    room.silent.set(peer.id, now);
+    const others = [...room.peers.values()].filter(p => p.id !== room.hostId && connected(room, p));
+    if (others.length && others.every(p => room.silent.has(p.id))) {
+      room.silent.clear(); room.migrating = true; room.tried = new Set();
+      broadcast(room, { type: 'owner_lost', epoch: room.epoch });
+      nextOffer(room);
+    }
   } else if (message.type === 'leave') {
     peer.leaving = true; ws.close(1000, 'Left room');
   } else if (message.type === 'ping') send(ws, { type: 'pong', at: message.at });
