@@ -288,7 +288,8 @@ function rotateWorld(node, axis, angle) {
 }
 function offsetWorld(node, delta) {
   if (!node.parent || !(delta.lengthSq() > 0)) return;
-  node.parent.getWorldQuaternion(_pq); node.parent.getWorldScale(_ws);
+  node.parent.updateWorldMatrix(true, false);
+  node.parent.matrixWorld.decompose(matrixPosition, _pq, _ws);
   _v3.copy(delta).applyQuaternion(_q.copy(_pq).invert()).divide(_ws);
   node.position.add(_v3);
 }
@@ -331,9 +332,9 @@ export function applyEnemyMotion(entry, ctx) {
 
   // Actor frame from the simulation-owned root (engine contract: -Z forward).
   entry.root.updateWorldMatrix(true, false);
-  entry.root.getWorldQuaternion(rootQ);
+  entry.root.matrixWorld.decompose(matrixPosition, rootQ, matrixScale);
   aR.set(1, 0, 0).applyQuaternion(rootQ); aU.set(0, 1, 0); aF.set(0, 0, -1).applyQuaternion(rootQ);
-  entry.root.getWorldPosition(_v);
+  _v.setFromMatrixPosition(entry.root.matrixWorld);
   const travel = st.init ? Math.hypot(_v.x - st.lastPos.x, _v.z - st.lastPos.z) : 0;
   const teleport = travel > 1.5;
   if (!teleport) st.stride = (st.stride + travel / .9) % 1024;
@@ -492,9 +493,12 @@ function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
   for (const leg of st.legs) if (leg.active) { orientFoot(leg, rootQ, aR, (st.gaitP?.toeOut || 0) * (1 - (st.guard || 0) * .5)); solveLeg(leg); }
 }
 
+const matrixPosition = new THREE.Vector3(), matrixScale = new THREE.Vector3();
 function solveLeg(leg) {
   const thigh = leg.thigh.node, knee = leg.knee.node, foot = leg.foot.node, T = leg.target;
-  thigh.getWorldPosition(H); knee.getWorldPosition(K); foot.getWorldPosition(A);
+  // Refresh the chain once after the foot pose changes, then read its coherent matrices.
+  foot.updateWorldMatrix(true, false);
+  H.setFromMatrixPosition(thigh.matrixWorld); K.setFromMatrixPosition(knee.matrixWorld); A.setFromMatrixPosition(foot.matrixWorld);
   const a = leg.a, b = leg.b;
   D.copy(T).sub(H); const d = D.length();
   if (!(a > 1e-6 && b > 1e-6 && d > 1e-6)) return;
@@ -507,10 +511,12 @@ function solveLeg(leg) {
   if (_v2.lengthSq() < 1e-12) return;
   _v2.normalize();
   K2.copy(H).addScaledVector(D, Math.cos(sol.hip) * a).addScaledVector(_v2, Math.sin(sol.hip) * a);
-  thigh.getWorldQuaternion(thighW); knee.getWorldQuaternion(kneeW); foot.getWorldQuaternion(footW);
+  thigh.matrixWorld.decompose(matrixPosition, thighW, matrixScale);
+  knee.matrixWorld.decompose(matrixPosition, kneeW, matrixScale);
+  foot.matrixWorld.decompose(matrixPosition, footW, matrixScale);
   // Thigh: rotate H->K onto H->K2 (world), expressed in the thigh's parent space.
   q1.setFromUnitVectors(_v.copy(K).sub(H).normalize(), _v3.copy(K2).sub(H).normalize());
-  thigh.parent.getWorldQuaternion(_pq);
+  thigh.parent.matrixWorld.decompose(matrixPosition, _pq, matrixScale);
   thighW.premultiply(q1);
   thigh.quaternion.copy(_pq).invert().multiply(thighW);
   // Shin: ankle carried by q1, then rotate K2->A1 onto K2->TR.

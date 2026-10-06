@@ -1275,3 +1275,5 @@ Claude PR assets: Timberline now uses the authored twin-bolt machine, moving str
 Ability performance diagnosis and repeatable checks: [2026-10-05 pass](docs/ABILITY-PERFORMANCE-20261005.md).
 
 Loading/crowd/host profiling and regression commands: [2026-10-05 performance pass](docs/WORLD-PERFORMANCE-20261005.md).
+
+Mobile crowd rendering and shader-transition performance (2026-10-06): see [measured results and reproduction](docs/MOBILE-PERFORMANCE-20261006.md).
