@@ -2317,3 +2317,15 @@ See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 
 ## Contact and first-use regressions — 2026-10-04
 
 [Current evidence and warmup lessons](GAMEPLAY-CONTACT-FIXES-20261004.md): 164 required checks pass. Idle-hidden shaders and damaged non-instanced tree variants need actual render representatives; CPU warmup timings alone do not prove GPU frame-time improvement. Guarded browser startup verified without WebXR or pointer capture. From multiplayer, redirect logs to ../logs and stop on PowerShell errors; ../../logs is outside this checkout.
+
+
+## Meadow timing guard - local-only proposal, 2026-10-05
+
+The single-sample 7.5 ms walking-refill assertion failed at 8.319 ms on main
+b62720d although its source was unchanged from green main. Seven independent
+first-step refills now tolerate one outlier while rejecting two slow samples.
+All structural assertions and the threshold remain. Real in-memory pause
+injection verifies rejection of repeated and sustained slowdown; 38 baseline
+and candidate comparisons behaved as expected. Build and 181/181 required local
+suites passed. No runtime files, remote CI, publication or deployment changed.
+See [method, evidence and review limits](MEADOW-TIMING-20261005.md).
