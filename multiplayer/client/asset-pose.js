@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {cloneSkinnedAsset as clone} from './clone-skinned-asset.js';
 import {siegebirdMechanism, SIEGEBIRD_WINCH} from './siegebird-reload.js';
+import {driveLiquid} from './wyrmspout-liquid.js';
+import {wyrmTime} from './wyrmspout-look.js';
 
 // Engine contract: metres, +Y up, -Z forward. Model axes are independently
 // authored facts, never inferred from a bounding box or camera angle.
@@ -240,9 +242,9 @@ function emberMaterials(visual) {
   return (visual.userData.emberMaterials = list);
 }
 
-export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates, ember, stringSnap = 0, stringGlow = 0, spray = 0, fill = 1, gout = 0} = {}) {
+export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, reload, hand = null, time = 0, templates, ember, stringSnap = 0, stringGlow = 0, spray = 0, fill = 1, gout = 0, charge = 1, locked = false} = {}) {
   const amount = THREE.MathUtils.clamp(draw, 0, 1);
-  if (tool === 'wyrmspout') { animateWyrmspout(visual, {spray, fill, gout, time}); return; }
+  if (tool === 'wyrmspout') { animateWyrmspout(visual, {spray, fill, gout, time, charge, locked}); return; }
   if (tool === 'bow') {
     const upper = visual.getObjectByName('UpperLimb'), lower = visual.getObjectByName('LowerLimb');
     for (const [node, sign] of [[upper, 1], [lower, -1]]) if (node) {
@@ -299,19 +301,53 @@ export function updateWeaponPresentation(visual, tool, {draw = 0, recoil = 0, re
   }
 }
 
-// Wyrmspout II (assets-source/wyrmspout-v2): the jaw drops while it sprays and snaps wide for the Gout, the tank's
-// liquid and the rear gauge show the fuel left, and the pilot ember and eyes flare with the jet.
-// spray 0..1 (smoothed trigger), fill 0..1 (tank), gout 1..0 (just hocked a Gout). Older models simply lack the nodes.
-export function animateWyrmspout(visual, {spray = 0, fill = 1, gout = 0, time = 0} = {}) {
-  // Shared template materials stay shared (remote copies reuse them): the pilot ember grows instead of brightening.
-  const parts = visual.userData.wyrmParts ||= (() => {
-    const find = n => visual.getObjectByName(n);
-    return {jaw: find('Jaw'), liquid: find('FuelLiquid'), needle: find('Gauge_Needle'), core: find('EmberCore'), head: find('Head')};
-  })();
-  const s = THREE.MathUtils.clamp(spray, 0, 1), f = THREE.MathUtils.clamp(fill, 0, 1), k = THREE.MathUtils.clamp(gout, 0, 1);
-  if (parts.jaw) parts.jaw.rotation.x = -(.36 * s + .62 * Math.sin(Math.PI * Math.min(1, (1 - k) * 1.4)) * (k > 0 ? 1 : 0)) - .03 * s * Math.sin(time * 38);
-  if (parts.head) { parts.head.userData.rest ??= parts.head.position.clone(); parts.head.position.copy(parts.head.userData.rest); parts.head.position.y += .003 * s * Math.sin(time * 47); parts.head.position.z += .012 * k * k; }
-  if (parts.liquid) { parts.liquid.visible = f > .01; parts.liquid.scale.y = Math.max(.01, f) * (1 + .04 * s * Math.sin(time * 29)); }
-  if (parts.needle) parts.needle.rotation.z = THREE.MathUtils.degToRad(120 - 240 * f) + .05 * s * Math.sin(time * 61);
-  if (parts.core) parts.core.scale.setScalar(.7 + 1.1 * s + 1.4 * k + .08 * Math.sin(time * 5));
+// Wyrmspout III (assets-source/wyrmspout-v3): the jaw drops while it sprays and snaps wide for the Gout; the liquid
+// sloshes in the glass (wyrmspout-liquid.js); and the wyrm tells you how it is doing with its own body:
+//   * the Wyrm's Eye on the tank's rear cap: a wide round pupil when full, a thin slit when nearly dry; it squints
+//     while spraying, blinks now and then, and shuts while the tank refills, opening as it fills back up;
+//   * three dorsal fins light their veins one by one as Gout recharges, and breathe when it is ready;
+//   * little flames flicker in its nostrils while Gout is ready.
+// spray 0..1 (smoothed trigger), fill 0..1 (tank), gout 1..0 (just hocked a Gout), charge 0..1 (Gout readiness),
+// locked (tank refilling). Older models simply lack the nodes. Everything runs on the presentation clock.
+const WYRM_NODES = ['Jaw', 'FuelLiquid', 'Gauge_Needle', 'EmberCore', 'Head', 'Eye_Pupil', 'Eye_LidUpper', 'Eye_LidLower', 'Eye_Glow',
+  'FinVein_1', 'FinVein_2', 'FinVein_3', 'NostrilFlame_L', 'NostrilFlame_R'];
+const blinkAt = n => { const x = Math.sin(n * 91.7 + 13.1) * 43758.5453; return x - Math.floor(x); };
+export function animateWyrmspout(visual, {spray = 0, fill = 1, gout = 0, time = 0, charge = 1, locked = false} = {}) {
+  // Shared template materials stay shared (remote copies reuse them): only nodes move and grow.
+  const parts = visual.userData.wyrmParts ||= Object.fromEntries(WYRM_NODES.map(n => [n, visual.getObjectByName(n)]));
+  const st = visual.userData.wyrmState ||= {time, open: 1, ready: 0, veins: [0, 0, 0]};
+  const dt = Math.min(.1, Math.max(0, time - st.time)); st.time = time;
+  const s = THREE.MathUtils.clamp(spray, 0, 1), f = THREE.MathUtils.clamp(fill, 0, 1), k = THREE.MathUtils.clamp(gout, 0, 1), c = THREE.MathUtils.clamp(charge, 0, 1);
+  const ease = rate => 1 - Math.exp(-dt * rate);
+  wyrmTime.value = time % 1800;
+  if (parts.Jaw) parts.Jaw.rotation.x = -(.36 * s + .62 * Math.sin(Math.PI * Math.min(1, (1 - k) * 1.4)) * (k > 0 ? 1 : 0)) - .03 * s * Math.sin(time * 38);
+  if (parts.Head) { parts.Head.userData.rest ??= parts.Head.position.clone(); parts.Head.position.copy(parts.Head.userData.rest); parts.Head.position.y += .003 * s * Math.sin(time * 47); parts.Head.position.z += .012 * k * k; }
+  const liquid = parts.FuelLiquid;
+  if (liquid?.material?.userData?.wyrmLiquid) driveLiquid(liquid, {dt, fill: f, spray: s, gout: k, time});
+  else if (liquid) { liquid.visible = f > .01; liquid.scale.y = Math.max(.01, f) * (1 + .04 * s * Math.sin(time * 29)); }
+  if (parts.Gauge_Needle) parts.Gauge_Needle.rotation.z = THREE.MathUtils.degToRad(120 - 240 * f) + .05 * s * Math.sin(time * 61);
+  if (parts.EmberCore) parts.EmberCore.scale.setScalar(.7 + 1.1 * s + 1.4 * k + .08 * Math.sin(time * 5));
+  // The eye. Pupil: round when full, a slit when dry, narrowed by the glare of its own fire.
+  if (parts.Eye_Pupil) { parts.Eye_Pupil.scale.x = (.32 + 2.1 * f ** .8) * (1 - .3 * s) * (1 + .03 * Math.sin(time * 1.3)); }
+  if (parts.Eye_Glow) parts.Eye_Glow.scale.setScalar(.55 + .6 * f + .5 * s + .1 * Math.sin(time * 2.2));
+  // Lids: shut while refilling and open over the last third of the refill; a squint while spraying; a blink every few seconds.
+  const want = (locked ? THREE.MathUtils.smoothstep(f, .62, 1) : 1) * (1 - .32 * s);
+  st.open += (want - st.open) * ease(locked ? 9 : 6);
+  const slot = Math.floor(time / 4.5), phase = time - slot * 4.5 - blinkAt(slot) * 3.2, blink = phase > 0 && phase < .16 ? Math.sin(phase / .16 * Math.PI) : 0;
+  const open = st.open * (1 - blink);
+  for (const lid of [parts.Eye_LidUpper, parts.Eye_LidLower]) if (lid) { lid.userData.restX ??= lid.rotation.x; lid.rotation.x = lid.userData.restX * open; }
+  // Fin veins fill one by one with the Gout charge (the light climbs each vein from its root), then breathe.
+  const ready = c >= 1 ? 1 : 0; st.ready += (ready - st.ready) * ease(ready ? 5 : 14);
+  for (let i = 0; i < 3; i++) {
+    const vein = parts[`FinVein_${i + 1}`]; if (!vein) continue;
+    const target = THREE.MathUtils.clamp(c * 3 - i, 0, 1);
+    st.veins[i] += (target - st.veins[i]) * ease(target >= st.veins[i] ? 10 : 30);   // fills steadily, drains at once
+    const v = st.veins[i], breathe = 1 + st.ready * .16 * Math.sin(time * 4.2 - i * .9);
+    vein.visible = v > .02; vein.scale.set(breathe, breathe, Math.max(.02, v));
+  }
+  // Nostril flames: lit while Gout is ready, flickering, and blown out by the Gout itself.
+  for (const [i, flame] of [parts.NostrilFlame_L, parts.NostrilFlame_R].entries()) if (flame) {
+    const lit = st.ready * (1 - k), flick = .75 + .25 * Math.sin(time * 23 + i * 2.1) * Math.sin(time * 7.7 + i);
+    flame.visible = lit > .03; flame.scale.set(lit * (.85 + .15 * flick), lit * (.85 + .15 * flick), lit * flick * (1 + .4 * s));
+  }
 }

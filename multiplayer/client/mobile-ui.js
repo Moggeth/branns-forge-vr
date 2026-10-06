@@ -133,6 +133,7 @@ function buildSettings() {
           ['★ Special', 'Weapon special; reachable while holding Attack'],
           ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
           ['Actions ⋯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
+          ['◈ Inspect', 'Admire your weapon; drag to turn it, tap again to put it away'],
           ['Collect / Eat', 'Pick up nearby loot or heal with an apple'],
           ['Bridge', 'Spend 3 wood to build ahead'],
           ['Jump', 'Jump'],
@@ -150,7 +151,7 @@ function buildSettings() {
         guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1–7', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
+          ['1–7', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['I', 'Inspect your weapon (hold and move the mouse to turn it)'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),

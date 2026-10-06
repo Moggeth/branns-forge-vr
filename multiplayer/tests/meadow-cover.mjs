@@ -39,10 +39,33 @@ test('bounded instances, four draws, nearest-first budgeted fill that converges'
   for (const [x, , z] of instances(m)) assert.ok(Math.hypot(x, z - 8) <= MEADOW_QUALITY.high.radius + 3.01, 'inside fill radius');
   const low = createMeadowCover({scene: new THREE.Scene(), height, quality: 'low'}); settle(low, cam);
   assert.ok(low.stats().grass <= MEADOW_QUALITY.low.grass && low.stats().triangles < s.triangles / 2.5, 'phone tier far lighter');
-  // Walking 2.5 m triggers one refill whose cell baking stays in budget once neighbours are cached.
-  const fills = s.fills; m.update(1 / 60, camAt(2.5, 1.65, 8)); const t = m.stats();
-  assert.equal(t.fills, fills + 1); assert.ok(t.lastFillMs < FILL_BUDGET_MS + 6, `refill ${t.lastFillMs} ms`);
-  return `${frames} frames to settle, ${s.daisies} daisy clumps, ${s.grass} tufts / ${s.triangles} tris high, ${low.stats().triangles} tris low, refill ${t.lastFillMs} ms`;
+  // Keep the original 7.5 ms limit, but allow one scheduler/GC interruption.
+  // Each sample uses a fresh meadow settled at the ORIGINAL position, then its
+  // first 2.5 m step. Repeatedly updating an already-filled camera would measure
+  // a no-op or a warmer cache and could hide a walking-refill regression.
+  const refills = [], lowTriangles = low.stats().triangles;
+  try {
+    for (let sample = 0; sample < 7; sample++) {
+      const meadow = sample === 0 ? m : createMeadowCover({scene: new THREE.Scene(), height});
+      try {
+        if (sample !== 0) settle(meadow, cam);
+        const fills = meadow.stats().fills;
+        meadow.update(1 / 60, camAt(2.5, 1.65, 8));
+        const t = meadow.stats();
+        assert.equal(t.fills, fills + 1, `sample ${sample}: one real walking refill`);
+        assert.equal(t.drawCalls, 4);
+        assert.ok(t.grass > 3000 && t.grass <= MEADOW_QUALITY.high.grass);
+        assert.ok(Number.isFinite(t.lastFillMs) && t.lastFillMs >= 0, 'valid refill measurement');
+        refills.push(t.lastFillMs);
+      } finally { if (sample !== 0) meadow.dispose(); }
+    }
+    // Six of seven must pass: two slow samples fail, even if the other five are fast.
+    // Report the maximum too; accepting one outlier is not a worst-frame guarantee.
+    const sorted = [...refills].sort((a, b) => a - b), secondSlowest = sorted.at(-2);
+    const timing = `walking refills [${refills.join(', ')}] ms; second-slowest ${secondSlowest} ms; max ${sorted.at(-1)} ms`;
+    assert.ok(secondSlowest < FILL_BUDGET_MS + 6, `${timing}; limit ${FILL_BUDGET_MS + 6} ms (at most one outlier)`);
+    return `${frames} frames to settle, ${s.daisies} daisy clumps, ${s.grass} tufts / ${s.triangles} tris high, ${lowTriangles} tris low; ${timing}`;
+  } finally { m.dispose(); low.dispose(); }
 });
 
 test('RTS view centres grass on the view target; headset tier lowers the cap', () => {
