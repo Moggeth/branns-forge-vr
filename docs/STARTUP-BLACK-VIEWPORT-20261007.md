@@ -34,3 +34,9 @@ Only use stale-frame injection against a local Vite source server. Default mode 
 - Shader isolation must preserve parent visibility and check an empty scene as a control. Binary search over visible renderables then inspect the guilty object's world matrix.
 - Unique shader keys, fog clamps and alternate render buffers changed startup timing and sometimes hid the race. One clean screenshot did not validate those hypotheses. All speculative shader changes were reverted.
 - Material investigation from 12:23:53 to 13:20:04 UTC took 3371 seconds (including failed experiments and local GPU runs). This was unnecessarily long; use the frame-clock/transform checks above first next time.
+
+## Publication validation follow-up
+
+GitHub rejected the initial patch-note category `Fixes`; the parser requires `Bug fixes`. The initial local CI run had started before that note was written, so it did not cover the final metadata. All other 188 remote checks passed. Validate new patch notes with `node tests/patch-notes.mjs` after authoring them, before committing; run the production build too. The category correction changes no runtime logic.
+
+Also, `gh pr merge --auto` may merge immediately when status checks are optional. It is not a substitute for explicitly awaiting successful checks. The deployment workflow correctly held publication after the patch-note check failed.
