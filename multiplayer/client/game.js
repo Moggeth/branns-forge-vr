@@ -73,7 +73,8 @@ import {earthLineEdits} from '../shared/earth-spells.js';
 import {acousticPosition} from './voice-audio.js';
 import {createVoiceIndicators} from './voice-indicators.js';
 import {setVoiceZoneResolver} from './voice-zones.js';
-import * as homeBaseRules from '../shared/home-bases.js';
+// Tavern rules arrive with the keep-buildings work; an empty glob keeps this build working before then.
+const tavernRules = Object.values(import.meta.glob('../shared/taverns.js', {eager: true}))[0] || {};
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -568,9 +569,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     node.traverse(child => { child.geometry?.dispose(); if (child.material) materials.add(child.material); });
     materials.forEach(material => material.dispose());
   }
-  // Taverns are voice rooms: the bases rules decide who is inside one (insideTavern may not exist yet).
+  // Taverns are voice rooms: insideTavern(state, position) returns the tavern ({id, label}) or null.
   const voiceBadges = createVoiceIndicators({scene});
-  setVoiceZoneResolver('home-taverns', position => homeBaseRules.insideTavern?.(snapshot, position) || null);
+  setVoiceZoneResolver('home-taverns', position => tavernRules.insideTavern?.(snapshot, position) || null);
   function syncActors() {
     const present = new Set();
     for (const data of [...snapshot.players, ...snapshot.enemies]) {
