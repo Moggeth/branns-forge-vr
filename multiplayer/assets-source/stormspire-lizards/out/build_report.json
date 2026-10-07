@@ -1,0 +1,38 @@
+{
+  "triangles": 3575,
+  "triangles_by_part": {
+    "body": 812,
+    "head": 352,
+    "jaw": 168,
+    "deco": 178,
+    "teeth": 56,
+    "eye": 264,
+    "lid": 180,
+    "limb": 280,
+    "boot": 400,
+    "spike": 132,
+    "HatHard": 243,
+    "gear": 354,
+    "Wrench": 84,
+    "Z1": 36,
+    "Z2": 36
+  },
+  "vertices": 2178,
+  "materials": 1,
+  "bones": 37,
+  "skipped_faces": 0,
+  "atlas": [
+    256,
+    144
+  ],
+  "animations": {
+    "idle": 23,
+    "climb": 27,
+    "cheer": 33,
+    "nap": 32,
+    "tinker": 28,
+    "bite": 29
+  },
+  "bytes": 309844,
+  "seconds": 2.0
+}

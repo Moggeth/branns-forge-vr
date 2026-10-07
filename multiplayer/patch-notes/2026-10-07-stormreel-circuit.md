@@ -12,3 +12,4 @@ title: Stormreel, round four: close the circuit
 - The cable now wraps snugly round tree trunks, curving all the way round the bark instead of cutting through it or floating beside it.
 - Lightning, bolts and cables got a big visual upgrade: brighter surges, sparks crawling over the target, current pulsing along a ribbed cable jacket, and new sounds for the surge, the spike and the tug.
 - The charge preview flashes blue when your next shot would close the circuit.
+- The Stormspire lizard crew are now **Voltnewts**: chunky teal newts with orange spikes, big amber eyes, a toothy grin, hard hats, medic harnesses and a power cable plugged into their backs. They blink, look at you when you come close, tinker with wrenches, bite the coil to zap it, nap on the hat brim, and squint, puff up and hop when the tower charges.
