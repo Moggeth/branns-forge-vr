@@ -8,6 +8,9 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 // constant names its source so a rule change is a one-line audit (test/interaction-cue.test.mjs checks the text).
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {HOME, HOME_LAYOUT, HOME_MANNED, bellPostAt, homePoint} from '../shared/home-bases.js';
+import {SHOP, counterAt, draughtCap} from '../shared/home-shop.js';
+import {MILL, millAt} from '../shared/home-mill.js';
+import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
 const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
@@ -155,9 +158,20 @@ export function decideCue(view, self, snapshot, aim, ctx) {
 function homeCue(self, snapshot, keys, make) {
   const b = snapshot.battle; if (b?.v !== 2 || b.status !== 'running') return null;
   const base = b.bases.find(x => x.side === (self.side || 'party')), p = self.position, tick = snapshot.tick ?? 0;
-  if (!base || base.fallenUntil > tick) return null;
   const at = (xz, r) => Math.hypot(p[0] - xz[0], p[2] - xz[1]) <= r;
   const wait = t => `${Math.ceil((t - tick) / 60)} s`;
+  const bar = taverns(snapshot).find(t => at(tavernBar(t), TAVERN.barReach));
+  if (bar) return (self.heartyUntil ?? 0) > tick ? make('home', 'wait', bar.id, TAVERN_NAMES[bar.side], 'Still merry', '', wait(self.heartyUntil))
+    : make('home', 'ready', bar.id, TAVERN_NAMES[bar.side], 'Hearty Ale', keys.collect, 'full health, then 20% tougher for 3 min');
+  if (!base || base.fallenUntil > tick) return null;
+  if (at(counterAt(base.side), SHOP.reach)) return make('home', 'ready', 'quartermaster', 'Quartermaster', 'Shop', keys.collect, `${self.resources?.gold || 0} Gold · items for your hero`);
+  const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;
+  if (at(millAt(base.side, MILL.crank), MILL.crankReach)) return mill?.queue?.length ? make('home', 'ready', 'mill-crank', 'Mill capstan', 'Crank', keys.crank || keys.collect, 'hold to grind three times as fast') : make('home', 'full', 'mill-crank', 'Mill capstan', 'Nothing grinding', '');
+  if (at(millAt(base.side, MILL.hopper), MILL.reach)) {
+    const r = self.resources || {}, worth = (r.goldOre || 0) * 2 + (r.copperOre || 0) + Math.floor((r.stone || 0) / 4);
+    return worth ? make('home', 'ready', 'mill', 'Gold mill', 'Tip it in', keys.collect, `about ${worth} Gold${owed ? ` · ${owed} still grinding` : ''}`)
+      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
+  }
   for (const part of base.parts) if (part.kind === 'ballista' && part.hp > 0 && at([part.position[0], part.position[2]], HOME_MANNED.reach)) {
     const sun = part.side !== 'rivals', name = sun ? 'Sunlance' : 'Gnashjaw', wind = keys.crank || keys.wind || 'crank';
     if (part.operator === self.id) return make('home', 'manned', part.id, name, 'Step off', keys.collect);
@@ -166,8 +180,10 @@ function homeCue(self, snapshot, keys, make) {
     return make('home', 'ready', part.id, name, 'Man it', keys.collect, sun ? `then aim, hold ${keys.strike.toLowerCase()} to draw, let go on the golden flash` : `then aim, ${keys.strike.toLowerCase()} spits the harpoon, ${wind} reels it in`);
   }
   if (at(homePoint(base.side, HOME_LAYOUT.fountain), HOME.drink.reach)) {
-    if (tick < (base.drinkReadyTick ?? 0)) return make('home', 'wait', 'fountain', 'Fountain', 'Refilling', '', wait(base.drinkReadyTick));
-    return (self.hp ?? 100) < 100 ? make('home', 'ready', 'fountain', 'Fountain', 'Drink', keys.collect, `heals ${HOME.drink.heal}`) : make('home', 'full', 'fountain', 'Fountain', 'Full health', '');
+    const ready = (self.drinkTick ?? -1e9) + HOME.drink.cooldown;
+    if (tick < ready) return make('home', 'wait', 'fountain', 'Healing well', 'Settling', '', wait(ready));
+    const hurt = (self.hp ?? 100) < (self.maxHp ?? 100), thirsty = (self.draughts || 0) < draughtCap(self);
+    return hurt || thirsty ? make('home', 'ready', 'fountain', 'Healing well', 'Drink', keys.collect, [hurt ? `heals ${HOME.drink.heal}` : '', thirsty ? 'fills your draught' : ''].filter(Boolean).join(' · ')) : make('home', 'full', 'fountain', 'Healing well', 'Full health', '');
   }
   if (at(bellPostAt(base.side), HOME.bell.reach)) {
     if (tick < (base.bellReadyTick ?? 0)) return make('home', 'wait', 'bell', 'Barracks bell', 'Still ringing', '', wait(base.bellReadyTick));

@@ -1,5 +1,6 @@
-import {HOME,HOME_SITES} from './home-bases.js';
-const insideHome=(x,z,margin=0)=>Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin);
+import {HOME,HOME_SITES,NEUTRAL_TAVERN} from './home-bases.js';
+// The keeps and the shared tavern's yard stay clear of wild trees and new ore.
+const insideHome=(x,z,margin=0)=>Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin)||Math.hypot(x-NEUTRAL_TAVERN.at[0],z-NEUTRAL_TAVERN.at[1])<8+margin;
 import {clearLandmarkTrees,STARTING_SITES} from './starting-world.js';
 import {DEPOSIT_CATALOG} from './material-catalog.js';
 // Deterministic world presentation data.  This file deliberately has no clock or RNG.

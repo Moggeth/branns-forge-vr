@@ -2,6 +2,10 @@ import {nextEntityId as nextId} from './entity-id.js';
 import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,battleActive,battleSkirmish,enemyHostileTo,attackBattleBase,damageBattleBase} from './battle-mode.js';
 import {homeBallistaAction,isHomeBallistaId} from './home-ballista.js';
 import {homeAction,isHomeAction} from './home-interact.js';
+import {isShopAction,shopAction,validTownFields,restoreTownFields} from './home-shop.js';
+import {isMillAction,millAction,stepMills} from './home-mill.js';
+import {aleArmor,resolveTaverns,stepTaverns,tavernAle,tavernSafe} from './taverns.js';
+import {itemBonus} from './hero-items.js';
 import {HOME,findHomeTarget,homeBattle,homePoint,resolveHomeDomes,resolveHomeStructures} from './home-bases.js';
 // Melee damage one hero deals another (out of 100 health).
 const PVP_DAMAGE=Object.freeze({axe:22,pick:20,hammer:34,limb:18});
@@ -96,6 +100,8 @@ function damageEnemy(state, enemy, amount, events, ownerId, side) {
 }
 function damageHero(state, hero, amount, events) {
   if((hero.protectedUntil??0)>state.tick||hero.dragon)return; // a Hero on their dragon is out of reach
+  if(tavernSafe(state,hero))return; // taverns are sanctuaries (shared/taverns.js)
+  amount*=Math.max(0,1-itemBonus(hero,'armor')-aleArmor(state,hero)); // Shield-Charm and Hearty Ale
   hero.hp -= amount;
   events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone'});
   if (hero.hp <= 0) {
@@ -221,6 +227,9 @@ function instantiate(state) {
       }
       if (message.type === 'action') {
         if(isHomeAction(message.action))return homeAction(state,p,message,{createEnemy,nextId,terrainHeight});
+        if(isShopAction(message.action))return shopAction(state,p,message);
+        if(isMillAction(message.action))return millAction(state,p,message);
+        if(message.action==='tavernAle')return tavernAle(state,p);
         if(typeof message.action==='string'&&message.action.startsWith('invention')&&isHomeBallistaId(message.structureId))return homeBallistaAction(state,p,message,{terrainHeight,damageHero,damageEnemy});
         if(typeof message.action==='string'&&message.action.startsWith('invention'))return inventionAction(state,p,message,inventionContext);
         if(typeof message.action==='string'&&message.action.startsWith('forge')&&p.side==='rivals')return fail('not_your_structure');
@@ -309,7 +318,7 @@ function instantiate(state) {
         if (supplied) {
           // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
           const rival=homeBattle(state)&&state.players.find(h=>h.id===message.targetId&&h.id!==p.id&&h.role==='hero'&&(h.side||'party')!==(p.side||'party'));
-          if(rival){if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
+          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
           if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
@@ -409,7 +418,7 @@ function instantiate(state) {
         p.mana = Math.min(100, p.mana + (3+(p.role==='god'?Math.min(2,state.groves.filter(g=>!state.harvestedTrees.some(t=>t.id.startsWith(g.id)&&t.cuts>=3)).length*.15):0)) / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
-          const pace=5*swiftFactor(state,p)/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
+          const pace=5*swiftFactor(state,p)*(1+itemBonus(p,'speed'))/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
           leash(state,p,p.position);
           resolveTerrainBoundary(p.position);
         }
@@ -449,6 +458,9 @@ function instantiate(state) {
         damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
+      for(const e of state.enemies)if(e.hp>0)resolveTaverns(state,e.position,.5); // monsters are shooed out of every tavern
+      stepTaverns(state);stepMills(state,events);
+      if(state.tick%30===0)for(const p of state.players)if(p.role==='hero'&&p.hp>0&&itemBonus(p,'regen')>0)p.hp=Math.min(heroMaxHp(p),p.hp+itemBonus(p,'regen')/2); // Pocket Kettle
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
       flushMeteorRewards(state,terrainHeight);
@@ -473,8 +485,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,streak,dragonReady,dragon}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp}), xp:xp||0, talents:talents||{}, mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,streak,dragonReady,dragon}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items}), xp:xp||0, talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
@@ -529,7 +541,7 @@ export function loadSimulation(saved) {
         (p.siegebird !== undefined && !validSiegebird(p.siegebird)) || !validBoons(p, saved.tick) ||
         (p.heldOre!==undefined&&!['ironOre','mithrilOre','starOre'].includes(p.heldOre)) ||
         (p.rally!==undefined&&!validId(p.rally)) ||
-        (p.side!==undefined&&!['party','rivals'].includes(p.side)) ||
+        (p.side!==undefined&&!['party','rivals'].includes(p.side)) || !validTownFields(p,saved.tick) ||
         (p.resources !== undefined && (!record(p.resources) || !MATERIAL_KEYS.every(k => p.resources[k]===undefined || Number.isSafeInteger(p.resources[k]) && p.resources[k] >= 0 && p.resources[k] <= 999))) ||
         (p.head !== undefined && !pose(p.head)) ||
         (p.hands !== undefined && (!Array.isArray(p.hands) || p.hands.length > 2 || !p.hands.every(h => pose(h)))))
@@ -557,7 +569,7 @@ export function loadSimulation(saved) {
   const treeIds=new Set(worldTrees(saved).map(t=>t.id));
   for (const t of entTrees.wildTrees) if (!treeIds.has(t.id)) throw Error('Invalid rooted tree'); // an id cannot be both awake and rooted
   if (entTrees.wildTrees.length + worldTrees({...saved,wildTrees:[]}).length !== treeIds.size) throw Error('Duplicate rooted tree');
-  const harvestedTrees=restoreHarvested({...saved,harvestedTrees:harvested},treeIds); // strict; legacy felled trees count as landed (wood already awarded)
+  const harvestedTrees=restoreHarvested({...saved,harvestedTrees:harvested.filter(h=>treeIds.has(h?.id)||!/^(tree|outer)\d+$/.test(h?.id))},treeIds); // base trees cleared by the widened keeps (2026-10-07) drop out // strict; legacy felled trees count as landed (wood already awarded)
   const contentIds = new Set([...ids, 'shrine', ...treeIds, ...entAwake, ...saved.pendingStarfalls.map(p=>p.id)]);
   for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !Object.hasOwn(DEPOSIT_CATALOG,d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > DEPOSIT_CATALOG[d.kind].maxHits || d.maxHits !== DEPOSIT_CATALOG[d.kind].maxHits || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
   const veinSlots=new Set();for(const d of deposits)validateVein(d,saved.tick,veinSlots);
@@ -598,7 +610,7 @@ export function loadSimulation(saved) {
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
-    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
+    ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...restoreTownFields(p),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
   state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');

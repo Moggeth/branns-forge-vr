@@ -10,6 +10,7 @@
 // frame from the launch event. Pure simulation rules: fixed ticks, no clocks or randomness.
 import {HOME, HOME_MANNED, baseFallen, damageHome, findHomeTarget, homeBattle, homeFrame, shieldUp} from './home-bases.js';
 import {worldColliders, insideVolume} from './colliders.js';
+import {hasItem} from './hero-items.js';
 export {HOME_MANNED};
 
 export const KEEP_BALLISTA = Object.freeze({
@@ -82,8 +83,11 @@ function launch(state, part, by, {charge = 0, perfect = false} = {}) {
   const {at, forward} = keepMuzzle(part), speed = keepSpeed(part, charge, perfect), style = keepStyle(part.side);
   const shot = {id: `${part.id}:${state.tick}`, part: part.id, side: part.side, style, o: at.map(round), v: forward.map(v => round(v * speed)), tick: state.tick,
     by: by ?? null, charge: round(charge), perfect: !!perfect, hits: []};
+  // Ballista Captain's Hat (shared/hero-items.js): the crew reloads twice as fast and every shot hits half again as hard.
+  const hat = !!by && hasItem(state.players.find(q => q.id === by), 'hat');
+  if (hat) shot.power = 1.5;
   (state.battle.keepShots ??= []).push(shot);
-  part.readyTick = state.tick + HOME_MANNED.reloadTicks; part.fireTick = state.tick;
+  part.readyTick = state.tick + (hat ? HOME_MANNED.reloadTicks / 2 : HOME_MANNED.reloadTicks); part.fireTick = state.tick;
   delete part.drawTick;
   return {kind: 'keep_ballista_fire', id: shot.id, part: part.id, side: part.side, style, o: [...shot.o], v: [...shot.v], tick: state.tick, charge: shot.charge,
     perfect: shot.perfect, by: shot.by, manned: !!by, position: [...part.position]};
@@ -163,12 +167,12 @@ function probe(state, shot, p, vols, c) {
 }
 
 function bodyDamage(state, shot, target, isHero, ctx, events) {
-  const S = KEEP_BALLISTA[shot.style];
+  const S = KEEP_BALLISTA[shot.style], power = shot.power || 1;
   if (shot.style === 'gnashjaw') {
-    if (isHero) ctx.damageHero(state, target, S.hero, events); else ctx.damageEnemy(target, S.damage, events, shot.side, shot.by);
+    if (isHero) ctx.damageHero(state, target, Math.round(S.hero * power), events); else ctx.damageEnemy(target, Math.round(S.damage * power), events, shot.side, shot.by);
     return;
   }
-  const n = isHero ? (shot.perfect ? S.perfectHero : lerp(S.hero[0], S.hero[1], shot.charge)) : (shot.perfect ? S.perfectDamage : lerp(S.damage[0], S.damage[1], shot.charge));
+  const n = power * (isHero ? (shot.perfect ? S.perfectHero : lerp(S.hero[0], S.hero[1], shot.charge)) : (shot.perfect ? S.perfectDamage : lerp(S.damage[0], S.damage[1], shot.charge)));
   if (isHero) ctx.damageHero(state, target, Math.round(n), events); else ctx.damageEnemy(target, Math.round(n), events, shot.side, shot.by);
 }
 

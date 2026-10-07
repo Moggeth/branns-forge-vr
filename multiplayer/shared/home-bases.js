@@ -1,4 +1,5 @@
 import {heroMaxHp} from './hero-progress.js';
+import {restoreMill} from './home-mill.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -7,16 +8,16 @@ import {heroMaxHp} from './hero-progress.js';
 // Pure simulation rules: fixed ticks, no clocks, rendering or random streams.
 
 export const HOME = Object.freeze({
-  domeRadius: 13.5, heartHp: 600, pylonHp: 300, levelCap: 5,
+  domeRadius: 17.5, heartHp: 600, pylonHp: 300, levelCap: 5,
   shieldDownTicks: 90 * 60, rebuildTicks: 180 * 60, waveTicks: 60 * 60, firstWaveTicks: 20 * 60,
   fountainEvery: 30, fountainHeal: 5,
   turrets: Object.freeze({
     spire: Object.freeze({hp: 250, range: 9, cooldown: 90, damage: 14}),
-    ballista: Object.freeze({hp: 300, range: 22, cooldown: 240, damage: 40, heroDamage: 20}),
+    ballista: Object.freeze({hp: 300, range: 17, cooldown: 240, damage: 40, heroDamage: 20}), // range trimmed as the keep widened: same reach from the heart
   }),
   reward: Object.freeze({iron: 12, wood: 12, gems: 6, starOre: 3}),
   // Hands-on pieces (shared/home-interact.js): drink at the fountain, ring the barracks bell, hammer-mend parts.
-  drink: Object.freeze({reach: 3, heal: 40, cooldown: 20 * 60}),
+  drink: Object.freeze({reach: 3 * 1.3, heal: 40, cooldown: 10 * 60}), // per hero; also fills the Healing Draught
   bell: Object.freeze({reach: 2.6, cooldown: 75 * 60}),
   repair: 30,
 });
@@ -31,17 +32,28 @@ export const HOME_SITES = Object.freeze({party: Object.freeze([-36, -36]), rival
 
 // Base-local layout in metres: x is to the right of the gate, y points out of the
 // gate toward the world centre. The client builds the same pieces from this table.
+// 2026-10-07: keeps widened by HOME_SCALE (buildings and footprints grow with it) to fit a tavern, mill and shop.
+export const HOME_SCALE = 1.3;
+const S = (x, y) => Object.freeze([+(x * HOME_SCALE).toFixed(3), +(y * HOME_SCALE).toFixed(3)]);
+// face: the base-local point a building's front (+Z of its model) looks toward.
+const piece = (at, face) => Object.freeze({at: Object.freeze(at), face: Object.freeze(face)});
 export const HOME_LAYOUT = Object.freeze({
-  barracks: Object.freeze([-7, 3.4]), fountain: Object.freeze([5.2, 3.2]),
-  pylons: Object.freeze([[6.6, 11.43], [-6.6, 11.43], [0, -13.2]].map(Object.freeze)),
-  spires: Object.freeze([[-4, 16], [4, 16]].map(Object.freeze)),
-  ballistas: Object.freeze([[-9.5, 14.5], [9.5, 14.5]].map(Object.freeze)),
-  gate: Object.freeze([0, 13.5]), gatePillars: Object.freeze([[-2.6, 13.5], [2.6, 13.5]].map(Object.freeze)),
+  barracks: S(-7, 3.4), fountain: S(5.2, 3.2),
+  pylons: Object.freeze([S(6.6, 11.43), S(-6.6, 11.43), S(0, -13.2)]),
+  spires: Object.freeze([S(-4, 16), S(4, 16)]),
+  ballistas: Object.freeze([S(-9.5, 14.5), S(9.5, 14.5)]),
+  gate: S(0, 13.5), gatePillars: Object.freeze([S(-2.6, 13.5), S(2.6, 13.5)]),
   // Boundary wards ring the dome every 22.5 degrees, leaving the gate and the three pylons clear.
   wards: Object.freeze([45, 67.5, 90, 112.5, 135, 157.5, -157.5, -135, -112.5, -90, -67.5, -45]
-    .map(d => Object.freeze([+(Math.sin(d * Math.PI / 180) * 14).toFixed(3), +(Math.cos(d * Math.PI / 180) * 14).toFixed(3)]))),
-  bellPost: Object.freeze([2.95, 2.75]), // in the barracks' own frame (three.js x, z)
+    .map(d => S(Math.sin(d * Math.PI / 180) * 14, Math.cos(d * Math.PI / 180) * 14))),
+  bellPost: S(2.95, 2.75), // in the barracks' own frame (three.js x, z)
+  // Town pieces (shared/home-shop.js, home-mill.js, taverns.js), unscaled: their models are built at full size.
+  tavern: piece([-9.6, -7.0], [0, 0]),
+  mill: piece([4.5, -10.5], [0, 0]),
+  quartermaster: piece([8.8, 10.0], [0, 9]),
 });
+// The shared tavern ("The Muddled Mug") stands off the lane south of the Forge, its front toward the centre.
+export const NEUTRAL_TAVERN = Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)});
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 const sideKey = side => side === 'rivals' ? 'rivals' : 'party';
@@ -55,6 +67,16 @@ export function homePoint(side, [lx, ly]) {
   const {centre, forward, right} = homeFrame(side);
   return [centre[0] + right[0] * lx + forward[0] * ly, centre[1] + right[1] * lx + forward[1] * ly];
 }
+
+/** World placement of a town piece: [x, z] and the three.js yaw that turns its front (+Z) toward its face point. */
+export function homePiece(side, name) {
+  const {at, face} = HOME_LAYOUT[name], [x, z] = homePoint(side, at), [fx, fz] = homePoint(side, face);
+  return {x, z, yaw: Math.atan2(fx - x, fz - z)};
+}
+/** World [x, z] of a point given in a placed piece's own frame (three.js x, z). */
+export const pieceWorld = ({x, z, yaw}, [px, pz]) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x + px * c + pz * s, z - px * s + pz * c]; };
+/** A world point in a placed piece's own frame. */
+export const pieceLocal = ({x, z, yaw}, [wx, wz]) => { const c = Math.cos(yaw), s = Math.sin(yaw), dx = wx - x, dz = wz - z; return [dx * c - dz * s, dx * s + dz * c]; };
 
 const partIds = side => {
   const id = `battle-base-${side}`;
@@ -211,12 +233,44 @@ export function resolveHomeDomes(state, position, side, radius = .3) {
 }
 
 // Solid footprints (base-local circles and the barracks box) so nobody walks through the buildings.
+const K = HOME_SCALE;
 const SOLIDS = Object.freeze([
-  {at: [0, 0], r: 3.3}, {at: HOME_LAYOUT.fountain, r: 2.0},
-  ...HOME_LAYOUT.pylons.map(at => ({at, r: .9})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95})),
-  ...HOME_LAYOUT.gatePillars.map(at => ({at, r: .85})), ...HOME_LAYOUT.wards.map(at => ({at, r: .45})),
+  {at: [0, 0], r: 3.3 * K}, {at: HOME_LAYOUT.fountain, r: 2.0 * K},
+  ...HOME_LAYOUT.pylons.map(at => ({at, r: .9 * K})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1 * K})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95 * K})),
+  ...HOME_LAYOUT.gatePillars.map(at => ({at, r: .85 * K})), ...HOME_LAYOUT.wards.map(at => ({at, r: .45 * K})),
 ]);
-const BARRACKS = Object.freeze({half: [3.2, 2.2], yaw: .55});
+const BARRACKS = Object.freeze({half: [3.2 * K, 2.2 * K], yaw: .55});
+// Town pieces' solid parts in their own frame: boxes {at, half} and circles {at, r}. Taverns are open-fronted halls
+// you walk into (walls, bar, tables and posts are solid); the shop stall is one box; the mill is its tower and hopper.
+const KEEP_TAVERN = Object.freeze([
+  {at: [0, -3], half: [4.2, .25]}, {at: [-4, -.1], half: [.25, 3.1]}, {at: [4, -.1], half: [.25, 3.1]},
+  {at: [0, -2.1], half: [2.55, .4]}, {at: [-2.2, .6], r: .75}, {at: [2.2, .6], r: .75}, {at: [-3.8, 2.8], r: .25}, {at: [3.8, 2.8], r: .25}]);
+export const TOWN_SOLIDS = Object.freeze({
+  tavern: KEEP_TAVERN,
+  neutralTavern: Object.freeze([
+    {at: [0, -4], half: [5.7, .25]}, {at: [-5.5, -.1], half: [.25, 4.1]}, {at: [5.5, -.1], half: [.25, 4.1]},
+    {at: [0, -2.9], half: [3.3, .4]}, ...[[-3, 1.6], [3, 1.6], [-3, -.6], [3, -.6]].map(at => ({at, r: .75})), {at: [-5.3, 3.8], r: .25}, {at: [5.3, 3.8], r: .25}]),
+  quartermaster: Object.freeze([{at: [0, 0], half: [2.5, 1.75]}]),
+  mill: Object.freeze([{at: [0, 0], r: 2.7}, {at: [0, 3.3], r: .7}, {at: [-2, 3], r: .45}]),
+});
+/** The shared tavern's placement, in the same shape as homePiece(). */
+export const neutralTavern = () => ({x: NEUTRAL_TAVERN.at[0], z: NEUTRAL_TAVERN.at[1], yaw: NEUTRAL_TAVERN.yaw});
+function pushOut(position, placed, solids, radius) {
+  for (const sol of solids) {
+    const [u, v] = pieceLocal(placed, [position[0], position[2]]), [cu, cv] = sol.at;
+    let nu = u, nv = v;
+    if (sol.r !== undefined) {
+      const du = u - cu, dv = v - cv, d = Math.hypot(du, dv), min = sol.r + radius;
+      if (d >= min) continue;
+      if (d > 1e-4) { nu = cu + du / d * min; nv = cv + dv / d * min; } else nu = cu + min;
+    } else {
+      const hu = sol.half[0] + radius, hv = sol.half[1] + radius, du = u - cu, dv = v - cv;
+      if (Math.abs(du) >= hu || Math.abs(dv) >= hv) continue;
+      if (hu - Math.abs(du) < hv - Math.abs(dv)) nu = cu + Math.sign(du || 1) * hu; else nv = cv + Math.sign(dv || 1) * hv;
+    }
+    [position[0], position[2]] = pieceWorld(placed, [nu, nv]);
+  }
+}
 /** World yaw (three.js, about +Y) of a base's gate; local +Z of a piece points out of the gate. */
 export const gateYaw = side => { const {forward} = homeFrame(side); return Math.atan2(forward[0], forward[1]); };
 export const barracksYaw = side => gateYaw(side) + (side === 'rivals' ? BARRACKS.yaw : -BARRACKS.yaw);
@@ -229,7 +283,8 @@ export function resolveHomeStructures(state, position, radius = .3) {
   if (!homeBattle(state)) return position;
   for (const side of ['party', 'rivals']) {
     const [cx, cz] = HOME_SITES[side];
-    if (Math.abs(position[0] - cx) > 20 || Math.abs(position[2] - cz) > 20) continue;
+    if (Math.abs(position[0] - cx) > 26 || Math.abs(position[2] - cz) > 26) continue;
+    for (const name of ['tavern', 'quartermaster', 'mill']) pushOut(position, homePiece(side, name), TOWN_SOLIDS[name], radius);
     for (const {at, r} of SOLIDS) {
       const [x, z] = homePoint(side, at), dx = position[0] - x, dz = position[2] - z, d = Math.hypot(dx, dz), min = r + radius;
       if (d >= min) continue;
@@ -247,6 +302,8 @@ export function resolveHomeStructures(state, position, radius = .3) {
     const [postX, postZ] = bellPostAt(side), ex = position[0] - postX, ez = position[2] - postZ, ed = Math.hypot(ex, ez), em = .3 + radius;
     if (ed < em && ed > 1e-4) { position[0] = postX + ex / ed * em; position[2] = postZ + ez / ed * em; }
   }
+  const n = NEUTRAL_TAVERN.at;
+  if (Math.abs(position[0] - n[0]) < 9 && Math.abs(position[2] - n[1]) < 9) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
   return position;
 }
 
@@ -284,14 +341,16 @@ export function restoreHomeBases(bases, tick) {
       const p = b.parts[n];
       if (!p || p.id !== id || p.kind !== kind || p.side !== side || p.maxHp !== partMaxHp(kind) || !num(p.hp, 0, p.maxHp) || !vec(p.position) || Math.abs(p.position[1]) > 200
         || (kind !== 'pylon' && !num(p.readyTick, 0, tick + 600))) bad();
-      return {id, kind, side, position: [...p.position], hp: p.hp, maxHp: p.maxHp, ...(kind === 'pylon' ? {} : {readyTick: p.readyTick}), ...(kind === 'ballista' ? manning(p, tick) : {})};
+      const [x, z] = homePoint(side, HOME_LAYOUT[kind === 'pylon' ? 'pylons' : kind === 'spire' ? 'spires' : 'ballistas'][+id.at(-1)]);
+      return {id, kind, side, position: [x, p.position[1], z], hp: p.hp, maxHp: p.maxHp, ...(kind === 'pylon' ? {} : {readyTick: p.readyTick}), ...(kind === 'ballista' ? manning(p, tick) : {})};
     });
     const extra = {};
-    for (const [k, span] of [['drinkReadyTick', HOME.drink.cooldown], ['bellReadyTick', HOME.bell.cooldown]]) {
+    for (const [k, span] of [['drinkReadyTick', 20 * 60], ['bellReadyTick', HOME.bell.cooldown]]) { // drinkReadyTick: older saves (drinks are per hero now)
       if (b[k] === undefined) continue;
       if (!num(b[k], 0, tick + span)) bad();
       extra[k] = b[k];
     }
+    const mill = restoreMill(b.mill, tick); if (mill) extra.mill = mill;
     return {id: b.id, side, position: [...b.position], hp: b.hp, maxHp: b.maxHp, level: b.level, shieldDownUntil: b.shieldDownUntil, fallenUntil: b.fallenUntil, parts, ...extra};
   });
 }
