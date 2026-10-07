@@ -199,12 +199,13 @@
         <section class="create-block">
           <button id="create" class="btn btn-primary btn-large" type="button">Play</button>
           <p class="hint">Joins the busiest world near you, or starts one if they’re all full.</p>
-          <button id="solo" class="btn btn-quiet" type="button">Play solo · no room service needed</button>
+          <!-- Kept for scripts; the welcome screen is just role + Play + guides now. -->
+          <button id="solo" class="btn btn-quiet" type="button" hidden>Play solo · no room service needed</button>
         </section>
 
         <div class="divider" role="presentation"><span>or</span></div>
 
-        <!-- Shown only for invite links (?room=…); quick play replaced typing codes. -->
+        <!-- Never shown: Play joins an invite link's world (?room=…) directly; quick play replaced typing codes. -->
         <section id="joinBlock" class="join-block" aria-labelledby="joinTitle" hidden>
           <h2 id="joinTitle" class="join-title">Join a friend</h2>
           <p id="inviteNote" class="invite-note" hidden></p>
@@ -229,7 +230,7 @@
       </div>
     </div>
 
-    <details id="savedWorlds" class="saved">
+    <details id="savedWorlds" class="saved" hidden>
       <summary>Bring back a saved world</summary>
       <div class="saved-body">
         <p id="savedSummary" class="hint">Worlds save automatically in this browser while you play.</p>
