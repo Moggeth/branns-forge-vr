@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>Keep ring lab</title><style>body{margin:0;background:#20242a}canvas{display:block}</style>
+<script type="module">
+// Review page for the ring keeps: the real carved terrain (shared/terrain.js baseHeight) around a keep corner, the base
+// (client/home-base-view.js) and its town (client/home-town-view.js) with both Blender kits. ?w=&h= sets the canvas.
+import * as T from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createSimulation} from '../shared/simulation.js';
+import {baseHeight} from '../shared/terrain.js';
+import {HOME_SITES} from '../shared/home-bases.js';
+import {createHomeBaseView} from '../client/home-base-view.js';
+import {createHomeTownView} from '../client/home-town-view.js';
+const q=new URLSearchParams(location.search),W=+q.get('w')||1280,H=+q.get('h')||720;
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.5;room.dispose();scene.background=new T.Color(0xa9c3d8);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x4a5a2a,1.3));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.position.set(-30,50,20);scene.add(sun);
+// The real ground: the shared height field over the whole map, coloured by height so cliffs read from above.
+const g=new T.PlaneGeometry(120,120,160,160).rotateX(-Math.PI/2),pos=g.attributes.position,col=new Float32Array(pos.count*3);
+for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),h=baseHeight(x,z);pos.setY(i,h);const t=Math.min(1,Math.max(0,h/12));col.set([.37+.25*t,.48+.07*t,.23+.3*t],i*3);}
+g.setAttribute('color',new T.BufferAttribute(col,3));g.computeVertexNormals();
+scene.add(new T.Mesh(g,new T.MeshStandardMaterial({vertexColors:true,roughness:1,flatShading:true})));
+const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene}),town=createHomeTownView({scene});
+const cam=new T.PerspectiveCamera(50,W/H,.1,400);let last=performance.now();
+function frame(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);view.update(dt,cam,sim.snapshot().tick);town.update(dt);last=now;renderer.render(scene,cam);}
+const sync=()=>{const s=sim.snapshot();view.sync(s);town.sync(s);};
+const load=(url,fn)=>new Promise((ok,bad)=>new GLTFLoader().load(url,gl=>ok(fn(gl)),undefined,bad));
+window.lab={sim,view,town,
+ loadKits:async()=>{const a=await load('/assets/bases_kit.glb',gl=>view.installKit(gl));const b=await load('/assets/town_kit.glb',gl=>town.installKit(gl));
+  const c=await load('/assets/keep_ballistas.glb',gl=>view.installKeepKit?.(gl)).catch(()=>false);sync();return [a,b,c];},
+ // mode: 'top' straight down over the keep, 'aerial' from the lane, 'back' from behind over the pass.
+ at:(side='party',mode='aerial')=>{const c=HOME_SITES[side],f=side==='party'?[1,1]:[-1,-1],n=Math.SQRT1_2;
+  if(mode==='top'){cam.position.set(c[0]-f[0]*n*4,62,c[1]-f[1]*n*4);cam.up.set(f[0],0,f[1]);cam.lookAt(c[0]-f[0]*n*4,0,c[1]-f[1]*n*4);}
+  else if(mode==='back'){cam.up.set(0,1,0);cam.position.set(c[0]-f[0]*n*26,16,c[1]-f[1]*n*26);cam.lookAt(c[0],1,c[1]);}
+  else{cam.up.set(0,1,0);cam.position.set(c[0]+f[0]*n*34+f[1]*n*10,20,c[1]+f[1]*n*34-f[0]*n*10);cam.lookAt(c[0]-f[0]*n*3,0,c[1]-f[1]*n*3);}
+  sync();frame();},
+ step:n=>{for(let i=0;i<n;i++)sim.step();sync();},
+ frame};
+sync();
+</script>

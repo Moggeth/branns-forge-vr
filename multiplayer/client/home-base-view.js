@@ -176,7 +176,7 @@ export function createHomeBaseView({scene}) {
     const gateYaw = baseGateYaw(side); // local +Z points out of the gate
     const K = HOME_SCALE; // buildings grow with the widened keep; ballistas keep their crew size
     const place = (obj, local, extraYaw = 0, scale = K) => { const [x, z] = homePoint(side, local); obj.position.set(x, terrainHeight(snapshot, x, z, false), z); obj.rotation.y = gateYaw + extraYaw; obj.scale.multiplyScalar(scale); group.add(obj); return obj; };
-    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12 / K, 9.5]); place(plaza, [0, 0]); plaza.position.y += .02;
+    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12, 9.5]); place(plaza, [0, 0], 0, 1); plaza.position.y += .02;
     const heart = buildHeart(side, M); place(heart.group, [0, 0], 0, 1.25 * K); tag(heart.group, data.id);
     place(buildBarracks(side, M), HOME_LAYOUT.barracks, barracksYaw(side) - gateYaw);
     const fountain = place(buildFountain(side, M), HOME_LAYOUT.fountain);

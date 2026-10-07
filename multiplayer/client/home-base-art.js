@@ -70,8 +70,9 @@ export function buildKitBase(kit, data, ctx) {
   const stone = kit.mats.get(side === 'rivals' ? 'Basalt' : 'Stone');
   const disc = new THREE.CylinderGeometry(9.5, 9.7, .14, side === 'rivals' ? 6 : 8, 1);
   const uv = disc.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 7, uv.getY(i) * 7);
-  disc.setAttribute('color', new THREE.BufferAttribute(new Float32Array(disc.attributes.position.count * 3).fill(.82), 3));
-  const plaza = new THREE.Mesh(disc, stone); place(plaza, [0, 0], Math.PI / 8, staticRoot); plaza.position.y += .03;
+  // RGBA like the kit's own colours: a 3-wide colour would drop out of the merged Stone mesh and turn it black.
+  disc.setAttribute('color', new THREE.BufferAttribute(new Float32Array(disc.attributes.position.count * 4).map((_, i) => i % 4 === 3 ? 1 : .82), 4));
+  const plaza = new THREE.Mesh(disc, stone); place(plaza, [0, 0], Math.PI / 8, staticRoot, 1); plaza.position.y += .03; // the ring plaza stays inside the buildings
 
   // Heart forge: static plinth and forge; the crystal and its two rings hover over it.
   const heartMain = place(clone('Heart'), [0, 0], 0, staticRoot); tag(heartMain, data.id);
