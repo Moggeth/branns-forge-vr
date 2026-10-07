@@ -8,7 +8,7 @@ import {performance} from 'node:perf_hooks';
 
 const suite = [
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','frame-inbox','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
-  'proximity-voice','voice-recovery','voice-topology','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
+  'proximity-voice','voice-recovery','voice-topology','voice-zones','ice-servers','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
   'ability-readiness','ability-warmup','shared-skin-palettes','merged-creature-skins','home-light-stability','state-codec-performance','entity-id-allocation','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','meadow-timing-guard','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
@@ -33,7 +33,7 @@ const suite = [
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','grove-growth','spell-schools','remains-physics',
-  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','home-base-kit','home-ballista','forgeling-kit','hero-progress','dragon-streak','heavy-launcher','turn-phone','stormreel',
+  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','home-base-kit','home-ballista','forgeling-kit','hero-progress','home-town','home-town-view','dragon-streak','heavy-launcher','turn-phone','stormreel',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

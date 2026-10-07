@@ -49,7 +49,8 @@ export function placeVein(state, ctx, slot, {previous = null, initial = false} =
   const R = VEIN_RULES, seed = state.seed | 0, tick = state.tick | 0;
   const live = (state.deposits || []).filter(d => !d.depleted), trees = worldTrees(state);
   for (let a = 0; a < R.attempts; a++) {
-    const u = (((slot + .5 + (unit(seed, key(slot, tick, a * 4)) - .5) * 1.5) / R.slots) * 4 + 4) % 4;
+    // Later attempts roam twice as far along the rim, so a slot whose stretch lies under a keep's dome still finds ground.
+    const u = (((slot + .5 + (unit(seed, key(slot, tick, a * 4)) - .5) * (a < R.attempts / 2 ? 1.5 : 3)) / R.slots) * 4 + 4) % 4;
     const depth = unit(seed, key(slot, tick, a * 4 + 1)), s = R.inner + (R.outer - R.inner) * depth;
     const [px, pz] = squarePoint(u), x = +(px * s).toFixed(3), z = +(pz * s).toFixed(3);
     if (previous && Math.hypot(previous.x - x, previous.z - z) < R.moveAway) continue;

@@ -54,7 +54,16 @@ const RECOVERY = {
  "no_tree": "No standing tree is close enough to wake. Aim at a tree (stumps and felled trees cannot wake); no mana was spent.",
  "machine_broken": "That ballista is broken. Mend it with your hammer, then man it again.",
  "squad_full": "Your side already has a full army in the field. Ring the bell again when some troops have fallen.",
- "base_fallen": "Your home base is rebuilding. Its fountain and bell wake up again when it is back.",
+ "base_fallen": "Your home base is rebuilding. Its well, bell, shop and mill wake up again when it is back.",
+ "invalid_item": "The Quartermaster doesn’t stock that. Close the shop and open it again to refresh the shelves.",
+ "already_owned": "You already carry one of those. Each item only works once, so pick something new.",
+ "slots_full": "All six pockets are full. Sell an item back for half its price to make room.",
+ "not_enough_gold": "Not enough Gold yet. Fell enemy troops, or tip gold ore, copper ore and stone into your keep’s mill.",
+ "not_owned": "That item isn’t in your pockets any more.",
+ "no_draught": "No Healing Draught left. Drink at your keep’s healing well to fill it again.",
+ "nothing_to_mill": "The mill takes gold ore, copper ore and stone (in fours). Mine some and bring it back to the hopper.",
+ "mill_busy": "The mill has a long queue already. Wait for a few customers to be paid out.",
+ "tavern_peace": "No fighting in the tavern. Step outside if you want a scrap.",
  "ent_limit": "Twelve ents are already awake. Wait for some to root again or fall before waking more; no mana was spent."
 };
 
@@ -62,7 +71,9 @@ export function actionError(code,{world={},player={},command={}}={}){
  const tick=world.tick||0,wait=(last,duration)=>Math.max(.1,(duration-(tick-(last??-1000)))/60).toFixed(1);
  if(code==='out_of_reach'&&command.action==='dragon')return 'That spot is too far from your dragon. Aim at ground closer to the circle it flies.';
  if(code==='cooldown'){
-  if(command.action==='homeDrink')return `The fountain is refilling: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.drinkReadyTick||tick)-tick)/60).toFixed(0)}s.`;
+  if(command.action==='homeDrink')return `Let that last drink settle: ${wait(player.drinkTick,600)}s until the well serves you again.`;
+  if(command.action==='drinkDraught')return `Still gulping: your next draught is ready in ${wait(player.draughtTick,90)}s.`;
+  if(command.action==='tavernAle')return `You're still full of Hearty Ale: ${Math.ceil(((player.heartyUntil||tick)-tick)/60)}s before the barkeep pours another.`;
   if(command.action==='homeBell')return `The bell is still ringing out: ${Math.max(.1,((world.battle?.bases?.find(b=>b.side===(player.side||'party'))?.bellReadyTick||tick)-tick)/60).toFixed(0)}s until the next squad can be called.`;
   if(command.type==='role')return `Perspective switch is recovering: ${wait(player.roleTick,120)}s.`;
   if(command.type==='cast')return `Magic is recovering: ${wait(player.castTick,45)}s.`;
@@ -85,6 +96,8 @@ export function actionError(code,{world={},player={},command={}}={}){
   return `Terrain storage is full (${world.edits?.length||0} edits). Mine crystal walls to clear space, or save and reset this world. Waiting does not clear terrain.`;
  }
  if(command.action==='inventionUse'&&code==='not_needed')return 'The Stormspire is already full of charge.';
+ if(command.action==='homeDrink'&&code==='not_needed')return 'You’re hale and your draught is full. Come back after a scrap.';
+ if(command.action==='drinkDraught'&&code==='not_needed')return 'You’re already at full health. Save the draught for a tight spot.';
  if(command.action==='inventionUse'&&code==='machine_manned')return 'Another Hero is wearing this Stormspire\'s pack. Wait for them to hang it back up.';
  if(command.action==='inventionUse'&&code==='insufficient_resources'&&command.feed)return 'You need a Crystal to feed the Stormspire.';
  if(code==='rate_limited')return 'Too many network requests arrived together. Wait up to a minute before creating or joining another room.';

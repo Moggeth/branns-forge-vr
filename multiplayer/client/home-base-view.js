@@ -3,10 +3,11 @@
 // dome shimmer and fades, heart bob, turret aim, zaps and ballista bolts.
 // Code-built stand-ins draw until the Blender kit (client/home-base-art.js) loads, then the bases rebuild from it.
 import * as THREE from 'three';
-import {HOME, HOME_LAYOUT, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
+import {HOME, HOME_LAYOUT, HOME_SCALE, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
 import {terrainHeight} from '../shared/terrain.js';
 import {buildKitBase, prepareHomeKit} from './home-base-art.js';
 import {homeBallistaYaw} from '../shared/home-ballista.js';
+import {createKeepBallistaView} from './keep-ballista-view.js';
 
 const STYLE = {
   party: {stone: 0xb9ad97, trim: 0xc49a52, glow: 0x5fb4ff, wood: 0x8a6440, roof: 0x3d4a5c, accent: 0x2f6fd0, dome: new THREE.Color(0x58b4ff)},
@@ -36,6 +37,9 @@ export function createHomeBaseView({scene}) {
   const root = new THREE.Group(); root.name = 'home-bases'; scene.add(root);
   const bases = new Map(), effects = [], effectPool = [], localAim = new Map();
   let snapshot = null, enabled = false, kit = null;
+  // The gate ballistas: once their kit loads, each base's ballista parts are taken over by Sunlance / Gnashjaw rigs.
+  const keep = createKeepBallistaView({root, height: (x, z) => terrainHeight(snapshot, x, z, false)});
+  const adoptKeep = b => { for (const p of b.parts.values()) if (p.kind === 'ballista') keep.adopt(p); };
   // Lights stay in the renderer even when the bases are hidden. Changing the
   // visible light count invalidates EVERY lit shader (including terrain/trees).
   // Two fixed slots keep join/leave/mode changes from recompiling the whole world.
@@ -170,16 +174,17 @@ export function createHomeBaseView({scene}) {
     const side = data.side, M = shared[side], group = new THREE.Group();
     group.name = `home-${side}`; root.add(group);
     const gateYaw = baseGateYaw(side); // local +Z points out of the gate
-    const place = (obj, local, extraYaw = 0) => { const [x, z] = homePoint(side, local); obj.position.set(x, terrainHeight(snapshot, x, z, false), z); obj.rotation.y = gateYaw + extraYaw; group.add(obj); return obj; };
-    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12, 9.5]); place(plaza, [0, 0]); plaza.position.y += .02;
-    const heart = buildHeart(side, M); place(heart.group, [0, 0]); heart.group.scale.setScalar(1.25); tag(heart.group, data.id);
+    const K = HOME_SCALE; // buildings grow with the widened keep; ballistas keep their crew size
+    const place = (obj, local, extraYaw = 0, scale = K) => { const [x, z] = homePoint(side, local); obj.position.set(x, terrainHeight(snapshot, x, z, false), z); obj.rotation.y = gateYaw + extraYaw; obj.scale.multiplyScalar(scale); group.add(obj); return obj; };
+    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12 / K, 9.5]); place(plaza, [0, 0]); plaza.position.y += .02;
+    const heart = buildHeart(side, M); place(heart.group, [0, 0], 0, 1.25 * K); tag(heart.group, data.id);
     place(buildBarracks(side, M), HOME_LAYOUT.barracks, barracksYaw(side) - gateYaw);
     const fountain = place(buildFountain(side, M), HOME_LAYOUT.fountain);
     const parts = new Map();
     for (const part of data.parts) {
       const local = part.kind === 'pylon' ? HOME_LAYOUT.pylons[+part.id.at(-1)] : part.kind === 'spire' ? HOME_LAYOUT.spires[+part.id.at(-1)] : HOME_LAYOUT.ballistas[+part.id.at(-1)];
       const built = part.kind === 'pylon' ? buildPylon(side, M) : part.kind === 'spire' ? buildSpire(side, M) : buildBallista(side, M);
-      place(built.group, local); tag(built.group, part.id); built.kind = part.kind; built.alive = 1; built.data = part; parts.set(part.id, built);
+      place(built.group, local, 0, part.kind === 'ballista' ? 1 : K); if (part.kind !== 'ballista') built.scale = K; tag(built.group, part.id); built.kind = part.kind; built.alive = 1; built.data = part; parts.set(part.id, built);
     }
     const dome = domeFor(side); group.add(dome);
     return {side, id: data.id, group, heart, fountain, parts, dome, domeAlpha: 1, heartAlive: 1, data};
@@ -202,13 +207,15 @@ export function createHomeBaseView({scene}) {
     if (!enabled) { for (const light of heartLights.values()) light.intensity = 0; return; }
     for (const data of s.battle.bases) {
       let b = bases.get(data.side);
-      if (!b) { b = buildBase(data); bases.set(data.side, b); }
+      if (!b) { b = buildBase(data); bases.set(data.side, b); adoptKeep(b); }
       b.data = data; syncHeartLight(b);
       for (const part of data.parts) { const p = b.parts.get(part.id); if (p) p.data = part; }
     }
+    keep.sync(s);
   }
 
   function disposeBase(b) {
+    for (const p of b.parts.values()) keep.release(p);
     b.group.removeFromParent(); b.dome.material.dispose();
     for (const m of b.baked || []) m.geometry.dispose();
     if (b.heart.proxy) { b.heart.proxy.geometry.dispose(); b.heart.proxy.material.dispose(); }
@@ -223,6 +230,7 @@ export function createHomeBaseView({scene}) {
 
   function event(ev) {
     if (!enabled) return;
+    keep.event(ev);
     if (ev.kind === 'battle_wave') for (const b of bases.values()) b.bellSwing = 1;
     if (ev.kind === 'home_bell') { const b = bases.get(ev.side); if (b) b.bellSwing = 1.4; }
     // A drink lifts a ring of the fountain's own glow; a mend sparkles once up the mended piece.
@@ -230,7 +238,7 @@ export function createHomeBaseView({scene}) {
     if (ev.kind === 'home_turret_fire') {
       const b = bases.get(ev.side), color = STYLE[ev.side]?.glow ?? 0xffffff, from = [...ev.from];
       const tp = b?.parts.get(ev.id);
-      from[1] += ev.turret === 'spire' ? (tp?.tipY ?? (ev.side === 'rivals' ? 5.2 : 6.6)) : 1.45;
+      from[1] += ev.turret === 'spire' ? (tp?.tipY ?? (ev.side === 'rivals' ? 5.2 : 6.6)) * (tp?.scale ?? HOME_SCALE) : 1.45;
       const to = [ev.to[0], ev.to[1] + 1.1, ev.to[2]];
       spawnEffect(ev.turret === 'spire' ? 'zap' : 'bolt', from, to, color);
       const p = b?.parts.get(ev.id); if (p?.head) p.targetAim = Math.atan2(ev.to[0] - ev.from[0], ev.to[2] - ev.from[2]);
@@ -242,8 +250,9 @@ export function createHomeBaseView({scene}) {
     }
   }
 
-  function update(dt, camera) {
+  function update(dt, camera, tick = snapshot?.tick) {
     if (!enabled || !snapshot) return;
+    keep.update(dt, tick, camera);
     const now = performance.now(), t = now / 1000, k = 1 - Math.exp(-dt * 6);
     for (const b of bases.values()) {
       const data = b.data, fallen = data.fallenUntil > snapshot.tick, pylonsUp = data.parts.some(p => p.kind === 'pylon' && p.hp > 0), shield = !fallen && pylonsUp;
@@ -263,7 +272,7 @@ export function createHomeBaseView({scene}) {
         const alive = p.data.hp > 0 && !fallen ? 1 : 0; p.alive += (alive - p.alive) * k;
         if (p.kind === 'pylon') { p.column.scale.y = .25 + .75 * p.alive; p.crown.visible = p.alive > .2; p.orb.position.y = (p.orbY ?? .7) + Math.sin(t * 2 + p.group.position.x) * .12; if (p.orbY !== undefined) p.orb.rotation.y = t * .8; }
         else if (p.kind === 'spire') { p.tip.visible = p.alive > .2; p.halo.rotation.z = t * 1.5; p.tip.position.y = p.tipY * (.35 + .65 * p.alive); }
-        else {
+        else if (!p.keep) {
           // Manned: the operator's own predicted aim drives it at once; others see the replicated aim, eased. Unmanned: it tracks its last target.
           const mine = localAim.get(p.data.id), aim = mine || (p.data.operator ? {yaw: p.data.aimYaw || 0, pitch: p.data.aimPitch || 0} : null);
           const want = aim ? homeBallistaYaw(b.side) + aim.yaw + Math.PI : p.targetAim, wantPitch = aim ? aim.pitch : 0, kk = mine ? 1 : k;
@@ -301,7 +310,8 @@ export function createHomeBaseView({scene}) {
     return out;
   }
 
-  const setLocalAim = (id, aim) => { if (aim) localAim.set(id, aim); else localAim.delete(id); };
-  return {sync, event, update, targets, installKit, setLocalAim, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
-    dispose() { for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
+  const setLocalAim = (id, aim) => { keep.setLocalAim(id, aim); if (aim) localAim.set(id, aim); else localAim.delete(id); };
+  function installKeepKit(gltf) { if (!keep.install(gltf)) return false; for (const b of bases.values()) adoptKeep(b); return true; }
+  return {sync, event, update, targets, installKit, installKeepKit, keep, setLocalAim, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
+    dispose() { keep.dispose(); for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }

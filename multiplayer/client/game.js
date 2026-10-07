@@ -10,8 +10,13 @@ import {createSiegebirdAim} from './siegebird-aim.js';
 import {createInventionView} from './invention-view.js';
 import {createInventionModel} from './invention-art.js';
 import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo,STRUCTURES} from '../shared/inventions.js';
-import {HOME_MANNED,homeBallistaSeat,homeBallistaYaw,isHomeBallistaId} from '../shared/home-ballista.js';
+import {HOME_MANNED,homeBallistaSeat,homeBallistaYaw,isHomeBallistaId,keepStyle} from '../shared/home-ballista.js';
+import {createKeepBallistaAudio} from './keep-ballista-audio.js';
 import {HOME as HOME_RULES,HOME_LAYOUT,bellPostAt,homePoint} from '../shared/home-bases.js';
+import {SHOP,counterAt} from '../shared/home-shop.js';
+import {MILL,millAt} from '../shared/home-mill.js';
+import {TAVERN,taverns,tavernBar} from '../shared/taverns.js';
+import {itemBonus} from '../shared/hero-items.js';
 import {createPresentationClock} from './presentation-clock.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
@@ -71,6 +76,10 @@ import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {earthLineEdits} from '../shared/earth-spells.js';
 import {acousticPosition} from './voice-audio.js';
+import {createVoiceIndicators} from './voice-indicators.js';
+import {setVoiceZoneResolver} from './voice-zones.js';
+// Tavern rules arrive with the keep-buildings work; an empty glob keeps this build working before then.
+const tavernRules = Object.values(import.meta.glob('../shared/taverns.js', {eager: true}))[0] || {};
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -121,7 +130,7 @@ import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, onNotice = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, voiceActivity = null, onNotice = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'grove', playerId = null;
   let requestedActive=false;
@@ -387,6 +396,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const stormKick=new THREE.Vector3(),stormMuzzle=new THREE.Vector3(),stormCam=new THREE.Vector3();
   // Probes and the foes on a live arc follow the drawn body: look each part's node up once per visual, not every frame.
   function stormPartNode(a,part){if(!a?.visual)return null;if(a.stormParts?.visual!==a.visual)a.stormParts={visual:a.visual,nodes:{}};return a.stormParts.nodes[part]||(a.stormParts.nodes[part]=partAnchor(a.visual,part));}
+  const keepAudio=createKeepBallistaAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const stormView=createStormreelView({scene,lightning,height:(x,z)=>heightAt(x,z,snapshot.edits),localId:()=>playerId,
     actorPose:id=>{const e=actors.get(`p:${id}`);return e?{position:e.root.position,yaw:e.data.yaw||0}:null;},
     localPose:()=>({position:localPosition,yaw}),
@@ -581,6 +591,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     node.traverse(child => { child.geometry?.dispose(); if (child.material) materials.add(child.material); });
     materials.forEach(material => material.dispose());
   }
+  // Taverns are voice rooms: insideTavern(state, position) returns the tavern ({id, label}) or null.
+  const voiceBadges = createVoiceIndicators({scene});
+  setVoiceZoneResolver('home-taverns', position => tavernRules.insideTavern?.(snapshot, position) || null);
   function syncActors() {
     const present = new Set();
     for (const data of [...snapshot.players, ...snapshot.enemies]) {
@@ -715,6 +728,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(disposed){disposeResources(gltf.scene);return;}
     if(!inventionVisual.installHomeKit(gltf)){disposeResources(gltf.scene);report('Home base models are incomplete; the simpler bases stay in place.');}
   },undefined,()=>report('Home base models unavailable; the simpler bases stay in place.'));
+  loader.load('/assets/town_kit.glb',gltf=>{ // Blender-built taverns, Quartermaster stalls and Gold mills; code-built stand-ins until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!inventionVisual.installTownKit(gltf)){disposeResources(gltf.scene);report('Town models are incomplete; the simpler taverns, stalls and mills stay.');}
+  },undefined,()=>report('Town models unavailable; the simpler taverns, stalls and mills stay.'));
+  loader.load('/assets/keep_ballistas.glb',gltf=>{ // the Sunlance and Gnashjaw gate ballistas (assets-source/keep-ballistas)
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!inventionVisual.installKeepKit(gltf)){disposeResources(gltf.scene);report('Gate ballista models are incomplete; the older ballistas stay in place.');}
+  },undefined,()=>report('Gate ballista models unavailable; the older ballistas stay in place.'));
   loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built landmarks and Heartstone shells; the code-built ones stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
     if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Landmark models are incomplete; the simpler versions stay in place.');return;}
@@ -1001,8 +1022,17 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Home base hands-on pieces: a deep bell, a bright drink chord, a hammer's chime as a part knits back together.
     if(event.kind==='home_bell'){homeSound.chord(event.position,[-12,-5,0],.16,180,4.5);if(event.id===playerId)report(`The bell rings out: ${event.count} troops march from the barracks.`);}
     if(event.kind==='home_drink'){homeSound.chord(event.position,[7,12,16],.08,60,1.6);if(event.id===playerId)report('A long cool drink. Health restored.');}
+    // Keep towns: coins clink, the mill creaks, the bar pours, a draught glugs.
+    if(event.kind==='gold_earned'&&event.id===playerId)homeSound.chord(event.position,[19,24],.05,50,.6);
+    if(event.kind==='mill_coin'&&event.id===playerId)homeSound.bell(event.position,event.owed>0?19:24,.035,.35);
+    if(event.kind==='mill_feed'){homeSound.chord(event.position,[-5,-1,2],.06,90,.9);if(event.id===playerId)report(`Into the hopper it goes: ${event.gold} Gold to grind. Lean on the capstan (hold R) to grind faster.`);}
+    if(event.kind==='mill_crank')homeSound.chord(event.position,[-10,-8],.05,120,.8);
+    if(event.kind==='shop_buy'){homeSound.chord(event.position,[12,16,19,24],.07,55,1.2);}
+    if(event.kind==='shop_sell')homeSound.chord(event.position,[19,16],.05,60,.8);
+    if(event.kind==='tavern_ale'){homeSound.chord(event.position,[0,4,7,12],.06,80,1.4);if(event.id===playerId)report('A Hearty Ale! Fully mended, and blows land 20% softer for three minutes.');}
+    if(event.kind==='draught_drunk'){homeSound.chord(event.position,[7,11,14],.06,50,1);if(event.id===playerId)report(`Glug. Healing Draught down; ${event.draughts} left. Refill at your keep's well.`);}
     if(event.kind==='home_part_repaired'){homeSound.bell(event.position,event.mended?12:7,.08,1.2);if(event.mended&&event.by===playerId)report(`The ${event.part} is mended.`);}
-    if(event.kind==='home_turret_fire'&&event.turret==='ballista')materialAudio?.play({...event,kind:'hit',material:'metal',energy:event.manned?2:1.4,position:event.from},listenerPose(),snapshot.tick); // the bow string snaps
+    if(event.kind.startsWith('keep_ballista_')){keepAudio.event(event,event.by===playerId);keepNotice(event);}
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
 
     // A Timberline bolt burying itself: a deep thunk in earth or stone, a thud in a body.
@@ -1170,7 +1200,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   let inspectFit=null,inspectFitModel=null,inspectBlocked=null;
   function wyrmIndicators(){const r=weaponReadiness(snapshot.players.find(p=>p.id===playerId),'wyrmspout',snapshot.tick||0);return {charge:r.specialReady,locked:r.overheated};}
   function startInspect(){const st=weapons.state();inspectBlocked=!active?'inactive':role!=='hero'?'role':renderer.xr.isPresenting?'xr':manned?'manned':tool==='limb'?'limb':!weaponAnchor.visible?'hidden':!axeModel?'loading':weaponSwap.busy?'swapping':st.firing?'firing':st.drawing?'drawing':null;if(inspectBlocked)return;unlockAudio();inspect.press();if(Number.isFinite(inspectPinAt))inspect.pin(inspectPinAt);}
-  function primaryDown(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){fireManned();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(tool==='stormreel'){stormWeapon.begin();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
+  function primaryDown(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){mannedPress();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(tool==='stormreel'){stormWeapon.begin();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
   function special(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='stormreel'){reelStorm();return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
   // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
   // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
@@ -1179,18 +1209,24 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const p=selfPlayer();if(!p)return;if((snapshot.tick||0)-(p.specialTick??-1000)<specialCooldown('bow',p)){onAction('special',{});return;} // the host explains the recharge
     const aim=projectileAim();weapons.cancel();emberwingMotion.loose(performance.now()/1000);onAction('special',{origin:aim.origin,direction:aim.direction});
   }
-  function primaryUp(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',false);return;}if(active&&role==='hero'){if(tool==='stormreel')stormWeapon.end();weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
+  function primaryUp(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',false);return;}if(active&&role==='hero'&&manned){mannedRelease();return;}if(active&&role==='hero'){if(tool==='stormreel')stormWeapon.end();weapons.end();if(wallAim&&renderer.xr.isPresenting)releaseWallAim();}}
   function collectibleVisible(from,to,id){const delta=new THREE.Vector3(...to).sub(new THREE.Vector3(...from)),length=delta.length();if(length<.01)return true;
     const ray=new THREE.Raycaster(new THREE.Vector3(...from),delta.multiplyScalar(1/length),0,Math.max(0,length-.06));
     return !ray.intersectObjects(content.targets().concat([shrine,startingWorld.group]),true).some(h=>surfaceVisible(h.object)&&resolveHit(h)?.targetId!==id);
   }
   function findCollectible(){const p=snapshot.players.find(p=>p.id===playerId);return p?nearestCollectible(snapshot,{...p,position:localPosition.toArray()},{height:(x,z)=>heightAt(x,z,snapshot.edits),visible:collectibleVisible}):null;}
   // The gate ballistas of your own home base: walk up and press Use to man one, like a Timberline.
-  function homeBallista(id){if(!isHomeBallistaId(id))return null;for(const base of snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases:[]){const p=base.parts.find(p=>p.id===id);if(p)return base.fallenUntil>(snapshot.tick??0)?null:{id:p.id,type:'homeBallista',side:p.side,position:p.position,yaw:homeBallistaYaw(p.side),aimYaw:p.aimYaw||0,aimPitch:p.aimPitch||0,operator:p.operator||null,readyTick:p.readyTick,fireTick:p.fireTick,hp:p.hp};}return null;}
+  function homeBallista(id){if(!isHomeBallistaId(id))return null;for(const base of snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases:[]){const p=base.parts.find(p=>p.id===id);if(p)return base.fallenUntil>(snapshot.tick??0)?null:{id:p.id,type:'homeBallista',side:p.side,position:p.position,yaw:homeBallistaYaw(p.side),aimYaw:p.aimYaw||0,aimPitch:p.aimPitch||0,operator:p.operator||null,readyTick:p.readyTick,fireTick:p.fireTick,hp:p.hp,hook:p.hook||null,drawTick:p.drawTick??null,style:keepStyle(p.side)};}return null;}
   function nearHomeBallista(){const self=snapshot.players.find(p=>p.id===playerId);let best=null,d=HOME_MANNED.reach;for(const base of snapshot.battle?.v===2?snapshot.battle.bases:[])if(base.side===(self?.side||'party'))for(const p of base.parts){if(p.kind!=='ballista'||p.hp<=0)continue;const k=Math.hypot(p.position[0]-localPosition.x,p.position[2]-localPosition.z);if(k<=d){d=k;best=p.id;}}return best&&homeBallista(best);}
   function useHomeBallista(id){const self=snapshot.players.find(p=>p.id===playerId),b=homeBallista(id);if(!self||!b||b.hp<=0||b.side!==(self.side||'party')||renderer.xr.isPresenting)return false;if(manned?.id===b.id){dismountMachine();return true;}if(Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>HOME_MANNED.reach){report('Step up to the ballista to man it.');return true;}mountMachine(b);return true;}
-  // Fountain (drink) and barracks bell (send a squad now) of your own base; the host decides cooldowns.
-  function useHomePiece(){const self=snapshot.players.find(p=>p.id===playerId),base=snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases.find(b=>b.side===(self?.side||'party')):null;if(!self||!base||base.fallenUntil>(snapshot.tick??0))return false;const near=([x,z],r)=>Math.hypot(x-localPosition.x,z-localPosition.z)<=r;
+  // Healing well (drink), barracks bell (send a squad now), Quartermaster (shop), Gold mill (feed / crank) and any
+  // tavern's bar (Hearty Ale); the host decides reach and cooldowns.
+  function useHomePiece(){const self=snapshot.players.find(p=>p.id===playerId),near=([x,z],r)=>Math.hypot(x-localPosition.x,z-localPosition.z)<=r;if(!self)return false;
+    const bar=taverns(snapshot).find(t=>near(tavernBar(t),TAVERN.barReach));if(bar){unlockAudio();onAction('tavernAle',{});return true;}
+    const base=snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases.find(b=>b.side===(self?.side||'party')):null;if(!base||base.fallenUntil>(snapshot.tick??0))return false;
+    if(near(counterAt(base.side),SHOP.reach)){unlockAudio();onAction('openShop',{});return true;}
+    if(near(millAt(base.side,MILL.crank),MILL.crankReach)){unlockAudio();onAction('millCrank',{});return true;}
+    if(near(millAt(base.side,MILL.hopper),MILL.reach)){unlockAudio();onAction('millFeed',{});return true;}
     if(near(homePoint(base.side,HOME_LAYOUT.fountain),HOME_RULES.drink.reach)){unlockAudio();onAction('homeDrink',{});return true;}
     if(near(bellPostAt(base.side),HOME_RULES.bell.reach)){unlockAudio();onAction('homeBell',{});return true;}return false;}
   function useInvention(id){if(isHomeBallistaId(id))return useHomeBallista(id);const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
@@ -1237,9 +1273,24 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function mannedMachine(){if(!manned)return null;if(isHomeBallistaId(manned.id)){const b=homeBallista(manned.id);return b?.hp>0?b:null;}return snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0);}
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
     manned={id:b.id,yaw:b.aimYaw||0,pitch:b.aimPitch||0,yawRate:0,sentAt:0,sent:'',sinceTick:snapshot.tick??0};yaw=(b.yaw||0)+manned.yaw;pitch=manned.pitch;
-    onAction('inventionMount',{structureId:b.id});if(b.type==='homeBallista'){report(touchEnabled?'Manning the ballista. Drag to swing it, Attack fires, hold Wind to crank, Collect steps off.':'Manning the ballista. Mouse swings it, click fires, hold R to wind faster, E or Esc steps off.');return;}report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
-  function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
+    onAction('inventionMount',{structureId:b.id});if(b.type==='homeBallista'){report(keepStyle(b.side)==='sunlance'?(touchEnabled?'Manning the Sunlance. Drag to swing it, hold Attack to draw and let go to loose (let go on the golden flash for a Dawnbreak), Sight shows the arc, hold Wind to crank, Collect steps off.':'Manning the Sunlance. Mouse swings it, hold click to draw and let go to loose (let go on the golden flash for a Dawnbreak), hold right-click to see the arc, hold R to wind faster, E or Esc steps off.'):(touchEnabled?'Manning the Gnashjaw. Drag to swing it, Attack spits the harpoon, hold Wind to reel a catch in (Attack again yanks), Sight shows the arc, Collect steps off.':'Manning the Gnashjaw. Mouse swings it, click spits the harpoon, hold R to reel a catch in (click again to yank), hold right-click to see the arc, E or Esc steps off.'));return;}report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
+  function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);keepKeep()?.setLocalDraw(id,null);keepSight(null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
   function fireManned(){const b=mannedMachine();if(!b)return;unlockAudio();onAction('inventionUse',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
+  // The Sunlance draws while the button is held and looses on release; everything else fires on the press.
+  const keepKeep=()=>inventionVisual.homeKeep?.();
+  function mannedPress(){const b=mannedMachine();if(!b)return;if(b.type==='homeBallista'&&b.style==='sunlance'){unlockAudio();if((snapshot.tick??0)<b.readyTick){report('The Sunlance is still winding.');return;}keepKeep()?.setLocalDraw(b.id,performance.now());manned.perfectRang=false;keepAudio.drawStart({local:true});onAction('inventionDraw',{structureId:b.id});return;}fireManned();}
+  // The touch attack button's word while seated: what a press does on this machine right now.
+  function mannedVerb(){if(!manned)return null;const b=mannedMachine();if(b?.type!=='homeBallista')return 'Fire';return b.style==='sunlance'?'Draw':b.hook?'Yank':'Spit';}
+  function mannedRelease(){const b=mannedMachine(),keep=keepKeep();if(!b||!keep?.localDraw(b.id))return;keep.setLocalDraw(b.id,null);fireManned();}
+  function keepSight(b,draw){const keep=keepKeep();if(!keep)return null;return keep.sight(b,manned?{yaw:manned.yaw,pitch:manned.pitch}:{yaw:0,pitch:0},{charge:draw?.charge||0,perfect:!!draw?.perfect,visible:!!b&&scopeAmount>.05});}
+  function keepNotice(ev){
+    if(ev.kind==='keep_ballista_burst'&&ev.by===playerId)return;
+    const mine=manned&&ev.part===manned.id;if(!mine)return;
+    if(ev.kind==='keep_ballista_fire'&&ev.perfect)report('Dawnbreak!');
+    if(ev.kind==='keep_ballista_hook')report(touchEnabled?'Hooked! Hold Wind to reel it in, Attack yanks.':'Hooked! Hold R to reel it in, click to yank.');
+    if(ev.kind==='keep_ballista_chomp')report('Chomp!');
+    if(ev.kind==='keep_ballista_release'&&ev.reason==='snap')report('The chain snapped loose.');
+  }
   // Heavy traverse: the wanted aim is the mouse; the carriage accelerates toward it and tops out near 50 degrees/s.
   function updateManned(dt,now){
     const b=mannedMachine();
@@ -1267,7 +1318,12 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const b=manned&&!renderer.xr.isPresenting&&role==='hero'&&active?mannedMachine():null;
     document.body.classList.toggle('timberline-manned',!!b);
     if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}inventionVisual.setScoped(null);return;}
-    if(b.type==='homeBallista'){timberlineSight.hide();timberlineAmmoHud.set({label:'Ballista',bolts:1,state:timberlineReadiness(b).state,scoped:scopeAmount>.5});return;} // free bolts, no range ladder
+    if(b.type==='homeBallista'){ // free bolts; the sighting arc stands in for the range ladder
+      timberlineSight.hide();const keep=keepKeep(),draw=b.style==='sunlance'?keep?.localDraw(b.id):null,sight=keepSight(b,draw);
+      if(draw?.perfect&&!manned.perfectRang){manned.perfectRang=true;keepAudio.perfectBeat();}
+      if(b.hook&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1,reel:true});else if((snapshot.tick??0)<b.readyTick&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1});
+      const state=b.hook?(touchEnabled?'Hooked · hold Wind to reel':'Hooked · hold R to reel, click to yank'):draw?(draw.perfect?'Dawnbreak! Let go!':`Drawing · ${Math.round(draw.charge*100)}%`):timberlineReadiness(b).state;
+      timberlineAmmoHud.set({label:b.style==='sunlance'?'Sunlance':'Gnashjaw',bolts:1,state:sight?.visible&&sight.distance?`${state} · ${Math.round(sight.distance)} m`:state,scoped:scopeAmount>.5});return;}
     const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
     // The forecast arcs only show while sighting along the ladder, and fade in with it.
@@ -1278,7 +1334,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function crankNearby(now){
     if(!active||role!=='hero'||!(keys.has('KeyR')||crankHeld)||now-crankAt<150)return;
     const self=snapshot.players.find(p=>p.id===playerId),b=manned?mannedMachine():snapshot.inventions?.structures.find(b=>b.type==='timberline'&&b.hp>0&&b.side===(self?.side||'party')&&Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)<=MANNED.crankReach)||nearHomeBallista();
-    if(!b||!(snapshot.tick<b.readyTick))return;crankAt=now;onAction('inventionCrank',{structureId:b.id});
+    if(!b&&!manned){const base=snapshot.battle?.v===2?snapshot.battle.bases.find(q=>q.side===(self?.side||'party')):null;if(base?.mill?.queue?.length){const [x,z]=millAt(base.side,MILL.crank);if(Math.hypot(x-localPosition.x,z-localPosition.z)<=MILL.crankReach){crankAt=now;onAction('millCrank',{});}}return;}
+    if(!b||!(snapshot.tick<b.readyTick||b.hook))return;crankAt=now;onAction('inventionCrank',{structureId:b.id});
   }
   // Blueprint placement: the see-through model follows the aim every frame (crosshair while the mouse is captured,
   // the cursor while it is free, the controller ray in VR, the screen centre or a tapped spot on touch).
@@ -1355,7 +1412,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (role === 'hero' && dragonRide.riding()) { if (!event.repeat) dragonRide.key(event.code, true); jumpPending = false; return; }
     if (role === 'hero' && !event.repeat && event.code === 'KeyH' && dragonRide.ready()) { dragonRide.call(); return; }
     if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); else if (event.code === 'KeyQ') special(); }
-    else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyI')startInspect();if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();if(event.code==='KeyR'&&tool==='stormreel')feedStormspire();}
+    else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyI')startInspect();if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();if(event.code==='KeyR'&&tool==='stormreel')feedStormspire();if(event.code==='KeyV'){unlockAudio();onAction('drinkDraught',{});}}
     if(role==='god'&&!inventionPlacement&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
   listen(window,'keyup',event=>{
@@ -1390,7 +1447,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(!active||role!=='hero'||inventionPlacement||event.sourceCapabilities?.firesTouchEvents)return;
     if(document.pointerLockElement!==canvas){void capturePointer();return;}
     if(dragonRide.riding()){if(event.button===0)dragonRide.press('breath',true);if(event.button===2)dragonRide.press('fireball',true);return;}
-    if(manned){if(event.button===0)fireManned();if(event.button===2)scoping=true;return;}
+    if(manned){if(event.button===0)mannedPress();if(event.button===2)scoping=true;return;}
     if(event.button===0)primaryDown();
     if(event.button===2){if(['crossbow','bow'].includes(tool))aiming=true;else weapons.special();if(tool==='bow')weapons.special();}
   });
@@ -1500,7 +1557,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
-      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{});const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);if(stormLeash(snapshot,me,predicted)&&(move.x||move.z))stormTug();localPosition.fromArray(predicted);
+      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{})*(1+itemBonus(me,'speed'));const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);if(stormLeash(snapshot,me,predicted)&&(move.x||move.z))stormTug();localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
       // Standing on rising or sinking earth follows the drawn ground every frame, not the 20 Hz snapshot.
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(terrainLive?{...snapshot,tick:terrainShownTick()}:snapshot, localPosition.x, localPosition.z)),localPosition.y);
@@ -1528,7 +1585,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     } else if (!dragonEye(dt)) {
       rig.position.copy(localPosition);
       const b = manned && mannedMachine();
-      if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? 2.35 : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
+      if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? (b.style === 'gnashjaw' ? 2.75 : 1.9) : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
     stormJoltStep(dt);
     dragonRide.setPointScale(renderer.domElement.height,camera.fov);dragonRide.aim(camera,now);
@@ -1538,7 +1595,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
     // Look inertia, gait bob and jump/land on the camera-held item (held-sway.js); presentation only, never aim.
     const swinging=(progress>=0&&progress<1&&!!swingRest)||!!specialSwing||(tool==='pick'&&pickWallMotion.slamming),swayMe=snapshot.players.find(p=>p.id===playerId);
-    const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
+    const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})*(1+itemBonus(swayMe,'speed'))),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
     else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='wyrmspout'?[.22,-.25,-.46]:tool==='stormreel'?[.2,-.19,-.5]:['crossbow','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask','stormreel'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000).add(sway.position));
@@ -1654,6 +1711,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
     skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
+    voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvas.clientHeight);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
     skyCycle.render(scene, camera);
@@ -1785,7 +1843,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Phones wind the manned Timberline by holding the Wind button (the Jump slot while seated).
     setCrank(down) { crankHeld = !!down && active && role === 'hero'; },
     projectWorld(point){camera.updateMatrixWorld();const p=new THREE.Vector3(...point).project(camera);if(p.z < -1||p.z>1)return null;const r=canvas.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2,viewportWidth:innerWidth,viewportHeight:innerHeight};},
-    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
+    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,mannedVerb:mannedVerb(),scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
     useResource(kind){if(active&&role==='hero')onAction('useResource',{kind});},
     beginInventionPlacement,
     interact,
@@ -1816,6 +1874,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (!active && document.pointerLockElement === canvas) document.exitPointerLock();
     },
     dispose() {
+      voiceBadges.dispose(); setVoiceZoneResolver('home-taverns', null);
       if (disposed) return;
       clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();
       clearTimeout(zeroInputTimer);

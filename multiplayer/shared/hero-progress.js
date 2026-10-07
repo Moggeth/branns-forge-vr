@@ -3,6 +3,7 @@
 //
 // Levels come fast: a couple of skeletons reach level 2. Each level adds healthPerLevel to max health and
 // damagePerLevel to every hero weapon hit, and earns one talent point to spend on any weapon's specialty.
+import {itemBonus, validItems} from './hero-items.js';
 export const HERO_LEVEL = Object.freeze({max: 10, baseHp: 100, healthPerLevel: .2, damagePerLevel: .2, ledger: 64});
 
 // XP to climb from `level` to the next one: 30, 50, 70 … 190 (990 XP to reach level 10).
@@ -53,9 +54,10 @@ export function heroLevel(xp = 0) {
   return level;
 }
 export const levelOf = p => heroLevel(p?.xp || 0);
-export const heroMaxHp = p => Math.round(HERO_LEVEL.baseHp * (1 + HERO_LEVEL.healthPerLevel * (levelOf(p) - 1)));
+export const heroMaxHp = p => Math.round(HERO_LEVEL.baseHp * (1 + HERO_LEVEL.healthPerLevel * (levelOf(p) - 1)) + itemBonus(p, 'hp'));
 // God-cast damage is never scaled: a player's level belongs to their hero.
-export const damageScale = p => p?.role === 'hero' ? 1 + HERO_LEVEL.damagePerLevel * (levelOf(p) - 1) : 1;
+// Quartermaster items add their own share on top (shared/hero-items.js).
+export const damageScale = p => p?.role === 'hero' ? (1 + HERO_LEVEL.damagePerLevel * (levelOf(p) - 1)) * (1 + itemBonus(p, 'damage')) : 1;
 export const hasTalent = (p, weapon, id) => !!p?.talents?.[weapon]?.includes(id);
 export const spentPoints = p => Object.values(p?.talents || {}).reduce((n, list) => n + (Array.isArray(list) ? list.length : 0), 0);
 export const talentPoints = p => Math.max(0, levelOf(p) - 1 - spentPoints(p));
@@ -77,14 +79,14 @@ function remember(state, p) {
     const drop = Object.entries(ledger).filter(([k]) => !here.has(k)).sort((a, b) => a[1].xp - b[1].xp)[0];
     if (!drop) return; delete ledger[drop[0]];
   }
-  ledger[key] = {xp: p.xp || 0, talents: structuredClone(p.talents || {})};
+  ledger[key] = {xp: p.xp || 0, talents: structuredClone(p.talents || {}), ...(p.items?.length ? {items: [...p.items]} : {})};
 }
 /** A joining hero picks up the progress last recorded under their name, unless someone here already wears it. */
 export function adoptProgress(state, p) {
   const key = ledgerKey(p.name), entry = key && state.heroLedger?.[key];
-  p.xp = 0; p.talents = {};
+  p.xp = 0; p.talents = {}; p.items = [];
   if (!entry || state.players.some(q => q !== p && ledgerKey(q.name) === key)) return;
-  p.xp = entry.xp; p.talents = structuredClone(entry.talents);
+  p.xp = entry.xp; p.talents = structuredClone(entry.talents); p.items = [...(entry.items || [])];
 }
 
 /** Award XP to a hero. Emits level_up (with the new level) for each level crossed. */
@@ -135,15 +137,15 @@ function validTalents(t, xp) {
 }
 export const validXp = xp => Number.isSafeInteger(xp) && xp >= 0 && xp <= XP_MAX;
 /** Save validation for a player's progress fields (both optional: older saves have neither). */
-export const validProgress = p => (p.xp === undefined || validXp(p.xp)) && (p.talents === undefined || validTalents(p.talents, p.xp || 0));
-export const restoreProgress = p => ({xp: p.xp || 0, talents: Object.fromEntries(Object.entries(p.talents || {}).filter(([, l]) => l.length).map(([w, l]) => [w, [...l]]))});
+export const validProgress = p => (p.xp === undefined || validXp(p.xp)) && (p.talents === undefined || validTalents(p.talents, p.xp || 0)) && (p.items === undefined || validItems(p.items));
+export const restoreProgress = p => ({xp: p.xp || 0, talents: Object.fromEntries(Object.entries(p.talents || {}).filter(([, l]) => l.length).map(([w, l]) => [w, [...l]])), items: [...(p.items || [])]});
 export function restoreLedger(saved) {
   const ledger = saved.heroLedger;
   if (ledger === undefined) return {};
   if (!record(ledger) || Object.keys(ledger).length > HERO_LEVEL.ledger) throw Error('Invalid hero ledger');
   const out = {};
   for (const [key, entry] of Object.entries(ledger)) {
-    if (!key || key.length > 24 || key !== ledgerKey(key) || !record(entry) || !validXp(entry.xp) || !validTalents(entry.talents, entry.xp)) throw Error('Invalid hero ledger');
+    if (!key || key.length > 24 || key !== ledgerKey(key) || !record(entry) || !validXp(entry.xp) || !validTalents(entry.talents, entry.xp) || (entry.items !== undefined && !validItems(entry.items))) throw Error('Invalid hero ledger');
     out[key] = restoreProgress(entry);
   }
   return out;
