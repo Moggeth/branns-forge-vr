@@ -19,3 +19,39 @@
   margin-top: 10px;
 }
 .voice-controls .voice-peer-line > span { flex: 1 1 9rem; overflow-wrap: anywhere; }
+
+/* Quick voice toggle. Desktop: a chip in the HUD row. Touch: a round button above the right stick. */
+.voice-mic-icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.voice-mic-icon rect { fill: currentColor; stroke: none; }
+.voice-mic-icon .voice-slash { display: none; }
+[data-mode="muted"] .voice-mic-icon .voice-slash, [data-mode="deafened"] .voice-mic-icon .voice-slash { display: inline; }
+[data-mode="muted"] .voice-mic-icon rect, [data-mode="deafened"] .voice-mic-icon rect { fill: none; stroke: currentColor; }
+.voice-quick { display: inline-flex; align-items: center; gap: 6px; }
+.voice-quick[hidden] { display: none; }
+.voice-quick-count:not(:empty) { min-width: 18px; padding: 0 5px; border-radius: 9px; background: rgba(255, 215, 122, .22); font-size: 12px; line-height: 18px; text-align: center; }
+.voice-quick[data-mode="live"], body.touch-controls-active .voice-fab:not([hidden])[data-mode="live"] { color: #18240f; background: #9be37a; border-color: #e4ffd4; }
+.voice-quick.is-speaking, .voice-fab.is-speaking { animation: voice-talking .9s ease-in-out infinite; }
+@keyframes voice-talking { 0%, 100% { box-shadow: 0 0 0 0 rgba(155, 227, 122, .7); } 50% { box-shadow: 0 0 0 7px rgba(155, 227, 122, 0); } }
+.voice-fab { display: none; }
+body.touch-controls-active .voice-fab:not([hidden]) {
+  position: fixed; z-index: 30; display: grid; place-items: center;
+  right: calc(env(safe-area-inset-right, 0px) + 18px); top: calc(env(safe-area-inset-top, 0px) + 64px);
+  width: 46px; height: 46px; border-radius: 50%; padding: 0;
+  color: #fff6dc; background: rgba(28, 36, 52, .78); border: 2px solid rgba(255, 215, 122, .7);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+body.touch-controls-active .voice-fab .voice-mic-icon { width: 22px; height: 22px; }
+body.touch-controls-active .voice-fab:not([hidden])[data-mode="off"] { opacity: .8; border-style: dashed; }
+body.touch-controls-active .voice-fab[data-count]:not([data-count=""])::after {
+  content: attr(data-count); position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; border-radius: 9px;
+  background: #ffd77a; color: #2a1d08; font: 700 11px/18px system-ui, sans-serif; text-align: center;
+}
+body.touch-controls-active .hud-room .voice-quick { display: none !important; }
+.voice-invite { position: fixed; z-index: 31; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; max-width: min(92vw, 520px); padding: 8px 8px 8px 14px; border-radius: 14px;
+  background: rgba(40, 30, 18, .9); color: #fff3d6; border: 1px solid rgba(255, 215, 122, .55); font-size: 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.voice-invite[hidden] { display: none; }
+.voice-invite > .btn { flex: none; min-height: 40px; }
+@media (prefers-reduced-motion: reduce) { .voice-quick.is-speaking, .voice-fab.is-speaking { animation: none; outline: 3px solid #9be37a; } }
+/* Desktop: sit above the hotbar instead of over the player card. */
+body:not(.touch-controls-active) .voice-invite { top: auto; bottom: 205px; }

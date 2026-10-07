@@ -1,14 +1,17 @@
 // A single host selects undirected edges. Independent nearest-N lists can
 // disagree and repeatedly tear down each other's offers in a crowded room.
-export const VOICE_MEMBERS=32,VOICE_NEIGHBORS=8,VOICE_JOIN_RANGE=32,VOICE_LEAVE_RANGE=40;
-export function proximityGraph(members,previous=new Map()){
+import {voiceZoneAt} from './voice-zones.js';
+export const VOICE_ROOM_RANGE=80,VOICE_MEMBERS=32,VOICE_NEIGHBORS=8,VOICE_JOIN_RANGE=32,VOICE_LEAVE_RANGE=40;
+export function proximityGraph(members,previous=new Map(),zones){
   const nodes=[...members].filter(m=>m.active&&Array.isArray(m.position)&&m.position.length===3&&m.position.every(Number.isFinite)).sort((a,b)=>a.id.localeCompare(b.id));
   const graph=new Map(nodes.map(n=>[n.id,new Set()])),edges=[];
+  // Players sharing a voice zone (a tavern) are linked first, at any distance inside it.
+  const zone=new Map(nodes.map(n=>[n.id,voiceZoneAt(n.position,zones)?.id??null]));
   for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
-    const a=nodes[i],b=nodes[j],distance=Math.hypot(...a.position.map((v,k)=>v-b.position[k])),held=previous.get(a.id)?.has(b.id)&&previous.get(b.id)?.has(a.id);
-    if(distance<=(held?VOICE_LEAVE_RANGE:VOICE_JOIN_RANGE))edges.push({a:a.id,b:b.id,distance,held:!!held});
+    const a=nodes[i],b=nodes[j],distance=Math.hypot(...a.position.map((v,k)=>v-b.position[k])),held=previous.get(a.id)?.has(b.id)&&previous.get(b.id)?.has(a.id),room=zone.get(a.id)!==null&&zone.get(a.id)===zone.get(b.id)&&distance<=VOICE_ROOM_RANGE;
+    if(room||distance<=(held?VOICE_LEAVE_RANGE:VOICE_JOIN_RANGE))edges.push({a:a.id,b:b.id,distance,held:!!held,room});
   }
-  edges.sort((a,b)=>Number(b.held)-Number(a.held)||a.distance-b.distance||a.a.localeCompare(b.a)||a.b.localeCompare(b.b));
+  edges.sort((a,b)=>Number(b.held)-Number(a.held)||Number(b.room)-Number(a.room)||a.distance-b.distance||a.a.localeCompare(b.a)||a.b.localeCompare(b.b));
   const add=({a,b})=>{graph.get(a).add(b);graph.get(b).add(a);};
   for(const edge of edges)if(edge.held&&graph.get(edge.a).size<VOICE_NEIGHBORS&&graph.get(edge.b).size<VOICE_NEIGHBORS)add(edge);
   // A newcomer must not be starved forever by a fully occupied stable graph.

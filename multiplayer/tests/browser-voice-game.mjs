@@ -38,7 +38,7 @@ try {
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();await sleep(200);
   const after=await god.evaluate(()=>brannHarness.voice().pose);
   assert(Math.hypot(...after.forward.map((n,i)=>n-before.forward[i]))>.02,'touch camera orbit updates listener orientation');
-  await god.locator('.mq-more').tap();await god.locator('[data-voice-badge]').click();await god.waitForFunction(()=>!brannHarness.voice().microphone);
+  await god.locator('[data-voice-fab]').tap();await god.waitForFunction(()=>!brannHarness.voice().microphone);
   assert.equal(await god.evaluate(()=>syntheticTracks.every(t=>t.readyState==='ended')),true);
   record('actual-desktop-hero-mobile-god-menu-opt-in-and-quick-mute','pass',{godFocus:godPose.voice.position,before:before.forward,after:after.forward});
   await hero.locator('[data-voice="mic"]').click();await hero.waitForFunction(()=>brannHarness.voice().microphone);

@@ -1003,6 +1003,7 @@ try {
     canvas,
     isHost, onSelection: chooseSpell,
     onVoicePose: pose => voice?.updatePose(pose),
+    voiceActivity: () => voice?.active ? voice.activity() : null,
     onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='openShop'?quartermaster.show():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },

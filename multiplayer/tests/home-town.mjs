@@ -9,6 +9,7 @@ import {MILL,millAt} from '../shared/home-mill.js';
 import {TAVERN,insideTavern,taverns,tavernBar} from '../shared/taverns.js';
 import {heroMaxHp} from '../shared/hero-progress.js';
 import {createEnemy} from '../shared/combat.js';
+import {HOME_MANNED} from '../shared/home-ballista.js';
 let count=0;
 function test(name,fn){fn();count++;console.log('PASS',name);}
 let seq=0;const act=(sim,id,action,extra={})=>sim.command(id,{type:'action',action,seq:++seq,...extra});
@@ -130,6 +131,20 @@ test('older saves load: the well\'s base cooldown, no items, no mill',()=>{
   const {sim,w}=rig();w.battle.bases[0].drinkReadyTick=w.tick+1100;const save=sim.checkpoint();
   for(const p of save.players){delete p.items;delete p.draughts;}for(const b of save.battle.bases)delete b.mill;
   const back=loadSimulation(save);assert.deepEqual(back.snapshot().players.map(p=>p.items),[[],[]]);
+});
+
+test('the Ballista Captain\'s Hat halves a crewed keep ballista\'s reload and adds half again to its shot',()=>{
+  const fire=hat=>{
+    const {sim,w,hero}=rig();const part=w.battle.bases[0].parts.find(p=>p.id==='battle-base-party-ballista-0');
+    hero.items=hat?['hat']:[];hero.position=[part.position[0]+1,part.position[1],part.position[2]];
+    assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);part.readyTick=0;
+    act(sim,'host','inventionDraw',{structureId:part.id});steps(sim,10);
+    const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:0}});assert.equal(r.ok,true,r.code);
+    return {reload:part.readyTick-w.tick,power:w.battle.keepShots.at(-1).power||1};
+  };
+  const plain=fire(false),capped=fire(true);
+  assert.equal(plain.reload,HOME_MANNED.reloadTicks);assert.equal(plain.power,1);
+  assert.equal(capped.reload,HOME_MANNED.reloadTicks/2);assert.equal(capped.power,1.5);
 });
 
 console.log(JSON.stringify({suite:'home-town',ok:true,checks:count}));

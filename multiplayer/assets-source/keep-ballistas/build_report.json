@@ -1,0 +1,32 @@
+{
+ "bytes": 1056888,
+ "materials": [
+  "KBGlowBlue",
+  "KBGlowPurple",
+  "KBMatte",
+  "KBMetal",
+  "KBOoze",
+  "KBSun"
+ ],
+ "total": {
+  "gnashjaw": 6996,
+  "sunlance": 5684
+ },
+ "triangles": {
+  "G_Base": 1280,
+  "G_Cradle": 2004,
+  "G_Drum": 940,
+  "G_Harpoon": 540,
+  "G_HornL": 586,
+  "G_HornR": 586,
+  "G_Jaw": 428,
+  "G_Turret": 632,
+  "S_Base": 784,
+  "S_Bolt": 352,
+  "S_Cradle": 2304,
+  "S_Crank": 504,
+  "S_Turret": 740,
+  "S_WingL": 500,
+  "S_WingR": 500
+ }
+}

@@ -173,9 +173,11 @@ function homeCue(self, snapshot, keys, make) {
       : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
   }
   for (const part of base.parts) if (part.kind === 'ballista' && part.hp > 0 && at([part.position[0], part.position[2]], HOME_MANNED.reach)) {
-    if (part.operator === self.id) return make('home', 'manned', part.id, 'Ballista', 'Step off', keys.collect);
+    const sun = part.side !== 'rivals', name = sun ? 'Sunlance' : 'Gnashjaw', wind = keys.crank || keys.wind || 'crank';
+    if (part.operator === self.id) return make('home', 'manned', part.id, name, 'Step off', keys.collect);
     const other = part.operator && part.operator !== self.id;
-    return other ? make('home', 'busy', part.id, 'Ballista', 'Manned', '') : make('home', 'ready', part.id, 'Ballista', 'Man it', keys.collect, `then aim, click to fire, ${keys.crank || keys.wind || 'crank'} to wind`);
+    if (other) return tick < part.readyTick || part.hook ? make('home', 'busy', part.id, name, part.hook ? 'Help reel' : 'Help wind', wind, part.hook ? 'reels the catch in faster' : 'winds it faster') : make('home', 'busy', part.id, name, 'Manned', '');
+    return make('home', 'ready', part.id, name, 'Man it', keys.collect, sun ? `then aim, hold ${keys.strike.toLowerCase()} to draw, let go on the golden flash` : `then aim, ${keys.strike.toLowerCase()} spits the harpoon, ${wind} reels it in`);
   }
   if (at(homePoint(base.side, HOME_LAYOUT.fountain), HOME.drink.reach)) {
     const ready = (self.drinkTick ?? -1e9) + HOME.drink.cooldown;
