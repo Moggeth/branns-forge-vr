@@ -429,7 +429,10 @@ function onWelcome(detail) {
   try { history.replaceState(null, '', url); } catch { /* sandboxed */ }
   roomInput.value = ROOM_PATTERN.test(room) ? room : roomInput.value;
   setText($('hudRoom'), detail.local?'Solo':room); setText($('menuRoom'), detail.local?'Solo — this device':room);
-  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite'])$(id).disabled=!!detail.local;
+  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite','showInviteQr'])$(id).disabled=!!detail.local;
+  $('inviteQr').hidden=!!detail.local;
+  $('inviteQr').open=false;
+  $('inviteQrImage').hidden=true;
   setText($('hudName'), nameInput.value.trim() || 'Wanderer');
   hideLobbyStatus();
   setPhase('game');
@@ -682,6 +685,32 @@ $('copyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied
 $('copyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
 $('menuCopyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied!'));
 $('menuCopyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
+
+// Lazy and local: opening an invite never sends its URL to a QR service.
+let qrRequest = 0;
+$('inviteQr').addEventListener('toggle', async () => {
+  const request = ++qrRequest;
+  if (!$('inviteQr').open || $('inviteQr').hidden) return;
+  const url = inviteUrl();
+  $('inviteQrImage').hidden = true;
+  $('inviteQrStatus').textContent = 'Preparing QR code…';
+  try {
+    const {default: QRCode} = await import('qrcode');
+    const src = await QRCode.toDataURL(url, {width:512,margin:4,errorCorrectionLevel:'M',color:{dark:'#000000',light:'#ffffff'}});
+    if (request !== qrRequest || url !== inviteUrl() || !$('inviteQr').open) return;
+    $('inviteQrImage').src = src;
+    $('inviteQrImage').hidden = false;
+    $('inviteQrStatus').textContent = `Scan with your phone camera to join world ${room}.`;
+  } catch {
+    if (request === qrRequest) $('inviteQrStatus').textContent = 'QR code could not load. Use Copy invite link above, or close and reopen this section to retry.';
+  }
+});
+$('showInviteQr').addEventListener('click', () => {
+  openMenu();
+  $('inviteQr').open = true;
+  $('inviteQr').scrollIntoView({block:'center'});
+  $('inviteQr').querySelector('summary').focus({preventScroll:true});
+});
 
 // ---------------------------------------------------------------- menu
 function openMenu() {

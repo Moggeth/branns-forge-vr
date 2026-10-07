@@ -163,6 +163,7 @@ body.touch-controls-active .god-help,
 body.touch-controls-active .look-hint,
 body.touch-controls-active #copyCode,
 body.touch-controls-active #copyInvite,
+body.touch-controls-active #showInviteQr,
 body.touch-controls-active #menuButton { display: none !important; } /* all available in Menu / touch Menu button */
 /* Reserve the utility dock in both source and bundled CSS; never reset this to zero. */
 body.touch-controls-active .hud-top { padding-right: calc(env(safe-area-inset-right, 0px) + 106px) !important; }
