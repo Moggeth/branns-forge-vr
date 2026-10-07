@@ -94,10 +94,12 @@ def string(prefix, limbs):
     import bmesh
     for side in limbs:
         tip, nock = O[f'{prefix}_{side}_Tip'], O[f'{prefix}_Nock']
-        me = bpy.data.meshes.new('str'); bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=5, radius1=.012, radius2=.012, depth=1); bm.to_mesh(me)
+        me = bpy.data.meshes.new('str'); bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=5, radius1=.012, radius2=.012, depth=1)
+        # STRETCH_TO aims local +Y at the target from the origin: lay the unit cylinder along +Y from 0 to 1.
+        import mathutils; bmesh.ops.rotate(bm, verts=bm.verts, matrix=mathutils.Matrix.Rotation(-1.5707963, 3, 'X')); bmesh.ops.translate(bm, verts=bm.verts, vec=(0, .5, 0)); bm.to_mesh(me)
         ob = bpy.data.objects.new(f'{prefix}_{side}_String', me); scene.collection.objects.link(ob)
         c = ob.constraints.new('COPY_LOCATION'); c.target = tip
-        st = ob.constraints.new('STRETCH_TO'); st.target = nock; st.rest_length = .5
+        st = ob.constraints.new('STRETCH_TO'); st.target = nock; st.rest_length = 1
         sm = bpy.data.materials.new('str'); sm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (.85, .8, .7, 1); me.materials.append(sm)
 
 

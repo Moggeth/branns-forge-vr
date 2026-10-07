@@ -18,7 +18,9 @@ foe.yaw = y; s.enemies.push(foe);
 const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 const at2 = ([x, z], h = 0) => [x, h, z];
 
-const {browser, page} = await launch({viewport: {width: 640, height: 360}, pointerLock: true});
+// PHONE=1 runs the same walk at a landscape phone size with touch on, and draws with the on-screen attack button.
+const PHONE = !!process.env.PHONE, VIEW = PHONE ? {width: 844, height: 390} : {width: 640, height: 360}, tag = n => PHONE ? `${n}-phone` : n;
+const {browser, page} = await launch({viewport: VIEW, pointerLock: true, touch: PHONE});
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
  performance.now = () => on ? vt : real();
@@ -47,8 +49,8 @@ async function capture() {
  // The release notes can pop up over the world on a slow load; close them and click into the world again.
  const notes = page.getByRole('button', {name: 'Got it', exact: true});
  for (let i = 0; i < 12; i++) {
-  if (await notes.isVisible()) { await notes.click(); await frames(2); }
-  await page.mouse.click(320, 180); await frames(2);
+  if (await notes.isVisible()) { await notes.evaluate(b => b.click()); await frames(2); } // a DOM click: the frame clock is paused here
+  await page.mouse.click(VIEW.width / 2, VIEW.height / 2); await frames(2);
   if (await page.waitForFunction(() => !!document.pointerLockElement, null, {timeout: 5000, polling: 250}).then(() => true, () => false)) return;
  }
  throw Error('pointer capture never took');
@@ -57,11 +59,11 @@ try {
  await page.goto(BASE + '/?acceptanceProbe');
  await page.waitForFunction(() => window.brannHarness?.state().rendererReady, null, {timeout: 240000});
  const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
- const dismiss = () => whatsNew.click({timeout: 20000}).catch(() => {}); // release notes open once per fresh browser
+ const dismiss = () => whatsNew.evaluate(b => b.click(), null, {timeout: 20000}).catch(() => {}); // a DOM click: a slow software renderer can stall real ones // release notes open once per fresh browser
  await dismiss();
  await page.fill('#name', 'Dawnhold QA'); await page.check('input[name="role"][value="hero"]', {force: true});
  await page.locator('#import').setInputFiles({name: 'home-ballista.json', mimeType: 'application/json', buffer: fixture});
- for (let i = 0; i < 6 && !(await page.evaluate(() => window.brannHarness?.state().phase === 'game')); i++) { if (await whatsNew.isVisible()) await whatsNew.click(); await new Promise(r => setTimeout(r, 5000)); }
+ for (let i = 0; i < 6 && !(await page.evaluate(() => window.brannHarness?.state().phase === 'game')); i++) { if (await whatsNew.isVisible()) await dismiss(); await new Promise(r => setTimeout(r, 5000)); }
  await page.waitForFunction(() => window.brannHarness?.state().phase === 'game', null, {timeout: 120000});
  await new Promise(r => setTimeout(r, 1500));
  await dismiss(); // the notes may open again once the world is up
@@ -77,15 +79,18 @@ try {
  assert.equal(b.operator, id, 'manned'); assert.ok(h.c.manned, 'controls are on the ballista'); record('manned', 'pass');
  const foeNow = h.s.enemies.find(e => e.id === 'qa-skeleton');
  await look([foeNow.position[0], foeNow.position[1] + 1, foeNow.position[2]], 30); await frames(60);
- await shot(page, 'home-ballista-aim');
+ await shot(page, tag('home-ballista-aim'));
  // The skeleton walks toward us: re-sight on where it is now, let the carriage settle, then fire.
  let f2 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton');
  await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 12); await frames(30);
  f2 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 6); await frames(20);
  const hp0 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
  // The Sunlance draws while held (the wings bend back, the sun ring lights) and looses on release.
- await capture(); await page.mouse.down(); await frames(40); await shot(page, 'home-ballista-draw'); await page.mouse.up(); await frames(4);
- await shot(page, 'home-ballista-fire'); await frames(40);
+ const strike = down => page.evaluate(d => { const b = document.querySelector('[data-touch-action="strike"]'), r = b.getBoundingClientRect();
+  b.dispatchEvent(new PointerEvent(d ? 'pointerdown' : 'pointerup', {bubbles: true, pointerId: 7, pointerType: 'touch', button: 0, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2})); }, down);
+ if (PHONE) { await strike(true); await frames(40); await shot(page, tag('home-ballista-draw')); await strike(false); }
+ else { await capture(); await page.mouse.down(); await frames(40); await shot(page, 'home-ballista-draw'); await page.mouse.up(); }
+ await frames(4); await shot(page, tag('home-ballista-fire')); await frames(40);
  h = await harness(); b = h.s.battle.bases[0].parts.find(p => p.id === part.id);
  const hp1 = h.s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
  record('fired', b.readyTick > h.s.tick ? 'pass' : 'fail', {hp: [hp0, hp1], readyTick: b.readyTick, tick: h.s.tick});
@@ -110,4 +115,4 @@ try {
  assert.deepEqual(page.errors, []);
 } catch (e) { record('exception', 'fail', {message: e.message, errors: page.errors}); await shot(page, 'home-ballista-failure'); process.exitCode = 1; }
 finally { await browser.close(); }
-save('home-ballista');
+save(tag('home-ballista'));
