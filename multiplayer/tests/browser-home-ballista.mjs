@@ -87,8 +87,10 @@ try {
  f2 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 6); await frames(20);
  const hp0 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
  // The Sunlance draws while held (the wings bend back, the sun ring lights) and looses on release.
- const strike = down => page.evaluate(d => { const b = document.querySelector('[data-touch-action="strike"]'), r = b.getBoundingClientRect();
-  b.dispatchEvent(new PointerEvent(d ? 'pointerdown' : 'pointerup', {bubbles: true, pointerId: 7, pointerType: 'touch', button: 0, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2})); }, down);
+ // A real held touch on the on-screen attack button (synthetic pointer events can't be captured).
+ const cdp = PHONE ? await page.context().newCDPSession(page) : null;
+ const strike = async down => { const r = await page.evaluate(() => { const b = document.querySelector('[data-touch-action="strike"]').getBoundingClientRect(); return {x: b.x + b.width / 2, y: b.y + b.height / 2}; });
+  await cdp.send('Input.dispatchTouchEvent', {type: down ? 'touchStart' : 'touchEnd', touchPoints: down ? [{x: r.x, y: r.y, id: 7}] : []}); };
  const resight = async () => { const f = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f.position[0], f.position[1] + 1, f.position[2]], 10); await frames(10); };
  if (PHONE) { await strike(true); await resight(); await shot(page, tag('home-ballista-draw')); await strike(false); }
  else { await capture(); await page.mouse.down(); await resight(); await shot(page, 'home-ballista-draw'); await page.mouse.up(); }

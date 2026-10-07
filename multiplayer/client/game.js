@@ -1231,6 +1231,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // The Sunlance draws while the button is held and looses on release; everything else fires on the press.
   const keepKeep=()=>inventionVisual.homeKeep?.();
   function mannedPress(){const b=mannedMachine();if(!b)return;if(b.type==='homeBallista'&&b.style==='sunlance'){unlockAudio();if((snapshot.tick??0)<b.readyTick){report('The Sunlance is still winding.');return;}keepKeep()?.setLocalDraw(b.id,performance.now());manned.perfectRang=false;keepAudio.drawStart({local:true});onAction('inventionDraw',{structureId:b.id});return;}fireManned();}
+  // The touch attack button's word while seated: what a press does on this machine right now.
+  function mannedVerb(){if(!manned)return null;const b=mannedMachine();if(b?.type!=='homeBallista')return 'Fire';return b.style==='sunlance'?'Draw':b.hook?'Yank':'Spit';}
   function mannedRelease(){const b=mannedMachine(),keep=keepKeep();if(!b||!keep?.localDraw(b.id))return;keep.setLocalDraw(b.id,null);fireManned();}
   function keepSight(b,draw){const keep=keepKeep();if(!keep)return null;return keep.sight(b,manned?{yaw:manned.yaw,pitch:manned.pitch}:{yaw:0,pitch:0},{charge:draw?.charge||0,perfect:!!draw?.perfect,visible:!!b&&scopeAmount>.05});}
   function keepNotice(ev){
@@ -1790,7 +1792,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Phones wind the manned Timberline by holding the Wind button (the Jump slot while seated).
     setCrank(down) { crankHeld = !!down && active && role === 'hero'; },
     projectWorld(point){camera.updateMatrixWorld();const p=new THREE.Vector3(...point).project(camera);if(p.z < -1||p.z>1)return null;const r=canvas.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2,viewportWidth:innerWidth,viewportHeight:innerHeight};},
-    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
+    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,mannedVerb:mannedVerb(),scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
     useResource(kind){if(active&&role==='hero')onAction('useResource',{kind});},
     beginInventionPlacement,
     interact,
