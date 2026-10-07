@@ -9,12 +9,13 @@ import {homeBallistaYaw} from '../shared/home-ballista.js';
 import {makeSave} from '../client/world-saves.js';
 import {launch, BASE, record, save, shot} from './browser-acceptance-lib.mjs';
 
-// The fixture: a quiet Dawnhold with a wild skeleton standing 12 m out in front of its left gate ballista.
+// The fixture: a quiet Dawnhold with a legless wild skeleton crawling in from 12 m out in front of its left gate ballista.
+// (A walking one reaches the ballista's feet during the walk over, under the barrel where no lance can reach it.)
 const sim = createSimulation({room: 'SOLO'}), s = sim.adventureWorld(); s.tick = 1; s.landmarks = false; s.enemies = [];
 s.battle.nextWaveTick = 3600;
 const part = s.battle.bases[0].parts.find(p => p.id === 'battle-base-party-ballista-0'), y = homeBallistaYaw('party');
 const foe = createEnemy('qa-skeleton', [part.position[0] - Math.sin(y) * 12, part.position[1], part.position[2] - Math.cos(y) * 12]);
-foe.yaw = y; s.enemies.push(foe);
+foe.yaw = y; foe.missingParts = ['leftLeg', 'rightLeg']; foe.parts.leftLeg = foe.parts.rightLeg = 0; s.enemies.push(foe);
 const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 const at2 = ([x, z], h = 0) => [x, h, z];
 
@@ -88,12 +89,14 @@ try {
  // The Sunlance draws while held (the wings bend back, the sun ring lights) and looses on release.
  const strike = down => page.evaluate(d => { const b = document.querySelector('[data-touch-action="strike"]'), r = b.getBoundingClientRect();
   b.dispatchEvent(new PointerEvent(d ? 'pointerdown' : 'pointerup', {bubbles: true, pointerId: 7, pointerType: 'touch', button: 0, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2})); }, down);
- if (PHONE) { await strike(true); await frames(40); await shot(page, tag('home-ballista-draw')); await strike(false); }
- else { await capture(); await page.mouse.down(); await frames(40); await shot(page, 'home-ballista-draw'); await page.mouse.up(); }
+ const resight = async () => { const f = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f.position[0], f.position[1] + 1, f.position[2]], 10); await frames(10); };
+ if (PHONE) { await strike(true); await resight(); await shot(page, tag('home-ballista-draw')); await strike(false); }
+ else { await capture(); await page.mouse.down(); await resight(); await shot(page, 'home-ballista-draw'); await page.mouse.up(); }
  await frames(4); await shot(page, tag('home-ballista-fire')); await frames(40);
  h = await harness(); b = h.s.battle.bases[0].parts.find(p => p.id === part.id);
  const hp1 = h.s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
- record('fired', b.readyTick > h.s.tick ? 'pass' : 'fail', {hp: [hp0, hp1], readyTick: b.readyTick, tick: h.s.tick});
+ const fNow = h.s.enemies.find(e => e.id === 'qa-skeleton');
+ record('fired', b.readyTick > h.s.tick ? 'pass' : 'fail', {hp: [hp0, hp1], readyTick: b.readyTick, tick: h.s.tick, fireTick: b.fireTick, aim: [b.aimYaw, b.aimPitch], rest: y, part: b.position, foe: fNow?.position, me: h.me.position, cam: [h.c.yaw, h.c.pitch], shots: h.s.battle.keepShots});
  assert.ok(b.readyTick > h.s.tick, 'the ballista fired and is reloading');
  assert.ok(hp1 < hp0, 'the bolt hit the skeleton');
  await page.keyboard.down('KeyR'); await frames(40); await page.keyboard.up('KeyR');
