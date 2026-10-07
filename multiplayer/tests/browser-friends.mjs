@@ -22,10 +22,10 @@ try{
   // Allow the 2 Hz recovery cadence; the assertion after takeover verifies the saved edit.
   await sleep(700);
   await a.browser.close();
-  await b.page.getByRole('button',{name:'Continue world here',exact:true}).waitFor({state:'visible',timeout:25000});
-  await b.page.getByRole('button',{name:'Continue world here',exact:true}).click();
-  await b.page.waitForFunction(()=>window.brannHarness.state().host && window.brannHarness.state().connected);
+  // The remaining player carries the world on by itself: no button.
+  await b.page.waitForFunction(()=>window.brannHarness.state().host && window.brannHarness.state().connected,null,{timeout:25000});
+  assert.equal(await b.page.getByRole('button',{name:'Continue world here',exact:true}).count(),0);
   assert.ok(await b.page.evaluate(()=>window.brannHarness.snapshot().edits.some(e=>e.kind==='raise')));
-  record('public-host-browser-exit-and-continue-button','pass');await shot(b.page,'friends-recovered-host');
+  record('public-host-browser-exit-automatic-takeover','pass');await shot(b.page,'friends-recovered-host');
  }
 }catch(e){record('exception','fail',{message:e.message});if(!a.page.isClosed())await shot(a.page,'friends-failure-hero');await shot(b.page,'friends-failure-god');process.exitCode=1;}finally{save('friends');await a.browser.close();await b.browser.close();}

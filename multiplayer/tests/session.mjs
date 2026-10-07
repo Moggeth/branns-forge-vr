@@ -12,6 +12,21 @@ class FakeConnection extends EventTarget {
   close(){}
 }
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)};};
+test('host refuses an unloadable checkpoint and autosaves only the last validated state',()=>{
+  const connection=new FakeConnection(), s=new WorldSession({connection,storage:storage()});
+  try {
+    s.connect();const good=structuredClone(s.latest),revision=connection.checkpointRevision,errors=[];
+    s.addEventListener('error',e=>errors.push(e.detail));
+    const real=s.simulation.checkpoint.bind(s.simulation);
+    s.simulation.checkpoint=()=>{const c=real();c.players[0].position[0]=1e99;return c;};
+    s.publish(true);s.publish(true);s.autoSave(true);
+    assert.equal(connection.checkpointRevision,revision);assert.deepEqual(s.latest,good);
+    assert.deepEqual(JSON.parse(JSON.stringify(s.saves.list()[0].checkpoint)),good);
+    assert.equal(s.metrics.rejectedCheckpoints,2);assert.equal(errors.length,1);
+    s.simulation.checkpoint=real;s.simulation.step();s.publish(true);
+    assert.equal(connection.checkpointRevision,revision+1);assert.equal(s.latest.tick,good.tick+1);
+  }finally{s.dispose();}
+});
 test('host commands mutate world, late join receives state, and local backup works',()=>{
   const connection=new FakeConnection(), s=new WorldSession({connection,storage:storage()});
   try{

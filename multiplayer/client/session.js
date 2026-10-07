@@ -26,12 +26,16 @@ export class WorldSession extends EventTarget {
   constructor({url, connection, storage} = {}) {
     super();
     this.connection = connection || new PeerRoomConnection({url});
+    // Recovery readiness means loadable simulation state, not merely valid transport JSON.
+    this.connection.validateCheckpoint = checkpoint => { loadSimulation(checkpoint); };
     this.saves = new WorldSaves(storage);
     this.simulation = null; this.identity = null; this.latest = null; this.sequence = 0;
     this.running = false; this.worldId = crypto.randomUUID(); this.name = 'Little Orchard';
     this.accumulator = 0; this.last = 0; this.lastSave = 0; this.lastCheckpoint = 0;
-    this.metrics = {steps:0, overruns:0, maxStepMs:0};
+    this.metrics = {steps:0, overruns:0, maxStepMs:0, rejectedCheckpoints:0, maxCheckpointValidationMs:0};
+    this.lastRecoveryErrorAt = -Infinity;
     this.parked = new Map();
+    this.autoContinue = true;
     // Delta snapshot stream (state-codec.js): one encoder while hosting, one decoder while a guest.
     this.codec = new SnapshotDeltaEncoder(); this.decoder = new SnapshotDeltaDecoder(); this.helloAt = 0;
     this.listeners = [];
@@ -73,6 +77,11 @@ export class WorldSession extends EventTarget {
       this.simulation = null;
       const recoverySaved = this.autoSave(true);
       this.emit(type, {...detail, recoverySaved});
+      // Take the world over at once so nobody has to press anything. A page in the background
+      // could not run it, so it passes and the room offers the next player instead.
+      if (type === 'continue_world_offer' && this.autoContinue) {
+        if (globalThis.document?.hidden) this.declineWorld(); else this.continueWorld();
+      }
     });
     for (const type of ['continue_offer_expired','world_waiting','peer_connection_state']) on(type,({detail})=>this.emit(type,detail));
     on('status', ({detail}) => {
@@ -313,7 +322,18 @@ export class WorldSession extends EventTarget {
     }
     const now = performance.now();
     if(force || now-this.lastCheckpoint > 500) {
-      this.latest = this.simulation.checkpoint();
+      const checkpoint = this.simulation.checkpoint(), started = performance.now();
+      try { this.connection.validateCheckpoint(checkpoint); }
+      catch {
+        this.metrics.rejectedCheckpoints++;
+        if (started-this.lastRecoveryErrorAt >= 10_000) {
+          this.lastRecoveryErrorAt = started;
+          this.emit('error',{code:'checkpoint_rejected',message:'This world produced an invalid recovery update. Your last working backup is kept. Download it from Saved Worlds before reloading.'});
+        }
+        this.lastCheckpoint = now; // Do not repeat an expensive failed validation every frame.
+        return;
+      } finally { this.metrics.maxCheckpointValidationMs = Math.max(this.metrics.maxCheckpointValidationMs,performance.now()-started); }
+      this.latest = checkpoint;
       // Revision is monotonic even when a confirmed reset starts simulation tick 0.
       const revision = Math.max(0, (this.connection.checkpointRevision ?? -1) + 1);
       this.connection.setCheckpoint(this.latest,revision); this.lastCheckpoint = now;
@@ -322,7 +342,7 @@ export class WorldSession extends EventTarget {
   }
   autoSave(force = false) {
     if(!this.latest || (!force && Date.now()-this.lastSave < 10000)) return false;
-    try { this.saves.put(this.exportSave()); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); return true; }
+    try { this.saves.put(makeSave(this.latest,{id:this.worldId,name:this.name})); this.lastSave = Date.now(); this.emit('saved',{at:this.lastSave}); return true; }
     catch(error) { this.lastSave = Date.now(); this.emit('error',{code:'save_failed',message:error.message}); return false; }
   }
   exportSave() { return makeSave(this.simulation?.checkpoint() || this.latest,{id:this.worldId,name:this.name}); }
@@ -331,6 +351,15 @@ export class WorldSession extends EventTarget {
   retryWorld() { this.connection.retryWorld(); }
   declineWorld() { this.connection.declineWorld(); }
   transferHost(id) { this.connection.transferHost(id); }
+  // Pass the world on while this host can still speak (closing, or a hidden tab whose timers
+  // are about to be throttled). A fresh recovery point goes out first so nothing rolls back.
+  handOver() {
+    if (!this.simulation || this.connection.local || !this.identity || this.connection.hostId !== this.identity.peerId) return false;
+    const successor = this.connection.successor?.();
+    if (!successor) return false;
+    this.publish(true);
+    return this.connection.transferHost(successor) !== false;
+  }
   resetWorld() {
     if (!this.simulation) throw new Error('Only the current host can reset the world.');
     // A failed recovery write must abort reset; the confirmation promises a backup.
@@ -339,6 +368,7 @@ export class WorldSession extends EventTarget {
     this.simulation = createSimulation({room:this.identity.room,seed:41}); this.codec.reset();
     this.reconcile(); this.publish(true);
   }
-  stop() { this.autoSave(true); this.running=false; clearInterval(this.timer); this.simulation=null; this.connection.close(); }
+  stop() { if (this.running && this.simulation) try { this.publish(true); } catch { /* closing */ }
+    this.autoSave(true); this.running=false; clearInterval(this.timer); this.simulation=null; this.connection.close(); }
   dispose() { this.stop(); this.listeners.forEach(remove=>remove()); }
 }

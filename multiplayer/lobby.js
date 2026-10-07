@@ -124,6 +124,7 @@ let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
+let handoverTimer = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
 let lastGameplayCommand={};
 function command(type,payload={}){lastGameplayCommand={type,...payload};return session?.command(type,payload);}
@@ -369,15 +370,19 @@ function start(attempt) {
   next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
-  next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
-  next.addEventListener('saved', mine(() => {}));
-  next.addEventListener('owner_lost', mine(detail => notice('owner', detail.recoverySaved
-    ? 'The host left. A recovery copy is saved in this browser.'
-    : 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, detail.recoverySaved ? 'info' : 'warn')));
-  next.addEventListener('continue_world_offer', mine(() => {
-    removeNotice('waiting');
-    notice('continue', 'The host has gone. You can keep this world running from your computer.', {label: 'Continue world here', run: () => { try { session?.continueWorld(); } catch (e) { onSessionError({message: e?.message}); } removeNotice('continue'); }}, 'action');
+  next.addEventListener('host_changed', mine(detail => {
+    refreshHostControls();
+    if (phase !== 'game') return;
+    const who = lastSnapshot?.players?.find(p => p.id === detail?.hostId)?.name;
+    toast(detail?.isHost ? 'You’re carrying the world now. Play on!' : who ? `${who} is carrying the world now.` : 'The world carries on with a new host.');
   }));
+  next.addEventListener('saved', mine(() => {}));
+  // The next player takes the world over by themselves, so a host leaving shows nothing unless
+  // the switch is unusually slow; then a quiet note explains the pause.
+  next.addEventListener('owner_lost', mine(detail => {
+    if (!detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
+  }));
+  next.addEventListener('continue_world_offer', mine(() => { removeNotice('waiting'); }));
   next.addEventListener('continue_offer_expired', mine(() => removeNotice('continue')));
   next.addEventListener('world_waiting', mine(() => {
     removeNotice('continue');
@@ -406,7 +411,8 @@ function start(attempt) {
 
   try {
     next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role,
-      desktop: !(/OculusBrowser|Quest|Mobile/i.test(navigator.userAgent))});
+      // Any device can carry the world on when the host leaves (phones and headsets host new worlds already).
+      desktop: true});
   } catch (error) {
     recordProblem(error);
     teardown(); setPhase('lobby');
@@ -423,7 +429,10 @@ function onWelcome(detail) {
   try { history.replaceState(null, '', url); } catch { /* sandboxed */ }
   roomInput.value = ROOM_PATTERN.test(room) ? room : roomInput.value;
   setText($('hudRoom'), detail.local?'Solo':room); setText($('menuRoom'), detail.local?'Solo — this device':room);
-  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite'])$(id).disabled=!!detail.local;
+  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite','showInviteQr'])$(id).disabled=!!detail.local;
+  $('inviteQr').hidden=!!detail.local;
+  $('inviteQr').open=false;
+  $('inviteQrImage').hidden=true;
   setText($('hudName'), nameInput.value.trim() || 'Wanderer');
   hideLobbyStatus();
   setPhase('game');
@@ -440,7 +449,12 @@ const STATUS_TEXT = {
 function onStatus(detail) {
   const state = String(detail?.state || '');
   lastStatus = state || 'unknown';
-  connected = state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
+  // While the world moves to a new host the game stays live under your hands (no lost pointer
+  // lock or hidden controls); only a slow switch earns a note.
+  const handing = phase === 'game' && (state === 'owner_lost' || state === 'connecting_to_host');
+  if (handing && !handoverTimer) handoverTimer = setTimeout(() => { if (handoverTimer) notice('owner', 'The host left. Moving the world to another player…', null, 'info'); }, 6000);
+  if (!handing) { clearTimeout(handoverTimer); handoverTimer = 0; }
+  connected = handing || state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
   syncActive();
   refreshBattlePanel();
   if (phase === 'connecting' && !playerId && state === 'closed') {
@@ -452,6 +466,7 @@ function onStatus(detail) {
   if (state === 'signaling_reconnecting') {
     notice('net', detail.playable ? 'Game connected. Restoring invites…' : 'Restoring the room connection…', null, 'info'); return;
   }
+  if (handing) return;
   if (connected) { for (const id of ['net','owner','waiting','continue','relay']) removeNotice(id); return; }
   if (state === 'reconnecting' || state === 'connecting') notice('net', STATUS_TEXT[state], null, 'info');
   else if (state === 'disconnected' || state === 'closed') {
@@ -545,7 +560,7 @@ function onSnapshot(snapshot) {
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to zap · every hit is a full shock · R at the tower feeds Crystal',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
@@ -670,6 +685,33 @@ $('copyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied
 $('copyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
 $('menuCopyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied!'));
 $('menuCopyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
+
+// Lazy and local: opening an invite never sends its URL to a QR service.
+let qrRequest = 0;
+$('inviteQr').addEventListener('toggle', async () => {
+  const request = ++qrRequest;
+  if (!$('inviteQr').open || $('inviteQr').hidden) return;
+  const url = inviteUrl();
+  $('inviteQrImage').hidden = true;
+  $('inviteQrStatus').textContent = 'Preparing QR code…';
+  try {
+    const {default: QRCode} = await import('qrcode');
+    const src = await QRCode.toDataURL(url, {width:512,margin:4,errorCorrectionLevel:'M',color:{dark:'#000000',light:'#ffffff'}});
+    if (request !== qrRequest || url !== inviteUrl() || !$('inviteQr').open) return;
+    $('inviteQrImage').src = src;
+    $('inviteQrImage').hidden = false;
+    $('inviteQrStatus').textContent = `Scan with your phone camera to join world ${room}.`;
+    if (menuOpen) $('inviteQrImage').scrollIntoView({block:'center'});
+  } catch {
+    if (request === qrRequest) $('inviteQrStatus').textContent = 'QR code could not load. Use Copy invite link above, or close and reopen this section to retry.';
+  }
+});
+$('showInviteQr').addEventListener('click', () => {
+  openMenu();
+  $('inviteQr').open = true;
+  $('inviteQr').scrollIntoView({block:'center'});
+  $('inviteQr').querySelector('summary').focus({preventScroll:true});
+});
 
 // ---------------------------------------------------------------- menu
 function openMenu() {
@@ -996,11 +1038,17 @@ setPhase('lobby');
 patchNotes.showWhatsNew();
 if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
 
+// A host stepping away hands the world to someone still playing before its timers are throttled.
+document.addEventListener('visibilitychange', () => { if (document.hidden) try { session?.handOver(); } catch { /* best effort */ } });
+// Phones often skip beforeunload; pagehide is the last chance to tell the room we left.
+window.addEventListener('pagehide', () => { try { session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('pageshow', event => { if (event.persisted && phase === 'game') location.reload(); });
 window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
   state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  network: () => session ? {transport:session.connection.diagnostics?.() || null, simulation:{...session.metrics}} : null,
   voice: () => voice ? structuredClone({...voice.state(), pose:voice.pose}) : null,
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,

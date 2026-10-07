@@ -11,6 +11,7 @@ const RECOVERY = {
  "invalid_cast": "The spell target is not valid. Aim at ground inside the valley and try again.",
  "invalid_contact": "That strike did not reach a visible surface. Adjust your aim and strike again.",
  "outside_world": "The target is outside the playable valley. Aim inside the mountain boundary.",
+ "no_pack": "The Stormreel lives on its Stormspire. Walk up to the tower and take its pack.",
  "hands_full": "Your hands are occupied. Collect or put down the held item before picking up another.",
  "nothing_held": "You are not holding an item. Pick one up before trying to drop or throw it.",
  "nothing_carried": "You have no carried supplies to deposit. Collect loose resources first.",
@@ -83,6 +84,9 @@ export function actionError(code,{world={},player={},command={}}={}){
   if(command.action==='special'&&player.tool==='pick')return `Terrain storage is full (${world.edits?.length||0} edits). Crystal walls free their space when they shatter (within a minute); mine one now to make room sooner.`;
   return `Terrain storage is full (${world.edits?.length||0} edits). Mine crystal walls to clear space, or save and reset this world. Waiting does not clear terrain.`;
  }
+ if(command.action==='inventionUse'&&code==='not_needed')return 'The Stormspire is already full of charge.';
+ if(command.action==='inventionUse'&&code==='machine_manned')return 'Another Hero is wearing this Stormspire\'s pack. Wait for them to hang it back up.';
+ if(command.action==='inventionUse'&&code==='insufficient_resources'&&command.feed)return 'You need a Crystal to feed the Stormspire.';
  if(code==='rate_limited')return 'Too many network requests arrived together. Wait up to a minute before creating or joining another room.';
  if(code==='busy')return 'The connection is processing another request. Retry shortly; if this persists, reconnect from Menu.';
  return RECOVERY[code]||null;
