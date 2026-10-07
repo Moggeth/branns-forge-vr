@@ -1,5 +1,5 @@
 // Home base hands-on pieces in the real game: walk from Dawnhold's heart to a gate ballista, press E to man it,
-// swing it onto a skeleton and fire, step off, then ring the barracks bell and drink at the fountain.
+// swing it onto a skeleton, draw and loose a lance, step off, then ring the barracks bell and drink at the fountain.
 // Real input on a virtual clock like browser-apple-timberline.mjs (a software renderer is slow).
 import assert from 'node:assert/strict';
 import {createSimulation} from '../shared/simulation.js';
@@ -83,8 +83,9 @@ try {
  await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 12); await frames(30);
  f2 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 6); await frames(20);
  const hp0 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
- await capture(); await page.mouse.down(); await page.mouse.up(); await frames(20);
- await shot(page, 'home-ballista-fire');
+ // The Sunlance draws while held (the wings bend back, the sun ring lights) and looses on release.
+ await capture(); await page.mouse.down(); await frames(40); await shot(page, 'home-ballista-draw'); await page.mouse.up(); await frames(4);
+ await shot(page, 'home-ballista-fire'); await frames(40);
  h = await harness(); b = h.s.battle.bases[0].parts.find(p => p.id === part.id);
  const hp1 = h.s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
  record('fired', b.readyTick > h.s.tick ? 'pass' : 'fail', {hp: [hp0, hp1], readyTick: b.readyTick, tick: h.s.tick});

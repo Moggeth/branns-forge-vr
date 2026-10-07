@@ -1,6 +1,6 @@
 // Optional host-controlled lane battle. All clocks and IDs belong to the simulation.
 import {expeditionRunning} from './adventure.js';
-import {stepHomeBallista} from './home-ballista.js';
+import {stepHomeBallista,stepKeepShots} from './home-ballista.js';
 import {HOME,repairHome,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
 
 export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTicks:900,baseHp:400,aggroRange:12});
@@ -124,7 +124,7 @@ export function spawnSquad(state,ctx,base,tag) {
 }
 
 function stepHomeBattle(state,ctx,events) {
-  if(homeBattle(state))for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part);
+  if(homeBattle(state)){for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part,ctx,events);stepKeepShots(state,ctx,events);}
   stepHomeBases(state,ctx,events);
   if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
   const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;

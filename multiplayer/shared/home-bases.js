@@ -22,7 +22,7 @@ export const HOME = Object.freeze({
 });
 // Manned home ballistas (shared/home-ballista.js): a Hero aims, fires and cranks one like a Timberline.
 export const HOME_MANNED = Object.freeze({
-  reach: 3.4, seat: 1.4, pitchMin: -8 * Math.PI / 180, pitchMax: 25 * Math.PI / 180,
+  reach: 3.4, seat: 1.75, pitchMin: -8 * Math.PI / 180, pitchMax: 25 * Math.PI / 180,
   range: 30, reloadTicks: 150, fireTicks: 30, crankHold: 12, operatorBoost: 2, helperBoost: 3,
   damage: 60, heroDamage: 30, muzzle: 1.45,
 });
@@ -180,7 +180,8 @@ export function stepHomeBases(state, ctx, events) {
       for (const bot of state.enemies) if (bot.battleRun !== undefined && bot.side === base.side && bot.hp > 0 && flat(bot.position, base.position) <= HOME.domeRadius) bot.hp = Math.min(bot.kind === 'golem' ? 320 : 100, bot.hp + HOME.fountainHeal);
     }
     for (const turret of base.parts) {
-      if (turret.kind === 'pylon' || turret.hp <= 0 || turret.operator || state.tick < turret.readyTick) continue;
+      // Ballistas aim and fire their own ballistic shots (shared/home-ballista.js).
+      if (turret.kind !== 'spire' || turret.hp <= 0 || state.tick < turret.readyTick) continue;
       const spec = HOME.turrets[turret.kind];
       let best = null, range = spec.range;
       for (const bot of state.enemies) if (bot.hp > 0 && bot.battleRun !== undefined && bot.side !== base.side) { const d = flat(bot.position, turret.position); if (d <= range) { range = d; best = bot; } }
