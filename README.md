@@ -1,3 +1,5 @@
+Camera black-flash containment: [GPU findings and regression](docs/CAMERA-BLACK-FLASH-20261007.md).
+
 Room invitations: [QR sharing](docs/ROOM-QR.md).
 
 Backend recovery and transport limits: [resilience notes](docs/BACKEND-RESILIENCE-20261007.md).

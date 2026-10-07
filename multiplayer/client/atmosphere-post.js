@@ -12,6 +12,15 @@ export function postTierFromUrl(search = globalThis.location?.search || '', coar
 
 const QUAD_VERTEX = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 
+// Half-float HDR can receive NaNs from a material or overflow from additive VFX.
+// Reject them BEFORE bloom spreads one bad fragment over every blur mip. Keep
+// ordinary HDR values unchanged; 1024 leaves ample headroom for glow and keeps
+// subsequent half-float blur/composite arithmetic below its 65504 limit.
+const FINITE_HDR = `
+  float bfFiniteHdr(float c) { return isnan(c) ? 0.0 : clamp(c, 0.0, 1024.0); }
+  vec3 bfFiniteHdr(vec3 c) { return vec3(bfFiniteHdr(c.r), bfFiniteHdr(c.g), bfFiniteHdr(c.b)); }
+`;
+
 function raysMaterial(samples) {
   return new THREE.ShaderMaterial({
     uniforms: {tDepth: {value: null}, sunUv: {value: new THREE.Vector2(.5, .5)}, aspect: {value: 1}, strength: {value: 0}, jitter: {value: 0}},
@@ -39,9 +48,10 @@ function finalMaterial() {
     uniforms: {tScene: {value: null}, tRays: {value: null}, rayColor: {value: new THREE.Color()}, vignette: {value: .28}, lift: {value: new THREE.Color(0, 0, 0)},
       gain: {value: new THREE.Color(1, 1, 1)}, saturation: {value: 1}, contrast: {value: 1}, time: {value: 0}},
     vertexShader: QUAD_VERTEX,
-    fragmentShader: `uniform sampler2D tScene, tRays; uniform vec3 rayColor, lift, gain; uniform float vignette, saturation, contrast, time; varying vec2 vUv;
+    fragmentShader: `${FINITE_HDR}
+      uniform sampler2D tScene, tRays; uniform vec3 rayColor, lift, gain; uniform float vignette, saturation, contrast, time; varying vec2 vUv;
       void main(){
-        vec3 c = texture2D(tScene, vUv).rgb + texture2D(tRays, vUv).rgb * rayColor;
+        vec3 c = bfFiniteHdr(texture2D(tScene, vUv).rgb) + bfFiniteHdr(texture2D(tRays, vUv).rgb) * rayColor;
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         c = gl_FragColor.rgb;
@@ -66,6 +76,11 @@ export function createAtmospherePost({renderer, tier = postTierFromUrl()}) {
   const sceneRT = new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType, samples: 4, depthTexture: depth});
   const raysRT = new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType, depthBuffer: false});
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .45, .55, 1.0);
+  const highPass = bloom.materialHighPassFilter;
+  const sample = 'vec4 texel = texture2D( tDiffuse, vUv );';
+  if (!highPass.fragmentShader.includes(sample)) throw new Error('Bloom shader changed: update the finite-HDR input guard.');
+  highPass.fragmentShader = FINITE_HDR + highPass.fragmentShader.replace(sample,
+    `${sample}\n texel = vec4(bfFiniteHdr(texel.rgb), 1.0);`);
   const rays = raysMaterial(48), final = finalMaterial();
   const raysQuad = new FullScreenQuad(rays), finalQuad = new FullScreenQuad(final);
   const sunWorld = new THREE.Vector3(), camPos = new THREE.Vector3(), camDir = new THREE.Vector3(), sunDir = new THREE.Vector3(0, 1, 0);
