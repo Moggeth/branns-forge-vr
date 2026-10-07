@@ -18,8 +18,9 @@ export function nextProbe(b, id) { return packOf(b, id) || 'red'; }
  */
 export function createStormreelWeapon(ctx) {
   const {scene, lightning} = ctx;
-  let started = null, lastShot = -Infinity, charge = 0, kick = 0, hum = null, idleArc = 0, model = null, nodes = {}, wallFrame = 0, wall = null;
-  // Aim preview: a thin line to the predicted contact and a ring where the current would meet the earth.
+  let started = null, lastShot = -Infinity, charge = 0, kick = 0, yank = 0, hum = null, idleArc = 0, model = null, nodes = {}, wallFrame = 0, wall = null;
+  // Aim preview: a thin line to the predicted contact, a ring there, and a wide splash ring when this bolt would
+  // close the circuit (the other pole already sits in that same foe).
   const lineGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
   const lineMat = new THREE.LineDashedMaterial({color: COLORS.circuit, dashSize: .35, gapSize: .25, transparent: true, opacity: .75, depthWrite: false});
   const line = new THREE.Line(lineGeo, lineMat); line.frustumCulled = false; line.visible = false; line.renderOrder = 14;
@@ -93,7 +94,7 @@ export function createStormreelWeapon(ctx) {
     const t = tower(), wearing = !!t && !!model;
     if (!t && started !== null) cancel();
     if (started !== null) charge = Math.min(1, (ctx.now() - started) / STORMREEL_FEEL.chargeSeconds);
-    kick = Math.max(0, kick - dt * 6);
+    kick = Math.max(0, kick - dt * 6); yank = Math.max(0, yank - dt * 3.4);
     if (model) { finishCrossbow(model, pole()); polarityBadge(); }
     const shots = t ? chargeShots(t) : 0, live = !!t && t.charge >= Math.max(1, Math.round(STORMREEL.shotCost * Math.max(STORMREEL.minCharge, charge || 1)));
     // Capacitor tubes: dim with the tower's store, fill with the hold.
@@ -122,17 +123,19 @@ export function createStormreelWeapon(ctx) {
       else if (wall && ((enemy && enemy.t < wall.t) || (ground && ground.t < wall.t))) wall = null;
       const hitEnemy = !wall && enemy && (!ground || enemy.t <= ground.t + .3) ? enemy : null;
       const end = wall ? b.fromArray(wall.point) : hitEnemy ? b.fromArray(hitEnemy.point) : ground ? b.fromArray(ground.point) : b.fromArray(aim.origin).addScaledVector(tmp.fromArray(aim.direction), STORMREEL.range);
-      let earth = null, grounded = false;
-      if (hitEnemy) { const e = hitEnemy.enemy, fl = height(e.position[0], e.position[2]); grounded = e.position[1] - fl <= STORMREEL.arcGap; earth = [e.position[0], fl, e.position[2]]; }
-      else if (wall) { earth = [wall.point[0], height(wall.point[0], wall.point[2]), wall.point[2]]; grounded = true; }
-      else if (ground) { earth = ground.point; grounded = true; }
-      const color = live ? COLORS[nextProbe(t, ctx.playerId())] : COLORS.dead;
+      const mine = nextProbe(t, ctx.playerId()), other = t.probes?.[mine === 'red' ? 'blue' : 'red'];
+      const closes = !!(live && hitEnemy && other && !other.fell && other.enemy === hitEnemy.enemy.id);
+      let earth = null;
+      if (hitEnemy) { const e = hitEnemy.enemy; earth = [e.position[0], height(e.position[0], e.position[2]), e.position[2]]; }
+      else if (wall) earth = [wall.point[0], height(wall.point[0], wall.point[2]), wall.point[2]];
+      else if (ground) earth = ground.point;
+      const color = closes ? COLORS.circuit : live ? COLORS[mine] : COLORS.dead;
       const p = lineGeo.attributes.position.array; p.set([muzzle.x, muzzle.y, muzzle.z, end.x, end.y, end.z]); lineGeo.attributes.position.needsUpdate = true; line.computeLineDistances();
       lineMat.color.setHex(color); lineMat.opacity = .35 + .5 * charge; line.visible = true;
       if (earth) {
         ring.position.set(earth[0], earth[1] + .05, earth[2]); ring.material.color.setHex(color); ring.visible = true;
-        const pulse = 1 + .08 * Math.sin(ctx.now() * 14); ring.scale.setScalar(pulse * (hitEnemy && grounded ? 1.4 : 1));
-        if (live && grounded) { step.position.copy(ring.position); step.material.color.setHex(color); step.material.opacity = .12 + .25 * charge; step.visible = true; }
+        const pulse = 1 + (closes ? .16 : .08) * Math.sin(ctx.now() * (closes ? 22 : 14)); ring.scale.setScalar(pulse * (closes ? 1.8 : hitEnemy ? 1.3 : 1));
+        if (closes) { step.position.copy(ring.position); step.material.color.setHex(color); step.material.opacity = .12 + .25 * charge; step.visible = true; }
       }
     }
     // HUD
@@ -140,7 +143,7 @@ export function createStormreelWeapon(ctx) {
       hud.hidden = !wearing;
       if (wearing) {
         const me = ctx.localPosition(), pack = packOf(t, ctx.playerId()) || 'red', d = cableLength(t, [me.x, 0, me.z], pack), left = Math.max(0, STORMREEL.cable - d), strain = cableStrain(t, [me.x, 0, me.z], pack);
-        const next = nextProbe(t, ctx.playerId()), arc = t.arc ? 'live' : t.probes?.red || t.probes?.blue ? 'half' : '';
+        const next = nextProbe(t, ctx.playerId()), arc = t.arc ? 'live' : t.probes?.red && t.probes?.blue ? 'open' : t.probes?.red || t.probes?.blue ? 'half' : '';
         const out = t.probes?.red || t.probes?.blue ? 1 : 0, text = `${shots}|${Math.round(left)}|${strain > .01 ? 1 : 0}|${next}|${arc}|${pack}|${out}`;
         if (text !== hudText) {
           hudText = text;
@@ -149,9 +152,12 @@ export function createStormreelWeapon(ctx) {
           hud.querySelector('.sr-cable').title = `${Math.round(left)} m of cable left`;
           hud.classList.toggle('sr-strain', strain > .01); hud.classList.toggle('sr-empty', !shots);
           hud.dataset.pack = pack; hud.querySelector('.sr-probe').dataset.next = next;
-          const reelKey = ctx.severKey?.() || 'Q', lodged = t.probes?.red ? 'positive' : 'negative';
+          const reelKey = ctx.severKey?.() || 'Q', lodged = t.probes?.red ? 'red' : 'blue', want = lodged === 'red' ? 'blue (\u2212)' : 'red (+)';
+          const sameFoe = t.probes?.[lodged]?.enemy && !t.probes[lodged].fell;
           hud.querySelector('.sr-pole').textContent = pack === 'red' ? '+' : '\u2212'; hud.querySelector('.sr-pole').title = pack === 'red' ? 'Positive (red) crossbow' : 'Negative (blue) crossbow';
-          hud.querySelector('.sr-arc').textContent = arc === 'live' ? `Arc live · ${reelKey} reel in` : arc === 'half' ? `${t.probes?.red && t.probes?.blue ? 'Both' : lodged} lodged · ${reelKey} reel in` : '';
+          hud.querySelector('.sr-arc').textContent = arc === 'live' ? `Circuit live · ${reelKey} reel in`
+            : arc === 'open' ? `Open circuit: both bolts must be in one foe · ${reelKey} reel in`
+            : arc === 'half' ? (sameFoe ? `${lodged === 'red' ? 'Red (+)' : 'Blue (\u2212)'} bolt in a foe · hit it with ${want}` : `Bolt in the ground · ${reelKey} reel in`) : '';
         }
       }
     }
@@ -159,9 +165,12 @@ export function createStormreelWeapon(ctx) {
   /** Weapon pose offsets for game.js: recoil kick back and up, a faint buzz while charging. */
   function poseOffset(out) {
     const buzz = started !== null ? (Math.random() - .5) * .0025 * charge : 0;
-    return out.set(buzz, kick * .012 + buzz, kick * STORMREEL_FEEL.kick);
+    // The tether tug yanks the crossbow forward and down toward the tower, then it springs back.
+    const y = yank > 0 ? Math.sin((1 - yank) * Math.PI) * yank : 0;
+    return out.set(buzz + y * .02, kick * .012 + buzz - y * .05, kick * STORMREEL_FEEL.kick - y * .09);
   }
-  return {begin, end, cancel, update, setModel, poseOffset, charging: () => started !== null, charge: () => charge,
+  function tug() { yank = 1; }
+  return {begin, end, cancel, update, setModel, poseOffset, tug, charging: () => started !== null, charge: () => charge,
     stats: () => ({charging: started !== null, charge, preview: line.visible, wearing: !!tower()}),
     dispose() { cancel(); badge?.removeFromParent(); badge?.material.map?.dispose(); badge?.material.dispose(); for (const o of [line, ring, step]) { o.removeFromParent(); o.geometry.dispose(); o.material.dispose(); } hud?.remove(); }};
 }

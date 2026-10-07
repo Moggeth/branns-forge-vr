@@ -83,7 +83,7 @@ try {
   await page.keyboard.press('KeyQ'); await frames(5); await clean('stormreel-reel'); await frames(14);
   t = await tw(); assert.ok(!t.probes, 'the reeled bolt is gone'); record('reel', 'pass', {charge: t.charge});
 
-  // 4. Lodge a gentle bolt again, then drop the pack: the probe stays, the cable runs on to it.
+  // 4. Lodge a gentle bolt again, then switch tools: the crossbow is spiked into the ground, the probe stays live.
   await aimFoe('zap0', 8); await tap(); await frames(12); t = await tw(); assert.ok(t.probes?.[first], 'lodged again');
   await page.keyboard.press('Digit1'); await frames(30);
   t = await tw(); assert.ok(poleOf(t, me.id) === null && t.probes?.[first], `the ${first} probe stays connected after the pack is dropped`);

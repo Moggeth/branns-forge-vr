@@ -1,13 +1,15 @@
 // Stormreel: a lightning crossbow fed by a cable-reel backpack that is plugged into a Stormspire tower.
 // One table drives the authority (this file, inventions.js, simulation.js) and the presentation (client/stormreel-*.js).
 //
-// The circuit is the rule. The tower stores charge (b.charge, 0..240) from Crystal fed into its hopper. The pack's cable
-// carries it to the crossbow; the bolt trails a fine copper filament (like a taser probe), so a hit closes the loop:
-// tower -> cable -> crossbow -> filament -> bolt -> target -> ground -> the tower's earth stakes.
-//   Grounded target: the full shock runs through it into the earth (more when the world is wet).
-//   Grounded neighbours: the current spreading through the soil jolts them (step voltage).
-//   Target off the ground (more than arcGap up): the arc still finds it (full shock) but no step voltage spreads.
-//   An empty tower still throws the bolt: the crossbow is a crossbow without the lightning.
+// The circuit is the rule (Mitch, 2026-10-07: "two bolts in the one enemy"). The tower stores charge (b.charge, 0..240)
+// from Crystal fed into its hopper. Each pack's cable carries one pole to its crossbow, and every bolt trails a fine copper
+// filament (like a taser probe). A bolt on its own only does its kinetic damage: current needs a loop. When a positive (+)
+// bolt and a negative (-) bolt are lodged in the SAME foe, the circuit closes through its body:
+//   tower(+) -> red cable -> red crossbow -> filament -> + bolt -> the foe -> - bolt -> filament -> blue crossbow -> blue cable -> tower(-)
+// It closes with an enormous surge, then cooks the foe ten times a second until it dies, the tower runs dry, it fades or a
+// bolt is reeled out. Bolts in the ground, a wall or two different foes are an open circuit: nothing flows.
+// A crossbow can be planted (G / Drop, or by choosing another weapon): it is spiked butt-first into the ground where you
+// stand, its pack beside it, cable and filament still connected, while you fetch the other pole. Pick it up again with Use.
 // Carrying: the tower's existing `operator` field names the Hero wearing its pack, and that Hero's tool is 'stormreel'.
 // Two crossbows, two terminals (Mitch, 2026-10-06): the RED pack's crossbow fires positive (+) bolts, the BLUE pack's fires
 // negative (-) ones. Current only runs once a positive probe AND a negative probe are lodged, in either order, and a probe
@@ -30,23 +32,19 @@ export const STORMREEL = Object.freeze({
   shotCost: 20,         // one full shot of stored charge
   crystalCharge: 80,    // one Crystal = four full shots
   range: 48,            // metres; the bolt flies fast and flat enough to resolve as a ray
-  bolt: 30,             // the bolt itself (scaled .4..1 by the hold)
-  shock: 90,            // the lightning through a grounded target (scaled by the hold)
-  wet: 1.5,             // rain multiplies the shock
-  arcGap: 2,            // metres the arc will jump from a target's feet to the ground
-  stepRadius: 2.5,      // grounded neighbours within this of the strike point are jolted
+  bolt: 18,             // the bolt's kinetic hit (scaled .4..1 by the hold): a bit of damage, never the point
+  wet: 1.5,             // rain multiplies every shock
+  stepRadius: 2.5,      // when a circuit closes, grounded neighbours this close to the foe are jolted through the soil
   stepDamage: 25,
-  groundStrike: .5,     // a live bolt into the ground jolts neighbours at half strength
   takeReach: 3.6,       // metres from the tower to shoulder or hang the pack, and to feed crystal
-  // The red-blue circuit (Mitch, 2026-10-06): each tower has a red (+) and a blue (-) pack. Every live bolt leaves a probe
-  // in what it hits; when the tower has a red probe and a blue probe out, lightning runs between them, frying everything
-  // on the line, until it is severed, runs dry, times out or the probes drift too far apart.
-  arcLength: 28,        // metres: further apart than this and the current will not jump
-  arcSeconds: 6,        // a live circuit lasts this long after its newest probe lands
+  // The circuit through one foe (Mitch, 2026-10-07): a + bolt and a - bolt lodged in the same body.
+  surge: 160,           // the closing surge, all at once (more in rain): fells a skeleton outright
+  surgeDrain: 12,       // tower charge the surge costs
+  arcSeconds: 4,        // then the current keeps cooking it this long after the second bolt lands
   arcPulseTicks: 6,     // damage pulses ten times a second
-  arcDamage: 14,        // per pulse to every foe on the line (140 a second; more in rain)
-  arcDrain: 2,          // tower charge per pulse (a full tower runs a circuit for 12 seconds)
-  arcReach: 1,          // metres from the line that the current catches
+  arcDamage: 24,        // per pulse (240 a second; more in rain)
+  arcDrain: 2,          // tower charge per pulse
+  plantReach: 2.6,      // metres from a planted crossbow to pick it up again
   probeSeconds: 90,     // a lone probe stays lodged (and tethered) this long while you fetch the other pack
   tether: 65,           // a probe whose pack is on its hook is held by the tower cable alone: past this it pulls free
   reelRefund: .6,       // reeling a bolt in returns this share of the charge it cost
@@ -65,6 +63,8 @@ export const hookPoint = (b, pack = 'red') => rotate(b, pack === 'blue' ? STORMS
 export const packOf = (b, id) => !id ? null : b.operator === id ? 'red' : b.operator2 === id ? 'blue' : null;
 const OPERATOR = {red: 'operator', blue: 'operator2'}, WRAPS = {red: ['wraps', 'wrapAt'], blue: ['wraps2', 'wrapAt2']};
 export const towerTop = b => rotate(b, STORMSPIRE.top);
+/** A crossbow spiked into the ground where its wearer left it: {at, yaw, tick, by} or null. */
+export const plantedPack = (b, pack) => b.planted?.[pack] || null;
 export const chargeShots = b => Math.floor((b?.charge || 0) / STORMREEL.shotCost);
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
@@ -128,9 +128,41 @@ export function cableStrain(b, position, pack = 'red') {
 }
 
 function hangUp(b, pack, by, events) {
-  b[OPERATOR[pack]] = null; delete b[WRAPS[pack][0]]; delete b[WRAPS[pack][1]];
+  const from = b.planted?.[pack]?.at; b[OPERATOR[pack]] = null; delete b[WRAPS[pack][0]]; delete b[WRAPS[pack][1]]; unplant(b, pack);
   // A probe this pack fired stays lodged, still tethered to the terminal: the cable runs to the bolt instead of winding home.
-  events.push({kind: 'storm_pack_home', id: b.id, structureId: b.id, by, pack, position: hookPoint(b, pack), ...(b.probes?.[pack] ? {tethered: true} : {})});
+  events.push({kind: 'storm_pack_home', id: b.id, structureId: b.id, by, pack, position: hookPoint(b, pack), ...(from ? {from: [...from]} : {}), ...(b.probes?.[pack] ? {tethered: true} : {})});
+}
+function unplant(b, pack) { if (!b.planted) return; delete b.planted[pack]; if (!b.planted.red && !b.planted.blue) delete b.planted; }
+/** Plant the crossbow you carry: spiked butt-first into the ground a step ahead, pack beside it, still wired up. */
+export function plantPack(state, p, events = [], height = null) {
+  for (const b of state.inventions?.structures || []) {
+    if (b.type !== 'stormspire') continue; const pack = packOf(b, p.id); if (!pack) continue;
+    const yaw = Number.isFinite(p.yaw) ? p.yaw : 0, x = p.position[0] - Math.sin(yaw) * .55, z = p.position[2] - Math.cos(yaw) * .55;
+    const y = height ? height(x, z) : p.position[1];
+    b[OPERATOR[pack]] = null; b.planted ||= {};
+    b.planted[pack] = {at: [+x.toFixed(3), +y.toFixed(3), +z.toFixed(3)], yaw: +Math.atan2(Math.sin(yaw), Math.cos(yaw)).toFixed(4), tick: state.tick, by: p.id};
+    b[WRAPS[pack][1]] = [x, z];   // the cable keeps any trees it is wrapped round
+    events.push({kind: 'storm_plant', id: b.id, structureId: b.id, by: p.id, pack, position: [...b.planted[pack].at], yaw: b.planted[pack].yaw});
+  }
+  if (p.tool === 'stormreel') p.tool = 'axe';
+  return events;
+}
+/** stormPickup (Use beside a planted crossbow): shoulder it again. A crossbow you already carry is planted in its place. */
+export function stormPickup(state, p, m = {}, height = null) {
+  if (p.role !== 'hero') return {ok: false, code: 'invalid_action', events: []};
+  if (p.heldOre || state.looseLogs?.some(l => l.heldBy === p.id) || state.detachedParts?.some(d => d.heldBy === p.id)) return {ok: false, code: 'hands_full', events: []};
+  let best = null;
+  for (const b of state.inventions?.structures || []) {
+    if (b.type !== 'stormspire' || b.hp <= 0 || !b.planted) continue;
+    for (const pack of PACKS) { const pl = b.planted[pack]; if (!pl) continue; const d = flat(p.position, pl.at); if (d <= STORMREEL.plantReach && (!best || d < best.d)) best = {b, pack, d}; }
+  }
+  if (!best) return {ok: false, code: 'too_far', events: []};
+  const events = [];
+  if (p.tool === 'stormreel') plantPack(state, p, events, height);
+  const {b, pack} = best, pl = b.planted[pack]; unplant(b, pack);
+  b[OPERATOR[pack]] = p.id; p.tool = 'stormreel'; b[WRAPS[pack][0]] ||= []; b[WRAPS[pack][1]] = [p.position[0], p.position[2]];
+  events.push({kind: 'storm_pickup', id: b.id, structureId: b.id, by: p.id, pack, position: [...pl.at]});
+  return {ok: true, events};
 }
 /** Drop the pack: it winds home to the hook. Called on unequip, role change, death and leaving. */
 export function releasePack(state, p, events = []) {
@@ -143,7 +175,7 @@ export function releasePack(state, p, events = []) {
 export const packWorn = (state, b, pack) => { const id = b[OPERATOR[pack]]; return !!id && state.players.some(h => h.id === id && h.tool === 'stormreel'); };
 /** The free pack hanging nearest to a Hero (a solo Hero walks to the pole they want), or null when both are worn. */
 export function nearestFreePack(state, b, p) {
-  return PACKS.filter(k => !packWorn(state, b, k)).sort((x, y) => flat(p.position, hookPoint(b, x)) - flat(p.position, hookPoint(b, y)))[0] || null;
+  return PACKS.filter(k => !packWorn(state, b, k) && !b.planted?.[k]).sort((x, y) => flat(p.position, hookPoint(b, x)) - flat(p.position, hookPoint(b, y)))[0] || null;
 }
 /** inventionUse on a Stormspire: feed Crystal when it is not full and you carry some, otherwise take or hang the pack. */
 export function useStormspire(state, p, b, m, pay, ok, fail) {
@@ -167,13 +199,17 @@ export function useStormspire(state, p, b, m, pay, ok, fail) {
   // The pack you stand beside (red hangs on the east hook, blue on the west) unless one is asked for by name.
   const worn = pack => packWorn(state, b, pack);
   if (m.pack !== undefined && !PACKS.includes(m.pack)) return fail('invalid_action');
-  const pack = m.pack && !worn(m.pack) ? m.pack : nearestFreePack(state, b, p);
-  if (!pack) return fail('machine_manned');
+  const pack = m.pack && !worn(m.pack) && !b.planted?.[m.pack] ? m.pack : nearestFreePack(state, b, p);
+  if (!pack) {
+    // Nothing on the hooks: a crossbow left planted out in the field winds home to its hook instead.
+    const away = PACKS.find(k => b.planted?.[k]); if (!away) return fail('machine_manned');
+    const events = []; hangUp(b, away, p.id, events); return ok(events);
+  }
   if (p.heldOre || state.looseLogs?.some(l => l.heldBy === p.id) || state.detachedParts?.some(d => d.heldBy === p.id)) return fail('hands_full');
   const quiet = [];
   for (const x of state.inventions.structures) if (x.type === 'stormspire') { const k = packOf(x, p.id); if (k) hangUp(x, k, p.id, quiet); }
   b[OPERATOR[pack]] = p.id; p.tool = 'stormreel'; b[WRAPS[pack][0]] = []; b[WRAPS[pack][1]] = [p.position[0], p.position[2]];
-  const events = [{kind: 'storm_pack_take', id: b.id, structureId: b.id, by: p.id, pack, position: hookPoint(b, pack)}]; topUp(events);
+  const events = [...quiet, {kind: 'storm_pack_take', id: b.id, structureId: b.id, by: p.id, pack, position: hookPoint(b, pack)}]; topUp(events);
   return ok(events);
 }
 
@@ -207,26 +243,31 @@ export function stepStormspires(state, events, height = null, ctx = null) {
         if (p && p.tool === 'stormreel' && !wornTower(state, p)) p.tool = 'axe';
       }
     }
+    if (b.planted && b.hp <= 0) delete b.planted;
     if (b.probes) stepCircuit(state, b, events, height, ctx);
   }
   for (const p of state.players) if (p.tool === 'stormreel' && !wornTower(state, p)) p.tool = 'axe';
 }
 
-// ---- the red-blue circuit
-/** Where a probe is now: riding the body part it stuck in, or where it landed. Updates p.at in place. */
+// ---- the circuit through one foe
+/** Where a probe is now: riding the body part it stuck in, or lying where it fell. Updates p.at in place. */
 function probeAt(state, probe, height) {
   if (probe.enemy) {
     const e = state.enemies.find(x => x.id === probe.enemy);
     if (e && e.hp > 0) probe.at = partPosition(e, probe.part || 'torso').map(v => +v.toFixed(3));
-    else { delete probe.enemy; delete probe.part; if (height) probe.at = [probe.at[0], height(probe.at[0], probe.at[2]), probe.at[2]]; }   // the bolt drops where the body fell
+    else { delete probe.enemy; delete probe.part; probe.fell = true; if (height) probe.at = [probe.at[0], +height(probe.at[0], probe.at[2]).toFixed(3), probe.at[2]]; }   // the bolt drops out of the body
   }
   return probe.at;
 }
-const segDist = (a, b, p) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = d[0] * d[0] + d[1] * d[1] + d[2] * d[2] || 1;
-  const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1] + (p[2] - a[2]) * d[2]) / L)); return Math.hypot(p[0] - a[0] - d[0] * u, p[1] - a[1] - d[1] * u, p[2] - a[2] - d[2] * u); };
+/** Both bolts in one living foe: the foe, else null. */
+export function circuitFoe(state, b) {
+  const red = b.probes?.red, blue = b.probes?.blue;
+  if (!red?.enemy || red.enemy !== blue?.enemy) return null;
+  const e = state.enemies.find(x => x.id === red.enemy); return e && e.hp > 0 ? e : null;
+}
 function endCircuit(b, events, why, keepProbes = false) {
-  const was = !!b.arc; delete b.arc; if (!keepProbes) delete b.probes;
-  if (was) events.push({kind: 'storm_arc_end', id: b.id, structureId: b.id, why});
+  const was = !!b.arc, enemy = b.arc?.enemy; delete b.arc; if (!keepProbes) delete b.probes;
+  if (was) events.push({kind: 'storm_arc_end', id: b.id, structureId: b.id, why, ...(enemy ? {enemy} : {})});
 }
 function dropProbe(b, colour, events, why) {
   const probe = b.probes?.[colour]; if (!probe) return;
@@ -235,46 +276,52 @@ function dropProbe(b, colour, events, why) {
   events.push({kind: 'storm_probe_lost', id: b.id, structureId: b.id, pack: colour, why, position: [...probe.at], probeTick: probe.tick});
   if (b.probes && !b.probes.red && !b.probes.blue) delete b.probes;
 }
+const shock = (state, base) => Math.round(base * (raining(state) ? STORMREEL.wet : 1));
+/** The closing surge: the foe takes it all at once and the current spreading into the soil jolts grounded neighbours. */
+function surge(state, b, e, events, ctx) {
+  b.charge = Math.max(0, b.charge - STORMREEL.surgeDrain);
+  const at = partPosition(e, 'torso'), by = b.arc.by, floor = ctx.terrainHeight ? ctx.terrainHeight(state, e.position[0], e.position[2]) : e.position[1];
+  const splash = [];
+  for (const o of [...state.enemies]) {
+    if (o === e || o.hp <= 0 || !enemyHostileTo(o, b.side) || Math.hypot(o.position[0] - e.position[0], o.position[2] - e.position[2]) > STORMREEL.stepRadius) continue;
+    if (e.position[1] - floor > 2 || o.position[1] - (ctx.terrainHeight ? ctx.terrainHeight(state, o.position[0], o.position[2]) : o.position[1]) > .6) continue;   // no path through the soil
+    splash.push(o.id);
+    ctx.hitEnemyPart(state, o, 'torso', shock(state, STORMREEL.stepDamage), {point: partPosition(o, 'torso'), normal: [0, 1, 0], ownerId: by, side: b.side, tool: 'stormreel', energy: 1, shock: true}, ctx, events);
+  }
+  ctx.hitEnemyPart(state, e, 'torso', shock(state, STORMREEL.surge), {point: at, normal: [0, 1, 0], ownerId: by, side: b.side, tool: 'stormreel', energy: 2.2, shock: true}, ctx, events);
+  return splash;
+}
 function stepCircuit(state, b, events, height, ctx) {
   for (const colour of PACKS) {
     const probe = b.probes?.[colour]; if (!probe) continue;
     probeAt(state, probe, height);
-    const id = b[OPERATOR[colour]], worn = !!id && state.players.some(h => h.id === id && h.tool === 'stormreel');
+    const id = b[OPERATOR[colour]], held = !!id && state.players.some(h => h.id === id && h.tool === 'stormreel') || !!b.planted?.[colour];
     if (state.tick - probe.tick > STORMREEL.probeSeconds * 60) dropProbe(b, colour, events, 'cold');   // the lone probe goes cold
-    else if (!worn) { const t = terminalPoint(b, colour); if (Math.hypot(probe.at[0] - t[0], probe.at[1] - t[1], probe.at[2] - t[2]) > STORMREEL.tether) dropProbe(b, colour, events, 'snapped'); }
+    else if (!held) { const t = terminalPoint(b, colour); if (Math.hypot(probe.at[0] - t[0], probe.at[1] - t[1], probe.at[2] - t[2]) > STORMREEL.tether) dropProbe(b, colour, events, 'snapped'); }
   }
-  if (!b.probes) return;
-  const {red, blue} = b.probes;
-  if (!b.arc) return;
-  if (!red || !blue) return endCircuit(b, events, 'reeled', true);
+  if (!b.probes || !b.arc) return;
+  const foe = circuitFoe(state, b);
+  if (!foe) return endCircuit(b, events, 'cooked', true);   // the foe fell (its bolts drop out) or a bolt came out
   if (b.hp <= 0) return endCircuit(b, events, 'tower');
   if (b.charge <= 0) return endCircuit(b, events, 'empty');
-  if (state.tick > b.arc.until) return endCircuit(b, events, 'faded');
-  const A = red.at, B = blue.at;
-  if (Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]) > STORMREEL.arcLength * 1.15) return endCircuit(b, events, 'stretched');
-  if ((state.tick - b.arc.tick) % STORMREEL.arcPulseTicks || !ctx) return;
+  if (state.tick > b.arc.until) return endCircuit(b, events, 'faded', true);
+  if ((state.tick - b.arc.tick) % STORMREEL.arcPulseTicks || !ctx || state.tick === b.arc.tick) return;
   b.charge = Math.max(0, b.charge - STORMREEL.arcDrain);
-  const amount = Math.round(STORMREEL.arcDamage * (raining(state) ? STORMREEL.wet : 1));
-  for (const e of [...state.enemies]) {
-    if (e.hp <= 0 || !enemyHostileTo(e, b.side)) continue;
-    // The body is a column from feet to head: the line catches it anywhere along that height.
-    const at = partPosition(e, 'torso'), feet = [e.position[0], e.position[1] + .2, e.position[2]], head = partPosition(e, 'head');
-    if (Math.min(segDist(A, B, at), segDist(A, B, feet), segDist(A, B, head)) > STORMREEL.arcReach + (e.kind === 'golem' ? .8 : 0)) continue;
-    ctx.hitEnemyPart(state, e, 'torso', amount, {point: at, normal: [0, 1, 0], ownerId: b.arc.by, side: b.side, tool: 'stormreel', energy: .6, shock: true}, ctx, events);
-  }
+  ctx.hitEnemyPart(state, foe, 'torso', shock(state, STORMREEL.arcDamage), {point: partPosition(foe, 'torso'), normal: [0, 1, 0], ownerId: b.arc.by, side: b.side, tool: 'stormreel', energy: .6, shock: true}, ctx, events);
 }
-/** Lay a probe where a live bolt landed; a red and a blue probe close the circuit. Returns the colour laid. */
-function layProbe(state, b, p, hit, events) {
-  // Your bolts are always your pack's polarity: red is positive, blue negative. A solo Hero lodges one, hangs that pack up
-  // (the probe stays tethered), shoulders the other and lodges the second to close the circuit.
+/** Lay a probe where a live bolt landed. A + and a - probe in the same foe close the circuit. Returns the colour laid. */
+function layProbe(state, b, p, hit, events, ctx) {
+  // Your bolts are always your pack's polarity: red is positive, blue negative. A solo Hero lodges one, plants that
+  // crossbow (the probe stays wired to it), fetches the other and lodges the second in the same foe.
   const colour = packOf(b, p.id);
   b.probes ||= {red: null, blue: null};
-  b.probes[colour] = {at: hit.point.map(v => +v.toFixed(3)), tick: state.tick, by: p.id, cost: hit.cost ?? 0, ...(hit.enemy ? {enemy: hit.enemy, part: hit.part} : {})};
-  const {red, blue} = b.probes;
-  if (red && blue && Math.hypot(...red.at.map((v, i) => v - blue.at[i])) <= STORMREEL.arcLength) {
-    const fresh = !b.arc;
-    b.arc = {tick: fresh ? state.tick : b.arc.tick, until: state.tick + STORMREEL.arcSeconds * 60, by: p.id};
-    if (fresh) events.push({kind: 'storm_arc', id: b.id, structureId: b.id, by: p.id, red: [...red.at], blue: [...blue.at]});
+  b.probes[colour] = {at: hit.point.map(v => +v.toFixed(3)), tick: state.tick, by: p.id, cost: hit.cost ?? 0, ...(hit.enemy ? {enemy: hit.enemy, part: hit.part} : {}), ...(hit.fell ? {fell: true} : {})};
+  const foe = circuitFoe(state, b);
+  if (b.arc && b.arc.enemy !== foe?.id) endCircuit(b, events, 'open', true);   // a bolt moved to another foe or the ground
+  if (foe && !b.arc && b.charge > 0) {
+    b.arc = {tick: state.tick, until: state.tick + STORMREEL.arcSeconds * 60, by: p.id, enemy: foe.id};
+    const at = partPosition(foe, 'torso'), splash = ctx ? surge(state, b, foe, events, ctx) : [];
+    events.push({kind: 'storm_arc', id: b.id, structureId: b.id, by: p.id, enemy: foe.id, red: [...b.probes.red.at], blue: [...b.probes.blue.at], at, splash, wet: raining(state)});
   }
   return colour;
 }
@@ -375,30 +422,17 @@ export function stormShot(state, p, m, ctx) {
   const hitEnemy = !wall && enemy && (!ground || enemy.t <= ground.t + .3) ? enemy : null;
   const wet = raining(state), events = [];
   const point = wall ? wall.point : hitEnemy ? hitEnemy.point : ground ? ground.point : m.origin.map((v, i) => v + dir[i] * STORMREEL.range);
-  let earth = null, grounded = false, splash = [];
+  // The bolt alone is only a bolt: a little kinetic damage. The lightning waits for the circuit (layProbe).
+  let killed = false;
   if (hitEnemy) {
-    const e = hitEnemy.enemy, floor = height(e.position[0], e.position[2]);
-    grounded = e.position[1] - floor <= STORMREEL.arcGap;
-    earth = [e.position[0], floor, e.position[2]];
-    const shock = live ? STORMREEL.shock * (wet ? STORMREEL.wet : 1) * charge : 0;   // the arc always finds its way (Mitch, 2026-10-06)
-    const amount = Math.round(STORMREEL.bolt * (.4 + .6 * charge) + shock);
-    ctx.hitEnemyPart(state, e, hitEnemy.part, amount, {point: [...point], normal: dir.map(v => -v), ownerId: p.id, side, tool: 'stormreel', energy: 1.6, shock: live && grounded}, ctx, events);
-  } else if (wall) { earth = [point[0], height(point[0], point[2]), point[2]]; grounded = true; }   // the current runs down the wall into the soil
-  else if (ground) { earth = [...ground.point]; grounded = true; }
-  // Step voltage: current spreading from the earth point jolts grounded neighbours.
-  if (live && grounded && earth) {
-    const k = (hitEnemy ? 1 : STORMREEL.groundStrike) * charge * (wet ? STORMREEL.wet : 1);
-    for (const e of [...state.enemies]) {
-      if (e === hitEnemy?.enemy || e.hp <= 0 || !enemyHostileTo(e, side)) continue;
-      if (Math.hypot(e.position[0] - earth[0], e.position[2] - earth[2]) > STORMREEL.stepRadius) continue;
-      if (e.position[1] - height(e.position[0], e.position[2]) > .6) continue;
-      splash.push(e.id);
-      ctx.hitEnemyPart(state, e, 'torso', Math.round(STORMREEL.stepDamage * k), {point: partPosition(e, 'torso'), normal: [0, 1, 0], ownerId: p.id, side, tool: 'stormreel', energy: 1}, ctx, events);
-    }
+    const e = hitEnemy.enemy;
+    ctx.hitEnemyPart(state, e, hitEnemy.part, Math.round(STORMREEL.bolt * (.4 + .6 * charge)), {point: [...point], normal: dir.map(v => -v), ownerId: p.id, side, tool: 'stormreel', energy: 1.2}, ctx, events);
+    killed = !state.enemies.includes(e) || e.hp <= 0;
   }
-  // A live bolt that lands leaves its probe (red or blue); a bolt that flies off into the distance leaves none.
-  const probe = live && (hitEnemy || wall || ground) ? layProbe(state, b, p, {point, cost, ...(hitEnemy && state.enemies.includes(hitEnemy.enemy) && hitEnemy.enemy.hp > 0 ? {enemy: hitEnemy.enemy.id, part: hitEnemy.part} : {})}, events) : null;
-  events.unshift({kind: 'storm_bolt', by: p.id, structureId: b.id, pole: packOf(b, p.id), origin: [...m.origin], position: [...point], ...(earth ? {earth} : {}), ...(probe ? {probe} : {}),
-    ...(hitEnemy ? {targetId: hitEnemy.enemy.id, part: hitEnemy.part} : {}), ...(wall ? {blocked: wall.kind, blockedId: wall.id} : {}), live, grounded, wet, charge: Math.round(charge * 100) / 100, splash, towerCharge: b.charge});
+  // A live bolt that lands leaves its probe (red or blue), still wired up; one that kills drops out and falls to the ground.
+  const rest = killed ? [point[0], height(point[0], point[2]), point[2]] : point;
+  const probe = live && (hitEnemy || wall || ground) ? layProbe(state, b, p, {point: rest, cost, ...(hitEnemy && !killed ? {enemy: hitEnemy.enemy.id, part: hitEnemy.part} : {}), ...(killed ? {fell: true} : {})}, events, ctx) : null;
+  events.unshift({kind: 'storm_bolt', by: p.id, structureId: b.id, pole: packOf(b, p.id), origin: [...m.origin], position: [...point], ...(probe ? {probe} : {}), ...(killed ? {fell: [...rest]} : {}),
+    ...(hitEnemy ? {targetId: hitEnemy.enemy.id, part: hitEnemy.part} : {}), ...(wall ? {blocked: wall.kind, blockedId: wall.id} : {}), live, wet, charge: Math.round(charge * 100) / 100, towerCharge: b.charge});
   return {ok: true, events};
 }

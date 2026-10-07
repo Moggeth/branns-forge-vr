@@ -85,6 +85,12 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     return make('carry', 'ready', held.id, 'Log in hand', 'Stow', keys.stow, `${keys.drop} drop · ${keys.throw} throw`);
   }
   const boneHeld = (snapshot.detachedParts || []).some(p => p.heldBy === self.id);
+  // A Stormreel crossbow spiked into the ground (shared/stormreel.js stormPickup; game.js interact checks it first).
+  for (const b of snapshot.inventions?.structures || []) for (const pack of ['red', 'blue']) {
+    const at = b.planted?.[pack]?.at; if (!at || Math.hypot(p[0] - at[0], p[2] - at[2]) > STORMREEL.plantReach + .4) continue;
+    const name = pack === 'red' ? 'Red (+) crossbow' : 'Blue (\u2212) crossbow';
+    return make('pickup', 'ready', `${b.id}:${pack}`, name, 'Pick it up', keys.collect, tool === 'stormreel' ? 'your crossbow is spiked here in its place' : 'its bolt stays live');
+  }
 
   // The game supplies the exact visible E target. Pure callers use the same authority selector.
   const selected = aim && Object.hasOwn(aim,'collectible') ? aim.collectible : nearestCollectible(snapshot,self,{height:ctx.height,visible:(from,to,id)=>{

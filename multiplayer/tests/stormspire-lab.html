@@ -1,10 +1,11 @@
 <!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4}</style></head><body>
 <script type="module">
-// Review lab for the Stormreel and Stormspire (round 3, 2026-10-06): the real presentation (stormspire-art.js,
-// stormreel-view.js, stormreel-look.js, lightning-fx.js) on flat grass with stand-in heroes and skeletons.
+// Review lab for the Stormreel and Stormspire (round 4, 2026-10-07): the real presentation (stormspire-art.js,
+// stormreel-view.js, stormreel-cable.js, stormreel-circuit.js, lightning-fx.js) on flat grass with stand-in heroes,
+// stand-in skeletons and real Orchard tree models for the cable to wrap.
 //   lab.frame(n)            advance n 60 Hz frames and render
 //   lab.view(name)          camera: front hat hopper side arc wear victims probe reel crossbows
-//   lab.scenario(name)      idle | worn | shot | half | circuit | reel | drop
+//   lab.scenario(name)      idle | worn | shot | half | open | circuit | cooked | fell | planted | wrap | wrap2 | tug | reel | drop
 //   lab.audio()             render every sound offline and report levels (no speakers needed)
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -21,43 +22,67 @@ scene.add(new T.HemisphereLight(0xc6e0ed,0x5e5139,1.2));const sun=new T.Directio
 scene.add(new T.Mesh(new T.PlaneGeometry(120,120).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x667b43,roughness:1})));
 const cam=new T.PerspectiveCamera(55,W/H,.05,200);scene.add(cam);
 const lightning=createLightningFx({scene}),art=createStormspireArt({lightning}),loader=new GLTFLoader();
-const [tower,pack,bow]=await Promise.all(['stormspire','reel_pack','stormreel'].map(n=>loader.loadAsync(`/assets/${n}.glb`)));
+const [tower,pack,bow,treeA,treeB]=await Promise.all(['stormspire','reel_pack','stormreel','tree','tree_b'].map(n=>loader.loadAsync(`/assets/${n}.glb`)));
+// Two real trees for the cable to hug (variant 0 'tree' and 1 'tree_b', at their authored scale).
+const TREES=[{id:'labTree1',x:-2.6,z:-5.4,height:6.002,variant:0},{id:'labTree2',x:-7.5,z:-10.5,height:6.297,variant:1}];
+for(const [i,t] of TREES.entries()){const m=(i?treeB:treeA).scene.clone(true);m.position.set(t.x,0,t.z);m.rotation.y=i*1.3;scene.add(m);}
 art.install(tower);art.installPack(pack);
 const b={id:'s1',type:'stormspire',position:[0,0,0],yaw:0,hp:240,charge:200,operator:null,operator2:null,side:'party'};
 const e={root:new T.Group(),data:b};scene.add(e.root);art.attach(e);
 // stand-ins: a hero in a pack and a crossbow, and skeletons (static bind pose) with approximate body anchors
-const heroPos=new T.Vector3(2.5,0,-7),hero=new T.Group();hero.position.copy(heroPos);scene.add(hero);
+const HERO0=new T.Vector3(2.5,0,-7),heroPos=HERO0.clone(),hero=new T.Group();hero.position.copy(heroPos);scene.add(hero);
 hero.add(new T.Mesh(new T.CapsuleGeometry(.26,1,4,12),new T.MeshStandardMaterial({color:0x6b7f9a,roughness:.8})).translateY(.8));hero.add(new T.Mesh(new T.SphereGeometry(.2,16,12),new T.MeshStandardMaterial({color:0xe0b894})).translateY(1.7));
 const held=bow.scene.clone(true);held.name='RemoteWeapon:stormreel';held.scale.setScalar(.9);held.position.set(.22,1.15,-.4);hero.add(held);
 const foes=[],bone=new T.MeshStandardMaterial({color:0xe9e2cf,roughness:.7});
 function addFoe(id,x,z){const g=new T.Group(),mk=(geo,x,y,z)=>{const m=new T.Mesh(geo,bone);m.position.set(x,y,z);g.add(m);return m;};   // a bone-white stand-in (the real skeleton is checked in the game)
   mk(new T.CapsuleGeometry(.17,.5,4,10),0,1.1,0);mk(new T.SphereGeometry(.15,12,10),0,1.65,0);for(const s of[-1,1]){mk(new T.CapsuleGeometry(.05,.55,3,8),s*.34,1.15,0);mk(new T.CapsuleGeometry(.06,.7,3,8),s*.12,.42,0);}
-  g.position.set(x,0,z);scene.add(g);foes.push({id,hp:100,kind:'skeleton',position:[x,0,z],m:g});}
+  g.position.set(x,0,z);scene.add(g);foes.push({id,hp:100,kind:'skeleton',position:[x,0,z],m:g});return g;}
 addFoe('f1',-3,-14);addFoe('f2',-1.4,-17);addFoe('f3',9,-6);
 const OFF={torso:[0,1.05,0],head:[0,1.62,0],leftArm:[-.4,1.2,0],rightArm:[.4,1.2,0],leftLeg:[-.14,.45,0],rightLeg:[.14,.45,0]};
 const foe=id=>foes.find(f=>f.id===id),offs=(id,part)=>{const f=foe(id);return f?[f.position[0]+OFF[part][0],f.position[1]+OFF[part][1],f.position[2]+OFF[part][2]]:null;};
 const snap={tick:0,enemies:foes,players:[],inventions:{structures:[b]}};
 const muzzle=()=>new T.Vector3(heroPos.x+.22,heroPos.y+1.3,heroPos.z-.9);
+function moveHero(x,z){heroPos.set(x,0,z);hero.position.copy(heroPos);}
+const jolts={shake:0,flash:0};
 const view=createStormreelView({scene,lightning,height:()=>0,localId:()=>'local',actorPose:id=>id==='me'?{position:heroPos,yaw:0}:null,localPose:()=>({position:new T.Vector3(0,0,30),yaw:0}),localMuzzle:()=>null,
   remoteMuzzle:(id,out)=>id==='me'?out.copy(muzzle()):null,remoteCrossbow:id=>id==='me'?held:null,
   probeAnchor:(id,part,out)=>{const p=offs(id,part||'torso');return p?out.fromArray(p):null;},bodyPoints:(id,out)=>{let n=0;for(const part of ['torso','head','leftArm','rightArm','leftLeg','rightLeg']){const p=offs(id,part);if(p)out[n++].fromArray(p);}return n;},
-  spireEntry:id=>id==='s1'?e:null,spireArt:art,audio:()=>null,listener:()=>null});
+  spireEntry:id=>id==='s1'?e:null,spireArt:art,audio:()=>null,listener:()=>null,
+  enemyVisual:id=>foe(id)?.m||null,trees:()=>TREES,shake:k=>{jolts.shake=Math.max(jolts.shake,k);},flash:k=>{jolts.flash=Math.max(jolts.flash,k);}});
 view.installPack(pack);view.installCrossbow(bow);view.sync(snap);
 let frame=0,evs=[],weapon=null,fpModel=null;
 const labNow=()=>frame/60;
 let tickN=0;const probe=(pole,enemy,part='torso')=>({at:offs(enemy,part),tick:++tickN,enemy,part});
 const SCEN={
-  idle(){Object.assign(b,{operator:null,operator2:null,probes:undefined,arc:undefined});delete b.probes;delete b.arc;},
+  idle(){for(const k of ['probes','arc','planted','wraps','wraps2','wrapAt','wrapAt2'])delete b[k];Object.assign(b,{operator:null,operator2:null});moveHero(HERO0.x,HERO0.z);hero.visible=true;held.visible=true;for(const f of foes){f.hp=100;f.m.visible=true;}},
   worn(){SCEN.idle();b.operator='me';},
-  shot(){SCEN.worn();const o=[muzzle().x,muzzle().y,muzzle().z],to=offs('f1','torso');view.event({kind:'storm_bolt',by:'me',structureId:'s1',pole:'red',origin:o,position:to,probe:'red',targetId:'f1',part:'torso',live:true,grounded:true,earth:[to[0],0,to[2]],charge:1,splash:['f2']});},
+  // A lone bolt only stings: a crisp bite, no lightning.
+  shot(){SCEN.worn();const o=[muzzle().x,muzzle().y,muzzle().z],to=offs('f1','torso');view.event({kind:'storm_bolt',by:'me',structureId:'s1',pole:'red',origin:o,position:to,probe:'red',targetId:'f1',part:'torso',live:true,charge:1});b.probes={red:probe('red','f1'),blue:null};},
   half(){SCEN.worn();b.probes={red:probe('red','f1'),blue:null};},
-  circuit(){SCEN.worn();b.probes={red:probe('red','f1'),blue:probe('blue','f2')};b.arc={tick:0,until:9999};view.event({kind:'storm_arc',id:'s1',red:offs('f1','torso'),blue:offs('f2','torso')});},
-  drop(){SCEN.idle();b.probes={red:probe('red','f1'),blue:null};},   // pack dropped: the cable runs on to the lodged bolt
+  // One bolt in each of two foes: an open circuit, nothing flows.
+  open(){SCEN.worn();b.probes={red:probe('red','f1'),blue:probe('blue','f2')};},
+  // Both poles in the same foe: the surge, then the cook.
+  circuit(){SCEN.worn();b.probes={red:probe('red','f1','torso'),blue:probe('blue','f1','head')};b.arc={tick:0,until:9999,enemy:'f1'};
+    view.event({kind:'storm_arc',id:'s1',structureId:'s1',by:'me',enemy:'f1',red:offs('f1','torso'),blue:offs('f1','head'),at:offs('f1','torso'),splash:['f2'],wet:false});},
+  cooked(){foe('f1').hp=0;view.event({kind:'storm_arc_end',id:'s1',structureId:'s1',enemy:'f1',why:'cooked'});delete b.arc;foe('f1').m.visible=true;
+    b.probes={red:{...b.probes.red,fell:true,at:[offs('f1','torso')[0]+.2,0,offs('f1','torso')[2]]},blue:{...b.probes.blue,fell:true,at:[offs('f1','head')[0]-.3,0,offs('f1','head')[2]+.2]}};},
+  // A killing bolt drops to the ground instead of hanging in mid-air.
+  fell(){SCEN.worn();const o=[muzzle().x,muzzle().y,muzzle().z],to=offs('f3','torso'),rest=[to[0]+.15,0,to[2]];foe('f3').m.visible=false;
+    view.event({kind:'storm_bolt',by:'me',structureId:'s1',pole:'red',origin:o,position:to,probe:'red',targetId:'f3',part:'torso',live:true,charge:1,fell:rest});b.probes={red:{at:rest,tick:++tickN,fell:true},blue:null};},
+  // The red crossbow spiked into the ground with its bolt still in f1; the hero has walked off to fetch blue.
+  planted(){SCEN.idle();b.probes={red:probe('red','f1'),blue:null};b.planted={red:{at:[1.4,0,-9.5],yaw:.5,tick:tickN,by:'me'}};
+    view.event({kind:'storm_plant',id:'s1',structureId:'s1',by:'me',pack:'red',position:[1.4,0,-9.5],yaw:.5});b.operator2='me';moveHero(-1.5,-3.2);},
+  // Walked round a tree: the cable hugs the trunk all the way round.
+  wrap(){SCEN.worn();moveHero(-6.2,-4.6);b.wraps=[{id:'labTree1',x:TREES[0].x,z:TREES[0].z,s:1}];b.wrapAt=[heroPos.x,heroPos.z];},
+  wrap2(){SCEN.worn();moveHero(-4.2,-14.5);b.wraps=[{id:'labTree1',x:TREES[0].x,z:TREES[0].z,s:1},{id:'labTree2',x:TREES[1].x,z:TREES[1].z,s:-1}];b.wrapAt=[heroPos.x,heroPos.z];},
+  tug(){SCEN.worn();view.tug('me');},
+  drop(){SCEN.idle();b.probes={red:probe('red','f1'),blue:null};},   // pack hung back up: the cable runs on to the lodged bolt
   reel(){SCEN.half();view.event({kind:'storm_reel',id:'s1',by:'me',pack:'red',position:offs('f1','torso'),refund:12,probeTick:tickN});delete b.probes;},
 };
 const VIEWS={front:[[3.2,2.4,-5.4],[0,2.2,0]],hat:[[1.6,5.9,-2.6],[0,5.2,-.6]],hopper:[[1.4,1.6,-3],[0,1.1,-1.5]],side:[[-5.5,2.6,.5],[0,2,0]],arc:[[7,3.2,-4],[-2,1.2,-15]],
-  wear:[[6.2,1.9,-3.5],[2.5,1.2,-7]],victims:[[-8,2.2,-9],[-2.2,1.2,-15.5]],probe:[[-1.2,1.8,-11.8],[-3,1.15,-14]],reel:[[5,1.8,-4.5],[0,1.2,-10]],crossbows:[[0,0,0],[0,0,0]]};
-window.lab={
+  wear:[[6.2,1.9,-3.5],[2.5,1.2,-7]],trunk:[[-1.2,1.3,-3.6],[-2.6,.5,-5.4]],trunkTop:[[-2.4,3.2,-4.4],[-2.6,.3,-5.6]],wrapWide:[[4,5,1],[-4,0,-9]],trunk2:[[-6,1.4,-8.4],[-7.5,.4,-10.5]],
+  planted:[[2.8,1.2,-8],[1.4,.5,-9.6]],plantedWide:[[4.5,2.4,-5],[0,.8,-11]],surge:[[1,1.8,-9.5],[-3,1.1,-14]],fell:[[6,1.5,-3],[9,.4,-6]],victims:[[-8,2.2,-9],[-2.2,1.2,-15.5]],probe:[[-1.2,1.8,-11.8],[-3,1.15,-14]],reel:[[5,1.8,-4.5],[0,1.2,-10]],crossbows:[[0,0,0],[0,0,0]]};
+window.lab={scene,
   foes:()=>foes.map(f=>({id:f.id,scale:f.m.scale.x,pos:f.m.position.toArray(),vis:f.m.visible,kids:f.m.children.length})),
   frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);weapon?.update(1/60);view.update(1/60,t,cam.position);lightning.update(1/60,cam);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
   view(name){const v=VIEWS[name];cam.position.fromArray(v[0]);cam.lookAt(...v[1]);},

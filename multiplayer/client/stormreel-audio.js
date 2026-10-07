@@ -195,6 +195,44 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     hiss(o, {from: 1500 + Math.random() * 900, q: 2, length: .11, gain: .7, am: 85}); tone(o, {type: 'square', from: 220, to: 90, length: .09, gain: .09});
   }
 
+  /** The circuit closes through a foe: a stacked thunderclap, a mains "BWAAM" and a sizzling whip-crack. */
+  function surge(at = null, wet = false) {
+    if (!ready()) return; const o = out(place(at), 1.1); cleanup(o, 3200);
+    hiss(o, {type: 'highpass', from: 3600, length: .06, gain: 1}); hiss(o, {type: 'highpass', from: 2200, at: .035, length: .08, gain: .8});
+    hiss(o, {type: 'lowpass', from: 1400, to: 70, length: 2, gain: 1.1, rate: .6});
+    tone(o, {from: 95, to: 24, length: 1.1, gain: 1.1, attack: .002});
+    tone(o, {type: 'square', from: 120, to: 58, length: .7, gain: .22}); tone(o, {type: 'sawtooth', from: 181, to: 87, length: .7, gain: .14});   // mains bwaam
+    tone(o, {type: 'sawtooth', from: 5200, to: 160, length: .5, gain: .25});
+    hiss(o, {from: 1800, q: 2.5, at: .08, length: .9, gain: .45, am: 120});
+    if (wet) hiss(o, {type: 'highpass', from: 4200, at: .05, length: 1.2, gain: .35});   // steam
+    chime(o, 'red', .12, .55); chime(o, 'blue', .2, .55);
+  }
+  /** A foe cooked by the circuit: a last fat crackle, a pop and a hiss of smoke. */
+  function cooked(at = null) {
+    if (!ready()) return; const o = out(place(at), .9); cleanup(o, 2600);
+    hiss(o, {from: 2600, q: 1.5, length: .22, gain: .8, am: 95}); tone(o, {from: 300, to: 60, at: .12, length: .18, gain: .45});
+    hiss(o, {type: 'highpass', from: 3800, to: 1800, at: .2, length: 1.8, gain: .22});
+  }
+  /** Hitting the end of the cable: the drum's brake bites (clunk), the cable thrums taut, a spark spits at the fairlead. */
+  function tug(k = 1, at = null) {
+    if (!ready()) return; const o = out(place(at, !at), .9 * k); cleanup(o, 1200);
+    tone(o, {from: 170, to: 70, length: .09, gain: .55}); hiss(o, {from: 1100, q: 2.5, length: .05, gain: .5});                  // brake clunk
+    tone(o, {type: 'triangle', from: 92, to: 84, at: .02, length: .55, gain: .3}); tone(o, {type: 'triangle', from: 184, to: 168, at: .02, length: .35, gain: .12});   // thrum
+    hiss(o, {type: 'highpass', from: 4500, at: .03, length: .07, gain: .35});                                                        // spark spit
+  }
+  /** Planting the crossbow: a grunt of effort is the player's; this is the butt biting into the earth and the rail ringing. */
+  function spike(pole = 'red', at = null, local = false) {
+    if (!ready()) return; const o = out(place(at, local), .95); cleanup(o, 1600);
+    tone(o, {from: 120, to: 45, length: .16, gain: .8}); hiss(o, {type: 'lowpass', from: 900, to: 200, length: .25, gain: .6});     // thunk into soil
+    tone(o, {type: 'triangle', from: 1180, at: .02, length: .5, gain: .07}); tone(o, {type: 'triangle', from: 1770, at: .02, length: .35, gain: .04});   // rail ring
+    chime(o, pole, .12, .3);
+  }
+  /** A bolt dropping out of a felled foe and clattering on the ground. */
+  function clatter(at = null) {
+    if (!ready()) return; const o = out(place(at), .7); cleanup(o, 700);
+    for (const [t, f] of [[0, 2200], [.09, 2700], [.15, 1900]]) { tone(o, {type: 'triangle', from: f, at: t, length: .06, gain: .12}); hiss(o, {from: f * 1.5, q: 4, at: t, length: .03, gain: .3}); }
+  }
+
   // ---- the tower's transformer hum (one voice, placed at the nearest charged tower) ----------------------------------
   let hum = null;
   function towerHum() {
@@ -221,5 +259,5 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
   }
   function dispose() { if (hum) { try { hum.a.stop(); hum.b.stop(); hum.c.stop(); hum.g.disconnect(); } catch { /* gone */ } hum = null; } }
 
-  return {fire, plant, circuitClose, circuitEnd, arcLoop, charger, reel, snap, creak, pack, towerCharge, shock, updateTowers, dispose, stats: () => ({...stats})};
+  return {fire, plant, surge, cooked, tug, spike, clatter, circuitClose, circuitEnd, arcLoop, charger, reel, snap, creak, pack, towerCharge, shock, updateTowers, dispose, stats: () => ({...stats})};
 }
