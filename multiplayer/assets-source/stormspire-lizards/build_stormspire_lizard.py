@@ -1,38 +1,42 @@
-"""Stormspire lizard crew: the Voltnewt (level 2) - reproducible Blender (bpy 4.5+/5.0) builder.
+"""Stormspire lizard crew: the Voltnewt (level 2, production pass) - reproducible Blender (bpy 4.5+/5.0) builder.
 
 Run:  python3.11 build_stormspire_lizard.py -- --out ../../public/assets/stormspire-lizard.glb
       python3.11 build_stormspire_lizard.py -- --out out/stormspire-lizard.glb      (scratch build + report only)
-      (pip install bpy numpy)
+      (pip install bpy numpy; the system python3 needs Pillow, which encodes the JPEG textures)
 Prints LIZARD_BUILD_OK as its last line on success. Blender can exit 0 after a Python traceback, so check for it.
 
-Design: Mitch's concept sheet "03 · VOLTNEWT" (2026-10-07). A chunky teal newt about 0.6 m nose to tail curl: darker
-teal spots, a cream belly, throat and jaw, a row of orange spikes down the back and a thick tail that curls up into a
-hook. Big friendly amber eyes high on a broad head and a wide toothy grin (cream cone teeth, pink mouth). Work gear: a
-yellow hard hat with a blue lightning bolt (an orange spike pokes out behind it), a yellow leather chest harness with
-brown straps, buckles and a round white badge with a red cross, a brass and steel power socket on the upper back with
-a red cable, and black chunky boots with rounded claws. Glowing blue electric veins run under the skin.
-Faces: the grin (jaw), a squinting charged-up face (eyelids shut, cheeks puffed by the Cheek bones, veins flaring),
-and the bite that zaps.
+Design: Mitch's concept sheet "03 · VOLTNEWT" (2026-10-07). A chunky teal newt about 0.6 m nose to tail: darker teal
+spots, a cream belly, throat and jaw, a row of rounded orange spikes down the back and a thick tail that rises and curls
+over into a hook. Big friendly amber eyes high on a broad head and a wide toothy grin (cream cone teeth, a deep red
+mouth, a pink tongue). Work gear: a yellow hard hat with a blue lightning bolt (an orange spike pokes out behind it), a
+yellow leather chest harness with brown straps, buckles and a round white badge with a red cross, a brass and steel
+power socket on the upper back with a red cable, and black chunky boots with rounded claws. Glowing blue electric veins
+run under the skin.
+Faces: the grin (jaw), a squinting charged-up face (eyelids shut into dark curved closed-eye lines, cheeks puffed by
+the Cheek bones, veins flaring), and the bite that zaps.
 
 Everything is authored in the game frame (X = the newt's right, Y up, -Z forward, origin on the ground under the belly,
 metres) and converted to Blender's Z-up on the way in, so these numbers match client/stormspire-lizards.js.
 
-One skinned mesh, one material (LizardSkin), one 256 x 144 texture atlas:
-  - rows 0..15 (Blender, bottom up): four 4 px palette rows, one per colour look (0 concept teal, 1 jade, 2 lagoon,
-    3 spare). u 0..96 px is a continuous skin ramp (dark spot teal -> back -> flank -> cream belly), the rest are 6 px
-    solid slots (eyes, mouth, teeth, gear...). TEXCOORD_0 picks the colour; the runtime offsets the row per look.
-  - rows 16..143, u 0..128: a tileable 128 px electric-vein tile. TEXCOORD_1 maps skin onto it (x along the body,
-    y around it; whole tiles around every loop so there is no seam); gear and eyes carry TEXCOORD_1.x = -500 (no veins).
-    The runtime samples the tile in the shader and adds a flickering blue glow (brighter while charging or biting).
-Vertex colours carry baked ambient occlusion only. The hard hat and the wrench hang on their own bones so the runtime
-can show the wrench only while tinkering. Bones Cable1..2 carry the cable stub; the runtime continues the cable from
-CableTip to wherever the newt is plugged in.
+One skinned mesh, one material (LizardSkin), three 512 x 512 JPEG textures sharing one UV layout:
+  - base colour: painted procedurally per texel from the rest-pose surface point (3D noise, so there are no seams):
+    a back-to-belly skin ramp, mottling, clustered dark spots and speckles, transverse belly scales, a painted amber
+    iris, a scuffed hard hat, a stitched leather chest plate and graded spikes; gear details live in 16 px solid cells.
+  - normal (glTF convention): pebbly skin, belly scale grooves, hat dents, stitching and leather grain.
+  - metallic-roughness: G = roughness (wet skin 0.3, matte belly, glossy eyes and boots), B = metalness (brass, steel)
+    and R = a vein mask (domain-warped noise isolines) the runtime lights as flickering blue electricity.
+UV regions (Blender pixels, y up): see REGIONS. The left limbs and eye are painted; the right ones share their texels.
+Vertex colour COLOR_0 carries data, not colour: R = baked ambient occlusion, G = self-glow (eye, catch-lights, z's,
+badge), B = skin mask (the runtime shifts the skin hue per crew member and adds a wet sheen there).
+
+The hard hat and the wrench hang on their own bones so the runtime can show the wrench only while tinkering. Bones
+Cable1..2 carry the cable stub; the runtime continues the cable from CableTip to wherever the newt is plugged in.
 
 Clips (glTF animations, 30 fps samples): idle, climb, cheer, nap, tinker, bite. After export the GLB is repacked with
 KHR_mesh_quantization (byte normals, colours and weights) and 16-bit rotation keys; channels that never leave rest are
-dropped.
+dropped, and the three textures are swapped in as JPEGs (4:4:4 for the data maps).
 """
-import os, sys
+import os, sys, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 import bpy, bmesh, math, json, time, struct, random
 import numpy as np
@@ -52,81 +56,63 @@ def smoothstep(a, b, x):
 def lerp(a, b, t): return a + (b - a) * t
 def to_b(p): return Vector((p[0], -p[2], p[1]))   # game (x right, y up, z back) -> Blender (x, y forward, z up)
 
-# ------------------------------------------------------------------ atlas: palette rows + vein tile
-RAMP_PX, SLOT_PX, TEX_W, TEX_H, ROW_PX, VEIN_PX = 96, 6, 256, 144, 4, 128
-SLOTS = ['eye', 'iris', 'pupil', 'mouth', 'tongue', 'tooth', 'hat', 'hat_dark', 'bolt', 'spike', 'spike_tip', 'harness',
-         'strap', 'buckle', 'badge', 'cross', 'brass', 'steel', 'cable', 'boot', 'claw', 'zzz', 'line', 'highlight',
-         'nostril', 'blush']
-assert RAMP_PX + SLOT_PX * len(SLOTS) <= TEX_W
-LOOKS = [   # skin ramp: spot, back, flank, light flank, cream, light cream
-    dict(ramp=['073a44', '137a83', '1f9f9c', '49c2ae', 'e6e1b8', 'f7f2d6'], iris='e48a1c'),
-    dict(ramp=['0c503a', '17805c', '25a273', '57c48f', 'e8e3b6', 'f7f2d6'], iris='d9771a'),
-    dict(ramp=['0b3d63', '15688f', '2189ad', '4fb2c9', 'e4e2c0', 'f5f3dc'], iris='ef9a2a'),
-]
-LOOKS.append(dict(LOOKS[0]))
-COMMON = dict(eye='fffdf6', pupil='1a1210', mouth='a8344e', tongue='ff7f94', tooth='fbf1d2', hat='ffc61f', hat_dark='e0930f',
-              bolt='2f7fe8', spike='f07a22', spike_tip='ffb35a', harness='f4be2c', strap='6e4126', buckle='9aa3ab', badge='fbf7ee',
-              cross='e2302e', brass='cf9a3e', steel='8f9aa3', cable='d8402e', boot='26262b', claw='3a3a42', zzz='eaf6ff',
-              line='3a1d18', highlight='ffffff', nostril='123a3c', blush='ff8f8f')
+# ------------------------------------------------------------------ texture layout (Blender pixels, origin bottom left)
+TEX, PAD, CELL = 512, 3, 16
+REGIONS = {
+    'body':  (0, 288, 512, 224),    # x along the loft (neck -> tail tip), y round it (seam under the belly)
+    'head':  (0, 128, 256, 160),    # x round the head (seam inside the mouth), y snout-ward
+    'jaw':   (256, 192, 128, 96),
+    'arm':   (384, 224, 128, 64),   # x round the limb, y shoulder -> wrist; left painted, right shares
+    'leg':   (384, 160, 128, 64),
+    'lid':   (256, 160, 64, 32),
+    'spike': (320, 160, 64, 32),    # x per spike, y base -> tip
+    'eye':   (256, 0, 128, 128),    # polar: the pupil at the centre
+    'plate': (0, 80, 256, 48),
+    'hat':   (384, 32, 128, 128),   # top-down projection of the dome and brim
+}
+SLOT_AREA = (0, 0, 256, 80)
+SKIN_REGIONS = {'body', 'head', 'jaw', 'arm', 'leg', 'lid'}
+def _overlap(a, b): return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+_rects = list(REGIONS.values()) + [SLOT_AREA]
+assert not any(_overlap(a, b) for i, a in enumerate(_rects) for b in _rects[i + 1:]), 'texture regions overlap'
+assert all(r[0] + r[2] <= TEX and r[1] + r[3] <= TEX for r in _rects)
+def reg_uv(name, a, b):
+    x0, y0, w, h = REGIONS[name]; return (x0 + PAD + a * (w - 2 * PAD), y0 + PAD + b * (h - 2 * PAD))
+# solid cells: colour, roughness, metalness
+SLOTS = dict(mouth=('6e1a2c', .32, 0), mouth_dark=('3e0b17', .4, 0), tongue=('f0717f', .3, 0), tooth=('fbf1d2', .28, 0),
+             hat=('ffc61f', .32, 0), hat_dark=('d08510', .45, 0), bolt=('2f7fe8', .35, 0), strap=('6e4126', .7, 0),
+             buckle=('a7afb6', .3, 1), badge=('fbf7ee', .45, 0), cross=('e2302e', .45, 0), brass=('d29b40', .32, 1),
+             steel=('9aa4ad', .28, 1), cable=('d8402e', .42, 0), boot=('232328', .34, 0), sole=('141417', .6, 0),
+             claw=('34343b', .3, 0), zzz=('eaf6ff', .5, 0), line=('241210', .6, 0), highlight=('ffffff', .1, 0),
+             nostril=('0d3236', .6, 0), lash=('163f44', .5, 0), blush=('f58a86', .5, 0), skin_back=('157f95', .34, 0), skin_mid=('23a596', .34, 0),
+             cream=('e3dfb5', .45, 0), harness=('f2b92a', .6, 0), spike=('f07a22', .45, 0))
+SLOT_NAMES = list(SLOTS)
+assert len(SLOT_NAMES) <= (SLOT_AREA[2] // CELL) * (SLOT_AREA[3] // CELL)
+def slot_px(name):
+    i = SLOT_NAMES.index(name); cols = SLOT_AREA[2] // CELL
+    return (SLOT_AREA[0] + CELL * (i % cols) + CELL / 2, SLOT_AREA[1] + CELL * (i // cols) + CELL / 2)
 def srgb(h): return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
-def slot_u(name): return (RAMP_PX + SLOT_PX * SLOTS.index(name) + SLOT_PX / 2) / TEX_W
-def ramp_u(r): return (1.5 + max(0.0, min(1.0, r)) * (RAMP_PX - 3)) / TEX_W
-ROW_V = (ROW_PX / 2) / TEX_H   # row 0 centre in Blender UV (v up); the runtime shifts rows by 4 px
-NO_VEIN = (-500.0, 0.0)
-
-def vein_tile(n=VEIN_PX, seed=11):
-    """Tileable branching lightning veins: random walks drawn with wrap-around, a hot core and a soft halo."""
-    rnd = random.Random(seed); core = np.zeros((n, n), np.float32)
-    def stamp(x, y, v):
-        core[int(y) % n, int(x) % n] = max(core[int(y) % n, int(x) % n], v)
-    def bolt(x, y, ang, length, v, depth):
-        for i in range(int(length)):
-            ang += rnd.uniform(-.55, .55) * (1 if i % 3 else 1.6)
-            x += math.cos(ang) * .9; y += math.sin(ang) * .9; stamp(x, y, v)
-            if depth < 2 and rnd.random() < .035: bolt(x, y, ang + rnd.choice((-1, 1)) * rnd.uniform(.5, 1.1), length * rnd.uniform(.25, .45), v * .8, depth + 1)
-    for k in range(4):
-        bolt(rnd.uniform(0, n), rnd.uniform(0, n), rnd.uniform(0, TAU), rnd.uniform(80, 130), 1.0, 0)
-    # halo: separable wrap-around blur
-    def blur(a, r):
-        k = np.exp(-np.arange(-r * 3, r * 3 + 1) ** 2 / (2 * r * r)); k /= k.sum()
-        out = sum(np.roll(a, i - r * 3, 0) * w for i, w in enumerate(k))
-        return sum(np.roll(out, i - r * 3, 1) * w for i, w in enumerate(k))
-    thick = np.maximum(core, blur(core, 1) * 2.2)
-    halo = blur(core, 3) * 4.0
-    return np.clip(np.maximum(thick, halo * .45), 0, 1)
-
-def atlas_pixels():
-    px = np.zeros((TEX_H, TEX_W, 4), np.float32); px[..., 3] = 1
-    for row, look in enumerate(LOOKS):
-        cols = {**COMMON, **{k: v for k, v in look.items() if k != 'ramp'}}
-        stops = [srgb(h) for h in look['ramp']]; pos = np.linspace(0, 1, len(stops))
-        y0 = row * ROW_PX
-        for x in range(RAMP_PX):
-            r = min(1, max(0, (x + .5 - 1.5) / (RAMP_PX - 3)))
-            px[y0:y0 + ROW_PX, x, :3] = [float(np.interp(r, pos, [s[i] for s in stops])) for i in range(3)]
-        for i, name in enumerate(SLOTS):
-            x0 = RAMP_PX + SLOT_PX * i
-            px[y0:y0 + ROW_PX, x0:x0 + SLOT_PX, :3] = srgb(cols[name])
-    v = vein_tile()
-    px[16:16 + VEIN_PX, 0:VEIN_PX, 0] = v; px[16:16 + VEIN_PX, 0:VEIN_PX, 1] = v; px[16:16 + VEIN_PX, 0:VEIN_PX, 2] = v
-    return px
+# the skin ramp (value 0 dark spot teal, .2 back, .45 flank, .95 cream belly)
+RAMP = [(0, '0a4656'), (.2, '157f95'), (.45, '22a497'), (.62, '58c3a3'), (.85, 'e3dfb5'), (1, 'f4f0d4')]
 
 # ------------------------------------------------------------------ geometry accumulator
 class Geo:
     def __init__(self):
-        self.P, self.R, self.W, self.part, self.ao = [], [], [], [], []
-        self.F, self.FS, self.FH, self.FV = [], [], [], []
-    def v(self, p, ramp, w, part, ao=1.0):
-        self.P.append(Vector(p)); self.R.append(ramp); self.W.append(w); self.part.append(part); self.ao.append(ao)
+        self.P, self.R, self.W, self.part, self.ao, self.glow = [], [], [], [], [], []
+        self.F, self.FS, self.FH, self.FU, self.FB = [], [], [], [], []
+    def v(self, p, ramp, w, part, ao=1.0, glow=0.0):
+        self.P.append(Vector(p)); self.R.append(ramp); self.W.append(w); self.part.append(part); self.ao.append(ao); self.glow.append(glow)
         return len(self.P) - 1
-    def f(self, idx, slot=None, inside=None, out=None, vein=None):
+    def f(self, idx, slot=None, inside=None, out=None, uv=None, bake=True):
         """A face; its winding is fixed later so it faces away from `inside` (a point) or along `out` (a direction).
-        vein: per-corner TEXCOORD_1 (vein tile coordinates) or None for no veins."""
-        self.F.append(list(idx)); self.FS.append(slot); self.FV.append(vein)
+        uv: (region, [per-corner texture pixel]) for painted faces; slot faces sample their solid cell."""
+        assert (slot is None) != (uv is None), 'a face is either painted (uv) or a solid slot'
+        self.F.append(list(idx)); self.FS.append(slot); self.FU.append(uv); self.FB.append(bake)
         self.FH.append(('in', Vector(inside)) if inside is not None else ('out', Vector(out)) if out is not None else None)
 G = Geo()
 OCCLUDERS = {'body', 'head', 'jaw', 'eye', 'limb', 'boot'}
-VEIN_TILE = .1   # metres of skin per vein tile along a part
+SKIN_PARTS = {'body', 'head', 'jaw', 'limb', 'lid'}
+LID_CLOSE = 1.75   # radians the upper lid turns to shut (the runtime blink uses the same)
 
 def frame_from(axis, up=(0, 1, 0)):
     d = Vector(axis).normalized(); ref = Vector(up)
@@ -134,64 +120,76 @@ def frame_from(axis, up=(0, 1, 0)):
     u = ref.cross(d).normalized(); v = d.cross(u)
     return d, u, v
 
-def ball(c, r, axis, lats, sides, slot_fn, weight, part, scale=(1, 1, 1), ramp=.5, ao=1.0, up=(0, 1, 0), phase=0.0):
+def ball(c, r, axis, lats, sides, slot_fn, weight, part, scale=(1, 1, 1), ramp=.5, ao=1.0, up=(0, 1, 0), phase=0.0,
+         uvf=None, region=None, bake=True, glow=0.0):
     """Sphere (or cap) with its pole along axis; latitude rings at the given angles (radians from the pole).
-    slot_fn(band) -> slot name or None (skin ramp) for the band between lats[band] and lats[band+1]."""
+    slot_fn(band) -> slot name, or None for a painted band mapped by uvf(angle, phi) into `region`."""
     c = Vector(c); d, u, v = frame_from(axis, up)
     def P(a, phi):
         q = d * math.cos(a) + (u * math.cos(phi) + v * math.sin(phi)) * math.sin(a)
         return c + Vector((q.x * scale[0], q.y * scale[1], q.z * scale[2])) * r
     rr = ramp if callable(ramp) else (lambda p, _r=ramp: _r)
     wf = weight if callable(weight) else (lambda p, _w=weight: _w)
-    top = G.v(P(0, 0), rr(P(0, 0)), wf(P(0, 0)), part, ao); rings = []
-    for a in lats[1:-1] if abs(lats[-1] - math.pi) < 1e-6 else lats[1:]:
+    closed = abs(lats[-1] - math.pi) < 1e-6
+    ring_a = lats[1:-1] if closed else lats[1:]
+    top = G.v(P(0, 0), rr(P(0, 0)), wf(P(0, 0)), part, ao, glow); rings = []
+    for a in ring_a:
         ring = []
         for k in range(sides):
-            p = P(a, TAU * k / sides + phase); ring.append(G.v(p, rr(p), wf(p), part, ao))
+            p = P(a, TAU * k / sides + phase); ring.append(G.v(p, rr(p), wf(p), part, ao, glow))
         rings.append(ring)
-    closed = abs(lats[-1] - math.pi) < 1e-6
-    for k in range(sides): G.f((top, rings[0][(k + 1) % sides], rings[0][k]), slot_fn(0), inside=c)
+    ph = lambda k: TAU * k / sides + phase
+    def face(idx, band, corners):
+        s = slot_fn(band)
+        if s is None: G.f(idx, None, inside=c, uv=(region, [uvf(a, p) for a, p in corners]), bake=bake)
+        else: G.f(idx, s, inside=c)
+    for k in range(sides):
+        face((top, rings[0][(k + 1) % sides], rings[0][k]), 0, [(0, ph(k + .5)), (ring_a[0], ph(k + 1)), (ring_a[0], ph(k))])
     for b, (ra, rb) in enumerate(zip(rings, rings[1:])):
         for k in range(sides):
-            k1 = (k + 1) % sides; G.f((ra[k], ra[k1], rb[k1], rb[k]), slot_fn(b + 1), inside=c)
+            k1 = (k + 1) % sides
+            face((ra[k], ra[k1], rb[k1], rb[k]), b + 1, [(ring_a[b], ph(k)), (ring_a[b], ph(k + 1)), (ring_a[b + 1], ph(k + 1)), (ring_a[b + 1], ph(k))])
     if closed:
-        bot = G.v(P(math.pi, 0), rr(P(math.pi, 0)), wf(P(math.pi, 0)), part, ao)
-        for k in range(sides): G.f((rings[-1][k], rings[-1][(k + 1) % sides], bot), slot_fn(len(lats) - 2), inside=c)
+        bot = G.v(P(math.pi, 0), rr(P(math.pi, 0)), wf(P(math.pi, 0)), part, ao, glow)
+        for k in range(sides):
+            face((rings[-1][k], rings[-1][(k + 1) % sides], bot), len(lats) - 2, [(ring_a[-1], ph(k)), (ring_a[-1], ph(k + 1)), (math.pi, ph(k + .5))])
     return rings
 
 def tube(path, radii, sides, slot, weight_fn, part, cap0=True, cap1=True, squash=1.0, up=None, ramp=.5, ao=1.0,
-         ramp_fn=None, vein=False, cap_slot=None):
-    """Tube along a polyline with parallel-transported frames. weight_fn(t) gets t in 0..1. vein=True maps the tube
-    onto the vein tile (two tiles round, VEIN_TILE metres per tile along)."""
+         ramp_fn=None, region=None, bake=True, cap_slot=None, glow=0.0):
+    """Tube along a polyline with parallel-transported frames. weight_fn(t) gets t in 0..1. With region (and no slot)
+    the tube is painted: x round it, y along it."""
     path = [Vector(p) for p in path]; n = len(path); rings = []
     tang = [(path[min(i + 1, n - 1)] - path[max(i - 1, 0)]).normalized() for i in range(n)]
     ref = Vector(up) if up else (Vector((0, 1, 0)) if abs(tang[0].y) < .9 else Vector((1, 0, 0)))
     nrm = (ref - tang[0] * ref.dot(tang[0])).normalized()
     along = [0.0]
     for i in range(1, n): along.append(along[-1] + (path[i] - path[i - 1]).length)
+    L = along[-1] or 1.0
     for i in range(n):
         if i: nrm = (nrm - tang[i] * nrm.dot(tang[i])).normalized()
         bi = tang[i].cross(nrm); t = i / (n - 1); ring = []
         for k in range(sides):
             a = TAU * k / sides
             p = path[i] + (nrm * math.cos(a) + bi * math.sin(a) * squash) * radii[i]
-            ring.append(G.v(p, ramp_fn(t, a) if ramp_fn else ramp, weight_fn(t), part, ao))
+            ring.append(G.v(p, ramp_fn(t, a) if ramp_fn else ramp, weight_fn(t), part, ao, glow))
         rings.append(ring)
     for i, (a, b) in enumerate(zip(rings, rings[1:])):
         mid = (path[i] + path[i + 1]) / 2
         for k in range(sides):
             k1 = (k + 1) % sides
-            vv = None
-            if vein:
-                x0, x1 = along[i] / VEIN_TILE, along[i + 1] / VEIN_TILE; y0, y1 = 2 * k / sides, 2 * (k + 1) / sides
-                vv = [(x0, y0), (x0, y1), (x1, y1), (x1, y0)]
-            G.f((a[k], a[k1], b[k1], b[k]), slot, inside=mid, vein=vv)
+            if slot is None:
+                y0, y1 = along[i] / L, along[i + 1] / L; x0, x1 = k / sides, (k + 1) / sides
+                G.f((a[k], a[k1], b[k1], b[k]), None, inside=mid, bake=bake,
+                    uv=(region, [reg_uv(region, x0, y0), reg_uv(region, x1, y0), reg_uv(region, x1, y1), reg_uv(region, x0, y1)]))
+            else: G.f((a[k], a[k1], b[k1], b[k]), slot, inside=mid)
+    cs = cap_slot or slot or 'skin_mid'
     if cap0:
-        c = G.v(path[0] - tang[0] * radii[0] * .5, ramp_fn(0, 0) if ramp_fn else ramp, weight_fn(0), part, ao)
-        for k in range(sides): G.f((rings[0][(k + 1) % sides], rings[0][k], c), cap_slot or slot, out=-tang[0])
+        c = G.v(path[0] - tang[0] * radii[0] * .5, ramp_fn(0, 0) if ramp_fn else ramp, weight_fn(0), part, ao, glow)
+        for k in range(sides): G.f((rings[0][(k + 1) % sides], rings[0][k], c), cs, out=-tang[0])
     if cap1:
-        c = G.v(path[-1] + tang[-1] * radii[-1] * .5, ramp_fn(1, 0) if ramp_fn else ramp, weight_fn(1), part, ao)
-        for k in range(sides): G.f((rings[-1][k], rings[-1][(k + 1) % sides], c), cap_slot or slot, out=tang[-1])
+        c = G.v(path[-1] + tang[-1] * radii[-1] * .5, ramp_fn(1, 0) if ramp_fn else ramp, weight_fn(1), part, ao, glow)
+        for k in range(sides): G.f((rings[-1][k], rings[-1][(k + 1) % sides], c), cs, out=tang[-1])
     return rings
 
 def bezier(p0, p1, p2, p3, n):
@@ -207,17 +205,18 @@ def catmull(pts, n=24):
             out.append(.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
     out.append(np.array(pts[-1], float)); return np.array(out)
 def se(c, n): return math.copysign(abs(c) ** (2 / n), c)
-def disc(c, normal, r, sides, slot, weight, part, stretch=1.0, lift=.0008):
+def disc(c, normal, r, sides, slot, weight, part, stretch=1.0, lift=.0008, glow=0.0):
     d, u, v = frame_from(normal); c = Vector(c) + d * lift
-    ctr = G.v(c, .5, weight, part, ao=0)
-    ring = [G.v(c + (u * math.cos(TAU * k / sides) * stretch + v * math.sin(TAU * k / sides)) * r, .5, weight, part, ao=0) for k in range(sides)]
+    ctr = G.v(c, .5, weight, part, ao=0, glow=glow)
+    ring = [G.v(c + (u * math.cos(TAU * k / sides) * stretch + v * math.sin(TAU * k / sides)) * r, .5, weight, part, ao=0, glow=glow) for k in range(sides)]
     for k in range(sides): G.f((ctr, ring[k], ring[(k + 1) % sides]), slot, out=d)
     return d, u, v
 
-# ------------------------------------------------------------------ body + tail: one loft from the neck to the curl tip
-# centreline (z, y) from the neck (inside the head) back to the tail tip; the thick tail curls up and forward into a hook
-CL = [(-.135, .142), (-.09, .126), (-.03, .117), (.03, .113), (.09, .11), (.15, .1), (.22, .086), (.29, .082),
-      (.34, .098), (.368, .138), (.366, .184), (.342, .214), (.31, .218), (.292, .2)]
+# ------------------------------------------------------------------ body + tail: one loft from the neck to the hook tip
+# centreline (z, y) from the neck (inside the head) back to the tail tip; the thick tail rises behind the hips and
+# curls over forward into a hook (its spikes, on the dorsal side, run along the inside of the curl as on the sheet)
+CL = [(-.135, .142), (-.09, .128), (-.03, .12), (.03, .116), (.09, .112), (.15, .104), (.21, .099), (.265, .108),
+      (.312, .134), (.347, .178), (.365, .232), (.36, .282), (.337, .316), (.302, .33), (.272, .318), (.262, .293)]
 SPN = catmull(CL, 20)
 SPL = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(SPN, axis=0), axis=1))]); BODY_LEN = float(SPL[-1])
 def cl_at(s):
@@ -227,21 +226,19 @@ def cl_at(s):
     return Vector((0, float(y), float(z))), t
 def s_of_z(z):   # only valid before the curl (z increasing)
     k = int(np.argmax(SPN[:, 0] > .33)); return float(np.interp(z, SPN[:k, 0], SPL[:k]))
-S_TAIL0 = s_of_z(.13); S_CURL = s_of_z(.31)
-# (s, half width, top, bottom, superellipse exponent)
-BKEYS = [(0, .056, .05, .05, 2.2), (s_of_z(-.075), .074, .054, .062, 2.35), (s_of_z(-.01), .085, .056, .07, 2.55),
-         (s_of_z(.05), .084, .055, .068, 2.55), (s_of_z(.1), .07, .05, .054, 2.4), (s_of_z(.15), .056, .047, .046, 2.25),
-         (s_of_z(.22), .043, .04, .038, 2.15), (s_of_z(.29), .035, .034, .032, 2.1), (BODY_LEN * .8, .025, .025, .024, 2.0),
-         (BODY_LEN - .02, .012, .012, .012, 2.0), (BODY_LEN, .004, .004, .004, 2.0)]
+S_TAIL0 = s_of_z(.13); S_CURL = s_of_z(.29)
+# (s, half width, top, bottom, superellipse exponent): soft and round, a big chest, a thick tail to a rounded hook
+BKEYS = [(0, .056, .05, .05, 2.1), (s_of_z(-.075), .077, .057, .065, 2.15), (s_of_z(-.01), .089, .059, .073, 2.25),
+         (s_of_z(.05), .087, .058, .071, 2.25), (s_of_z(.1), .073, .053, .057, 2.15), (s_of_z(.15), .061, .05, .05, 2.1),
+         (s_of_z(.22), .051, .046, .045, 2.05), (s_of_z(.29), .044, .042, .041, 2.0), (lerp(S_CURL, BODY_LEN, .45), .035, .034, .034, 2.0),
+         (lerp(S_CURL, BODY_LEN, .8), .028, .027, .027, 2.0), (BODY_LEN - .016, .019, .019, .019, 2.0), (BODY_LEN, .006, .006, .006, 2.0)]
 BK = np.array([k[0] for k in BKEYS])
 def bkey(s, i):
     vals = [k[i] for k in BKEYS]; s = min(max(s, BK[0]), BK[-1])
     j = min(int(np.searchsorted(BK, s, side='right') - 1), len(BK) - 2); t = (s - BK[j]) / (BK[j + 1] - BK[j])
     return lerp(vals[j], vals[j + 1], t * t * (3 - 2 * t))
 def section_frame(s):
-    c, t = cl_at(s); N = Vector((0, t.z, -t.y)).normalized()
-    if s < S_CURL and N.y < 0: N = -N
-    if s >= S_CURL and t.z > 0 and N.y < 0: N = -N
+    c, t = cl_at(s); N = Vector((0, t.z, -t.y)).normalized()   # dorsal; turns with the curl (inside of the hook)
     return c, t, N
 def body_point(s, th, off=0.0):
     """Surface point of the body loft at arc length s and angle th (0 = top, + toward the right side)."""
@@ -259,7 +256,7 @@ BONES['Belly'] = ((0, .1, .02), (0, .1, -.03), 'Hips')
 BONES['Head'] = ((0, .14, -.12), (0, .16, -.24), 'Spine')
 BONES['Jaw'] = ((0, .135, -.13), (0, .12, -.27), 'Head')
 EYE_R = .035
-EYE_C = {'L': Vector((-.046, .19, -.222)), 'R': Vector((.046, .19, -.222))}
+EYE_C = {'L': Vector((-.046, .188, -.222)), 'R': Vector((.046, .188, -.222))}
 for sfx, c in EYE_C.items():
     sx = -1 if sfx == 'L' else 1
     BONES[f'Eye{sfx}'] = (tuple(c), tuple(c + Vector((0, 0, -.03))), 'Head')
@@ -303,33 +300,16 @@ def body_weights(s):
     w = {names[i]: 1.0}
     for jn in (i, i + 1):
         if jn <= 0 or jn >= len(names): continue
-        h = .025 if jn > 2 else .035
+        h = .03 if jn > 2 else .035
         if abs(s - js[jn]) < h:
             t = smoothstep(-h, h, s - js[jn]); w = {names[jn - 1]: 1 - t, names[jn]: t}; break
     return w
 
-def spot_amount(s, th, w):
-    """Darker teal spots scattered over the back, flanks and tail (deterministic jittered grid)."""
-    if s < .01 or s > BODY_LEN - .02: return 0.0
-    best = 0.0; arc = th * w * 1.15
-    for row in range(-4, 5):
-        a0 = row * .028
-        if abs(row) > 3 and s > S_TAIL0: continue
-        step = .036; off = (row % 2) * step * .5
-        k = round((s - off) / step)
-        for kk in (k - 1, k, k + 1):
-            h = math.sin(kk * 12.9898 + row * 78.233) * 43758.5453; h -= math.floor(h)
-            sc = off + kk * step + (h - .5) * .012; ac = a0 + (h * 7 % 1 - .5) * .01
-            r = (.011 + .007 * (h * 3 % 1)) * (1 - .4 * smoothstep(S_TAIL0, BODY_LEN, s))
-            d = math.hypot(s - sc, arc - ac)
-            best = max(best, smoothstep(r, r * .5, d))
-    return best
-
-K = 14
+K = 16
 def body():
     s = 0.0; ss = []
     while s < BODY_LEN - .002:
-        ss.append(s); s += .022 if s < S_TAIL0 else .03 if s < S_CURL else .026
+        ss.append(s); s += .021 if s < S_TAIL0 else .028 if s < S_CURL else .024
     ss.append(BODY_LEN - .001)
     rings, cents = [], []
     for s in ss:
@@ -338,27 +318,28 @@ def body():
         for k in range(K):
             th = TAU * k / K; cx, cy = math.sin(th), math.cos(th)
             x = w * se(cx, n); y = (top if cy >= 0 else bot) * se(cy, n)
-            if cy < -.7: y *= .95                     # a slightly flat belly
+            if cy < -.7: y *= .96                     # a slightly flat belly
             p = c + Vector((1, 0, 0)) * x + N * y
             t_up = (cy + 1) / 2
-            ramp = .2 + .25 * smoothstep(.95, .45, t_up) + .5 * smoothstep(.42, .22, t_up)   # back .2, flank .45, cream belly .95
-            ramp = lerp(ramp, 0.0, spot_amount(s, th if th <= math.pi else th - TAU, w) * smoothstep(.3, .45, t_up))
+            ce = lerp(.42, .26, smoothstep(S_TAIL0, S_CURL, s))   # the cream underside narrows along the tail
+            ramp = .2 + .25 * smoothstep(.95, .45, t_up) + .5 * smoothstep(ce, ce - .2, t_up)   # back .2, flank .45, cream belly .95
             wts = body_weights(s)
             if -.07 < c.z < .07 and s < S_TAIL0:   # breathing: the belly bone inflates the torso
                 kb = .65 * smoothstep(-.07, -.02, c.z) * smoothstep(.07, .02, c.z)
                 wts = {k_: v * (1 - kb) for k_, v in wts.items()}; wts['Belly'] = wts.get('Belly', 0) + kb
             ring.append(G.v(p, ramp, wts, 'body'))
         rings.append(ring)
-    tiles = 4
+    bv = lambda k: (k / K + .5) % 1.0       # round the loft, the seam under the belly
     for i, (a, b) in enumerate(zip(rings, rings[1:])):
-        mid = (cents[i] + cents[i + 1]) / 2; x0, x1 = ss[i] / VEIN_TILE, ss[i + 1] / VEIN_TILE
+        mid = (cents[i] + cents[i + 1]) / 2; x0, x1 = ss[i] / BODY_LEN, ss[i + 1] / BODY_LEN
         for k in range(K):
-            k1 = (k + 1) % K; y0, y1 = tiles * k / K, tiles * (k + 1) / K
-            G.f((a[k], b[k], b[k1], a[k1]), inside=mid, vein=[(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
+            k1 = (k + 1) % K; y0 = bv(k); y1 = y0 + 1 / K
+            G.f((a[k], b[k], b[k1], a[k1]), inside=mid,
+                uv=('body', [reg_uv('body', x0, y0), reg_uv('body', x1, y0), reg_uv('body', x1, y1), reg_uv('body', x0, y1)]))
     c0, t0 = cl_at(0); cap = G.v(c0 - t0 * .01, .3, {'Head': 1.0}, 'body')
-    for k in range(K): G.f((rings[0][k], rings[0][(k + 1) % K], cap), out=-t0)
-    c1, t1 = cl_at(BODY_LEN); cap = G.v(c1 + t1 * .002, .4, body_weights(BODY_LEN), 'body')
-    for k in range(K): G.f((rings[-1][(k + 1) % K], rings[-1][k], cap), out=t1)
+    for k in range(K): G.f((rings[0][k], rings[0][(k + 1) % K], cap), 'skin_back', out=-t0)
+    c1, t1 = cl_at(BODY_LEN); cap = G.v(c1 + t1 * .004, .4, body_weights(BODY_LEN), 'body')
+    for k in range(K): G.f((rings[-1][(k + 1) % K], rings[-1][k], cap), 'skin_back', out=t1)
 body()
 
 # ------------------------------------------------------------------ head: broad newt head, cheeks, a big grinning jaw
@@ -368,16 +349,17 @@ def head_section(z):
     """mouth line y, half width, height above the mouth line, depth below it (inside the jaw)."""
     u = max(0, min(1, (z - HEAD_Z0) / (HEAD_Z1 - HEAD_Z0)))
     U = [0, .1, .28, .5, .72, .9, 1]
-    w = np.interp(u, U, [.022, .066, .085, .085, .075, .055, .01])
-    top = np.interp(u, U, [.025, .07, .082, .076, .06, .042, .008])
+    w = np.interp(u, U, [.022, .067, .087, .087, .077, .057, .012])
+    top = np.interp(u, U, [.025, .07, .082, .076, .06, .043, .01])
     bot = np.interp(u, U, [.014, .024, .026, .022, .018, .013, .004])
     ym = np.interp(u, [0, .3, .7, 1], [.146, .14, .137, .136])
     return float(ym), float(w), float(top), float(bot)
+CHEEK_C = .062
 def cheek_w(p):
     out = {}
     for sfx, sx in (('L', -1), ('R', 1)):
-        d = (p - Vector((sx * .06, .142, -.188))).length
-        k = .85 * smoothstep(.042, .008, d)
+        d = (p - Vector((sx * CHEEK_C, .142, -.186))).length
+        k = .9 * smoothstep(.054, .01, d)
         if k > 0: out[f'Cheek{sfx}'] = k
     return out
 def head():
@@ -386,29 +368,32 @@ def head():
         ym, w, top, bot = head_section(z); ring = []
         for k in range(HK):
             th = TAU * k / HK; cx, cy = math.sin(th), math.cos(th)
-            x = w * se(cx, 2.35); y = (top if cy >= 0 else bot) * se(cy, 2.6)
+            x = w * se(cx, 2.2); y = (top if cy >= 0 else bot) * se(cy, 2.45)
             p = Vector((x, ym + y, z)); t_up = (cy + 1) / 2
             ramp = .2 + .25 * smoothstep(.95, .55, t_up) + .5 * smoothstep(.5, .4, t_up)
             ck = cheek_w(p); wts = {'Head': 1 - sum(ck.values()), **ck}
             ring.append(G.v(p, ramp, wts, 'head'))
         rings.append(ring)
+    bv = lambda k: (k / HK + .5) % 1.0
     for zi, (a, b) in enumerate(zip(rings, rings[1:])):
-        x0, x1 = (HEAD_Z0 - zs[zi]) / VEIN_TILE, (HEAD_Z0 - zs[zi + 1]) / VEIN_TILE
+        y0, y1 = zi / (len(zs) - 1), (zi + 1) / (len(zs) - 1)
         for k in range(HK):
             k1 = (k + 1) % HK; cy = math.cos(TAU * (k + .5) / HK); z = (zs[zi] + zs[zi + 1]) / 2
-            slot = 'mouth' if (cy < -.3 and z < -.125) else None
-            G.f((a[k], a[k1], b[k1], b[k]), slot, inside=(0, head_section(z)[0], z),
-                vein=None if slot else [(x0, 3 * k / HK), (x0, 3 * (k + 1) / HK), (x1, 3 * (k + 1) / HK), (x1, 3 * k / HK)])
+            inside = (0, head_section(z)[0], z)
+            if cy < -.3 and z < -.125: G.f((a[k], a[k1], b[k1], b[k]), 'mouth_dark' if zi < 4 else 'mouth', inside=inside); continue
+            x0 = bv(k); x1 = x0 + 1 / HK
+            G.f((a[k], a[k1], b[k1], b[k]), None, inside=inside,
+                uv=('head', [reg_uv('head', x0, y0), reg_uv('head', x1, y0), reg_uv('head', x1, y1), reg_uv('head', x0, y1)]))
     for ring, z, sgn in ((rings[0], zs[0], 1), (rings[-1], zs[-1], -1)):
         ym, w, top, bot = head_section(z); c = G.v((0, ym + (top - bot) * .3, z + sgn * .004), .25, {'Head': 1.0}, 'head')
-        for k in range(HK): G.f((ring[(k + 1) % HK], ring[k], c), out=(0, 0, sgn))
+        for k in range(HK): G.f((ring[(k + 1) % HK], ring[k], c), 'skin_back', out=(0, 0, sgn))
 head()
 
 JAW_Z0, JAW_Z1 = -.115, -.28
 def jaw_section(z):
     u = (z - JAW_Z0) / (JAW_Z1 - JAW_Z0)
-    w = float(np.interp(u, [0, .2, .55, .85, 1], [.04, .074, .074, .056, .014]))
-    dep = float(np.interp(u, [0, .2, .55, .85, 1], [.03, .056, .054, .042, .012]))
+    w = float(np.interp(u, [0, .2, .55, .85, 1], [.04, .075, .075, .057, .015]))
+    dep = float(np.interp(u, [0, .2, .55, .85, 1], [.03, .058, .056, .043, .012]))
     ytop = float(np.interp(u, [0, 1], [.142, .136]))
     return w, dep, ytop
 def jaw():
@@ -417,20 +402,23 @@ def jaw():
         w, dep, ytop = jaw_section(z); ring = []
         for k in range(JK):
             th = TAU * k / JK; cx, cy = math.sin(th), math.cos(th)
-            x = w * se(cx, 2.4); y = ytop - .003 + (.002 * se(cy, 6) if cy > 0 else dep * se(cy, 2.3))
+            x = w * se(cx, 2.3); y = ytop - .003 + (.002 * se(cy, 6) if cy > 0 else dep * se(cy, 2.2))
             p = Vector((x * .97, y, z)); ck = cheek_w(p); ck = {k_: v * .5 for k_, v in ck.items()}
             ring.append(G.v(p, .93, {'Jaw': 1 - sum(ck.values()), **ck}, 'jaw'))
         rings.append(ring)
     for zi, (a, b) in enumerate(zip(rings, rings[1:])):
-        x0, x1 = (JAW_Z0 - zs[zi]) / VEIN_TILE, (JAW_Z0 - zs[zi + 1]) / VEIN_TILE
+        y0, y1 = zi / (len(zs) - 1), (zi + 1) / (len(zs) - 1)
         for k in range(JK):
             k1 = (k + 1) % JK; cy = math.cos(TAU * (k + .5) / JK); cx = math.sin(TAU * (k + .5) / JK)
-            slot = ('tongue' if abs(cx) < .55 and 1 <= zi < 5 else 'mouth') if cy > .3 else None
-            G.f((a[k], a[k1], b[k1], b[k]), slot, inside=(0, .125, (zs[zi] + zs[zi + 1]) / 2),
-                vein=None if slot else [(x0, 3 * k / JK), (x0, 3 * (k + 1) / JK), (x1, 3 * (k + 1) / JK), (x1, 3 * k / JK)])
+            inside = (0, .125, (zs[zi] + zs[zi + 1]) / 2)
+            if cy > .3:
+                G.f((a[k], a[k1], b[k1], b[k]), ('tongue' if abs(cx) < .55 and 1 <= zi < 5 else 'mouth_dark' if zi < 1 else 'mouth'), inside=inside); continue
+            x0 = k / JK; x1 = (k + 1) / JK
+            G.f((a[k], a[k1], b[k1], b[k]), None, inside=inside,
+                uv=('jaw', [reg_uv('jaw', x0, y0), reg_uv('jaw', x1, y0), reg_uv('jaw', x1, y1), reg_uv('jaw', x0, y1)]))
     for ring, z, sgn in ((rings[0], zs[0], 1), (rings[-1], zs[-1], -1)):
         c = G.v((0, .13, z + sgn * .003), .93, {'Jaw': 1.0}, 'jaw')
-        for k in range(JK): G.f((ring[(k + 1) % JK], ring[k], c), out=(0, 0, sgn))
+        for k in range(JK): G.f((ring[(k + 1) % JK], ring[k], c), 'cream', out=(0, 0, sgn))
 jaw()
 
 def lip_point(a, inset=0.0, upper=True):
@@ -446,47 +434,66 @@ def smile():
         t = i / 12; a = math.pi * (t - .5) * 1.0
         p = lip_point(a); corner = smoothstep(.7, 1, abs(2 * t - 1))
         pts.append(p + Vector((math.copysign(.004, p.x) * corner, .016 * corner ** 1.5, -.002 * (1 - corner))))
-    tube(pts, [.0028] * 13, 4, 'line', lambda t: {'Head': 1.0}, 'deco', ao=0)
+    tube(pts, [.0026] * 13, 4, 'line', lambda t: {'Head': 1.0}, 'deco', ao=0)
 smile()
+def cone(base_c, axis, r, ln, sides, weight, part):
+    d, u, v = frame_from(axis, (0, 0, 1)); ring = [G.v(base_c + (u * math.cos(TAU * k / sides) + v * math.sin(TAU * k / sides)) * r, .5, weight, part) for k in range(sides)]
+    mid = [G.v(base_c + d * ln * .45 + (u * math.cos(TAU * k / sides) + v * math.sin(TAU * k / sides)) * r * .62, .5, weight, part) for k in range(sides)]
+    tip = G.v(base_c + d * ln, .5, weight, part)
+    for k in range(sides):
+        k1 = (k + 1) % sides
+        G.f((ring[k], ring[k1], mid[k1], mid[k]), 'tooth', inside=base_c + d * ln * .2)
+        G.f((mid[k], mid[k1], tip), 'tooth', inside=base_c + d * ln * .3)
 def teeth():
-    for i, a in enumerate(np.linspace(-1.15, 1.15, 8)):     # upper row: cream cones hanging from the lip
-        p = lip_point(a, inset=.006); ln = .013 if abs(a) < .9 else .011
-        d, u, v = frame_from((0, -1, 0)); base = [p + (u * math.cos(TAU * k / 4 + .785) + v * math.sin(TAU * k / 4 + .785)) * .0048 for k in range(4)]
-        tip = G.v(p + Vector((0, -ln, 0)), .5, {'Head': 1.0}, 'teeth'); bi = [G.v(q, .5, {'Head': 1.0}, 'teeth') for q in base]
-        for k in range(4): G.f((bi[k], bi[(k + 1) % 4], tip), 'tooth', inside=p + Vector((0, -ln * .3, 0)))
-    for a in np.linspace(-.95, .95, 6):                      # lower row on the jaw
-        p = lip_point(a, inset=.009, upper=False) + Vector((0, -.002, 0)); ln = .009
-        d, u, v = frame_from((0, 1, 0)); base = [p + (u * math.cos(TAU * k / 4 + .785) + v * math.sin(TAU * k / 4 + .785)) * .0042 for k in range(4)]
-        tip = G.v(p + Vector((0, ln, 0)), .5, {'Jaw': 1.0}, 'teeth'); bi = [G.v(q, .5, {'Jaw': 1.0}, 'teeth') for q in base]
-        for k in range(4): G.f((bi[k], bi[(k + 1) % 4], tip), 'tooth', inside=p + Vector((0, ln * .3, 0)))
+    """The sheet's grin: big cream cones along the upper lip, a shorter row on the jaw."""
+    for a in np.linspace(-1.12, 1.12, 7):
+        p = lip_point(a, inset=.0058) + Vector((0, .003, 0)); ln = .029 if abs(a) < .5 else .025 if abs(a) < .9 else .02
+        cone(p, (0, -1, -.1), .0082, ln, 5, {'Head': 1.0}, 'teeth')
+    for a in np.linspace(-.95, .95, 6):
+        p = lip_point(a, inset=.0085, upper=False) + Vector((0, -.005, 0)); ln = .019 if abs(a) < .6 else .016
+        cone(p, (0, 1, -.08), .0068, ln, 5, {'Jaw': 1.0}, 'teeth')
 teeth()
 
-# eyes: big glossy amber eyes on the Eye bones, lids on the Lid bones, catch-lights fixed to the head
+# eyes: big glossy amber eyes on the Eye bones (catch-lights ride them, so a squashed shut eye keeps them under the lid),
+# lids on the Lid bones
 EYE_LOOK = {'L': Vector((-.2, .08, -.97)).normalized(), 'R': Vector((.2, .08, -.97)).normalized()}
-LATS = [0, .3, .5, .7, 1.0, 1.45, 2.0]
-def eye_slot(b):
-    a = (LATS[b] + LATS[b + 1]) / 2
-    return 'pupil' if a < .4 else 'iris' if a < .7 else 'eye'
+LATS = [0, .22, .42, .62, .82, 1.0, 1.45, 2.0]
+EYE_AMAX = 2.0
+def eye_uv(a, phi): return reg_uv('eye', .5 + .5 * (a / EYE_AMAX) * math.cos(phi), .5 + .5 * (a / EYE_AMAX) * math.sin(phi))
+def squint_arc(sfx, c):
+    """The closed-eye line of the sheet's squint: a dark arc laid on the lid where it faces front once shut (it rides on
+    top of the open eye as a little brow line)."""
+    F = EYE_LOOK[sfx]; side = Vector((1, 0, 0)); up = Vector((0, 1, 0)); rl = EYE_R * 1.14 * 1.04
+    to_open = Matrix.Rotation(LID_CLOSE, 3, 'X')
+    pts = []
+    for i in range(9):
+        psi = -1 + 2 * i / 8
+        d = (F + side * psi * .78 + up * (.16 - .36 * psi * psi)).normalized()
+        pts.append(c + to_open @ (d * rl))
+    tube(pts, [.0018, .0026, .003, .0031, .0031, .0031, .003, .0026, .0018], 4, 'line', lambda t: {f'Lid{sfx}': 1.0}, 'lid', ao=0, up=(0, 1, 0))
 for sfx, c in EYE_C.items():
     sx = -1 if sfx == 'L' else 1
-    ball(c, EYE_R, EYE_LOOK[sfx], LATS, 12, eye_slot, {f'Eye{sfx}': 1.0}, 'eye', ao=.35)
+    ball(c, EYE_R, EYE_LOOK[sfx], LATS, 12, lambda b: None, {f'Eye{sfx}': 1.0}, 'eye', ao=.35, uvf=eye_uv, region='eye',
+         bake=sfx == 'L', glow=.18)
     hl = (EYE_LOOK[sfx] + Vector((0, .7, 0)) + Vector((sx * -.3, 0, 0))).normalized()
-    ball(c + hl * EYE_R * .9, .0068, hl, [0, 1.2, 2.2], 6, lambda b: 'highlight', {'Head': 1.0}, 'deco', ao=0)
+    ball(c + hl * EYE_R * .9, .0068, hl, [0, 1.2, 2.2], 6, lambda b: 'highlight', {f'Eye{sfx}': 1.0}, 'deco', ao=0, glow=.9)
     hl2 = (EYE_LOOK[sfx] + Vector((sx * .2, -.45, 0))).normalized()
-    ball(c + hl2 * EYE_R * .97, .0032, hl2, [0, 1.4], 5, lambda b: 'highlight', {'Head': 1.0}, 'deco', ao=0)
-    # upper lid: a skin shell over the back and top of the eye with a dark lash rim. Rest pose = open.
+    ball(c + hl2 * EYE_R * .97, .0032, hl2, [0, 1.4], 5, lambda b: 'highlight', {f'Eye{sfx}': 1.0}, 'deco', ao=0, glow=.9)
+    # upper lid: a skin shell over the back and top of the eye with a thin dark lash rim. Rest pose = open.
     pole = Vector((sx * .15, .32, .94)).normalized()
     lat = [0, .7, 1.3, 1.86, 1.96]
-    rings = ball(c, EYE_R * 1.14, pole, lat, 10, lambda b: 'line' if b >= 3 else None, {f'Lid{sfx}': 1.0}, 'lid',
-                 ramp=lambda p: .25 + .25 * smoothstep(.17, .2, p.y), ao=1.0)
-    last = rings[-1]; inner = [G.v(c + (G.P[vi] - c) * .93, .1, {f'Lid{sfx}': 1.0}, 'lid') for vi in last]
+    rings = ball(c, EYE_R * 1.14, pole, lat, 10, lambda b: None, {f'Lid{sfx}': 1.0}, 'lid',
+                 ramp=lambda p: .22 + .2 * smoothstep(.17, .2, p.y), ao=1.0, region='lid', bake=sfx == 'L',
+                 uvf=lambda a, phi: reg_uv('lid', phi / TAU, a / 1.96))
+    last = rings[-1]; inner = [G.v(c + (G.P[vi] - c) * .965, .1, {f'Lid{sfx}': 1.0}, 'lid') for vi in last]
     for k in range(10):
-        k1 = (k + 1) % 10; G.f((last[k], last[k1], inner[k1], inner[k]), 'line', out=-pole)
+        k1 = (k + 1) % 10; G.f((last[k], last[k1], inner[k1], inner[k]), 'lash', out=-pole)
+    squint_arc(sfx, c)
     # nostril
     ym, w, top, bot = head_section(-.277)
     disc((sx * .015, ym + top * .8 + .001, -.276), (sx * .3, .75, -.6), .0035, 6, 'nostril', {'Head': 1.0}, 'deco', stretch=1.4)
-    # rosy cheek blush (rides the cheek bone, so it swells with the puff)
-    bc = Vector((sx * .071, .148, -.19)); disc(bc, (sx * .9, .1, -.4), .011, 8, 'blush', {f'Cheek{sfx}': 1.0}, 'deco', stretch=1.3, lift=.0015)
+    # a faint rosy cheek (rides the cheek bone, so it swells with the puff)
+    bc = Vector((sx * .073, .147, -.188)); disc(bc, (sx * .9, .1, -.4), .01, 8, 'blush', {f'Cheek{sfx}': 1.0}, 'deco', stretch=1.3, lift=.0018)
 
 # ------------------------------------------------------------------ limbs: chunky arms and legs in black boots
 def limb(sfx, kind):
@@ -497,83 +504,92 @@ def limb(sfx, kind):
     upper = bezier(inner, sh + (el - sh) * .3 + Vector((0, .006, 0)), el + (sh - el) * .25, el, 4)
     lower = bezier(el, el + (wr - el) * .35 + Vector((sh.x * .06, 0, 0)), wr + (el - wr) * .4, wr + (el - wr) * .25, 3)
     path = upper + lower[1:]
-    r0 = .043 if kind == 'Leg' else .037
-    radii = [r0, r0 * .92, r0 * .8, r0 * .74, r0 * .72, r0 * .72]
+    r0 = .045 if kind == 'Leg' else .039
+    radii = [r0, r0 * .93, r0 * .82, r0 * .76, r0 * .73, r0 * .72]
     def wt(t):
         if t < .25: k = smoothstep(.0, .25, t); return {root: 1 - k, U: k}
         if t < .5: return {U: 1.0}
         if t < .65: k = smoothstep(.5, .65, t); return {U: 1 - k, L: k}
         return {L: 1.0}
-    tube(path, radii, 7, None, wt, 'limb', cap0=False, cap1=False, ramp_fn=lambda t, a: .33 + .12 * t, vein=True)
-    # the boot: a black shaft from mid-shin, a rounded foot block, three fat rounded claws
+    tube(path, radii, 8, None, wt, 'limb', cap0=False, cap1=False, ramp_fn=lambda t, a: .33 + .12 * t,
+         region='arm' if kind == 'Arm' else 'leg', bake=sfx == 'L')
+    # the boot: a glossy black shaft from mid-shin with a rolled cuff, a rounded foot, three fat rounded claws
     top = wr + (el - wr) * .3; br = r0 * .8
-    tube([top, wr + Vector((0, -.006, 0)), Vector((wr.x, .02, (wr.z + ft.z) / 2))], [br * 1.02, br * 1.06, br * 1.1], 8, 'boot',
-         lambda t: {L: 1 - smoothstep(.2, .8, t), H: smoothstep(.2, .8, t)}, 'boot', cap0=False, cap1=False)
+    tube([top + (el - wr).normalized() * .004, top, wr + Vector((0, -.006, 0)), Vector((wr.x, .02, (wr.z + ft.z) / 2))],
+         [br * 1.16, br * 1.12, br * 1.06, br * 1.1], 8, 'boot',
+         lambda t: {L: 1 - smoothstep(.3, .85, t), H: smoothstep(.3, .85, t)}, 'boot', cap0=True, cap1=False, cap_slot='sole')
     fc = Vector((ft.x, .017, ft.z - .004))
-    ball(fc, 1.0, (0, 1, 0), [0, 1.0, 1.9, math.pi], 8, lambda b: 'boot', {H: 1.0}, 'boot', scale=(.036, .022, .042))
+    ball(fc, 1.0, (0, 1, 0), [0, 1.0, 1.9, math.pi], 8, lambda b: 'sole' if b >= 2 else 'boot', {H: 1.0}, 'boot', scale=(.037, .022, .043))
     for k, dx in enumerate((-.017, 0, .017)):
-        cc = fc + Vector((dx * (1 if sfx == 'L' else -1), -.006, -.039 + .004 * abs(dx) / .017))
-        ball(cc, 1.0, (0, 0, -1), [0, 1.2, math.pi], 6, lambda b: 'claw', {H: 1.0}, 'boot', scale=(.0115, .0105, .0135))
+        cc = fc + Vector((dx * (1 if sfx == 'L' else -1), -.006, -.04 + .004 * abs(dx) / .017))
+        ball(cc, 1.0, (0, .2, -1), [0, 1.2, math.pi], 6, lambda b: 'claw', {H: 1.0}, 'boot', scale=(.012, .011, .014))
 for sfx in ('L', 'R'):
     limb(sfx, 'Arm'); limb(sfx, 'Leg')
 
-# ------------------------------------------------------------------ orange spikes down the back and tail
-def spike(s, h, base_len, lean=.45):
+# ------------------------------------------------------------------ rounded orange spikes down the back and tail
+def spike(s, h, base_len, col, lean=.42):
     c, t, N = section_frame(s); w = body_weights(s)
-    top = bkey(s, 2); base = c + N * (top - .006); fwd = -t
+    top = bkey(s, 2); base = c + N * (top - .007); fwd = -t
     side = Vector((1, 0, 0)); tip = base + N * h - fwd * (h * lean)
-    pts = [base + fwd * base_len * .5, base + side * base_len * .32, base - fwd * base_len * .55, base - side * base_len * .32]
-    bi = [G.v(p, .5, w, 'spike') for p in pts]
-    mid = [G.v(base.lerp(tip, .45) + (p - base) * .62, .5, w, 'spike') for p in pts]
+    sides = 6; xs = lambda k: (col % 10 + .1 + .8 * k / sides) / 10
+    ring = lambda k, sc: (fwd * math.cos(TAU * k / sides) * base_len * .52 + side * math.sin(TAU * k / sides) * base_len * .34) * sc
+    levels = [(0.0, 1.0), (.4, .74), (.75, .4)]
+    rings = [[G.v(base.lerp(tip, f) + ring(k, sc), .5, w, 'spike') for k in range(sides)] for f, sc in levels]
     ti = G.v(tip, .5, w, 'spike')
-    for k in range(4):
-        k1 = (k + 1) % 4; G.f((bi[k], bi[k1], mid[k1], mid[k]), 'spike', inside=base + N * h * .2)
-        G.f((mid[k], mid[k1], ti), 'spike_tip', inside=base + N * h * .4)
-SPIKES = [(.012, .03, .032)] + [(s_of_z(z), h, l) for z, h, l in ((.04, .03, .032), (.085, .034, .036), (.13, .033, .034),
-          (.175, .03, .03), (.22, .027, .027), (.265, .024, .024), (.305, .021, .021))] + \
-         [(S_CURL + (BODY_LEN - S_CURL) * f, h, l) for f, h, l in ((.18, .018, .019), (.4, .015, .016), (.62, .012, .013))]
-for s, h, l in SPIKES: spike(s, h * 1.3, l * 1.25)
+    for li, (ra, rb) in enumerate(zip(rings, rings[1:])):
+        for k in range(sides):
+            k1 = (k + 1) % sides; y0, y1 = levels[li][0], levels[li + 1][0]
+            G.f((ra[k], ra[k1], rb[k1], rb[k]), None, inside=base + N * h * .25, uv=('spike', [reg_uv('spike', xs(k), y0), reg_uv('spike', xs(k + 1), y0), reg_uv('spike', xs(k + 1), y1), reg_uv('spike', xs(k), y1)]))
+    for k in range(sides):
+        G.f((rings[-1][k], rings[-1][(k + 1) % sides], ti), None, inside=base + N * h * .4, uv=('spike', [reg_uv('spike', xs(k), .75), reg_uv('spike', xs(k + 1), .75), reg_uv('spike', xs(k + .5), 1.0)]))
+SPIKES = [(.012, .03, .032)] + [(s_of_z(z), h, l) for z, h, l in ((.04, .031, .033), (.085, .035, .037), (.13, .034, .035),
+          (.175, .031, .031), (.22, .028, .028), (.262, .025, .025))] + \
+         [(S_CURL + (BODY_LEN - S_CURL) * f, h, l) for f, h, l in ((.08, .022, .023), (.27, .02, .021), (.46, .017, .018), (.64, .014, .015), (.8, .011, .012))]
+for i, (s, h, l) in enumerate(SPIKES): spike(s, h * 1.3, l * 1.3, i)
 
 # ------------------------------------------------------------------ gear: hard hat, harness with badge, socket and cable
-def dome(c, rx, ry, rz, lats, sides, slot_fn, weight, part, tilt=0.0):
-    c = Vector(c); rings = []; rot = Matrix.Rotation(tilt, 3, 'X')
-    top = G.v(c + rot @ Vector((0, ry, 0)), .5, weight, part)
-    for a in lats[1:]:
-        rings.append([G.v(c + rot @ Vector((math.sin(a) * math.cos(TAU * k / sides) * rx, math.cos(a) * ry, math.sin(a) * math.sin(TAU * k / sides) * rz)), .5, weight, part) for k in range(sides)])
-    for k in range(sides): G.f((top, rings[0][(k + 1) % sides], rings[0][k]), slot_fn(0), inside=c)
-    for b, (ra, rb) in enumerate(zip(rings, rings[1:])):
-        for k in range(sides):
-            k1 = (k + 1) % sides; G.f((ra[k], ra[k1], rb[k1], rb[k]), slot_fn(b + 1), inside=c)
-    return rings
+HAT_TILT, HAT_R = .14, .1
+HAT_ROT = Matrix.Rotation(HAT_TILT, 3, 'X')
+def hat_uv(p):
+    q = HAT_ROT.inverted() @ (Vector(p) - Vector(HAT_BASE)); return reg_uv('hat', .5 + q.x / (2 * HAT_R), .5 - q.z / (2 * HAT_R))
+def hat_face(idx, inside=None, out=None):
+    G.f(idx, None, inside=inside, out=out, uv=('hat', [hat_uv(G.P[i]) for i in idx]))
 def hard_hat():
-    w = {'HatHard': 1.0}; c = Vector(HAT_BASE); tilt = .14; rot = Matrix.Rotation(tilt, 3, 'X')
+    w = {'HatHard': 1.0}; c = Vector(HAT_BASE); rot = HAT_ROT
     rx, ry, rz = .073, .062, .079
-    dome(c, rx, ry, rz, [0, .45, .9, 1.25, 1.571], 14, lambda b: 'hat', w, 'gear', tilt=tilt)
+    lats = [0, .4, .8, 1.15, 1.42, 1.571]; sides = 16
+    top = G.v(c + rot @ Vector((0, ry, 0)), .5, w, 'gear'); rings = []
+    for a in lats[1:]:
+        rings.append([G.v(c + rot @ Vector((math.sin(a) * math.cos(TAU * k / sides) * rx, math.cos(a) * ry, math.sin(a) * math.sin(TAU * k / sides) * rz)), .5, w, 'gear') for k in range(sides)])
+    for k in range(sides): hat_face((top, rings[0][(k + 1) % sides], rings[0][k]), inside=c)
+    for ra, rb in zip(rings, rings[1:]):
+        for k in range(sides):
+            k1 = (k + 1) % sides; hat_face((ra[k], ra[k1], rb[k1], rb[k]), inside=c)
     # brim: a flat ring with a rolled lip, stretched into a peak at the front
-    sides = 14; rin, rout, rlo, rbot = [], [], [], []
+    rin, rout, rlo, rbot = [], [], [], []
     for k in range(sides):
         phi = TAU * k / sides; dx, dz = math.cos(phi), math.sin(phi); peak = .012 * max(0, -dz) ** 2
-        rin.append(G.v(c + rot @ Vector((dx * rx, 0, dz * rz)), .5, w, 'gear'))
+        rin.append(rings[-1][k])
         rout.append(G.v(c + rot @ Vector((dx * (rx + .012 + peak * .3), -.003, dz * (rz + .012 + peak))), .5, w, 'gear'))
         rlo.append(G.v(c + rot @ Vector((dx * (rx + .011 + peak * .3), -.008, dz * (rz + .011 + peak))), .5, w, 'gear'))
         rbot.append(G.v(c + rot @ Vector((dx * rx * .97, -.006, dz * rz * .97)), .5, w, 'gear'))
     up = rot @ Vector((0, 1, 0))
     for k in range(sides):
         k1 = (k + 1) % sides
-        G.f((rin[k], rin[k1], rout[k1], rout[k]), 'hat', out=up)
-        G.f((rout[k], rout[k1], rlo[k1], rlo[k]), 'hat', inside=c)
+        hat_face((rin[k], rin[k1], rout[k1], rout[k]), out=up)
+        hat_face((rout[k], rout[k1], rlo[k1], rlo[k]), inside=c)
         G.f((rlo[k], rlo[k1], rbot[k1], rbot[k]), 'hat_dark', out=-up)
     # the centre ridge, the hard hat signature
-    ridge = [c + rot @ Vector((0, math.cos(a) * (ry + .002), math.sin(a) * (rz + .002))) for a in np.linspace(-1.25, 1.3, 7)]
-    tube(ridge, [.007] * 7, 4, 'hat_dark', lambda t: w, 'gear', squash=.55, up=(1, 0, 0))
+    ridge = [c + rot @ Vector((0, math.cos(a) * (ry + .002), math.sin(a) * (rz + .002))) for a in np.linspace(-1.25, 1.3, 8)]
+    tube(ridge, [.0072] * 8, 5, 'hat', lambda t: w, 'gear', squash=.55, up=(1, 0, 0))
     # a blue lightning bolt on the front
     bc = c + rot @ Vector((.012, ry * .55, -rz * .84)); n = (rot @ Vector((0, .55, -1))).normalized(); d, u, v = frame_from(n, (0, 1, 0))
     bolt = [(.002, .015), (.011, .015), (.003, .003), (.01, .003), (-.008, -.017), (-.002, -.003), (-.009, -.003)]
-    idx = [G.v(bc + u * x + v * y + d * .002, .5, w, 'gear', ao=0) for x, y in bolt]
+    idx = [G.v(bc + u * x + v * y + d * .0022, .5, w, 'gear', ao=0) for x, y in bolt]
     G.f(idx, 'bolt', out=n)
 hard_hat()
 
-def band_ring(s, width, off, slot, tiles=None, th0=0.0, th1=TAU, n=16, weight=None):
+def band_ring(s, width, off, slot, th0=0.0, th1=TAU, n=16, weight=None):
     """A strap round the body loft at arc length s (closed if th0..th1 spans the full circle)."""
     w = weight or body_weights(s); full = abs(th1 - th0 - TAU) < 1e-6; cnt = n if full else n + 1
     rings = []
@@ -586,22 +602,23 @@ def band_ring(s, width, off, slot, tiles=None, th0=0.0, th1=TAU, n=16, weight=No
     return rings
 def harness():
     s_col, s_girth = s_of_z(-.098), s_of_z(.012)
-    band_ring(s_col, .016, .006, 'strap')                         # collar
-    band_ring(s_girth, .014, .006, 'strap')                       # girth strap behind the front legs
+    band_ring(s_col, .017, .006, 'strap')                         # collar
+    band_ring(s_girth, .015, .006, 'strap')                       # girth strap behind the front legs
     # dorsal strap: collar -> socket -> girth along the top
     sa, sb = s_col, s_girth; n = 6
     left = [G.v(body_point(sa + (sb - sa) * i / n, -.12, .007), .5, body_weights(sa + (sb - sa) * i / n), 'gear') for i in range(n + 1)]
     right = [G.v(body_point(sa + (sb - sa) * i / n, .12, .007), .5, body_weights(sa + (sb - sa) * i / n), 'gear') for i in range(n + 1)]
     for i in range(n): G.f((left[i], left[i + 1], right[i + 1], right[i]), 'strap', inside=cl_at(sa + (sb - sa) * (i + .5) / n)[0])
-    # yellow chest plate: wraps the lower chest from side to side between collar and girth (the front legs come
-    # through it), with a round medic badge on each flank
-    nu, nv = 4, 10; ths = [1.3 + (TAU - 2.6) * j / nv for j in range(nv + 1)]
+    # yellow leather chest plate: wraps the lower chest from side to side between collar and girth (the front legs
+    # come through it), stitched round the edge, with a round medic badge on each flank
+    nu, nv = 4, 12; ths = [1.3 + (TAU - 2.6) * j / nv for j in range(nv + 1)]
     sl = lambda i: lerp(s_col + .008, s_girth - .006, i / nu)
     bulge = lambda i, j: .009 + .003 * math.sin(math.pi * i / nu)
     grid = [[G.v(body_point(sl(i), th, bulge(i, j)), .5, body_weights(sl(i)), 'gear') for j, th in enumerate(ths)] for i in range(nu + 1)]
     for i in range(nu):
         for j in range(nv):
-            G.f((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]), 'harness', inside=cl_at(sl(i + .5))[0])
+            G.f((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]), None, inside=cl_at(sl(i + .5))[0],
+                uv=('plate', [reg_uv('plate', j / nv, i / nu), reg_uv('plate', j / nv, (i + 1) / nu), reg_uv('plate', (j + 1) / nv, (i + 1) / nu), reg_uv('plate', (j + 1) / nv, i / nu)]))
     for j in (0, nv):   # brown edging where the plate meets the skin
         for i in range(nu):
             ia = G.v(body_point(sl(i), ths[j] + (-.08 if j == 0 else .08), .002), .5, body_weights(sl(i)), 'gear')
@@ -610,15 +627,19 @@ def harness():
     sm = lerp(s_col, s_girth, .5); wts = body_weights(sm); c0, _t = cl_at(sm)
     for th in (1.95, TAU - 1.95):
         bp = body_point(sm, th, .0135); bn = (bp - c0).normalized(); bn = (bn + Vector((0, 0, -.25))).normalized()
-        d, u, v = disc(bp, bn, .017, 12, 'badge', wts, 'gear', lift=.0005)
+        d, u, v = disc(bp, bn, .017, 12, 'badge', wts, 'gear', lift=.0005, glow=.12)
+        # a steel rim round the badge
+        ring = [bp + d * .0004 + (u * math.cos(TAU * k / 12) + v * math.sin(TAU * k / 12)) * .0185 for k in range(13)]
+        tube(ring, [.0016] * 13, 4, 'buckle', lambda t: wts, 'gear', cap0=False, cap1=False)
         for (a0, a1), (b0, b1) in (((-.011, .011), (-.0037, .0037)), ((-.0037, .0037), (-.011, .011))):
             q = [bp + d * .0012 + u * x + v * y for x, y in ((a0, b0), (a1, b0), (a1, b1), (a0, b1))]
-            G.f([G.v(p_, .5, wts, 'gear', ao=0) for p_ in q], 'cross', out=bn)
-    # steel buckles on the collar and girth
+            G.f([G.v(p_, .5, wts, 'gear', ao=0, glow=.12) for p_ in q], 'cross', out=bn)
+    # steel buckles on the collar and girth: a frame with a bar across
     for s_, th in ((s_col, 1.15), (s_col, -1.15), (s_girth, 1.05), (s_girth, -1.05)):
         p = body_point(s_, th, .0095); c0, _t = cl_at(s_); n_ = (p - c0).normalized(); d, u, v = frame_from(n_, (0, 0, 1))
-        q = [p + u * x + v * y for x, y in ((-.008, -.007), (.008, -.007), (.008, .007), (-.008, .007))]
-        G.f([G.v(pp, .5, body_weights(s_), 'gear') for pp in q], 'buckle', out=n_)
+        q = [p + u * x + v * y for x, y in ((-.0085, -.0075), (.0085, -.0075), (.0085, .0075), (-.0085, .0075))]
+        tube(q + [q[0]], [.0016] * 5, 4, 'buckle', lambda t: body_weights(s_), 'gear', cap0=False, cap1=False)
+        tube([p + u * -.0085, p + u * .0085], [.0014] * 2, 4, 'buckle', lambda t: body_weights(s_), 'gear')
 harness()
 
 def socket_and_cable():
@@ -648,8 +669,8 @@ def zzz():
     glyph = [(-.012, .014), (.012, .014), (.012, .009), (-.004, -.009), (.012, -.009), (.012, -.014), (-.012, -.014), (-.012, -.009), (.004, .009), (-.012, .009)]
     for name, sc in (('Z1', 1.0), ('Z2', 1.35)):
         h, _t, _p = BONES[name]; c = Vector(h); w = {name: 1.0}
-        front = [G.v(c + Vector((x * sc, y * sc, -.003)), .5, w, 'gear', ao=0) for x, y in glyph]
-        back = [G.v(c + Vector((x * sc, y * sc, .003)), .5, w, 'gear', ao=0) for x, y in glyph]
+        front = [G.v(c + Vector((x * sc, y * sc, -.003)), .5, w, 'gear', ao=0, glow=.7) for x, y in glyph]
+        back = [G.v(c + Vector((x * sc, y * sc, .003)), .5, w, 'gear', ao=0, glow=.7) for x, y in glyph]
         for quad in ((0, 1, 2, 9), (2, 3, 8, 9), (3, 4, 5, 6), (3, 6, 7, 8)):
             G.f([front[i] for i in quad], 'zzz', out=(0, 0, -1)); G.f([back[i] for i in quad], 'zzz', out=(0, 0, 1))
         n = len(glyph); area = sum(glyph[k][0] * glyph[(k + 1) % n][1] - glyph[(k + 1) % n][0] * glyph[k][1] for k in range(n))
@@ -671,7 +692,7 @@ for i, (f, h) in enumerate(zip(G.F, G.FH)):
     want = (cen - h[1]) if h[0] == 'in' else h[1]
     if face_normal(f).dot(want) < 0:
         G.F[i] = f[::-1]
-        if G.FV[i]: G.FV[i] = G.FV[i][::-1]
+        if G.FU[i]: G.FU[i] = (G.FU[i][0], G.FU[i][1][::-1])
 
 # ------------------------------------------------------------------ baked ambient occlusion (body, limbs and boots occlude)
 tris_occ = []
@@ -704,40 +725,223 @@ for i, p in enumerate(G.P):
     if G.ao[i] <= 0: AO.append(1.0); continue
     a = ao_at(p, vn[i]); AO.append(lerp(1, lerp(.45, 1, a ** 1.1), G.ao[i]))
 
+# ------------------------------------------------------------------ texture bake: rasterise the painted faces, paint per texel
+def _hash(ix, iy, iz, seed):
+    h = (ix * 374761393 + iy * 668265263 + iz * 1274126177 + seed * 1442695041) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 1103515245) & 0xFFFFFFFF
+    h = (h ^ (h >> 16)) & 0xFFFFFFFF
+    return (h & 0xFFFFFF) / 16777216.0
+def vnoise(P, seed):
+    """Smooth value noise in 0..1 at points P (n, 3)."""
+    Pf = np.floor(P); f = P - Pf; i = Pf.astype(np.int64); u = f * f * (3 - 2 * f); out = np.zeros(len(P))
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (u[:, 0] if dx else 1 - u[:, 0]) * (u[:, 1] if dy else 1 - u[:, 1]) * (u[:, 2] if dz else 1 - u[:, 2])
+                out += w * _hash(i[:, 0] + dx, i[:, 1] + dy, i[:, 2] + dz, seed)
+    return out
+def fbm(P, seed, octaves=3):
+    tot, amp, out = 0.0, 1.0, np.zeros(len(P))
+    for o in range(octaves):
+        out += vnoise(P * (2 ** o), seed + o * 17) * amp; tot += amp; amp *= .5
+    return out / tot
+def worley(P, seed):
+    """Distance to the nearest jittered feature point (cell units) and that cell's random value."""
+    i = np.floor(P).astype(np.int64); best = np.full(len(P), 9.0); cid = np.zeros(len(P))
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                cx, cy, cz = i[:, 0] + dx, i[:, 1] + dy, i[:, 2] + dz
+                fp = np.stack([cx + .15 + .7 * _hash(cx, cy, cz, seed), cy + .15 + .7 * _hash(cx, cy, cz, seed + 1), cz + .15 + .7 * _hash(cx, cy, cz, seed + 2)], 1)
+                d = np.linalg.norm(P - fp, axis=1); upd = d < best
+                best = np.where(upd, d, best); cid = np.where(upd, _hash(cx, cy, cz, seed + 3), cid)
+    return best, cid
+def sstep(a, b, x):
+    t = np.clip((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
+def hexes(hs): return np.array([srgb(h) for h in hs])
+def ramp_colour(R):
+    pos = [p for p, _ in RAMP]; cols = hexes([h for _, h in RAMP])
+    return np.stack([np.interp(R, pos, cols[:, k]) for k in range(3)], 1)
+def mixc(a, b, t): return a + (b - a) * np.asarray(t)[:, None]
+
+def bake():
+    H = W = TEX
+    attr = np.zeros((H, W, 7), np.float32); fill = np.zeros((H, W), bool)
+    vnn = [v.normalized() if v.length > 1e-12 else Vector((0, 1, 0)) for v in vn]
+    for f, uv, bk in zip(G.F, G.FU, G.FB):
+        if uv is None or not bk: continue
+        pts = uv[1]; A = [np.array([*G.P[i], *vnn[i], G.R[i]], np.float32) for i in f]
+        for k in range(1, len(f) - 1):
+            (x0, y0), (x1, y1), (x2, y2) = pts[0], pts[k], pts[k + 1]
+            d = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            if abs(d) < 1e-9: continue
+            xs = np.arange(int(math.floor(min(x0, x1, x2))), int(math.ceil(max(x0, x1, x2))) + 1) + .5
+            ys = np.arange(int(math.floor(min(y0, y1, y2))), int(math.ceil(max(y0, y1, y2))) + 1) + .5
+            X, Y = np.meshgrid(xs, ys)
+            l0 = ((y1 - y2) * (X - x2) + (x2 - x1) * (Y - y2)) / d; l1 = ((y2 - y0) * (X - x2) + (x0 - x2) * (Y - y2)) / d; l2 = 1 - l0 - l1
+            m = (l0 > -.03) & (l1 > -.03) & (l2 > -.03)
+            cols, rows = X[m].astype(int), Y[m].astype(int); ok = (cols >= 0) & (cols < W) & (rows >= 0) & (rows < H)
+            vals = l0[m][:, None] * A[0] + l1[m][:, None] * A[k] + l2[m][:, None] * A[k + 1]
+            attr[rows[ok], cols[ok]] = vals[ok]; fill[rows[ok], cols[ok]] = True
+    # grow every region a few texels into its padding so filtering and mips never pick up black
+    def shift(a, dy, dx):
+        out = np.zeros_like(a); h, w = a.shape[:2]
+        out[max(dy, 0):h + min(dy, 0), max(dx, 0):w + min(dx, 0)] = a[max(-dy, 0):h + min(-dy, 0), max(-dx, 0):w + min(-dx, 0)]
+        return out
+    for name, (x0, y0, w, h) in REGIONS.items():
+        sa, sf = attr[y0:y0 + h, x0:x0 + w], fill[y0:y0 + h, x0:x0 + w]
+        for _ in range(PAD + 4):
+            acc = np.zeros_like(sa); cnt = np.zeros(sf.shape, np.float32)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    if dx or dy: acc += shift(sa * sf[..., None], dy, dx); cnt += shift(sf.astype(np.float32), dy, dx)
+            grow = (~sf) & (cnt > 0)
+            sa[grow] = acc[grow] / cnt[grow][:, None]; sf |= grow
+    base = np.zeros((H, W, 3)); hgt = np.zeros((H, W)); rough = np.full((H, W), .5); metal = np.zeros((H, W)); vein = np.zeros((H, W))
+    nstr = np.zeros((H, W))
+    for name in SLOT_NAMES:
+        col, r, m_ = SLOTS[name]; cx, cy = slot_px(name); x0, y0 = int(cx - CELL / 2), int(cy - CELL / 2)
+        base[y0:y0 + CELL, x0:x0 + CELL] = srgb(col); rough[y0:y0 + CELL, x0:x0 + CELL] = r; metal[y0:y0 + CELL, x0:x0 + CELL] = m_
+    for name, (x0, y0, w, h) in REGIONS.items():
+        sub = np.zeros((H, W), bool); sub[y0:y0 + h, x0:x0 + w] = True; m = sub & fill
+        rows, cols = np.nonzero(m)
+        if not len(rows): continue
+        a_ = (cols + .5 - x0 - PAD) / (w - 2 * PAD); b_ = (rows + .5 - y0 - PAD) / (h - 2 * PAD)
+        P = attr[rows, cols, 0:3].astype(np.float64); R = attr[rows, cols, 6].astype(np.float64)
+        if name in SKIN_REGIONS:
+            col, hh, rr, vv = paint_skin(name, P, R, a_, b_)
+            nstr[rows, cols] = .75
+        elif name == 'eye': col, hh, rr, vv = paint_eye(a_, b_); nstr[rows, cols] = 0
+        elif name == 'hat': col, hh, rr, vv = paint_hat(P, a_, b_); nstr[rows, cols] = 1.2
+        elif name == 'plate': col, hh, rr, vv = paint_plate(P, a_, b_, w, h); nstr[rows, cols] = 1.4
+        elif name == 'spike': col, hh, rr, vv = paint_spike(P, a_, b_); nstr[rows, cols] = .6
+        base[rows, cols] = col; hgt[rows, cols] = hh; rough[rows, cols] = rr; vein[rows, cols] = vv
+        metal[rows, cols] = 0
+    gy, gx = np.gradient(hgt)            # per texel, y up the image (Blender v): the glTF normal-map convention
+    nrm = np.stack([-gx * nstr, -gy * nstr, np.ones_like(hgt)], -1); nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    return np.clip(base, 0, 1), nrm, np.clip(rough, .04, 1), metal, np.clip(vein, 0, 1)
+
+def paint_skin(name, P, R, a_, b_):
+    n = len(P); belly = sstep(.7, .88, R); dorsal = sstep(.66, .48, R)
+    col = ramp_colour(R)
+    # mottling: broad value swells, a green-blue drift, finer grain
+    m1 = vnoise(P * 22, 1); m2 = vnoise(P * 70, 2); drift = vnoise(P * 8, 3)
+    col *= (.9 + .17 * m1 + .06 * (m2 - .5))[:, None] * (1 - .35 * belly)[:, None] + (.35 * belly)[:, None]
+    col = mixc(col, col * np.array([.82, 1.06, .9]), .55 * drift * dorsal)
+    col = mixc(col, col * np.array([1.0, .96, 1.08]), .4 * (1 - drift) * dorsal)
+    # spots: clustered dark teal blotches and speckles over the back, flanks, tail and legs (fewer on the face)
+    spot_w = dorsal * (.55 if name in ('head', 'lid', 'jaw') else 1.0)
+    F1, cid = worley(P * 46, 4); rad = .24 + .17 * cid; clus = sstep(.35, .6, vnoise(P * 9, 5))
+    spot = sstep(rad, rad - .09, F1) * (cid > .22) * spot_w * (.55 + .45 * clus)
+    F2, cid2 = worley(P * 115, 6); speck = sstep(.24, .13, F2) * (cid2 > .5) * spot_w * .75
+    sp = np.maximum(spot, speck)
+    spot_col = mixc(ramp_colour(np.zeros(n)), ramp_colour(np.full(n, .1)), vnoise(P * 30, 7))
+    col = mixc(col, spot_col, .85 * sp)
+    # cream belly and throat: transverse scale rows
+    if name == 'body': along = a_ * BODY_LEN; pitch = .0125
+    else: along = P[:, 2]; pitch = .0105
+    q = np.mod(along / pitch, 1.0); groove = 1 - sstep(.0, .14, q) * sstep(1.0, .86, q)
+    bands = groove * belly * (1.0 if name in ('body', 'jaw', 'head') else 0.0)
+    col *= (1 - .13 * bands)[:, None]
+    # pebbly skin: small domed scales everywhere, finer on the belly
+    Fp, cp = worley(P * np.where(belly[:, None] > .5, 330, 240), 8); peb = sstep(.66, .08, Fp)
+    col *= (.95 + .08 * peb)[:, None]
+    h = .55 * peb + .25 * sp - .9 * bands + .25 * (m2 - .5)
+    rough = .4 + .15 * belly + .07 * (vnoise(P * 34, 9) - .5) - .05 * sp + .04 * (1 - peb)
+    # veins: domain-warped noise isolines, in patches, a little sparser on the belly
+    warp = np.stack([vnoise(P * 9, 11), vnoise(P * 9, 12), vnoise(P * 9, 13)], 1) - .5
+    nv = fbm(P * 13 + warp * 1.4, 14, 3)
+    line = sstep(.032, .008, np.abs(nv - .5))
+    patch = sstep(.42, .6, vnoise(P * 4.5, 15))
+    vein = line * patch * (1 - .5 * belly)
+    if name == 'lid': vein *= 0
+    return col, h, rough, vein
+
+def paint_eye(a_, b_):
+    dx, dy = a_ - .5, b_ - .5; a = np.hypot(dx, dy) * 2 * EYE_AMAX; phi = np.arctan2(dy, dx); n = len(a)
+    t = np.clip((a - .5) / .42, 0, 1)
+    iris = np.stack([np.interp(t, [0, .3, .75, 1], hexes(['ffd463', 'f59c27', 'c9661a', '6e310c'])[:, k]) for k in range(3)], 1)
+    streak = 1 + .1 * np.sin(phi * 31 + 4 * vnoise(np.stack([np.cos(phi) * 3, np.sin(phi) * 3, a * 4], 1), 21)) * (t > 0)
+    iris *= streak[:, None]
+    white = mixc(np.tile(srgb('fbf7ee'), (n, 1)), np.tile(srgb('e6ddd2'), (n, 1)), sstep(1.2, 1.9, a))
+    col = mixc(iris, np.tile(srgb('110b09'), (n, 1)), sstep(.54, .47, a))
+    col = mixc(col, white, sstep(.9, .98, a))
+    return col, np.zeros(n), np.full(n, .07), np.zeros(n)
+
+def paint_hat(P, a_, b_):
+    n = len(P); q = np.stack([a_, b_], 1)
+    lift = P[:, 1] - HAT_BASE[1]
+    col = mixc(np.tile(srgb('f0b416'), (n, 1)), np.tile(srgb('ffd24a'), (n, 1)), sstep(.0, .06, lift))
+    # scuffs and scratches: thin anisotropic streaks, dark grime and pale chips
+    s1 = vnoise(P * np.array([420, 60, 420]), 31); s2 = vnoise(P * np.array([60, 420, 520]), 32)
+    scratch = np.maximum(sstep(.84, .9, s1), sstep(.86, .92, s2)) * sstep(.45, .7, vnoise(P * 14, 33))
+    grime = sstep(.6, .85, vnoise(P * 30, 34)) * .22
+    col = mixc(col, col * np.array([.78, .66, .5]), grime)
+    col = mixc(col, np.tile(srgb('fff1c4'), (n, 1)), .3 * scratch)
+    Fd, cd = worley(P * 38, 35); dent = sstep(.32, .0, Fd) * (cd > .78)
+    h = -.45 * dent - .2 * scratch + .1 * (vnoise(P * 200, 36) - .5)
+    rough = .36 + .25 * scratch + .15 * grime
+    return col, h, rough, np.zeros(n)
+
+def paint_plate(P, a_, b_, w, h_px):
+    n = len(P); ex = np.minimum(a_, 1 - a_) * (w - 2 * PAD); ey = np.minimum(b_, 1 - b_) * (h_px - 2 * PAD); e = np.minimum(ex, ey)
+    col = np.tile(srgb('f2b92a'), (n, 1))
+    col = mixc(col * np.array([.8, .62, .4]), col, sstep(0, 9, e))           # worn, darker edges
+    grain = vnoise(P * 520, 41); col *= (.94 + .1 * grain)[:, None]
+    along = np.where(ex < ey, b_ * (h_px - 2 * PAD), a_ * (w - 2 * PAD))
+    stitch = sstep(1.3, .5, np.abs(e - 5.0)) * (np.mod(along / 6.0, 1.0) < .55)
+    col = mixc(col, np.tile(srgb('6a3d1a'), (n, 1)), .85 * stitch)
+    hh = .35 * grain - .9 * stitch - .5 * sstep(4, 0, e)
+    rough = .52 + .12 * grain + .1 * stitch
+    return col, hh, rough, np.zeros(n)
+
+def paint_spike(P, a_, b_):
+    n = len(P); t = np.clip(b_, 0, 1)
+    col = np.stack([np.interp(t, [0, .45, 1], hexes(['d65a16', 'f2852a', 'ffc779'])[:, k]) for k in range(3)], 1)
+    col *= (.93 + .1 * vnoise(np.stack([a_ * 40, b_ * 6, a_ * 3], 1), 51))[:, None]
+    return col, np.zeros(n), .42 - .1 * t, np.zeros(n)
+
+def encode(rgb01, quality, subsampling):
+    """JPEG via the system Pillow (bpy's Python has none). rgb01 is bottom-up (Blender rows)."""
+    arr = np.ascontiguousarray(np.flipud(np.clip(np.round(rgb01 * 255), 0, 255).astype(np.uint8)))
+    code = ('import sys, io; from PIL import Image; h, w, q, s = map(int, sys.argv[1:5]); d = sys.stdin.buffer.read(); '
+            'b = io.BytesIO(); Image.frombytes("RGB", (w, h), d).save(b, "JPEG", quality=q, subsampling=s, optimize=True); sys.stdout.buffer.write(b.getvalue())')
+    res = subprocess.run(['python3', '-I', '-c', code, str(arr.shape[0]), str(arr.shape[1]), str(quality), str(subsampling)], input=arr.tobytes(), capture_output=True, check=True)
+    return res.stdout
+
+TB = time.time()
+BASE, NRM, ROUGH, METAL, VEIN = bake()
+JPEGS = {'base': encode(BASE, 90, 2), 'normal': encode(NRM * .5 + .5, 92, 0), 'mr': encode(np.stack([VEIN, ROUGH, METAL], -1), 92, 0)}
+BAKE_SECONDS = round(time.time() - TB, 1)
+
 # ------------------------------------------------------------------ Blender objects
 bpy.ops.wm.read_factory_settings(use_empty=True)
 SC = bpy.context.scene; SC.render.fps = FPS; SC.frame_start = 0
-img = bpy.data.images.new('LizardAtlas', TEX_W, TEX_H, alpha=False)
-img.colorspace_settings.name = 'sRGB'
-img.pixels.foreach_set(atlas_pixels().ravel())
+img = bpy.data.images.new('LizardBase', TEX, TEX, alpha=False)
+img.pixels.foreach_set(np.concatenate([BASE, np.ones((TEX, TEX, 1))], -1).astype(np.float32).ravel())
 img.pack(); img.file_format = 'PNG'
-
 mat = bpy.data.materials.new('LizardSkin'); mat.use_nodes = True; nt = mat.node_tree; bsdf = nt.nodes['Principled BSDF']
 bsdf.inputs['Roughness'].default_value = .5; bsdf.inputs['Metallic'].default_value = 0.0
 tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img; tex.interpolation = 'Linear'
-vc = nt.nodes.new('ShaderNodeVertexColor'); vc.layer_name = 'Col'
-mixn = nt.nodes.new('ShaderNodeMix'); mixn.data_type = 'RGBA'; mixn.blend_type = 'MULTIPLY'; mixn.inputs['Factor'].default_value = 1.0
-sock = lambda socks, name: [x for x in socks if x.name == name and x.type == 'RGBA'][0]
-nt.links.new(tex.outputs['Color'], sock(mixn.inputs, 'A')); nt.links.new(vc.outputs['Color'], sock(mixn.inputs, 'B'))
-nt.links.new(sock(mixn.outputs, 'Result'), bsdf.inputs['Base Color'])
+nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])   # the repack swaps in the JPEG set (base, normal, MR)
 mat.use_backface_culling = True
 
 bm = bmesh.new()
 bv = [bm.verts.new(to_b(p)) for p in G.P]
 bm.verts.index_update(); bm.verts.ensure_lookup_table()
-uvl = bm.loops.layers.uv.new('UVMap'); uvv = bm.loops.layers.uv.new('Veins')
+uvl = bm.loops.layers.uv.new('UVMap')
 skipped = 0
-for f, slot, vein in zip(G.F, G.FS, G.FV):
+for f, slot, uv in zip(G.F, G.FS, G.FU):
     try: face = bm.faces.new([bv[i] for i in f])
     except ValueError: skipped += 1; continue
     face.smooth = True
     for li, loop in enumerate(face.loops):
-        loop[uvl].uv = (slot_u(slot) if slot else ramp_u(G.R[loop.vert.index]), ROW_V)
-        loop[uvv].uv = vein[li] if vein else NO_VEIN
+        x, y = uv[1][li] if uv else slot_px(slot)
+        loop[uvl].uv = (x / TEX, y / TEX)
 me = bpy.data.meshes.new('Lizard'); bm.to_mesh(me); bm.free()
 me.materials.append(mat)
 ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
-ca.data.foreach_set('color', np.array([(a, a, a, 1.0) for a in AO], np.float32).ravel())
+ca.data.foreach_set('color', np.array([(AO[i], G.glow[i], 1.0 if G.part[i] in SKIN_PARTS else 0.0, 1.0) for i in range(len(G.P))], np.float32).ravel())
 me.color_attributes.active_color = ca
 try: me.set_sharp_from_angle(angle=math.radians(70))
 except Exception: pass
@@ -800,7 +1004,6 @@ def limb_pose(spec, side, kind, swing, lift, out=0.0):
     add(spec, H, r=(-(swing + lift * .55 - bend), 0, sgn * (out + lift * .25) * .8))
 def cheeks(spec, k):
     for c in ('CheekL', 'CheekR'): add(spec, c, s=(1 + k, 1 + k * .8, 1 + k))
-LID_CLOSE = 1.75   # radians the upper lid turns to shut (the runtime blink uses the same)
 def lids(spec, k):   # k 1 = shut
     add(spec, 'LidL', r=(-LID_CLOSE * k, 0, 0)); add(spec, 'LidR', r=(-LID_CLOSE * k, 0, 0))
 def cable(spec, t, amt=1.0):
@@ -821,7 +1024,7 @@ def clip_idle(t):
     add(spec, 'Head', r=(.05 + .025 * br, look, tilt)); add(spec, 'Spine', r=(0, look * .2, 0))
     add(spec, 'EyeL', r=(0, look * .45, 0)); add(spec, 'EyeR', r=(0, look * .45, 0))
     grin = 1 - bump(t, 3.9, 4.25, 5.5, 5.9)             # the big toothy grin, closing to a smile for the toe tap
-    jaw_open(spec, (.3 * grin + .03 * br, 0, 0)); cheeks(spec, .05 * grin)
+    jaw_open(spec, (.3 * grin + .03 * br, 0, 0)); cheeks(spec, .08 * grin)
     tail_sway(spec, t, 3.0, .1, .05 * math.sin(TAU * t / 3))
     shift = math.sin(TAU * t / 6)                       # a slow weight shift
     add(spec, 'Root', r=(0, 0, .02 * shift))
@@ -867,7 +1070,7 @@ def clip_cheer(t):
     add(spec, 'Spine', r=(.3 * up - .08 * charge, 0, tremble)); add(spec, 'Hips', r=(-.1 * up, 0, -tremble))
     add(spec, 'Head', r=(.18 * up - .12 * charge, 0, .12 * math.sin(TAU * t * 1.4) * up + tremble))
     jaw_open(spec, (.42 * bump(t, .52, .66, 1.2, 1.5), 0, 0))
-    cheeks(spec, .45 * charge + .06 * up)
+    cheeks(spec, .62 * charge + .06 * up)
     lids(spec, charge)
     wave = math.sin(TAU * t * 3.2)
     for side in 'LR':
@@ -891,13 +1094,13 @@ def clip_nap(t):
     add(spec, 'Belly', s=(1 + .09 * br, 1 + .04 * br, 1 + .09 * br))
     add(spec, 'Spine', r=(-.04 + .04 * br, 0, .03))
     add(spec, 'Head', r=(-.16 + .05 * br, -.22, .16))
-    jaw_open(spec, (.04 + .14 * snore, 0, 0)); cheeks(spec, .12 * snore)
+    jaw_open(spec, (.04 + .14 * snore, 0, 0)); cheeks(spec, .2 * snore)
     lids(spec, 1.0)
     add(spec, 'HatHard', r=(-.3, 0, .06))
     for side in 'LR':
         limb_pose(spec, side, 'Arm', .5, 0, 1.15)
         limb_pose(spec, side, 'Leg', -.6, 0, 1.15)
-    tail_sway(spec, t, NAP_T, .04, -.06)
+    tail_sway(spec, t, NAP_T, .04, -.16)
     for name, off in (('Z1', 0.0), ('Z2', .5)):
         q = ((t / NAP_T) + off) % 1
         grow = bump(q, .0, .25, .6, .95)
@@ -935,7 +1138,7 @@ def clip_bite(t):
     add(spec, 'Hips', r=(-.06 * wind + .08 * lunge, 0, 0))
     add(spec, 'Head', r=(.4 * wind - .12 * lunge, .06 * math.sin(TAU * t * 4.5) * shake, .16 * math.sin(TAU * t * 9) * shake))
     jaw_open(spec, (.75 * bump(t, .05, .3, .4, .48) + .06 * shake, 0, 0))
-    lids(spec, .9 * shake); cheeks(spec, .25 * shake)
+    lids(spec, .9 * shake); cheeks(spec, .42 * shake)
     for side in 'LR':
         limb_pose(spec, side, 'Arm', .25 * lunge - .1 * wind, .2 * wind, .05)
         limb_pose(spec, side, 'Leg', -.25 * lunge, 0, .05)
@@ -965,6 +1168,7 @@ for name, (fn, T) in CLIPS.items():
     track.strips.new(name, 0, act); track.mute = True
     rig.animation_data.action = None
 apply({})
+
 
 # ------------------------------------------------------------------ GLB repack: quantized attributes and rotation keys
 def quantize_glb(path):
@@ -1031,11 +1235,13 @@ def quantize_glb(path):
         if target: v['target'] = target
         if stride: v['byteStride'] = stride
         out.extend(data); views.append(v); return len(views) - 1
-    img_views = {im['bufferView'] for im in doc.get('images', [])}
-    remap = {}
-    for vi in sorted(img_views):
-        bv = doc['bufferViews'][vi]; o = bv.get('byteOffset', 0); remap[vi] = push(bin0[o:o + bv['byteLength']])
-    for im in doc.get('images', []): im['bufferView'] = remap[im['bufferView']]
+    # the texture set: Blender's PNG base colour is replaced by the three JPEGs, mip-mapped and clamped
+    doc['images'] = [{'name': f'Lizard_{n}', 'mimeType': 'image/jpeg', 'bufferView': push(JPEGS[n])} for n in ('base', 'normal', 'mr')]
+    doc['textures'] = [{'sampler': 0, 'source': i} for i in range(3)]
+    doc['samplers'] = [{'magFilter': 9729, 'minFilter': 9987, 'wrapS': 33071, 'wrapT': 33071}]
+    m0 = doc['materials'][0]; pbr = m0.setdefault('pbrMetallicRoughness', {})
+    pbr.pop('baseColorFactor', None); pbr['baseColorTexture'] = {'index': 0}; pbr['metallicRoughnessTexture'] = {'index': 2}
+    pbr['metallicFactor'] = 1.0; pbr['roughnessFactor'] = 1.0; m0['normalTexture'] = {'index': 1}
     for ai, a in enumerate(doc['accessors']):
         data = read(ai); kind = conv.get(ai); target = doc['bufferViews'][a['bufferView']].get('target'); a.pop('byteOffset', None)
         if kind == 'normal':
@@ -1060,7 +1266,6 @@ def quantize_glb(path):
         else:
             a['bufferView'] = push(data.astype(CT[a['componentType']]).tobytes(), target)
     doc['bufferViews'] = views; doc['buffers'] = [{'byteLength': len(out)}]
-    for s in doc.get('samplers', []): s['magFilter'] = 9729; s['minFilter'] = 9729; s['wrapS'] = 33071; s['wrapT'] = 33071
     for k in ('extensionsUsed', 'extensionsRequired'): doc[k] = sorted(set(doc.get(k, [])) | {'KHR_mesh_quantization'})
     js = json.dumps(doc, separators=(',', ':')).encode(); js += b' ' * (-len(js) % 4)
     while len(out) % 4: out.append(0)
@@ -1075,8 +1280,9 @@ for f in G.F:
     w = G.W[f[0]]; b = next(iter(w)) if G.part[f[0]] == 'gear' and len(w) == 1 and next(iter(w)) in ('HatHard', 'Wrench', 'Z1', 'Z2') else G.part[f[0]]
     parts[b] = parts.get(b, 0) + len(f) - 2
 REPORT = {'triangles': tri_count, 'triangles_by_part': parts, 'vertices': len(me.vertices), 'materials': len(me.materials),
-          'bones': len(order), 'skipped_faces': skipped, 'atlas': [TEX_W, TEX_H]}
-assert tri_count < 4000, REPORT
+          'bones': len(order), 'skipped_faces': skipped, 'texture': [TEX, TEX], 'jpeg_bytes': {k: len(v) for k, v in JPEGS.items()},
+          'bake_seconds': BAKE_SECONDS}
+assert tri_count < 5500, REPORT
 assert skipped == 0, REPORT
 assert all(abs(sum(g.weight for g in v.groups) - 1) < 1e-3 for v in me.vertices), 'every vertex fully weighted'
 os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
@@ -1091,6 +1297,8 @@ REPORT['animations'] = {a['name']: len(a['channels']) for a in doc.get('animatio
 REPORT['bytes'] = os.path.getsize(OUT); REPORT['seconds'] = round(time.time() - T0, 1)
 os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
 with open(os.path.join(HERE, 'out', 'build_report.json'), 'w') as fh: json.dump(REPORT, fh, indent=2)
+if '--dump-textures' in ARGS:
+    for k, v in JPEGS.items(): open(os.path.join(HERE, 'out', f'lizard_{k}.jpg'), 'wb').write(v)
 print(json.dumps(REPORT))
 assert set(REPORT['animations']) == set(CLIPS), REPORT['animations']
 print('LIZARD_BUILD_OK')

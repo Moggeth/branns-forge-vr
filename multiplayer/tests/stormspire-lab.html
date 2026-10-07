@@ -83,6 +83,10 @@ const VIEWS={front:[[3.2,2.4,-5.4],[0,2.2,0]],hat:[[1.6,5.9,-2.6],[0,5.2,-.6]],h
   wear:[[6.2,1.9,-3.5],[2.5,1.2,-7]],trunk:[[-1.2,1.3,-3.6],[-2.6,.5,-5.4]],trunkTop:[[-2.4,3.2,-4.4],[-2.6,.3,-5.6]],wrapWide:[[4,5,1],[-4,0,-9]],trunk2:[[-6,1.4,-8.4],[-7.5,.4,-10.5]],
   planted:[[2.8,1.2,-8],[1.4,.5,-9.6]],plantedWide:[[4.5,2.4,-5],[0,.8,-11]],surge:[[1,1.8,-9.5],[-3,1.1,-14]],fell:[[6,1.5,-3],[9,.4,-6]],victims:[[-8,2.2,-9],[-2.2,1.2,-15.5]],probe:[[-1.2,1.8,-11.8],[-3,1.15,-14]],reel:[[5,1.8,-4.5],[0,1.2,-10]],crossbows:[[0,0,0],[0,0,0]]};
 window.lab={scene,
+  /** Move the stand-in hero (it carries the pack); packInfo() reports the worn and hanging packs' motion nodes. */
+  walk(x,z){moveHero(x,z);hero.rotation.y=0;},
+  packInfo(){const out=[];scene.traverse(o=>{if(/ReelPack/.test(o.name)&&!o.parent?.name?.includes('ReelPack')){const sw=o.getObjectByName('Sway'),r=o.getObjectByName('Reel'),w=o.getObjectByName('Reel_Windings'),c=o.getObjectByName('Crank'),p=o.getObjectByName('Pawl');
+    out.push({name:o.name,sway:sw?[sw.rotation.x,sw.rotation.y,sw.rotation.z].map(v=>+v.toFixed(4)):null,reel:r?+r.rotation.x.toFixed(3):null,wind:w?+w.scale.y.toFixed(3):null,crank:c?+c.rotation.x.toFixed(3):null,pawl:p?+p.rotation.x.toFixed(3):null});}});return out;},
   foes:()=>foes.map(f=>({id:f.id,scale:f.m.scale.x,pos:f.m.position.toArray(),vis:f.m.visible,kids:f.m.children.length})),
   frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);weapon?.update(1/60);view.update(1/60,t,cam.position);lightning.update(1/60,cam);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
   view(name){const v=VIEWS[name];cam.position.fromArray(v[0]);cam.lookAt(...v[1]);},

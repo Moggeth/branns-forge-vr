@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import {STORMREEL,PACKS,terminalPoint,hookPoint as sharedHook,cableStrain,cableWraps} from '../shared/stormreel.js';
 import {worldTrees} from '../shared/world-content.js';
+import {trunkRadius} from '../shared/trees.js';
 import {PACK_COLORS,tintPack} from './stormspire-art.js';
 import {POLE,finishCrossbow,softTexture,coronaTexture,glyphTexture,ribbonTexture,createRibbon,createBeads,makeSprite,along,flicker} from './stormreel-look.js';
 import {createStormreelAudio} from './stormreel-audio.js';
@@ -66,7 +67,21 @@ export function createStormreelView(ctx) {
     if (treesFor !== snapshot) { treesFor = snapshot; treeMap = new Map((ctx.trees?.(snapshot) || worldTrees(snapshot)).map(t => [t.id, t])); }
     return list.map(w => ({x: w.x, z: w.z, tree: treeMap.get(w.id) || null}));
   }
-  function dropCable(id) { const c = cables.get(id); if (!c) return; kit.drop(c); c.glow.dispose(); cables.delete(id); }
+  /** Trees near this cable that it is not wrapped round: its free spans slide round their bark (stormreel-cable.js). */
+  const trunkList = new Map();
+  function trunksNear(c, a, b, wraps) {
+    if (treesFor !== snapshot) { treesFor = snapshot; treeMap = new Map((ctx.trees?.(snapshot) || worldTrees(snapshot)).map(t => [t.id, t])); }
+    let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), z0 = Math.min(a.z, b.z), z1 = Math.max(a.z, b.z);
+    if (c.seeded) for (const p of c.p) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
+    const out = trunkList.get(c) || []; out.length = 0; trunkList.set(c, out);
+    const wrapped = new Set((wraps || []).map(w => w.tree?.id));
+    for (const t of treeMap.values()) {
+      if (wrapped.has(t.id) || t.x < x0 - 1 || t.x > x1 + 1 || t.z < z0 - 1 || t.z > z1 + 1) continue;
+      const floor = ctx.height(t.x, t.z); out.push({x: t.x, z: t.z, r: trunkRadius(t, .8) + .01, top: floor + Math.min(2.2, t.height * .4)});
+    }
+    return out.length ? out : null;
+  }
+  function dropCable(id) { const c = cables.get(id); if (!c) return; trunkList.delete(c); kit.drop(c); c.glow.dispose(); cables.delete(id); }
 
   /**
    * Current pulses along a polyline: red carries them out from the tower (u 0 -> 1), blue returns them (1 -> 0). The ribbon
@@ -411,7 +426,8 @@ export function createStormreelView(ctx) {
         // The far end pays out toward a lodged bolt instead of jumping to it.
         if (!worn && !home && !pl && probe) { v.subVectors(b, c.end); const l = v.length(), step = CABLE.payOut * dt; if (l > step) c.end.addScaledVector(v, step / l); else c.end.copy(b); } else c.end.copy(b);
         const target = worn || pl ? b : c.end; if (worn) strain = cableStrain(tower, [pose.position.x, 0, pose.position.z], colour);
-        kit.step(c, {a, b: target, wraps: worn || pl ? wrapsFor(tower, colour) : null, strain, dt, maxLength: worn || home || pl ? STORMREEL.cable : STORMREEL.tether, home: !!home});
+        const wl = worn || pl ? wrapsFor(tower, colour) : null;
+        kit.step(c, {a, b: target, wraps: wl, trunks: trunksNear(c, a, target, wl), strain, dt, maxLength: worn || home || pl ? STORMREEL.cable : STORMREEL.tether, home: !!home});
         kit.draw(c);
         // Current: faint idle pulses; a flood while the circuit runs; a white flash down the line at the surge and at a tug.
         c.surge = Math.max(0, (c.surge || 0) - dt * 1.5); c.tugGlow = Math.max(0, (c.tugGlow || 0) - dt * 4);

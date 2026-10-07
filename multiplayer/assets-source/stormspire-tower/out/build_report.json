@@ -1,0 +1,117 @@
+{
+  "tower": {
+    "by_object": {
+      "Stormspire_Stormspire": 8578,
+      "Stormspire_Coil": 3480,
+      "Stormspire_Hat": 1320,
+      "Capacitor_Stormspire": 308,
+      "Capacitor_Crystal": 88,
+      "ChargeColumn_Glass": 32,
+      "ChargeColumn_Core": 80,
+      "Hopper_Crystals": 198,
+      "Door_Lamp": 32,
+      "Window_Glow": 9,
+      "Window_Glow_E": 9,
+      "Stormspire_Window": 36
+    },
+    "triangles": 14170,
+    "materials": [
+      "Charge",
+      "Coil",
+      "Crystal",
+      "CrystalCore",
+      "Glass",
+      "Hat",
+      "Stormspire",
+      "Window"
+    ],
+    "meshes": 12,
+    "primitives": 12,
+    "bytes": 916516,
+    "texture_bytes": {
+      "base": 135070,
+      "normal": 236045,
+      "orm": 79538
+    },
+    "nodes": [
+      "CableTerminal",
+      "CableTerminal_B",
+      "Capacitor",
+      "Capacitor_Crystal",
+      "Capacitor_Stormspire",
+      "ChargeColumn",
+      "ChargeColumn_Core",
+      "ChargeColumn_Glass",
+      "Door_Lamp",
+      "Earth_0",
+      "Earth_1",
+      "Earth_2",
+      "Earth_3",
+      "Hopper",
+      "Hopper_Crystals",
+      "PackHook",
+      "PackHook_B",
+      "Stormspire",
+      "Stormspire_Coil",
+      "Stormspire_Hat",
+      "Stormspire_Stormspire",
+      "Stormspire_Window",
+      "TopLoad",
+      "Window_Glow",
+      "Window_Glow_E"
+    ]
+  },
+  "pack": {
+    "by_object": {
+      "Sway_PackAtlas": 2310,
+      "Reel_PackAtlas": 1192,
+      "Reel_Cable": 80,
+      "Reel_Windings_Cable": 780,
+      "Crank_PackAtlas": 72,
+      "CrankKnob_PackAtlas": 80,
+      "Pawl_PackAtlas": 16,
+      "Sway_Cable": 876,
+      "Lamp_Glow": 96
+    },
+    "triangles": 5502,
+    "materials": [
+      "Cable",
+      "Lamp",
+      "PackAtlas"
+    ],
+    "meshes": 9,
+    "primitives": 9,
+    "bytes": 307456,
+    "texture_bytes": {
+      "base": 42029,
+      "normal": 59040,
+      "orm": 22971
+    },
+    "nodes": [
+      "ArcGap_A",
+      "ArcGap_B",
+      "CableExit",
+      "CordAnchor",
+      "Crank",
+      "CrankKnob",
+      "CrankKnob_PackAtlas",
+      "Crank_PackAtlas",
+      "HangPoint",
+      "Lamp",
+      "Lamp_Glow",
+      "PackAnchor",
+      "Pawl",
+      "Pawl_PackAtlas",
+      "Reel",
+      "ReelPack",
+      "Reel_Cable",
+      "Reel_PackAtlas",
+      "Reel_Windings",
+      "Reel_Windings_Cable",
+      "Sway",
+      "Sway_Cable",
+      "Sway_PackAtlas"
+    ]
+  },
+  "seconds": 5.1
+}

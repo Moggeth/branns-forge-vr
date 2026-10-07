@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import {trunkRadius} from '../shared/trees.js';
 
 export const CABLE = Object.freeze({points: 84, sides: 8, radius: .026, iterations: 12, gravity: 9.8, homeSeconds: .8, payOut: 40, wrapY: .8, arcStep: .2});
-const ARC_MAX = 24, WRAP_MAX = 12, CAP = CABLE.points + WRAP_MAX * (ARC_MAX + 2);
+const ARC_MAX = 24, WRAP_MAX = 12, RAW = CABLE.points + WRAP_MAX * (ARC_MAX + 2), CAP = RAW * 2;   // drawn: every span split once (Catmull-Rom)
 const TAU = Math.PI * 2, wrapAngle = a => ((a % TAU) + TAU) % TAU;
 
 /** Rubber jacket: a faint moulded rib every 9 cm and a lighter pinstripe running along one side (so twist and motion read). */
@@ -42,7 +42,7 @@ export function createCableKit(ctx) {
     mesh.raycast = () => {}; mesh.userData.ignoreContact = true; mesh.name = 'StormreelCable'; scene.add(mesh);
     const N = CABLE.points;
     return {mesh, geo, p: Array.from({length: N}, () => new THREE.Vector3()), o: Array.from({length: N}, () => new THREE.Vector3()),
-      render: Array.from({length: CAP}, () => new THREE.Vector3()), count: 0, seeded: false, length: 0, end: new THREE.Vector3(),
+      raw: Array.from({length: RAW}, () => new THREE.Vector3()), render: Array.from({length: CAP}, () => new THREE.Vector3()), count: 0, seeded: false, length: 0, end: new THREE.Vector3(),
       pins: [], wraps: [], path: 0, whip: 0};
   }
   function seed(c, a, b) {
@@ -104,9 +104,10 @@ export function createCableKit(ctx) {
   }
 
   /**
-   * One frame. opts: {a, b (Vector3 ends), wraps ([{x,z,tree}] or null), strain 0..1, dt, maxLength, home (winding home)}
+   * One frame. opts: {a, b (Vector3 ends), wraps ([{x,z,tree}] or null), strain 0..1, dt, maxLength, home (winding home),
+   * trunks ([{x, z, r, top}] trees the cable is NOT wrapped round: free spans slide round them instead of through)}
    */
-  function step(c, {a, b, wraps, strain = 0, dt, maxLength, home = false}) {
+  function step(c, {a, b, wraps, strain = 0, dt, maxLength, home = false, trunks = null}) {
     if (!c.seeded) seed(c, a, b);
     c.path = supports(c, a, b, wraps); pinWraps(c, a);
     const N = c.p.length, h = Math.min(dt, 1 / 30), g = CABLE.gravity * h * h;
@@ -130,17 +131,32 @@ export function createCableKit(ctx) {
         const wa = i === 0 ? 0 : .5, wb = i + 1 === N - 1 ? 0 : .5, k = wa + wb; if (!k) continue;
         p.addScaledVector(v, diff * wa / k); n.addScaledVector(v, -diff * wb / k);
       }
-      for (let i = 1; i < N - 1; i++) { const p = c.p[i], ground = ctx.height(p.x, p.z) + CABLE.radius; if (p.y < ground) p.y = ground; }
+      for (let i = 1; i < N - 1; i++) {
+        const p = c.p[i], ground = ctx.height(p.x, p.z) + CABLE.radius; if (p.y < ground) p.y = ground;
+        if (trunks) for (const t of trunks) {   // bark is solid: push the rope out to the trunk's surface
+          const dx = p.x - t.x, dz = p.z - t.z, d2 = dx * dx + dz * dz, r = t.r + CABLE.radius;
+          if (d2 < r * r && p.y < t.top) { const d = Math.sqrt(d2) || 1e-4; p.x = t.x + dx / d * r; p.z = t.z + dz / d * r; }
+        }
+      }
       c.p[0].copy(a); c.p[N - 1].copy(b); pinTo(c);
     }
     // The drawn line: simulated points, with each wrap replaced by its dense arc round the bark.
-    let n = 0, i = 0; const R = c.render, byIn = new Map(c.pins.map(pin => [pin.iIn, pin]));
+    let n = 0, i = 0; const R = c.raw, byIn = new Map(c.pins.map(pin => [pin.iIn, pin]));
     while (i < N) {
       const pin = byIn.get(i);
       if (pin) { R[n++].copy(pin.w.tin); for (const q of pin.w.arc) R[n++].copy(q); R[n++].copy(pin.w.tout); i = pin.iOut + 1; continue; }
       R[n++].copy(c.p[i]); i++;
     }
-    c.count = n;
+    // Then every span split at its Catmull-Rom midpoint, lifted clear of the ground there too, so bends are round
+    // (no facets where the cable leaves the pack or drapes over a ridge) and it never dips under a bump between points.
+    const D = c.render; let m = 0;
+    for (let k = 0; k < n; k++) {
+      D[m++].copy(R[k]); if (k === n - 1) break;
+      const p0 = R[Math.max(0, k - 1)], p1 = R[k], p2 = R[k + 1], p3 = R[Math.min(n - 1, k + 2)], q = D[m++];
+      q.set(-.0625 * p0.x + .5625 * p1.x + .5625 * p2.x - .0625 * p3.x, -.0625 * p0.y + .5625 * p1.y + .5625 * p2.y - .0625 * p3.y, -.0625 * p0.z + .5625 * p1.z + .5625 * p2.z - .0625 * p3.z);
+      const g = ctx.height(q.x, q.z) + CABLE.radius; if (q.y < g) q.y = g;
+    }
+    c.count = m;
   }
 
   /** Tube along the render polyline, parallel-transported frames, ribbed jacket UVs. */

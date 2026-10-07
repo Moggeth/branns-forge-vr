@@ -42,6 +42,10 @@ export function createCircuitFx(ctx) {
   const tex = {smoke: smokeTexture(), scorch: scorchTexture()};
   const victims = new Map(), smokes = [], scorches = [], v = new THREE.Vector3(), v2 = new THREE.Vector3(), c3 = new THREE.Color();
   const body = Array.from({length: 8}, () => new THREE.Vector3());
+  // One permanent light for the circuit (never added or removed, so no shader rebuilds): the surge floods the
+  // surroundings blue-white, then the cook flickers it while the current runs. Off (intensity 0) the rest of the time.
+  const light = new THREE.PointLight(0xbfe0ff, 0, 11, 2); light.castShadow = false; light.name = 'StormCircuitLight'; scene.add(light);
+  let flashK = 0, cookK = 0;
   // Lit-from-inside and charred variants of an enemy's own materials, shared by every foe wearing them.
   const lit = new Map(), char = new Map(), litMats = new Set();
   function variant(cache, m, make) { if (!m) return m; let x = cache.get(m.uuid); if (!x) { x = make(m); cache.set(m.uuid, x); } return x; }
@@ -87,6 +91,7 @@ export function createCircuitFx(ctx) {
     const at = v.fromArray(ev.at || ev.red).clone(), x = victim(ev.enemy); x.age = 0; x.kick = 1;
     ctx.sound?.('surge', ev.at, !!ev.wet);
     if (local) { ctx.flash?.(.55); ctx.shake?.(.7); } else ctx.shake?.(.35, at);
+    light.position.copy(at); flashK = 1;
     if (!lightning) return;
     lightning.glow(at, {size: 5.5, life: .5, color: 0xffffff}); lightning.glow(at, {size: 3, life: .9, color: 0x9fd0ff});
     lightning.ring(new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .04, at.z), {radius: 3.2, life: .6, color: 0xbfe2ff});
@@ -106,7 +111,7 @@ export function createCircuitFx(ctx) {
   function cook(id, pa, pb, dt, time, power = 1) {
     const x = victim(id); x.age += dt; x.seen = true;
     const n = ctx.bodyPoints?.(id, body) || 0, centre = n ? body[0] : (ctx.enemyAt?.(id, v) || pa);
-    x.at.copy(centre);
+    x.at.copy(centre); light.position.lerp(centre, Math.min(1, dt * 12)); cookK = Math.max(cookK, (.35 + .65 * flicker(time * 2.3, 5)) * (.5 + .5 * power));
     // Lit from inside: one shared pulse for every lit material (bright on each surge-like flicker).
     const f = flicker(time * 1.3, 4), k = (.35 + .9 * f) * (.5 + .5 * power) * (1 + 1.5 * Math.max(0, x.kick || 0));
     for (const m of litMats) { m.emissiveIntensity = k; m.emissive.copy(BODY).lerp(HOT, f * .6); }
@@ -153,6 +158,9 @@ export function createCircuitFx(ctx) {
     release(x, cooked);
   }
   function update(dt, camPos) {
+    // Surge: a white-hot flash that falls off fast; cook: a cooler flicker held while a victim is lit.
+    light.intensity = 40 * flashK * flashK + 6 * cookK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
+    flashK = Math.max(0, flashK - dt * 3.2); cookK = Math.max(0, cookK - dt * 8);
     for (const x of [...victims.values()]) { if (!x.seen) end(x.id, false); x.seen = false; }
     for (let i = smokes.length - 1; i >= 0; i--) {
       const s = smokes[i]; s.age += dt; const t = s.age / s.life;
@@ -169,6 +177,6 @@ export function createCircuitFx(ctx) {
   }
   return {surge, cook, end, update, puff, active: () => victims.size,
     stats: () => ({victims: victims.size, smokes: smokes.length, scorches: scorches.length}),
-    dispose() { for (const x of [...victims.values()]) release(x, false); for (const s of smokes) { s.s.removeFromParent(); s.s.material.dispose(); } smokes.length = 0;
+    dispose() { light.removeFromParent(); for (const x of [...victims.values()]) release(x, false); for (const s of smokes) { s.s.removeFromParent(); s.s.material.dispose(); } smokes.length = 0;
       for (const s of scorches) { s.mesh.removeFromParent(); s.mesh.geometry.dispose(); s.mesh.material.dispose(); } scorches.length = 0; tex.smoke?.dispose(); tex.scorch?.dispose(); }};
 }
