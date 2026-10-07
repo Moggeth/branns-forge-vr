@@ -701,6 +701,7 @@ $('inviteQr').addEventListener('toggle', async () => {
     $('inviteQrImage').src = src;
     $('inviteQrImage').hidden = false;
     $('inviteQrStatus').textContent = `Scan with your phone camera to join world ${room}.`;
+    if (menuOpen) $('inviteQrImage').scrollIntoView({block:'center'});
   } catch {
     if (request === qrRequest) $('inviteQrStatus').textContent = 'QR code could not load. Use Copy invite link above, or close and reopen this section to retry.';
   }

@@ -29,7 +29,7 @@ try {
   await b.page.locator('[data-touch-action="menu"]').first().click();
   await b.page.locator('#inviteQr summary').click();
   await b.page.locator('#inviteQrImage').waitFor({state:'visible'});
-  const box=await b.page.locator('#inviteQrImage').boundingBox();assert.ok(box.width>=200&&box.x>=0&&box.x+box.width<=390);
+  const box=await b.page.locator('#inviteQrImage').boundingBox();assert.ok(box.width>=200&&box.x>=0&&box.x+box.width<=390&&box.y>=0&&box.y+box.height<=844);
   await shot(b.page,'qr-phone');
   console.log('PASS: QR independently decoded, correct invite room, phone guest joined, responsive QR');
 } finally {await a.browser.close();await b.browser.close();}
