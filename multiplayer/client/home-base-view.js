@@ -3,7 +3,7 @@
 // dome shimmer and fades, heart bob, turret aim, zaps and ballista bolts.
 // Code-built stand-ins draw until the Blender kit (client/home-base-art.js) loads, then the bases rebuild from it.
 import * as THREE from 'three';
-import {HOME, HOME_LAYOUT, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
+import {HOME, HOME_LAYOUT, HOME_SCALE, barracksYaw, gateYaw as baseGateYaw, homePoint} from '../shared/home-bases.js';
 import {terrainHeight} from '../shared/terrain.js';
 import {buildKitBase, prepareHomeKit} from './home-base-art.js';
 import {homeBallistaYaw} from '../shared/home-ballista.js';
@@ -170,16 +170,17 @@ export function createHomeBaseView({scene}) {
     const side = data.side, M = shared[side], group = new THREE.Group();
     group.name = `home-${side}`; root.add(group);
     const gateYaw = baseGateYaw(side); // local +Z points out of the gate
-    const place = (obj, local, extraYaw = 0) => { const [x, z] = homePoint(side, local); obj.position.set(x, terrainHeight(snapshot, x, z, false), z); obj.rotation.y = gateYaw + extraYaw; group.add(obj); return obj; };
-    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12, 9.5]); place(plaza, [0, 0]); plaza.position.y += .02;
-    const heart = buildHeart(side, M); place(heart.group, [0, 0]); heart.group.scale.setScalar(1.25); tag(heart.group, data.id);
+    const K = HOME_SCALE; // buildings grow with the widened keep; ballistas keep their crew size
+    const place = (obj, local, extraYaw = 0, scale = K) => { const [x, z] = homePoint(side, local); obj.position.set(x, terrainHeight(snapshot, x, z, false), z); obj.rotation.y = gateYaw + extraYaw; obj.scale.multiplyScalar(scale); group.add(obj); return obj; };
+    const plaza = add(group, side === 'rivals' ? geo.cyl6 : geo.disc, M.stone, [0, 0, 0], [9.5, .12 / K, 9.5]); place(plaza, [0, 0]); plaza.position.y += .02;
+    const heart = buildHeart(side, M); place(heart.group, [0, 0], 0, 1.25 * K); tag(heart.group, data.id);
     place(buildBarracks(side, M), HOME_LAYOUT.barracks, barracksYaw(side) - gateYaw);
     const fountain = place(buildFountain(side, M), HOME_LAYOUT.fountain);
     const parts = new Map();
     for (const part of data.parts) {
       const local = part.kind === 'pylon' ? HOME_LAYOUT.pylons[+part.id.at(-1)] : part.kind === 'spire' ? HOME_LAYOUT.spires[+part.id.at(-1)] : HOME_LAYOUT.ballistas[+part.id.at(-1)];
       const built = part.kind === 'pylon' ? buildPylon(side, M) : part.kind === 'spire' ? buildSpire(side, M) : buildBallista(side, M);
-      place(built.group, local); tag(built.group, part.id); built.kind = part.kind; built.alive = 1; built.data = part; parts.set(part.id, built);
+      place(built.group, local, 0, part.kind === 'ballista' ? 1 : K); if (part.kind !== 'ballista') built.scale = K; tag(built.group, part.id); built.kind = part.kind; built.alive = 1; built.data = part; parts.set(part.id, built);
     }
     const dome = domeFor(side); group.add(dome);
     return {side, id: data.id, group, heart, fountain, parts, dome, domeAlpha: 1, heartAlive: 1, data};
@@ -230,7 +231,7 @@ export function createHomeBaseView({scene}) {
     if (ev.kind === 'home_turret_fire') {
       const b = bases.get(ev.side), color = STYLE[ev.side]?.glow ?? 0xffffff, from = [...ev.from];
       const tp = b?.parts.get(ev.id);
-      from[1] += ev.turret === 'spire' ? (tp?.tipY ?? (ev.side === 'rivals' ? 5.2 : 6.6)) : 1.45;
+      from[1] += ev.turret === 'spire' ? (tp?.tipY ?? (ev.side === 'rivals' ? 5.2 : 6.6)) * (tp?.scale ?? HOME_SCALE) : 1.45;
       const to = [ev.to[0], ev.to[1] + 1.1, ev.to[2]];
       spawnEffect(ev.turret === 'spire' ? 'zap' : 'bolt', from, to, color);
       const p = b?.parts.get(ev.id); if (p?.head) p.targetAim = Math.atan2(ev.to[0] - ev.from[0], ev.to[2] - ev.from[2]);

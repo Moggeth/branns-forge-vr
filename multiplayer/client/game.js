@@ -12,6 +12,10 @@ import {createInventionModel} from './invention-art.js';
 import {resolveInventions,inventionFloor,MANNED,operatorSeat,timberlineAmmo,STRUCTURES} from '../shared/inventions.js';
 import {HOME_MANNED,homeBallistaSeat,homeBallistaYaw,isHomeBallistaId} from '../shared/home-ballista.js';
 import {HOME as HOME_RULES,HOME_LAYOUT,bellPostAt,homePoint} from '../shared/home-bases.js';
+import {SHOP,counterAt} from '../shared/home-shop.js';
+import {MILL,millAt} from '../shared/home-mill.js';
+import {TAVERN,taverns,tavernBar} from '../shared/taverns.js';
+import {itemBonus} from '../shared/hero-items.js';
 import {createPresentationClock} from './presentation-clock.js';
 import {createMountainArena} from './mountain-arena.js';
 import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
@@ -699,6 +703,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(disposed){disposeResources(gltf.scene);return;}
     if(!inventionVisual.installHomeKit(gltf)){disposeResources(gltf.scene);report('Home base models are incomplete; the simpler bases stay in place.');}
   },undefined,()=>report('Home base models unavailable; the simpler bases stay in place.'));
+  loader.load('/assets/town_kit.glb',gltf=>{ // Blender-built taverns, Quartermaster stalls and Gold mills; code-built stand-ins until then
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!inventionVisual.installTownKit(gltf)){disposeResources(gltf.scene);report('Town models are incomplete; the simpler taverns, stalls and mills stay.');}
+  },undefined,()=>report('Town models unavailable; the simpler taverns, stalls and mills stay.'));
   loader.load('/assets/landmarks_kit.glb',gltf=>{ // Blender-built landmarks and Heartstone shells; the code-built ones stand in until then
     if(disposed){disposeResources(gltf.scene);return;}
     if(!startingWorld.installKit(gltf)){disposeResources(gltf.scene);report('Landmark models are incomplete; the simpler versions stay in place.');return;}
@@ -985,6 +993,15 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Home base hands-on pieces: a deep bell, a bright drink chord, a hammer's chime as a part knits back together.
     if(event.kind==='home_bell'){homeSound.chord(event.position,[-12,-5,0],.16,180,4.5);if(event.id===playerId)report(`The bell rings out: ${event.count} troops march from the barracks.`);}
     if(event.kind==='home_drink'){homeSound.chord(event.position,[7,12,16],.08,60,1.6);if(event.id===playerId)report('A long cool drink. Health restored.');}
+    // Keep towns: coins clink, the mill creaks, the bar pours, a draught glugs.
+    if(event.kind==='gold_earned'&&event.id===playerId)homeSound.chord(event.position,[19,24],.05,50,.6);
+    if(event.kind==='mill_coin'&&event.id===playerId)homeSound.bell(event.position,event.owed>0?19:24,.035,.35);
+    if(event.kind==='mill_feed'){homeSound.chord(event.position,[-5,-1,2],.06,90,.9);if(event.id===playerId)report(`Into the hopper it goes: ${event.gold} Gold to grind. Lean on the capstan (hold R) to grind faster.`);}
+    if(event.kind==='mill_crank')homeSound.chord(event.position,[-10,-8],.05,120,.8);
+    if(event.kind==='shop_buy'){homeSound.chord(event.position,[12,16,19,24],.07,55,1.2);}
+    if(event.kind==='shop_sell')homeSound.chord(event.position,[19,16],.05,60,.8);
+    if(event.kind==='tavern_ale'){homeSound.chord(event.position,[0,4,7,12],.06,80,1.4);if(event.id===playerId)report('A Hearty Ale! Fully mended, and blows land 20% softer for three minutes.');}
+    if(event.kind==='draught_drunk'){homeSound.chord(event.position,[7,11,14],.06,50,1);if(event.id===playerId)report(`Glug. Healing Draught down; ${event.draughts} left. Refill at your keep's well.`);}
     if(event.kind==='home_part_repaired'){homeSound.bell(event.position,event.mended?12:7,.08,1.2);if(event.mended&&event.by===playerId)report(`The ${event.part} is mended.`);}
     if(event.kind==='home_turret_fire'&&event.turret==='ballista')materialAudio?.play({...event,kind:'hit',material:'metal',energy:event.manned?2:1.4,position:event.from},listenerPose(),snapshot.tick); // the bow string snaps
     if(['timberline_fire','launcher_fire','trap_snap','machine_turn','refinery_output','invention_build'].includes(event.kind)){const sound={...event,kind:event.kind==='invention_destroyed'?'ore_break':'hit',material:event.kind==='invention_build'?'wood':'metal',energy:event.kind.endsWith('_fire')?2:1};if(sound.material==='wood')woodAudio?.play(sound,listenerPose());else materialAudio?.play(sound,listenerPose(),snapshot.tick);}
@@ -1173,8 +1190,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function homeBallista(id){if(!isHomeBallistaId(id))return null;for(const base of snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases:[]){const p=base.parts.find(p=>p.id===id);if(p)return base.fallenUntil>(snapshot.tick??0)?null:{id:p.id,type:'homeBallista',side:p.side,position:p.position,yaw:homeBallistaYaw(p.side),aimYaw:p.aimYaw||0,aimPitch:p.aimPitch||0,operator:p.operator||null,readyTick:p.readyTick,fireTick:p.fireTick,hp:p.hp};}return null;}
   function nearHomeBallista(){const self=snapshot.players.find(p=>p.id===playerId);let best=null,d=HOME_MANNED.reach;for(const base of snapshot.battle?.v===2?snapshot.battle.bases:[])if(base.side===(self?.side||'party'))for(const p of base.parts){if(p.kind!=='ballista'||p.hp<=0)continue;const k=Math.hypot(p.position[0]-localPosition.x,p.position[2]-localPosition.z);if(k<=d){d=k;best=p.id;}}return best&&homeBallista(best);}
   function useHomeBallista(id){const self=snapshot.players.find(p=>p.id===playerId),b=homeBallista(id);if(!self||!b||b.hp<=0||b.side!==(self.side||'party')||renderer.xr.isPresenting)return false;if(manned?.id===b.id){dismountMachine();return true;}if(Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>HOME_MANNED.reach){report('Step up to the ballista to man it.');return true;}mountMachine(b);return true;}
-  // Fountain (drink) and barracks bell (send a squad now) of your own base; the host decides cooldowns.
-  function useHomePiece(){const self=snapshot.players.find(p=>p.id===playerId),base=snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases.find(b=>b.side===(self?.side||'party')):null;if(!self||!base||base.fallenUntil>(snapshot.tick??0))return false;const near=([x,z],r)=>Math.hypot(x-localPosition.x,z-localPosition.z)<=r;
+  // Healing well (drink), barracks bell (send a squad now), Quartermaster (shop), Gold mill (feed / crank) and any
+  // tavern's bar (Hearty Ale); the host decides reach and cooldowns.
+  function useHomePiece(){const self=snapshot.players.find(p=>p.id===playerId),near=([x,z],r)=>Math.hypot(x-localPosition.x,z-localPosition.z)<=r;if(!self)return false;
+    const bar=taverns(snapshot).find(t=>near(tavernBar(t),TAVERN.barReach));if(bar){unlockAudio();onAction('tavernAle',{});return true;}
+    const base=snapshot.battle?.v===2&&snapshot.battle.status==='running'?snapshot.battle.bases.find(b=>b.side===(self?.side||'party')):null;if(!base||base.fallenUntil>(snapshot.tick??0))return false;
+    if(near(counterAt(base.side),SHOP.reach)){unlockAudio();onAction('openShop',{});return true;}
+    if(near(millAt(base.side,MILL.crank),MILL.crankReach)){unlockAudio();onAction('millCrank',{});return true;}
+    if(near(millAt(base.side,MILL.hopper),MILL.reach)){unlockAudio();onAction('millFeed',{});return true;}
     if(near(homePoint(base.side,HOME_LAYOUT.fountain),HOME_RULES.drink.reach)){unlockAudio();onAction('homeDrink',{});return true;}
     if(near(bellPostAt(base.side),HOME_RULES.bell.reach)){unlockAudio();onAction('homeBell',{});return true;}return false;}
   function useInvention(id){if(isHomeBallistaId(id))return useHomeBallista(id);const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
@@ -1260,6 +1283,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   function crankNearby(now){
     if(!active||role!=='hero'||!(keys.has('KeyR')||crankHeld)||now-crankAt<150)return;
     const self=snapshot.players.find(p=>p.id===playerId),b=manned?mannedMachine():snapshot.inventions?.structures.find(b=>b.type==='timberline'&&b.hp>0&&b.side===(self?.side||'party')&&Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)<=MANNED.crankReach)||nearHomeBallista();
+    if(!b&&!manned){const base=snapshot.battle?.v===2?snapshot.battle.bases.find(q=>q.side===(self?.side||'party')):null;if(base?.mill?.queue?.length){const [x,z]=millAt(base.side,MILL.crank);if(Math.hypot(x-localPosition.x,z-localPosition.z)<=MILL.crankReach){crankAt=now;onAction('millCrank',{});}}return;}
     if(!b||!(snapshot.tick<b.readyTick))return;crankAt=now;onAction('inventionCrank',{structureId:b.id});
   }
   // Blueprint placement: the see-through model follows the aim every frame (crosshair while the mouse is captured,
@@ -1337,7 +1361,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if (role === 'hero' && dragonRide.riding()) { if (!event.repeat) dragonRide.key(event.code, true); jumpPending = false; return; }
     if (role === 'hero' && !event.repeat && event.code === 'KeyH' && dragonRide.ready()) { dragonRide.call(); return; }
     if (role === 'hero' && !event.repeat && manned) { if (event.code === 'KeyE' || event.code === 'Escape') dismountMachine(); else if (event.code === 'KeyQ') special(); }
-    else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyI')startInspect();if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();if(event.code==='KeyR'&&tool==='stormreel')feedStormspire();}
+    else if (role === 'hero' && !event.repeat) {const slot=/^Digit[1-9]$/.test(event.code)?Number(event.code.slice(5))-1:-1;if(slot>=0&&slot<hotbarSlots.length)equip(hotbarSlots[slot]);if(event.code==='KeyI')startInspect();if(event.code==='KeyE')interact();if(event.code==='KeyB'&&event.shiftKey)onAction('buildBridge');if(event.code==='KeyF')grab();if(event.code==='KeyG')release();if(event.code==='KeyX')release(true);if(event.code==='KeyQ')special();if(event.code==='KeyR'&&tool==='stormreel')feedStormspire();if(event.code==='KeyV'){unlockAudio();onAction('drinkDraught',{});}}
     if(role==='god'&&!inventionPlacement&&!event.repeat&&spellKeys[event.code]){spell=spellKeys[event.code];onSelection(spell);castStart=null;if(quickCast&&cursor.visible){quickKey=event.code;if(isLineSpell())castStart=hitPoint.clone();else castAt(hitPoint);}}
   });
   listen(window,'keyup',event=>{
@@ -1482,7 +1506,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
-      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{});const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);stormLeash(snapshot,me,predicted);localPosition.fromArray(predicted);
+      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{})*(1+itemBonus(me,'speed'));const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);stormLeash(snapshot,me,predicted);localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
       // Standing on rising or sinking earth follows the drawn ground every frame, not the 20 Hz snapshot.
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(terrainLive?{...snapshot,tick:terrainShownTick()}:snapshot, localPosition.x, localPosition.z)),localPosition.y);
@@ -1519,7 +1543,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe,progress=(now-swingAt)/(profile.duration*1000);
     // Look inertia, gait bob and jump/land on the camera-held item (held-sway.js); presentation only, never aim.
     const swinging=(progress>=0&&progress<1&&!!swingRest)||!!specialSwing||(tool==='pick'&&pickWallMotion.slamming),swayMe=snapshot.players.find(p=>p.id===playerId);
-    const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
+    const sway=heldSway.update(dt,{yaw,pitch,move:swayMove.copy(move).multiplyScalar(5*swiftFactor(snapshot,swayMe||{})*(1+itemBonus(swayMe,'speed'))),grounded,verticalSpeed,tool,calm:adsAmount,swinging,visible:weaponAnchor.visible});
     if(progress>=0&&progress<1&&swingRest&&!renderer.xr.isPresenting){const pose=swingPose(tool,progress,swingRest,weaponTip,swingReach);weaponAnchor.position.copy(pose.position);weaponAnchor.quaternion.copy(pose.quaternion);}
     else {weaponAnchor.position.fromArray(tool==='bow'?[-.25,-.32,-.48]:tool==='wyrmspout'?[.22,-.25,-.46]:tool==='stormreel'?[.2,-.19,-.5]:['crossbow','flask'].includes(tool)?[.24,-.3,-.48]:FPS_WEAPON_POSE.position).add(idleOffset(now/1000));weaponAnchor.position.x*=Math.min(1,camera.aspect/.9);weaponAnchor.rotation.fromArray(['bow','crossbow','wyrmspout','flask','stormreel'].includes(tool)?[0,0,tool==='bow'?-.08:0]:FPS_WEAPON_POSE.rotation);}
     if(tool==='crossbow'&&siegebirdAim&&!renderer.xr.isPresenting){adsAmount=siegebirdAim.update(dt,active&&role==='hero'&&aiming,idleOffset(now/1000).add(sway.position));

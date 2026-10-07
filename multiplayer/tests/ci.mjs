@@ -33,7 +33,7 @@ const suite = [
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','grove-growth','spell-schools','remains-physics',
-  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','home-base-kit','home-ballista','forgeling-kit','hero-progress','dragon-streak','heavy-launcher','turn-phone','stormreel',
+  'phoenix-flight','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','home-base-kit','home-ballista','forgeling-kit','hero-progress','home-town','home-town-view','dragon-streak','heavy-launcher','turn-phone','stormreel',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

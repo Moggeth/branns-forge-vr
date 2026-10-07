@@ -4,6 +4,7 @@
 // client reuses its manning controls. Fire is an instant hitscan along the aim; while manned the
 // ballista stops firing on its own. Pure simulation rules: fixed ticks, no clocks or randomness.
 import {HOME_MANNED, baseFallen, findHomeTarget, homeBattle, homeFrame} from './home-bases.js';
+import {hasItem} from './hero-items.js';
 export {HOME_MANNED};
 
 const ID = /^battle-base-(party|rivals)-ballista-[01]$/;
@@ -59,10 +60,11 @@ function fire(state, p, part, aim, c) {
   }
   const reach = Number.isFinite(dist) ? dist : HOME_MANNED.range, to = from.map((n, i) => n + dir[i] * reach);
   to[1] -= 1.1; // events carry feet heights; the view lifts bolt ends back to chest height
-  part.readyTick = state.tick + HOME_MANNED.reloadTicks; part.fireTick = state.tick;
+  const hat = hasItem(p, 'hat'); // Ballista Captain's Hat: twice the reload speed, half again the punch
+  part.readyTick = state.tick + (hat ? HOME_MANNED.reloadTicks / 2 : HOME_MANNED.reloadTicks); part.fireTick = state.tick;
   const events = [{kind: 'home_turret_fire', id: part.id, turret: 'ballista', side: part.side, targetId: best?.id ?? null, from: [...part.position], to, tick: state.tick, manned: true, by: p.id}];
-  if (best?.role === 'hero') c.damageHero(state, best, HOME_MANNED.heroDamage, events);
-  else if (best) c.damageEnemy(state, best, HOME_MANNED.damage, events, p.id, part.side);
+  if (best?.role === 'hero') c.damageHero(state, best, HOME_MANNED.heroDamage * (hat ? 1.5 : 1), events);
+  else if (best) c.damageEnemy(state, best, HOME_MANNED.damage * (hat ? 1.5 : 1), events, p.id, part.side);
   return ok(events);
 }
 

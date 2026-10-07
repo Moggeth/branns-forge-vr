@@ -51,7 +51,10 @@ import {createPatchNotes} from './client/patch-notes.js';
 import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
 import './client/patch-notes.css';
 import {createHeroProgressUI} from './client/hero-progress-ui.js';
+import {createQuartermasterUI} from './client/quartermaster-ui.js';
+import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
+import './client/quartermaster.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -121,7 +124,7 @@ let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
-let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
+let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false, shopOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let handoverTimer = 0;
@@ -322,8 +325,8 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
@@ -367,7 +370,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(detail => {
@@ -563,6 +566,7 @@ function onSnapshot(snapshot) {
     const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to zap · every hit is a full shock · R at the tower feeds Crystal',flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
+    quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
   if (snapshots % 15 === 0) refreshHostControls();
@@ -941,6 +945,11 @@ const heroProgress=createHeroProgressUI({hudSelf:document.querySelector('.hud-se
   onLearn:(weapon,talent)=>command('action',{action:'talent',weapon,talent}),onReset:()=>command('action',{action:'talent',reset:true}),
   onOpen:()=>{talentsOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{talentsOpen=false;syncActive();}});
+// The keep Quartermaster (client/quartermaster-ui.js): E at the shop counter opens it; V or the vitals chip drinks a draught.
+const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySelector('.hud-self'),
+  onBuy:item=>command('action',{action:'homeShop',buy:item}),onSell:item=>command('action',{action:'homeShop',sell:item}),onDrink:()=>command('action',{action:'drinkDraught'}),
+  onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
+  onClose:()=>{shopOpen=false;syncActive();}});
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -949,6 +958,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
   if(roomBrowser.isOpen)return;
   if(event.key==='Escape'&&event.target.closest?.('.bf-bt-confirm'))return;
   if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
+  if(quartermaster.isOpen){if(!quartermaster.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&event.key==='Escape'){event.preventDefault();quartermaster.close();}}return;} // the shop owns its keys
   if(heroProgress.isOpen){if(!heroProgress.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&(event.key==='Escape'||event.code==='KeyN')){event.preventDefault();heroProgress.close();}}return;} // so does the Talents panel
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
@@ -993,7 +1003,7 @@ try {
     canvas,
     isHost, onSelection: chooseSpell,
     onVoicePose: pose => voice?.updatePose(pose),
-    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
+    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='openShop'?quartermaster.show():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onNotice: text => toast(text),
