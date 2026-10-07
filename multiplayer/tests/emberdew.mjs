@@ -78,6 +78,6 @@ assert.deepEqual(cinderVelocities([1,-.1,-4]),cinderVelocities([1,-.1,-4]));
  h.thrown(1,'hurl');o=h.update(1.2,1/60,{aiming:true});assert.equal(o.visible,false);let back=false;for(let t=1.2;t<2;t+=1/60){o=h.update(t,1/60,{aiming:true});if(o.kick)back=true;}assert.ok(o.visible&&back,'a fresh bottle bobs up');}
 
 // Model: the named parts the presentation layers rely on, inside the triangle and draw budget.
-{const m=createEmberdewModel();for(const n of ['Liquid','Glass','Wick','WickTip','NeckCollar','GripWrap','FootBand','Stopper','Muzzle','CorkEyes','Wax'])assert.ok(m.getObjectByName(n),n);
- assert.ok(m.userData.stats.triangles<4000&&m.userData.stats.draws<=11,JSON.stringify(m.userData.stats));m.userData.dispose();}
+{const m=createEmberdewModel();for(const n of ['Liquid','Glass','Wick','WickTip','NeckCollar','GripWrap','FootBand','Stopper','Muzzle','Stamp','Tag'])assert.ok(m.getObjectByName(n),n);
+ assert.ok(m.userData.stats.triangles<4000&&m.userData.stats.draws<=10,JSON.stringify(m.userData.stats));m.userData.dispose();}
 console.log('emberdew: aimed throws, Cinder Cluster rules + forecast, save round trip, effects budget, hand and model ok');
