@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {clientCapacity,roomCapacity} from '../peer/room-capacity.js';
 import {roomListing, DIRECTORY_REFRESH, regionOf} from './room-directory.js';
 import {MAX_PLAYERS, MAX_PENDING_ROOM_SOCKETS, OFFLINE_SEAT_GRACE_MS, SIGNAL_MESSAGES_PER_EDGE, RELAY_BYTES_PER_EDGE, RELAY_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
+import {iceServers} from './ice-servers.js';
 export {ForgeDirectory} from './directory.js';
 
 // One hibernating coordinator per room. Simulation and saves stay on players' devices.
@@ -113,6 +114,7 @@ export class ForgeRoom extends DurableObject {
     return new Response(null, { status: 101, webSocket: client });
   }
   async attach(ws, p) {
+    const ice = await iceServers(this.env); // cached per isolate; first call may wait briefly on Cloudflare TURN
     const r = this.room, old = this.sockets.get(p.id);
     if (old && old !== ws) old.close(4001, 'Session replaced');
     this.sockets.set(p.id, ws); p.offlineAt = 0; p.leaving = false;
@@ -123,7 +125,7 @@ export class ForgeRoom extends DurableObject {
     await this.updateDirectory(true);
     send(ws, { type: 'welcome', protocol: 1, room: r.code, peerId: p.id, secret: p.secret, role: p.role, hostId: r.hostId, epoch: r.epoch,
       maxPeers: roomCapacity(r), peers: this.peers().filter(q => q.id !== p.id).map(q => this.publicPeer(q)),
-      iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }], relayConfigured: true, relayTransport: 'websocket' });
+      iceServers: ice, relayConfigured: true, relayTransport: 'websocket' });
     this.broadcast({ type: 'peer_joined', maxPeers:roomCapacity(r), peer: this.publicPeer(p), epoch: r.epoch }, p.id);
     await this.schedule();
     console.log(JSON.stringify({ event: 'peer_connected', room: r.code, count: this.sockets.size }));
