@@ -71,6 +71,9 @@ import {createSkeletonFx} from './skeleton-fx.js';
 import {createWallPreview} from './crystal-wall-preview.js';
 import {earthLineEdits} from '../shared/earth-spells.js';
 import {acousticPosition} from './voice-audio.js';
+import {createVoiceIndicators} from './voice-indicators.js';
+import {setVoiceZoneResolver} from './voice-zones.js';
+import * as homeBaseRules from '../shared/home-bases.js';
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
 import {createImpactPresentation} from './impact-presentation.js';
@@ -121,7 +124,7 @@ import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, onNotice = () => {} }) {
+export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, voiceActivity = null, onNotice = () => {} }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'grove', playerId = null;
   let requestedActive=false;
@@ -565,6 +568,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     node.traverse(child => { child.geometry?.dispose(); if (child.material) materials.add(child.material); });
     materials.forEach(material => material.dispose());
   }
+  // Taverns are voice rooms: the bases rules decide who is inside one (insideTavern may not exist yet).
+  const voiceBadges = createVoiceIndicators({scene});
+  setVoiceZoneResolver('home-taverns', position => homeBaseRules.insideTavern?.(snapshot, position) || null);
   function syncActors() {
     const present = new Set();
     for (const data of [...snapshot.players, ...snapshot.enemies]) {
@@ -1635,6 +1641,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
     skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});
     orchard.update(dt, camera); skyline.update(camera);
+    voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvas.clientHeight);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
     skyCycle.render(scene, camera);
@@ -1797,6 +1804,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (!active && document.pointerLockElement === canvas) document.exitPointerLock();
     },
     dispose() {
+      voiceBadges.dispose(); setVoiceZoneResolver('home-taverns', null);
       if (disposed) return;
       clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();
       clearTimeout(zeroInputTimer);

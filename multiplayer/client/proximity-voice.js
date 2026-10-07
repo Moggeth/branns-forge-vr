@@ -1,5 +1,6 @@
 import {VoiceRoute} from './voice-route.js';
-import {VoiceAudio} from './voice-audio.js';
+import {VoiceAudio, SPEAKING_THRESHOLD, SPEAKING_HOLD_MS} from './voice-audio.js';
+import {voiceZoneAt, voiceRelation} from './voice-zones.js';
 import {VOICE_NEIGHBORS} from './voice-topology.js';
 
 const errorText = error => ({
@@ -12,7 +13,7 @@ export class ProximityVoice extends EventTarget {
   constructor(connection, {mediaDevices = globalThis.navigator?.mediaDevices, createContext = () => new (globalThis.AudioContext || globalThis.webkitAudioContext)(), createPeer = options => new RTCPeerConnection(options), now = () => Date.now()} = {}) {
     super(); this.connection = connection; this.mediaDevices = mediaDevices; this.createContext = createContext; this.createPeer = createPeer; this.now = now;
     this.active = false; this.disposed = false; this.pending = false; this.captureGeneration = 0; this.joinGeneration = 0; this.session = crypto.randomUUID();
-    this.selected=new Map();this.lastPresence=null;this.nextOfferAt=0;
+    this.selected=new Map();this.lastPresence=null;this.nextOfferAt=0;this.zone=null;this.speakingUntil=0;
     this.peers = new Map(); this.members = new Map(); this.muted = new Set(); this.removers = [];
     this.route = new VoiceRoute(connection, (id, body) => this.receive(id, body));
     const on = (type, fn) => { connection.addEventListener(type, fn); this.removers.push(() => connection.removeEventListener(type, fn)); };
@@ -33,11 +34,24 @@ export class ProximityVoice extends EventTarget {
   changed() { this.dispatchEvent(new Event('change')); }
   state() {
     return {active:this.active, microphone:!!this.stream, pending:this.pending, deafened:!!this.audio?.deafened,
-      audioState:this.audio?.context.state || 'off', message:this.message || '',
+      audioState:this.audio?.context.state || 'off', message:this.message || '', speaking:this.selfSpeaking(),
+      zone:this.zone ? {id:this.zone.id, kind:this.zone.kind, label:this.zone.label} : null,
       peers:[...this.members].map(([id, m]) => ({id, name:this.connection.roster.get(id)?.name || 'Player', microphone:m.mic,
-        state:this.peers.get(id)?.pc.connectionState || (m.attempts >= 3 ? 'blocked' : 'waiting'), muted:this.muted.has(id)}))};
+        state:this.peers.get(id)?.pc.connectionState || (m.attempts >= 3 ? 'blocked' : 'waiting'), muted:this.muted.has(id), speaking:this.peerSpeaking(id)}))};
   }
-  updatePose(pose) { this.pose = pose; if (this.active) this.audio?.listener(pose); }
+  // Loud on the latest sample, or within the hold after it (a slow frame can delay the 10 Hz tick past the hold).
+  selfSpeaking() { return !!this.stream && (this.selfLoud || this.now() < this.speakingUntil); }
+  peerSpeaking(id) { const m = this.members.get(id); return !!m && m.mic && !this.muted.has(id) && !this.audio?.deafened && (m.loud || this.now() < (m.speakingUntil || 0)); }
+  /** Who is talking right now, for in-world and HUD indicators. Cheap; safe to call every frame. */
+  activity() {
+    const peers = new Set(); if (this.active) for (const id of this.members.keys()) if (this.peerSpeaking(id)) peers.add(id);
+    return {self:this.selfSpeaking(), peers};
+  }
+  updatePose(pose) {
+    this.pose = pose; if (this.active) this.audio?.listener(pose);
+    const zone = voiceZoneAt(pose?.position);
+    if (zone?.id !== this.zone?.id) { this.zone = zone; this.changed(); }
+  }
   async join() {
     if (this.disposed || this.connection.local) return;
     const generation = ++this.joinGeneration;
@@ -64,7 +78,7 @@ export class ProximityVoice extends EventTarget {
       if (generation !== this.captureGeneration || !this.active || this.disposed) { stream.getTracks().forEach(t => t.stop()); return; }
       const track = stream.getAudioTracks()[0];
       if (!track) { stream.getTracks().forEach(t => t.stop()); throw new Error('no audio track'); }
-      this.stream = stream;
+      this.stream = stream; this.audio?.watchMicrophone?.(stream);
       track.onended = () => { if (this.stream === stream) { this.stopMicrophone(); this.message = 'Microphone disconnected. Reconnect it and enable microphone again.'; this.changed(); } };
       for (const [id, p] of this.peers) p.sender?.replaceTrack(track).catch(() => this.fail(id, p));
       this.message = 'Microphone on: nearby players in voice can hear you.'; this.announce();
@@ -73,7 +87,7 @@ export class ProximityVoice extends EventTarget {
   }
   stopMicrophone() {
     ++this.captureGeneration; this.pending = false;
-    const stream = this.stream; this.stream = null;
+    const stream = this.stream; this.stream = null; this.audio?.unwatchMicrophone?.(); this.speakingUntil = 0; this.selfLoud = false;
     stream?.getTracks().forEach(t => { t.onended = null; t.stop(); });
     for (const p of this.peers.values()) p.sender?.replaceTrack(null).catch(() => {});
     this.message = 'Microphone off. Enable it when you want to speak.';
@@ -92,15 +106,21 @@ export class ProximityVoice extends EventTarget {
   tick() {
     if (!this.active || this.disposed) return;
     this.announce(false);
-    const now = this.now();
+    const now = this.now(), before = this.speakingSignature();
+    this.selfLoud = !!this.stream && this.audio?.microphoneLevel?.() > SPEAKING_THRESHOLD;
+    if (this.selfLoud) this.speakingUntil = now + SPEAKING_HOLD_MS;
     for (const [id, m] of this.members) {
       if (!this.route.member(id) || now - m.seen > 12000) { this.remove(id); continue; }
-      this.audio?.position(id, m.position, now - m.seen < 3000 && m.mic);
+      this.audio?.position(id, m.position, now - m.seen < 3000 && m.mic, voiceRelation(this.pose?.position, m.position));
+      m.loud = m.mic && this.audio?.level?.(id) > SPEAKING_THRESHOLD;
+      if (m.loud) m.speakingUntil = now + SPEAKING_HOLD_MS;
       const p = this.peers.get(id);
       if (p && now - p.started > 15000 && p.pc.connectionState !== 'connected') this.fail(id, p);
       if (this.eligible(id)&&!this.peers.has(id) && this.connection.peerId < id && now >= m.retryAt && m.attempts < 3&&now>=this.nextOfferAt) {this.nextOfferAt=now+100;void this.offer(id);}
     }
+    if (this.speakingSignature() !== before) this.changed();
   }
+  speakingSignature() { const a = this.activity(); return (a.self ? '+' : '-') + [...a.peers].sort().join(','); }
   receive(id, b) {
     if (!this.active || this.disposed) return;
     if(b.type==='neighbors'){
