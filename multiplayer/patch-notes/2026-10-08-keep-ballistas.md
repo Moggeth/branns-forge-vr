@@ -16,3 +16,4 @@ title: The keep ballistas get a glow-up
 - When nobody is manning them, the ballistas now aim properly: they track, lead walking targets and fire real shots.
 - A hero caught by an unmanned Gnashjaw can tear free by running past the end of the chain. A manned one holds on.
 - New synthesised sounds for drawing, loosing, harpoon hits, chain rattles, the reel ratchet and the big chomp.
+- On phones, the attack button now says what it does while you're seated: **Draw**, **Spit** or **Yank** (and **Fire** on the Timberline).
