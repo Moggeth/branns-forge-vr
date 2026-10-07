@@ -58,7 +58,7 @@ export function createInventionView({scene,lightning=null}){
   if(/launcher/.test(ev.kind)&&ev.position&&ev.target&&!assets.heavy_launcher){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...ev.position),new THREE.Vector3(...ev.target)]);const m=new THREE.LineBasicMaterial({color:0xa9ffdc,transparent:true});const line=new THREE.Line(g,m);scene.add(line);effects.push({line,life:.3});while(effects.length>16){const old=effects.shift();old.line.removeFromParent();old.line.geometry.dispose();old.line.material.dispose();}}
  }
  function update(dt,tick,camera=null,viewportHeight=1080){
-  homeBases.update(dt,camera);
+  homeBases.update(dt,camera,tick);
   for(const e of entries.values())if(e.spire)spires.animate(e,tick/60,dt);
   timberFx.update(dt);stuck?.update(snapshot,tick);tracers.begin();
   const ids=new Set();for(const q of snapshot?.inventions?.shots||[]){ids.add(q.id);let v=shots.get(q.id);
@@ -80,7 +80,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
    refinery.animate({time:tick/60,dt,jobs:snapshot?.inventions?.refining?.length||0,feedReady,bay});}
   for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.line.material.opacity=Math.max(0,e.life/.3);if(e.life<=0){e.line.removeFromParent();e.line.geometry.dispose();e.line.material.dispose();effects.splice(i,1);}}
  }
- return {installStormspire(gltf){assets.stormspire=gltf;spires.install(gltf);},installReelPack:gltf=>spires.installPack(gltf),spires,spireEntry:id=>{const e=entries.get(id);return e?.spire?e:null;},installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),homeBaseStats:()=>homeBases.stats(),sync,event,update,
+ return {installStormspire(gltf){assets.stormspire=gltf;spires.install(gltf);},installReelPack:gltf=>spires.installPack(gltf),spires,spireEntry:id=>{const e=entries.get(id);return e?.spire?e:null;},installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),installKeepKit:gltf=>homeBases.installKeepKit(gltf),homeKeep:()=>homeBases.keep,homeBaseStats:()=>homeBases.stats(),sync,event,update,
   // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
   setLocalAim(id,aim){homeBases.setLocalAim(id,aim);if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
