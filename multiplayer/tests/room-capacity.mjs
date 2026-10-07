@@ -7,7 +7,7 @@ import {MAX_PLAYERS,OFFLINE_SEAT_GRACE_MS} from '../shared/multiplayer-limits.js
 
 let source=await readFile(new URL('../cloud/worker.js',import.meta.url),'utf8');
 source=source.replace("import { DurableObject } from 'cloudflare:workers';",'class DurableObject {}').replace("export {ForgeDirectory} from './directory.js';",'');
-for(const path of ['./room-directory.js','../shared/multiplayer-limits.js','../peer/room-capacity.js'])source=source.replace(JSON.stringify(path).replaceAll('"',"'"),JSON.stringify(new URL(path,new URL('../cloud/worker.js',import.meta.url)).href));
+for(const path of ['./room-directory.js','./ice-servers.js','../shared/multiplayer-limits.js','../peer/room-capacity.js'])source=source.replace(JSON.stringify(path).replaceAll('"',"'"),JSON.stringify(new URL(path,new URL('../cloud/worker.js',import.meta.url)).href));
 const {ForgeRoom}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 function fixture(){
   const service=Object.create(ForgeRoom.prototype);service.room=null;service.sockets=new Map();service.env={};

@@ -9,7 +9,7 @@ import {createPresentationClock} from '../client/presentation-clock.js';
 
 let source=await readFile(new URL('../cloud/worker.js',import.meta.url),'utf8');
 source=source.replace("import { DurableObject } from 'cloudflare:workers';",'class DurableObject {}').replace("export {ForgeDirectory} from './directory.js';",'');
-for(const path of ['./room-directory.js','../shared/multiplayer-limits.js','../peer/room-capacity.js'])
+for(const path of ['./room-directory.js','./ice-servers.js','../shared/multiplayer-limits.js','../peer/room-capacity.js'])
   source=source.replace(`'${path}'`,JSON.stringify(new URL((path.startsWith('./')?'../cloud/':'../')+path.replace(/^\.\.?\//,''),import.meta.url).href));
 const {ForgeRoom}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 

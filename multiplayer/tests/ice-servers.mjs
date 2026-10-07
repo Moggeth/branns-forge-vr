@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {iceServers, normalizeTurn, resetIceCache, STUN} from '../cloud/ice-servers.js';
+assert.deepEqual(await iceServers({}), STUN, 'no TURN key: STUN only, no network call');
+const reply = {iceServers:[{urls:['stun:stun.cloudflare.com:3478','stun:stun.cloudflare.com:53']},
+  {urls:['turn:turn.cloudflare.com:3478?transport=udp','turn:turn.cloudflare.com:53?transport=udp','turns:turn.cloudflare.com:443?transport=tcp'],username:'u',credential:'c'}]};
+assert.deepEqual(normalizeTurn(reply)[1].urls,['turn:turn.cloudflare.com:3478?transport=udp','turns:turn.cloudflare.com:443?transport=tcp'],'port 53 dropped');
+assert.equal(normalizeTurn({iceServers:{urls:'turn:x:3478',username:'u',credential:'c'}}).length,1,'older single-object shape');
+assert.equal(normalizeTurn({iceServers:[{urls:['turn:x:3478']}]}).length,0,'TURN without credentials is dropped');
+let calls = 0, request;
+const fetch = async (url, init) => { calls++; request = {url, init}; return {ok:true, json:async () => reply}; };
+const env = {TURN_KEY_ID:'key', TURN_KEY_API_TOKEN:'secret'};
+const servers = await iceServers(env, {fetch, now:0});
+assert.match(request.url, /\/v1\/turn\/keys\/key\/credentials\/generate-ice-servers$/); assert.equal(request.init.headers.authorization, 'Bearer secret');
+assert(servers.some(s => s.username === 'u' && s.urls.some(u => u.startsWith('turns:'))), 'relay credentials reach players');
+await iceServers(env, {fetch, now:3600_000}); assert.equal(calls, 1, 'credentials reused for six hours');
+const failing = async () => { calls++; return {ok:false, status:500}; };
+assert.deepEqual(await iceServers(env, {fetch:failing, now:7 * 3600_000}), servers, 'API failure keeps last valid set');
+resetIceCache(); const log = console.log; console.log = () => {};
+assert.deepEqual(await iceServers(env, {fetch:failing, now:0}), STUN, 'API failure with no cache falls back to STUN'); console.log = log;
+console.log('PASS ice servers: STUN-only default, Cloudflare TURN credentials, port-53 filter, caching and fallback');
