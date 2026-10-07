@@ -382,6 +382,7 @@
       </div>
       <button id="copyCode" class="btn btn-chip" type="button">Copy code</button>
       <button id="copyInvite" class="btn btn-chip" type="button">Copy invite</button>
+      <button id="showInviteQr" class="btn btn-chip" type="button">Join QR</button>
       <button id="vr" class="btn btn-chip btn-vr" type="button" hidden>Enter VR</button>
       <button id="perspectiveButton" class="btn btn-chip" type="button" title="Switch Hero / God (F9)" aria-label="Switch Hero / God perspective" aria-keyshortcuts="F9"><svg class="ico" aria-hidden="true"><use href="#i-god"/></svg><span>F9</span></button>
       <button id="quickBuildButton" class="btn btn-chip" type="button" data-qb-toggle aria-keyshortcuts="B" aria-haspopup="dialog" title="Quick build (B)"><svg class="ico" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span></button>
@@ -550,6 +551,13 @@
         <button id="menuCopyCode" class="btn btn-secondary" type="button">Copy code</button>
         <button id="menuCopyInvite" class="btn btn-secondary" type="button">Copy invite link</button>
       </div>
+      <details id="inviteQr" class="saved">
+        <summary>Scan to join · QR code</summary>
+        <div class="saved-body">
+          <p id="inviteQrStatus" class="hint" role="status">Open to show this world’s QR code.</p>
+          <img id="inviteQrImage" width="256" height="256" alt="QR code to join this world" hidden style="max-width:100%;height:auto;align-self:center">
+        </div>
+      </details>
     </section>
 
     <!-- New: opens the shared #controlsCard inside this menu (focus stays inside the dialog). -->
