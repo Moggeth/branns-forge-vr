@@ -15,6 +15,7 @@ import {createKeepBallistaAudio} from './keep-ballista-audio.js';
 import {HOME as HOME_RULES,HOME_LAYOUT,bellPostAt,homePoint} from '../shared/home-bases.js';
 import {SHOP,counterAt} from '../shared/home-shop.js';
 import {MILL,millAt} from '../shared/home-mill.js';
+import {STORES,backTownSpot} from '../shared/home-workshop.js';
 import {TAVERN,taverns,tavernBar} from '../shared/taverns.js';
 import {itemBonus} from '../shared/hero-items.js';
 import {createPresentationClock} from './presentation-clock.js';
@@ -108,6 +109,7 @@ import {createOreGlint} from './ore-glint.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {createAlpineSkyline} from './alpine-skyline.js';
 import {createAlpineForest} from './alpine-forest.js';
+import {createKeepCornerGround} from './keep-corner-ground.js';
 import {createHeroView} from './hero-view.js';
 import {createWoodAudio} from './wood-audio.js';
 import {createSpellAudio} from './spell-audio.js';
@@ -347,6 +349,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   applyMountainGroundTreatment(orchard.material);
   const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const alpineForest=createAlpineForest({scene,arena:mountainArena,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high'});
+  const cornerGround=createKeepCornerGround({scene,ground,height:(x,z)=>heightAt(x,z,snapshot.edits)}); // the keeps' back towns past the old map edge
   let nearestPickup=null;
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
@@ -513,7 +516,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     terrainGeometry.update((x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)),dirty);
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
     if(live){orchard.terrainTick?.(tick);content.terrainMoved(dirty);for(const e of dirty||[])meadowPending.set(e.id,e);return;}
-    const meadowDirty=dirty&&dirty.concat([...meadowPending.values()]);meadowPending.clear();mountainArena.sync(snapshot);alpineForest.sync();
+    const meadowDirty=dirty&&dirty.concat([...meadowPending.values()]);meadowPending.clear();mountainArena.sync(snapshot);alpineForest.sync();cornerGround.sync();
     meadow.terrainChanged({edits: snapshot.edits, terrainTick: tick, dirty: foundationChanged ? null : meadowDirty});
     orchard.groundChanged({edits: snapshot.edits,terrainTick:tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals
   }
@@ -716,6 +719,10 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(disposed){disposeResources(gltf.scene);return;}
     if(!inventionVisual.installTownKit(gltf)){disposeResources(gltf.scene);report('Town models are incomplete; the simpler taverns, stalls and mills stay.');}
   },undefined,()=>report('Town models unavailable; the simpler taverns, stalls and mills stay.'));
+  loader.load('/assets/backtown_kit.glb',gltf=>{ // Blender-built back towns behind the keeps (assets/backtown-20261008)
+    if(disposed){disposeResources(gltf.scene);return;}
+    if(!inventionVisual.installBackTownKit(gltf)){disposeResources(gltf.scene);report('Back town models are incomplete; the simpler buildings stay.');}
+  },undefined,()=>report('Back town models unavailable; the simpler buildings stay.'));
   loader.load('/assets/keep_ballistas.glb',gltf=>{ // the Sunlance and Gnashjaw gate ballistas (assets-source/keep-ballistas)
     if(disposed){disposeResources(gltf.scene);return;}
     if(!inventionVisual.installKeepKit(gltf)){disposeResources(gltf.scene);report('Gate ballista models are incomplete; the older ballistas stay in place.');}
@@ -1211,6 +1218,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(near(counterAt(base.side),SHOP.reach)){unlockAudio();onAction('openShop',{});return true;}
     if(near(millAt(base.side,MILL.crank),MILL.crankReach)){unlockAudio();onAction('millCrank',{});return true;}
     if(near(millAt(base.side,MILL.hopper),MILL.reach)){unlockAudio();onAction('millFeed',{});return true;}
+    if(near(backTownSpot(base.side,'stores',STORES.door),STORES.reach)){unlockAudio();onAction('inventionDeposit',{});return true;}
     if(near(homePoint(base.side,HOME_LAYOUT.fountain),HOME_RULES.drink.reach)){unlockAudio();onAction('homeDrink',{});return true;}
     if(near(bellPostAt(base.side),HOME_RULES.bell.reach)){unlockAudio();onAction('homeBell',{});return true;}return false;}
   function useInvention(id){if(isHomeBallistaId(id))return useHomeBallista(id);const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
@@ -1833,7 +1841,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inspectState(){return {mode:inspect.mode(),active:inspect.active()};},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1857,7 +1865,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     dispose() {
       voiceBadges.dispose(); setVoiceZoneResolver('home-taverns', null);
       if (disposed) return;
-      clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();
+      clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();cornerGround.dispose();
       clearTimeout(zeroInputTimer);
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());

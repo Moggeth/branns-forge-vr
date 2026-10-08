@@ -1,4 +1,5 @@
 import {MOUNTAIN_ROCK_GLSL} from './material-refinements.js';
+import {keepCarve} from '../shared/keep-sites.js';
 export {MOUNTAIN_ROCK_GLSL};
 // Mountain colosseum boundary: one batched, seeded, presentation-only rock massif that hugs the authoritative
 // terrain ring and rises into a broken snowy summit silhouette behind the walkable domain.
@@ -114,9 +115,12 @@ export function createMountainArena({THREE, scene, height, seed = 7, columnsPerS
         // reads as spurs and amphitheatre bowls instead of four flat walls. The inner seam (s <= crest) stays exact.
         const w = sstep(ARENA.crest, ARENA.crest + 3, s), sr = s + w * 2.6 * sstep(.3, .8, R0.bay);
         const pn = Math.pow(Math.pow(Math.abs(dx), 6) + Math.pow(Math.abs(dz), 6), 1 / 6), k = sr * (1 + (1 / pn - 1) * w * sstep(ARENA.crest, ARENA.outer, s));
-        const kk = Math.min(k, ARENA.outer), x = dx * kk, z = dz * kk, y = height(x, z) + lift; // never beyond Chebyshev 65
+        const kk = Math.min(k, ARENA.outer), x = dx * kk, z = dz * kk, carve = keepCarve(x, z);
+        // Where a keep has cut its pass and back town out of the corner the rock steps aside: the shell sinks under
+        // the carved floor and the real cliffs (ground mesh + keep-corner-ground.js) show instead.
+        const y = height(x, z) + lift * (1 - carve) - 2.5 * carve; // never beyond Chebyshev 65
         positions[o] = x; positions[o + 1] = y; positions[o + 2] = z;
-        if (s <= ARENA.crest + 1) minLift = Math.min(minLift, lift); maxY = Math.max(maxY, y);
+        if (s <= ARENA.crest + 1 && carve < .01) minLift = Math.min(minLift, lift); maxY = Math.max(maxY, y);
         // Vertex tint = baked occlusion: gullies and the shoulder foot darker, rib crests catch light.
         const rowRib = pnoise(u * 23 + s * .09, 92, seed + 2), rib = 1 - Math.abs(rowRib * 2 - 1);
         const ao = .74 + .26 * rib, foot = .86 + .14 * sstep(ARENA.shellStart, ARENA.crest + 1.5, s), warm = .92 + .16 * R0.macro;

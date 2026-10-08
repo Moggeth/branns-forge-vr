@@ -10,6 +10,8 @@ import {nearestCollectible, collectibleCandidate} from '../shared/collection-tar
 import {HOME, HOME_LAYOUT, HOME_MANNED, bellPostAt, homePoint} from '../shared/home-bases.js';
 import {SHOP, counterAt, draughtCap} from '../shared/home-shop.js';
 import {MILL, millAt} from '../shared/home-mill.js';
+import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
+import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
@@ -172,6 +174,12 @@ function homeCue(self, snapshot, keys, make) {
     return worth ? make('home', 'ready', 'mill', 'Gold mill', 'Tip it in', keys.collect, `about ${worth} Gold${owed ? ` · ${owed} still grinding` : ''}`)
       : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
   }
+  // Back town (shared/home-workshop.js): the Workshop smelts ore from your pack on its own; the Stores banks your haul.
+  if (at(backTownSpot(base.side, 'workshop', WORKSHOP.anvil), WORKSHOP.reach)) {
+    const ore = Object.keys(ORE_RECIPES).reduce((n, k) => n + (self.resources?.[k] || 0), 0);
+    return ore ? make('home', 'ready', 'workshop', 'Workshop', 'Smelting', '', `${ore} ore left · stay by the anvil`) : make('home', 'full', 'workshop', 'Workshop', 'Bring ore', '', 'smelts it into bars while you wait');
+  }
+  if (at(backTownSpot(base.side, 'stores', STORES.door), STORES.reach)) return make('home', 'ready', 'stores', 'Stores', 'Bank it all', keys.collect, 'everything in your pack into your side\'s stores');
   for (const part of base.parts) if (part.kind === 'ballista' && part.hp > 0 && at([part.position[0], part.position[2]], HOME_MANNED.reach)) {
     const sun = part.side !== 'rivals', name = sun ? 'Sunlance' : 'Gnashjaw', wind = keys.crank || keys.wind || 'crank';
     if (part.operator === self.id) return make('home', 'manned', part.id, name, 'Step off', keys.collect);

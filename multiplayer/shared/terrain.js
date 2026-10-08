@@ -1,6 +1,6 @@
 // One deterministic surface contract for authority, rendering and saved worlds.
 export const TERRAIN_LIMITS = Object.freeze({bound:55, mountainStart:46, mountainCrest:55, deformation:6, axeScar:.65, slope:1.15, rim:50});
-import {HOME_SITES,keepCarve} from './keep-sites.js';
+import {HOME_SITES,WORLD_EXTENT,keepCarve,onKeepGround} from './keep-sites.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 export const SUNDER_SETTLE_DISTANCE=1.1;
@@ -224,7 +224,9 @@ export function moveOnTerrain(state,position,dx,dz,radius=.28) {
   const origin=[...position];
   for(const [axis,delta] of [[0,dx],[2,dz]]) {
     if(!delta)continue;
-    const next=[...position];next[axis]=clamp(next[axis]+delta,-50+radius,50-radius);
+    const next=[...position];next[axis]+=delta;
+    // The open meadow stops at ±50; a keep's carved bowl, pass and back town run on out toward the corners.
+    if(!walkable(next[0],next[2],radius)){if(Math.max(Math.abs(position[0]),Math.abs(position[2]))>50-radius)continue;next[axis]=clamp(next[axis],-50+radius,50-radius);} // out on keep ground: stop at its edge
     const ground=terrainHeight(state,position[0],position[2]),dest=terrainHeight(state,next[0],next[2]);
     const probe=[...next];probe[axis]+=Math.sign(delta)*radius;
     const ahead=terrainHeight(state,probe[0],probe[2]);
@@ -234,7 +236,9 @@ export function moveOnTerrain(state,position,dx,dz,radius=.28) {
   }
   return Math.hypot(position[0]-origin[0],position[2]-origin[2]);
 }
+const walkable=(x,z,radius)=>Math.max(Math.abs(x),Math.abs(z))<=50-radius||onKeepGround(x,z)&&Math.max(Math.abs(x),Math.abs(z))<=WORLD_EXTENT-radius;
 export function resolveTerrainBoundary(position,radius=.28) {
+  if(walkable(position[0],position[2],radius))return position;
   position[0]=clamp(position[0],-50+radius,50-radius);
   position[2]=clamp(position[2],-50+radius,50-radius);
   return position;

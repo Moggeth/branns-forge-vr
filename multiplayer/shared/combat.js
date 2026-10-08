@@ -18,6 +18,7 @@ import {payKillGold} from './home-shop.js';
 import {tavernSafe} from './taverns.js';
 import {noteKill} from './dragon-streak.js';
 import {stepRemains,applyImpulse,partMass,linkRagdoll,wake,tear} from './remains-physics.js';
+import {beyondWorld} from './keep-sites.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel']);
@@ -366,7 +367,7 @@ export function stepCombat(state,ctx,events){
     if(p.flare&&state.tick-p.bornTick>=FLARE.fuse){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(...ctx.flareBurst(state,p.position,p.ownerId));continue;}
     // Apple on a stick (shared/fruit.js): an arrow or bolt through a hanging apple takes it off the tree and stops.
     const fruit=ctx.fruitStrike?.(state,p.previousPosition,p.position,p);if(fruit){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(fruit);continue;}
-    if(state.tick-p.bornTick>(p.kind==='flame'?(p.gout?WYRMSPOUT.gout.lifeTicks:sprayTuning(state.players.find(q=>q.id===p.ownerId)).lifeTicks):p.kind==='fuel'?180:480)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
+    if(state.tick-p.bornTick>(p.kind==='flame'?(p.gout?WYRMSPOUT.gout.lifeTicks:sprayTuning(state.players.find(q=>q.id===p.ownerId)).lifeTicks):p.kind==='fuel'?180:480)||beyondWorld(p.position[0],p.position[2])||p.position[1]<ctx.terrainHeight(state,p.position[0],p.position[2])-.5)state.projectiles.splice(state.projectiles.indexOf(p),1);
   }
   const before=new Map();
   for(const d of [...state.detachedParts]){

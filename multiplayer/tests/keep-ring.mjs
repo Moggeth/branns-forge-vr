@@ -1,10 +1,12 @@
 // Ring keeps (2026-10-08): each keep sits in a bowl carved out of its corner mountains, its buildings on a half ring
-// round the heart, with a narrow pass leading back to a hollow. Nothing overlaps, every building stands on level
-// ground, the ground under the ring is flat, and the pass is walkable while the cliffs either side are not.
+// round the heart, with a narrow pass leading back to a walled back town in the corner (past the old map edge). Nothing overlaps, every building stands on level
+// ground, the ground under the ring is flat, and the town is reachable only up the pass.
 import assert from 'node:assert/strict';
 import {HOME_LAYOUT as L, HOME_SITES, homePoint} from '../shared/home-bases.js';
-import {KEEP_CARVE, keepCarve} from '../shared/keep-sites.js';
-import {baseHeight} from '../shared/terrain.js';
+import {KEEP_CARVE, WORLD_EXTENT, backTownPiece, keepCarve, onKeepGround} from '../shared/keep-sites.js';
+import {BACK_TOWN_SOLIDS, STORES, WORKSHOP, backTownSpot, resolveBackTowns} from '../shared/home-workshop.js';
+import {baseHeight, moveOnTerrain} from '../shared/terrain.js';
+const liveState = {battle: {v: 2, status: 'running'}};
 
 let count = 0;
 const test = (name, fn) => { fn(); count++; console.log('PASS', name); };
@@ -39,19 +41,86 @@ test('every piece stands on level ground inside the carved bowl, in both keeps',
   }
 });
 
-test('a narrow pass leads back from each keep to a hollow, walled by cliffs', () => {
+test('a narrow pass leads back from each keep into its back town, walled by cliffs', () => {
   for (const [sx, sz] of Object.values(HOME_SITES)) {
-    const l = Math.hypot(sx, sz), bx = sx / l, bz = sz / l, rx = -bz, rz = bx; // back toward the corner, and across
+    const g = Math.sign(sx), l = Math.hypot(sx, sz), bx = sx / l, bz = sz / l, rx = -bz, rz = bx; // back toward the corner, and across
     const at = (back, side) => [sx + bx * back + rx * side, sz + bz * back + rz * side];
     const floor = baseHeight(sx, sz);
-    for (let back = 0; back <= KEEP_CARVE.hollow.at; back += .5) {
+    for (let back = 0; back <= KEEP_CARVE.pass.to; back += .5) {
       const [x, z] = at(back, 0); assert.ok(Math.abs(baseHeight(x, z) - floor) < .35, `pass floor at ${back} m`);
     }
-    const [cx, cz] = at(KEEP_CARVE.pass.to - 1, KEEP_CARVE.pass.half + KEEP_CARVE.pass.blend + 2.5);
+    const [cx, cz] = at(KEEP_CARVE.pass.to - 6, KEEP_CARVE.pass.half + KEEP_CARVE.pass.blend + 2.5);
     assert.ok(baseHeight(cx, cz) - floor > 5, 'cliffs stand either side of the pass');
-    assert.equal(keepCarve(...at(KEEP_CARVE.hollow.at, 0)), 1, 'the hollow is open ground');
-    const [hx, hz] = at(KEEP_CARVE.hollow.at, 0); assert.ok(Math.max(Math.abs(hx), Math.abs(hz)) < 55, 'the hollow is inside the map');
+    const {from, to} = KEEP_CARVE.town;
+    for (let u = from + 1; u <= to - 1; u += 1) for (let v = from + 1; v <= to - 1; v += 1) {
+      assert.equal(keepCarve(g * u, g * v), 1, `town ground open at ${u},${v}`);
+      assert.ok(Math.abs(baseHeight(g * u, g * v) - floor) < .5, `town floor level at ${u},${v}`);
+    }
+    for (const [u, v] of [[(from + to) / 2, from - 4], [from - 4, (from + to) / 2], [(from + to) / 2, to + 2.5], [to + 2.5, (from + to) / 2]])
+      assert.ok(baseHeight(g * u, g * v) - floor > 8, `the town is walled in at ${u},${v}`);
+    assert.ok(Math.max(Math.abs(g * to), Math.abs(g * to)) < WORLD_EXTENT, 'the town stays inside the world');
   }
+});
+
+test('walking reaches the back town only through the pass', () => {
+  const state = {edits: [], tick: 0};
+  const walk = (from, to, steps = 900) => {
+    const p = [from[0], baseHeight(...from), from[1]];
+    for (let i = 0; i < steps; i++) {
+      const dx = to[0] - p[0], dz = to[1] - p[2], d = Math.hypot(dx, dz); if (d < .2) break;
+      moveOnTerrain(state, p, dx / d * .1, dz / d * .1); p[1] = baseHeight(p[0], p[2]);
+    }
+    return p;
+  };
+  for (const side of ['party', 'rivals']) {
+    const g = side === 'rivals' ? 1 : -1, [sx, sz] = HOME_SITES[side], town = [g * 60, g * 60];
+    // Straight up the pass from the heart: arrives.
+    let p = walk([sx, sz], [g * 55.5, g * 55.5]); p = walk([p[0], p[2]], town);
+    assert.ok(Math.hypot(p[0] - town[0], p[2] - town[1]) < .5, `${side}: the pass leads into the town (stopped at ${p[0].toFixed(1)}, ${p[2].toFixed(1)})`);
+    // Back out again, and to every building's door.
+    p = walk(town, [sx + g * 8, sz + g * 8]); assert.ok(Math.hypot(p[0] - sx - g * 8, p[2] - sz - g * 8) < .5, `${side}: and back out to the keep`);
+    // From the open meadow and the bowl's rim, heading straight at the town: the old edge and the cliffs stop you.
+    for (const from of [[g * 45, g * 20], [g * 20, g * 45], [g * 48, g * 5], [g * 5, g * 48], [g * 49, g * 30], [g * 30, g * 49]]) {
+      const q = walk(from, town), u = q[0] * g, v = q[2] * g;
+      assert.ok(u < KEEP_CARVE.town.from - 1 || v < KEEP_CARVE.town.from - 1, `${side}: no way round from ${from} (reached ${q[0].toFixed(1)}, ${q[2].toFixed(1)})`);
+    }
+  }
+});
+
+test('the back town buildings stand apart, on the town floor, inside the world', () => {
+  const placed = Object.keys(BACK_TOWN_SOLIDS);
+  const disc = name => { const sol = BACK_TOWN_SOLIDS[name]; let r = 0; for (const q of sol) r = Math.max(r, Math.hypot(...q.at) + (q.r ?? Math.hypot(...q.half))); return r; };
+  for (const side of ['party', 'rivals']) {
+    for (const name of placed) {
+      const {x, z} = backTownPiece(side, name), r = disc(name);
+      for (let a = 0; a < 16; a++) {
+        const px = x + Math.cos(a / 16 * Math.PI * 2) * r * .8, pz = z + Math.sin(a / 16 * Math.PI * 2) * r * .8;
+        assert.ok(onKeepGround(px, pz), `${side} ${name} sits on carved ground`);
+      }
+    }
+    for (const name of placed) for (const q of BACK_TOWN_SOLIDS[name]) { // every footprint really blocks
+      const [x, z] = backTownSpot(side, name, q.at), probe = [x, 0, z]; resolveBackTowns(liveState, probe, 0);
+      assert.ok(Math.hypot(probe[0] - x, probe[2] - z) > 0, `${side} ${name} solid at ${q.at} blocks`);
+    }
+    const pa = Object.fromEntries(placed.map(n => [n, backTownPiece(side, n)]));
+    for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+      const a = pa[placed[i]], b = pa[placed[j]];
+      assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= disc(placed[i]) * .62 + disc(placed[j]) * .62, `${side} ${placed[i]} crowds ${placed[j]}`);
+    }
+    // Every door and the Workshop's anvil can be stood at.
+    for (const [name, spot] of [['workshop', WORKSHOP.anvil], ['stores', STORES.door]]) {
+      const [x, z] = backTownSpot(side, name, spot), at = backTownSpot(side, name, [spot[0], spot[1] + 1.2]);
+      const probe = [at[0], 0, at[1]]; resolveBackTowns(liveState, probe);
+      assert.ok(Math.hypot(probe[0] - at[0], probe[2] - at[1]) < 1e-9, `${side} ${name}: you can stand in front of it`);
+      assert.ok(onKeepGround(x, z), `${side} ${name} spot on carved ground`);
+    }
+  }
+});
+
+test('the back town is only solid while the keep battle runs', () => {
+  const [x, z] = backTownSpot('party', 'well', [0, 0]), probe = [x, 0, z];
+  resolveBackTowns({battle: null}, probe); assert.deepEqual([probe[0], probe[2]], [x, z]);
+  resolveBackTowns(liveState, probe); assert.ok(Math.hypot(probe[0] - x, probe[2] - z) >= 1.29);
 });
 
 test('the open meadow away from the keeps is untouched by the carve', () => {
