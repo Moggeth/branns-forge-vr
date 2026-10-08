@@ -4,12 +4,14 @@ import {createEnemy} from '../shared/combat.js';
 import {STRUCTURES} from '../shared/inventions.js';
 import {STORMREEL,terminalPoint,wornTower,cableLength,leash,nearestFreePack,hookPoint} from '../shared/stormreel.js';
 
+const foeHp=(s,id)=>s.checkpoint().enemies.find(e=>e.id===id)?.hp??0;
+
 // Fixture: a hero beside a Stormspire at (8, 20) with optional skeletons `ahead` metres along -Z of the hero (a clear line).
 function fixture({charge=240,gems=3,foes=[],heroAt=[10,24]}={}) {
   const sim=createSimulation();sim.addPlayer({id:'h',name:'Mitch'});
   const c=sim.checkpoint(),p=c.players[0];p.position=[heroAt[0],terrainHeight(c,...heroAt),heroAt[1]];p.yaw=0;p.tool='axe';p.resources.gems=gems;
   c.inventions.structures.push({id:'spire1',type:'stormspire',position:[8,terrainHeight(c,8,20),20],yaw:0,hp:240,maxHp:240,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge,armed:false,aimYaw:0});
-  c.enemies=foes.map((f,i)=>{const [dx,dz,dy=0]=Array.isArray(f)?f:[0,-f];const x=heroAt[0]+dx,z=heroAt[1]+dz;return createEnemy(`foe${i}`,[x,terrainHeight(c,x,z)+dy,z]);});
+  c.enemies=foes.map((f,i)=>{const [dx,dz,dy=0,kind='skeleton']=Array.isArray(f)?f:[0,-f];const x=heroAt[0]+dx,z=heroAt[1]+dz;return createEnemy(`foe${i}`,[x,terrainHeight(c,x,z)+dy,z],kind);});
   return loadSimulation(c);
 }
 const hero=s=>s.checkpoint().players[0],tower=s=>s.checkpoint().inventions.structures.find(b=>b.id==='spire1');
@@ -48,24 +50,32 @@ assert.ok(d<=STORMREEL.cable+1e-6&&d>STORMREEL.cable-.5,`held at the end of the 
  const around=cableLength(b,me.position);assert.ok(Math.abs(around-(10+Math.hypot(2,5)))<.05,`wrapped length counts the run to the tree (${around.toFixed(2)})`);
  walk(t[0]+2,t[2]+15);assert.ok(!b.wraps.some(w=>w.id==='peg-tree0'),'walking back round unwraps it');}
 
-// Switching to another weapon sends the pack home.
+// Choosing another weapon plants the crossbow where you stand (Mitch, 2026-10-07): spiked into the ground, still wired up.
 r=act(s,{action:'equip',tool:'pick'});
-assert.equal(r.ok,true);assert.equal(hero(s).tool,'pick');assert.equal(tower(s).operator,null);assert.ok(r.events.some(e=>e.kind==='storm_pack_home'));
+assert.equal(r.ok,true);assert.equal(hero(s).tool,'pick');assert.equal(tower(s).operator,null);
+{const pl=r.events.find(e=>e.kind==='storm_plant');assert.ok(pl,'planted');assert.ok(tower(s).planted?.red,'the red crossbow stands planted');
+ assert.ok(Math.hypot(pl.position[0]-hero(s).position[0],pl.position[2]-hero(s).position[2])<1,'right where you stood');
+ assert.ok(!r.events.some(e=>e.kind==='storm_pack_home'),'it does not wind home');
+ // Use beside it picks it up again, cable and all.
+ const up=act(s,{action:'stormPickup'});assert.equal(up.ok,true,up.code);assert.equal(hero(s).tool,'stormreel');assert.equal(tower(s).operator,'h');assert.equal(tower(s).planted,undefined);
+ // G (stormPlant) puts it down on purpose too; too far away, it cannot be picked up.
+ assert.equal(act(s,{action:'stormPlant'}).ok,true);assert.ok(tower(s).planted?.red);
+ {const k=s.checkpoint();k.players[0].position[0]+=6;s=loadSimulation(k);}assert.equal(act(s,{action:'stormPickup'}).code,'too_far');}
 
-// A full-charge shot at a grounded skeleton: bolt + shock, and the neighbour standing beside it is jolted through the soil.
+// A full-charge bolt on its own is only a bolt: a little kinetic damage and no lightning (Mitch: the bulk is the circuit).
 s=fixture({foes:[8,[1.2,-8]]});
 act(s,{action:'inventionUse',structureId:'spire1'});
 let c=s.checkpoint(),foe=c.enemies[0],aim=aimAt(s,[foe.position[0],foe.position[1]+1.1,foe.position[2]]);
 r=act(s,{action:'storm',...aim,charge:1});
 assert.equal(r.ok,true,r.code);
 const bolt=r.events.find(e=>e.kind==='storm_bolt');
-assert.equal(bolt.targetId,'foe0');assert.equal(bolt.live,true);assert.equal(bolt.grounded,true);assert.deepEqual(bolt.splash,['foe1']);
-assert.ok(!s.checkpoint().enemies.some(e=>e.id==='foe0'),'a full shock fells a skeleton');
-assert.ok(s.checkpoint().enemies.find(e=>e.id==='foe1').hp<100,'step voltage hurts the neighbour');
+assert.equal(bolt.targetId,'foe0');assert.equal(bolt.live,true);assert.equal(bolt.probe,'red');
+assert.ok(foeHp(s,'foe0')<100&&foeHp(s,'foe0')>=100-STORMREEL.bolt,'kinetic damage only');
+assert.equal(foeHp(s,'foe1'),100,'no current spreads from a lone bolt');
 assert.equal(tower(s).charge,240-STORMREEL.shotCost,'one full shot of charge spent');
 assert.equal(act(s,{action:'storm',...aim,charge:1}).code,'cooldown');
 
-// Walls stop the bolt: a storehouse between the hero and the skeleton takes the hit, and the current runs down into the soil.
+// Walls stop the bolt: a storehouse between the hero and the skeleton takes the hit.
 s=fixture({foes:[10]});
 {const k=s.checkpoint();k.inventions.structures.push({id:'shed',type:'storehouse',position:[10,terrainHeight(k,10,19),19],yaw:0,hp:STRUCTURES.storehouse.hp,maxHp:STRUCTURES.storehouse.hp,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge:0,armed:false,aimYaw:0});s=loadSimulation(k);}
 act(s,{action:'inventionUse',structureId:'spire1'});
@@ -73,13 +83,14 @@ c=s.checkpoint();foe=c.enemies[0];aim=aimAt(s,[foe.position[0],foe.position[1]+1
 r=act(s,{action:'storm',...aim,charge:1});
 assert.equal(r.events.find(e=>e.kind==='storm_bolt').blockedId,'shed');assert.equal(s.checkpoint().enemies[0].hp,100,'the skeleton behind the wall is untouched');
 
-// A target off the ground: the arc still finds it, but no current spreads through the soil.
-s=fixture({foes:[[0,-8,4]]});
+// A bolt that kills drops out of the body and falls to the ground instead of hanging in the air.
+s=fixture({foes:[8]});
+{const k=s.checkpoint();k.enemies[0].hp=3;for(const part of Object.keys(k.enemies[0].parts))k.enemies[0].parts[part]=3;s=loadSimulation(k);}
 act(s,{action:'inventionUse',structureId:'spire1'});
 c=s.checkpoint();foe=c.enemies[0];aim=aimAt(s,[foe.position[0],foe.position[1]+1.1,foe.position[2]]);
 r=act(s,{action:'storm',...aim,charge:1});
-assert.equal(r.events.find(e=>e.kind==='storm_bolt').grounded,false);
-assert.ok(!s.checkpoint().enemies.some(e=>e.id==='foe0'),'the arc jumps to a flying foe too');
+{const ev=r.events.find(e=>e.kind==='storm_bolt'),pr=tower(s).probes.red;assert.ok(!s.checkpoint().enemies.some(e=>e.id==='foe0'),'felled by the bolt');
+ assert.ok(ev.fell&&pr.fell&&!pr.enemy,'the probe fell out');assert.ok(Math.abs(pr.at[1]-terrainHeight(s.checkpoint(),pr.at[0],pr.at[2]))<.01,'and lies on the ground');}
 
 // An empty tower still throws the bolt, without lightning.
 s=fixture({charge:0,gems:0,foes:[8]});
@@ -87,7 +98,7 @@ act(s,{action:'inventionUse',structureId:'spire1'});
 c=s.checkpoint();foe=c.enemies[0];aim=aimAt(s,[foe.position[0],foe.position[1]+1.1,foe.position[2]]);
 r=act(s,{action:'storm',...aim,charge:1});
 assert.equal(r.events.find(e=>e.kind==='storm_bolt').live,false);
-assert.ok(s.checkpoint().enemies[0].hp>=60,'bolt only');
+assert.ok(s.checkpoint().enemies[0].hp>=80,'bolt only');
 
 // A God's lightning bolt on the tower fills it rather than damaging it.
 {
@@ -106,43 +117,55 @@ assert.ok(s.checkpoint().enemies[0].hp>=60,'bolt only');
   const t=terminalPoint(b),base=k.battle.bases.find(x=>x.side===side);assert.ok(Math.hypot(t[0],t[2])<Math.hypot(b.position[0],b.position[2]),'terminal on the field side');void base;}
  const again=loadSimulation(JSON.parse(JSON.stringify(k)));again.step();assert.equal(again.checkpoint().inventions.structures.filter(b=>b.type==='stormspire').length,2,'never duplicated');}
 
-// The red-blue circuit (Mitch, 2026-10-06): the red crossbow fires positive bolts, the blue crossbow negative ones, and
-// current only runs once BOTH polarities are lodged, in either order. A solo Hero lodges one, hangs that pack up (the
-// probe stays tethered where it landed), shoulders the other and lodges the second.
-{s=fixture({foes:[[0,-9],[-.4,-14]]});const h=hero(s),at=(dx,dz)=>{const x=h.position[0]+dx,z=h.position[2]+dz;return [x,terrainHeight(s.checkpoint(),x,z),z];};
+// The circuit (Mitch, 2026-10-07): a positive bolt and a negative bolt in the SAME foe. A solo Hero lodges the + bolt,
+// plants the red crossbow (the bolt stays wired to it), fetches the blue one and lodges the - bolt in the same body.
+{s=fixture({foes:[[0,-9,0,'golem'],[-1.5,-9.6]]});const h=hero(s),body=id=>{const e=s.checkpoint().enemies.find(e=>e.id===id);return [e.position[0],e.position[1]+1.4,e.position[2]];};
  act(s,{action:'inventionUse',structureId:'spire1'});assert.equal(tower(s).operator,'h','the first free pack is red');
- let r1=act(s,{action:'storm',...aimAt(s,at(0,-9)),charge:1});assert.equal(r1.events.find(e=>e.kind==='storm_bolt').probe,'red');
+ let r1=act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.equal(r1.events.find(e=>e.kind==='storm_bolt').probe,'red');
+ assert.equal(tower(s).probes.red.enemy,'foe0','the + bolt rides the golem');
  run(s,STORMREEL.cooldownTicks);
- let r1b=act(s,{action:'storm',...aimAt(s,at(-.4,-14)),charge:1});assert.equal(r1b.events.find(e=>e.kind==='storm_bolt').probe,'red','red stays red: no alternating');
+ let r1b=act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.equal(r1b.events.find(e=>e.kind==='storm_bolt').probe,'red','red stays red: no alternating');
  assert.ok(!r1b.events.some(e=>e.kind==='storm_arc')&&!tower(s).arc,'two positive bolts never close a circuit');
- assert.ok(tower(s).probes.red&&!tower(s).probes.blue);
- // Drop the red pack (switch tool) with the positive probe still lodged: it stays connected.
- const drop=act(s,{action:'equip',tool:'pick'});assert.equal(drop.ok,true);assert.equal(tower(s).operator,null);
- assert.equal(drop.events.find(e=>e.kind==='storm_pack_home').tethered,true,'the cable stays attached to the lodged probe');
- run(s,60*20);assert.ok(tower(s).probes?.red,'the positive probe is still lodged twenty seconds later');
- // Take the blue pack and lodge the negative bolt: now the current runs.
- {const c=s.checkpoint(),p=c.players[0];p.position=[...h.position];s=loadSimulation(c);}  // (the world carries a new Hero off to its spawn while the clock runs)
+ // Plant the red crossbow with the positive bolt still lodged: it stays connected.
+ const drop=act(s,{action:'stormPlant'});assert.equal(drop.ok,true);assert.equal(tower(s).operator,null);assert.ok(tower(s).planted.red);
+ run(s,60*4);assert.ok(tower(s).probes?.red?.enemy,'the positive bolt is still lodged while you walk off');
+ {const c=s.checkpoint(),p=c.players[0];p.position=[...h.position];for(const e of c.enemies){const [x,z]=[h.position[0]+(e.id==='foe0'?0:-1.5),h.position[2]+(e.id==='foe0'?-9:-9.6)];e.position=[x,terrainHeight(c,x,z),z];e.attackTick=c.tick;}s=loadSimulation(c);}
  const tk=act(s,{action:'inventionUse',structureId:'spire1',pack:'blue'});assert.equal(tk.ok,true,tk.code);assert.equal(tower(s).operator2,'h');
  run(s,STORMREEL.cooldownTicks);
- let r2=act(s,{action:'storm',...aimAt(s,at(.2,-14)),charge:1});assert.equal(r2.events.find(e=>e.kind==='storm_bolt').probe,'blue');
- assert.ok(r2.events.some(e=>e.kind==='storm_arc'),'a positive and a negative probe close the circuit');
- const before=tower(s).charge;run(s,60);
- const k=s.checkpoint();assert.ok(!k.enemies.some(e=>e.id==='foe0')||k.enemies.find(e=>e.id==='foe0').hp<100,'a foe on the line is fried');
- assert.ok(tower(s).charge<before,'the circuit drains the tower');assert.ok(tower(s).arc,'still live');
+ // A negative bolt in a DIFFERENT foe is an open circuit: nothing flows.
+ const other=act(s,{action:'storm',...aimAt(s,body('foe1')),charge:.3});assert.equal(other.events.find(e=>e.kind==='storm_bolt').targetId,'foe1');
+ assert.ok(!other.events.some(e=>e.kind==='storm_arc')&&!tower(s).arc,'bolts in two foes do not close the circuit');assert.ok(foeHp(s,'foe1')>80);
+ run(s,STORMREEL.cooldownTicks);
+ const g0=foeHp(s,'foe0'),r2=act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.equal(r2.events.find(e=>e.kind==='storm_bolt').probe,'blue');
+ const arc=r2.events.find(e=>e.kind==='storm_arc');assert.ok(arc,'+ and - in the same foe close the circuit');assert.equal(arc.enemy,'foe0');
+ assert.ok(g0-foeHp(s,'foe0')>=STORMREEL.surge*.4,'the closing surge is enormous, even through golem stone');assert.ok(foeHp(s,'foe1')<100&&arc.splash.includes('foe1'),'the neighbour is jolted through the soil');
+ const before=tower(s).charge,hp1=foeHp(s,'foe0');assert.ok(hp1>0&&tower(s).arc,'a golem survives the surge, so the current keeps cooking it');
+ run(s,20);assert.ok(foeHp(s,'foe0')<hp1,'pulses keep frying it');assert.ok(tower(s).charge<before,'the circuit drains the tower');
  // Reel (Q): the blue bolt winds back in along its tether, the circuit dies, the positive probe stays, charge comes back.
  const charge0=tower(s).charge,rl=act(s,{action:'stormReel'});assert.equal(rl.ok,true,rl.code);
  assert.ok(rl.events.some(e=>e.kind==='storm_reel'&&e.pack==='blue'),'your own bolt is reeled in');
  assert.ok(rl.events.some(e=>e.kind==='storm_arc_end'&&e.why==='reeled'));
  assert.equal(tower(s).arc,undefined);assert.ok(tower(s).probes?.red&&!tower(s).probes.blue,'the other polarity stays lodged');
  assert.ok(tower(s).charge>charge0,'reeling returns part of the bolt\'s charge');
- // With only the red probe out, the blue wearer can still reel it in (so a circuit can always be cleared).
- const rl2=act(s,{action:'stormReel'});assert.equal(rl2.ok,true);assert.equal(tower(s).probes,undefined);
- assert.equal(act(s,{action:'stormReel'}).code,'not_needed');}
+ // Lodge it again: the circuit kills the golem, both bolts drop out of the body and the circuit ends.
+ run(s,STORMREEL.cooldownTicks);act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.ok(tower(s).arc);
+ run(s,60*STORMREEL.arcSeconds);assert.equal(foeHp(s,'foe0'),0,'cooked');assert.equal(tower(s).arc,undefined);
+ assert.ok(tower(s).probes.red.fell&&tower(s).probes.blue.fell&&!tower(s).probes.red.enemy,'both bolts fell out of the body');
+ // With only the planted red probe left, the blue wearer can still reel bolts in (so a circuit can always be cleared).
+ assert.equal(act(s,{action:'stormReel'}).ok,true);assert.equal(act(s,{action:'stormReel'}).ok,true);assert.equal(tower(s).probes,undefined);
+ assert.equal(act(s,{action:'stormReel'}).code,'not_needed');
+ // Nothing left on the hooks: Use at the tower winds the planted red crossbow home.
+ {const c=s.checkpoint();c.players[0].position=[9.6,terrainHeight(c,9.6,20.5),20.5];s=loadSimulation(c);}
+ act(s,{action:'inventionUse',structureId:'spire1'});assert.equal(tower(s).operator2,null,'Use at the tower hangs up the worn blue pack');
+ const tk2=act(s,{action:'inventionUse',structureId:'spire1',pack:'red'});assert.equal(tk2.ok,true,tk2.code);assert.equal(tower(s).operator2,'h','with red still planted out, the blue pack is the free one');
+ s.addPlayer({id:'h2',name:'Friend'});{const c=s.checkpoint(),p2=c.players.find(p=>p.id==='h2');p2.position=[9.6,terrainHeight(c,9.6,19.5),19.5];c.players[0].tool='pick';c.inventions.structures.find(b=>b.id==='spire1').operator2=null;s=loadSimulation(c);}
+ assert.equal(s.command('h2',{type:'action',seq:1,action:'inventionUse',structureId:'spire1'}).ok,true);assert.equal(tower(s).operator2,'h2','a friend takes the blue pack');
+ const recall=act(s,{action:'inventionUse',structureId:'spire1'});assert.equal(recall.ok,true,recall.code);assert.ok(recall.events.some(e=>e.kind==='storm_pack_home'&&e.pack==='red'&&e.from),'the planted crossbow winds home');assert.equal(tower(s).planted,undefined);}
 
 // A lone probe held only by the tower cable pulls free when the target is dragged beyond the tether.
 {s=fixture({foes:[[0,-9]]});act(s,{action:'inventionUse',structureId:'spire1'});
  const h=hero(s);act(s,{action:'storm',...aimAt(s,[h.position[0],terrainHeight(s.checkpoint(),h.position[0],h.position[2]-9),h.position[2]-9]),charge:1});
- assert.ok(tower(s).probes?.red);act(s,{action:'equip',tool:'pick'});
+ assert.ok(tower(s).probes?.red);act(s,{action:'inventionUse',structureId:'spire1'});assert.equal(tower(s).operator,null,'hung back on its hook');
  const c=s.checkpoint(),b=c.inventions.structures.find(b=>b.id==='spire1');b.probes.red.at=[b.position[0]+STORMREEL.tether+5,b.position[1],b.position[2]];delete b.probes.red.enemy;const l=loadSimulation(c);
  const ev=[];for(let i=0;i<3;i++)ev.push(...(l.step()?.events||[]));
  assert.ok(!l.checkpoint().inventions.structures.find(b=>b.id==='spire1').probes,'a stretched tether lets go');}
@@ -155,14 +178,15 @@ assert.ok(s.checkpoint().enemies[0].hp>=60,'bolt only');
  for(let i=0;i<2;i++){const r=act(s,{action:'storm',...aimAt(s,pt),charge:1});assert.equal(r.events.find(e=>e.kind==='storm_bolt').probe,'red','partnered: always your own colour');run(s,STORMREEL.cooldownTicks);}
  assert.equal(s.command('h',{type:'action',seq:seq++,action:'equip',tool:'pick'}).ok,true);assert.equal(tower(s).operator,null);assert.equal(tower(s).operator2,'h2','the blue pack stays on its wearer');}
 
-// A saved game keeps lodged probes and a live circuit, and trims damaged fields instead of choking on them.
-{s=fixture({foes:[[0,-9],[-.4,-14]]});act(s,{action:'inventionUse',structureId:'spire1'});const h=hero(s),at=(dx,dz)=>{const x=h.position[0]+dx,z=h.position[2]+dz;return [x,terrainHeight(s.checkpoint(),x,z),z];};
- act(s,{action:'storm',...aimAt(s,at(0,-9)),charge:.3});act(s,{action:'equip',tool:'pick'});act(s,{action:'inventionUse',structureId:'spire1',pack:'blue'});run(s,STORMREEL.cooldownTicks);
- act(s,{action:'storm',...aimAt(s,at(-.4,-14)),charge:.3});assert.ok(tower(s).arc,'circuit up before saving');
+// A saved game keeps lodged probes, a planted crossbow and a live circuit, and trims damaged fields instead of choking on them.
+{s=fixture({foes:[[0,-9,0,'golem']]});act(s,{action:'inventionUse',structureId:'spire1'});const body=()=>{const e=s.checkpoint().enemies[0];return [e.position[0],e.position[1]+1.4,e.position[2]];};
+ {const c=s.checkpoint();c.enemies[0].attackTick=c.tick;s=loadSimulation(c);}
+ act(s,{action:'storm',...aimAt(s,body()),charge:.3});act(s,{action:'equip',tool:'pick'});act(s,{action:'inventionUse',structureId:'spire1',pack:'blue'});run(s,STORMREEL.cooldownTicks);
+ act(s,{action:'storm',...aimAt(s,body()),charge:.3});assert.ok(tower(s).arc,'circuit up before saving');
  const loaded=loadSimulation(JSON.parse(JSON.stringify(s.checkpoint())));const t2=loaded.checkpoint().inventions.structures.find(b=>b.id==='spire1');
- assert.ok(t2.probes.red&&t2.probes.blue&&t2.arc,'probes and arc survive a save');assert.equal(t2.probes.red.cost>0,true);
- const bad=JSON.parse(JSON.stringify(s.checkpoint()));const bt=bad.inventions.structures.find(b=>b.id==='spire1');bt.probes.red.at=[NaN,0,'x'];bt.operator2={};bt.wraps2='nope';
- const fixed=loadSimulation(bad).checkpoint().inventions.structures.find(b=>b.id==='spire1');assert.ok(!fixed.probes?.red&&!fixed.arc&&fixed.operator2===null&&Array.isArray(fixed.wraps2),'a damaged save is trimmed');}
+ assert.ok(t2.probes.red&&t2.probes.blue&&t2.arc&&t2.arc.enemy==='foe0'&&t2.planted.red,'probes, planted crossbow and arc survive a save');assert.equal(t2.probes.red.cost>0,true);
+ const bad=JSON.parse(JSON.stringify(s.checkpoint()));const bt=bad.inventions.structures.find(b=>b.id==='spire1');bt.probes.red.at=[NaN,0,'x'];bt.operator2={};bt.wraps2='nope';bt.planted.red.at='here';
+ const fixed=loadSimulation(bad).checkpoint().inventions.structures.find(b=>b.id==='spire1');assert.ok(!fixed.probes?.red&&!fixed.arc&&fixed.operator2===null&&Array.isArray(fixed.wraps2)&&!fixed.planted,'a damaged save is trimmed');}
 
 // You get the pack hanging beside you: standing by the west hook shoulders the blue one, by the east hook the red one.
 {s=fixture({heroAt:[6.2,22]});const c=s.checkpoint(),b=c.inventions.structures.find(x=>x.id==='spire1');

@@ -7,14 +7,19 @@
 // drawn body part they stuck in), never from the snapshot tick.
 //
 // Red is the positive (+) pole and blue the negative (-): current is drawn leaving the red terminal and returning to the
-// blue one, as bright pulses running along each cable and filament and as carriers along the live arc.
+// blue one, as bright pulses running along each cable and filament and as carriers through the foe the circuit cooks
+// (stormreel-circuit.js). The cable itself (and its snug wraps round tree trunks) is stormreel-cable.js. A crossbow its
+// carrier planted stands spiked butt-first in the ground with its pack beside it, still wired up.
 import * as THREE from 'three';
 import {STORMREEL,PACKS,terminalPoint,hookPoint as sharedHook,cableStrain,cableWraps} from '../shared/stormreel.js';
+import {worldTrees} from '../shared/world-content.js';
+import {trunkRadius} from '../shared/trees.js';
 import {PACK_COLORS,tintPack} from './stormspire-art.js';
-import {POLE,MIXED_HUE,finishCrossbow,softTexture,coronaTexture,glyphTexture,ribbonTexture,createRibbon,createBeads,makeSprite,along,flicker} from './stormreel-look.js';
+import {POLE,finishCrossbow,softTexture,coronaTexture,glyphTexture,ribbonTexture,createRibbon,createBeads,makeSprite,along,flicker} from './stormreel-look.js';
 import {createStormreelAudio} from './stormreel-audio.js';
-
-export const CABLE = Object.freeze({points: 26, sides: 5, radius: .022, iterations: 10, gravity: 9.8, homeSeconds: .8, payOut: 40});
+import {createCableKit,CABLE} from './stormreel-cable.js';
+import {createCircuitFx} from './stormreel-circuit.js';
+export {CABLE};
 const BACK = new THREE.Vector3(0, 1.28, .17);   // pack anchor behind the shoulder blades, actor-local (+Z is behind)
 const BOLT_LEN = .33, BOLT_BURY = .1;            // the authored bolt: tail to nose, and how far a lodged one sinks in
 const REEL = Object.freeze({minSeconds: .22, maxSeconds: .65, speed: 38});
@@ -25,95 +30,58 @@ const GLOW = {red: new THREE.Color(POLE.red.glow), blue: new THREE.Color(POLE.bl
  *   scene, lightning (lightning-fx), height(x,z), localId(), actorPose(id) -> {position:Vector3, yaw} | null,
  *   localPose() -> {position:Vector3, yaw}, localMuzzle(out) -> Vector3 | null, remoteMuzzle(id, out) -> Vector3 | null,
  *   remoteCrossbow(id) -> Object3D | null, probeAnchor(enemyId, part, out), bodyPoints(enemyId, outVectors) -> count,
- *   spireEntry(id) -> invention entry, spireArt (stormspire-art), audio() -> AudioContext | null, listener() -> ear pose | null
+ *   spireEntry(id) -> invention entry, spireArt (stormspire-art), audio() -> AudioContext | null, listener() -> ear pose | null,
+ *   enemyVisual(id) -> Object3D | null, shake(amount, at), flash(amount), trees(snapshot) -> tree list   (the last four optional)
  */
 export function createStormreelView(ctx) {
   const {scene, lightning} = ctx;
-  let packTemplate = null, boltTemplate = null, snapshot = null, clock = 0;
-  const cables = new Map(), packs = new Map(), bolts = [], homes = new Map(), wires = new Map(), reels = [], victims = new Map(), arcLoops = new Map(), arcFx = new Map();
+  let packTemplate = null, boltTemplate = null, bowTemplate = null, bowButt = null, snapshot = null, clock = 0, treesFor = null, treeMap = new Map();
+  const cables = new Map(), packs = new Map(), bolts = [], homes = new Map(), wires = new Map(), reels = [], arcLoops = new Map();
   const probeMeshes = new Map(), pending = new Map(), hidden = new Map(), dirs = new Map();
   const v = new THREE.Vector3(), v2 = new THREE.Vector3(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c3 = new THREE.Color();
-  const cableMats = {red: new THREE.MeshStandardMaterial({color: PACK_COLORS.red, roughness: .55, metalness: 0, emissive: POLE.red.glow, emissiveIntensity: 0}),
-    blue: new THREE.MeshStandardMaterial({color: PACK_COLORS.blue, roughness: .55, metalness: 0, emissive: POLE.blue.glow, emissiveIntensity: 0})};
+  const kit = createCableKit({scene, height: ctx.height});
+  // Rubber-jacketed cable: a deep pole colour with a moulded rib and a lighter pinstripe (stormreel-cable.js jacketTexture).
+  const cableMats = {red: new THREE.MeshStandardMaterial({color: 0xc23224, roughness: .5, metalness: 0, map: kit.jacket, emissive: POLE.red.glow, emissiveIntensity: 0}),
+    blue: new THREE.MeshStandardMaterial({color: 0x2a62d0, roughness: .5, metalness: 0, map: kit.jacket, emissive: POLE.blue.glow, emissiveIntensity: 0})};
   const OP = {red: 'operator', blue: 'operator2'};
   // Shared pooled drawing: soft textures, one bead Points for every travelling carrier, and the sound.
   const tex = {soft: softTexture(), corona: coronaTexture(), ribbon: ribbonTexture(), red: glyphTexture('red'), blue: glyphTexture('blue')};
   const beads = createBeads(scene, tex.soft, {capacity: 200, size: .15});
   const sfx = createStormreelAudio({audio: ctx.audio, listener: ctx.listener});
+  const sound = (name, ...args) => { try { sfx[name]?.(...args); } catch { /* audio is never worth a frame */ } };
+  const circuit = createCircuitFx({scene, lightning, height: ctx.height, beads, tex, sound, bodyPoints: ctx.bodyPoints, enemyVisual: ctx.enemyVisual,
+    enemyAt: (id, out) => { const e = snapshot?.enemies?.find(x => x.id === id); return e ? out.fromArray(e.position).setY(e.position[1] + 1.1) : null; }, shake: ctx.shake, flash: ctx.flash});
   let creakAt = 0;
 
   function installPack(gltf) { packTemplate = gltf; }
-  function installCrossbow(gltf) { boltTemplate = gltf.scene.getObjectByName('Bolt') || null; }
-  const sound = (name, ...args) => { try { sfx[name]?.(...args); } catch { /* audio is never worth a frame */ } };
+  function installCrossbow(gltf) {
+    boltTemplate = gltf.scene.getObjectByName('Bolt') || null; bowTemplate = gltf.scene;
+    // The butt: the back end of the crossbow along its length (-Z forward), where it bites into the ground when planted.
+    const box = new THREE.Box3().setFromObject(gltf.scene); bowButt = new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * .35, box.max.z);
+  }
 
-  // ---- cable: a verlet rope with ground contact, drawn as a small tube rebuilt in place every frame, with a glowing
-  // ribbon over it that carries the current pulses
-  function makeCable(colour = 'red') {
-    const N = CABLE.points, S = CABLE.sides, pos = new Float32Array(N * S * 3), idx = [];
-    for (let i = 0; i < N - 1; i++) for (let k = 0; k < S; k++) { const a = i * S + k, b = i * S + (k + 1) % S, c = a + S, d = b + S; idx.push(a, c, b, b, c, d); }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)); geo.setIndex(idx);
-    const mesh = new THREE.Mesh(geo, cableMats[colour]); mesh.frustumCulled = false; mesh.castShadow = false; mesh.raycast = () => {}; mesh.userData.ignoreContact = true; mesh.name = 'StormreelCable';
-    scene.add(mesh);
-    return {mesh, geo, glow: createRibbon(scene, tex.ribbon, {capacity: N}), p: Array.from({length: N}, () => new THREE.Vector3()), o: Array.from({length: N}, () => new THREE.Vector3()), seeded: false, length: 0, pins: [], end: new THREE.Vector3(), colour};
+  // ---- cable (stormreel-cable.js): wrapped trees resolve to their own trunk profiles for a snug fit
+  function makeCable(colour) { const c = kit.make(cableMats[colour]); c.glow = createRibbon(scene, tex.ribbon, {capacity: 220}); c.colour = colour; return c; }
+  function wrapsFor(tower, colour) {
+    const list = cableWraps(tower, colour); if (!list.length) return null;
+    if (treesFor !== snapshot) { treesFor = snapshot; treeMap = new Map((ctx.trees?.(snapshot) || worldTrees(snapshot)).map(t => [t.id, t])); }
+    return list.map(w => ({x: w.x, z: w.z, tree: treeMap.get(w.id) || null}));
   }
-  function seed(c, a, b) {
-    for (let i = 0; i < c.p.length; i++) { const t = i / (c.p.length - 1); c.p[i].lerpVectors(a, b, t); c.p[i].y -= Math.sin(t * Math.PI) * .4; c.o[i].copy(c.p[i]); }
-    c.seeded = true; c.length = a.distanceTo(b) + .6; c.end.copy(b);
-  }
-  // Trees the cable is wrapped round (shared/stormreel.js b.wraps) pin the rope to their trunks, spaced by path length.
-  function pinsFor(c, a, b, wraps) {
-    c.pins.length = 0; if (!wraps?.length) return a.distanceTo(b);
-    const pts = [a]; for (const w of wraps) { const y = ctx.height(w.x, w.z) + .35; pts.push(new THREE.Vector3(w.x, y, w.z)); } pts.push(b);
-    let total = 0; const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(total += pts[i].distanceTo(pts[i - 1]));
-    const N = c.p.length;
-    for (let k = 1; k < pts.length - 1; k++) {
-      // Sit the cable on the outside of the turn, against the bark rather than through the trunk.
-      const pin = pts[k].clone(), out = v.subVectors(pts[k - 1], pin).setY(0).normalize().add(v2.subVectors(pts[k + 1], pin).setY(0).normalize()).normalize();
-      if (out.lengthSq() > .5) pin.addScaledVector(out, -.32);
-      c.pins.push({i: Math.min(N - 2, Math.max(1, Math.round(cum[k] / total * (N - 1)))), at: pin});
+  /** Trees near this cable that it is not wrapped round: its free spans slide round their bark (stormreel-cable.js). */
+  const trunkList = new Map();
+  function trunksNear(c, a, b, wraps) {
+    if (treesFor !== snapshot) { treesFor = snapshot; treeMap = new Map((ctx.trees?.(snapshot) || worldTrees(snapshot)).map(t => [t.id, t])); }
+    let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), z0 = Math.min(a.z, b.z), z1 = Math.max(a.z, b.z);
+    if (c.seeded) for (const p of c.p) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
+    const out = trunkList.get(c) || []; out.length = 0; trunkList.set(c, out);
+    const wrapped = new Set((wraps || []).map(w => w.tree?.id));
+    for (const t of treeMap.values()) {
+      if (wrapped.has(t.id) || t.x < x0 - 1 || t.x > x1 + 1 || t.z < z0 - 1 || t.z > z1 + 1) continue;
+      const floor = ctx.height(t.x, t.z); out.push({x: t.x, z: t.z, r: trunkRadius(t, .8) + .01, top: floor + Math.min(2.2, t.height * .4)});
     }
-    return total;
+    return out.length ? out : null;
   }
-  function simulate(c, a, b, strain, dt, path, maxLength) {
-    const N = c.p.length, h = Math.min(dt, 1 / 30), g = CABLE.gravity * h * h;
-    // Paid-out length: generous slack near the tower, drawing taut as the wearer reaches the end of the drum.
-    const d = path ?? a.distanceTo(b), want = Math.min(maxLength + .5, d * (1.04 - .035 * strain) + .7 * (1 - strain));
-    c.length += (want - c.length) * Math.min(1, dt * 3);
-    const rest = c.length / (N - 1);
-    for (let i = 1; i < N - 1; i++) {
-      const p = c.p[i], o = c.o[i], ground = ctx.height(p.x, p.z) + CABLE.radius;
-      const onGround = p.y <= ground + .01, damp = onGround ? .55 : .985;   // lying cable drags; hanging cable swings
-      const vx = (p.x - o.x) * damp, vy = (p.y - o.y) * .985, vz = (p.z - o.z) * damp;
-      o.copy(p); p.x += vx; p.y += vy - g; p.z += vz;
-    }
-    c.p[0].copy(a); c.p[N - 1].copy(b);
-    for (const pin of c.pins) { c.p[pin.i].copy(pin.at); c.o[pin.i].copy(pin.at); }
-    for (let it = 0; it < CABLE.iterations; it++) {
-      for (let i = 0; i < N - 1; i++) {
-        const p = c.p[i], n = c.p[i + 1]; v.subVectors(n, p); const l = v.length() || 1e-6, diff = (l - rest) / l;
-        const wa = i === 0 ? 0 : .5, wb = i + 1 === N - 1 ? 0 : .5, k = wa + wb; if (!k) continue;
-        p.addScaledVector(v, diff * wa / k); n.addScaledVector(v, -diff * wb / k);
-      }
-      for (let i = 1; i < N - 1; i++) { const p = c.p[i], ground = ctx.height(p.x, p.z) + CABLE.radius; if (p.y < ground) p.y = ground; }
-      for (const pin of c.pins) c.p[pin.i].copy(pin.at);
-    }
-  }
-  function draw(c) {
-    const N = c.p.length, S = CABLE.sides, pos = c.geo.attributes.position.array, t = new THREE.Vector3(), n = new THREE.Vector3(), bn = new THREE.Vector3();
-    let prevN = null;
-    for (let i = 0; i < N; i++) {
-      t.subVectors(c.p[Math.min(i + 1, N - 1)], c.p[Math.max(i - 1, 0)]).normalize();
-      if (!prevN) { n.crossVectors(t, Math.abs(t.y) < .9 ? up : v2.set(1, 0, 0)).normalize(); }
-      else { n.copy(prevN).addScaledVector(t, -t.dot(prevN)).normalize(); }
-      prevN = (prevN || new THREE.Vector3()).copy(n); bn.crossVectors(t, n);
-      for (let k = 0; k < S; k++) {
-        const a = k / S * Math.PI * 2, x = Math.cos(a) * CABLE.radius, y = Math.sin(a) * CABLE.radius, j = (i * S + k) * 3;
-        pos[j] = c.p[i].x + n.x * x + bn.x * y; pos[j + 1] = c.p[i].y + n.y * x + bn.y * y; pos[j + 2] = c.p[i].z + n.z * x + bn.z * y;
-      }
-    }
-    c.geo.attributes.position.needsUpdate = true; c.geo.computeVertexNormals();
-  }
-  function dropCable(id) { const c = cables.get(id); if (!c) return; c.mesh.removeFromParent(); c.geo.dispose(); c.glow.dispose(); cables.delete(id); }
+  function dropCable(id) { const c = cables.get(id); if (!c) return; trunkList.delete(c); kit.drop(c); c.glow.dispose(); cables.delete(id); }
 
   /**
    * Current pulses along a polyline: red carries them out from the tower (u 0 -> 1), blue returns them (1 -> 0). The ribbon
@@ -167,37 +135,55 @@ export function createStormreelView(ctx) {
   const poleOfHero = (b, id) => !b || !id ? null : b.operator === id ? 'red' : b.operator2 === id ? 'blue' : null;
   const at3 = a => a ? [a.x, a.y, a.z] : null;
 
-  // ---- probes: the lodged bolt, a corona, a spinning polarity badge, and crawling St Elmo's fire
-  function makeProbe(colour) {
-    const g = new THREE.Group(); g.name = `StormProbe:${colour}`;
+  // ---- probes: the lodged bolt, a corona, a spinning polarity badge, and crawling St Elmo's fire. A bolt whose foe died
+  // drops out of the body, falls, clatters and lies on the ground (still wired up, still reelable).
+  function makeProbe(colour, start = null) {
     const corona = makeSprite(scene, tex.corona, GLOW[colour], 15), halo = makeSprite(scene, tex.soft, GLOW[colour], 14), badge = makeSprite(scene, tex[colour], 0xffffff, 16);
     badge.material.depthTest = false; badge.material.blending = THREE.NormalBlending; badge.material.opacity = .95;
     let bolt = null;
     if (boltTemplate) {
       bolt = new THREE.Group(); const m = boltTemplate.clone(true); m.position.copy(boltTemplate.position).negate(); bolt.add(m); finishCrossbow(bolt, colour);
-      bolt.traverse(n => { if (n.isMesh) { n.raycast = () => {}; n.userData.ignoreContact = true; } }); scene.add(bolt);
+      bolt.traverse(n => { if (n.isMesh) { n.raycast = () => {}; n.userData.ignoreContact = true; n.castShadow = true; } }); scene.add(bolt);
     }
-    return {colour, corona, halo, badge, bolt, crawl: 0, since: 0, planted: clock, pos: new THREE.Vector3()};
+    return {colour, corona, halo, badge, bolt, crawl: 0, since: 0, planted: clock, pos: new THREE.Vector3(), started: !!start, start: start?.clone() || null, vel: new THREE.Vector3(), lying: 0, spin: 0, bounced: 0, quat: new THREE.Quaternion()};
   }
   function dropProbeMesh(key) { const m = probeMeshes.get(key); if (!m) return; for (const s of [m.corona, m.halo, m.badge]) { s.removeFromParent(); s.material.dispose(); } m.bolt?.removeFromParent(); probeMeshes.delete(key); }
-  /** A probe's drawn position: riding the drawn body part (smooth, not snapshot-stepped) or where it landed. */
-  function probePoint(probe, out) { return (probe.enemy && ctx.probeAnchor?.(probe.enemy, probe.part, out)) || out.fromArray(probe.at); }
+  /** A probe's target position: riding the drawn body part (smooth, not snapshot-stepped) or where it lies. */
+  function probePoint(probe, out) { return (probe.enemy && !probe.fell && ctx.probeAnchor?.(probe.enemy, probe.part, out)) || out.fromArray(probe.at); }
   function shownProbe(key, probe) {
     const h = hidden.get(key); if (probe && h !== undefined && probe.tick === h) return null;   // reeled in a moment ago: the snapshot has not caught up
-    if (probe) { pending.delete(key); return probe; }
+    if (probe) { const p = pending.get(key); if (p?.start && !probeMeshes.has(key)) starts.set(key, p.start); pending.delete(key); return probe; }
     const p = pending.get(key); if (p && clock < p.until) return p.probe; if (p) pending.delete(key); return null;   // landed, snapshot still on its way
   }
+  const starts = new Map(), tq = new THREE.Quaternion(), lieQ = new THREE.Quaternion(), fwd = new THREE.Vector3(0, 0, -1);
   function updateProbe(key, colour, probe, live, camPos, dt, time) {
-    let m = probeMeshes.get(key); if (!m) { m = makeProbe(colour); probeMeshes.set(key, m); }
-    probePoint(probe, m.pos); const age = clock - m.planted, P = POLE[colour];
-    const stamp = 1 + .9 * Math.exp(-age * 7) * Math.cos(age * 22), flick = .8 + .4 * flicker(time, colour === 'red' ? 0 : 3);
+    let m = probeMeshes.get(key); if (!m) { m = makeProbe(colour, starts.get(key)); starts.delete(key); probeMeshes.set(key, m); if (m.start) m.pos.copy(m.start); else probePoint(probe, m.pos); }
+    const target = probePoint(probe, v), riding = !!probe.enemy && !probe.fell && !!ctx.probeAnchor?.(probe.enemy, probe.part, v2);
+    if (riding) { m.pos.copy(target); m.vel.set(0, 0, 0); m.lying = 0; }
+    else if (m.pos.y > target.y + .03 || m.vel.lengthSq() > .01) {
+      // Falling out of a felled foe: gravity, a little tumble, one bounce and a clatter, then it lies still.
+      m.vel.y -= 9.8 * dt; m.pos.addScaledVector(m.vel, dt); m.pos.x += (target.x - m.pos.x) * Math.min(1, dt * 3); m.pos.z += (target.z - m.pos.z) * Math.min(1, dt * 3); m.spin += dt * 9;
+      if (m.pos.y <= target.y) {
+        m.pos.y = target.y;
+        if (m.vel.y < -1.2 && m.bounced < 2) { m.vel.y *= -.28; m.vel.x = (Math.random() - .5) * .6; m.vel.z = (Math.random() - .5) * .6; m.bounced++; if (m.bounced === 1) { sound('clatter', at3(m.pos)); lightning?.burst(m.pos, {count: 6, speed: 1.8, up: 1}); } }
+        else m.vel.set(0, 0, 0);
+      }
+      m.lying = Math.min(1, m.lying + dt * 4);
+    } else { m.pos.copy(target); if (probe.fell || !probe.enemy) m.lying = probe.fell ? 1 : m.lying; }
+    const age = clock - m.planted, P = POLE[colour];
+    const stamp = 1 + .9 * Math.exp(-age * 7) * Math.cos(age * 22), flick = .8 + .4 * flicker(time, colour === 'red' ? 0 : 3), dim = m.lying > .5 ? .7 : 1;
     m.corona.position.copy(m.pos); m.corona.material.rotation = time * (colour === 'red' ? 2.2 : -2.2) + (live ? Math.sin(time * 30) * .3 : 0);
-    m.corona.scale.setScalar(.5 * flick * (live ? 1.5 : 1) * stamp); m.corona.material.color.copy(GLOW[colour]).lerp(HOT[colour], live ? .35 : .1);
+    m.corona.scale.setScalar(.5 * flick * (live ? 1.5 : 1) * stamp * dim); m.corona.material.color.copy(GLOW[colour]).lerp(HOT[colour], live ? .35 : .1);
     m.halo.position.copy(m.pos); m.halo.scale.setScalar((1 + .3 * Math.sin(time * 6.5 + (colour === 'red' ? 0 : 2))) * (live ? 1.4 : 1)); m.halo.material.opacity = live ? .32 : .2;
     const far = camPos.distanceTo(m.pos); m.badge.position.set(m.pos.x, m.pos.y + .95 + .06 * Math.sin(time * 2.4 + (colour === 'red' ? 0 : 1.6)), m.pos.z);
     m.badge.scale.setScalar(.3 * stamp * (1 + .1 * Math.max(0, far - 8) / 10)); m.badge.material.opacity = Math.min(1, .95 - Math.max(0, far - 30) * .02);
     if (m.bolt) {
-      const d = dirs.get(key) || up; m.bolt.quaternion.setFromUnitVectors(v.set(0, 0, -1), d); m.bolt.position.copy(m.pos).addScaledVector(d, BOLT_BURY - BOLT_LEN);
+      const d = dirs.get(key) || v2.set(0, -1, 0); tq.setFromUnitVectors(fwd, d);
+      if (m.lying > 0) {   // lying flat along its flight line, rolled by the tumble
+        v.set(d.x, 0, d.z); if (v.lengthSq() < 1e-4) v.set(1, 0, 0); v.normalize(); lieQ.setFromUnitVectors(fwd, v).multiply(q.setFromAxisAngle(fwd, m.spin)); tq.slerp(lieQ, m.lying);
+      }
+      m.bolt.quaternion.copy(tq);
+      const bury = m.lying > .5 ? 0 : BOLT_BURY; v.set(0, 0, -1).applyQuaternion(tq); m.bolt.position.copy(m.pos).addScaledVector(v, bury - BOLT_LEN * (m.lying > .5 ? .5 : 1)); if (m.lying > .5) m.bolt.position.y += .015;
       if (probe.enemy && !dirs.has(key)) dirs.set(key, new THREE.Vector3(0, 0, -1));
     }
     // St Elmo's fire: little arcs crawl from the head across whatever it is stuck in; busier and brighter while the circuit runs.
@@ -210,11 +196,72 @@ export function createStormreelView(ctx) {
     }
   }
 
+  // ---- a planted crossbow: spiked butt-first into the ground, its pack lying beside it, a short coiled cord between them
+  const planted = new Map();
+  const dust = (at, n = 6) => { for (let i = 0; i < n; i++) circuit.puff(at.clone().add(v.set((Math.random() - .5) * .5, .05, (Math.random() - .5) * .5)), {size: .28 + Math.random() * .2, life: .7 + Math.random() * .4, rise: .35, color: 0x8a7a62, drift: .9}); };
+  function plantedPose(at, yaw, out) {
+    // Muzzle up, leaning a little forward the way its carrier faced; the top of the receiver faces back toward them.
+    const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), muzzle = new THREE.Vector3(0, 1, 0).addScaledVector(f, .28).normalize();
+    const z = muzzle.clone().negate(), y = f.clone().negate().addScaledVector(z, -f.clone().negate().dot(z)).normalize(), x = new THREE.Vector3().crossVectors(y, z);
+    out.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+    const butt = (bowButt || new THREE.Vector3(0, 0, .3)).clone().applyQuaternion(out.quaternion);
+    out.position.copy(at).sub(butt).addScaledVector(muzzle, -.07);   // a few centimetres of the butt bitten into the soil
+    return muzzle;
+  }
+  function makePlanted(key, colour, pl, fresh) {
+    const g = {colour, at: new THREE.Vector3(...pl.at), yaw: pl.yaw, t: fresh ? 0 : 1, bow: null, pack: null, cord: null, badge: makeSprite(scene, tex[colour], 0xffffff, 16), glow: makeSprite(scene, tex.soft, GLOW[colour], 13), landed: !fresh};
+    g.badge.material.depthTest = false; g.badge.material.blending = THREE.NormalBlending;
+    if (bowTemplate) {
+      g.bow = bowTemplate.clone(true); g.bow.name = `PlantedStormreel:${colour}`; finishCrossbow(g.bow, colour);
+      g.bow.traverse(n => { if (n.isMesh) { n.castShadow = true; n.raycast = () => {}; n.userData.ignoreContact = true; } });
+      for (const name of ['Charge_L_Core', 'Charge_R_Core']) { const c = g.bow.getObjectByName(name); if (c) { c.visible = true; c.scale.z = .12; } }
+      scene.add(g.bow); g.muzzleDir = plantedPose(g.at, g.yaw, g.bow); g.rest = g.bow.position.clone(); g.restQ = g.bow.quaternion.clone(); g.muzzle = g.bow.getObjectByName('Muzzle'); g.cordAt = g.bow.getObjectByName('CordAnchor');
+    }
+    if (packTemplate) {
+      g.pack = tintPack(packTemplate.scene.clone(true), colour); g.pack.name = `PlantedPack:${colour}`;
+      g.pack.traverse(n => { if (n.isMesh) { n.castShadow = true; n.raycast = () => {}; n.userData.ignoreContact = true; } });
+      // Set down on its frame to the right of the crossbow, drum up.
+      const right = new THREE.Vector3(Math.cos(g.yaw), 0, -Math.sin(g.yaw)), at = g.at.clone().addScaledVector(right, .55);
+      g.pack.position.set(at.x, ctx.height(at.x, at.z) + .17, at.z); g.pack.rotation.set(-Math.PI / 2, 0, g.yaw + Math.PI, 'YXZ'); scene.add(g.pack); g.pack.updateMatrixWorld(true);
+      g.exit = g.pack.getObjectByName('CableExit');
+    }
+    planted.set(key, g); return g;
+  }
+  function dropPlanted(key) {
+    const g = planted.get(key); if (!g) return;
+    g.bow?.removeFromParent(); g.pack?.removeFromParent(); g.cord?.geometry.dispose(); g.cord?.removeFromParent();
+    for (const s of [g.badge, g.glow]) { s.removeFromParent(); s.material.dispose(); } planted.delete(key);
+  }
+  function updatePlanted(g, dt, time, camPos) {
+    if (g.bow) {
+      // Plant: it comes down hard from hip height along its own axis, bites, then shivers to a stop.
+      g.t = Math.min(1, g.t + dt / .22); const fall = 1 - g.t * g.t;
+      g.bow.position.copy(g.rest).addScaledVector(g.muzzleDir, .85 * fall);
+      if (g.t >= 1 && !g.landed) { g.landed = true; g.wobble = 1; dust(g.at, 8); lightning?.burst(g.at, {count: 10, speed: 2.4, up: 1}); lightning?.glow(g.at.clone().setY(g.at.y + .3), {size: 1, life: .25, color: POLE[g.colour].glow}); }
+      g.wobble = Math.max(0, (g.wobble || 0) - dt * 2.2);
+      g.bow.quaternion.copy(g.restQ).multiply(q.setFromAxisAngle(v.set(1, 0, 0), Math.sin(clock * 34) * .06 * g.wobble * g.wobble));
+      g.bow.updateMatrixWorld(true);
+      // The cord from the pack to the crossbow's butt socket: a lazy loop over the grass.
+      if (g.exit && g.cordAt && !g.cord && g.landed) {
+        const a = g.cordAt.getWorldPosition(new THREE.Vector3()), b = g.pack.getObjectByName('CableExit').getWorldPosition(new THREE.Vector3()), mid = a.clone().lerp(b, .5); mid.y = ctx.height(mid.x, mid.z) + .03;
+        const lift = a.clone().lerp(mid, .35); lift.y = Math.max(lift.y, mid.y + .05);
+        g.cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, lift, mid, b]), 20, .013, 6, false), cableMats[g.colour]); g.cord.castShadow = true; g.cord.raycast = () => {}; g.cord.userData.ignoreContact = true; scene.add(g.cord);
+      }
+    }
+    // A marker so you can find it again across the field: the polarity badge over it and a soft glow at the grip.
+    const far = camPos.distanceTo(g.at); g.badge.position.set(g.at.x, g.at.y + 1.25 + .05 * Math.sin(time * 2), g.at.z); g.badge.scale.setScalar(.28 * (1 + Math.max(0, far - 6) * .045)); g.badge.material.opacity = Math.min(.95, .35 + far * .04);
+    g.glow.position.set(g.at.x, g.at.y + .55, g.at.z); g.glow.scale.setScalar(.9 + .2 * flicker(time, 2)); g.glow.material.opacity = .22;
+  }
+  /** Where a planted pack's cable leaves it, and where its filament leaves the crossbow. */
+  const plantedExit = (g, out) => g?.exit ? g.exit.getWorldPosition(out) : out.copy(g?.at || out);
+  const plantedMuzzle = (g, out) => g?.muzzle ? g.muzzle.getWorldPosition(out) : null;
+
   // ---- events
   function event(ev) {
     if (ev.kind === 'storm_pack_home') {
-      const colour = ev.pack || 'red', key = `${ev.id}:${colour}`, c = cables.get(key), from = c ? c.p[c.p.length - 1].clone() : null;
+      const colour = ev.pack || 'red', key = `${ev.id}:${colour}`, c = cables.get(key), from = c && c.count ? c.render[c.count - 1].clone() : ev.from ? new THREE.Vector3(...ev.from) : null;
       sound('pack', 'hang', colour, ev.position, ev.by === ctx.localId());
+      dropPlanted(key);
       if (ev.tethered) return;   // a lodged bolt still holds the cable: it pays out to the probe instead of winding home
       if (from) { homes.set(key, {t: 0, from, by: ev.by}); away(ev.id, colour, true); }
       return;
@@ -225,16 +272,27 @@ export function createStormreelView(ctx) {
       if (t && lightning) { lightning.glow(t, {size: 1.8, life: .35, color: POLE[ev.pack || 'red'].glow}); lightning.burst(t, {count: 14, speed: 3}); }
       return;
     }
+    if (ev.kind === 'storm_plant') {
+      const key = `${ev.id}:${ev.pack}`; dropPlanted(key); makePlanted(key, ev.pack, {at: ev.position, yaw: ev.yaw}, true);
+      sound('spike', ev.pack, ev.position, ev.by === ctx.localId()); return;
+    }
+    if (ev.kind === 'storm_pickup') {
+      const key = `${ev.id}:${ev.pack}`, g = planted.get(key); if (g) { dust(g.at, 5); lightning?.burst(g.at.clone().setY(g.at.y + .5), {count: 8, speed: 2}); }
+      dropPlanted(key); sound('pack', 'take', ev.pack, ev.position, ev.by === ctx.localId()); return;
+    }
     if (ev.kind === 'storm_arc') {
-      sound('circuitClose', ev.red);
-      if (lightning) for (const [at, pole] of [[ev.red, 'red'], [ev.blue, 'blue']]) {
-        const p = new THREE.Vector3(...at); lightning.glow(p, {size: 3, life: .45, color: POLE[pole].glow}); lightning.burst(p, {count: 22, speed: 4.5}); lightning.ring(p, {radius: 2.2, life: .5, color: POLE[pole].glow});
-      }
-      return;
+      const tower = towerOf(ev.id), local = ev.by === ctx.localId();
+      const pa = new THREE.Vector3(...ev.red), pb = new THREE.Vector3(...ev.blue);
+      for (const [k, m] of probeMeshes) { if (k === `${ev.id}:red`) pa.copy(m.pos); if (k === `${ev.id}:blue`) pb.copy(m.pos); }
+      const splash = (ev.splash || []).map(id => snapshot?.enemies?.find(e => e.id === id)).filter(Boolean).map(e => new THREE.Vector3(...e.position));
+      circuit.surge(ev, pa, pb, splash, local);
+      for (const colour of PACKS) { const c = cables.get(`${ev.id}:${colour}`); if (c) c.surge = 1; }
+      void tower; return;
     }
     if (ev.kind === 'storm_arc_end') {
       const tower = towerOf(ev.id);
-      if (lightning && tower?.probes) for (const [k, m] of probeMeshes) if (k.startsWith(`${ev.id}:`)) lightning.burst(m.pos, {count: 10, speed: 2.5});
+      if (lightning) for (const [k, m] of probeMeshes) if (k.startsWith(`${ev.id}:`)) lightning.burst(m.pos, {count: 10, speed: 2.5});
+      if (ev.enemy) circuit.end(ev.enemy, ev.why === 'cooked' && !snapshot?.enemies?.some(e => e.id === ev.enemy && e.hp > 0));
       sound('circuitEnd', ev.why, tower?.position);
       return;
     }
@@ -250,7 +308,7 @@ export function createStormreelView(ctx) {
     const local = ev.by === ctx.localId(), tower = towerOf(ev.structureId), pole = ev.pole || poleOfHero(tower, ev.by) || 'red', P = POLE[pole], key = `${ev.structureId}:${pole}`;
     const from = (local ? ctx.localMuzzle?.(new THREE.Vector3()) : null) || new THREE.Vector3(...ev.origin);
     const to = new THREE.Vector3(...ev.position), dist = from.distanceTo(to), dir = to.clone().sub(from).normalize();
-    const bolt = {from, to, t: 0, flight: Math.max(.04, dist / 140), ev, pole, key, dir, mesh: null, landed: false, pos: from.clone(), splash: (ev.splash || []).map(id => snapshot?.enemies?.find(e => e.id === id)).filter(Boolean).map(e => new THREE.Vector3(...e.position))};
+    const bolt = {from, to, t: 0, flight: Math.max(.04, dist / 140), ev, pole, key, dir, mesh: null, landed: false, pos: from.clone()};
     if (boltTemplate) {
       const holder = new THREE.Group(), m = boltTemplate.clone(true); m.position.copy(boltTemplate.position).negate(); holder.add(m); finishCrossbow(holder, pole);
       scene.add(holder); bolt.holder = holder; holder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir); holder.position.copy(from);
@@ -264,25 +322,18 @@ export function createStormreelView(ctx) {
     const ev = b.ev, P = POLE[b.pole]; b.landed = true;
     if (b.holder) { b.holder.removeFromParent(); b.holder = null; }
     if (ev.probe) {   // the bolt stays: draw its probe from now, the snapshot's copy takes over a moment later
-      pending.set(b.key, {until: clock + .8, probe: {at: [b.to.x, b.to.y, b.to.z], tick: -2, ...(ev.targetId ? {enemy: ev.targetId, part: ev.part} : {})}});
-      dirs.set(b.key, b.dir.clone()); const old = probeMeshes.get(b.key); if (old) old.planted = clock;
+      const at = ev.fell || [b.to.x, b.to.y, b.to.z];
+      pending.set(b.key, {until: clock + .8, start: ev.fell ? b.to.clone() : null, probe: {at, tick: -2, ...(ev.fell ? {fell: true} : ev.targetId ? {enemy: ev.targetId, part: ev.part} : {})}});
+      dirs.set(b.key, b.dir.clone()); const old = probeMeshes.get(b.key); if (old) { old.planted = clock; if (ev.fell) { old.pos.copy(b.to); old.vel.set(0, 0, 0); old.bounced = 0; } } else if (ev.fell) starts.set(b.key, b.to.clone());
     }
     sound('plant', {pole: b.pole, charge: ev.charge ?? 1, at: [b.to.x, b.to.y, b.to.z], ground: !ev.targetId});
     if (!lightning) return;
     if (!ev.live) { lightning.burst(b.to, {count: 6, speed: 1.5}); return; }
+    // A lone bolt carries the filament's static only: a crisp bite and a crackle, waiting for its opposite pole.
     const k = .6 + .4 * (ev.charge ?? 1);
-    lightning.strike(b.from, b.to, {life: .3, width: .08 * k, rough: .06, branches: 2, restrikes: 2, intensity: 1.1, hue: P.hue});
-    lightning.glow(b.to, {size: 2.4 * k, life: .32, color: P.glow});
-    lightning.ring(b.to, {radius: 1.3 * k, life: .4, color: P.glow});
-    lightning.burst(b.to, {count: Math.round(26 * k), speed: 4.5, normal: b.dir.clone().negate()});
-    if (ev.earth && ev.grounded) {
-      const earth = new THREE.Vector3(...ev.earth);
-      if (earth.distanceTo(b.to) > .25) lightning.strike(b.to, earth, {life: .34, width: .08 * k, rough: .14, branches: 1, restrikes: 2, hue: P.hue});
-      lightning.ring(earth, {radius: STORMREEL.stepRadius, life: .55, color: P.glow});
-      lightning.glow(earth.clone().setY(earth.y + .15), {size: 2.6 * k, life: .4, color: P.glow});
-      lightning.burst(earth, {count: 18, speed: 3, up: 1});
-      for (const s of b.splash) lightning.strike(earth, s.clone().setY(s.y + .9), {life: .28, width: .045, rough: .2, branches: 1, restrikes: 1, intensity: .8, hue: P.hue});
-    } else lightning.burst(b.to, {count: 10, speed: 2, up: 0});
+    lightning.strike(b.from, b.to, {life: .2, width: .035 * k, rough: .05, branches: 1, restrikes: 1, intensity: .9, hue: P.hue});
+    lightning.glow(b.to, {size: 1.4 * k, life: .25, color: P.glow});
+    lightning.burst(b.to, {count: Math.round(16 * k), speed: 3.5, normal: b.dir.clone().negate()});
   }
 
   // ---- the filament tether: a hair-thin glowing line from the crossbow to its lodged bolt (or the bolt in flight)
@@ -295,9 +346,9 @@ export function createStormreelView(ctx) {
     for (let i = 0; i < N; i++) {
       const u = i / (N - 1), p = w.pts[i].lerpVectors(a, b, u), env = Math.sin(u * Math.PI);
       p.y -= sag * env; p.y += Math.sin(u * 17 - time * 52) * shake * env * .4; p.x += Math.sin(u * 13 + time * 47) * shake * env * .3;
+      const g = ctx.height(p.x, p.z) + .02; if (p.y < g) p.y = g;   // a long filament lies on the grass, never under it
     }
     pulses(w.pts, w.ribbon, colour, level, time, camPos, key.length * .07, true);
-    // the filament itself is much thinner than the cable overlay
     return w;
   }
   function dropWire(key) { const w = wires.get(key); if (!w) return; w.ribbon.dispose(); wires.delete(key); }
@@ -318,8 +369,7 @@ export function createStormreelView(ctx) {
       const r = reels[i]; r.t += dt; const k = Math.min(1, r.t / r.seconds), ease = Math.pow(k, 2.3), tip = muzzleOf(r.by, v2.set(0, 0, 0)) || r.from;
       r.pos.lerpVectors(r.from, tip, ease);
       if (r.mesh) { const dir = v.subVectors(tip, r.from).normalize(); r.mesh.quaternion.setFromUnitVectors(q0.set(0, 0, -1), dir); r.mesh.position.copy(r.pos).addScaledVector(dir, -BOLT_LEN * .5 * (1 - k)); }   // tail first: it is being pulled home
-      const w = drawWire(r.key + ':reel', r.colour, tip, r.pos, true, time, camPos, 1);
-      void w;
+      drawWire(r.key + ':reel', r.colour, tip, r.pos, true, time, camPos, 1);
       if (lightning) { lightning.burst(r.pos, {count: 2, speed: 1.4, life: .22}); if (Math.random() < dt * 24) lightning.strike(r.pos.clone(), v.copy(r.pos).add(v2.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(.8)), {life: .08, width: .015, rough: .35, depth: 3, branches: 0, restrikes: 0, hue: POLE[r.colour].hue}); }
       if (k >= 1) {
         const P = POLE[r.colour];
@@ -329,73 +379,29 @@ export function createStormreelView(ctx) {
     }
   }
 
-  // ---- the live circuit: sheathed plasma between the poles, red fading to blue, with carriers flowing + to -
-  const pa = new THREE.Vector3(), pb = new THREE.Vector3(), pm = new THREE.Vector3();
-  function arcFor(id) { let f = arcFx.get(id); if (!f) { f = {at: 0, side: 0, sheath: createRibbon(scene, tex.ribbon, {capacity: 18, order: 11}), pts: Array.from({length: 18}, () => new THREE.Vector3())}; arcFx.set(id, f); } return f; }
-  function updateArc(tower, probes, dt, time, camPos) {
-    const f = arcFor(tower.id); probePoint(probes.red, pa); probePoint(probes.blue, pb); const length = pa.distanceTo(pb), power = Math.min(1, (tower.charge || 0) / 60);
-    // sheath: a wavering glow tube, red at the positive end fading through white to blue
-    for (let i = 0; i < f.pts.length; i++) { const u = i / (f.pts.length - 1), env = Math.sin(u * Math.PI); f.pts[i].lerpVectors(pa, pb, u); f.pts[i].y += Math.sin(u * 9 - time * 31) * .14 * env + .06; f.pts[i].x += Math.sin(u * 7 + time * 27) * .1 * env; }
-    f.sheath.update(f.pts, camPos, (i, u) => .22 + .12 * Math.sin(u * Math.PI) + .08 * flicker(time, i), (i, u, out) => { out.copy(GLOW.red).lerp(HOT.red, .3); out.lerp(c3.copy(GLOW.blue), Math.min(1, Math.max(0, (u - .3) / .4))); out.multiplyScalar((.25 + .22 * flicker(time, i * .7)) * (.5 + .5 * power)); });
-    // carriers: beads drifting from the red probe to the blue one
-    const n = Math.min(18, Math.max(6, Math.round(length * .8)));
-    for (let k = 0; k < n; k++) { const u = (((time * .9 + k / n) % 1) + 1) % 1; along(f.pts, u, v); c3.copy(HOT.red).lerp(HOT.blue, u); beads.add(v, c3, .9); }
-    // restriking channels in three segments, so the hue runs red -> white -> blue along the line
-    f.at -= dt;
-    if (lightning && f.at <= 0) {
-      f.at = .05 + Math.random() * .05;
-      const segs = [[0, .4, POLE.red.hue], [.4, .6, MIXED_HUE], [.6, 1, POLE.blue.hue]];
-      for (const [u0, u1, hue] of segs) lightning.strike(v.copy(pa).lerp(pb, u0).clone(), v2.copy(pa).lerp(pb, u1).clone(), {life: .13 + Math.random() * .08, width: .13, rough: .1, depth: 4, branches: 1, restrikes: 1, intensity: 1.5, hue, follow: segFollow(probes, u0, u1)});
-      if (Math.random() < .6) lightning.strike(pa.clone(), pb.clone(), {life: .1, width: .045, rough: .24, depth: 4, branches: 0, restrikes: 0, intensity: 1.2, follow: segFollow(probes, 0, 1)});
-      if (Math.random() < .55) {   // a side-arc leaps from the line to the ground
-        const u = .1 + Math.random() * .8; pm.copy(pa).lerp(pb, u); v.copy(pm); v.x += (Math.random() - .5) * 3; v.z += (Math.random() - .5) * 3; v.y = ctx.height(v.x, v.z) + .05;
-        lightning.strike(pm.clone(), v.clone(), {life: .11, width: .03, rough: .3, depth: 3, branches: 0, restrikes: 0, intensity: .9, hue: MIXED_HUE}); lightning.burst(v, {count: 4, speed: 2.5, up: 1});
-      }
+  // ---- the end of the cable: a brief, clear tug (the cable whips taut, the fairlead spits sparks, the brake clunks)
+  function tug(id, k = 1) {
+    for (const [key, c] of cables) {
+      const tower = towerOf(key.split(':')[0]), colour = key.split(':')[1]; if (!tower || tower[OP[colour]] !== id) continue;
+      kit.whip(c, 1.2 * k); c.tugGlow = 1;
+      const end = c.count ? c.render[c.count - 1] : null;
+      if (end && lightning) { lightning.burst(end, {count: 10, speed: 2.6}); lightning.glow(end, {size: .9, life: .18, color: POLE[colour].glow}); }
+      sound('tug', k, id === ctx.localId() ? null : end ? at3(end) : null);
     }
   }
-  const segFollow = (probes, u0, u1) => { const a = new THREE.Vector3(), b = new THREE.Vector3(), o = [new THREE.Vector3(), new THREE.Vector3()]; return () => { probePoint(probes.red, a); probePoint(probes.blue, b); o[0].lerpVectors(a, b, u0); o[1].lerpVectors(a, b, u1); return o; }; };
 
-  // ---- the foes on the line: current crawls over them and they flare
-  const bodyBuf = Array.from({length: 8}, () => new THREE.Vector3());
-  function distSeg(a, b, p) { v.subVectors(b, a); const L = v.lengthSq() || 1, u = Math.max(0, Math.min(1, v2.subVectors(p, a).dot(v) / L)); return v2.copy(a).addScaledVector(v, u).distanceTo(p); }
-  function updateVictims(tower, probes, dt, time) {
-    probePoint(probes.red, pa); probePoint(probes.blue, pb); const seen = new Set();
-    for (const e of snapshot?.enemies || []) {
-      if (e.hp <= 0 || seen.size >= 6) continue;
-      v.fromArray(e.position); v.y += .9; if (distSeg(pa, pb, v) > 3.5) continue;   // cheap reject before touching the body rig
-      const n = ctx.bodyPoints?.(e.id, bodyBuf) || 0; let near = Infinity;
-      if (n) { for (let i = 0; i < n; i++) { const d = distSeg(pa, pb, bodyBuf[i]); if (d < near) near = d; } }
-      else { v.fromArray(e.position); v.y += .9; near = distSeg(pa, pb, v); }
-      if (near > STORMREEL.arcReach + (e.kind === 'golem' ? 1 : .35)) continue;
-      seen.add(e.id); let x = victims.get(e.id);
-      if (!x) { x = {since: 0, shock: 0, flare: makeSprite(scene, tex.soft, 0x7fb8ff, 14)}; victims.set(e.id, x); }
-      const centre = n ? bodyBuf[0] : v; x.flare.position.copy(centre); x.flare.position.y += .1; x.flare.scale.setScalar((.9 + .7 * flicker(time, e.id.length * 3.1)) * (e.kind === 'golem' ? 2 : 1)); x.flare.material.opacity = .22 + .22 * flicker(time * 1.7, 2);
-      x.since -= dt; x.shock -= dt;
-      if (lightning && n >= 2 && x.since <= 0) {
-        x.since = .04 + Math.random() * .07; const i = Math.floor(Math.random() * n); let j = Math.floor(Math.random() * n); if (j === i) j = (j + 1) % n;
-        lightning.strike(bodyBuf[i].clone(), bodyBuf[j].clone(), {life: .08, width: .022, rough: .32, depth: 3, branches: 0, restrikes: 0, intensity: 1.1, hue: Math.random() < .5 ? POLE.red.hue : POLE.blue.hue});
-        if (Math.random() < .5) lightning.burst(bodyBuf[j], {count: 2, speed: 2, life: .3});
-      }
-      if (x.shock <= 0) {
-        x.shock = .22 + Math.random() * .2; sound('shock', at3(centre));
-        if (lightning && seen.size <= 2) { v.fromArray(e.position); lightning.ring(v.clone().setY(ctx.height(v.x, v.z) + .05), {radius: e.kind === 'golem' ? 2.2 : 1.1, life: .35, color: 0x9fc8ff}); }
-      }
-    }
-    for (const [id, x] of victims) if (!seen.has(id)) { x.flare.removeFromParent(); x.flare.material.dispose(); victims.delete(id); }
-  }
-
-  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), pa = new THREE.Vector3(), pb = new THREE.Vector3(), pm = new THREE.Vector3();
   function update(dt, time, camPos = new THREE.Vector3(0, 2, 0)) {
     clock += dt; beads.begin();
-    const live = new Set(), wearers = new Set(), shownProbes = new Set(), liveWires = new Set(), liveArcs = new Set(), towers = [];
+    const live = new Set(), wearers = new Set(), shownProbes = new Set(), liveWires = new Set(), liveArcs = new Set(), livePlanted = new Set(), towers = [];
     for (const tower of snapshot?.inventions?.structures || []) {
       if (tower.type !== 'stormspire' || tower.hp <= 0) continue;
       const probes = tower.probes, arcLive = !!(tower.arc && probes?.red && probes?.blue), level = tower.charge > 0 ? (arcLive ? 1 : .12) : 0;
       towers.push({at: tower.position, charge: Math.min(1, (tower.charge || 0) / STORMREEL.maxCharge), working: arcLive});
       for (const colour of PACKS) {
-        const key = `${tower.id}:${colour}`, op = tower[OP[colour]], home = homes.get(key), probe = shownProbe(key, probes?.[colour]);
+        const key = `${tower.id}:${colour}`, op = tower[OP[colour]], home = homes.get(key), probe = shownProbe(key, probes?.[colour]), pl = tower.planted?.[colour];
         if (probe) shownProbes.add(key);
-        const pose = op ? wearerPose(op) : null; let pack = null, worn = false, strain = 0;
+        const pose = op ? wearerPose(op) : null; let pack = null, worn = false, strain = 0, g = null;
         towerTerminal(tower, a, colour);
         if (op && pose) {
           wearers.add(op); homes.delete(key); away(tower.id, colour, false); worn = true;
@@ -403,6 +409,9 @@ export function createStormreelView(ctx) {
           exitPoint(pose, pack, b);
           if (pack?.userData.reel) pack.userData.reel.rotation.x = -(cables.get(key)?.length || 0) * 1.8;   // drum turns as cable pays out
           if (op === ctx.localId() || ctx.actorPose(op)) { const crossbow = op === ctx.localId() ? null : ctx.remoteCrossbow?.(op); if (crossbow) finishCrossbow(crossbow, colour); }
+        } else if (pl) {
+          g = planted.get(key) || makePlanted(key, colour, pl, false); livePlanted.add(key); homes.delete(key); away(tower.id, colour, false);
+          updatePlanted(g, dt, time, camPos); plantedExit(g, b);
         } else if (home) {
           // Winding home: the end of the cable (and the pack on it) zips back along the ground to its hook.
           home.t += dt / CABLE.homeSeconds; const k = Math.min(1, home.t), ease = k * k * (3 - 2 * k);
@@ -413,23 +422,26 @@ export function createStormreelView(ctx) {
         else { away(tower.id, colour, false); continue; }
         live.add(key);
         let c = cables.get(key); if (!c) { c = makeCable(colour); cables.set(key, c); }
-        if (!c.seeded) seed(c, a, b);
+        if (!c.seeded) kit.seed(c, a, b);
         // The far end pays out toward a lodged bolt instead of jumping to it.
-        if (!worn && !home && probe) { v.subVectors(b, c.end); const l = v.length(), step = CABLE.payOut * dt; if (l > step) c.end.addScaledVector(v, step / l); else c.end.copy(b); } else c.end.copy(b);
-        const target = worn ? b : c.end; if (worn) strain = cableStrain(tower, [pose.position.x, 0, pose.position.z], colour);
-        const path = pinsFor(c, a, target, worn ? cableWraps(tower, colour) : null);
-        simulate(c, a, target, home ? 1 : strain, dt, path, worn || home ? STORMREEL.cable : STORMREEL.tether);
-        draw(c);
-        pulses(c.p, c.glow, colour, level, time, camPos, colour === 'red' ? 0 : .5);
-        cableMats[colour].emissiveIntensity = (arcLive ? .5 : level > 0 ? .08 : 0) * (.6 + .4 * flicker(time, 5));
+        if (!worn && !home && !pl && probe) { v.subVectors(b, c.end); const l = v.length(), step = CABLE.payOut * dt; if (l > step) c.end.addScaledVector(v, step / l); else c.end.copy(b); } else c.end.copy(b);
+        const target = worn || pl ? b : c.end; if (worn) strain = cableStrain(tower, [pose.position.x, 0, pose.position.z], colour);
+        const wl = worn || pl ? wrapsFor(tower, colour) : null;
+        kit.step(c, {a, b: target, wraps: wl, trunks: trunksNear(c, a, target, wl), strain, dt, maxLength: worn || home || pl ? STORMREEL.cable : STORMREEL.tether, home: !!home});
+        kit.draw(c);
+        // Current: faint idle pulses; a flood while the circuit runs; a white flash down the line at the surge and at a tug.
+        c.surge = Math.max(0, (c.surge || 0) - dt * 1.5); c.tugGlow = Math.max(0, (c.tugGlow || 0) - dt * 4);
+        pulses(kit.points(c), c.glow, colour, Math.min(1, level + c.surge + c.tugGlow * .5), time, camPos, colour === 'red' ? 0 : .5);
+        cableMats[colour].emissiveIntensity = Math.max(cableMats[colour].emissiveIntensity * .9, (arcLive ? .45 : level > 0 ? .05 : 0) * (.6 + .4 * flicker(time, 5)) + c.surge * 1.2);
         // A taut cable fizzes at the fairlead as a warning, and groans.
         if (worn && strain > .85) { if (lightning && Math.random() < dt * 6) lightning.burst(b, {count: 2, speed: 1.2}); if (clock > creakAt && op === ctx.localId()) { creakAt = clock + 1.6; sound('creak', strain); } }
-        // The filament: crossbow -> bolt, while the wearer still carries the pack and a bolt is out.
-        if (worn) {
-          const bolt = bolts.find(x => x.key === key && !x.landed), tipOk = muzzleOf(op, v2);
-          if (tipOk && (probe || bolt)) {
-            const end = bolt ? bolt.pos : probePoint(probe, v);
-            drawWire(`${key}:wire`, colour, v2, end, false, time, camPos, arcLive ? 1 : .2); liveWires.add(`${key}:wire`);
+        // The filament: crossbow -> bolt, from the crossbow in someone's hands or the one standing planted.
+        const tip = worn ? muzzleOf(op, v2) : g ? plantedMuzzle(g, v2) : null;
+        if (tip) {
+          const bolt = bolts.find(x => x.key === key && !x.landed);
+          if (probe || bolt) {
+            const m = probeMeshes.get(key), end = bolt ? bolt.pos : m ? m.pos : probePoint(probe, pm);
+            drawWire(`${key}:wire`, colour, tip, end, false, time, camPos, arcLive ? 1 : .2); liveWires.add(`${key}:wire`);
           }
         }
       }
@@ -437,18 +449,21 @@ export function createStormreelView(ctx) {
         const probe = shownProbe(`${tower.id}:${colour}`, probes?.[colour]); if (!probe) continue;
         updateProbe(`${tower.id}:${colour}`, colour, probe, arcLive, camPos, dt, time);
       }
-      if (arcLive) {
-        liveArcs.add(tower.id); updateArc(tower, probes, dt, time, camPos); updateVictims(tower, probes, dt, time);
+      if (arcLive && tower.arc.enemy) {
+        liveArcs.add(tower.id);
+        const mr = probeMeshes.get(`${tower.id}:red`), mb = probeMeshes.get(`${tower.id}:blue`);
+        if (mr) pa.copy(mr.pos); else probePoint(probes.red, pa); if (mb) pb.copy(mb.pos); else probePoint(probes.blue, pb);
+        circuit.cook(tower.arc.enemy, pa, pb, dt, time, Math.min(1, (tower.charge || 0) / 60));
         let loop = arcLoops.get(tower.id); if (!loop) { loop = sfx.arcLoop(); if (loop) arcLoops.set(tower.id, loop); }
         if (loop) { pm.copy(pa).lerp(pb, .5); loop.update([pm.x, pm.y, pm.z], dt, Math.min(1, tower.charge / 80)); }
       }
     }
     // retire what is no longer shown
-    for (const [key, m] of probeMeshes) if (!shownProbes.has(key)) dropProbeMesh(key);
+    for (const [key] of probeMeshes) if (!shownProbes.has(key)) dropProbeMesh(key);
+    for (const key of [...planted.keys()]) if (!livePlanted.has(key)) dropPlanted(key);
     for (const key of [...wires.keys()]) if (!liveWires.has(key) && !key.endsWith(':reel')) dropWire(key);
-    for (const [id, f] of arcFx) if (!liveArcs.has(id)) { f.sheath.dispose(); arcFx.delete(id); }
     for (const [id, loop] of arcLoops) if (!liveArcs.has(id)) { loop.stop(); arcLoops.delete(id); }
-    if (!liveArcs.size && victims.size) { for (const x of victims.values()) { x.flare.removeFromParent(); x.flare.material.dispose(); } victims.clear(); }
+    circuit.update(dt, camPos);
     for (const id of [...cables.keys()]) if (!live.has(id)) dropCable(id);
     for (const [id, p] of packs) if (!wearers.has(id)) { p.removeFromParent(); packs.delete(id); }
     for (let i = bolts.length - 1; i >= 0; i--) {
@@ -463,13 +478,13 @@ export function createStormreelView(ctx) {
     sfx.updateTowers(towers, dt);
     beads.end();
   }
-  return {installPack, installCrossbow, sync, event, update, sfx,
-    stats: () => ({cables: cables.size, packs: packs.size, bolts: bolts.length, homes: homes.size, probes: probeMeshes.size, wires: wires.size, reels: reels.length, victims: victims.size, beads: beads.count(), arcs: arcFx.size, audio: sfx.stats()}),
+  return {installPack, installCrossbow, sync, event, update, tug, sfx,
+    stats: () => ({cables: cables.size, packs: packs.size, bolts: bolts.length, homes: homes.size, probes: probeMeshes.size, planted: planted.size, wires: wires.size, reels: reels.length, ...circuit.stats(), beads: beads.count(), audio: sfx.stats()}),
     dispose() {
       for (const id of [...cables.keys()]) dropCable(id); for (const p of packs.values()) p.removeFromParent(); packs.clear();
-      for (const k of [...probeMeshes.keys()]) dropProbeMesh(k); for (const k of [...wires.keys()]) dropWire(k);
-      for (const f of arcFx.values()) f.sheath.dispose(); arcFx.clear(); for (const l of arcLoops.values()) l.stop(); arcLoops.clear();
-      for (const x of victims.values()) { x.flare.removeFromParent(); x.flare.material.dispose(); } victims.clear(); for (const r of reels) r.mesh?.removeFromParent(); reels.length = 0;
-      beads.dispose(); sfx.dispose(); for (const t of Object.values(tex)) t?.dispose?.(); for (const m of Object.values(cableMats)) m.dispose();
+      for (const k of [...probeMeshes.keys()]) dropProbeMesh(k); for (const k of [...wires.keys()]) dropWire(k); for (const k of [...planted.keys()]) dropPlanted(k);
+      for (const l of arcLoops.values()) l.stop(); arcLoops.clear(); circuit.dispose();
+      for (const r of reels) r.mesh?.removeFromParent(); reels.length = 0;
+      beads.dispose(); sfx.dispose(); for (const t of Object.values(tex)) t?.dispose?.(); for (const m of Object.values(cableMats)) m.dispose(); kit.jacket?.dispose();
     }};
 }

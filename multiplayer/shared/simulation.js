@@ -33,7 +33,7 @@ import {growthPlan,waveLine,validGroveTrees} from './grove-growth.js';
 import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js';
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
-import {stormShot,stormReel,leash,releasePack,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
+import {stormShot,stormReel,leash,releasePack,plantPack,stormPickup,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
 import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
@@ -242,9 +242,9 @@ function instantiate(state) {
         if (p.dragon && message.action !== 'equip') return fail('dragon_riding');
         if (message.action === 'equip') {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
-          // The Stormreel only comes off a Stormspire's hook; putting it away sends the pack winding home.
+          // The Stormreel only comes off a Stormspire's hook; choosing another weapon plants it in the ground where you stand.
           if (message.tool==='stormreel') return wornTower(state,p)?ok():fail('no_pack');
-          if (p.tool==='stormreel') { const events=releasePack(state,p); p.tool=message.tool; releaseHeld(state,p,[0,0,0]); return ok(events); }
+          if (p.tool==='stormreel') { const events=plantPack(state,p,[],(x,z)=>terrainHeight(state,x,z,false)); p.tool=message.tool; releaseHeld(state,p,[0,0,0]); return ok(events); }
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           if(message.tool!==p.tool)releaseSnack(state,p);
           p.tool = message.tool; return ok();
@@ -255,6 +255,8 @@ function instantiate(state) {
         if(message.action==='special'&&['axe','pick'].includes(p.tool))reclaimDepletedDeposits(state);
         if (message.action === 'storm') return stormShot(state,p,message,{...combatContext,hitEnemyPart});
         if (message.action === 'stormReel') return stormReel(state,p);
+        if (message.action === 'stormPlant') return wornTower(state,p)?ok(plantPack(state,p,[],(x,z)=>terrainHeight(state,x,z,false))):fail('no_pack');
+        if (message.action === 'stormPickup') return stormPickup(state,p,message,(x,z)=>terrainHeight(state,x,z,false));
         const combatResult=combatAction(state,p,message,combatContext);if(combatResult)return combatResult;
         if (message.action === 'interact') {
           const target=nearestCollectible(state,p,{height:(x,z)=>terrainHeight(state,x,z,false)});

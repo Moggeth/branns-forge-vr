@@ -405,7 +405,20 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     remoteCrossbow:id=>actors.get(`p:${id}`)?.root.getObjectByName('RemoteWeapon:stormreel')||null,
     remoteMuzzle:(id,out)=>{const m=actors.get(`p:${id}`)?.root.getObjectByName('RemoteWeapon:stormreel')?.getObjectByName('Muzzle');return m?m.getWorldPosition(out):null;},
     bodyPoints:(id,out)=>{const a=actors.get(`e:${id}`);if(!a?.visual)return 0;let n=0;for(const part of ['torso','head','leftArm','rightArm','leftLeg','rightLeg']){const node=stormPartNode(a,part);if(node&&n<out.length)node.getWorldPosition(out[n++]);}return n;},
-    listener:()=>listenerPose(),spireEntry:id=>inventionVisual.spireEntry(id),spireArt:inventionVisual.spires,audio:()=>audioContext});
+    listener:()=>listenerPose(),spireEntry:id=>inventionVisual.spireEntry(id),spireArt:inventionVisual.spires,audio:()=>audioContext,
+    enemyVisual:id=>actors.get(`e:${id}`)?.visual||null,
+    shake:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;stormJolt.shake=Math.max(stormJolt.shake,k*Math.max(0,1-d/28));},
+    flash:k=>{stormJolt.flash=Math.max(stormJolt.flash,k);}});
+  // Camera jolt for a surge nearby and the tug when the cable runs out (presentation only, decays every frame).
+  const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null};
+  function stormTug(){const t=performance.now()/1000;if(t<stormJolt.nextTug)return;stormJolt.nextTug=t+.65;stormJolt.tug=1;stormView.tug(playerId);stormWeapon.tug?.();
+    if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.8,duration:60}]);else if(touchEnabled)try{navigator.vibrate?.([35]);}catch{}
+    report('The cable is at full stretch. Spike the crossbow (G) or walk back toward the tower.');}
+  function stormJoltStep(dt){const j=stormJolt,t=performance.now();
+    if(!renderer.xr.isPresenting&&(j.shake>.001||j.tug>.001)){camera.rotation.x+=j.shake*.03*Math.sin(t*.083)-j.tug*j.tug*.05;camera.rotation.y+=j.shake*.022*Math.sin(t*.067+1)+j.tug*.012*Math.sin(t*.05);}
+    j.shake=Math.max(0,j.shake-dt*2.6);j.tug=Math.max(0,j.tug-dt*3.2);j.flash=Math.max(0,j.flash-dt*3.5);
+    if(j.flash>.001&&!j.el&&globalThis.document){j.el=document.createElement('div');j.el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(circle,rgba(220,235,255,.9),rgba(140,180,255,.35));opacity:0';document.body.appendChild(j.el);}
+    if(j.el)j.el.style.opacity=String(Math.min(.6,j.flash));}
   const stormWeapon=createStormreelWeapon({scene,lightning,send:(action,payload)=>{unlockAudio();onAction(action,payload);},aim:()=>weaponAim(),snapshot:()=>snapshot,playerId:()=>playerId,
     height:(x,z)=>heightAt(x,z,snapshot.edits),localPosition:()=>localPosition,audio:()=>audioContext,now:()=>performance.now()/1000,hud:globalThis.document?.body,severKey:()=>touchEnabled?'Special':'Q',sfx:stormView.sfx});
   // R beside the tower while wearing its pack drops in another Crystal (taking or hanging the pack does this too).
@@ -413,11 +426,14 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Q / Special: reel your bolt back in along its tether (shared/stormreel.js stormReel); it also breaks a live circuit.
   function reelStorm(){const b=wornTower(snapshot,selfPlayer());if(!b?.probes){report('No bolt out to reel in. Hold and release to fire one.');return;}unlockAudio();onAction('stormReel',{});}
   function stormFeel(event){
-    if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (negative)':'Red (positive)'} Stormreel shouldered. ${touchEnabled?'Hold Zap to charge, release to fire':'Hold click to charge, release to fire'}. Lodge a positive bolt and a negative bolt in a foe to run lightning between them (drop one pack and take the other if you are solo); ${touchEnabled?'Special':'Q'} reels your bolt back in.`);
+    if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (negative)':'Red (positive)'} Stormreel shouldered. ${touchEnabled?'Hold Zap to charge, release to fire':'Hold click to charge, release to fire'}. Stick a red (+) bolt and a blue (−) bolt in the SAME foe to close the circuit. Solo? ${touchEnabled?'Drop':'G'} spikes this crossbow in the ground so you can fetch the other one. ${touchEnabled?'Special':'Q'} reels your bolt back in.`);
+    if(event.kind==='storm_plant'&&event.by===playerId)report(`Crossbow spiked into the ground. Its bolt stays live. ${touchEnabled?'Use':'E'} beside it to pick it back up.`);
+    if(event.kind==='storm_pickup'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (−)':'Red (+)'} crossbow back in hand.`);
+    if(event.kind==='storm_arc'&&event.by===playerId)report('Circuit closed! Lightning is cooking your target.');
     if(event.kind==='storm_reel'&&event.by===playerId){if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.35,duration:30},{at:70,amplitude:.7,duration:50}]);else if(touchEnabled)try{navigator.vibrate?.([14,24,30]);}catch{}}
     if(event.kind==='storm_reel'&&event.by===playerId&&event.refund)report(`Bolt reeled in${event.refund?`, ${event.refund} charge returned to the tower`:''}.`);
     if(event.kind==='storm_arc'&&event.by===playerId&&touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([30,20,30,20,60]);}catch{}
-    if(event.kind==='storm_bolt'&&event.by===playerId){const strong=event.live&&event.grounded;
+    if(event.kind==='storm_bolt'&&event.by===playerId){const strong=!!(event.probe||event.fell);
       if(renderer.xr.isPresenting)feedback.pattern?.(strong?[{at:0,amplitude:1,duration:70},{at:90,amplitude:.5,duration:120}]:[{at:0,amplitude:.5,duration:40}]);
       else if(touchEnabled)try{navigator.vibrate?.(strong?[40,30,70]:[20]);}catch{}}
   }
@@ -1214,7 +1230,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(near(homePoint(base.side,HOME_LAYOUT.fountain),HOME_RULES.drink.reach)){unlockAudio();onAction('homeDrink',{});return true;}
     if(near(bellPostAt(base.side),HOME_RULES.bell.reach)){unlockAudio();onAction('homeBell',{});return true;}return false;}
   function useInvention(id){if(isHomeBallistaId(id))return useHomeBallista(id);const self=snapshot.players.find(p=>p.id===playerId),b=snapshot.inventions?.structures.find(b=>b.id===id);if(!self||!b||b.type==='foundation'||b.hp<=0||(b.side!==(self.side||'party')&&b.type!=='forge')||Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z)>5)return false;/* inventions.js usable reach */if(b.type==='forge'){onAction('openWorkshop',{structureId:b.id});return true;}if(b.type==='timberline'&&!renderer.xr.isPresenting){if(manned?.id===b.id)dismountMachine();else mountMachine(b);}else if(['timberline','launcher'].includes(b.type))beginInventionPlacement('operate:'+b.id);else onAction('inventionUse',{structureId:b.id});return true;}
-  function interact(){if(!active||role!=='hero')return;if(appleSnack.holding()){unlockAudio();appleSnack.bite();return;}const c=findCollectible();if(c){onAction('collectTarget',{targetId:c.id});return;}const looked=aimProbe().hit?.targetId;if(looked&&isHomeBallistaId(looked)&&useHomeBallista(looked))return;if(looked&&snapshot.inventions?.structures.some(b=>b.id===looked)&&useInvention(looked))return;const hb=nearHomeBallista();if(hb&&useHomeBallista(hb.id))return;if(useHomePiece())return;const b=snapshot.inventions?.structures.filter(b=>b.hp>0&&b.type!=='foundation').sort((a,b)=>Math.hypot(a.position[0]-localPosition.x,a.position[2]-localPosition.z)-Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z))[0];if(b)useInvention(b.id);}
+  function interact(){if(!active||role!=='hero')return;if(appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(nearPlantedPack()){unlockAudio();onAction('stormPickup');return;}const c=findCollectible();if(c){onAction('collectTarget',{targetId:c.id});return;}const looked=aimProbe().hit?.targetId;if(looked&&isHomeBallistaId(looked)&&useHomeBallista(looked))return;if(looked&&snapshot.inventions?.structures.some(b=>b.id===looked)&&useInvention(looked))return;const hb=nearHomeBallista();if(hb&&useHomeBallista(hb.id))return;if(useHomePiece())return;const b=snapshot.inventions?.structures.filter(b=>b.hp>0&&b.type!=='foundation').sort((a,b)=>Math.hypot(a.position[0]-localPosition.x,a.position[2]-localPosition.z)-Math.hypot(b.position[0]-localPosition.x,b.position[2]-localPosition.z))[0];if(b)useInvention(b.id);}
 
   function grab(pressIndex){if(!active||role!=='hero')return;const ore=findCollectible();if(ore&&Object.hasOwn(ORE_RECIPES,ore.kind)){sendInput(performance.now(),false,true);onAction('inventionLiftOre',{targetId:ore.id});return;}const aim=weaponAim(pressIndex);let nearLog=null;
     if(renderer.xr.isPresenting){const index=[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0];if(index!==undefined){const hand=grips[index].getWorldPosition(new THREE.Vector3()).toArray();nearLog=(snapshot.looseLogs||[]).filter(l=>!l.heldBy&&capsuleDistance(l,hand)<=POUCH_RULES.grabReach).sort((a,b)=>capsuleDistance(a,hand)-capsuleDistance(b,hand)||a.id.localeCompare(b.id))[0];}}
@@ -1222,7 +1238,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     if(id){if(renderer.xr.isPresenting){sendInput(performance.now(),false,true);onAction('grab',{id,interaction:'vr-grip',hand:1});}else onAction('grab',{id});}else if(!renderer.xr.isPresenting)interact();
   }
   function pouchReady(){const p=snapshot.players.find(p=>p.id===playerId),i=[...controllerSources.entries()].find(([,s])=>s.handedness==='right')?.[0];if(!p||i===undefined)return false;const hand=localPose(grips[i]).position,pouch=waistPouchPosition({...p,yaw,head:localPose(renderer.xr.getCamera())});return Math.hypot(...hand.map((v,k)=>v-pouch[k]))<=POUCH_RULES.radius;}
-  function release(throwIt=false,pressIndex){if(!active||role!=='hero')return;if(appleSnack.holding()){onAction('snack',{op:'drop',toss:throwIt});return;}if(snapshot.players.find(p=>p.id===playerId)?.heldOre){sendInput(performance.now(),false,true);onAction('inventionDropOre');return;}const log=snapshot.looseLogs?.find(l=>l.heldBy===playerId);
+  // A Stormreel crossbow spiked into the ground within reach (shared/stormreel.js stormPickup uses the same reach).
+  function nearPlantedPack(){let best=null,bd=STORMREEL.plantReach+.4;for(const b of snapshot.inventions?.structures||[])for(const pack of ['red','blue']){const at=b.planted?.[pack]?.at;if(!at)continue;const d=Math.hypot(at[0]-localPosition.x,at[2]-localPosition.z);if(d<bd){bd=d;best={b,pack};}}return best;}
+  function release(throwIt=false,pressIndex){if(!active||role!=='hero')return;if(appleSnack.holding()){onAction('snack',{op:'drop',toss:throwIt});return;}if(tool==='stormreel'&&wornTower(snapshot,selfPlayer())){unlockAudio();onAction('stormPlant');return;}if(snapshot.players.find(p=>p.id===playerId)?.heldOre){sendInput(performance.now(),false,true);onAction('inventionDropOre');return;}const log=snapshot.looseLogs?.find(l=>l.heldBy===playerId);
     if(!throwIt&&log&&renderer.xr.isPresenting&&pouchReady()){sendInput(performance.now(),false,true);onAction('stowLog',{id:log.id});return;}
     onAction('release',{throw:throwIt,direction:weaponAim(pressIndex).direction});
   }
@@ -1539,7 +1557,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     sendInput(now);
     // Stop prediction when snapshots stall; server also expires held input at 300ms.
     if (active && role === 'hero' && initialized && now - snapshotAt < 500) {
-      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{})*(1+itemBonus(me,'speed'));const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);stormLeash(snapshot,me,predicted);localPosition.fromArray(predicted);
+      const me=snapshot.players.find(p=>p.id===playerId),pace=dt*5*swiftFactor(snapshot,me||{})*(1+itemBonus(me,'speed'));const predicted=localPosition.toArray();moveOnTerrain(snapshot,predicted,move.x*pace,move.z*pace);if(stormLeash(snapshot,me,predicted)&&(move.x||move.z))stormTug();localPosition.fromArray(predicted);
       const forgeY=heightAt(0,0,snapshot.edits);
       // Standing on rising or sinking earth follows the drawn ground every frame, not the 20 Hz snapshot.
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(terrainLive?{...snapshot,tick:terrainShownTick()}:snapshot, localPosition.x, localPosition.z)),localPosition.y);
@@ -1569,6 +1587,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       const b = manned && mannedMachine();
       if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? (b.style === 'gnashjaw' ? 2.75 : 1.9) : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
+    stormJoltStep(dt);
     dragonRide.setPointScale(renderer.domElement.height,camera.fov);dragonRide.aim(camera,now);
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned && !dragonBlend;
@@ -1838,7 +1857,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
     setExpeditionPointerHand(hand) { adventurePanel.setPointerHand(hand); },
-    controlsSnapshot() {return {pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
+    controlsSnapshot() {return {godPan:[pan.x,pan.z],orbit:[orbitYaw,orbitRadius,orbitTilt],pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');
@@ -1862,7 +1881,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
-      mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();stormWeapon.dispose();stormView.dispose();lightning.dispose();heroView.dispose();
+      mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();stormWeapon.dispose();stormView.dispose();stormJolt.el?.remove();lightning.dispose();heroView.dispose();
       heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
