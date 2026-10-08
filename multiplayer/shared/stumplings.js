@@ -6,6 +6,7 @@
 // sometimes ore its roots were clutching. Its harvest record is released on death or burrowing; burrowing moves
 // the tree root to the critter's exact position. Tree-view grows the sapling and the harvest slot is freed.
 import {isFelled} from './trees.js';
+import {clampToWorld} from './keep-sites.js';
 
 export const STUMPLING = Object.freeze({
  minAgeTicks: 3600,     // a stump rests at least 60 s after felling before it may stir
@@ -128,10 +129,10 @@ export function stepStumplingMotion(state, e, {heroes, ground, resolve}) {
  // A small deterministic fan steers around trunks and steps, like the other creatures.
  for (const angle of [0, .6, -.6, 1.2, -1.2, 1.9, -1.9]) {
   const c = Math.cos(angle), s = Math.sin(angle), x = dx * c - dz * s, z = dx * s + dz * c;
-  const probe = [clamp(e.position[0] + x * .5, -55, 55), e.position[1], clamp(e.position[2] + z * .5, -55, 55)], before = [...probe];
+  const [px, pz] = clampToWorld(e.position[0] + x * .5, e.position[2] + z * .5), probe = [px, e.position[1], pz], before = [...probe];
   resolve(probe, STUMPLING.radius, STUMPLING.height);
   if (Math.hypot(probe[0] - before[0], probe[2] - before[2]) > .025 || Math.abs(ground(probe[0], probe[2]) - e.position[1]) > .6) continue;
-  e.position[0] = clamp(e.position[0] + x * speed / 60, -55, 55); e.position[2] = clamp(e.position[2] + z * speed / 60, -55, 55);
+  [e.position[0], e.position[2]] = clampToWorld(e.position[0] + x * speed / 60, e.position[2] + z * speed / 60);
   break;
  }
  resolve(e.position, STUMPLING.radius, STUMPLING.height); e.position[1] = ground(e.position[0], e.position[2]);
@@ -143,10 +144,10 @@ export function dropStumplingLoot(state, e, ctx, events) {
  const [x, y, z] = e.position, logs = Math.min(STUMPLING.logs, Math.max(0, ctx.logLimit - state.looseLogs.length));
  for (let i = 0; i < logs; i++) {
   const a = e.yaw + Math.PI / 2 + i * 1.1, half = Math.SQRT1_2, yaw = e.yaw + i * 1.3;
-  state.looseLogs.push({id: ctx.nextId(state, 'log'), sourceId: e.treeId, position: [clamp(x + Math.sin(a) * .2, -54.5, 54.5), Math.max(y, ctx.terrainHeight(state, x, z)) + .35, clamp(z + Math.cos(a) * .2, -54.5, 54.5)],
+  state.looseLogs.push({id: ctx.nextId(state, 'log'), sourceId: e.treeId, position: (([lx, lz]) => [lx, Math.max(y, ctx.terrainHeight(state, x, z)) + .35, lz])(clampToWorld(x + Math.sin(a) * .2, z + Math.cos(a) * .2, 54.5)),
    quaternion: [Math.cos(yaw) * half, 0, Math.sin(yaw) * half, half], velocity: [Math.sin(a) * .7, 1.8, Math.cos(a) * .7], angularVelocity: [Math.cos(a) * 1.4, .8, -Math.sin(a) * 1.4], heldBy: null, bornTick: state.tick, sleeping: false});
  }
- const pickup = (kind, amount, ox, oz) => { if (state.pickups.length >= 256) return null; const id = ctx.nextId(state, 'p'), px = clamp(x + ox, -54.5, 54.5), pz = clamp(z + oz, -54.5, 54.5);
+ const pickup = (kind, amount, ox, oz) => { if (state.pickups.length >= 256) return null; const id = ctx.nextId(state, 'p'), [px, pz] = clampToWorld(x + ox, z + oz, 54.5);
   state.pickups.push({id, kind, x: px, z: pz, y: ctx.terrainHeight(state, px, pz), amount}); return id; };
  if (logs < STUMPLING.logs) pickup('wood', STUMPLING.logs - logs, 0, 0);
  const roll = unit(state.seed, e.id, 'loot'), ore = roll < STUMPLING.gold ? 'goldOre' : roll < STUMPLING.gold + STUMPLING.copper ? 'copperOre' : null;

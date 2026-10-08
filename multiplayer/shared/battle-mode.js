@@ -8,7 +8,7 @@ export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTick
 export const BATTLE_SIDES = Object.freeze(['party','rivals']);
 const sites = [[-40,-40],[40,40]];
 // The bent central lane bypasses the permanent Forge and its apron.
-const lane = [[-40,-40],[-21,-21],[-12,0],[0,16],[20,25],[40,40]]; // waypoints 1 and 4 sit just outside the widened domes
+const lane = [[-38,-38],[-19,-19],[-12,0],[0,16],[18,23],[38,38]]; // waypoints 1 and 4 sit just outside the ring keeps' domes
 const flat = (a,b) => Math.hypot(a[0]-b[0],a[2]-b[2]);
 const int = (n,a,b) => Number.isSafeInteger(n)&&n>=a&&n<=b;
 const fail = code => ({ok:false,code,events:[]});

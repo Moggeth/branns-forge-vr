@@ -43,6 +43,8 @@ import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.j
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
+import {WORLD_EXTENT,clampToWorld} from './keep-sites.js';
+import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
 export const HZ = 60;
 
 const BOUND = 55, MAX_WORLD = 64;
@@ -54,11 +56,12 @@ const fail = code => ({ok: false, code, events: []});
 const ok = (events = []) => ({ok: true, events});
 const safeSeq = n => Number.isSafeInteger(n) && n > 0;
 const cleanName = value => (typeof value === 'string' ? value : 'Guest').trim().replace(/[\r\n\t]/g, ' ').slice(0, 24) || 'Guest';
-const validPoint = p => Array.isArray(p) && p.length === 3 && p.every(finite) && Math.abs(p[0]) <= BOUND && Math.abs(p[2]) <= BOUND && Math.abs(p[1]) <= 1000;
+const validPoint = p => Array.isArray(p) && p.length === 3 && p.every(finite) && Math.abs(p[0]) <= WORLD_EXTENT && Math.abs(p[2]) <= WORLD_EXTENT && Math.abs(p[1]) <= 1000;
+const castPoint = p => validPoint(p) && Math.abs(p[0]) <= BOUND && Math.abs(p[2]) <= BOUND; // god spells stay on the open map
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 const validPosition = p => Array.isArray(p) && p.length === 3 && p.every(finite) &&
-  Math.abs(p[0]) <= BOUND && Math.abs(p[2]) <= BOUND && Math.abs(p[1]) <= 200;
+  Math.abs(p[0]) <= WORLD_EXTENT && Math.abs(p[2]) <= WORLD_EXTENT && Math.abs(p[1]) <= 200; // keep back towns reach past ±55
 const validTick = (n, current, minimum = -1000, future = 0) => Number.isSafeInteger(n) && n >= minimum && n <= current + future;
 
 function pose(value) {
@@ -140,7 +143,7 @@ function instantiate(state) {
   // so a Hero who leaves mid-expedition cannot strand the team. Parked reconnect records rejoin with an empty pack (no duplicates).
   const dropCarried = p => { let slot = 0; for (const kind of MATERIAL_KEYS) { while ((p.resources?.[kind] | 0) > 0 && slot < 24) {
     const n = Math.min(10, p.resources[kind]), a = slot * 2.39996, r = .7 + .25 * (slot % 3);
-    if (!addPickup(kind, clamp(p.position[0] + Math.cos(a) * r, -BOUND, BOUND), clamp(p.position[2] + Math.sin(a) * r, -BOUND, BOUND), n)) return;
+    if (!addPickup(kind, ...clampToWorld(p.position[0] + Math.cos(a) * r, p.position[2] + Math.sin(a) * r, BOUND), n)) return;
     p.resources[kind] -= n; slot++; } } };
   // Optional Forge Expedition (shared/adventure.js): command results since the last step feed its deed tracking.
   const adventureEvents = [], adventureContext = {createEnemy, terrainHeight};
@@ -337,10 +340,10 @@ function instantiate(state) {
       if (p.role !== 'god') return fail('role_required');
       const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
-      if(line && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
-      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!validPoint(message.start)||!validPoint(message.end)))return fail('invalid_cast');
+      if(line && (message.start!==undefined||message.end!==undefined) && (!castPoint(message.start)||!castPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
+      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!castPoint(message.start)||!castPoint(message.end)))return fail('invalid_cast');
       const lineCount=line?earthLineEdits(message.start,message.end):1;
-      if (!Object.hasOwn(COST, spell) || !validPoint(message.point)) return fail('invalid_cast');
+      if (!Object.hasOwn(COST, spell) || !castPoint(message.point)) return fail('invalid_cast');
       // Mana is the only rule that refuses a cast; placement rules move it instead.
       const point = settleCastPoint(spell, message.point, {expedition: expeditionRunning(state.adventure)});
       if (bloomLevel(state.bloom) < SPELL_BLOOM[spell]) return fail('bloom_locked');
@@ -425,7 +428,7 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -456,12 +459,12 @@ function instantiate(state) {
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveHomeStructures(state,position,radius);resolveTerrainBoundary(position,radius);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
       for(const e of state.enemies)if(e.hp>0)resolveTaverns(state,e.position,.5); // monsters are shooed out of every tavern
-      stepTaverns(state);stepMills(state,events);
+      stepTaverns(state);stepMills(state,events);stepWorkshops(state,{terrainHeight},events);
       if(state.tick%30===0)for(const p of state.players)if(p.role==='hero'&&p.hp>0&&itemBonus(p,'regen')>0)p.hp=Math.min(heroMaxHp(p),p.hp+itemBonus(p,'regen')/2); // Pocket Kettle
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
@@ -519,7 +522,7 @@ export function loadSimulation(saved) {
     throw Error('Invalid simulation checkpoint');
   const ids = new Set();
   const unique = id => { if (!validId(id) || id === 'shrine' || ids.has(id)) return false; ids.add(id); return true; };
-  const validXZ = item => finite(item.x) && finite(item.z) && Math.abs(item.x) <= BOUND && Math.abs(item.z) <= BOUND;
+  const validXZ = item => finite(item.x) && finite(item.z) && Math.abs(item.x) <= WORLD_EXTENT && Math.abs(item.z) <= WORLD_EXTENT;
   const harvested = saved.harvestedTrees === undefined ? [] : saved.harvestedTrees;
   const deposits = saved.deposits === undefined ? initialDeposits() : saved.deposits;
   const pickups = saved.pickups === undefined ? [] : saved.pickups;

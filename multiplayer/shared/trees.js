@@ -1,6 +1,7 @@
 // Shared, deterministic tree rules: chopping, tick-driven felling, physical logs, collision and strict save.
 // No clock, no RNG, no Three.js. Every client and late joiner derives identical poses from (state, tick).
 import {worldTrees} from './world-content.js';
+import {WORLD_EXTENT} from './keep-sites.js';
 
 export const TREE_LIMITS = {logs: 48, logsPerTree: 3, logLength: 1.1, logRadius: .16, reach: 2.5, settleTicks: 36,
  notchTolerance: .35, chopSlack: .25, hz: 60, gravity: 15, maxFallTicks: 240, cell: 4, worldHalf: 54.5};
@@ -266,7 +267,7 @@ export function restoreLogs(saved, ids) {
  const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), trees = new Set([...worldTrees(saved), ...(saved.awakenedTrees || [])].map(t => t.id)); // ent timber names its awakened tree
  const KEYS = ['id', 'sourceId', 'position', 'quaternion', 'velocity', 'angularVelocity', 'heldBy', 'bornTick', 'sleeping', 'section', 'length', 'radius'];
  return (saved.looseLogs || []).map(log => {
-  if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > 55 || Math.abs(log.position[2]) > 55 || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
+  if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > WORLD_EXTENT || Math.abs(log.position[2]) > WORLD_EXTENT || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
   if(log.section!==undefined && (!Array.isArray(log.section)||log.section.length!==2||!log.section.every(n=>Number.isFinite(n)&&n>=0&&n<=4)||log.section[1]<=log.section[0]||!Number.isFinite(log.length)||log.length<=0||log.length>4||!Number.isFinite(log.radius)||log.radius<=0||log.radius>1.5))throw Error('Invalid timber section');
   if(log.section===undefined&&(log.length!==undefined||log.radius!==undefined))throw Error('Invalid legacy log dimensions');
   ids.add(log.id); if (log.heldBy) holders.add(log.heldBy); return Object.fromEntries(KEYS.filter(k=>log[k]!==undefined).map(k => [k, structuredClone(log[k])]));

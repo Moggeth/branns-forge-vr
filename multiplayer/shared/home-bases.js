@@ -1,5 +1,6 @@
 import {heroMaxHp} from './hero-progress.js';
 import {restoreMill} from './home-mill.js';
+import {HOME_SITES} from './keep-sites.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -8,7 +9,7 @@ import {restoreMill} from './home-mill.js';
 // Pure simulation rules: fixed ticks, no clocks, rendering or random streams.
 
 export const HOME = Object.freeze({
-  domeRadius: 17.5, heartHp: 600, pylonHp: 300, levelCap: 5,
+  domeRadius: 18.5, heartHp: 600, pylonHp: 300, levelCap: 5,
   shieldDownTicks: 90 * 60, rebuildTicks: 180 * 60, waveTicks: 60 * 60, firstWaveTicks: 20 * 60,
   fountainEvery: 30, fountainHeal: 5,
   turrets: Object.freeze({
@@ -28,29 +29,34 @@ export const HOME_MANNED = Object.freeze({
   damage: 60, heroDamage: 30, muzzle: 1.45,
 });
 export const HOME_NAMES = Object.freeze({party: 'Dawnhold', rivals: 'Grumblekeep'});
-export const HOME_SITES = Object.freeze({party: Object.freeze([-36, -36]), rivals: Object.freeze([36, 36])});
+export {HOME_SITES} from './keep-sites.js';
 
 // Base-local layout in metres: x is to the right of the gate, y points out of the
 // gate toward the world centre. The client builds the same pieces from this table.
-// 2026-10-07: keeps widened by HOME_SCALE (buildings and footprints grow with it) to fit a tavern, mill and shop.
+// 2026-10-08 ring keep: the heart stands in a round bowl cut into the corner mountains (shared/keep-sites.js).
+// The front half is open toward the lane (gate, ballistas, pylons, spires); the buildings stand round the back
+// half of the ring facing the heart; a narrow pass behind the heart leads to a hollow in the corner.
+// HOME_SCALE still sizes the kit buildings (1.3x their modelled size).
 export const HOME_SCALE = 1.3;
-const S = (x, y) => Object.freeze([+(x * HOME_SCALE).toFixed(3), +(y * HOME_SCALE).toFixed(3)]);
+const P = (x, y) => Object.freeze([x, y]);
+const polar = (deg, r) => P(+(Math.sin(deg * Math.PI / 180) * r).toFixed(3), +(Math.cos(deg * Math.PI / 180) * r).toFixed(3));
 // face: the base-local point a building's front (+Z of its model) looks toward.
 const piece = (at, face) => Object.freeze({at: Object.freeze(at), face: Object.freeze(face)});
+const HEART = P(0, 0);
 export const HOME_LAYOUT = Object.freeze({
-  barracks: S(-7, 3.4), fountain: S(5.2, 3.2),
-  pylons: Object.freeze([S(6.6, 11.43), S(-6.6, 11.43), S(0, -13.2)]),
-  spires: Object.freeze([S(-4, 16), S(4, 16)]),
-  ballistas: Object.freeze([S(-9.5, 14.5), S(9.5, 14.5)]),
-  gate: S(0, 13.5), gatePillars: Object.freeze([S(-2.6, 13.5), S(2.6, 13.5)]),
-  // Boundary wards ring the dome every 22.5 degrees, leaving the gate and the three pylons clear.
-  wards: Object.freeze([45, 67.5, 90, 112.5, 135, 157.5, -157.5, -135, -112.5, -90, -67.5, -45]
-    .map(d => S(Math.sin(d * Math.PI / 180) * 14, Math.cos(d * Math.PI / 180) * 14))),
-  bellPost: S(2.95, 2.75), // in the barracks' own frame (three.js x, z)
-  // Town pieces (shared/home-shop.js, home-mill.js, taverns.js), unscaled: their models are built at full size.
-  tavern: piece([-9.6, -7.0], [0, 0]),
-  mill: piece([4.5, -10.5], [0, 0]),
-  quartermaster: piece([8.8, 10.0], [0, 9]),
+  barracks: P(-14, .5), fountain: P(-6.5, 6.5),
+  // Two pylons flank the gate; the third guards the mouth of the pass.
+  pylons: Object.freeze([P(9, 13), P(-9, 13), P(0, -16)]),
+  spires: Object.freeze([P(-15.5, 8), P(15.5, 8)]),
+  ballistas: Object.freeze([P(-10.5, 17.5), P(10.5, 17.5)]),
+  gate: P(0, 17.5), gatePillars: Object.freeze([P(-3.4, 17.5), P(3.4, 17.5)]),
+  // Boundary wards ring the dome, leaving the gate, the pylons, the barracks, the shop and the backs of the tavern and mill clear.
+  wards: Object.freeze([50, 72, 116, 160, -160, -116, -72, -50].map(d => polar(d, 18.2))),
+  bellPost: P(+(2.95 * HOME_SCALE).toFixed(3), +(2.75 * HOME_SCALE).toFixed(3)), // in the barracks' own frame (three.js x, z)
+  // Town pieces (shared/home-shop.js, home-mill.js, taverns.js) on the back half of the ring, fronts to the heart.
+  tavern: piece(P(-10.6, -10.6), HEART),
+  mill: piece(P(10.6, -10.6), HEART),
+  quartermaster: piece(P(14, .5), HEART),
 });
 // The shared tavern ("The Muddled Mug") stands off the lane south of the Forge, its front toward the centre.
 export const NEUTRAL_TAVERN = Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)});
@@ -239,7 +245,7 @@ const SOLIDS = Object.freeze([
   ...HOME_LAYOUT.pylons.map(at => ({at, r: .9 * K})), ...HOME_LAYOUT.spires.map(at => ({at, r: 1.1 * K})), ...HOME_LAYOUT.ballistas.map(at => ({at, r: .95 * K})),
   ...HOME_LAYOUT.gatePillars.map(at => ({at, r: .85 * K})), ...HOME_LAYOUT.wards.map(at => ({at, r: .45 * K})),
 ]);
-const BARRACKS = Object.freeze({half: [3.2 * K, 2.2 * K], yaw: .55});
+const BARRACKS = Object.freeze({half: [3.2 * K, 2.2 * K]});
 // Town pieces' solid parts in their own frame: boxes {at, half} and circles {at, r}. Taverns are open-fronted halls
 // you walk into (walls, bar, tables and posts are solid); the shop stall is one box; the mill is its tower and hopper.
 const KEEP_TAVERN = Object.freeze([
@@ -273,7 +279,8 @@ function pushOut(position, placed, solids, radius) {
 }
 /** World yaw (three.js, about +Y) of a base's gate; local +Z of a piece points out of the gate. */
 export const gateYaw = side => { const {forward} = homeFrame(side); return Math.atan2(forward[0], forward[1]); };
-export const barracksYaw = side => gateYaw(side) + (side === 'rivals' ? BARRACKS.yaw : -BARRACKS.yaw);
+// The barracks door faces the heart across the ring.
+export const barracksYaw = side => { const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks), [hx, hz] = HOME_SITES[sideKey(side)]; return Math.atan2(hx - bx, hz - bz); };
 /** World [x, z] of a base's bell post, beside the barracks door. */
 export function bellPostAt(side) {
   const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks), t = barracksYaw(side), c = Math.cos(t), sn = Math.sin(t), [px, pz] = HOME_LAYOUT.bellPost;

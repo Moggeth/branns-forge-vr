@@ -4,6 +4,7 @@
 // stay pinned at their joints (neck, shoulders, hips) and fall as one ragdoll; a hard enough blow tears
 // a joint. Fixed 1/60 s ticks, no randomness: every peer replays the host exactly.
 // Bodies sleep once they settle and wake on any impulse, push or grab, so a field of bones costs nothing.
+import {clampToWorld} from './keep-sites.js';
 const G = 15, SUB = 2, ITER = 4, FOLD = .78, SLEEP_V = .06, SLEEP_W = .1, SLEEP_TICKS = 24, MU = .7, BREAK = 7.5;
 // Mass in arbitrary units (only ratios matter): the ribcage anchors a ragdoll, an arm swings off it.
 const MASS = {skeleton: {head: 1, torso: 3, leftArm: .8, rightArm: .8, leftLeg: 1.3, rightLeg: 1.3}, golem: {head: 6, torso: 14, leftArm: 5, rightArm: 5, leftLeg: 6, rightLeg: 6}};
@@ -110,7 +111,7 @@ export function stepRemains(state, ctx, dt = 1 / 60) {
   }
   for (const b of S.values()) {
     const d = b.d; if (!b.w) continue;
-    d.quaternion = b.q; d.position = sub(b.x, rotate(b.c, b.q)).map((n, i) => clamp(n, i === 1 ? -150 : -54.5, i === 1 ? 150 : 54.5));
+    d.quaternion = b.q; d.position = sub(b.x, rotate(b.c, b.q)); [d.position[0], d.position[2]] = clampToWorld(d.position[0], d.position[2], 54.5); d.position[1] = clamp(d.position[1], -150, 150);
     const still = len(d.velocity) < SLEEP_V && len(d.angularVelocity) < SLEEP_W && state.tick - d.bornTick > 20;
     d.rest = still ? Math.min(SLEEP_TICKS, (d.rest || 0) + 1) : 0;
     if (d.rest >= SLEEP_TICKS) {d.velocity = [0, 0, 0]; d.angularVelocity = [0, 0, 0];}

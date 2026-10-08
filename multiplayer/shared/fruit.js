@@ -14,6 +14,7 @@ import {heroMaxHp} from './hero-progress.js';
 import {worldTrees} from './world-content.js';
 import {treeScale,isFelled} from './trees.js';
 import {BLOOM,addBloom} from './bloom.js';
+import {clampToWorld} from './keep-sites.js';
 
 // Apple centres and radii in tree.glb (the Orchard apple, VARIANTS[0]) Tree-root space, metres, Y-up, in the
 // authored Fruit mesh's vertex order (26 apples, 42 vertices each). Regenerate with tests/fruit-slots.mjs.
@@ -204,7 +205,8 @@ export function stepFruit(state, ctx, events) {
   }
   const v = d.velocity, drag = Math.exp(-.35*dt);
   v[0] *= drag; v[2] *= drag; v[1] = v[1]*drag - G*dt;
-  d.position = d.position.map((n, i) => i === 1 ? clamp(n + v[i]*dt, -150, 150) : clamp(n + v[i]*dt, -BOUND, BOUND));
+  const [ax, az] = clampToWorld(d.position[0] + v[0]*dt, d.position[2] + v[2]*dt, BOUND);
+  d.position = [ax, clamp(d.position[1] + v[1]*dt, -150, 150), az];
   const speed = len(v), s = STICKS[d.stick];
   if (d.half && speed > .5) { // a tumbling half: its face turns over as it falls (deterministic, from its spin sense)
    const a = 7*dt*(d.id.charCodeAt(d.id.length - 1) % 2 ? 1 : -1), c = Math.cos(a), sn = Math.sin(a), [x, y, z] = d.cut;
@@ -294,7 +296,7 @@ export function snackAction(state, p, m) {
 export function releaseSnack(state, p, toss = false) {
  const d = state.fruit?.drops?.find(q => q.heldBy === p.id); if (!d) return false;
  const fx = -Math.sin(p.yaw || 0), fz = -Math.cos(p.yaw || 0);
- d.heldBy = null; d.mode = 'air'; d.position = [clamp(p.position[0] + fx*.45, -BOUND, BOUND), p.position[1] + 1.15, clamp(p.position[2] + fz*.45, -BOUND, BOUND)];
+ d.heldBy = null; d.mode = 'air'; const [ax, az] = clampToWorld(p.position[0] + fx*.45, p.position[2] + fz*.45, BOUND); d.position = [ax, p.position[1] + 1.15, az];
  d.velocity = toss ? [fx*3.5, 2.2, fz*3.5] : [fx*.6, .5, fz*.6]; d.bornTick = Math.max(d.bornTick, state.tick - FRUIT.dropLifeTicks + 60*60); return true;
 }
 
