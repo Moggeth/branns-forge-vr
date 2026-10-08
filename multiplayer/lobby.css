@@ -254,13 +254,7 @@ input[aria-invalid="true"] { border-color: var(--danger) !important; box-shadow:
   .lobby-form { gap: 14px; }
   .lobby .role-body { min-height: 112px; padding: 12px; }
   .lobby .role-icon { width: 36px; height: 36px; margin-bottom: 2px; }
-  /* One column: Create + Public worlds side by side, solo below, then Join full width (nothing squeezed). */
   .actions { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .create-block { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
-  .create-block > :not(#create):not(#browseWorlds) { grid-column: 1 / -1; margin: 0; }
-  .create-block #create, .create-block #browseWorlds { margin: 0; }
-  .create-block .bf-pr-lobby-notice { text-align: center; }
-  .create-block > .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .divider { display: none; }
   .join-block { padding: 12px; }
   .join-title { margin-bottom: 6px; }
@@ -449,3 +443,18 @@ body.field-overlay-open .mui-root {pointer-events:none;}
 .hud-self > .meters {grid-column:2;width:100%;min-width:0;}
 .hud-self .meter {grid-template-columns:2.6em minmax(0,1fr) auto;}
 .hud-self .meter-track {min-width:0;}
+
+/* Welcome screen, stripped down: Hero / God, one big central Play, then How to play + Patch notes. */
+#lobby .create-block { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; margin: 4px 0 0; }
+#lobby .create-block > .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#lobby #create { width: min(100%, 340px); min-height: 64px; margin: 0; padding: 10px 24px; border-radius: 16px; font-size: 1.6rem; letter-spacing: .06em; }
+#lobby > .card > .howto-row { width: min(100%, 340px); margin: 14px auto 0; }
+@media (max-width: 760px), (max-height: 560px) {
+  #lobby #create { width: 100%; min-height: 58px !important; font-size: 1.45rem !important; }
+  #lobby > .card > .howto-row { width: 100%; margin: 0; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  #lobby .lobby-form > .actions { align-content: center !important; }
+  #lobby #create { width: 100%; min-height: 72px !important; }
+  #lobby > .card > .howto-row { grid-column: 2 / -1; width: 100%; }
+}

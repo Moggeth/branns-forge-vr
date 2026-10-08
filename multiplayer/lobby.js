@@ -40,7 +40,7 @@ import { adventureView } from './shared/adventure.js';
 import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import {createRoomDirectory} from './client/public-room-directory.js';
 import {findWorlds} from './client/quick-play.js';
-import {createPublicRoomBrowser,createPublicRoomsLauncher} from './client/public-rooms.js';
+import {createPublicRoomBrowser} from './client/public-rooms.js';
 import {createBattlePanel} from './client/battle-panel.js';
 import './client/public-rooms.css';
 import './client/battle-panel.css';
@@ -143,9 +143,7 @@ const roomBrowser=createPublicRoomBrowser({
   onClose:()=>{directory.close();if(directoryPending){directoryPending=null;teardown();hideLobbyStatus();setPhase('lobby');}roomBrowser.render({pendingCode:null});}
 });
 const directory=createRoomDirectory({endpoint:peerEndpoint,onChange:state=>roomBrowser.render({...state,pendingCode:directoryPending})});
-const browseButton=createPublicRoomsLauncher({onOpen:button=>{roomBrowser.open(button);directory.open();}});
-browseButton.id='browseWorlds';$('create').after(browseButton);
-const publicNotice=document.createElement('p');publicNotice.className='bf-pr-lobby-notice';publicNotice.textContent='Multiplayer worlds are public. Anyone can join.';browseButton.after(publicNotice);
+// Welcome screen keeps only role + Play + guides; the public world browser has no lobby launcher.
 const battlePanel=createBattlePanel({mount:document.querySelector('#menu .menu-card'),onAction:({action,side})=>{
   if(!connected)return;
   if(action==='side')command('action',{action:'inventionSide',side});
@@ -180,16 +178,14 @@ roomInput.addEventListener('paste', event => {
 const invited = (new URLSearchParams(location.search).get('room') || '').trim();
 if (ROOM_PATTERN.test(invited)) {
   roomInput.value = invited;
-  $('joinBlock').classList.add('invited');
-  $('joinBlock').hidden = false;
-  body.classList.add('has-invite');
+  $('joinBlock').classList.add('invited');   // stays hidden: Play joins this world directly
   $('inviteNote').hidden = false;
   setText($('inviteNote'), 'You’ve been invited! Pick a name and role, then join.');
 }
 
 $('lobbyForm').addEventListener('submit', event => {
   event.preventDefault();
-  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play
+  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play (always now)
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
@@ -200,6 +196,8 @@ $('create').addEventListener('click', () => quickPlay());
 let quickSearch = 0;
 async function quickPlay(tried = []) {
   if (rendererFailed || !game) { start({create: true}); return; }
+  // An invite link (or QR scan) goes straight to that world; if it has closed, fall back to quick play.
+  if (!tried.length && ROOM_PATTERN.test(invited)) { start({create: false, room: invited, quick: {tried: [invited]}}); return; }
   const search = ++quickSearch;
   teardown(); phase = 'connecting'; body.dataset.phase = 'connecting';
   showLobbyStatus('Finding a world near you…', {busy: true, cancel: true});
@@ -399,7 +397,7 @@ function start(attempt) {
   }));
 
   phase = 'connecting'; body.dataset.phase = 'connecting';
-  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? 'Joining a world near you…' : `Looking for world ${attempt.room}…`;
+  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? (attempt.room === invited ? 'Joining your friend’s world…' : 'Joining a world near you…') : `Looking for world ${attempt.room}…`;
   showLobbyStatus(verb, {busy: true, cancel: true});
 
   joinTimer = setTimeout(() => {
@@ -935,8 +933,6 @@ const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='un
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
 holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
-const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.innerHTML='<svg aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Equipment</span>';lobbyFieldButton.setAttribute('aria-label','Equipment guide');
-lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
@@ -1047,7 +1043,7 @@ export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
 patchNotes.showWhatsNew();
-if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
+if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('create') : nameInput).focus({preventScroll: true});
 
 // A host stepping away hands the world to someone still playing before its timers are throttled.
 document.addEventListener('visibilitychange', () => { if (document.hidden) try { session?.handOver(); } catch { /* best effort */ } });
