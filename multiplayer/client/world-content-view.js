@@ -6,7 +6,7 @@ import {BAR_STACK_MAX} from './forest-resource-art.js';
 import {terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,TERRAIN_GRID} from '../shared/terrain.js';
 import * as T from 'three';
 import {createCrystalWall} from './crystal-wall.js';
-import {attachFracture,prepareFractureWarmup} from './mining-fracture.js';
+import {attachFracture,prepareFractureWarmup,prepareFractureWarmupAsync} from './mining-fracture.js';
 import {createGeodeLight,setGeodeLightTime,geodeLightGlobalStats,GEODE_LIGHT_BUDGET,GEODE_LIGHT_DISTANCE} from './geode-light.js';
 import {createTreeView} from './tree-view.js';
 
@@ -31,12 +31,15 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
  const crystalWall=createCrystalWall({THREE:T,scene,height});let previousTickTime=null;
  const matrix=new T.Matrix4(),dummy=new T.Object3D();
  const lightCandidates=[],cameraPosition=new T.Vector3();
- function prepareMiningWarmup(){
-  miningWarmup?.dispose();
+ function nearbyDeposits(){
   const deposits=[...objects.values()].filter(e=>e.data.type==='deposit');
   if(camera)deposits.sort((a,b)=>a.root.position.distanceToSquared(camera.position)-b.root.position.distanceToSquared(camera.position));
-  miningWarmup=prepareFractureWarmup(T,deposits.map(e=>({root:e.root,id:e.data.id})),{limit:12});
-  return miningWarmup;
+  return deposits.map(e=>({root:e.root,id:e.data.id}));
+ }
+ function prepareMiningWarmup(){miningWarmup?.dispose();return miningWarmup=prepareFractureWarmup(T,nearbyDeposits(),{limit:12});}
+ async function prepareMiningWarmupAsync(cancelled){
+  miningWarmup?.dispose();const warm=await prepareFractureWarmupAsync(T,nearbyDeposits(),{limit:12,cancelled});
+  if(cancelled?.())warm.dispose();else miningWarmup=warm;return warm;
  }
  function authored(name,size=1){const template=templates.get(name);if(!template)return null;const mesh=template.scene.clone(true);const collisionOnly=[];mesh.traverse(n=>{if(n.name.toLowerCase().includes('colonly'))collisionOnly.push(n);});for(const n of collisionOnly)n.removeFromParent();const bounds=new T.Box3().setFromObject(mesh),span=bounds.getSize(new T.Vector3());const scale=size/Math.max(.01,span.y);const root=new T.Group();root.add(mesh);mesh.scale.multiplyScalar(scale);mesh.position.set(-(bounds.min.x+bounds.max.x)/2*scale,-bounds.min.y*scale,-(bounds.min.z+bounds.max.z)/2*scale);return root;}
  function tag(node,id){node.userData.targetId=id;node.traverse(c=>{if(c.isMesh)c.userData.targetId=id;});return node;}
@@ -97,7 +100,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   for(const e of objects.values())if(e.light&&e.lightRank>=GEODE_LIGHT_BUDGET)e.light.update(dt,camera,false);
   for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].light.update(dt,camera);
   for(const e of objects.values())if(e.data.type==='pickup'&&!e.bay){e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007;}}
- return {prepareMiningWarmup,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
+ return {prepareMiningWarmup,prepareMiningWarmupAsync,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
   // Raycast hit -> {id, point, normal (world), instanced}: instanced tree batches map instanceId to the tree id; deposits/entities use userData.targetId.
   resolveTarget(hit){const t=treeView.resolveTarget(hit)||crystalWall.resolveTarget(hit);if(t)return t;let n=hit?.object;while(n&&!n.userData.targetId)n=n.parent;if(!n)return null;
    return {id:n.userData.targetId,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:false};},

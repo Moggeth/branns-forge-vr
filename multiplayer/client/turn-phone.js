@@ -118,7 +118,9 @@ export function mountTurnPhone({doc = document, win = window} = {}) {
 
   go.addEventListener('click', async () => {
     dismissed = true; write('dismissed');
-    if (await enterFullscreen()) render(); else { el.hidden = true; doc.body.classList.remove('turn-phone-open'); }
+    // Acknowledge the tap before awaiting platform permission/orientation promises.
+    render();
+    void enterFullscreen();
   });
   el.querySelector('.tp-stay').addEventListener('click', () => { dismissed = true; write('dismissed'); render(); });
 
