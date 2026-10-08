@@ -89,6 +89,8 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   assert.ok(ATMOSPHERE.bfWet.value < .7, 'ground dries once the rain stops');
   const golden = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .55, weather: 'clear'}});
   golden.setTrees(trees); golden.update({tick: 0, camera, time: 0, dt: 0});
+  const beamAxis = golden.stats() && scene.children.filter(o => o.name === 'sunbeams').at(-1).material.uniforms.uAxis.value;
+  assert.ok(-beamAxis.y > Math.sin(60 * Math.PI / 180), `low sun still drops shafts steeply: ${beamAxis.y.toFixed(3)}`);
   const gs = golden.stats(); assert.ok(gs.sunbeams.beams === 6 && gs.sunbeams.strength > .3, `golden-hour shafts ${JSON.stringify(gs.sunbeams)}`);
   const noonSky = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: DAYLIGHT_SHARE / 2, weather: 'clear'}});
   noonSky.setTrees(trees); noonSky.update({tick: 0, camera, time: 0, dt: 0});
