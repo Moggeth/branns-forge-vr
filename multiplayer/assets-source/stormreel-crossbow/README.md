@@ -26,7 +26,7 @@ sampling noise in the AO and bevel bakes.
   hazard bands, the polarity bezel (small, where the eye goes).
 - **Reading the electricity:** cord into the butt socket, copper straps from the tube caps into the receiver, the
   Jacob's-ladder horns between the tube caps, the bolt drawn through the coil, the filament spool on the bolt's tail.
-- **Two finishes, one atlas:** red (+) is crimson candy enamel with bone accents; blue (-) is cobalt enamel on
+- **Two finishes, one atlas:** red (+) is crimson candy enamel with bone accents; blue (-) is blue-black enamel on
   blackened steel with electric-blue accents. Steel, brass, copper, porcelain and rubber are shared.
 - **First person:** the tubes ride the top shoulders, so the shooter watches them fill; the horns rise just right of the
   sight line; the polarity bezel sits between the tubes facing up.

@@ -62,7 +62,7 @@ FIN = {
     'red': dict(Enamel='9c1b14', Accent='ecdfc4', Ceramic='f4ecda', Steel='959ca6', Brass='d9a646', Copper='d9814f', Rubber='202124',
                 Fletch='ec4a2e', Badge='f0c24a', Wire='8c4a2c', Cable='c23224', DarkSteel='3b3f47', Coil='d27a46', HazA='f1e5cc', HazB='9a1e17',
                 Glyph='b3241b'),
-    'blue': dict(Enamel='23439a', Accent='45a0ff', Ceramic='e2e9f3', Steel='8f97a3', Brass='d9a646', Copper='d9814f', Rubber='1f2023',
+    'blue': dict(Enamel='1d2638', Accent='45a0ff', Ceramic='e2e9f3', Steel='8f97a3', Brass='d9a646', Copper='d9814f', Rubber='1f2023',
                  Fletch='2f88ff', Badge='a9c9f2', Wire='8c4a2c', Cable='2a62d0', DarkSteel='2a2e36', Coil='d27a46', HazA='2f7df2', HazB='14171d',
                  Glyph='e9f2ff'),
 }
@@ -230,7 +230,7 @@ def limb_path(s):
 def build():
     body = Part('Stormreel_Body')
     # --- receiver: one faceted wedge, deepest over the hand, tapering to the stock and to the prod
-    # dark steel core at the back (where the tubes and side armour mount), crimson/cobalt enamel nose ahead of the latch
+    # dark steel core at the back (where the tubes and side armour mount), crimson/blue-black enamel nose ahead of the latch
     rec = [(-.208, .019, .097, .054, .008), (-.193, .029, .1045, .041, .010), (-.07, .030, .1065, .032, .011), (.075, .030, .1065, .034, .011)]
     body.add(loft([ring_xz(chamfer_rect(w, (t - b) / 2, c)[::-1], y, (t + b) / 2) for y, w, t, b, c in rec]), 'DarkSteel')
     front = [(.070, .0305, .1068, .0335, .0112), (.17, .025, .1058, .046, .009), (.31, .021, .1048, .056, .008), (.345, .024, .1048, .058, .008)]

@@ -1,6 +1,6 @@
 {
  "out": "../../public/assets/stormreel.glb",
- "bytes": 990072,
+ "bytes": 988788,
  "triangles": 7684,
  "bolt_triangles": 312,
  "meshes": 9,
@@ -10,7 +10,7 @@
   "Charge"
  ],
  "textures": {
-  "stormreel_base.jpg": 381968,
+  "stormreel_base.jpg": 380683,
   "stormreel_orm.jpg": 138285,
   "stormreel_normal.jpg": 200058
  },
@@ -24,5 +24,5 @@
   0.44,
   0.1932
  ],
- "seconds": 309
+ "seconds": 61
 }

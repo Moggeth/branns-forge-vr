@@ -91,7 +91,7 @@ try {
     await page.mouse.up(); await frames(3); await snap('fire'); await frames(30); await snap('lodged');
     // Spike the crossbow and look down at it.
     await page.keyboard.press('KeyG'); await frames(40);
-    let me = (await harness()).me; await look([me.position[0] + .2, me.position[1] - .2, me.position[2] - 1.4], 14); await frames(30); await snap('planted');
+    const pl = Object.values((await tw()).planted || {})[0]; let me = (await harness()).me; await look(pl ? [pl.at[0], pl.at[1] + .25, pl.at[2]] : [me.position[0] + .2, me.position[1] - .2, me.position[2] - 1.4], 14); await frames(30); await snap('planted');
     // The other pack: walk to its hook, take it, close the circuit on the same skeleton.
     const t = await tw(), mine = t.operator ? 'red' : t.operator2 ? 'blue' : null, other = (t.probes?.red ? 'blue' : 'red');
     console.log('worn after plant', mine, 'probes', Object.keys(t.probes || {}).filter(k => t.probes[k]));
