@@ -68,11 +68,16 @@ try {
   await page.evaluate(() => window.__vt.enable());
   if (GOD) {
     // Pan the God camera over the tower (closed loop on the reported pan), then three zooms and a turn.
-    for (let i = 0; i < 80; i++) {
-      const {c} = await harness(), [px, pz] = c.godPan, ex = T[0] - px, ez = T[1] - pz; if (Math.hypot(ex, ez) < 1.2) break;
-      let best = null; for (const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) { await page.keyboard.down(key); await frames(2, 50); await page.keyboard.up(key); const p = (await harness()).c.godPan;
-        const err = Math.hypot(T[0] - p[0], T[1] - p[1]); if (!best || err < best.err) best = {key, err}; }
-      await page.keyboard.down(best.key); await frames(6, 50); await page.keyboard.up(best.key);
+    // Probe how W and D move the pan, solve for the hold lengths, then correct twice (each frame is slow on software GL).
+    const pan = async () => (await harness()).c.godPan, hold = async (key, n) => { if (n <= 0) return; await page.keyboard.down(key); await frames(n, 50); await page.keyboard.up(key); await frames(1); };
+    for (let round = 0; round < 3; round++) {
+      const p0 = await pan(); if (Math.hypot(T[0] - p0[0], T[1] - p0[1]) < 1.2) break;
+      await hold('KeyW', 3); const p1 = await pan(); await hold('KeyD', 3); const p2 = await pan();
+      const w = [(p1[0] - p0[0]) / 3, (p1[1] - p0[1]) / 3], d = [(p2[0] - p1[0]) / 3, (p2[1] - p1[1]) / 3], e = [T[0] - p2[0], T[1] - p2[1]];
+      const det = w[0] * d[1] - w[1] * d[0]; if (Math.abs(det) < 1e-6) break;
+      const a = (e[0] * d[1] - e[1] * d[0]) / det, b = (w[0] * e[1] - w[1] * e[0]) / det;
+      await hold(a > 0 ? 'KeyW' : 'KeyS', Math.min(200, Math.round(Math.abs(a)))); await hold(b > 0 ? 'KeyD' : 'KeyA', Math.min(200, Math.round(Math.abs(b))));
+      console.log('pan', round, JSON.stringify(await pan()));
     }
     await frames(30);
     for (const [name, wheel] of [['far', 600], ['mid', -900], ['near', -900]]) { await page.mouse.move(W / 2, H / 2); await page.mouse.wheel(0, wheel); await frames(40); await snap(name); }
