@@ -308,6 +308,7 @@ function supportBrim(p, out, nrm) {
 
 // --- One rigged lizard ---------------------------------------------------------------------------------------------
 export const LIZARD_SCALE = 1.2;   // a touch bigger than life so the crew reads from the ground
+const HUG = {nap: 1.25};
 const LOOK_WEIGHT = {idle: 1, tinker: .35, climb: .3, cheer: .2, nap: 0, bite: .1};
 const LIMBS = [['ArmUL', 'ArmLL', 'HandL', 'soleArmL'], ['ArmUR', 'ArmLR', 'HandR', 'soleArmR'], ['LegUL', 'LegLL', 'FootL', 'soleLegL'], ['LegUR', 'LegLR', 'FootR', 'soleLegR']];
 const TAILS = ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'Tail5', 'Tail6'];
@@ -346,7 +347,7 @@ function makeModel(lizard) {
   const base = [];   // the clip pose of every bone a procedural layer touches
   for (const name of LAYERED) if (bones[name]) base.push({bone: bones[name], q: bones[name].quaternion.clone(), s: bones[name].scale.clone()});
   return {model, bones, rest, base, mixer, actions, material, clip: null, wrench: 0, vein: .6, prevTime: 0,
-    blink: 0, blinkAt: 1 + Math.random() * 3, blinkDouble: false, yaw: 0, pitch: 0, ik: 0,
+    blink: 0, blinkAt: 1 + Math.random() * 3, blinkDouble: false, yaw: 0, pitch: 0, ik: 0, hug: [0, 0],
     hat: {p: spring(), r: spring()}, tailY: [spring(), spring(), spring()], tailP: [spring(), spring(), spring()], belly: spring(), cheek: spring(),
     trHead: tracker(), trHips: tracker(), trTip: tracker(), yawRate: 0, lastQ: new THREE.Quaternion(), sway: new THREE.Vector3(), swayV: new THREE.Vector3()};
 }
@@ -476,6 +477,17 @@ function animateModel(lizard, t, dt, target) {
   if (B.Belly) B.Belly.scale.multiply(_v.set(1 - m.belly.x * .5, 1 + m.belly.x, 1 - m.belly.x * .5));
   for (const c of ['CheekL', 'CheekR']) if (B[c]) B[c].scale.multiplyScalar(1 + m.cheek.x);
 
+  // hugging: on a perch narrower than the newt (the hopper lip, the brim pipe) the limbs fold in and down round it
+  // before the IK plants them (the clips splay the legs for flat ground or, napping, flop them out sideways)
+  const hug = lizard.hug ? lizard.hug(m.clip) : null;
+  let hugged = false;
+  for (const [k, side] of [[0, 'L'], [1, 'R']]) {
+    m.hug[k] += ((hug ? hug[k] : 0) - m.hug[k]) * damp(5, dt);
+    if (Math.abs(m.hug[k]) < 1e-3) continue;
+    const sg = side === 'L' ? 1 : -1; hugged = true;
+    turn(m, `ArmU${side}`, 'z', sg * m.hug[k]); turn(m, `LegU${side}`, 'z', sg * m.hug[k]);
+  }
+  if (hugged) lizard.holder.updateMatrixWorld(true);
   // foot IK: every boot finds the surface under it (the stone, the rim, the brim) and keeps the clip's lift from there
   const ikTarget = lizard.support ? 1 : 0;
   m.ik += (ikTarget - m.ik) * damp(6, dt);
@@ -548,7 +560,8 @@ let stoneLength = 0;
 // back, turning (or hopping a winding) a body length short of it on either side.
 // The red and blue cable terminals (east and west, y 1.85) and the pack hooks under them (y 1.40, packs hanging below)
 // also stand off the wall: on the turns that pass them the patrol stops short of them too.
-const COLUMN_A = Math.PI / 2, COLUMN_GAP = .56;
+// (The column now stands on brackets .27 m out from the face, with brass bracket arms back to the wall: the gap is wider.)
+const COLUMN_A = Math.PI / 2, COLUMN_GAP = .68;
 const OBSTACLES = [[0, 1.85, .52, .3], [Math.PI, 1.85, .52, .3], [0, 1.2, .5, .42], [Math.PI, 1.2, .5, .42]];   // angle, y, half angle, half height
 const U_TURN = 1 / TW.turns, U_RAD = 1 / (TAU * TW.turns);
 const segStart = n => (COLUMN_A + COLUMN_GAP - TW.phase + TAU * n) * U_RAD;
@@ -591,6 +604,9 @@ export function createLizardCrew() {
   const mk = (role, look) => { const holder = new THREE.Group(); holder.name = `Lizard_${LIZARD_LOOKS[look].name}`; group.add(holder); return {role, look, holder, stand: null, m: null, cable: null, cableSpace: group, supportSpace: group, sparks, cheerIn: -1, cheerLeft: 0}; };
   const climber = mk('climber', 0), keeper = mk('keeper', 1), lounger = mk('lounger', 2), crew = [climber, keeper, lounger];
   climber.support = supportShaft; keeper.support = supportHopper; lounger.support = supportBrim;
+  // radians each side's limbs fold in (L, R): the napping lounger's limbs hang down either side of the brim pipe
+  // instead of flopping out into the air
+  lounger.hug = clip => clip === 'nap' ? [HUG.nap, HUG.nap] : [0, 0];
   // The keeper straddles the right side of the hopper rim like a cat on a fence, belly on the lip, facing the front
   // of the tower (her inner boots brace on the inside of the bowl, her outer ones hook the lip; the tail curls up
   // clear of the charge column); the lounger drapes along the copper torus brim over the charge column.
@@ -621,6 +637,9 @@ export function createLizardCrew() {
     if (climber.m) play(climber.m, 'climb'); if (keeper.m) play(keeper.m, 'tinker'); if (lounger.m) play(lounger.m, 'nap');
   }
   const api = {upgrade: build};
+  // review/test hook (tests/lizard-lab.html): each boot sole's height above the surface it stands on, after the IK
+  group.userData.lizardFeet = () => crew.filter(l => l.m && l.support).map(l => ({name: LIZARD_LOOKS[l.look].name, clip: l.m.clip, hug: l.m.hug.map(v => +v.toFixed(2)),
+    feet: LIMBS.map(leg => { if (!pointOf(l.m, leg[3], _F)) return null; _S.copy(_F).applyMatrix4(_m.copy(group.matrixWorld).invert()); return +l.support(_S, _T, _N).toFixed(3); })}));
   build(); if (!template) { waiting.add(api); load(); }
   const watching = l => viewer.seen > frameNo - 3 && l.holder.getWorldPosition(_w).distanceTo(viewer.pos) < 7 ? viewer.pos : null;
   function climberStep(dt) {

@@ -8,6 +8,10 @@
 //   lab.charge()            charge the tower (the crew cheers)
 //   lab.show(clip)          showcase lizards play a clip from its start (idle climb cheer nap tinker bite)
 //   lab.size(w, h)          resize (e.g. 390 x 844 for a phone)
+//   lab.near(who, off, aim) camera in a crew newt's own frame (who Sparky Sprocket Snooze; x right, y up off its belly, z back)
+//   lab.feet()              every crew boot sole's height above the surface it stands on (after the IK)
+//   lab.solo(k)             show only showcase newt k (0..2) at the centre of the slab (lab.solo(-1) restores all three)
+//   lab.orbit(az, el, d, y, dz) camera orbiting the slab centre (+dz along it; the heads are at dz -.3): azimuth (0 = in front of the newts), elevation, distance, aim height
 //   lab.stats()             draw calls, triangles
 //   lab.springs()           the middle showcase newt's secondary-motion springs
 //   lab.probe(bone), lab.track(clip, bone)   debugging: a showcase bone's pose and clip track
@@ -37,7 +41,7 @@ function setView(name){follow=null;if(name==='climber'||name==='climber-close'){
 function render(){
   if(follow){const h=e.spire.root.getObjectByName('Lizard_Sparky');if(h){const p=h.getWorldPosition(new T.Vector3()),out=new T.Vector3(p.x,0,p.z).normalize();const tan=new T.Vector3(-out.z,0,out.x);cam.position.copy(p).addScaledVector(out,follow).addScaledVector(tan,follow<1?.35:0).add(new T.Vector3(0,follow<1?.25:.5,0));cam.lookAt(p.clone().add(new T.Vector3(0,.05,0)));}}
   renderer.render(scene,cam);}
-window.lab={
+window.lab={scene,e,T,
   frame(n=1){for(let i=0;i<n;i++){frame++;const t=frame/60,dt=1/60;art.animate(e,t,dt);for(const l of shows)l.update(t,dt,cam.position);}render();return frame;},
   view(name){setView(name);render();},
   charge(){art.charged(e);},
@@ -46,6 +50,10 @@ window.lab={
   probe(bone){const m=shows[1].model,b=m.bones[bone];return{q:b.quaternion.toArray().map(v=>+v.toFixed(3)),rest:m.rest[bone].q.toArray().map(v=>+v.toFixed(3)),clip:m.clip,w:Object.fromEntries(Object.entries(m.actions).map(([k,a])=>[k,+a.getEffectiveWeight().toFixed(2)])),tracks:m.actions[m.clip]?.getClip().tracks.filter(t=>t.name.startsWith(bone)).map(t=>t.name)};},
   track(clip,bone){const t=shows[1].model.actions[clip].getClip().tracks.find(t=>t.name.startsWith(bone));return{times:Array.from(t.times),values:Array.from(t.values).map(v=>+v.toFixed(3)),type:t.constructor.name,interp:t.getInterpolation()};},
   springs(){const m=shows[1].model,r=v=>+v.toFixed(3);return{clip:m.clip,hat:[r(m.hat.p.x),r(m.hat.r.x)],tailY:m.tailY.map(s=>r(s.x)),tailP:m.tailP.map(s=>r(s.x)),belly:r(m.belly.x),cheek:r(m.cheek.x)};},
+  near(who,off,aim=[0,.12,0]){follow=null;const h=e.spire.root.getObjectByName('Lizard_'+who);h.updateWorldMatrix(true,false);cam.position.copy(h.localToWorld(new T.Vector3(...off)));cam.up.copy(new T.Vector3(0,1,0));cam.lookAt(h.localToWorld(new T.Vector3(...aim)));render();},
+  feet(){return e.spire.crew?.group?.userData.lizardFeet?.()??e.spire.root.getObjectByName('LizardCrew')?.userData.lizardFeet?.();},
+  solo(k){shows.forEach((l,i)=>{l.group.visible=k<0||i===k;l.group.position.x=SHOW.x+(k<0?(i-1)*.62:0);});render();},
+  orbit(az,el,d,y=.3,dz=0){follow=null;const z=SHOW.z+dz;cam.position.set(SHOW.x+Math.sin(az)*Math.cos(el)*d,y+Math.sin(el)*d,z-Math.cos(az)*Math.cos(el)*d);cam.lookAt(SHOW.x,y,z);render();},
   stats(){renderer.info.reset;render();return{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,frame,model:!!shows.length};},
 };
 setView('front');lab.frame(1);document.title='ready';

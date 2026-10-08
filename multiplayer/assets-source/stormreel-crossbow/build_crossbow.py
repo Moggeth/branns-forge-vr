@@ -59,11 +59,11 @@ ZPROP = {
 }
 # finishes (sRGB hex): red = positive (+) crimson & bone, blue = negative (-) blackened steel & electric blue
 FIN = {
-    'red': dict(Enamel='9c1b14', Accent='ecdfc4', Ceramic='f4ecda', Steel='3d424b', Brass='d9a646', Copper='d9814f', Rubber='202124',
-                Fletch='ec4a2e', Badge='f0c24a', Wire='8c4a2c', Cable='c23224', DarkSteel='25282e', Coil='d27a46', HazA='f1e5cc', HazB='9a1e17',
+    'red': dict(Enamel='9c1b14', Accent='ecdfc4', Ceramic='f4ecda', Steel='959ca6', Brass='d9a646', Copper='d9814f', Rubber='202124',
+                Fletch='ec4a2e', Badge='f0c24a', Wire='8c4a2c', Cable='c23224', DarkSteel='3b3f47', Coil='d27a46', HazA='f1e5cc', HazB='9a1e17',
                 Glyph='b3241b'),
-    'blue': dict(Enamel='23439a', Accent='45a0ff', Ceramic='e2e9f3', Steel='3a404a', Brass='d9a646', Copper='d9814f', Rubber='1f2023',
-                 Fletch='2f88ff', Badge='a9c9f2', Wire='8c4a2c', Cable='2a62d0', DarkSteel='17191e', Coil='d27a46', HazA='2f7df2', HazB='14171d',
+    'blue': dict(Enamel='23439a', Accent='45a0ff', Ceramic='e2e9f3', Steel='8f97a3', Brass='d9a646', Copper='d9814f', Rubber='1f2023',
+                 Fletch='2f88ff', Badge='a9c9f2', Wire='8c4a2c', Cable='2a62d0', DarkSteel='2a2e36', Coil='d27a46', HazA='2f7df2', HazB='14171d',
                  Glyph='e9f2ff'),
 }
 def hexc(h): return np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)], dtype=np.float32)
@@ -552,10 +552,14 @@ B['normal'] = bake('normal', 'NORMAL', imgs['normal'], max(8, SAMPLES // 2), ATL
 SC.world = bpy.data.worlds.new('W') if SC.world is None else SC.world
 SC.render.bake.use_selected_to_active = False
 SC.world.light_settings.distance = .05
-bolt_parent = BOLT.parent; bolt_parent.location.x += 10; bpy.context.view_layer.update()
+bolt_parent = BOLT.parent; bolt_parent.location.x += 10
+for o in [GLASS] + CORES: o.hide_render = True   # glass must not shade what is inside it
+bpy.context.view_layer.update()
 ao_body = bake('ao', 'AO', imgs['ao'], SAMPLES, [o for o in ATLAS if o is not BOLT])
 ao_bolt = bake('ao', 'AO', imgs['ao'], SAMPLES, [BOLT])
-bolt_parent.location.x -= 10; bpy.context.view_layer.update()
+bolt_parent.location.x -= 10
+for o in [GLASS] + CORES: o.hide_render = False
+bpy.context.view_layer.update()
 
 # ================================================================== composite (numpy, Blender rows are bottom-up)
 idm = np.clip(np.floor(B['id'][..., 0] * 16).astype(int), 0, len(ZONES) - 1)
@@ -680,7 +684,7 @@ base_path = os.path.join(WORK, 'stormreel_base.jpg')
 # top half (glTF v 0..0.5) = red, bottom half = blue; arrays are bottom-up, so stack blue under red then flip in save
 save(np.concatenate([blue, red], 0), base_path, 84, sub=2)
 orm_path = save(ORM, os.path.join(WORK, 'stormreel_orm.jpg'), 88, size=(TEX // 2, TEX // 2))
-nrm_path = save(NRM, os.path.join(WORK, 'stormreel_normal.jpg'), 83)
+nrm_path = save(NRM, os.path.join(WORK, 'stormreel_normal.jpg'), 80)
 for k in ('id', 'edge'): save(np.repeat((B[k][..., :1] if k == 'edge' else (idm[..., None] / 14.0)), 3, -1), os.path.join(WORK, f'debug_{k}.png'))
 save(np.repeat(ao[..., None], 3, -1), os.path.join(WORK, 'debug_ao.png'))
 log('textures', {p: os.path.getsize(p) for p in (base_path, orm_path, nrm_path)})

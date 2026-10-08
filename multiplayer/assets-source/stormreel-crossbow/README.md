@@ -35,10 +35,10 @@ sampling noise in the AO and bevel bakes.
 
 | | |
 | --- | --- |
-| Triangles | crossbow about 7,400 including the seated bolt; bolt 312 |
+| Triangles | 7,684 in all: body 6,428, limbs 2 x 304, string halves 2 x 12, seated bolt 312, glass 184, cores 2 x 64 (the bolt alone: 312) |
 | Draw calls | 9 meshes (body, 2 limbs, 2 string halves, bolt, glass, 2 charge cores), 3 materials |
-| Textures | base colour 1024 x 2048 JPEG (both finishes), ORM 512 x 512 JPEG, normal 1024 x 1024 JPEG |
-| GLB | see `out/bake/report.json` (target under 1 MB) |
+| Textures | base colour 1024 x 2048 JPEG (both finishes, 382 KB), ORM 512 x 512 JPEG (138 KB), normal 1024 x 1024 JPEG (200 KB) |
+| GLB | 990 KB (`out/bake/report.json` after a build) |
 
 Normals are stored as normalized bytes and UVs as normalized shorts (`KHR_mesh_quantization`, core in three.js).
 

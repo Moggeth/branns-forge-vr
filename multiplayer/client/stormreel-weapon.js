@@ -169,7 +169,7 @@ export function createStormreelWeapon(ctx) {
       core.scale.z = Math.max(.04, fill.x); const swell = 1 + .35 * Math.max(0, pulse.x); core.scale.x = core.scale.y = swell;
       core.visible = live || pulling || fill.x > .06;
     }
-    if (coreMat) coreMat.emissiveIntensity = (.9 + 2.2 * fill.x + 2.5 * Math.max(0, pulse.x)) * (.85 + .3 * flicker(now, 4));
+    if (coreMat) coreMat.emissiveIntensity = (.45 + 1.15 * fill.x + 1.6 * Math.max(0, pulse.x)) * (.85 + .3 * flicker(now, 4));
   }
   function spark(node, k) {
     if (!node || !lightning) return; node.getWorldPosition(a);

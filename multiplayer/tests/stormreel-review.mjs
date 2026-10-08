@@ -58,7 +58,9 @@ try {
   await page.waitForFunction(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Got it' && b.offsetParent); b?.click(); return !!b || !!document.querySelector('#name')?.offsetParent && document.querySelector('#name') === document.elementFromPoint(...(r => [r.x + 5, r.y + 5])(document.querySelector('#name').getBoundingClientRect())); }, null, {timeout: 60000, polling: 500}).catch(() => {});
   await page.waitForTimeout(800);
   await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Got it' && b.offsetParent)?.click());
-  await page.fill("#name", "Storm Review", {timeout: 180000}); await page.check(`input[name="role"][value="${GOD ? 'god' : 'hero'}"]`, {force: true});
+  // Fill the welcome form straight through the DOM (the What's-new panel and the welcome animation can cover it).
+  await page.evaluate(role => { const n = document.querySelector('#name'); if (n) { n.value = 'Storm Review'; n.dispatchEvent(new Event('input', {bubbles: true})); }
+    const r = document.querySelector(`input[name="role"][value="${role}"]`); if (r) { r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); } }, GOD ? 'god' : 'hero');
   await page.locator('#import').setInputFiles({name: 'stormreel.json', mimeType: 'application/json', buffer: fixture}, {timeout: 180000});
   await page.waitForFunction(() => window.brannHarness?.state().phase === 'game', null, {timeout: 600000});
   await new Promise(r => setTimeout(r, 2500));

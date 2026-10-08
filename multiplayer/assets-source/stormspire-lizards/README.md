@@ -11,9 +11,11 @@ cable, and glossy black boots with rounded claws. Glowing blue veins run under t
 
 Signature features:
 
-1. **The faces.** A hinged jaw with big cone teeth, glossy painted eyes with real eyelids, and the sheet's squint:
-   when the lids shut, a dark curved closed-eye line lands across each eye (it sits on top of the open eye as a small
-   brow line), with the cheeks puffed by the Cheek bones.
+1. **The faces.** A hinged jaw with big, blunt cream cone teeth (seven above, five below), glossy painted eyes tucked
+   under the hard-hat brim, and the sheet's squint: each upper lid is a hemisphere whose edge runs through the eye's
+   sides and over the top of the iris with a dark lash line on top only (no goggle ring), over a fixed skin socket so
+   a blink never shows the back of the eye; when the lids shut a dark curved closed-eye line lands across each eye,
+   with the cheeks puffed by the Cheek bones. The snout is a broad quarter ellipse with two nostrils.
 2. **Live wiring.** Flickering blue veins that flare while charging up or biting, spark bursts, and a cable from the
    back socket that the runtime runs to wherever the newt is plugged in (the coil, the plinth, the brim).
 
@@ -30,12 +32,15 @@ none). The last line printed is `LIZARD_BUILD_OK`; Blender can exit 0 after a tr
 `--dump-textures` also writes the three JPEGs to `out/`. The build is deterministic (same bytes every run).
 Review in `tests/lizard-lab.html` (Vite dev server): `lab.view('show-face')`, `lab.show('cheer')`, `lab.frame(20)`,
 tower views `front`, `hopper`, `hopper-side`, `brim`, `climber` and `climber-close`, and `lab.size(390, 844)` for a
-phone. In-game captures: `tests/stormreel-review.mjs` (first person, `PHONE=1`, `VIEW=god`).
+phone. `lab.solo(k)` and `lab.orbit(az, el, d, y, dz)` give clean turnarounds of one newt, `lab.near(who, off, aim)` a
+camera in a crew newt's own frame, and `lab.feet()` every crew boot's height above the surface it stands on. In-game captures: `tests/stormreel-review.mjs` (first person, `PHONE=1`, `VIEW=god`).
 
 ## Budget
 
-5,020 triangles in the one skinned mesh, of which about 4,860 are visible at once (the wrench, 84, shows only while
-tinkering; the two z's, 72, only while napping). 37 bones, one material, one draw call per newt plus its cable (144
+About 5,200 triangles in the one skinned mesh (see `out/build_report.json`), of which about 5,050 are visible at
+once (the wrench, 84, shows only while tinkering; the two z's, 72, only while napping). The 2026-10-07 finishing pass
+spent its extra triangles on the snout, teeth, lids and claws and paid for part of it with flat bevelled badge rims
+and buckles. 37 bones, one material, one draw call per newt plus its cable (144
 triangles) and one spark cloud per tower (64 points). Textures: three 512 x 512 JPEGs (base colour 55 KB, normal
 114 KB, metallic-roughness 68 KB), mip-mapped, shared by every newt; about 1 MB of GPU memory each with mips.
 Vertex colours carry data (ambient occlusion, glow, skin mask). No lights. About 560 KB on disk. The GLB is repacked
@@ -67,7 +72,8 @@ transverse belly scales and small domed pebbles (in the normal map). The metalli
   sets its time scale from the climbing speed), `cheer` (1.6 s, once: charge up with eyes shut and cheeks puffed, then
   a hop with arms up and a grin), `nap` (4 s: belly down, hat over the eyes, snore, z's), `tinker` (2 s: two wrench
   taps), `bite` (1.8 s: rear back, lunge, chomp and a fizzing, squinting shake).
-- Procedural layers (runtime): blinks, look-at, springs (tail follow-through in three cascaded stages, hat wobble,
+- Procedural layers (runtime): limb hugging (the napping lounger's limbs fold down either side of the brim pipe
+  before the IK plants them), blinks, look-at, springs (tail follow-through in three cascaded stages, hat wobble,
   belly and cheek jiggle, cable sway) driven by the measured acceleration of the head and hips, and two-bone IK that
   plants each boot on the analytic tower surfaces (octagonal stone and courses plus the coil wire for the climber, the
   hopper bowl's lathe profile for the keeper, the torus brim for the napper) while keeping the clip's foot lift.

@@ -228,10 +228,10 @@ def s_of_z(z):   # only valid before the curl (z increasing)
     k = int(np.argmax(SPN[:, 0] > .33)); return float(np.interp(z, SPN[:k, 0], SPL[:k]))
 S_TAIL0 = s_of_z(.13); S_CURL = s_of_z(.29)
 # (s, half width, top, bottom, superellipse exponent): soft and round, a big chest, a thick tail to a rounded hook
-BKEYS = [(0, .056, .05, .05, 2.1), (s_of_z(-.075), .077, .057, .065, 2.15), (s_of_z(-.01), .089, .059, .073, 2.25),
-         (s_of_z(.05), .087, .058, .071, 2.25), (s_of_z(.1), .073, .053, .057, 2.15), (s_of_z(.15), .061, .05, .05, 2.1),
-         (s_of_z(.22), .051, .046, .045, 2.05), (s_of_z(.29), .044, .042, .041, 2.0), (lerp(S_CURL, BODY_LEN, .45), .035, .034, .034, 2.0),
-         (lerp(S_CURL, BODY_LEN, .8), .028, .027, .027, 2.0), (BODY_LEN - .016, .019, .019, .019, 2.0), (BODY_LEN, .006, .006, .006, 2.0)]
+BKEYS = [(0, .056, .05, .05, 2.1), (s_of_z(-.075), .079, .06, .068, 2.15), (s_of_z(-.01), .091, .064, .077, 2.25),
+         (s_of_z(.05), .089, .063, .075, 2.25), (s_of_z(.1), .075, .057, .061, 2.15), (s_of_z(.15), .062, .051, .051, 2.1),
+         (s_of_z(.22), .056, .05, .049, 2.05), (s_of_z(.29), .05, .047, .046, 2.0), (lerp(S_CURL, BODY_LEN, .45), .043, .041, .041, 2.0),
+         (lerp(S_CURL, BODY_LEN, .8), .034, .033, .033, 2.0), (BODY_LEN - .018, .025, .025, .025, 2.0), (BODY_LEN, .008, .008, .008, 2.0)]
 BK = np.array([k[0] for k in BKEYS])
 def bkey(s, i):
     vals = [k[i] for k in BKEYS]; s = min(max(s, BK[0]), BK[-1])
@@ -256,7 +256,7 @@ BONES['Belly'] = ((0, .1, .02), (0, .1, -.03), 'Hips')
 BONES['Head'] = ((0, .14, -.12), (0, .16, -.24), 'Spine')
 BONES['Jaw'] = ((0, .135, -.13), (0, .12, -.27), 'Head')
 EYE_R = .035
-EYE_C = {'L': Vector((-.046, .188, -.222)), 'R': Vector((.046, .188, -.222))}
+EYE_C = {'L': Vector((-.049, .181, -.234)), 'R': Vector((.049, .181, -.234))}
 for sfx, c in EYE_C.items():
     sx = -1 if sfx == 'L' else 1
     BONES[f'Eye{sfx}'] = (tuple(c), tuple(c + Vector((0, 0, -.03))), 'Head')
@@ -279,8 +279,8 @@ for sfx in ('L', 'R'):
         BONES[f'{limb}U{sfx}'] = (sh, el, parent_of[limb])
         BONES[f'{limb}L{sfx}'] = (el, wr, f'{limb}U{sfx}')
         BONES[f'{"Hand" if limb == "Arm" else "Foot"}{sfx}'] = (wr, tuple(Vector(ft) + Vector((0, 0, -.04))), f'{limb}L{sfx}')
-HAT_BASE = (0, .222, -.152)
-BONES['HatHard'] = (HAT_BASE, (0, .27, -.158), 'Head')
+HAT_BASE = (0, .221, -.16)
+BONES['HatHard'] = (HAT_BASE, (0, .27, -.165), 'Head')
 WRENCH_AT = Vector(BONES['HandR'][1]) + Vector((.0, .035, .02))
 BONES['Wrench'] = (tuple(WRENCH_AT), tuple(WRENCH_AT + Vector((0, .05, -.01))), 'HandR')
 SOCKET = body_point(s_of_z(-.035), 0.0)                        # top of the upper back, between the shoulders
@@ -348,10 +348,13 @@ HEAD_Z0, HEAD_Z1 = -.095, -.288
 def head_section(z):
     """mouth line y, half width, height above the mouth line, depth below it (inside the jaw)."""
     u = max(0, min(1, (z - HEAD_Z0) / (HEAD_Z1 - HEAD_Z0)))
-    U = [0, .1, .28, .5, .72, .9, 1]
-    w = np.interp(u, U, [.022, .067, .087, .087, .077, .057, .012])
-    top = np.interp(u, U, [.025, .07, .082, .076, .06, .043, .01])
-    bot = np.interp(u, U, [.014, .024, .026, .022, .018, .013, .004])
+    U = [0, .1, .28, .5, .7]
+    w = np.interp(u, U, [.022, .067, .087, .087, .078])
+    top = np.interp(u, U, [.025, .07, .082, .076, .061])
+    bot = np.interp(u, U, [.014, .024, .026, .022, .018])
+    if u > .7:   # a broad, round snout: the front third is a quarter ellipse in plan and in profile
+        e = math.sqrt(max(0.0, 1 - ((u - .7) / .3) ** 2)) * .93 + .07 * (1 - (u - .7) / .3)
+        w, top, bot = w * e, top * e, bot * e
     ym = np.interp(u, [0, .3, .7, 1], [.146, .14, .137, .136])
     return float(ym), float(w), float(top), float(bot)
 CHEEK_C = .062
@@ -363,7 +366,7 @@ def cheek_w(p):
         if k > 0: out[f'Cheek{sfx}'] = k
     return out
 def head():
-    zs = list(np.linspace(HEAD_Z0, HEAD_Z1, 11)); rings = []
+    zs = [HEAD_Z0 + (HEAD_Z1 - HEAD_Z0) * u for u in (0, .1, .2, .3, .4, .5, .6, .7, .79, .87, .93, .97, 1)]; rings = []
     for z in zs:
         ym, w, top, bot = head_section(z); ring = []
         for k in range(HK):
@@ -376,24 +379,24 @@ def head():
         rings.append(ring)
     bv = lambda k: (k / HK + .5) % 1.0
     for zi, (a, b) in enumerate(zip(rings, rings[1:])):
-        y0, y1 = zi / (len(zs) - 1), (zi + 1) / (len(zs) - 1)
+        y0, y1 = (zs[zi] - HEAD_Z0) / (HEAD_Z1 - HEAD_Z0), (zs[zi + 1] - HEAD_Z0) / (HEAD_Z1 - HEAD_Z0)
         for k in range(HK):
             k1 = (k + 1) % HK; cy = math.cos(TAU * (k + .5) / HK); z = (zs[zi] + zs[zi + 1]) / 2
             inside = (0, head_section(z)[0], z)
-            if cy < -.3 and z < -.125: G.f((a[k], a[k1], b[k1], b[k]), 'mouth_dark' if zi < 4 else 'mouth', inside=inside); continue
+            if cy < -.3 and z < -.125: G.f((a[k], a[k1], b[k1], b[k]), 'mouth_dark' if z > -.172 else 'mouth', inside=inside); continue
             x0 = bv(k); x1 = x0 + 1 / HK
             G.f((a[k], a[k1], b[k1], b[k]), None, inside=inside,
                 uv=('head', [reg_uv('head', x0, y0), reg_uv('head', x1, y0), reg_uv('head', x1, y1), reg_uv('head', x0, y1)]))
     for ring, z, sgn in ((rings[0], zs[0], 1), (rings[-1], zs[-1], -1)):
         ym, w, top, bot = head_section(z); c = G.v((0, ym + (top - bot) * .3, z + sgn * .004), .25, {'Head': 1.0}, 'head')
-        for k in range(HK): G.f((ring[(k + 1) % HK], ring[k], c), 'skin_back', out=(0, 0, sgn))
+        for k in range(HK): G.f((ring[(k + 1) % HK], ring[k], c), 'skin_mid', out=(0, 0, sgn))
 head()
 
 JAW_Z0, JAW_Z1 = -.115, -.28
 def jaw_section(z):
     u = (z - JAW_Z0) / (JAW_Z1 - JAW_Z0)
-    w = float(np.interp(u, [0, .2, .55, .85, 1], [.04, .075, .075, .057, .015]))
-    dep = float(np.interp(u, [0, .2, .55, .85, 1], [.03, .058, .056, .043, .012]))
+    w = float(np.interp(u, [0, .2, .55, .85, 1], [.04, .075, .076, .063, .03]))
+    dep = float(np.interp(u, [0, .2, .55, .85, 1], [.03, .058, .056, .045, .02]))
     ytop = float(np.interp(u, [0, 1], [.142, .136]))
     return w, dep, ytop
 def jaw():
@@ -436,26 +439,31 @@ def smile():
         pts.append(p + Vector((math.copysign(.004, p.x) * corner, .016 * corner ** 1.5, -.002 * (1 - corner))))
     tube(pts, [.0026] * 13, 4, 'line', lambda t: {'Head': 1.0}, 'deco', ao=0)
 smile()
-def cone(base_c, axis, r, ln, sides, weight, part):
-    d, u, v = frame_from(axis, (0, 0, 1)); ring = [G.v(base_c + (u * math.cos(TAU * k / sides) + v * math.sin(TAU * k / sides)) * r, .5, weight, part) for k in range(sides)]
-    mid = [G.v(base_c + d * ln * .45 + (u * math.cos(TAU * k / sides) + v * math.sin(TAU * k / sides)) * r * .62, .5, weight, part) for k in range(sides)]
+def cone(base_c, axis, r, ln, sides, weight, part, flat=.8):
+    """A chunky cartoon tooth: a wide base, a convex flank and a blunt rounded tip (flattened front to back by flat)."""
+    d, u, v = frame_from(axis, (0, 0, 1))
+    def ring(f, sc):
+        return [G.v(base_c + d * ln * f + (u * math.cos(TAU * k / sides) + v * math.sin(TAU * k / sides) * flat) * r * sc, .5, weight, part) for k in range(sides)]
+    rings = [ring(0, 1.0), ring(.42, .74), ring(.8, .34)]
     tip = G.v(base_c + d * ln, .5, weight, part)
-    for k in range(sides):
-        k1 = (k + 1) % sides
-        G.f((ring[k], ring[k1], mid[k1], mid[k]), 'tooth', inside=base_c + d * ln * .2)
-        G.f((mid[k], mid[k1], tip), 'tooth', inside=base_c + d * ln * .3)
+    for ra, rb in zip(rings, rings[1:]):
+        for k in range(sides):
+            k1 = (k + 1) % sides; G.f((ra[k], ra[k1], rb[k1], rb[k]), 'tooth', inside=base_c + d * ln * .3)
+    for k in range(sides): G.f((rings[-1][k], rings[-1][(k + 1) % sides], tip), 'tooth', inside=base_c + d * ln * .5)
 def teeth():
     """The sheet's grin: big cream cones along the upper lip, a shorter row on the jaw."""
-    for a in np.linspace(-1.12, 1.12, 7):
-        p = lip_point(a, inset=.0058) + Vector((0, .003, 0)); ln = .029 if abs(a) < .5 else .025 if abs(a) < .9 else .02
-        cone(p, (0, -1, -.1), .0082, ln, 5, {'Head': 1.0}, 'teeth')
-    for a in np.linspace(-.95, .95, 6):
-        p = lip_point(a, inset=.0085, upper=False) + Vector((0, -.005, 0)); ln = .019 if abs(a) < .6 else .016
-        cone(p, (0, 1, -.08), .0068, ln, 5, {'Jaw': 1.0}, 'teeth')
+    for a in np.linspace(-1.1, 1.1, 7):
+        p = lip_point(a, inset=.0062) + Vector((0, .004, 0)); ln = .03 if abs(a) < .5 else .026 if abs(a) < .9 else .021
+        cone(p, (0, -1, -.16), .0112 if abs(a) < .9 else .0095, ln, 5, {'Head': 1.0}, 'teeth')
+    for a in np.linspace(-.84, .84, 5):
+        p = lip_point(a, inset=.0088, upper=False) + Vector((0, -.004, 0)); ln = .02 if abs(a) < .5 else .017
+        cone(p, (0, 1, -.12), .0092, ln, 5, {'Jaw': 1.0}, 'teeth')
 teeth()
 
 # eyes: big glossy amber eyes on the Eye bones (catch-lights ride them, so a squashed shut eye keeps them under the lid),
 # lids on the Lid bones
+LID_SIDES, LID_R = 14, 1.15
+LID_POLE = 2.33   # radians from the gaze to the lid's pole: its edge rides about .76 rad above the gaze, over the top of the iris
 EYE_LOOK = {'L': Vector((-.2, .08, -.97)).normalized(), 'R': Vector((.2, .08, -.97)).normalized()}
 LATS = [0, .22, .42, .62, .82, 1.0, 1.45, 2.0]
 EYE_AMAX = 2.0
@@ -463,7 +471,7 @@ def eye_uv(a, phi): return reg_uv('eye', .5 + .5 * (a / EYE_AMAX) * math.cos(phi
 def squint_arc(sfx, c):
     """The closed-eye line of the sheet's squint: a dark arc laid on the lid where it faces front once shut (it rides on
     top of the open eye as a little brow line)."""
-    F = EYE_LOOK[sfx]; side = Vector((1, 0, 0)); up = Vector((0, 1, 0)); rl = EYE_R * 1.14 * 1.04
+    F = EYE_LOOK[sfx]; side = Vector((1, 0, 0)); up = Vector((0, 1, 0)); rl = EYE_R * LID_R * 1.035
     to_open = Matrix.Rotation(LID_CLOSE, 3, 'X')
     pts = []
     for i in range(9):
@@ -479,19 +487,24 @@ for sfx, c in EYE_C.items():
     ball(c + hl * EYE_R * .9, .0068, hl, [0, 1.2, 2.2], 6, lambda b: 'highlight', {f'Eye{sfx}': 1.0}, 'deco', ao=0, glow=.9)
     hl2 = (EYE_LOOK[sfx] + Vector((sx * .2, -.45, 0))).normalized()
     ball(c + hl2 * EYE_R * .97, .0032, hl2, [0, 1.4], 5, lambda b: 'highlight', {f'Eye{sfx}': 1.0}, 'deco', ao=0, glow=.9)
-    # upper lid: a skin shell over the back and top of the eye with a thin dark lash rim. Rest pose = open.
-    pole = Vector((sx * .15, .32, .94)).normalized()
-    lat = [0, .7, 1.3, 1.86, 1.96]
-    rings = ball(c, EYE_R * 1.14, pole, lat, 10, lambda b: None, {f'Lid{sfx}': 1.0}, 'lid',
+    # a fixed skin socket over the back of the eyeball (so a blink never shows the back of the eye) ...
+    gaze = EYE_LOOK[sfx]; upg = (Vector((0, 1, 0)) - gaze * gaze.y).normalized()
+    ball(c, EYE_R * 1.1, (-gaze * .55 + upg * .45).normalized(), [0, .6, 1.15, 1.45], 12, lambda b: 'skin_mid', {'Head': 1.0}, 'head', ao=1.0)
+    # ... and the upper lid: a hemisphere whose edge runs through the eye's sides and over the top of the iris, with a
+    # dark lash line along that edge. Rest pose = open; turning LID_CLOSE about X sweeps it down over the eye.
+    pole = (gaze * math.cos(LID_POLE) + upg * math.sin(LID_POLE)).normalized()
+    lat = [0, .55, 1.05, 1.4, math.pi / 2 + .04]
+    rings = ball(c, EYE_R * LID_R, pole, lat, LID_SIDES, lambda b: None, {f'Lid{sfx}': 1.0}, 'lid',
                  ramp=lambda p: .22 + .2 * smoothstep(.17, .2, p.y), ao=1.0, region='lid', bake=sfx == 'L',
-                 uvf=lambda a, phi: reg_uv('lid', phi / TAU, a / 1.96))
-    last = rings[-1]; inner = [G.v(c + (G.P[vi] - c) * .965, .1, {f'Lid{sfx}': 1.0}, 'lid') for vi in last]
-    for k in range(10):
-        k1 = (k + 1) % 10; G.f((last[k], last[k1], inner[k1], inner[k]), 'lash', out=-pole)
+                 uvf=lambda a, phi: reg_uv('lid', phi / TAU, a / (math.pi / 2 + .04)))
+    last = rings[-1]; inner = [G.v(c + (G.P[vi] - c) * .955 - pole * EYE_R * .05, .1, {f'Lid{sfx}': 1.0}, 'lid') for vi in last]
+    for k in range(LID_SIDES):
+        k1 = (k + 1) % LID_SIDES; mid_k = ((G.P[last[k]] + G.P[last[k1]]) / 2 - c).normalized()
+        G.f((last[k], last[k1], inner[k1], inner[k]), 'lash' if mid_k.dot(gaze) > -.35 else 'skin_mid', out=-pole)
     squint_arc(sfx, c)
     # nostril
-    ym, w, top, bot = head_section(-.277)
-    disc((sx * .015, ym + top * .8 + .001, -.276), (sx * .3, .75, -.6), .0035, 6, 'nostril', {'Head': 1.0}, 'deco', stretch=1.4)
+    ym, w, top, bot = head_section(-.272)
+    disc((sx * .015, ym + top * .955 + .0008, -.272), (sx * .3, .62, -.72), .0036, 6, 'nostril', {'Head': 1.0}, 'deco', stretch=1.4)
     # a faint rosy cheek (rides the cheek bone, so it swells with the puff)
     bc = Vector((sx * .073, .147, -.188)); disc(bc, (sx * .9, .1, -.4), .01, 8, 'blush', {f'Cheek{sfx}': 1.0}, 'deco', stretch=1.3, lift=.0018)
 
@@ -522,7 +535,7 @@ def limb(sfx, kind):
     ball(fc, 1.0, (0, 1, 0), [0, 1.0, 1.9, math.pi], 8, lambda b: 'sole' if b >= 2 else 'boot', {H: 1.0}, 'boot', scale=(.037, .022, .043))
     for k, dx in enumerate((-.017, 0, .017)):
         cc = fc + Vector((dx * (1 if sfx == 'L' else -1), -.006, -.04 + .004 * abs(dx) / .017))
-        ball(cc, 1.0, (0, .2, -1), [0, 1.2, math.pi], 6, lambda b: 'claw', {H: 1.0}, 'boot', scale=(.012, .011, .014))
+        ball(cc, 1.0, (0, .35, -1), [0, 1.2, math.pi], 8, lambda b: 'claw', {H: 1.0}, 'boot', scale=(.0125, .0115, .0155))
 for sfx in ('L', 'R'):
     limb(sfx, 'Arm'); limb(sfx, 'Leg')
 
@@ -542,13 +555,13 @@ def spike(s, h, base_len, col, lean=.42):
             G.f((ra[k], ra[k1], rb[k1], rb[k]), None, inside=base + N * h * .25, uv=('spike', [reg_uv('spike', xs(k), y0), reg_uv('spike', xs(k + 1), y0), reg_uv('spike', xs(k + 1), y1), reg_uv('spike', xs(k), y1)]))
     for k in range(sides):
         G.f((rings[-1][k], rings[-1][(k + 1) % sides], ti), None, inside=base + N * h * .4, uv=('spike', [reg_uv('spike', xs(k), .75), reg_uv('spike', xs(k + 1), .75), reg_uv('spike', xs(k + .5), 1.0)]))
-SPIKES = [(.012, .03, .032)] + [(s_of_z(z), h, l) for z, h, l in ((.04, .031, .033), (.085, .035, .037), (.13, .034, .035),
+SPIKES = [(s_of_z(z), h, l) for z, h, l in ((.04, .031, .033), (.085, .035, .037), (.13, .034, .035),
           (.175, .031, .031), (.22, .028, .028), (.262, .025, .025))] + \
-         [(S_CURL + (BODY_LEN - S_CURL) * f, h, l) for f, h, l in ((.08, .022, .023), (.27, .02, .021), (.46, .017, .018), (.64, .014, .015), (.8, .011, .012))]
+         [(S_CURL + (BODY_LEN - S_CURL) * f, h, l) for f, h, l in ((.08, .026, .026), (.27, .024, .024), (.46, .021, .021), (.64, .018, .018), (.8, .015, .015))]
 for i, (s, h, l) in enumerate(SPIKES): spike(s, h * 1.3, l * 1.3, i)
 
 # ------------------------------------------------------------------ gear: hard hat, harness with badge, socket and cable
-HAT_TILT, HAT_R = .14, .1
+HAT_TILT, HAT_R = .1, .11
 HAT_ROT = Matrix.Rotation(HAT_TILT, 3, 'X')
 def hat_uv(p):
     q = HAT_ROT.inverted() @ (Vector(p) - Vector(HAT_BASE)); return reg_uv('hat', .5 + q.x / (2 * HAT_R), .5 - q.z / (2 * HAT_R))
@@ -556,7 +569,7 @@ def hat_face(idx, inside=None, out=None):
     G.f(idx, None, inside=inside, out=out, uv=('hat', [hat_uv(G.P[i]) for i in idx]))
 def hard_hat():
     w = {'HatHard': 1.0}; c = Vector(HAT_BASE); rot = HAT_ROT
-    rx, ry, rz = .073, .062, .079
+    rx, ry, rz = .078, .064, .084
     lats = [0, .4, .8, 1.15, 1.42, 1.571]; sides = 16
     top = G.v(c + rot @ Vector((0, ry, 0)), .5, w, 'gear'); rings = []
     for a in lats[1:]:
@@ -600,6 +613,15 @@ def band_ring(s, width, off, slot, th0=0.0, th1=TAU, n=16, weight=None):
         k1 = (k + 1) % cnt
         G.f((rings[0][k], rings[0][k1], rings[1][k1], rings[1][k]), slot, inside=c)
     return rings
+def rim(c, d, u, v, r_in, r_out, n, w, phase=0.0, sq=False):
+    """A raised metal ring flat on a surface: outer edge on it, a crest between, inner edge just above it."""
+    k_sq = 1 / math.cos(math.pi / 4) if sq else 1.0
+    pt = lambda r, k, h: c + d * h + (u * math.cos(phase + TAU * k / n) + v * math.sin(phase + TAU * k / n)) * r * k_sq
+    rm = (r_in + r_out) / 2
+    rings = [[G.v(pt(r, k, h), .5, w, 'gear') for k in range(n)] for r, h in ((r_out, .0004), (rm, .0024), (r_in, .0014))]
+    for ra, rb in zip(rings, rings[1:]):
+        for k in range(n):
+            k1 = (k + 1) % n; G.f((ra[k], ra[k1], rb[k1], rb[k]), 'buckle', out=d)
 def harness():
     s_col, s_girth = s_of_z(-.098), s_of_z(.012)
     band_ring(s_col, .017, .006, 'strap')                         # collar
@@ -628,18 +650,17 @@ def harness():
     for th in (1.95, TAU - 1.95):
         bp = body_point(sm, th, .0135); bn = (bp - c0).normalized(); bn = (bn + Vector((0, 0, -.25))).normalized()
         d, u, v = disc(bp, bn, .017, 12, 'badge', wts, 'gear', lift=.0005, glow=.12)
-        # a steel rim round the badge
-        ring = [bp + d * .0004 + (u * math.cos(TAU * k / 12) + v * math.sin(TAU * k / 12)) * .0185 for k in range(13)]
-        tube(ring, [.0016] * 13, 4, 'buckle', lambda t: wts, 'gear', cap0=False, cap1=False)
+        # a raised steel rim round the badge (a bevelled annulus: cheap and it still catches the light)
+        rim(bp, d, u, v, .0162, .0205, 12, wts)
         for (a0, a1), (b0, b1) in (((-.011, .011), (-.0037, .0037)), ((-.0037, .0037), (-.011, .011))):
             q = [bp + d * .0012 + u * x + v * y for x, y in ((a0, b0), (a1, b0), (a1, b1), (a0, b1))]
             G.f([G.v(p_, .5, wts, 'gear', ao=0, glow=.12) for p_ in q], 'cross', out=bn)
-    # steel buckles on the collar and girth: a frame with a bar across
+    # steel buckles on the collar and girth: a bevelled square frame with a bar across
     for s_, th in ((s_col, 1.15), (s_col, -1.15), (s_girth, 1.05), (s_girth, -1.05)):
-        p = body_point(s_, th, .0095); c0, _t = cl_at(s_); n_ = (p - c0).normalized(); d, u, v = frame_from(n_, (0, 0, 1))
-        q = [p + u * x + v * y for x, y in ((-.0085, -.0075), (.0085, -.0075), (.0085, .0075), (-.0085, .0075))]
-        tube(q + [q[0]], [.0016] * 5, 4, 'buckle', lambda t: body_weights(s_), 'gear', cap0=False, cap1=False)
-        tube([p + u * -.0085, p + u * .0085], [.0014] * 2, 4, 'buckle', lambda t: body_weights(s_), 'gear')
+        p = body_point(s_, th, .0075); c0, _t = cl_at(s_); n_ = (p - c0).normalized(); d, u, v = frame_from(n_, (0, 0, 1))
+        rim(p, d, u, v, .0058, .0095, 4, body_weights(s_), phase=math.pi / 4, sq=True)
+        bar = [G.v(p + d * .0016 + u * x + v * y, .5, body_weights(s_), 'gear') for x, y in ((-.0065, -.0011), (.0065, -.0011), (.0065, .0011), (-.0065, .0011))]
+        G.f(bar, 'buckle', out=d)
 harness()
 
 def socket_and_cable():
@@ -841,7 +862,7 @@ def paint_skin(name, P, R, a_, b_):
     if name == 'body': along = a_ * BODY_LEN; pitch = .0125
     else: along = P[:, 2]; pitch = .0105
     q = np.mod(along / pitch, 1.0); groove = 1 - sstep(.0, .14, q) * sstep(1.0, .86, q)
-    bands = groove * belly * (1.0 if name in ('body', 'jaw', 'head') else 0.0)
+    bands = groove * belly * (1.0 if name in ('body', 'head') else 0.0)
     col *= (1 - .13 * bands)[:, None]
     # pebbly skin: small domed scales everywhere, finer on the belly
     Fp, cp = worley(P * np.where(belly[:, None] > .5, 330, 240), 8); peb = sstep(.66, .08, Fp)
