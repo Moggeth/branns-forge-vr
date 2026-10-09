@@ -130,6 +130,11 @@ import {createEmberdewHand} from './emberdew-hand.js';
 import {flaskLaunch,forecastFlask,forecastCinder,createLandingMarkers} from './emberdew-aim.js';
 import {worldTrees} from '../shared/world-content.js';
 import {createLightningFx} from './lightning-fx.js';
+import {createAudioMix} from './audio-mix.js';
+import {createAmbienceAudio} from './ambience-audio.js';
+import {createSoundKit} from './sound-kit.js';
+import {cueFor,pickupCue} from './event-sounds.js';
+import {onKeepGround} from '../shared/keep-sites.js';
 import {createStormreelView} from './stormreel-view.js';
 import {createStormreelWeapon} from './stormreel-weapon.js';
 import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
@@ -247,7 +252,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const skyline = createAlpineSkyline({scene, sky: orchard.objects.sky}); orchard.objects.backdrop.visible = false;
   yield;
   const skyCycle = createDayNightWeather({scene, orchard, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
-  let orchardContentKey = '', stepDistance = 0;
+  let orchardContentKey = '', stepDistance = 0, stepSound = false;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
   cursor.visible = false;cursor.layers.set(31);
@@ -357,6 +362,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     target.addEventListener(type, handler, options);
     removers.push(() => target.removeEventListener(type, handler, options));
   }
+  // Footfall surface for the sound kit: cobbles on keep ground, snow or puddles when the weather has settled in, grass otherwise.
+  let surfaceAt=0,surface='grass';
+  function footSurface(){const now=performance.now();if(now-surfaceAt<600)return surface;surfaceAt=now;const w=skyCycle.stats().weights||{};surface=onKeepGround(localPosition.x,localPosition.z)?'stone':(w.snow||0)>.5?'snow':((w.rain||0)+(w.storm||0))>.5?'wet':'grass';return surface;}
+  // Every in-game button gets a soft click (the HUD, talents, build menu, panels). Pointer clicks are user gestures, so
+  // this is also a safe place to wake audio.
+  listen(globalThis.document||{addEventListener(){},removeEventListener(){}},'click',e=>{const b=e.target?.closest?.('button,[role="button"],.hotbar-slot,summary');if(!b||b.disabled)return;unlockAudio();soundKit?.play(b.matches?.('[aria-expanded="true"],summary')?'open':'click',null,null,{gap:.04});},{capture:true});
   function report(message) { if (!disposed) onStatus(message); }
   yield;
   const content = createWorldContent({scene,templates,instantiate,height:heightAt,camera});
@@ -932,7 +943,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Geode golems: crystal light, footfall/slam dust and resonance ring, procedural sound; rumble only reaches a nearby Hero.
   const golemFx=createGolemPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),
     haptic:(amplitude,ms)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:Math.min(1,amplitude),duration:ms}]);else if(touchEnabled&&amplitude>.3)try{navigator.vibrate?.(Math.round(ms*amplitude));}catch{}}});
-  let audioContext=null;let lastSound=0;let woodAudio=null;let materialAudio=null;let spellAudio=null;
+  let audioContext=null,audioMix=null,ambience=null,soundKit=null;let lastSound=0;let woodAudio=null;let materialAudio=null;let spellAudio=null;
   // Wins (raids, rewards, crafting, building, loot) answer with light, chimes and rumble; presentation only.
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
@@ -1044,7 +1055,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(renderer.xr.isPresenting)feedback.pattern?.(steps);
     else if(touchEnabled)try{const v=[];let last=0;for(const s of steps){v.push(Math.max(0,Math.round(s.at-last)),s.duration);last=s.at+s.duration;}v[0]=0;navigator.vibrate?.(v.slice(1));}catch{}
   }
-  function unlockAudio(){try{audioContext??=new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();skyCycle.attachAudio(audioContext);wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
+  function unlockAudio(){try{if(!audioContext){const phone=touchEnabled||!!globalThis.matchMedia?.('(pointer: coarse)').matches;audioMix=createAudioMix(new (window.AudioContext||window.webkitAudioContext)(),{phone});audioContext=audioMix.contextFor('sfx');ambience=createAmbienceAudio({context:audioMix.contextFor('ambience'),level:audioMix.level,claim:audioMix.claim,phone});soundKit=createSoundKit({context:audioContext,ui:audioMix.contextFor('ui'),level:audioMix.level,claim:audioMix.claim,duck:audioMix.duck});}if(audioContext.state==='suspended')void audioContext.resume();woodAudio??=createWoodAudio({context:audioContext,baseUrl:'/assets/wood-audio/'});woodAudio.unlock();materialAudio??=createMaterialAudio({context:audioContext});materialAudio.unlock();skyCycle.attachAudio(audioMix.contextFor('ambience'));wallAudio??=createCrystalWallAudio({context:audioContext});spellAudio??=createSpellAudio(audioContext);}catch{}}
   // Reuse the native authored flame loop. One quiet source per local weapon,
   // never one source per packet; gain ramps prevent clicks on trigger release.
   let flameBuffer=null,flameLoading=false,flameSource=null,flameGain=null;
@@ -1121,6 +1132,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if((event?.kind==='hit'||event?.kind==='headshot')&&event.id!==undefined){const a=actors.get(`e:${event.id}`);if(a)noteEnemyHit(a,event);}
     skeletonFx.handle(event);
     if(event?.by!==undefined&&event.by!==playerId){const a=actors.get(`p:${event.by}`);if(a?.visual.userData.hero)heroView.event(a.visual,event,a.data);} // attributed result -> remote swing/recoil
+    let kitSound=false;{const cue=soundKit&&cueFor(event,{me:playerId});if(cue?.name)kitSound=soundKit.play(cue.name,cue.at===undefined?event.position:cue.at,listenerPose(),cue.opts||{})||kitSound;if(event.kind==='spell'&&['quake','starfall'].includes(event.spell)&&(event.spell==='quake'||event.phase==='impact'))audioMix?.duck(.4,1.4);}
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound)materialAudio.play(event,listenerPose(),snapshot.tick);
@@ -1149,9 +1161,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
     const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
     if(isImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed});}
-    const now=performance.now();if(audioContext&&!woodSound&&!materialSound&&!rewardSound&&!(kind==='embed'&&!event.impact)&&!(kind==='shoot'&&event.weapon==='crossbow'&&event.by===playerId)&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
+    if(kind==='pickup'&&soundKit&&!woodSound&&!rewardSound){const c=pickupCue(event);kitSound=soundKit.play(c.name,event.position,listenerPose(),c.opts);}
+    const now=performance.now();if(audioContext&&!kitSound&&!['death','detach','shoot','build','pickup','shockwave'].includes(kind)&&!woodSound&&!materialSound&&!rewardSound&&!(kind==='embed'&&!event.impact)&&!(kind==='shoot'&&event.weapon==='crossbow'&&event.by===playerId)&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
   }
   function equipVisual(next) {
+    if(next!==tool&&initialized)soundKit?.play('swap',null,null,{metal:['axe','pick','hammer','crossbow','stormreel'].includes(next),gap:.15});
     if(next!==tool)feedback.reset();
     if(tool==='crossbow'&&next!=='crossbow'&&axeModel)stowSiegebird();
     if(next==='limb'){axeModel?.removeFromParent();axeModel=null;tool=next;return;}
@@ -1331,7 +1345,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(['crossbow','bow','wyrmspout','flask','stormreel'].includes(tool)){primaryDown();return;}
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe;
     if (!active || role !== 'hero' || specialSwing || weaponSwap.busy || performance.now() - swingAt < profile.cooldown*1000) return;
-    swingAt = performance.now();swingContact=false;swingTarget=contactRay();swingReach=THREE.MathUtils.clamp(swingTarget?.distance||2.5,.6,2.8);
+    swingAt = performance.now();swingContact=false;soundKit?.play('swing',null,null,{tool,gap:.05});swingTarget=contactRay();swingReach=THREE.MathUtils.clamp(swingTarget?.distance||2.5,.6,2.8);
     swingRest={position:new THREE.Vector3(...FPS_WEAPON_POSE.position),quaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(...FPS_WEAPON_POSE.rotation))};
     swingRest.position.x=.33*Math.min(1,camera.aspect/.9);
     unlockAudio();
@@ -1615,7 +1629,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       input.hands = ['left','right'].map(hand=>{const i=[...controllerSources.entries()].find(([,s])=>s.handedness===hand)?.[0];return i===undefined?{position:[0,1,0],quaternion:[0,0,0,1]}:localPose(grips[i]);});
     }
     onInput(input);
-    if (jumpPending && !zero && grounded && role === 'hero') { verticalSpeed = 5.5; grounded = false; }
+    if (jumpPending && !zero && grounded && role === 'hero') { verticalSpeed = 5.5; grounded = false; soundKit?.play('jump'); }
     jumpPending = false;
   }
   function frame(now) {
@@ -1648,9 +1662,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       // Standing on rising or sinking earth follows the drawn ground every frame, not the 20 Hz snapshot.
       const groundY = inventionFloor(snapshot,localPosition.x,localPosition.z,forgeFloor(localPosition.x,localPosition.z,forgeY,simulationHeight(terrainLive?{...snapshot,tick:terrainShownTick()}:snapshot, localPosition.x, localPosition.z)),localPosition.y);
       if (!grounded) { verticalSpeed -= 15 * dt; localPosition.y += verticalSpeed * dt; }
-      if (!grounded && localPosition.y <= groundY && verticalSpeed < -4) orchard.contact(localPosition.x, localPosition.z, {strength: 1.5}); // landing dust (presentation only)
+      if (!grounded && localPosition.y <= groundY && verticalSpeed < -4) { orchard.contact(localPosition.x, localPosition.z, {strength: 1.5}); soundKit?.play('land', null, null, {weight: Math.min(1.4, -verticalSpeed / 7)}); } // landing dust (presentation only)
       if (grounded || localPosition.y <= groundY) { localPosition.y = groundY; verticalSpeed = 0; grounded = true; }
-      if (grounded && (stepDistance += move.length() * dt * 5) > .75) { stepDistance = 0; orchard.contact(localPosition.x, localPosition.z, {strength: .6}); }
+      if (grounded && (stepDistance += move.length() * dt * 5) > .75) { stepDistance = 0; orchard.contact(localPosition.x, localPosition.z, {strength: .6}); if (soundKit && (stepSound = !stepSound)) soundKit.play('step', null, null, {surface: footSurface(), weight: .8 + Math.random() * .3, gap: .1}); }
       const amount = 1 - Math.exp(-dt * 8);
       localPosition.addScaledVector(correction, amount);
       correction.multiplyScalar(1 - amount);
@@ -1744,7 +1758,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;
     }else{trajectoryGuide.hide();nextGuideAt=0;guideHitTick=null;}
     updateFlaskGuide(now);
-    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);wyrmStream.update(dt,camera);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());
+    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);wyrmStream.update(dt,camera);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());ambience?.update({dt,ear:listenerPose,sky:()=>skyCycle.stats(),state:()=>snapshot,altitude:()=>{const p=listenerPose().position;return p[1]-heightAt(p[0],p[2],snapshot.edits);}});
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
@@ -1962,7 +1976,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1996,7 +2010,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
-      content.dispose();environment.dispose();audioContext?.close();
+      content.dispose();environment.dispose();ambience?.dispose();audioContext?.close();
       for(const batch of remoteBatches.values())batch.dispose();remoteBatches.clear();
       renderer.dispose(); actors.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
     },
