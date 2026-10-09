@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE} from './skeleton-motion.js';
+import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE, FORGELING_GAIT} from './skeleton-motion.js';
 import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
 import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
 const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
@@ -324,7 +324,7 @@ export function applyEnemyMotion(entry, ctx) {
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) {
-    st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st);
+    st = buildState(visual, kind); st.visual = visual; st.traits = traits(data.id, kind); states.set(visual, st);
     if (kind === 'skeleton') { rigSkeleton(st, entry.root); measureLegs(st); }
   }
   restore(st);
@@ -357,9 +357,11 @@ export function applyEnemyMotion(entry, ctx) {
     const want = st.speed > .25 ? 1 : 0;
     st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .12 : .22)));
     // Each skeleton starts at its own point in the stride, steps its own length and wanders a little, so a crowd never marches in step.
-    const P = st.gaitP ||= gaitProfile(st.traits.seed, skeletonKindIndex(data.id));
+    const P = st.gaitP ||= gaitProfile(st.traits.seed, gaitKind(visual, data));
     if (st.phase === undefined) st.phase = P.phase0;
-    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
+    // Sideways and backwards steps are shorter and quicker than a forward stride (span shrinks with the stride, so feet stay matched).
+    st.strideK = 1 - .45 * Math.abs(st.moveR ?? 0) - .2 * Math.max(0, -(st.moveF ?? 1));
+    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * st.strideK * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
     if (!teleport) st.phase = (st.phase + travel / stride) % 4096;
     if (st.walk < .5 && !teleport) { const target = Math.round(st.phase * 2) / 2; st.phase += (target - st.phase) * (1 - Math.exp(-dt / .18)); }
     // Guard: the shield comes up while winding up or recoiling, and when a Hero is close in front.
@@ -373,7 +375,17 @@ export function applyEnemyMotion(entry, ctx) {
     const emerging = tick - (data.emergeTick ?? -1e9) < EMERGE_TICKS;
     const guardWant = Math.max(threat * .85, age >= 0 && age < 40 ? .4 : 0, hurt >= 0 && hurt < 50 ? .8 : 0) * (data.missingParts?.includes('leftArm') || data.shieldBroken || emerging ? 0 : 1);
     st.guard = (st.guard || 0) + (guardWant - (st.guard || 0)) * (1 - Math.exp(-dt / (guardWant > (st.guard || 0) ? .14 : .55)));
+    // Notice: a Hero stepping up after a quiet spell startles it (once; a skeleton already squared up does not re-startle).
+    if (data.side === 'party') st.calm = 0; // Dawnhold's own troops are not startled by their Heroes
+    else if (threat < .08) st.calm = (st.calm || 0) + dt; else if (threat > .35 && (st.calm ?? 9) > 2.5 && !emerging && st.init) { st.noticeAt = t; st.calm = 0; } else st.calm = 0;
+    // Travel direction in actor space (x right, z forward), smoothed: steps follow it, so backing off and sidling step too.
+    if (travel > 1e-4 && !teleport) {
+      const dx = _v.x - st.prevX, dz = _v.z - st.prevZ, d = Math.hypot(dx, dz) || 1, r = (dx * aR.x + dz * aR.z) / d, f = (dx * aF.x + dz * aF.z) / d, k = 1 - Math.exp(-dt / .15);
+      st.moveR = (st.moveR ?? 0) + (r - (st.moveR ?? 0)) * k; st.moveF = (st.moveF ?? 1) + (f - (st.moveF ?? 1)) * k;
+      const n = Math.hypot(st.moveR, st.moveF); if (n > 1e-3) { st.moveR /= Math.max(n, .35); st.moveF /= Math.max(n, .35); }
+    }
   }
+  st.prevX = _v.x; st.prevZ = _v.z;
 
   if (data.hurtTick !== undefined && data.hurtTick !== st.lastHurt) {
     // Spawned already-hurt actors do not replay an old flinch.
@@ -455,6 +467,9 @@ function golemEvents(st, data, tick) {
   st.telegraph = envelope.coil; st.recoil = Math.abs(recoilSig.value);
 }
 
+// Walk style: the warband archetype from the id, or the forgelings' own drill step.
+const gaitKind = (visual, data) => visual?.userData.forgeling ? FORGELING_GAIT : skeletonKindIndex(data.id);
+
 // Rest leg lengths and planted ankle height, measured once from the authored rig (procedural pose starts at rest).
 function measureLegs(st) {
   let len = 0;
@@ -470,9 +485,14 @@ const bodyEnv = {};
 function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
   const N = st.nodes;
   for (const leg of st.legs) leg.active = !missingSig[leg.part];
-  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t: tick / TICK_RATE, dt, teleport, aR, aU, aF, rootQ,
+  const P = st.gaitP, w = st.walk || 0, ph = st.phase || 0, sc = st.legScale || 1, t = tick / TICK_RATE;
+  const notice = Number.isFinite(st.noticeAt) && t - st.noticeAt < .9 && t >= st.noticeAt ? (t - st.noticeAt) / .9 : -1;
+  const both = !missingSig.leftLeg && !missingSig.rightLeg;
+  // Hops lift the whole body, feet and all: a Bloomcaller's skip on each stance, and the startle on noticing a Hero.
+  const hopLift = both ? (P?.hop || 0) * w * .05 * sc * Math.pow(.5 - .5 * Math.cos(ph * Math.PI * 4), 3) + (notice >= 0 && notice < .3 ? .09 * sc * Math.sin(Math.PI * notice / .3) : 0) : 0;
+  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t, dt, teleport, aR, aU, aF, rootQ, notice, hopLift, moveR: st.moveR ?? 0, moveF: st.moveF ?? 1, strideK: st.strideK ?? 1,
     rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits,
-    kind: skeletonKindIndex(data.id), shieldBroken: !!data.shieldBroken,
+    kind: gaitKind(st.visual, data) % FORGELING_GAIT, shieldBroken: !!data.shieldBroken,
     flinch: Number.isFinite(data.flinchTick) && tick >= data.flinchTick && tick - data.flinchTick < FLINCH_SHOW ? (tick - data.flinchTick) / FLINCH_SHOW : -1});
   poseSkeletonBody(st, bodyEnv, offsetWorld, solveLeg);
   if (!ctx.height || !N.root || !st.legs.length) return;

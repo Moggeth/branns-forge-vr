@@ -97,15 +97,30 @@ const fc = {fwd: 0, lift: 0, toe: 0, stance: true}, fcO = {fwd: 0, lift: 0, toe:
 const h01 = (seed, n) => { let h = Math.imul(seed ^ Math.imul(n + 7, 0x9e3779b1), 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
 const range = (seed, n, a, b) => a + (b - a) * h01(seed, n);
 // kind: warband archetype index (shared/skeleton-kinds.js). Old Bones (3) mostly limp; Rustguard (1) marches.
+// Each archetype walks like who it is (multipliers on the per-skeleton spread below; 1 = neutral).
+//  Mossward: easy rolling plod. Rustguard: crisp parade march, knees up, chin up. Thornhood: low sneaky prowl, short quick steps.
+//  (chin: head tipped back, i.e. eyes up; armOut: elbows out while walking; hop: a skip on each step.)
+//  Old Bones: stooped shuffle, feet barely leave the ground. Bloomcaller: bouncy skip with arms out. Antlerbound: proud chest-out strut.
+export const KIND_GAIT = [
+  {stride: 1, lift: .95, bob: 1.1, sway: 1.35, lean: 0, swagger: 1, armSwing: 1, hop: 0, crouch: 0, chin: 0, armOut: .04},
+  {stride: 1.02, lift: 1.4, bob: .8, sway: .6, lean: -.05, swagger: .6, armSwing: .9, hop: 0, crouch: 0, chin: .1, armOut: 0},
+  {stride: .84, lift: .85, bob: .55, sway: .8, lean: .16, swagger: .7, armSwing: .6, hop: 0, crouch: .07, chin: .12, armOut: .12},
+  {stride: .82, lift: .55, bob: .7, sway: 1.2, lean: .1, swagger: .8, armSwing: .6, hop: 0, crouch: .03, chin: -.02, armOut: 0},
+  {stride: 1.04, lift: 1.25, bob: .9, sway: 1, lean: .02, swagger: 1.2, armSwing: 1.35, hop: 1, crouch: .03, chin: .06, armOut: .22},
+  {stride: 1.12, lift: 1.05, bob: .8, sway: .9, lean: -.08, swagger: 1.7, armSwing: 1.1, hop: 0, crouch: 0, chin: .14, armOut: .08},
+  // Forgeling (Dawnhold's stone-and-brass troops, FORGELING_GAIT): a steady, sure-footed drill step, in good order.
+  {stride: .96, lift: 1.2, bob: .7, sway: .7, lean: .03, swagger: .5, armSwing: 1.05, hop: 0, crouch: .02, chin: .05, armOut: .05},
+];
+export const FORGELING_GAIT = 6;
 export function gaitProfile(seed, kind = 0) {
-  const limping = h01(seed, 9) < (kind === 3 ? .7 : .14);
-  return {
+  const limping = kind !== FORGELING_GAIT && h01(seed, 9) < (kind === 3 ? .7 : .14), K = KIND_GAIT[kind] || KIND_GAIT[0];
+  return {kindGait: K, hop: K.hop, crouch: K.crouch, chin: K.chin, armOut: K.armOut,
     phase0: h01(seed, 1),                         // where in its stride it starts
-    stride: range(seed, 2, .88, 1.13),            // step length (and so cadence at the same speed)
+    stride: range(seed, 2, .88, 1.13) * K.stride,            // step length (and so cadence at the same speed)
     drift: range(seed, 3, .025, .06),             // slow stride wander: identical walkers still drift apart
-    armSwing: range(seed, 4, .55, 1.45) * (kind === 1 ? .7 : 1),
-    bob: range(seed, 5, .6, 1.6), sway: range(seed, 6, .5, 1.6), lift: range(seed, 7, .8, 1.35) * (kind === 1 ? 1.15 : 1),
-    lean: range(seed, 8, -.03, .1) + (kind === 3 ? .08 : 0), nod: range(seed, 10, .4, 1.6), swagger: range(seed, 11, .5, 1.6),
+    armSwing: range(seed, 4, .7, 1.3) * K.armSwing,
+    bob: range(seed, 5, .7, 1.4) * K.bob, sway: range(seed, 6, .6, 1.4) * K.sway, lift: range(seed, 7, .85, 1.25) * K.lift,
+    lean: range(seed, 8, -.03, .08) + K.lean, nod: range(seed, 10, .4, 1.6), swagger: range(seed, 11, .6, 1.4) * K.swagger,
     toeOut: range(seed, 12, -.04, .16), elbow: range(seed, 13, .75, 1.35), headCock: range(seed, 14, -.12, .12),
     limp: limping ? range(seed, 15, .3, .65) : 0, limpSide: h01(seed, 16) < .5 ? -1 : 1,
   };
@@ -164,11 +179,15 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   let dip = 0;
   if (P.limp) { footCycle(phase + (P.limpSide > 0 ? 0 : .5), fcO); dip = fcO.stance ? 1 - fcO.fwd * fcO.fwd : 0; }
   const fl = env.flinch >= 0 ? env.flinch : -1, flinch = fl >= 0 ? smooth(fl / .1) * (1 - smooth((fl - .35) / .65)) : 0;
+  // Notice: the moment a Hero steps up it startles: a little hop, jaw agape, elbows flung out, then it squares up.
+  const nu = env.notice >= 0 ? env.notice : -1, startle = nu >= 0 ? smooth(nu / .12) * (1 - smooth((nu - .3) / .45)) : 0;
+  const crouchNotice = nu >= 0 ? smooth((nu - .35) / .2) * (1 - smooth((nu - .7) / .3)) : 0; // ...then a ready crouch
 
   // ---- pelvis (rig Root joint): drop, bob, sway, roll, yaw
   if (N.root) {
     const bob = .028 * sc * w * (.5 + .5 * Math.cos(phase * TAU * 2)) * (1 + style * .4) * P.bob;
-    const drop = Math.min(sig.drop * legLen, legLen * .88) + bob + (coil * .03 + strike * .05 + g * .03) * sc + P.limp * .05 * sc * w * dip + flinch * .05 * sc;
+    const drop = Math.min(sig.drop * legLen, legLen * .88) + bob + (coil * .03 + strike * .05 + g * .03) * sc + P.limp * .05 * sc * w * dip + flinch * .05 * sc
+      + P.crouch * legLen * (.45 + .55 * w) + crouchNotice * .08 * sc - (env.hopLift || 0);
     _v.copy(aU).multiplyScalar(-drop).addScaledVector(aR, sig.sideShift + Math.sin(phase * TAU) * .022 * sc * w * P.sway).addScaledVector(aF, sig.lunge + strike * .06 * sc - flinch * .09 * sc);
     offsetWorld(N.root.node, _v);
     turn(N.root, 1, .1 * (fwdR - fwdL) * .5 * (1 - g * .5) * P.swagger);
@@ -177,7 +196,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   }
   // ---- spine
   if (N.torso) {
-    const lean = sig.torsoPitch + .07 * w + style * .12 * w + P.lean * w + g * .12 + strike * .1 - flinch * .42;
+    const lean = sig.torsoPitch + .07 * w + style * .12 * w + P.lean * w + g * .12 + strike * .1 - flinch * .42 - startle * .18 + crouchNotice * .12;
     turn(N.torso, 0, -lean);
     turn(N.torso, 1, sig.torsoYaw - .07 * (fwdR - fwdL) * .5 + (N.armR ? N.armR.side : -1) * (.38 * coil - .42 * strike));
     turn(N.torso, 2, -sig.torsoRoll + .03 * Math.sin(phase * TAU) * w);
@@ -188,11 +207,12 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     turn(N.head, 1, sig.headYaw + .06 * (fwdR - fwdL) * .5 + sh * (.25 * flinch + .75 * look));   // looks to the empty shield hand
     turn(N.head, 0, sig.headPitch * -1 + .05 * w + g * .14 - coil * .08 + strike * .06 + Math.cos(phase * TAU * 2) * .025 * w * P.nod - flinch * .35 + look * .3);
     turn(N.head, 2, -sig.headRoll + P.headCock * (1 - w * .5));
+    turn(N.head, 0, P.chin * (.4 + .6 * w) + (P.lean + style * .12) * .5 * w + startle * .3);       // eyes up the road, not at the feet
   }
   if (N.jaw && !missing.head) {
     const chatter = Math.max(0, Math.sin(t * 1.3 + tr.breathPhase) - .82) / .18;
     const clack = chatter * (.5 + .5 * Math.sin(t * 34)) * .16;
-    const gape = coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU) + flinch * .55;
+    const gape = coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU) + flinch * .55 + startle * .7;
     turn(N.jaw, 0, -(gape + clack));
   }
   // ---- arms
@@ -202,7 +222,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     const s = shield.side;
     const relaxed = .06 + .12 * swing(s) * P.armSwing + Math.sin(t * tr.breathHz * TAU) * .015;
     turn(shield, 0, mix(relaxed + sig.armSwingL, .62, g) - flinch * .75);                      // flinch: arm flung back where the shield burst
-    turn(shield, 2, s * (mix(.1 + .03 * w, -.38, g) + flinch * .55));
+    turn(shield, 2, s * (mix(.1 + .03 * w + P.armOut * w, -.38, g) + flinch * .55 + startle * .5));
     turn(N.foreL, 0, mix((.32 + .08 * w) * P.elbow, 1.25, g) + flinch * .3);
     if (flinch > 0) turn(N.handL, 2, Math.sin(t * 31) * .5 * flinch * (1 - fl));               // shaking the sting out
     turn(N.handL, 0, .05 * (1 - g));
@@ -219,7 +239,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   if (claw && !missing.rightArm) {
     const s = claw.side, ready = g * (1 - Math.max(coil, strike));
     turn(claw, 0, .04 + .38 * swing(s) * P.armSwing + sig.armSwingR + sig.armR * .6 + ready * .45 + flinch * .5);
-    turn(claw, 2, s * (.08 + ready * .12 + flinch * .45));
+    turn(claw, 2, s * (.08 + ready * .12 + flinch * .45 + P.armOut * w * (1 - ready) + startle * .55));
     turn(N.foreR, 0, (.28 + .18 * Math.max(0, swing(s)) * w) * P.elbow + ready * .9);
     // Claw swipe: cock the arm high and back beside the skull, then rake down and across the front.
     const k = coil + strike;
@@ -235,7 +255,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     turn(N.handR, 0, -.35 * coil + .4 * strike);
   }
   // Idle fidgets (presentation only; any reason to act cancels them at once).
-  const idleNow = (1 - w) * (1 - g) * (1 - Math.min(1, (coil + strike) * 4)) * (1 - Math.min(1, Math.abs(env.recoilValue) * 3)) * (fl >= 0 ? 0 : 1) * (legsGone || missing.head ? 0 : 1);
+  const idleNow = (1 - w) * (1 - g) * (1 - Math.min(1, (coil + strike) * 4)) * (1 - Math.min(1, Math.abs(env.recoilValue) * 3)) * (fl >= 0 ? 0 : 1) * (1 - startle) * (legsGone || missing.head ? 0 : 1);
   st.idleW = (st.idleW ?? idleNow) + (idleNow - (st.idleW ?? idleNow)) * (idleNow < (st.idleW ?? 0) ? 1 : 1 - Math.exp(-(env.dt || 1 / 60) / .4));
   const fid = env.teleport ? null : fidgetFor(st, t, st.idleW, (tr.seed || 0) ^ 0x5f3759df, env.kind || 0);
   if (fid) fidget(st, N, fid, env, missing);
@@ -248,17 +268,45 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
 }
 
 // Foot targets: stride-locked gait while walking, planted feet with little re-squaring steps at idle.
+// Stance feet are pinned in the world (a turn or a curve never skates them); a swing foot flies from where it
+// lifted to where the stride puts it down. Steps follow the travel direction, so backing off and side-steps step too.
 export function placeFeet(st, env) {
   const {aR, aF, rootPos, height, dt, teleport, walk: w, phase} = env;
-  const P = st.gaitP, sc = st.legScale || 1, span = (st.legLenRest || .78) * SKELETON_STRIDE * SKELETON_STANCE * .5 * (P?.stride || 1);
-  const groundY = rootPos.y;
+  const P = st.gaitP, sc = st.legScale || 1, legLen = st.legLenRest || .78, span = legLen * SKELETON_STRIDE * SKELETON_STANCE * .5 * (P?.stride || 1) * (env.strideK ?? 1);
+  const groundY = rootPos.y, mdR = env.moveR ?? 0, mdF = env.moveF ?? 1;
+  const ev = st.stepEvents ||= []; ev.length = 0;
   let stepping = st.legs.some(l => l.step);
   for (const leg of st.legs) {
-    if (!leg.active) { leg.locked = false; leg.step = null; continue; }
+    if (!leg.active) { leg.locked = false; leg.step = null; leg.plant = null; continue; }
     footCycle(phase + (leg.side > 0 ? 0 : .5), fc);
-    // Gait target in world.
-    const gx = leg.rest.x, gz = -leg.rest.z + fc.fwd * span * w; // (right, forward)
-    const gwx = rootPos.x + aR.x * gx + aF.x * gz, gwz = rootPos.z + aR.z * gx + aF.z * gz;
+    // Gait target in world, relative to the body now.
+    const gx = leg.rest.x + fc.fwd * span * w * mdR, gz = -leg.rest.z + fc.fwd * span * w * mdF; // (right, forward)
+    let gwx = rootPos.x + aR.x * gx + aF.x * gz, gwz = rootPos.z + aR.z * gx + aF.z * gz;
+    let turned = false;
+    if (teleport || w < .05) { leg.plant = null; leg.from = null; leg.resid = null; }
+    else if (fc.stance) {
+      if (!leg.plant) { turned = !!leg.last; leg.plant = leg.last ? {x: leg.last.x, z: leg.last.z} : {x: gwx, z: gwz}; if (leg.wasSwing && w > .4) ev.push({type: 'step', side: leg.side > 0 ? 'right' : 'left', strength: w}); }
+      // Held where it landed; only a hard pivot or a shove drags it back toward the stride (never past knee reach).
+      const dx = leg.plant.x - gwx, dz = leg.plant.z - gwz, dev = Math.hypot(dx, dz), max = .42 * legLen;
+      if (dev > max) { leg.plant.x = gwx + dx / dev * max; leg.plant.z = gwz + dz / dev * max; }
+      gwx = leg.plant.x; gwz = leg.plant.z; leg.from = null;
+    } else {
+      if (!leg.from) { turned = !!leg.last; leg.from = leg.last ? {x: leg.last.x, z: leg.last.z} : leg.plant ? {x: leg.plant.x, z: leg.plant.z} : {x: gwx, z: gwz}; }
+      leg.plant = null;
+      const e = smooth((fc.fwd + 1) / 2);
+      gwx = mix(leg.from.x, gwx, e); gwz = mix(leg.from.z, gwz, e);
+    }
+    // A gait reversal (the stride easing back to a planted pose) can enter a phase from its far end: any jump that
+    // makes is carried as a residual that fades out in a few frames, so a foot never pops.
+    if (leg.plant || leg.from) {
+      const r = leg.resid ||= {x: 0, z: 0}, k = Math.exp(-(dt || 1 / 60) / .07);
+      r.x *= k; r.z *= k;
+      if (turned) { r.x += leg.last.x - (gwx + r.x); r.z += leg.last.z - (gwz + r.z); }
+      if (leg.plant) { leg.plant.x += r.x; leg.plant.z += r.z; r.x = 0; r.z = 0; } // a planted foot simply stays where it is
+      gwx += r.x; gwz += r.z;
+      (leg.last ||= {x: 0, z: 0}).x = gwx; leg.last.z = gwz;
+    } else leg.last = null;
+    leg.wasSwing = !fc.stance;
     // Idle target: where the foot belongs under the body now.
     const rx = rootPos.x + aR.x * leg.rest.x - aF.x * leg.rest.z, rz = rootPos.z + aR.z * leg.rest.x - aF.z * leg.rest.z;
     if (!leg.locked || teleport) { leg.lock.set(rx, 0, rz); leg.locked = true; leg.step = null; }
@@ -275,9 +323,9 @@ export function placeFeet(st, env) {
     const tx = mix(ix, gwx, smooth(w)), tz = mix(iz, gwz, smooth(w));
     const lift = mix(ilift, fc.lift * .11 * sc * (P?.lift || 1) * (P?.limp && leg.side === P.limpSide ? 1 - .6 * P.limp : 1), smooth(w));
     leg.toe = mix(itoe, fc.toe, smooth(w));
-    const gy = height ? height(tx, tz) : NaN, legLen = leg.a + leg.b;
-    const ground = Number.isFinite(gy) && Math.abs(gy - groundY) < .4 * legLen ? gy : groundY;
-    leg.target.set(tx, ground + leg.ankleH + lift, tz);
+    const gy = height ? height(tx, tz) : NaN, chain = leg.a + leg.b;
+    const ground = Number.isFinite(gy) && Math.abs(gy - groundY) < .4 * chain ? gy : groundY;
+    leg.target.set(tx, ground + leg.ankleH + lift + (env.hopLift || 0), tz);
     leg.lift = lift;
   }
 }
