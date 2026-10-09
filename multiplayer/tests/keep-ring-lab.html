@@ -49,6 +49,13 @@ window.lab={sim,view,town,back,arena,
    else{cam.position.set(c[0]-f[0]*n*20,baseHeight(c[0],c[1])+1.7,c[1]-f[1]*n*20);cam.lookAt(w.x,y+1.5,w.z);}}
   else{cam.up.set(0,1,0);cam.position.set(c[0]+f[0]*n*34+f[1]*n*10,20,c[1]+f[1]*n*34-f[0]*n*10);cam.lookAt(c[0]-f[0]*n*3,0,c[1]-f[1]*n*3);}
   sync();frame();},
+ // A tavern from its own frame (id: tavern-party | tavern-rivals | tavern-neutral). mode 'front' from the yard,
+ // 'inside' at eye height from the porch looking at the bar, 'hearth' beside the fire, 'roof' to see the chimney smoke.
+ tavern:(id='tavern-party',mode='front')=>{sync();frame();const g=town.object.getObjectByName(id);if(!g)return false;g.updateMatrixWorld(true);
+  const n=id==='tavern-neutral',hx=n?5.3:-3.8,hz=n?0:-.8,P=(x,y,z)=>new T.Vector3(x,y,z).applyMatrix4(g.matrixWorld);cam.up.set(0,1,0);
+  const shot={front:[[2.5,3.4,n?11:9.5],[0,1.8,0]],inside:[[n?1.2:.9,1.65,n?4.2:3.1],[-.2,1.4,n?-3.4:-2.6]],
+   hearth:[[hx*.25,1.7,hz+(n?2.6:2.2)],[hx,1.0,hz]],roof:[[-hx*.4+(n?-6:6),7,8],[hx,4.5,hz]]}[mode]||[[2.5,3.4,9.5],[0,1.8,0]];
+  cam.position.copy(P(...shot[0]));cam.lookAt(P(...shot[1]));frame();return true;},
  smelt:(side='party',metal='iron')=>back.event({kind:'workshop_smelt',side,metal,ore:metal+'Ore',left:1,position:[0,0,0]}),
  step:n=>{for(let i=0;i<n;i++)sim.step();sync();},
  frame};
