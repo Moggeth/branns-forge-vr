@@ -122,9 +122,9 @@ test('taverns are sanctuaries: no harm in, no harm out, monsters shooed, slow me
 
 test('nobody walks through the tavern walls, the shop stall or the mill; you walk into a tavern through its front',()=>{
   const {w}=rig();
-  for(const [name,local] of [['quartermaster',[0,0]],['mill',[0,0]],['tavern',[0,-3]]]){const p=pieceWorld(homePiece('party',name),local),q=resolveHomeStructures(w,[p[0]+.01,0,p[1]]);assert.ok(Math.hypot(q[0]-p[0],q[2]-p[1])>.2,name);}
+  for(const [name,local] of [['quartermaster',[0,0]],['mill',[0,0]],['tavern',[0,-3*TAVERN.scale]]]){const p=pieceWorld(homePiece('party',name),local),q=resolveHomeStructures(w,[p[0]+.01,0,p[1]]);assert.ok(Math.hypot(q[0]-p[0],q[2]-p[1])>.2,name);}
   const t=homePiece('party','tavern'),door=pieceWorld(t,[0,1]),q=resolveHomeStructures(w,[door[0],0,door[1]]);assert.ok(Math.hypot(q[0]-door[0],q[2]-door[1])<1e-6,'the hall floor is open');
-  const mug={x:NEUTRAL_TAVERN.at[0],z:NEUTRAL_TAVERN.at[1],yaw:NEUTRAL_TAVERN.yaw},bar=pieceWorld(mug,[0,-2.9]),qb=resolveHomeStructures(w,[bar[0],0,bar[1]]);assert.ok(Math.hypot(qb[0]-bar[0],qb[2]-bar[1])>.2,'the Mug\'s bar is solid');
+  const mug={x:NEUTRAL_TAVERN.at[0],z:NEUTRAL_TAVERN.at[1],yaw:NEUTRAL_TAVERN.yaw},bar=pieceWorld(mug,[0,-2.9*TAVERN.scale]),qb=resolveHomeStructures(w,[bar[0],0,bar[1]]);assert.ok(Math.hypot(qb[0]-bar[0],qb[2]-bar[1])>.2,'the Mug\'s bar is solid');
 });
 
 test('older saves load: the well\'s base cooldown, no items, no mill',()=>{
