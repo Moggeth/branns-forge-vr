@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import {createSunbeams} from '../client/sunbeams.js';
 import {worldClock, weatherAt, dayPhase, nightAmount, solarAngle, lightningAt, DAY_TICKS, WEATHER_TICKS, DAYLIGHT_SHARE} from '../shared/world-clock.js';
 import {createDayNightWeather, previewFromUrl} from '../client/day-night-weather.js';
 
@@ -89,6 +90,8 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   assert.ok(ATMOSPHERE.bfWet.value < .7, 'ground dries once the rain stops');
   const golden = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .55, weather: 'clear'}});
   golden.setTrees(trees); golden.update({tick: 0, camera, time: 0, dt: 0});
+  const beamAxis = golden.stats() && scene.children.filter(o => o.name === 'sunbeams').at(-1).material.uniforms.uAxis.value;
+  assert.ok(-beamAxis.y > Math.sin(60 * Math.PI / 180), `low sun still drops shafts steeply: ${beamAxis.y.toFixed(3)}`);
   const gs = golden.stats(); assert.ok(gs.sunbeams.beams === 6 && gs.sunbeams.strength > .3, `golden-hour shafts ${JSON.stringify(gs.sunbeams)}`);
   const noonSky = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: DAYLIGHT_SHARE / 2, weather: 'clear'}});
   noonSky.setTrees(trees); noonSky.update({tick: 0, camera, time: 0, dt: 0});
@@ -102,3 +105,22 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   assert.equal(scene.children.length, before);
   console.log('day-night-weather: ok');
 });
+
+// The angle limit must hold beyond golden hour, including a nearly overhead light.
+// Normalising only the horizontal components first incorrectly flattens these rays.
+{
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.7, 8); camera.updateMatrixWorld();
+  const beams = createSunbeams({scene, height: () => 0, quality: 'low'});
+  beams.setTrees([{id: 'angle-check', x: 0, z: 0, height: 6}]);
+  for (const degrees of [0, 15, 30, 45, 62, 75, 89.9, 90]) {
+    const angle = degrees * Math.PI / 180;
+    const light = new THREE.Vector3(Math.cos(angle) * .6, Math.sin(angle), Math.cos(angle) * .8);
+    beams.update({camera, light, strength: 1, time: degrees});
+    const axis = beams.mesh.material.uniforms.uAxis.value;
+    assert.ok(-axis.y >= Math.sin(62 * Math.PI / 180) - 1e-9, `shaft too shallow at ${degrees}: ${axis.y}`);
+    assert.ok(Math.abs(axis.length() - 1) < 1e-9);
+    assert.ok(Math.abs(axis.x * light.z - axis.z * light.x) < 1e-9, 'compass direction is preserved');
+  }
+  beams.dispose();
+}
