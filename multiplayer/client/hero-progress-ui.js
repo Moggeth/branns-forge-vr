@@ -8,7 +8,7 @@ export const WEAPON_INFO = Object.freeze({
   pick: {name: 'Stonewhisper', icon: 'bfi-pick', role: 'Miner’s pick'},
   crossbow: {name: 'Siegebird', icon: 'bfi-crossbow', role: 'Songbird crossbow'},
   bow: {name: 'Emberwing', icon: 'bfi-bow', role: 'Phoenix bow'},
-  flask: {name: 'Emberdew', icon: 'bfi-flask', role: 'Fire flasks'},
+  flask: {name: 'Emberdew', icon: 'bfi-flask', role: 'Fire bottles'},
   wyrmspout: {name: 'Wyrmspout', icon: 'bfi-wyrmspout', role: 'Dragon’s breath'},
 });
 const el = (tag, attrs = {}, children = []) => {

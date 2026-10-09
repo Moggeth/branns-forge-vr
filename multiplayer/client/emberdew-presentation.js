@@ -11,28 +11,30 @@
 // update() allocates nothing. Named parts Liquid, Glass, Wick, NeckCollar, GripWrap and Muzzle are preserved;
 // a ReadinessAnchor Object3D is added at the wick tip when the clone lacks one.
 import * as THREE from 'three';
+import {EMBERDEW_INNER_PROFILE as INNER, EMBERDEW_SIDES as SIDES, EMBERDEW_TURN as TURN, EMBERDEW_WICK_TIP} from './emberdew-model.js';
 
-export const FILL = .9;            // fraction of the container volume that is liquid
+export const FILL = .86;           // fraction of the container volume that is liquid
 const MAX_TILT = .55, MAX_ACC = 35, TELEPORT_SPEED = 25, MAX_DT = .1, SUB = 1 / 90;
-const K = 70, DAMP = 5.5, ACC_GAIN = 1 / 9.81; // spring stiffness/damping, accel -> tilt
-// Inner container profile = glass profile radius minus wall, capped below the stopper (stopper starts at y=.063).
-const INNER = [[0, -.0855], [.018, -.0848], [.0315, -.0755], [.0385, -.056], [.0385, -.03], [.0345, -.006], [.0278, .0155], [.0188, .0345], [.0142, .049], [.0142, .0605], [0, .0605]];
-const WICK_TIP = new THREE.Vector3(0, .103, 0);
+const K = 62, DAMP = 4.2, ACC_GAIN = 1 / 9.81; // spring stiffness/damping (a little livelier than before), accel -> tilt
+const WICK_TIP = new THREE.Vector3(...EMBERDEW_WICK_TIP);
 
 let S = null, refs = 0;
 function buildShared() {
   const time = { value: 0 };
-  const container = new THREE.LatheGeometry(INNER.map(([r, y]) => new THREE.Vector2(r, y)), 20); container.name = 'EmberdewLiquidContainer';
+  const container = new THREE.LatheGeometry(INNER.map(([r, y]) => new THREE.Vector2(r, y)), SIDES); container.rotateY(TURN); container.name = 'EmberdewLiquidContainer';
   // volume-conserving plane offset table: angle between bottle +Y and surface normal (0..PI) -> offset d
   const pts = [], r = (a, b) => a + (b - a) * Math.random(); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const radiusAt = y => { for (let i = 1; i < INNER.length; i++) { const [r0, y0] = INNER[i - 1], [r1, y1] = INNER[i]; if (y >= y0 && y <= y1 && y1 > y0) return r0 + (r1 - r0) * (y - y0) / (y1 - y0); } return 0; };
-  while (pts.length < 6000 * 3) { const x = (rnd() * 2 - 1) * .04, y = -.0855 + rnd() * .146, z = (rnd() * 2 - 1) * .04; if (Math.hypot(x, z) < radiusAt(y)) pts.push(x, y, z); }
+  // Inside the faceted container: within every face plane (faces look along k * PI/4 after the TURN).
+  const apothem = Math.cos(Math.PI / SIDES), inside = (x, z, r) => { for (let k = 0; k < SIDES; k++) { const a = k * 2 * Math.PI / SIDES; if (x * Math.sin(a) + z * Math.cos(a) > r * apothem) return false; } return true; };
+  const y0 = INNER[0][1], y1 = INNER[INNER.length - 1][1];
+  while (pts.length < 6000 * 3) { const x = (rnd() * 2 - 1) * .046, y = y0 + rnd() * (y1 - y0), z = (rnd() * 2 - 1) * .046; if (inside(x, z, radiusAt(y))) pts.push(x, y, z); }
   const N = 64, table = new Float32Array(N + 1), proj = new Float32Array(pts.length / 3);
   for (let i = 0; i <= N; i++) { const a = Math.PI * i / N, nx = Math.sin(a), ny = Math.cos(a);
     for (let j = 0; j < proj.length; j++) proj[j] = pts[j * 3] * nx + pts[j * 3 + 1] * ny;
     proj.sort(); table[i] = proj[Math.min(proj.length - 1, Math.floor(FILL * proj.length))]; }
   // flame: teardrop lathe, base at origin, +Y up, ~2.6 cm tall
-  const flameGeo = new THREE.LatheGeometry([[0, 0], [.0042, .003], [.0058, .009], [.0046, .016], [.0022, .022], [0, .027]].map(([a, b]) => new THREE.Vector2(a, b)), 10); flameGeo.name = 'EmberdewFlame';
+  const flameGeo = new THREE.LatheGeometry([[0, 0], [.0042, .003], [.0058, .009], [.0046, .016], [.0022, .022], [0, .027]].map(([a, b]) => new THREE.Vector2(a, b)), 10); flameGeo.scale(1.35, 1.5, 1.35); flameGeo.name = 'EmberdewFlame';
   const flameMat = new THREE.ShaderMaterial({
     name: 'EmberdewFlameMat', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, side: THREE.DoubleSide,
     uniforms: { time },
@@ -40,9 +42,9 @@ function buildShared() {
       uniform float time; varying float vH; varying float vF;
       void main(){
         float ph = modelMatrix[3].x*31.7+modelMatrix[3].z*17.3+modelMatrix[3].y*5.1;
-        vec3 p = position; float h = p.y/.027;
+        vec3 p = position; float h = p.y/.0405;
         float flick = sin(time*23.+ph)*.5+sin(time*37.+ph*1.7)*.3+sin(time*11.+ph*.3)*.2;
-        p.xz *= 1.+.12*flick*h; p.y *= 1.+.16*flick; p.x += .0016*h*h*sin(time*9.+ph);
+        p.xz *= 1.+.12*flick*h; p.y *= 1.+.16*flick; p.x += .0028*h*h*sin(time*9.+ph);
         vec4 mv = modelViewMatrix*vec4(p,1.);
         vF = abs(dot(normalize(normalMatrix*normal), normalize(-mv.xyz))); vH = h;
         gl_Position = projectionMatrix*mv;
@@ -53,7 +55,7 @@ function buildShared() {
         vec3 core = vec3(1.,.93,.62), mid = vec3(1.,.48,.08), tip = vec3(.75,.16,.02);
         vec3 c = mix(core, mid, smoothstep(.0,.55,vH)); c = mix(c, tip, smoothstep(.55,1.,vH));
         float a = smoothstep(.0,.6,vF)*(1.-smoothstep(.75,1.,vH))*(.55+.45*smoothstep(.0,.25,vH)) + (1.-vH)*.25*(1.-vF);
-        gl_FragColor = vec4(c*a*1.6, 1.);
+        gl_FragColor = vec4(c*a*1.2, 1.);
       }`,
   });
   // lit swaps (shared; the template's own wick/copper materials are never mutated)
@@ -67,7 +69,7 @@ function makeLiquidMaterial() {
   const u = { uPlane: { value: new THREE.Vector4(0, 1, 0, 0) }, uLit: { value: 0 }, uRipple: { value: new THREE.Vector4(0, 0, 0, 0) }, uTime: S.time };
   const m = new THREE.MeshStandardMaterial({ name: 'EmberdewLiquid', color: 0x8c3f0a, roughness: .16, metalness: 0, emissive: 0x6a2004, emissiveIntensity: .18, side: THREE.DoubleSide });
   m.userData.u = u;
-  m.customProgramCacheKey = () => 'emberdew-liquid-v1';
+  m.customProgramCacheKey = () => 'emberdew-liquid-v2';
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLocal; varying vec3 vSurfN; uniform vec4 uPlane;')
@@ -87,7 +89,12 @@ function makeLiquidMaterial() {
       float surf = gl_FrontFacing ? 0. : 1.;
       diffuseColor.rgb *= mix(1.15, .7, depthBelow) + surf*.25;
       float pulse = .85+.15*sin(uTime*3.1);
-      totalEmissiveRadiance += uLit*pulse*mix(vec3(1.,.42,.06)*.9, vec3(1.,.22,.02)*.35, depthBelow) + surf*uLit*vec3(.6,.25,.04);`);
+      totalEmissiveRadiance += uLit*pulse*mix(vec3(1.,.42,.06)*.9, vec3(1.,.22,.02)*.35, depthBelow) + surf*uLit*vec3(.6,.25,.04);
+      // Ember motes: sparse glints drifting up through the dew (bright sparks once the rag is lit). One hash, no textures.
+      vec3 mq = vLocal*vec3(150.,110.,150.) + vec3(0., -uTime*1.7, 0.), mc = floor(mq), mf = fract(mq) - .5;
+      float mh = fract(sin(dot(mc, vec3(12.9898, 78.233, 37.719)))*43758.5453);
+      float mote = step(.94, mh)*smoothstep(.24, .02, length(mf.xy))*(1. - surf);
+      totalEmissiveRadiance += mote*(.35 + uLit*1.8)*vec3(1., .66, .24);`);
   };
   return m;
 }
@@ -167,7 +174,7 @@ export function attachEmberdew({ root }) {
     const d = S.table[i0] * (1 - f) + S.table[i0 + 1] * f;
     // table is for normal in the XY plane; lathe symmetry makes it valid for any azimuth
     u.uPlane.value.set(tmp.x, tmp.y, tmp.z, d);
-    u.uRipple.value.set(Math.cos(time * .7) * .6, Math.sin(time * .9) * .6, 0, Math.min(.0018, energy * .004));
+    u.uRipple.value.set(Math.cos(time * .7) * .6, Math.sin(time * .9) * .6, 0, Math.min(.0024, energy * .005));
 
     // armed state
     isLit = !!lit;
@@ -183,6 +190,9 @@ export function attachEmberdew({ root }) {
     if (collar) collar.material = litAmt > .2 ? S.collarLit : orig.collarMat;
   }
 
+  // A scripted slosh (raising to throw, a hurl, a bonk): a sideways push on the surface, world space, about 0..3.
+  function kick(x = 0, z = 0) { if (Number.isFinite(x + z)) { nv.x += x; nv.z += z; energy = Math.min(1, energy + .25 * Math.hypot(x, z)); } }
+
   function dispose() {
     if (disposed) return; disposed = true;
     liquid.geometry = orig.liqGeo; liquid.material = orig.liqMat; wick.material = orig.wickMat; if (collar) collar.material = orig.collarMat;
@@ -191,6 +201,6 @@ export function attachEmberdew({ root }) {
     if (--refs <= 0 && S) { S.container.dispose(); S.flameGeo.dispose(); S.flameMat.dispose(); S.wickLit.dispose(); S.collarLit.dispose(); S = null; refs = 0; }
   }
   function stats() { return { lit: isLit, litAmount: litAmt, surfaceTilt: Math.acos(Math.min(1, n.y)), energy, teleports, plane: u.uPlane.value.toArray(), sharedRefs: refs, extraDraws: flame.visible ? 1 : 0 }; }
-  return { update, reset, dispose, stats, anchor, flame, liquidMaterial: liqMat, container: () => S?.container };
+  return { update, reset, kick, dispose, stats, anchor, flame, liquidMaterial: liqMat, container: () => S?.container };
 }
 export const EMBERDEW_INNER_PROFILE = INNER;

@@ -9,6 +9,7 @@ import {STUMPLING,stumplingParts,dropStumplingLoot} from './stumplings.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
 import {WYRMSPOUT,sprayTuning,spendGlob,clingSplash} from './wyrmspout.js';
+import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 // Phoenix Flare: launch speed and extra upward loft (m/s), and the fuse before it bursts (ticks).
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
@@ -282,17 +283,19 @@ export function releaseHeld(state,p,direction,throwing=false){const held=state.d
 export function combatAction(state,p,m,ctx){
   if(m.action==='flame'||m.action==='pour'){
     const flame=m.action==='flame';
-    if(p.tool!==(flame?'wyrmspout':'flask')||!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
+    if(p.tool!==(flame?'wyrmspout':'flask')||!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction)||(m.aimed!==undefined&&typeof m.aimed!=='boolean'))return fail('invalid_action');
     if(flame&&(p.overheatUntil||0)>state.tick)return fail('overheated');
     if(state.tick-p.attackTick<(flame?WYRMSPOUT.acceptTicks:60))return fail('cooldown');
     if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     p.attackTick=state.tick;
     // Wyrmspout: one glob of sticky liquid fire from the tank (shared/wyrmspout.js).
     const spray=flame?sprayTuning(p):null;if(flame)spendGlob(state,p,spray.cost);
-    const id=ctx.nextId(state,'q'),speed=flame?spray.speed:6,motion=flame?[0,0,0]:ctx.playerVelocity?.(p);
+    // Emberdew: a hip toss lobs an unlit puddle; an aimed throw (right click held) lights the rag and hurls it far.
+    const aimed=!flame&&m.aimed===true,throwing=aimed?EMBERDEW.hurl:EMBERDEW.toss;
+    const id=ctx.nextId(state,'q'),speed=flame?spray.speed:throwing.speed,motion=flame?[0,0,0]:ctx.playerVelocity?.(p);
     const inherited=vec(motion,100)?motion:[0,0,0];
-    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:flame?'flame':'fuel',lit:!flame&&!!p.flaskLit,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(!flame&&i===1?2:0)+inherited[i]),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
-    return ok([{kind:flame?'flame_emit':'fuel_throw',weapon:p.tool,position:[...m.origin],id,...(flame?{by:p.id}:{})}]);
+    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:flame?'flame':'fuel',lit:!flame&&(aimed||!!p.flaskLit),position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*speed+(!flame&&i===1?throwing.loft:0)+inherited[i]),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    return ok([{kind:flame?'flame_emit':'fuel_throw',weapon:p.tool,position:[...m.origin],id,...(flame?{by:p.id}:{by:p.id,...(aimed?{aimed:true}:{})})}]);
   }
   // Gout (Wyrmspout Q): one big lobbed ball of sticky fire that bursts into a wide burning splash. Costs part of the tank.
   if(m.action==='special'&&p.tool==='wyrmspout'){
@@ -306,7 +309,18 @@ export function combatAction(state,p,m,ctx){
     state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'flame',gout:true,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map((n,i)=>n*G.speed+(i===1?G.loft:0)),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
     return ok([{kind:'gout_launch',weapon:'wyrmspout',by:p.id,position:[...m.origin],id}]);
   }
-  if(m.action==='special'&&p.tool==='flask'){p.flaskLit=!p.flaskLit;return ok([]);}
+  // Emberdew's rag is lit while its thrower aims (right click held); everyone sees the flame on the held bottle.
+  if(m.action==='wick'&&p.tool==='flask'){if(typeof m.lit!=='boolean')return fail('invalid_action');p.flaskLit=m.lit;return ok([]);}
+  // Cinder Cluster (Emberdew Q): a big lit jug lobbed high; stepCombat pops it at the top of its arc into a ring of lit bottles.
+  if(m.action==='special'&&p.tool==='flask'){
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('flask',p))return fail('cooldown');
+    if(!vec(m.origin)||dist(m.origin,p.position)>2.7||!unit(m.direction))return fail('invalid_action');
+    if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
+    p.specialTick=state.tick;
+    const id=ctx.nextId(state,'q'),motion=ctx.playerVelocity?.(p),inherited=vec(motion,100)?motion:[0,0,0];
+    state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'fuel',lit:true,cluster:true,position:[...m.origin],previousPosition:[...m.origin],velocity:cinderLaunch(m.direction,inherited),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
+    return ok([{kind:'cinder_throw',weapon:'flask',by:p.id,position:[...m.origin],id}]);
+  }
   // Phoenix Flare (Emberwing Q): a flare arrow climbs along the aim, bursts overhead, lights the area and rains
   // embers that set what is under it alight (fire.js flareBurst). Contact before the burst bursts it there.
   if(m.action==='special'&&p.tool==='bow'){
@@ -364,6 +378,13 @@ export function stepCombat(state,ctx,events){
     p.previousPosition=[...p.position];const age=(state.tick-p.bornTick-1)*dt,len=Math.hypot(...p.curve),fraction=t=>1-Math.pow(1-clamp(t/.85,0,1),3),angle=len*(fraction(age+dt)-fraction(age));
     let v=p.velocity;if(len>.000001){const a=p.curve.map(n=>n/len),c=Math.cos(angle),s=Math.sin(angle),dot=a.reduce((n,q,i)=>n+q*v[i],0),cross=[a[1]*v[2]-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]-a[1]*v[0]];v=v.map((n,i)=>n*c+cross[i]*s+a[i]*dot*(1-c));}
     const nv=v.map((n,i)=>n*Math.exp(-.045*dt)-(i===1?(p.kind==='arrow'?5.8:p.kind==='flame'?WYRMSPOUT.gravity:p.kind==='fuel'?15:3)*dt:0));p.position=p.position.map((n,i)=>n+(p.velocity[i]+nv[i])*.5*dt);p.velocity=nv;p.trail.push([...p.position]);if(p.trail.length>16)p.trail.shift();
+    // Cinder Cluster: at the top of its arc the jug pops and rains lit bottles in a ring (each an ordinary lit throw).
+    if(p.cluster&&p.velocity[1]<=0){
+      state.projectiles.splice(state.projectiles.indexOf(p),1);const bottles=[];
+      for(const v of cinderVelocities(p.velocity)){if(state.projectiles.length>=COMBAT_LIMITS.projectiles)break;const id=ctx.nextId(state,'q');bottles.push(id);
+        state.projectiles.push({id,ownerId:p.ownerId,side:p.side,kind:'fuel',lit:true,position:[...p.position],previousPosition:[...p.position],velocity:v,curve:[0,0,0],bornTick:state.tick,trail:[[...p.position]]});}
+      events.push({kind:'cinder_pop',id:p.id,by:p.ownerId,position:[...p.position],bottles});
+      continue;}
     if(p.flare&&state.tick-p.bornTick>=FLARE.fuse){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(...ctx.flareBurst(state,p.position,p.ownerId));continue;}
     // Apple on a stick (shared/fruit.js): an arrow or bolt through a hanging apple takes it off the tree and stops.
     const fruit=ctx.fruitStrike?.(state,p.previousPosition,p.position,p);if(fruit){state.projectiles.splice(state.projectiles.indexOf(p),1);events.push(fruit);continue;}
@@ -411,7 +432,7 @@ export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);
   const tick=n=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick;
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
-  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.skewer!==undefined&&(p.skewer!==true||p.kind!=='bolt'||p.golden))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.gout!==undefined&&(p.gout!==true||p.kind!=='flame'))||(p.pierced!==undefined&&(!(p.golden||p.skewer)||!Array.isArray(p.pierced)||p.pierced.length>(p.golden?GOLDEN_PIERCE.max:SKEWER.max)||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
+  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.skewer!==undefined&&(p.skewer!==true||p.kind!=='bolt'||p.golden))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.gout!==undefined&&(p.gout!==true||p.kind!=='flame'))||(p.cluster!==undefined&&(p.cluster!==true||p.kind!=='fuel'))||(p.pierced!==undefined&&(!(p.golden||p.skewer)||!Array.isArray(p.pierced)||p.pierced.length>(p.golden?GOLDEN_PIERCE.max:SKEWER.max)||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   for(const e of [...saved.enemies,...(saved.detachedParts||[])])if(e.burnUntil!==undefined&&(!Number.isSafeInteger(e.burnUntil)||e.burnUntil<0||e.burnUntil>saved.tick+240||!PARTS.includes(e.burnPart))||e.burnPart!==undefined&&!PARTS.includes(e.burnPart))throw Error('Invalid burning part');
   for(const d of saved.detachedParts||[])if(d.scorch!==undefined&&(!Number.isFinite(d.scorch)||d.scorch<0||d.scorch>1))throw Error('Invalid detached scorch');
   for(const d of saved.detachedParts||[])if(d.rest!==undefined&&(!Number.isInteger(d.rest)||d.rest<0||d.rest>64)||d.joint!==undefined&&(!d.joint||typeof d.joint!=='object'||Object.keys(d.joint).length!==3||!vec(d.joint.a,4)||!vec(d.joint.b,4)||d.joint.to===d.id||(saved.detachedParts.find(o=>o.id===d.joint.to)?.sourceId)!==d.sourceId))throw Error('Invalid remains joint');
@@ -426,7 +447,7 @@ export function validateCombat(saved,ids){
 export function restoreCombat(saved){
   const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value[k]!==undefined).map(k=>[k,structuredClone(value[k])]));
   return {
-    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','side','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden','skewer','pierced','flare','gout'])),
+    projectiles:(saved.projectiles||[]).map(p=>pick(p,['id','ownerId','side','kind','position','previousPosition','velocity','curve','bornTick','trail','lit','golden','skewer','pierced','flare','gout','cluster'])),
     embeds:(saved.embeds||[]).map(e=>pick(e,['id','kind','targetId','part','localPoint','localQuaternion','point','normal','localNormal','penetration','boneName','surface','golden'])),
     detachedParts:(saved.detachedParts||[]).map(d=>({...pick(d,['id','sourceId','kind','part','position','quaternion','velocity','angularVelocity','heldBy','bornTick','throwerId','throwerSide','hitIds','miningHits','scorch','burnUntil','burnPart','rest']),...(d.joint?{joint:{to:d.joint.to,a:[...d.joint.a],b:[...d.joint.b]}}:{}),...(d.localBounds?{localBounds:{min:[...d.localBounds.min],max:[...d.localBounds.max]}}:{})})),
   };
