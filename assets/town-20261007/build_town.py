@@ -137,9 +137,27 @@ def tex_window(name, n, seed, warm, cool, base_rgb):
     base = L.mix(base_rgb, [0.08, 0.07, 0.06], lead)
     return save_set_lean(name, base, lead, 0.1 + 0.5 * lead, 0.6 * lead, 1.2, emis=np.clip(em, 0, 1))
 
+# round 2 (2026-10-09): calmer wall and cloth surfaces. The bases kit's plaster is a blotchy grey render and its cloth
+# a coarse noisy weave; up close inside a tavern both read as dirt. Limewash is a warm, even cream with soft trowel
+# sweeps and a few hairline cracks; the cloth is a fine, even plain weave that lets the vertex colours (banners,
+# cushions, rugs) read clean and saturated.
+def tex_limewash(name, n, seed):
+    a = L.fnoise(n, 1.7, seed, hi=n / 14); trowel = L.fnoise(n, 1.1, seed + 2, ax=0.3, hi=n / 8); fine = L.fnoise(n, 0.4, seed + 1)
+    crack = np.exp(-(L.fnoise(n, 1.3, seed + 3, hi=n / 6) / 0.012) ** 2) * L.sm(0.35, 0.75, L.fnoise(n, 1.8, seed + 4, hi=5))
+    base = L.mix([0.87, 0.83, 0.75], [0.96, 0.93, 0.86], L.sm(-0.9, 0.9, 0.5 * a + 0.5 * trowel)) * (1 + 0.02 * fine - 0.14 * crack)[..., None]
+    return save_set_lean(name, base, 0.2 * a + 0.3 * trowel + 0.04 * fine - 0.25 * crack, 0.85 + 0.04 * fine, np.zeros((n, n)), 0.8)
+
+def tex_weave(name, n, seed, k=48):
+    y, x = np.mgrid[0:n, 0:n] / n
+    over = ((np.floor(x * k) + np.floor(y * k)) % 2).astype(float)
+    warp, weft = np.abs(np.sin(x * k * math.pi)), np.abs(np.sin(y * k * math.pi))
+    h = over * weft + (1 - over) * warp; a = L.fnoise(n, 1.4, seed, hi=n / 10); slub = L.fnoise(n, 0.7, seed + 1, ay=0.1)
+    base = L.mix([0.72, 0.7, 0.66], [0.9, 0.89, 0.86], np.clip(0.35 + 0.5 * h + 0.1 * a, 0, 1)) * (1 + 0.03 * slub)[..., None]
+    return save_set_lean(name, base, h * 0.7 + 0.1 * a, 0.92 - 0.05 * h, np.zeros((n, n)), 1.0)
+
 def build_materials(n=256, g=128):
     lum = {"Stone": L.tex_stone("Stone", n, 41), "Wood": L.tex_wood("Wood", n, 85), "Basalt": B.tex_basalt("Basalt", n, 501),
-           "Plaster": B.tex_plaster("Plaster", n, 511), "Slate": B.tex_slate("Slate", n, 521, rows=8, cols=6), "Cloth": B.tex_cloth("Cloth", g, 531),
+           "Plaster": tex_limewash("Plaster", n, 511), "Slate": B.tex_slate("Slate", n, 521, rows=8, cols=6), "Cloth": tex_weave("Cloth", n, 531),
            "Bone": B.tex_bone("Bone", g, 541), "Iron": B.tex_iron("Iron", g, 551), "Brass": B.tex_brass("Brass", g, 561),
            "Crystal": B.tex_glow("Crystal", g, 74, [0.22, 0.58, 1.0], [0.55, 0.85, 1.0], [0.25, 0.2, 0.0], [0.12, 0.30, 0.62], [0.40, 0.68, 0.95], 0.6),
            "Amethyst": B.tex_glow("Amethyst", g, 571, [0.40, 0.10, 0.85], [0.80, 0.45, 1.0], [0.3, 0.3, 0.1], [0.25, 0.08, 0.40], [0.62, 0.35, 0.85]),
@@ -265,11 +283,17 @@ def keg(r=0.27, h=0.62, wood="Wood", wtone=WOOD_T, hoop="Iron", htone=IRON_T, se
     return out
 
 def mug(r=0.055, h=0.13, body="Wood", btone=WOOD_T, band=None, foam=True, seg=6, foam_mat="Plaster", foam_tone=FOAM_T):
-    prof = [(0.0, 0.0), (r * 0.95, 0.0), (r * 1.04, h), (r * 0.82, h), (r * 0.82, h * 0.85), (0.0, h * 0.85)]
+    """Tankard: a flared foot, a rolled lip and a chunky handle; hoops low and high when banded; foam (with a drip on
+    the big ones)."""
+    prof = [(0.0, 0.0), (r * 1.06, 0.0), (r * 1.06, h * 0.08), (r * 0.96, h * 0.13), (r * 1.0, h * 0.9), (r * 1.07, h), (r * 0.86, h * 0.9), (0.0, h * 0.9)]
     out = [(obj("mug", *lathe(prof, seg), body, btone, tile=0.3, sa=50), Matrix())]
-    if band: out.append((obj("band", *lathe([(r * 0.99, h * 0.25), (r * 1.05, h * 0.3), (r * 1.06, h * 0.42), (r * 1.0, h * 0.47)], seg), band, BRASS_T if band == "Brass" else IRON_T, tile=0.3), Matrix()))
-    if foam: out.append((blob(r * 0.98, r * 0.98, r * 0.6, foam_mat, foam_tone, seg, 4), T(0, 0, h * 0.95)))
-    out.append(tube2([(r * 0.9, 0, h * 0.82), (r * 1.7, 0, h * 0.62), (r * 1.6, 0, h * 0.3), (r * 0.9, 0, h * 0.22)], r * 0.17, r * 0.17, body, btone, 4, 1))
+    if band:
+        bt = BRASS_T if band == "Brass" else IRON_T
+        for z in (0.26, 0.7): out.append((obj("band", *lathe([(r * 0.97, h * (z - 0.05)), (r * 1.06, h * z), (r * 0.97, h * (z + 0.05))], seg), band, bt, tile=0.3), Matrix()))
+    if foam:
+        out.append((blob(r * 0.98, r * 0.98, r * 0.6, foam_mat, foam_tone, seg, 3), T(0, 0, h * 0.95)))
+        if r >= 0.07: out.append((blob(r * 0.22, r * 0.16, r * 0.5, foam_mat, foam_tone, 5, 3), T(-r * 0.75, -r * 0.6, h * 0.86)))
+    out.append(tube2([(r * 0.9, 0, h * 0.84), (r * 1.8, 0, h * 0.74), (r * 1.75, 0, h * 0.3), (r * 0.9, 0, h * 0.2)], r * 0.2, r * 0.17, body, btone, 4, 1))
     return out
 
 def lantern(metal="Brass", mtone=BRASS_T, glow="Ember", s=1.0):
@@ -315,14 +339,20 @@ def coin_pile(r0, h, seed, count=10):
     return out
 
 def bunting(a, b, sag, n, colours, seed, size=0.26):
-    """A cord with triangular pennants hanging from it (a -> b, Blender coords)."""
-    a, b = np.array(a, float), np.array(b, float); pts = [tuple(a + (b - a) * t + np.array([0, 0, -sag * math.sin(t * math.pi)])) for t in np.linspace(0, 1, 5)]
-    out = [tube2(pts, 0.012, 0.012, "Cloth", col([0.85, 0.8, 0.7], 3, 0.05), 3, 2)]
-    d = (b - a) / np.linalg.norm(b - a); yaw = math.atan2(d[1], d[0])
+    """A twisted cord with folded pennants hanging from it (a -> b, Blender coords): each pennant creased down its
+    middle so it catches the light, every third one a swallowtail."""
+    a, b = np.array(a, float), np.array(b, float); pts = [tuple(a + (b - a) * t + np.array([0, 0, -sag * math.sin(t * math.pi)])) for t in np.linspace(0, 1, 7)]
+    out = [tube2(pts, 0.016, 0.016, "Cloth", col([0.92, 0.86, 0.72], 3, 0.04), 4, 2)]
+    d = (b - a) / np.linalg.norm(b - a); yaw = math.atan2(d[1], d[0]); s = size
     for i in range(n):
         t = (i + 0.5) / n; p = a + (b - a) * t + np.array([0, 0, -sag * math.sin(t * math.pi)])
-        V = np.array([[-size / 2, 0, 0], [size / 2, 0, 0], [0, 0.0, -size * 1.2]])
-        out.append((obj("flag", V, [[0, 2, 1]], "Cloth", col(colours[i % len(colours)], seed + i, 0.06), tile=0.3, sa=80), T(*p) @ R(yaw, "Z") @ R(0.15 * math.sin(i * 2.1), "X")))
+        if i % 3 == 1:  # swallowtail
+            V = np.array([[-s / 2, 0, 0], [s / 2, 0, 0], [s / 2, 0, -s * 1.15], [0, -0.03, -s * 0.7], [-s / 2, 0, -s * 1.15], [0, -0.035, -0.02]])
+            F = [[0, 5, 3, 4], [5, 1, 2, 3]]
+        else:
+            V = np.array([[-s / 2, 0, 0], [s / 2, 0, 0], [0, 0.0, -s * 1.2], [0, -0.035, -0.02]]); F = [[0, 3, 2], [3, 1, 2]]
+        out.append((obj("flag", V, F, "Cloth", col(colours[i % len(colours)], seed + i, 0.04), tile=0.3, sa=80), T(*p) @ R(yaw, "Z") @ R(0.15 * math.sin(i * 2.1), "X")))
+        out.append((blob(0.022, 0.02, 0.018, "Cloth", col([0.92, 0.86, 0.72], 3, 0.04), 4, 2), T(*p)))
     return out
 
 def sun_disc(r, metal="Brass", tone=BRASS_T, gem="Crystal", rays=10):
@@ -421,7 +451,7 @@ STYLES = {
               cloth=[0.16, 0.32, 0.78], sigil=[0.95, 0.78, 0.36], table_t=WOOD_T, wall_top=3.3, ridge=6.5),
     "G": dict(lo="Basalt", lo_t=basalt_tone(3101), hi="Wood", hi_t=lambda p, n: np.clip(PLANK_T(p, n) * np.array([1.75, 1.3, 1.95]), 0, 1), frame="Wood", frame_t=DARKWOOD_T,
               roof="Slate", roof_t=col([0.66, 0.54, 0.78], 33, 0.1), metal="Iron", metal_t=IRON_T, lamp="GlassOoze",
-              cloth=[0.36, 0.14, 0.48], sigil=[0.62, 0.95, 0.35], table_t=DARKWOOD_T, wall_top=3.2, ridge=6.6),
+              cloth=[0.3, 0.11, 0.44], sigil=[0.62, 0.95, 0.35], table_t=DARKWOOD_T, wall_top=3.2, ridge=6.6),
     "N": dict(lo="Stone", lo_t=STONE_T(3201), hi="Plaster", hi_t=col([1.0, 0.88, 0.68], 34, 0.08), frame="Wood", frame_t=WOOD_T,
               roof="Slate", roof_t=None, metal="Iron", metal_t=IRON_T, lamp="Glass",
               cloth=[0.55, 0.45, 0.3], sigil=[0.95, 0.78, 0.36], table_t=WOOD_T, wall_top=3.5, ridge=7.7),
@@ -535,17 +565,62 @@ def window(pre, sx, hw, y, z, st, w=0.8, h=0.9):
         p.append((bbox(0.05, w / 2, h, "Wood", col(paint, 3960 + sy, 0.1)), T(sx * (hw + 0.1) + sx * 0.15, y + sy * (w / 2 + 0.17), z) @ R(sx * sy * 1.1, "Z")))
     return p
 
-def flag(w, h, rgb, sigil, seed, tatter=0.0, metal="Brass", mt=BRASS_T):
-    """Hanging banner, origin at the top centre, face toward -Y: a soft-waved sheet with a pointed (or tattered) tail
-    and a raised sigil."""
-    rr = np.random.default_rng(seed)
+def emblem(kind, r, colour, seed, metal="Brass", mt=BRASS_T):
+    """A raised appliqué device for a banner, centred on the origin, facing -Y, about 2r across.
+    D: a rayed sun over an anvil; G: a goofy skull over crossed bones; N: a foaming tankard."""
+    p = []; c = col(colour, seed, 0.04)
+    if kind == "D":
+        p.append((obj("sun", *lathe([(0.0, 0.0), (r * 0.55, 0.0), (r * 0.5, 0.02), (0.0, 0.03)], 10), "Cloth", c, tile=0.3, sa=40), T(0, 0, r * 0.3) @ R(math.pi / 2, "X")))
+        for k in range(10):
+            a = k / 10 * TAU; ln = r * (0.38 if k % 2 else 0.55)
+            p.append((prism([(-r * 0.1, 0.0), (r * 0.1, 0.0), (0.0, ln)], -0.012, 0.012, "Cloth", c, tile=0.3), T(math.cos(a) * r * 0.55, 0, r * 0.3 + math.sin(a) * r * 0.55) @ R(-a + math.pi / 2, "Y")))
+        anv = [(-r * 0.55, 0.0), (r * 0.35, 0.0), (r * 0.62, r * 0.12), (r * 0.2, r * 0.1), (r * 0.15, -r * 0.18), (r * 0.3, -r * 0.3), (-r * 0.3, -r * 0.3), (-r * 0.15, -r * 0.18), (-r * 0.2, r * 0.1)]
+        V = np.array([(x, -0.012, z) for x, z in anv] + [(x, 0.012, z) for x, z in anv]); n = len(anv)
+        F = [list(range(n))[::-1], list(range(n, 2 * n))] + [[i, (i + 1) % n, n + (i + 1) % n, n + i] for i in range(n)]
+        p.append((obj("anvil", V, F, metal, mt, tile=0.3, sa=20), T(0, -0.01, -r * 0.62)))
+    elif kind == "G":
+        for a in (0.7, -0.7):
+            M = T(0, 0.005, -r * 0.15) @ R(a, "Y")
+            p.append((cyl(r * 0.07, r * 1.6, "Cloth", c, seg=4), M @ T(0, 0, -r * 0.8)))
+            for e in (-1, 1):
+                for d in (-1, 1): p.append((blob(r * 0.09, r * 0.05, r * 0.09, "Cloth", c, 5, 3), M @ T(d * r * 0.07, 0, e * r * 0.82)))
+        p += grp(skull(seed, r * 0.42, r * 0.16, r * 0.4, eye_big=1.3, eyes="Ooze", teeth=True, mat="Cloth", tone=col([0.95, 0.92, 0.82], seed, 0.03), seg=7, rings=4), T(0, -0.02, r * 0.2))
+    else:
+        M = T(0, 0, -r * 0.55) @ Matrix.Diagonal((1.0, 0.35, 1.0, 1.0))
+        p += grp(mug(r=r * 0.42, h=r * 1.0, body="Cloth", btone=c, band=metal, foam=False, seg=8), M)
+        for k in range(4):
+            a = k / 4 * math.pi; p.append((blob(r * 0.2, r * 0.07, r * 0.15, "Cloth", col([0.98, 0.96, 0.9], seed + k, 0.02), 6, 3), T(math.cos(a) * r * 0.32, -0.01, r * 0.48 + math.sin(a) * r * 0.08)))
+    return p
+
+def flag(w, h, rgb, sigil, seed, tatter=0.0, metal="Brass", mt=BRASS_T, emblem_kind=None):
+    """Heraldic banner, origin at the top centre, face toward -Y: a softly waved field with a pointed (or tattered)
+    tail, a trim border in the sigil colour, a raised device, a fringe of tassels, a pole with finials and cords
+    ending in tassels (round 2, 2026-10-09)."""
+    tail = h * 0.2
     def f(u, v):
-        x = (u - 0.5) * w; z = -v * h
-        if v > 0.999: z -= h * 0.18 * (1 - abs(2 * u - 1)) + (tatter * h * 0.25 * abs(math.sin(u * 9 + seed)) if tatter else 0)
+        x = (u - 0.5) * w; z = -v * (h + tail * (1 - abs(2 * u - 1)))
+        if tatter: z -= tatter * h * 0.25 * abs(math.sin(u * 9 + seed)) * v ** 8
         return (x, -0.04 * math.sin(v * 3 + seed) * v - 0.02 * math.sin(u * math.pi), z)
-    p = [sheet(2, 5, f, "Cloth", col(rgb, seed, 0.08), tile=0.5, sa=80)]
-    p.append((obj("sig", *lathe([(0.0, 0.0), (w * 0.22, 0.0), (w * 0.2, 0.025), (0.0, 0.03)], 6 if not tatter else 4), "Cloth", col(sigil, seed + 1, 0.05), tile=0.3, sa=30), T(0, -0.06, -h * 0.42) @ R(math.pi / 2, "X")))
-    p.append(rodr((-w * 0.6, -0.01, 0.0), (w * 0.6, -0.01, 0.0), 0.025, metal, mt, 5))
+    field = col(rgb, seed, 0.05); trim = col(sigil, seed + 1, 0.04)
+    p = [sheet(4, 8, f, "Cloth", field, tile=0.5, sa=80)]
+    bu, bv = min(0.07 / w, 0.2), 0.07 / h
+    def strip(u0, u1, v0, v1, nx, ny, dy=-0.006):
+        g = lambda u, v: (lambda q: (q[0], q[1] + dy, q[2]))(f(u0 + (u1 - u0) * u, v0 + (v1 - v0) * v))
+        return sheet(nx, ny, g, "Cloth", trim, tile=0.5, sa=80)
+    p += [strip(0, bu, 0, 1, 1, 6), strip(1 - bu, 1, 0, 1, 1, 6), strip(bu, 1 - bu, 0.0, 0.05, 3, 1)]
+    if not tatter: p.append(strip(0, 1, 1 - bv, 1, 6, 1))
+    vc = 0.4; q = f(0.5, vc)
+    if emblem_kind: p += grp(emblem(emblem_kind, w * (0.33 if emblem_kind == "N" else 0.29), sigil, seed + 7, metal, mt), T(0, q[1] - 0.012, q[2]))
+    else: p.append((obj("sig", *lathe([(0.0, 0.0), (w * 0.22, 0.0), (w * 0.2, 0.025), (0.0, 0.03)], 8), "Cloth", trim, tile=0.3, sa=30), T(0, q[1] - 0.02, q[2]) @ R(math.pi / 2, "X")))
+    if not tatter:  # fringe along the pointed hem
+        for u in np.linspace(0.06, 0.94, 7):
+            e = f(u, 1.0); p.append((cyl(0.014, 0.08, "Cloth", trim, seg=4, r1=0.006), T(e[0], e[1], e[2] - 0.075)))
+    p.append(rodr((-w * 0.62, -0.01, 0.0), (w * 0.62, -0.01, 0.0), 0.025, metal, mt, 6))
+    for sx in (-1, 1):  # finials, and a cord with a tassel hanging from each end
+        x = sx * w * 0.62; p.append((blob(0.05, 0.05, 0.05, metal, mt, 6, 4), T(x + sx * 0.03, -0.01, 0.0)))
+        p.append(tube2([(x - sx * 0.04, -0.03, -0.01), (x - sx * 0.02, -0.04, -0.2), (x - sx * 0.03, -0.035, -0.36)], 0.008, 0.008, "Cloth", trim, 3, 1))
+        p.append((blob(0.022, 0.022, 0.022, "Cloth", trim, 5, 3), T(x - sx * 0.03, -0.035, -0.37)))
+        p.append((cyl(0.03, 0.11, "Cloth", trim, seg=5, r1=0.012), T(x - sx * 0.03, -0.035, -0.49)))
     return p
 
 def tie_ys(D): return [D / 2 - 1.5, -0.4] if D < 7 else [D / 2 - 1.8, 0.4, -2.0]
@@ -610,7 +685,7 @@ def hearth(pre, side, yh, hw, top, ridge, s, st):
         p += grp(skull(3430, 0.15, 0.12, 0.14, eye_big=1.3), T(side * (hw - 0.55), yh + 0.5, 1.98) @ R(-side * math.pi / 2 + 0.3, "Z"))
     return p
 
-def bar(pre, cy, length, st, depth=0.7):
+def bar(pre, cy, length, st, depth=0.7, wall_y=None):
     """Counter (front face at cy - depth/2, top at 1.1), foot rail, pumps, mugs; keg stillage and bottle shelf on the
     back wall, standing kegs at the ends."""
     p = []; fr, fr_t = st["frame"], st["frame_t"]; metal, mt = st["metal"], st["metal_t"]; evil = pre == "G"
@@ -651,6 +726,25 @@ def bar(pre, cy, length, st, depth=0.7):
         if evil: p += grp(skull(3500 + k, 0.11, 0.08, 0.1, eye_big=1.3, seg=8, rings=6), T(x, back - 0.6, zk + 0.07))
         elif pre == "D" and k == 1: p += grp(sun_disc(0.1, rays=8, gem=None), T(x, back - 0.6, zk + 0.07))
     zs = 2.45
+    # round 2: a panelled back board behind the stillage and shelves, a carved crest on top, tankards on hooks
+    wy = back if wall_y is None else wall_y; bd = max(0.04, wy - back + 0.04)
+    p.append((bbox(length - 0.1, bd, 1.4, PANEL_MAT[pre], col(PANEL[pre], 4900 + len(pre), 0.06)), T(0, wy - bd / 2, 1.12 + 0.7)))
+    for x in np.linspace(-(length - 0.1) / 2, (length - 0.1) / 2, 2 * int(round(length / 1.6)) + 1):
+        p.append((bbox(0.07, 0.04, 1.4, fr, fr_t), T(x, wy - bd - 0.015, 1.12 + 0.7)))
+    if evil:
+        p += grp(skull(4910, 0.24, 0.12, 0.22, eye_big=1.35, seg=9, rings=6), T(0, back - 0.12, 3.12))
+        for a in (0.7, -0.7): p.append((cyl(0.035, 0.8, "Bone", BONE_T, seg=5), T(0, back - 0.06, 3.1) @ R(a, "Y") @ T(0, 0, -0.4)))
+    elif pre == "D":
+        p += grp(sun_disc(0.24, rays=10, gem="Crystal"), T(0, back - 0.07, 3.08))
+    else:
+        p.append((bbox(1.1, 0.05, 0.36, "Wood", col([0.88, 0.75, 0.52], 4911, 0.06), bev=0.0), T(0, back - 0.05, 3.12)))
+        p += grp(mug(r=0.08, h=0.2, body="Wood", btone=col([0.9, 0.62, 0.38], 4912, 0.06), band="Brass", seg=8), T(0, back - 0.14, 2.99))
+        for sx in (-1, 1): p.append((bbox(0.3, 0.02, 0.04, "Plaster", FOAM_T), T(sx * 0.33, back - 0.085, 3.12)))
+    p.append(rodr((-(length / 2 - 0.5), back - 0.3, zs - 0.08), (length / 2 - 0.5, back - 0.3, zs - 0.08), 0.012, "Iron", IRON_T, 4))
+    for k, x in enumerate(np.linspace(-(length / 2 - 0.7), length / 2 - 0.7, 6)):
+        if abs(x) < 0.45: continue
+        body, bt = ("Bone", BONE_T) if evil else ("Wood", col([0.85, 0.62, 0.42], 4920 + k, 0.1))
+        p += grp(mug(r=0.05, h=0.12, body=body, btone=bt, band=metal if k % 2 else None, foam=False, seg=6), T(x, back - 0.3, zs - 0.105 - 0.05 * 1.8) @ R(math.pi / 2, "Z") @ R(-math.pi / 2, "Y"))
     p.append((bbox(length - 0.2, 0.32, 0.06, "Wood", fr_t), T(0, back - 0.16, zs)))
     for x in (-(length / 2 - 0.3), 0.0, length / 2 - 0.3):
         p.append(beam((x, back - 0.02, zs - 0.35), (x, back - 0.28, zs - 0.03), 0.05, "Wood", fr_t))
@@ -660,8 +754,13 @@ def bar(pre, cy, length, st, depth=0.7):
             p += grp(mug(foam=False, body="Bone" if evil else "Wood", btone=BONE_T if evil else WOOD_T), T(x, back - 0.16, zs + 0.03) @ R(k, "Z"))
             continue
         h = 0.2 + 0.1 * rr.random(); g = glows[(k + len(pre)) % 4]
-        bv, bf = lathe([(0.0, 0.0), (0.055, 0.0), (0.055, h * 0.6), (0.02, h * 0.8), (0.02, h), (0.0, h)], 5)
-        p.append((obj("bottle", bv, bf, g, None, tile=0.3, sa=50), T(x, back - 0.16, zs + 0.03)))
+        bv, bf = lathe([(0.0, 0.0), (0.055, 0.0), (0.058, h * 0.55), (0.03, h * 0.72), (0.02, h * 0.76), (0.02, h), (0.0, h)], 6)
+        if k % 4 == 1:  # a stoneware flagon instead of a glowing bottle
+            p.append((obj("flagon", bv, bf, "Stone", col([0.62, 0.45, 0.3] if not evil else [0.35, 0.42, 0.3], 4930 + k, 0.08), tile=0.3, sa=50), T(x, back - 0.16, zs + 0.03)))
+        else:
+            p.append((obj("bottle", bv, bf, g, None, tile=0.3, sa=50), T(x, back - 0.16, zs + 0.03)))
+            p.append((bbox(0.008, 0.07, 0.06, "Plaster", col([0.97, 0.92, 0.78], 4940 + k, 0.03)), T(x, back - 0.218, zs + 0.03 + h * 0.3) @ R(math.pi / 2, "Z")))
+        p.append((cyl(0.022, 0.035, "Wood", col([0.8, 0.62, 0.42], 4950 + k, 0.06), seg=4), T(x, back - 0.16, zs + 0.03 + h - 0.005)))
     # standing kegs at the ends of the counter
     xe = length / 2 + 0.55
     for sx in (-1, 1):
@@ -673,36 +772,103 @@ def bar(pre, cy, length, st, depth=0.7):
         if pre == "N": p += grp(keg(0.24, 0.55, "Wood", kw, kmetal, kmt), T(sx * xe, cy + 0.15, 0.72) @ R(0.9, "Z"))
     return p
 
-def table_set(pre, x, y, st, seed, bench_side=1):
-    """Round table (r 0.7) with a bench toward the bar and three stools; mugs and a candle on top."""
-    p = []; rr = np.random.default_rng(seed); evil = pre == "G"; tt = st["table_t"]
-    top_t = col([0.85, 0.65, 0.48], seed, 0.12) if not evil else col([0.45, 0.36, 0.36], seed, 0.12)
-    p.append((obj("top", *lathe([(0.0, 0.0), (0.66, 0.0), (0.7, 0.045), (0.66, 0.09), (0.0, 0.09)], 12), "Wood", top_t, tile=0.6, sa=40), T(x, y, 0.7)))
-    p.append((cyl(0.09, 0.62, "Wood", tt, seg=6), T(x, y, 0.1)))
-    for k in range(4):
-        a = k * math.pi / 2 + math.pi / 4; e = (x + math.cos(a) * 0.48, y + math.sin(a) * 0.48, 0.12)
-        if evil: p.append(tube2([(x, y, 0.38), (x + math.cos(a) * 0.3, y + math.sin(a) * 0.3, 0.3), e], 0.06, 0.04, "Bone", BONE_T, 5, 1))
-        else: p.append(beam((x, y, 0.3), e, 0.08, "Wood", tt))
-    by = y + bench_side * 1.05
-    p.append((bbox(1.5, 0.36, 0.07, "Wood", tt), T(x, by, 0.47)))
+CUSHION = {"D": [0.2, 0.36, 0.8], "G": [0.42, 0.18, 0.52], "N": [0.72, 0.36, 0.22]}
+
+def chair(pre, st, seed, tone):
+    """Ladder-back chair, seat centred on the origin (floor at z 0.1), back toward +Y; a tied-on cushion (Grumblekeep:
+    bone knobs on the back posts and no cushion, naturally)."""
+    p = []; evil = pre == "G"; zs = 0.47
+    p.append((bbox(0.44, 0.42, 0.05, "Wood", tone, bev=0.0), T(0, 0, zs)))
     for sx in (-1, 1):
+        p.append((bbox(0.05, 0.05, zs - 0.12, "Wood", tone), T(sx * 0.18, -0.17, (zs + 0.1) / 2)))  # front legs
+        p.append((bbox(0.055, 0.055, 0.98 - 0.1, "Wood", tone), T(sx * 0.18, 0.18, (0.98 + 0.1) / 2)))  # back posts
+        p.append((blob(0.04, 0.04, 0.04, "Bone" if evil else st["metal"], BONE_T if evil else st["metal_t"], 4, 2), T(sx * 0.18, 0.18, 1.0)))
+    p.append((bbox(0.34, 0.03, 0.03, "Wood", tone), T(0, -0.17, 0.25)))
+    for z in (0.7, 0.88):
+        p.append((bbox(0.32, 0.03, 0.07, "Wood", tone), T(0, 0.185, z)))
+    if not evil:
+        p.append((blob(0.2, 0.19, 0.035, "Cloth", col(CUSHION[pre], seed, 0.06), 6, 3), T(0, -0.01, zs + 0.04)))
+    return p
+
+def settle(pre, st, seed, tone, length=1.5):
+    """High-backed settle, seat centred on the origin, back toward +Y: boarded back with a cap rail, shaped ends."""
+    p = []; evil = pre == "G"; zs = 0.46
+    p.append((bbox(length, 0.42, 0.06, "Wood", tone), T(0, 0, zs)))
+    p.append((bbox(length, 0.05, 0.12, "Wood", tone), T(0, -0.19, zs - 0.08)))  # apron
+    p.append((bbox(length - 0.1, 0.05, 0.78, "Wood", tone), T(0, 0.2, zs + 0.42)))
+    for k in range(1, 4): p.append((bbox(0.06, 0.03, 0.7, "Wood", st["frame_t"]), T(-length / 2 + k * length / 4, 0.17, zs + 0.43)))
+    p.append((bbox(length + 0.1, 0.11, 0.06, "Wood", st["frame_t"], bev=0.0), T(0, 0.2, zs + 0.84)))
+    for sx in (-1, 1):
+        prof = [(-0.22, 0.1), (0.24, 0.1), (0.24, zs + 0.86), (0.12, zs + 0.86), (-0.12, zs + 0.3), (-0.22, zs + 0.26)]
+        V = np.array([(sx * length / 2 + d, y_, z) for y_, z in prof for d in (-0.03, 0.03)]); m = len(prof)
+        F = [[2 * i for i in range(m)][::-1], [2 * i + 1 for i in range(m)]] + [[2 * i, 2 * ((i + 1) % m), 2 * ((i + 1) % m) + 1, 2 * i + 1] for i in range(m)]
+        p.append((obj("end", V, F, "Wood", st["frame_t"], tile=0.6, sa=30), Matrix()))
+        if evil: p.append((blob(0.06, 0.06, 0.05, "Bone", BONE_T, 6, 3), T(sx * length / 2, -0.2, zs + 0.3)))
+    if not evil:
+        p.append((blob(length * 0.46, 0.18, 0.035, "Cloth", col(CUSHION[pre], seed, 0.06), 8, 3), T(0, -0.02, zs + 0.04)))
+    return p
+
+def table_food(pre, x, y, z, st, seed, k):
+    """Supper on the table: bread on a board and a cheese wedge, or a pie (Grumblekeep: a bowl of glowing stew and a
+    drumstick), two tankards, a bottle, and a candle in its holder."""
+    p = []; rr = np.random.default_rng(seed); evil = pre == "G"
+    body, bt = ("Bone", BONE_T) if evil else ("Wood", col([0.85, 0.62, 0.42], seed, 0.1))
+    for j, (a, d) in enumerate(((0.5 + rr.random(), 0.42), (3.6 + rr.random(), 0.45))):
+        p += grp(mug(body=body, btone=bt, band=st["metal"], foam=j == 0, foam_mat="Ooze" if evil else "Plaster", foam_tone=None if evil else FOAM_T),
+                 T(x + math.cos(a) * d, y + math.sin(a) * d, z) @ R(rr.random() * TAU, "Z"))
+    fx, fy = x - 0.12, y - 0.15
+    if evil:
+        p.append((obj("bowl", *lathe([(0.0, 0.0), (0.08, 0.0), (0.13, 0.05), (0.15, 0.09), (0.13, 0.09), (0.0, 0.03)], 8), "Iron", IRON_T, tile=0.3, sa=50), T(fx, fy, z)))
+        p.append((obj("stew", *disc_lathe(0.13, 0.13, 0, 0.01, 8), "Ooze", None, tile=0.3), T(fx, fy, z + 0.075)))
+        p.append((blob(0.09, 0.06, 0.05, "Wood", col([0.55, 0.3, 0.18], seed, 0.1), 6, 4), T(x + 0.22, y + 0.05, z + 0.04) @ R(0.6, "Z")))
+        p.append(rodr((x + 0.28, y + 0.08, z + 0.04), (x + 0.4, y + 0.14, z + 0.03), 0.015, "Bone", BONE_T, 4))
+        p.append((blob(0.025, 0.025, 0.02, "Bone", BONE_T, 5, 3), T(x + 0.41, y + 0.145, z + 0.03)))
+    else:
+        p.append((bbox(0.38, 0.24, 0.025, "Wood", col([0.88, 0.7, 0.48], seed + 1, 0.06)), T(fx, fy, z + 0.012) @ R(0.3, "Z")))
+        if k % 2 == 0:  # a scored loaf and a cheese wedge
+            crust = lambda pp, n: np.clip(np.tile([0.85, 0.55, 0.28], (len(pp), 1)) * (1 - 0.3 * (np.abs(np.sin((pp[:, 0] + 0.4 * pp[:, 1]) * 55)) > 0.92) + 0.25 * (pp[:, 2] < 0.0))[:, None], 0, 1)
+            p.append((obj("loaf", *ellipsoid(0.12, 0.07, 0.06, 8, 4), "Plaster", crust, tile=0.3, sa=70), T(fx - 0.04, fy, z + 0.045) @ R(0.3, "Z")))
+            p.append((prism([(0.0, 0.0), (0.13, 0.0), (0.0, 0.07)], -0.04, 0.04, "Plaster", col([1.0, 0.82, 0.35], seed + 2, 0.04), tile=0.3), T(fx + 0.1, fy + 0.03, z + 0.025) @ R(0.3, "Z")))
+        else:  # a lattice pie
+            pie = lambda pp, n: np.clip(np.where((np.abs(np.sin(pp[:, 0] * 45)) > 0.55)[:, None] | (np.abs(np.sin(pp[:, 1] * 45)) > 0.55)[:, None], [0.95, 0.7, 0.38], [0.45, 0.12, 0.2]) * np.ones((len(pp), 1)), 0, 1)
+            p.append((obj("pie", *lathe([(0.0, 0.0), (0.14, 0.0), (0.16, 0.04), (0.15, 0.05), (0.0, 0.055)], 10), "Plaster", pie, tile=0.3, sa=50), T(fx, fy, z + 0.025)))
+    bt2 = col([0.22, 0.38, 0.22] if not evil else [0.3, 0.2, 0.35], seed + 3, 0.05)
+    bx, by = x + 0.2, y - 0.25
+    p.append((obj("bottle", *lathe([(0.0, 0.0), (0.05, 0.0), (0.05, 0.16), (0.02, 0.22), (0.018, 0.29), (0.0, 0.29)], 7), "Stone", bt2, tile=0.3, sa=50), T(bx, by, z)))
+    p.append((bbox(0.008, 0.06, 0.06, "Plaster", col([0.97, 0.92, 0.78], seed + 4, 0.03)), T(bx, by - 0.05, z + 0.09) @ R(math.pi / 2, "Z")))
+    p.append((cyl(0.017, 0.03, "Wood", col([0.8, 0.62, 0.42], seed, 0.06), seg=4), T(bx, by, z + 0.285)))
+    # candle in a dish holder with a ring handle
+    p.append((obj("dish", *lathe([(0.0, 0.0), (0.08, 0.0), (0.09, 0.02), (0.07, 0.02), (0.03, 0.012), (0.0, 0.012)], 8), st["metal"], st["metal_t"], tile=0.3), T(x, y, z)))
+    p.append((obj("loop", *torus(0.03, 0.007, 6, 3), st["metal"], st["metal_t"], tile=0.3), T(x + 0.1, y, z + 0.02) @ R(math.pi / 2, "X")))
+    p.append((cyl(0.03, 0.11, "Bone" if evil else "Plaster", BONE_T if evil else col([1.0, 0.95, 0.8], 5, 0.04), seg=6), T(x, y, z + 0.012)))
+    p.append((blob(0.012, 0.012, 0.03, "Bone" if evil else "Plaster", BONE_T if evil else col([1.0, 0.95, 0.8], 5, 0.04), 4, 2), T(x + 0.03, y, z + 0.1)))  # a drip
+    v, f = L.crystal_point(0.08, 0.022, 4); p.append((obj("flame", v, f, "Ooze" if evil else "Ember", None, tile=0.2, sa=20), T(x, y, z + 0.125)))
+    return p
+
+def table_set(pre, x, y, st, seed, side=1, k=0, settle_len=1.5, settle_dy=0.0, spread=1.15):
+    """Round plank-top table (r 0.7) on a turned pedestal, a high-backed settle against the side wall (`side` +-1 in x,
+    so its back never hides the bar from the door) and three ladder-back chairs round the room side, supper on top
+    (round 2, 2026-10-09)."""
+    p = []; evil = pre == "G"; tt = st["table_t"]
+    top_t0 = [0.85, 0.65, 0.48] if not evil else [0.45, 0.36, 0.36]
+    plank = lambda pp, n: np.clip(np.array(top_t0) * (0.9 + 0.12 * np.sin(np.floor(pp[:, 0] / 0.155) * 5.3) + 0.06 * fbm(pp, seed, 3.0, 2))[:, None]
+                                  * (1 - 0.4 * (np.abs(pp[:, 0] / 0.155 - np.round(pp[:, 0] / 0.155)) < 0.06))[:, None], 0, 1)
+    p.append((obj("top", *lathe([(0.0, 0.0), (0.66, 0.0), (0.7, 0.045), (0.66, 0.09), (0.0, 0.09)], 14), "Wood", plank, tile=0.6, sa=40), T(x, y, 0.7)))
+    p.append((obj("band", *torus(0.7, 0.018, 12, 3), "Iron" if evil else st["metal"], IRON_T if evil else st["metal_t"], tile=0.3), T(x, y, 0.745)))
+    ped = [(0.0, 0.0), (0.15, 0.0), (0.15, 0.05), (0.09, 0.09), (0.07, 0.18), (0.11, 0.27), (0.11, 0.31), (0.065, 0.4), (0.06, 0.52), (0.1, 0.56), (0.1, 0.6), (0.0, 0.6)]
+    p.append((obj("ped", *lathe(ped, 8), "Bone" if evil else "Wood", BONE_T if evil else tt, tile=0.4, sa=50), T(x, y, 0.1)))
+    for j in range(4):
+        a = j * math.pi / 2 + math.pi / 4; e = (x + math.cos(a) * 0.5, y + math.sin(a) * 0.5, 0.13)
         if evil:
-            p.append(tube2([(x + sx * 0.6, by, 0.1), (x + sx * 0.56, by, 0.3), (x + sx * 0.6, by, 0.45)], 0.05, 0.05, "Bone", BONE_T, 5, 1))
-            p.append((blob(0.08, 0.08, 0.05, "Bone", BONE_T, 6, 3), T(x + sx * 0.6, by, 0.12)))
-        else: p.append((bbox(0.08, 0.3, 0.37, "Wood", tt), T(x + sx * 0.6, by, 0.285)))
-    for k, a in enumerate((-math.pi / 2 * bench_side, -math.pi / 2 * bench_side - 1.2, -math.pi / 2 * bench_side + 1.2)):
-        sx_, sy_ = x + math.cos(a) * 1.0, y + math.sin(a) * 1.0
-        p.append((cyl(0.2, 0.06, "Wood", top_t, seg=7, r1=0.18), T(sx_, sy_, 0.43)))
-        for j in range(3):
-            b = j / 3 * TAU + a
-            p.append(rodr((sx_ + math.cos(b) * 0.1, sy_ + math.sin(b) * 0.1, 0.44), (sx_ + math.cos(b) * 0.17, sy_ + math.sin(b) * 0.17, 0.0), 0.03, "Bone" if evil else "Wood", BONE_T if evil else tt, 3))
-    for k in range(1):
-        a = rr.random() * TAU; d = 0.3 + 0.2 * rr.random()
-        body, bt = ("Bone", BONE_T) if evil else ("Wood", WOOD_T)
-        p += grp(mug(body=body, btone=bt, band=st["metal"] if k == 0 else None, foam_mat="Ooze" if evil else "Plaster", foam_tone=None if evil else FOAM_T), T(x + math.cos(a) * d, y + math.sin(a) * d, 0.79) @ R(rr.random() * TAU, "Z"))
-    p.append((obj("dish", *disc_lathe(0.09, 0.1, 0, 0.02, 6), st["metal"], st["metal_t"], tile=0.3), T(x, y, 0.79)))
-    p.append((cyl(0.035, 0.1, "Plaster", col([1.0, 0.95, 0.8], 5, 0.04), seg=5), T(x, y, 0.81)))
-    v, f = L.crystal_point(0.08, 0.022, 4); p.append((obj("flame", v, f, "Ember", None, tile=0.2, sa=20), T(x, y, 0.91)))
+            p.append(tube2([(x, y, 0.3), (x + math.cos(a) * 0.3, y + math.sin(a) * 0.3, 0.26), e], 0.055, 0.04, "Bone", BONE_T, 5, 1))
+        else:
+            p.append(tube2([(x + math.cos(a) * 0.08, y + math.sin(a) * 0.08, 0.26), (x + math.cos(a) * 0.32, y + math.sin(a) * 0.32, 0.2), e], 0.045, 0.035, "Wood", tt, 4, 1))
+    p += grp(settle(pre, st, seed + 5, tt, settle_len), T(x + side * 1.0, y + settle_dy, 0) @ R(-side * math.pi / 2, "Z"))
+    a0 = 0.0 if side < 0 else math.pi
+    for j, a in enumerate((a0, a0 - spread, a0 + spread)):
+        cx, cy = x + math.cos(a) * 0.98, y + math.sin(a) * 0.98
+        p += grp(chair(pre, st, seed + j, tt), T(cx, cy, 0) @ R(a - math.pi / 2 + 0.12 * (j - 1), "Z"))
+    p += table_food(pre, x, y, 0.79, st, seed, k)
     return p
 
 def hanging_lanterns(points, st, drop=0.5):
@@ -990,6 +1156,47 @@ def glowshrooms(points, seed):
             p.append((obj("cap", *lathe([(0.0, -0.01), (cr, 0.0), (cr * 0.9, cr * 0.35), (0.0, cr * 0.75)], 7), "Ooze" if j % 2 == 0 else "Amethyst", None, tile=0.3, sa=50), T(x + dx, y + dy, h)))
     return p
 
+PANEL = {"D": [0.5, 0.64, 0.95], "G": [0.62, 0.78, 0.46], "N": [1.0, 0.86, 0.62]}  # painted cottage blue, sickly toad green, honey oak
+PANEL_MAT = {"D": "Plaster", "G": "Plaster", "N": "Wood"}  # paint goes on the calm limewash surface, the oak keeps its grain
+
+def interior(pre, W, D, st, hs, hy, wins, clear):
+    """Round 2 (2026-10-09) inside walls: a panelled oak wainscot (baseboard, two rows of fielded panels, chair rail)
+    round the side and back walls, and the timber frame showing on the inside too: posts, a wall plate and corner
+    braces above the rail. Posts stand clear of windows, the hearth and whatever hangs on the wall (`clear`: side ->
+    [(y0, y1)] Blender y ranges)."""
+    p = []; hw, hd = W / 2, D / 2; top = st["wall_top"]; fr, fr_t = st["frame"], st["frame_t"]
+    pt = col(PANEL[pre], 4800 + len(pre), 0.06); zr = 1.12; pm = PANEL_MAT[pre]
+    def run(face, a0, a1, n_hat, along):
+        """Wainscot along one wall: `face` is the wall's inner plane, n_hat (+-1) points into the room, along 'y'|'x'."""
+        L_ = a1 - a0; mid = (a0 + a1) / 2; out = []
+        def at(off, c, z): return T(face + n_hat * off, c, z) if along == "y" else T(c, face + n_hat * off, z)
+        def bx(t, l, h): return (t, l, h) if along == "y" else (l, t, h)
+        out.append((bbox(*bx(0.03, L_, 1.0), pm, pt), at(0.015, mid, 0.6)))
+        out.append((bbox(*bx(0.05, L_, 0.14), fr, fr_t), at(0.025, mid, 0.17)))
+        out.append((bbox(*bx(0.04, L_, 0.05), fr, fr_t), at(0.035, mid, 0.66)))
+        out.append((bbox(*bx(0.075, L_, 0.07), fr, fr_t, bev=0.0), at(0.037, mid, zr)))
+        nst = max(1, int(round(L_ / 0.7)))
+        for k in range(nst + 1):
+            out.append((bbox(*bx(0.045, 0.06, 0.86), fr, fr_t), at(0.03, a0 + 0.03 + (L_ - 0.06) * k / nst, 0.66)))
+        return out
+    yf, yb = -hd + 0.4, hd - 0.42
+    for sx in (-1, 1):
+        xi = sx * (hw - 0.42); spans = [(yf + 0.02, hy - 1.06), (hy + 1.06, yb)] if sx == hs else [(yf + 0.02, yb)]
+        for a0, a1 in spans:
+            if a1 - a0 > 0.2: p += run(xi, a0, a1, -sx, "y")
+        p.append((bbox(0.08, D - 0.82, 0.14, fr, fr_t), T(xi - sx * 0.04, 0.0, top - 0.1)))  # wall plate
+        busy = [(w - 0.6, w + 0.6) for w in wins.get(sx, [])] + clear.get(sx, []) + ([(hy - 1.15, hy + 1.15)] if sx == hs else [])
+        for y in np.linspace(yf + 0.12, yb - 0.08, 5 if D < 7 else 6):
+            if any(a <= y <= b for a, b in busy): continue
+            p.append((bbox(0.06, 0.16, top - zr - 0.13, fr, fr_t), T(xi - sx * 0.03, y, (zr + 0.05 + top - 0.17) / 2)))
+    yi = hd - 0.42
+    p += run(yi, -hw + 0.42, hw - 0.42, -1, "x")
+    p.append((bbox(W - 0.84, 0.08, 0.14, fr, fr_t), T(0, yi - 0.04, top - 0.1)))
+    for sx in (-1, 1):  # corner posts and braces on the back wall, clear of the bar's back shelves
+        p.append((bbox(0.16, 0.06, top - zr - 0.13, fr, fr_t), T(sx * (hw - 0.52), yi - 0.03, (zr + 0.05 + top - 0.17) / 2)))
+        p.append(beam((sx * (hw - 0.6), yi - 0.03, zr + 0.1), (sx * (hw - 1.35), yi - 0.03, top - 0.2), 0.08, fr, fr_t))
+    return p
+
 def build_tavern(pre):
     st = dict(STYLES[pre], pre=pre)
     if pre == "N": W, D, cy, blen, tables, hs, hy = 11.0, 8.0, 2.9, 6.5, [(-3, -1.6), (3, -1.6), (-3, 0.6), (3, 0.6)], 1, 0.0
@@ -997,9 +1204,12 @@ def build_tavern(pre):
     hw, hd = W / 2, D / 2; top = st["wall_top"]; ridge = st["ridge"]
     wins = {"D": {-1: [-1.875], 1: [-1.875, 0.625, 1.875]}, "N": {-1: [-2.575, -0.725, 1.125, 2.975], 1: [-2.575, 2.975]}, "G": {}}[pre]
     p = tavern_shell(pre, W, D, st, hs, hy, wins)
-    p += bar(pre, cy, blen, st)
+    sh = -hs  # the wall opposite the hearth carries the plate rail and the notice board
+    clear = {sh: [(-3.4, -1.3), (1.7, 3.5), (-0.3, 0.7)]} if pre == "N" else {sh: [(-0.2, 2.5), (-2.0, -1.0)], hs: [(-2.55, -0.55)]}
+    p += interior(pre, W, D, st, hs, hy, wins, clear)
+    p += bar(pre, cy, blen, st, wall_y=hd - 0.4)
     for k, (x, y) in enumerate(tables):
-        p += table_set(pre, x, y, st, 3700 + k * 11 + len(pre), bench_side=1 if (pre != "N" or y > 0) else -1)
+        p += table_set(pre, x, y, st, 3700 + k * 11 + len(pre), side=1 if x > 0 else -1, k=k, **(dict(spread=0.95) if pre == "N" else dict(settle_len=1.2, settle_dy=-0.35)))
     ties = tie_ys(D)
     lamps = [(x, ties[-1], top - 0.28) for x in ((-2.2, 2.2) if pre != "N" else (-3.0, 3.0))] + [(0.0, ties[0], top - 0.28)]
     p += hanging_lanterns(lamps, st, drop=0.45)
@@ -1011,7 +1221,7 @@ def build_tavern(pre):
     if pre == "D":
         p += grp(sun_disc(0.45), T(0, -hd - 0.02, zg + 0.45))
         for x in (-2.6, 2.6):
-            p += grp(flag(0.6, 1.3, st["cloth"], st["sigil"], 3801 + int(x)), T(x, -hd - 0.03, top - 0.25))
+            p += grp(flag(0.6, 1.3, st["cloth"], st["sigil"], 3801 + int(x), emblem_kind="D"), T(x, -hd - 0.03, top - 0.25))
         p += bunting((-hw + 0.2, -hd - 0.08, top - 0.25), (hw - 0.2, -hd - 0.08, top - 0.25), 0.35, 11, [[0.18, 0.35, 0.8], [0.95, 0.88, 0.65], [0.95, 0.72, 0.28]], 3810)
         for yy in (-hd - 1.0, hd + 0.4):  # crystal finials at the gable apexes, brass ridge
             v, f = L.crystal_point(0.7, 0.13); p.append((obj("fin", v, f, "Crystal", None, tile=0.4, sa=20), T(0, yy, ridge + 0.15)))
@@ -1025,7 +1235,7 @@ def build_tavern(pre):
         for sx in (-1, 1):
             v, f = L.crystal_point(0.6, 0.1, 5); p.append((obj("horn", v, f, "Bone", BONE_T, tile=0.3), T(sx * 0.42, -hd - 0.1, zg + 0.75) @ R(sx * 0.5, "Y")))
         for x in (-2.6, 2.6):
-            p += grp(flag(0.65, 1.4, st["cloth"], st["sigil"], 3851 + int(x), tatter=0.4, metal="Iron", mt=IRON_T), T(x, -hd - 0.03, top - 0.25))
+            p += grp(flag(0.65, 1.4, st["cloth"], st["sigil"], 3851 + int(x), tatter=0.4, metal="Iron", mt=IRON_T, emblem_kind="G"), T(x, -hd - 0.03, top - 0.25))
         p += bunting((-hw + 0.2, -hd - 0.08, top - 0.25), (hw - 0.2, -hd - 0.08, top - 0.25), 0.4, 11, [[0.4, 0.16, 0.52], [0.55, 0.9, 0.3]], 3860)
         ridge_pts = [(0, y, ridge + 0.12 - 0.22 * math.sin(math.pi * (y + hd + 1.05) / (D + 1.55))) for y in np.linspace(-hd - 1.05, hd + 0.5, 5)]
         p.append(tube2(ridge_pts, 0.13, 0.13, "Bone", BONE_T, 6, 2, wob=0.1))
@@ -1038,8 +1248,8 @@ def build_tavern(pre):
                 p.append(tube2([(sx * (hw + 0.09), y - 0.42, 1.85), (sx * (hw + 0.09), y - 0.42, 2.5), (sx * (hw + 0.09), y, 2.75), (sx * (hw + 0.09), y + 0.42, 2.5), (sx * (hw + 0.09), y + 0.42, 1.85)], 0.05, 0.05, "Bone", BONE_T, 5, 1))
     else:
         p += grp(handshake(3900), T(0, -hd - 0.12, zg + 0.1))
-        p += grp(flag(0.8, 1.7, [0.16, 0.32, 0.78], [0.95, 0.78, 0.36], 3901), T(-1.2, -hd - 0.03, top - 0.22) @ R(-0.1, "Y"))
-        p += grp(flag(0.8, 1.7, [0.36, 0.14, 0.48], [0.62, 0.95, 0.35], 3902, tatter=0.3, metal="Iron", mt=IRON_T), T(1.2, -hd - 0.03, top - 0.22) @ R(0.1, "Y"))
+        p += grp(flag(0.8, 1.7, [0.16, 0.32, 0.78], [0.95, 0.78, 0.36], 3901, emblem_kind="N"), T(-1.2, -hd - 0.03, top - 0.22) @ R(-0.1, "Y"))
+        p += grp(flag(0.8, 1.7, [0.36, 0.14, 0.48], [0.62, 0.95, 0.35], 3902, metal="Iron", mt=IRON_T, emblem_kind="N"), T(1.2, -hd - 0.03, top - 0.22) @ R(0.1, "Y"))
         p += bunting((-hw + 0.2, -hd - 0.08, top - 0.25), (-2.0, -hd - 0.08, top - 0.25), 0.3, 6, [[0.18, 0.35, 0.8], [0.4, 0.16, 0.52], [0.55, 0.9, 0.3], [0.95, 0.8, 0.4]], 3910)
         p += bunting((2.0, -hd - 0.08, top - 0.25), (hw - 0.2, -hd - 0.08, top - 0.25), 0.3, 6, [[0.4, 0.16, 0.52], [0.18, 0.35, 0.8], [0.95, 0.8, 0.4], [0.55, 0.9, 0.3]], 3911)
         p.append((bbox(0.3, D + 1.6, 0.3, "Wood", WOOD_T, bev=0.05), T(0, -0.28, ridge + 0.1)))
@@ -1057,14 +1267,13 @@ def build_tavern(pre):
     # outside a log pile by the chimney and climbers on the front posts
     evil = pre == "G"
     p += chandelier(0.0, ties[-1] if pre != "N" else ties[1], top - 0.02, st, r=0.55 if pre != "N" else 0.7, drop=0.8 if pre != "N" else 0.95)
-    sh = -hs  # the wall opposite the hearth carries the plate rail and the notice board
     if pre == "N":
         p += plate_shelf(sh, hw, -3.4, -1.3, 1.75, st, 4200, plates="Plaster")
         p += plate_shelf(sh, hw, 1.7, 3.5, 1.75, st, 4201, plates="Plaster")
-        p += notice_board(sh, hw, 0.2, 1.45, st, 4210)
+        p += notice_board(sh, hw, 0.2, 1.68, st, 4210)
     else:
         p += plate_shelf(sh, hw, -0.2, 2.5, 1.75, st, 4200, plates="Bone" if evil else "Plaster", plate_t=BONE_T if evil else None)
-        p += notice_board(sh, hw, -1.5, 1.35, st, 4210)
+        p += notice_board(sh, hw, -1.5, 1.74, st, 4210)
         p += plate_shelf(hs, hw, -2.55, -0.55, 1.85, st, 4202, plates="Bone" if evil else "Plaster", plate_t=BONE_T if evil else None)
     p += trophy(pre, hs, hw, hy, 2.75 if pre != "N" else 2.95, st)
     hz = top - 0.15 - 0.13
@@ -1181,6 +1390,8 @@ def awning(x0, x1, yb, zb, yf, zf, n, cols, seed, tatter=0.0, drop=0.32):
             x = xa + (xb - xa) * u; scal = 1 - 0.35 * (1 - math.sin(math.pi * u)) if not tatter else 1 - tatter * abs(math.sin(u * 7 + i))
             return (x, yf - 0.01, zf - dz * v * scal)
         p.append(sheet(2, 1, g, "Cloth", c))
+        if not tatter:  # a tassel at each join of the valance
+            p.append((cyl(0.025, 0.1, "Cloth", col(cols[(i + 1) % len(cols)], seed + 50 + i, 0.04), seg=4, r1=0.01), T(xa, yf - 0.02, zf - dz * 0.75 - 0.1)))
     return p
 
 QM = {"D": dict(base="Stone", base_t=STONE_T(5001), wood_t=WOOD_T, pole="Brass", pole_t=BRASS_T, metal="Brass", metal_t=BRASS_T,
@@ -1207,7 +1418,7 @@ def build_quartermaster(pre):
     for k, x in enumerate(np.linspace(-2.25, 2.25, 4)): p.append((bbox(0.14, 0.1, 2.9, "Wood", wt), T(x, 1.5, 1.6)))
     for k, x in enumerate((-2.25, -0.75, 0.75, 2.25)): p.append((bbox(0.14, 0.08, 2.9, "Wood", wt), T(x, 1.74, 1.6)))
     for z in (0.5, 2.9): p.append((bbox(4.9, 0.08, 0.14, "Wood", wt), T(0, 1.74, z)))
-    p += grp(flag(0.8, 1.5, [0.16, 0.32, 0.78] if not evil else [0.36, 0.14, 0.48], [0.95, 0.78, 0.36] if not evil else [0.62, 0.95, 0.35], 5205, tatter=0.3 if evil else 0.0, metal=m, mt=mt), T(1.5, 1.82, 2.66) @ R(math.pi, "Z"))
+    p += grp(flag(0.8, 1.5, [0.16, 0.32, 0.78] if not evil else [0.36, 0.14, 0.48], [0.95, 0.78, 0.36] if not evil else [0.62, 0.95, 0.35], 5205, tatter=0.3 if evil else 0.0, metal=m, mt=mt, emblem_kind=pre), T(1.5, 1.82, 2.66) @ R(math.pi, "Z"))
     shelves = (1.25, 1.9, 2.55)
     p.append(slab(-2.36, 2.36, 1.53, 1.55, 1.0, 2.95, "Plaster", col([0.98, 0.9, 0.72] if not evil else [0.62, 0.78, 0.5], 5206, 0.08), chip=0.0, step=1.2, tile=1.2))
     for z in shelves:
