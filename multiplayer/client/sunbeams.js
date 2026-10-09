@@ -75,7 +75,7 @@ export function createSunbeams({scene, height, quality = 'high'}) {
       // keeps its compass direction but never lays the beams flat across the meadow.
       axis.copy(light).negate().normalize();
       const flat = Math.hypot(axis.x, axis.z), drop = Math.max(-axis.y, flat * STEEP);
-      if (flat > 1e-4) axis.set(axis.x / flat, -drop, axis.z / flat).normalize(); else axis.set(0, -1, 0);
+      if (flat > 1e-4) axis.set(axis.x, -drop, axis.z).normalize(); else axis.set(0, -1, 0);
       material.uniforms.uAxis.value.copy(axis);
       camera.getWorldPosition(cam);
       const key = `${axis.x.toFixed(2)},${axis.y.toFixed(2)},${axis.z.toFixed(2)}`;

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import {createSunbeams} from '../client/sunbeams.js';
 import {worldClock, weatherAt, dayPhase, nightAmount, solarAngle, lightningAt, DAY_TICKS, WEATHER_TICKS, DAYLIGHT_SHARE} from '../shared/world-clock.js';
 import {createDayNightWeather, previewFromUrl} from '../client/day-night-weather.js';
 
@@ -104,3 +105,22 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   assert.equal(scene.children.length, before);
   console.log('day-night-weather: ok');
 });
+
+// The angle limit must hold beyond golden hour, including a nearly overhead light.
+// Normalising only the horizontal components first incorrectly flattens these rays.
+{
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.7, 8); camera.updateMatrixWorld();
+  const beams = createSunbeams({scene, height: () => 0, quality: 'low'});
+  beams.setTrees([{id: 'angle-check', x: 0, z: 0, height: 6}]);
+  for (const degrees of [0, 15, 30, 45, 62, 75, 89.9, 90]) {
+    const angle = degrees * Math.PI / 180;
+    const light = new THREE.Vector3(Math.cos(angle) * .6, Math.sin(angle), Math.cos(angle) * .8);
+    beams.update({camera, light, strength: 1, time: degrees});
+    const axis = beams.mesh.material.uniforms.uAxis.value;
+    assert.ok(-axis.y >= Math.sin(62 * Math.PI / 180) - 1e-9, `shaft too shallow at ${degrees}: ${axis.y}`);
+    assert.ok(Math.abs(axis.length() - 1) < 1e-9);
+    assert.ok(Math.abs(axis.x * light.z - axis.z * light.x) < 1e-9, 'compass direction is preserved');
+  }
+  beams.dispose();
+}
