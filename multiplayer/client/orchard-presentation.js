@@ -7,7 +7,8 @@ import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terr
 // plus authored bank/edge breakup and planar bedrock for exposed stone. No extra draws, lights or geometry.
 import * as THREE from 'three';
 import {createDeformationField} from './terrain-deformation-field.js';
-import {keepCarve} from '../shared/keep-sites.js';
+import {keepCarve, backTownPoint, BACK_TOWN} from '../shared/keep-sites.js';
+import {homePoint, NEUTRAL_TAVERN} from '../shared/home-bases.js';
 
 export const ORCHARD_PRESENTATION_VERSION = 2;
 export const WALK_BOUND = 55;
@@ -23,10 +24,41 @@ export const ORCHARD_LAYOUT = Object.freeze({
     [0, 8, -3.6, 9.4, .5, .6], [-3.6, 9.4, -7, 10, .5, .6], [0, 8, 3.7, 9.1, .5, .6], [3.7, 9.1, 7, 10, .5, .6],
     [.2, -1.6, .5, -5.5, .7, .8], [.5, -5.5, -2.2, -10, .5, .5], [-2.2, -10, -6, -12.5, .4, .32],
     [5, 5, 13, 3.4, .45, .42], [13, 3.4, 24, 2.2, .38, .3], [-5, 5, -13.5, 5.6, .45, .42], [-13.5, 5.6, -23, 4.2, .38, .3],
+    ...keepPaths(),
   ],
   deposits: [[-5, 5], [5, 5], [-7, 10], [7, 10], [0, 14]],
   trees: [[-2, 6, 5.8], [1.8, 6.5, 6.4], [-3.5, 9, 5.2], [3.7, 9.4, 6.1], [0, 11.5, 6.8], [-12, -9, 7], [14, -12, 6.5], [-17, 17, 7.2], [19, 18, 5.6], [-24, 4, 6.4], [25, 2, 6.8]],
 });
+
+// Worn paths that tie the map together (2026-10-09 cozy towns pass): each keep's gate road out to the Forge, a
+// footpath to The Muddled Mug, a little square round each keep's heart with spokes to the tavern, mill, shop,
+// barracks and fountain, and the lane back through the pass into the back town's yard. Same [ax, az, bx, bz,
+// halfWidth, wear] rows as the hand-placed orchard paths; built from the shared keep layout so they follow it.
+function keepPaths() {
+  const rows = [], line = (pts, hw, w) => { for (let i = 1; i < pts.length; i++) rows.push([...pts[i - 1], ...pts[i], hw, w].map(v => +(+v).toFixed(2))); };
+  const ring = (side, r, n) => Array.from({length: n + 1}, (_, i) => homePoint(side, [Math.sin(i / n * Math.PI * 2) * r, Math.cos(i / n * Math.PI * 2) * r]));
+  for (const side of ['party', 'rivals']) {
+    const L = local => local.map(p => homePoint(side, p)), g = side === 'rivals' ? 1 : -1;
+    line(L([[0, 17.5], [0, 12.5], [0, 7.5]]), 1.15, .9);                 // gate into the square
+    line(ring(side, 7.5, 16), .8, .72);                                 // the square round the heart
+    for (const spoke of [[[-5.3, -5.3], [-8.2, -8.2]], [[5.3, -5.3], [8.2, -8.2]], [[7.5, .3], [11.3, .45]], [[-7.5, .3], [-10.8, .45]], [[-5.3, 5.3], [-6.2, 6.2]]]) line(L(spoke), .75, .7);
+    line(L([[0, -7.5], [0, -13.5], [1.9, -16], [0, -18.5], [0, -29], [0, -35]]), .9, .8); // past the pass pylon, up the pass
+    const yard = backTownPoint(side, [58.5, 58.5]);
+    line([homePoint(side, [0, -35]), yard], .95, .75);
+    for (const name of ['workshop', 'stores', 'cottage', 'cottage2', 'well']) {
+      const {at: [u, v], face: [fu, fv]} = BACK_TOWN[name], d = Math.hypot(fu - u, fv - v), k = name === 'well' ? 1.4 : name === 'workshop' ? 3.4 : 2.6;
+      line([yard, backTownPoint(side, [u + (fu - u) / d * k, v + (fv - v) / d * k])], .7, .65);
+    }
+    // The gate road: out of the keep, wandering a little, to the Forge yard.
+    line([homePoint(side, [0, 17.5]), homePoint(side, [1.2, 24]), [g * 11, g * 10.2], [g * 6.4, g * 5.4], [g * 2.6, g * 2.4]], 1.1, .85);
+  }
+  // The Muddled Mug: a footpath from Dawnhold's road and one down from the Forge, meeting at the door.
+  const [mx, mz] = NEUTRAL_TAVERN.at, mug = [mx + Math.sin(NEUTRAL_TAVERN.yaw) * 4.6, mz + Math.cos(NEUTRAL_TAVERN.yaw) * 4.6];
+  line([homePoint('party', [1.2, 24]), [-12, -22.5], [-4, -23.6], mug], .85, .72);
+  line([[.5, -5.5], [2.6, -12], [4.2, -18.5], mug], .85, .72);
+  return rows;
+}
+export const KEEP_PATHS = Object.freeze(keepPaths());
 
 // Art direction presets. Colours are sRGB hex; intensities are physically-plausible-ish Three units.
 export const DAYLIGHT = Object.freeze({

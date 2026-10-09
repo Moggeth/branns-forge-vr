@@ -12,6 +12,7 @@ import {HOME_SITES} from '../shared/home-bases.js';
 import {createHomeBaseView} from '../client/home-base-view.js';
 import {createHomeTownView} from '../client/home-town-view.js';
 import {createBackTownView} from '../client/back-town-view.js';
+import {createTownLife} from '../client/town-life.js';
 import {createMountainArena} from '../client/mountain-arena.js';
 import {createAlpineForest} from '../client/alpine-forest.js';
 import {createKeepCornerGround} from '../client/keep-corner-ground.js';
@@ -30,12 +31,15 @@ const orchard=createOrchardPresentation({scene,renderer,ground,sun,height:baseHe
 orchard.objects.backdrop.visible=false; // the game swaps this for the alpine skyline
 const corner=createKeepCornerGround({scene,ground,height:baseHeight});
 const arena=createMountainArena({THREE:T,scene,height:baseHeight}),forest=createAlpineForest({scene,arena,quality:'high'});
-const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene}),town=createHomeTownView({scene}),back=createBackTownView({scene});
+const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene}),town=createHomeTownView({scene}),back=createBackTownView({scene}),life=createTownLife({scene});
 const cam=new T.PerspectiveCamera(50,W/H,.1,400);let last=performance.now();
-function frame(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);view.update(dt,cam,sim.snapshot().tick);town.update(dt);back.update(dt);corner.sync();orchard.update?.(dt,cam);last=now;renderer.render(scene,cam);}
-const sync=()=>{const s=sim.snapshot();view.sync(s);town.sync(s);back.sync(s);};
+function frame(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);view.update(dt,cam,sim.snapshot().tick);town.update(dt);back.update(dt);life.update(dt,H);corner.sync();orchard.update?.(dt,cam);last=now;renderer.render(scene,cam);}
+const sync=()=>{const s=sim.snapshot();view.sync(s);town.sync(s);back.sync(s);life.sync(s);};
 const load=(url,fn)=>new Promise((ok,bad)=>new GLTFLoader().load(url,gl=>ok(fn(gl)),undefined,bad));
-window.lab={sim,view,town,back,arena,
+window.lab={sim,view,town,back,life,arena,
+ // look from an exact eye point at a target (world x, y above ground, z), for townsfolk and street close-ups.
+ look:(eye,target)=>{cam.up.set(0,1,0);cam.position.set(eye[0],baseHeight(eye[0],eye[2])+eye[1],eye[2]);cam.lookAt(target[0],baseHeight(target[0],target[2])+target[1],target[2]);sync();frame();},
+ dusk:(n=.8)=>{life.setNight(n);sun.intensity=2.6*(1-n*.8);sun.color.set(n>.3?0xffa070:0xfff0d8);scene.background.set(n>.3?0x4a5878:0xa9c3d8);},
  loadKits:async()=>{const a=await load('/assets/bases_kit.glb',gl=>view.installKit(gl));const b=await load('/assets/town_kit.glb',gl=>town.installKit(gl));const d=await load('/assets/backtown_kit.glb',gl=>back.installKit(gl));
   const c=await load('/assets/keep_ballistas.glb',gl=>view.installKeepKit?.(gl)).catch(()=>false);sync();return [a,b,c,d];},
  // mode: 'top' straight down over the keep, 'aerial' from the lane, 'back' from behind over the pass, 'town' over the
