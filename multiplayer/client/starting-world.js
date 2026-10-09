@@ -14,7 +14,7 @@ export const STARTING_SITES = [
     goal: 'Gather moss-stone shards at the ring', footprints: [] },
   { id: 'outcrop', name: 'Crystal Outcrop', x: 24, z: -6, radius: 7, // moved off Grumblekeep's gate ballista 2026-10-09
     goal: 'Mine glowing crystal for the Forge', footprints: [] },
-  { id: 'watcharch', name: 'Ruined Watch-Arch', x: -5, z: -28, radius: 6.5,
+  { id: 'watcharch', name: 'Ruined Watch-Arch', x: -11, z: -1.5, radius: 6.5, // brought in from behind the Mug to beside the Forge 2026-10-09
     goal: 'Recover the bronze beacon', footprints: [] },
 ];
 
@@ -22,7 +22,7 @@ export const STARTING_SITES = [
 export const PATHS = [
   { id: 'to-sanctuary', width: 1.6, points: [[-5, 4], [-12, 7], [-18, 7.5]] },
   { id: 'to-outcrop', width: 1.6, points: [[5, 4], [11, 1.5], [16.7, -4.2]] },
-  { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
+  { id: 'to-watcharch', width: 1.6, points: [[-5, -1], [-8, 2.5], [-10.5, 4.5]] },
 ];
 
 const TRI_CAP = 64000; // ~15k code-built, ~45k with the landmark kit; the cap guards against runaway layouts
