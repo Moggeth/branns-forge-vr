@@ -5,7 +5,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {prepareAsset, updateWeaponPresentation} from '../client/asset-pose.js';
 import {createSiegebirdSight, SIEGEBIRD_PRESENTATION as P} from '../client/siegebird-sight.js';
 import {createSiegebirdFlock, siegebirdBirdPose, SIEGEBIRD_PLUMAGES} from '../client/siegebird-flock.js';
-import {SIEGEBIRD_RELOAD as R, siegebirdSide, siegebirdPlumage, siegebirdMechanism, siegebirdCues, SIEGEBIRD_WINCH} from '../client/siegebird-reload.js';
+import {SIEGEBIRD_RELOAD as R, siegebirdSide, siegebirdPlumage, siegebirdReliefPlumage, siegebirdMechanism, siegebirdCues, SIEGEBIRD_WINCH} from '../client/siegebird-reload.js';
 // Siegebird songbird reload presentation: alternation, plumage flock, timeline, off-frame entry, bolt hand-off,
 // clearance against the crossbow and sight, golden dressing and shared GPU resources.
 const begin = performance.now();
@@ -32,6 +32,13 @@ for (const id of ['p1', 'guest-7']) {
   for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i], seq[i - 1], 'never the same colour twice in a row');
 }
 assert.notDeepEqual(Array.from({length: 6}, (_, i) => siegebirdPlumage('p1', i + 1)), Array.from({length: 6}, (_, i) => siegebirdPlumage('p2', i + 1)));
+// Quick swap: the bird that takes over an abandoned reload never wears the colours of the bird it relieves.
+for (let base = 0; base < 6; base++) {
+  assert.equal(siegebirdReliefPlumage(base, 0), base, 'no swap, no change');
+  const chain = [base, ...Array.from({length: 5}, (_, k) => siegebirdReliefPlumage(base, k + 1))];
+  assert.deepEqual([...chain].sort(), [0, 1, 2, 3, 4, 5], 'five takeovers use the five other colours');
+  for (let k = 1; k < chain.length; k++) assert.notEqual(chain[k], chain[k - 1], 'takeover differs from the bird it relieves');
+}
 assert.equal(SIEGEBIRD_PLUMAGES.length, 6);
 
 // 2. Timeline: the string is latched before the bird seats the bolt, which happens before the shot is allowed.
