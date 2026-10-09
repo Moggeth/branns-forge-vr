@@ -54,6 +54,7 @@ import {createQuartermasterUI} from './client/quartermaster-ui.js';
 import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
+import './client/ui-polish.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -67,6 +68,11 @@ const hudHeaderObserver = new ResizeObserver(() => {
   syncFieldHudLayout();
 });
 hudHeaderObserver.observe(hudHeader);
+// Bottom HUD lane: anything that floats above the hotbar (the dragon call) sits on top of this stack, never over it.
+const hudBottom = document.querySelector('.hud-bottom');
+function syncBottomLane(){const top=hudBottom?.getBoundingClientRect().top;if(top>0)document.documentElement.style.setProperty('--hud-bottom-clear',`${Math.ceil(innerHeight-top)}px`);}
+const hudBottomObserver = hudBottom ? new ResizeObserver(syncBottomLane) : null;
+hudBottomObserver?.observe(hudBottom); addEventListener('resize', syncBottomLane);
 function syncFieldHudLayout(){const tools=$('heroTools');if(tools)$('hud').style.setProperty('--field-tools-bottom',`${Math.ceil(tools.getBoundingClientRect().bottom)}px`);}
 const fieldToolsObserver=new ResizeObserver(syncFieldHudLayout);fieldToolsObserver.observe($('heroTools'));
 const NAME_KEY = 'branns-forge.player-name';
@@ -960,6 +966,7 @@ const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySele
   onBuy:item=>command('action',{action:'homeShop',buy:item}),onSell:item=>command('action',{action:'homeShop',sell:item}),onDrink:()=>command('action',{action:'drinkDraught'}),
   onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{shopOpen=false;syncActive();}});
+if(/acceptanceProbe/.test(location.search))window.__qaUI={quartermaster,heroProgress,patchNotes:null};
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -1069,7 +1076,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) try {
 // Phones often skip beforeunload; pagehide is the last chance to tell the room we left.
 window.addEventListener('pagehide', () => { try { session?.dispose(); } catch { /* closing */ } });
 window.addEventListener('pageshow', event => { if (event.persisted && phase === 'game') location.reload(); });
-window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect();hudBottomObserver?.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({

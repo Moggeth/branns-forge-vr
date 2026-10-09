@@ -1,0 +1,173 @@
+/* UI polish pass (2026-10-09): one layer over the HUD, hotbar, shop, talents and menus so they share type, spacing,
+   framing and states. Loaded after every other stylesheet; it only restyles, never moves authority or input.
+   Bottom HUD lanes, desktop: [dragon call] above [look hint] above [hotbar] above [hint] above [supplies], each with
+   its own clear row. --hud-bottom-clear (lobby.js) is the measured height of that stack. */
+:root {
+  --ui-gold: #ffd98a; --ui-gold-hi: #fff0c4; --ui-brass: #c9a45c; --ui-ink: rgba(18, 14, 10, .84); --ui-ink-2: rgba(30, 23, 16, .9);
+  --ui-edge: rgba(214, 176, 104, .34); --ui-edge-hi: rgba(255, 214, 140, .7); --ui-text: #f6ead0; --ui-muted: #c2b08e;
+  --ui-good: #9fe4a6; --ui-warn: #ffb27a; --ui-radius: 14px; --ui-lane: 8px;
+  --ui-shadow: 0 6px 18px rgba(0, 0, 0, .38);
+}
+
+/* ================= bottom lanes ================= */
+body:not(.touch-controls-active) .hud-bottom { gap: var(--ui-lane); }
+body:not(.touch-controls-active) .hero-tools { row-gap: var(--ui-lane) !important; align-items: center; }
+/* Special and help sit centred on the hotbar frame, not hanging off its top edge. */
+body:not(.touch-controls-active) .hero-tools > .bf-special { align-self: center; }
+body:not(.touch-controls-active) .hero-tools > .bf-help { align-self: center; }
+body:not(.touch-controls-active) .hero-tools > .bf-help > summary {
+  color: var(--ui-muted); background: var(--ui-ink); border: 1px solid var(--ui-edge); box-shadow: var(--ui-shadow);
+}
+body:not(.touch-controls-active) .hero-tools > .bf-help > summary:hover { color: var(--ui-gold); border-color: var(--ui-edge-hi); }
+/* The weapon hint: one quiet caption under the hotbar, never touching the supplies strip. */
+.bf-sub .bf-hint {
+  padding: 4px 12px; border-radius: 999px; font: 600 12px/1.25 var(--sans, system-ui); letter-spacing: .01em;
+  color: var(--ui-text); background: var(--ui-ink); border: 1px solid rgba(214, 176, 104, .18);
+}
+.look-hint { padding: 7px 16px; border-radius: 999px; font-size: .88rem; font-weight: 600; border-color: var(--ui-edge); }
+
+/* Dragon call: its own lane above the whole bottom stack (it used to sit at a fixed height over the weapons). */
+body .dragon-hud:not(.is-touch) .dragon-call {
+  bottom: calc(var(--hud-bottom-clear, 150px) + 14px);
+  padding: 9px 16px 9px 12px; font-size: 15px; border-radius: 999px;
+}
+body .dragon-hud:not(.is-touch) .dragon-call svg { width: 26px; height: 26px; }
+/* Touch: same pill, thumb-sized but not a billboard; it stays above the move stick. */
+body .dragon-hud.is-touch .dragon-call { padding: 11px 16px 11px 12px; font-size: 15px; border-radius: 999px; gap: 8px; }
+body .dragon-hud.is-touch .dragon-call svg { width: 26px; height: 26px; }
+
+/* ================= supplies strip ================= */
+/* Only what you actually have (plus the three core materials). Thirteen zeros read as noise; phones already did this. */
+body:not(.touch-controls-active) .res-bar { gap: 6px; padding: 4px 12px; font-size: 13px; }
+body:not(.touch-controls-active) .rb-item { min-width: 0; padding: 2px 3px; }
+body:not(.touch-controls-active) .rb-ico { width: 22px; height: 22px; }
+body:not(.touch-controls-active) .rb-item[data-zero="true"]:not([data-core]) { display: none; }
+body:not(.touch-controls-active) .rb-group:not(:has(.rb-item:not([data-zero="true"]))):not(:first-child) { display: none; }
+.rb-item i { color: var(--ui-muted); }
+
+/* ================= header ================= */
+/* Share buttons do nothing in a solo world; hide them there instead of showing three dead chips. */
+.hud-room .btn-chip:disabled { display: none; }
+.room-chip { border-radius: 12px; }
+.hud-room .btn-chip { font-weight: 650; }
+
+/* ================= hotbar slots ================= */
+body:not(.touch-controls-active) .hero-tools > .bf-bar { border-color: var(--ui-edge); box-shadow: inset 0 1px 0 rgba(255, 225, 170, .12), var(--ui-shadow); }
+body:not(.touch-controls-active) .hero-tools .bf-chip kbd,
+body:not(.touch-controls-active) .hero-tools > .bf-special kbd,
+.bf-roleswitch kbd {
+  font: 700 9px/1 var(--sans, system-ui); padding: 2px 4px; border-radius: 5px; border-bottom-width: 1px;
+  color: var(--ui-gold-hi); background: rgba(10, 8, 6, .82); border-color: rgba(231, 194, 122, .45);
+}
+/* The selected weapon's name tag: brighter, with a small pointer so it reads as belonging to the slot. */
+body:not(.touch-controls-active) .hero-tools :is(.bf-chip, .bf-actions-drawer > summary, .bf-special) .bf-name {
+  font: 650 12px/1.2 var(--sans, system-ui); padding: 4px 10px; border-radius: 8px; color: var(--ui-text);
+  background: var(--ui-ink-2); border-color: var(--ui-edge-hi);
+}
+body:not(.touch-controls-active) .hero-tools :is(.bf-chip, .bf-actions-drawer > summary, .bf-special) .bf-name::after {
+  content: ""; position: absolute; left: 50%; top: 100%; width: 8px; height: 8px; transform: translate(-50%, -4px) rotate(45deg);
+  background: var(--ui-ink-2); border-right: 1px solid var(--ui-edge-hi); border-bottom: 1px solid var(--ui-edge-hi);
+}
+
+/* ================= shared dialog chrome (shop, talents, patch notes) ================= */
+.qm-dialog, .hp-dialog {
+  border-color: var(--ui-edge);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), 0 0 0 1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 230, 180, .1);
+}
+.qm-title, .hp-title { letter-spacing: .005em; }
+.qm-close, .hp-close { border-radius: 12px; }
+
+/* ================= Quartermaster ================= */
+.qm-scroll { gap: 18px; }
+.qm-scroll > :has(> .qm-shelf) { display: grid; gap: 26px; }
+.qm-shelf { gap: 12px; }
+.qm-shelf-title { padding-bottom: 6px; border-bottom: 1px solid rgba(214, 176, 104, .14); }
+.qm-shelf-title small { padding: 3px 7px; border-radius: 999px; background: rgba(255, 255, 255, .05); }
+.qm-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.qm-item {
+  grid-template-columns: 56px minmax(0, 1fr); column-gap: 12px; padding: 12px 12px 10px; border-radius: var(--ui-radius);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 210, .05);
+}
+.qm-art { width: 56px; height: 56px; border-radius: 14px; }
+/* Rarity reads on the picture frame and the card edge, like every shop players already know. */
+.qm-shelf[data-tier="common"] .qm-art { box-shadow: inset 0 0 0 1px rgba(236, 210, 154, .4), 0 2px 6px rgba(0, 0, 0, .35); }
+.qm-shelf[data-tier="rare"] .qm-art { box-shadow: inset 0 0 0 1.5px rgba(120, 186, 255, .7), 0 0 10px rgba(80, 150, 255, .25); }
+.qm-shelf[data-tier="epic"] .qm-art { box-shadow: inset 0 0 0 1.5px rgba(220, 160, 255, .75), 0 0 12px rgba(190, 110, 255, .3); }
+.qm-item-name { font-size: .98rem; }
+.qm-item-text { font-size: .8rem; color: #cdbd9c; }
+.qm-item-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(214, 176, 104, .12); }
+/* Can't afford yet: keep the card readable (you are deciding what to save for) and say how far off it is. */
+.qm-item[data-state="poor"] { opacity: 1; }
+.qm-item[data-state="poor"] .qm-art { filter: saturate(.75); }
+.qm-item[data-state="poor"] .qm-price { color: #d9c18a; }
+.qm-item[data-state="poor"] .qm-item-state { color: var(--ui-warn); letter-spacing: .06em; }
+.qm-item[data-state="full"] { opacity: .7; }
+.qm-item[data-state="owned"] { background: linear-gradient(180deg, rgba(140, 220, 150, .1), rgba(140, 220, 150, .02)); }
+.qm-item[data-state="owned"] .qm-item-state { color: var(--ui-good); }
+.qm-item[data-state="buy"] { border-color: rgba(255, 214, 140, .42); }
+.qm-item[data-state="buy"] .qm-item-state { box-shadow: 0 2px 8px rgba(255, 190, 90, .35); }
+/* The six pockets: soft wells that clearly say "empty" rather than a wall of dashed boxes. */
+.qm-slots { gap: 10px; }
+.qm-slot { min-height: 92px; border-radius: var(--ui-radius); border: 1px solid rgba(214, 176, 104, .16); background: radial-gradient(90% 80% at 50% 35%, rgba(0, 0, 0, .1), rgba(0, 0, 0, .32)); box-shadow: inset 0 2px 8px rgba(0, 0, 0, .45); }
+.qm-slot-empty { font: 700 .72rem/1 var(--sans, system-ui); letter-spacing: .12em; text-transform: uppercase; color: rgba(214, 176, 104, .38); }
+.qm-slot[data-filled] { box-shadow: inset 0 1px 0 rgba(255, 240, 210, .08), 0 2px 8px rgba(0, 0, 0, .3); }
+.qm-purse { box-shadow: inset 0 1px 0 rgba(255, 240, 200, .12); }
+
+/* ================= Talents ================= */
+.hp-grid { gap: 12px; }
+.hp-weapon { border-color: rgba(214, 176, 104, .2); border-radius: var(--ui-radius); }
+.hp-weapon-head h3 { font-family: var(--serif, Georgia, serif); }
+
+/* ================= world menu ================= */
+.menu-card h2 { letter-spacing: .005em; }
+
+/* ================= phones ================= */
+@media (max-width: 640px) {
+  .qm-item { grid-template-columns: 48px minmax(0, 1fr); }
+  .qm-art { width: 48px; height: 48px; }
+  .qm-slot { min-height: 76px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  /* Landscape phone: the shop header and pockets are compact so the shelves get the room. */
+  .qm-head { padding: 20px 16px 10px; }
+  .qm-lede { display: none; }
+  .qm-slots { margin-top: 8px; gap: 6px; }
+  .qm-slot { min-height: 58px; padding: 4px; }
+  .qm-slot .qm-art { width: 30px; height: 30px; }
+  .qm-slot-name { display: none; }
+  .qm-scroll { padding: 10px 16px 14px; gap: 16px; }
+}
+
+/* ================= phone vitals pill ================= */
+/* Heroes have no mana, and the Healing Draught chip used to sit on top of the HP numbers. Give the meters a real
+   minimum width and the chip its own slot at the end of the pill. */
+:root[data-mq] body.touch-controls-active[data-role="hero"] .hud-self .meter.mana { display: none !important; }
+:root[data-mq] body.touch-controls-active .hud-self:has(.qm-draught:not([hidden])) { width: auto !important; max-width: min(250px, 46vw) !important; }
+:root[data-mq] body.touch-controls-active .hud-self .meters { min-width: 112px !important; }
+:root[data-mq] body.touch-controls-active .hud-self .qm-draught {
+  position: static; flex: none; min-height: 28px; padding: 2px 8px 2px 5px; gap: 4px; font-size: 11px; margin-left: 2px; pointer-events: auto;
+}
+/* Phones: the floating Full screen button sat on top of the shop and Talents close buttons. */
+body:has(.qm-backdrop:not([hidden])) .mui-fullscreen-surface,
+body:has(.hp-backdrop:not([hidden])) .mui-fullscreen-surface { display: none !important; }
+
+/* ================= world menu: Play as cards ================= */
+/* The compact Hero / God cards squeezed the name into one letter per line ("He / ro"). Icon left, name over line. */
+#menu .roles-compact .role-body {
+  display: grid !important; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px;
+  align-items: center; text-align: left; padding: 12px 14px;
+}
+#menu .roles-compact .role-icon { grid-row: 1 / 3; }
+#menu .roles-compact .role-name { margin: 0 !important; white-space: nowrap; line-height: 1.1; }
+#menu .roles-compact .role-desc { line-height: 1.25; }
+/* A solo world has nothing to share: hide the dead invite buttons and "Share the code Solo — this device". */
+#menu .menu-section:has(#menuCopyCode:disabled) { display: none; }
+
+/* ================= God bar ================= */
+/* The Forge button read as faded text next to the Quick cast chip; give it the same chip frame. */
+#godHelp .bf-sub > [data-open-forge] {
+  min-height: 40px; padding: 6px 14px; border-radius: 12px; font-weight: 650; color: var(--ui-gold);
+  background: var(--ui-ink); border: 1px solid var(--ui-edge); box-shadow: var(--ui-shadow); opacity: 1;
+}
+#godHelp .bf-sub > [data-open-forge]:hover { border-color: var(--ui-edge-hi); color: var(--ui-gold-hi); }
+#godHelp .bf-sub .bf-hint { padding: 5px 12px; }
