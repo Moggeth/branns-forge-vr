@@ -128,7 +128,7 @@ const KEEP_FOLK = {
 const MUG_FOLK = [[-1, -3.25, 0, 'wipe', 'barkeep', .4], [.7, -1.85, Math.PI, 'drink', 'goblin'], [-1.9, -1.85, Math.PI, 'drink', 'folk'], [-3, 2.55, Math.PI, 'drink', 'smith'], [3, 2.55, Math.PI, 'chat', 'goblin2'], [3.4, 2.45, -2.3, 'chat', 'keeper']];
 // Props per site: [kind, local x, local z, local yaw].
 const KEEP_PROPS = {
-  tavern: [['barrel', -4.75, -2.2, 0], ['barrel', -4.7, -1.45, .6], ['crate', 4.75, -2.1, .2], ['sacks', 4.8, -1.1, 1.2], ['planter', -4.6, 3.35, 0], ['planter', 4.6, 3.35, 0], ['bench', -2.3, 4.3, Math.PI]],
+  tavern: [['barrel', -4.75, -2.2, 0], ['barrel', -4.7, -1.45, .6], ['crate', 4.75, -2.1, .2], ['sacks', 4.8, -1.1, 1.2], ['planter', -4.3, 3.35, 0], ['planter', 4.3, 3.35, 0], ['bench', -2.3, 4.3, Math.PI]],
   quartermaster: [['planter', -3.2, 1.75, 0], ['planter', 3.2, 1.75, 0], ['crate', 3.25, -1.0, .4], ['crate', 3.3, -1.0, .1, .7], ['barrel', -3.15, -1.05, 0], ['sacks', -3.2, .1, .3]],
   mill: [['sacks', 2.7, 2.6, .4], ['sacks', 3.2, 1.6, 2], ['crate', -3.1, 1.5, .3]],
   workshop: [['woodpile', -3.8, .8, Math.PI / 2], ['crate', 3.5, -1.6, .3], ['barrel', 3.5, -.8, 0]],
