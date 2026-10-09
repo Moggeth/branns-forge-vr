@@ -171,3 +171,13 @@ body:has(.hp-backdrop:not([hidden])) .mui-fullscreen-surface { display: none !im
 }
 #godHelp .bf-sub > [data-open-forge]:hover { border-color: var(--ui-edge-hi); color: var(--ui-gold-hi); }
 #godHelp .bf-sub .bf-hint { padding: 5px 12px; }
+
+/* ================= phone supplies strip ================= */
+/* It used to hide behind the weapon tray at the bottom centre. The top centre, between the vitals and the
+   Build / menu buttons, is free on phones; give it that lane. */
+@media (min-width: 700px) {
+  :root[data-mq] body.touch-controls-active .res-bar {
+    top: calc(env(safe-area-inset-top, 0px) + 10px) !important; bottom: auto !important;
+    max-width: calc(100vw - 520px) !important; overflow: hidden;
+  }
+}

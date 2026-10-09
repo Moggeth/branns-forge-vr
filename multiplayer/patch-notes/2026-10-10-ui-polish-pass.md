@@ -10,4 +10,4 @@ title: Tidier, clearer menus and hotbar
 - Fixed the Hero and God cards in the World menu squashing their names into "He / ro" and "Go / d".
 - The God's Forge button now looks like a button.
 - Phones: the Healing Draught chip no longer covers your health numbers, Heroes no longer see a mana row, and the Full screen button no longer covers the close button on the shop and Talents panels.
-- Phones: the dragon call button is a tidier size.
+- Phones: the supplies strip moved to the top of the screen instead of hiding behind the weapon buttons, and the dragon call button is a tidier size.
