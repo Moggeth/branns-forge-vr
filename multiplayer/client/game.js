@@ -294,7 +294,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
-  const beaconView=createBeaconView({scene,startingWorld,audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
+  const beaconView=createBeaconView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),night:()=>skyCycle.night(),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});

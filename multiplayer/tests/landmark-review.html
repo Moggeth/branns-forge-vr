@@ -28,7 +28,7 @@ if (!q.has('nokit')) { const {GLTFLoader} = await import('three/addons/loaders/G
 const {createWaygateView} = await import('../client/waygate-view.js');
 const gate = createWaygateView({scene, startingWorld: world, height: () => 0});
 const {createBeaconView} = await import('../client/beacon-view.js');
-const beacon = createBeaconView({scene, startingWorld: world});
+const beacon = createBeaconView({scene, startingWorld: world, night: () => night ? 1 : 0});
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .05, 200);
 const v = s => s.split(',').map(Number);
 // open: 0 shut, 1 open (the portal animates in over ~2 s of review time, stepped here at 30 fps).
