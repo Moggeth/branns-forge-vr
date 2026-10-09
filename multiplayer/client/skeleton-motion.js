@@ -199,7 +199,9 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     const lean = sig.torsoPitch + .07 * w + style * .12 * w + P.lean * w + g * .12 + strike * .1 - flinch * .42 - startle * .18 + crouchNotice * .12;
     turn(N.torso, 0, -lean);
     turn(N.torso, 1, sig.torsoYaw - .07 * (fwdR - fwdL) * .5 + (N.armR ? N.armR.side : -1) * (.38 * coil - .42 * strike));
-    turn(N.torso, 2, -sig.torsoRoll + .03 * Math.sin(phase * TAU) * w);
+    turn(N.torso, 2, -sig.torsoRoll + .03 * Math.sin(phase * TAU) * w + (env.lagR || 0) * .8);
+    turn(N.torso, 0, -(env.lagF || 0) * .9);                                                   // inertia: rocks back on a start, pitches on through a stop
+    turn(N.torso, 1, (env.lookYaw || 0) * .25 * (1 - Math.max(coil, strike)));
   }
   // ---- head and jaw: the head stays level against the stride, looks about at idle, tucks behind a raised shield
   if (N.head && !missing.head) {
@@ -207,12 +209,14 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
     turn(N.head, 1, sig.headYaw + .06 * (fwdR - fwdL) * .5 + sh * (.25 * flinch + .75 * look));   // looks to the empty shield hand
     turn(N.head, 0, sig.headPitch * -1 + .05 * w + g * .14 - coil * .08 + strike * .06 + Math.cos(phase * TAU * 2) * .025 * w * P.nod - flinch * .35 + look * .3);
     turn(N.head, 2, -sig.headRoll + P.headCock * (1 - w * .5));
+    const attend = 1 - Math.max(coil, strike) * .7;                                              // keeps the Hero in view, over its shoulder if need be
+    turn(N.head, 1, (env.lookYaw || 0) * .75 * attend); turn(N.head, 0, (env.lookPitch || 0) * .8 * attend + (env.lagF || 0) * .5);
     turn(N.head, 0, P.chin * (.4 + .6 * w) + (P.lean + style * .12) * .5 * w + startle * .3);       // eyes up the road, not at the feet
   }
   if (N.jaw && !missing.head) {
     const chatter = Math.max(0, Math.sin(t * 1.3 + tr.breathPhase) - .82) / .18;
     const clack = chatter * (.5 + .5 * Math.sin(t * 34)) * .16;
-    const gape = coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU) + flinch * .55 + startle * .7;
+    const gape = Math.max(0, -(env.lagF || 0)) * .9 + coil * .42 + strike * .22 + Math.abs(env.recoilValue) * .25 + .03 + .02 * Math.sin(t * tr.breathHz * TAU) + flinch * .55 + startle * .7;
     turn(N.jaw, 0, -(gape + clack));
   }
   // ---- arms
@@ -221,7 +225,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   if (shield && !missing.leftArm) {
     const s = shield.side;
     const relaxed = .06 + .12 * swing(s) * P.armSwing + Math.sin(t * tr.breathHz * TAU) * .015;
-    turn(shield, 0, mix(relaxed + sig.armSwingL, .62, g) - flinch * .75);                      // flinch: arm flung back where the shield burst
+    turn(shield, 0, mix(relaxed + sig.armSwingL + (env.lagF || 0) * 1.3, .62, g) - flinch * .75);                      // flinch: arm flung back where the shield burst
     turn(shield, 2, s * (mix(.1 + .03 * w + P.armOut * w, -.38, g) + flinch * .55 + startle * .5));
     turn(N.foreL, 0, mix((.32 + .08 * w) * P.elbow, 1.25, g) + flinch * .3);
     if (flinch > 0) turn(N.handL, 2, Math.sin(t * 31) * .5 * flinch * (1 - fl));               // shaking the sting out
@@ -238,7 +242,7 @@ export function poseSkeletonBody(st, env, offsetWorld, solveLeg) {
   }
   if (claw && !missing.rightArm) {
     const s = claw.side, ready = g * (1 - Math.max(coil, strike));
-    turn(claw, 0, .04 + .38 * swing(s) * P.armSwing + sig.armSwingR + sig.armR * .6 + ready * .45 + flinch * .5);
+    turn(claw, 0, .04 + (env.lagF || 0) * 1.3 * (1 - ready) + .38 * swing(s) * P.armSwing + sig.armSwingR + sig.armR * .6 + ready * .45 + flinch * .5);
     turn(claw, 2, s * (.08 + ready * .12 + flinch * .45 + P.armOut * w * (1 - ready) + startle * .55));
     turn(N.foreR, 0, (.28 + .18 * Math.max(0, swing(s)) * w) * P.elbow + ready * .9);
     // Claw swipe: cock the arm high and back beside the skull, then rake down and across the front.

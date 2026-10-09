@@ -403,6 +403,7 @@ export function applyEnemyMotion(entry, ctx) {
   attackEnvelope(tick - (data.attackTick ?? -1000), kind, envelope);
   sigIn.kind = kind; sigIn.tr = st.traits; sigIn.t = t; sigIn.moving = moving; sigIn.stride = st.stride; sigIn.walk = st.walk || 0; sigIn.gait = st.gait || 0;
   poseSignals(sigIn, sig);
+  secondaryMotion(st, kind, ctx, dt, teleport);
 
   visual.getWorldScale(_ws); const scale = _ws.y;
   if (kind === 'golem') applyGolem(st, ctx);
@@ -411,6 +412,39 @@ export function applyEnemyMotion(entry, ctx) {
   commit(st);
   st.init = true;
   return st;
+}
+
+// ---- Level 3 secondary motion: inertia and attention, shared by skeletons and golems.
+// A damped spring per channel (semi-implicit Euler, sub-stepped): the body lags a start, pitches on through a stop and
+// sways on a swerve; the head turns to keep a nearby Hero in view. Pure presentation, from the rendered root.
+function spring(s, target, dt, w, z) {
+  for (let n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n; n--;) { s.v += (w * w * (target - s.x) - 2 * z * w * s.v) * h; s.x += s.v * h; }
+  return s.x;
+}
+function secondaryMotion(st, kind, ctx, dt, teleport) {
+  const heavy = kind === 'golem', p = st.lastPos, dtc = Math.max(dt, 1e-3);
+  if (st.vpx === undefined || teleport) { st.vpx = p.x; st.vpz = p.z; st.vx = 0; st.vz = 0; }
+  const k = 1 - Math.exp(-dt / .06), ovx = st.vx, ovz = st.vz;
+  st.vx += ((p.x - st.vpx) / dtc - st.vx) * k; st.vz += ((p.z - st.vpz) / dtc - st.vz) * k; st.vpx = p.x; st.vpz = p.z;
+  const ax = (st.vx - ovx) / dtc, az = (st.vz - ovz) / dtc, aFwd = ax * aF.x + az * aF.z, aSide = ax * aR.x + az * aR.z;
+  // Inertial lean: minus the acceleration (a start rocks it back, a stop pitches it on), springy with a little overshoot.
+  const gain = heavy ? .012 : .022;
+  st.lagF = spring(st.lagFs ||= {x: 0, v: 0}, -clamp(aFwd, -14, 14) * gain, dt, heavy ? 6 : 10, heavy ? .5 : .32);
+  st.lagR = spring(st.lagRs ||= {x: 0, v: 0}, -clamp(aSide, -14, 14) * gain, dt, heavy ? 6 : 10, heavy ? .5 : .32);
+  // Attention: the nearest Hero within reach of its interest, held a little late and never past the neck's comfort.
+  let yaw = 0, pitch = 0, best = heavy ? 11 : 9;
+  for (const h of ctx.threats || []) {
+    const dx = h[0] - p.x, dz = h[2] - p.z, d = Math.hypot(dx, dz);
+    if (d < best && d > .3) { best = d; const f = dx * aF.x + dz * aF.z, r = dx * aR.x + dz * aR.z; yaw = -Math.atan2(r, f); pitch = Math.atan2((h[1] ?? p.y) + 1.5 - (p.y + (heavy ? 2.4 : 1.55)), d); }
+  }
+  const want = Math.abs(yaw) < 2.2 ? 1 : 0, lim = heavy ? .7 : 1.05;
+  st.lookYaw = spring(st.lookYs ||= {x: 0, v: 0}, clamp(yaw, -lim, lim) * want, dt, heavy ? 3.5 : 7, heavy ? .9 : .7);
+  st.lookPitch = spring(st.lookPs ||= {x: 0, v: 0}, clamp(pitch, -.45, .35) * want, dt, heavy ? 3.5 : 7, .8);
+  if (heavy) {
+    sig.bodyPitch += st.lagF * .55; sig.bodyRoll -= st.lagR * .35;
+    sig.armSwingL -= st.lagF * 1.1; sig.armSwingR -= st.lagF * 1.1;
+    sig.headYaw += st.lookYaw * (1 - envelope.coil); sig.headPitch += st.lookPitch * .6;
+  }
 }
 
 function applyHead(N) {
@@ -490,7 +524,7 @@ function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
   const both = !missingSig.leftLeg && !missingSig.rightLeg;
   // Hops lift the whole body, feet and all: a Bloomcaller's skip on each stance, and the startle on noticing a Hero.
   const hopLift = both ? (P?.hop || 0) * w * .05 * sc * Math.pow(.5 - .5 * Math.cos(ph * Math.PI * 4), 3) + (notice >= 0 && notice < .3 ? .09 * sc * Math.sin(Math.PI * notice / .3) : 0) : 0;
-  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t, dt, teleport, aR, aU, aF, rootQ, notice, hopLift, moveR: st.moveR ?? 0, moveF: st.moveF ?? 1, strideK: st.strideK ?? 1,
+  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t, dt, teleport, aR, aU, aF, rootQ, notice, hopLift, lagF: st.lagF || 0, lagR: st.lagR || 0, lookYaw: st.lookYaw || 0, lookPitch: st.lookPitch || 0, moveR: st.moveR ?? 0, moveF: st.moveF ?? 1, strideK: st.strideK ?? 1,
     rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits,
     kind: gaitKind(st.visual, data) % FORGELING_GAIT, shieldBroken: !!data.shieldBroken,
     flinch: Number.isFinite(data.flinchTick) && tick >= data.flinchTick && tick - data.flinchTick < FLINCH_SHOW ? (tick - data.flinchTick) / FLINCH_SHOW : -1});

@@ -16,14 +16,14 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // Pace personality per warband archetype (shared/skeleton-kinds.js order): Thornhood scurry, Old Bones dawdle.
 const SKELETON_PACE=[1,.96,1.08,.88,1.04,1];
-const AVOID_AHEAD=1.7,TURN_RATE=.1;
+const AVOID_AHEAD=1.7,TURN_RATE=.15;
 const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
  const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
  const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
- const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e)}));
+ const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e),yaw:e.yaw,side:e.side}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
  const blocked=(a,b)=>{const n=Math.ceil(flat(a,b)/.18);for(let i=1;i<n;i++){const t=i/n,p=a.map((v,k)=>v+(b[k]-v)*t);p[1]+=1.05;const q=[...p];resolve(q,0,.04);if(flat(p,q)>.003||ground(p[0],p[2])>p[1])return true;}return false;};
  for(const e of [...state.enemies]){
@@ -60,7 +60,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
     let ox=e.position[0]-other.position[0],oz=e.position[2]-other.position[2],d=Math.hypot(ox,oz);const gap=self+other.radius+.18;
     // Look ahead: a body in the path is passed on one side (each pair agrees which), so a crowd flows round itself
     // instead of shoving. Someone already walking the same way is followed, not dodged.
-    if(best>1.5&&d>gap&&d<AVOID_AHEAD){
+    if(best>1.5&&d>gap&&d<AVOID_AHEAD&&other.id!==target.id&&other.side===e.side){ // dodge friends only: a foe in the way is a fight
      const ahead=-(ox*sx+oz*sz),lat=-(ox*-sz+oz*sx),width=gap+.25;
      if(ahead>0&&Math.abs(lat)<width){
       const same=Math.max(0,-Math.sin(other.yaw)*sx-Math.cos(other.yaw)*sz),side=Math.abs(lat)>.04?-Math.sign(lat):e.id<other.id?1:-1;
@@ -83,13 +83,13 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
     }
     if(chosen){
      // Walkers face where they are going and ease off while turning hard, so feet and body agree (no moonwalking).
-     const facing=-Math.sin(e.yaw)*chosen[0]-Math.cos(e.yaw)*chosen[1],pace=Math.min(length,speed+1)/60*clamp(.3+.7*facing,.3,1);
+     const facing=-Math.sin(e.yaw)*chosen[0]-Math.cos(e.yaw)*chosen[1],pace=Math.min(length,speed+1)/60*clamp(.6+.4*facing,.6,1);
      if(best>1.5)heading=Math.atan2(-chosen[0],-chosen[1]);
      [e.position[0],e.position[2]]=clampToWorld(e.position[0]+chosen[0]*pace,e.position[2]+chosen[1]*pace);
     }
    }
    // Turn rate eases into small corrections (no twitching) and caps big ones (a weighty pivot, not a snap).
-   const turn=wrap(heading-e.yaw);e.yaw=wrap(e.yaw+clamp(turn*.25,-TURN_RATE,TURN_RATE));
+   const turn=wrap(heading-e.yaw);e.yaw=wrap(e.yaw+clamp(turn*.35,-TURN_RATE,TURN_RATE));
   }
   // Keep all bodies outside the player's camera, including overlapping summons.
   for(const h of heroes){const d=flat(e.position,h.position);if(d<1&&Math.abs(e.position[1]-h.position[1])<2.5){const x=d>.001?(e.position[0]-h.position[0])/d:1,z=d>.001?(e.position[2]-h.position[2])/d:0;[e.position[0],e.position[2]]=clampToWorld(h.position[0]+x,h.position[2]+z);}}

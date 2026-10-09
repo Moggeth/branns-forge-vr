@@ -1779,7 +1779,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     enemyThreats.length=0;for(const p of snapshot.players||[])if(p.role==='hero'&&p.position)enemyThreats.push(p.id===playerId?localPosition.toArray(threatPoint):p.position);
     updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround,threats:enemyThreats});
     golemFx.update(actors,renderTick,dt,now/1000);
-    entView.update(actors,renderTick,dt);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
+    entView.update(actors,renderTick,dt,enemyThreats);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
     goldenFlight.length=0;for(const q of snapshot.projectiles||[])if(q.golden){const node=combat.projectiles.get(q.id);if(node?.visible!==false)goldenFlight.push({id:q.id,position:node?node.position:new THREE.Vector3().fromArray(q.position)});}
     skeletonFx.update(dt,{camera,golden:goldenFlight,viewportHeight:renderer.domElement.height||800});
