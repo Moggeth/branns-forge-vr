@@ -105,12 +105,12 @@ test('held bone permits direct lumber collection', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -1.8])], detachedParts: [{id: 'd1', heldBy: 'p1'}]});
   assert.equal(decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx()).action, 'Collect');
 });
-test('nearby pickups: Collect / Eat / full', () => {
+test('nearby pickups: Collect / Pick up / full', () => {
   const st = snap({pickups: [{id: 'q1', kind: 'stone', x: 1, z: 0, y: 0, amount: 2}]});
   const c = decideCue(view(), hero(), st, null, ctx());
   assert.deepEqual([c.name, c.action, c.control], ['Stone ×2', 'Collect', 'E']);
   assert.equal(decideCue(view(), hero({resources: {stone: 998}}), st, null, ctx()).action, 'Pack full');
-  assert.equal(decideCue(view(), hero(), snap({pickups: [{id: 'a', kind: 'apple', x: 0, z: 1, y: 0, amount: 1}]}), null, ctx()).action, 'Eat');
+  assert.equal(decideCue(view(), hero(), snap({pickups: [{id: 'a', kind: 'apple', x: 0, z: 1, y: 0, amount: 1}]}), null, ctx()).action, 'Pick up');
   assert.equal(decideCue(view(), hero(), snap({pickups: [{id: 'q1', kind: 'stone', x: 3, z: 0, y: 0, amount: 2}]}), null, ctx()), null);
 });
 test('forge Deliver only in range with accepted carried kinds', () => {

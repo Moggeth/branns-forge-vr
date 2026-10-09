@@ -292,6 +292,16 @@ export function snackAction(state, p, m) {
  if (op === 'drop') { releaseSnack(state, p, m.toss === true); return {ok: true, events: [{kind: 'snack_drop', id: d.id, by: p.id, position: [...d.position]}]}; }
  return {ok: false, code: 'invalid_action', events: []};
 }
+/** A loose apple lying on the ground (a `pickups` entry of kind 'apple': God gifts, starting apples) is taken into the hand
+ *  like any other drop, a bare apple with no shaft, and eaten in three bites. Returns null when it can't become a drop. */
+export function takeGroundApple(state, ctx, p, q) {
+ if (p?.role !== 'hero' || q?.kind !== 'apple') return null;
+ if (heldDrop(state, p) || handsFull(state, p)) return {ok: false, code: 'hands_full', events: []};
+ const r = .08, d = spawnDrop(state, ctx, {stick: 'none', position: [q.x, q.y + r, q.z], velocity: [0, 0, 0], dir: [0, 1, 0], radius: r}); if (!d) return null;
+ d.heldBy = p.id; d.mode = 'held'; d.biteTick = state.tick - FRUIT.biteTicks + 20;
+ state.pickups.splice(state.pickups.indexOf(q), 1);
+ return {ok: true, events: [{kind: 'snack_take', id: d.id, by: p.id, stick: 'none', ground: q.id, position: [...d.position]}]};
+}
 /** Put the held snack down (tool change, death, role change, leaving): it falls from the hand. */
 export function releaseSnack(state, p, toss = false) {
  const d = state.fruit?.drops?.find(q => q.heldBy === p.id); if (!d) return false;

@@ -104,6 +104,23 @@ check('it can be eaten at full health, put down, and other heroes cannot take it
  const after = sim3.checkpoint().fruit.drops[0]; assert.equal(after.heldBy, null, 'changing tools puts it down'); assert.equal(after.bites, 1, 'bites are kept');
 });
 
+check('an apple lying on the ground is picked up at full health and eaten in three bites', () => {
+ const base = createSimulation({seed: 41}); base.addPlayer({id: 'h'}); const s = base.checkpoint(), p = s.players[0];
+ const q = s.pickups.find(q => q.kind === 'apple'); assert.ok(q, 'the starting world has ground apples');
+ p.position = [q.x + .8, terrainHeight(s, q.x + .8, q.z), q.z]; p.tool = 'bow'; const sim = loadSimulation(s); seq = 0;
+ const s0 = state(sim), full = s0.players[0].hp, c = nearestCollectible(s0, s0.players[0]);
+ assert.equal(c?.id, q.id, 'offered even at full health'); assert.equal(c.unnecessary, false);
+ const r = act(sim, 'collectTarget', {targetId: q.id}); assert.equal(r.ok, true); assert.equal(r.events[0].kind, 'snack_take');
+ let t = state(sim); assert.ok(!t.pickups.some(x => x.id === q.id), 'the ground apple is gone');
+ const d = t.fruit.drops.find(x => x.heldBy === 'h'); assert.ok(d, 'and is in the hand'); assert.equal(d.stick, 'none'); assert.equal(t.players[0].hp, full);
+ step(sim, FRUIT.biteTicks); const bites = [];
+ for (let i = 0; i < 3; i++) { const b = act(sim, 'snack', {op: 'bite'}); assert.equal(b.ok, true, `bite ${i + 1}`); bites.push(...b.events); step(sim, FRUIT.biteTicks); }
+ assert.ok(bites.some(e => e.kind === 'snack_done')); assert.equal(state(sim).fruit.drops.length, 0);
+ const hurt = state(sim); hurt.players[0].hp = 40; const q2 = hurt.pickups.find(x => x.kind === 'apple'); hurt.players[0].position = [q2.x + .5, terrainHeight(hurt, q2.x + .5, q2.z), q2.z];
+ const sim2 = loadSimulation(hurt); { const r2 = sim2.command('h', {type: 'action', seq: 9000, action: 'collectTarget', targetId: q2.id}); assert.equal(r2.ok, true, r2.code); }
+ assert.equal(sim2.checkpoint().players[0].hp, 40, 'no instant heal: the bites heal');
+});
+
 check('saves round-trip falling, resting and held drops; legacy saves start with no fruit', () => {
  const {sim, apple, origin} = scene(0); act(sim, 'fire', {origin, direction: aim(origin, apple.position), draw: 1}); step(sim, 12);
  const s = state(sim); assert.equal(s.fruit.drops[0].mode, 'air');
