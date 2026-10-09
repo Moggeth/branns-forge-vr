@@ -2335,3 +2335,7 @@ Changing visible home-base light counts invalidated 67 shaders after the lobby w
 
 ### Startup black viewport (2026-10-07)
 A queued RAF can predate async warm-up completion. Clamp frame dt on both sides before exponential easing; otherwise base bolts can grow to 1e25 and poison HDR bloom. See [cause, deterministic regression and investigation lessons](STARTUP-BLACK-VIEWPORT-20261007.md). Match Vite diagnostic routes by pathname and assert hook installation.
+
+### Mobile startup and sustained rendering (2026-10-08)
+
+See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.

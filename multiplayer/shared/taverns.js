@@ -3,15 +3,19 @@
 // door, and heroes slowly mend. The barkeep pours a Hearty Ale (full health, then 20% less damage for three minutes).
 // Voice is encouraged inside (insideTavern() is the hook the voice chat can read).
 // Pure simulation rules: fixed ticks, no clocks or randomness.
-import {HOME_SITES, NEUTRAL_TAVERN, homeBattle, homePiece, neutralTavern, pieceLocal, pieceWorld} from './home-bases.js';
+import {HOME_SITES, NEUTRAL_TAVERN, TAVERN_SCALE, homeBattle, homePiece, neutralTavern, pieceLocal, pieceWorld} from './home-bases.js';
 import {heroMaxHp} from './hero-progress.js';
 
+const at = (x, z) => Object.freeze([x * TAVERN_SCALE, z * TAVERN_SCALE]);
+const zone = (min, max) => Object.freeze({min: at(...min), max: at(...max)});
 export const TAVERN = Object.freeze({
+  // Drawn and walled at TAVERN_SCALE times the kit (shared/home-bases.js); everything below is already scaled.
+  scale: TAVERN_SCALE,
   // The safe zone in each tavern's own frame: the hall plus its front porch.
-  keepZone: Object.freeze({min: [-4.2, -3.3], max: [4.2, 4.6]}),
-  neutralZone: Object.freeze({min: [-5.7, -4.3], max: [5.7, 5.8]}),
+  keepZone: zone([-4.2, -3.3], [4.2, 4.6]),
+  neutralZone: zone([-5.7, -4.3], [5.7, 5.8]),
   regenEvery: 20, regenHp: 1, // 3 health a second
-  bar: Object.freeze({keep: Object.freeze([0, -1.75]), neutral: Object.freeze([0, -2.55])}), barReach: 2.2,
+  bar: Object.freeze({keep: at(0, -1.75), neutral: at(0, -2.55)}), barReach: 2.6,
   aleTicks: 180 * 60, aleArmor: .2,
 });
 export const TAVERN_NAMES = Object.freeze({party: 'The Gilded Anvil', rivals: 'The Rattling Tankard', neutral: 'The Muddled Mug'});
@@ -26,9 +30,9 @@ const inZone = (t, [x, , z]) => { const [u, v] = pieceLocal(t.placed, [x, z]); r
 /** The tavern a point stands in, or null. Only while the home bases run. */
 export function insideTavern(state, position) {
   if (!homeBattle(state) || !Array.isArray(position)) return null;
-  // Cheap reject: every tavern sits within 26 m of a keep centre or 9 m of the shared tavern.
+  // Cheap reject: every tavern sits within 26 m of a keep centre or 10 m (scaled) of the shared tavern.
   const near = Object.values(HOME_SITES).some(([a, b]) => Math.abs(position[0] - a) < 26 && Math.abs(position[2] - b) < 26)
-    || Math.hypot(position[0] - NEUTRAL_TAVERN.at[0], position[2] - NEUTRAL_TAVERN.at[1]) < 10;
+    || Math.hypot(position[0] - NEUTRAL_TAVERN.at[0], position[2] - NEUTRAL_TAVERN.at[1]) < 10 * TAVERN_SCALE;
   if (!near) return null;
   for (const t of taverns(state)) if (inZone(t, position)) return t;
   return null;

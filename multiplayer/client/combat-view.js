@@ -15,7 +15,7 @@ import {createPhoenixFlareView, dressFlareArrow} from './phoenix-flare-view.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
-const forward = new THREE.Vector3(0, 0, -1);
+const forward = new THREE.Vector3(0, 0, -1), spinSide = new THREE.Vector3(1, 0, 0), tumble = new THREE.Quaternion();
 const geometryRecords = new WeakMap();
 const sharedTriangleRecords = new WeakMap();
 const hashId = id => [...String(id)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
@@ -464,7 +464,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     for (const data of next.projectiles || []) {
       let node = projectiles.get(data.id);
-      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; projectiles.set(data.id, node); scene.add(node); }
+      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; if (data.cluster) node.userData.emberdewRoot?.scale.setScalar(1.6); projectiles.set(data.id, node); scene.add(node); } // Cinder Cluster's jug: a big bottle
       // A fresh snapshot replaces the prediction; the visible gap closes over ~60 ms instead of popping.
       const rendered = node.userData.flight ? node.position.clone() : null;
       node.position.fromArray(data.position);
@@ -561,6 +561,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         flight.offset.multiplyScalar(Math.exp(-dt / .06));
         node.position.copy(flightPoint).add(flight.offset);
         if (flightVelocity.lengthSq() > 1e-6) node.quaternion.setFromUnitVectors(forward, flightPoint.copy(flightVelocity).normalize());
+        // A thrown Emberdew tumbles end over end (Cinder Cluster's big jug turns slower); its dew floats and sloshes.
+        if (data.kind === 'fuel') { const age = (flight.tick - data.bornTick) / 60 + flight.age; node.quaternion.multiply(tumble.setFromAxisAngle(spinSide, -age * (data.cluster ? 5 : 9))); }
         if (node.userData.wings) updatePhoenixWings(node, data, (flight.tick - data.bornTick) / 60 + flight.age);
       } else {
         flight.age = Math.min(.05, flight.age + dt);
@@ -603,7 +605,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       for (let i = 1; i < path.length; i++) {
         const from = path[i - 1], to = path[i];
         if (from.every((n, axis) => n === to[axis])) continue;
-        const hits = segmentContacts(from, to, {excludeId: data.ownerId}), world = worldContact(from, to);
+        const hits = segmentContacts(from, to, {excludeId: data.ownerId}), found = worldContact(from, to);
+        const world = found;
         if (world) hits.push({...world, distance: world.distance ?? new THREE.Vector3().fromArray(from).distanceTo(new THREE.Vector3().fromArray(world.point))});
         hits.sort((a, b) => a.distance - b.distance);
         if (data.golden || data.skewer) {

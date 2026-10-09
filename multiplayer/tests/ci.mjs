@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
+  'mobile-render-budget','rigid-weapon-batch',
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','frame-inbox','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'proximity-voice','voice-recovery','voice-topology','voice-zones','ice-servers','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
@@ -15,7 +16,7 @@ const suite = [
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
-  'expedition-presentation.test','fire','wyrmspout','wyrmspout-tank','weapon-inspect','fire-authored-samples','fire-performance',
+  'expedition-presentation.test','fire','wyrmspout','wyrmspout-tank','weapon-inspect','emberdew','fire-authored-samples','fire-performance',
   'fire-spatial-phoenix','fire-warmup','forest-resource-integration','forge-protection','foundation-tiles',
   'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
   'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',

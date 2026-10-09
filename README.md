@@ -1,3 +1,5 @@
+Mobile startup and adaptive rendering: [implementation, measurements and real-device limits](docs/MOBILE-RESPONSIVENESS-20261008.md).
+
 Camera black-flash containment: [GPU findings and regression](docs/CAMERA-BLACK-FLASH-20261007.md).
 
 Room invitations: [QR sharing](docs/ROOM-QR.md).
