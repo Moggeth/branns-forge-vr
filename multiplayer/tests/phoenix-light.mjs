@@ -25,6 +25,11 @@ assert.equal(count(), 1, 'still exactly one light');
 const near = new T.Vector3(1, 2, 0), far = new T.Vector3(30, 2, 0);
 step(30, [[far, 1], [near, 1]]);
 assert.ok(view.light.position.distanceTo(near) < .2, 'nearest phoenix wins');
+// A bird beside the camera loses to one further off that the player is actually looking at.
+const beside = new T.Vector3(3, 2, 0), ahead = new T.Vector3(0, 2, -8);
+camera.lookAt(0, 2, -10); camera.updateMatrixWorld();
+step(10, [[beside, 1], [ahead, 1]]);
+assert.ok(view.light.position.distanceTo(ahead) < .2, 'the bird in view wins over one off screen');
 
 // A hit flashes at the wound, brighter than the bird.
 view.flash([10, 1, 10]);
