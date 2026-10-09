@@ -13,6 +13,7 @@ import {predictArrow, createPhoenixContrails} from './phoenix-flight.js';
 import {carryPose} from '../shared/phoenix-carry.js';
 import {createPhoenixFlareView, dressFlareArrow} from './phoenix-flare-view.js';
 import {createPhoenixIgniteView} from './phoenix-ignite-view.js';
+import {createPhoenixLight} from './phoenix-light.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
@@ -287,7 +288,7 @@ function capsuleContact(from, to, base, height, radius) {
   }
   return best;
 }
-export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party'}) {
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party', night = () => 0}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
   const creatures = createCreatureLifeDeath({scene, height});
@@ -296,6 +297,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
   const contrails = createPhoenixContrails();
   const flares = createPhoenixFlareView({scene, templates, height});
   const ignites = createPhoenixIgniteView({scene});
+  const phoenixLight = createPhoenixLight({scene, night, camera});
   scene.add(fractures.object, streaks.object, contrails.object);
   const flightPoint = new THREE.Vector3(), flightVelocity = new THREE.Vector3(), wingTip = new THREE.Vector3();
   let wingTips = null; // [left, right] wing-tip points in each wing node's own frame, measured once from the mesh
@@ -341,6 +343,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     group.updateWorldMatrix(false, true);
     // Frantic wing tips would scribble at carrying speed; one soft ember wisp streams from the tail instead.
     contrails.emit(`carry:${rig.group.id}`, u.arrow.localToWorld(wingTip.set(0, 0, .78)), .9 * (u.fade ?? 1));
+    phoenixLight.offer(group.position, .7 * (u.fade ?? 1));
   }
   function updateCarries(dt, tick) {
     const live = new Set();
@@ -398,6 +401,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     node.updateWorldMatrix(false, true);
     for (let i = 0; i < 2; i++) if (nodes[i]) contrails.emit(`${data.id}:${i}`, nodes[i].localToWorld(wingTip.copy(wingTips[i])), fade);
+    phoenixLight.offer(node.position, fade);
   }
   const embedPoint = new THREE.Vector3(), embedTravel = new THREE.Vector3(), embedQuaternion = new THREE.Quaternion();
   const streakFallback = new THREE.Vector3();
@@ -586,6 +590,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     updateCarries(dt, renderTick);
     flares.update(dt);
     ignites.update(dt);
+    phoenixLight.update(dt);
     contrails.update(dt, camera);
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
     if (camera) fractures.update(camera);
@@ -718,7 +723,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     damageNumbers.dispose();
     creatures.dispose();
     fractures.dispose();
-    streaks.dispose(); contrails.dispose(); flares.dispose(); ignites.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
+    streaks.dispose(); contrails.dispose(); flares.dispose(); ignites.dispose(); phoenixLight.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
     fractureAnchors.clear();
     for (const [id] of embeds) remove(embeds, id);
     for (const [id] of projectiles) remove(projectiles, id);
@@ -726,7 +731,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
   return {sync, prepareActors, tick, fireSamples, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
-    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails, contrailMotes: contrails.stats().motes, flares: flares.stats().flares, ignites: ignites.stats().ignites}),
+    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails, contrailMotes: contrails.stats().motes, flares: flares.stats().flares, ignites: ignites.stats().ignites, phoenixLight: phoenixLight.stats()}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),
     heldLimbRoot: holderId => {
@@ -740,7 +745,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       if ((event?.kind === 'hit' || event?.kind === 'headshot') && creatureActor(actor)) creatures.hit(actor, event);
       if (event?.kind === 'death' && (creatureActor(actor) || ['skeleton', 'golem'].includes(event.creature))) creatures.death(actor, event);
       if (event?.kind === 'phoenix_flare' && Array.isArray(event.position)) flares.burst(event);
-      if (event?.kind === 'phoenix_ignite' && Array.isArray(event.position)) ignites.burst(event);
+      if (event?.kind === 'phoenix_ignite' && Array.isArray(event.position)) { ignites.burst(event); phoenixLight.flash(event.position); }
     },
     damageNumberStats: () => damageNumbers.stats()};
 }

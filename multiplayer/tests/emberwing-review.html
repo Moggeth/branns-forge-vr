@@ -21,8 +21,11 @@ renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace; ren
 renderer.setSize(innerWidth, innerHeight, false);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9c3d6); scene.fog = new THREE.Fog(0xa9c3d6, 30, 90);
 const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
-scene.add(new THREE.HemisphereLight(0xdfeeff, 0x5a6b3a, 1.1));
-const sun = new THREE.DirectionalLight(0xfff0d8, 2.2); sun.position.set(8, 14, 6); scene.add(sun);
+// ?night=1 drops the scene into moonlit dark so the phoenix's own light shows; ?nolight=1 blacks that light out (the before).
+const night = q.get('night') === '1', noLight = q.get('nolight') === '1';
+scene.add(new THREE.HemisphereLight(night ? 0x5a6f9e : 0xdfeeff, night ? 0x10140e : 0x5a6b3a, night ? .22 : 1.1));
+const sun = new THREE.DirectionalLight(night ? 0x8ea4d8 : 0xfff0d8, night ? .25 : 2.2); sun.position.set(8, 14, 6); scene.add(sun);
+if (night) { scene.background = new THREE.Color(0x0b1020); scene.fog = new THREE.Fog(0x0b1020, 18, 70); scene.environmentIntensity = .08; }
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .05, 200);
 const loader = new GLTFLoader(), templates = new Map();
 await Promise.all(['arrow', 'wings', 'skeleton'].map(name => loader.loadAsync(`/assets/${name}.glb`).then(g => templates.set(name, g))));
@@ -35,6 +38,15 @@ const ground = new THREE.PlaneGeometry(120, 120, 120, 120); ground.rotateX(-Math
 const gp = ground.attributes.position; for (let i = 0; i < gp.count; i++) gp.setY(i, H(gp.getX(i), gp.getZ(i)));
 ground.computeVertexNormals();
 scene.add(new THREE.Mesh(ground, new THREE.MeshStandardMaterial({color: 0x5f7a3a, roughness: .95})));
+if (night) {
+  // A few stand-ins along the flight path, a hut, posts and rocks, for the light to find in the dark.
+  const stone = new THREE.MeshStandardMaterial({color: 0x9a8f7c, roughness: .9}), wood = new THREE.MeshStandardMaterial({color: 0x7a5434, roughness: .85});
+  const put = (mesh, x, z, y = 0) => { mesh.position.set(x, H(x, z) + y, z); scene.add(mesh); return mesh; };
+  put(new THREE.Mesh(new THREE.BoxGeometry(2.4, 2, 2.2), stone), -3.4, -9, 1);
+  put(new THREE.Mesh(new THREE.ConeGeometry(2, 1.3, 4), wood), -3.4, -9, 2.6).rotation.y = Math.PI / 4;
+  for (const [x, z] of [[2.4, -4], [-1.8, -3], [2.8, -11], [1.2, -16], [-2, -14]]) put(new THREE.Mesh(new THREE.CylinderGeometry(.14, .18, 1.8, 8), wood), x, z, .9);
+  for (const [x, z, r] of [[1.6, -7, .5], [-1.2, -6, .4], [3.6, -8, .6], [-4.5, -4, .7]]) put(new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), stone), x, z, r * .5);
+}
 
 let sim, view, actors = new Map(), tick = 0, frame = 0;
 const enemyVisual = new Map();
@@ -56,7 +68,8 @@ function setup() {
   const enemyAt = sceneName === 'carry' ? [0, 0, -2] : sceneName === 'flare' ? [1.5, 0, -15] : [0, 0, -6];
   c.enemies = [createEnemy('enemy', [enemyAt[0], H(enemyAt[0], enemyAt[2]), enemyAt[2]], 'skeleton')];
   sim = loadSimulation(c);
-  view = createCombatView({scene, templates, actors, camera, height: H});
+  view = createCombatView({scene, templates, actors, camera, height: H, night: () => night ? 1 : 0});
+  if (noLight) scene.getObjectByName('PhoenixLight')?.color.set(0);
   syncActors(sim.snapshot()); view.sync(sim.snapshot());
   tick = sim.snapshot().tick;
 }
