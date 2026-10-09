@@ -864,7 +864,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // Wins (raids, rewards, crafting, building, loot) answer with light, chimes and rumble; presentation only.
   const rewards=createRewardMoments({scene,camera,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,sources:()=>controllerSources.values(),presenting:()=>renderer.xr.isPresenting,context:()=>{const p=snapshot.players?.find(p=>p.id===playerId);return {playerId,side:p?.side||'party',position:p?.position};}});
   // Siegebird: one shared songbird flock for every crossbow (local and remote); the local reload's cues drive audio and rumble.
-  let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity};
+  let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity,relief:{n:0,k:0}};
   function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding,ground:(x,z)=>heightAt(x,z,snapshot.edits)});}return siegebirdFlock;}
   // Reload birds linger: perches on standing trees near where the bird leaves the crossbow, ahead of its flight first.
   let siegebirdTreeCache=null,siegebirdTreeSnapshot=null;const siegebirdViewer=new THREE.Vector3();
@@ -934,15 +934,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   // Swapping away mid-reload: the bird turns off with the bolt and drops it (siegebird-flock.js stow). Coming back
   // replays the delivery from the bird's entry, and the shot waits for the bolt to seat. Unchanged without a swap.
+  // A bird already in view when you swapped is relieved by a differently coloured one (siegebirdReliefPlumage).
   function stowSiegebird(){
-    const reload=siegebirdWind.time();if(reload<SIEGEBIRD_RELOAD.seat)siegebirdLocal.stowed={t:Math.max(0,reload),n:siegebirdLocal.n};
+    const reload=siegebirdWind.time(),r=siegebirdLocal.relief;if(reload<SIEGEBIRD_RELOAD.seat)siegebirdLocal.stowed={t:Math.max(0,reload),n:siegebirdLocal.n,relief:(r.n===siegebirdLocal.n?r.k:0)+(reload>=SIEGEBIRD_RELOAD.enter?1:0)};
     siegebirdFlock?.stow(axeModel);
   }
   function resumeSiegebird(){
     const s=siegebirdLocal.stowed;siegebirdLocal.stowed=null;if(!s)return;
     const t0=Math.min(s.t,SIEGEBIRD_RELOAD.enter),sb=snapshot.players.find(p=>p.id===playerId)?.siegebird;
-    siegebirdWind.resume(t0);siegebirdLocal.prevT=t0;
-    const flock=siegebirdFlockReady();if(flock&&axeModel)flock.shot(axeModel,{n:s.n,golden:sb&&sb.n===s.n?!!sb.golden:null,playerId,time:performance.now()/1000-t0});
+    siegebirdWind.resume(t0);siegebirdLocal.prevT=t0;siegebirdLocal.relief={n:s.n,k:s.relief};
+    const flock=siegebirdFlockReady();if(flock&&axeModel)flock.shot(axeModel,{n:s.n,golden:sb&&sb.n===s.n?!!sb.golden:null,playerId,time:performance.now()/1000-t0,relief:s.relief});
   }
   function updateSiegebirdLocal(now,reload){
     const flock=siegebirdFlockReady();if(!flock||!axeModel)return;
