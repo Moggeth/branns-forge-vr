@@ -215,7 +215,8 @@ function walk(w,target,ctx){
 }
 function workerReach(w,target,ctx){
  const d=flat(w.position,target.position),end=target.type==='log'||target.type==='pickup'?target.position[1]+.2:ctx.ground(target.position[0],target.position[2])+.8;
- for(let at=.25;at<d-.65;at+=.2){const t=at/Math.max(d,.001),p=[w.position[0]+(target.position[0]-w.position[0])*t,w.position[1]+1+(end-w.position[1]-1)*t,w.position[2]+(target.position[2]-w.position[2])*t],before=[...p];ctx.resolve(p,.02,.05);if(flat(p,before)>.03||ctx.ground(p[0],p[2])>p[1])return false;}
+ const stop=target.type==='ore'?1.1:.65; // the rock itself is solid now: stop the reach check at its face
+ for(let at=.25;at<d-stop;at+=.2){const t=at/Math.max(d,.001),p=[w.position[0]+(target.position[0]-w.position[0])*t,w.position[1]+1+(end-w.position[1]-1)*t,w.position[2]+(target.position[2]-w.position[2])*t],before=[...p];ctx.resolve(p,.02,.05);if(flat(p,before)>.03||ctx.ground(p[0],p[2])>p[1])return false;}
  return true;
 }
 export function stepSettlement(state,ctx,events,recent=[]){

@@ -11,3 +11,5 @@ title: The towns come alive
 - The Crystal Outcrop has moved a little south, out of Grumblekeep's front yard. It no longer pokes through one of the keep's gate ballistas, and its path from the Forge and its waygate stop moved with it.
 - Two mithril seams that sat in the feet of the keep ballistas now start a few steps clear of them.
 - Tidied a few crates, planters and benches so they no longer poke into the back town's walls.
+- Rocks are solid now. Skeletons, golems, Ents and Forge workers walk around ore rocks, boulders and meteors instead of straight through them, and so do you. Mined-out rocks stop blocking.
+- The two meteors that had come to rest in Grumblekeep's lane now sit beside the Crystal Outcrop, and the sanctuary's boulder no longer leans into a standing stone.

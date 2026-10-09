@@ -35,6 +35,7 @@ import {createWaygateView} from './waygate-view.js';
 import {createGeodeView} from './geode-view.js';
 import {createBeaconView} from './beacon-view.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
+import {resolveDeposits} from '../shared/colliders.js';
 import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
 import {SPELLS,settleCastPoint} from '../shared/spells.js';
@@ -1655,7 +1656,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       localPosition.addScaledVector(correction, amount);
       correction.multiplyScalar(1 - amount);
       localPosition.y = Math.max(localPosition.y, groundY);
-      localPosition.fromArray(resolveForge(localPosition.toArray(),forgeY));localPosition.fromArray(resolveInventions(snapshot,localPosition.toArray()));if(snapshot.landmarks)localPosition.fromArray(resolveStartingWorld(localPosition.toArray(),(x,z)=>heightAt(x,z,snapshot.edits)));
+      localPosition.fromArray(resolveForge(localPosition.toArray(),forgeY));localPosition.fromArray(resolveInventions(snapshot,localPosition.toArray()));if(snapshot.landmarks)localPosition.fromArray(resolveStartingWorld(localPosition.toArray(),(x,z)=>heightAt(x,z,snapshot.edits)));localPosition.fromArray(resolveDeposits(snapshot,localPosition.toArray(),.28,(x,z)=>heightAt(x,z,snapshot.edits)));
       {const held=localPosition.toArray();if(stormLeash(snapshot,me,held))localPosition.fromArray(held);} // the cable holds against corrections too
     }
     if (manned) updateManned(dt, now);

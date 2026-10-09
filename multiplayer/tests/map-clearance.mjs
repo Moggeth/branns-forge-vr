@@ -8,7 +8,8 @@ import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, homePiece, homePoint, neutralTaver
 import {BACK_TOWN, BACK_TOWN_LANTERNS, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES} from '../shared/starting-world.js';
-import {baseTrees, initialDeposits} from '../shared/world-content.js';
+import {baseTrees} from '../shared/world-content.js';
+import {createSimulation} from '../shared/simulation.js';
 import {baseHeight} from '../shared/terrain.js';
 import {townLifeLayout} from '../client/town-life.js';
 
@@ -37,7 +38,7 @@ for (const side of ['party', 'rivals']) {
 solids('mug', 'tavern', neutralTavern(), TOWN_SOLIDS.neutralTavern);
 for (const s of STARTING_SITES) s.footprints.forEach((f, i) => add(`site-${s.id}`, `${f.kind}-${i}`, f.x, f.z, Math.hypot(f.w, f.d) / 2, {box: [f.rotY, f.w / 2, f.d / 2], sign: 1}));
 baseTrees.forEach(([x, z], i) => add('trees', `tree-${i}`, x, z, .8));
-initialDeposits().forEach(d => add('deposits', `${d.kind}-${d.id}`, d.x, d.z, 1.3, {cliff: true}));
+createSimulation({seed: 3}).adventureWorld().deposits.forEach(d => add('deposits', `${d.kind}-${d.id}`, d.x, d.z, 1.3, {cliff: true}));
 const L = townLifeLayout();
 L.props.forEach((p, i) => add('town-life', `${p.kind}-${i}`, p.x, p.z, p.kind === 'bench' ? .7 : .45, {decor: true}));
 L.posts.forEach((p, i) => add('town-life', `post-${i}`, p.x, p.z, .25, {decor: true, cliff: true}));

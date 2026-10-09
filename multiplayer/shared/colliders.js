@@ -19,6 +19,20 @@ export const DEPOSIT_SHAPES=Object.freeze({
  meteor:Object.freeze({base:1.05,top:.7,height:1.5}),   // meteor.glb at 1.5 m
 });
 export const depositShape=d=>DEPOSIT_SHAPES[d.kind]||DEPOSIT_SHAPES.ore;
+/** Walkers (heroes, skeletons, golems, ents, workers) stop at ore rocks, boulders, crystals and meteors instead of
+ * walking through them: push a ground point out of every standing deposit's footprint (its base, a touch inside the
+ * drawn silhouette so you can still walk right up to it and swing). Something above a rock's top passes over it. */
+export function resolveDeposits(state,position,radius=.3,height=null){
+ for(const d of state.deposits||[]){
+  if(d.depleted||d.special)continue; // spell-raised seams ride their own terrain edit (a crystal wall is already solid ground)
+  const shape=depositShape(d),min=shape.base*.92+radius,dx=position[0]-d.x,dz=position[2]-d.z;
+  if(Math.abs(dx)>=min||Math.abs(dz)>=min)continue;
+  const dist=Math.hypot(dx,dz);if(dist>=min)continue;
+  if(height&&position[1]>height(d.x,d.z)+shape.height-.15)continue;
+  if(dist>1e-4){position[0]=d.x+dx/dist*min;position[2]=d.z+dz/dist*min;}else position[0]=d.x+min;
+ }
+ return position;
+}
 // Structures: drawn half-width and height (invention-art.js / timberline_ballista.glb). The forge uses its authored boxes.
 export const STRUCTURE_SHAPES=Object.freeze({
  timberline:{radius:1,height:1.5}, trap:{radius:.9,height:.25}, prospector:{radius:1.25,height:1.4},
