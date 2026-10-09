@@ -2,7 +2,7 @@
 // round the heart, with a narrow pass leading back to a walled back town in the corner (past the old map edge). Nothing overlaps, every building stands on level
 // ground, the ground under the ring is flat, and the town is reachable only up the pass.
 import assert from 'node:assert/strict';
-import {HOME_LAYOUT as L, HOME_SITES, homePoint} from '../shared/home-bases.js';
+import {HOME_LAYOUT as L, HOME_SITES, TAVERN_SCALE, homePiece, homePoint, pieceWorld} from '../shared/home-bases.js';
 import {KEEP_CARVE, WORLD_EXTENT, backTownPiece, keepCarve, onKeepGround} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS, STORES, WORKSHOP, backTownSpot, resolveBackTowns} from '../shared/home-workshop.js';
 import {baseHeight, moveOnTerrain} from '../shared/terrain.js';
@@ -11,7 +11,7 @@ const liveState = {battle: {v: 2, status: 'running'}};
 let count = 0;
 const test = (name, fn) => { fn(); count++; console.log('PASS', name); };
 // [name, base-local centre, footprint radius] for everything that stands in the keep.
-const items = [['heart', [0, 0], 4.3], ['barracks', L.barracks, 4.5], ['fountain', L.fountain, 2.6], ['tavern', L.tavern.at, 4.5],
+const items = [['heart', [0, 0], 4.3], ['barracks', L.barracks, 4.5], ['fountain', L.fountain, 2.6], ['tavern', L.tavern.at, 4.5 * TAVERN_SCALE],
   ['mill', L.mill.at, 3.2], ['quartermaster', L.quartermaster.at, 2.8], ['gate', L.gate, 2],
   ...L.pylons.map((p, i) => [`pylon${i}`, p, 1.2]), ...L.spires.map((p, i) => [`spire${i}`, p, 1.5]),
   ...L.ballistas.map((p, i) => [`ballista${i}`, p, 1.6]), ...L.wards.map((p, i) => [`ward${i}`, p, .6])];
@@ -34,8 +34,12 @@ test('the town buildings stand on a half ring behind the heart', () => {
 test('every piece stands on level ground inside the carved bowl, in both keeps', () => {
   for (const side of ['party', 'rivals']) for (const [name, p, r] of items) {
     const [x, z] = homePoint(side, p); let lo = Infinity, hi = -Infinity;
-    for (let a = 0; a < 12; a++) { const h = baseHeight(x + Math.cos(a) * r, z + Math.sin(a) * r); lo = Math.min(lo, h); hi = Math.max(hi, h); }
-    const flat = Math.hypot(...p) + r < KEEP_CARVE.bowl ? .1 : .3; // the gate ballistas stand out on the rolling meadow
+    // The tavern is a long hall (its circle overstates it): sample its real floor, walls to porch, instead.
+    const hall = name === 'tavern' && homePiece(side, 'tavern'), k = TAVERN_SCALE;
+    const ring = hall ? [...Array(48)].map((_, i) => pieceWorld(hall, [(i % 8 / 7 - .5) * 8.5 * k, (Math.floor(i / 8) / 5 * 6.95 - 3.25) * k]))
+      : [...Array(12)].map((_, a) => [x + Math.cos(a) * r, z + Math.sin(a) * r]);
+    for (const [px, pz] of ring) { const h = baseHeight(px, pz); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+    const flat = hall || Math.hypot(...p) + r < KEEP_CARVE.bowl ? .1 : .3; // the gate ballistas stand out on the rolling meadow
     assert.ok(hi - lo < flat, `${side} ${name} ground varies ${(hi - lo).toFixed(2)} m`);
     assert.ok(Math.max(Math.abs(x), Math.abs(z)) < 55, `${side} ${name} inside the map`);
   }

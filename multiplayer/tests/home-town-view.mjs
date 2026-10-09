@@ -26,7 +26,7 @@ test('town kit carries every piece and the anchors the rules stand players at', 
   for (const pre of ['D', 'G']) {
     for (const piece of ['Tavern', 'Quartermaster', 'Mill', 'MillSails', 'MillCrank']) assert.ok(byName.has(`${pre}_${piece}`), `${pre}_${piece}`);
     const bar = child(byName.get(`${pre}_Tavern`), `${pre}_Tavern_Bar`).translation;
-    near(bar[0], TAVERN.bar.keep[0], .1, 'keep bar x'); near(bar[2], TAVERN.bar.keep[1], .1, 'keep bar z');
+    near(bar[0] * TAVERN.scale, TAVERN.bar.keep[0], .13, 'keep bar x'); near(bar[2] * TAVERN.scale, TAVERN.bar.keep[1], .13, 'keep bar z'); // the view draws taverns TAVERN.scale times the kit
     const counter = child(byName.get(`${pre}_Quartermaster`), `${pre}_Quartermaster_Counter`).translation;
     near(counter[2], SHOP.counter[1], .3, 'counter front'); near(counter[0], SHOP.counter[0], .1, 'counter x');
     const mill = byName.get(`${pre}_Mill`);
@@ -37,7 +37,7 @@ test('town kit carries every piece and the anchors the rules stand players at', 
     assert.ok(child(mill, `${pre}_Mill_Hub`), 'mill hub');
   }
   const n = byName.get('N_Tavern'); assert.ok(n, 'N_Tavern');
-  const bar = child(n, 'N_Tavern_Bar').translation; near(bar[2], TAVERN.bar.neutral[1], .1, 'neutral bar z');
+  const bar = child(n, 'N_Tavern_Bar').translation; near(bar[2] * TAVERN.scale, TAVERN.bar.neutral[1], .13, 'neutral bar z');
 });
 
 function world() {
@@ -50,7 +50,8 @@ test('the view lays out three taverns, two stalls and two mills at the rules’ 
   const scene = new THREE.Scene(), view = createHomeTownView({scene});
   view.sync(w); assert.equal(view.stats().pieces, 7); assert.equal(view.stats().kit, false);
   const mill = view.object.getObjectByName('mill-party'), placed = homePiece('party', 'mill');
-  near(mill.position.x, placed.x, 1e-6, 'mill x'); near(mill.position.z, placed.z, 1e-6, 'mill z'); near(mill.rotation.y, placed.yaw, 1e-6, 'mill yaw');
+  near(mill.position.x, placed.x, 1e-6, 'mill x'); near(mill.position.z, placed.z, 1e-6, 'mill z'); near(mill.rotation.y, placed.yaw, 1e-6, 'mill yaw'); assert.equal(mill.scale.x, 1);
+  for (const id of ['tavern-party', 'tavern-rivals', 'tavern-neutral']) near(view.object.getObjectByName(id).scale.x, TAVERN.scale, 1e-9, `${id} drawn roomier`);
   const mug = view.object.getObjectByName('tavern-neutral'), n = neutralTavern(); near(mug.position.x, n.x, 1e-6, 'mug x');
   view.sync({...w, battle: {...w.battle, status: 'off'}}); assert.equal(view.object.visible, false);
   view.dispose();
