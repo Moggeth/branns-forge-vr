@@ -1,3 +1,7 @@
+import {warmRender} from './warm-render.js';
+import {batchRigidWeapon} from './rigid-weapon-batch.js';
+import {createRenderBudget,renderSize} from './render-budget.js';
+import {yieldToBrowser,createAssetQueue,prepareAssetTextures} from './startup-work.js';
 import './atmosphere-materials.js'; // installs the shared mist/wet/snow material layer before anything compiles
 import {mergeCreatureSkins} from './merge-creature-skins.js';
 import {dressForgeling,dressForgelingModel,prepareForgelingTemplate} from './forgeling-look.js';
@@ -135,14 +139,18 @@ import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
 let currentTerrainBake;
 export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
 
-export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, voiceActivity = null, onNotice = () => {} }) {
+function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, voiceActivity = null, onNotice = () => {}, construction = [] }) {
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'grove', playerId = null;
   let requestedActive=false;
-  const startup={ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
+  const startup={construction,ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
   // Non-authoritative lobby preview only: never stepped, published or saved.
   // Real room/save snapshots replace it through applySnapshot below.
   let snapshot = createSimulation({room:'PREVIEW',seed:41}).snapshot();
+  yield;
+  const mobileBudget=!!globalThis.matchMedia?.('(pointer: coarse)').matches;
+  let graphicsMode='auto';try{graphicsMode=localStorage.getItem('branns-forge.graphics')||'auto';}catch{}
+  const renderBudget=createRenderBudget({mobile:mobileBudget,dpr:globalThis.devicePixelRatio||1,mode:graphicsMode});
   const frameMetrics=createFrameMetrics();
   const terrainSampler=createTerrainSampler(snapshot);
   const heightAt=(x,z,edits=snapshot.edits)=>edits===snapshot.edits?terrainSampler.height(x,z):terrainHeight(x,z,edits,snapshot.tick??Infinity);
@@ -163,6 +171,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const hotbarSlots=equipment.filter(t=>t!=='limb');
   const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Digit0:'awaken',Minus:'wildwake',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
+  const remoteBatches=new Map();
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
   let heldReadiness = null, failedReadinessRoot = null;
@@ -190,14 +199,16 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   scene.background = new THREE.Color(0xabc5c2);
   scene.fog = new THREE.Fog(0xabc5c2, 58, 125);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+  // Keep CSS/UI resolution independent from the adaptive 3D drawing buffer.
+  renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.localClippingEnabled = true;
+  yield;
   const pmrem = new THREE.PMREMGenerator(renderer);
   const roomEnvironment = new RoomEnvironment();
-  const environment = pmrem.fromScene(roomEnvironment, .04);
+  const environment = pmrem.fromScene(roomEnvironment, .04, .1, 100, {size:mobileBudget?128:256});
   scene.environment = environment.texture;
   scene.environmentIntensity = .55;
   roomEnvironment.dispose(); pmrem.dispose();
@@ -217,6 +228,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const sun = new THREE.DirectionalLight(0xffe3ad, 2.2);
   sun.position.set(-22, 38, 15);
   scene.add(sun);
+  yield;
   const groundGeometry = new THREE.PlaneGeometry(120, 120, 160, 160);
   groundGeometry.rotateX(-Math.PI / 2);
   const terrainGeometry=createTerrainGeometryUpdater(groundGeometry);
@@ -227,11 +239,13 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const orchard = createOrchardPresentation({scene, renderer, ground, sun, camera, height: (x, z) => heightAt(x, z, snapshot.edits),
     baseHeight: (x,z) => heightAt(x,z,[]), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
   // Living meadow (grass, wildflowers, pollen) over the same authoritative surface; presentation only.
+  yield;
   const meadow = createMeadowCover({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
   // Mountain-foot ore veins glint so they can be spotted from across the Orchard (shared/ore-veins.js).
   const oreGlint = createOreGlint({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits)});
   // Layered distant alpine ranges replace the low orchard silhouette backdrop.
   const skyline = createAlpineSkyline({scene, sky: orchard.objects.sky}); orchard.objects.backdrop.visible = false;
+  yield;
   const skyCycle = createDayNightWeather({scene, orchard, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
   let orchardContentKey = '', stepDistance = 0;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
@@ -275,6 +289,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const controllerSources = new Map();
   // Haptics only for local contacts/releases/damage, on the hand that actually holds the weapon (by handedness).
   let weaponHand = null;
+  yield;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
   const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
@@ -343,6 +358,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     removers.push(() => target.removeEventListener(type, handler, options));
   }
   function report(message) { if (!disposed) onStatus(message); }
+  yield;
   const content = createWorldContent({scene,templates,instantiate,height:heightAt,camera});
   // Stonewhisper wall: hold Special (Q / right mouse / touch Special / VR trigger) to see the exact footprint, release to raise it.
   const wallPreview=createWallPreview({THREE,scene,height:(x,z)=>heightAt(x,z)});let wallAim=null,wallAudio=null;
@@ -350,6 +366,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const emberwingMotion=createEmberwingMotion({reducedMotion:reducedWeaponMotion});let bowLayer=null,bowLayerShown=false;
   const pickupHighlight=createPickupHighlight({scene});
   applyMountainGroundTreatment(orchard.material);
+  yield;
   const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const alpineForest=createAlpineForest({scene,arena:mountainArena,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high'});
   const cornerGround=createKeepCornerGround({scene,ground,height:(x,z)=>heightAt(x,z,snapshot.edits)}); // the keeps' back towns past the old map edge
@@ -391,6 +408,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   const stumplingView=createStumplingView({scene,templates,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
     onSound:event=>{if(event.kind==='stump_chirp'||event.kind==='stump_squeak')stumpChirp(event);else woodAudio?.play(event,listenerPose());},
     stumpOf:treeId=>{const cut=(snapshot.harvestedTrees||[]).find(h=>h.id===treeId),tree=cut&&worldTrees(snapshot).find(t=>t.id===treeId);return tree?{height:cutLocalHeight(tree,cut,heightAt(tree.x,tree.z,snapshot.edits))}:null;}});
+  yield;
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const wyrmStream=createWyrmspoutStream({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   // Wyrmspout rumble: controller pulses in VR, short buzzes on phones (phone may be null for a pulse phones skip).
@@ -452,6 +470,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   }
   const rangedReticle=createRangedReticle(),trajectoryGuide=createTrajectoryGuide();scene.add(trajectoryGuide.object);let nextGuideAt=0,guideHitTick=null;const GUIDE_NO_HIT=[-1,-1],guideTiming={lastMs:0,maxMs:0,updates:0};
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
+  yield;
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   // Level-ups and weapon-talent effects (client/talent-fx.js): the column rides the hero's presented position.
@@ -529,10 +548,17 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       report(automatic?'Browser requires a gesture to restore the mouse. Click once to resume; Escape keeps it free.':`Mouse capture failed: ${error.message || 'browser permission denied'}. Click the canvas again; Esc releases it.`);
     }
   }
+  let canvasWidth=1,canvasHeight=1;
+  function resizeBuffer() {
+    const size=renderSize(canvasWidth,canvasHeight,renderBudget.ratio());
+    if(canvas.width!==size.width||canvas.height!==size.height){renderer.setSize(size.width,size.height,false);startup.resizes=(startup.resizes||0)+1;}
+  }
   function resize() {
     if (disposed || renderer.xr.isPresenting) return;
     const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight);
-    renderer.setSize(width, height, false);
+    canvasWidth=width;canvasHeight=height;resizeBuffer();
+    if(camera.aspect===width/height)return;
+    renderBudget.reset();
     camera.aspect = width / height;
     weaponAnchor.position.x = 0.33 * Math.min(1, camera.aspect / 0.9);
     camera.updateProjectionMatrix();
@@ -593,7 +619,11 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   // in the WeaponGrip socket with the local XR contract. null while loading; hero-view retries and never disposes templates.
   function remoteWeapon(name) {
     if (!templates.has(name)) return null;
-    const visual = instantiate(name, WEAPON_HEIGHTS[name]);
+    let visual;
+    if(['axe','pick','hammer'].includes(name)){
+      let batch=remoteBatches.get(name);if(!batch){batch=batchRigidWeapon(templates.get(name));remoteBatches.set(name,batch);}
+      visual=prepareAsset(batch.gltf,name,WEAPON_HEIGHTS[name]).visual;
+    }else visual=instantiate(name, WEAPON_HEIGHTS[name]);
     if (visual && name === 'flask') { const m = visual.children[0].children[0]; m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1); } // template root is the live local flask
     return visual;
   }
@@ -733,14 +763,25 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       scene.remove(warning.group); disposeResources(warning.group); warnings.delete(id);
     }
   }
-  const loader = new GLTFLoader(),assetInstalls=[];
+  const loader = new GLTFLoader(),assetInstalls=[],secondaryInstalls=[];
+  const assetQueue=createAssetQueue({concurrency:mobileBudget?2:4});
+  // Decorative ground cover, the optional launcher and VR pouch
+  // must not hold the playable world hostage to their download/decoding time.
+  const secondaryAssets=new Set(['heavy_launcher','waist_pouch','grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']);
   const loadAsset=loader.load.bind(loader);
   // Include async installation, not only downloads: clones add material variants.
   loader.load=(url,install,progress,failed)=>{
-    const pending=new Promise(resolve=>loadAsset(url,async gltf=>{
-      try{await install(gltf);}catch(error){startup.error=String(error.message||error);report(`Asset preparation: ${startup.error}`);}finally{resolve();}
-    },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}}));
-    assetInstalls.push(pending);return pending;
+    const name=url.split('/').pop().replace('.glb',''),essential=!secondaryAssets.has(name);
+    const pending=assetQueue.add(()=>disposed?Promise.resolve():new Promise(resolve=>loadAsset(url,async gltf=>{
+      try{
+        if(disposed){disposeResources(gltf.scene);return;}
+        const held=['axe','pick','hammer','crossbow','bow','wyrmspout','stormreel'].includes(name);
+        startup.textureCount+=await prepareAssetTextures(gltf.scene,{renderer,maxSize:mobileBudget?(held?2048:1024):Infinity,upload:false,stats:startup,cancelled:()=>disposed});
+        if(disposed){disposeResources(gltf.scene);return;}
+        await install(gltf);
+      }catch(error){startup.error=String(error.message||error);report(`Asset preparation: ${startup.error}`);}finally{resolve();}
+    },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}})),essential);
+    (essential?assetInstalls:secondaryInstalls).push(pending);return pending;
   };
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}
@@ -1585,7 +1626,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     // competes with downloads and the welcome screen without drawing a frame.
     if (!startup.ready) { previous=now; return; }
     const frameStarted=performance.now();
-    if(startup.ready)frameMetrics.record('frameInterval',now-previous);
+    const intervalMs=now-previous;
+    if(startup.ready)frameMetrics.record('frameInterval',intervalMs);
     // A queued RAF timestamp can precede the warm-up completion timestamp.
     // Negative dt makes exponential easing explode (notably ballista bolt scale).
     const dt = Math.max(0, Math.min((now - previous) / 1000, 0.05));
@@ -1768,6 +1810,7 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvas.clientHeight);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
+    if(!renderer.xr.isPresenting){renderBudget.ratio(dt);resizeBuffer();}
     skyCycle.render(scene, camera);
     if (onVoicePose && playerId) {
       // After render, WebXR's viewer camera includes this frame's head pose.
@@ -1778,7 +1821,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       earVector.set(0,1,0).applyQuaternion(earCamera.getWorldQuaternion(earQuaternion));
       onVoicePose({position, forward, up:earVector.toArray()});
     }
-    frameMetrics.record('frameCpu',performance.now()-frameStarted);
+    const frameCpu=performance.now()-frameStarted;
+    frameMetrics.record('frameCpu',frameCpu);
+    renderBudget.sample(now,intervalMs,frameCpu,active&&!document.hidden&&!renderer.xr.isPresenting);
   }
   function disposeResources(root) {
     const geometries = new Set(), materials = new Set(), textures = new Set();
@@ -1795,7 +1840,9 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
   void (async()=>{
     const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup,abilityWarmup,wallWarmup;
     try{
+      assetQueue.start();
       await Promise.all(assetInstalls);if(disposed)return;
+      await yieldToBrowser();
       // Build the default render-only world before compiling, even in the empty
       // lobby. Do not initialize a player or step/publish this preview state.
       content.sync(snapshot);syncWorldSignals();syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
@@ -1804,17 +1851,22 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       for(const [i,name] of ['axe','pick','hammer','crossbow','bow','wyrmspout','flask'].entries()){
         const data={id:`warm-hero-${i}`,role:'hero',tool:name,hp:100},visual=heroView.create(data,{variant:i%2?'mosswarden':'emberwright'});
         if(visual){const root=new THREE.Group();root.position.set(i*2-6,0,0);root.add(visual);representatives.add(root);heroView.update(visual,data,root,1/60,camera.position);warmHeroes.push(visual);}
+        await yieldToBrowser();if(disposed)return;
       }
       for(let i=0;i<6;i++){const visual=instantiate('skeleton',1.7,i);if(visual){visual.position.set(i*2-5,0,-3);representatives.add(visual);}}
       // Allied waves use a distinct stone/brass rig, not the skeleton material set.
       // Compile that exact template before the first populated snapshot reaches the renderer.
       for(let i=0;i<3;i++){const visual=instantiate('forgeling',1.81,i);if(visual){dressForgelingModel(visual,i);visual.position.set(i*2,0,-5);representatives.add(visual);}}
       const sanctuary=createInventionModel('sanctuary');sanctuary.position.set(0,0,-6);representatives.add(sanctuary);
+      await yieldToBrowser();if(disposed)return;
       treeWarmup=content.trees.prepareWarmup();representatives.add(treeWarmup.group);startup.treeHarvestWarmup=treeWarmup.stats;
-      miningWarmup=content.prepareMiningWarmup();representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
+      await yieldToBrowser();if(disposed)return;
+      miningWarmup=await content.prepareMiningWarmupAsync(()=>disposed);if(disposed)return;representatives.add(miningWarmup.group);startup.miningWarmup=miningWarmup.stats;
+      await yieldToBrowser();if(disposed)return;
       abilityWarmup=createAbilityWarmup(THREE,scene);representatives.add(abilityWarmup.group);startup.abilityWarmup=abilityWarmup.stats;
       wallWarmup=content.crystalWall.prepareWarmup();representatives.add(wallWarmup.group);
       scene.add(representatives);scene.updateMatrixWorld(true);
+      skyCycle.prepare(scene);
       startup.phase='shaders';report('Preparing world shaders and textures…');
       await spellVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
       await fireVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
@@ -1822,17 +1874,20 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       await renderer.compileAsync(scene,camera);if(disposed)return;
       const textures=new Set();scene.traverse(object=>{for(const material of [object.material,object.customDepthMaterial,object.customDistanceMaterial].flat())if(material)for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);});
       // Small upload batches let the loading interface update between them.
-      for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;if(startup.textureCount%8===0)await new Promise(resolve=>setTimeout(resolve,0));}
+      for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;await yieldToBrowser();}
       if(disposed)return;
+      await skyCycle.prepareRenderer(scene,camera);if(disposed)return;
       startup.phase='shadows';
       // compileAsync omits the shadow render pass. Warm both camera families once.
       const warmCamera=camera.clone();warmCamera.position.set(0,48,38);warmCamera.lookAt(0,0,0);
-      const warmStarted=performance.now();skyCycle.render(scene,camera);skyCycle.render(scene,warmCamera);startup.warmDrawMs=performance.now()-warmStarted;
+      const warmStarted=performance.now();startup.warmBatches=await warmRender({renderer,scene,camera:warmCamera,cancelled:()=>disposed});if(disposed)return;await yieldToBrowser();skyCycle.render(scene,camera);startup.warmDrawMs=performance.now()-warmStarted;
       await renderer.compileAsync(scene,camera);if(disposed)return;
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
     finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
     if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
     report(`World renderer ready (${Math.round(startup.readyMs)} ms).`);
+    assetQueue.background();
+    void Promise.all(secondaryInstalls).then(()=>{startup.secondaryReady=true;startup.completeMs=performance.now()-started;});
   })();
   // Read-only presentation evidence for browser QA (no input, state or credentials).
   Object.defineProperty(canvas, 'brannDiagnostics', {configurable: true, value: () => disposed ? null : api.diagnostics()});
@@ -1906,7 +1961,8 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
     inspectState(){return {mode:inspect.mode(),active:inspect.active()};},
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
-    diagnostics(){return {startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
+    setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -1941,8 +1997,22 @@ export function createGame({ canvas, onAction = () => {}, onCast = () => {}, onI
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();audioContext?.close();
+      for(const batch of remoteBatches.values())batch.dispose();remoteBatches.clear();
       renderer.dispose(); actors.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
     },
   };
   return api;
+}
+
+// Synchronous construction is retained for isolated renderer fixtures. The actual
+// page uses the cooperative path so input can run between construction stages.
+export function createGame(options) {
+  const builder=buildGame(options);let step;
+  do {step=builder.next();} while(!step.done);
+  return step.value;
+}
+export async function createGameAsync(options) {
+  const construction=[],builder=buildGame({...options,construction});let step;
+  do {const t=performance.now();step=builder.next();construction.push(performance.now()-t);if(!step.done)await yieldToBrowser();} while(!step.done);
+  return step.value;
 }

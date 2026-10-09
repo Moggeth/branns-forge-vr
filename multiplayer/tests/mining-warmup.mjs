@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {attachFracture,prepareFractureWarmup} from '../client/mining-fracture.js';
+import {attachFracture,prepareFractureWarmup,prepareFractureWarmupAsync} from '../client/mining-fracture.js';
 import {loadGLB} from './glb.mjs';
 const started=performance.now(),source=loadGLB(new URL('../public/assets/boulder.glb',import.meta.url)).scene;
 const original=[];source.traverse(n=>{if(n.isMesh)original.push({mesh:n,visible:n.visible,raycast:n.raycast,geometry:n.geometry});});
@@ -20,3 +20,8 @@ warm.dispose();warm.dispose();assert.equal(releasedLive.length,0,'closing warmup
 fracture.setDamage(2,4);fracture.dispose();assert.equal(releasedLive.length,used.size,'last owner releases runtime geometry');
 const coldRoot=source.clone(true),coldStart=performance.now(),cold=attachFracture(T,coldRoot,'cold-unprepared');const coldMs=performance.now()-coldStart;cold.dispose();
 console.log(JSON.stringify({result:'bounded mining prewarm preserves originals, reuses prepared partitions and releases ownership safely',warm:warm.stats,reuseMs,coldMs,elapsedMs:performance.now()-started}));
+
+let yielded=false;setTimeout(()=>{yielded=true;},0);
+const cooperative=await prepareFractureWarmupAsync(T,inputs,{limit:2});
+assert.equal(yielded,true,'input task runs between partitions');assert.equal(cooperative.stats.partitions,2);cooperative.dispose();
+const cancelled=await prepareFractureWarmupAsync(T,inputs,{cancelled:()=>true});assert.equal(cancelled.stats.partitions,0);cancelled.dispose();

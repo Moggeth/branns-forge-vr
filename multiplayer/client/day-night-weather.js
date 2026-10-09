@@ -238,13 +238,15 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     }
   }
   let camera_ = null;
+  function prepare(scene_) { adopted = true; return adoptAtmosphere(scene_); }
   function render(scene_, camera) {
-    if (!adopted) { adopted = true; adoptAtmosphere(scene_); }
+    if (!adopted) prepare(scene_);
     if (post) post.render(scene_, camera); else renderer.render(scene_, camera);
   }
 
   return {
-    update, render,
+    update, render, prepare,
+    async prepareRenderer(scene_,camera) { prepare(scene_);await post?.prepare?.(scene_,camera); },
     setTrees(list) { beams?.setTrees(list); },
     // Call once the AudioContext exists (after a user gesture); safe to call repeatedly.
     attachAudio(context) { if (!audio && context) { try { audio = createWeatherAudio(context); } catch { audio = null; } } },

@@ -116,6 +116,20 @@ export function createAtmospherePost({renderer, tier = postTierFromUrl()}) {
     final.uniforms.time.value = (stats.frames % 997) * .013;
     renderer.setRenderTarget(prior); finalQuad.render(renderer);
   }
+  // Compile the scene against the SAME HDR target used during play. Compiling
+  // only against the default framebuffer misses the no-tone-mapping variants.
+  async function prepare(scene,camera) {
+    const prior=renderer.getRenderTarget();
+    const geometry=new THREE.PlaneGeometry(2,2),quad=new THREE.Mesh(geometry,final),stage=new THREE.Scene();stage.add(quad);
+    const eye=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+    try {
+      renderer.setRenderTarget(sceneRT);await renderer.compileAsync(scene,camera);
+      for(const material of [highPass,...bloom.separableBlurMaterials,bloom.compositeMaterial,bloom.materialCopy,rays]) {
+        if(!material)continue;quad.material=material;await renderer.compileAsync(stage,eye);
+      }
+      renderer.setRenderTarget(prior);quad.material=final;await renderer.compileAsync(stage,eye);
+    } finally {renderer.setRenderTarget(prior);geometry.dispose();}
+  }
   // Day/night drives these: sun direction, shaft strength and colour, glow, and the grade.
   function set({sun, rays: r, rayColor, bloom: b, bloomThreshold, vignette, lift, gain, saturation, contrast} = {}) {
     if (sun) sunDir.copy(sun).normalize();
@@ -126,7 +140,7 @@ export function createAtmospherePost({renderer, tier = postTierFromUrl()}) {
     if (saturation !== undefined) u.saturation.value = saturation; if (contrast !== undefined) u.contrast.value = contrast;
   }
   return {
-    render, set, stats: () => ({...stats}),
+    render, set, prepare, stats: () => ({...stats}),
     dispose() { sceneRT.dispose(); raysRT.dispose(); depth.dispose(); bloom.dispose(); rays.dispose(); final.dispose(); raysQuad.dispose(); finalQuad.dispose(); },
   };
 }

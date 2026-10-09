@@ -28,9 +28,8 @@ import {SPELLS,SPELL_SCHOOLS} from './shared/spells.js';
 import {BLOOM,bloomLevel,nextBloom} from './shared/bloom.js';
 import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
-import {mountTurnPhone} from './client/turn-phone.js';
 import './client/mobile-ui.css';
-import { createGame } from './client/game.js';
+import {afterPaint} from './client/startup-work.js';
 import {LocalRoomConnection} from './client/local-room.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
@@ -123,6 +122,7 @@ let resourceBar=null,forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=n
 let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
+let rendererPromise=null, startRevision=0;
 let phase = 'lobby';          // lobby | connecting | game
 let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false, shopOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
@@ -195,6 +195,13 @@ $('create').addEventListener('click', () => quickPlay());
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
 let quickSearch = 0;
 async function quickPlay(tried = []) {
+  // A tap during loading must keep invite/quick-play semantics after the renderer arrives.
+  if (!game && !rendererFailed) {
+    const revision = ++startRevision;
+    showLobbyStatus('Preparing the world…', {busy: true, cancel: true});
+    await rendererPromise;
+    if (revision !== startRevision) return;
+  }
   if (rendererFailed || !game) { start({create: true}); return; }
   // An invite link (or QR scan) goes straight to that world; if it has closed, fall back to quick play.
   if (!tried.length && ROOM_PATTERN.test(invited)) { start({create: false, room: invited, quick: {tried: [invited]}}); return; }
@@ -331,6 +338,7 @@ function syncActive() {
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  startRevision++;
   voice?.dispose(); voice = null; voiceControls.update();
   closeQuickBuild();closeForge();
   restoreFieldLock=false;holdOverlays?.close();
@@ -344,7 +352,13 @@ function teardown() {
   clearNotices();
 }
 
-function start(attempt) {
+async function start(attempt) {
+  const revision=++startRevision;
+  if(!game&&!rendererFailed){
+    showLobbyStatus('Preparing the world…', {busy:true, cancel:true});
+    await rendererPromise;
+    if(revision!==startRevision)return;
+  }
   attempt={...attempt,solo:!!attempt.solo||attempt.save?.checkpoint?.room==='SOLO'};
   if (rendererFailed || !game) {
     showLobbyProblem('This browser couldn’t start the 3D world. Try a recent version of Chrome, Edge or Firefox.', {back: true});
@@ -994,8 +1008,11 @@ $('vr').addEventListener('click', async () => {
 window.addEventListener('error', event => { recordProblem(event.error || {message: event.message}); });
 window.addEventListener('unhandledrejection', event => { recordProblem(event.reason); event.preventDefault(); });
 
+rendererPromise=(async()=>{
 try {
-  game = createGame({
+  await afterPaint();
+  const {createGameAsync}=await import('./client/game.js');
+  game = await createGameAsync({
     canvas,
     isHost, onSelection: chooseSpell,
     onVoicePose: pose => voice?.updatePose(pose),
@@ -1010,6 +1027,7 @@ try {
     onExpeditionAction: expeditionAction,
     onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud'),point=>game.projectWorld(point)); const cue=interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen || forgeOpen || quickBuildOpen || !!fieldKind); mobile?.setCue(cue); },
   });
+  const graphics=$('graphicsMode');graphics.value=store.get('branns-forge.graphics')||'auto';graphics.addEventListener('change',()=>game.setGraphicsMode(graphics.value));
   game.setDamageNumbers(store.get('branns-forge.damage-numbers')==='on');
   $('damageNumbers').checked=store.get('branns-forge.damage-numbers')==='on';
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
@@ -1031,11 +1049,12 @@ try {
   $('create').disabled = true; $('join').disabled = true;
 }
 
+})();
+
 const controlsCard = bindControlsCard(document, {store,
   role: () => phase === 'game' ? currentRole : chosenRole(),
   scheme: () => detectControlScheme({xrPresenting: xrActive, touchMode: store.get('branns-forge.touch.mode') || 'auto', coarse: matchMedia('(any-pointer: coarse)').matches, maxTouchPoints: navigator.maxTouchPoints || 0})});
 bindConnectivity(document, window);
-mountTurnPhone();
 // Expedition integration point: the owning module assigns these; buttons stay hidden unless canStart/canRestart.
 export const objectiveHooks = {onStart: null, onRestart: null};
 bindObjectiveActions(document, {onStart: () => objectiveHooks.onStart?.(), onRestart: () => objectiveHooks.onRestart?.()});
