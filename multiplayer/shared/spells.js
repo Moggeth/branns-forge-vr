@@ -41,6 +41,7 @@ export const WEAPONS = Object.freeze([
   {id:'hammer',label:'War Hammer',slot:3,cooldown:40}, {id:'crossbow',label:'Siegebird',slot:4,cooldown:60},
   {id:'bow',label:'Emberwing',slot:5,cooldown:33}, {id:'limb',label:'Held Limb',slot:6,cooldown:32},
   {id:'wyrmspout',label:'Wyrmspout',slot:7,cooldown:5}, {id:'flask',label:'Emberdew',slot:8,cooldown:60},
+  {id:'staff',label:'Sunthread',slot:9,cooldown:30},
 ].map(Object.freeze));
 
 // Placement rules move a cast to the nearest allowed spot; they never refuse it.

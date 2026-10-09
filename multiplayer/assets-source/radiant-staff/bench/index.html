@@ -1,0 +1,31 @@
+<!doctype html><html><body style="margin:0;background:#000">
+<!-- Sunthread look bench: the real staff.glb and client/radiant-staff.js in a plain lit yard. Serve multiplayer/ (python3 -m http.server 5199) and open /assets-source/radiant-staff/bench/?mode=held|beam|nova&night=1&foe=1. -->
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createRadiantStaff, enhanceStaffTemplate} from '/client/radiant-staff.js';
+const q=new URLSearchParams(location.search), night=+(q.get('night')||0);
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(960,540);r.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(r.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(night?0x0b1430:0x9cc8ee);
+scene.add(new THREE.HemisphereLight(night?0x2a3c70:0xdfefff,night?0x101418:0x6a7a4a,night?.25:1.6));
+const sun=new THREE.DirectionalLight(0xfff1d6,night?0.05:2.2);sun.position.set(5,9,3);scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,60,1,1).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x7c9a52,roughness:.95}));scene.add(ground);
+for(let i=0;i<8;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.8,1.6+i%3*.6,.8),new THREE.MeshStandardMaterial({color:[0xc9b79a,0x8f9db0,0xb88b5e][i%3],roughness:.8}));b.position.set(-6+i*1.8,b.geometry.parameters.height/2,-7-(i%2)*2);scene.add(b);}
+const foe=new THREE.Mesh(new THREE.CapsuleGeometry(.35,.9,4,10),new THREE.MeshStandardMaterial({color:0x8a8f99,roughness:.6}));foe.position.set(.7,.8,-6);scene.add(foe);
+const cam=new THREE.PerspectiveCamera(70,960/540,.03,200);cam.position.set(0,1.65,0);cam.rotation.set(-.18,0,0,'YXZ');scene.add(cam);
+const g=await new GLTFLoader().loadAsync('/public/assets/staff.glb');enhanceStaffTemplate(g.scene);
+const anchor=new THREE.Group();cam.add(anchor);anchor.position.set(.44,-.52,-.7);anchor.rotation.set(-.2,.1,.24);
+const model=g.scene;const box=new THREE.Box3().setFromObject(model);model.scale.setScalar(1.6/(box.max.y-box.min.y));anchor.add(model);
+const ray=new THREE.Raycaster();
+const fx=createRadiantStaff({scene,height:()=>0,night:()=>night,audio:()=>null,reducedMotion:false,
+  ground:(o,d,max)=>{ray.set(o,d);ray.far=max;const h=ray.intersectObject(ground)[0];return h?h.point.clone():null;},
+  *targets(){if(q.get('foe'))yield {id:'f',position:foe.position.clone().add(new THREE.Vector3(0,.3,0))};}});
+fx.attach(model);
+const mode=q.get('mode')||'held';if(mode==='beam')fx.press();
+let t=10;const step=dt=>{t+=dt;cam.updateMatrixWorld(true);const o=cam.getWorldPosition(new THREE.Vector3()),d=cam.getWorldDirection(new THREE.Vector3());
+  window.st=fx.update({time:t,dt,shown:true,aim:{origin:o.toArray(),direction:d.toArray()},camera:cam});if(q.get('hide'))scene.getObjectByName(q.get('hide')).visible=false;r.render(scene,cam);};
+for(let i=0;i<40;i++)step(1/30);
+if(mode==='nova'){fx.nova(t);for(let i=0;i<+(q.get('nf')||8);i++)step(1/30);}
+window.done=true;
+</script></body></html>
