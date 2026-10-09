@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Brann's Forge — how getting hurt feels (presentation only; the host's 'hit' event with `hero:true` is the evidence).
 // Clear but never a red screen: a soft crimson bloom swells on the edge of the view that faces the blow (behind = the
 // bottom edge), the HP bar flashes and leaves a pale chip of what was lost, the view gets one small nudge (flat screens
-// only: never in VR), phones buzz, VR hands rumble on the side that was struck, and a short body thump plays. Below
+// only: never in VR), phones buzz, VR hands rumble on the side that was struck; the hit sound itself is the sound kit's "hurt" cue. Below
 // 30% health a faint edge glow breathes with a quiet heartbeat. Everything decays per frame from performance time.
 // One camera-held quad draws the overlay, so desktop, phone and headset share the look; it is hidden when idle.
 
@@ -14,7 +14,6 @@ export const HURT_TUNING = Object.freeze({
   beat: .86,              // heartbeat period (s) at the threshold; quicker as health falls
   nudge: .022,            // radians of pitch kick at full severity (flat screens only)
   roll: .028,             // radians of roll toward the blow at full severity
-  soundGap: .14,          // seconds between hurt thumps (fire ticks fast)
   hapticGap: .12,
   xrDistance: 1,          // metres: the overlay sits at a comfortable focal distance in a headset
 });
@@ -69,7 +68,7 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
   camera?.add(quad);
 
   const slots = hits.map(() => ({x: 0, y: 1, strength: 0, warm: 0}));
-  let glow = 0, warmGlow = 0, low = 0, beatClock = 0, beatPulse = 0, time = 0, lastSound = -1, lastHaptic = -1;
+  let glow = 0, warmGlow = 0, low = 0, beatClock = 0, beatPulse = 0, time = 0, lastHaptic = -1;
   const spring = {pitch: 0, vp: 0, roll: 0, vr: 0};
   let lastHp = null, ghost = null, ghostTimer = 0, meterEl = null;
 
@@ -102,7 +101,8 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
     ghostTimer = .38; ghost.dataset.to = String(toRatio);
   }
 
-  // ---- sound: a short body thump panned toward the blow; heartbeat lub-dub when low ----------------------------
+  // ---- sound: the hit itself is the sound kit's 'hurt' cue (event-sounds.js); this owns only the low-health heartbeat.
+// audio() is the mix's sfx view, so `destination` here is the sfx bus, not the speakers.
   function thump(ctx, at, {freq = 118, end = 52, length = .16, gain = .2, pan = 0, noise = .06} = {}) {
     const out = ctx.createGain(); out.gain.value = 1;
     let dest = ctx.destination;
@@ -119,13 +119,6 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
       src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 820; bp.Q.value = 1.1; ng.gain.value = noise;
       src.connect(bp).connect(ng).connect(out); src.start(at);
     }
-  }
-  function hurtSound(severity, pan, warm) {
-    const ctx = audio(); if (!ctx || ctx.state !== 'running' || time - lastSound < T.soundGap) return;
-    lastSound = time;
-    const s = .35 + .65 * severity, at = ctx.currentTime + .005;
-    if (warm) thump(ctx, at, {freq: 160, end: 70, length: .12, gain: .09 * s, pan: pan * .5, noise: .09 * s});
-    else thump(ctx, at, {freq: 120 + 25 * severity, end: 50, length: .14 + .08 * severity, gain: .2 * s, pan: pan * .55, noise: .07 * s});
   }
   function heartbeat(level) {
     const ctx = audio(); if (!ctx || ctx.state !== 'running') return;
@@ -167,7 +160,6 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
         haptic?.([{at: 0, amplitude: (main ? .25 : .35 + .5 * severity) * k, duration: 40 + 50 * severity}], main === 'right' ? 'left' : main === 'left' ? 'right' : 'left');
       } else if (touch()) try { navigator.vibrate?.(warm ? [12] : severity > .6 ? [45, 40, 25] : [Math.round(18 + 30 * severity)]); } catch {}
     }
-    hurtSound(severity, side, warm);
     const after = Math.max(0, Number(me.hp) || 0), before = Math.min(max, after + damage);
     meterHit(before / max, after / max);
     return true;
