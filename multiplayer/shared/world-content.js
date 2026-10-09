@@ -13,7 +13,7 @@ export const baseTrees = [
 export const initialDeposits = () => [
   [-5, 5, 'stone'], [5, 5, 'stone'], [-7, 10, 'stone'], [7, 10, 'stone'], [0, 14, 'stone'],
   [-8, 3, 'iron'], [8, 3, 'iron'], [9, -8, 'iron'], [-15, -10, 'iron'],
-  [-28, -17, 'mithril'], [30, 14, 'mithril'], [18, -24, 'crystal'], [-19, 23, 'crystal']
+  [-24, -12, 'mithril'], [24, 12, 'mithril'], [18, -24, 'crystal'], [-19, 23, 'crystal']
 ].map(([x,z,kind], i) => ({id: `ore${i + 1}`, x, z, kind, hits: 0, maxHits: DEPOSIT_CATALOG[kind].maxHits, depleted: false}));
 
 /** A new visible seam rises every two minutes. Existing depleted rocks stay depleted.

@@ -13,6 +13,7 @@ import {createHomeBaseView} from '../client/home-base-view.js';
 import {createHomeTownView} from '../client/home-town-view.js';
 import {createBackTownView} from '../client/back-town-view.js';
 import {createTownLife} from '../client/town-life.js';
+import {createStartingWorld} from '../client/starting-world.js';
 import {createMountainArena} from '../client/mountain-arena.js';
 import {createAlpineForest} from '../client/alpine-forest.js';
 import {createKeepCornerGround} from '../client/keep-corner-ground.js';
@@ -32,6 +33,7 @@ orchard.objects.backdrop.visible=false; // the game swaps this for the alpine sk
 const corner=createKeepCornerGround({scene,ground,height:baseHeight});
 const arena=createMountainArena({THREE:T,scene,height:baseHeight}),forest=createAlpineForest({scene,arena,quality:'high'});
 const sim=createSimulation({seed:3});sim.addPlayer({id:'lab'});const view=createHomeBaseView({scene}),town=createHomeTownView({scene}),back=createBackTownView({scene}),life=createTownLife({scene});
+const landmarks=createStartingWorld({THREE:T,scene,height:baseHeight});landmarks.group.visible=true;
 const cam=new T.PerspectiveCamera(50,W/H,.1,400);let last=performance.now();
 function frame(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);view.update(dt,cam,sim.snapshot().tick);town.update(dt);back.update(dt);life.update(dt,H);corner.sync();orchard.update?.(dt,cam);last=now;renderer.render(scene,cam);}
 const sync=()=>{const s=sim.snapshot();view.sync(s);town.sync(s);back.sync(s);life.sync(s);};

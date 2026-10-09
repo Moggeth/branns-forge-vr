@@ -12,7 +12,7 @@ import {BEACON_HEARTH} from '../shared/watch-beacon.js';
 export const STARTING_SITES = [
   { id: 'sanctuary', name: 'Ancient Stone Sanctuary', x: -25, z: 8, radius: 7.5,
     goal: 'Gather moss-stone shards at the ring', footprints: [] },
-  { id: 'outcrop', name: 'Crystal Outcrop', x: 27, z: 14, radius: 7,
+  { id: 'outcrop', name: 'Crystal Outcrop', x: 24, z: -6, radius: 7, // moved off Grumblekeep's gate ballista 2026-10-09
     goal: 'Mine glowing crystal for the Forge', footprints: [] },
   { id: 'watcharch', name: 'Ruined Watch-Arch', x: -5, z: -28, radius: 6.5,
     goal: 'Recover the bronze beacon', footprints: [] },
@@ -21,7 +21,7 @@ export const STARTING_SITES = [
 // Paths start just outside the forge plaza (r ~ 6) so the centre stays clear.
 export const PATHS = [
   { id: 'to-sanctuary', width: 1.6, points: [[-5, 4], [-12, 7], [-18, 7.5]] },
-  { id: 'to-outcrop', width: 1.6, points: [[5, 4], [13, 9], [20.5, 12.5]] },
+  { id: 'to-outcrop', width: 1.6, points: [[5, 4], [11, 1.5], [16.7, -4.2]] },
   { id: 'to-watcharch', width: 1.6, points: [[-1, -6], [-3, -15], [-4.5, -22]] },
 ];
 

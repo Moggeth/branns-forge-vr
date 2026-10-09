@@ -25,7 +25,7 @@ function destination(id, name, x, z, face) {
 }
 export const DESTINATIONS = Object.freeze([
   destination('forge', 'the Forge', -7.4, 5.1, [0, 0]), // on the sanctuary path, clear of the yard's ore nodes
-  destination('outcrop', 'the Crystal Outcrop', 20.5, 12.5, [27, 14]),
+  destination('outcrop', 'the Crystal Outcrop', 16.7, -4.2, [24, -6]),
   destination('watcharch', 'the Ruined Watch-Arch', -4.5, -22, [-5, -28]),
 ]);
 const flat = (a, x, z) => Math.hypot(a[0] - x, a[2] - z);

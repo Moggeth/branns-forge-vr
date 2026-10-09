@@ -8,7 +8,12 @@
 // the frame clock. Cheap: everything is instanced, about twenty draws for the lot.
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {homePiece, homePoint, neutralTavern, pieceWorld} from '../shared/home-bases.js';
+import * as HOME from '../shared/home-bases.js';
+const {homePiece, homePoint, pieceWorld} = HOME;
+// Taverns may draw larger than the kit (TAVERN_SCALE); everything dressed in a tavern's frame scales with it.
+const tavernScale = () => HOME.TAVERN_SCALE ?? 1;
+const neutralTavern = () => ({...HOME.neutralTavern(), s: tavernScale()});
+const tavernPiece = side => ({...homePiece(side, 'tavern'), s: tavernScale()});
 import {BACK_TOWN_LANTERNS, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
 import {terrainHeight} from '../shared/terrain.js';
 
@@ -127,9 +132,9 @@ const KEEP_PROPS = {
   quartermaster: [['planter', -3.2, 1.75, 0], ['planter', 3.2, 1.75, 0], ['crate', 3.25, -1.0, .4], ['crate', 3.3, -1.0, .1, .7], ['barrel', -3.15, -1.05, 0], ['sacks', -3.2, .1, .3]],
   mill: [['sacks', 2.7, 2.6, .4], ['sacks', 3.2, 1.6, 2], ['crate', -3.1, 1.5, .3]],
   workshop: [['woodpile', -3.8, .8, Math.PI / 2], ['crate', 3.5, -1.6, .3], ['barrel', 3.5, -.8, 0]],
-  stores: [['crate', -3.1, 2.4, .5], ['sacks', 3, 2.2, -.4], ['barrel', 2.4, 2.9, 0]],
-  cottage: [['planter', -1.6, 2.35, 0], ['woodpile', 2.85, -.2, -Math.PI / 2], ['bench', 1.35, 2.55, 0]],
-  cottage2: [['planter', 1.6, 2.35, 0], ['barrel', -2.75, 1.4, 0], ['sacks', -2.8, .4, 1]],
+  stores: [['crate', -3.1, 2.4, .5], ['barrel', 2.4, 2.9, 0]],
+  cottage: [['planter', -1.6, 2.6, 0], ['woodpile', 2.85, -.2, -Math.PI / 2], ['bench', 1.35, 2.85, 0]],
+  cottage2: [['planter', 1.6, 2.6, 0], ['barrel', -2.75, 1.4, 0], ['sacks', -2.8, .4, 1]],
   well: [['bench', 0, -2.1, 0]],
 };
 const MUG_PROPS = [['barrel', -6.3, -3, 0], ['barrel', -6.25, -2.25, .7], ['barrel', -6.9, -2.6, .2], ['woodpile', 6.35, -2.2, Math.PI / 2], ['crate', 6.3, 1.8, .3],
@@ -138,8 +143,8 @@ const MUG_PROPS = [['barrel', -6.3, -3, 0], ['barrel', -6.25, -2.25, .7], ['barr
 /** Where every lantern post, townsperson, prop and glow goes, from the shared keep layout. Pure. */
 export function townLifeLayout() {
   const folk = [], props = [], posts = [], glows = [], bunting = [];
-  const place = (placed, [lx, lz], ly = 0) => { const [x, z] = pieceWorld(placed, [lx, lz]); return {x, z, y: ly}; };
-  const sitePiece = (side, name) => name === 'workshop' || name === 'stores' || name.startsWith('cottage') || name === 'well' ? backTownPiece(side, name) : homePiece(side, name);
+  const place = (placed, [lx, lz], ly = 0) => { const k = placed.s ?? 1, [x, z] = pieceWorld(placed, [lx * k, lz * k]); return {x, z, y: ly * k}; };
+  const sitePiece = (side, name) => name === 'workshop' || name === 'stores' || name.startsWith('cottage') || name === 'well' ? backTownPiece(side, name) : name === 'tavern' ? tavernPiece(side) : homePiece(side, name);
   for (const side of SIDE_KEYS) {
     const evil = side === 'rivals';
     for (const [name, list] of Object.entries(KEEP_FOLK)) {
@@ -161,7 +166,7 @@ export function townLifeLayout() {
       posts.push({x, z, yaw: Math.atan2(fx - x, fz - z), side});
     }
     // Hearths, stall lanterns and the back town's own lantern posts glow too.
-    const tav = homePiece(side, 'tavern'); glows.push({...place(tav, [-3.75, -.8], .7), size: 2.6, pool: 3.4});
+    const tav = tavernPiece(side); glows.push({...place(tav, [-3.75, -.8], .7), size: 2.6, pool: 3.4});
     const qm = homePiece(side, 'quartermaster'); for (const s of [-1, 1]) glows.push({...place(qm, [s * 2.15, 1.95], 2.55), size: 1.4, pool: 2.6});
     BACK_TOWN_LANTERNS.forEach(at => {
       const [x, z] = backTownPoint(side, at), [cx, cz] = backTownPoint(side, [(at[0] + at[1]) / 2, (at[0] + at[1]) / 2]);
@@ -187,7 +192,7 @@ export function townLifeLayout() {
     }
   };
   for (const side of SIDE_KEYS) { const g = side === 'rivals' ? 1 : -1; road([homePoint(side, [0, 17.5]), homePoint(side, [1.2, 24]), [g * 11, g * 10.2], [g * 6.4, g * 5.4]], 7.5, 2.1); }
-  const mug = neutralTavern(), door = [mug.x + Math.sin(mug.yaw) * 4.6, mug.z + Math.cos(mug.yaw) * 4.6];
+  const mug = neutralTavern(), door = [mug.x + Math.sin(mug.yaw) * 4.6 * mug.s, mug.z + Math.cos(mug.yaw) * 4.6 * mug.s];
   road([[-14, -20.5], [-4, -23.6], door], 7, 1.9);
   road([[2.6, -12], [4.2, -18.5], [door[0], door[1] + 2]], 7, 1.9);
   for (const [lx, lz, yaw, role, variant, floor = .1] of MUG_FOLK) folk.push({...place(mug, [lx, lz], floor), yaw: mug.yaw + yaw, role, variant, side: 'neutral'});
@@ -195,7 +200,7 @@ export function townLifeLayout() {
   glows.push({...place(mug, [5.2, 0], .7), size: 3, pool: 4});
   bunting.push({a: place(mug, [-5.3, 3.85], 3.3), b: place(mug, [5.3, 3.85], 3.3), colours: [0xd08a2f, 0x2f6fd0, 0x8fd04a, 0xff6f8e, 0xf2c64a], sag: .7});
   // No post inside a building: drop any that a road brought too close to the Mug.
-  for (let i = posts.length - 1; i >= 0; i--) if (Math.hypot(posts[i].x - mug.x, posts[i].z - mug.z) < 7.5) posts.splice(i, 1);
+  for (let i = posts.length - 1; i >= 0; i--) if (Math.hypot(posts[i].x - mug.x, posts[i].z - mug.z) < 7.5 * mug.s) posts.splice(i, 1);
   for (const p of posts) { const r = p.yaw; glows.push({x: p.x + Math.sin(r) * LAMP_REACH, z: p.z + Math.cos(r) * LAMP_REACH, y: LAMP_HEIGHT, size: 1.6, pool: 3.2}); }
   return {folk, props, posts, glows, bunting};
 }

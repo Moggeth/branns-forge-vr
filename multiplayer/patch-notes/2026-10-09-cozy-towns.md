@@ -8,3 +8,6 @@ title: The towns come alive
 - Barrels, crates, flour sacks, woodpiles, benches and flower boxes now sit around the taverns, shops, mills and cottages, with bunting strung across the tavern fronts.
 - Worn dirt paths now link everything. Each keep's gate road leads out to the Forge, a little square circles each keep's heart with paths off to the tavern, mill, shop, barracks and fountain, a lane runs up the pass to the back town, and footpaths wind down to The Muddled Mug.
 - Lantern posts line the roads. Every lamp, hearth and stall lantern now gives off a soft, warm glow and casts a pool of light on the ground, and they glow brighter as dusk falls.
+- The Crystal Outcrop has moved a little south, out of Grumblekeep's front yard. It no longer pokes through one of the keep's gate ballistas, and its path from the Forge and its waygate stop moved with it.
+- Two mithril seams that sat in the feet of the keep ballistas now start a few steps clear of them.
+- Tidied a few crates, planters and benches so they no longer poke into the back town's walls.
