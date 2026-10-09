@@ -10,6 +10,7 @@ import {movedPlaced, movedTable} from './map-layout.js';
 // Pure simulation rules: fixed ticks, no clocks, rendering or random streams.
 
 export const HOME = Object.freeze({
+  TAVERN_SCALE: 1.3, // taverns drawn and walled this many times their kit size (see TAVERN_SCALE below)
   domeRadius: 18.5, heartHp: 600, pylonHp: 300, levelCap: 5,
   shieldDownTicks: 90 * 60, rebuildTicks: 180 * 60, waveTicks: 60 * 60, firstWaveTicks: 20 * 60,
   fountainEvery: 30, fountainHeal: 5,
@@ -53,7 +54,7 @@ export const HOME_LAYOUT = movedTable('keep', {
   ballistas: Object.freeze([P(-10.5, 17.5), P(10.5, 17.5)]),
   gate: P(0, 17.5), gatePillars: Object.freeze([P(-3.4, 17.5), P(3.4, 17.5)]),
   // Boundary wards ring the dome, leaving the gate, the pylons, the barracks, the shop and the backs of the tavern and mill clear.
-  wards: Object.freeze([50, 72, 116, 160, -160, -116, -72, -50].map(d => polar(d, 18.2))),
+  wards: Object.freeze([50, 72, 111, 160, -160, -111, -72, -50].map(d => polar(d, 18.2))),
   bellPost: P(+(2.95 * HOME_SCALE).toFixed(3), +(2.75 * HOME_SCALE).toFixed(3)), // in the barracks' own frame (three.js x, z)
   // Town pieces (shared/home-shop.js, home-mill.js, taverns.js) on the back half of the ring, fronts to the heart.
   tavern: piece(P(-10.6, -10.6), HEART),
@@ -250,12 +251,16 @@ const SOLIDS = Object.freeze([
 const BARRACKS = Object.freeze({half: [3.2 * K, 2.2 * K]});
 // Town pieces' solid parts in their own frame: boxes {at, half} and circles {at, r}. Taverns are open-fronted halls
 // you walk into (walls, bar, tables and posts are solid); the shop stall is one box; the mill is its tower and hopper.
-const KEEP_TAVERN = Object.freeze([
+// The taverns are drawn TAVERN_SCALE times their kit size (2026-10-09: roomier, so a crowd fits inside); the kit
+// footprints below are in kit metres and scaled here, so the walls, the safe zone and the bar all grow together.
+export const TAVERN_SCALE = HOME.TAVERN_SCALE;
+const scaled = (solids, k = TAVERN_SCALE) => Object.freeze(solids.map(q => Object.freeze({at: [q.at[0] * k, q.at[1] * k], ...(q.r !== undefined ? {r: q.r * k} : {half: [q.half[0] * k, q.half[1] * k]})})));
+const KEEP_TAVERN = scaled([
   {at: [0, -3], half: [4.2, .25]}, {at: [-4, -.1], half: [.25, 3.1]}, {at: [4, -.1], half: [.25, 3.1]},
   {at: [0, -2.1], half: [2.55, .4]}, {at: [-2.2, .6], r: .75}, {at: [2.2, .6], r: .75}, {at: [-3.8, 2.8], r: .25}, {at: [3.8, 2.8], r: .25}]);
 export const TOWN_SOLIDS = Object.freeze({
   tavern: KEEP_TAVERN,
-  neutralTavern: Object.freeze([
+  neutralTavern: scaled([
     {at: [0, -4], half: [5.7, .25]}, {at: [-5.5, -.1], half: [.25, 4.1]}, {at: [5.5, -.1], half: [.25, 4.1]},
     {at: [0, -2.9], half: [3.3, .4]}, ...[[-3, 1.6], [3, 1.6], [-3, -.6], [3, -.6]].map(at => ({at, r: .75})), {at: [-5.3, 3.8], r: .25}, {at: [5.3, 3.8], r: .25}]),
   quartermaster: Object.freeze([{at: [0, 0], half: [2.5, 1.75]}]),
@@ -312,7 +317,7 @@ export function resolveHomeStructures(state, position, radius = .3) {
     if (ed < em && ed > 1e-4) { position[0] = postX + ex / ed * em; position[2] = postZ + ez / ed * em; }
   }
   const n = NEUTRAL_TAVERN.at;
-  if (Math.abs(position[0] - n[0]) < 9 && Math.abs(position[2] - n[1]) < 9) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
+  if (Math.abs(position[0] - n[0]) < 9 * TAVERN_SCALE && Math.abs(position[2] - n[1]) < 9 * TAVERN_SCALE) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
   return position;
 }
 
