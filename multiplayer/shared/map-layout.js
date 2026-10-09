@@ -64,3 +64,21 @@ export function shiftSite(site, moves = MAP_MOVES) {
   if (!dx && !dz) return site;
   return {...site, x: +(site.x + dx).toFixed(3), z: +(site.z + dz).toFixed(3), footprints: (site.footprints || []).map(f => ({...f, x: f.x + dx, z: f.z + dz}))};
 }
+
+// ---------------------------------------------------------------- extras: new things placed from the editor's build menu
+// [{id: 'x1', kind, x, z, yaw, style?: 'party' | 'rivals', height?: metres (trees)}]. Trees and ore join the starting
+// trees and deposits (shared/world-content.js); buildings stand as solid scenery (shared/map-extras.js).
+export const EXTRA_KINDS = Object.freeze(['tree', 'stone', 'iron', 'mithril', 'crystal', 'cottage', 'cottageB', 'well', 'lantern']);
+const EXTRA_LIMIT = 400;
+export function validExtra(e) {
+  return !!e && typeof e === 'object' && typeof e.id === 'string' && /^x\d{1,5}$/.test(e.id) && EXTRA_KINDS.includes(e.kind) &&
+    Number.isFinite(e.x) && Number.isFinite(e.z) && Math.abs(e.x) <= 68 && Math.abs(e.z) <= 68 && Number.isFinite(e.yaw ?? 0) &&
+    (e.style === undefined || e.style === 'party' || e.style === 'rivals') && (e.height === undefined || (Number.isFinite(e.height) && e.height >= 3 && e.height <= 9));
+}
+export function readExtras(list) {
+  if (!Array.isArray(list)) return Object.freeze([]);
+  const seen = new Set();
+  return Object.freeze(list.slice(0, EXTRA_LIMIT).filter(e => validExtra(e) && !seen.has(e.id) && seen.add(e.id))
+    .map(e => Object.freeze({id: e.id, kind: e.kind, x: +e.x, z: +e.z, yaw: +(e.yaw ?? 0), ...(e.style ? {style: e.style} : {}), ...(e.height ? {height: +e.height} : {})})));
+}
+export const MAP_EXTRAS = readExtras(layout?.extras);

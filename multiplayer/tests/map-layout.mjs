@@ -59,3 +59,17 @@ const mill = byKey.get('keep.mill'), m = M.placement(mill, 'party');
 M.moveTo(tavern, 'party', m.x + 1, m.z, byKey);
 assert.ok(M.overlaps(M.instances(items)).some(o => [o.a.it.key, o.b.it.key].includes('keep.mill') && [o.a.it.key, o.b.it.key].includes('keep.tavern')), 'tavern on mill is flagged');
 console.log(`map layout: ${items.length} editable placements, ${Object.keys(MAP_MOVES).length} moved in the layout file`);
+
+// Extras from the build menu: well-formed ones are kept, buildings are solid, and the editor round-trips them.
+import {readExtras} from '../shared/map-layout.js';
+import {resolveMapExtras} from '../shared/map-extras.js';
+const extras = readExtras([{id: 'x1', kind: 'cottage', x: 10, z: 10, yaw: 0}, {id: 'x2', kind: 'tree', x: 5, z: 5, yaw: 0, height: 7}, {id: 'x1', kind: 'well', x: 0, z: 0}, {id: 'x3', kind: 'castle', x: 0, z: 0}, {id: 'x4', kind: 'well', x: 900, z: 0}]);
+assert.deepEqual(extras.map(e => e.id), ['x1', 'x2'], 'duplicates, unknown kinds and far-off spots are dropped');
+const walker = [10, 0, 10.5];
+resolveMapExtras(walker, .3, extras.filter(e => e.kind === 'cottage'));
+assert.ok(Math.abs(walker[2] - 10) > 2 || Math.abs(walker[0] - 10) > 2, 'a walker is pushed out of a placed cottage');
+const added = M.addExtra(items, 'well', -3, 8, .5, {style: 'rivals'});
+assert.equal(added.key, 'x1');
+const file2 = JSON.parse(M.layoutFile(items));
+assert.deepEqual(file2.extras, [{id: 'x1', kind: 'well', x: -3, z: 8, yaw: .5, style: 'rivals'}]);
+assert.deepEqual(readExtras(file2.extras), file2.extras, 'what the editor writes, the game reads back unchanged');

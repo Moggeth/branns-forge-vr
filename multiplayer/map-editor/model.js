@@ -6,7 +6,8 @@ import {BACK_TOWN, BACK_TOWN_LANTERNS, WORLD_EXTENT, backTownPoint, beyondWorld}
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
 import {baseTrees, initialDeposits} from '../shared/world-content.js';
-import {AUTHORED, MAP_MOVES, shiftPath, siteShift} from '../shared/map-layout.js';
+import {AUTHORED, EXTRA_KINDS, MAP_EXTRAS, MAP_MOVES, shiftPath, siteShift} from '../shared/map-layout.js';
+import {EXTRA_BUILDINGS} from '../shared/map-extras.js';
 import {baseHeight} from '../shared/terrain.js';
 
 export {HOME, HOME_SITES, WORLD_EXTENT, baseHeight};
@@ -53,8 +54,34 @@ export function buildItems() {
   baseTrees.forEach(([x, z], i) => add({key: `tree${i + 1}`, label: `Tree ${i + 1}`, group: 'tree', frame: 'world', kind: 'point', value: [x, z], authoredValue: authored(`tree${i + 1}`), shape: circle(.8)}));
   initialDeposits().forEach(d => add({key: d.id, label: `${d.kind[0].toUpperCase()}${d.kind.slice(1)} ore (${d.id})`, group: 'ore', frame: 'world', kind: 'point', value: [d.x, d.z], authoredValue: authored(d.id), shape: circle(1.3)}));
   for (const it of items) { if (it.authoredValue !== undefined) it.authored = clone(it.authoredValue); delete it.authoredValue; }
+  for (const e of MAP_EXTRAS) items.push(extraItem(e));
   return items;
 }
+
+// ---------------------------------------------------------------- extras (the build menu)
+export const PALETTE = Object.freeze([
+  {kind: 'cottage', label: 'Cottage', group: 'Buildings'}, {kind: 'cottageB', label: 'Cottage (wide)', group: 'Buildings'},
+  {kind: 'well', label: 'Well', group: 'Buildings'}, {kind: 'lantern', label: 'Lantern post', group: 'Buildings'},
+  {kind: 'tree', label: 'Tree', group: 'Nature'},
+  {kind: 'stone', label: 'Stone boulder', group: 'Ore'}, {kind: 'iron', label: 'Iron seam', group: 'Ore'},
+  {kind: 'mithril', label: 'Mithril seam', group: 'Ore'}, {kind: 'crystal', label: 'Crystal growth', group: 'Ore'},
+]);
+const EXTRA_SHAPE = kind => EXTRA_BUILDINGS[kind] ?? circle(kind === 'tree' ? .8 : 1.3);
+const ORE_KINDS = ['stone', 'iron', 'mithril', 'crystal'];
+export function extraItem(e) {
+  const p = PALETTE.find(q => q.kind === e.kind), value = {x: e.x, z: e.z, yaw: e.yaw ?? 0, ...(e.style ? {style: e.style} : {}), ...(e.height ? {height: e.height} : {})};
+  return {key: e.id, label: `${p?.label ?? e.kind} (new)`, group: ORE_KINDS.includes(e.kind) ? 'ore' : e.kind === 'tree' ? 'tree' : 'extra', extraKind: e.kind,
+    frame: 'world', kind: 'extra', value, authored: null, rotatable: e.kind !== 'tree', removable: true, shape: EXTRA_SHAPE(e.kind)};
+}
+/** A new extra of `kind` at (x, z), with the next free id. */
+export function addExtra(items, kind, x, z, yaw = 0, extra = {}) {
+  if (!EXTRA_KINDS.includes(kind)) throw Error(`unknown kind ${kind}`);
+  let n = 1; const used = new Set(items.map(i => i.key)); while (used.has(`x${n}`)) n++;
+  const it = extraItem({id: `x${n}`, kind, x: round(x), z: round(z), yaw: round(yaw), ...extra});
+  items.push(it); return it;
+}
+export const exportExtras = items => items.filter(i => i.kind === 'extra').map(i => ({id: i.key, kind: i.extraKind, x: round(i.value.x), z: round(i.value.z), yaw: round(i.value.yaw),
+  ...(i.value.style ? {style: i.value.style} : {}), ...(i.value.height ? {height: i.value.height} : {})}));
 
 // Fixed things drawn for reference but not moved here: each keep's heart and dome, and the Forge in the middle.
 export const FIXED = [
@@ -79,6 +106,7 @@ export function placement(it, side) {
   if (it.kind === 'point') { const [x, z] = toWorldPoint(it.frame, side, v); return {x, z, yaw: 0}; }
   if (it.kind === 'piece') { const [x, z] = toWorldPoint(it.frame, side, v.at), [fx, fz] = toWorldPoint(it.frame, side, v.face); return {x, z, yaw: yawToward(x, z, fx, fz)}; }
   if (it.kind === 'placed') return {x: v.at[0], z: v.at[1], yaw: v.yaw};
+  if (it.kind === 'extra') return {x: v.x, z: v.z, yaw: v.yaw};
   return {x: it.origin[0] + v.dx, z: it.origin[1] + v.dz, yaw: 0};
 }
 /** Same for the authored (unmoved) spot. */
@@ -93,6 +121,7 @@ export function moveTo(it, side, wx, wz, byKey) {
     const [fx, fz] = toWorldPoint(it.frame, side, it.value.face);
     it.value = {at: toFramePoint(it.frame, side, [wx, wz]).map(round), face: toFramePoint(it.frame, side, [fx + wx - before.x, fz + wz - before.z]).map(round)};
   } else if (it.kind === 'placed') it.value = {at: [round(wx), round(wz)], yaw: it.value.yaw};
+  else if (it.kind === 'extra') it.value = {...it.value, x: round(wx), z: round(wz)};
   else it.value = {dx: round(wx - it.origin[0]), dz: round(wz - it.origin[1])};
   for (const key of it.carry || []) {
     const other = byKey?.get(key); if (!other) continue;
@@ -102,6 +131,7 @@ export function moveTo(it, side, wx, wz, byKey) {
 /** Turns one copy of an item to a world yaw (three.js: front +Z turned by yaw). Pieces and the Mug only. */
 export function turnTo(it, side, yaw) {
   if (it.kind === 'placed') { it.value = {at: it.value.at, yaw: round(yaw)}; return; }
+  if (it.kind === 'extra') { it.value = {...it.value, yaw: round(Math.atan2(Math.sin(yaw), Math.cos(yaw)))}; return; }
   if (it.kind !== 'piece') return;
   const {x, z} = placement(it, side), [fx, fz] = toWorldPoint(it.frame, side, it.value.face);
   const d = Math.max(4, Math.hypot(fx - x, fz - z));
@@ -198,7 +228,16 @@ export function exportMoves(items) {
   // Keep keys this editor doesn't know about (written by a newer editor or by hand).
   const known = new Set(items.map(i => i.key));
   for (const [k, v] of Object.entries(MAP_MOVES)) if (!known.has(k)) moves[k] = v;
-  for (const it of items) if (!same(it.value, it.authored)) moves[it.key] = clone(it.value);
+  for (const it of items) if (it.kind !== 'extra' && !same(it.value, it.authored)) moves[it.key] = clone(it.value);
   return moves;
 }
-export const layoutFile = items => JSON.stringify({version: 1, moves: exportMoves(items)}, null, 2) + '\n';
+export function layoutFile(items) {
+  const extras = exportExtras(items);
+  return JSON.stringify({version: 1, moves: exportMoves(items), ...(extras.length ? {extras} : {})}, null, 2) + '\n';
+}
+
+// Lookups the 3D view needs to draw the authored starting trees and ore, and the landmark shift already saved.
+export const treeHeight = key => baseTrees[+key.slice(4) - 1]?.[2] ?? 6;
+const DEPOSIT_KINDS = new Map(initialDeposits().map(d => [d.id, d.kind]));
+export const oreKind = key => DEPOSIT_KINDS.get(key) ?? 'stone';
+export const savedShift = id => siteShift(id);
