@@ -23,11 +23,12 @@ uniform float uFlash;
 varying vec3 vN; varying vec3 vV;
 void main(){
   float f = 1.0 - max(0.0, dot(normalize(vN), normalize(vV)));
-  float rim = .22 + 1.1 * f * f;
+  float rim = .3 + 1.4 * f * f;
   gl_FragColor = vec4(vec3(1.0, .26, .16) * rim * uFlash, 1.0);
 }`;
 
-export const HERO_HURT_FLASH = Object.freeze({length: .34, peak: .85});
+const visibleUp = n => { for (; n; n = n.parent) if (!n.visible) return false; return true; };
+export const HERO_HURT_FLASH = Object.freeze({length: .4, peak: 1.5});
 
 /** Lazily builds the shell for `meshes` (SkinnedMesh list). Returns {strike(), update(dt), dispose()}. */
 export function createHeroHurtFlash(meshes) {
@@ -36,8 +37,10 @@ export function createHeroHurtFlash(meshes) {
     material = new THREE.ShaderMaterial({vertexShader: VERT, fragmentShader: FRAG, uniforms: {uFlash: {value: 0}},
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false});
     shells = [];
-    for (const src of meshes) {
-      if (!src?.isSkinnedMesh || !src.parent) continue;
+    const skinned = [];
+    for (const m of meshes) m?.traverse?.(n => { if (n.isSkinnedMesh) skinned.push(n); });   // multi-material parts load as groups
+    for (const src of skinned) {
+      if (!src.parent) continue;
       const shell = new THREE.SkinnedMesh(src.geometry, material);
       shell.name = `${src.name}_HurtFlash`; shell.bindMode = src.bindMode;
       shell.bind(src.skeleton, src.bindMatrix);
@@ -52,8 +55,8 @@ export function createHeroHurtFlash(meshes) {
       if (!shells || t === Infinity) return;
       t += dt;
       const k = t / HERO_HURT_FLASH.length, on = k < 1;
-      material.uniforms.uFlash.value = on ? HERO_HURT_FLASH.peak * Math.min(1, t / .03) * (1 - k) ** 2 : 0;
-      for (const [src, shell] of shells) shell.visible = on && src.visible;
+      material.uniforms.uFlash.value = on ? HERO_HURT_FLASH.peak * Math.min(1, t / .03) * (1 - k) ** 1.6 : 0;
+      for (const [src, shell] of shells) shell.visible = on && visibleUp(src);
       if (!on) t = Infinity;
     },
     dispose() { if (!shells) return; for (const [, shell] of shells) shell.removeFromParent(); material.dispose(); shells = null; },

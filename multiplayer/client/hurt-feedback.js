@@ -35,22 +35,23 @@ void main(){
   float ang = atan(dirN.y, dirN.x);
   // A slow living ripple along the rim so the glow reads as light, not a flat gradient.
   float ripple = .82 + .18 * noise(ang * 3.2 + uTime * .9) + .08 * noise(ang * 9.0 - uTime * 2.3);
-  float rim = smoothstep(.5, 1.12, edge * ripple);
+  float rim = smoothstep(.58, 1.15, edge * ripple); rim *= rim;
   float hit = 0.0, warm = uWarm * uGlow;
   for (int i = 0; i < ${HURT_TUNING.slots}; i++) {
     vec4 h = uHits[i];
     if (h.z <= .001) continue;
     float facing = max(0.0, dot(dirN, h.xy) * .5 + .5);
-    float lobe = pow(facing, 5.0) * smoothstep(.28, 1.05, edge * ripple) * (1.0 + .35 * h.z);
+    float band = smoothstep(.5, 1.12, edge * ripple);
+    float lobe = pow(facing, 6.0) * band * sqrt(band) * (1.5 + .5 * h.z);
     hit += lobe * h.z; warm += lobe * h.z * h.w;
   }
   float low = rim * uLow * (.45 + .55 * uBeat);
-  float alpha = clamp(hit * .78 + rim * uGlow * .55 + low * .42, 0.0, .82);
+  float alpha = clamp(hit * .9 + rim * uGlow * .9 + low * .75, 0.0, .9);
   if (alpha < .004) discard;
   // Deep crimson on the very rim, a warmer red toward the inside; fire leans ember orange.
   float inner = smoothstep(1.1, .55, edge);
-  vec3 blood = mix(vec3(.38, .015, .03), vec3(.92, .16, .12), inner);
-  vec3 ember = mix(vec3(.55, .12, .02), vec3(1.0, .52, .16), inner);
+  vec3 blood = mix(vec3(.5, .0, .03), vec3(.95, .08, .08), inner);
+  vec3 ember = mix(vec3(.75, .2, .02), vec3(1.0, .58, .18), inner);
   vec3 col = mix(blood, ember, clamp(warm / max(alpha * 1.4, .05), 0.0, 1.0));
   gl_FragColor = vec4(col, alpha);
 }`;
