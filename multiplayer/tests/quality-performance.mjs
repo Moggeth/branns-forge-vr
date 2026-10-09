@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {terrainHeight,createSunderRupture} from '../shared/terrain.js';
 import {createTerrainSampler} from '../shared/terrain-sampler.js';
 import {createTreeIndex,resolveTrees} from '../shared/trees.js';
+import {keepCarve} from '../shared/keep-sites.js';
 const start=performance.now(),reference='51e9e98';
 async function before(file){
  const source=execFileSync('git',['show',`${reference}:multiplayer/shared/${file}`],{encoding:'utf8'}).replace(/from ['"](\.\/[^'"]+)['"]/g,(_,p)=>`from '${new URL('../shared/'+p,import.meta.url).href}'`);
@@ -15,6 +16,9 @@ const state={seed:41,tick:40,edits:Array.from({length:64},(_,i)=>({id:'e'+i,kind
 const sampler=createTerrainSampler(state),points=[];
 for(let i=0;i<4000;i++)points.push([(i*613%12300)/100-61.5,(i*397%12300)/100-61.5]);
 points.push([60,60],[-60,-60],[0,0],[4,0],[7,0],[46,50]);
+// The ring keeps (2026-10-08) deliberately reshaped their corners; the oracle covers the rest of the map.
+const carved=(x,z)=>[-.8,0,.8].some(a=>[-.8,0,.8].some(b=>keepCarve(x+a,z+b))); // any grid corner of the triangle
+for(let i=points.length-1;i>=0;i--)if(carved(...points[i]))points.splice(i,1);
 let exact=0;
 function verify(){sampler.setState(state);for(const [x,z] of points){const expected=oldTerrain.terrainHeight(state,x,z,false);assert.equal(terrainHeight(state,x,z,false),expected,'kernel broad phase must preserve exact height');assert.equal(sampler.height(x,z),expected,`cached height ${x},${z},tick ${state.tick}`);exact++;}}
 verify();const cold=sampler.stats().samples;verify();assert.equal(sampler.stats().samples,cold,'unchanged snapshots must retain vertices');

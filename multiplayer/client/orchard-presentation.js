@@ -7,6 +7,7 @@ import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terr
 // plus authored bank/edge breakup and planar bedrock for exposed stone. No extra draws, lights or geometry.
 import * as THREE from 'three';
 import {createDeformationField} from './terrain-deformation-field.js';
+import {keepCarve} from '../shared/keep-sites.js';
 
 export const ORCHARD_PRESENTATION_VERSION = 2;
 export const WALK_BOUND = 55;
@@ -434,7 +435,8 @@ function createSkirt(material, height, segments = 96, rings = 7, outer = 104) {
       for (let r = 0; r < rings; r++) {
         const t = r / (rings - 1), dist = k + (outer - k) * t * t;
         const lift = t * t * (2.2 + 3 * valueNoise(cx * 3 + 7, cz * 3 - 2));
-        positions.set([cx * dist, edge * (1 - t) + lift, cz * dist], (s * rings + r) * 3);
+        const x = cx * dist, z = cz * dist, carve = keepCarve(x, z); // tucked under the keeps' carved back towns
+        positions.set([x, carve ? (edge * (1 - t) + lift) * (1 - carve) + (height(x, z) - 2) * carve : edge * (1 - t) + lift, z], (s * rings + r) * 3);
       }
     }
     geometry.attributes.position.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();

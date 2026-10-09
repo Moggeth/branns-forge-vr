@@ -1,0 +1,6 @@
+renders/
+textures/
+backtown_kit.glb
+build_report.json
+render.log
+__pycache__/

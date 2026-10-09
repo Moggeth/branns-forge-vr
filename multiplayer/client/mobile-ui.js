@@ -245,7 +245,7 @@ export function createMobileUI({ mount = true } = {}) {
     mountSettings(settings);
   }
 
-  const state = { tool:'axe',visible: false, fullscreenVisible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+  const state = { tool:'axe',strikeVerb:null,visible: false, fullscreenVisible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
 
   function placeFullscreenSurface() {
     if (!mount || fullscreenSurface.hidden) return;
@@ -274,7 +274,7 @@ export function createMobileUI({ mount = true } = {}) {
     leftStick._caption.textContent = god ? 'Pan' : 'Move';
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
-    const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',stormreel:'Zap',flask:'Throw',limb:'Swing'})[state.tool]||'Attack';
+    const verb=state.strikeVerb||({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',stormreel:'Zap',flask:'Throw',limb:'Swing'})[state.tool]||'Attack';
     if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
     cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';

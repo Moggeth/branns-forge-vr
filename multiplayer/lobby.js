@@ -40,7 +40,7 @@ import { adventureView } from './shared/adventure.js';
 import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import {createRoomDirectory} from './client/public-room-directory.js';
 import {findWorlds} from './client/quick-play.js';
-import {createPublicRoomBrowser,createPublicRoomsLauncher} from './client/public-rooms.js';
+import {createPublicRoomBrowser} from './client/public-rooms.js';
 import {createBattlePanel} from './client/battle-panel.js';
 import './client/public-rooms.css';
 import './client/battle-panel.css';
@@ -51,7 +51,10 @@ import {createPatchNotes} from './client/patch-notes.js';
 import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
 import './client/patch-notes.css';
 import {createHeroProgressUI} from './client/hero-progress-ui.js';
+import {createQuartermasterUI} from './client/quartermaster-ui.js';
+import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
+import './client/quartermaster.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -121,7 +124,7 @@ let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
 let phase = 'lobby';          // lobby | connecting | game
-let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
+let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false, shopOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
 let handoverTimer = 0;
@@ -140,9 +143,7 @@ const roomBrowser=createPublicRoomBrowser({
   onClose:()=>{directory.close();if(directoryPending){directoryPending=null;teardown();hideLobbyStatus();setPhase('lobby');}roomBrowser.render({pendingCode:null});}
 });
 const directory=createRoomDirectory({endpoint:peerEndpoint,onChange:state=>roomBrowser.render({...state,pendingCode:directoryPending})});
-const browseButton=createPublicRoomsLauncher({onOpen:button=>{roomBrowser.open(button);directory.open();}});
-browseButton.id='browseWorlds';$('create').after(browseButton);
-const publicNotice=document.createElement('p');publicNotice.className='bf-pr-lobby-notice';publicNotice.textContent='Multiplayer worlds are public. Anyone can join.';browseButton.after(publicNotice);
+// Welcome screen keeps only role + Play + guides; the public world browser has no lobby launcher.
 const battlePanel=createBattlePanel({mount:document.querySelector('#menu .menu-card'),onAction:({action,side})=>{
   if(!connected)return;
   if(action==='side')command('action',{action:'inventionSide',side});
@@ -177,16 +178,14 @@ roomInput.addEventListener('paste', event => {
 const invited = (new URLSearchParams(location.search).get('room') || '').trim();
 if (ROOM_PATTERN.test(invited)) {
   roomInput.value = invited;
-  $('joinBlock').classList.add('invited');
-  $('joinBlock').hidden = false;
-  body.classList.add('has-invite');
+  $('joinBlock').classList.add('invited');   // stays hidden: Play joins this world directly
   $('inviteNote').hidden = false;
   setText($('inviteNote'), 'You’ve been invited! Pick a name and role, then join.');
 }
 
 $('lobbyForm').addEventListener('submit', event => {
   event.preventDefault();
-  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play
+  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play (always now)
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
@@ -197,6 +196,8 @@ $('create').addEventListener('click', () => quickPlay());
 let quickSearch = 0;
 async function quickPlay(tried = []) {
   if (rendererFailed || !game) { start({create: true}); return; }
+  // An invite link (or QR scan) goes straight to that world; if it has closed, fall back to quick play.
+  if (!tried.length && ROOM_PATTERN.test(invited)) { start({create: false, room: invited, quick: {tried: [invited]}}); return; }
   const search = ++quickSearch;
   teardown(); phase = 'connecting'; body.dataset.phase = 'connecting';
   showLobbyStatus('Finding a world near you…', {busy: true, cancel: true});
@@ -322,8 +323,8 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
@@ -367,7 +368,7 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(detail => {
@@ -396,7 +397,7 @@ function start(attempt) {
   }));
 
   phase = 'connecting'; body.dataset.phase = 'connecting';
-  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? 'Joining a world near you…' : `Looking for world ${attempt.room}…`;
+  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? (attempt.room === invited ? 'Joining your friend’s world…' : 'Joining a world near you…') : `Looking for world ${attempt.room}…`;
   showLobbyStatus(verb, {busy: true, cancel: true});
 
   joinTimer = setTimeout(() => {
@@ -560,9 +561,10 @@ function onSnapshot(snapshot) {
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to zap · every hit is a full shock · R at the tower feeds Crystal',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
+    quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
   if (snapshots % 15 === 0) refreshHostControls();
@@ -931,8 +933,6 @@ const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='un
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
 holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
-const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.innerHTML='<svg aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Equipment</span>';lobbyFieldButton.setAttribute('aria-label','Equipment guide');
-lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
@@ -941,6 +941,11 @@ const heroProgress=createHeroProgressUI({hudSelf:document.querySelector('.hud-se
   onLearn:(weapon,talent)=>command('action',{action:'talent',weapon,talent}),onReset:()=>command('action',{action:'talent',reset:true}),
   onOpen:()=>{talentsOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{talentsOpen=false;syncActive();}});
+// The keep Quartermaster (client/quartermaster-ui.js): E at the shop counter opens it; V or the vitals chip drinks a draught.
+const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySelector('.hud-self'),
+  onBuy:item=>command('action',{action:'homeShop',buy:item}),onSell:item=>command('action',{action:'homeShop',sell:item}),onDrink:()=>command('action',{action:'drinkDraught'}),
+  onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
+  onClose:()=>{shopOpen=false;syncActive();}});
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -949,6 +954,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
   if(roomBrowser.isOpen)return;
   if(event.key==='Escape'&&event.target.closest?.('.bf-bt-confirm'))return;
   if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
+  if(quartermaster.isOpen){if(!quartermaster.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&event.key==='Escape'){event.preventDefault();quartermaster.close();}}return;} // the shop owns its keys
   if(heroProgress.isOpen){if(!heroProgress.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&(event.key==='Escape'||event.code==='KeyN')){event.preventDefault();heroProgress.close();}}return;} // so does the Talents panel
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
@@ -994,7 +1000,7 @@ try {
     isHost, onSelection: chooseSpell,
     onVoicePose: pose => voice?.updatePose(pose),
     voiceActivity: () => voice?.active ? voice.activity() : null,
-    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
+    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='openShop'?quartermaster.show():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onNotice: text => toast(text),
@@ -1037,7 +1043,7 @@ export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
 patchNotes.showWhatsNew();
-if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
+if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('create') : nameInput).focus({preventScroll: true});
 
 // A host stepping away hands the world to someone still playing before its timers are throttled.
 document.addEventListener('visibilitychange', () => { if (document.hidden) try { session?.handOver(); } catch { /* best effort */ } });

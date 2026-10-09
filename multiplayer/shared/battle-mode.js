@@ -1,13 +1,14 @@
 // Optional host-controlled lane battle. All clocks and IDs belong to the simulation.
 import {expeditionRunning} from './adventure.js';
-import {stepHomeBallista} from './home-ballista.js';
+import {stepHomeBallista,stepKeepShots} from './home-ballista.js';
+import {itemBonus} from './hero-items.js';
 import {HOME,repairHome,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
 
 export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTicks:900,baseHp:400,aggroRange:12});
 export const BATTLE_SIDES = Object.freeze(['party','rivals']);
 const sites = [[-40,-40],[40,40]];
 // The bent central lane bypasses the permanent Forge and its apron.
-const lane = [[-40,-40],[-24,-24],[-12,0],[0,16],[24,28],[40,40]];
+const lane = [[-38,-38],[-19,-19],[-12,0],[0,16],[18,23],[38,38]]; // waypoints 1 and 4 sit just outside the ring keeps' domes
 const flat = (a,b) => Math.hypot(a[0]-b[0],a[2]-b[2]);
 const int = (n,a,b) => Number.isSafeInteger(n)&&n>=a&&n<=b;
 const fail = code => ({ok:false,code,events:[]});
@@ -80,10 +81,11 @@ export function attackBattleBase(state,player,id,ctx,{cooldown=true}={}) {
   }
   if(!['axe','pick','hammer','limb'].includes(player.tool))return fail('melee_required');
   const d=flat(player.position,base.position),dot=(-Math.sin(player.yaw)*(base.position[0]-player.position[0])-Math.cos(player.yaw)*(base.position[2]-player.position[2]))/Math.max(.001,d);
-  if(d>(state.battle.v===2?4.2:3.2)||Math.abs(player.position[1]-base.position[1])>2.5||(d>.5&&dot<.45))return fail('out_of_reach');
+  const heart=state.battle.v===2&&findHomeTarget(state,id)?.base===base; // the widened heart forge is 4.3 m across its plinth
+  if(d>(heart?5.8:state.battle.v===2?4.2:3.2)||Math.abs(player.position[1]-base.position[1])>2.5||(d>.5&&dot<.45))return fail('out_of_reach');
   if(cooldown&&state.tick-player.attackTick<({axe:27,pick:29,hammer:40,limb:32}[player.tool]))return fail('cooldown');
   player.attackTick=state.tick;const events=[];
-  damageBattleBase(state,id,player.tool==='hammer'?55:25,player.side||'party',events);
+  damageBattleBase(state,id,(player.tool==='hammer'?55:25)*(1+itemBonus(player,'siege')),player.side||'party',events); // Siege Crown
   return {ok:true,events};
 }
 
@@ -124,7 +126,7 @@ export function spawnSquad(state,ctx,base,tag) {
 }
 
 function stepHomeBattle(state,ctx,events) {
-  if(homeBattle(state))for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part);
+  if(homeBattle(state)){for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part,ctx,events);stepKeepShots(state,ctx,events);}
   stepHomeBases(state,ctx,events);
   if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
   const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;

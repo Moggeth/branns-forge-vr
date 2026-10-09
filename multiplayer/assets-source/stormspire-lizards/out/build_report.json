@@ -1,0 +1,44 @@
+{
+  "triangles": 5183,
+  "triangles_by_part": {
+    "body": 1088,
+    "head": 536,
+    "jaw": 168,
+    "deco": 178,
+    "teeth": 300,
+    "eye": 312,
+    "lid": 396,
+    "limb": 320,
+    "boot": 544,
+    "spike": 330,
+    "HatHard": 325,
+    "gear": 530,
+    "Wrench": 84,
+    "Z1": 36,
+    "Z2": 36
+  },
+  "vertices": 3036,
+  "materials": 1,
+  "bones": 37,
+  "skipped_faces": 0,
+  "texture": [
+    512,
+    512
+  ],
+  "jpeg_bytes": {
+    "base": 55476,
+    "normal": 112756,
+    "mr": 67998
+  },
+  "bake_seconds": 3.5,
+  "animations": {
+    "idle": 23,
+    "climb": 27,
+    "cheer": 33,
+    "nap": 32,
+    "tinker": 28,
+    "bite": 29
+  },
+  "bytes": 558092,
+  "seconds": 6.8
+}

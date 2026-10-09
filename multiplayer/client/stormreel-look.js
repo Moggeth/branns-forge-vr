@@ -11,36 +11,47 @@ export const POLE = Object.freeze({
 export const MIXED_HUE = new THREE.Color(1, .86, 1);
 
 // ---- crossbow finishes -----------------------------------------------------------------------------------------
-// The glb is authored in the neutral kit palette; each pole gets its own clones of the materials it recolours. Red: crimson
-// lacquered steel, bone-white bands, red glass cores. Blue/black: blackened steel, electric-blue bands, blue cores.
+// public/assets/stormreel.glb (assets-source/stormreel-crossbow) bakes both finishes into one base-colour atlas: red (+)
+// crimson enamel and bone in the top half, blue/black (-) blackened enamel and electric blue in the bottom half. The glTF
+// shows the top half through KHR_texture_transform; the blue pole gets a clone whose map looks at the bottom half (same
+// image, same GPU texture). The charge cores take the pole's glow, and the capacitor glass gets a fresnel edge (cheap
+// stand-in for transmission: clear face-on, a bright tinted rim at grazing angles).
 const FINISH = {
-  red: {Steel: {color: 0x8a211b, roughness: .34, metalness: .55}, PlateSteel: {color: 0x5e1812, roughness: .3, metalness: .7}, Hazard: {color: 0xf1e4cf},
-    CeramicBlue: {color: 0xd8463a}, Charge: {color: 0xff7a50, emissive: 0xff3a14}, Cable: {color: 0xd8402e}, Fletch: {color: 0xd8402e}, Gold: {color: 0xe3b04e}},
-  blue: {Steel: {color: 0x12151b, roughness: .3, metalness: .85}, PlateSteel: {color: 0x1b2230, roughness: .26, metalness: .85}, Hazard: {color: 0x2f74e0, roughness: .4},
-    CeramicBlue: {color: 0x3a74d8}, Charge: {color: 0x59b4ff, emissive: 0x1f8fff}, Cable: {color: 0x2f74e0}, Fletch: {color: 0x2f74e0}, Gold: {color: 0x8fb8f0}},
+  red: {offset: 0, Charge: {color: 0xff6a3c, emissive: 0xff3a12}, Glass: {color: 0xffe2d8, rim: [1, .62, .5]}},
+  blue: {offset: .5, Charge: {color: 0x62b4ff, emissive: 0x1a7cff}, Glass: {color: 0xdcecff, rim: [.55, .78, 1]}},
 };
 const finished = new Map();
+function glassFresnel(m, rim) {
+  m.transparent = true; m.depthWrite = false; m.opacity = Math.min(m.opacity, .2); m.roughness = .04; m.metalness = 0; m.envMapIntensity = 1.6;
+  m.onBeforeCompile = sh => {
+    sh.uniforms.rimColor = {value: new THREE.Color(...rim)};
+    sh.fragmentShader = 'uniform vec3 rimColor;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+      'float fres = pow(1.0 - clamp(abs(dot(normalize(vViewPosition), normal)), 0.0, 1.0), 3.0);\n' +
+      'outgoingLight += rimColor * fres * 0.55; diffuseColor.a = clamp(diffuseColor.a + fres * 0.65, 0.0, 0.92);\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'stormreel-glass';
+}
+function finishMaterial(m, pole) {
+  if (!m) return m;
+  const base = m.userData.baseMaterial || m, f = FINISH[pole], key = `${base.uuid}:${pole}`;
+  if (finished.has(key)) return finished.get(key);
+  let out = base;
+  if (base.map && base.name === 'Stormreel_Body') {
+    out = base.clone(); out.map = base.map.clone(); out.map.offset.y = (base.userData.mapOffsetY ??= base.map.offset.y) + f.offset; out.map.needsUpdate = true;
+  } else if (f[base.name]) {
+    const d = f[base.name]; out = base.clone();
+    if (d.color !== undefined) out.color.setHex(d.color);
+    if (d.emissive !== undefined) out.emissive.setHex(d.emissive);
+    if (base.name === 'Glass') glassFresnel(out, d.rim);
+  }
+  if (out !== base) out.userData.baseMaterial = base;
+  finished.set(key, out); return out;
+}
 /** Recolour a Stormreel crossbow (or a bolt) for a pole, in place. Safe to call every frame: it only works on a change. */
 export function finishCrossbow(root, pole) {
   if (!root || root.userData.pole === pole || !FINISH[pole]) return root;
   root.userData.pole = pole;
-  root.traverse(n => {
-    if (!n.isMesh) return;
-    const list = [n.material].flat(), out = list.map(m => {
-      const f = FINISH[pole][m?.name]; if (!f) return m;
-      const base = m.userData.baseMaterial || m, key = `${base.uuid}:${pole}`;
-      if (!finished.has(key)) {
-        const c = base.clone(); c.userData.baseMaterial = base;
-        if (f.color !== undefined) c.color.setHex(f.color);
-        if (f.emissive !== undefined) c.emissive.setHex(f.emissive);
-        if (f.roughness !== undefined) c.roughness = f.roughness;
-        if (f.metalness !== undefined) c.metalness = f.metalness;
-        finished.set(key, c);
-      }
-      return finished.get(key);
-    });
-    n.material = Array.isArray(n.material) ? out : out[0];
-  });
+  root.traverse(n => { if (n.isMesh) n.material = Array.isArray(n.material) ? n.material.map(m => finishMaterial(m, pole)) : finishMaterial(n.material, pole); });
   return root;
 }
 
