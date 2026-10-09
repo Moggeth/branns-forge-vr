@@ -21,17 +21,26 @@ for (let i = 0; i < 3; i++) assert.ok(Math.abs(p.getComponent(i) - out[90 + i]) 
 let last = -Infinity;
 for (let f = 0; f <= 1.001; f += .125) { predictArrow({kind: 'arrow', position: origin, velocity, curve, bornTick: 0}, 0, 3 + f, p); assert.ok(-p.z > last); last = -p.z; }
 
-// Contrails: two trails per phoenix, bounded samples, one draw, fade out after their arrow is gone.
+// Contrails: two trails per phoenix, bounded samples, at most the ribbon plus its ember motes (2 draws),
+// shedding sparks while they burn and leaving nothing behind once their arrow is gone.
 const trails = createPhoenixContrails();
 const camera = new THREE.PerspectiveCamera(); camera.position.set(0, 2, 5); camera.updateMatrixWorld();
 for (let f = 0; f < 40; f++) {
   for (const side of [-1, 1]) trails.emit(`a:${side}`, new THREE.Vector3(side * .3, 1.6, -f * .5), 1);
   trails.update(1 / 60, camera);
 }
-assert.equal(trails.stats().trails, 2); assert.equal(trails.stats().drawCalls, 1);
-assert.ok(trails.object.geometry.drawRange.count <= 2 * (CONTRAIL.samples - 1) * 6);
-for (let f = 0; f < 60; f++) trails.update(1 / 60, camera);
-assert.equal(trails.stats().trails, 0); assert.equal(trails.object.visible, false);
+assert.equal(trails.stats().trails, 2); assert.ok(trails.stats().drawCalls <= 2, 'ribbon plus motes stay at two draws');
+assert.ok(trails.stats().motes > 0, 'a burning trail sheds embers');
+assert.ok(trails.object.geometry.drawRange.count <= 2 * (CONTRAIL.samples - 1) * 3 * 6);
+// Every ember is bounded by the pool, however long the phoenix flies.
+for (let f = 0; f < 240; f++) {
+  for (const side of [-1, 1]) trails.emit(`a:${side}`, new THREE.Vector3(side * .3, 1.6, -40 - f * .5), 1);
+  trails.update(1 / 60, camera);
+}
+assert.ok(trails.stats().motes <= CONTRAIL.motes, 'ember pool is a hard cap');
+for (let f = 0; f < 120; f++) trails.update(1 / 60, camera);
+assert.equal(trails.stats().trails, 0); assert.equal(trails.stats().motes, 0);
+assert.equal(trails.object.visible, false);
 // Capacity is a hard cap.
 for (let i = 0; i < CONTRAIL.trails + 10; i++) trails.emit(`x${i}`, new THREE.Vector3(i, 0, 0));
 assert.equal(trails.stats().trails, CONTRAIL.trails);

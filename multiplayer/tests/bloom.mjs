@@ -35,8 +35,10 @@ assert.equal(S.springs.length, BLOOM.spring.cap, 'the oldest spring gives way in
 
 // Eating fruit and felling the God's creatures feed Bloom.
 const apple = S.pickups.find(q => q.kind === 'apple'); hero.position = [apple.x, apple.y, apple.z]; hero.hp = 40;
-const ate = sim.command('h', {type: 'action', seq: 1, action: 'collectTarget', targetId: apple.id});
-assert.equal(ate.ok, true, ate.code); assert.equal(S.bloom, 30 + BLOOM.apple);
+const took = sim.command('h', {type: 'action', seq: 1, action: 'collectTarget', targetId: apple.id});
+assert.equal(took.ok, true, took.code); assert.equal(S.bloom, 30, 'picking it up is not eating it');
+for (let i = 0; i < 3; i++) { for (let k = 0; k < 30; k++) sim.step(); const ate = sim.command('h', {type: 'action', seq: 2 + i, action: 'snack', op: 'bite'}); assert.equal(ate.ok, true, ate.code); }
+assert.equal(S.bloom, 30 + BLOOM.apple, 'the eaten core spreads the seed');
 
 // Save and restore keep Bloom and live springs; older saves start at zero.
 const saved = sim.checkpoint(), restored = loadSimulation(saved);
@@ -64,7 +66,7 @@ assert.deepEqual(quake.events.filter(e => e.kind === 'god_gift').map(e => e.mate
 const before = S.bloom; S.enemies = []; S.bloom = 200;
 sim.command('g', {type: 'cast', seq: ++seq, spell: 'skeleton', point: [hero.position[0], 0, hero.position[2] - 1.5]});
 const target = S.enemies.at(-1); target.position = [hero.position[0], hero.position[1], hero.position[2] - 1.5]; target.emergeTick = 0; target.hp = 1; hero.yaw = 0; hero.tool = 'axe'; hero.attackTick = -1000;
-const kill = sim.command('h', {type: 'action', seq: 2, action: 'strike'});
+const kill = sim.command('h', {type: 'action', seq: 10, action: 'strike'});
 assert.ok(kill.events.some(e => e.kind === 'death' && e.id === target.id), 'skeleton felled');
 assert.equal(S.bloom, 200 + BLOOM.skeleton); void before;
 

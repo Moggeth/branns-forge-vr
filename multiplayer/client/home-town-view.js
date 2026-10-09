@@ -4,7 +4,7 @@
 // cranked; the capstan turns; hearths flicker; coins hop out of the chute, the counter and fallen troops.
 // Code-built stand-ins draw until the Blender kit (assets/town-20261007 -> /assets/town_kit.glb) loads.
 import * as THREE from 'three';
-import {homePiece, neutralTavern} from '../shared/home-bases.js';
+import {TAVERN_SCALE, homePiece, neutralTavern} from '../shared/home-bases.js';
 import {MILL} from '../shared/home-mill.js';
 import {terrainHeight} from '../shared/terrain.js';
 
@@ -93,6 +93,7 @@ export function createHomeTownView({scene}) {
   function build(id, kind, side, placed) {
     const made = (kit && kitPiece(kind, side)) || (kind === 'Tavern' ? standTavern(side) : kind === 'Mill' ? standMill(side) : standStall(side));
     made.group.name = id; made.group.rotation.y = placed.yaw; made.kind = kind; made.side = side; made.placed = placed; made.kit = !!kit;
+    if (kind === 'Tavern') made.group.scale.setScalar(TAVERN_SCALE); // roomier halls drawn from the same kit
     made.group.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     made.spin = 0; made.crankSpin = 0; made.sailAngle = 0;
     root.add(made.group); pieces.set(id, made); return made;
