@@ -72,3 +72,12 @@ Real-device acceptance still required: iPhone 12 Safari cold/warm launch, rotati
 - UI acknowledgement cannot depend on an OS fullscreen promise resolving. Test blocked imports and platform promises deliberately.
 - A long test that walks continuously leaves its intended cast area. Use bounded oscillatory movement and record authoritative action results; the original long test failed its wall assertion despite no browser exception. A subsequent run was invalidated by Vite reloading after patch-note edits. The isolated ability harness now disables the dev HMR client; source remains unchanged throughout measurements.
 - PowerShell rg wildcards belong in `-g` filters; text source uses explicit UTF-8. Use apply_patch for long documentation payloads.
+
+
+## Publication integration — 2026-10-09
+
+Personal GitHub CLI authentication was repaired and verified as Moggeth against the private repository. The connector still uses the work account; use the verified per-command CLI wrapper for this project. Integrated the original two commits onto fresh main ee022e5 on codex/mobile-responsive-release-20261009, preserving the original branch. Retained voiceActivity and the new Emberdew, corner-ground and back-town diagnostics while resolving the game-constructor overlap.
+
+The simplified welcome screen on current main hides the old solo button. Updated browser acceptance to exercise Play then the visible offline fallback, with only room sockets mocked. Initial mock closed every WebSocket, including Vite HMR, causing reloads and a missing prompt; restrict it to /peer paths. Fixed early Play so waiting for the renderer preserves invite and quick-play semantics and cancellation.
+
+Integrated required checks: 200/200 in 152.9 seconds; production build passed (3.40 seconds tool duration). Early-input/rotation/settings check passed in 29.70 seconds on Chromium touch with 4x CPU throttling: orientation acknowledgement 3ms, 58 GLB requests with no repeats across rotations. Renderer-ready 11.89 seconds under that throttle; not a real-phone result. Pixel coverage checks passed desktop, portrait touch and forced-HDR touch in 28.21 seconds, without runtime exceptions. New upstream towns and assets increase startup work, so the historical A/B timings above must not be represented as measurements of current production content. iPhone 12 60 FPS remains unverified.

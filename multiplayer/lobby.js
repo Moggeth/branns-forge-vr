@@ -195,6 +195,13 @@ $('create').addEventListener('click', () => quickPlay());
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
 let quickSearch = 0;
 async function quickPlay(tried = []) {
+  // A tap during loading must keep invite/quick-play semantics after the renderer arrives.
+  if (!game && !rendererFailed) {
+    const revision = ++startRevision;
+    showLobbyStatus('Preparing the world…', {busy: true, cancel: true});
+    await rendererPromise;
+    if (revision !== startRevision) return;
+  }
   if (rendererFailed || !game) { start({create: true}); return; }
   // An invite link (or QR scan) goes straight to that world; if it has closed, fall back to quick play.
   if (!tried.length && ROOM_PATTERN.test(invited)) { start({create: false, room: invited, quick: {tried: [invited]}}); return; }

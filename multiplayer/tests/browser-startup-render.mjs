@@ -1,6 +1,6 @@
 // Real scene pixel coverage after cold startup and resize, with optional stale-RAF injection.
 import assert from 'node:assert/strict';
-import {launch,BASE,record,save,shot} from './browser-acceptance-lib.mjs';
+import {launch,BASE,record,save,shot,stubUnavailableRooms,enterSoloFromPlay} from './browser-acceptance-lib.mjs';
 async function coverage(page){
  const png=(await page.screenshot()).toString('base64');
  return page.evaluate(async png=>{
@@ -29,10 +29,11 @@ for(const config of [
      body=body.replace('previous = now; renderTick=', 'if(globalThis.__startupClockProbe && globalThis.__startupClockProbe.deltas.length<8)globalThis.__startupClockProbe.deltas.push(dt);previous = now; renderTick=');
      await route.fulfill({response,body});
    });
-   await page.goto(BASE+'/?acceptanceProbe'+config.query,{waitUntil:'domcontentloaded'});
+   await stubUnavailableRooms(page);
+ await page.goto(BASE+'/?acceptanceProbe'+config.query,{waitUntil:'domcontentloaded'});
    await page.waitForFunction(()=>window.brannHarness,null,{timeout:60000});
    const close=page.locator('.pn-close');if(await close.isVisible())await close.click();
-   await page.locator('#solo').click();
+   await enterSoloFromPlay(page);
    await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics?.().startup.ready,null,{timeout:120000});
    await page.waitForTimeout(500);
    if(process.env.STARTUP_STALE_FRAME === '1') {

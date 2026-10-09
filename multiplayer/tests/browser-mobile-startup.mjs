@@ -1,7 +1,7 @@
 // Real DOM taps with the heavy game module and secondary GLBs deliberately held.
 // Chromium touch emulation is not iPhone/Safari hardware acceptance.
 import assert from 'node:assert/strict';
-import {launch,BASE,record,save,shot} from './browser-acceptance-lib.mjs';
+import {launch,BASE,record,save,shot,stubUnavailableRooms,enterSoloFromPlay} from './browser-acceptance-lib.mjs';
 const {browser,page}=await launch({touch:true,turnPrompt:true,viewport:{width:390,height:844}});
 let releaseGame,releaseExtras;
 const gameGate=new Promise(r=>releaseGame=r),extrasGate=new Promise(r=>releaseExtras=r);
@@ -21,6 +21,7 @@ try {
  });
  await page.route('**/client/game.js*',async r=>{await gameGate;await r.continue();});
  await page.route(/\/(grass_tuft|fern_delicate|heavy_launcher|waist_pouch)\.glb$/,async r=>{await extrasGate;await r.continue();});
+ await stubUnavailableRooms(page);
  await page.goto(BASE+'/?acceptanceProbe',{waitUntil:'domcontentloaded'});
  await page.locator('.tp-go').tap();
  await page.waitForFunction(()=>document.querySelector('.turn-phone').hidden);
@@ -30,7 +31,7 @@ try {
  assert.equal(await page.evaluate(()=>!!document.querySelector('#world').brannDiagnostics),false,'orientation works before renderer import');
  await page.waitForFunction(()=>window.brannHarness);
  const close=page.getByRole('button',{name:'Close patch notes',exact:true});if(await close.isVisible())await close.click();
- await page.locator('#solo').click();
+ await page.locator('#create').click();
  await page.locator('#statusCancel').click();
  releaseGame();
  await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics?.()?.startup.phase==='shadows',null,{timeout:120000});
@@ -39,7 +40,7 @@ try {
  assert.equal(await page.evaluate(()=>window.brannHarness.state().phase),'lobby','cancelled early join must not enter later');
  const ready=await page.evaluate(()=>document.querySelector('#world').brannDiagnostics());
  assert.equal(ready.startup.error,null);assert.equal(ready.startup.secondaryReady,undefined,'blocked optional assets do not block entry');
- await page.locator('#solo').click();
+ await enterSoloFromPlay(page);
  await page.waitForFunction(()=>window.brannHarness.state().connected);
  const atReady=requested.length;
  for(const viewport of [{width:844,height:390},{width:390,height:844},{width:844,height:390}]){await page.setViewportSize(viewport);await page.waitForTimeout(350);}

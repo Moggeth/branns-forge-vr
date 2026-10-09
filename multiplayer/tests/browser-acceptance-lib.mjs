@@ -71,3 +71,13 @@ export async function chooseTouchWeapon(page,id){
  if(await page.locator('body').getAttribute('data-mq-tray')!=='weapons')await page.locator('[data-equip][aria-pressed="true"]').tap();
  await page.locator('[data-equip="'+id+'"]').tap();
 }
+
+// Exercise the visible offline fallback after Play; never contact public rooms.
+export async function stubUnavailableRooms(page) {
+  await page.route(url => /\/rooms$/.test(url.pathname), route => route.fulfill({json: {rooms: [], region: ''}}));
+  await page.routeWebSocket(url => url.pathname.startsWith('/peer'), socket => { setTimeout(() => socket.close(), 100); });
+}
+export async function enterSoloFromPlay(page) {
+  await page.locator('#create').click();
+  await page.locator('#statusSolo').click({timeout: 30000});
+}
