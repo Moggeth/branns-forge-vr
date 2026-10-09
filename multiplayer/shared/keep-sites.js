@@ -36,14 +36,31 @@ export function keepCarve(x, z) {
   return carve;
 }
 // The keeps' fronts and the lane between them stay clear of new rocks (ore veins, renewed seams): nothing rises within
-// `bowl + front` of a keep's heart (the gate ballistas stand at ~20.4 m) or within `lane` of the straight march from
+// `bowl + front` of a keep's heart (the gate ballistas stand at ~20.4 m) or within `lane` of the main road from
 // one keep to the other, where the troops walk.
+// The main road from one keep's gate to the other's: straight down the diagonal, then a 45° jog round the Forge's
+// south-east side and back, so there is no straight sightline from corner to corner. Symmetric across x = -z, so both
+// keeps march the same distance. Party gate first. Drives the worn ground, the lanterns and the rock-free lane.
+export const MAIN_ROAD = Object.freeze({
+  half: 1.6, // worn width either side of the centreline; nothing solid stands on it
+  points: Object.freeze([[-20, -20], [-12, -12], [0, -12], [12, 0], [12, 12], [20, 20]].map(p => Object.freeze(p))),
+});
+/** Distance from (x, z) to the main road's centreline. */
+export function mainRoadDistance(x, z) {
+  let best = Infinity;
+  const P = MAIN_ROAD.points;
+  for (let i = 1; i < P.length; i++) {
+    const [ax, az] = P[i - 1], [bx, bz] = P[i], dx = bx - ax, dz = bz - az;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
 export const KEEP_APPROACH = Object.freeze({front: 6.5, lane: 4, yard: 13}); // the Forge yard keeps its own ore
 /** True where a rock must not rise: a keep's bowl and gate front, or the lane between the keeps. */
 export function inKeepApproach(x, z) {
   for (const [sx, sz] of Object.values(HOME_SITES)) if (Math.hypot(x - sx, z - sz) < KEEP_CARVE.bowl + KEEP_APPROACH.front) return true;
-  const [ax, az] = HOME_SITES.party, [bx, bz] = HOME_SITES.rivals, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
-  return Math.hypot(x, z) > KEEP_APPROACH.yard && Math.hypot(x - ax - dx * t, z - az - dz * t) < KEEP_APPROACH.lane;
+  return Math.hypot(x, z) > KEEP_APPROACH.yard && mainRoadDistance(x, z) < KEEP_APPROACH.lane;
 }
 /** True on a keep's carved floor (bowl, pass or town), where walkers may go past the open meadow's edge. */
 export function onKeepGround(x, z) {

@@ -8,7 +8,7 @@ import {DEPOSIT_CATALOG} from './material-catalog.js';
 const hash = (seed, n) => { let x = (seed ^ Math.imul(n + 1, 0x9e3779b9)) >>> 0; x ^= x >>> 16; x = Math.imul(x, 0x85ebca6b); x ^= x >>> 13; return x >>> 0; };
 export const baseTrees = [
   [-2, 6, 5.8], [1.8, 6.5, 6.4], [-3.5, 9, 5.2], [3.7, 9.4, 6.1], [0, 11.5, 6.8],
-  [-12, -9, 7], [14, -12, 6.5], [-17, 17, 7.2], [19, 18, 5.6], [-24, 4, 6.4], [25, 2, 6.8]
+  [-12, -9, 7], [14, -12, 6.5], [-17, 17, 7.2], [21, 16, 5.6], [-24, 4, 6.4], [25, 2, 6.8]
 ];
 export const initialDeposits = () => [
   [-5, 5, 'stone'], [5, 5, 'stone'], [-7, 10, 'stone'], [7, 10, 'stone'], [0, 14, 'stone'],

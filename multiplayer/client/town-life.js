@@ -14,7 +14,7 @@ const {homePiece, homePoint, pieceWorld} = HOME;
 const tavernScale = () => HOME.TAVERN_SCALE ?? 1;
 const neutralTavern = () => ({...HOME.neutralTavern(), s: tavernScale()});
 const tavernPiece = side => ({...homePiece(side, 'tavern'), s: tavernScale()});
-import {BACK_TOWN_LANTERNS, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
+import {BACK_TOWN_LANTERNS, MAIN_ROAD, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
 import {terrainHeight} from '../shared/terrain.js';
 
 const TAU = Math.PI * 2;
@@ -191,9 +191,9 @@ export function townLifeLayout() {
       walked += len;
     }
   };
-  for (const side of SIDE_KEYS) { const g = side === 'rivals' ? 1 : -1; road([homePoint(side, [0, 17.5]), homePoint(side, [1.2, 24]), [g * 11, g * 10.2], [g * 6.4, g * 5.4]], 7.5, 2.1); }
+  road([homePoint('party', [0, 17.5]), ...MAIN_ROAD.points, homePoint('rivals', [0, 17.5])], 7.5, 2.1);
   const mug = neutralTavern(), door = [mug.x + Math.sin(mug.yaw) * 4.6 * mug.s, mug.z + Math.cos(mug.yaw) * 4.6 * mug.s];
-  road([[-14, -20.5], [-4, -23.6], door], 7, 1.9);
+  road([[-15.5, -16], [-12, -22.5], [-4, -23.6], door], 7, 1.9);
   road([[2.6, -12], [4.2, -18.5], [door[0], door[1] + 2]], 7, 1.9);
   for (const [lx, lz, yaw, role, variant, floor = .1] of MUG_FOLK) folk.push({...place(mug, [lx, lz], floor), yaw: mug.yaw + yaw, role, variant, side: 'neutral'});
   for (const [kind, lx, lz, yaw] of MUG_PROPS) props.push({kind, ...place(mug, [lx, lz], 0), yaw: mug.yaw + yaw, side: 'neutral'});

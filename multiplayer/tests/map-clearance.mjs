@@ -5,7 +5,7 @@
 // `node tests/map-clearance.mjs --list` prints every overlap and steep placement instead of failing on the first.
 import assert from 'node:assert/strict';
 import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, homePiece, homePoint, neutralTavern, pieceWorld} from '../shared/home-bases.js';
-import {BACK_TOWN, BACK_TOWN_LANTERNS, backTownPiece, backTownPoint, inKeepApproach} from '../shared/keep-sites.js';
+import {BACK_TOWN, BACK_TOWN_LANTERNS, MAIN_ROAD, backTownPiece, backTownPoint, inKeepApproach, mainRoadDistance} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES} from '../shared/starting-world.js';
 import {baseTrees} from '../shared/world-content.js';
@@ -70,6 +70,14 @@ for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++
   if ((a.folk && !b.decor) || (b.folk && !a.decor)) continue;
   const gap = separation(a, b);
   if (gap < -.05) overlaps.push(`${a.group}/${a.name} x ${b.group}/${b.name}: ${(-gap).toFixed(2)} m deep at [${a.x.toFixed(1)}, ${a.z.toFixed(1)}]`);
+}
+// The main road between the keeps stays open: nothing solid stands within its worn width (townsfolk walk it).
+const roadSamples = [];
+MAIN_ROAD.points.slice(1).forEach(([bx, bz], i) => { const [ax, az] = MAIN_ROAD.points[i], n = Math.ceil(Math.hypot(bx - ax, bz - az) / .3); for (let k = 0; k <= n; k++) roadSamples.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]); });
+for (const it of items) {
+  if (it.folk) continue;
+  const gap = it.box ? Math.min(...roadSamples.map(([x, z]) => boxCircle(it, x, z, 0))) : mainRoadDistance(it.x, it.z) - it.r;
+  if (gap < MAIN_ROAD.half - .05) overlaps.push(`main road x ${it.group}/${it.name}: ${(MAIN_ROAD.half - gap).toFixed(2)} m onto the road at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
 }
 // Props inside the buildings they dress are fine only when they sit outside every solid of another building.
 const steep = [];

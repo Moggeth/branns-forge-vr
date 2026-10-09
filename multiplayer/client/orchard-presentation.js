@@ -7,7 +7,7 @@ import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terr
 // plus authored bank/edge breakup and planar bedrock for exposed stone. No extra draws, lights or geometry.
 import * as THREE from 'three';
 import {createDeformationField} from './terrain-deformation-field.js';
-import {keepCarve, backTownPoint, BACK_TOWN} from '../shared/keep-sites.js';
+import {keepCarve, backTownPoint, BACK_TOWN, MAIN_ROAD} from '../shared/keep-sites.js';
 import {homePoint, NEUTRAL_TAVERN} from '../shared/home-bases.js';
 
 export const ORCHARD_PRESENTATION_VERSION = 2;
@@ -38,7 +38,7 @@ function keepPaths() {
   const rows = [], line = (pts, hw, w) => { for (let i = 1; i < pts.length; i++) rows.push([...pts[i - 1], ...pts[i], hw, w].map(v => +(+v).toFixed(2))); };
   const ring = (side, r, n) => Array.from({length: n + 1}, (_, i) => homePoint(side, [Math.sin(i / n * Math.PI * 2) * r, Math.cos(i / n * Math.PI * 2) * r]));
   for (const side of ['party', 'rivals']) {
-    const L = local => local.map(p => homePoint(side, p)), g = side === 'rivals' ? 1 : -1;
+    const L = local => local.map(p => homePoint(side, p));
     line(L([[0, 17.5], [0, 12.5], [0, 7.5]]), 1.15, .9);                 // gate into the square
     line(ring(side, 7.5, 16), .8, .72);                                 // the square round the heart
     for (const spoke of [[[-5.3, -5.3], [-8.2, -8.2]], [[5.3, -5.3], [8.2, -8.2]], [[7.5, .3], [11.3, .45]], [[-7.5, .3], [-10.8, .45]], [[-5.3, 5.3], [-6.2, 6.2]]]) line(L(spoke), .75, .7);
@@ -49,12 +49,13 @@ function keepPaths() {
       const {at: [u, v], face: [fu, fv]} = BACK_TOWN[name], d = Math.hypot(fu - u, fv - v), k = name === 'well' ? 1.4 : name === 'workshop' ? 3.4 : 2.6;
       line([yard, backTownPoint(side, [u + (fu - u) / d * k, v + (fv - v) / d * k])], .7, .65);
     }
-    // The gate road: out of the keep, wandering a little, to the Forge yard.
-    line([homePoint(side, [0, 17.5]), homePoint(side, [1.2, 24]), [g * 11, g * 10.2], [g * 6.4, g * 5.4], [g * 2.6, g * 2.4]], 1.1, .85);
   }
+  // The main road from gate to gate (shared/keep-sites.js), jogging round the Forge, with a lane up into the Forge yard.
+  line([homePoint('party', [0, 17.5]), ...MAIN_ROAD.points, homePoint('rivals', [0, 17.5])], 1.25, .88);
+  line([[6, -6], [2.6, -2.4]], .9, .75);
   // The Muddled Mug: a footpath from Dawnhold's road and one down from the Forge, meeting at the door.
   const [mx, mz] = NEUTRAL_TAVERN.at, mug = [mx + Math.sin(NEUTRAL_TAVERN.yaw) * 4.6, mz + Math.cos(NEUTRAL_TAVERN.yaw) * 4.6];
-  line([homePoint('party', [1.2, 24]), [-12, -22.5], [-4, -23.6], mug], .85, .72);
+  line([[-15, -15], [-12, -22.5], [-4, -23.6], mug], .85, .72);
   line([[.5, -5.5], [2.6, -12], [4.2, -18.5], mug], .85, .72);
   return rows;
 }

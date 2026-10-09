@@ -2,13 +2,14 @@
 import {expeditionRunning} from './adventure.js';
 import {stepHomeBallista,stepKeepShots} from './home-ballista.js';
 import {itemBonus} from './hero-items.js';
+import {MAIN_ROAD} from './keep-sites.js';
 import {HOME,repairHome,createHomeBase,damageHome,findHomeTarget,homeBattle,homePoint,restoreHomeBases,siegeTargets,squadFor,stepHomeBases,baseFallen} from './home-bases.js';
 
 export const BATTLE = Object.freeze({botCap:32,perSideCap:16,waveSize:4,waveTicks:900,baseHp:400,aggroRange:12});
 export const BATTLE_SIDES = Object.freeze(['party','rivals']);
 const sites = [[-40,-40],[40,40]];
-// The bent central lane bypasses the permanent Forge and its apron.
-const lane = [[-38,-38],[-19,-19],[-12,0],[0,16],[18,23],[38,38]]; // waypoints 1 and 4 sit just outside the ring keeps' domes
+// Troops march the main road (shared/keep-sites.js), whose 45° jog bypasses the permanent Forge and its apron.
+const lane = [[-38,-38],...MAIN_ROAD.points,[38,38]]; // waypoints 1 and length-2 sit just outside the ring keeps' gates
 const flat = (a,b) => Math.hypot(a[0]-b[0],a[2]-b[2]);
 const int = (n,a,b) => Number.isSafeInteger(n)&&n>=a&&n<=b;
 const fail = code => ({ok:false,code,events:[]});
