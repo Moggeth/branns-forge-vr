@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {bowShotFromAim} from './bow-shot.js';
+import {beyondWorld} from '../shared/keep-sites.js';
 export {bowShotFromAim} from './bow-shot.js';
 // Emberwing curved-draw forecast. The integrator mirrors shared/combat.js
 // stepCombat() term for term (dt, curl fraction, drag, gravity, trapezoid
@@ -39,7 +40,7 @@ export function forecastTrajectory({origin, velocity, curve = [0, 0, 0], kind = 
     let reason = null, contact = null;
     if (hit && (!hitWindow || (k >= hitWindow[0] && k <= hitWindow[1]))) { _from[0] = px; _from[1] = py; _from[2] = pz; _to[0] = qx; _to[1] = qy; _to[2] = qz; contact = hit(_from, _to); if (contact) reason = 'hit'; }
     px = qx; py = qy; pz = qz;
-    if (!reason && (Math.abs(px) > 55 || Math.abs(pz) > 55)) reason = 'bounds';
+    if (!reason && beyondWorld(px, pz)) reason = 'bounds';
     if (!reason && terrainHeight && py < terrainHeight(px, pz) - .5) reason = 'terrain';
     const last = reason || k === maxTicks - 1;
     if (last || (k + 1) % sampleEvery === 0) {

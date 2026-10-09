@@ -199,12 +199,13 @@
         <section class="create-block">
           <button id="create" class="btn btn-primary btn-large" type="button">Play</button>
           <p class="hint">Joins the busiest world near you, or starts one if they’re all full.</p>
-          <button id="solo" class="btn btn-quiet" type="button">Play solo · no room service needed</button>
+          <!-- Kept for scripts; the welcome screen is just role + Play + guides now. -->
+          <button id="solo" class="btn btn-quiet" type="button" hidden>Play solo · no room service needed</button>
         </section>
 
         <div class="divider" role="presentation"><span>or</span></div>
 
-        <!-- Shown only for invite links (?room=…); quick play replaced typing codes. -->
+        <!-- Never shown: Play joins an invite link's world (?room=…) directly; quick play replaced typing codes. -->
         <section id="joinBlock" class="join-block" aria-labelledby="joinTitle" hidden>
           <h2 id="joinTitle" class="join-title">Join a friend</h2>
           <p id="inviteNote" class="invite-note" hidden></p>
@@ -229,7 +230,7 @@
       </div>
     </div>
 
-    <details id="savedWorlds" class="saved">
+    <details id="savedWorlds" class="saved" hidden>
       <summary>Bring back a saved world</summary>
       <div class="saved-body">
         <p id="savedSummary" class="hint">Worlds save automatically in this browser while you play.</p>
@@ -281,6 +282,7 @@
           <dt><kbd>1</kbd>–<kbd>8</kbd></dt><dd>Choose weapon</dd>
           <dt><kbd>E</kbd> <kbd>B</kbd> <kbd>T</kbd></dt><dd>Collect · Quick build · Place Timberline. Shift+B builds a bridge (3 carried Wood).</dd>
           <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>X</kbd></dt><dd>Grab a log or bone · drop · throw</dd>
+          <dt><kbd>I</kbd></dt><dd>Inspect your weapon · hold <kbd>I</kbd> and move the mouse to turn it yourself</dd>
           <dt>Timberline</dt><dd><kbd>E</kbd> mans it · mouse swings and tilts · click fires · hold <kbd>R</kbd> to wind faster (a friend cranking beside it winds 4×) · <kbd>E</kbd> or <kbd>Esc</kbd> steps off</dd>
           <dt><kbd>F9</kbd></dt><dd>Switch Hero / God perspective</dd>
           <dt><kbd>Esc</kbd></dt><dd>Release the mouse, then use Menu</dd>
@@ -311,6 +313,7 @@
           <dt>★ Special</dt><dd>Reach it with a second thumb while holding Attack</dd>
           <dt>Weapon bar</dt><dd>Eight weapons; swipe the bar sideways for more</dd>
           <dt>⋯ Actions</dt><dd>Collect (stows a held log), Bridge, Grab, Drop, Throw</dd>
+          <dt>◈ Inspect</dt><dd>Admire your weapon; drag to turn it, tap again to put it away</dd>
         </dl>
       </section>
       <section class="controls-role" data-for-role="god">
@@ -380,6 +383,7 @@
       </div>
       <button id="copyCode" class="btn btn-chip" type="button">Copy code</button>
       <button id="copyInvite" class="btn btn-chip" type="button">Copy invite</button>
+      <button id="showInviteQr" class="btn btn-chip" type="button">Join QR</button>
       <button id="vr" class="btn btn-chip btn-vr" type="button" hidden>Enter VR</button>
       <button id="perspectiveButton" class="btn btn-chip" type="button" title="Switch Hero / God (F9)" aria-label="Switch Hero / God perspective" aria-keyshortcuts="F9"><svg class="ico" aria-hidden="true"><use href="#i-god"/></svg><span>F9</span></button>
       <button id="quickBuildButton" class="btn btn-chip" type="button" data-qb-toggle aria-keyshortcuts="B" aria-haspopup="dialog" title="Quick build (B)"><svg class="ico" aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Build</span></button>
@@ -456,7 +460,7 @@
     <ul class="bf-help-list">
       <li><b>Attack</b> — click, or hold to draw Emberwing or breathe Wyrmspout fire.</li>
       <li><b>Special</b> — Q, right-click or the star button, even while drawing.</li>
-      <li><b>Weapons</b> — 1–7. Grab F · stow a held log E · Drop G · Throw X · Collect E · Bridge B.</li>
+      <li><b>Weapons</b> — 1–7. Grab F · stow a held log E · Drop G · Throw X · Collect E · Bridge B · Inspect I.</li>
     </ul>
   </details>
 </div>
@@ -548,6 +552,13 @@
         <button id="menuCopyCode" class="btn btn-secondary" type="button">Copy code</button>
         <button id="menuCopyInvite" class="btn btn-secondary" type="button">Copy invite link</button>
       </div>
+      <details id="inviteQr" class="saved">
+        <summary>Scan to join · QR code</summary>
+        <div class="saved-body">
+          <p id="inviteQrStatus" class="hint" role="status">Open to show this world’s QR code.</p>
+          <img id="inviteQrImage" width="256" height="256" alt="QR code to join this world" hidden style="max-width:100%;height:auto;align-self:center">
+        </div>
+      </details>
     </section>
 
     <!-- New: opens the shared #controlsCard inside this menu (focus stays inside the dialog). -->
@@ -580,6 +591,7 @@
     </details>
 
     <section class="menu-section" data-mc-page="controls" aria-label="Combat feedback">
+      <label for="graphicsMode">Graphics</label><select id="graphicsMode" class="mui-select"><option value="auto">Automatic</option><option value="clarity">Sharper image</option><option value="battery">Lower rendering cost</option></select><p class="hint">Adjusts the 3D image. Controls and text stay sharp.</p>
       <label class="bf-toggle"><input id="damageNumbers" type="checkbox"><span>Damage numbers</span></label><p class="hint">Small impact numbers. Off keeps combat fully in-world.</p>
     </section>
     <details id="techDetails" class="menu-section tech">
@@ -605,6 +617,6 @@
   </section>
 </div>
 
-<script type="module" src="./lobby.js"></script>
+<script type="module" src="./bootstrap.js"></script>
 </body>
 </html>

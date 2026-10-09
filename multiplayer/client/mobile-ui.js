@@ -133,6 +133,7 @@ function buildSettings() {
           ['★ Special', 'Weapon special; reachable while holding Attack'],
           ['Weapon bar', 'Choose any of eight weapons (swipe for more)'],
           ['Actions ⋯', 'Grab, drop or throw a log or bone; Collect stows a held log'],
+          ['◈ Inspect', 'Admire your weapon; drag to turn it, tap again to put it away'],
           ['Collect / Eat', 'Pick up nearby loot or heal with an apple'],
           ['Bridge', 'Spend 3 wood to build ahead'],
           ['Jump', 'Jump'],
@@ -150,7 +151,7 @@ function buildSettings() {
         guideBlock('Hero · desktop', [
           ['WASD / arrows', 'Move'],
           ['Mouse / click', 'Look / swing / shoot; hold and release to draw bow'],
-          ['1–7', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
+          ['1–7', 'Choose weapon'], ['Q / right mouse', 'Special; while drawing bow, lock curve origin then aim'], ['F / G / X', 'Grab / drop / throw a log or bone'], ['I', 'Inspect your weapon (hold and move the mouse to turn it)'], ['E / B', 'Collect, eat or stow a held log / build bridge'],
           ['Space', 'Jump'],
           ['Esc', 'Release the cursor'],
         ]),
@@ -175,7 +176,7 @@ function buildSettings() {
           ['In a world', 'Switch role, copy code or invite, download a backup, reset (host, with confirmation), leave'],
           ['Lobby', 'Import or resume a save, create or join a world'],
         ]),
-        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack tosses fuel; Special toggles its wick. Left trigger performs these specials in VR.' }),
+        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack hurls a lit bottle along its arc; Special lobs a Cinder Cluster. Stormreel: hold Attack to charge a bolt, Special reels it back in along its tether. Left trigger performs these specials in VR.' }),
       ]),
     ]),
   ]);
@@ -244,7 +245,7 @@ export function createMobileUI({ mount = true } = {}) {
     mountSettings(settings);
   }
 
-  const state = { tool:'axe',visible: false, fullscreenVisible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
+  const state = { tool:'axe',strikeVerb:null,visible: false, fullscreenVisible: false, quickCast: false, role: 'hero', fullscreen: false, fullscreenSupported: true, standalone: false, targeting: false, leftHanded: false };
 
   function placeFullscreenSurface() {
     if (!mount || fullscreenSurface.hidden) return;
@@ -273,7 +274,7 @@ export function createMobileUI({ mount = true } = {}) {
     leftStick._caption.textContent = god ? 'Pan' : 'Move';
     rightStick._caption.textContent = god ? 'Orbit' : 'Look';
 
-    const verb=({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',flask:'Pour',limb:'Swing'})[state.tool]||'Attack';
+    const verb=state.strikeVerb||({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',wyrmspout:'Fire',stormreel:'Zap',flask:'Throw',limb:'Swing'})[state.tool]||'Attack';
     if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
     cast.hidden = god && state.quickCast;
     cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';

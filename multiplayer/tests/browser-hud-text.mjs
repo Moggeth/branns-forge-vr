@@ -14,7 +14,7 @@ try{
  for(const size of [{width:390,height:844},{width:844,height:390}])for(const zoom of [1,1.5]){
   // Browser zoom layout equivalent: 1.5 device pixels per CSS pixel in the same physical viewport.
   const layout={width:Math.round(size.width/zoom),height:Math.round(size.height/zoom)};
-  const context=await browser.newContext({viewport:layout,deviceScaleFactor:zoom,isMobile:true,hasTouch:true});page=await context.newPage();page.errors=[];page.setDefaultTimeout(10000);
+  const context=await browser.newContext({viewport:layout,deviceScaleFactor:zoom,isMobile:true,hasTouch:true});await context.addInitScript(()=>{window.__brannQuietTurnPrompt=true;});page=await context.newPage();page.errors=[];page.setDefaultTimeout(10000);
   page.on('pageerror',e=>page.errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('favicon'))page.errors.push(m.text());});
   await enterWorld(page,{name});
   if(process.env.PATCH_HUD_CSS==='1') for(const file of ['lobby.css','styles.css','expedition-hud.css','client/field-overlays.css']){const css=readFileSync(new URL('../'+file,import.meta.url),'utf8'),mark=css.indexOf('/* Text-fit repair:');assert.ok(mark>=0);await page.addStyleTag({content:css.slice(mark)});}

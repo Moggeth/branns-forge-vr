@@ -15,22 +15,22 @@ assert.equal(state.players.length,32);assert.equal(state.enemies.length,32,'do n
 for(const [i,p] of state.players.entries()){const x=(i%8-3.5)*2,z=12-Math.floor(i/8)*2;p.position=[x,terrainHeight(state,x,z),z];p.side=i%2?'party':'rivals';p.yaw=Math.PI;p.tool=['axe','pick','hammer','crossbow','bow'][i%5];}
 state.players[0].position=[0,terrainHeight(state,0,20),20];state.players[0].yaw=0;
 for(const [i,e] of state.enemies.entries()){const x=(i%8-3.5)*2,z=3-Math.floor(i/8)*2;e.position=[x,terrainHeight(state,x,z),z];e.yaw=0;}
-loadSimulation(sim.checkpoint());const fixture=sim.snapshot();
-const {browser,page}=await launch({viewport:{width:960,height:540}});
+loadSimulation(sim.checkpoint());const fixture=sim.snapshot();if(process.env.PERF_BASES==='1')fixture.battle=createSimulation({seed:41}).snapshot().battle;
+const {browser,page}=await launch({deviceScaleFactor:Number(process.env.PERF_DPR)||1,touch:process.env.PERF_TOUCH==='1',viewport:{width:Number(process.env.PERF_WIDTH)||960,height:Number(process.env.PERF_HEIGHT)||540}});
 try{
  // This isolated fixture has no HMR lifecycle. Remove Vite's dev websocket only;
  // all game modules/assets still come from the running Vite server unchanged.
  await page.route('**/@vite/client',route=>route.fulfill({contentType:'application/javascript',body:'export const createHotContext=()=>({accept(){},dispose(){},prune(){},invalidate(){},on(){},send(){},data:{}}); export const injectQuery=u=>u; export const updateStyle=()=>{}; export const removeStyle=()=>{};'}));
- const profiler=await page.context().newCDPSession(page);await profiler.send('Profiler.enable');await profiler.send('Profiler.start');
- await page.route('**/client/game.js*',async route=>{const response=await route.fetch(),body=await response.text();if(!body.includes('renderer.render(scene, camera);'))throw Error('Render instrumentation marker missing');await route.fulfill({response,body:body.replace('renderer.render(scene, camera);','window.profileRender(renderer, scene, camera);')});});
+ const profiler=await page.context().newCDPSession(page);await profiler.send('Profiler.enable');if(process.env.PERF_CPU_RATE)await profiler.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.PERF_CPU_RATE)});await profiler.send('Profiler.start');
+ await page.route('**/client/game.js*',async route=>{const response=await route.fetch(process.env.PERF_GAME_MODULE?{url:new URL(process.env.PERF_GAME_MODULE,BASE).href}:{}),body=await response.text();if(!body.includes('skyCycle.render(scene, camera);'))throw Error('Render instrumentation marker missing');await route.fulfill({response,body:body.replace('skyCycle.render(scene, camera);','window.profileRender(renderer, scene, camera, () => skyCycle.render(scene, camera));').replace("startup.ready=true;","window.warmPrograms=renderer.info.programs.map(p=>p.cacheKey); window.warmLights=[];scene.traverseVisible(n=>{if(n.isLight)window.warmLights.push(n.type+':'+n.name)});startup.ready=true;")});});
  await page.route('**/tests/battle-render-load.html',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas id="game"></canvas><script type="module">
  import {createGame} from '/client/game.js';
- window.measure={submit:[],gpu:[],pending:[],backend:null,gpuSupported:false,frames:0};
- window.profileRender=(renderer,scene,camera)=>{window.renderScene=scene; const m=window.measure,gl=renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+ window.measure={submit:[],gpu:[],intervals:[],previous:null,pending:[],backend:null,gpuSupported:false,frames:0};
+ window.profileRender=(renderer,scene,camera,draw)=>{window.renderScene=scene; const m=window.measure,gl=renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
  if(!m.backend){const debug=gl.getExtension('WEBGL_debug_renderer_info');m.backend=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);m.gpuSupported=!!ext;}
  if(ext)for(let i=m.pending.length-1;i>=0;i--){const q=m.pending[i];if(gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE)){if(!gl.getParameter(ext.GPU_DISJOINT_EXT))m.gpu.push(gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6);gl.deleteQuery(q);m.pending.splice(i,1);}}
  const q=ext&&++m.frames%15===0&&m.pending.length<4?gl.createQuery():null;if(q)gl.beginQuery(ext.TIME_ELAPSED_EXT,q);
- const t=performance.now();renderer.render(scene,camera);m.submit.push(performance.now()-t);if(m.submit.length>2000)m.submit.shift();if(q){gl.endQuery(ext.TIME_ELAPSED_EXT);m.pending.push(q);}}
+ const t=performance.now();if(m.previous!==null)m.intervals.push(t-m.previous);m.previous=t;draw();m.submit.push(performance.now()-t);if(!window.programKeys&&window.fixture){window.programKeys=renderer.info.programs.map(p=>p.cacheKey);window.joinedLights=[];scene.traverseVisible(n=>{if(n.isLight)window.joinedLights.push(n.type+':'+n.name)});}if(m.submit.length>2000)m.submit.shift();if(q){gl.endQuery(ext.TIME_ELAPSED_EXT);m.pending.push(q);}}
  window.game=createGame({canvas:document.querySelector('canvas'),isHost:()=>false});window.ready=true;
  </script>`}));
  await page.goto(BASE+'/tests/battle-render-load.html');await page.waitForFunction(()=>window.ready,null,{timeout:120000});
@@ -43,14 +43,15 @@ try{
  await page.waitForTimeout(12000);
  const {profile}=await profiler.send('Profiler.stop');writeFileSync(join(here,'startup.cpuprofile'),JSON.stringify(profile));
  const nodes=new Map(profile.nodes.map(n=>[n.id,n.callFrame])),totals=new Map();for(let i=0;i<(profile.samples||[]).length;i++){const f=nodes.get(profile.samples[i]),key=`${f?.functionName||'(anonymous)'} ${f?.url||''}:${(f?.lineNumber??-1)+1}`;totals.set(key,(totals.get(key)||0)+(profile.timeDeltas?.[i]||0));}
+ record('shader-variants','measured',await page.evaluate(()=>({warmCount:window.warmPrograms?.length,lights:window.warmLights,joinedCount:window.programKeys?.length,newPrograms:window.programKeys?.filter(k=>!window.warmPrograms?.includes(k)).length,joinedLights:window.joinedLights})));
  record('startup-profile','measured',{topSelfMs:[...totals].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([frame,us])=>({frame,ms:us/1000}))});
  for(const role of ['hero','god']){
-  await page.evaluate(role=>{window.game.setRole(role);if(role==='god')window.game.zoomBy(8);window.measure.submit=[];window.measure.gpu=[];},role);
+  await page.evaluate(role=>{window.game.setRole(role);if(role==='god')window.game.zoomBy(8);window.measure.submit=[];window.measure.gpu=[];window.measure.intervals=[];window.measure.previous=null;},role);
   await profiler.send('Profiler.start');
-  await page.waitForTimeout(12000);
+  await page.waitForTimeout(Number(process.env.PERF_DURATION_MS)||12000);
   const steady=await profiler.send('Profiler.stop');writeFileSync(join(here,role+'.cpuprofile'),JSON.stringify(steady.profile));
   record('scene-'+role,'measured',await page.evaluate(()=>window.renderScene.children.map(root=>{let meshes=0,triangles=0,skinned=0;root.traverseVisible(n=>{if(n.isMesh){meshes++;skinned+=!!n.isSkinnedMesh;triangles+=(n.geometry.index?.count??n.geometry.attributes.position?.count??0)/3*(n.isInstancedMesh?n.count:1);}});return{name:root.name,type:root.type,meshes,triangles,skinned};}).filter(r=>r.meshes).sort((a,b)=>b.meshes-a.meshes)));
-  const result=await page.evaluate(()=>{const stats=a=>{a=[...a].sort((a,b)=>a-b);return {samples:a.length,p50:a[Math.floor(a.length*.5)]??null,p95:a[Math.floor(a.length*.95)]??null,p99:a[Math.floor(a.length*.99)]??null,max:a.at(-1)??null};};const d=window.game.diagnostics(),m=window.measure;return {backend:m.backend,gpuSupported:m.gpuSupported,renderSubmitMs:stats(m.submit),gpuMs:stats(m.gpu),cpu:d.cpuTimings,calls:d.calls,triangles:d.triangles,geometries:d.geometries,textures:d.textures,heroes:d.heroes,creatures:d.creatures,world:d.world,fire:d.fire,effects:d.effects};});
+  const result=await page.evaluate(()=>{const stats=a=>{a=[...a].sort((a,b)=>a-b);return {samples:a.length,p50:a[Math.floor(a.length*.5)]??null,p95:a[Math.floor(a.length*.95)]??null,p99:a[Math.floor(a.length*.99)]??null,max:a.at(-1)??null};};const d=window.game.diagnostics(),m=window.measure;return {backend:m.backend,gpuSupported:m.gpuSupported,renderSubmitMs:stats(m.submit),gpuMs:stats(m.gpu),frameIntervalMs:stats(m.intervals),graphics:d.graphics,cpu:d.cpuTimings,calls:d.calls,triangles:d.triangles,geometries:d.geometries,textures:d.textures,heroes:d.heroes,creatures:d.creatures,world:d.world,fire:d.fire,effects:d.effects};});
   record('full-world-'+role,page.errors.length?'fail':'pass',{...result,fixture:'32 players /32 battle bots;20Hz moving snapshots; no networking or authority stepping',capture:await shot(page,'battle-full-'+role),errors:page.errors});
  }
  save('battle-full-render');if(page.errors.length)process.exitCode=1;

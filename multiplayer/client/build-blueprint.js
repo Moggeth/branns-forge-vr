@@ -13,7 +13,7 @@ export const BLUEPRINT_COLORS = Object.freeze({
  * timberline: () => the authored Timberline {object, dispose}, called once timberlineReady() says its glTF has loaded.
  * The ghost eases towards the target every frame so snapped tiles glide instead of popping.
  */
-export function createBlueprintGhost({scene, timberlineReady = () => false, timberline = () => null}) {
+export function createBlueprintGhost({scene, timberlineReady = () => false, timberline = () => null, authored: authoredModels = {}}) {
   const fill = new THREE.MeshBasicMaterial({color: BLUEPRINT_COLORS.valid.fill, transparent: true, opacity: .2, depthWrite: false, side: THREE.DoubleSide});
   const edge = new THREE.LineBasicMaterial({color: BLUEPRINT_COLORS.valid.edge, transparent: true, opacity: .9, depthWrite: false});
   const root = new THREE.Group(); root.name = 'build-blueprint'; root.visible = false; root.renderOrder = 15; scene.add(root);
@@ -42,12 +42,12 @@ export function createBlueprintGhost({scene, timberlineReady = () => false, timb
   }
   function model(type) {
     let m = models.get(type);
-    if (m && !(m.placeholder && timberlineReady())) return m;
+    if (m && !(m.placeholder && (type === 'timberline' ? timberlineReady() : !!authoredModels[type]?.()))) return m;
     if (m) { m.dispose?.(); m.object.removeFromParent(); }
     let object, dispose = null, placeholder = false;
-    const authored = type === 'timberline' && timberlineReady() ? timberline() : null;
+    const authored = type === 'timberline' ? (timberlineReady() ? timberline() : null) : authoredModels[type]?.() || null;
     if (authored) { object = authored.object; dispose = () => authored.dispose?.(); }
-    else { try { object = createInventionModel(type); } catch { object = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 1.6, 12).translate(0, .8, 0)); dispose = () => object.geometry.dispose(); } placeholder = type === 'timberline'; }
+    else { try { object = createInventionModel(type); } catch { object = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 1.6, 12).translate(0, .8, 0)); dispose = () => object.geometry.dispose(); } placeholder = type === 'timberline' || !!authoredModels[type]; }
     blueprint(object); object.visible = false; root.add(object);
     m = {object, dispose, placeholder}; models.set(type, m);
     return m;
@@ -61,7 +61,7 @@ export function createBlueprintGhost({scene, timberlineReady = () => false, timb
     show({type, position, yaw = 0, valid: ok = true, dt = 1 / 60, time = 0}) {
       if (!type || !position) { this.hide(); return; }
       if (type !== currentType) { if (current) current.object.visible = false; current = model(type); currentType = type; placed = false; appear = 0; }
-      else if (current.placeholder && timberlineReady()) { current.object.visible = false; current = model(type); }
+      else if (current.placeholder && (type === 'timberline' ? timberlineReady() : !!authoredModels[type]?.())) { current.object.visible = false; current = model(type); }
       current.object.visible = true; root.visible = true; tint(ok);
       target.set(position[0], position[1], position[2]);
       // Ease towards the aim (fast enough to feel attached, smooth across tile snaps); jump on first show or long hops.

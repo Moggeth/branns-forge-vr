@@ -9,6 +9,7 @@
 //    cell is gone, so adjacent craters merge cleanly.
 //  * Partitions are cached per (template geometry, variant) and shared by every instance; materials are the template's own
 //    shared materials and are never mutated. dispose() only frees what this module allocated.
+import {yieldToBrowser} from './startup-work.js';
 import {applyCrystalMaterial} from './material-refinements.js';
 export const CHUNKS=14,RECESS=.76,VARIANTS=4;
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
@@ -51,12 +52,12 @@ export function attachFracture(T,root,id,{chunks=CHUNKS}={}){
 /** Prepare at most 12 unique nearby deposit/variant partitions without changing
  * the actual deposits. Add group to startup shader/render representatives, call
  * finish() after their warm draw, and dispose() when the owning world closes. */
-export function prepareFractureWarmup(T,deposits,{limit=12}={}){
+function* fractureWarmup(T,deposits,{limit=12,cancelled=()=>false}={}){
  const started=performance.now(),group=new T.Group();group.name='MiningFractureWarmup';
  const controllers=[],seen=new Set();let finished=false,disposed=false;
  const bounded=Math.max(0,Math.min(12,Number.isFinite(limit)?Math.floor(limit):12));
  try{for(const {root,id} of deposits){
-  if(seen.size>=bounded)break;
+  if(seen.size>=bounded||cancelled())break;
   const meshes=[];root.traverse(n=>{if(n.isMesh&&!n.userData.fractureOwned)meshes.push(n);});
   if(!meshes.length||meshes.some(m=>m.userData.fractureHidden))continue;
   const key=fractureKey(meshes,id,CHUNKS);if(seen.has(key))continue;seen.add(key);
@@ -65,12 +66,20 @@ export function prepareFractureWarmup(T,deposits,{limit=12}={}){
   controllers.push(controller);
   controller.setDamage(2,4,{animate:false});
   clone.traverse(n=>{if(n.isMesh)n.frustumCulled=false;});
+  yield;
  }}catch(error){dispose();throw error;}
  // Keep the bounded controllers/materials alive off-scene: disposing their
  // last material reference here also releases the just-warmed WebGL program.
  function finish(){if(finished)return;finished=true;group.removeFromParent();}
  function dispose(){if(disposed)return;disposed=true;finish();for(const c of controllers)c.dispose();group.clear();}
  return {group,finish,dispose,stats:{partitions:controllers.length,prepareMs:performance.now()-started}};
+}
+
+export function prepareFractureWarmup(...args){
+ const builder=fractureWarmup(...args);let step;do{step=builder.next();}while(!step.done);return step.value;
+}
+export async function prepareFractureWarmupAsync(...args){
+ const builder=fractureWarmup(...args);let step;do{step=builder.next();if(!step.done)await yieldToBrowser();}while(!step.done);return step.value;
 }
 
 function partition(T,meshes,variant,chunks){

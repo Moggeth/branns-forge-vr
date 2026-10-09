@@ -3,6 +3,7 @@
 // Presentation only: reads the arena mesh's own vertices (which already sit on the authoritative surface), never
 // collides, raycasts or casts shadows. Rescatters only when the arena rebuilds.
 import * as THREE from 'three';
+import {keepCarve} from '../shared/keep-sites.js';
 
 export const ALPINE_FOREST_VERSION = 1;
 const QUALITY = {high: {max: 2600, density: .5}, low: {max: 1000, density: .2}};
@@ -46,6 +47,7 @@ export function scatterFirs(position, index, {density = .1, max = 2000, treeline
     if (n.y < 0) n.negate();
     const cx = (a.x + b.x + c.x) / 3, cz = (a.z + b.z + c.z) / 3, cy = (a.y + b.y + c.y) / 3;
     const s = Math.max(Math.abs(cx), Math.abs(cz)); if (s < 49) continue; // never on the walkable meadow side
+    if (keepCarve(cx, cz) > .02) continue; // nor in the keeps' passes and back towns (the shell sinks there)
     const inward = -(cx * n.x + cz * n.z) / Math.hypot(cx, cz); if (inward < -.05) continue; // faces turned away are never seen
     const line = treeline + 3 * (hash(t, 11) - .5);
     if (n.y < .45 || cy > line) continue;

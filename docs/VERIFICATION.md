@@ -2317,3 +2317,25 @@ See [findings, tests and durable lessons](CODE-QUALITY-REVIEW-20261004.md). All 
 ## Contact and first-use regressions — 2026-10-04
 
 [Current evidence and warmup lessons](GAMEPLAY-CONTACT-FIXES-20261004.md): 164 required checks pass. Idle-hidden shaders and damaged non-instanced tree variants need actual render representatives; CPU warmup timings alone do not prove GPU frame-time improvement. Guarded browser startup verified without WebXR or pointer capture. From multiplayer, redirect logs to ../logs and stop on PowerShell errors; ../../logs is outside this checkout.
+
+
+## Meadow timing guard - local-only proposal, 2026-10-05
+
+The single-sample 7.5 ms walking-refill assertion failed at 8.319 ms on main
+b62720d although its source was unchanged from green main. Seven independent
+first-step refills now tolerate one outlier while rejecting two slow samples.
+All structural assertions and the threshold remain. Real in-memory pause
+injection verifies rejection of repeated and sustained slowdown; 38 baseline
+and candidate comparisons behaved as expected. Build and 181/181 required local
+suites passed. No runtime files, remote CI, publication or deployment changed.
+See [method, evidence and review limits](MEADOW-TIMING-20261005.md).
+
+### Mobile profiling (2026-10-06)
+Changing visible home-base light counts invalidated 67 shaders after the lobby warm-up; fixed slots with zero intensity avoid this. Model warm-up alone did not solve it. Keep benchmark CPU measurements separate from simultaneous regression tests. Use PERF_BASES=1 for current base-mode stress and the default legacy fixture for light-count transition coverage. See docs/MOBILE-PERFORMANCE-20261006.md.
+
+### Startup black viewport (2026-10-07)
+A queued RAF can predate async warm-up completion. Clamp frame dt on both sides before exponential easing; otherwise base bolts can grow to 1e25 and poison HDR bloom. See [cause, deterministic regression and investigation lessons](STARTUP-BLACK-VIEWPORT-20261007.md). Match Vite diagnostic routes by pathname and assert hook installation.
+
+### Mobile startup and sustained rendering (2026-10-08)
+
+See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.

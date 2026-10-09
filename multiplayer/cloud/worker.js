@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {clientCapacity,roomCapacity} from '../peer/room-capacity.js';
 import {roomListing, DIRECTORY_REFRESH, regionOf} from './room-directory.js';
 import {MAX_PLAYERS, MAX_PENDING_ROOM_SOCKETS, OFFLINE_SEAT_GRACE_MS, SIGNAL_MESSAGES_PER_EDGE, RELAY_BYTES_PER_EDGE, RELAY_MESSAGES_PER_EDGE} from '../shared/multiplayer-limits.js';
+import {iceServers} from './ice-servers.js';
 export {ForgeDirectory} from './directory.js';
 
 // One hibernating coordinator per room. Simulation and saves stay on players' devices.
@@ -113,6 +114,7 @@ export class ForgeRoom extends DurableObject {
     return new Response(null, { status: 101, webSocket: client });
   }
   async attach(ws, p) {
+    const ice = await iceServers(this.env); // cached per isolate; first call may wait briefly on Cloudflare TURN
     const r = this.room, old = this.sockets.get(p.id);
     if (old && old !== ws) old.close(4001, 'Session replaced');
     this.sockets.set(p.id, ws); p.offlineAt = 0; p.leaving = false;
@@ -123,7 +125,7 @@ export class ForgeRoom extends DurableObject {
     await this.updateDirectory(true);
     send(ws, { type: 'welcome', protocol: 1, room: r.code, peerId: p.id, secret: p.secret, role: p.role, hostId: r.hostId, epoch: r.epoch,
       maxPeers: roomCapacity(r), peers: this.peers().filter(q => q.id !== p.id).map(q => this.publicPeer(q)),
-      iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }], relayConfigured: true, relayTransport: 'websocket' });
+      iceServers: ice, relayConfigured: true, relayTransport: 'websocket' });
     this.broadcast({ type: 'peer_joined', maxPeers:roomCapacity(r), peer: this.publicPeer(p), epoch: r.epoch }, p.id);
     await this.schedule();
     console.log(JSON.stringify({ event: 'peer_connected', room: r.code, count: this.sockets.size }));
@@ -132,7 +134,7 @@ export class ForgeRoom extends DurableObject {
     const r = this.room; r.offer = null;
     const candidate = this.peers().filter(p => p.id !== r.hostId && p.desktop && clientCapacity(p.simCapacity)>=r.peers.length && p.revision >= 0 && this.online(p.id) && !r.tried.includes(p.id))
       .sort((a, b) => b.revision - a.revision || a.id.localeCompare(b.id))[0];
-    if (!candidate) this.broadcast({ type: 'world_waiting', epoch: r.epoch, message: 'Waiting for a desktop player with a recovery checkpoint.' });
+    if (!candidate) this.broadcast({ type: 'world_waiting', epoch: r.epoch, message: 'Waiting for another player to carry the world on.' });
     else {
       r.tried.push(candidate.id); r.offer = { peerId: candidate.id, epoch: r.epoch, graceful: false, expires: Date.now() + Number(this.env.OFFER_MS || 120000) };
       send(this.sockets.get(candidate.id), { type: 'continue_world_offer', epoch: r.epoch, revision: candidate.revision, graceful: false });
@@ -217,7 +219,7 @@ export class ForgeRoom extends DurableObject {
     } else if (m.type === 'continue_world') {
       if (r.offer?.peerId !== p.id || m.epoch !== r.epoch || p.revision < 0) return error(ws, 'no_offer', 'No current continuation offer.');
       if (clientCapacity(p.simCapacity)<r.peers.length) return error(ws,'client_update_required','Refresh the game before hosting this many players.');
-      const previousHostId = r.hostId; r.hostId = p.id; r.epoch++; r.offer = null; r.migrating = false; r.graceAt = 0;
+      const previousHostId = r.hostId; r.hostId = p.id; r.epoch++; r.offer = null; r.migrating = false; r.graceAt = 0; r.changedAt = now; r.silent = {};
       await this.save(); await this.updateDirectory(true); this.broadcast({ type: 'host_changed', maxPeers:roomCapacity(r), hostId: p.id, previousHostId, epoch: r.epoch });
     } else if (m.type === 'decline_world') {
       if (r.offer?.peerId !== p.id) return;
@@ -225,7 +227,24 @@ export class ForgeRoom extends DurableObject {
       if (graceful) send(this.sockets.get(r.hostId), { type: 'transfer_declined', peerId: p.id });
       else await this.nextOffer();
     } else if (m.type === 'retry_world') {
-      if (r.migrating && !r.offer && !this.online(r.hostId)) { r.tried = []; await this.nextOffer(); }
+      // Sent by guests that stopped hearing the host's game traffic.
+      if (p.id === r.hostId) return;
+      if (!this.online(r.hostId)) {
+        // Players already know the host is gone: skip the rest of the reconnect grace.
+        if (r.graceAt) { r.graceAt = 0; r.migrating = true; r.tried = []; await this.nextOffer(); }
+        else if (r.migrating && !r.offer) { r.tried = []; await this.nextOffer(); }
+      } else if (!r.migrating && !r.offer && now - (r.changedAt || 0) > 30000) {
+        // A host frozen in a background tab keeps its socket open but sends nothing. Once every
+        // other online player reports silence, move the world on (at most once per 30 s).
+        const silent = r.silent = Object.fromEntries(Object.entries(r.silent || {}).filter(([, at]) => now - at < 10000));
+        silent[p.id] = now;
+        const others = this.peers().filter(q => q.id !== r.hostId && this.online(q.id));
+        if (others.length && others.every(q => silent[q.id])) {
+          r.silent = {}; r.migrating = true; r.tried = [];
+          this.broadcast({ type: 'owner_lost', epoch: r.epoch, deliberate: false });
+          await this.nextOffer();
+        }
+      }
     } else if (m.type === 'leave') { p.leaving = true; await this.depart(ws); ws.close(1000, 'Left room'); return; }
     else if (m.type === 'ping') { send(ws, { type: 'pong', at: m.at }); return; }
     else return error(ws, 'unknown_type', 'Unsupported message.');

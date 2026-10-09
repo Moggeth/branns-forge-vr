@@ -4,6 +4,7 @@ import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart} from './combat.js';
 import {hasTalent} from './hero-progress.js';
 import {entHeight} from './ents.js';
 import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
+import {WORLD_EXTENT} from './keep-sites.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
@@ -79,7 +80,7 @@ export function fireContact(state,shot,hit,ctx){
     const owner=state.players.find(p=>p.id===shot.ownerId),tar=hasTalent(owner,'flask','tar'),bomb=shot.lit&&hasTalent(owner,'flask','firebomb');
     addFuel(state,[point[0],ground,point[2]],tar?TAR_PIT.radius:1.2,.85,!!shot.lit,tar);
     if(shot.lit)applyHeat(state,point,bomb?FIREBOMB.radius:1.5,1,ctx);
-    events.push({kind:'fuel_spill',id:shot.id,position:[...point],normal:[...hit.normal],...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
+    events.push({kind:'fuel_spill',id:shot.id,by:shot.ownerId,position:[...point],normal:[...hit.normal],...(shot.lit?{lit:true}:{}),...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
     if(bomb){
       const hits=[];
       for(const enemy of [...state.enemies]){
@@ -226,7 +227,7 @@ export function restoreFire(saved,ids){
     seen.add(key(c.x,c.z));
   }
   for(const p of surfaces){
-    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>55||Math.abs(p.position[2])>55||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,240)||(p.emberTick!==undefined&&(!tick(p.emberTick,90)||p.emberTick>=p.expiresTick)))throw Error('Invalid fire surface');
+    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>WORLD_EXTENT||Math.abs(p.position[2])>WORLD_EXTENT||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,240)||(p.emberTick!==undefined&&(!tick(p.emberTick,90)||p.emberTick>=p.expiresTick)))throw Error('Invalid fire surface');
     ids.add(p.id);
   }
   for(const p of saved.players)if(p.heat!==undefined&&(!Number.isFinite(p.heat)||p.heat<0||p.heat>1)||p.overheatUntil!==undefined&&!tick(p.overheatUntil,180)||p.flameTick!==undefined&&(!Number.isSafeInteger(p.flameTick)||p.flameTick< -1000||p.flameTick>saved.tick)||p.flaskLit!==undefined&&typeof p.flaskLit!=='boolean')throw Error('Invalid fire equipment state');

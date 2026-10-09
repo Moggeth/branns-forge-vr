@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4}</style></head><body>
+<script type="module">
+// First-person review of eating an apple off an arrow (Opus 5.5, 2026-10-06): three bites that visibly eat it down,
+// then the core drops and songbirds peck it clean and fly off. The real presentation (createAppleSnack, apple-feast.js)
+// with a stand-in host that counts bites; flat grass at y = 0. lab.frame() advances one 60 Hz frame and renders it.
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createAppleSnack} from '../client/apple-snack.js';
+const W=960,H=540,renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;renderer.shadowMap.enabled=true;document.body.append(renderer.domElement);
+const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;scene.environmentIntensity=.55;room.dispose();scene.background=new T.Color(0x9fb3c4);
+scene.add(new T.HemisphereLight(0xe8f2ff,0x5a4b2a,1.2));const sun=new T.DirectionalLight(0xfff0d8,2.8);sun.position.set(-2,6,3);sun.castShadow=true;sun.shadow.camera.left=sun.shadow.camera.bottom=-4;sun.shadow.camera.right=sun.shadow.camera.top=4;scene.add(sun);
+const ground=new T.Mesh(new T.PlaneGeometry(40,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x5f7040,roughness:1}));ground.receiveShadow=true;scene.add(ground);
+const cam=new T.PerspectiveCamera(70,W/H,.05,100);cam.rotation.order='YXZ';cam.position.set(0,1.65,0);cam.rotation.x=-.12;scene.add(cam);
+const loader=new GLTFLoader(),templates=new Map();for(const n of ['arrow','siegebird_songbird'])templates.set(n,await loader.loadAsync(`/assets/${n}.glb`));
+let drop={id:'qa-apple',stick:'arrow',apples:1,bites:0,radius:.08,position:[0,1.4,-.4],velocity:[0,0,0],dir:[0,0,-1],mode:'held',bornTick:0,biteTick:-1000,heldBy:'me'};
+const events=[];
+const snack=createAppleSnack({scene,camera:cam,templates,height:()=>0,send:(action,detail)=>{if(action==='snack'&&detail.op==='bite'&&drop){drop.bites++;if(drop.bites>=3){events.push({kind:'snack_done',id:drop.id,by:'me',stick:'arrow',position:drop.position});drop=null;}}}});
+let frame=0;const sync=()=>snack.sync(JSON.parse(JSON.stringify({tick:frame,fruit:{missing:[],drops:drop?[drop]:[]}})),'me');
+window.lab={
+ frame(){sync();for(const e of events.splice(0))snack.event(e,'me');snack.update(1/60,{now:frame/60,renderTick:frame});
+  const v=snack.view();cam.rotation.x=-.12+(v?.pitch||0)+(window.lab.look||0);renderer.render(scene,cam);frame++;return snack.stats();},
+ bite:()=>snack.bite(),look:0,
+};
+document.title='ready';
+</script></body></html>

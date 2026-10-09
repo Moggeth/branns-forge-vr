@@ -7,15 +7,16 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
-  'proximity-voice','voice-recovery','voice-topology','battle-model','checkpoint-delta','adventure-capacity','battle-renderer-contact',
+  'mobile-render-budget','rigid-weapon-batch',
+  'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','frame-inbox','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
+  'proximity-voice','voice-recovery','voice-topology','voice-zones','ice-servers','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
-  'ability-readiness','ability-warmup','shared-skin-palettes','state-codec-performance','entity-id-allocation','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','ore-veins',
+  'ability-readiness','ability-warmup','shared-skin-palettes','merged-creature-skins','home-light-stability','state-codec-performance','entity-id-allocation','action-feedback','callouts','resource-bar','forge-smelting','axe-cleave','axe-luminance','meadow-cover','meadow-timing-guard','ore-veins',
   'timberline-manned','timberline-long','timberline-stuck-view','adventure','asset-dependencies','asset-pose','combat',
   'combat-performance','combat-session','combat-view','combat-view-perf','contact-feedback',
   'contact-feedback-shared','creature-life-death','crossbow-cords','embedded-skull',
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
-  'expedition-presentation.test','fire','wyrmspout','fire-authored-samples','fire-performance',
+  'expedition-presentation.test','fire','wyrmspout','wyrmspout-tank','weapon-inspect','emberdew','fire-authored-samples','fire-performance',
   'fire-spatial-phoenix','fire-warmup','forest-resource-integration','forge-protection','foundation-tiles',
   'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
   'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',
@@ -33,7 +34,7 @@ const suite = [
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','golem-presentation','earth-spells','smooth-terrain','grove-growth','spell-schools','remains-physics',
-  'phoenix-flight','phoenix-ignite','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','home-bases','home-base-kit','home-ballista','forgeling-kit','hero-progress','heavy-launcher',
+  'phoenix-flight','phoenix-ignite','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','keep-ring','home-workshop','home-base-kit','home-ballista','forgeling-kit','hero-progress','home-town','home-town-view','dragon-streak','heavy-launcher','turn-phone','stormreel',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

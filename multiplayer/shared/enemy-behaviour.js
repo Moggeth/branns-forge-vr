@@ -4,6 +4,7 @@ import {BATTLE,battleBot,battleObjectives,battleWaypoint} from './battle-mode.js
 import {PICK_WALL} from './terrain.js';
 import {entSpec,entWaking,entRooting} from './ents.js';
 import {STUMPLING,stepStumplingMotion} from './stumplings.js';
+import {clampToWorld} from './keep-sites.js';
 export const ENEMY_STRIKE_TICK=18;
 // A skeleton whose shield splinters reels for this long (no steering, no new swing, a swing in progress misses).
 export const FLINCH_TICKS=45;
@@ -14,8 +15,9 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
 
+// Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
- const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
+ const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
  const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
  const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e)}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
@@ -60,15 +62,15 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
     vx/=length;vz/=length;let chosen=null,score=-Infinity;
     // A small deterministic fan steers around trunks and solid landmarks instead of walking through them.
     for(const angle of [0,.65,-.65,1.25,-1.25]){const c=Math.cos(angle),s=Math.sin(angle),x=vx*c-vz*s,z=vx*s+vz*c;
-     const probe=[clamp(e.position[0]+x*.65,-55,55),e.position[1],clamp(e.position[2]+z*.65,-55,55)],before=[...probe];resolve(probe,radius(e));
+     const [px,pz]=clampToWorld(e.position[0]+x*.65,e.position[2]+z*.65),probe=[px,e.position[1],pz],before=[...probe];resolve(probe,radius(e));
      if(flat(probe,before)>.025||Math.abs(ground(probe[0],probe[2])-e.position[1])>.8)continue;
      const value=x*vx+z*vz;if(value>score){score=value;chosen=[x,z];}
     }
-    if(chosen){const pace=Math.min(length,speed+1)/60;e.position[0]=clamp(e.position[0]+chosen[0]*pace,-55,55);e.position[2]=clamp(e.position[2]+chosen[1]*pace,-55,55);}
+    if(chosen){const pace=Math.min(length,speed+1)/60;[e.position[0],e.position[2]]=clampToWorld(e.position[0]+chosen[0]*pace,e.position[2]+chosen[1]*pace);}
    }
   }
   // Keep all bodies outside the player's camera, including overlapping summons.
-  for(const h of heroes){const d=flat(e.position,h.position);if(d<1&&Math.abs(e.position[1]-h.position[1])<2.5){const x=d>.001?(e.position[0]-h.position[0])/d:1,z=d>.001?(e.position[2]-h.position[2])/d:0;e.position[0]=clamp(h.position[0]+x,-55,55);e.position[2]=clamp(h.position[2]+z,-55,55);}}
+  for(const h of heroes){const d=flat(e.position,h.position);if(d<1&&Math.abs(e.position[1]-h.position[1])<2.5){const x=d>.001?(e.position[0]-h.position[0])/d:1,z=d>.001?(e.position[2]-h.position[2])/d:0;[e.position[0],e.position[2]]=clampToWorld(h.position[0]+x,h.position[2]+z);}}
   resolve(e.position,radius(e));e.position[1]=ground(e.position[0],e.position[2]);
   const range=flat(e.position,target.position),facing=(-Math.sin(e.yaw)*(target.position[0]-e.position[0])-Math.cos(e.yaw)*(target.position[2]-e.position[2]))/Math.max(range,.001);
   if(!committed&&!staggered&&!patrol&&range<reach&&facing>.7&&Math.abs(e.position[1]-target.position[1])<1.8&&state.tick-e.attackTick>60&&(building||!blocked(e.position,target.position))){

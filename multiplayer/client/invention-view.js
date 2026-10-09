@@ -14,18 +14,22 @@ import {createTimberlineStuck} from './timberline-stuck.js';
 import {createTimberlineTracers} from './timberline-tracers.js';
 import {createBlueprintGhost,BLUEPRINT_COLORS} from './build-blueprint.js';
 import {createHomeBaseView} from './home-base-view.js';
+import {createHomeTownView} from './home-town-view.js';
+import {createBackTownView} from './back-town-view.js';
+import {createStormspireArt} from './stormspire-art.js';
 // Presentation consumes authoritative structures; no gameplay timers or resources live here.
-export function createInventionView({scene}){
+export function createInventionView({scene,lightning=null}){
+ const spires=createStormspireArt({lightning});
  const assets={},entries=new Map(),shots=new Map(),localAim=new Map();const timberFx=createTimberlineFx({maxChips:96,maxDust:16});scene.add(timberFx.object);const tracers=createTimberlineTracers({scene});let snapshot=null,stuck=null,viewerId=null,scoped=null;const effects=[];
  const ring=new THREE.Mesh(new THREE.RingGeometry(1.7,1.78,40),new THREE.MeshBasicMaterial({color:0xe9ca75,side:THREE.DoubleSide,transparent:true,opacity:.8,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.visible=false;scene.add(ring);
  const tilePreview=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-3,0,-3),new THREE.Vector3(3,0,-3),new THREE.Vector3(3,0,3),new THREE.Vector3(-3,0,3)]),new THREE.LineBasicMaterial({color:0xe9ca75}));tilePreview.visible=false;scene.add(tilePreview);
  const tileFill=new THREE.Mesh(new THREE.PlaneGeometry(6,6),new THREE.MeshBasicMaterial({color:0xe9ca75,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide}));tileFill.rotation.x=-Math.PI/2;tileFill.visible=false;scene.add(tileFill);
  let previewState=null,previewLabel=null,labelCanvas=null,labelContext=null,lastLabel='';
  if(typeof document!=='undefined'){labelCanvas=document.createElement('canvas');labelCanvas.width=768;labelCanvas.height=104;labelContext=labelCanvas.getContext('2d');if(labelContext){const map=new THREE.CanvasTexture(labelCanvas);previewLabel=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,depthTest:false,depthWrite:false}));previewLabel.scale.set(7.4,1,1);previewLabel.visible=false;previewLabel.renderOrder=20;scene.add(previewLabel);}}
- const ghost=createBlueprintGhost({scene,timberlineReady:()=>!!assets.timberline_ballista,timberline:()=>createTimberlineBallista(assets.timberline_ballista,{castShadow:false,filament:false,autoReload:false})});
+ const ghost=createBlueprintGhost({scene,timberlineReady:()=>!!assets.timberline_ballista,timberline:()=>createTimberlineBallista(assets.timberline_ballista,{castShadow:false,filament:false,autoReload:false}),authored:{stormspire:()=>assets.stormspire?{object:assets.stormspire.scene.clone(true)}:null}});
  function label(text,valid){if(!labelContext||lastLabel===`${valid}:${text}`)return;lastLabel=`${valid}:${text}`;labelContext.clearRect(0,0,768,104);labelContext.fillStyle='rgba(24,23,20,.9)';labelContext.fillRect(0,0,768,104);labelContext.fillStyle=valid?'#ffe1a0':'#ffb7ad';labelContext.font='bold 25px sans-serif';labelContext.textAlign='center';const lines=[];let line='';for(const word of text.split(' ')){const next=line?`${line} ${word}`:word;if(labelContext.measureText(next).width>730&&line){lines.push(line);line=word;}else line=next;}lines.push(line);lines.slice(0,2).forEach((line,i)=>labelContext.fillText(line,384,lines.length>1?38+i*34:61));previewLabel.material.map.needsUpdate=true;}
  let refinery=null;
- const homeBases=createHomeBaseView({scene});
+ const homeBases=createHomeBaseView({scene}),homeTown=createHomeTownView({scene}),backTown=createBackTownView({scene});
  const shotGeo=new THREE.IcosahedronGeometry(.28,1),shotMat=new THREE.MeshStandardMaterial({color:0x77736a,roughness:.9});
  const wardGeo=new THREE.RingGeometry(5.92,6,64),wardMat=new THREE.MeshBasicMaterial({color:0x64dbea,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false});
 
@@ -39,16 +43,16 @@ export function createInventionView({scene}){
   if(s.inventions&&!refinery){refinery=createForgeWorks();scene.add(refinery.root);}
   if(refinery)refinery.place(terrainHeight(s,FORGE_WORKS_ORIGIN[0],FORGE_WORKS_ORIGIN[1],false));
   // Battle objectives reuse the commissioned sanctuary, including its real contact geometry.
-  homeBases.sync(s);
+  homeBases.sync(s);homeTown.sync(s);backTown.sync(s);
   const objectives=(s.battle?.status!=='off'&&s.battle?.v!==2?s.battle?.bases||[]:[]).map(b=>({...b,type:'sanctuary',yaw:0,battleBase:true}));
   for(const b of [...s.inventions?.structures||[],...objectives]){if(b.type==='forge')continue;ids.add(b.id);let e=entries.get(b.id);
-   if(!e){const root=b.type==='timberline'?new THREE.Group():createInventionModel(b.type);root.name=b.id;root.traverse(n=>{if(n.isMesh)n.userData.targetId=b.id;});scene.add(root);e={root,data:b,fireTick:b.fireTick??-10000};if(b.type==='ward'){e.field=new THREE.Mesh(wardGeo,wardMat);e.field.rotation.x=-Math.PI/2;scene.add(e.field);}entries.set(b.id,e);if(b.type==='timberline')upgrade(e);if(b.type==='launcher')upgradeLauncher(e);}
+   if(!e){const root=b.type==='timberline'?new THREE.Group():createInventionModel(b.type);root.name=b.id;root.traverse(n=>{if(n.isMesh)n.userData.targetId=b.id;});scene.add(root);e={root,data:b,fireTick:b.fireTick??-10000};if(b.type==='ward'){e.field=new THREE.Mesh(wardGeo,wardMat);e.field.rotation.x=-Math.PI/2;scene.add(e.field);}entries.set(b.id,e);if(b.type==='timberline')upgrade(e);if(b.type==='launcher')upgradeLauncher(e);if(b.type==='stormspire')spires.attach(e);}
    e.data=b;e.fireTick=b.fireTick??-10000;const p=b.position||[b.x,0,b.z];e.root.position.set(p[0],b.type==='foundation'?p[1]:terrainHeight(s,p[0],p[2],false),p[2]);if(e.root.userData.lastYaw===undefined)e.root.rotation.y=b.yaw||0;e.root.userData.lastYaw=b.yaw||0;e.root.visible=true;
   }
-  for(const [id,e]of entries)if(!ids.has(id)){e.machine?.dispose();e.launcher?.dispose();e.root.removeFromParent();e.field?.removeFromParent();entries.delete(id);}
+  for(const [id,e]of entries)if(!ids.has(id)){if(e.spire)spires.detach(e);e.machine?.dispose();e.launcher?.dispose();e.root.removeFromParent();e.field?.removeFromParent();entries.delete(id);}
  }
  function event(ev){
-  homeBases.event(ev);
+  homeBases.event(ev);homeTown.event(ev);backTown.event(ev);
   if(refinery&&(ev.kind==='refinery_feed'||ev.kind==='refinery_output'))refinery.event(ev);
   if(ev.kind==='timberline_shear'&&ev.position)timberFx.chips(new THREE.Vector3(...ev.position),new THREE.Vector3(0,1,0),{count:20});
   if(ev.kind==='timberline_stop'&&ev.position)timberFx.dust(new THREE.Vector3(...ev.position),{count:8});
@@ -56,7 +60,8 @@ export function createInventionView({scene}){
   if(/launcher/.test(ev.kind)&&ev.position&&ev.target&&!assets.heavy_launcher){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...ev.position),new THREE.Vector3(...ev.target)]);const m=new THREE.LineBasicMaterial({color:0xa9ffdc,transparent:true});const line=new THREE.Line(g,m);scene.add(line);effects.push({line,life:.3});while(effects.length>16){const old=effects.shift();old.line.removeFromParent();old.line.geometry.dispose();old.line.material.dispose();}}
  }
  function update(dt,tick,camera=null,viewportHeight=1080){
-  homeBases.update(dt,camera);
+  homeBases.update(dt,camera,tick);homeTown.update(dt);backTown.update(dt);
+  for(const e of entries.values())if(e.spire)spires.animate(e,tick/60,dt);
   timberFx.update(dt);stuck?.update(snapshot,tick);tracers.begin();
   const ids=new Set();for(const q of snapshot?.inventions?.shots||[]){ids.add(q.id);let v=shots.get(q.id);
    if(!v){if(q.type==='timberline'){if(!assets.timberline_bolts)continue;const pair=createTimberlineBoltPair(assets.timberline_bolts,{castShadow:false,sharedMaterials:assets.timberline_ballista?collectMaterials(assets.timberline_ballista.scene):null});v={root:pair.group,pair};}else {const ball=assets.heavy_launcher&&q.type==='launcher'?assets.heavy_launcher.scene.getObjectByName('Ball'):null;v={root:ball?ball.clone():new THREE.Mesh(shotGeo,shotMat)};if(ball){v.root.position.set(0,0,0);v.start=entries.get(q.structureId)?.launcher?.releasePoint();}}scene.add(v.root);shots.set(q.id,v);}
@@ -77,7 +82,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
    refinery.animate({time:tick/60,dt,jobs:snapshot?.inventions?.refining?.length||0,feedReady,bay});}
   for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.line.material.opacity=Math.max(0,e.life/.3);if(e.life<=0){e.line.removeFromParent();e.line.geometry.dispose();e.line.material.dispose();effects.splice(i,1);}}
  }
- return {installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),homeBaseStats:()=>homeBases.stats(),sync,event,update,
+ return {installStormspire(gltf){assets.stormspire=gltf;spires.install(gltf);},installReelPack:gltf=>spires.installPack(gltf),spires,spireEntry:id=>{const e=entries.get(id);return e?.spire?e:null;},installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),installKeepKit:gltf=>homeBases.installKeepKit(gltf),installTownKit:gltf=>homeTown.installKit(gltf),installBackTownKit:gltf=>backTown.installKit(gltf),backTownStats:()=>backTown.stats(),homeKeep:()=>homeBases.keep,homeBaseStats:()=>homeBases.stats(),homeTownStats:()=>homeTown.stats(),sync,event,update,
   // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
   setLocalAim(id,aim){homeBases.setLocalAim(id,aim);if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).

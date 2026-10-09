@@ -662,45 +662,5 @@ export function createFirePresentation({ scene, height = () => 0, quality = 1, l
   };
 }
 
-// =====================================================================================
-/** Ember Dew supply bottle. ~0.18 m tall, origin at bottle middle (grip), +Y up, -Z forward. */
-export function createEmberdewModel() {
-  const g = new THREE.Group(); g.name = 'Emberdew';
-  const geos = [], mats = [];
-  const G = (x) => (geos.push(x), x), M = (x) => (mats.push(x), x);
-  const seg = 20;
-  const glassProfile = [[0, -0.09], [0.020, -0.089], [0.034, -0.078], [0.041, -0.056], [0.041, -0.03], [0.037, -0.006], [0.030, 0.016], [0.021, 0.036], [0.0165, 0.050], [0.0165, 0.064], [0.0205, 0.068], [0.0205, 0.074]];
-  const lathe = (pts, s = seg) => G(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), s));
-
-  // subtle glass: thin tinted shell, softened clearcoat and environment so the amber inside reads first
-  const glassMat = M(new THREE.MeshPhysicalMaterial({ color: 0xfff0d8, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.22, clearcoat: 0.5, clearcoatRoughness: 0.08, specularIntensity: 0.7, envMapIntensity: 0.6, depthWrite: false }));
-  // slippery amber: low ember emissive, strong wet clearcoat, thin-film pearl instead of orange glow
-  const liquidMat = M(new THREE.MeshPhysicalMaterial({ color: 0x8c3f0a, roughness: 0.18, metalness: 0, emissive: 0x6a2004, emissiveIntensity: 0.18, clearcoat: 1, clearcoatRoughness: 0.06, iridescence: 0.55, iridescenceIOR: 1.4, iridescenceThicknessRange: [220, 520], sheen: 0.25, sheenRoughness: 0.4, sheenColor: new THREE.Color(0xffc27a) }));
-  const leatherMat = M(new THREE.MeshStandardMaterial({ color: 0x4a2a17, roughness: 0.85, metalness: 0 }));
-  const copperMat = M(new THREE.MeshStandardMaterial({ color: 0xb8602e, roughness: 0.38, metalness: 0.9 }));
-  const wickMat = M(new THREE.MeshStandardMaterial({ color: 0xd9c9a0, roughness: 0.95, emissive: 0x401400, emissiveIntensity: 0.4 }));
-
-  // amber liquid (inset glass profile, fill to just below the neck)
-  const liq = [[0, -0.086], [0.018, -0.085], [0.031, -0.075], [0.038, -0.056], [0.038, -0.03], [0.034, -0.006], [0.027, 0.014], [0.019, 0.030], [0, 0.031]];
-  const liquid = new THREE.Mesh(lathe(liq), liquidMat); liquid.name = 'Liquid'; g.add(liquid);
-  const glass = new THREE.Mesh(lathe(glassProfile), glassMat); glass.name = 'Glass'; glass.renderOrder = 2; g.add(glass);
-
-  // leather grip wrap around the waist
-  const wrap = new THREE.Mesh(lathe([[0.0405, -0.052], [0.0445, -0.048], [0.0445, -0.012], [0.0405, -0.008]], seg), leatherMat); wrap.name = 'GripWrap'; g.add(wrap);
-  // copper foot band and neck collar
-  const foot = new THREE.Mesh(G(new THREE.TorusGeometry(0.0285, 0.0042, 6, seg)), copperMat); foot.name = 'FootBand'; foot.rotation.x = Math.PI / 2; foot.position.y = -0.081; g.add(foot);
-  const collar = new THREE.Mesh(G(new THREE.TorusGeometry(0.0195, 0.0035, 6, seg)), copperMat); collar.name = 'NeckCollar'; collar.rotation.x = Math.PI / 2; collar.position.y = 0.058; g.add(collar);
-  // leather stopper (tapered plug with bulb cap)
-  const stopper = new THREE.Mesh(lathe([[0, 0.063], [0.0145, 0.063], [0.0175, 0.07], [0.0215, 0.074], [0.0225, 0.082], [0.016, 0.0865], [0, 0.088]], 16), leatherMat); stopper.name = 'Stopper'; g.add(stopper);
-  // wick: short twisted cord, slightly canted
-  const wick = new THREE.Mesh(G(new THREE.CylinderGeometry(0.0022, 0.0028, 0.016, 6)), wickMat); wick.name = 'Wick'; wick.position.set(0, 0.095, 0); wick.rotation.z = 0.12; g.add(wick);
-
-  // pour mouth marker: front of the neck (-Z), where fuel leaves when tilted
-  const muzzle = new THREE.Object3D(); muzzle.name = 'Muzzle'; muzzle.position.set(0, 0.066, -0.017); g.add(muzzle);
-
-  let tris = 0, draws = 0;
-  g.traverse((o) => { if (o.isMesh) { draws++; const gg = o.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3; } });
-  g.userData.stats = { triangles: tris, draws, heightMeters: 0.18 };
-  g.userData.dispose = () => { geos.forEach((x) => x.dispose()); mats.forEach((x) => x.dispose()); };
-  return g;
-}
+// Ember Dew bottle: see emberdew-model.js (re-exported here for existing callers).
+export {createEmberdewModel} from './emberdew-model.js';

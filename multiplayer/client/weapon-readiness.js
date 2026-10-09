@@ -14,12 +14,12 @@ import {createAxeLuminance} from './axe-luminance.js';
 // - Inputs are fractions owned by the shared simulation; this module never runs its own timers.
 //   axe: specialReady (6 s cleave) · pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
 //   curve adds nothing) · limb: attackReady (0.53 s) · wyrmspout: heat + overheated (3 s lock) and
-//   specialReady (6 s Gout) · flask: attackReady (1 s toss; wick toggle is instant so it has no indicator).
+//   specialReady (6 s Gout) · flask: specialReady (12 s Cinder Cluster; the 1 s toss needs no indicator).
 // - Max 3 draw calls per tool, no lights, every descendant has userData.ignoreContact = true.
 
 export const READINESS_TIMINGS = Object.freeze({
   axe: {special: 6}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
-  limb: {attack: .53}, wyrmspout: {vent: 6, overheatLock: 3}, flask: {attack: 1},
+  limb: {attack: .53}, wyrmspout: {vent: 6, overheatLock: 3}, flask: {special: 12},
 });
 
 export const ANCHORS = Object.freeze({
@@ -343,7 +343,8 @@ const BUILD = {
     const mark = named(diamondGeometry(.0042, .021, .0008), 'limb-etching');
     return {attack: new Strip(owner, mark, glowMaterial({color: 0x6e5a40, metalness: 0, roughness: .8}), transforms, steps, PALETTES.bone)};
   },
-  // Ember slats beside the six authored heat vents (heat/overheat) + a cooling ring on the neck (vent).
+  // Ember slats beside the six authored cheek gills (heat/overheat): the wyrm runs hot as it spits. Gout charge is the
+  // model's own fin veins and nostril flames (asset-pose.js animateWyrmspout), so there is no ring here any more.
   wyrmspout(owner, host, find) {
     const slats = [], steps = [];
     for (const side of ['L', 'R']) for (let i = 1; i <= 3; i++) {
@@ -353,19 +354,7 @@ const BUILD = {
     }
     const slat = named(new THREE.CapsuleGeometry(.0021, .012, 2, 6), 'wyrmspout-slat');
     const heat = slats.length ? new Strip(owner, slat, glowMaterial({color: 0x3a2418, metalness: .5, roughness: .5}), slats, steps, PALETTES.heat) : null;
-    const neck = find('Neck_Scales'), band = find('Neck_BrassBand_1'), pts = collectPoints(host, [neck]);
-    const axisOrigin = hostPosition(host, neck), z = band ? hostPosition(host, band).z - .032 : axisOrigin.z + .038;
-    const r = radiusAt(pts, axisOrigin, new THREE.Vector3(0, 0, 1), z - axisOrigin.z - .005, z - axisOrigin.z + .005, .06, .03) + .0024;
-    const arcs = [], ringSteps = [], count = 8, arc = Math.PI * 2 / count * .74;
-    for (let i = 0; i < count; i++) {
-      const a = Math.PI / 2 + (i + .5) * Math.PI * 2 / count, n = new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
-      // Scaly neck is not round: each arc is scaled to the measured surface in its own direction.
-      const local = castSurface(host, [neck], new THREE.Vector3(axisOrigin.x, axisOrigin.y, z), n, r - .0024) + .0024, k = local / r;
-      arcs.push([new THREE.Vector3(axisOrigin.x, axisOrigin.y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a - arc / 2), new THREE.Vector3(k, k, 1)]);
-      ringSteps.push(Math.min(i, count - 1 - i)); // fills from the top (eye side) down both flanks
-    }
-    const ring = named(new THREE.TorusGeometry(r, .0024, 5, 8, arc), 'wyrmspout-cool-ring');
-    return {heat, vent: new Strip(owner, ring, glowMaterial({color: 0x51606a, metalness: .9, roughness: .3}), arcs, ringSteps, PALETTES.cool)};
+    return {heat};
   },
   // Amber collar segments just under the copper neck collar; fill from the player-facing back, both ways.
   flask(owner, host, find) {
@@ -378,7 +367,7 @@ const BUILD = {
       arcs.push([new THREE.Vector3(collar.x, y, collar.z), q]); steps.push(Math.min(i, count - 1 - i));
     }
     const ring = named(new THREE.TorusGeometry(r, .0021, 5, 8, arc), 'flask-collar');
-    return {attack: new Strip(owner, ring, glowMaterial({color: 0x6a3a18, metalness: .85, roughness: .4}), arcs, steps, PALETTES.amber)};
+    return {special: new Strip(owner, ring, glowMaterial({color: 0x6a3a18, metalness: .85, roughness: .4}), arcs, steps, PALETTES.amber)};
   },
 };
 

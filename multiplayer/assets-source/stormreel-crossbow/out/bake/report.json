@@ -1,0 +1,28 @@
+{
+ "out": "../../public/assets/stormreel.glb",
+ "bytes": 988788,
+ "triangles": 7684,
+ "bolt_triangles": 312,
+ "meshes": 9,
+ "materials": [
+  "Stormreel_Body",
+  "Glass",
+  "Charge"
+ ],
+ "textures": {
+  "stormreel_base.jpg": 380683,
+  "stormreel_orm.jpg": 138285,
+  "stormreel_normal.jpg": 200058
+ },
+ "bounds_min": [
+  -0.2748,
+  -0.348,
+  -0.0872
+ ],
+ "bounds_max": [
+  0.2748,
+  0.44,
+  0.1932
+ ],
+ "seconds": 61
+}

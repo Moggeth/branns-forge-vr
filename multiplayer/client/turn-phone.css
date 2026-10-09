@@ -1,0 +1,67 @@
+/* "Turn for more adventure": the phone in the picture turns sideways and the little world inside it
+   widens to show a tree, the sun and a crystal outcrop. Pure CSS transforms on inline SVG; the
+   picture only animates while the prompt is up. lobby.css's reduced-motion rule stills it. */
+.turn-phone[hidden] { display: none !important; }
+.turn-phone {
+  position: fixed; inset: 0; z-index: 400; display: grid; place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: radial-gradient(120% 80% at 50% 35%, #17302a, #0e110d) #0e110d;
+  animation: tp-in .35s ease-out both;
+}
+/* The phone full-screen button follows open dialogs; here "Turn it for me" already does that job. */
+.turn-phone .mui-fullscreen-surface { display: none !important; }
+.tp-card { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(340px, 100%); text-align: center; }
+.tp-art { width: min(280px, 74vw); height: auto; overflow: visible; }
+.tp-title { margin: 0; font-family: var(--serif, Georgia, serif); font-size: 1.7rem; line-height: 1.15; color: var(--parchment, #f2e6cd); letter-spacing: .02em; }
+.tp-line { margin: 0 0 6px; color: var(--muted, #b9aa8e); font-size: 1rem; }
+.tp-go { width: 100%; min-height: 52px; font-size: 1.05rem; }
+.tp-stay {
+  min-height: 44px; padding: 8px 18px; border: 0; background: none; cursor: pointer;
+  color: var(--muted, #b9aa8e); font: inherit; font-size: .95rem; text-decoration: underline; text-underline-offset: 3px;
+}
+.tp-stay:hover, .tp-stay:focus-visible { color: var(--brass-hi, #ecd29a); }
+
+/* The phone and the world inside it turn about the same point in opposite directions,
+   so the world stays level while the screen's window onto it widens. */
+.tp-phone, .tp-world { transform-box: view-box; transform-origin: 100px 100px; }
+.tp-phone { animation: tp-turn 4.6s cubic-bezier(.45, 0, .25, 1) infinite; }
+.tp-world { animation: tp-level 4.6s cubic-bezier(.45, 0, .25, 1) infinite; }
+.tp-arrow { animation: tp-arrow 4.6s ease-in-out infinite; }
+.tp-sparkles path { transform-box: fill-box; transform-origin: center; opacity: 0; animation: tp-sparkle 4.6s ease-out infinite; }
+.tp-sparkles path:nth-child(2) { animation-delay: .12s; }
+.tp-sparkles path:nth-child(3) { animation-delay: .24s; }
+.tp-pick { transform-box: view-box; transform-origin: 104.3px 121px; animation: tp-swing 1.15s cubic-bezier(.5, 0, .3, 1) infinite; }
+.tp-hero { animation: tp-hop 4.6s ease-in-out infinite; }
+.tp-crystal-glow { transform-box: fill-box; transform-origin: center; animation: tp-glow 2.3s ease-in-out infinite; }
+.tp-bird { animation: tp-bird 4.6s ease-in-out infinite; }
+
+@keyframes tp-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tp-turn {
+  0%, 16% { transform: rotate(0deg); }
+  34% { transform: rotate(-96deg); }
+  40%, 80% { transform: rotate(-90deg); }
+  94%, 100% { transform: rotate(0deg); }
+}
+@keyframes tp-level {
+  0%, 16% { transform: rotate(0deg); }
+  34% { transform: rotate(96deg); }
+  40%, 80% { transform: rotate(90deg); }
+  94%, 100% { transform: rotate(0deg); }
+}
+@keyframes tp-arrow { 0%, 10% { opacity: 1; } 22%, 86% { opacity: 0; } 98%, 100% { opacity: 1; } }
+@keyframes tp-sparkle {
+  0%, 36% { opacity: 0; transform: scale(.2); }
+  44% { opacity: 1; transform: scale(1.25) rotate(20deg); }
+  58%, 100% { opacity: 0; transform: scale(.4) rotate(45deg); }
+}
+@keyframes tp-swing { 0%, 100% { transform: rotate(-35deg); } 40% { transform: rotate(-50deg); } 62% { transform: rotate(25deg); } }
+@keyframes tp-hop { 0%, 38% { transform: translateY(0); } 42% { transform: translateY(-4px); } 47%, 100% { transform: translateY(0); } }
+@keyframes tp-glow { 0%, 100% { opacity: .55; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes tp-bird { 0% { transform: translate(0, 0); } 50% { transform: translate(-14px, -3px); } 100% { transform: translate(0, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still picture: the phone shown already turned, so the instruction reads without motion. */
+  .tp-phone { transform: rotate(-90deg); }
+  .tp-world { transform: rotate(90deg); }
+  .tp-arrow, .tp-sparkles { display: none; }
+}

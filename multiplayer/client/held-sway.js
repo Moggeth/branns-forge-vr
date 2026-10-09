@@ -24,7 +24,7 @@ export const HELD_SWAY = Object.freeze({
   aimCalm: .85,         // aiming down sights removes this share of the sway
   swingWeight: .5,      // authored swing paths keep their shape under a fast turn
   reducedMotion: .35,
-  mass: Object.freeze({hammer: 1.35, limb: 1.25, crossbow: 1.15, axe: 1, wyrmspout: 1, pick: .85, bow: .8, flask: .65}),
+  mass: Object.freeze({hammer: 1.35, limb: 1.25, crossbow: 1.15, stormreel: 1.1, axe: 1, wyrmspout: 1, pick: .85, bow: .8, flask: .65}),
 });
 
 const wrap = angle => Math.atan2(Math.sin(angle), Math.cos(angle));

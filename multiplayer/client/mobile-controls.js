@@ -12,8 +12,9 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
     if(msg.id==='deliver')onExpeditionAction('deposit');
     if(msg.id==='bandage')game.useResource('wood');
     if(msg.id==='drop')game.release(false);
+    if(msg.id==='inspect')game.inspectWeapon();
   }});
-  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'}]);
+  direct.setQuick([{id:'bandage',icon:'✚',label:'Bandage: use 3 wood to restore 35 health'},{id:'deliver',icon:'♜',label:'Deliver carried supplies to the forge'},{id:'drop',icon:'↓',label:'Drop held item gently'},{id:'inspect',icon:'◈',label:'Inspect your weapon (drag to turn it, tap again to put it away)'}]);
   document.querySelector('.menu-card').insertBefore(ui.settings, document.getElementById('leave'));
   const coarse = matchMedia('(any-pointer: coarse)'), app = matchMedia('(display-mode: standalone)');
   let state = {active:false, role:'hero', xr:false}, mode = read('mode','auto'), sensitivity = Number(read('sensitivity','1')) || 1;
@@ -91,7 +92,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   listen(jumpButton,'pointerdown',event=>{if(!state.active||state.xr||!game.weaponState()?.manned)return;windPointer=event.pointerId;game.setCrank(true);});
   for(const name of ['pointerup','pointercancel','lostpointercapture'])listen(jumpButton,name,event=>{if(event.pointerId!==windPointer)return;windPointer=null;game.setCrank(false);});
   let attackPointer=null;
-  listen(ui.root,'pointerdown',event=>{const button=event.target.closest('[data-touch-action="strike"]');if(!button||!state.active||state.xr||attackPointer!==null)return;event.preventDefault();attackPointer=event.pointerId;button.setPointerCapture(event.pointerId);game.primaryDown();});
+  listen(ui.root,'pointerdown',event=>{const button=event.target.closest('[data-touch-action="strike"]');if(!button||!state.active||state.xr||attackPointer!==null)return;event.preventDefault();attackPointer=event.pointerId;try{button.setPointerCapture(event.pointerId);}catch{/* the touch already ended */}game.primaryDown();});
   listen(ui.root,'pointerup',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.primaryUp();}});
   listen(ui.root,'lostpointercapture',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.clearControls();}});
   listen(ui.root,'pointercancel',event=>{if(event.pointerId===attackPointer){attackPointer=null;game.clearControls();}});
@@ -119,5 +120,5 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   render();
   return {refresh:render,setCue(cue){const ws=game.weaponState(),b=document.getElementById('special'),isAim=ws?.tool==='crossbow';if(b){if(ws?.manned){b.querySelector('.bf-name').textContent='Sight';b.setAttribute('aria-label','Sight along the Timberline range ladder');b.title='Sight (hold right click / Q toggles)';b.setAttribute('aria-pressed',String(!!ws.scoping));}else{b.querySelector('.bf-name').textContent=isAim?'Aim':'Special';b.setAttribute('aria-label',isAim?'Aim down sights':'Weapon special');b.title=isAim?'Aim down sights (hold right click / Q toggles)':'Weapon special (Q)';if(isAim)b.setAttribute('aria-pressed',String(!!ws.aiming));else b.removeAttribute('aria-pressed');}}
    // Seated at the Timberline, Jump becomes Wind (hold to crank) and Attack fires.
-   const wind=!!ws?.manned,jump=ui.buttons.jump;if(jump&&jump.dataset.wind!==String(wind)){jump.dataset.wind=String(wind);jump._label.textContent=wind?'Wind':'Jump';jump.setAttribute('aria-label',wind?'Hold to wind the Timberline':'Jump');}ui.setState({tool:ws?.tool});direct.setContext(cue?.kind==='pickup'&&(cue.state==='ready'||ws?.manned)?{kind:'collect',label:cue.action,targetId:cue.target}:null);},get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();actionButtons.forEach(b=>b.dispose());sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());direct.dispose();ui.destroy();}};
+   const wind=!!ws?.manned,jump=ui.buttons.jump;if(jump&&jump.dataset.wind!==String(wind)){jump.dataset.wind=String(wind);jump._label.textContent=wind?'Wind':'Jump';jump.setAttribute('aria-label',wind?'Hold to wind the Timberline':'Jump');}ui.setState({tool:ws?.tool,strikeVerb:ws?.mannedVerb||null});direct.setContext(cue?.kind==='pickup'&&(cue.state==='ready'||ws?.manned)?{kind:'collect',label:cue.action,targetId:cue.target}:null);},get enabled(){return enabled;}, update(next){const changed=state.active!==next.active||state.role!==next.role||state.xr!==next.xr;if(changed){reset();if(state.role!==next.role)target=false;}state=next;render();},dispose(){reset();actionButtons.forEach(b=>b.dispose());sticks.forEach(s=>s.dispose());worldTouch.dispose();cleanups.forEach(fn=>fn());direct.dispose();ui.destroy();}};
 }

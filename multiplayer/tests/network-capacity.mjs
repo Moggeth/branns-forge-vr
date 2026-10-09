@@ -8,7 +8,7 @@ import {WorldSession} from '../client/session.js';
 let source=await readFile(new URL('../cloud/worker.js',import.meta.url),'utf8');
 source=source.replace("import { DurableObject } from 'cloudflare:workers';",'class DurableObject {}');
 source=source.replace("export {ForgeDirectory} from './directory.js';",'');
-source=source.replace("'./room-directory.js'",JSON.stringify(new URL('../cloud/room-directory.js',import.meta.url).href));
+source=source.replace("'./room-directory.js'",JSON.stringify(new URL('../cloud/room-directory.js',import.meta.url).href)).replace("'./ice-servers.js'",JSON.stringify(new URL('../cloud/ice-servers.js',import.meta.url).href));
 source=source.replace("'../shared/multiplayer-limits.js'",JSON.stringify(new URL('../shared/multiplayer-limits.js',import.meta.url).href));
 source=source.replace("'../peer/room-capacity.js'",JSON.stringify(new URL('../peer/room-capacity.js',import.meta.url).href));
 const {ForgeRoom}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));

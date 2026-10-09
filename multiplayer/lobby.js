@@ -29,7 +29,7 @@ import {BLOOM,bloomLevel,nextBloom} from './shared/bloom.js';
 import {siegebirdGoldenChance} from './shared/combat.js';
 import { createMobileControls } from './client/mobile-controls.js';
 import './client/mobile-ui.css';
-import { createGame } from './client/game.js';
+import {afterPaint} from './client/startup-work.js';
 import {LocalRoomConnection} from './client/local-room.js';
 import { WorldSession } from './client/session.js';
 import { WorldSaves, parseSave } from './client/world-saves.js';
@@ -39,7 +39,7 @@ import { adventureView } from './shared/adventure.js';
 import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import {createRoomDirectory} from './client/public-room-directory.js';
 import {findWorlds} from './client/quick-play.js';
-import {createPublicRoomBrowser,createPublicRoomsLauncher} from './client/public-rooms.js';
+import {createPublicRoomBrowser} from './client/public-rooms.js';
 import {createBattlePanel} from './client/battle-panel.js';
 import './client/public-rooms.css';
 import './client/battle-panel.css';
@@ -50,7 +50,10 @@ import {createPatchNotes} from './client/patch-notes.js';
 import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
 import './client/patch-notes.css';
 import {createHeroProgressUI} from './client/hero-progress-ui.js';
+import {createQuartermasterUI} from './client/quartermaster-ui.js';
+import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
+import './client/quartermaster.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -119,10 +122,12 @@ let resourceBar=null,forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=n
 let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
+let rendererPromise=null, startRevision=0;
 let phase = 'lobby';          // lobby | connecting | game
-let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false;
+let playerId = null, room = '', connected = false, menuOpen = false, patchNotesOpen = false, talentsOpen = false, shopOpen = false;
 let appliedRole = null, currentRole = 'hero', spell = 'grove', vrSupported = false, vrChecked = false;
 let lastAttempt = null, joinTimer = 0, lastSnapshot = null, snapshots = 0, inputs = 0;
+let handoverTimer = 0;
 let lastEvent = null, lastStatus = 'not connected', rendererStatus = 'starting', lastProblem = 'none';
 let lastGameplayCommand={};
 function command(type,payload={}){lastGameplayCommand={type,...payload};return session?.command(type,payload);}
@@ -138,9 +143,7 @@ const roomBrowser=createPublicRoomBrowser({
   onClose:()=>{directory.close();if(directoryPending){directoryPending=null;teardown();hideLobbyStatus();setPhase('lobby');}roomBrowser.render({pendingCode:null});}
 });
 const directory=createRoomDirectory({endpoint:peerEndpoint,onChange:state=>roomBrowser.render({...state,pendingCode:directoryPending})});
-const browseButton=createPublicRoomsLauncher({onOpen:button=>{roomBrowser.open(button);directory.open();}});
-browseButton.id='browseWorlds';$('create').after(browseButton);
-const publicNotice=document.createElement('p');publicNotice.className='bf-pr-lobby-notice';publicNotice.textContent='Multiplayer worlds are public. Anyone can join.';browseButton.after(publicNotice);
+// Welcome screen keeps only role + Play + guides; the public world browser has no lobby launcher.
 const battlePanel=createBattlePanel({mount:document.querySelector('#menu .menu-card'),onAction:({action,side})=>{
   if(!connected)return;
   if(action==='side')command('action',{action:'inventionSide',side});
@@ -175,16 +178,14 @@ roomInput.addEventListener('paste', event => {
 const invited = (new URLSearchParams(location.search).get('room') || '').trim();
 if (ROOM_PATTERN.test(invited)) {
   roomInput.value = invited;
-  $('joinBlock').classList.add('invited');
-  $('joinBlock').hidden = false;
-  body.classList.add('has-invite');
+  $('joinBlock').classList.add('invited');   // stays hidden: Play joins this world directly
   $('inviteNote').hidden = false;
   setText($('inviteNote'), 'You’ve been invited! Pick a name and role, then join.');
 }
 
 $('lobbyForm').addEventListener('submit', event => {
   event.preventDefault();
-  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play
+  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play (always now)
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
@@ -194,7 +195,16 @@ $('create').addEventListener('click', () => quickPlay());
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
 let quickSearch = 0;
 async function quickPlay(tried = []) {
+  // A tap during loading must keep invite/quick-play semantics after the renderer arrives.
+  if (!game && !rendererFailed) {
+    const revision = ++startRevision;
+    showLobbyStatus('Preparing the world…', {busy: true, cancel: true});
+    await rendererPromise;
+    if (revision !== startRevision) return;
+  }
   if (rendererFailed || !game) { start({create: true}); return; }
+  // An invite link (or QR scan) goes straight to that world; if it has closed, fall back to quick play.
+  if (!tried.length && ROOM_PATTERN.test(invited)) { start({create: false, room: invited, quick: {tried: [invited]}}); return; }
   const search = ++quickSearch;
   teardown(); phase = 'connecting'; body.dataset.phase = 'connecting';
   showLobbyStatus('Finding a world near you…', {busy: true, cancel: true});
@@ -320,14 +330,15 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
 
 // ---------------------------------------------------------------- connection
 function teardown() {
+  startRevision++;
   voice?.dispose(); voice = null; voiceControls.update();
   closeQuickBuild();closeForge();
   restoreFieldLock=false;holdOverlays?.close();
@@ -341,7 +352,13 @@ function teardown() {
   clearNotices();
 }
 
-function start(attempt) {
+async function start(attempt) {
+  const revision=++startRevision;
+  if(!game&&!rendererFailed){
+    showLobbyStatus('Preparing the world…', {busy:true, cancel:true});
+    await rendererPromise;
+    if(revision!==startRevision)return;
+  }
   attempt={...attempt,solo:!!attempt.solo||attempt.save?.checkpoint?.room==='SOLO'};
   if (rendererFailed || !game) {
     showLobbyProblem('This browser couldn’t start the 3D world. Try a recent version of Chrome, Edge or Firefox.', {back: true});
@@ -365,18 +382,22 @@ function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
-  next.addEventListener('host_changed', mine(() => { refreshHostControls(); }));
-  next.addEventListener('saved', mine(() => {}));
-  next.addEventListener('owner_lost', mine(detail => notice('owner', detail.recoverySaved
-    ? 'The host left. A recovery copy is saved in this browser.'
-    : 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, detail.recoverySaved ? 'info' : 'warn')));
-  next.addEventListener('continue_world_offer', mine(() => {
-    removeNotice('waiting');
-    notice('continue', 'The host has gone. You can keep this world running from your computer.', {label: 'Continue world here', run: () => { try { session?.continueWorld(); } catch (e) { onSessionError({message: e?.message}); } removeNotice('continue'); }}, 'action');
+  next.addEventListener('host_changed', mine(detail => {
+    refreshHostControls();
+    if (phase !== 'game') return;
+    const who = lastSnapshot?.players?.find(p => p.id === detail?.hostId)?.name;
+    toast(detail?.isHost ? 'You’re carrying the world now. Play on!' : who ? `${who} is carrying the world now.` : 'The world carries on with a new host.');
   }));
+  next.addEventListener('saved', mine(() => {}));
+  // The next player takes the world over by themselves, so a host leaving shows nothing unless
+  // the switch is unusually slow; then a quiet note explains the pause.
+  next.addEventListener('owner_lost', mine(detail => {
+    if (!detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
+  }));
+  next.addEventListener('continue_world_offer', mine(() => { removeNotice('waiting'); }));
   next.addEventListener('continue_offer_expired', mine(() => removeNotice('continue')));
   next.addEventListener('world_waiting', mine(() => {
     removeNotice('continue');
@@ -390,7 +411,7 @@ function start(attempt) {
   }));
 
   phase = 'connecting'; body.dataset.phase = 'connecting';
-  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? 'Joining a world near you…' : `Looking for world ${attempt.room}…`;
+  const verb = attempt.save ? `Bringing back ${attempt.save.name || 'your world'}…` : attempt.create ? 'Lighting the forge for a new world…' : attempt.quick ? (attempt.room === invited ? 'Joining your friend’s world…' : 'Joining a world near you…') : `Looking for world ${attempt.room}…`;
   showLobbyStatus(verb, {busy: true, cancel: true});
 
   joinTimer = setTimeout(() => {
@@ -405,7 +426,8 @@ function start(attempt) {
 
   try {
     next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role,
-      desktop: !(/OculusBrowser|Quest|Mobile/i.test(navigator.userAgent))});
+      // Any device can carry the world on when the host leaves (phones and headsets host new worlds already).
+      desktop: true});
   } catch (error) {
     recordProblem(error);
     teardown(); setPhase('lobby');
@@ -422,7 +444,10 @@ function onWelcome(detail) {
   try { history.replaceState(null, '', url); } catch { /* sandboxed */ }
   roomInput.value = ROOM_PATTERN.test(room) ? room : roomInput.value;
   setText($('hudRoom'), detail.local?'Solo':room); setText($('menuRoom'), detail.local?'Solo — this device':room);
-  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite'])$(id).disabled=!!detail.local;
+  for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite','showInviteQr'])$(id).disabled=!!detail.local;
+  $('inviteQr').hidden=!!detail.local;
+  $('inviteQr').open=false;
+  $('inviteQrImage').hidden=true;
   setText($('hudName'), nameInput.value.trim() || 'Wanderer');
   hideLobbyStatus();
   setPhase('game');
@@ -439,7 +464,12 @@ const STATUS_TEXT = {
 function onStatus(detail) {
   const state = String(detail?.state || '');
   lastStatus = state || 'unknown';
-  connected = state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
+  // While the world moves to a new host the game stays live under your hands (no lost pointer
+  // lock or hidden controls); only a slow switch earns a note.
+  const handing = phase === 'game' && (state === 'owner_lost' || state === 'connecting_to_host');
+  if (handing && !handoverTimer) handoverTimer = setTimeout(() => { if (handoverTimer) notice('owner', 'The host left. Moving the world to another player…', null, 'info'); }, 6000);
+  if (!handing) { clearTimeout(handoverTimer); handoverTimer = 0; }
+  connected = handing || state === 'connected' || state === 'hosting' || (state === 'signaling_reconnecting' && detail.playable);
   syncActive();
   refreshBattlePanel();
   if (phase === 'connecting' && !playerId && state === 'closed') {
@@ -451,6 +481,7 @@ function onStatus(detail) {
   if (state === 'signaling_reconnecting') {
     notice('net', detail.playable ? 'Game connected. Restoring invites…' : 'Restoring the room connection…', null, 'info'); return;
   }
+  if (handing) return;
   if (connected) { for (const id of ['net','owner','waiting','continue','relay']) removeNotice(id); return; }
   if (state === 'reconnecting' || state === 'connecting') notice('net', STATUS_TEXT[state], null, 'info');
   else if (state === 'disconnected' || state === 'closed') {
@@ -544,9 +575,10 @@ function onSnapshot(snapshot) {
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,flask:`Emberdew · attack: toss fuel · Q: ${self.flaskLit?'extinguish':'light'} wick · ${self.flaskLit?'LIT':'unlit'}`}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
+    quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
   if (snapshots % 15 === 0) refreshHostControls();
@@ -669,6 +701,33 @@ $('copyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied
 $('copyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
 $('menuCopyCode').addEventListener('click', e => copy(room, e.currentTarget, 'Copied!'));
 $('menuCopyInvite').addEventListener('click', e => copy(inviteUrl(), e.currentTarget, 'Link copied!'));
+
+// Lazy and local: opening an invite never sends its URL to a QR service.
+let qrRequest = 0;
+$('inviteQr').addEventListener('toggle', async () => {
+  const request = ++qrRequest;
+  if (!$('inviteQr').open || $('inviteQr').hidden) return;
+  const url = inviteUrl();
+  $('inviteQrImage').hidden = true;
+  $('inviteQrStatus').textContent = 'Preparing QR code…';
+  try {
+    const {default: QRCode} = await import('qrcode');
+    const src = await QRCode.toDataURL(url, {width:512,margin:4,errorCorrectionLevel:'M',color:{dark:'#000000',light:'#ffffff'}});
+    if (request !== qrRequest || url !== inviteUrl() || !$('inviteQr').open) return;
+    $('inviteQrImage').src = src;
+    $('inviteQrImage').hidden = false;
+    $('inviteQrStatus').textContent = `Scan with your phone camera to join world ${room}.`;
+    if (menuOpen) $('inviteQrImage').scrollIntoView({block:'center'});
+  } catch {
+    if (request === qrRequest) $('inviteQrStatus').textContent = 'QR code could not load. Use Copy invite link above, or close and reopen this section to retry.';
+  }
+});
+$('showInviteQr').addEventListener('click', () => {
+  openMenu();
+  $('inviteQr').open = true;
+  $('inviteQr').scrollIntoView({block:'center'});
+  $('inviteQr').querySelector('summary').focus({preventScroll:true});
+});
 
 // ---------------------------------------------------------------- menu
 function openMenu() {
@@ -888,8 +947,6 @@ const fieldBuildTag=createBuildTag({mount:body,text:typeof __BRANN_BUILD__!=='un
 // This listener precedes the hold router, whose keyup closes synchronously in this trusted gesture.
 window.addEventListener('keyup',event=>{fieldKeyupTrusted=event.isTrusted&&(event.code==='F1'||event.code==='Tab');setTimeout(()=>{fieldKeyupTrusted=false;},0);},true);
 holdOverlays=bindHoldOverlays({canParty:()=>phase==='game'&&!patchNotes.isOpen&&!menuOpen&&!forgeOpen&&!quickBuildOpen&&!xrActive&&!fieldPinned,onChange:fieldChanged});
-const lobbyFieldButton=document.createElement('button');lobbyFieldButton.type='button';lobbyFieldButton.className='btn btn-quiet btn-howto';lobbyFieldButton.innerHTML='<svg aria-hidden="true"><use href="#bfi-hammer"/></svg><span>Equipment</span>';lobbyFieldButton.setAttribute('aria-label','Equipment guide');
-lobbyFieldButton.addEventListener('click',()=>{fieldPinned=true;holdOverlays.open('equipment');});document.querySelector('.howto-row')?.append(lobbyFieldButton);
 refreshFieldModel();
 
 // ---------------------------------------------------------------- keyboard & pointer
@@ -898,6 +955,11 @@ const heroProgress=createHeroProgressUI({hudSelf:document.querySelector('.hud-se
   onLearn:(weapon,talent)=>command('action',{action:'talent',weapon,talent}),onReset:()=>command('action',{action:'talent',reset:true}),
   onOpen:()=>{talentsOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{talentsOpen=false;syncActive();}});
+// The keep Quartermaster (client/quartermaster-ui.js): E at the shop counter opens it; V or the vitals chip drinks a draught.
+const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySelector('.hud-self'),
+  onBuy:item=>command('action',{action:'homeShop',buy:item}),onSell:item=>command('action',{action:'homeShop',sell:item}),onDrink:()=>command('action',{action:'drinkDraught'}),
+  onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
+  onClose:()=>{shopOpen=false;syncActive();}});
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -906,6 +968,7 @@ for (const type of ['keydown', 'keyup', 'keypress']) window.addEventListener(typ
   if(roomBrowser.isOpen)return;
   if(event.key==='Escape'&&event.target.closest?.('.bf-bt-confirm'))return;
   if(patchNotes.isOpen){if(!patchNotes.root.contains(event.target))event.stopImmediatePropagation();return;} // the dialog owns its keys
+  if(quartermaster.isOpen){if(!quartermaster.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&event.key==='Escape'){event.preventDefault();quartermaster.close();}}return;} // the shop owns its keys
   if(heroProgress.isOpen){if(!heroProgress.root.contains(event.target)){event.stopImmediatePropagation();if(type==='keydown'&&(event.key==='Escape'||event.code==='KeyN')){event.preventDefault();heroProgress.close();}}return;} // so does the Talents panel
   if(event.code==='F9'&&phase==='game'&&!isTyping(event.target)){event.preventDefault();event.stopImmediatePropagation();if(type==='keydown'&&!event.repeat)changePerspective();return;}
   if(quickBuildOpen&&!isTyping(event.target)){
@@ -945,12 +1008,16 @@ $('vr').addEventListener('click', async () => {
 window.addEventListener('error', event => { recordProblem(event.error || {message: event.message}); });
 window.addEventListener('unhandledrejection', event => { recordProblem(event.reason); event.preventDefault(); });
 
+rendererPromise=(async()=>{
 try {
-  game = createGame({
+  await afterPaint();
+  const {createGameAsync}=await import('./client/game.js');
+  game = await createGameAsync({
     canvas,
     isHost, onSelection: chooseSpell,
     onVoicePose: pose => voice?.updatePose(pose),
-    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
+    voiceActivity: () => voice?.active ? voice.activity() : null,
+    onAction: (action, details = {}) => action==='placementFeedback'?fail(details.reason):action==='openWorkshop'?openForge():action==='openShop'?quartermaster.show():action==='projectileHit'?session?.projectileContact(details):command('action', {action, ...details}),
     onCast: (chosen, point, details={}) => command('cast', {spell: chosen, point,...details}),
     onInput: input => { if (session?.command('input', input)) inputs++; },
     onNotice: text => toast(text),
@@ -960,6 +1027,7 @@ try {
     onExpeditionAction: expeditionAction,
     onAimProbe: (aim, state) => { interactionCue ??= createInteractionCueController($('hud'),point=>game.projectWorld(point)); const cue=interactionCue.sample(aim, state, lastSnapshot, playerId, menuOpen || forgeOpen || quickBuildOpen || !!fieldKind); mobile?.setCue(cue); },
   });
+  const graphics=$('graphicsMode');graphics.value=store.get('branns-forge.graphics')||'auto';graphics.addEventListener('change',()=>game.setGraphicsMode(graphics.value));
   game.setDamageNumbers(store.get('branns-forge.damage-numbers')==='on');
   $('damageNumbers').checked=store.get('branns-forge.damage-numbers')==='on';
   game.setExpeditionPointerHand(store.get('branns-forge.vr.pointerHand') === 'left' ? 'left' : 'right');
@@ -981,6 +1049,8 @@ try {
   $('create').disabled = true; $('join').disabled = true;
 }
 
+})();
+
 const controlsCard = bindControlsCard(document, {store,
   role: () => phase === 'game' ? currentRole : chosenRole(),
   scheme: () => detectControlScheme({xrPresenting: xrActive, touchMode: store.get('branns-forge.touch.mode') || 'auto', coarse: matchMedia('(any-pointer: coarse)').matches, maxTouchPoints: navigator.maxTouchPoints || 0})});
@@ -992,13 +1062,19 @@ export const setObjective = data => renderObjective(document, data);
 applyRoleUi(chosenRole());
 setPhase('lobby');
 patchNotes.showWhatsNew();
-if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('join') : nameInput).focus({preventScroll: true});
+if (ROOM_PATTERN.test(invited)) (nameInput.value ? $('create') : nameInput).focus({preventScroll: true});
 
+// A host stepping away hands the world to someone still playing before its timers are throttled.
+document.addEventListener('visibilitychange', () => { if (document.hidden) try { session?.handOver(); } catch { /* best effort */ } });
+// Phones often skip beforeunload; pagehide is the last chance to tell the room we left.
+window.addEventListener('pagehide', () => { try { session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('pageshow', event => { if (event.persisted && phase === 'game') location.reload(); });
 window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({
   state: () => ({phase, connected, solo:!!session?.connection.local, menuOpen, forgeOpen, quickBuildOpen, fieldOverlay:fieldKind, controlsActive: phase === 'game' && connected && !menuOpen && !patchNotesOpen && !forgeOpen && !quickBuildOpen && !fieldKind, touch:mobile?.enabled, xr:xrActive, playerId, role: appliedRole, snapshots, inputs, lastEvent, rendererReady, host: isHost()}),
+  network: () => session ? {transport:session.connection.diagnostics?.() || null, simulation:{...session.metrics}} : null,
   voice: () => voice ? structuredClone({...voice.state(), pose:voice.pose}) : null,
   controls: () => game?.controlsSnapshot(),
   snapshot: () => lastSnapshot ? structuredClone(lastSnapshot) : null,

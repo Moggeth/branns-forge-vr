@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import {createSunbeams} from '../client/sunbeams.js';
 import {worldClock, weatherAt, dayPhase, nightAmount, solarAngle, lightningAt, DAY_TICKS, WEATHER_TICKS, DAYLIGHT_SHARE} from '../shared/world-clock.js';
 import {createDayNightWeather, previewFromUrl} from '../client/day-night-weather.js';
 
@@ -62,4 +63,64 @@ const fog = createDayNightWeather({scene, orchard, quality: 'high', preview: {ph
 assert.ok(env.fogScale < .2);
 for (const s of [sky, forced, fog]) s.dispose();
 assert.equal(scene.children.length, before);
-console.log('day-night-weather: ok');
+
+// Atmosphere: every built-in material gets the shared mist/wet/snow layer without losing its own shader hook.
+import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosphere, atmosphereStats}) => {
+  assert.ok(THREE.ShaderChunk.fog_fragment.includes('BF_ATMOS') && THREE.ShaderChunk.emissivemap_fragment.includes('bfSnow'));
+  const plain = new THREE.MeshStandardMaterial(), hooked = new THREE.MeshLambertMaterial();
+  let ran = 0; hooked.onBeforeCompile = shader => { ran++; shader.vertexShader = '// mine\n' + shader.vertexShader; };
+  const shader = () => ({vertexShader: 'void main(){}', fragmentShader: 'void main(){}', uniforms: {}});
+  const a = shader(); plain.onBeforeCompile(a); assert.ok(a.fragmentShader.startsWith('#define BF_ATMOS') && a.uniforms.bfMist === ATMOSPHERE.bfMist);
+  const b = shader(); hooked.onBeforeCompile(b); assert.equal(ran, 1); assert.ok(b.vertexShader.includes('// mine') && b.uniforms.bfWet === ATMOSPHERE.bfWet);
+  assert.notEqual(plain.customProgramCacheKey(), hooked.customProgramCacheKey(), 'different hooks never share a program');
+  const early = new THREE.MeshPhongMaterial(); Object.defineProperty(early, 'onBeforeCompile', {value: s => { s.mine = true; }, writable: true, configurable: true, enumerable: true});
+  const holder = new THREE.Scene(); holder.add(new THREE.Mesh(new THREE.BoxGeometry(), early));
+  assert.equal(adoptAtmosphere(holder), 1); const c = shader(); early.onBeforeCompile(c); assert.ok(c.mine && c.uniforms.bfSnow);
+  assert.ok(atmosphereStats().installed);
+
+  // Weather drives the surfaces: rain wets the ground over time, snow settles slowly, mist thickens at dawn.
+  const height = () => 0, trees = [{id: 't1', x: 6, z: 0, height: 6}, {id: 't2', x: -5, z: 4, height: 7}];
+  camera.position.set(0, 1.7, 0); camera.updateMatrixWorld();
+  const wetSky = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .3, weather: 'rain'}});
+  wetSky.update({tick: 0, camera, time: 0, dt: 0}); assert.ok(ATMOSPHERE.bfWet.value > .9, 'a preview starts already wet');
+  const dawn = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .015, weather: 'clear'}});
+  dawn.setTrees(trees);
+  dawn.update({tick: 0, camera, time: 0, dt: 0}); const dawnMist = ATMOSPHERE.bfMist.value;
+  for (let i = 1; i < 40; i++) dawn.update({tick: 0, camera, time: i * .5, dt: .5});
+  assert.ok(ATMOSPHERE.bfWet.value < .7, 'ground dries once the rain stops');
+  const golden = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .55, weather: 'clear'}});
+  golden.setTrees(trees); golden.update({tick: 0, camera, time: 0, dt: 0});
+  const beamAxis = golden.stats() && scene.children.filter(o => o.name === 'sunbeams').at(-1).material.uniforms.uAxis.value;
+  assert.ok(-beamAxis.y > Math.sin(60 * Math.PI / 180), `low sun still drops shafts steeply: ${beamAxis.y.toFixed(3)}`);
+  const gs = golden.stats(); assert.ok(gs.sunbeams.beams === 6 && gs.sunbeams.strength > .3, `golden-hour shafts ${JSON.stringify(gs.sunbeams)}`);
+  const noonSky = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: DAYLIGHT_SHARE / 2, weather: 'clear'}});
+  noonSky.setTrees(trees); noonSky.update({tick: 0, camera, time: 0, dt: 0});
+  assert.ok(dawnMist > ATMOSPHERE.bfMist.value * 2, 'dawn is far mistier than noon');
+  assert.ok(noonSky.stats().sunbeams.strength < gs.sunbeams.strength, 'shafts are strongest in low sun');
+  const overcast = createDayNightWeather({scene, orchard, height, quality: 'low', preview: {phase: .55, weather: 'storm'}});
+  overcast.setTrees(trees); overcast.update({tick: 0, camera, time: 0, dt: 0}); assert.equal(overcast.stats().sunbeams.beams, 0, 'no shafts under storm cloud');
+  const snowy = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .3, weather: 'snow'}});
+  snowy.update({tick: 0, camera, time: 0, dt: 0}); assert.ok(ATMOSPHERE.bfSnow.value > .9 && ATMOSPHERE.bfMist.value > dawnMist * .5);
+  for (const s of [wetSky, dawn, golden, noonSky, overcast, snowy]) s.dispose();
+  assert.equal(scene.children.length, before);
+  console.log('day-night-weather: ok');
+});
+
+// The angle limit must hold beyond golden hour, including a nearly overhead light.
+// Normalising only the horizontal components first incorrectly flattens these rays.
+{
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.7, 8); camera.updateMatrixWorld();
+  const beams = createSunbeams({scene, height: () => 0, quality: 'low'});
+  beams.setTrees([{id: 'angle-check', x: 0, z: 0, height: 6}]);
+  for (const degrees of [0, 15, 30, 45, 62, 75, 89.9, 90]) {
+    const angle = degrees * Math.PI / 180;
+    const light = new THREE.Vector3(Math.cos(angle) * .6, Math.sin(angle), Math.cos(angle) * .8);
+    beams.update({camera, light, strength: 1, time: degrees});
+    const axis = beams.mesh.material.uniforms.uAxis.value;
+    assert.ok(-axis.y >= Math.sin(62 * Math.PI / 180) - 1e-9, `shaft too shallow at ${degrees}: ${axis.y}`);
+    assert.ok(Math.abs(axis.length() - 1) < 1e-9);
+    assert.ok(Math.abs(axis.x * light.z - axis.z * light.x) < 1e-9, 'compass direction is preserved');
+  }
+  beams.dispose();
+}
