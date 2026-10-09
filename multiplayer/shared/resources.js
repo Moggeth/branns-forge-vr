@@ -1,5 +1,6 @@
 import {heroMaxHp} from './hero-progress.js';
-import {snackAction,isFruitDrop} from './fruit.js';
+import {snackAction,isFruitDrop,takeGroundApple} from './fruit.js';
+import {nextEntityId} from './entity-id.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
@@ -55,7 +56,7 @@ export function collectTarget(state,p,m,ctx){
    (p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+bundle.reduce((n,item)=>n+item.amount,0));
    return ok(bundle.map(item=>({kind:'pickup',id:item.id,position:[item.x,item.y,item.z],material:item.kind})));
   }
-  if(q.kind==='apple'&&p.hp>=heroMaxHp(p))return fail('not_needed');
+  if(q.kind==='apple'){const took=takeGroundApple(state,{nextId:nextEntityId},p,q);if(took)return took;if(p.hp>=heroMaxHp(p))return fail('not_needed');} // ground apples are picked up and eaten in three bites
   if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
   if(q.kind==='apple')p.hp=Math.min(heroMaxHp(p),p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}

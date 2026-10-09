@@ -1,4 +1,3 @@
-import {heroMaxHp} from './hero-progress.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {MATERIAL_KEYS,materialLabel} from './material-catalog.js';
 import {capsuleDistance, TREE_LIMITS} from './trees.js';
@@ -49,7 +48,7 @@ function candidateFor(p,q,log,ctx,state) {
  if(![...MATERIAL_KEYS,'apple'].includes(kind))return null;
  const target={id:q.id,type:log?'log':q.embedded?'embed':'pickup',kind,amount,position,distance,held,
   full:isTestingGift(q)?giftContents(state).some(item=>(p.resources?.[item.kind]||0)+item.amount>INVENTORY_CAP):kind!=='apple'&&(p.resources?.[kind]||0)+amount>INVENTORY_CAP,
-  unnecessary:kind==='apple'&&p.hp>=heroMaxHp(p)};
+  unnecessary:false}; // an apple is always worth picking up: it's a snack you eat in three bites
  // Terrain occlusion remains deterministic on host and clients. Stop above the resource surface.
  if(!held){
   const end=[position[0],position[1]+(q.embedded?0:log?.12:.25),position[2]];

@@ -95,6 +95,16 @@ export function siegebirdPlumage(id = '', n = 1, count = 6) {
   return order[slot];
 }
 
+// Relief bird: after a quick swap away and back, a new bird takes over the reload the first one abandoned. It
+// wears a clearly different plumage so the two read as separate birds. Each of the six (kingfisher, robin,
+// bluebird, cardinal, chickadee, greenfinch) lists the others from strongest contrast down; relief k (1, 2, ...)
+// takes the k-th, so every takeover also differs from the bird it replaces and from the original.
+const RELIEF_ORDER = [[3, 4, 5, 1, 2], [2, 5, 4, 0, 3], [1, 5, 3, 4, 0], [0, 5, 2, 4, 1], [3, 5, 0, 2, 1], [3, 2, 4, 1, 0]];
+export function siegebirdReliefPlumage(plumage, relief = 0) {
+  if (!(relief > 0)) return plumage;
+  const order = RELIEF_ORDER[plumage]; return order ? order[(relief - 1) % order.length] : plumage;
+}
+
 // Reload cues crossed between two reload times (prev exclusive, next inclusive): drives audio and rumble.
 // release: string thrown and drum spinning back, engage: clutch bites, click: one per ratchet tooth the pawl
 // drops off while winding (17), latch: the pawl falls into the last notch, enter/arrive/seat/leave: the bird,

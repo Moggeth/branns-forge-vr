@@ -310,7 +310,7 @@ export function createRadiantStaff(ctx) {
       light.intensity = base + STAFF.light.beam * beamK * (1 + night) + STAFF.light.nova * novaK * novaK;
       light.distance = STAFF.light.distance + 4 * beamK + 6 * novaK;
       // ground pools: around you always, under the beam's end while it is out
-      const poolI = (STAFF.pool.day + (STAFF.pool.night - STAFF.pool.day) * night) * (1 + .6 * charge);
+      const poolI = (STAFF.pool.day + (STAFF.pool.night - STAFF.pool.day) * night) * (1 + .6 * charge) * (ctx.realLight === false ? 1.5 : 1);   // phones: the pools stand in for the light
       pool.mesh.visible = true; const pu = pool.mesh.material.uniforms; pu.uTime.value = time;
       if (novaK > 0) {   // the nova: the pool opens out to the ring's full reach and a bright band races to its edge
         pool.place(crownAt.x, crownAt.z, STAFF.nova.radius, ctx.height);
