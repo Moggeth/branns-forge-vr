@@ -108,6 +108,7 @@ import {createExpeditionPresentation} from './expedition-presentation.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
 import {createDayNightWeather} from './day-night-weather.js';
+import {SUNNY, gradeScene} from './palette-preview.js';
 import {createMeadowCover} from './meadow-cover.js';
 import {createOreGlint} from './ore-glint.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
@@ -1642,6 +1643,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if (jumpPending && !zero && grounded && role === 'hero') { verticalSpeed = 5.5; grounded = false; soundKit?.play('jump'); }
     jumpPending = false;
   }
+  let frameCountSunny = 0;
   function frame(now) {
     contactFrame++;
     if (disposed) return;
@@ -1840,6 +1842,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
     if(!renderer.xr.isPresenting){renderBudget.ratio(dt);resizeBuffer();}
+    if (SUNNY && (frameCountSunny++ % 30 === 0)) gradeScene(scene);
     skyCycle.render(scene, camera);
     if (onVoicePose && playerId) {
       // After render, WebXR's viewer camera includes this frame's head pose.
