@@ -14,7 +14,7 @@ const GLOW = {Crystal: 1.5, Amethyst: 1.5, Ember: 2.4, Ooze: 1.7, Glass: 1.15, G
 const FLICKER = new Set(['Ember', 'Glass', 'GlassOoze']);
 // Where the smoke leaves each tavern's chimney pot when the kit has no *_Tavern_Chimney anchor (tavern frame).
 const CHIMNEY = {D: [-4.22, 5.05, -.8], G: [-4.22, 4.95, -.8], N: [5.72, 5.3, 0]};
-const SMOKE_TINT = {party: 0xd8d2c8, rivals: 0xb4c49c, neutral: 0xd6cfc2};
+const SMOKE_TINT = {party: 0xbdb6ac, rivals: 0x9fb088, neutral: 0xbab2a5};
 
 // ---- Hearth fire and chimney smoke textures, generated (no downloads) as tiny DataTextures so node tests run too ----
 function makeTex(size, fn) {
@@ -72,7 +72,7 @@ export function createHomeTownView({scene}) {
     const fire = {flames: [], glow: null, embers: [], at, out: at.x < 0 ? 1 : -1};
     for (let i = 0; i < 3; i++) {
       const s = new THREE.Sprite(fireMats.flame); s.center.set(.5, .02); s.renderOrder = 3; g.add(s);
-      fire.flames.push({s, x: (i - 1) * .16, z: (i % 2) * .08, h: i === 1 ? .62 : .44, seed: i * 1.7});
+      fire.flames.push({s, x: (i - 1) * .16, z: (i % 2) * .08, h: i === 1 ? .8 : .58, seed: i * 1.7});
     }
     fire.glow = new THREE.Sprite(fireMats.glow); fire.glow.position.set(at.x, at.y + .4, at.z); fire.glow.scale.set(1.6, 1.3, 1); fire.glow.renderOrder = 2; g.add(fire.glow);
     for (let i = 0; i < 3; i++) { const s = new THREE.Sprite(fireMats.ember.clone()); s.renderOrder = 3; g.add(s); fire.embers.push({s, phase: i / 3}); }
@@ -227,7 +227,7 @@ export function createHomeTownView({scene}) {
     }
     fire.glow.material.opacity = .45 + .12 * Math.sin(t * 9.7) + .06 * Math.sin(t * 17.3);
     for (const e of fire.embers) {
-      const u = (t * .45 + e.phase) % 1, k = Math.floor(t * .45 + e.phase);
+      const w = t * .45 + e.phase, k = Math.floor(w), u = w - k; // (t can be negative: it carries the tavern's position)
       e.s.position.set(at.x + Math.sin(k * 3.1 + u * 5) * .22 * u, at.y + .3 + u * 1.25, at.z + Math.cos(k * 1.7 + u * 4) * .18 * u);
       e.s.scale.setScalar(.06 * (1 - u * .6)); e.s.material.opacity = Math.min(1, (1 - u) * 1.6);
     }
@@ -235,9 +235,9 @@ export function createHomeTownView({scene}) {
   function stepSmoke(smoke, t) {
     const {at} = smoke;
     for (const pf of smoke.puffs) {
-      const u = (t * .16 + pf.phase) % 1, k = Math.floor(t * .16 + pf.phase);
+      const w = t * .16 + pf.phase, k = Math.floor(w), u = w - k;
       pf.s.position.set(at.x + .7 * u * u + Math.sin(k * 2.3 + u * 3) * .15, at.y + u * 2.8, at.z + .35 * u + Math.cos(k * 1.9 + u * 2) * .12);
-      pf.s.scale.setScalar(.45 + 1.5 * u); pf.s.material.opacity = .34 * smooth(0, .12, u) * (1 - smooth(.45, 1, u));
+      pf.s.scale.setScalar(.6 + 1.6 * u); pf.s.material.opacity = .6 * smooth(0, .08, u) * (1 - smooth(.45, 1, u));
       pf.s.material.rotation = k * 1.3 + u * .8;
     }
   }

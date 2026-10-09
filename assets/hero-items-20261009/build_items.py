@@ -200,24 +200,29 @@ def item_breastplate(C):
     def shape(V):
         x, y, z = V[:, 0], V[:, 1], V[:, 2]
         y = np.minimum(y, 0.02)  # open back
-        x = x * (1 + 0.28 * np.clip((z + 0.05) / 0.25, 0, 1))  # broad chest, nipped waist
+        x = x * (1.12 + 0.2 * np.clip((z + 0.05) / 0.25, 0, 1))  # broad chest, barely tapered: a soldier's cuirass
+        y = y * (1 - 0.25 * np.clip(-(z + 0.1) / 0.18, 0, 1))  # flatter belly
         y = y - 0.035 * np.exp(-(x / 0.05) ** 2) * (y < 0)  # keel
         d = np.exp(-(((x + 0.09) / 0.045) ** 2 + ((z + 0.08) / 0.05) ** 2)); y = y + 0.018 * d * (y < 0)  # the dent
-        return np.stack([x, y, np.minimum(z, 0.2)], -1)
-    ellipsoid_mesh("plate", (0.2, 0.14, 0.28), M("brass"), C, at=(0, 0, 0.3), deform=shape, seg=32, rings=18)
-    # rolled rim at the neck and arm holes, waist fauld plates
-    curve("neckrim", [(-0.09, -0.03, 0.5), (-0.05, -0.1, 0.47), (0, -0.12, 0.46), (0.05, -0.1, 0.47), (0.09, -0.03, 0.5)], 0.012, M("brass"), C)
-    for k in range(2):
-        z = 0.05 - k * 0.04; w = 0.17 - k * 0.01
-        ellipsoid_mesh(f"fauld{k}", (w, 0.13, 0.03), M("brass"), C, at=(0, 0.01, z),
-                       deform=lambda V: np.stack([V[:, 0], np.minimum(V[:, 1], 0.0), V[:, 2]], -1), seg=28, rings=6)
-    for sx in (-1, 1):  # pauldrons with rivets and leather straps
-        ellipsoid_mesh(f"paul{sx}", (0.1, 0.12, 0.05), M("brass"), C, at=(sx * 0.23, -0.01, 0.43), rot=(0, sx * 0.85, 0),
-                       deform=lambda V: np.stack([V[:, 0], V[:, 1], np.maximum(V[:, 2], -0.01)], -1), seg=24, rings=10)
+        cut = 0.2 - 0.075 * np.exp(-(x / 0.075) ** 2) - 0.07 * np.clip((np.abs(x) - 0.12) / 0.1, 0, 1)  # neck and arm scoops
+        z = np.minimum(z, cut); z = np.maximum(z, -0.2)  # flat hem at the waist
+        return np.stack([x, y, z], -1)
+    ellipsoid_mesh("plate", (0.2, 0.14, 0.26), M("brass"), C, at=(0, 0, 0.32), deform=shape, seg=40, rings=22)
+    sol = bpy.data.objects["plate"].modifiers.new("thick", "SOLIDIFY"); sol.thickness = 0.008; sol.offset = 1
+    bpy.data.objects["plate"].modifiers.move(len(bpy.data.objects["plate"].modifiers) - 1, 0)
+    curve("neckrim", [(-0.1, -0.06, 0.5), (-0.05, -0.13, 0.45), (0, -0.155, 0.445), (0.05, -0.13, 0.45), (0.1, -0.06, 0.5)], 0.011, M("gold"), C)
+    for k in range(2):  # fauld lames wrapping the belly
+        z = 0.14 - k * 0.045
+        pts = [(math.sin(t) * (0.235 + 0.01 * k), -math.cos(t) * (0.125 + 0.01 * k), z) for t in np.linspace(-1.25, 1.25, 14)]
+        strap(f"fauld{k}", pts, 0.055, 0.008, M("brass"), C, up=(0, -1, 0))
+        for t in (-0.9, 0, 0.9): prim("uv_sphere", "rivet", M("steel"), C, at=(math.sin(t) * (0.24 + 0.01 * k), -math.cos(t) * (0.13 + 0.01 * k) - 0.006, z), scale=(0.007,) * 3, segments=8, ring_count=5)
+    for sx in (-1, 1):  # pauldrons draped down over the shoulders, rivets and leather straps
+        ellipsoid_mesh(f"paul{sx}", (0.1, 0.11, 0.05), M("brass"), C, at=(sx * 0.23, -0.02, 0.44), rot=(0, sx * 0.75, 0),
+                       deform=lambda V: np.stack([V[:, 0], V[:, 1], np.maximum(V[:, 2], 0.0)], -1), seg=24, rings=10)
         for k in range(3):
-            prim("uv_sphere", "rivet", M("steel"), C, at=(sx * (0.21 + k * 0.035), -0.09 + k * 0.005, 0.5 - k * 0.015), scale=(0.008,) * 3, segments=10, ring_count=6)
-        strap(f"strap{sx}", [(sx * 0.12, -0.11, 0.42), (sx * 0.14, -0.04, 0.53), (sx * 0.12, 0.05, 0.5)], 0.04, 0.008, M("leather"), C)
-        prim("cube", "buckle", M("steel"), C, at=(sx * 0.12, -0.12, 0.41), scale=(0.022, 0.006, 0.016), bevel=0.003)
+            prim("uv_sphere", "rivet", M("steel"), C, at=(sx * (0.26 + k * 0.02), -0.11 + k * 0.004, 0.45 - k * 0.04), scale=(0.008,) * 3, segments=10, ring_count=6)
+        strap(f"strap{sx}", [(sx * 0.13, -0.12, 0.42), (sx * 0.15, -0.04, 0.5), (sx * 0.13, 0.05, 0.48)], 0.04, 0.008, M("leather"), C)
+        prim("cube", "buckle", M("steel"), C, at=(sx * 0.13, -0.13, 0.41), scale=(0.022, 0.006, 0.016), bevel=0.003)
     # sun boss: blue enamel disc, brass rays
     revolve("boss", [(0, 0), (0.06, 0), (0.06, 0.008), (0.045, 0.018), (0, 0.022)], M("sun_enamel"), C, at=(0, -0.185, 0.33), rot=(math.pi / 2, 0, 0))
     for k in range(10):

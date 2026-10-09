@@ -51,7 +51,7 @@
 .qm-slot[data-filled] { border-style: solid; border-color: rgba(236, 210, 154, .45); background: linear-gradient(180deg, rgba(255, 230, 180, .1), rgba(255, 230, 180, .03)); }
 .qm-slot-empty { font: 600 1.1rem/1 var(--serif, Georgia, serif); color: rgba(201, 164, 92, .35); }
 .qm-slot-name { font-size: .72rem; line-height: 1.15; color: var(--parchment, #f2e6cd); }
-.qm-slot .qm-art { width: 44px; height: 44px; font-size: 22px; }
+.qm-slot .qm-art { grid-area: auto; width: 44px; height: 44px; font-size: 22px; }
 .qm-sell {
   display: inline-flex; gap: 5px; align-items: center; min-height: 28px; padding: 2px 9px; border-radius: 999px; cursor: pointer;
   font: 600 .72rem/1 var(--sans, system-ui); color: var(--muted, #b9aa8e); background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
