@@ -5,7 +5,7 @@
 // `node tests/map-clearance.mjs --list` prints every overlap and steep placement instead of failing on the first.
 import assert from 'node:assert/strict';
 import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, homePiece, homePoint, neutralTavern, pieceWorld} from '../shared/home-bases.js';
-import {BACK_TOWN, BACK_TOWN_LANTERNS, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
+import {BACK_TOWN, BACK_TOWN_LANTERNS, backTownPiece, backTownPoint, inKeepApproach} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES} from '../shared/starting-world.js';
 import {baseTrees} from '../shared/world-content.js';
@@ -77,6 +77,14 @@ for (const it of items.filter(i => i.cliff)) {
   let lo = Infinity, hi = -Infinity;
   for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, h = baseHeight(it.x + Math.cos(a) * it.r, it.z + Math.sin(a) * it.r); lo = Math.min(lo, h); hi = Math.max(hi, h); }
   if (hi - lo > Math.max(.6, it.r * .45)) steep.push(`${it.group}/${it.name} sits on a ${(hi - lo).toFixed(2)} m slope at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
+}
+// Rocks that rise on their own (mountain-foot veins, renewed seams) never land in a keep's front or the lane between
+// the keeps, whatever the world seed; and an untouched one left there by an older save moves on.
+for (let seed = 1; seed <= 24; seed++) {
+  const sim = createSimulation({seed}); sim.addPlayer({id: 'a'}); const w = sim.adventureWorld();
+  if (seed === 1) w.deposits.push({id: 'vein0t0', x: -14, z: -23.5, kind: 'iron', hits: 0, maxHits: 4, depleted: false, vein: 0}, {id: 'renewal9', x: 14, z: 23.5, kind: 'stone', hits: 0, maxHits: 3, depleted: false});
+  for (let i = 0; i < 40; i++) sim.step();
+  for (const d of w.deposits) if (!d.depleted && inKeepApproach(d.x, d.z)) overlaps.push(`seed ${seed}: ${d.id} (${d.kind}) rose in a keep's approach at [${d.x}, ${d.z}]`);
 }
 if (LIST) { console.log(`${items.length} footprints`); for (const o of [...overlaps, ...steep]) console.log(o); }
 else {

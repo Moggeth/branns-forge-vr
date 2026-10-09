@@ -1,5 +1,5 @@
 import {HOME,HOME_SITES,NEUTRAL_TAVERN} from './home-bases.js';
-import {keepCarve} from './keep-sites.js';
+import {keepCarve,inKeepApproach} from './keep-sites.js';
 // The keeps (with their carved bowl, pass and hollow) and the shared tavern's yard stay clear of wild trees and new ore.
 const insideHome=(x,z,margin=0)=>keepCarve(x,z)>.02||Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin)||Math.hypot(x-NEUTRAL_TAVERN.at[0],z-NEUTRAL_TAVERN.at[1])<8+margin;
 import {clearLandmarkTrees,STARTING_SITES} from './starting-world.js';
@@ -12,8 +12,8 @@ export const baseTrees = [
 ];
 export const initialDeposits = () => [
   [-5, 5, 'stone'], [5, 5, 'stone'], [-7, 10, 'stone'], [7, 10, 'stone'], [0, 14, 'stone'],
-  [-8, 3, 'iron'], [8, 3, 'iron'], [9, -8, 'iron'], [-15, -10, 'iron'],
-  [-24, -12, 'mithril'], [24, 12, 'mithril'], [18, -24, 'crystal'], [-19, 23, 'crystal']
+  [-8, 3, 'iron'], [8, 3, 'iron'], [9, -8, 'iron'], [-16, -7, 'iron'],
+  [-27, -6, 'mithril'], [27, 6, 'mithril'], [18, -24, 'crystal'], [-19, 23, 'crystal']
 ].map(([x,z,kind], i) => ({id: `ore${i + 1}`, x, z, kind, hits: 0, maxHits: DEPOSIT_CATALOG[kind].maxHits, depleted: false}));
 
 /** A new visible seam rises every two minutes. Existing depleted rocks stay depleted.
@@ -29,7 +29,7 @@ export function renewGeology(state,ctx,events=[]){
   const survey=(state.inventions?.structures||[]).find(b=>b.type==='prospector'&&b.hp>0&&state.inventions.surveyTick>state.tick-7200);
   const h=hash(state.seed,cycle*17+attempt),angle=(h%6283)/1000,radius=survey?7+((h>>>12)%7):18+((h>>>12)%20),x=+((survey?.position[0]||0)+Math.cos(angle)*radius).toFixed(3),z=+((survey?.position[2]||0)+Math.sin(angle)*radius).toFixed(3);
   if(Math.abs(x)>43||Math.abs(z)>43)continue;
-  if(state.battle?.v===2&&insideHome(x,z,2))continue;
+  if((state.battle?.v===2&&insideHome(x,z,2))||inKeepApproach(x,z))continue;
   if((state.players||[]).some(p=>p.role==='hero'&&Math.hypot(p.position[0]-x,p.position[2]-z)<10)||state.deposits.some(d=>Math.hypot(d.x-x,d.z-z)<3)||(state.landmarks&&STARTING_SITES.some(s=>Math.hypot(s.x-x,s.z-z)<s.radius+2))||(state.structures||[]).some(b=>Math.hypot((b.x??b.position?.[0]??0)-x,(b.z??b.position?.[2]??0)-z)<5)||ctx.canPlace?.(x,z)===false)continue;
   const y=ctx.terrainHeight(state,x,z);if(!Number.isFinite(y)||Math.abs(y)>180)continue;
   state.deposits.push({id,x,z,kind,hits:0,maxHits:DEPOSIT_CATALOG[kind].maxHits,depleted:false});

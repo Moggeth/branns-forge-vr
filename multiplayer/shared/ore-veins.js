@@ -6,6 +6,7 @@
 // Deterministic: no clock or RNG, only state.seed, slot and tick, so replays and peers agree.
 import {DEPOSIT_CATALOG} from './material-catalog.js';
 import {STARTING_SITES} from './starting-world.js';
+import {inKeepApproach} from './keep-sites.js';
 import {worldTrees} from './world-content.js';
 
 export const VEIN_RULES = Object.freeze({
@@ -57,7 +58,7 @@ export function placeVein(state, ctx, slot, {previous = null, initial = false} =
     if (live.some(d => Math.hypot(d.x - x, d.z - z) < R.spacing) || (state.deposits || []).some(d => Math.hypot(d.x - x, d.z - z) < 3)) continue;
     if (!initial && (state.players || []).some(p => p.role === 'hero' && Math.hypot(p.position[0] - x, p.position[2] - z) < R.heroClear)) continue;
     if (state.landmarks && STARTING_SITES.some(q => Math.hypot(q.x - x, q.z - z) < q.radius + 2)) continue;
-    if ((state.bridges || []).some(b => Math.hypot(b.x - x, b.z - z) < 4) || ctx.canPlace?.(x, z) === false) continue;
+    if ((state.bridges || []).some(b => Math.hypot(b.x - x, b.z - z) < 4) || ctx.canPlace?.(x, z) === false || inKeepApproach(x, z)) continue;
     if (trees.some(t => Math.hypot(t.x - x, t.z - z) < 3)) continue; // clear of trunks and canopies' feet
     const y = ctx.terrainHeight(state, x, z);
     if (!Number.isFinite(y) || Math.abs(y) > 180) continue;
@@ -73,7 +74,15 @@ export function stepVeins(state, ctx, events = []) {
   const R = VEIN_RULES;
   if (!Number.isSafeInteger(state.tick) || state.tick <= 0 || (state.tick % R.check && state.tick !== 1) || !Array.isArray(state.deposits)) return 0;
   const bySlot = new Map();
-  for (const d of state.deposits) if (isVein(d)) bySlot.set(d.vein, d);
+  for (const d of state.deposits) {
+    if (isVein(d)) bySlot.set(d.vein, d);
+    // Worlds saved before keeps were kept clear: an untouched rock in a keep's front or the lane moves on (a vein
+    // rises elsewhere in its stretch at once; a renewed seam just goes).
+    if (!d.depleted && !d.hits && (isVein(d) || /^renewal/.test(d.id)) && inKeepApproach(d.x, d.z)) {
+      if (isVein(d)) { d.depleted = true; d.respawnTick = state.tick; } else d.gone = true;
+    }
+  }
+  for (let i = state.deposits.length - 1; i >= 0; i--) if (state.deposits[i].gone) state.deposits.splice(i, 1);
   let raised = 0;
   for (let slot = 0; slot < R.slots; slot++) {
     const old = bySlot.get(slot);

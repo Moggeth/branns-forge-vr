@@ -35,6 +35,16 @@ export function keepCarve(x, z) {
   }
   return carve;
 }
+// The keeps' fronts and the lane between them stay clear of new rocks (ore veins, renewed seams): nothing rises within
+// `bowl + front` of a keep's heart (the gate ballistas stand at ~20.4 m) or within `lane` of the straight march from
+// one keep to the other, where the troops walk.
+export const KEEP_APPROACH = Object.freeze({front: 6.5, lane: 4, yard: 13}); // the Forge yard keeps its own ore
+/** True where a rock must not rise: a keep's bowl and gate front, or the lane between the keeps. */
+export function inKeepApproach(x, z) {
+  for (const [sx, sz] of Object.values(HOME_SITES)) if (Math.hypot(x - sx, z - sz) < KEEP_CARVE.bowl + KEEP_APPROACH.front) return true;
+  const [ax, az] = HOME_SITES.party, [bx, bz] = HOME_SITES.rivals, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+  return Math.hypot(x, z) > KEEP_APPROACH.yard && Math.hypot(x - ax - dx * t, z - az - dz * t) < KEEP_APPROACH.lane;
+}
 /** True on a keep's carved floor (bowl, pass or town), where walkers may go past the open meadow's edge. */
 export function onKeepGround(x, z) {
   return Math.abs(x) <= WORLD_EXTENT && Math.abs(z) <= WORLD_EXTENT && keepCarve(x, z) > .5;

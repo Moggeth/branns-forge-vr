@@ -13,3 +13,4 @@ title: The towns come alive
 - Tidied a few crates, planters and benches so they no longer poke into the back town's walls.
 - Rocks are solid now. Skeletons, golems, Ents and Forge workers walk around ore rocks, boulders and meteors instead of straight through them, and so do you. Mined-out rocks stop blocking.
 - The two meteors that had come to rest in Grumblekeep's lane now sit beside the Crystal Outcrop, and the sanctuary's boulder no longer leans into a standing stone.
+- Ore veins and fresh seams no longer pop up right in front of a keep's gate ballistas or in the lane where the troops march. Any that already did will move on by themselves, unless someone has started mining them.
