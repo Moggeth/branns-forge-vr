@@ -197,7 +197,7 @@ export function projectileContact(state,m,ctx){
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side||'party';
     if(!['arrow','bolt'].includes(shot.kind)||(rival.side||'party')===side||rival.id===shot.ownerId||Math.hypot(m.point[0]-rival.position[0],m.point[2]-rival.position[2])>1.2||m.point[1]<rival.position[1]-.3||m.point[1]>rival.position[1]+2.2)return fail('invalid_contact');
     if(tavernSafe(state,state.players.find(p=>p.id===shot.ownerId)))return fail('tavern_peace');
-    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?40:28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events);return ok(events);
+    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?40:28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events,shot.trail?.[0]||shot.previousPosition);return ok(events);
   }
   const home=findHomeTarget(state,m.targetId),base=home?.target||state.battle?.bases.find(b=>b.id===m.targetId);
   if(base){

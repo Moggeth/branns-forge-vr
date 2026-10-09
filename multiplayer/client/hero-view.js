@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {cloneSkinnedAsset as clone} from './clone-skinned-asset.js';
 import {setWeaponGrip, updateWeaponPresentation} from './asset-pose.js';
 import {SIEGEBIRD_RELOAD} from './siegebird-reload.js';
+import {createHeroHurtFlash} from './hero-hurt-flash.js';
 
 // Remote Hero body (opus-player-character). Presentation only: reads snapshot
 // position/yaw/role/hp/tool/head/hands and attributed events, never writes input, physics or network state.
@@ -104,7 +105,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     group.userData = {hero: true, placeholder: false, variant, model, high, low, head, bones, rest, posed: false, sockets, heroMixer: mixer, heroActions: actions,
       speed: 0, last: null, hp: data.hp, lod: false, firstPerson, clock: 0, attackAt: -Infinity, embedAt: -Infinity, recoil: 0,
       legs:['L','R'].map(s=>[bones[`UpperLeg${s}`],bones[`LowerLeg${s}`],bones[`Foot${s}`]]),
-      weapons: new Map(), weapon: null, weaponTool: null, crouch: 0, torsoYaw: null};
+      weapons: new Map(), weapon: null, weaponTool: null, crouch: 0, torsoYaw: null, hurtFlash: createHeroHurtFlash([...high, low].filter(Boolean))};
     if (firstPerson) setFirstPerson(group, true);
     setLod(group, false);
     live.add(group);
@@ -285,7 +286,8 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   function update(group, data, root, dt, cameraPosition) {
     const u = group.userData; u.clock += dt;
     if (cameraPosition) { const far = root.getWorldPosition(_v).distanceToSquared(cameraPosition) > lodDistance * lodDistance; if (far !== u.lod) setLod(group, far); }
-    if (data.hp !== undefined && u.hp !== undefined && data.hp < u.hp) trigger(group, 'Hit');   // derived from authoritative HP drop
+    if (data.hp !== undefined && u.hp !== undefined && data.hp < u.hp) { trigger(group, 'Hit'); u.hurtFlash.strike(); }   // derived from authoritative HP drop
+    u.hurtFlash.update(dt);
     u.hp = data.hp;
     syncWeapon(u, data);
     if (u.weapon) u.weapon.visible = !(u.lod && cameraPosition && root.getWorldPosition(_v).distanceToSquared(cameraPosition) > 4 * lodDistance * lodDistance);
@@ -327,6 +329,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const u = group.userData;
     for (const visual of u.weapons.values()) disposeOwned(visual);
     u.weapons.clear(); u.weapon = null; u.weaponTool = null;
+    u.hurtFlash?.dispose();
     const m = u.heroMixer; m.stopAllAction(); m.uncacheRoot(u.model);
     group.traverse(n => n.skeleton?.dispose()); group.removeFromParent(); live.delete(group);
   }

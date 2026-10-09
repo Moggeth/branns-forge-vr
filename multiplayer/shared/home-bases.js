@@ -219,7 +219,7 @@ export function stepHomeBases(state, ctx, events) {
       turret.readyTick = state.tick + spec.cooldown;
       const hero = heroes.includes(best);
       events.push({kind: 'home_turret_fire', id: turret.id, turret: turret.kind, side: base.side, targetId: best.id, from: [...turret.position], to: [...best.position], tick: state.tick});
-      if (hero) ctx.damageHero(state, best, spec.heroDamage ?? spec.damage, events);
+      if (hero) ctx.damageHero(state, best, spec.heroDamage ?? spec.damage, events, turret.position);
       else ctx.damageEnemy(best, spec.damage, events, base.side);
     }
   }

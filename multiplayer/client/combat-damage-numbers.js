@@ -22,7 +22,7 @@ export function createCombatDamageNumbers(scene) {
     if (!context) return;
     context.clearRect(0, 0, c.width, c.height);
     const strong = item.kind === 'strong', weak = item.kind === 'weak';
-    const color = weak ? '#9ab9bc' : strong ? '#ffe7a6' : '#f4eee0';
+    const color = item.kind === 'hero' ? '#ff9c8a' : weak ? '#9ab9bc' : strong ? '#ffe7a6' : '#f4eee0';
     context.font = `${strong ? 700 : 600} ${strong ? 33 : 29}px system-ui, sans-serif`;
     context.textAlign = 'center'; context.textBaseline = 'middle';
     context.shadowColor = '#080d11'; context.shadowBlur = 5;
@@ -35,7 +35,8 @@ export function createCombatDamageNumbers(scene) {
     if (!enabled || !event || !['hit', 'headshot'].includes(event.kind) || !Array.isArray(event.position)) return false;
     const amount = Number(event.damage);
     if (!Number.isFinite(amount) || amount <= 0) return false;
-    const kind = event.resisted ? 'weak' : event.kind === 'headshot' || amount >= 55 ? 'strong' : 'normal';
+    // A struck Hero (another player) shows a rose number over the head instead of at the feet.
+    const kind = event.hero ? 'hero' : event.resisted ? 'weak' : event.kind === 'headshot' || amount >= 55 ? 'strong' : 'normal';
     const recent = active.find(item => item.id === event.id && item.kind === kind && item.age < .12);
     if (recent) {recent.damage += amount; recent.age = 0; paint(recent); return true;}
     const c = canvas(); if (!c) return false;
@@ -45,7 +46,7 @@ export function createCombatDamageNumbers(scene) {
     const material = new THREE.SpriteMaterial({map:texture, transparent:true, depthWrite:false, depthTest:false, opacity:.95});
     const sprite = new THREE.Sprite(material);
     sprite.position.fromArray(event.position);
-    sprite.position.y += kind === 'strong' ? .23 : .13;
+    sprite.position.y += kind === 'hero' ? 2.05 : kind === 'strong' ? .23 : .13;
     const width = kind === 'strong' ? .45 : .37;
     sprite.scale.set(width, width * .5, 1);
     sprite.renderOrder = 50;
