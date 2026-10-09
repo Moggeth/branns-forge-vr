@@ -49,7 +49,9 @@ await test('time-budgeted step stays near budget for a 64-edit worst case', () =
 });
 await test('v1 surface mask/classification unchanged (frozen shipped checksums)', () => {
   const V1 = JSON.parse(fs.readFileSync(path.join(HERE,'fixtures/terrain-surface-v1.json'),'utf8'));
-  const hash = a => crypto.createHash('sha256').update(a).digest('hex'); const ctx={edits:FIXTURE_EDITS};
+  const hash = a => crypto.createHash('sha256').update(a).digest('hex');
+  // The checksums freeze the hand-placed orchard; the keep roads (KEEP_PATHS, 2026-10-09) were added on top of it.
+  const L=V2.ORCHARD_LAYOUT,ctx={edits:FIXTURE_EDITS,layout:{...L,paths:L.paths.slice(0,L.paths.length-V2.KEEP_PATHS.length)}};
   assert.equal(hash(V2.bakeSurfaceMask(ctx,96)),V1.mask);
   const a=new Uint8Array(96*96*4);V2.bakeDisturbedChannel(FIXTURE_EDITS,96,60,a);assert.equal(hash(a),V1.disturbed);
   assert.deepEqual(V2.classifySurface(-5,-8,(x,z)=>fixtureHeight(x,z,FIXTURE_EDITS),ctx),V1.classification);
