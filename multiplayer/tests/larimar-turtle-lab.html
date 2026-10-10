@@ -1,0 +1,73 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Larimar Cove lab</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// Larimar Cove on its own: the rivals' cove (corner +u,+v) on the real terrain, with Shellbright driven by the real brain.
+// window.lab drives review captures: lab.at(seconds) jumps the presentation clock, lab.view([x,y,z],[x,y,z]),
+// lab.night(0..1), lab.hero([u,v] | null), lab.follow(distance, height, side) frames the turtle, lab.state().
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {baseHeight} from '../shared/terrain.js';
+import {COVE, covePoint} from '../shared/larimar-cove.js';
+import {createLarimarCoveView} from '../client/larimar-cove-view.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
+const scene = new THREE.Scene(), sky = new THREE.Color(0xa8d4f2);
+scene.background = sky.clone(); scene.fog = new THREE.Fog(sky.clone(), 40, 140);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55;
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5a6b3a, 1.2), sun = new THREE.DirectionalLight(0xffe3ad, 2.2);
+sun.position.set(30, 60, 20); scene.add(hemi, sun, sun.target);
+const camera = new THREE.PerspectiveCamera(50, 1, .05, 400);
+
+// ground: the real heights round the rivals' cove
+{
+  const [cx, cz] = covePoint('rivals', [COVE.lake.u, COVE.lake.v]), size = 34, n = 170;
+  const geo = new THREE.PlaneGeometry(size, size, n, n); geo.rotateX(-Math.PI / 2);
+  const p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + cx, z = p.getZ(i) + cz, y = baseHeight(x, z); p.setXYZ(i, x, y, z);
+    const slope = Math.abs(baseHeight(x + .3, z) - y) + Math.abs(baseHeight(x, z + .3) - y);
+    c.set(0x6f9a45).lerp(new THREE.Color(0x8a8378), Math.min(1, slope * 1.4)); col.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors: true, roughness: .95})));
+}
+const view = createLarimarCoveView({scene, height: baseHeight});
+const params = new URLSearchParams(location.search);
+let T = Number(params.get('t') || 0), night = Number(params.get('night') || 0), hero = null, follow = null, manual = params.has('manual');
+const heroMesh = new THREE.Mesh(new THREE.CapsuleGeometry(.3, 1.1, 4, 8), new THREE.MeshStandardMaterial({color: 0xd35a3a})); heroMesh.visible = false; scene.add(heroMesh);
+{ const [x, z] = covePoint('rivals', [56, 41]), [lx, lz] = covePoint('rivals', [COVE.lake.u, COVE.lake.v]); camera.position.set(x, baseHeight(x, z) + 6, z); camera.lookAt(lx, baseHeight(lx, lz), lz); }
+
+function frame(dt, draw = true) {
+  if (!manual) { const w = innerWidth, h = innerHeight; if (canvas.width !== (w * renderer.getPixelRatio() | 0)) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } }
+  const k = 1 - night; sun.intensity = 2.2 * k + .15; hemi.intensity = 1.2 * k + .25;
+  const s = sky.clone().lerp(new THREE.Color(0x101a33), night); scene.background.copy(s); scene.fog.color.copy(s);
+  const heroes = [];
+  if (hero) { const [x, z] = covePoint('rivals', hero), y = baseHeight(x, z); heroMesh.position.set(x, y + .85, z); heroMesh.visible = true; heroes.push({id: 'me', x, y: y + 1.6, z}); } else heroMesh.visible = false;
+  view.update(dt, {tick: T * 60, camera, heroes, night, sky: s, sunDir: sun.position});
+  if (follow) {
+    const t = view.turtles()[1].position, yaw = view.turtles()[1].rotation.y + follow.side;
+    camera.position.set(t.x + Math.sin(yaw) * follow.d, t.y + follow.h, t.z + Math.cos(yaw) * follow.d); camera.lookAt(t.x, t.y + .05, t.z);
+  }
+  if (draw) renderer.render(scene, camera);
+}
+let last = performance.now();
+function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; if (!manual) T += dt; frame(dt); requestAnimationFrame(loop); }
+if (!manual) requestAnimationFrame(loop);
+window.lab = {
+  at(t) { // warm the brain and pose smoothing up to t in small steps so the pose memory is settled
+    for (let k = 40; k >= 0; k--) { T = t - k / 60; frame(1 / 60, false); } return view.state('rivals');
+  },
+  view(pos, look) { follow = null; camera.position.fromArray(pos); camera.lookAt(...look); },
+  size(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); },
+  cove: uv => { const [x, z] = covePoint('rivals', uv); return [x, baseHeight(x, z), z]; },
+  follow(d = 2.4, h = .9, side = .8) { follow = {d, h, side}; },
+  shot() { frame(0); return canvas.toDataURL('image/png'); },
+  night(v) { night = v; }, hero(uv) { hero = uv; }, state: () => view.state('rivals'), stats: () => view.stats(),
+  turtle: () => view.turtles()[1].position.toArray(), water: () => view.cove('rivals').waterY,
+};
+window.coveView = view;
+document.title = 'ready';
+</script>

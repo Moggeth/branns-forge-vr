@@ -1,7 +1,8 @@
 // Where the two keeps stand, and the ground carved for them out of the corner mountains: a round bowl for the
 // half-ring keep, a narrow pass straight back toward the corner, and a walled back town filling the corner itself,
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
-// (shared/home-bases.js). Pure data and maths.
+// (shared/home-bases.js). Pure data and maths. Larimar Cove (shared/larimar-cove.js) opens off each back town's yard.
+import {coveCarve} from './larimar-cove.js';
 export const HOME_SITES = Object.freeze({party: Object.freeze([-34, -34]), rivals: Object.freeze([34, 34])});
 export const KEEP_CARVE = Object.freeze({
   bowl: 20, bowlBlend: 3,          // flat to 20 m from the heart, cliffs rise over the next 3 m
@@ -33,7 +34,7 @@ export function keepCarve(x, z) {
     const town = 1 - smooth(edge / T.blend);
     carve = Math.max(carve, bowl, pass, town);
   }
-  return carve;
+  return Math.max(carve, coveCarve(x, z));
 }
 /** True on a keep's carved floor (bowl, pass or town), where walkers may go past the open meadow's edge. */
 export function onKeepGround(x, z) {

@@ -126,6 +126,12 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
     reward: {seconds: 1.4, range: 30, play(o, t) { [0, 4, 7, 11, 14].forEach((n, i) => bell(o, t + i * .06, semis(784, n), .025, .9)); }},
     resource_use: {trim: 4, seconds: .4, range: 18, play(o, t) { tone(o, t, {type: 'triangle', f0: 600, f1: 450, peak: .03, release: .12}); noise(o, t, {f0: 1500, q: 2, peak: .03, release: .06}); }},
 
+    // Larimar Cove (2026-10-10): the turtle's breath at the surface is a soft wet "pfff" with a little hum under it;
+    // a splash is a bright slap of water (big when it slides off its rock); a dive leaves a few glassy bubbles.
+    turtle_breath: {trim: 2, seconds: .9, range: 22, play(o, t) { noise(o, t, {f0: 1800, f1: 900, q: .7, attack: .04, peak: .06, release: .4}); noise(o, t + .03, {type: 'highpass', f0: 3800, f1: 2400, attack: .02, peak: .02, release: .2}); tone(o, t + .02, {type: 'triangle', f0: 180, f1: 150, attack: .05, peak: .012, release: .4}); }},
+    water_splash: {trim: 1.6, seconds: 1, range: 30, play(o, t, {big = false} = {}) { const k = big ? 1.6 : 1; thump(o, t, 140, 60, .08 * k, .12); noise(o, t, {f0: 2200, f1: 900, q: .8, attack: .004, peak: .09 * k, release: big ? .5 : .28}); for (let i = 0; i < (big ? 6 : 3); i++) noise(o, t + .08 + i * .06 + Math.random() * .04, {f0: 2600 + Math.random() * 1600, q: 4, peak: .025 * k, release: .05}); }},
+    turtle_bubble: {trim: 2, seconds: .8, range: 20, play(o, t) { for (let i = 0; i < 4; i++) tone(o, t + i * .09 + Math.random() * .04, {f0: 500 + Math.random() * 300, f1: 1200 + Math.random() * 500, attack: .004, peak: .02, release: .06}); }},
+
     // Hero movement and hands ------------------------------------------------------------------------------------
     // Footfall: a soft, short scuff, grassy by default; stone is crisper, snow is a muffled crunch, wet adds a splash.
     step: {trim: 5, seconds: .2, range: 0, play(o, t, {surface = 'grass', weight = 1} = {}) {
