@@ -319,6 +319,25 @@ export function resolveHomeStructures(state, position, radius = .3) {
   return position;
 }
 
+/** The same solids as plain shapes (the Stormreel cable routes round them): circles {id, x, z, r} and boxes
+ *  {id, x, z, yaw, at: [u, v], half: [hu, hv]} whose corners are pieceWorld({x, z, yaw}, [u ± hu, v ± hv]). */
+export function homeSolids(side) {
+  const out = [], tag = `home-${sideKey(side)}`;
+  for (const [n, {at, r}] of SOLIDS.entries()) { const [x, z] = homePoint(side, at); out.push({id: `${tag}-s${n}`, x, z, r}); }
+  const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks);
+  out.push({id: `${tag}-barracks`, x: bx, z: bz, yaw: barracksYaw(side), at: [0, 0], half: BARRACKS.half});
+  const [px, pz] = bellPostAt(side); out.push({id: `${tag}-bell`, x: px, z: pz, r: .3});
+  for (const name of ['tavern', 'quartermaster', 'mill']) {
+    const placed = homePiece(side, name);
+    for (const [n, sol] of TOWN_SOLIDS[name].entries()) {
+      const id = `${tag}-${name}${n}`;
+      if (sol.r !== undefined) { const [x, z] = pieceWorld(placed, sol.at); out.push({id, x, z, r: sol.r}); }
+      else out.push({id, x: placed.x, z: placed.z, yaw: placed.yaw, at: sol.at, half: sol.half});
+    }
+  }
+  return out;
+}
+
 /** Squad for one barracks wave: forgeling-style allies for Dawnhold, skeletons then golems for Grumblekeep. */
 export function squadFor(base) {
   const n = Math.min(6, 2 + base.level);

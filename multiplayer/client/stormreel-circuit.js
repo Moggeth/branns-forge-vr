@@ -1,6 +1,8 @@
 // Stormreel circuit through a foe (presentation): a + bolt and a - bolt in the same body close the loop, and this is what
-// the player sees while the current runs. The closing SURGE: a white-hot flash, a ground shockwave, thick channels from
-// each bolt into the body, arcs leaping to the neighbours the soil current jolts. Then the COOK: the body lights up blue-white
+// the player sees. The closing SURGE kills outright (Mitch, 2026-10-10: "a big fuckin deal"): the sky splits and a column of
+// lightning slams into the foe, so bright the world around it goes dark (ctx.darken dips the exposure; every lightning
+// material is drawn untonemapped, so the strike itself stays white-hot), a blinding flash, a wide shockwave, thick channels
+// from each bolt into the body, arcs leaping to the neighbours the soil current jolts. Then the COOK: the body lights up blue-white
 // from inside and shakes, current pours bolt -> body -> bolt as a branching red-to-blue channel with carriers riding it,
 // arcs crawl over the limbs and spit into the ground, smoke curls off the head. If it dies in the circuit it is left
 // charred, smoking, on a scorch mark. Reads authority events and snapshots; never writes gameplay state.
@@ -35,7 +37,7 @@ function scorchTexture() {
 /**
  * ctx: scene, lightning, height(x,z), beads (stormreel-look createBeads), tex {soft}, sound(name, ...args),
  *      bodyPoints(enemyId, outVectors) -> count, enemyVisual(enemyId) -> Object3D | null, enemyAt(enemyId, out) -> Vector3 | null,
- *      shake(amount, at) (camera, local only), flash(amount) (screen, local only)
+ *      shake(amount, at) (camera), flash(amount, at) (screen), darken(amount, at) (the world dims round the strike)
  */
 export function createCircuitFx(ctx) {
   const {scene, lightning} = ctx;
@@ -45,7 +47,7 @@ export function createCircuitFx(ctx) {
   // One permanent light for the circuit (never added or removed, so no shader rebuilds): the surge floods the
   // surroundings blue-white, then the cook flickers it while the current runs. Off (intensity 0) the rest of the time.
   const light = new THREE.PointLight(0xbfe0ff, 0, 11, 2); light.castShadow = false; light.name = 'StormCircuitLight'; scene.add(light);
-  let flashK = 0, cookK = 0;
+  let flashK = 0, cookK = 0, blastK = 0;
   // Lit-from-inside and charred variants of an enemy's own materials, shared by every foe wearing them.
   const lit = new Map(), char = new Map(), litMats = new Set();
   function variant(cache, m, make) { if (!m) return m; let x = cache.get(m.uuid); if (!x) { x = make(m); cache.set(m.uuid, x); } return x; }
@@ -90,12 +92,19 @@ export function createCircuitFx(ctx) {
   function surge(ev, pa, pb, splashAt = [], local = false) {
     const at = v.fromArray(ev.at || ev.red).clone(), x = victim(ev.enemy); x.age = 0; x.kick = 1;
     ctx.sound?.('surge', ev.at, !!ev.wet);
-    if (local) { ctx.flash?.(.55); ctx.shake?.(.7); } else ctx.shake?.(.35, at);
-    light.position.copy(at); flashK = 1;
+    ctx.darken?.(1, at); ctx.flash?.(local ? .9 : .7, at); ctx.shake?.(local ? 1 : .8, local ? undefined : at);
+    light.position.copy(at); light.position.y += 1.5; flashK = 1; blastK = 1;
     if (!lightning) return;
-    lightning.glow(at, {size: 5.5, life: .5, color: 0xffffff}); lightning.glow(at, {size: 3, life: .9, color: 0x9fd0ff});
-    lightning.ring(new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .04, at.z), {radius: 3.2, life: .6, color: 0xbfe2ff});
-    lightning.burst(at, {count: 60, speed: 6.5, life: .8}); lightning.burst(at, {count: 24, speed: 3, up: 1.5});
+    // The sky splits: a fat white column from high overhead, re-striking, with a second fork beside it.
+    const floor0 = new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .05, at.z);
+    for (const [dx, dz, w, life] of [[0, 0, .55, .7], [(Math.random() - .5) * 10, (Math.random() - .5) * 10, .28, .45]]) {
+      const sky = new THREE.Vector3(at.x + dx + (Math.random() - .5) * 6, at.y + 42, at.z + dz + (Math.random() - .5) * 6);
+      lightning.strike(sky, w > .4 ? at.clone() : floor0.clone(), {life, width: w, rough: .1, depth: 6, branches: 5, restrikes: 5, intensity: 3});
+    }
+    for (let k = 1; k <= 5; k++) lightning.glow(new THREE.Vector3(at.x, at.y + k * 6, at.z), {size: 7 - k * .6, life: .35, color: 0xe8f4ff});
+    lightning.glow(at, {size: 16, life: .7, color: 0xffffff}); lightning.glow(at, {size: 8, life: 1.3, color: 0x9fd0ff}); lightning.glow(at, {size: 26, life: .3, color: 0xdfeeff});
+    lightning.ring(floor0.clone(), {radius: 3.2, life: .6, color: 0xbfe2ff}); lightning.ring(floor0.clone(), {radius: 9, life: .9, color: 0x9fd0ff});
+    lightning.burst(at, {count: 120, speed: 9, life: 1}); lightning.burst(at, {count: 40, speed: 3.5, up: 1.5});
     for (const [p, pole] of [[pa, 'red'], [pb, 'blue']]) {
       lightning.strike(p.clone(), at.clone(), {life: .35, width: .2, rough: .12, depth: 5, branches: 3, restrikes: 3, intensity: 1.8, hue: POLE[pole].hue});
       lightning.glow(p, {size: 2.2, life: .4, color: POLE[pole].glow});
@@ -159,8 +168,9 @@ export function createCircuitFx(ctx) {
   }
   function update(dt, camPos) {
     // Surge: a white-hot flash that falls off fast; cook: a cooler flicker held while a victim is lit.
-    light.intensity = 40 * flashK * flashK + 6 * cookK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
-    flashK = Math.max(0, flashK - dt * 3.2); cookK = Math.max(0, cookK - dt * 8);
+    // The strike floods everything within 40 m with white light (the same one light: only its numbers change, never its shader).
+    light.intensity = 40 * flashK * flashK + 6 * cookK + 900 * blastK * blastK; light.distance = 11 + 34 * blastK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
+    flashK = Math.max(0, flashK - dt * 2.4); cookK = Math.max(0, cookK - dt * 8); blastK = Math.max(0, blastK - dt * 2.8);
     for (const x of [...victims.values()]) { if (!x.seen) end(x.id, false); x.seen = false; }
     for (let i = smokes.length - 1; i >= 0; i--) {
       const s = smokes[i]; s.age += dt; const t = s.age / s.life;

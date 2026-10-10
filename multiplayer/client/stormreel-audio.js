@@ -38,6 +38,12 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     const rx = -ear.forward[2], rz = ear.forward[0], n = Math.hypot(rx, rz) || 1;
     return {gain: 1 / (1 + (d / 14) ** 1.6), pan: d < 1.5 ? 0 : Math.max(-.85, Math.min(.85, (dx * rx + dz * rz) / n / d))};
   }
+  /** Thunder carries: the surge is heard right across the map, a little later the further away you stand. */
+  function placeFar(at) {
+    const p = place(at), ear = at && listener(); if (!ear) return {...p, delay: 0};
+    const d = Math.hypot(at[0] - ear.position[0], at[2] - ear.position[2]);
+    return {gain: 1 / (1 + (d / 45) ** 1.4), pan: p.pan, delay: Math.min(.35, d / 343)};
+  }
   function out(place_, gain) {
     const g = ctx.createGain(); g.gain.value = gain * place_.gain;
     if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = place_.pan; g.connect(p).connect(bus); } else g.connect(bus);
@@ -52,7 +58,7 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
   }
   function hiss(dest, {at = 0, length, gain, type = 'bandpass', from = 2000, to = from, q = 1, rate = 1, am = 0}) {
     const t = ctx.currentTime + at, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    s.buffer = noiseBuf(); s.playbackRate.value = rate; f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t);
+    s.buffer = noiseBuf(); s.playbackRate.value = rate; s.loop = length > .35;   // long rumbles loop the noise f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t);
     if (to !== from) f.frequency.exponentialRampToValueAtTime(Math.max(40, to), t + length);
     g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + length);
     s.connect(f).connect(g).connect(dest);
@@ -195,17 +201,20 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     hiss(o, {from: 1500 + Math.random() * 900, q: 2, length: .11, gain: .7, am: 85}); tone(o, {type: 'square', from: 220, to: 90, length: .09, gain: .09});
   }
 
-  /** The circuit closes through a foe: a stacked thunderclap, a mains "BWAAM" and a sizzling whip-crack. */
+  /** The circuit closes through a foe (Mitch, 2026-10-10: "a big deal ... pretty loud"): a split-sky double crack, a
+   *  cannon boom you feel, thunder rolling away for seconds, the mains "BWAAM" and a sizzling whip-crack. Heard map-wide. */
   function surge(at = null, wet = false) {
-    if (!ready()) return; const o = out(place(at), 1.1); cleanup(o, 3200);
-    hiss(o, {type: 'highpass', from: 3600, length: .06, gain: 1}); hiss(o, {type: 'highpass', from: 2200, at: .035, length: .08, gain: .8});
-    hiss(o, {type: 'lowpass', from: 1400, to: 70, length: 2, gain: 1.1, rate: .6});
-    tone(o, {from: 95, to: 24, length: 1.1, gain: 1.1, attack: .002});
-    tone(o, {type: 'square', from: 120, to: 58, length: .7, gain: .22}); tone(o, {type: 'sawtooth', from: 181, to: 87, length: .7, gain: .14});   // mains bwaam
-    tone(o, {type: 'sawtooth', from: 5200, to: 160, length: .5, gain: .25});
-    hiss(o, {from: 1800, q: 2.5, at: .08, length: .9, gain: .45, am: 120});
-    if (wet) hiss(o, {type: 'highpass', from: 4200, at: .05, length: 1.2, gain: .35});   // steam
-    chime(o, 'red', .12, .55); chime(o, 'blue', .2, .55);
+    if (!ready()) return; const p = placeFar(at), o = out(p, 1.9), d = p.delay; cleanup(o, 5600);
+    hiss(o, {type: 'highpass', from: 2600, at: d, length: .09, gain: 1.6}); hiss(o, {type: 'highpass', from: 1700, at: d + .03, length: .12, gain: 1.3});
+    hiss(o, {type: 'bandpass', from: 900, q: .6, at: d, length: .25, gain: 1.2});
+    tone(o, {from: 72, to: 20, at: d, length: 1.7, gain: 1.8, attack: .002});                 // the cannon boom
+    hiss(o, {type: 'lowpass', from: 1600, to: 60, at: d, length: 3, gain: 1.5, rate: .5});
+    hiss(o, {type: 'lowpass', from: 320, to: 90, at: d + .35, length: 3.4, gain: 1, rate: .45, am: 6});   // thunder rolling away
+    tone(o, {type: 'square', from: 120, to: 58, at: d, length: .8, gain: .3}); tone(o, {type: 'sawtooth', from: 181, to: 87, at: d, length: .8, gain: .2});   // mains bwaam
+    tone(o, {type: 'sawtooth', from: 5200, to: 160, at: d, length: .5, gain: .3});
+    hiss(o, {from: 1800, q: 2.5, at: d + .08, length: 1.1, gain: .55, am: 120});
+    if (wet) hiss(o, {type: 'highpass', from: 4200, at: d + .05, length: 1.6, gain: .4});   // steam
+    chime(o, 'red', d + .14, .6); chime(o, 'blue', d + .22, .6);
   }
   /** A foe cooked by the circuit: a last fat crackle, a pop and a hiss of smoke. */
   function cooked(at = null) {

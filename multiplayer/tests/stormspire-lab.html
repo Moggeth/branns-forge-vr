@@ -43,12 +43,12 @@ const foe=id=>foes.find(f=>f.id===id),offs=(id,part)=>{const f=foe(id);return f?
 const snap={tick:0,enemies:foes,players:[],inventions:{structures:[b]}};
 const muzzle=()=>new T.Vector3(heroPos.x+.22,heroPos.y+1.3,heroPos.z-.9);
 function moveHero(x,z){heroPos.set(x,0,z);hero.position.copy(heroPos);}
-const jolts={shake:0,flash:0};
+const jolts={shake:0,flash:0,dark:0,hold:0};
 const view=createStormreelView({scene,lightning,height:()=>0,localId:()=>'local',actorPose:id=>id==='me'?{position:heroPos,yaw:0}:null,localPose:()=>({position:new T.Vector3(0,0,30),yaw:0}),localMuzzle:()=>null,
   remoteMuzzle:(id,out)=>id==='me'?out.copy(muzzle()):null,remoteCrossbow:id=>id==='me'?held:null,
   probeAnchor:(id,part,out)=>{const p=offs(id,part||'torso');return p?out.fromArray(p):null;},bodyPoints:(id,out)=>{let n=0;for(const part of ['torso','head','leftArm','rightArm','leftLeg','rightLeg']){const p=offs(id,part);if(p)out[n++].fromArray(p);}return n;},
   spireEntry:id=>id==='s1'?e:null,spireArt:art,audio:()=>null,listener:()=>null,
-  enemyVisual:id=>foe(id)?.m||null,trees:()=>TREES,shake:k=>{jolts.shake=Math.max(jolts.shake,k);},flash:k=>{jolts.flash=Math.max(jolts.flash,k);}});
+  enemyVisual:id=>foe(id)?.m||null,trees:()=>TREES,shake:k=>{jolts.shake=Math.max(jolts.shake,k);},flash:k=>{jolts.flash=Math.max(jolts.flash,k);},darken:k=>{if(k>jolts.dark){jolts.dark=k;jolts.hold=.16;}}});
 view.installPack(pack);view.installCrossbow(bow);view.sync(snap);
 let frame=0,evs=[],weapon=null,fpModel=null;
 const labNow=()=>frame/60;
@@ -88,7 +88,7 @@ window.lab={scene,
   packInfo(){const out=[];scene.traverse(o=>{if(/ReelPack/.test(o.name)&&!o.parent?.name?.includes('ReelPack')){const sw=o.getObjectByName('Sway'),r=o.getObjectByName('Reel'),w=o.getObjectByName('Reel_Windings'),c=o.getObjectByName('Crank'),p=o.getObjectByName('Pawl');
     out.push({name:o.name,sway:sw?[sw.rotation.x,sw.rotation.y,sw.rotation.z].map(v=>+v.toFixed(4)):null,reel:r?+r.rotation.x.toFixed(3):null,wind:w?+w.scale.y.toFixed(3):null,crank:c?+c.rotation.x.toFixed(3):null,pawl:p?+p.rotation.x.toFixed(3):null});}});return out;},
   foes:()=>foes.map(f=>({id:f.id,scale:f.m.scale.x,pos:f.m.position.toArray(),vis:f.m.visible,kids:f.m.children.length})),
-  frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);weapon?.update(1/60);view.update(1/60,t,cam.position);lightning.update(1/60,cam);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
+  frame(n=1){for(let i=0;i<n;i++){const t=frame/60;art.animate(e,t,1/60);weapon?.update(1/60);view.update(1/60,t,cam.position);lightning.update(1/60,cam);if(jolts.hold>0)jolts.hold-=1/60;else jolts.dark=Math.max(0,jolts.dark-(.6+jolts.dark*.9)/60);renderer.toneMappingExposure=1-.85*Math.min(1,jolts.dark);frame++;}renderer.render(scene,cam);return {...view.stats(),...lightning.stats()};},
   view(name){const v=VIEWS[name];cam.position.fromArray(v[0]);cam.lookAt(...v[1]);},
   scenario(name){SCEN[name]();view.sync(snap);},
   look(pos,at){cam.position.fromArray(pos);cam.lookAt(...at);},
