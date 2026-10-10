@@ -319,7 +319,7 @@ export function createRadiantStaff(ctx) {
         pool.place(crownAt.x, crownAt.z, STAFF.pool.radius * (1 + .25 * charge), ctx.height); pu.uI.value = poolI; pu.uRing.value = -1;
       }
       impactPool.mesh.visible = beamOn && !latched;
-      if (impactPool.mesh.visible) { impactPool.place(endShown.x, endShown.z, STAFF.pool.impactRadius, ctx.height); const iu = impactPool.mesh.material.uniforms; iu.uI.value = (.35 + .55 * night) * beamK * grow; iu.uTime.value = time; iu.uRing.value = -1; }
+      if (impactPool.mesh.visible) { impactPool.place(endShown.x, endShown.z, STAFF.pool.impactRadius, ctx.height); const iu = impactPool.mesh.material.uniforms; iu.uI.value = (.55 + .4 * night) * beamK * grow; iu.uTime.value = time; iu.uRing.value = -1; }
       const live = sparks.update(dt);
       stats = {beam: beamOn, latched, from: originAt.toArray().map(v => +v.toFixed(2)), to: endShown.toArray().map(v => +v.toFixed(2)), grow: +grow.toFixed(2), light: +light.intensity.toFixed(2), sparks: live, night: +night.toFixed(2)};
       return stats;
