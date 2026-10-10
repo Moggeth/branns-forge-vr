@@ -131,6 +131,7 @@ import {flaskLaunch,forecastFlask,forecastCinder,createLandingMarkers} from './e
 import {worldTrees} from '../shared/world-content.js';
 import {createLightningFx} from './lightning-fx.js';
 import {createAudioMix} from './audio-mix.js';
+import {createStormDarken} from './storm-darken.js';
 import {createAmbienceAudio} from './ambience-audio.js';
 import {createSoundKit} from './sound-kit.js';
 import {cueFor,pickupCue} from './event-sounds.js';
@@ -452,9 +453,10 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     shake:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;stormJolt.shake=Math.max(stormJolt.shake,k*Math.max(0,1-d/28));},
     flash:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;stormJolt.flash=Math.max(stormJolt.flash,k*Math.max(0,1-d/90)*(reducedWeaponMotion?.4:1));},
     // A closed circuit is so bright the world around it goes dark (Mitch, 2026-10-10): the exposure dips while the lightning, drawn untonemapped, stays white-hot.
-    darken:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;const f=k*Math.max(.3,1-d/140)*(reducedWeaponMotion?.45:1);if(f>stormJolt.dark){stormJolt.dark=f;stormJolt.darkHold=.16;}}});
+    darken:(k,at)=>stormDarken.hit(k,at,localPosition)});
+  const stormDarken=createStormDarken({camera,renderer,reduced:reducedWeaponMotion});
   // Camera jolt for a surge nearby and the tug when the cable runs out (presentation only, decays every frame).
-  const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null,dark:0,darkHold:0,exposure:null};
+  const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null};
   function stormTug(){const t=performance.now()/1000;if(t<stormJolt.nextTug)return;stormJolt.nextTug=t+.65;stormJolt.tug=1;stormView.tug(playerId);stormWeapon.tug?.();
     if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.8,duration:60}]);else if(touchEnabled)try{navigator.vibrate?.([35]);}catch{}
     report(`The cable is at full stretch. Spike the crossbow (${touchEnabled?'Spike':'G'}) or walk back toward the tower.`);}
@@ -463,8 +465,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     j.shake=Math.max(0,j.shake-dt*2.6);j.tug=Math.max(0,j.tug-dt*3.2);j.flash=Math.max(0,j.flash-dt*3.5);
     if(j.flash>.001&&!j.el&&globalThis.document){j.el=document.createElement('div');j.el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(circle,rgba(220,235,255,.9),rgba(140,180,255,.35));opacity:0';document.body.appendChild(j.el);}
     if(j.el)j.el.style.opacity=String(Math.min(.85,j.flash));
-    if(j.dark>.001){if(j.exposure===null)j.exposure=renderer.toneMappingExposure;renderer.toneMappingExposure=j.exposure*(1-.85*Math.min(1,j.dark));if(j.darkHold>0)j.darkHold-=dt;else j.dark=Math.max(0,j.dark-dt*(.6+j.dark*.9));}
-    else if(j.exposure!==null){renderer.toneMappingExposure=j.exposure;j.exposure=null;j.dark=0;}}
+    stormDarken.update(dt);}
   const stormWeapon=createStormreelWeapon({scene,lightning,send:(action,payload)=>{unlockAudio();onAction(action,payload);},aim:()=>weaponAim(),snapshot:()=>snapshot,playerId:()=>playerId,
     height:(x,z)=>heightAt(x,z,snapshot.edits),localPosition:()=>localPosition,audio:()=>audioContext,now:()=>performance.now()/1000,hud:globalThis.document?.body,severKey:()=>touchEnabled?'Special':'Q',sfx:stormView.sfx});
   // R beside the tower while wearing its pack drops in another Crystal (taking or hanging the pack does this too).

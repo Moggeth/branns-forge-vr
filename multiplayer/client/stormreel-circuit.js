@@ -168,8 +168,8 @@ export function createCircuitFx(ctx) {
   }
   function update(dt, camPos) {
     // Surge: a white-hot flash that falls off fast; cook: a cooler flicker held while a victim is lit.
-    // The strike floods everything within 40 m with white light (the same one light: only its numbers change, never its shader).
-    light.intensity = 40 * flashK * flashK + 6 * cookK + 900 * blastK * blastK; light.distance = 11 + 34 * blastK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
+    // The strike floods everything within 35 m with white light (the same one light: only its numbers change, never its shader).
+    light.intensity = 40 * flashK * flashK + 6 * cookK + 900 * blastK * blastK; light.distance = 11 + 24 * blastK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
     flashK = Math.max(0, flashK - dt * 2.4); cookK = Math.max(0, cookK - dt * 8); blastK = Math.max(0, blastK - dt * 2.8);
     for (const x of [...victims.values()]) { if (!x.seen) end(x.id, false); x.seen = false; }
     for (let i = smokes.length - 1; i >= 0; i--) {

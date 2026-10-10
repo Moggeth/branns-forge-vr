@@ -50,7 +50,7 @@ export function createStormreelView(ctx) {
   const sfx = createStormreelAudio({audio: ctx.audio, listener: ctx.listener});
   const sound = (name, ...args) => { try { sfx[name]?.(...args); } catch { /* audio is never worth a frame */ } };
   const circuit = createCircuitFx({scene, lightning, height: ctx.height, beads, tex, sound, bodyPoints: ctx.bodyPoints, enemyVisual: ctx.enemyVisual,
-    enemyAt: (id, out) => { const e = snapshot?.enemies?.find(x => x.id === id); return e ? out.fromArray(e.position).setY(e.position[1] + 1.1) : null; }, shake: ctx.shake, flash: ctx.flash});
+    enemyAt: (id, out) => { const e = snapshot?.enemies?.find(x => x.id === id); return e ? out.fromArray(e.position).setY(e.position[1] + 1.1) : null; }, shake: ctx.shake, flash: ctx.flash, darken: ctx.darken});
   let creakAt = 0;
 
   function installPack(gltf) { packTemplate = gltf; }
