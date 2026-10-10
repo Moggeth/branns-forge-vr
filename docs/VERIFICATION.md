@@ -2339,3 +2339,7 @@ A queued RAF can predate async warm-up completion. Clamp frame dt on both sides 
 ### Mobile startup and sustained rendering (2026-10-08)
 
 See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.
+
+### Graphics profiling (2026-10-11)
+
+See [candidate handoff](GRAPHICS-PERFORMANCE-20261011.md). Count all renderer passes, not just the final quad. Never nest GPU queries or wait for results. Stop interval capture before screenshots. Audit actual image dimensions before generating smaller variants. Snapshot identity is not forest identity. Use directory plus rg -g patterns on PowerShell, not positional wildcards. Local server launch was blocked by automatic review; static checks were allowed. README contains pre-existing non-UTF-8 bytes: preserve them when adding a scoped link. Confirm repo-root workdir before documentation edits.

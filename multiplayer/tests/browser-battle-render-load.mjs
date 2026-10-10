@@ -29,7 +29,7 @@ try{
  window.profileRender=(renderer,scene,camera,draw)=>{window.renderScene=scene; const m=window.measure,gl=renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
  if(!m.backend){const debug=gl.getExtension('WEBGL_debug_renderer_info');m.backend=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);m.gpuSupported=!!ext;}
  if(ext)for(let i=m.pending.length-1;i>=0;i--){const q=m.pending[i];if(gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE)){if(!gl.getParameter(ext.GPU_DISJOINT_EXT))m.gpu.push(gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6);gl.deleteQuery(q);m.pending.splice(i,1);}}
- const q=ext&&++m.frames%15===0&&m.pending.length<4?gl.createQuery():null;if(q)gl.beginQuery(ext.TIME_ELAPSED_EXT,q);
+ const q=ext&&++m.frames%15===0&&m.pending.length<4&&!gl.getQuery(ext.TIME_ELAPSED_EXT,gl.CURRENT_QUERY)?gl.createQuery():null;if(q)gl.beginQuery(ext.TIME_ELAPSED_EXT,q);
  const t=performance.now();if(m.previous!==null)m.intervals.push(t-m.previous);m.previous=t;draw();m.submit.push(performance.now()-t);if(!window.programKeys&&window.fixture){window.programKeys=renderer.info.programs.map(p=>p.cacheKey);window.joinedLights=[];scene.traverseVisible(n=>{if(n.isLight)window.joinedLights.push(n.type+':'+n.name)});}if(m.submit.length>2000)m.submit.shift();if(q){gl.endQuery(ext.TIME_ELAPSED_EXT);m.pending.push(q);}}
  window.game=createGame({canvas:document.querySelector('canvas'),isHost:()=>false});window.ready=true;
  </script>`}));
