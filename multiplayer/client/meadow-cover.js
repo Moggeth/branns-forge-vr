@@ -11,7 +11,7 @@ import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
 import {STRUCTURES} from '../shared/inventions.js';
 import {FOUNDATION_HALF} from '../shared/terrain.js';
 
-export const MEADOW_VERSION = 1;
+export const MEADOW_VERSION = 2; // v2: rolling wind waves + tip sheen, per-blade hue, ordered smoothstep fades
 export const MEADOW_QUALITY = Object.freeze({
   high: {grass: 9000, flowers: 1600, daisies: 320, motes: 96, radius: 22, spacing: .42, blades: 12},
   low: {grass: 3200, flowers: 700, daisies: 140, motes: 40, radius: 14, spacing: .55, blades: 8},
@@ -92,14 +92,15 @@ export function bakeCellStatic(ci, cj, cfg, landmarks) {
 // Blade: tapered, pre-curved strip. uv.y = height fraction (drives wind/trample/colour). Normals point up so the
 // tuft shades like the ground it grows from instead of flickering with blade orientation.
 function grassTuftGeometry(blades) {
-  const pos = [], uv = [], idx = [], rows = [0, .5, 1];
+  const pos = [], uv = [], idx = [], blade = [], rows = [0, .5, 1];
   for (let b = 0; b < blades; b++) {
     const a = b / blades * Math.PI * 2 + hash2(b, 7) * 1.4, r = .03 + .13 * hash2(b, 11), lean = .06 + .2 * hash2(b, 13);
     const ca = Math.cos(a), sa = Math.sin(a), w = .018 + .016 * hash2(b, 17), hk = .55 + .45 * hash2(b, 19), base = pos.length / 3;
+    const hue = hash2(b, 23); // v2: per-blade green variety (static geometry attribute, no instance cost)
     for (const t of rows) {
       const bend = lean * t * t, cx = ca * (r + bend), cz = sa * (r + bend), y = t * hk * (1 - .12 * lean * t), half = w * (1 - t * .7);
-      if (t === 1) { pos.push(cx, y, cz); uv.push(.5, t); continue; }
-      pos.push(cx - sa * half, y, cz + ca * half, cx + sa * half, y, cz - ca * half); uv.push(0, t, 1, t);
+      if (t === 1) { pos.push(cx, y, cz); uv.push(.5, t); blade.push(hue); continue; }
+      pos.push(cx - sa * half, y, cz + ca * half, cx + sa * half, y, cz - ca * half); uv.push(0, t, 1, t); blade.push(hue, hue);
     }
     idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4);
   }
@@ -107,6 +108,7 @@ function grassTuftGeometry(blades) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => i % 3 === 1 ? 1 : 0), 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aMeadowBlade', new THREE.Float32BufferAttribute(blade, 1));
   g.setIndex(idx);
   return g;
 }
@@ -178,12 +180,24 @@ attribute vec4 aMeadowPos; // xyz root, w height
 attribute vec4 aMeadowTint; // rgb tint (or kind), w yaw
 varying vec3 vMeadowTint;
 varying vec2 vMeadowUv;
+// v2: rolling wind waves. Bands travel downwind and are bent by a slow cross-wind wobble, so a meadow shows the
+// classic "wave over the grass" read; the same value drives the bend and the grass tip sheen. 0..1, never NaN.
+vec2 meadowWindDir() { float l = length(uMeadowWind); return l > 1e-4 ? uMeadowWind / l : vec2(1.0, 0.0); }
+float meadowWave(vec2 root) {
+  vec2 wd = meadowWindDir();
+  float along = dot(root, wd), across = dot(root, vec2(-wd.y, wd.x));
+  float g = sin(along * .32 - uMeadowTime * 1.15 + sin(across * .13 + uMeadowTime * .07) * 1.6);
+  return smoothstep(.25, 1.0, g) * (.55 + .45 * sin(across * .071 + uMeadowTime * .21));
+}
 vec2 meadowSway(vec2 root, float h, float stiff) {
   float ph = dot(root, vec2(.31, .23)) + uMeadowTime * 1.6;
   float gust = .55 + .45 * sin(dot(root, vec2(.045, .03)) - uMeadowTime * .55); // slow travelling gust fronts
   vec2 sway = uMeadowWind * gust * (.7 + .3 * sin(ph)) + vec2(sin(ph * 1.7 + 1.3), cos(ph * 1.3)) * .035;
+  sway += meadowWindDir() * meadowWave(root) * .22 * min(1.0, length(uMeadowWind) * 1.6); // the wave leans with the wind
   return sway * h * h / stiff;
 }
+// Fade to nothing at the refill radius (edges ordered low->high: reversed smoothstep edges are undefined in GLSL ES).
+float meadowFade(vec2 root) { return 1.0 - smoothstep(uMeadowRadius - 6.0, uMeadowRadius, distance(root, uMeadowFocus.xz)); }
 vec3 meadowTrample(vec3 p, vec2 root, float h) {
   vec2 off = vec2(0.0); float mFlat = 0.0;
   for (int i = 0; i < 4; i++) {
@@ -197,10 +211,10 @@ vec3 meadowTrample(vec3 p, vec2 root, float h) {
 `;
 function patchGrass(shader, U) {
   Object.assign(shader.uniforms, U);
-  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + COMMON_VERT)
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + COMMON_VERT + 'attribute float aMeadowBlade;\nvarying float vMeadowWave, vMeadowBlade;')
     .replace('#include <begin_vertex>', /* glsl */`
-    float mH = uv.y; vMeadowUv = uv;
-    float mFade = smoothstep(uMeadowRadius, uMeadowRadius - 6.0, distance(aMeadowPos.xz, uMeadowFocus.xz));
+    float mH = uv.y; vMeadowUv = uv; vMeadowBlade = aMeadowBlade; vMeadowWave = meadowWave(aMeadowPos.xz);
+    float mFade = meadowFade(aMeadowPos.xz);
     float mC = cos(aMeadowTint.w), mS = sin(aMeadowTint.w);
     vec3 transformed = vec3(mC * position.x - mS * position.z, position.y, mS * position.x + mC * position.z);
     transformed *= vec3(mix(.75, 1.15, fract(aMeadowTint.w * 3.7)), aMeadowPos.w, mix(.75, 1.15, fract(aMeadowTint.w * 3.7))) * mFade;
@@ -208,7 +222,7 @@ function patchGrass(shader, U) {
     transformed = meadowTrample(transformed, aMeadowPos.xz, mH);
     transformed += aMeadowPos.xyz;
     vMeadowTint = aMeadowTint.rgb;`);
-  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vMeadowTint;\nvarying vec2 vMeadowUv;')
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vMeadowTint;\nvarying vec2 vMeadowUv;\nvarying float vMeadowWave, vMeadowBlade;')
     .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal); // both faces shade like the ground they grow from')
     .replace('#include <color_fragment>', /* glsl */`#include <color_fragment>
     // Root occlusion into the soil, sunlit straw-gold tips, a faint mid-blade crease.
@@ -216,6 +230,10 @@ function patchGrass(shader, U) {
     vec3 mCol = vMeadowTint * mix(.62, 1.42, smoothstep(0.0, .9, mT));
     mCol = mix(mCol, mCol * vec3(1.18, 1.1, .7) + vec3(.02, .015, 0.0), smoothstep(.6, 1.0, mT) * .35);
     mCol *= .92 + .16 * abs(vMeadowUv.x - .5) * 2.0;
+    // v2: every tuft mixes blades of a few greens (cool blue-green to fresh yellow-green, Rec.709 near-neutral), and
+    // a passing wind wave lifts the tips into a pale silver-gold sheen. Bounded multipliers, linear space.
+    mCol *= mix(vec3(.9, 1.0, 1.1), vec3(1.12, 1.04, .8), vMeadowBlade) * (.94 + .1 * vMeadowBlade);
+    mCol *= 1.0 + vMeadowWave * smoothstep(.35, 1.0, mT) * vec3(.38, .34, .2);
     diffuseColor.rgb = mCol;`);
 }
 function patchFlowers(shader, U) {
@@ -224,7 +242,7 @@ function patchFlowers(shader, U) {
     .replace('#include <begin_vertex>', /* glsl */`
     int mK = int(aMeadowTint.x + .5);
     float mH = uv.y; vMeadowUv = uv;
-    float mFade = smoothstep(uMeadowRadius, uMeadowRadius - 6.0, distance(aMeadowPos.xz, uMeadowFocus.xz));
+    float mFade = meadowFade(aMeadowPos.xz);
     float mC = cos(aMeadowTint.w), mS = sin(aMeadowTint.w);
     vec3 p = position;
     if (uv.x > .5) { p.xz *= uFlowerSize[mK]; p.y = 1.0 + (p.y - 1.0) * uFlowerSize[mK]; } // head parts scale with petal size
@@ -252,7 +270,7 @@ function patchDaisies(shader, U) {
     #endif`)
     .replace('#include <begin_vertex>', /* glsl */`
     float mH = aDaisy.z; vMeadowUv = uv; vDaisyPart = aDaisy.x;
-    float mFade = smoothstep(uMeadowRadius, uMeadowRadius - 6.0, distance(aMeadowPos.xz, uMeadowFocus.xz));
+    float mFade = meadowFade(aMeadowPos.xz);
     float mC = cos(aMeadowTint.w), mS = sin(aMeadowTint.w);
     vec3 transformed = vec3(mC * position.x - mS * position.z, position.y, mS * position.x + mC * position.z) * aMeadowPos.w * mFade;
     transformed.xz += meadowSway(aMeadowPos.xz + 7.7, mH, 3.0) * .25;

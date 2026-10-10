@@ -5,13 +5,21 @@
 import * as THREE from 'three';
 import {keepCarve} from '../shared/keep-sites.js';
 
-export const ALPINE_FOREST_VERSION = 1;
+export const ALPINE_FOREST_VERSION = 2;
 const QUALITY = {high: {max: 2600, density: .5}, low: {max: 1000, density: .2}};
+const FROST_FROM = 15, FROST_FULL = 26; // world Y (m) where fir tops start / finish frosting (default tree line is 25)
 
 function hash(i, seed) {
   let h = (Math.imul((i + 4096) >>> 0, 0x8da6b343) ^ Math.imul((seed + 4096) >>> 0, 0xd8163841)) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0; h = (h ^ (h >>> 15)) >>> 0;
   return (h & 0xffffff) / 16777215;
+}
+// Smooth 2D value noise on the integer lattice (deterministic, presentation-only colour grouping).
+function standNoise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z); let fx = x - ix, fz = z - iz; fx = fx * fx * (3 - 2 * fx); fz = fz * fz * (3 - 2 * fz);
+  const c = (a, b) => hash((a & 0xffff) * 65536 + (b & 0xffff), 29);
+  const a = c(ix, iz) + (c(ix + 1, iz) - c(ix, iz)) * fx, b = c(ix, iz + 1) + (c(ix + 1, iz + 1) - c(ix, iz + 1)) * fx;
+  return a + (b - a) * fz;
 }
 
 // Fir: three drooping five-sided tiers on a short trunk, unit height. Vertex colour carries the crown shading
@@ -24,11 +32,13 @@ export function firGeometry() {
     const p = v(Math.cos(a) * w, 0, Math.sin(a) * w, trunk), q = v(Math.cos(b) * w, 0, Math.sin(b) * w, trunk), r = v(Math.cos(b) * w * .6, .3, Math.sin(b) * w * .6, trunk), s = v(Math.cos(a) * w * .6, .3, Math.sin(a) * w * .6, trunk);
     idx.push(p, r, q, p, s, r); }
   const tiers = [[.16, .52, .36], [.4, .74, .27], [.6, 1, .17]]; // [skirt y, apex y, radius]
+  // v2 palette (linear): lifted ~30% and nudged from olive toward a clean fir green so slopes read bright and
+  // optimistic; rims alternate warm/cool around each tier so a single tree has sunlit and shaded flanks.
   for (const [ti, [y0, y1, r]] of tiers.entries()) {
-    const twist = ti * .6, apex = v(0, y1, 0, ti === 2 ? [.08, .13, .07] : [.035, .07, .035]), under = v(0, y0 + (y1 - y0) * .32, 0, [.008, .016, .01]);
+    const twist = ti * .6, apex = v(0, y1, 0, ti === 2 ? [.11, .17, .08] : [.045, .095, .045]), under = v(0, y0 + (y1 - y0) * .32, 0, [.01, .02, .013]);
     const ring = [];
-    for (let k = 0; k < sides; k++) { const a = k / sides * Math.PI * 2 + twist, droop = y0 - .03;
-      ring.push(v(Math.cos(a) * r, droop, Math.sin(a) * r, [.028 + .012 * ti, .062 + .014 * ti, .03])); }
+    for (let k = 0; k < sides; k++) { const a = k / sides * Math.PI * 2 + twist, droop = y0 - .03, warm = k % 2 ? 1.12 : .9;
+      ring.push(v(Math.cos(a) * r, droop, Math.sin(a) * r, [(.036 + .016 * ti) * warm, .082 + .018 * ti, (.036 + .004 * ti) / warm])); }
     for (let k = 0; k < sides; k++) { const a = ring[k], b = ring[(k + 1) % sides]; idx.push(apex, b, a, under, a, b); }
   }
   const g = new THREE.BufferGeometry();
@@ -68,6 +78,21 @@ export function createAlpineForest({scene, arena, quality = 'high'} = {}) {
   if (!scene || !arena?.mesh) throw new Error('createAlpineForest requires scene and the mountain arena');
   const cfg = QUALITY[quality] || QUALITY.high, geometry = firGeometry();
   const material = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .92, metalness: 0, side: THREE.DoubleSide, envMapIntensity: .5});
+  // v2: frost-dusted upper tiers on the highest stands, so the forest fades into the snow line instead of stopping.
+  // Keyed to the instance's world Y (instanceMatrix translation) and the up-facing tier tops; one varying, no
+  // uniforms, no textures. The hook goes through the atmosphere accessor when installed (it runs first, atmosphere
+  // after) and the default cache key derives from this function's source, so the program is not shared by mistake.
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float vFirFrost;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+      vFirFrost = smoothstep(${FROST_FROM.toFixed(1)}, ${FROST_FULL.toFixed(1)}, instanceMatrix[3].y) * smoothstep(0.45, 1.0, position.y) * clamp(objectNormal.y * 1.5, 0.0, 1.0);
+#else
+      vFirFrost = 0.0;
+#endif`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vFirFrost;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\n      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.68, 0.76), vFirFrost * 0.6);');
+  };
   const mesh = new THREE.InstancedMesh(geometry, material, cfg.max);
   mesh.name = 'alpine-forest'; mesh.raycast = () => {}; mesh.receiveShadow = false; mesh.castShadow = false; mesh.frustumCulled = false; mesh.count = 0;
   scene.add(mesh);
@@ -79,7 +104,11 @@ export function createAlpineForest({scene, arena, quality = 'high'} = {}) {
     list.forEach(([x, y, z, h, yaw], i) => {
       q.setFromAxisAngle(up, yaw); const lean = .9 + .2 * hash(i, 3);
       m.compose(p.set(x, y, z), q, s.set(h * .62 * lean, h, h * .62 * lean)); mesh.setMatrixAt(i, m);
-      const v = .78 + .42 * hash(i, 9); mesh.setColorAt(i, tint.setRGB(v * (.92 + .1 * hash(i, 13)), v, v * (.9 + .12 * hash(i, 17))));
+      // v2 tint: stands share a colour (40 m value noise) with only a small per-tree jitter, so slopes read as coherent
+      // forest patches at 50-70 m instead of per-tree speckle; higher stands drift cooler/bluer toward the snow.
+      const stand = standNoise(x * .025 + 3.1, z * .025 - 1.7), alt = Math.min(1, Math.max(0, (y - 10) / 15));
+      const v = (.86 + .3 * stand) * (.95 + .1 * hash(i, 9)), warm = .06 * (stand - .5) - .05 * alt;
+      mesh.setColorAt(i, tint.setRGB(v * (1 + warm), v, v * (1 - warm * .8 + .04 * alt)));
     });
     mesh.count = last = list.length; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     scatterMs = performance.now() - t0;

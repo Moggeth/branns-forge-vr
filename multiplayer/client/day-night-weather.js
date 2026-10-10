@@ -9,6 +9,7 @@ import {worldClock, solarAngle, nightAmount, DAYLIGHT_SHARE} from '../shared/wor
 import {ATMOSPHERE, adoptAtmosphere, atmosphereStats} from './atmosphere-materials.js';
 import {createAtmospherePost} from './atmosphere-post.js';
 import {createSunbeams} from './sunbeams.js';
+import {setMountainGroundLight} from './mountain-ground-treatment.js';
 
 const C = hex => new THREE.Color(hex);
 // Palette keyed on sun elevation (sin of the solar angle). Colours sRGB hex -> linear working space via THREE.Color.
@@ -226,6 +227,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     // Shafts falling through the crowns: golden in low sun, a faint cool silver under a clear moon, gone under cloud.
     const clear = (1 - overcast) ** 2;
     const beamStrength = sunSide ? sunUp * clear * (.22 + lowSun * .5 + dawn * .2) : moonUp * clear * .1;
+    setMountainGroundLight({time,strength:sunSide?Math.min(1,beamStrength*1.6):0});
     if (sunSide) beamColor.copy(env.skySun); else beamColor.setRGB(.55, .68, 1);
     if (beams && camera_) beams.update({camera: camera_, light: lightDir, strength: beamStrength * (rts ? .5 : 1), color: beamColor, time});
     if (post) {
