@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {createStandingTrees} from '../client/standing-trees.js';
+import {worldTrees} from '../shared/world-content.js';
+import {isFelled} from '../shared/trees.js';
+const read=createStandingTrees();
+let s={seed:41,tick:0,groves:[],harvestedTrees:[]},last=read(s);
+for(let tick=1;tick<200;tick++)assert.equal(read({...s,tick}),last,'fresh snapshots reuse the forest');
+const check=state=>{
+ const actual=read(state),felled=new Set((state.harvestedTrees||[]).filter(isFelled).map(t=>t.id));
+ assert.deepEqual(actual,worldTrees(state).filter(t=>!felled.has(t.id)));
+ assert.notEqual(actual,last,'a forest change invalidates the list');last=actual;s=state;
+};
+check({...s,treeRoots:[{id:'tree1',x:12,z:13}]});
+check({...s,awakenedTrees:[{id:'tree2'}]});
+check({...s,wildTrees:[{id:'wild',x:9,z:8,height:4,variant:1}]});
+const g={id:'growth',trees:[[1,2,6,0,10],[3,4,7,1,20]]};
+assert.equal(read({...s,tick:9,groves:[g]}),last,'future trees remain absent');
+check({...s,tick:10,groves:[g]});
+check({...s,tick:20});
+check({...s,seed:42});
+check({...s,battle:{v:2}});
+check({...s,landmarks:true});
+check({...s,harvestedTrees:[{id:'wild',cuts:3,felledTick:20}]});
+console.log('standing-trees: stable snapshots, exact growth ticks, roots, awakening, seeds, clearings and felling match authority');

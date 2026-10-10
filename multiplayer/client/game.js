@@ -1,5 +1,6 @@
 import {warmRender} from './warm-render.js';
 import {createGpuFrameTimer} from './gpu-frame-timer.js';
+import {createStandingTrees} from './standing-trees.js';
 import {batchRigidWeapon} from './rigid-weapon-batch.js';
 import {createRenderBudget,renderSize} from './render-budget.js';
 import {yieldToBrowser,createAssetQueue,prepareAssetTextures} from './startup-work.js';
@@ -952,8 +953,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity,relief:{n:0,k:0}};
   function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding,ground:(x,z)=>heightAt(x,z,snapshot.edits)});}return siegebirdFlock;}
   // Reload birds linger: perches on standing trees near where the bird leaves the crossbow, ahead of its flight first.
-  let siegebirdTreeCache=null,siegebirdTreeSnapshot=null;const siegebirdViewer=new THREE.Vector3();
-  function siegebirdTrees(){if(siegebirdTreeSnapshot!==snapshot){siegebirdTreeSnapshot=snapshot;const felled=new Set((snapshot.harvestedTrees||[]).filter(isFelled).map(h=>h.id));siegebirdTreeCache=worldTrees(snapshot).filter(t=>!felled.has(t.id));}return siegebirdTreeCache;}
+  const standingTrees=createStandingTrees(),siegebirdViewer=new THREE.Vector3();
+  function siegebirdTrees(){return standingTrees(snapshot);}
   function siegebirdTreeStanding(id){return siegebirdTrees().some(t=>t.id===id);}
   // The perch is the outer face of the actual crown (or a bough) on the side facing the bird, found by a ray toward the
   // trunk, so it works for any tree species; it falls back to a bough-height point when nothing is hit.
