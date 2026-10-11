@@ -2,7 +2,7 @@
 
 Branch: `codex/graphics-performance-20261011`, based on `d94d191`.
 Implemented and code-tested. **Local startup and visual checks passed on 2026-10-12;
-performance acceptance and a hosted preview remain pending. Do not merge/deploy yet.**
+uncontended desktop performance checks passed; hosted preview verification is next.**
 Original local main divergence/work was preserved. Draft PR: #99.
 
 ## Changes
@@ -98,7 +98,7 @@ Evidence remains in ignored `output/playwright/graphics-20261012/` (comparison/g
 startup screenshots/results); raw ability profiles are in `logs/ability-performance/`.
 `logs/work-timing.csv` records each measured run.
 
-### Performance results are contaminated — do not use as an improvement claim
+### Superseded performance run: competing GPU workload
 
 The 24-enemy idle/Pick aim/Pick cast/Phoenix aim fixtures completed and verified real
 wall creation/forecast updates. Baseline took 51.865 s; candidate 53.576 s. Frame p95
@@ -112,7 +112,46 @@ During the diagnostic run utilization was 99%. Concurrent workload changed betwe
 runs, so the figures do **not** establish a causal regression or an improvement.
 The unrelated game was not stopped. Asked the user to close it and reply `GPU free`.
 Repeat matched tests only when the GPU is idle; record utilization before/after each.
-No sustained/crowd acceptance or physical iPhone 12 acceptance is claimed.
+This contaminated run is superseded by the controlled desktop results below. Physical
+iPhone 12 acceptance is still not claimed.
+
+### Controlled desktop runs after the user freed the GPU
+
+Preflight utilization fell to 15–16%, approximately 40 W, with no competing game.
+Baseline/candidate 24-enemy tests each measured 8.4 ms frame p95 across all four phases.
+A corrected harness then excluded profiler start/stop and screenshot IPC from measured
+intervals, and separately recorded synchronous ability dispatch cost:
+
+| Phase | Before p95 / p99 ms | Candidate p95 / p99 ms | Candidate dispatch ms |
+|---|---:|---:|---:|
+| Idle | 16.8 / 25.0 | 16.7 / 16.8 | 0.0 |
+| Pick aim | 16.8 / 25.0 | 8.5 / 16.7 | 109.0 |
+| Pick cast | 16.8 / 25.0 | 16.7 / 16.8 | 3.2 |
+| Phoenix aim | 16.7 / 16.8 | 16.7 / 16.8 | 0.4 |
+
+No sustained regression is observed on this RTX 3080 Ti. Desktop scheduling varies
+between 8.3 and 16.7 ms cadence, so this is not a claimed speedup percentage. Auto
+resolution stayed at ratio 1; no visual reduction was required in these fixtures.
+Real wall creation and curved-forecast updates passed; no browser errors occurred.
+Corrected profiles/results: `logs/ability-performance/clean-timed-{before,after}.*`.
+
+**Outstanding first-use audio cost:** the synthetic fixture's first audio-unlocking
+action was Pick aim. Synchronous dispatch took 201.9 ms before / 109.0 ms after;
+~100 ms of the candidate's first 250 ms CPU profile was inside `unlockAudio`.
+This is an existing cold audio initialization cost, not evidence of a terrain-preview
+regression. Do not claim that all first-action hitches are eliminated. A follow-up
+should profile AudioContext/device startup separately from procedural audio buffer
+creation and prepare the latter progressively before gameplay, preserving gesture
+requirements, cancellation, disposal and first-tap responsiveness.
+
+**Six-minute crowd renderer run:** 32 players + 32 bots at 20 Hz snapshots, three
+minutes each Hero/God, full world and current bases. Hero frame p95/p99 10.1/11.9 ms,
+GPU p95 6.16 ms; God 8.6/9.0 ms, GPU p95 6.40 ms. No runtime/shader/asset errors.
+Hero max 31.3 ms. God max 139.5 ms included profiler startup: CPU profile sample 0
+alone was 121.638 ms in `(program)`. The follow-up harness excludes that boundary
+and records timed >33 ms outliers, rather than hiding them in a percentile.
+This is a synthetic renderer test, not a network/authority, phone, or thermal test.
+Evidence: `output/playwright/graphics-idle-gpu-crowd/`.
 
 ### Lessons and reproducible comparison
 
@@ -133,6 +172,9 @@ No sustained/crowd acceptance or physical iPhone 12 acceptance is claimed.
   `PERF_SOURCE_ROOT` and use a second label for the candidate.
 - Shader timings and profiler captures require an otherwise idle GPU. Check for
   unrelated games/renderers before starting a long benchmark; never close them silently.
+- Start interval sampling after Profiler.start, and stop it before Profiler.stop.
+  Keep synchronous action cost as a separate metric: excluding profiler IPC must
+  not conceal actual ability dispatch work.
 
 ## Remaining acceptance
 
