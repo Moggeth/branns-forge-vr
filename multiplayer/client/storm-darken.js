@@ -1,7 +1,7 @@
 // The Stormreel strike is so bright the world around it goes dark (Mitch, 2026-10-10: "darkens the surrounding area by
 // default of how bright it is"). Presentation only. Two layers, both brief:
 //  - the tone-mapping exposure dips, so lit surfaces dim while every lightning material (drawn untonemapped) stays white-hot;
-//  - a dark veil over the screen with a tall clear window round the strike, following it on screen every frame, so the
+//  - a dark veil over the screen with a clear round window on the arc, following it on screen every frame, so the
 //    sky and anything not tone mapped darken too. The HUD sits above it.
 import * as THREE from 'three';
 
@@ -29,7 +29,7 @@ export function createStormDarken({camera, renderer, root = globalThis.document?
         const v = veil();
         if (v) {
           p.copy(at).project(camera); const behind = p.z > 1, x = behind ? 50 : (p.x * .5 + .5) * 100, y = behind ? 50 : (.5 - p.y * .5) * 100;
-          v.style.background = `radial-gradient(ellipse 24% 130% at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(4,8,22,0) 0%, rgba(4,8,22,.15) 35%, rgba(4,8,22,.88) 100%)`;
+          v.style.background = `radial-gradient(circle 34vmin at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(4,8,22,0) 0%, rgba(4,8,22,.15) 35%, rgba(4,8,22,.88) 100%)`;
           v.style.opacity = String(Math.min(1, dark));
         }
       } else if (exposure !== null) { renderer.toneMappingExposure = exposure; exposure = null; dark = 0; if (el) el.style.opacity = '0'; }

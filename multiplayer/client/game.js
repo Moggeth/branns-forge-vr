@@ -476,7 +476,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (−)':'Red (+)'} Stormreel. ${touchEnabled?'Hold Zap':'Hold click'} to charge. A red and a blue bolt in one foe strikes it down. ${touchEnabled?'Spike':'G'} plants it, ${touchEnabled?'Reel':'Q'} winds a bolt back.`);
     if(event.kind==='storm_plant'&&event.by===playerId)report(`Crossbow spiked into the ground. Its bolt stays live. ${touchEnabled?'Use':'E'} beside it to pick it back up.`);
     if(event.kind==='storm_pickup'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (−)':'Red (+)'} crossbow back in hand.`);
-    if(event.kind==='storm_arc'&&event.by===playerId)report(event.killed===false?'Circuit closed, but something shielded your target.':'Circuit closed! Lightning struck your target down.');
+    if(event.kind==='storm_arc'&&event.by===playerId)report(event.killed===false?'Circuit closed, but something shielded your target.':'Circuit closed! The arc burned your target down.');
     if(event.kind==='storm_arc')audioMix?.duck(.3,1.8);
     if(event.kind==='storm_reel'&&event.by===playerId){if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.35,duration:30},{at:70,amplitude:.7,duration:50}]);else if(touchEnabled)try{navigator.vibrate?.([14,24,30]);}catch{}}
     if(event.kind==='storm_reel'&&event.by===playerId&&event.refund)report(`Bolt reeled in${event.refund?`, ${event.refund} charge returned to the tower`:''}.`);

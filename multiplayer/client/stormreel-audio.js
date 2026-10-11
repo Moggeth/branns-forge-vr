@@ -4,7 +4,7 @@
 //   fire     string twang + sharp crack + sub thump + a falling zap, then a polarity chime: bright and rising for the red
 //            (+) bolt, low and falling for the blue (-) one, so you can hear which pole you just lodged
 //   plant    the bolt biting in: thud, sizzle, the same polarity chime
-//   circuit  a thunder crack as the second pole lands, then a held mains buzz with random crackle until it ends
+//   circuit  an arc-flash bang and roar as the second pole lands (surge), then a held mains buzz with random crackle until it ends
 //   reel     a ratchet that speeds up under a rising winch whine and an air zip, ending in a metallic clack and a tiny zap
 //   cable    taut-cable creak, the snap when a tether lets go, pack buckle and spin-up when you take or hang it
 //   tower    a low transformer hum that swells with the stored charge, and glassy chimes when Crystal goes in
@@ -38,7 +38,7 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     const rx = -ear.forward[2], rz = ear.forward[0], n = Math.hypot(rx, rz) || 1;
     return {gain: 1 / (1 + (d / 14) ** 1.6), pan: d < 1.5 ? 0 : Math.max(-.85, Math.min(.85, (dx * rx + dz * rz) / n / d))};
   }
-  /** Thunder carries: the surge is heard right across the map, a little later the further away you stand. */
+  /** The arc flash carries: the surge is heard right across the map, a little later the further away you stand. */
   function placeFar(at) {
     const p = place(at), ear = at && listener(); if (!ear) return {...p, delay: 0};
     const d = Math.hypot(at[0] - ear.position[0], at[2] - ear.position[2]);
@@ -50,15 +50,16 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     return g;
   }
   const done = (src, ...nodes) => { src.onended = () => { try { src.disconnect(); nodes.forEach(n => n.disconnect()); } catch { /* already gone */ } }; };
-  function tone(dest, {type = 'sine', from, to = from, at = 0, length, gain, attack = .003, curve = 'exp'}) {
+  function tone(dest, {type = 'sine', from, to = from, at = 0, length, gain, attack = .003, curve = 'exp', hold = 0}) {
     const t = ctx.currentTime + at, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.setValueAtTime(from, t); if (to !== from) o.frequency[curve === 'lin' ? 'linearRampToValueAtTime' : 'exponentialRampToValueAtTime'](Math.max(20, to), t + length);
-    g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(.0001, t + length);
+    g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(gain, t + attack); if (hold) g.gain.setValueAtTime(gain, t + Math.max(attack, length * hold)); g.gain.exponentialRampToValueAtTime(.0001, t + length);   // hold: sustain for that share of the length
     o.connect(g).connect(dest); o.start(t); o.stop(t + length + .03); done(o, g); stats.voices++; return o;
   }
   function hiss(dest, {at = 0, length, gain, type = 'bandpass', from = 2000, to = from, q = 1, rate = 1, am = 0}) {
     const t = ctx.currentTime + at, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    s.buffer = noiseBuf(); s.playbackRate.value = rate; s.loop = length > .35;   // long rumbles loop the noise f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t);
+    s.buffer = noiseBuf(); s.playbackRate.value = rate; s.loop = length > .35;   // long tails loop the noise
+    f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t);
     if (to !== from) f.frequency.exponentialRampToValueAtTime(Math.max(40, to), t + length);
     g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + length);
     s.connect(f).connect(g).connect(dest);
@@ -201,20 +202,29 @@ export function createStormreelAudio({audio = () => null, listener = () => null,
     hiss(o, {from: 1500 + Math.random() * 900, q: 2, length: .11, gain: .7, am: 85}); tone(o, {type: 'square', from: 220, to: 90, length: .09, gain: .09});
   }
 
-  /** The circuit closes through a foe (Mitch, 2026-10-10: "a big deal ... pretty loud"): a split-sky double crack, a
-   *  cannon boom you feel, thunder rolling away for seconds, the mains "BWAAM" and a sizzling whip-crack. Heard map-wide. */
+  /** The circuit closes through a foe: an industrial arc flash, not thunder (Mitch, 2026-10-11; "pretty loud", 2026-10-10).
+   *  The blast of the flash itself, a distorted mains ROAR with crackle for as long as the arc holds, the breaker slamming
+   *  open, the transformer whining down and the slap of the bang coming back off the walls. Heard map-wide. */
   function surge(at = null, wet = false) {
-    if (!ready()) return; const p = placeFar(at), o = out(p, 1.9), d = p.delay; cleanup(o, 5600);
-    hiss(o, {type: 'highpass', from: 2600, at: d, length: .09, gain: 1.6}); hiss(o, {type: 'highpass', from: 1700, at: d + .03, length: .12, gain: 1.3});
-    hiss(o, {type: 'bandpass', from: 900, q: .6, at: d, length: .25, gain: 1.2});
-    tone(o, {from: 72, to: 20, at: d, length: 1.7, gain: 1.8, attack: .002});                 // the cannon boom
-    hiss(o, {type: 'lowpass', from: 1600, to: 60, at: d, length: 3, gain: 1.5, rate: .5});
-    hiss(o, {type: 'lowpass', from: 320, to: 90, at: d + .35, length: 3.4, gain: 1, rate: .45, am: 6});   // thunder rolling away
-    tone(o, {type: 'square', from: 120, to: 58, at: d, length: .8, gain: .3}); tone(o, {type: 'sawtooth', from: 181, to: 87, at: d, length: .8, gain: .2});   // mains bwaam
-    tone(o, {type: 'sawtooth', from: 5200, to: 160, at: d, length: .5, gain: .3});
-    hiss(o, {from: 1800, q: 2.5, at: d + .08, length: 1.1, gain: .55, am: 120});
+    if (!ready()) return; const p = placeFar(at), o = out(p, 1.9), d = p.delay; cleanup(o, 3600);
+    // The flash: a hard crack and a short, punchy blast (an arc flash is an explosion).
+    hiss(o, {type: 'highpass', from: 2400, at: d, length: .08, gain: 1.7}); hiss(o, {type: 'bandpass', from: 1100, q: .5, at: d, length: .22, gain: 1.4});
+    tone(o, {from: 110, to: 34, at: d, length: .55, gain: 1.6, attack: .002});
+    // The roar: mains harmonics driven into distortion, a fierce 100 Hz buzz with a hiss of plasma riding it.
+    const drive = ctx.createWaveShaper(), curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = i / 127.5 - 1; curve[i] = Math.tanh(x * 4); }
+    drive.curve = curve; const roar = ctx.createGain(); roar.gain.value = .55; drive.connect(roar).connect(o);
+    tone(drive, {type: 'sawtooth', from: 100, to: 96, at: d, length: .75, gain: .8, attack: .004, curve: 'lin', hold: .85});
+    tone(drive, {type: 'square', from: 50, to: 48, at: d, length: .75, gain: .6, attack: .004, curve: 'lin', hold: .85});
+    tone(drive, {type: 'sawtooth', from: 150.5, to: 146, at: d, length: .7, gain: .45, attack: .004, curve: 'lin', hold: .85});
+    hiss(o, {from: 2600, q: 1.1, at: d, length: .75, gain: .9, am: 100});
+    for (let i = 0; i < 9; i++) hiss(o, {type: 'highpass', from: 2200 + Math.random() * 4000, at: d + .03 + Math.random() * .62, length: .02 + Math.random() * .04, gain: .9 + Math.random() * .5});
+    // The breaker slams open and the arc dies; the transformer whines down; the bang slaps back off the walls.
+    tone(o, {from: 190, to: 60, at: d + .72, length: .09, gain: .8}); hiss(o, {from: 1300, q: 1.5, at: d + .72, length: .06, gain: .9});
+    tone(o, {from: 1900, to: 180, at: d + .7, length: 1.1, gain: .1}); tone(o, {type: 'square', from: 60, to: 55, at: d + .72, length: 1.2, gain: .08});
+    hiss(o, {type: 'lowpass', from: 700, to: 90, at: d + .14, length: 1.3, gain: .55, rate: .6});
     if (wet) hiss(o, {type: 'highpass', from: 4200, at: d + .05, length: 1.6, gain: .4});   // steam
-    chime(o, 'red', d + .14, .6); chime(o, 'blue', d + .22, .6);
+    chime(o, 'red', d + .8, .5); chime(o, 'blue', d + .88, .5);
   }
   /** A foe cooked by the circuit: a last fat crackle, a pop and a hiss of smoke. */
   function cooked(at = null) {
