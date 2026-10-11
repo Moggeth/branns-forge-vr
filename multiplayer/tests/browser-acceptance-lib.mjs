@@ -30,6 +30,32 @@ export async function launch({viewport = {width: 1280, height: 720}, headless = 
   const xr = process.env.BROWSER_QA_XR === '1';
   const browser = await chromium.launch({...(CHROME?{executablePath:CHROME}:{}), headless, args: ['--enable-unsafe-swiftshader', ...(!xr ? ['--disable-features=WebXR'] : [])]});
   const context = await browser.newContext({viewport, hasTouch: touch, isMobile: touch, deviceScaleFactor});
+  const transportErrors=[];
+  // Optional protected-preview verification. Keep the short-lived token in memory
+  // and restrict it to the explicitly selected deployment, never room/asset origins.
+  if (process.env.BROWSER_QA_TRUSTED_VERCEL_ORIGIN) {
+    const origin = process.env.BROWSER_QA_TRUSTED_VERCEL_ORIGIN;
+    const target = new URL(BASE);
+    if (target.protocol !== 'https:' || target.origin !== origin || !target.hostname.endsWith('.vercel.app') || !process.env.VERCEL_OIDC_TOKEN) {
+      await browser.close();
+      throw Error('Protected preview requires the exact ACCEPT_BASE HTTPS Vercel origin and a development OIDC token.');
+    }
+    await context.route(url => url.origin === origin, async route => {
+      // Fetch without following redirects: custom headers on continue() can carry
+      // into a redirected request. Let the browser follow without the token, then
+      // independently authorize only requests that still match the chosen origin.
+      try {
+        const response=await route.fetch({maxRedirects:0,headers:{...route.request().headers(), 'x-vercel-trusted-oidc-idp-token':process.env.VERCEL_OIDC_TOKEN}});
+        await route.fulfill({response});
+      } catch (error) {
+        // Optional assets can still be in flight during browser.close(). Never
+        // print raw request exceptions: their call logs may contain auth headers.
+        if (/Request context disposed|Target .*closed/i.test(String(error.message))) return;
+        transportErrors.push('Protected preview request failed: '+new URL(route.request().url()).pathname);
+        await route.abort('failed').catch(()=>{});
+      }
+    });
+  }
   // The portrait "turn your phone" prompt and first-tap fullscreen would cover or resize every phone check.
   if (!turnPrompt) await context.addInitScript(() => { window.__brannQuietTurnPrompt = true; });
   if (!xr) await context.addInitScript(() => Object.defineProperty(navigator, 'xr', {value: undefined, configurable: true}));
@@ -40,7 +66,7 @@ export async function launch({viewport = {width: 1280, height: 720}, headless = 
   });
   const page = await context.newPage();
   const log = join(here, 'logs', 'browser-console.log'); mkdirSync(dirname(log), {recursive: true});
-  page.errors = []; page.missing = [];
+  page.errors = transportErrors; page.missing = [];
   // Console 404 lines carry no URL; attribute them via responses and ignore only the known missing /favicon.ico.
   page.on('response', r => { if (r.status() >= 400) { page.missing.push(`${r.status()} ${r.url()}`); appendFileSync(log, `${ms()} http ${r.status()} ${r.url()}\n`); if (!/\/favicon\.ico$/.test(r.url())) page.errors.push(`HTTP ${r.status()} ${r.url()}`); } });
   page.on('console', m => { appendFileSync(log, `${ms()} ${m.type()} ${m.text()}\n`); if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) page.errors.push(m.text()); });

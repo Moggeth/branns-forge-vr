@@ -19,6 +19,7 @@ export async function resolve(spec, ctx, next) {
 }`));
 const THREE = await import('three');
 const O = await import(pathToFileURL(path.resolve(here, '../client/orchard-presentation.js')).href);
+const M = await import('../client/mountain-ground-treatment.js');
 
 const results = []; let failed = 0;
 const test = (name, fn) => { const t0 = performance.now(); try { const note = fn(); results.push(`ok   ${name}${note ? '  ' + note : ''}  (${(performance.now() - t0).toFixed(1)} ms)`); } catch (e) { failed++; results.push(`FAIL ${name}: ${e.message}`); } };
@@ -51,7 +52,15 @@ test('shader anchors exist in installed three ShaderLib.physical', () => {
 });
 for (const quality of ['high', 'low']) test(`patched ${quality} shader is structurally sound`, () => {
   const {p} = fixture({quality});
+  M.applyMountainGroundTreatment(p.material);
   const sh = compile(p.material);
+  assert.equal(p.material.userData.mountainTreatment.patched,true,'production ground treatment chains onto orchard');
+  assert.equal(sh.uniforms.mtnDapple,M.MOUNTAIN_GROUND_LIGHT);
+  M.setMountainGroundLight({time:7201,strength:2});
+  assert.equal(sh.uniforms.mtnDapple.value.x,1);
+  assert.equal(sh.uniforms.mtnDapple.value.y,1);
+  M.setMountainGroundLight({strength:0});
+  assert.equal(sh.uniforms.mtnDapple.value.y,0,'night removes daylight flecks');
   assert.equal(p.stats().shaderPatched, true);
   for (const a of ['#include <map_fragment>', '#include <roughnessmap_fragment>', '#include <normal_fragment_maps>']) assert.ok(!sh.fragmentShader.includes(a), `${a} replaced`);
   for (const inc of sh.fragmentShader.matchAll(/#include <(\w+)>/g)) assert.ok(THREE.ShaderChunk[inc[1]] !== undefined, `chunk ${inc[1]} exists`);

@@ -2339,3 +2339,13 @@ A queued RAF can predate async warm-up completion. Clamp frame dt on both sides 
 ### Mobile startup and sustained rendering (2026-10-08)
 
 See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.
+
+### Graphics profiling (2026-10-11)
+
+See [candidate handoff](GRAPHICS-PERFORMANCE-20261011.md). Count all renderer passes, not just the final quad. Never nest GPU queries or wait for results. Stop interval capture before screenshots. Audit actual image dimensions before generating smaller variants. Snapshot identity is not forest identity. Use directory plus rg -g patterns on PowerShell, not positional wildcards. Local server launch was blocked by automatic review; static checks were allowed. README contains pre-existing non-UTF-8 bytes: preserve them when adding a scoped link. Confirm repo-root workdir before documentation edits.
+
+### Shared-PC graphics acceptance (2026-10-12)
+
+Check GPU load with test browsers closed before interpreting frame-time changes. An unrelated game held this GPU at 95% utilization and invalidated before/after performance comparisons. Do not stop user applications silently. Same-server source comparisons must include assets-source runtime JS and must reject differing public assets; use scripts/prepare_graphics_baseline.py. Current keep bolts are S_Bolt/G_Harpoon on animated parent pivots; update selectors while retaining scale assertions. Local startup and 16 paired renders passed; performance remains gated. See the graphics candidate handoff.
+
+2026-10-12 follow-up: after the GPU was freed, matched ability and six-minute crowd runs passed without sustained regression. Profiler.start/stop IPC itself created long-frame outliers; measure between those calls and report synchronous action CPU separately. First-use audio initialization remains measurable (~109 ms here). Protected preview QA uses in-memory OIDC headers scoped to the exact deployment; never forward them through redirects. See the updated candidate handoff for evidence and limitations.

@@ -1,4 +1,6 @@
 import {warmRender} from './warm-render.js';
+import {createGpuFrameTimer} from './gpu-frame-timer.js';
+import {createStandingTrees} from './standing-trees.js';
 import {batchRigidWeapon} from './rigid-weapon-batch.js';
 import {createRenderBudget,renderSize} from './render-budget.js';
 import {yieldToBrowser,createAssetQueue,prepareAssetTextures} from './startup-work.js';
@@ -204,6 +206,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   scene.background = new THREE.Color(0xabc5c2);
   scene.fog = new THREE.Fog(0xabc5c2, 58, 125);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+  const gpuFrameTimer=createGpuFrameTimer(renderer.getContext(),(key,ms)=>frameMetrics.record(key,ms));
   // Keep CSS/UI resolution independent from the adaptive 3D drawing buffer.
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -950,8 +953,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   let siegebirdFlock=null,siegebirdAudio=null;const siegebirdLocal={n:0,prevT:Infinity,relief:{n:0,k:0}};
   function siegebirdFlockReady(){if(!siegebirdFlock&&templates.has('crossbow')&&templates.has('siegebird_songbird')){siegebirdFlock=createSiegebirdFlock({birdTemplate:templates.get('siegebird_songbird'),crossbowTemplate:templates.get('crossbow')});siegebirdFlock.attachWorld({scene,perch:siegebirdPerches,standing:siegebirdTreeStanding,ground:(x,z)=>heightAt(x,z,snapshot.edits)});}return siegebirdFlock;}
   // Reload birds linger: perches on standing trees near where the bird leaves the crossbow, ahead of its flight first.
-  let siegebirdTreeCache=null,siegebirdTreeSnapshot=null;const siegebirdViewer=new THREE.Vector3();
-  function siegebirdTrees(){if(siegebirdTreeSnapshot!==snapshot){siegebirdTreeSnapshot=snapshot;const felled=new Set((snapshot.harvestedTrees||[]).filter(isFelled).map(h=>h.id));siegebirdTreeCache=worldTrees(snapshot).filter(t=>!felled.has(t.id));}return siegebirdTreeCache;}
+  const standingTrees=createStandingTrees(),siegebirdViewer=new THREE.Vector3();
+  function siegebirdTrees(){return standingTrees(snapshot);}
   function siegebirdTreeStanding(id){return siegebirdTrees().some(t=>t.id===id);}
   // The perch is the outer face of the actual crown (or a bough) on the side facing the bird, found by a ray toward the
   // trunk, so it works for any tree species; it falls back to a bough-height point when nothing is hit.
@@ -1826,7 +1829,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
     if(!renderer.xr.isPresenting){renderBudget.ratio(dt);resizeBuffer();}
-    skyCycle.render(scene, camera);
+    gpuFrameTimer.begin();
+    // Aggregate all atmosphere/post passes rather than reporting only the final quad.
+    renderer.info.reset();
+    const autoReset=renderer.info.autoReset;renderer.info.autoReset=false;
+    try { skyCycle.render(scene, camera); }
+    finally { renderer.info.autoReset=autoReset;gpuFrameTimer.end(); }
     if (onVoicePose && playerId) {
       // After render, WebXR's viewer camera includes this frame's head pose.
       const earCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
@@ -1977,7 +1985,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),gpuTiming:gpuFrameTimer.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -2013,7 +2021,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       for (const template of templates.values()) disposeResources(template.scene);
       content.dispose();environment.dispose();ambience?.dispose();audioContext?.close();
       for(const batch of remoteBatches.values())batch.dispose();remoteBatches.clear();
-      renderer.dispose(); actors.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
+      gpuFrameTimer.dispose();renderer.dispose(); actors.clear(); warnings.clear(); templates.clear(); controllerSources.clear();
     },
   };
   return api;
