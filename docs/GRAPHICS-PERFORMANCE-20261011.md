@@ -1,8 +1,9 @@
 # Graphics and performance candidate â€” 2026-10-11
 
 Branch: `codex/graphics-performance-20261011`, based on `d94d191`.
-Implemented and code-tested; **browser/visual acceptance is pending. Do not deploy
-or merge on code checks alone.** Original local main divergence/work was preserved.
+Implemented and code-tested. **Local startup and visual checks passed on 2026-10-12;
+performance acceptance and a hosted preview remain pending. Do not merge/deploy yet.**
+Original local main divergence/work was preserved. Draft PR: #99.
 
 ## Changes
 
@@ -68,13 +69,76 @@ Ignored detailed logs: `logs/work-timing.csv`, `logs/graphics-ci.log`,
 `logs/graphics-orchard.log`. The initial felling test omitted `cuts:3`; authority
 correctly kept that tree standing. Fixed the fixture, not the implementation.
 
-## Remaining browser acceptance
+## Browser verification — 2026-10-12
 
-Automatic approval review rejected the combined dependency-link, hidden Vite launch
-and browser-test command: **"blocked by policy"**, no more specific reason. Nothing
-launched and the operation was not rerouted. Independent dependency setup/static
-checks succeeded. User was asked to start the server; no reply/server yet at handoff.
-No hosted preview or production deployment was made.
+The user started Vite on port 5197 after automatic approval review had blocked the
+agent's launch. That user-owned server was left running. All owned browser contexts
+were closed; WebXR and pointer capture were disabled throughout.
+
+- Mobile startup passed in **38.922 s**: Chromium touch emulation, 4x CPU throttle,
+  delayed game module/optional assets and a never-resolving orientation promise.
+  Rotate acknowledged the tap in **1.5 ms**, before the renderer import. Cancelled
+  joining stayed in the lobby. Orientation did not reload assets/rebuild the world;
+  manual quality remained accessible in portrait and landscape. This is not an iPhone.
+  Full ready time was 16.834 s under intentional loading stalls/throttling, so it is
+  not a cold-phone load-time claim. Construction still contains long main-thread slices.
+- Negative-frame/black-viewport checks passed in **32.568 s** at desktop tall, phone
+  portrait and phone landscape with high post effects, including resize. The sampled
+  black-pixel fractions were 0–0.418%, rather than an opaque viewport-sized rectangle.
+  No runtime/shader/asset errors. Ready times were 6.610 / 4.772 / 9.023 s respectively.
+- **16 matched full-game captures** passed in **59.230 s**, seed 41, noon/golden/night
+  and God overview, phone 844x390 and desktop 1280x720. Camera position/quaternion
+  matched exactly for every pair. Visually inspected both galleries: no black overlay,
+  missing geometry or shader errors; meadow and alpine silhouette preserved, ground
+  variation subtle, shafts softer. Moving foliage/particles are not pixel-deterministic.
+- Actual backend: ANGLE D3D11 on **NVIDIA RTX 3080 Ti**. Phone viewport emulation does
+  not emulate an iPhone GPU, thermal limits or Safari.
+
+Evidence remains in ignored `output/playwright/graphics-20261012/` (comparison/gallery,
+startup screenshots/results); raw ability profiles are in `logs/ability-performance/`.
+`logs/work-timing.csv` records each measured run.
+
+### Performance results are contaminated — do not use as an improvement claim
+
+The 24-enemy idle/Pick aim/Pick cast/Phoenix aim fixtures completed and verified real
+wall creation/forecast updates. Baseline took 51.865 s; candidate 53.576 s. Frame p95
+was ~47–48 ms before and ~115–131 ms after. A 33.258 s diagnostic using old art still
+performed poorly. These observations prompted checking the environment rather than
+shipping or guessing at a shader regression.
+
+After all test browsers closed, `nvidia-smi` still reported **95% GPU utilization,
+7,726 MiB occupied and 326 W**; an unrelated Galactic Racer process was running.
+During the diagnostic run utilization was 99%. Concurrent workload changed between
+runs, so the figures do **not** establish a causal regression or an improvement.
+The unrelated game was not stopped. Asked the user to close it and reply `GPU free`.
+Repeat matched tests only when the GPU is idle; record utilization before/after each.
+No sustained/crowd acceptance or physical iPhone 12 acceptance is claimed.
+
+### Lessons and reproducible comparison
+
+- Startup test initially failed in 13.502 s because the old `_BallistaBolt` selector
+  missed the current `S_Bolt` / `G_Harpoon` assets. Check both current bolt scales and
+  their reload-pivot scales; retain the legacy selector for historical fixtures.
+- Baseline extraction must include `assets-source` JavaScript, not just client/shared:
+  Timberline imports runtime code from there. The missing import caused HTTP 500.
+  Run Git archive from the repository root, not the multiplayer subdirectory.
+- Use `python scripts/prepare_graphics_baseline.py d94d191` from the repo root.
+  It resolves the commit, rejects differing public assets, extracts only JS/JSON to
+  ignored `multiplayer/tests/.graphics-baseline`, and records ownership/revision.
+  Same-server comparisons share unchanged public assets; differing assets require
+  separate complete checkouts. Existing unowned output is never overwritten.
+- Then run `node tests/browser-graphics-comparison.mjs` from multiplayer with the
+  environment below. For ability comparisons set `PERF_SOURCE_ROOT` to
+  `/tests/.graphics-baseline` and `PERF_LABEL` to a unique baseline name; clear
+  `PERF_SOURCE_ROOT` and use a second label for the candidate.
+- Shader timings and profiler captures require an otherwise idle GPU. Check for
+  unrelated games/renderers before starting a long benchmark; never close them silently.
+
+## Remaining acceptance
+
+Remote main advanced to a6f04e5 (Dragon round two and Watch-Arch remodel) while this
+candidate remains based on d94d191. Integrate/recheck those changes before merge.
+Private origin branch is the delivery location; no production deployment was made.
 
 From this branch's `multiplayer` directory, the user can run:
 
