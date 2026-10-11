@@ -29,6 +29,10 @@ body.touch-left-handed .dragon-hud.is-touch .dragon-call { left: auto; right: ca
   background: linear-gradient(180deg, rgba(58, 26, 14, .86), rgba(28, 14, 9, .9)); border: 1px solid rgba(255, 170, 90, .5); white-space: nowrap; }
 .dragon-timer-bar { width: 140px; height: 8px; border-radius: 4px; background: rgba(255, 220, 180, .15); overflow: hidden; }
 .dragon-timer-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff6a2a, #ffd36b); transform-origin: left; }
+.dragon-view { pointer-events: auto; display: flex; align-items: center; gap: 5px; margin-left: 2px; padding: 3px 6px; border-radius: 999px; border: 1px solid rgba(255, 190, 120, .45); background: rgba(255, 220, 180, .1); color: #ffe7b8; cursor: pointer; touch-action: none; }
+.dragon-view svg { width: 20px; height: 20px; }
+.dragon-hud.is-touch .dragon-view { padding: 6px 9px; }
+.dragon-hud.is-touch .dragon-view svg { width: 24px; height: 24px; }
 .dragon-timer-left { min-width: 28px; text-align: right; color: #ffd9a8; font-variant-numeric: tabular-nums; }
 .dragon-attacks { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); transform: translateX(-50%); display: flex; gap: 10px; }
 .dragon-attack { pointer-events: auto; position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 14px; cursor: pointer; touch-action: none;
