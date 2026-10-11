@@ -246,6 +246,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
 
   return {
     update, render, prepare,
+    night() { return last?.night ?? 0; }, // 0 day .. 1 deep night, for faked light (beacon glow)
     async prepareRenderer(scene_,camera) { prepare(scene_);await post?.prepare?.(scene_,camera); },
     setTrees(list) { beams?.setTrees(list); },
     // How dark it is now (0 day .. 1 deep night), cheap enough to read every frame.
