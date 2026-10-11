@@ -13,15 +13,15 @@ writeFileSync(fixture,'<meta name="viewport" content="width=device-width,initial
 try{
  await page.route('**/@vite/client',route=>route.fulfill({contentType:'application/javascript',body:'export const createHotContext=()=>({accept(){},dispose(){},prune(){},invalidate(){},on(){},send(){},data:{}}); export const injectQuery=u=>u; export const updateStyle=()=>{}; export const removeStyle=()=>{};'}));
  await page.goto(`${process.env.FORGE_PERF_URL||'http://127.0.0.1:5195'}/tests/.ability-perf.html`,{waitUntil:'networkidle'});
- await page.evaluate(async enemyCount=>{
-  const {createGame}=await import('/client/game.js'),{createSimulation}=await import('/shared/simulation.js');const sim=createSimulation({seed:41});sim.addPlayer({id:'p',role:'hero'});let seq=0;
+ await page.evaluate(async ({enemyCount,sourceRoot})=>{
+  const {createGame}=await import(sourceRoot+'/client/game.js'),{createSimulation}=await import(sourceRoot+'/shared/simulation.js');const sim=createSimulation({seed:41});sim.addPlayer({id:'p',role:'hero'});let seq=0;
   const state=sim.adventureWorld(),player=state.players[0];
-  if(enemyCount){const {createEnemy}=await import('/shared/combat.js');const {terrainHeight}=await import('/shared/simulation.js');for(let i=0;i<enemyCount;i++){const a=i/enemyCount*Math.PI*2,x=player.position[0]+Math.cos(a)*10,z=player.position[2]+Math.sin(a)*10;state.enemies.push(createEnemy('perf-enemy'+i,[x,terrainHeight(state,x,z),z]));}}
+  if(enemyCount){const {createEnemy}=await import(sourceRoot+'/shared/combat.js');const {terrainHeight}=await import(sourceRoot+'/shared/simulation.js');for(let i=0;i<enemyCount;i++){const a=i/enemyCount*Math.PI*2,x=player.position[0]+Math.cos(a)*10,z=player.position[2]+Math.sin(a)*10;state.enemies.push(createEnemy('perf-enemy'+i,[x,terrainHeight(state,x,z),z]));}}
   window.actionResults=[];
   const game=createGame({canvas:document.querySelector('canvas'),isHost:()=>true,onInput:input=>sim.command('p',{type:'input',seq:++seq,...input}),onAction:(action,body)=>{const r=sim.command('p',{type:'action',seq:++seq,action,...body});window.actionResults.push({action,result:r});for(const e of r.events||[])game.handleEvent(e);}});
   window.qa={game,sim};game.applySnapshot(sim.snapshot(),'p');game.setActive(true);game.setTouchEnabled(true);
   window.timer=setInterval(()=>{if(enemyCount)player.hp=Math.max(player.hp,100);for(let i=0;i<3;i++)for(const event of sim.step())game.handleEvent(event);game.applySnapshot(sim.snapshot(),'p');},50);
- },Number(process.env.PERF_ENEMIES)||0);
+ },{enemyCount:Number(process.env.PERF_ENEMIES)||0,sourceRoot:process.env.PERF_SOURCE_ROOT||''});
  await page.waitForFunction(()=>qa.game.diagnostics().startup.ready,null,{timeout:120000});
  const cdp=await page.context().newCDPSession(page);await cdp.send('Profiler.enable');const results=[];
  for(const phase of ['idle','pickAim','pickCast','bowAim']){

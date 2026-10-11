@@ -39,7 +39,12 @@ for(const config of [
    if(process.env.STARTUP_STALE_FRAME === '1') {
      const deltas=await page.evaluate(()=>globalThis.__startupClockProbe?.deltas);
      assert.ok(deltas?.length>0&&deltas[0]===0&&deltas.every(x=>x>=0&&x<=.05),`Stale RAF must not reverse animation time: ${deltas}`);
-     const scales=await page.evaluate(()=>{const out=[];globalThis.__startupClockProbe?.scene.traverse(o=>{if(/_BallistaBolt$/.test(o.name))out.push(...o.scale.toArray());});return out;});
+     const scales=await page.evaluate(()=>{const out=[];globalThis.__startupClockProbe?.scene.traverse(o=>{
+       if(/_BallistaBolt$/.test(o.name))out.push(...o.scale.toArray());
+       // Authored keep rigs replaced the old named placeholder. The reload scale
+       // now lives on their parent bolt pivot, not on the GLB's bolt root.
+       if(o.name==='S_Bolt'||o.name==='G_Harpoon')out.push(...o.scale.toArray(),...o.parent.scale.toArray());
+     });return out;});
      assert.ok(scales.length>0,'Must inspect actual base ballista bolts');
      assert.ok(scales.every(x=>Number.isFinite(x)&&x>=.001&&x<=1),`${config.name}: unstable bolt scale ${scales}`);
    }

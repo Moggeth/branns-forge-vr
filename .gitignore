@@ -53,3 +53,6 @@ godot/assets/tree_cutting/*.import
 # The golem GLB embeds material images; Godot recreates these on import.
 godot/assets/golem/*.png
 godot/assets/golem/*.import
+
+# Same-server source-only graphics comparison fixture.
+multiplayer/tests/.graphics-baseline/
