@@ -300,7 +300,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
-  const beaconView=createBeaconView({scene,startingWorld,audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
+  const beaconView=createBeaconView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),night:()=>skyCycle.night(),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
@@ -392,14 +392,14 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     haptic:kind=>{if(renderer.xr.isPresenting)feedback.pattern?.(kind==='bite'?[{at:0,amplitude:.55,duration:28},{at:55,amplitude:.3,duration:18}]:[{at:0,amplitude:.25,duration:20}]);else if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[16,34,10]:[10]);}catch{}}});
   appleSnack.attachTrees(content.trees);
   // Dragon kill streak: every dragon in the sky, its fire, and the rider's seat, aim and attack buttons.
-  const dragonRide=createDragonRide({scene,ray:terrainRay,send:detail=>{unlockAudio();onAction('dragon',detail);},report,audio:()=>audioContext,listener:()=>listenerPose(),touch:()=>touchEnabled,xr:()=>renderer.xr.isPresenting});
+  const dragonRide=createDragonRide({scene,ray:terrainRay,height:(x,z)=>heightAt(x,z),send:detail=>{unlockAudio();onAction('dragon',detail);},report,audio:()=>audioContext,listener:()=>listenerPose(),touch:()=>touchEnabled,xr:()=>renderer.xr.isPresenting});
   let dragonBlend=null,dragonLastEye=null,dragonFrame={seat:null,yawDrift:0,enter:false,shake:0}; // smooth camera hand-over between the body and the saddle (presentation only)
   const dragonEyeAt=new THREE.Vector3(),dragonBodyEye=new THREE.Vector3();
   // Places the camera while on the dragon, and for the glide up to the saddle and back down to the body. False otherwise.
   function dragonEye(dt){
     if(renderer.xr.isPresenting||role!=='hero'){dragonBlend=null;dragonLastEye=null;return false;}
     const seat=dragonFrame.seat,body=dragonBodyEye.set(localPosition.x,localPosition.y+1.65,localPosition.z);
-    if(!!seat!==(dragonBlend?.to==='seat')){if(!seat&&!dragonLastEye){dragonBlend=null;return false;}dragonBlend={to:seat?'seat':'body',t:0,from:(dragonLastEye||body).clone()};}
+    if(!!seat!==(dragonBlend?.to==='seat')||seat&&dragonLastEye&&dragonBlend.mode!==dragonFrame.mode){if(!seat&&!dragonLastEye){dragonBlend=null;return false;}dragonBlend={to:seat?'seat':'body',mode:dragonFrame.mode,t:0,from:(dragonLastEye||body).clone()};} // also glides between the chase camera and the saddle
     if(!dragonBlend)return false;
     dragonBlend.t=Math.min(1,dragonBlend.t+dt/(seat?.9:.7));
     dragonEyeAt.copy(dragonBlend.from).lerp(seat||body,THREE.MathUtils.smootherstep(dragonBlend.t,0,1));
@@ -1681,8 +1681,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     }
     if (manned) updateManned(dt, now);
     crankNearby(now);
-    dragonFrame=dragonRide.update(dt,{snapshot,tick:renderTick,localId:playerId,now});
-    if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=-.62;}yaw+=dragonFrame.yawDrift;pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
+    dragonFrame=dragonRide.update(dt,{snapshot,tick:renderTick,localId:playerId,now,view:{yaw,pitch}});
+    if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=dragonFrame.startPitch;}pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
     if (role === 'god' && !renderer.xr.isPresenting) {
       pan.addScaledVector(move, dt * 18);
       pan.x = THREE.MathUtils.clamp(pan.x, -45, 45); pan.z = THREE.MathUtils.clamp(pan.z, -45, 45);

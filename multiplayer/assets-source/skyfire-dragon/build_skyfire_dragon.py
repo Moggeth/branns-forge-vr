@@ -53,7 +53,8 @@ C = {k: lin(v) for k, v in dict(
     horn_base='e9cf9c', horn='fff0cf', horn_tip='fffaf0', gold='f4b234', gold_tip='ffe58a', claw='f8e8c8',
     eye_white='fffaf2', iris_in='ffd45a', iris_out='e5861a', iris_ring='4a200c', pupil='120a08', nostril='3a0c0a',
     brow='8e1d16', wing_root='e0482a', wing_mid='ff7c2e', wing_edge='ffb347', wing_vein='c0321e', arm='a8291f',
-    flame='ffa42a', flame_tip='ffe680').items()}
+    flame='ffa42a', flame_tip='ffe680', lid='c63322', lash='4a0e0b', leather='7a4426', leather_hi='a8653a', leather_dk='4a2614',
+    brass='e0a83a', brass_hi='ffe08a', blanket='2a63b0', blanket_trim='ffc94a', wood='6b4428', flag='ffc24a', flag_band='e0482a').items()}
 
 # ------------------------------------------------------------------ geometry accumulator
 class Geo:
@@ -93,9 +94,9 @@ def s_of_z(z): return float(np.interp(z, SP[:, 0], SL))
 # Cross-section keys by spine z: half width, height above and depth below the spine, superellipse exponents.
 KEYS = [  # z,    w,    top,  bot,  n_top, n_bot
     (-6.9, .05, .05, .05, 2.0, 2.0), (-6.2, .13, .12, .12, 2.1, 2.1), (-5.1, .24, .22, .22, 2.2, 2.2),
-    (-3.9, .36, .35, .34, 2.25, 2.3), (-2.6, .48, .47, .46, 2.3, 2.4), (-1.7, .62, .6, .6, 2.3, 2.4),
-    (-.9, .74, .68, .74, 2.3, 2.3), (.6, 1.12, 1.08, 1.12, 2.4, 2.3), (1.45, .92, .92, .82, 2.4, 2.4),
-    (2.1, .52, .5, .54, 2.3, 2.4), (2.7, .4, .41, .44, 2.3, 2.5), (3.15, .47, .48, .5, 2.3, 3.0),
+    (-3.9, .3, .3, .29, 2.25, 2.3), (-2.6, .4, .4, .39, 2.3, 2.4), (-1.7, .5, .5, .52, 2.3, 2.4),
+    (-.9, .58, .6, .68, 2.3, 2.3), (.6, .86, .96, 1.08, 2.4, 2.3), (1.45, .72, .84, .78, 2.4, 2.4),
+    (2.1, .42, .44, .48, 2.3, 2.4), (2.7, .34, .36, .4, 2.3, 2.5), (3.15, .47, .48, .5, 2.3, 3.0),
     (3.5, .61, .55, .36, 2.4, 3.6), (3.85, .63, .54, .26, 2.45, 4.0), (4.2, .48, .4, .2, 2.4, 4.0),
     (4.55, .37, .3, .14, 2.4, 4.0), (4.75, .3, .23, .1, 2.4, 4.0), (4.86, .17, .13, .07, 2.3, 3.0)]
 KZ = np.array([k[0] for k in KEYS])
@@ -127,11 +128,16 @@ def spine_weights(z):
             t = smoothstep(-h, h, z - zs[jn]); return {names[jn - 1]: 1 - t, names[jn]: t}
     return w
 
-WING_S = (.66, .78, 1.0); WING_E = (2.25, 1.08, .5); WING_W = (3.8, 1.2, 1.0)
-WING_F = [(6.4, 1.0, -.3), (5.35, .88, -1.8), (3.4, .78, -2.6)]
-WING_R = (.6, .5, -1.15)
+WING_S = (.55, .82, 1.0); WING_E = (3.3, 1.22, .1); WING_W = (7.0, 1.5, .95)
+WING_F = [(15.5, 1.1, -1.6), (12.3, .8, -5.0), (8.0, .58, -6.6)]
+WING_R = (.5, .38, -3.2)
 JAW_HINGE = (0, .95, 3.42)
-NECK_LIFT = .26
+NECK_LIFT = .5; NECK_STRETCH = .9; TAIL_STRETCH = 1.0
+EYE_C = (.37, 1.43, 3.98); EYE_R = .215
+def eye_frame(sx):
+    """Eye look direction d, lid up u and the lid hinge axis k = d x u (a positive turn about k raises a lid edge)."""
+    d = Vector((sx * .5, .12, .86)).normalized(); u = (Vector((0, 1, 0)) - d * d.y).normalized(); return d, u, d.cross(u)
+STIRRUP_TOP = (.54, .78, 1.83)  # placeholder; saddle() sets the stirrup and flag bones from the body surface
 BONES = {}  # name: (head, tail, parent)
 def spine_pt(z): return (0.0, spine_y(z), z)
 BONES['Body'] = (spine_pt(-.3), spine_pt(.8), None)
@@ -142,6 +148,8 @@ BONES['Neck3'] = (spine_pt(2.85), spine_pt(3.25), 'Neck2')
 BONES['Head'] = (spine_pt(3.25), spine_pt(4.9), 'Neck3')
 BONES['Jaw'] = (JAW_HINGE, (0, .86, 4.75), 'Head')
 BONES['Horns'] = ((0, 1.62, 3.42), (0, 1.98, 3.0), 'Head')
+BONES['Flag1'] = ((0, 2.0, 1.4), (0, 1.98, 1.0), 'Chest')
+BONES['Flag2'] = ((0, 1.98, 1.0), (0, 1.96, .6), 'Flag1')
 BONES['Hips'] = (spine_pt(-.3), spine_pt(-1.7), 'Body')
 prev = 'Hips'
 for i, (za, zb) in enumerate([(-1.7, -2.55), (-2.55, -3.4), (-3.4, -4.2), (-4.2, -5.05), (-5.05, -5.95), (-5.95, -6.9)]):
@@ -149,6 +157,10 @@ for i, (za, zb) in enumerate([(-1.7, -2.55), (-2.55, -3.4), (-3.4, -4.2), (-4.2,
 for side, sfx in ((1, 'L'), (-1, 'R')):
     m = lambda p: (side * p[0], p[1], p[2])
     BONES[f'Brow{sfx}'] = (m((.4, 1.76, 4.01)), m((.62, 1.7, 3.8)), 'Head')
+    ec = m(EYE_C); k = eye_frame(side)[2]
+    BONES[f'LidU{sfx}'] = (ec, tuple(Vector(ec) + k * .2), 'Head')
+    BONES[f'LidL{sfx}'] = (ec, tuple(Vector(ec) - k * .2), 'Head')
+    BONES[f'Stirrup{sfx}'] = (m(STIRRUP_TOP), m((STIRRUP_TOP[0] + .05, STIRRUP_TOP[1] - .6, STIRRUP_TOP[2])), 'Chest')
     BONES[f'WingArm{sfx}'] = (m(WING_S), m(WING_E), 'Chest')
     BONES[f'WingFore{sfx}'] = (m(WING_E), m(WING_W), f'WingArm{sfx}')
     for k in range(3): BONES[f'WingF{k + 1}{sfx}'] = (m(WING_W), m(WING_F[k]), f'WingFore{sfx}')
@@ -170,7 +182,7 @@ def hide_colour(z, t_up, x, y, s, groove):
     c = mix(c, belly, b)
     if z < 1.7 and t_up > .55:   # chevrons running down the back and tail
         p = .5 + .5 * math.cos(TAU * (s / 1.05 + .55 * (1 - t_up)))
-        c = mix(c, C['stripe'], .55 * smoothstep(.45, .95, p) * smoothstep(.55, .8, t_up) * smoothstep(1.7, 1.0, z))
+        c = mix(c, C['stripe'], .72 * smoothstep(.45, .95, p) * smoothstep(.55, .8, t_up) * smoothstep(1.7, 1.0, z))
     for sx in (-1, 1):  # cheeks
         d = (Vector((x, y, z)) - Vector((sx * .5, .98, 3.66))).length
         c = mix(c, C['blush'], .75 * smoothstep(.26, .08, d))
@@ -279,7 +291,7 @@ def ball(c, r, axis, lats, sides, colour, weight, mat=HIDE, scale=(1, 1, 1), aok
         for k in range(sides): k1 = (k + 1) % sides; G.f((a[k], b[k], b[k1], a[k1]), mat)
     for k in range(sides): G.f((ringsx[-1][(k + 1) % sides], ringsx[-1][k], bot), mat)
 
-def fin(base, length, height, lean, width, weight, col0, col1, mat=HIDE, out=(0, 1, 0)):
+def fin(base, length, height, lean, width, weight, col0, col1, mat=HIDE, out=(0, 1, 0), mask=(0.0, 0.0)):
     """A golden crest spine: diamond sections shrinking from a long thin base to a sharp tip, leaning back."""
     base = Vector(base); up = Vector(out).normalized(); fwd = Vector((0, 0, 1)); side = up.cross(fwd).normalized()
     if side.length < .5: side = Vector((1, 0, 0))
@@ -287,9 +299,9 @@ def fin(base, length, height, lean, width, weight, col0, col1, mat=HIDE, out=(0,
     for h, k in secs:
         cc = base + up * (height * h) - fwd * (lean * h * h + length * .12 * h)
         pts = [cc + fwd * (length * .5 * k), cc + side * (width * k), cc - fwd * (length * .5 * k * 1.15), cc - side * (width * k)]
-        ringsx.append([G.v(p, mix(col0, col1, h), weight) for p in pts])
+        ringsx.append([G.v(p, mix(col0, col1, h), weight, mask) for p in pts])
     tipp = base + up * height - fwd * (lean + length * .12 + length * .05)
-    tipv = G.v(tipp, col1, weight)
+    tipv = G.v(tipp, col1, weight, mask)
     for a, b in zip(ringsx, ringsx[1:]):
         for k in range(4): G.f((a[k], a[(k + 1) % 4], b[(k + 1) % 4], b[k]), mat)
     for k in range(4): G.f((ringsx[-1][k], ringsx[-1][(k + 1) % 4], tipv), mat)
@@ -323,6 +335,29 @@ for sx in (-1, 1):
 
 # ------------------------------------------------------------------ face: big friendly eyes, brows, nostrils
 LATS = [0, .14, .3, .38, .42, .5, .6, .64, .7, .95, 1.35, 1.8, 2.4, math.pi]
+def eyelids(sx, sfx, ec):
+    """Upper and lower lids: thin shells just outside the eyeball, swept about the hinge axis k. In the bind pose both edges
+    sit on the eye's equator (half closed); the runtime turns them open, shut, squinting or wide."""
+    d, u, k = eye_frame(sx)
+    for name, sign, span in ((f'LidU{sfx}', 1, 2.3), (f'LidL{sfx}', -1, 1.9)):
+        grid = {}
+        es = [0, .1, .45, .95, 1.5, span]; phis = [math.radians(a) for a in range(-100, 101, 25)]
+        for li, rr in ((0, EYE_R * 1.12), (1, EYE_R * 1.04)):
+            for i, e in enumerate(es):
+                q = Quaternion(k, sign * e)
+                for j, ph in enumerate(phis):
+                    a = q @ (d * math.cos(ph) + k * math.sin(ph))
+                    col = C['lash'] if (i == 0 or li == 1) else mix(C['lid'], C['head_top'], smoothstep(.2, 1.0, e))
+                    grid[li, i, j] = G.v(ec + a * rr, col, {name: 1.0}, aok=.5)
+        ni, nj = len(es), len(phis)
+        for li in (0, 1):
+            for i in range(ni - 1):
+                for j in range(nj - 1):
+                    q4 = (grid[li, i, j], grid[li, i + 1, j], grid[li, i + 1, j + 1], grid[li, i, j + 1])
+                    G.f(q4 if (li == 0) == (sign > 0) else q4[::-1], HIDE)
+        for j in range(nj - 1):  # the rounded lid margin joins the two shells
+            G.f((grid[0, 0, j], grid[0, 0, j + 1], grid[1, 0, j + 1], grid[1, 0, j]), HIDE)
+
 def eye_colour(a, phi):
     if a < .4: return C['pupil']
     if a < .44: return mix(C['pupil'], C['iris_in'], .6)
@@ -330,13 +365,14 @@ def eye_colour(a, phi):
     if a < .67: return C['iris_ring']
     return C['eye_white']
 for sx, sfx in ((1, 'L'), (-1, 'R')):
-    ec = Vector((sx * .37, 1.43, 3.98)); look = Vector((sx * .5, .12, .86)).normalized()
-    ball(ec, .215, look, LATS, 16, eye_colour, {'Head': 1.0}, aok=.35)
+    ec = Vector((sx * EYE_C[0], EYE_C[1], EYE_C[2])); look = eye_frame(sx)[0]
+    ball(ec, EYE_R, look, LATS, 16, eye_colour, {'Head': 1.0}, aok=.35)
     hl = (look + Vector((0, .5, 0)) + Vector((sx * -.12, 0, 0))).normalized()
     ball(ec + hl * .2, .05, hl, [0, .8, 1.6, 2.4, math.pi], 8, lambda a, p: C['eye_white'], {'Head': 1.0}, aok=0)
     ball(ec + Vector((sx * -.2, -.35, .62)) * .22 + look * .02, .02, look, [0, 1.2, 2.0, math.pi], 6, lambda a, p: C['eye_white'], {'Head': 1.0}, aok=0)
     brow = bezier((sx * .2, 1.68, 4.08), (sx * .32, 1.79, 4.07), (sx * .5, 1.79, 3.96), (sx * .62, 1.7, 3.8), 7)
     tube(brow, [.035, .05, .06, .06, .055, .045, .03], 7, lambda t, a: C['brow'], lambda t: {f'Brow{sfx}': 1.0}, up=(0, 1, 0))
+    eyelids(sx, sfx, ec)
     ball((sx * .105, 1.17, 4.84), .05, (sx * .3, .3, 1), [0, .6, 1.2, 1.9, 2.5, math.pi], 8, lambda a, p: C['nostril'], {'Head': 1.0}, scale=(1.2, .8, .7), aok=.5)
 
 # ------------------------------------------------------------------ horns, cheek frills, head crest (all on the Horns bone)
@@ -350,12 +386,13 @@ for k, (z, h) in enumerate([(3.62, .22), (3.38, .2)]):
     fin((0, surface_y(z) - .05, z), .26, h, .1, .055, {'Horns': 1.0}, C['gold'], C['gold_tip'])
 
 # ------------------------------------------------------------------ crest spines down the neck, back and tail
-CREST = [(3.0, .14), (2.66, .16), (2.32, .17), (1.3, .3), (.88, .38), (.46, .42), (.04, .43), (-.38, .42), (-.8, .4), (-1.22, .37),
+CREST = [(3.0, .14), (2.66, .16), (1.25, .3), (.88, .38), (.46, .42), (.04, .43), (-.38, .42), (-.8, .4), (-1.22, .37),
          (-1.66, .34), (-2.1, .31), (-2.55, .28), (-3.0, .25), (-3.48, .22), (-3.98, .19), (-4.5, .16), (-5.05, .13), (-5.6, .11)]
 for z, h in CREST:
     s = s_of_z(z); c0, t = spine_at(s); N = Vector((0, t.z, -t.y)).normalized()
     base = c0 + N * (key(z, 2) + .02 - .05)
-    fin(base, .34 * min(1, h / .3) + .06, h, h * .45, .06 * min(1, h / .25) + .02, spine_weights(z), C['gold'], C['gold_tip'], out=N)
+    fin(base, .34 * min(1, h / .3) + .06, h, h * .45, .06 * min(1, h / .25) + .02, spine_weights(z), C['gold'], C['gold_tip'], out=N,
+        mat=EMBER, mask=(.85, max(.01, min(1.0, (z + 5.7) / 8.7))))
 
 # ------------------------------------------------------------------ tail flame (Ember): a flat three-tongued flame
 def flame_tail():
@@ -398,84 +435,174 @@ def leg(sx, sfx, path, radii, kind):
         d = d.normalized(); b = end + Vector((sx * (.07 - .07 * k), -.03, 0)) + d * .06
         tube([b, b + d * .1, b + d * .2 + Vector((0, -.04, 0))], [.05, .035, 0], 5, lambda t, a: C['claw'], lambda t: {bone: 1.0})
 for sx, sfx in ((1, 'L'), (-1, 'R')):
-    leg(sx, sfx, [(.5, -.3, 1.05), (.78, -.86, .78), (.7, -1.08, 1.05), (.62, -1.08, 1.32)], (.3, .2, .13), 'F')
-    leg(sx, sfx, [(.5, -.2, -1.12), (.92, -.62, -.62), (.76, -1.02, -1.42), (.66, -1.0, -1.98)], (.5, .26, .15), 'H')
+    leg(sx, sfx, [(.42, -.3, 1.05), (.62, -.86, .78), (.56, -1.08, 1.05), (.5, -1.08, 1.32)], (.24, .16, .11), 'F')
+    leg(sx, sfx, [(.42, -.2, -1.12), (.72, -.6, -.62), (.6, -1.0, -1.42), (.52, -.98, -1.98)], (.38, .2, .13), 'H')
 
 # ------------------------------------------------------------------ wings (SkyfireWing): bones and scalloped membrane
 def wing(sx, sfx):
+    """A big bat wing: long arm and three long fingers, broad cambered membrane with scalloped trailing edges.
+    Membrane vertices carry TEXCOORD_1 = (billow weight, thinness): the runtime billows the skin along its normal and
+    lets thin skin glow warm when seen against the sky; veins along the fingers stay dark."""
     m = lambda p: Vector((sx * p[0], p[1], p[2]))
     S, E, W, R = m(WING_S), m(WING_E), m(WING_W), m(WING_R); F = [m(f) for f in WING_F]
     A, Fo = f'WingArm{sfx}', f'WingFore{sfx}'; FB = [f'WingF{k + 1}{sfx}' for k in range(3)]
-    arm_col = lambda t, a: C['arm']
-    tube([S, (S + E) / 2 + Vector((0, .05, 0)), E], [.22, .16, .13], 7, arm_col, lambda t: {'Chest': 1 - smoothstep(0, .3, t), A: smoothstep(0, .3, t)}, WING, cap0=False, cap1=False)
-    tube([E, (E + W) / 2, W], [.12, .1, .1], 7, arm_col, lambda t: {A: 1 - smoothstep(0, .35, t), Fo: smoothstep(0, .35, t)}, WING, cap0=True, cap1=False)
-    ball(W, .14, (0, 1, 0), [0, .7, 1.4, 2.1, 2.7, math.pi], 8, lambda a, p: C['arm'], {Fo: 1.0}, WING)
-    thumb = W + m((.05, .08, .16))
-    tube([W + m((0, .02, .06)), thumb, thumb + m((-.02, .02, .14))], [.07, .05, 0], 6, lambda t, a: mix(C['arm'], C['claw'], smoothstep(.2, .6, t)), lambda t: {Fo: 1.0}, WING)
+    UP = Vector((0, 1, 0))
+    arm_col = lambda t, a: mix(C['arm'], C['wing_vein'], .3 * math.sin(a) ** 2)
+    tube([S, (S + E) / 2 + Vector((0, .1, 0)), E], [.3, .2, .15], 8, arm_col, lambda t: {'Chest': 1 - smoothstep(0, .25, t), A: smoothstep(0, .25, t)}, WING, cap0=False, cap1=False)
+    tube([E, (E + W) / 2 + Vector((0, .04, 0)), W], [.15, .11, .12], 7, arm_col, lambda t: {A: 1 - smoothstep(0, .3, t), Fo: smoothstep(0, .3, t)}, WING, cap0=True, cap1=False)
+    ball(W, .17, (0, 1, 0), [0, .7, 1.4, 2.1, 2.7, math.pi], 8, lambda a, p: C['arm'], {Fo: 1.0}, WING)
+    thumb = W + m((.06, .1, .2))
+    tube([W + m((0, .03, .08)), thumb, thumb + m((-.03, .03, .2))], [.09, .06, 0], 6, lambda t, a: mix(C['arm'], C['claw'], smoothstep(.2, .6, t)), lambda t: {Fo: 1.0}, WING)
     for k in range(3):
-        d = (F[k] - W); pts = [W + d * u for u in (0, .1, .35, .65, .9, 1.0)]
-        tube(pts, [.085, .075, .06, .045, .03, .0], 6, lambda t, a: mix(C['arm'], C['claw'], smoothstep(.86, .95, t)), lambda t, b=FB[k]: {Fo: 1 - smoothstep(0, .12, t), b: smoothstep(0, .12, t)}, WING, cap0=False)
+        d = (F[k] - W); pts = [W + d * u + UP * (.12 * math.sin(math.pi * u)) for u in (0, .08, .3, .55, .8, .95, 1.0)]
+        tube(pts, [.11, .095, .075, .058, .04, .022, 0], 6, lambda t, a: mix(C['arm'], C['claw'], smoothstep(.9, .97, t)),
+             lambda t, b=FB[k]: {Fo: 1 - smoothstep(0, .1, t), b: smoothstep(0, .1, t)}, WING, cap0=False)
 
-    def mcol(r, edge_t, near_bone):
-        c = mix(C['wing_root'], C['wing_mid'], smoothstep(0, .55, r)); c = mix(c, C['wing_edge'], smoothstep(.6, 1, r))
-        return mix(c, C['wing_vein'], .55 * near_bone)
-    def grid(Pfun, Wfun, nr, nt, flip):
+    def mcol(r, near_bone):
+        c = mix(C['wing_root'], C['wing_mid'], smoothstep(0, .5, r)); c = mix(c, C['wing_edge'], smoothstep(.55, 1, r))
+        return mix(c, C['wing_vein'], .8 * near_bone)
+    def grid(Pfun, Wfun, nr, nt):
         idx = [[None] * (nt + 1) for _ in range(nr + 1)]
         for i in range(nr + 1):
             for j in range(nt + 1):
-                r, t = i / nr, j / nt; p, col = Pfun(r, t)
-                idx[i][j] = G.v(p, col, Wfun(r, t))
+                r, t = i / nr, j / nt; p, col, billow, thin = Pfun(r, t)
+                idx[i][j] = G.v(p, col, Wfun(r, t), (billow, thin), aok=.6)
         for i in range(nr):
             for j in range(nt):
                 q = (idx[i][j], idx[i + 1][j], idx[i + 1][j + 1], idx[i][j + 1])
-                G.f(q if flip else q[::-1], WING)
+                n = (G.P[q[2]] - G.P[q[0]]).cross(G.P[q[3]] - G.P[q[1]])
+                G.f(q if n.y >= 0 else q[::-1], WING)   # membrane normals point up in the bind pose (billow sign)
     def scallop(a, b, t, depth, toward):
         e = a.lerp(b, t); return e + (toward - e).normalized() * depth * math.sin(math.pi * t)
-    # outer panels between neighbouring fingers
+    # outer panels between neighbouring fingers, arched (cambered) upward
     for k in range(2):
-        a, b = F[k], F[k + 1]; depth = .3 * (a - b).length
-        def P(r, t, a=a, b=b, depth=depth):
-            e = scallop(a, b, t, depth, W); p = W.lerp(e, r)
-            nb = max(smoothstep(.12, 0, t), smoothstep(.88, 1, t)) * smoothstep(.05, .3, r)
-            return p, mcol(r, t, nb)
+        a, b = F[k], F[k + 1]; depth = .24 * (a - b).length; span = (a - b).length
+        def P(r, t, a=a, b=b, depth=depth, span=span):
+            e = scallop(a, b, t, depth, W); p = W.lerp(e, r) + UP * (.12 * math.sin(math.pi * r * .9))
+            p += UP * (.075 * span * math.sin(math.pi * t) * r * (1.25 - r))
+            vein = max(smoothstep(.1, 0, t), smoothstep(.9, 1, t)) * smoothstep(.03, .2, r)
+            return p, mcol(r, vein), math.sin(math.pi * t) * smoothstep(0, .6, r), (1 - vein) * smoothstep(0, .3, r)
         def Wt(r, t, k=k):
             fo = (1 - r) ** 2; out = {Fo: fo}
             out[FB[k]] = (1 - fo) * (1 - t); out[FB[k + 1]] = out.get(FB[k + 1], 0) + (1 - fo) * t
             return out
-        grid(P, Wt, 7, 9, sx > 0)
+        grid(P, Wt, 9, 11)
     # inner panel from the last finger round the forearm, upper arm and flank, with two scallops to the body
     inner = [W, E, S, R]
-    def along(t):  # wrist -> elbow -> shoulder -> body root along the arm and flank
-        seg = [(0, .38), (.38, .72), (.72, 1.0)]
+    def along(t):
+        seg = [(0, .34), (.34, .62), (.62, 1.0)]
         for (t0, t1), p0, p1 in zip(seg, inner, inner[1:]):
             if t <= t1 + 1e-9: return p0.lerp(p1, (t - t0) / (t1 - t0))
         return R
     def trail(t):
-        a, b = F[2], R; mid = a.lerp(b, .5) + Vector((0, 0, .25))
-        if t < .5: return scallop(a, mid, t * 2, .26 * (a - mid).length, along(t * .7))
-        return scallop(mid, b, (t - .5) * 2, .22 * (mid - b).length, along(.4 + .6 * t))
+        a, b = F[2], R; mid = a.lerp(b, .45) + Vector((0, 0, .4))
+        if t < .5: return scallop(a, mid, t * 2, .24 * (a - mid).length, along(t * .7))
+        return scallop(mid, b, (t - .5) * 2, .2 * (mid - b).length, along(.4 + .6 * t))
     def P(r, t):
         p = along(t).lerp(trail(t), r)
-        nb = smoothstep(.1, 0, t) * smoothstep(.05, .3, r) + .5 * smoothstep(.2, 0, r) * (1 - smoothstep(.8, 1, t))
-        return p, mcol(r * (1 - .4 * t), t, min(1, nb))
+        chord = (trail(t) - along(t)).length
+        p += UP * (.07 * chord * r * (1.2 - r) * (1 - smoothstep(.8, 1, t)))
+        vein = smoothstep(.08, 0, t) * smoothstep(.03, .2, r) + .6 * smoothstep(.12, 0, r) * (1 - smoothstep(.85, 1, t))
+        vein = min(1, vein)
+        return p, mcol(r * (1 - .35 * t), vein), smoothstep(0, .6, r) * smoothstep(0, .12, t) * (1 - smoothstep(.75, 1, t)), (1 - vein) * smoothstep(0, .25, r)
     def Wt(r, t):
-        if t < .38: inner_w = {Fo: 1 - smoothstep(.25, .38, t) * .5, A: smoothstep(.25, .38, t) * .5}
-        elif t < .72: inner_w = {A: 1 - smoothstep(.6, .72, t) * .5, Fo: 0, 'Chest': smoothstep(.6, .72, t) * .5}
-        else: inner_w = {'Chest': 1 - smoothstep(.8, 1, t), 'Body': smoothstep(.8, 1, t)}
-        f3 = r * (1 - smoothstep(0, .55, t)); out = {k: v * (1 - f3) for k, v in inner_w.items() if v > 0}
+        if t < .34: inner_w = {Fo: 1 - smoothstep(.22, .34, t) * .5, A: smoothstep(.22, .34, t) * .5}
+        elif t < .62: inner_w = {A: 1 - smoothstep(.5, .62, t) * .5, 'Chest': smoothstep(.5, .62, t) * .5}
+        else: inner_w = {'Chest': 1 - smoothstep(.75, 1, t), 'Body': smoothstep(.75, 1, t) * .6, 'Hips': smoothstep(.75, 1, t) * .4}
+        f3 = r * (1 - smoothstep(0, .5, t)); out = {k: v * (1 - f3) for k, v in inner_w.items() if v > 0}
         out[FB[2]] = out.get(FB[2], 0) + f3
         return out
-    grid(P, Wt, 7, 14, sx < 0)
-    # leading edge membrane in front of the arm: shoulder -> wrist straight, filling the elbow notch
+    grid(P, Wt, 9, 18)
+    # leading edge membrane in front of the arm: shoulder -> wrist, filling the elbow notch
     def P(r, t):
-        arm = (S.lerp(E, t / .5) if t < .5 else E.lerp(W, (t - .5) / .5)); lead = S.lerp(W, t) + Vector((0, .02, .08 * math.sin(math.pi * t)))
-        return arm.lerp(lead, r), mix(C['wing_vein'], C['wing_mid'], .5 * r)
-    def Wt(r, t): return {A: 1 - smoothstep(.4, .7, t), Fo: smoothstep(.4, .7, t)} if t > .08 else {'Chest': .5, A: .5}
-    grid(P, Wt, 3, 8, sx < 0)
+        arm = (S.lerp(E, t / .45) if t < .45 else E.lerp(W, (t - .45) / .55)); lead = S.lerp(W, t) + Vector((0, .05, .25 * math.sin(math.pi * t)))
+        return arm.lerp(lead, r), mix(C['wing_vein'], C['wing_mid'], .6 * r), .5 * r * math.sin(math.pi * t), .7 * r
+    def Wt(r, t): return {A: 1 - smoothstep(.35, .6, t), Fo: smoothstep(.35, .6, t)} if t > .06 else {'Chest': .5, A: .5}
+    grid(P, Wt, 3, 10)
 for sx, sfx in ((1, 'L'), (-1, 'R')): wing(sx, sfx)
 
+# ------------------------------------------------------------------ saddle: leather seat on a blue blanket, brass trim, stirrups, pennant
+def body_surface(z, th, off):
+    """A point on the body loft at spine z and ring angle th (pi/2 = top), pushed out by off."""
+    c0, t = spine_at(s_of_z(z)); N = Vector((0, t.z, -t.y)).normalized()
+    w, top, bot, nt, nb = (key(z, i) for i in range(1, 6)); cx, cy = math.cos(th), math.sin(th)
+    n = nt if cy >= 0 else nb; x = w * se(cx, n); y = (top if cy >= 0 else bot) * se(cy, n)
+    p = c0 + Vector((1, 0, 0)) * x + N * y
+    return p + (p - c0).normalized() * off
+def shell(z0, z1, th0, th1, off_out, off_in, nz, nt, colour, weightz, mat=HIDE, lift=None):
+    """A closed slab hugging the body between two spine stations and two ring angles."""
+    g = {}
+    for li, off in ((0, off_out), (1, off_in)):
+        for i in range(nz + 1):
+            for j in range(nt + 1):
+                u, v = i / nz, j / nt; z = lerp(z0, z1, u); th = lerp(th0, th1, v)
+                extra = lift(u, v) if (lift and li == 0) else 0.0
+                g[li, i, j] = G.v(body_surface(z, th, off + extra), colour(u, v, li), weightz(z))
+    def quad(a, b, c, d, flip): G.f((a, b, c, d) if not flip else (d, c, b, a), mat)
+    for li in (0, 1):
+        for i in range(nz):
+            for j in range(nt): quad(g[li, i, j], g[li, i + 1, j], g[li, i + 1, j + 1], g[li, i, j + 1], li == 1)
+    for i in range(nz):
+        quad(g[0, i, 0], g[1, i, 0], g[1, i + 1, 0], g[0, i + 1, 0], False); quad(g[0, i, nt], g[0, i + 1, nt], g[1, i + 1, nt], g[1, i, nt], False)
+    for j in range(nt):
+        quad(g[0, 0, j], g[0, 0, j + 1], g[1, 0, j + 1], g[1, 0, j], False); quad(g[0, nz, j], g[1, nz, j], g[1, nz, j + 1], g[0, nz, j + 1], False)
+def saddle():
+    top = math.pi / 2
+    # blanket: blue with a gold border, draping over the shoulders
+    shell(1.48, 2.52, top - 1.25, top + 1.25, .045, .012, 6, 10,
+          lambda u, v, li: C['blanket_trim'] if (u < .1 or u > .9 or v < .07 or v > .93) else C['blanket'], spine_weights)
+    # leather seat with a dip in the middle, a raised cantle behind and pommel in front
+    def seat_lift(u, v): return .04 + .1 * (1 - math.sin(math.pi * u)) ** 2 * (1 - abs(v - .5) * 1.4)
+    shell(1.6, 2.36, top - .95, top + .95, .07, .04, 6, 8,
+          lambda u, v, li: C['leather_dk'] if (li == 1 or v < .08 or v > .92) else mix(C['leather'], C['leather_hi'], math.sin(math.pi * v) * .7), spine_weights, lift=seat_lift)
+    cant = [body_surface(1.6, top + a, .2 + .08 * math.cos(a * 1.6)) for a in np.linspace(-.85, .85, 9)]
+    tube(cant, [.06] * 9, 6, lambda t, a: C['leather_dk'], lambda t: spine_weights(1.6))
+    pom = [body_surface(2.36, top + a, .19 + .07 * math.cos(a * 2)) for a in np.linspace(-.55, .55, 7)]
+    tube(pom, [.055] * 7, 6, lambda t, a: C['leather_dk'], lambda t: spine_weights(2.36))
+    knob = body_surface(2.38, top, .34)
+    ball(knob, .075, (0, 1, 0), [0, .7, 1.4, 2.2, math.pi], 8, lambda a, p: mix(C['brass_hi'], C['brass'], a / math.pi), spine_weights(2.38))
+    for z, a in ((1.68, -.8), (1.68, .8), (2.28, -.8), (2.28, .8)):  # brass rivets
+        ball(body_surface(z, top + a, .14), .035, (0, 1, 0), [0, 1.2, 2.2, math.pi], 6, lambda a_, p: C['brass'], spine_weights(z), aok=.5)
+    # girth strap round the neck base
+    ring = lambda z, off: [body_surface(z, -math.pi / 2 + TAU * k / 18, off) for k in range(18)]
+    rs = [ring(1.95, .012), ring(1.95, .035), ring(2.07, .035), ring(2.07, .012)]
+    idx = [[G.v(p, C['leather_dk'], spine_weights(2.0)) for p in r] for r in rs]
+    for a, b in zip(idx, idx[1:] + idx[:1]):
+        for k in range(18): G.f((a[k], a[(k + 1) % 18], b[(k + 1) % 18], b[k]), HIDE)
+    # stirrups hang from the sides of the seat on their own bones (they swing)
+    for sx, sfx in ((1, 'L'), (-1, 'R')):
+        t0 = body_surface(2.0, top - sx * 1.0 if sx > 0 else top + 1.0, .06); b = f'Stirrup{sfx}'
+        BONES[b] = (tuple(t0), tuple(t0 + Vector((sx * .05, -.6, 0))), 'Chest')
+        bot = t0 + Vector((sx * .06, -.55, 0))
+        tube([t0, t0.lerp(bot, .5), bot], [.035, .03, .03], 4, lambda t, a: C['leather_dk'], lambda t: {b: 1.0}, squash=.35, up=(sx, 0, 0))
+        loop = [bot + Vector((sx * .01, -.12 * (1 - math.cos(a)) , .1 * math.sin(a))) for a in np.linspace(0, TAU, 11)]
+        tube(loop, [.025] * 11, 5, lambda t, a: C['brass'], lambda t: {b: 1.0}, cap0=False, cap1=False)
+        tube([bot + Vector((0, -.24, -.12)), bot + Vector((0, -.25, .12))], [.03, .03], 5, lambda t, a: C['brass_hi'], lambda t: {b: 1.0})
+    # pennant pole behind the cantle with a fluttering swallowtail flag (cloth uses the double-sided wing material)
+    pb = body_surface(1.5, top, .1); pt = pb + Vector((0, 1.0, -.12))
+    BONES['Flag1'] = (tuple(pt + Vector((0, -.12, -.02))), tuple(pt + Vector((0, -.14, -.42))), 'Chest')
+    BONES['Flag2'] = (tuple(pt + Vector((0, -.14, -.42))), tuple(pt + Vector((0, -.16, -.84))), 'Flag1')
+    tube([pb, pb.lerp(pt, .5), pt], [.03, .026, .022], 6, lambda t, a: C['wood'], lambda t: spine_weights(1.5))
+    ball(pt + Vector((0, .05, 0)), .055, (0, 1, 0), [0, .8, 1.6, 2.4, math.pi], 8, lambda a, p: C['brass_hi'], spine_weights(1.5))
+    nu, nv = 8, 4; fl = {}
+    for i in range(nu + 1):
+        for j in range(nv + 1):
+            u, v = i / nu, j / nv; h = .34 * (1 - .35 * u)
+            notch = .16 * math.sin(math.pi * v) * smoothstep(.75, 1, u)
+            x0 = pt + Vector((0, -.03, -.02)); p = x0 + Vector((0, -v * h, -u * .82 + notch * u))
+            col = C['flag_band'] if .38 < v < .62 and u > .12 else mix(C['flag'], C['brass'], .3 * u)
+            w2 = smoothstep(.35, .7, u); w1 = smoothstep(0, .2, u) * (1 - w2)
+            wt = {'Flag1': w1, 'Flag2': w2}; wt.update({k: v_ * (1 - w1 - w2) for k, v_ in spine_weights(1.4).items()})
+            fl[i, j] = G.v(p, col, {k: v_ for k, v_ in wt.items() if v_ > 1e-4})
+    for i in range(nu):
+        for j in range(nv): G.f((fl[i, j], fl[i + 1, j], fl[i + 1, j + 1], fl[i, j + 1]), WING)
+saddle()
+
 # ------------------------------------------------------------------ proud neck: lift the head and upper neck smoothly
-def neck_lift(p): return Vector((p[0], p[1] + NECK_LIFT * smoothstep(1.7, 3.5, p[2]), p[2]))
+def neck_lift(p):
+    """Stretch the neck and tail and raise the head, smoothly, after everything is modelled (bones too)."""
+    z = p[2]; dz = NECK_STRETCH * smoothstep(1.7, 3.3, z) - TAIL_STRETCH * smoothstep(-1.8, -6.9, z)
+    return Vector((p[0], p[1] + NECK_LIFT * smoothstep(1.7, 3.6, z), z + dz))
 G.P = [neck_lift(p) for p in G.P]
 BONES = {n: (tuple(neck_lift(h)), tuple(neck_lift(t)), par) for n, (h, t, par) in BONES.items()}
 
@@ -671,13 +798,17 @@ print(json.dumps(REPORT))
 
 # ------------------------------------------------------------------ review renders
 AX = {'x': Vector((1, 0, 0)), 'y': Vector((0, 0, 1)), 'z': Vector((0, -1, 0))}   # game axes in Blender
-def pose(spec):
-    """spec: {bone: (pitch_x, yaw_y, roll_z)} radians about the model's own (game) axes, as client/dragon-art.js does."""
+def pose(spec, lids=(.95, -.85)):
+    """spec: {bone: (pitch_x, yaw_y, roll_z)} radians about the model's own (game) axes, as client/dragon-art.js does.
+    lids: upper and lower lid edge elevations (radians) about each eye's hinge axis."""
     for pb in rig.pose.bones:
         pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = Quaternion(); pb.scale = (1, 1, 1)
+        rw = pb.bone.matrix_local.to_quaternion()
+        if pb.name.startswith('Lid'):
+            k = eye_frame(1 if pb.name.endswith('L') else -1)[2]
+            pb.rotation_quaternion = rw.inverted() @ Quaternion(to_b(k), lids[0] if pb.name[3] == 'U' else lids[1]) @ rw; continue
         if pb.name not in spec: continue
         ax, ay, az = spec[pb.name]
-        rw = pb.bone.matrix_local.to_quaternion()
         qm = Quaternion(AX['y'], ay) @ Quaternion(AX['z'], az) @ Quaternion(AX['x'], ax)
         pb.rotation_quaternion = rw.inverted() @ qm @ rw
     bpy.context.view_layer.update()
@@ -692,6 +823,8 @@ POSES = {
     'glide': side_spec({'WingArm*': (0, 0, .12), 'WingFore*': (0, 0, .04), 'WingF1*': (0, 0, .03)}),
     'flap-down': side_spec({'WingArm*': (0, -.08, -.62), 'WingFore*': (0, 0, -.2), 'WingF1*': (.12, 0, .22), 'WingF2*': (.12, 0, .18), 'WingF3*': (.1, 0, .12),
                             'Body': (.04, 0, 0), 'Tail1': (-.05, 0, 0), 'Tail2': (-.05, 0, 0)}),
+    'upstroke': side_spec({'WingArm*': (0, .1, .7), 'WingFore*': (0, .45, -.55), 'WingF1*': (-.15, .45, -.35), 'WingF2*': (-.12, .4, -.3), 'WingF3*': (-.1, .3, -.25),
+                           'Body': (-.03, 0, 0)}),
     'dive': side_spec({'WingArm*': (0, .85, .3), 'WingFore*': (0, 1.35, -.15), 'WingF1*': (0, .5, 0), 'WingF2*': (0, .35, 0), 'WingF3*': (0, .2, 0),
                        'Neck1': (.12, 0, 0), 'Neck2': (.08, 0, 0), 'Head': (-.15, 0, 0), 'Tail1': (-.06, 0, 0), 'Tail2': (-.04, 0, 0),
                        'LegF*': (-.5, 0, 0), 'LegH*': (-.35, 0, 0)}),
@@ -717,15 +850,19 @@ if RENDER:
         cam.lens = lens; co.location = to_b(eye); co.rotation_euler = (to_b(at) - to_b(eye)).to_track_quat('-Z', 'Y').to_euler()
         SC.render.filepath = os.path.join(RENDER, f'{name}.png'); bpy.ops.render.render(write_still=True)
     em = MATS[2].node_tree.nodes['Principled BSDF']
+    Q = ((19, 10, 19), (0, .3, -1.2)); views = []
     pose(POSES['glide'])
-    shot('three-quarter', (10.5, 5.5, 10.5), (0, .4, -.3))
-    shot('side', (16, 1.2, -.8), (0, .3, -1.0))
-    shot('front', (0, 2.2, 15), (0, .6, 0))
-    shot('top', (0, 17, -1.0), (0, 0, -1.0))
-    shot('below', (5, -9, 7), (0, 0, -.5))
-    shot('face', (3.2, 2.6, 8.4), (0, 1.25, 3.9), 50)
-    pose(POSES['flap-down']); shot('flap-down', (10.5, 5.5, 10.5), (0, .4, -.3))
-    pose(POSES['dive']); shot('dive', (10.5, 6.5, 8.5), (0, .4, -.8))
-    pose(POSES['breath']); em.inputs['Emission Strength'].default_value = 5.0
-    shot('breath', (3.6, 2.2, 8.8), (0, 1.0, 3.2), 45)
+    shot('three-quarter', *Q, 35)
+    shot('side', (30, 2, -1.5), (0, .5, -1.5))
+    shot('front', (0, 4, 30), (0, 1.0, 0))
+    shot('top', (0, 34, -1.5), (0, 0, -1.5))
+    shot('below', (9, -17, 12), (0, 0, -1.0))
+    shot('face', (3.6, 3.2, 10.2), (0, 1.75, 4.9), 50)
+    shot('chase', (0, 7.1, -14.6), (0, 1.0, 4.0), 62)
+    shot('saddle-close', (3.0, 3.6, -.4), (0, 1.3, 2.1), 40)
+    pose(POSES['flap-down']); shot('downstroke', *Q, 35)
+    pose(POSES['upstroke']); shot('upstroke', *Q, 35)
+    pose(POSES['dive']); shot('dive', (19, 12, 15), (0, .4, -1.2), 35)
+    pose(POSES['breath'], lids=(.3, -.5)); em.inputs['Emission Strength'].default_value = 5.0
+    shot('breath', (4.2, 2.6, 10.4), (0, 1.3, 4.0), 45)
 print('SKYFIRE_BUILD_OK')

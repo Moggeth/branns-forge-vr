@@ -8,6 +8,7 @@ const ICON = {
   breath: '<path d="M4 13c3-1 5-4 6-8 1 3 0 5 1 6 1-2 3-3 4-6 1 4 5 6 5 10a8 8 0 0 1-16 0z" opacity=".9"/><path d="M9 15c0-2 2-3 2-5 2 2 4 3 4 5a3 3 0 0 1-6 0z" fill="#fff3c4" stroke="none"/>',
   fireball: '<circle cx="15" cy="9" r="4.2"/><path d="M12 12L4 20M14.5 13.5L8 20M10.5 10.5L4 16"/>',
   dive: '<path d="M12 3v12"/><path d="M6.5 10L12 16l5.5-6"/><path d="M4 20c2.6-1.6 5.3-2.4 8-2.4s5.4.8 8 2.4"/><path d="M7 17.5l-1.5-2M17 17.5l1.5-2" opacity=".7"/>',
+  view: '<path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.6"/>',
   dragon: '<path d="M3 15c3-1 4-4 7-4 2 0 3 1 4 2l3-4 1 4 3-1-2 4c-1 3-4 4-7 4-4 0-6-2-9-5z"/><circle cx="15.5" cy="13" r=".9" fill="currentColor"/><path d="M10 11l-2-5 4 3M13 10l1-5 2 4"/>',
 };
 const svg = name => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[name]}</svg>`;
@@ -17,13 +18,13 @@ export const ATTACK_TEXT = Object.freeze({
   dive: {name: 'Comet Dive', key: 'Space', touch: 'Tap'},
 });
 
-export function createDragonHud({root = document.body, onCall, onAttack}) {
+export function createDragonHud({root = document.body, onCall, onAttack, onView}) {
   const wrap = document.createElement('div'); wrap.className = 'dragon-hud';
   wrap.innerHTML = `
     <div class="dragon-streak" hidden><span class="dragon-streak-pips"></span><span class="dragon-streak-text"></span></div>
     <button type="button" class="dragon-call" hidden>${svg('dragon')}<span class="dragon-call-text">Slay Thee, Sun Birdy Above</span><kbd>H</kbd></button>
     <div class="dragon-ride" hidden>
-      <div class="dragon-timer"><span class="dragon-timer-name">Slay Thee, Sun Birdy Above</span><span class="dragon-timer-bar"><i></i></span><span class="dragon-timer-left"></span></div>
+      <div class="dragon-timer"><span class="dragon-timer-name">Slay Thee, Sun Birdy Above</span><span class="dragon-timer-bar"><i></i></span><span class="dragon-timer-left"></span><button type="button" class="dragon-view" aria-label="Change view">${svg('view')}<kbd>C</kbd></button></div>
       <div class="dragon-attacks">${['breath', 'fireball', 'dive'].map(k => `<button type="button" class="dragon-attack" data-attack="${k}" aria-label="${ATTACK_TEXT[k].name}"><span class="dragon-fill"></span>${svg(k)}<span class="dragon-attack-name">${ATTACK_TEXT[k].name}</span><kbd>${ATTACK_TEXT[k].key}</kbd></button>`).join('')}</div>
     </div>`;
   root.append(wrap);
@@ -39,6 +40,8 @@ export function createDragonHud({root = document.body, onCall, onAttack}) {
     for (const n of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(n, up);
     b.addEventListener('contextmenu', e => e.preventDefault());
   }
+  const view = wrap.querySelector('.dragon-view');
+  view.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); onView?.(); });
   call.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
   call.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); onCall?.(); });
   return {
