@@ -2,7 +2,7 @@
 
 Branch: `codex/graphics-performance-20261011`, based on `d94d191`.
 Implemented and code-tested. **Local startup and visual checks passed on 2026-10-12;
-uncontended desktop performance checks passed; hosted preview verification is next.**
+uncontended desktop performance and protected hosted-preview checks passed.**
 Original local main divergence/work was preserved. Draft PR: #99.
 
 ## Changes
@@ -50,7 +50,8 @@ Fresh cleaned-child auth: `fauxgrady@gmail.com`, `claude.ai`, Max subscription.
 Explicit/actual/final-verified model: `claude-opus-5-5`. Duration **340.126 s**, cap
 720 s. No API billing/extra usage. Owned files: sunbeams, alpine-forest, meadow-cover,
 mountain-ground-treatment. Root integrated the day/night uniform and reviewed changes.
-Opus had no render available; no visual or GPU shader-compile acceptance claimed.
+Opus had no render available during the commission; subsequent root visual and GPU
+shader acceptance is documented below.
 
 ## Measured verification
 
@@ -153,6 +154,8 @@ and records timed >33 ms outliers, rather than hiding them in a percentile.
 This is a synthetic renderer test, not a network/authority, phone, or thermal test.
 Evidence: `output/playwright/graphics-idle-gpu-crowd/`.
 
+**Boundary-corrected crowd confirmation:** one minute per role, no >33 ms outliers. Hero p95/p99/max 13.5/15.4/21.4 ms; God 8.7/9.4/16.8 ms. No browser errors. Evidence: `output/playwright/graphics-clean-crowd/`.
+
 ### Lessons and reproducible comparison
 
 - Startup test initially failed in 13.502 s because the old `_BallistaBolt` selector
@@ -176,11 +179,42 @@ Evidence: `output/playwright/graphics-idle-gpu-crowd/`.
   Keep synchronous action cost as a separate metric: excluding profiler IPC must
   not conceal actual ability dispatch work.
 
-## Remaining acceptance
+## Preview and remaining acceptance
 
-Remote main advanced to a6f04e5 (Dragon round two and Watch-Arch remodel) while this
-candidate remains based on d94d191. Integrate/recheck those changes before merge.
-Private origin branch is the delivery location; no production deployment was made.
+Preview (Vercel sign-in required):
+https://branns-forge-multiplayer-oz8xdun78-moggeths-projects.vercel.app
+
+Deployment `dpl_DHXrcLCD62sADo1kUtPxiJeL2Lyn` contains game revision **caec286**.
+Later commits only update verification tooling/evidence. Production was not changed.
+Build/stage: 1.995 s; preview deployment: 8.145 s. Actual hosted page, assets, solo
+entry, desktop/phone rendering and resize passed. Phone high-post capture was visually
+inspected. The network was stubbed for solo acceptance; the real cloud readiness gate
+separately confirmed 32 seats and a valid public directory. This is not a multiplayer
+session/load test. Protected-route automation affects startup timing, so its wall
+clock is not an end-user loading benchmark.
+
+Deployment lessons: the Vercel connector could not see the known project, but local
+CLI 62.1.0 successfully resolved its exact team/project ID. Use scoped existing CLI
+auth; do not relink, change accounts or disable protection. `vercel env run` supplies
+a short-lived development OIDC token to the browser harness in memory. Set
+`BROWSER_QA_TRUSTED_VERCEL_ORIGIN` to the exact HTTPS `ACCEPT_BASE` preview origin.
+The harness sends that header only there; fetch uses `maxRedirects:0` so a redirect
+cannot carry the token to another origin. No token is printed, saved or committed.
+Run release readiness with `PEER_URL` or `VITE_PEER_WS_URL` explicitly set.
+Optional asset requests can outlive browser shutdown: ignore only closed-context
+transport exceptions, report other failures without raw request logs (which can
+contain authentication headers), and always close the owned browser in finally.
+
+Remote main is a6f04e5 (Dragon round two and Watch-Arch remodel); this candidate is
+based on d94d191. The PR is mergeable and its pre-existing code checks passed, but
+the local galleries/preview do not include those newer main assets. Before release,
+verify the final combined revision. Original main checkout was left untouched.
+
+Physical iPhone 12/Safari, prolonged thermal behavior and real multi-device/network
+acceptance remain outstanding. A six-minute desktop fixture does not replace them.
+The cold audio-initialization cost above is also an outstanding gameplay-quality item.
+The graphics candidate is available for review; these results do not assert that the
+entire game's mobile performance goal is finished.
 
 From this branch's `multiplayer` directory, the user can run:
 
@@ -198,7 +232,7 @@ WebXR and Windows pointer capture. Close owned browsers in `finally`.
 3. `node tests/browser-ability-performance.mjs` with `PERF_ENEMIES=24`,
    `PERF_PHASE_MS=10000`: idle, moving Pick aim/cast and Phoenix aim.
 4. `node tests/browser-battle-render-load.mjs` with `PERF_TOUCH=1`, `PERF_BASES=1`,
-   `PERF_DURATION_MS=900000`: 15 minutes per role, 32-player/32-bot synthetic renderer
+   `PERF_DURATION_MS=180000`: three minutes per role, 32-player/32-bot synthetic renderer
    fixture. This is not network or physical-phone acceptance. Run without builds/tests.
 5. Matched seed/camera/time/weather screenshots versus `d94d191`: Hero/God, noon,
    golden hour, canopy, treeline and night. Inspect new shader cost, hitch deltas and
