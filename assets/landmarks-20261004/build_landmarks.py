@@ -133,6 +133,39 @@ def tex_wood(name, n, seed):
     h = 0.5 * grain + 0.3 * streak - 0.4 * knot - 0.6 * checks
     return save_set(name, base, h, 0.78 + 0.1 * streak, np.zeros((n, n)), 2.2, ao=1 - 0.3 * checks)
 
+ASHLAR_SPAN = 2.4  # metres covered by one Ashlar texture tile: six 0.4 m courses
+
+def tex_ashlar(name, n, seed):
+    """Dressed sandstone ashlar in running bond: six courses per tile, blocks of varied length with softened, chipped
+    arrises, recessed lime mortar, per-block tone, tooling and lichen. Tiles in both directions."""
+    r = np.random.default_rng(seed); courses = 6; ch = n // courses; S = ASHLAR_SPAN
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    edge = np.zeros((n, n)); tone = np.zeros((n, n)); warm = np.zeros((n, n))
+    for c in range(courses):
+        lens = r.uniform(0.55, 1.15, 8); cuts = np.cumsum(lens); k = np.searchsorted(cuts, S); lens = lens[:k + 1]
+        lens = lens / lens.sum() * n; bounds = np.concatenate([[0], np.cumsum(lens)]) + r.uniform(0, n)
+        row = slice(c * ch, (c + 1) * ch if c < courses - 1 else n); x = xx[row]; y = yy[row] - c * ch; h = (ch if c < courses - 1 else n - c * ch)
+        xs = (x - bounds[0]) % n; idx = np.searchsorted(bounds[1:] - bounds[0], xs, side="right")
+        left = xs - (bounds[idx] - bounds[0]); right = (bounds[idx + 1] - bounds[0]) - xs
+        edge[row] = np.minimum(np.minimum(left, right), np.minimum(y, h - 1 - y))
+        t = r.uniform(0.84, 1.1, len(bounds)); w = r.uniform(0, 1, len(bounds)); tone[row] = t[idx % len(t)]; warm[row] = w[idx % len(w)]
+    px = n / S; joint = 0.012 * px; bevel = 0.03 * px
+    chip = fnoise(n, 1.0, seed + 1, hi=n / 12) * 0.035 * px
+    e = edge - joint + chip
+    face = sm(0, bevel, e)                                     # 0 in the joint, 1 on the block face
+    big = fnoise(n, 1.2, seed + 2, hi=n / 10); fine = fnoise(n, 0.35, seed + 3); tool = fnoise(n, 0.8, seed + 4, ay=0.25, hi=n / 3)
+    h = face * (0.75 + 0.15 * big + 0.05 * tool + 0.03 * fine) + (1 - face) * (0.1 + 0.05 * fine)
+    base = np.stack([0.66 + 0.05 * warm, 0.60 + 0.02 * warm, 0.50 - 0.03 * warm], -1) * tone[..., None]
+    base = base * (0.9 + 0.12 * big + 0.06 * fine + 0.04 * tool)[..., None]
+    lich = sm(0.35, 0.7, fnoise(n, 1.4, seed + 5, hi=n / 14)) * face
+    base = mix(base, [0.60, 0.64, 0.46], lich * 0.45)
+    base = mix(base, [0.68, 0.58, 0.36], sm(0.55, 0.85, fnoise(n, 1.3, seed + 6, hi=n / 16)) * face * 0.35)
+    mortar = np.array([0.52, 0.49, 0.43]) * (0.85 + 0.2 * fine)[..., None]
+    base = base * face[..., None] + mortar * (1 - face)[..., None]
+    ao = np.clip(0.72 + 0.28 * sm(-bevel, bevel * 2.0, e), 0, 1)
+    rough = np.clip(0.86 + 0.08 * fine - 0.06 * face * tool, 0, 1)
+    return save_set(name, base, h, rough, np.zeros((n, n)), 2.6, ao=ao)
+
 def tex_crystal(name, n, seed):
     veins = np.clip(1 - np.abs(fnoise(n, 1.1, seed, lo=3, hi=n / 6) * 2.4), 0, 1) ** 4
     cells = fnoise(n, 0.9, seed + 1, hi=n / 8); fine = fnoise(n, 0.4, seed + 2)
@@ -241,7 +274,7 @@ def make_mesh(name, V, F, mat, tone_fn=None, tile=0.9, smooth_angle=48, mats=Non
     ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob)
     return ob
 
-def finalize(ob, tone_fn=None, tile=1.6, smooth_angle=50, decimate=None, planar=None):
+def finalize(ob, tone_fn=None, tile=1.6, smooth_angle=50, decimate=None, planar=None, uv_fn=None):
     """Optional decimation (keeps the silhouette, drops flat detail), then UVs, colours and sharp edges."""
     if decimate or planar:
         if planar:
@@ -261,6 +294,8 @@ def finalize(ob, tone_fn=None, tile=1.6, smooth_angle=50, decimate=None, planar=
     uvs = np.zeros((len(me.loops), 2)); cols = np.ones((len(me.loops), 4))
     lv = np.array([l.vertex_index for l in me.loops])
     for p in me.polygons:
+        if uv_fn is not None:
+            li = list(p.loop_indices); uvs[li] = uv_fn(co[lv[li]], np.array(p.normal[:])); continue
         n = np.abs(np.array(p.normal[:])); ax = int(np.argmax(n))
         for li in p.loop_indices:
             c = co[lv[li]]
@@ -574,7 +609,7 @@ def ashlar_tone(seed, top=None):
     r = np.random.default_rng(seed); tone = 0.86 + 0.18 * r.random(); warm = r.random()
     def f(p, n):
         g = fbm(p, seed, 2.2, 3); v = tone * (0.86 + 0.3 * g)
-        c = np.stack([v * (1.02 + 0.05 * warm), v * (0.97 + 0.01 * warm), v * (0.90 - 0.04 * warm)], -1)
+        c = np.stack([v * (1.1 + 0.05 * warm), v * (0.98 + 0.01 * warm), v * (0.8 - 0.04 * warm)], -1)  # warm to sit with the Ashlar piers
         up = np.clip(n[:, 2], 0, 1)[:, None]; lich = sm(0.12, 0.3, fbm(p, seed + 4, 1.4, 2))[:, None] * up
         c = c * (1 - 0.5 * lich) + 0.5 * lich * np.array([0.55, 0.62, 0.38])
         return np.clip(c, 0, 1)
@@ -589,21 +624,56 @@ def block(seed, w, d, h, chip=0.045, seg=(3, 2, 2), tone=None):
     ob = make_mesh(f"blk{seed}", P, F, MATS["Stone"])
     return finalize(ob, tone or ashlar_tone(seed), tile=1.2, smooth_angle=35)
 
-def pier(name, seed, w=1.1, h=4.6, d=1.0, course=0.46, broken=False):
-    r = np.random.default_rng(seed); parts = []; n = round(h / course)
-    for k in range(n):
-        z = (k + 0.5) * h / n; ch = h / n * 0.97; ragged = broken and k == n - 1
-        split = 0.42 + r.random() * 0.16 if k % 2 else 0; deep = 0.8 + r.random() * 0.15 if broken and k >= n - 2 else 1
-        if split:
-            parts.append((block(seed + k * 7, w * split - 0.015, d * deep, ch), Matrix.Translation((-w / 2 + w * split / 2, 0, z))))
-            if not ragged or r.random() > 0.4:
-                hh = ch * (0.6 if ragged else 1)
-                parts.append((block(seed + k * 7 + 3, w * (1 - split) - 0.015, d * deep, hh), Matrix.Translation((w / 2 - w * (1 - split) / 2, 0, z - (ch - hh) / 2))))
-        else:
-            hh = ch * (0.65 if ragged else 1)
-            parts.append((block(seed + k * 7, w, d * deep, hh), Matrix.Translation(((r.random() - 0.5) * 0.03, 0, z - (ch - hh) / 2)) @ Matrix.Rotation((r.random() - 0.5) * 0.04, 4, "Z")))
-    if not broken: parts.append((block(seed + 99, w * 1.18, d * 1.14, 0.24, 0.035), Matrix.Translation((0, 0, h + 0.12))))
-    return assemble(name, parts, MATS["Stone"])
+def ashlar_uv(Rref=4 * ASHLAR_SPAN / (2 * math.pi)):
+    """Cylindrical UVs for round ashlar work: courses run level round the tower (four whole tiles per turn, so no seam
+    jump), flat tops take plan UVs, radial faces (merlon cheeks, slit reveals) take radius along U."""
+    def f(c, n):
+        if abs(n[2]) > 0.7: return c[:, :2] / ASHLAR_SPAN
+        a = np.arctan2(c[:, 1], c[:, 0]); a = np.where(a - a[0] > math.pi, a - 2 * math.pi, np.where(a - a[0] < -math.pi, a + 2 * math.pi, a))
+        am = a.mean(); tang = abs(-math.sin(am) * n[0] + math.cos(am) * n[1])
+        if tang > 0.7: return np.stack([np.linalg.norm(c[:, :2], axis=1) / ASHLAR_SPAN, c[:, 2] / ASHLAR_SPAN], -1)
+        return np.stack([a * Rref / ASHLAR_SPAN, c[:, 2] / ASHLAR_SPAN], -1)
+    return f
+
+def weather_tone(seed, height, soot_from=None, moss_foot=0.4):
+    """Multiply over the Ashlar texture: rain streaks, a mossy damp foot, lichen on ledges, soot near the fire."""
+    def f(p, n):
+        z = p[:, 2]; g = fbm(p, seed, 1.1, 3)
+        streak = fbm(p * np.array([3.2, 3.2, 0.18]), seed + 1, 1.0, 2)
+        v = 0.9 + 0.12 * g - 0.12 * sm(0.05, 0.3, streak) * (z / height)
+        c = np.stack([v, v * 0.985, v * 0.955], -1)
+        foot = (np.clip(1 - z / moss_foot, 0, 1) * (0.7 + 0.3 * sm(-0.2, 0.2, g)))[:, None]
+        c = c * (1 - foot) + foot * np.array([0.40, 0.50, 0.27])
+        up = np.clip(n[:, 2], 0, 1)[:, None] * sm(-0.05, 0.2, fbm(p, seed + 2, 2.2, 2))[:, None]
+        c = c * (1 - 0.55 * up) + 0.55 * up * np.array([0.50, 0.58, 0.32])
+        if soot_from is not None:
+            s = np.clip((z - soot_from) / max(height - soot_from, 1e-3), 0, 1)[:, None] * (0.75 + 0.25 * g[:, None])
+            c = c * (1 - 0.55 * s) + 0.55 * s * np.array([0.16, 0.14, 0.13])
+        return np.clip(c, 0, 1)
+    return f
+
+def pier(name, seed, w=1.1, h=4.6, d=1.0, broken=False):
+    """One continuous ashlar pier (the coursing is in the texture, aligned with the tower): softened arrises, a slight
+    entasis, a moulded cap on the standing pier, a ragged robbed-out top on the broken one."""
+    V, F = grid_box(4, 3, int(h / 0.2)); P = V * np.array([w / 2, d / 2, h / 2]); P[:, 2] += h / 2
+    corner = (np.abs(V[:, 0]) > 0.99) & (np.abs(V[:, 1]) > 0.99); P[corner, :2] *= np.array([1 - 0.09 / w, 1 - 0.09 / d])
+    P[:, :2] *= (1 + 0.03 * (1 - P[:, 2] / h))[:, None]
+    P += 0.014 * np.stack([fbm(P, seed + k, 1.6, 2) for k in range(3)], -1)
+    if broken:
+        top = V[:, 2] > 0.99; hi = V[:, 2] > 0.6
+        jag = np.round((0.45 * (0.5 + 0.5 * np.sin(P[:, 0] * 3.1 + 1.0)) + 0.35 * np.abs(fbm(P, seed + 9, 1.8, 2))) / 0.2) * 0.2
+        P[top, 2] -= jag[top]; P[hi & ~top, 2] -= jag[hi & ~top] * (V[hi & ~top, 2] - 0.6) / 0.4
+    ob = finalize(make_mesh(name + "_s", P, F, MATS["Ashlar"]), weather_tone(seed, h), tile=ASHLAR_SPAN, smooth_angle=40)
+    parts = [(ob, Matrix())]
+    if not broken:
+        cap, cf = grid_box(3, 3, 2); cp = cap * np.array([w * 0.6, d * 0.6, 0.14]); cp[:, 2] += h + 0.12
+        cp[(cap[:, 2] < -0.99), :2] *= 0.88; cp += 0.01 * np.stack([fbm(cp, seed + 20 + k, 3, 2) for k in range(3)], -1)
+        parts.append((finalize(make_mesh("cap", cp, cf, MATS["Ashlar"]), weather_tone(seed + 3, h + 0.3), tile=ASHLAR_SPAN * 2, smooth_angle=35), Matrix()))
+    else:  # two loose blocks left where they slipped
+        for k, (x, y, z, rz) in enumerate([(0.18, 0.05, h - 0.32, 0.22), (-0.35, -0.6, 0.18, -0.4)]):
+            b = finalize(make_mesh("lb", *grid_box(3, 2, 2), MATS["Ashlar"]), weather_tone(seed + 30 + k, h), tile=ASHLAR_SPAN * 3)
+            b.data.transform(Matrix.Diagonal((0.36, 0.26, 0.2, 1))); parts.append((b, Matrix.Translation((x, y, z)) @ Matrix.Rotation(rz, 4, "Z")))
+    return assemble(name, parts, MATS["Ashlar"])
 
 def voussoir(name, seed, inner=3.3, outer=4.05, span=math.pi / 15, depth=1.0, centred=False):
     """One arch stone between angles 0..span on a circle round the origin, in Blender XZ (three.js XY), depth along Y."""
@@ -622,45 +692,153 @@ def rod(seed, a, b, r=0.03, seg=6, mat="Bronze"):
     ob = finalize(make_mesh(f"rod{seed}", V, F, MATS[mat]), lambda p, n: np.full((len(p), 3), 0.85), tile=0.4, smooth_angle=50)
     return ob, between(a, b)
 
+def arc_box(r0, r1, a0, a1, z0, z1, seg=3, chip=0.03, seed=0):
+    """Curved block between radii r0..r1 and angles a0..a1, z0..z1 (merlons, string courses, slit surrounds)."""
+    V, F = grid_box(seg, 1, 2); a = a0 + (a1 - a0) * (V[:, 0] + 1) / 2; rr = r0 + (r1 - r0) * (V[:, 1] + 1) / 2; z = z0 + (z1 - z0) * (V[:, 2] + 1) / 2
+    edges = (np.abs(V) > 0.999).sum(1) >= 2; rr = rr - chip * edges * (V[:, 1] > 0); z = z - chip * edges * np.sign(V[:, 2]) * (np.abs(V[:, 2]) > 0.99)
+    P = np.stack([np.cos(a) * rr, np.sin(a) * rr, z], -1); P += 0.008 * np.stack([fbm(P, seed + k, 3, 2) for k in range(3)], -1)
+    return P, F
+
+TOWER_R = 1.6           # wall face radius above the battered plinth (collider footprint 3.4 m square)
+
+def tower_r(z):
+    """Outer wall radius at height z: a battered plinth to 0.62 m, then plumb, with a string course at 2.2 m."""
+    return float(np.interp(z, [-0.05, 0.42, 0.62, 2.18, 2.2, 2.34, 2.36, 9], [1.74, 1.72, TOWER_R, TOWER_R, 1.67, 1.67, TOWER_R, TOWER_R]))
+
 def build_watch_arch():
     pier("Pier_L", 311, h=4.6); pier("Pier_R", 312, h=3.2, broken=True)
     voussoir("Voussoir", 320); voussoir("Voussoir_Loose", 340, centred=True)
     ks = voussoir("Keystone", 349, inner=3.25, outer=4.15, span=math.pi / 13, centred=True)
     cl = crystal_cluster("Keystone_Crystals", 350, 0.12, 4, 0.28, spread=0.5); cl.data.transform(Matrix.Rotation(math.pi / 2, 4, "X") @ Matrix.Translation((0, 0, -0.02)))
     cl.parent = ks; cl.location = (0, -0.5, 0)
-    # Watch-tower stump: rings of dressed blocks round a rubble core, top courses robbed out, two arrow slits (north and
-    # west), a crystal vein climbing the arch-facing side (three.js +Z = Blender -Y) from the offering dish to the basket.
-    R, H, per = 1.6, 3.2, 13; n = round(H / 0.4); r = np.random.default_rng(361); parts = []
-    for k in range(n):
-        z = (k + 0.5) * H / n; ch = H / n * 0.96; off = 0.5 if k % 2 else 0
-        for j in range(per):
-            if k >= n - 2 and r.random() < (0.45 if k == n - 1 else 0.15): continue
-            a = (j + off) / per * 2 * math.pi; L = 2 * math.pi * R / per * 0.96
-            slit = 3 <= k <= 5 and min(abs(math.atan2(math.sin(a - t), math.cos(a - t))) for t in (math.pi / 2, math.pi)) < math.pi / per * 0.8
-            tone = (lambda p, nn: np.full((len(p), 3), 0.16)) if slit else None
-            parts.append((block(4000 + k * 41 + j, L, 0.46, ch, 0.04, seg=(2, 1, 2), tone=tone), Matrix.Rotation(a + math.pi / 2, 4, "Z") @ Matrix.Translation((0, -(R - 0.23 + (0.12 if slit else 0)), z))))
-    core, cf = lathe([(0.0, 0.0), (R - 0.4, 0.0), (R - 0.4, H - 0.3), (R - 0.7, H - 0.15), (0.0, H - 0.2)], 12)
-    core += 0.06 * np.stack([fbm(core, 362 + k, 2.0, 2) for k in range(3)], -1)
-    parts.append((finalize(make_mesh("core", core, cf, MATS["Stone"]), lambda p, nn: np.clip(np.stack([0.45 + 0.2 * fbm(p, 363, 2, 2)] * 3, -1), 0, 1), tile=1.2), Matrix()))
-    tw = assemble("Tower", parts, MATS["Stone"])
+    # Watch-tower: one round ashlar shell (coursing from the Ashlar texture) on a battered plinth, a string course, and a
+    # crenellated parapet whose east side has been knocked down. Inside, a fire floor at 2.95 m where the owl brazier
+    # stands. Arrow slits north and east, a studded door up two steps on the west, the crystal vein on the arch side
+    # (three.js +Z = Blender -Y). Footprint unchanged (shared/starting-layout.json).
+    H, WT, FL, RI = 3.07, 0.42, 2.95, TOWER_R - 0.42; seg = 64; uvf = ashlar_uv(); parts = []
+    outer = [(tower_r(z), z) for z in (-0.05, 0.42, 0.62, 1.4, 2.18, 2.2, 2.34, 2.36, 2.8, H)]
+    prof = outer + [(RI, H), (RI, FL), (0.0, FL)]
+    V, F = lathe(prof, seg); ang = np.arctan2(V[:, 1], V[:, 0])
+    # broken east parapet: the top ring dips raggedly between -0.5 and 0.9 rad
+    east = np.clip(1 - np.abs(np.arctan2(np.sin(ang - 0.2), np.cos(ang - 0.2))) / 0.75, 0, 1)
+    top = V[:, 2] > H - 0.01; V[top, 2] -= east[top] * (0.05 + 0.08 * np.abs(np.sin(ang[top] * 9)))
+    rr = np.linalg.norm(V[:, :2], axis=1, keepdims=True) + 1e-6; wall = (rr[:, 0] > RI - 0.01)
+    V[wall, :2] += V[wall, :2] / rr[wall] * (0.012 * fbm(V[wall], 365, 1.4, 2))[:, None]
+    tw_tone = weather_tone(361, H + 0.4, soot_from=2.5)
+    def tone(p, n):
+        c = tw_tone(p, n); inner = np.linalg.norm(p[:, :2], axis=1) < RI + 0.05
+        c[inner] *= 0.55  # smoke-blackened inside the parapet
+        return c
+    parts.append((finalize(make_mesh("shell", V, F, MATS["Ashlar"]), tone, uv_fn=uvf, smooth_angle=50), Matrix()))
+    # merlons: eight round the parapet, the three on the east gone (two stumps)
+    for k in range(8):
+        a0 = k / 8 * 2 * math.pi + 0.08; a1 = a0 + 2 * math.pi / 8 * 0.56; mid = (a0 + a1) / 2
+        e = 1 - min(abs(math.atan2(math.sin(mid - 0.2), math.cos(mid - 0.2))) / 0.75, 1)
+        if e > 0.6: continue
+        hh = 0.36 * (1 - e * 0.9) + (0.04 if k % 3 == 0 else 0)
+        P, Fm = arc_box(RI + 0.02, TOWER_R + 0.015, a0, a1, H - 0.02, H + hh, seg=4, seed=380 + k)
+        parts.append((finalize(make_mesh("merlon", P, Fm, MATS["Ashlar"]), weather_tone(380 + k, H + 0.4, soot_from=2.5), uv_fn=uvf, smooth_angle=35), Matrix()))
+    # arrow slits (north, east, and one over the door): a proud dressed surround round a dark recess
+    for a, zc in ((math.pi / 2, 1.55), (0.05, 1.4), (math.pi * 0.62, 2.7)):
+        for (da0, da1, z0, z1) in ((-0.13, -0.045, zc - 0.5, zc + 0.5), (0.045, 0.13, zc - 0.5, zc + 0.5), (-0.13, 0.13, zc + 0.5, zc + 0.64), (-0.15, 0.15, zc - 0.64, zc - 0.5)):
+            P, Fs = arc_box(TOWER_R - 0.02, TOWER_R + 0.05, a + da0, a + da1, z0, z1, seg=2, chip=0.02, seed=int(a * 100 + z0 * 10))
+            parts.append((finalize(make_mesh("sl", P, Fs, MATS["Ashlar"]), weather_tone(390, H), tile=ASHLAR_SPAN * 4, smooth_angle=35), Matrix()))
+        P, Fs = arc_box(TOWER_R - 0.04, TOWER_R + 0.005, a - 0.05, a + 0.05, zc - 0.5, zc + 0.5, seg=1, chip=0.0)
+        parts.append((finalize(make_mesh("slit", P, Fs, MATS["Ashlar"]), lambda p, n: np.full((len(p), 3), 0.07), tile=ASHLAR_SPAN), Matrix()))
+    # west door: jambs and a round-headed arch of seven voussoirs, two steps up to the threshold
+    dz0, dz1, dw = 0.62, 1.62, 0.42
+    for sgn in (-1, 1):
+        P, Fj = grid_box(2, 2, 4); P = P * np.array([0.1, 0.11, (dz1 - dz0) / 2]) + np.array([-TOWER_R - 0.04, sgn * (dw + 0.1), (dz0 + dz1) / 2])
+        parts.append((finalize(make_mesh("jamb", P, Fj, MATS["Ashlar"]), weather_tone(395 + sgn, H), tile=ASHLAR_SPAN * 3, smooth_angle=35), Matrix()))
+    for k in range(7):
+        b0 = math.pi * k / 7 + 0.012; b1 = math.pi * (k + 1) / 7 - 0.012; V2, F2 = grid_box(2, 2, 1)
+        b = b0 + (b1 - b0) * (V2[:, 0] + 1) / 2; rad = dw + 0.02 + (0.2 + (0.04 if k == 3 else 0)) * (V2[:, 1] + 1) / 2
+        P = np.stack([-TOWER_R - 0.04 + 0.1 * V2[:, 2], np.cos(b) * rad, dz1 + np.sin(b) * rad], -1)
+        parts.append((finalize(make_mesh("dv", P, F2, MATS["Ashlar"]), weather_tone(400 + k, H), tile=ASHLAR_SPAN * 3, smooth_angle=35), Matrix()))
+    for k, (x0, x1, zt) in enumerate(((-2.0, -1.74, 0.22), (-1.86, -1.62, 0.44))):
+        P, Fs = grid_box(2, 3, 1); P = P * np.array([(x1 - x0) / 2, 0.52, zt / 2 + 0.03]) + np.array([(x0 + x1) / 2, 0, zt / 2 - 0.03])
+        P[:, :2] += 0.015 * np.stack([fbm(P, 410 + k, 2, 2), fbm(P, 412 + k, 2, 2)], -1)
+        parts.append((finalize(make_mesh("step", P, Fs, MATS["Ashlar"]), weather_tone(410 + k, 1.0, moss_foot=0.3), tile=ASHLAR_SPAN * 2, smooth_angle=35), Matrix()))
+    tw = assemble("Tower", parts, MATS["Ashlar"])
+    # door leaf: four oak planks under a round head, two dark iron straps with studs (vertex-coloured)
+    planks = []
+    for k in range(4):
+        y0 = -dw + k * dw / 2 + 0.006; y1 = y0 + dw / 2 - 0.012; V2, F2 = grid_box(2, 1, 6)
+        y = y0 + (y1 - y0) * (V2[:, 0] + 1) / 2; t = (V2[:, 2] + 1) / 2; topz = dz1 + np.sqrt(np.clip(dw ** 2 - y ** 2, 0, None))
+        z = dz0 + (topz - dz0) * t; P = np.stack([-TOWER_R - 0.035 + 0.03 * V2[:, 1], y, z], -1)
+        def ptone(p, n, k=k):
+            g = 0.82 + 0.16 * fbm(p * np.array([1, 1, 0.25]), 420 + k, 4, 2); c = np.stack([g, g * 0.92, g * 0.82], -1)
+            strap = (np.abs(p[:, 2] - 0.9) < 0.045) | (np.abs(p[:, 2] - 1.45) < 0.045)
+            c[strap] = np.array([0.2, 0.19, 0.2]); return c
+        planks.append((finalize(make_mesh("pl", P, F2, MATS["Wood"]), ptone, tile=1.0, smooth_angle=30), Matrix()))
+    for zz in (0.9, 1.45):  # stud heads proud of the straps
+        for y in np.linspace(-dw + 0.08, dw - 0.08, 5):
+            V2, F2 = lathe([(0.0, 0.0), (0.022, 0.0), (0.016, 0.018), (0.0, 0.022)], 6)
+            planks.append((finalize(make_mesh("st", V2, F2, MATS["Wood"]), lambda p, n: np.full((len(p), 3), 0.18), tile=1.0), Matrix.Translation((-TOWER_R - 0.065, y, zz)) @ Matrix.Rotation(-math.pi / 2, 4, "Y")))
+    dr = assemble("Tower_Door", planks, MATS["Wood"]); dr.parent = tw
     vein = []
     for k in range(10):
         z = 0.72 + k * 0.27; wob = math.sin(k * 1.7) * 0.18; L = 0.2 + (k % 3) * 0.06
         v, f = crystal_point(L, L * 0.2); axis = (wob * 0.5, -1.0, 0.6 + 0.2 * math.sin(k))
-        vein.append((place(v, (wob, -(R + 0.02), z), axis, spin=k), f))
+        vein.append((place(v, (wob, -(tower_r(z) + 0.02), z), axis, spin=k), f))
     V, F = merge(vein); vo = finalize(make_mesh("Tower_Vein", V, F, MATS["Crystal"]), None, tile=1.4, smooth_angle=20); vo.parent = tw
-    # Bronze fire basket on a tripod (BASKET in client/watch-arch-art.js: bowl top 0.95, fire 1.05, rim radius 0.62).
-    Rb, Hb = 0.62, 0.95; parts = []
-    bowl, bf = lathe([(0.08, 0.0), (0.32, 0.04), (0.56, 0.16), (Rb, 0.34), (Rb + 0.05, 0.38), (Rb - 0.02, 0.40), (0.5, 0.2), (0.26, 0.08), (0.06, 0.06)], 18)
-    parts.append((finalize(make_mesh("bowl", bowl, bf, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.9), tile=0.6, smooth_angle=40), Matrix.Translation((0, 0, Hb - 0.2))))
+    build_owl_brazier()
+    # Offering dish on a short plinth at the tower foot.
+    pl = block(371, 0.5, 0.5, 0.78, 0.05); pl.data.transform(Matrix.Translation((0, 0, 0.39))); pl.name = "Plinth"; pl.data.name = "Plinth"
+    dish, df = lathe([(0.04, 0.0), (0.24, 0.02), (0.36, 0.08), (0.40, 0.12), (0.37, 0.125), (0.33, 0.1), (0.2, 0.05), (0.02, 0.04)], 18)
+    do = finalize(make_mesh("Dish", dish, df, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.92), tile=0.5, smooth_angle=40)
+    do.data.transform(Matrix.Translation((0, 0, 0.78))); do.parent = pl
+    di = crystal_cluster("Dish_Crystal", 372, 0.05, 3, 0.2, lift=0.82, spread=0.5); di.parent = pl
+
+OWL_EYE = (0.115, -0.655, 1.0)   # Blender, basket-local; client/watch-arch-art.js BASKET.eyes is the three.js mirror
+
+def build_owl_brazier():
+    """The beacon basket as a bronze owl: a round-bellied bowl with a feathered rim, a heart-shaped face disc on the arch
+    side with big ringed eyes (crystal, they glow when the fire is fed), a hooked beak and ear tufts, on three taloned
+    legs. Sizes match BASKET in client/watch-arch-art.js (bowl top 0.95, fire 1.05, rim radius 0.62)."""
+    Rb, Hb = 0.62, 0.95; z0 = Hb - 0.2; parts = []
+    def btone(p, n):  # verdigris in the hollows, worn bright on the high spots
+        g = fbm(p, 701, 5.0, 2); up = np.clip(n[:, 2], 0, 1)
+        c = np.stack([0.95 + 0.1 * g] * 3, -1); vg = sm(0.1, 0.35, g * 0.6 - up * 0.4)[:, None]
+        return np.clip(c * (1 - 0.35 * vg) + 0.35 * vg * np.array([0.5, 0.8, 0.7]), 0, 1)
+    bowl, bf = lathe([(0.08, 0.0), (0.34, 0.03), (0.55, 0.13), (Rb, 0.3), (Rb + 0.035, 0.37), (Rb + 0.05, 0.4), (Rb - 0.02, 0.42), (0.52, 0.22), (0.26, 0.08), (0.06, 0.06)], 28)
+    a = np.arctan2(bowl[:, 1], bowl[:, 0]); rim = bowl[:, 2] > 0.36   # scalloped feather rim
+    bowl[rim, 2] += 0.035 * np.abs(np.sin(a[rim] * 14))
+    parts.append((finalize(make_mesh("bowl", bowl, bf, MATS["Bronze"]), btone, tile=0.6, smooth_angle=40), Matrix.Translation((0, 0, z0))))
+    # feather ridges on the belly: shallow raised chevrons in rows
+    for row, zr in enumerate((0.1, 0.2)):
+        for k in range(14):
+            aa = (k + 0.5 * row) / 14 * 2 * math.pi
+            if abs(math.atan2(math.sin(aa + math.pi / 2), math.cos(aa + math.pi / 2))) < 0.55: continue  # face goes here
+            rb = float(np.interp(zr, [0.03, 0.13, 0.3], [0.34, 0.55, Rb]))
+            V2, F2 = lathe([(0.0, 0.0), (0.055, 0.0), (0.04, 0.012), (0.0, 0.016)], 6); V2[:, 1] *= 0.6
+            parts.append((finalize(make_mesh("fe", V2, F2, MATS["Bronze"]), btone, tile=0.4), Matrix.Translation((rb * math.cos(aa), rb * math.sin(aa), z0 + zr)) @ Matrix.Rotation(aa - math.pi / 2, 4, "Z") @ Matrix.Rotation(-math.pi / 2 + 0.5, 4, "X")))
+    # face disc: a heart-shaped dished plate on the -Y side
+    fy = -(Rb + 0.0); fz = OWL_EYE[2] - 0.04
+    V2, F2 = lathe([(0.0, 0.03), (0.12, 0.025), (0.22, 0.0), (0.26, -0.03), (0.24, -0.05), (0.0, -0.04)], 24)
+    an = np.arctan2(V2[:, 1], V2[:, 0]); V2[:, 0] *= 1.15; V2[:, 1] *= 1 + 0.12 * np.sin(an)  # wider than tall, heart notch on top
+    V2[:, 1] -= 0.05 * np.exp(-((an - math.pi / 2) ** 2) / 0.05) * (np.linalg.norm(V2[:, :2], axis=1) > 0.15)
+    parts.append((finalize(make_mesh("face", V2, F2, MATS["Bronze"]), btone, tile=0.4, smooth_angle=45), Matrix.Translation((0, fy - 0.02, fz)) @ Matrix.Rotation(math.pi / 2, 4, "X")))
+    for sx in (-1, 1):  # eye rings
+        V2, F2 = lathe([(0.055, -0.01), (0.07, 0.02), (0.095, 0.03), (0.11, 0.0), (0.09, -0.02), (0.055, -0.01)], 18)
+        parts.append((finalize(make_mesh("ring", V2, F2, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 1.0), tile=0.3, smooth_angle=50), Matrix.Translation((sx * OWL_EYE[0], OWL_EYE[1], OWL_EYE[2])) @ Matrix.Rotation(math.pi / 2, 4, "X")))
+        # ear tufts: swept feather blades above the rim
+        V2, F2 = lathe([(0.06, 0.0), (0.05, 0.12), (0.025, 0.24), (0.0, 0.3)], 5); V2[:, 1] *= 0.45
+        parts.append((finalize(make_mesh("tuft", V2, F2, MATS["Bronze"]), btone, tile=0.4, smooth_angle=60), Matrix.Translation((sx * 0.21, fy - 0.03, z0 + 0.4)) @ Matrix.Rotation(sx * -0.4, 4, "Y") @ Matrix.Rotation(0.12, 4, "X")))
+    V2, F2 = lathe([(0.045, 0.0), (0.035, 0.05), (0.015, 0.1), (0.0, 0.12)], 6); V2[:, 0] *= 0.8   # hooked beak, pointing down
+    V2[:, 1] -= 0.25 * (V2[:, 2] / 0.12) ** 2 * 0.12 * 0
+    parts.append((finalize(make_mesh("beak", V2, F2, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 1.0), tile=0.3, smooth_angle=50), Matrix.Translation((0, OWL_EYE[1] - 0.02, OWL_EYE[2] - 0.06)) @ Matrix.Rotation(math.pi - 0.35, 4, "X")))
+    # three legs ending in talons gripping the floor, a collar ring, and the fire cage straps
     for i in range(3):
-        a = i / 3 * 2 * math.pi; ca, sa = math.cos(a), math.sin(a)
-        parts.append(rod(700 + i, (0.62 * ca, 0.62 * sa, 0.0), (0.2 * ca, 0.2 * sa, Hb - 0.14), 0.04))
-        foot, ff = lathe([(0.0, 0.0), (0.08, 0.0), (0.06, 0.05), (0.0, 0.06)], 8)
-        parts.append((finalize(make_mesh("foot", foot, ff, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0.62 * ca, 0.62 * sa, 0))))
-    ring, rf = lathe([(0.24, -0.02), (0.27, -0.02), (0.27, 0.02), (0.24, 0.02), (0.24, -0.02)], 14)
-    parts.append((finalize(make_mesh("ring", ring, rf, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0, 0, Hb * 0.45))))
-    for i in range(4):  # strap bars from the rim up to a crown ring over the fire
+        a = i / 3 * 2 * math.pi + math.pi / 6; ca, sa = math.cos(a), math.sin(a)
+        parts.append(rod(700 + i, (0.56 * ca, 0.56 * sa, 0.06), (0.2 * ca, 0.2 * sa, z0 + 0.06), 0.045, 7))
+        for t in (-0.6, 0.0, 0.6):  # three forward toes and a hind claw
+            tx, ty = math.cos(a + t), math.sin(a + t)
+            parts.append(rod(705 + i * 4, (0.56 * ca, 0.56 * sa, 0.06), (0.56 * ca + 0.17 * tx, 0.56 * sa + 0.17 * ty, 0.0), 0.028, 5))
+        parts.append(rod(709 + i * 4, (0.56 * ca, 0.56 * sa, 0.06), (0.47 * ca, 0.47 * sa, 0.0), 0.024, 5))
+    ring, rf = lathe([(0.24, -0.025), (0.28, -0.025), (0.28, 0.025), (0.24, 0.025), (0.24, -0.025)], 16)
+    parts.append((finalize(make_mesh("ring", ring, rf, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0, 0, z0 * 0.5))))
+    for i in range(4):
         a = i / 4 * 2 * math.pi + math.pi / 4; ca, sa = math.cos(a), math.sin(a); pts = []
         for t in np.linspace(0, 1, 5): rr = Rb + 0.03 - (Rb - 0.17) * t ** 1.6; pts.append((rr * ca, rr * sa, Hb + 0.18 + 0.5 * math.sin(t * math.pi / 2)))
         for k in range(4): parts.append(rod(720 + i * 5 + k, pts[k], pts[k + 1], 0.024, 5))
@@ -668,12 +846,11 @@ def build_watch_arch():
     parts.append((finalize(make_mesh("crown", crown, cf, MATS["Bronze"]), None, tile=0.4), Matrix.Translation((0, 0, Hb + 0.68))))
     bk = assemble("Basket", parts, MATS["Bronze"])
     coals = crystal_cluster("Basket_Coals", 730, 0.32, 9, 0.3, lift=Hb - 0.16, spread=0.8); coals.parent = bk
-    # Offering dish on a short plinth at the tower foot.
-    pl = block(371, 0.5, 0.5, 0.78, 0.05); pl.data.transform(Matrix.Translation((0, 0, 0.39))); pl.name = "Plinth"; pl.data.name = "Plinth"
-    dish, df = lathe([(0.04, 0.0), (0.24, 0.02), (0.36, 0.08), (0.40, 0.12), (0.37, 0.125), (0.33, 0.1), (0.2, 0.05), (0.02, 0.04)], 18)
-    do = finalize(make_mesh("Dish", dish, df, MATS["Bronze"]), lambda p, n: np.full((len(p), 3), 0.92), tile=0.5, smooth_angle=40)
-    do.data.transform(Matrix.Translation((0, 0, 0.78))); do.parent = pl
-    di = crystal_cluster("Dish_Crystal", 372, 0.05, 3, 0.2, lift=0.82, spread=0.5); di.parent = pl
+    eyes = []
+    for sx in (-1, 1):
+        V2, F2 = lathe([(0.0, 0.035), (0.03, 0.03), (0.055, 0.012), (0.06, 0.0), (0.0, 0.0)], 12)
+        eyes.append((place(V2, (sx * OWL_EYE[0], OWL_EYE[1] + 0.012, OWL_EYE[2]), (0, -1, 0)), F2))
+    V, F = merge(eyes); ey = finalize(make_mesh("Basket_Eyes", V, F, MATS["Crystal"]), None, tile=0.3, smooth_angle=60); ey.parent = bk
 
 # ---- Heartstone (the God side's living geode heart; client/heartstone-art.js) -----------------------
 def tube(name, pts, r0, r1, mat, sides=7, seed=0):
@@ -752,8 +929,8 @@ MATS = {}
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     lum = {"Stone": tex_stone("Stone", 1024, 41), "Moss": tex_moss("Moss", 512, 52), "Bronze": tex_bronze("Bronze", 512, 63), "Crystal": tex_crystal("Crystal", 256, 74),
-           "Wood": tex_wood("Wood", 512, 85)}
-    for n in ("Stone", "Moss", "Bronze", "Wood"): MATS[n] = make_material(n)
+           "Wood": tex_wood("Wood", 512, 85), "Ashlar": tex_ashlar("Ashlar", 1024, 96)}
+    for n in ("Stone", "Moss", "Bronze", "Wood", "Ashlar"): MATS[n] = make_material(n)
     MATS["Crystal"] = make_material("Crystal", emissive=True)
     objs = []
     for i, (h, w, d, tp) in enumerate([(3.0, 0.98, 0.62, 0.66), (3.5, 0.92, 0.58, 0.70), (3.9, 1.0, 0.64, 0.62), (4.3, 0.95, 0.6, 0.72)]):

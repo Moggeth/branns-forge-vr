@@ -1,5 +1,5 @@
 ---
-date: 2026-10-10 09:03
+date: 2026-10-12 12:47
 area: Creatures
 title: Livelier skeletons and smoother crowds
 ---
