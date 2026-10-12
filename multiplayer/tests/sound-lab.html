@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sound Lab</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 16px; background: #14161c; color: #eef; font: 15px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 18px 0 6px; color: #9cf; }
+  p { margin: 0 0 10px; color: #aab; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { background: #262b38; color: #eef; border: 1px solid #3a4256; border-radius: 8px; padding: 8px 10px; font: inherit; cursor: pointer; }
+  button:active { background: #33405c; }
+</style>
+</head>
+<body>
+<h1>Sound Lab</h1>
+<p>Every procedural cue from the sound pass, through the same mixing desk the game uses. Tap to listen.</p>
+<div id="groups"></div>
+<script type="module">
+import {createAudioMix} from '../client/audio-mix.js';
+import {createSoundKit} from '../client/sound-kit.js';
+import {createSpellAudio} from '../client/spell-audio.js';
+import {createAmbienceAudio} from '../client/ambience-audio.js';
+
+const SPELLS = ['raise', 'lower', 'wall', 'sunder', 'crystal', 'grove', 'ring', 'heal', 'lightning', 'frost', 'wave', 'spring', 'blessing', 'rainfall', 'quake', 'skeleton', 'squad', 'golem', 'awaken', 'wildwake'];
+const GROUPS = {
+  'Combat': [['swing', {tool: 'axe'}, 'swing (axe)'], ['swing', {tool: 'pick'}, 'swing (pick)'], ['swing', {tool: 'hammer'}, 'swing (hammer)'], 'death_bone', 'death_stone', 'death_soft', 'detach', 'hurt', 'hero_down', 'respawn', 'shoot', 'radiant', 'shockwave', 'saw', 'splat', 'ignite', ['throw', {hard: true}, 'throw'], 'flame_puff', 'unfurl', 'bloop'],
+  'Hero': [['step', {surface: 'grass'}, 'step grass'], ['step', {surface: 'stone'}, 'step stone'], ['step', {surface: 'snow'}, 'step snow'], ['step', {surface: 'wet'}, 'step wet'], 'jump', 'land', ['swap', {metal: true}, 'swap metal'], ['swap', {metal: false}, 'swap wood']],
+  'Keeps and battles': ['turret_fire', 'shield_block', 'shield_up', 'shield_down', 'part_broken', 'battle_start', 'battle_wave', 'battle_victory', 'battle_stop', 'telegraph', 'star_impact', 'stage', 'support'],
+  'Building and gathering': [['pickup', {material: 'iron'}, 'pickup ore'], ['pickup', {material: 'gold'}, 'pickup gold'], ['pickup', {material: 'gems'}, 'pickup gems'], ['pickup', {material: 'stone'}, 'pickup stone'], 'build', 'place', 'forge_success', 'forge_fail', 'smelt', 'worker_summon', 'deliver', 'reward', 'resource_use'],
+  'UI': ['click', 'confirm', 'open', 'close', 'deny', 'talent'],
+};
+
+// Shared builders so the offline renderer below can reuse exactly what the buttons play.
+function rig(context) {
+  const view = new Proxy(context, {get: (t, k) => k === 'state' ? 'running' : (typeof t[k] === 'function' ? t[k].bind(t) : t[k])});
+  const mix = createAudioMix(view);
+  const kit = createSoundKit({context: mix.contextFor('sfx'), ui: mix.contextFor('ui'), level: mix.level, claim: () => true, duck: mix.duck});
+  const spells = createSpellAudio(mix.contextFor('sfx'));
+  return {mix, kit, spells, view};
+}
+const items = [];
+for (const [group, list] of Object.entries(GROUPS)) for (const entry of list) { const [name, opts, label] = Array.isArray(entry) ? entry : [entry, {}, entry]; items.push({group, label, play: r => r.kit.play(name, null, null, {...opts, gap: 0})}); }
+for (const spell of SPELLS) items.push({group: 'God spells', label: spell, play: r => r.spells.play({spell, position: [0, 0, 0]}, {x: 0, z: 0}, true)});
+items.push({group: 'God spells', label: 'starfall impact', play: r => r.spells.play({spell: 'starfall', phase: 'impact', position: [0, 0, 0]}, {x: 0, z: 0}, true)});
+const AMBIENCE = {
+  'day birds': {night: 0, weights: {clear: 1}}, 'night crickets + owl': {night: 1, weights: {clear: 1}},
+  'tavern + fountain': {night: .2, weights: {clear: 1}, town: true}, 'high god view': {night: 0, weights: {clear: 1}, altitude: 40},
+};
+const tavernState = {battle: {v: 2}};
+function ambienceRun(r, setup, seconds, schedule) {
+  const amb = createAmbienceAudio({context: r.mix.contextFor('ambience'), level: r.mix.level, phone: false});
+  const ear = {position: setup.town ? [-27, 2, -38] : [0, 2, 0], forward: [0, 0, -1], up: [0, 1, 0]};
+  // Owls and birds are on random timers; nudge them so a short clip has something in it.
+  return schedule(dt => amb.update({dt, ear: () => ear, sky: () => setup, state: () => setup.town ? tavernState : {}, altitude: () => setup.altitude ?? 2}), amb);
+}
+for (const [label, setup] of Object.entries(AMBIENCE)) items.push({group: 'Ambience (8 s)', label, ambience: setup});
+
+let live = null;
+const groups = document.getElementById('groups');
+for (const group of [...new Set(items.map(i => i.group))]) {
+  const h = document.createElement('h2'); h.textContent = group; groups.append(h);
+  const row = document.createElement('div'); row.className = 'row'; groups.append(row);
+  for (const item of items.filter(i => i.group === group)) {
+    const b = document.createElement('button'); b.textContent = item.label; row.append(b);
+    b.onclick = () => {
+      live ??= rig(new AudioContext()); live.view.resume?.();
+      if (item.ambience) { let left = 8; ambienceRun(live, item.ambience, 8, (step, amb) => { const id = setInterval(() => { step(.1); if ((left -= .1) <= 0) { clearInterval(id); amb.dispose(); } }, 100); }); }
+      else item.play(live);
+    };
+  }
+}
+
+// Offline render for review and CI-style level checks: returns [{group, label, peak, rms, wav(base64)}].
+function wav(buffer) {
+  const ch = buffer.numberOfChannels, len = buffer.length, sr = buffer.sampleRate, bytes = new DataView(new ArrayBuffer(44 + len * ch * 2));
+  const str = (o, s) => [...s].forEach((c, i) => bytes.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); bytes.setUint32(4, 36 + len * ch * 2, true); str(8, 'WAVEfmt '); bytes.setUint32(16, 16, true); bytes.setUint16(20, 1, true); bytes.setUint16(22, ch, true);
+  bytes.setUint32(24, sr, true); bytes.setUint32(28, sr * ch * 2, true); bytes.setUint16(32, ch * 2, true); bytes.setUint16(34, 16, true); str(36, 'data'); bytes.setUint32(40, len * ch * 2, true);
+  const data = [...Array(ch)].map((_, c) => buffer.getChannelData(c));
+  for (let i = 0, o = 44; i < len; i++) for (let c = 0; c < ch; c++, o += 2) bytes.setInt16(o, Math.max(-1, Math.min(1, data[c][i])) * 32767, true);
+  let bin = ''; const u8 = new Uint8Array(bytes.buffer); for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(bin);
+}
+window.renderAll = async ({withWav = false} = {}) => {
+  const results = [];
+  for (const item of items) {
+    const seconds = item.ambience ? 8 : 3.2, ctx = new OfflineAudioContext(2, Math.ceil(44100 * seconds), 44100), r = rig(ctx);
+    if (item.ambience) {
+      ambienceRun(r, item.ambience, seconds, step => { for (let t = .1; t < seconds; t += .1) ctx.suspend(t).then(() => { step(.1); ctx.resume(); }); step(.1); });
+    } else item.play(r);
+    const buffer = await ctx.startRendering();
+    let peak = 0, sum = 0; const n = buffer.length;
+    for (let c = 0; c < 2; c++) { const d = buffer.getChannelData(c); for (let i = 0; i < n; i++) { const v = Math.abs(d[i]); if (v > peak) peak = v; sum += v * v; } }
+    // "loudness": RMS over the loudest 300 ms window, so short and long cues compare fairly.
+    const w = 13230, d0 = buffer.getChannelData(0); let best = 0, acc = 0; for (let i = 0; i < n; i++) { acc += d0[i] * d0[i]; if (i >= w) acc -= d0[i - w] * d0[i - w]; if (i >= w - 1) best = Math.max(best, acc); }
+    results.push({group: item.group, label: item.label, peak: +peak.toFixed(3), loud: +Math.sqrt(best / w).toFixed(4), ...(withWav ? {wav: wav(buffer)} : {})});
+  }
+  return results;
+};
+window.soundLabReady = true;
+</script>
+</body>
+</html>
