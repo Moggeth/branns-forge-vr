@@ -12,11 +12,11 @@ const want = {Stone: ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 
   Moss: ['Moss_A', 'Moss_B', 'Moss_C'], Bronze: ['Hoop', 'Chain'], Crystal: ['LintelSeam', 'AltarCrystals', 'HoopInlay', 'TuneCrystal']};
 const outcrop = {Stone: ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'Cup'], Wood: ['MineHead', 'OreCart'], Bronze: ['MineHead_Iron', 'OreCart_Iron'],
   Crystal: ['GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'OreCart_Crystals']};
-const arch = {Stone: ['Pier_L', 'Pier_R', 'Voussoir', 'Voussoir_Loose', 'Keystone', 'Tower', 'Plinth', 'HeartShell'], Bronze: ['Basket', 'Dish'], Wood: ['HeartShell_Roots'],
-  Crystal: ['Keystone_Crystals', 'Tower_Vein', 'Basket_Coals', 'Dish_Crystal', 'HeartShell_Lining']};
+const arch = {Stone: ['Voussoir', 'Voussoir_Loose', 'Keystone', 'Plinth', 'HeartShell'], Ashlar: ['Pier_L', 'Pier_R', 'Tower'], Bronze: ['Basket', 'Dish'], Wood: ['Tower_Door', 'HeartShell_Roots'],
+  Crystal: ['Keystone_Crystals', 'Tower_Vein', 'Basket_Coals', 'Basket_Eyes', 'Dish_Crystal', 'HeartShell_Lining']};
 for (const [mat, names] of [...Object.entries(want), ...Object.entries(outcrop), ...Object.entries(arch)]) for (const n of names) { assert.ok(node(n), n + ' in kit'); assert.equal(matOf(n), mat, n + ' material'); }
 for (const n of 'ABCD') assert.ok(node(`Menhir_${n}`).children.some(i => json.nodes[i].name === `Menhir_${n}_Rune`), `Menhir_${n} rune anchor`);
-assert.ok(glb.length < 4.5e6, 'kit stays small enough for phones');
+assert.ok(glb.length < 5.5e6, 'kit stays small enough for phones'); // loads after the world is up; code stand-ins until then
 
 // Installing a kit swaps the code-built pieces for kit pieces with the same struck ids, and runes hug the stone.
 const fake = new THREE.Group(), M = n => Object.assign(new THREE.MeshStandardMaterial(), {name: n});

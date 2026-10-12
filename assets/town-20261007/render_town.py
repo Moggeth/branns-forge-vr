@@ -25,7 +25,7 @@ def setup():
     kit = {o.name: o for o in bpy.data.objects}
     for m in bpy.data.materials:  # the game drives glow with emissiveIntensity; match the bases renders
         b = m.node_tree.nodes.get("Principled BSDF") if m.use_nodes else None
-        if b and m.name in ("Crystal", "Amethyst", "Ember", "Ooze"): b.inputs["Emission Strength"].default_value = {"Ember": 4.0, "Ooze": 2.5}.get(m.name, 3.0)
+        if b and m.name in ("Crystal", "Amethyst", "Ember", "Ooze", "Glass", "GlassOoze"): b.inputs["Emission Strength"].default_value = {"Ember": 4.0, "Ooze": 2.5, "Glass": 2.2, "GlassOoze": 2.2}.get(m.name, 3.0)
     for o in kit.values(): o.hide_render = True
     return kit
 
