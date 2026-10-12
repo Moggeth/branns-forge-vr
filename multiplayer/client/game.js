@@ -96,6 +96,7 @@ import {createAppleSnack} from './apple-snack.js';
 import {createDragonRide} from './dragon-ride.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
+import {noteEnemySnapshot, presentEnemyRoot} from './enemy-interp.js';
 import {dressSkeleton} from './skeleton-look.js';
 import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
@@ -692,6 +693,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       }
       entry.target.fromArray(data.position);
       entry.data = data;
+      if (enemy) noteEnemySnapshot(entry, data, snapshot.tick); // interpolated per frame (enemy-interp.js), never stepped per packet
       upgradeActor(entry); upgradeHero(entry);
       if (!enemy && !entry.visual.userData.hero) {
         const { head, hands } = entry.visual.userData;
@@ -1773,9 +1775,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
           animation.motion = motion;
         }
       }
-      entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
-      if (entry.enemy || !entry.data.head) entry.root.rotation.y = entry.data.yaw || 0;
-      else entry.root.rotation.y = 0;
+      if (entry.enemy) presentEnemyRoot(entry, renderTick, dt);
+      else {
+        entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
+        entry.root.rotation.y = entry.data.head ? 0 : entry.data.yaw || 0;
+      }
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
       if (!entry.enemy && entry.data?.role) entry.root.visible = !entry.data.dragon; // a Hero on their dragon is up in the saddle
     }
@@ -1790,7 +1794,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     enemyThreats.length=0;for(const p of snapshot.players||[])if(p.role==='hero'&&p.position)enemyThreats.push(p.id===playerId?localPosition.toArray(threatPoint):p.position);
     updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround,threats:enemyThreats});
     golemFx.update(actors,renderTick,dt,now/1000);
-    entView.update(actors,renderTick,dt);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
+    entView.update(actors,renderTick,dt,enemyThreats);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
     goldenFlight.length=0;for(const q of snapshot.projectiles||[])if(q.golden){const node=combat.projectiles.get(q.id);if(node?.visible!==false)goldenFlight.push({id:q.id,position:node?node.position:new THREE.Vector3().fromArray(q.position)});}
     skeletonFx.update(dt,{camera,golden:goldenFlight,viewportHeight:renderer.domElement.height||800});
