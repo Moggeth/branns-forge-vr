@@ -1,5 +1,5 @@
 ---
-date: 2026-10-10 09:10
+date: 2026-10-12 23:44
 area: Interface
 title: Tidier, clearer menus and hotbar
 ---
