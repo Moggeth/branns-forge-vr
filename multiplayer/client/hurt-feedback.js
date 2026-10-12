@@ -225,11 +225,11 @@ export function createHurtFeedback({camera, view = null, presenting = () => fals
     glow = Math.max(0, glow - dt / T.fade); warmGlow = Math.max(0, warmGlow - dt * 1.5);
     const me = self(), max = Math.max(1, maxHp(me)), frac = me && me.hp > 0 ? me.hp / max : 1;
     // A respawn (HP jumps back up past half) drops the low-health glow at once but lets the killing blow fade out;
-    // any smaller rise is a heal and breathes a soft gold-green from the edges.
+    // a real heal (10%+ at once: draught, drink, ale, Blessing) breathes a soft gold-green; the fountain's trickle does not.
     if (lastHp !== null && me && me.hp > 0 && lastHp > 0) {
       const gain = me.hp - lastHp;
       if (gain > max * .5) low = 0;
-      else if (gain >= Math.max(1, max * .04)) heal = Math.min(1, heal + .35 + gain / max * 2);
+      else if (gain >= Math.max(1, max * .1)) heal = Math.min(1, heal + .35 + gain / max * 2);
     }
     lastHp = me ? me.hp : null;
     heal = Math.max(0, heal - dt / T.heal);
