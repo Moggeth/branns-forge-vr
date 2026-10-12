@@ -457,7 +457,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null};
   // Getting hurt (client/hurt-feedback.js): edge bloom toward the blow, HP chip, view nudge, buzz, thump; low-health heartbeat.
   const hurtEye=new THREE.Vector3(),hurtLook=new THREE.Vector3();
-  const hurtFeel=createHurtFeedback({camera,presenting:()=>renderer.xr.isPresenting,touch:()=>touchEnabled,reducedMotion:reducedWeaponMotion,audio:()=>audioContext,
+  const hurtView={position:new THREE.Vector3(),yaw:0},hurtDir=new THREE.Vector3();
+  const hurtFeel=createHurtFeedback({camera,view:()=>{camera.getWorldPosition(hurtView.position);camera.getWorldDirection(hurtDir);hurtView.yaw=Math.atan2(-hurtDir.x,-hurtDir.z);return hurtView;},presenting:()=>renderer.xr.isPresenting,touch:()=>touchEnabled,reducedMotion:reducedWeaponMotion,audio:()=>audioContext,
     haptic:(steps,hand)=>feedback.pattern?.(steps,hand),self:()=>role==='hero'?snapshot.players?.find(p=>p.id===playerId)||null:null,maxHp:p=>p?.maxHp||heroMaxHp(p||{})});
   function stormTug(){const t=performance.now()/1000;if(t<stormJolt.nextTug)return;stormJolt.nextTug=t+.65;stormJolt.tug=1;stormView.tug(playerId);stormWeapon.tug?.();
     if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.8,duration:60}]);else if(touchEnabled)try{navigator.vibrate?.([35]);}catch{}

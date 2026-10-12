@@ -5,6 +5,9 @@ import * as THREE from 'three';
 // bottom edge), the HP bar flashes and leaves a pale chip of what was lost, the view gets one small nudge (flat screens
 // only: never in VR), phones buzz, VR hands rumble on the side that was struck; the hit sound itself is the sound kit's "hurt" cue. Below
 // 30% health a faint edge glow breathes with a quiet heartbeat. Everything decays per frame from performance time.
+// Round 2: a crisp crescent (the Overwatch-style damage arc) circles the middle of the view toward each blow, and both
+// arc and bloom keep pointing at where the blow came from as you turn, so you can swing round to face it. Healing
+// breathes a soft gold-green from the edges. The killing blow stays on screen through the respawn and fades.
 // One camera-held quad draws the overlay, so desktop, phone and headset share the look; it is hidden when idle.
 
 export const HURT_TUNING = Object.freeze({
@@ -16,6 +19,10 @@ export const HURT_TUNING = Object.freeze({
   roll: .028,             // radians of roll toward the blow at full severity
   hapticGap: .12,
   xrDistance: 1,          // metres: the overlay sits at a comfortable focal distance in a headset
+  arc: .44,               // crescent radius, as a share of the half view height
+  arcSpan: .42,           // half-width of the crescent, radians (~24°)
+  arcLife: 2,             // seconds the crescent stays (it outlasts the bloom so you can turn to it)
+  heal: 1.1,              // seconds a heal glow takes to fade
 });
 
 const VERT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
@@ -23,7 +30,8 @@ const FRAG = /* glsl */`
 precision mediump float;
 varying vec2 vUv;
 uniform vec4 uHits[${HURT_TUNING.slots}];  // xy screen direction (up = in front), z strength, w warm (fire) 0..1
-uniform float uAspect, uGlow, uLow, uBeat, uTime, uWarm;
+uniform vec4 uArcs[${HURT_TUNING.slots}];  // x age (s), y crescent strength
+uniform float uAspect, uGlow, uLow, uBeat, uTime, uWarm, uHeal, uArcR, uArcSpan;
 float hash(float n){ return fract(sin(n) * 43758.5453); }
 float noise(float x){ float i = floor(x), f = fract(x); return mix(hash(i), hash(i + 1.0), f * f * (3.0 - 2.0 * f)); }
 void main(){
@@ -35,39 +43,65 @@ void main(){
   // A slow living ripple along the rim so the glow reads as light, not a flat gradient.
   float ripple = .82 + .18 * noise(ang * 3.2 + uTime * .9) + .08 * noise(ang * 9.0 - uTime * 2.3);
   float rim = smoothstep(.58, 1.15, edge * ripple); rim *= rim;
-  float hit = 0.0, warm = uWarm * uGlow;
+  float hit = 0.0, warm = uWarm * uGlow, arc = 0.0, core = 0.0;
+  // Distance from the middle in half-heights, so the crescent is a true circle on any screen shape.
+  float r = length(vec2(q.x * uAspect, q.y));
   for (int i = 0; i < ${HURT_TUNING.slots}; i++) {
-    vec4 h = uHits[i];
-    if (h.z <= .001) continue;
+    vec4 h = uHits[i], c = uArcs[i];
+    if (h.z <= .001 && c.y <= .001) continue;     // the crescent outlives the bloom
     float facing = max(0.0, dot(dirN, h.xy) * .5 + .5);
     float band = smoothstep(.5, 1.12, edge * ripple);
     float lobe = pow(facing, 6.0) * band * sqrt(band) * (1.5 + .5 * h.z);
     hit += lobe * h.z; warm += lobe * h.z * h.w;
+    // Crescent: pops in a little wide and settles onto its ring; thick in the middle, tapering to points.
+    if (c.y > .001) {
+      float settle = 1.0 + .22 * exp(-c.x * 14.0), radius = uArcR * settle;
+      float off = acos(clamp(dot(dirN, h.xy), -1.0, 1.0)) / uArcSpan;            // 0 at the middle of the arc, 1 at its tips
+      float taper = 1.0 - smoothstep(.55, 1.0, off);
+      float thick = .034 * (1.0 - off * off) + .006;
+      float d = abs(r - radius);
+      float body = 1.0 - smoothstep(thick * .7, thick, d);
+      float halo = exp(-d * d / (thick * thick * 9.0)) * .55;
+      arc += max(body, halo) * taper * c.y;
+      core += body * taper * c.y * smoothstep(.45, 0.0, off);
+      warm += max(body, halo) * taper * c.y * h.w;
+    }
   }
   float low = rim * uLow * (.45 + .55 * uBeat);
-  float alpha = clamp(hit * .9 + rim * uGlow * .9 + low * .75, 0.0, .9);
+  float heal = rim * uHeal;
+  float alpha = clamp(hit * .9 + rim * uGlow * .9 + low * .75 + arc * .95 + heal * .8, 0.0, .95);
   if (alpha < .004) discard;
-  // Deep crimson on the very rim, a warmer red toward the inside; fire leans ember orange.
+  // Deep crimson on the very rim, a warmer red toward the inside; fire leans ember orange; the crescent burns hot in
+  // its middle; healing is a soft gold-green. Output is premultiplied so red stays red over green grass.
   float inner = smoothstep(1.1, .55, edge);
-  vec3 blood = mix(vec3(.5, .0, .03), vec3(.95, .08, .08), inner);
-  vec3 ember = mix(vec3(.75, .2, .02), vec3(1.0, .58, .18), inner);
-  vec3 col = mix(blood, ember, clamp(warm / max(alpha * 1.4, .05), 0.0, 1.0));
-  gl_FragColor = vec4(col, alpha);
+  vec3 blood = mix(vec3(.62, .0, .04), vec3(1.0, .1, .08), inner);
+  vec3 ember = mix(vec3(.85, .24, .02), vec3(1.0, .62, .2), inner);
+  float total = hit + rim * uGlow + low + arc + heal + 1e-4;
+  vec3 col = mix(blood, ember, clamp(warm / max(total, .05), 0.0, 1.0));
+  col = mix(col, vec3(1.0, .78, .62), clamp(core * .7, 0.0, .7));
+  col = mix(col, vec3(.72, 1.0, .5), clamp(heal / total, 0.0, 1.0));
+  gl_FragColor = vec4(col * alpha * 1.2, alpha);
 }`;
 
 /**
- * ctx: {camera, presenting(), touch(), reducedMotion, audio() -> AudioContext|null, haptic(pattern, hand), self() -> player|null}
+ * ctx: {camera, view() -> {position: Vector3, yaw} (the live eye, so blooms follow as you turn), presenting(), touch(), reducedMotion,
+ *       audio() -> AudioContext|null, haptic(pattern, hand), self() -> player|null}
  */
-export function createHurtFeedback({camera, presenting = () => false, touch = () => false, reducedMotion = false, audio = () => null, haptic = null, self = () => null, maxHp = p => p?.maxHp || 100} = {}) {
+export function createHurtFeedback({camera, view = null, presenting = () => false, touch = () => false, reducedMotion = false, audio = () => null, haptic = null, self = () => null, maxHp = p => p?.maxHp || 100} = {}) {
   const T = HURT_TUNING;
-  const hits = Array.from({length: T.slots}, () => new THREE.Vector4());
-  const uniforms = {uHits: {value: hits}, uAspect: {value: 1}, uGlow: {value: 0}, uLow: {value: 0}, uBeat: {value: 0}, uTime: {value: 0}, uWarm: {value: 0}};
-  const material = new THREE.ShaderMaterial({vertexShader: VERT, fragmentShader: FRAG, uniforms, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false});
+  const hits = Array.from({length: T.slots}, () => new THREE.Vector4()), arcs = Array.from({length: T.slots}, () => new THREE.Vector4());
+  const uniforms = {uHits: {value: hits}, uArcs: {value: arcs}, uAspect: {value: 1}, uGlow: {value: 0}, uLow: {value: 0}, uBeat: {value: 0}, uTime: {value: 0}, uWarm: {value: 0},
+    uHeal: {value: 0}, uArcR: {value: T.arc}, uArcSpan: {value: T.arcSpan}};
+  // Premultiplied "over": the shader's colour is already multiplied by its alpha (and lifted a touch), so a red edge
+  // stays red over grass instead of mixing to brown.
+  const material = new THREE.ShaderMaterial({vertexShader: VERT, fragmentShader: FRAG, uniforms, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false,
+    blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor});
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
   quad.name = 'HurtOverlay'; quad.renderOrder = 10000; quad.frustumCulled = false; quad.visible = false;
   camera?.add(quad);
 
-  const slots = hits.map(() => ({x: 0, y: 1, strength: 0, warm: 0}));
+  const slots = hits.map(() => ({x: 0, y: 1, strength: 0, warm: 0, arc: 0, age: 0, from: null}));
+  let heal = 0;
   let glow = 0, warmGlow = 0, low = 0, beatClock = 0, beatPulse = 0, time = 0, lastHaptic = -1;
   const spring = {pitch: 0, vp: 0, roll: 0, vr: 0};
   let lastHp = null, ghost = null, ghostTimer = 0, meterEl = null;
@@ -127,6 +161,15 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
     thump(ctx, at + .19, {freq: 64, end: 40, length: .14, gain: g * .7, noise: 0});
   }
 
+  // Screen direction of a world point from the eye: x right, y ahead (behind = down the screen).
+  function screenDir(from, v, out) {
+    const dx = from[0] - v.position.x, dz = from[2] - v.position.z;
+    if (dx * dx + dz * dz <= .04) return false;
+    const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), rx = -fz, rz = fx, a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
+    out.x = Math.sin(a); out.y = Math.cos(a); return true;
+  }
+  const _d = {x: 0, y: 1};
+
   // ---- the event -----------------------------------------------------------------------------------------------
   /** A host 'hit' on the local Hero. view: {position: Vector3 (eye), yaw: radians} at the moment it lands. */
   function hurt(event, view) {
@@ -134,18 +177,16 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
     const max = Math.max(1, maxHp(me)), damage = Math.max(0, Number(event.damage) || 0);
     const severity = THREE.MathUtils.clamp(damage / max * 3.2, .22, 1), warm = event.fire ? 1 : 0;
     let side = 0;
-    if (Array.isArray(event.from) && view?.position) {
-      const dx = event.from[0] - view.position.x, dz = event.from[2] - view.position.z;
-      if (dx * dx + dz * dz > .04) {
-        // Angle of the source from the view's forward, clockwise positive (right = +90°); behind lands on the bottom edge.
-        const fx = -Math.sin(view.yaw), fz = -Math.cos(view.yaw), rx = -fz, rz = fx;
-        const a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
-        side = Math.sin(a);
-        let slot = slots.reduce((m, s) => s.strength < m.strength ? s : m, slots[0]);
-        // Repeated blows from the same side build one bloom instead of stacking copies.
-        for (const s of slots) if (s.strength > .05 && s.x * Math.sin(a) + s.y * Math.cos(a) > .92) { slot = s; break; }
-        slot.x = Math.sin(a); slot.y = Math.cos(a); slot.strength = Math.min(1.25, slot.strength * .6 + .5 + .6 * severity); slot.warm = warm;
-      } else glow = Math.min(1, glow + .45 + .5 * severity);
+    const at = view?.position ? view : null;
+    if (Array.isArray(event.from) && at && screenDir(event.from, at, _d)) {
+      // Angle of the source from the view's forward, clockwise positive (right = +90°); behind lands on the bottom edge.
+      side = _d.x;
+      let slot = slots.reduce((m, s) => s.strength < m.strength ? s : m, slots[0]);
+      // Repeated blows from the same side build one bloom instead of stacking copies.
+      for (const s of slots) if (s.strength > .05 && s.x * _d.x + s.y * _d.y > .92) { slot = s; break; }
+      slot.x = _d.x; slot.y = _d.y; slot.strength = Math.min(1.25, slot.strength * .6 + .5 + .6 * severity); slot.warm = warm;
+      slot.from = event.from.slice(0, 3); slot.age = 0; slot.arc = warm ? .55 : Math.min(1, .7 + .5 * severity);
+      if (severity > .6) glow = Math.min(1, glow + .3 * severity);          // a heavy blow also flares the whole rim
     } else glow = Math.min(1, glow + (warm ? .22 : .4) + .45 * severity);
     if (warm) warmGlow = 1;
     if (!presenting() && !reducedMotion) {
@@ -169,16 +210,29 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
   function update(dt) {
     dt = Math.min(.1, Math.max(0, dt)); time += dt;
     const xr = presenting();
+    const eye = view?.();
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i];
       s.strength = Math.max(0, s.strength - dt / T.fade * (s.strength > .7 ? 1.4 : 1));
-      hits[i].set(s.x, s.y, s.strength, s.warm);
+      s.age += dt; s.arc = Math.max(0, s.arc - dt / T.arcLife * (s.age < .3 ? .3 : 1));
+      // Keep pointing at the blow's origin as the player turns (every frame, from the live eye).
+      if (s.from && eye && (s.strength > .002 || s.arc > .002) && screenDir(s.from, eye, _d)) {
+        const k = 1 - Math.exp(-dt * 30); s.x += (_d.x - s.x) * k; s.y += (_d.y - s.y) * k;
+        const l = Math.hypot(s.x, s.y) || 1; s.x /= l; s.y /= l;
+      }
+      hits[i].set(s.x, s.y, s.strength, s.warm); arcs[i].set(s.age, s.arc, 0, 0);
     }
     glow = Math.max(0, glow - dt / T.fade); warmGlow = Math.max(0, warmGlow - dt * 1.5);
     const me = self(), max = Math.max(1, maxHp(me)), frac = me && me.hp > 0 ? me.hp / max : 1;
-    // A respawn (HP jumps back up) clears everything at once; healing eases the glow away.
-    if (lastHp !== null && me && me.hp > lastHp + max * .5) { for (const s of slots) s.strength = 0; glow = 0; low = 0; }
+    // A respawn (HP jumps back up past half) drops the low-health glow at once but lets the killing blow fade out;
+    // any smaller rise is a heal and breathes a soft gold-green from the edges.
+    if (lastHp !== null && me && me.hp > 0 && lastHp > 0) {
+      const gain = me.hp - lastHp;
+      if (gain > max * .5) low = 0;
+      else if (gain >= Math.max(1, max * .04)) heal = Math.min(1, heal + .35 + gain / max * 2);
+    }
     lastHp = me ? me.hp : null;
+    heal = Math.max(0, heal - dt / T.heal);
     const lowTarget = me && me.role !== 'god' && frac < T.low ? THREE.MathUtils.clamp((T.low - frac) / T.low * 1.3 + .25, 0, 1) : 0;
     low += (lowTarget - low) * (1 - Math.exp(-dt * (lowTarget > low ? 2.5 : 1.2)));
     const period = T.beat * (.75 + .25 * frac / T.low);
@@ -199,10 +253,10 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
     if (xr || reducedMotion) { spring.pitch = spring.roll = spring.vp = spring.vr = 0; }
     else if (camera && (Math.abs(spring.pitch) > 1e-5 || Math.abs(spring.roll) > 1e-5)) { camera.rotation.x += spring.pitch; camera.rotation.z += spring.roll; }
 
-    const active = glow > .002 || low > .01 || slots.some(s => s.strength > .002);
+    const active = glow > .002 || low > .01 || heal > .005 || slots.some(s => s.strength > .002 || s.arc > .002);
     quad.visible = active && !!camera;
     if (!quad.visible) return;
-    uniforms.uGlow.value = glow; uniforms.uLow.value = low; uniforms.uBeat.value = beatPulse; uniforms.uTime.value = time; uniforms.uWarm.value = warmGlow;
+    uniforms.uGlow.value = glow; uniforms.uLow.value = low; uniforms.uBeat.value = beatPulse; uniforms.uTime.value = time; uniforms.uWarm.value = warmGlow; uniforms.uHeal.value = heal;
     // Fill the flat view exactly; in a headset sit a metre out and cover well past the edge of vision.
     const d = xr ? T.xrDistance : Math.max(.06, (camera.near || .05) * 1.6);
     const h = xr ? 2 * d * Math.tan(THREE.MathUtils.degToRad(52)) : 2 * d * Math.tan(THREE.MathUtils.degToRad((camera.fov || 70) / 2));
@@ -211,7 +265,7 @@ export function createHurtFeedback({camera, presenting = () => false, touch = ()
     uniforms.uAspect.value = w / h;
   }
 
-  function reset() { for (const s of slots) s.strength = 0; glow = low = warmGlow = 0; spring.pitch = spring.roll = spring.vp = spring.vr = 0; quad.visible = false; meterEl?.classList.remove('bf-low', 'bf-hurt'); }
+  function reset() { for (const s of slots) { s.strength = s.arc = 0; s.from = null; } glow = low = warmGlow = heal = 0; spring.pitch = spring.roll = spring.vp = spring.vr = 0; quad.visible = false; meterEl?.classList.remove('bf-low', 'bf-hurt'); }
   function dispose() { reset(); quad.removeFromParent(); quad.geometry.dispose(); material.dispose(); ghost?.remove(); ghost = null; meterEl = null; }
-  return {hurt, update, reset, dispose, stats: () => ({visible: quad.visible, glow, low, blooms: slots.filter(s => s.strength > .002).map(s => ({x: s.x, y: s.y, strength: s.strength})), pitch: spring.pitch, roll: spring.roll})};
+  return {hurt, update, reset, dispose, stats: () => ({visible: quad.visible, glow, low, blooms: slots.filter(s => s.strength > .002).map(s => ({x: s.x, y: s.y, strength: s.strength, arc: s.arc})), heal, pitch: spring.pitch, roll: spring.roll})};
 }

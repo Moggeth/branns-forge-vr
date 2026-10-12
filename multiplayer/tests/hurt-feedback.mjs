@@ -56,4 +56,18 @@ test('fire and sourceless hurts glow all round; haptics pick the struck hand in 
   assert.equal(hands[0][0],'right');assert.ok(hands[0][1]>hands[1][1],'struck side rumbles harder');
   assert.equal(camera.rotation.x,0,'no camera motion in VR');
 });
+test('the bloom and crescent keep pointing at the blow as you turn toward it',()=>{
+  const camera=new THREE.PerspectiveCamera(),me={hp:80,maxHp:100},eye={position:new THREE.Vector3(),yaw:0};
+  const fx=createHurtFeedback({camera,self:()=>me,view:()=>eye});
+  fx.hurt({kind:'hit',hero:true,id:'h',damage:10,from:[-3,1,0]},eye);fx.update(1/60);
+  let b=fx.stats().blooms[0];assert.ok(b.x<-.99&&b.arc>.5,'left, with a crescent');
+  eye.yaw=Math.PI/2;for(let i=0;i<10;i++)fx.update(1/60);   // turned left to face it
+  b=fx.stats().blooms[0];assert.ok(b.y>.95,`now ahead (${b.x.toFixed(2)},${b.y.toFixed(2)})`);
+});
+test('healing breathes a gold-green glow that fades; a respawn does not count as a heal',()=>{
+  const camera=new THREE.PerspectiveCamera(),me={hp:50,maxHp:100},fx=createHurtFeedback({camera,self:()=>me});
+  fx.update(1/60);me.hp=70;fx.update(1/60);assert.ok(fx.stats().heal>.4);
+  for(let i=0;i<120;i++)fx.update(1/30);assert.equal(fx.stats().heal,0);assert.equal(fx.stats().visible,false);
+  me.hp=10;fx.update(1/60);me.hp=100;fx.update(1/60);assert.equal(fx.stats().heal,0,'respawn');
+});
 console.log(`hurt-feedback: ${passed} passed`);
