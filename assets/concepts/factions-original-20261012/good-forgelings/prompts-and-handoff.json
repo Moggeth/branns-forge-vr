@@ -1,0 +1,51 @@
+{
+  "tool": "Built-in image_gen",
+  "referenceModel": "E:/UnrealWork/forge-graphics-performance/multiplayer/public/assets/forgeling.glb",
+  "commonPrompt": "Use case: stylized-concept. Make a polished readable game character concept reference sheet for Brann's Forge, bright optimistic stylised fantasy, charming handmade workshop engineering. Use the attached actual Forgeling model renders as strict shared BODY IDENTITY references: ivory warm stone barrel torso, round bobbly head with dome/chimney, big round blue crystal eyes in brass rims, little brass grille jaw, blue crystal heart, segmented stone limbs, brass joint balls and bands, chunky feet. Preserve this anatomy, proportions and articulation; only kit changes except explicit heavy width or sapper scale. Interpret geometry with appealing bevels, tactile stone and warm aged brass, restrained craftsmanship, no excessive greebles. Clean warm pale parchment background, soft studio shadows, full body entirely visible, no scene clutter. Landscape professional art sheet, large front three-quarter hero view on left, smaller useful rear three-quarter view upper right, equipment detail and readable action vignette lower right. Consistent character identity across all views, legible chunky silhouettes suitable for phone/Quest crowds. Level-one modular design fidelity with polished concept illustration/3D paintover finish: understandable buildable shapes, not photorealism, not greybox. Sparse tasteful typography: only the exact title at top and short two-word labels for views/actions; no paragraphs. Images are concepts, not screenshots. ",
+  "concepts": [
+    {
+      "id": "01-forgeling",
+      "title": "FORGELING — GRUNT",
+      "prompt": "Standard existing body proportions. Equip a sturdy one-handed squared smith's hammer and round brass-rimmed stone forge shield. Hero pose is cheerful but battle-ready. Action inset clearly shows hammer bonking its own shield before winding up for a swing. Rear view exposes simple forearm shield strap and toolbelt, unobscured joints.",
+      "elapsedSeconds": 23.964,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-1be5bb50-6f80-4ef6-a72a-50167f345489.png"
+    },
+    {
+      "id": "02-anvilback",
+      "title": "ANVILBACK — HEAVY",
+      "prompt": "Same body and height, but torso/shoulder silhouette exactly about 1.4 times as wide as the reference. Slow, stout, dependable. Bolted reinforcement kit, large recognisably anvil-shaped tower shield with broad anvil horn shoulders and heavy flat base. Can plant shield upright as cover. Show shield held in main pose, rear mounting in rear view, and action inset shield planted on ground with a short charming puff of steam from its chimney. Same eyes/head/joints as reference; not a new golem species.",
+      "elapsedSeconds": 59.228,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-5f8c1b6c-8814-4995-adec-ef57ad0574d2.png"
+    },
+    {
+      "id": "03-glintshot",
+      "title": "GLINTSHOT — RANGED",
+      "prompt": "Same standard body. Two-handed crystal repeater, tidy brass and dark wood stock, compact faceted blue crystal magazine, clearly readable barrel and insulated handgrips. Aiming stance; action inset shows a short three-shot crystal-light burst while flanking a heavy silhouette, no huge laser. Rear view shows bolt-on crystal ammo rack and unobstructed shoulder joints. Alert charming marksman.",
+      "elapsedSeconds": 81.611,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-b7d61e4f-b7a4-4f3b-969b-4ccbeb17c099.png"
+    },
+    {
+      "id": "04-mender",
+      "title": "MENDER — HEALER",
+      "prompt": "Same standard body. Carries an ember of the Hearthfire in a lovely portable brass lantern with warm amber core, plus broad soft-faced repair mallet. Warm apricot accent differentiates healing kit while existing eye and heart crystals remain blue. Main pose holding lantern and mallet. Two small action insets: gently tapping cracks closed on another stone Forgeling with mallet, lantern light soothing a human Hero. Rear view shows practical lantern hook and repair pouch. A stone mechanic healer, not a cleric in robes.",
+      "elapsedSeconds": 106.225,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-b0de0fbd-ce0a-4fe8-b365-86751f342ba9.png"
+    },
+    {
+      "id": "05-fusewick",
+      "title": "FUSEWICK — SAPPER",
+      "prompt": "Same body scaled uniformly smaller, agile runner, same round goggle eyes and grille. Carries a strapped Emberdew keg with wood staves, metal hoops, distinct visible fuse. Cute dangerous slapstick sapper. Main running pose with keg securely carried. Rear view shows keg harness without concealing leg joints. Action vignette two sequential small poses: setting keg by a fantasy gate and lighting fuse; then comic wide-eyed panic and running away with hands up. No gore, modern bomb or grim military styling.",
+      "elapsedSeconds": 142.351,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-62bf025a-ff0a-4414-9a14-caf12ccb6c1b.png"
+    },
+    {
+      "id": "06-sunlance-cart",
+      "title": "SUNLANCE CART — MOBILE SIEGE",
+      "prompt": "Same actual Forgeling body used for a small visible operator crew member alongside a compact wheeled siege kit, not transformed into a tank. Main focus is miniature Sunlance: brass-and-ivory fantasy light lance on a stout dark-wood two-wheel carriage with small rear support, solar crystal focusing lens and mechanically clear elevation pivot. Warm golden energy instead of blue repeater fire. Rear view exposes operating handles and stabilising stakes. Action inset shows cart stationary with stakes planted into earth, firing long-range focused golden beam toward a distant defensive spire. Operator fits shared existing humanoid rig. Tidy handmade whimsical workshop siege equipment.",
+      "elapsedSeconds": 166.973,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-76d49b76-242a-4ecd-b46a-6e0bcdc72168.png"
+    }
+  ],
+  "inspectionNotes": "Actual Forgeling GLB rendered via existing asset browser. New checkout lacked browser CLI; original checkout index lacked Forgeling. Imported existing browser with ROOT override. First capture timed out (30s) because current asset-pose imports are not staged by historical viewer; raw inspection succeeded in 2.280s with historical adapter in disposable staging only. Production untouched.",
+  "artReview": "All six preserve stone/brass/blue-crystal family and show kit/action details. Concept proportions are interpretive, not exact production measurements. Anvilback width requires explicit 1.4x constraint in 3D. Cart is a proposed Sunlance interpretation, not a traced existing Sunlance mesh. Fusewick lights a separate placed keg; rear view depicts transport harness. Check rig/kit clearance in 3D; references do not prove animation reuse or performance."
+}

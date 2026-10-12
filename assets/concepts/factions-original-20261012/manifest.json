@@ -1,0 +1,66 @@
+{
+  "images": [
+    {
+      "path": "good-forgelings/01-forgeling.png",
+      "sha256": "11a2cc18b5e58aaf087a731c5c1698c6e54e8a8b0b26a92793a92de8715c59a9",
+      "bytes": 2497975
+    },
+    {
+      "path": "good-forgelings/02-anvilback.png",
+      "sha256": "cbb5d02a777b7282b98e6694951e71d83b323d359c70e3e4c056a49463866b66",
+      "bytes": 2504316
+    },
+    {
+      "path": "good-forgelings/03-glintshot.png",
+      "sha256": "86b7812e104be40b320f390b45d4c00ad40d46c3e896e6a7a4fb8bc81f3a0033",
+      "bytes": 2410976
+    },
+    {
+      "path": "good-forgelings/04-mender.png",
+      "sha256": "7477214a208d717b862c6f182d938edf30911be59a1a7e84a48d55b319aba9be",
+      "bytes": 2410264
+    },
+    {
+      "path": "good-forgelings/05-fusewick.png",
+      "sha256": "50ba92b2cf7e069c0ded661fa48e5cb85073d8f6234229f0f35d188516152ad2",
+      "bytes": 2382856
+    },
+    {
+      "path": "good-forgelings/06-sunlance-cart.png",
+      "sha256": "4a35acf76c6eb3ae66550ff7520a92f2b80eff4c630bc15939dfd5585eb40b15",
+      "bytes": 2623075
+    },
+    {
+      "path": "evil-skeletons/01-rattleguard.png",
+      "sha256": "28d9e90594e220edb24794ad8ea8049eb7371ff1c53a0e750f1d94ba24d2be03",
+      "bytes": 2529200
+    },
+    {
+      "path": "evil-skeletons/02-graveback.png",
+      "sha256": "b2476c310c0966beb4a41318a1a3b2c255ce7f5c74c395bebcbf5335be9c7884",
+      "bytes": 2720458
+    },
+    {
+      "path": "evil-skeletons/03-splintershot.png",
+      "sha256": "e00cd456ccf5a35214db86c9fa39092ffd3bd8960ec304a7937999cbda8a557e",
+      "bytes": 2480491
+    },
+    {
+      "path": "evil-skeletons/04-bonebinder.png",
+      "sha256": "222bf870153ebd86456ad4bc75c89571e2b78afb16400b860edf27311c6809d6",
+      "bytes": 2555448
+    },
+    {
+      "path": "evil-skeletons/05-wickbone.png",
+      "sha256": "eb76413c27f85b31aa798479a3c647341c049d967dd31a7d1e2916381a189620",
+      "bytes": 2506613
+    },
+    {
+      "path": "evil-skeletons/06-gloamlance-cart.png",
+      "sha256": "2cf1079cc27be8bff64356678bf3e9272aa92c9c4b6f3869e09e414d5f6a7aff",
+      "bytes": 2735463
+    }
+  ],
+  "tool": "built-in image_gen",
+  "set": "Original good and evil, not later variant sheets"
+}

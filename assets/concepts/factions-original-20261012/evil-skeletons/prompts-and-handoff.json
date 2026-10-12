@@ -1,0 +1,51 @@
+{
+  "tool": "Built-in image_gen",
+  "baseReference": "E:/UnrealWork/forge-graphics-performance/multiplayer/public/assets/skeleton.glb",
+  "captureSeconds": 4.2466832,
+  "commonPrompt": "Use case: stylized-concept. Create a polished character/equipment reference sheet for Brann's Forge's evil skeleton faction. Input images: first image is ACTUAL SKELETON BODY reference, use anatomy/proportions/skull/exposed ribs/joints as baseline, but DO NOT copy the stacked overlapping optional headgear and shields in the raw model; select only the kit in brief. Second image is the finished opposing Forgeling sheet, use ONLY its presentation style, quality, warm paper background, layout, material rendering and cheerful fantasy tone, never its stone robot anatomy. Skeletons must be visually skeletal with separated ribs, thin bone arms/legs and skull faces, no flesh. Same base body and rig language across all variants; equipment bolted/strapped on. Evil through sly attitude, crooked silhouettes, rusty iron, dark wood, restrained plum cloth and spectral green/violet magic; remain goofy, charming and readable, not grimdark, no gore. Warm ivory bone shaded clearly apart from pale paper. Level-one modular design specificity rendered as appealing polished stylised 3D paintover illustration with bevelled tangible materials, restrained useful detail, suitable to inspire efficient phone/Quest game meshes. Landscape clean reference sheet, large full-body front three-quarter on left; smaller rear three-quarter on right; distinct equipment closeup; small action vignette bottom right. Whole silhouette visible, no clipping, readable negative space, consistent anatomy and kit across views. Sparse typography title plus short view/action labels only. These are new proposed concept designs, not game screenshots. ",
+  "concepts": [
+    {
+      "id": "01-rattleguard",
+      "title": "RATTLEGUARD — GRUNT",
+      "prompt": "Counterpart to Forgeling grunt. Same base skeleton anatomy, crooked rusty kettle helmet, short torn plum waistcloth, battered wooden shield bound with iron and a stubby notched iron mace. Mischievous toothy confidence, glowing acid-green pinprick eyes. Main ready pose. Rear view shows shield forearm straps. Equipment closeups mace/shield. Action inset two readable poses: rattles mace against shield, then overcommitted clumsy swing. A charming expendable bone soldier.",
+      "elapsedSeconds": 36.456,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-52b423fe-17a4-4ca2-a2a4-9f62663eeb83.png"
+    },
+    {
+      "id": "02-graveback",
+      "title": "GRAVEBACK — HEAVY",
+      "prompt": "Counterpart to Anvilback. Same skeleton bones and rig inside a silhouette about 1.4x wider due to broad mismatched bolted iron shoulder armour; keep exposed skeletal waist and limbs. Huge tall coffin-lid shaped WOODEN pavise shield with broad iron bands, chipped purple heraldry and simple skull boss. No corpse. Heavy slow posture; low rusted helmet over visible skull. Rear view exposes shield carry harness and clear bone joints. Action inset plants pavise's two iron feet into soil to shelter smaller skeleton silhouettes; puff of eerie green dust escapes on impact. Separate shield front/rear detail.",
+      "elapsedSeconds": 78.421,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-ceef3070-45ca-4aae-964a-82e13d43ec0f.png"
+    },
+    {
+      "id": "03-splintershot",
+      "title": "SPLINTERSHOT — RANGED",
+      "prompt": "Counterpart to Glintshot. Same skeleton with minimal tattered purple hood that leaves face readable, narrow profile and quiver. Handheld repeating crossbow from dark splintered wood, rusty iron winding ratchet and compact top magazine of short spectral green-tipped quarrels. Mechanically coherent bow limbs and string, no modern gun. Main aimed three-quarter stance; rear view magazine pouch and shoulder clearance. Weapon close-up. Action inset three green-tipped bolts in short burst aimed into flank of distant broad shield-bearing construct silhouette. Cunning skeletal skirmisher, same shared body.",
+      "elapsedSeconds": 116.219,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-244be017-954d-43b1-be8f-2fd923595b76.png"
+    },
+    {
+      "id": "04-bonebinder",
+      "title": "BONEBINDER — HEALER",
+      "prompt": "Counterpart to Mender. Same skeleton with short ragged plum shoulder shawl, simple hood and crooked little bone-setting tongs/repair tool, portable rusted iron lantern with caged green ghost flame. Exposed ribs and pelvis, no full robe hiding body. Friendly-to-its-own evil field medic. Main body holds lantern and tongs. Rear view shows sparse spare-bone rack and tool pouch. Equipment closeup lantern and tongs. Action insets: snaps a loose forearm back onto seated skeleton using green binding wisps; raises lantern to sustain allied skeletons with restrained spectral glow. Funny practical necromancy, no flesh gore or anatomical horror.",
+      "elapsedSeconds": 158.238,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-24057c53-b8c7-4c4e-a9dc-7bffab24de4f.png"
+    },
+    {
+      "id": "05-wickbone",
+      "title": "WICKBONE — SAPPER",
+      "prompt": "Counterpart to Fusewick. Base skeleton scaled uniformly smaller, huge eager skull expression, minimal leather harness, small crooked helmet and short purple rag. Carries a battered wooden Emberdew keg with iron hoops and a plainly visible long fuse. Main running pose with secured keg. Rear equipment/harness view, detached keg detail. Three small action story beats: places keg at fantasy gate, lights fuse with flint, panics and bolts away flailing skeletal arms while jaw drops open. Readable silhouette, comic villainy, not modern explosives, no explosion obscuring design.",
+      "elapsedSeconds": 197.421,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-78fe1177-cf33-4633-bdb5-633730952fba.png"
+    },
+    {
+      "id": "06-gloamlance-cart",
+      "title": "GLOAMLANCE CART — MOBILE SIEGE",
+      "prompt": "Counterpart to Sunlance Cart. One clearly visible operator using exactly the shared thin skeleton body, skull, ribs and bony hands. Main subject compact dark-wood two-wheel siege carriage with rusty iron braces, a long crooked-but-engineered spectral focusing lance: antique iron tube sections, bone-like decorative ribs over barrel, faceted violet crystal lens at muzzle, coherent elevation trunnion and hand crank. Little torn purple pennant. Rear view controls and two stabilising ground stakes. Detail muzzle and stakes. Action inset planted stakes, operator working crank, long narrow violet-green spectral beam toward distant bright fantasy defence spire. Charming villain workshop counterpart, substantial useful design, no modern tank or biological flesh.",
+      "elapsedSeconds": 238.034,
+      "source": "C:\\Users\\mog\\.codex\\generated_images\\01a09466-d09a-72b2-ab93-deb4e7ea0c02\\exec-af287adb-6857-4cda-bc92-2b87d23f1985.png"
+    }
+  ],
+  "review": "Proposed names and kits, not implementation. Six sheets inspected. Preserve original skeleton mesh/rig dimensions during modelling; generated bone proportions and details are interpretive. Raw source shows overlapping variant equipment; choose one kit per unit, not all optional meshes. Graveback contains brass-coloured joint caps influenced by opposing reference; omit these or use iron straps on existing bone joints. Wickbone depicts both hand-carry and back-carry; choose one transport attachment and leave fuse unlit until planting. Cart anchors need an explicit stake placement/retraction mechanism. Crossbow string, magazine and trigger require mechanical validation. Character kit and effects do not establish performance or animation compatibility. No game files changed."
+}
