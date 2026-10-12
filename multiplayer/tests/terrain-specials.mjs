@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {DEPOSIT_CATALOG,depositReward} from '../shared/material-catalog.js';
 import {baseHeight,mountainHeight,moveOnTerrain,PICK_WALL,pickWallDurationTicks} from '../shared/terrain.js';
 import {planCrystalWall} from '../shared/weapon-specials.js';
 import {createEnemy} from '../shared/combat.js';
@@ -45,8 +46,9 @@ assert.equal(special(s).code,'outside_world');assert.deepEqual(gameplay(s.checkp
 // Mine one segment: its earth sinks over sinkTicks (never instantly), rewards once, then edit+deposit retire.
 s=fixture('pick');special(s);for(let i=0;i<60;i++)s.step();
 let ore=s.snapshot().deposits.filter(d=>d.special==='pick_wall').at(-1);
-const peak=terrainHeight(s.snapshot(),ore.x,ore.z);
-for(let i=0;i<3;i++) {
+const peak=terrainHeight(s.snapshot(),ore.x,ore.z),reward=depositReward(ore.kind),rewardBefore=s.snapshot().pickups.filter(q=>q.kind===reward.kind).length;
+assert.equal(ore.maxHits,DEPOSIT_CATALOG[ore.kind].maxHits);
+for(let i=0;i<ore.maxHits;i++) {
   c=s.checkpoint();c.players[0].attackTick=-1000;
   c.players[0].position=[ore.x+2,terrainHeight(c,ore.x+2,ore.z),ore.z];c.players[0].yaw=Math.PI/2;s=loadSimulation(c);
   const result=s.command('h',{type:'action',action:'strike',seq:i+2,tool:'pick',targetId:ore.id,point:[ore.x,terrainHeight(s.snapshot(),ore.x,ore.z),ore.z],normal:[0,1,0]});
@@ -55,7 +57,7 @@ for(let i=0;i<3;i++) {
 assert.equal(s.snapshot().deposits.find(d=>d.id===ore.id).depleted,true);
 const sinking=s.snapshot().edits.find(e=>e.id===ore.editId);assert.ok(sinking&&sinking.wall.expireTick===s.snapshot().tick,'mined segment starts sinking, not vanishing');
 assert.ok(terrainHeight(s.snapshot(),ore.x,ore.z)>peak-.01,'no instant drop');
-assert.equal(s.snapshot().pickups.filter(q=>q.kind==='stone').length,2); // Existing sanctuary cache plus reward.
+assert.equal(s.snapshot().pickups.filter(q=>q.kind===reward.kind).length,rewardBefore+1,'the mined mineral pays its own resource');
 assert.deepEqual(loadSimulation(s.checkpoint()).snapshot(),s.snapshot());
 const clean=s.checkpoint();
 for(const mutate of [c=>c.deposits.find(d=>d.id===ore.id).depleted=false,c=>c.edits.find(e=>e.kind==='pick_wall').height=999,c=>c.deposits.find(d=>d.special==='pick_wall'&&!d.depleted).editId='missing',c=>c.edits.find(e=>e.kind==='pick_wall').kind='raise',
@@ -110,7 +112,7 @@ c.pendingStarfalls=[{id:'meteorPending',x:-20,z:-20,radius:5,impactTick:48}];s=l
 assert.equal(special(s).ok,true);{const after=s.checkpoint();assert.ok(after.edits.length+after.pendingStarfalls.length<=48&&after.terrainBake);}
 
 // Full pickup capacity preserves the last wall hit, cooldown and terrain; retry can finish later.
-s=fixture('pick');special(s);c=s.checkpoint();ore=c.deposits.find(d=>d.special==='pick_wall');ore.hits=2;
+s=fixture('pick');special(s);c=s.checkpoint();ore=c.deposits.find(d=>d.special==='pick_wall');ore.hits=ore.maxHits-1;
 c.pickups=Array.from({length:256},(_,i)=>({id:`full${i}`,kind:'stone',amount:1,x:-20,z:-20,y:terrainHeight(c,-20,-20)}));
 s=loadSimulation(c);const full=s.checkpoint();
 assert.equal(s.command('h',{type:'action',action:'strike',seq:2,tool:'pick',targetId:ore.id,point:[ore.x,terrainHeight(c,ore.x,ore.z),ore.z],normal:[0,1,0]}).code,'world_limit');
@@ -216,3 +218,15 @@ for(const point of [undefined,[10,0,7]]){
   assert.ok(c1.edits.some(e=>e.wall&&terrainHeight(c1,e.x,e.z)>ground.at(-1)+.4),'the wall itself rose');
 }
 console.log(`terrain-specials: pass (${((performance.now()-started)/1000).toFixed(3)} s)`);
+
+// Pick of Riches: every cast surfaces at least one rich seam, never star metal, deterministically per seed and cast.
+{const {ridgeMinerals,RIDGE_KINDS,isRichMineral}=await import('../shared/weapon-specials.js');const tally={};
+ for(let seed=1;seed<=400;seed++)for(const n of [2,4,7]){const kinds=ridgeMinerals(seed,`w${seed}`,n);
+  assert.equal(kinds.length,n);assert.ok(kinds.some(isRichMineral),'one rich seam per cast');assert.ok(kinds.every(k=>RIDGE_KINDS.includes(k)&&k!=='star'&&k!=='meteor'));
+  assert.deepEqual(ridgeMinerals(seed,`w${seed}`,n),kinds,'same seed and cast, same minerals');for(const k of kinds)tally[k]=(tally[k]||0)+1;}
+ assert.ok(tally.stone>tally.iron&&tally.iron>tally.copper&&tally.stone>tally.gold&&tally.gold>tally.mithril,'common minerals dominate, mithril is rarest');
+ // A live cast stores them as mineable deposits with the catalog's hits.
+ const s=fixture('pick');const r=special(s);assert.equal(r.ok,true);const e=r.events.find(e=>e.kind==='pick_burst');
+ assert.deepEqual(s.snapshot().deposits.filter(d=>d.special==='pick_wall').map(d=>d.kind),e.minerals);
+ assert.deepEqual(loadSimulation(JSON.parse(JSON.stringify(s.checkpoint()))).snapshot().deposits,s.snapshot().deposits,'mineral seams survive a reload');
+ const bad=s.checkpoint();bad.deposits.find(d=>d.special==='pick_wall').kind='star';bad.deposits.find(d=>d.special==='pick_wall').maxHits=6;assert.throws(()=>loadSimulation(bad),'star metal never rides a ridge');}
