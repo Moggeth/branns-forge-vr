@@ -102,7 +102,7 @@ export function createBoneShards({scene, material = null, height = () => 0, qual
     if (!event || !Array.isArray(event.position)) return false;
     const seed = hashOf(event.kind, event.id, event.style || '', event.part || '');
     if (event.kind === 'death' && event.creature === 'skeleton' && event.style === 'shatter') {
-      const S = SHARDS.shatter, at = event.point || [event.position[0], event.position[1] + 1.1, event.position[2]], away = flat((event.normal || [0, 0, 0]).map(n => -n));
+      const S = SHARDS.shatter, at = event.point || [event.position[0], event.position[1] + 1.1, event.position[2]], away = event.direction ? flat(event.direction) : flat((event.normal || [0, 0, 0]).map(n => -n));
       burst('splinter', fewer(S.splinter), at, away, S.speed, S.lift, seed, 1);
       burst('knob', fewer(S.knob), at, away, S.speed, S.lift, seed + 1, 1);
     } else if (event.kind === 'death' && event.creature === 'skeleton' && event.style === 'headshot') {

@@ -223,7 +223,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);}
   return true;
 }
 // Skeleton equipment and a golem's forged iron bracers are useful Iron immediately (golem stone comes from mining
@@ -421,7 +421,11 @@ export function combatAction(state,p,m,ctx){
     if(state.tick-(p.specialTick??-1000)<specialCooldown('hammer'))return fail('cooldown');
     const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[];
     p.specialTick=state.tick;
-    for(const e of [...state.enemies])if(dist(e.position,at)<5)hitEnemyPart(state,e,'torso',65,{tool:p.tool,point:at,ownerId:p.id},ctx,events);
+    // Each foe is struck by the shockwave from the slam's centre outward, so shattered bones fly away from it.
+    for(const e of [...state.enemies])if(dist(e.position,at)<5){
+      const dx=e.position[0]-at[0],dz=e.position[2]-at[2],r=Math.hypot(dx,dz),direction=r>.05?[dx/r,0,dz/r]:[-Math.sin(p.yaw),0,-Math.cos(p.yaw)],torso=partPosition(e,'torso');
+      hitEnemyPart(state,e,'torso',65,{tool:p.tool,point:[torso[0]-direction[0]*.2,torso[1],torso[2]-direction[2]*.2],direction,ownerId:p.id},ctx,events);
+    }
     events.push({kind:'hammer_slam',id:p.id,position:at});return ok(events);
   }
   return null;

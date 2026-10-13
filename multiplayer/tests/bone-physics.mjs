@@ -2,7 +2,7 @@
 // (hinged elbows/knees/jaw, splinters), checked on the shipped skeleton model.
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createEnemy, hitEnemyPart, stepCombat, deathStyle, BONE_DEATH} from '../shared/combat.js';
+import {createEnemy, hitEnemyPart, stepCombat, combatAction, deathStyle, BONE_DEATH} from '../shared/combat.js';
 import {prepareAsset} from '../client/asset-pose.js';
 import {snapshotDetachedPart} from '../client/combat-view.js';
 import {stepHinges, HINGE_LIMITS} from '../client/bone-articulation.js';
@@ -97,6 +97,20 @@ assert.equal(cueFor({kind: 'death', creature: 'skeleton', style: 'crumple'}).nam
   hitEnemyPart(w.state, e, 'torso', 500, {part: 'torso', tool: 'axe', normal: [0, 0, 1], point: [0, 1.1, .1], partPoses: {leftLeg: leg, rightLeg: {...leg, position: [-.1, .9, 0]}, torso: {position: [0, 1.1, 0], quaternion: id}}}, w.ctx, []);
   let top = 0; for (let i = 0; i < 60; i++) { step(w, 1); top = Math.max(top, ...w.state.detachedParts.filter(d => d.part.endsWith('Leg')).map(d => d.position[1])); }
   assert.ok(top < 1.3, `buried legs pop out gently (highest hip ${top.toFixed(2)} m)`);
+}
+
+// ---- the hammer slam's shockwave throws bones away from its centre, whichever way the skeleton faces --------------
+{
+  const w = world(), hero = {id: 'h', position: [0, 0, 0], yaw: Math.PI, tool: 'hammer', hp: 100, specialTick: -1000};
+  w.state.players.push(hero);
+  const at = [0, 0, 1.5], e = createEnemy('east', [3, 0, 1.5]); e.yaw = Math.PI / 2; e.hp = 1; w.state.enemies.push(e); // east of the slam, facing east
+  const r = combatAction(w.state, hero, {type: 'action', action: 'special'}, w.ctx);
+  const death = r.events.find(ev => ev.kind === 'death');
+  assert.equal(death?.style, 'shatter', 'the Q slam shatters too');
+  assert.ok(death.direction[0] > .99, 'its blow points away from the slam centre');
+  const before = w.state.detachedParts.map(d => d.position[0] - at[0]); step(w, 90);
+  const after = w.state.detachedParts.map(d => d.position[0] - at[0]);
+  assert.ok(after.reduce((a, b) => a + b, 0) > before.reduce((a, b) => a + b, 0) + 2, 'the bones fly outward, not back into the crater');
 }
 
 // ---- same blow, same pile, on every machine -----------------------------------------------------------------------
