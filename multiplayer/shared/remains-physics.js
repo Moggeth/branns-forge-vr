@@ -5,7 +5,7 @@
 // a joint. Fixed 1/60 s ticks, no randomness: every peer replays the host exactly.
 // Bodies sleep once they settle and wake on any impulse, push or grab, so a field of bones costs nothing.
 import {clampToWorld} from './keep-sites.js';
-const G = 15, SUB = 2, ITER = 4, FOLD = .78, SLEEP_V = .06, SLEEP_W = .1, SLEEP_TICKS = 24, MU = .7, BREAK = 7.5;
+const G = 15, SUB = 2, ITER = 4, FOLD = .78, FOLD_ARM = .38, SLEEP_V = .06, SLEEP_W = .1, SLEEP_TICKS = 24, MU = .7, BREAK = 7.5, DEPEN = 1.5;
 // Mass in arbitrary units (only ratios matter): the ribcage anchors a ragdoll, an arm swings off it.
 const MASS = {skeleton: {head: 1, torso: 3, leftArm: .8, rightArm: .8, leftLeg: 1.3, rightLeg: 1.3}, golem: {head: 6, torso: 14, leftArm: 5, rightArm: 5, leftLeg: 6, rightLeg: 6}};
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -80,7 +80,7 @@ export function stepRemains(state, ctx, dt = 1 / 60) {
   const joints = bodies.filter(d => d.joint && S.has(byId.get(d.joint.to)));
   for (let s = 0; s < SUB; s++) {
     for (const b of S.values()) {
-      b.x0 = [...b.x]; b.q0 = [...b.q];
+      b.x0 = [...b.x]; b.q0 = [...b.q]; b.v0 = [...b.d.velocity]; b.w0 = len(b.d.angularVelocity); b.deep = false;
       if (!b.w) {b.x = add(b.d.position, rotate(b.c, b.d.quaternion)); b.q = [...b.d.quaternion]; continue;}
       const v = b.d.velocity; v[1] -= G * h;
       b.x = add(b.x, [v[0] * h, v[1] * h, v[2] * h]);
@@ -94,8 +94,13 @@ export function stepRemains(state, ctx, dt = 1 / 60) {
         positional(A, B, rA, rB, delta.map(v => v / c), c);
         // No-fold: a limb's middle keeps its distance from the ribcage's middle, so a skull or a leg
         // can swing at its joint but never fold through the torso (bones do not interpenetrate).
-        const min = FOLD * (len(sub(d.joint.a, A.c)) + len(sub(B.c, d.joint.b))), gap = sub(B.x, A.x), g = len(gap);
-        if (g < min && g > 1e-6) positional(A, B, [0, 0, 0], [0, 0, 0], gap.map(v => v / g), min - g);
+        // An arm hangs close beside the ribs, so it may come nearer the ribcage's middle than a leg or skull.
+        const min = (d.part.endsWith('Arm') ? FOLD_ARM : FOLD) * (len(sub(d.joint.a, A.c)) + len(sub(B.c, d.joint.b))), gap = sub(B.x, A.x), g = len(gap);
+        if (g < min && g > 1e-6) {
+          // A pose that starts folded (an arm hanging close beside the ribs) eases open instead of springing apart.
+          const folded = len(sub(B.x0, A.x0)) < min - .01;
+          positional(A, B, [0, 0, 0], [0, 0, 0], gap.map(v => v / g), folded ? Math.min(min - g, .004) : min - g);
+        }
       }
       for (const b of S.values()) if (b.w) contacts(state, ctx, b);
     }
@@ -104,6 +109,12 @@ export function stepRemains(state, ctx, dt = 1 / 60) {
       b.d.velocity = sub(b.x, b.x0).map(v => clamp(v / h, -60, 60));
       const dq = mulInv(b.q, b.q0), sign = dq[3] < 0 ? -1 : 1;
       b.d.angularVelocity = [dq[0], dq[1], dq[2]].map(v => clamp(2 * v * sign / h, -28, 28));
+      // Pushing a bone that started inside the ground back out is a correction, not a kick: without this a limb
+      // that came off with its foot planted a few centimetres deep would be fired into the sky.
+      if (b.deep) {
+        const dv = sub(b.d.velocity, b.v0), n = len(dv); if (n > DEPEN) b.d.velocity = add(b.v0, dv.map(v => v * DEPEN / n));
+        const w = len(b.d.angularVelocity), cap = b.w0 + DEPEN * 2; if (w > cap) b.d.angularVelocity = b.d.angularVelocity.map(v => v * cap / w);
+      }
       // Air and bone friction: a dead joint is stiff, so each limb gives up some spin to its torso.
       b.d.velocity = b.d.velocity.map(v => v * (1 - .2 * h));
       b.d.angularVelocity = b.d.angularVelocity.map(v => v * (1 - (b.d.joint ? 2.6 : 1.2) * h));
@@ -140,6 +151,7 @@ function contacts(state, ctx, b) {
     const local = [i ? bx.max[0] : bx.min[0], j ? bx.max[1] : bx.min[1], k ? bx.max[2] : bx.min[2]].map((v, a) => v - b.c[a]);
     const r = rotate(local, b.q), p = add(b.x, r), ground = ctx.terrainHeight(state, p[0], p[2]), depth = ground - p[1];
     if (depth <= 0) continue;
+    if (ground - add(b.x0, rotate(local, b.q0))[1] > .01) b.deep = true; // this corner was already buried
     const e = .12, gx = ctx.terrainHeight(state, p[0] + e, p[2]) - ground, gz = ctx.terrainHeight(state, p[0], p[2] + e) - ground;
     const n0 = [-gx / e, 1, -gz / e], nl = len(n0), n = n0.map(v => v / nl), pen = depth * n[1];
     const lambda = positional(null, b, null, r, n, pen);

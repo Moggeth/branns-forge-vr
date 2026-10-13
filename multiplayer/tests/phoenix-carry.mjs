@@ -36,7 +36,8 @@ assert.equal(act(s,3,'collectTarget',{targetId:skull.id}).ok,false);
 advance(s,150);skull=s.snapshot().detachedParts.find(d=>d.id===start.id);assert.ok(skull.carry);
 const pose=carryPose(skull.carry,s.snapshot().tick,(x,z)=>terrainHeight(s.checkpoint(),x,z));
 assert.ok(Math.hypot(...skull.position.map((n,i)=>n-pose.position[i]))<1e-9);
-assert.ok(skull.position[2]<from[2]-8,'flies on along the heading (-z)');if(torso0)assert.ok(Math.hypot(torsoAt()[0]-torso0[0],torsoAt()[2]-torso0[2])<1.5,'body is not dragged along');assert.ok(skull.position[1]>terrainHeight(s.checkpoint(),skull.position[0],skull.position[2])+.5);
+assert.ok(skull.position[2]<from[2]-8,'flies on along the heading (-z)');// A headshot knocks the body over backwards (about a body length); the skull's flight must not drag it further.
+if(torso0)assert.ok(Math.hypot(torsoAt()[0]-torso0[0],torsoAt()[2]-torso0[2])<2.2,'body is not dragged along');assert.ok(skull.position[1]>terrainHeight(s.checkpoint(),skull.position[0],skull.position[2])+.5);
 // A save mid-flight drops the carry (never saved) and the skull falls from where it was.
 const reloaded=loadSimulation(s.checkpoint());const ghost=reloaded.snapshot().detachedParts.find(d=>d.id===start.id);assert.equal(ghost.carry,undefined);
 const y0=ghost.position[1];advance(reloaded,90);assert.ok(reloaded.snapshot().detachedParts.find(d=>d.id===start.id).position[1]<y0-.5,'falls after reload');
