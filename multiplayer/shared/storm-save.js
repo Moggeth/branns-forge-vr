@@ -28,7 +28,7 @@ export function restoreStormspire(b, tick) {
     if (out.red || out.blue) b.planted = out; else delete b.planted;
   }
   for (const [wraps, at] of [['wraps', 'wrapAt'], ['wraps2', 'wrapAt2']]) {
-    if (b[wraps] !== undefined) b[wraps] = Array.isArray(b[wraps]) ? b[wraps].slice(0, 12).filter(w => w && id(w.id) && Number.isFinite(w.x) && Number.isFinite(w.z) && (w.s === 1 || w.s === -1)).map(({id: i, x, z, s}) => ({id: i, x, z, s})) : [];
+    if (b[wraps] !== undefined) b[wraps] = Array.isArray(b[wraps]) ? b[wraps].slice(0, 24).filter(w => w && id(w.id) && Number.isFinite(w.x) && Number.isFinite(w.z) && (w.s === 1 || w.s === -1)).map(({id: i, x, z, s}) => ({id: i, x, z, s})) : [];
     if (b[at] !== undefined && !(Array.isArray(b[at]) && b[at].length === 2 && b[at].every(Number.isFinite))) delete b[at];
   }
 }

@@ -1,25 +1,26 @@
 // Stormreel: a lightning crossbow fed by a cable-reel backpack that is plugged into a Stormspire tower.
 // One table drives the authority (this file, inventions.js, simulation.js) and the presentation (client/stormreel-*.js).
 //
-// The circuit is the rule (Mitch, 2026-10-07: "two bolts in the one enemy"). The tower stores charge (b.charge, 0..240)
+// The circuit is the rule (Mitch, 2026-10-07: "two bolts in the one enemy"; 2026-10-10: closing it is an instant kill). The tower stores charge (b.charge, 0..240)
 // from Crystal fed into its hopper. Each pack's cable carries one pole to its crossbow, and every bolt trails a fine copper
 // filament (like a taser probe). A bolt on its own only does its kinetic damage: current needs a loop. When a positive (+)
 // bolt and a negative (-) bolt are lodged in the SAME foe, the circuit closes through its body:
 //   tower(+) -> red cable -> red crossbow -> filament -> + bolt -> the foe -> - bolt -> filament -> blue crossbow -> blue cable -> tower(-)
-// It closes with an enormous surge, then cooks the foe ten times a second until it dies, the tower runs dry, it fades or a
-// bolt is reeled out. Bolts in the ground, a wall or two different foes are an open circuit: nothing flows.
+// It closes with one blinding surge that kills the foe outright, whatever it is (Mitch, 2026-10-10: "instant kill for any
+// enemy", no continuous zapping). Bolts in the ground, a wall or two different foes are an open circuit: nothing flows.
 // A crossbow can be planted (G / Drop, or by choosing another weapon): it is spiked butt-first into the ground where you
 // stand, its pack beside it, cable and filament still connected, while you fetch the other pole. Pick it up again with Use.
 // Carrying: the tower's existing `operator` field names the Hero wearing its pack, and that Hero's tool is 'stormreel'.
 // Two crossbows, two terminals (Mitch, 2026-10-06): the RED pack's crossbow fires positive (+) bolts, the BLUE pack's fires
 // negative (-) ones. Current only runs once a positive probe AND a negative probe are lodged, in either order, and a probe
 // stays lodged (tethered to its tower terminal by cable) after you drop the pack that fired it. Q reels your bolt back in.
-// The cable is the range limit: its path (terminal, round any trees it wraps, to the wearer) never exceeds `cable` metres.
+// The cable is the range limit: its path (terminal, round anything it wraps, to the wearer) never exceeds `cable` metres.
+// It routes round everything solid it touches (Mitch, 2026-10-10): trees, keep buildings, rocks, structures and the tower.
 import {partPosition,validPartHit,PARTS} from './combat.js';
 import {enemyHostileTo} from './battle-mode.js';
 import {raining} from './weather-spell.js';
 import {worldColliders,insideVolume} from './colliders.js';
-import {resolveHomeStructures,homePoint,homeFrame} from './home-bases.js';
+import {resolveHomeStructures,homePoint,homeFrame,homeSolids,pieceWorld,HOME_SITES} from './home-bases.js';
 import {worldTrees} from './world-content.js';
 
 export const STORMREEL = Object.freeze({
@@ -38,12 +39,9 @@ export const STORMREEL = Object.freeze({
   stepDamage: 25,
   takeReach: 3.6,       // metres from the tower to shoulder or hang the pack, and to feed crystal
   // The circuit through one foe (Mitch, 2026-10-07): a + bolt and a - bolt lodged in the same body.
-  surge: 160,           // the closing surge, all at once (more in rain): fells a skeleton outright
+  surge: 160,           // the least the closing surge does; it always does enough to kill the foe outright (2026-10-10)
   surgeDrain: 12,       // tower charge the surge costs
-  arcSeconds: 4,        // then the current keeps cooking it this long after the second bolt lands
-  arcPulseTicks: 6,     // damage pulses ten times a second
-  arcDamage: 24,        // per pulse (240 a second; more in rain)
-  arcDrain: 2,          // tower charge per pulse
+  arcSeconds: .5,       // the circuit stays drawn this long if anything (a rival ward) kept the foe alive
   plantReach: 2.6,      // metres from a planted crossbow to pick it up again
   probeSeconds: 90,     // a lone probe stays lodged (and tethered) this long while you fetch the other pack
   tether: 65,           // a probe whose pack is on its hook is held by the tower cable alone: past this it pulls free
@@ -67,6 +65,7 @@ export const towerTop = b => rotate(b, STORMSPIRE.top);
 export const plantedPack = (b, pack) => b.planted?.[pack] || null;
 export const chargeShots = b => Math.floor((b?.charge || 0) / STORMREEL.shotCost);
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
+const MAX_WRAPS = 24;
 
 /** The tower whose pack this player wears, if any. */
 export function wornTower(state, p) {
@@ -74,12 +73,53 @@ export function wornTower(state, p) {
   return state.inventions?.structures?.find(b => b.type === 'stormspire' && b.hp > 0 && (b.operator === p.id || b.operator2 === p.id)) || null;
 }
 
-// ---- the cable's path: tower terminal -> any trees it is wrapped around -> the wearer
-// Trees are pegs. When the straight run from the last anchor sweeps across a trunk, the cable wraps it (b.wraps gains
+// ---- the cable's path: tower terminal -> any pegs it is wrapped around -> the wearer
+// Pegs: every tree trunk, plus the corners of everything solid near the tower (keep buildings and walls, rocks, structures,
+// the Forge, landmarks and the tower itself), a few centimetres off the surface. A circle becomes a polygon of pegs, a box
+// its four corners. The pegs sit inside the space a walker is pushed out of, so a Hero can never stand between a peg and
+// the thing it guards (if they could, the cable would catch the far side instead). Same list on the host and in prediction.
+const PEG_PAD = .15, TOWER_PEG_R = 1.1;   // the cable's own tower: its pegs stay inside the terminals (1.34 m out), or every run would start wrapped
+function ringPegs(out, id, x, z, r) {
+  if (r < .35) { out.push({id, x, z}); return; }
+  const n = r > 2 ? 16 : 8, R = r + PEG_PAD;
+  for (let k = 0; k < n; k++) { const a = (k + .5) * Math.PI * 2 / n; out.push({id: `${id}-${k}`, x: x + Math.cos(a) * R, z: z + Math.sin(a) * R}); }
+}
+function boxPegs(out, id, placed, [u, v], [hu, hv]) {
+  for (const [k, [su, sv]] of [[1, 1], [1, -1], [-1, -1], [-1, 1]].entries()) {
+    const [x, z] = pieceWorld(placed, [u + su * (hu + PEG_PAD), v + sv * (hv + PEG_PAD)]); out.push({id: `${id}-${k}`, x, z});
+  }
+}
+const pegCache = new WeakMap();
+/** Every peg within cable reach of this tower: [{id, x, z}] (trees keep their own ids, so older saves still unwrap). */
+export function cablePegs(state, b) {
+  const key = `${state.tick}|${b.position[0]}|${b.position[2]}|${state.inventions?.structures?.length}|${state.deposits?.length}`;
+  const hit = pegCache.get(state)?.get(b.id); if (hit?.key === key) return hit.pegs;
+  const reach = STORMREEL.cable + 3, cx = b.position[0], cz = b.position[2], near = (x, z, r = 0) => Math.hypot(x - cx, z - cz) <= reach + r;
+  const pegs = [];
+  for (const t of worldTrees(state)) if (near(t.x, t.z)) pegs.push({id: t.id, x: t.x, z: t.z});
+  if (state.battle?.v === 2) for (const side of ['party', 'rivals']) {
+    const [hx, hz] = HOME_SITES[side]; if (!near(hx, hz, 30)) continue;
+    for (const sol of homeSolids(side)) {
+      if (sol.r !== undefined) { if (near(sol.x, sol.z, sol.r)) ringPegs(pegs, sol.id, sol.x, sol.z, sol.r); }
+      else if (near(sol.x, sol.z, Math.hypot(...sol.half) + Math.hypot(...sol.at))) boxPegs(pegs, sol.id, sol, sol.at, sol.half);
+    }
+  }
+  const solids = worldColliders(state, {terrainHeight: (_, x, z) => b.position[1], near: (x, z, r) => near(x, z, r)});
+  for (const v of solids) {
+    if (v.kind !== 'block' || v.shape === 'trunk') continue;
+    const id = `peg-${v.obj?.id ?? 'x'}${v.shape === 'box' ? `-${v.cx ?? 0}-${v.cz ?? 0}`.replace(/[^-\w]/g, '') : ''}`.slice(0, 56);
+    if (v.shape === 'box') boxPegs(pegs, id, {x: v.at[0], z: v.at[2], yaw: Math.atan2(v.s ?? 0, v.c ?? 1)}, [v.cx ?? 0, v.cz ?? 0], [v.w / 2, v.d / 2]);
+    else if (v.shape === 'ring') ringPegs(pegs, id, v.at[0], v.at[2], v.radius + v.band);
+    else ringPegs(pegs, id, v.at[0], v.at[2], v.obj?.id === b.id ? TOWER_PEG_R : v.base);
+  }
+  if (!pegCache.has(state)) pegCache.set(state, new Map()); pegCache.get(state).set(b.id, {key, pegs});
+  return pegs;
+}
+// Pegs work like the trees always did. When the straight run from the last anchor sweeps across a trunk, the cable wraps it (b.wraps gains
 // {id, x, z, s}, s the turn direction); swinging back across the same line unwraps it. Wrapped cable is used up, so
 // walking around a tree shortens your reach and walking back around gives it back. Never snags, never freezes.
 const cross = (ax, az, bx, bz) => ax * bz - az * bx;
-/** The trees one pack's cable is wrapped round (red keeps b.wraps, blue b.wraps2). */
+/** The pegs one pack's cable is wrapped round (red keeps b.wraps, blue b.wraps2). */
 export const cableWraps = (b, pack = 'red') => b[WRAPS[pack][0]] || [];
 function anchors(b, pack) { const t = terminalPoint(b, pack); return [[t[0], t[2]], ...cableWraps(b, pack).map(w => [w.x, w.z])]; }
 /** Cable used from the terminal to the last anchor. */
@@ -93,12 +133,12 @@ function updateWraps(state, b, position, pack) {
     if (cross(w.x - A[0], w.z - A[1], P[0] - w.x, P[1] - w.z) * w.s < 0) freed.add(wraps.pop().id); else break;
   }
   // Wrap: the run from the last anchor swept across a trunk between the last position and this one.
-  if (!freed.size && wraps.length < 12 && (prev[0] !== P[0] || prev[1] !== P[1])) {
+  if (!freed.size && wraps.length < MAX_WRAPS && (prev[0] !== P[0] || prev[1] !== P[1])) {
     const a = anchors(b, pack), A = a[a.length - 1], last = wraps[wraps.length - 1]?.id;
     let best = null;
-    for (const t of worldTrees(state)) {
+    for (const t of cablePegs(state, b)) {
       if (t.id === last || freed.has(t.id)) continue;   // swinging back across a peg frees it, it does not re-catch
-      const cx = t.x - A[0], cz = t.z - A[1], dc = Math.hypot(cx, cz); if (dc < .6) continue;
+      const cx = t.x - A[0], cz = t.z - A[1], dc = Math.hypot(cx, cz); if (dc < .25) continue;
       const before = cross(cx, cz, prev[0] - A[0], prev[1] - A[1]), after = cross(cx, cz, P[0] - A[0], P[1] - A[1]);
       if (before * after > 0 || (before === 0 && after === 0)) continue;
       // Only a peg between the anchor and the wearer (on the near side of the swept wedge) catches the cable.
@@ -213,18 +253,26 @@ export function useStormspire(state, p, b, m, pay, ok, fail) {
   return ok(events);
 }
 
-// Every home base keeps its own Stormspire, charged and ready, beside the keep (Mitch, 2026-10-06). Base-local metres
-// (x right of the gate, y out of it, shared/home-bases.js HOME_LAYOUT). Rebuilt full if it is ever destroyed.
-export const HOME_STORMSPIRE = Object.freeze({at: Object.freeze([7.6, -5.2])});
+// Every home base keeps its own Stormspire, charged and ready (Mitch, 2026-10-06), at the front of the keep just inside
+// the gate, off the troop lane (2026-10-10). Base-local metres (x right of the gate, y out of it, shared/home-bases.js
+// HOME_LAYOUT). Stormspires cannot be destroyed for now (Mitch, 2026-10-10: "it's too fun to kill").
+export const HOME_STORMSPIRE = Object.freeze({at: Object.freeze([5.6, 11.4])});
 export const homeStormspireId = side => `home-stormspire-${side}`;
 export function ensureHomeStormspires(state, height) {
   if (state.battle?.v !== 2 || !state.battle.bases || !state.inventions?.structures) return;
   for (const base of state.battle.bases) {
     const id = homeStormspireId(base.side);
-    if (state.inventions.structures.some(b => b.id === id)) continue;
     const [x, z] = homePoint(base.side, HOME_STORMSPIRE.at), {forward} = homeFrame(base.side);
     // The cable terminal (tower +X) faces the gate so the cable leads out toward the field.
     const yaw = Math.atan2(-forward[1], forward[0]);
+    const old = state.inventions.structures.find(b => b.id === id);
+    if (old) {
+      // Older saves keep the tower behind the heart: walk it to the front once nobody is using it.
+      if (flat(old.position, [x, 0, z]) > .5 && !old.operator && !old.operator2 && !old.planted && !old.probes) {
+        old.position = [x, height(x, z), z]; old.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw)); for (const k of ['wraps', 'wrapAt', 'wraps2', 'wrapAt2']) delete old[k];
+      }
+      continue;
+    }
     state.inventions.structures.push({id, type: 'stormspire', position: [x, height(x, z), z], yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)), hp: 240, maxHp: 240,
       side: base.side, builtTick: state.tick || 0, readyTick: state.tick || 0, fireTick: -1000, open: false, charge: STORMREEL.maxCharge, armed: false, aimYaw: 0, operator: null, home: true});
   }
@@ -235,6 +283,7 @@ export function stepStormspires(state, events, height = null, ctx = null) {
   if (height) ensureHomeStormspires(state, height);
   for (const b of state.inventions?.structures || []) {
     if (b.type !== 'stormspire') continue;
+    if (b.hp < b.maxHp) b.hp = b.maxHp;   // indestructible for now, and a tower knocked down in an older save stands again
     for (const pack of PACKS) {
       const id = b[OPERATOR[pack]]; if (!id) continue;
       const p = state.players.find(h => h.id === id);
@@ -277,7 +326,8 @@ function dropProbe(b, colour, events, why) {
   if (b.probes && !b.probes.red && !b.probes.blue) delete b.probes;
 }
 const shock = (state, base) => Math.round(base * (raining(state) ? STORMREEL.wet : 1));
-/** The closing surge: the foe takes it all at once and the current spreading into the soil jolts grounded neighbours. */
+/** The closing surge: the foe takes enough to die outright whatever it is (even a golem through its armour), and the
+ *  current spreading into the soil jolts grounded neighbours. */
 function surge(state, b, e, events, ctx) {
   b.charge = Math.max(0, b.charge - STORMREEL.surgeDrain);
   const at = partPosition(e, 'torso'), by = b.arc.by, floor = ctx.terrainHeight ? ctx.terrainHeight(state, e.position[0], e.position[2]) : e.position[1];
@@ -288,7 +338,8 @@ function surge(state, b, e, events, ctx) {
     splash.push(o.id);
     ctx.hitEnemyPart(state, o, 'torso', shock(state, STORMREEL.stepDamage), {point: partPosition(o, 'torso'), normal: [0, 1, 0], ownerId: by, side: b.side, tool: 'stormreel', energy: 1, shock: true}, ctx, events);
   }
-  ctx.hitEnemyPart(state, e, 'torso', shock(state, STORMREEL.surge), {point: at, normal: [0, 1, 0], ownerId: by, side: b.side, tool: 'stormreel', energy: 2.2, shock: true}, ctx, events);
+  const lethal = Math.max(shock(state, STORMREEL.surge), Math.ceil((e.hp + 1) / .45));   // .45: golem armour (combat.js)
+  ctx.hitEnemyPart(state, e, 'torso', lethal, {point: at, normal: [0, 1, 0], ownerId: by, side: b.side, tool: 'stormreel', energy: 2.2, shock: true}, ctx, events);
   return splash;
 }
 function stepCircuit(state, b, events, height, ctx) {
@@ -305,9 +356,6 @@ function stepCircuit(state, b, events, height, ctx) {
   if (b.hp <= 0) return endCircuit(b, events, 'tower');
   if (b.charge <= 0) return endCircuit(b, events, 'empty');
   if (state.tick > b.arc.until) return endCircuit(b, events, 'faded', true);
-  if ((state.tick - b.arc.tick) % STORMREEL.arcPulseTicks || !ctx || state.tick === b.arc.tick) return;
-  b.charge = Math.max(0, b.charge - STORMREEL.arcDrain);
-  ctx.hitEnemyPart(state, foe, 'torso', shock(state, STORMREEL.arcDamage), {point: partPosition(foe, 'torso'), normal: [0, 1, 0], ownerId: b.arc.by, side: b.side, tool: 'stormreel', energy: .6, shock: true}, ctx, events);
 }
 /** Lay a probe where a live bolt landed. A + and a - probe in the same foe close the circuit. Returns the colour laid. */
 function layProbe(state, b, p, hit, events, ctx) {
@@ -319,9 +367,11 @@ function layProbe(state, b, p, hit, events, ctx) {
   const foe = circuitFoe(state, b);
   if (b.arc && b.arc.enemy !== foe?.id) endCircuit(b, events, 'open', true);   // a bolt moved to another foe or the ground
   if (foe && !b.arc && b.charge > 0) {
-    b.arc = {tick: state.tick, until: state.tick + STORMREEL.arcSeconds * 60, by: p.id, enemy: foe.id};
-    const at = partPosition(foe, 'torso'), splash = ctx ? surge(state, b, foe, events, ctx) : [];
-    events.push({kind: 'storm_arc', id: b.id, structureId: b.id, by: p.id, enemy: foe.id, red: [...b.probes.red.at], blue: [...b.probes.blue.at], at, splash, wet: raining(state)});
+    b.arc = {tick: state.tick, until: state.tick + Math.round(STORMREEL.arcSeconds * 60), by: p.id, enemy: foe.id};
+    const at = partPosition(foe, 'torso'), kind = foe.kind, arc = {kind: 'storm_arc', id: b.id, structureId: b.id, by: p.id, enemy: foe.id, creature: kind, red: [...b.probes.red.at], blue: [...b.probes.blue.at], at, splash: [], wet: raining(state)};
+    // The arc event leads, so the blinding flash and the thunder land with the kill rather than after it.
+    events.push(arc); arc.splash = ctx ? surge(state, b, foe, events, ctx) : [];
+    arc.killed = !state.enemies.includes(foe) || foe.hp <= 0;
   }
   return colour;
 }

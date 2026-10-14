@@ -58,3 +58,6 @@ body.dragon-riding #heroTools, body.dragon-riding .hero-tools, body.dragon-ridin
 @keyframes dragon-bump { 0% { transform: translateX(-50%) scale(1.12); } 100% { transform: translateX(-50%) scale(1); } }
 @keyframes dragon-nope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 @media (prefers-reduced-motion: reduce) { .dragon-call, .dragon-streak.bump { animation: none; } }
+/* The Stormreel and Timberline plates share the top-centre seat: the streak drops beneath them instead of covering them. */
+body:has(.stormreel-hud:not([hidden])) .dragon-streak, body:has(.timberline-ammo:not([hidden])) .dragon-streak { top: calc(env(safe-area-inset-top, 0px) + 104px); }
+@media (pointer: coarse) { body:has(.stormreel-hud:not([hidden])) .dragon-streak, body:has(.timberline-ammo:not([hidden])) .dragon-streak { top: calc(env(safe-area-inset-top, 0px) + 96px); } }

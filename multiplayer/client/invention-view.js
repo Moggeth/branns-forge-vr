@@ -9,13 +9,14 @@ import {createInventionModel,animateInventionModel,disposeInventionArt} from './
 import {createHeavyLauncher,HEAVY_LAUNCHER} from './heavy-launcher.js';
 import {STRUCTURES,machineCycleAge,timberlineAmmo,isBayStack} from '../shared/inventions.js';
 import {createForgeWorks,FORGE_WORKS_ORIGIN} from './forge-works-art.js';
-import {terrainHeight} from '../shared/terrain.js';
+import {baseHeight,terrainHeight} from '../shared/terrain.js';
 import {createTimberlineStuck} from './timberline-stuck.js';
 import {createTimberlineTracers} from './timberline-tracers.js';
 import {createBlueprintGhost,BLUEPRINT_COLORS} from './build-blueprint.js';
 import {createHomeBaseView} from './home-base-view.js';
 import {createHomeTownView} from './home-town-view.js';
 import {createBackTownView} from './back-town-view.js';
+import {createMapExtrasView} from './map-extras-view.js';
 import {createStormspireArt} from './stormspire-art.js';
 // Presentation consumes authoritative structures; no gameplay timers or resources live here.
 export function createInventionView({scene,lightning=null}){
@@ -30,6 +31,7 @@ export function createInventionView({scene,lightning=null}){
  function label(text,valid){if(!labelContext||lastLabel===`${valid}:${text}`)return;lastLabel=`${valid}:${text}`;labelContext.clearRect(0,0,768,104);labelContext.fillStyle='rgba(24,23,20,.9)';labelContext.fillRect(0,0,768,104);labelContext.fillStyle=valid?'#ffe1a0':'#ffb7ad';labelContext.font='bold 25px sans-serif';labelContext.textAlign='center';const lines=[];let line='';for(const word of text.split(' ')){const next=line?`${line} ${word}`:word;if(labelContext.measureText(next).width>730&&line){lines.push(line);line=word;}else line=next;}lines.push(line);lines.slice(0,2).forEach((line,i)=>labelContext.fillText(line,384,lines.length>1?38+i*34:61));previewLabel.material.map.needsUpdate=true;}
  let refinery=null;
  const homeBases=createHomeBaseView({scene}),homeTown=createHomeTownView({scene}),backTown=createBackTownView({scene});
+ const mapExtras=createMapExtrasView({scene,height:(x,z)=>snapshot?terrainHeight(snapshot,x,z,false):baseHeight(x,z)}); // buildings placed with the map editor
  const shotGeo=new THREE.IcosahedronGeometry(.28,1),shotMat=new THREE.MeshStandardMaterial({color:0x77736a,roughness:.9});
  const wardGeo=new THREE.RingGeometry(5.92,6,64),wardMat=new THREE.MeshBasicMaterial({color:0x64dbea,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false});
 
@@ -82,7 +84,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
    refinery.animate({time:tick/60,dt,jobs:snapshot?.inventions?.refining?.length||0,feedReady,bay});}
   for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.line.material.opacity=Math.max(0,e.life/.3);if(e.life<=0){e.line.removeFromParent();e.line.geometry.dispose();e.line.material.dispose();effects.splice(i,1);}}
  }
- return {installStormspire(gltf){assets.stormspire=gltf;spires.install(gltf);},installReelPack:gltf=>spires.installPack(gltf),spires,spireEntry:id=>{const e=entries.get(id);return e?.spire?e:null;},installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),installKeepKit:gltf=>homeBases.installKeepKit(gltf),installTownKit:gltf=>homeTown.installKit(gltf),installBackTownKit:gltf=>backTown.installKit(gltf),backTownStats:()=>backTown.stats(),homeKeep:()=>homeBases.keep,homeBaseStats:()=>homeBases.stats(),homeTownStats:()=>homeTown.stats(),sync,event,update,
+ return {installStormspire(gltf){assets.stormspire=gltf;spires.install(gltf);},installReelPack:gltf=>spires.installPack(gltf),spires,spireEntry:id=>{const e=entries.get(id);return e?.spire?e:null;},installTimberline,installLauncher,installHomeKit:gltf=>homeBases.installKit(gltf),installKeepKit:gltf=>homeBases.installKeepKit(gltf),installTownKit:gltf=>homeTown.installKit(gltf),installBackTownKit:gltf=>{const ok=backTown.installKit(gltf);if(ok)mapExtras.installKit(gltf);return ok;},mapExtrasStats:()=>mapExtras.stats(),backTownStats:()=>backTown.stats(),homeKeep:()=>homeBases.keep,homeBaseStats:()=>homeBases.stats(),homeTownStats:()=>homeTown.stats(),sync,event,update,
   // The local operator's predicted aim wins over the last replicated aim, so a manned machine answers the mouse at once.
   setLocalAim(id,aim){homeBases.setLocalAim(id,aim);if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
