@@ -1,13 +1,13 @@
 {
-  "triangles": 8740,
-  "vertices": 4689,
+  "triangles": 11530,
+  "vertices": 6249,
   "materials": 3,
-  "bones": 31,
+  "bones": 39,
   "materials_names": [
     "SkyfireHide",
     "SkyfireWing",
     "SkyfireEmber"
   ],
-  "bytes": 299084,
-  "seconds": 0.7
+  "bytes": 395748,
+  "seconds": 0.8
 }

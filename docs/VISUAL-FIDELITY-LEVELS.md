@@ -83,5 +83,5 @@ The extra mile. Only for things that are already level 2 and that players love o
 
 | Asset | Level | Notes |
 |---|---|---|
-| Kill-streak dragon ("Slay Thee, Sun Birdy Above") | 2 | Blender builder in multiplayer/assets-source/skyfire-dragon: lofted body, baked AO, scale tile, 31-bone rig posed in closed form, ember belly and golden crest. 8.7k triangles, 3 materials, 292 KB. Level 3 left: blinks, saddle, normal map, LODs, take-off and landing clips, real device checks. |
-| Kill-streak fire | 2 | client/dragon-fire.js: noise-shaped premultiplied flames, flame stream, fireballs, smoke, embers, debris, shock rings, scorch marks; 7 draws. Level 3 left: heat haze, lingering ground fire decals per device tier. |
+| Kill-streak dragon ("Slay Thee, Sun Birdy Above") | 2 | Round two (2026-10-10) Blender builder in multiplayer/assets-source/skyfire-dragon: leaner body, 23 m cambered wings with finger bones and backlit membranes, cupped downstroke and swept upstroke, wingbeat gusts. 11.5k triangles, 1 skinned mesh, 3 materials, 39 bones, 396 KB. Checked in game on desktop (chase and saddle). Level 3 left: portrait-phone chase framing, take-off and landing clips, LODs, real device checks. |
+| Kill-streak fire | 2 | client/dragon-fire.js: velocity-stretched flame tongues, ballistic fire globs that splash where they land, fading scorch, smoke, sparks, wing gust dust, fireballs and shock rings. Level 3 left: heat haze, device-tier extras. |

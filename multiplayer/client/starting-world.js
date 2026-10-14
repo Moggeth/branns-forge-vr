@@ -180,8 +180,8 @@ export function createStartingWorld({ THREE, scene, height }) {
     const site = STARTING_SITES[2]; site.footprints.length = 0; const r = rng(303);
     const ax = site.x, az = site.z, ys = 4.84, inner = 3.3, outer = 4.05, step = Math.PI / 3 / 5;
     prim.pierL = wa.pierGeometry(311, {w: 1.1, h: 4.6, d: 1.0}); prim.pierR = wa.pierGeometry(312, {w: 1.1, h: 3.2, d: 1.0, broken: true});
-    P('stone', 'pierL', ax - 2.2, az, 0, [1, 1, 1]); K({mat: 'kStone', geo: 'k:Pier_L'});
-    P('stone', 'pierR', ax + 2.2, az, 0, [1, 1, 1], [0, 0, -0.03]); K({mat: 'kStone', geo: 'k:Pier_R'});
+    P('stone', 'pierL', ax - 2.2, az, 0, [1, 1, 1]); K({mat: 'kAshlar', geo: 'k:Pier_L'});
+    P('stone', 'pierR', ax + 2.2, az, 0, [1, 1, 1], [0, 0, -0.03]); K({mat: 'kAshlar', geo: 'k:Pier_R'});
     for (let k = 0; k < 4; k++) { // left half: four of its five voussoirs still lean to the crown
       const g = 'vous' + k; prim[g] = wa.voussoirGeometry(320 + k, inner, outer, Math.PI - (k + 1) * step, Math.PI - k * step, 1.0);
       P('stone', g, ax + 1.65, az, ys, [1, 1, 1], [0, 0, -k * 0.004]); K({mat: 'kStone', geo: 'k:Voussoir', r: [0, 0, Math.PI - (k + 1) * step - k * 0.004]});
@@ -201,9 +201,9 @@ export function createStartingWorld({ THREE, scene, height }) {
     // Watch-tower stump behind the arch (north), the beacon basket on its rubble top, struck/fed as 'watchBeacon'.
     const tx = ax + 0.5, tz = az - 4.5, th = 3.2;
     prim.tower = wa.towerGeometry(361, {r: 1.6, h: th}); P('stone', 'tower', tx, tz, 0, [1, 1, 1], [0, 0.3, 0], 'watchBeacon');
-    K({mat: 'kStone', geo: 'k:Tower', r: [0, 0, 0]}); KC('kCrystal', 'k:Tower_Vein'); // the kit tower carries its vein, facing the arch
+    K({mat: 'kAshlar', geo: 'k:Tower', r: [0, 0, 0]}); KC('kCrystal', 'k:Tower_Vein'); KC('kWood', 'k:Tower_Door'); // the kit tower carries its vein (facing the arch) and a west door
     prim.basket = wa.basketGeometry(); P('bronze', 'basket', tx, tz, th - 0.25, [1, 1, 1], [0, 0.2, 0], 'watchBeacon');
-    K({mat: 'kBronze', geo: 'k:Basket'}); KC('kCrystal', 'k:Basket_Coals');
+    K({mat: 'kBronze', geo: 'k:Basket'}); KC('kCrystal', 'k:Basket_Coals'); KC('kCrystal', 'k:Basket_Eyes'); // the bronze owl brazier
     prim.coal = art.crystalPointGeometry(1, 0.08);
     for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, d = k ? 0.26 : 0;
       P('crystal', 'coal', tx + Math.cos(a) * d, tz + Math.sin(a) * d, th - 0.25 + wa.BASKET.height - 0.12, [1, k ? 0.28 : 0.4, 1], [Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6]); K({hide: 'k:Basket_Coals'}); }
@@ -357,19 +357,19 @@ export function createStartingWorld({ THREE, scene, height }) {
     const found = {}; gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse(o => { if (o.isMesh) found[o.name] = o; });
     const optional = ['GeodeBoulder_A', 'GeodeBoulder_B', 'GeodeBoulder_C', 'GeodeBoulder_A_Crystals', 'GeodeBoulder_B_Crystals', 'GeodeBoulder_C_Crystals', 'Cup', 'MineHead', 'MineHead_Iron', 'OreCart', 'OreCart_Iron', 'OreCart_Crystals',
-      'Pier_L', 'Pier_R', 'Voussoir', 'Voussoir_Loose', 'Keystone', 'Keystone_Crystals', 'Tower', 'Tower_Vein', 'Basket', 'Basket_Coals', 'Plinth', 'Dish', 'Dish_Crystal'];
+      'Pier_L', 'Pier_R', 'Voussoir', 'Voussoir_Loose', 'Keystone', 'Keystone_Crystals', 'Tower', 'Tower_Vein', 'Tower_Door', 'Basket', 'Basket_Coals', 'Basket_Eyes', 'Plinth', 'Dish', 'Dish_Crystal'];
     const need = ['Menhir_A', 'Menhir_B', 'Menhir_C', 'Menhir_D', 'Post_A', 'Post_B', 'Lintel', 'LintelSeam', 'Altar', 'AltarCrystals', 'Hoop', 'HoopInlay', 'Chain', 'TuneCrystal', 'Moss_A', 'Moss_B', 'Moss_C', 'Rubble_A', 'Rubble_B', 'Rubble_C'];
     if (need.some(n => !found[n])) return false;
     const kitMats = {};
     for (const n of [...need, ...optional.filter(n => found[n])]) {
-      const o = found[n], m = o.material, key = 'k' + m.name; // Stone, Moss, Bronze, Crystal
+      const o = found[n], m = o.material, key = 'k' + m.name; // Stone, Moss, Bronze, Crystal, Wood, Ashlar
       if (/^GeodeBoulder_._Crystals$/.test(n)) { // origin at the geode window; build() keeps them unstretched
         prim['k:' + n] = o.geometry.clone().applyMatrix4(new THREE.Matrix4().extractRotation(o.matrixWorld)); prim['k:' + n].userData.anchor = o.position.clone();
       } else prim['k:' + n] = o.geometry.clone().applyMatrix4(o.matrixWorld); // children (seams, inlay) keep their offset
       if (!kitMats[key]) { m.vertexColors = !!o.geometry.attributes.color; m.needsUpdate = true; kitMats[key] = m; }
     }
     if (!kitMats.kStone || !kitMats.kCrystal || !kitMats.kBronze || !kitMats.kMoss) { for (const k in prim) if (k.startsWith('k:')) { prim[k].dispose(); delete prim[k]; } return false; }
-    Object.assign(mats, kitMats);
+    Object.assign(mats, kitMats); mats.kAshlar ||= mats.kStone; // an older kit without the dressed-stone material
     // Runes follow the hewn face: each stroke vertex is pressed onto the stone's inner (-Z) surface.
     const probe = new THREE.Mesh(undefined, new THREE.MeshBasicMaterial()), ray = new THREE.Raycaster(), from = new THREE.Vector3(), dir = new THREE.Vector3(0, 0, 1);
     kitRunes = runes.map(rr => {
@@ -421,10 +421,11 @@ export function createStartingWorld({ THREE, scene, height }) {
     for (const k in mats) mats[k].dispose();
     runeMesh?.geometry.dispose(); rune.material.dispose(); clusterMesh?.geometry.dispose(); geode.material.dispose(); hoopParts.bronze.dispose(); hoopParts.glow.dispose(); tuneGeo.dispose();
     if (kit) { hoopBronze.geometry.dispose(); hoopGlow.geometry.dispose(); for (const g of kitRunes) g.dispose();
-      for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal', 'kWood']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
+      for (const k of ['kStone', 'kMoss', 'kBronze', 'kCrystal', 'kWood', 'kAshlar']) for (const t of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) mats[k]?.[t]?.dispose(); }
   }
   function stats() { return { kit: !!kit, builds, refits, draws: Object.keys(meshes).length, liveDraws: (runeMesh ? 1 : 0) + (clusterMesh ? 1 : 0) + 3, triangles: tris, triCap: TRI_CAP, dropped, pieces: pieces.length, runes: runes.length }; }
   // Beacon fire anchor (world space, follows terrain edits): where client/beacon-view.js draws the flame and beam.
-  const beacon = () => beaconAt && {x: beaconAt.x, y: H(beaconAt.x, beaconAt.z) - 0.15 + beaconAt.y, z: beaconAt.z};
+  // yaw is the basket's turn; owl says the kit's owl brazier (with its eyes at wa.BASKET.eyes) is in place.
+  const beacon = () => beaconAt && {x: beaconAt.x, y: H(beaconAt.x, beaconAt.z) - 0.15 + beaconAt.y, z: beaconAt.z, yaw: 0.2, owl: !!prim['k:Basket_Eyes']};
   return { group, update, tick, setLit, setGeodes, beacon, installKit, dispose, stats, sites: STARTING_SITES, paths: PATHS };
 }

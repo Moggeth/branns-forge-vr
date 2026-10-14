@@ -1,10 +1,12 @@
 // Watch-Arch beacon presentation: the blue watch-fire in the bronze basket, its beam into the sky (seen from anywhere
 // in the meadow; it pulses red on an alarm), a flare over every hostile while it burns, and its sounds and messages.
 // Reads snapshot.beacon (shared/watch-beacon.js); never changes gameplay.
-// Budget: nothing while cold; three draws while lit (flame, beam, foe flares as one instanced mesh). No lights/textures.
+// Budget: nothing while cold; five draws while lit (flame, beam, foe flares as one instanced mesh, and the glow from
+// client/beacon-glow.js: halo/sparks/owl eyes, ground pool). No lights/textures.
 import * as THREE from 'three';
 import {BEACON, BEACON_HEARTH} from '../shared/watch-beacon.js';
 import {createLandmarkAudio} from './landmark-audio.js';
+import {createBeaconGlow} from './beacon-glow.js';
 
 const MAX_FLARES = 24;
 const noise = `float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -54,7 +56,7 @@ export function compass([x, , z]) {
   const a = Math.atan2(x, -z); return 'to the ' + DIRS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
 }
 
-export function createBeaconView({scene, startingWorld, audio = () => null, listener = () => null, report = () => {}}) {
+export function createBeaconView({scene, startingWorld, height = null, night = () => 0, audio = () => null, listener = () => null, report = () => {}}) {
   const group = new THREE.Group(); group.name = 'WatchBeacon'; scene.add(group);
   const quad = new THREE.PlaneGeometry(1.25, 2.3); quad.translate(0, 1.0, 0);
   const flameGeo = (() => { const parts = [0, 1, 2].map(i => quad.clone().rotateY(i * Math.PI / 3)); const g = new THREE.BufferGeometry();
@@ -70,6 +72,7 @@ export function createBeaconView({scene, startingWorld, audio = () => null, list
   const flareMat = new THREE.MeshBasicMaterial({...additive, vertexColors: true, opacity: 0.8, fog: false});
   const flares = new THREE.InstancedMesh(flareGeo, flareMat, MAX_FLARES); flares.count = 0; flares.visible = false; flares.frustumCulled = false; flares.renderOrder = 6; group.add(flares);
   for (const o of [flame, beam, flares]) o.raycast = () => {};
+  const glow = createBeaconGlow({group, height});
   const sound = createLandmarkAudio({audio, listener}), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s3 = new THREE.Vector3(), p3 = new THREE.Vector3();
   let lit = 0, alarm = 0, seconds = 0, hintAt = -1e9, wasNear = false;
 
@@ -99,8 +102,9 @@ export function createBeaconView({scene, startingWorld, audio = () => null, list
     const ear = listener()?.position, near = !!ear && Math.hypot(ear[0] - BEACON.x, ear[2] - BEACON.z) < 5.5;
     if (near && !wasNear && !burning && seconds - hintAt > 90) { hintAt = seconds; report('The beacon is cold. Strike its offering dish with Crystal in your pack to light the watch-fire.'); }
     wasNear = near;
-    if (!show) { flares.count = 0; return; }
     const pulse = alarm * (0.6 + 0.4 * Math.sin(seconds * 9));
+    glow.update({at, lit, night: Math.max(0, Math.min(1, night() || 0)), alarm: pulse, seconds, dt});
+    if (!show) { flares.count = 0; return; }
     flame.position.set(at.x, at.y, at.z); flame.rotation.y = seconds * 0.4; flame.scale.setScalar(0.85 + lit * 0.25 + pulse * 0.3);
     beam.position.set(at.x, at.y + 0.4, at.z);
     for (const m of [flameMat, beamMat]) { m.uniforms.uTime.value = seconds; m.uniforms.uLit.value = lit; m.uniforms.uAlarm.value = pulse; }
@@ -114,7 +118,7 @@ export function createBeaconView({scene, startingWorld, audio = () => null, list
     flares.count = n; flares.instanceMatrix.needsUpdate = true; flares.visible = n > 0;
     flareMat.opacity = (0.35 + pulse * 0.6) * lit;
   }
-  function dispose() { scene.remove(group); flameGeo.dispose(); flameMat.dispose(); beamGeo.dispose(); beamMat.dispose(); flareGeo.dispose(); flareMat.dispose(); flares.dispose(); }
-  return {handleEvent, update, dispose, stats: () => ({lit, flares: flares.count, draws: show3(flame, beam, flares)})};
+  function dispose() { scene.remove(group); flameGeo.dispose(); flameMat.dispose(); beamGeo.dispose(); beamMat.dispose(); flareGeo.dispose(); flareMat.dispose(); flares.dispose(); glow.dispose(); }
+  return {handleEvent, update, dispose, stats: () => ({lit, flares: flares.count, draws: show3(flame, beam, flares) + glow.draws()})};
 }
 const show3 = (...o) => o.filter(x => x.visible).length;
