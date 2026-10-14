@@ -176,7 +176,7 @@ function buildSettings() {
           ['In a world', 'Switch role, copy code or invite, download a backup, reset (host, with confirmation), leave'],
           ['Lobby', 'Import or resume a save, create or join a world'],
         ]),
-        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack hurls a lit bottle along its arc; Special lobs a Cinder Cluster. Stormreel: hold Attack to charge a bolt, Special reels it back in along its tether. Left trigger performs these specials in VR.' }),
+        el('p', { class: 'hint mui-guide-note', text: 'Wyrmspout: hold Attack to spray sticky fire; Special lobs a Gout. Emberdew: Attack hurls a lit bottle along its arc; Special lobs a Cinder Cluster. Stormreel: hold Attack (Zap) to charge a bolt; Special becomes Reel and winds it back in; Drop becomes Spike and plants the crossbow; Collect takes or hangs a pack at the tower and picks a spiked crossbow back up. Left trigger performs these specials in VR.' }),
       ]),
     ]),
   ]);

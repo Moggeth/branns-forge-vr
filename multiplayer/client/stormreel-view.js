@@ -18,7 +18,7 @@ import {PACK_COLORS,tintPack} from './stormspire-art.js';
 import {POLE,finishCrossbow,softTexture,coronaTexture,glyphTexture,ribbonTexture,createRibbon,createBeads,makeSprite,along,flicker} from './stormreel-look.js';
 import {createStormreelAudio} from './stormreel-audio.js';
 import {createCableKit,CABLE} from './stormreel-cable.js';
-import {createCircuitFx} from './stormreel-circuit.js';
+import {createCircuitFx,ARC} from './stormreel-circuit.js';
 export {CABLE};
 const BACK = new THREE.Vector3(0, 1.28, .17);   // pack anchor behind the shoulder blades, actor-local (+Z is behind)
 const BOLT_LEN = .33, BOLT_BURY = .1;            // the authored bolt: tail to nose, and how far a lodged one sinks in
@@ -50,7 +50,7 @@ export function createStormreelView(ctx) {
   const sfx = createStormreelAudio({audio: ctx.audio, listener: ctx.listener});
   const sound = (name, ...args) => { try { sfx[name]?.(...args); } catch { /* audio is never worth a frame */ } };
   const circuit = createCircuitFx({scene, lightning, height: ctx.height, beads, tex, sound, bodyPoints: ctx.bodyPoints, enemyVisual: ctx.enemyVisual,
-    enemyAt: (id, out) => { const e = snapshot?.enemies?.find(x => x.id === id); return e ? out.fromArray(e.position).setY(e.position[1] + 1.1) : null; }, shake: ctx.shake, flash: ctx.flash});
+    enemyAt: (id, out) => { const e = snapshot?.enemies?.find(x => x.id === id); return e ? out.fromArray(e.position).setY(e.position[1] + 1.1) : null; }, shake: ctx.shake, flash: ctx.flash, darken: ctx.darken});
   let creakAt = 0;
 
   function installPack(gltf) { packTemplate = gltf; }
@@ -287,7 +287,15 @@ export function createStormreelView(ctx) {
       const splash = (ev.splash || []).map(id => snapshot?.enemies?.find(e => e.id === id)).filter(Boolean).map(e => new THREE.Vector3(...e.position));
       circuit.surge(ev, pa, pb, splash, local);
       for (const colour of PACKS) { const c = cables.get(`${ev.id}:${colour}`); if (c) c.surge = 1; }
-      void tower; return;
+      // The power comes from somewhere: the Stormspire dumps its charge (a flashover across its two terminals) and the
+      // crossbows spit at the muzzle as the current goes through them, the same instant the arc lands in the foe.
+      if (lightning && tower) {
+        const tr = towerTerminal(tower, new THREE.Vector3(), 'red'), tb = towerTerminal(tower, new THREE.Vector3(), 'blue');
+        lightning.strike(tr, tb, {life: .5, width: .22, rough: .1, depth: 4, branches: 0, restrikes: 1, intensity: 3.5, hue: ARC});
+        for (const t of [tr, tb]) { lightning.glow(t, {size: 3.5, life: .5, color: 0xd8ccff}); lightning.burst(t, {count: 18, speed: 3.5, life: .9, molten: true}); }
+        for (const id of [tower.operator, tower.operator2]) { const m = id && muzzleOf(id, new THREE.Vector3()); if (m) { lightning.glow(m, {size: 1.4, life: .35, color: 0xd8ccff}); lightning.burst(m, {count: 8, speed: 2.2, life: .6, molten: true}); } }
+      }
+      return;
     }
     if (ev.kind === 'storm_arc_end') {
       const tower = towerOf(ev.id);
