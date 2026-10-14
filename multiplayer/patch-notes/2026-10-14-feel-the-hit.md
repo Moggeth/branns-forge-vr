@@ -1,5 +1,5 @@
 ---
-date: 2026-10-12 23:50
+date: 2026-10-14 22:58
 area: Heroes
 title: You can feel it when you get hit
 ---
