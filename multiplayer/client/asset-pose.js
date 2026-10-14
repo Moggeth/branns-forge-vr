@@ -14,6 +14,7 @@ export const ASSET_POSES = Object.freeze({
   bow: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'Grip', height: 1.48, nativeScale: 1, tip: 'ArrowGuide'},
   wyrmspout: {forward:[0,0,-1],up:[0,1,0],pivot:'GripAnchor',height:.4,nativeScale:1,tip:'Muzzle'},
   stormreel: {forward:[0,0,-1],up:[0,1,0],pivot:'GripAnchor',height:.5,nativeScale:1,tip:'Muzzle'},
+  staff: {forward:[0,0,-1],up:[0,1,0],pivot:'GripAnchor',height:1.6,nativeScale:1,tip:'Crown'},
   flask: {forward:[0,0,-1],up:[0,1,0],pivot:[0,0,0],height:.18,nativeScale:1,tip:'Muzzle'},
   arrow: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'ArrowTip', height: .78, nativeScale: 1},
   wings: {forward: [0, 0, -1], up: [0, 1, 0], pivot: [0, 0, 0], height: .5, nativeScale: 1},
@@ -75,7 +76,7 @@ export function setWeaponGrip(visual, xr = false, tool = 'axe', hand = 'right') 
   visual.scale.set(tool==='bow'&&hand==='left'?-1:1,1,1);
   visual.position.set(0, 0, 0);
   visual.quaternion.copy(assetBasis(ASSET_POSES[tool]));
-  if (xr && !['crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel'].includes(tool)) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));
+  if (xr && !['crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff'].includes(tool)) visual.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4));
 }
 
 export function weaponTip(visual, tool, target = new THREE.Vector3()) {
