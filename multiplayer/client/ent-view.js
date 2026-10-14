@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import {ENT, ENT_SIZES, entHeight, entRootTick} from '../shared/ents.js';
 import {VARIANTS} from '../shared/trees.js';
 import {maskMissingParts} from './combat-view.js';
+import {buildEntFace, poseEntFace} from './ent-face.js';
 
 const TAU = Math.PI * 2, clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v), smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -132,17 +133,7 @@ function buildGlowGeometry(size) {
  const quad = (pts, k) => { const base = P.length / 3; for (const p of pts) { P.push(p[0], p[1] - spine, p[2]); C.push(GLOW.r * k, GLOW.g * k, GLOW.b * k); } I.push(base, base + 1, base + 2, base, base + 2, base + 3); };
  const surf = (y, ang, out = .006 * H) => { const r = radiusAt(y) + out; return [Math.sin(ang) * r, y, -Math.cos(ang) * r]; };
  const ey = S.eye * H;
- for (const s of [-1, 1]) { // angry almond eyes, tilted toward the brow
-  const a0 = s * .42, w = .05 * H, h = .016 * H, tilt = s * .3;
-  const c = surf(ey, a0, .008 * H), tx = Math.cos(a0), tz = Math.sin(a0);
-  const along = [tx * w / 2, Math.sin(tilt) * w / 2, tz * w / 2];
-  quad([[c[0] - along[0], c[1] - along[1], c[2] - along[2]], [c[0], c[1] - h, c[2]], [c[0] + along[0], c[1] + along[1], c[2] + along[2]], [c[0], c[1] + h * .6, c[2]]], 1.6);
- }
- const strip = (pts, wid, k) => { for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]], dx = b[0] - a[0], dz = b[2] - a[2], L = Math.hypot(dx, dz) || 1;
-  const nx = -dz / L * 0, ny = 1, nz = dx / L * 0; void nx; void nz; const o = wid / 2, kk = k * (1 - i / pts.length * .6);
-  quad([[a[0], a[1] - o * ny, a[2]], [b[0], b[1] - o * ny, b[2]], [b[0], b[1] + o * ny, b[2]], [a[0], a[1] + o * ny, a[2]]], kk); } };
- // Mouth: a jagged horizontal crack.
- const my = ey - .075 * H; strip(Array.from({length: 7}, (_, i) => surf(my + (i % 2 ? .006 : -.004) * H, (i / 6 - .5) * .9, .006 * H)), .008 * H, 1);
+ // The face itself (eyes, brows, mouth) is sculpted in ent-face.js; the glow keeps the resonance veins.
  // Veins: thin vertical cracks (quads stand across the trunk, facing out).
  const vein = (ang0, y0, y1, k) => { const n = 9; for (let i = 0; i < n; i++) { const ya = lerp(y0, y1, i / n), yb = lerp(y0, y1, (i + 1) / n);
    const aa = ang0 + Math.sin(i * 1.7 + ang0 * 3) * .08, ab = ang0 + Math.sin((i + 1) * 1.7 + ang0 * 3) * .08, w = .0065 * H;
@@ -229,13 +220,16 @@ export function createEntView({scene, templates, height = () => 0, quality = 'hi
   for (const part of k.crown) { const m = new THREE.Mesh(part.geometry, part.material); m.name = part.part; m.matrixAutoUpdate = false; m.matrix.copy(part.matrix); m.castShadow = part.part !== 'Fruit'; crown.add(m); }
   bones[B.Head].add(crown);
   const glowMat = glowBase.clone(), glow = new THREE.Mesh(glowGeometry(size), glowMat); glow.name = 'EntGlow'; glow.userData.ignoreContact = true; glow.renderOrder = 2; bones[B.Spine].add(glow);
+  const radiusAt = y => { const tr = S.trunk; for (let i = 1; i < tr.length; i++) if (y / H <= tr[i][0]) { const u = (y / H - tr[i - 1][0]) / (tr[i][0] - tr[i - 1][0]); return lerp(tr[i - 1][1], tr[i][1], u) * H; } return tr.at(-1)[1] * H; };
+  const face = buildEntFace({size, layout: {H, eyeY: S.eye * H, spineY: S.spine * H, r: radiusAt}, spine: bones[B.Spine], bark: k.bark, glowMat, seed});
   const bodyGroup = new THREE.Group(); bodyGroup.name = 'EntBody'; bodyGroup.add(mesh);
   const visual = new THREE.Group(); visual.name = 'Ent'; visual.add(bodyGroup);
   visual.userData.ent = {size, H, S, mesh, bones: Object.fromEntries(BONES.map(n => [n, bones[B[n]]])), rest: Object.fromEntries(BONES.map(n => [n, {q: bones[B[n]].quaternion.clone(), p: bones[B[n]].position.clone()}])),
-   crown, glow, glowMat, bodyGroup, seed, variant: VARIANTS[data.variant] || 'tree'};
+   crown, glow, glowMat, bodyGroup, seed, face, variant: VARIANTS[data.variant] || 'tree'};
   return visual;
  }
- const e1 = new THREE.Euler(), q1 = new THREE.Quaternion(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
+ const e1 = new THREE.Euler(), q1 = new THREE.Quaternion(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), faceTarget = new THREE.Vector3();
+ let threats = null;
  function rot(rig, name, x = 0, y = 0, z = 0) { const b = rig.bones[name]; b.quaternion.copy(rig.rest[name].q).multiply(q1.setFromEuler(e1.set(x, y, z))); }
  function pose(entry, tick, dt) {
   const visual = entry.visual, rig = visual.userData.ent, d = entry.data; if (!rig || !d) return;
@@ -273,12 +267,23 @@ export function createEntView({scene, templates, height = () => 0, quality = 'hi
   rot(rig, 'LeftKnee', -Math.max(0, Math.sin(ph + 1.3)) * knee); rot(rig, 'RightKnee', -Math.max(0, Math.sin(ph + 1.3 + Math.PI)) * knee);
   const lurch = Math.sin(ph) * (rig.size === 'elder' ? .085 : .05) * m, bob = Math.abs(Math.cos(ph)) * (rig.size === 'elder' ? .025 : .05) * H * m;
   const breathe = Math.sin(clock * 1.3 + rig.seed) * .012;
-  rig.bones.Torso.position.copy(rig.rest.Torso.p).add(v2.set(0, bob - (1 - Math.abs(Math.cos(ph))) * .01 * H * m, 0));
+  // Footfalls: each root foot lands with a thud that settles the trunk, shakes the crown and kicks up soil (elders).
+  const half = Math.floor(st.stride * 2 + .25);
+  if (st.half !== undefined && half !== st.half && m > .5) { st.stepAt = clock; st.swayV += (half & 1 ? 1 : -1) * .5; st.nodV += .6; if (rig.size === 'elder') footDust(entry, rig, half & 1 ? 'RightKnee' : 'LeftKnee'); }
+  st.half = half;
+  const step = st.stepAt !== undefined ? Math.exp(-(clock - st.stepAt) * 9) * (clock - st.stepAt < 1 ? 1 : 0) : 0;
+  rig.bones.Torso.position.copy(rig.rest.Torso.p).add(v2.set(0, bob - (1 - Math.abs(Math.cos(ph))) * .01 * H * m - step * .018 * H * m, 0));
   rot(rig, 'Torso', lean + slamLean * .6 + recoil * .2 + breathe, 0, lurch + recoil * .06 * st.hitDir);
-  rot(rig, 'Spine', slamLean * .5 + recoil * .12, Math.sin(clock * .7 + rig.seed) * .05 * (1 - m), -lurch * .4);
+  // Attention: the trunk turns (stiffly, a little late) to glare at the nearest Hero.
+  let target = null, best = 12;
+  for (const p of threats || []) { const dd = Math.hypot(p[0] - v1.x, p[2] - v1.z); if (dd < best) { best = dd; target = p; } }
+  let glare = 0;
+  if (target) { const yaw = Math.atan2(-(target[0] - v1.x), -(target[2] - v1.z)); glare = clamp(Math.atan2(Math.sin(yaw - entry.root.rotation.y), Math.cos(yaw - entry.root.rotation.y)), -.55, .55); }
+  st.glare = (st.glare ?? 0) + (glare - (st.glare ?? 0)) * (1 - Math.exp(-dt * 2.5));
+  rot(rig, 'Spine', slamLean * .5 + recoil * .12, Math.sin(clock * .7 + rig.seed) * .05 * (1 - m) * (target ? .3 : 1) + st.glare, -lurch * .4);
   // Crown: a damped spring that lags the body's lurch, plus wind; it shivers when struck.
-  const target = -lurch * 1.6 + Math.sin(clock * .9 + rig.seed) * .025, targetNod = -(lean + slamLean) * .7;
-  st.swayV += ((target - st.sway) * 38 - st.swayV * 6.5) * dt; st.sway += st.swayV * dt;
+  const swayTo = -lurch * 1.6 + Math.sin(clock * .9 + rig.seed) * .025, targetNod = -(lean + slamLean) * .7;
+  st.swayV += ((swayTo - st.sway) * 38 - st.swayV * 6.5) * dt; st.sway += st.swayV * dt;
   st.nodV += ((targetNod - st.nod) * 30 - st.nodV * 6) * dt; st.nod += st.nodV * dt;
   rot(rig, 'Head', st.nod + Math.sin(clock * 31) * .03 * recoil, 0, st.sway + Math.sin(clock * 37 + 1) * .04 * recoil);
   // Arms: swing against the legs; lift together to slam; hold up and out as branches while waking or rooting.
@@ -291,6 +296,11 @@ export function createEntView({scene, templates, height = () => 0, quality = 'hi
   // Glow: eyes ignite as it wakes, flare when hit, dim as it roots.
   const eyes = (wake < 1 ? smooth((age - .45) / .4) : 1) * (1 - smooth(rootIn * 1.2)) * (.85 + .15 * Math.sin(clock * 2.6 + rig.seed)) + recoil * .8;
   rig.glowMat.color.setScalar(clamp(eyes, 0, 2)); rig.glow.visible = eyes > .02;
+  if (rig.face) {
+   if (target) faceTarget.set(target[0], target[1] + 1.55, target[2]);
+   const up = attacking ? smooth(aAge / .27) : 0, down = attacking ? smooth((aAge - .27) / .06) * (1 - smooth((aAge - .45) / .35)) : 0;
+   poseEntFace(rig.face, {clock: clock + rig.seed % 97, dt, awake: wake < 1 ? smooth((age - .3) / .6) : 1 - smooth(rootIn * 1.2), attack: {up: up * (1 - smooth((aAge - .45) / .35)), down}, recoil, walk: m, step: step * m, target: target ? faceTarget : null, angry: target ? smooth((6 - best) / 4) * .35 : 0});
+  }
   if (wake < 1 && !woke.has(d.id) && age >= 0 && age < .6) { woke.add(d.id); wakeBurst(entry, rig, d, s0); }
  }
  function worldOf(rig, name, out) { return rig.bones[name].getWorldPosition(out); }
@@ -308,6 +318,10 @@ export function createEntView({scene, templates, height = () => 0, quality = 'hi
   v2.set(v1.x, g + (d.treeHeight || 6) * .7, v1.z); leaves(rig, v2, Math.round(46 * n), 1.6 * s0 * .6, 1.4);
   v2.set(v1.x, g + .05, v1.z); chips(v2, Math.round(26 * n), 1.6, [.3, .22, .14]); glowMotes(v2, Math.round(30 * n), rig.size === 'elder' ? 1.4 : .9, 1.8);
  }
+ function footDust(entry, rig, knee) {
+  rig.bones[knee].updateWorldMatrix(true, false); rig.bones[knee].getWorldPosition(v3); v3.y = height(v3.x, v3.z) + .04;
+  chips(v3, quality === 'low' ? 3 : 6, .7, [.4, .32, .22]);
+ }
  function slam(entry, rig, d) {
   rig.bones.ElbowL.updateWorldMatrix(true, false); entry.root.getWorldPosition(v1);
   const fwd = v2.set(-Math.sin(entry.root.rotation.y), 0, -Math.cos(entry.root.rotation.y)), reach = rig.size === 'elder' ? 1.6 : .9;
@@ -316,7 +330,7 @@ export function createEntView({scene, templates, height = () => 0, quality = 'hi
   onSound({kind: rig.size === 'elder' ? 'ent_slam' : 'ent_swipe', id: d.id, position: at.toArray(), size: rig.size});
   if (rig.size === 'elder') onRumble({position: at.toArray(), strength: .6, kind: 'slam'});
  }
- function update(actors, tick, dt) { clock += dt; let n = 0; for (const entry of actors.values()) if (entry.enemy && entry.visual?.userData.ent) { pose(entry, tick, dt); n++; } return n; }
+ function update(actors, tick, dt, heroes = null) { clock += dt; threats = heroes; let n = 0; for (const entry of actors.values()) if (entry.enemy && entry.visual?.userData.ent) { pose(entry, tick, dt); n++; } return n; }
  function event(e) {
   if (!e || !e.kind) return;
   if ((e.kind === 'hit' || e.kind === 'headshot') && e.material === 'wood' && Array.isArray(e.normal)) lastHit.set(e.id, e.normal[0] >= 0 ? 1 : -1);

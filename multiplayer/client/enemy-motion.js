@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE} from './skeleton-motion.js';
+import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE, FORGELING_GAIT} from './skeleton-motion.js';
 import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
 import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
 const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
@@ -324,7 +324,7 @@ export function applyEnemyMotion(entry, ctx) {
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) {
-    st = buildState(visual, kind); st.traits = traits(data.id, kind); states.set(visual, st);
+    st = buildState(visual, kind); st.visual = visual; st.traits = traits(data.id, kind); states.set(visual, st);
     if (kind === 'skeleton') { rigSkeleton(st, entry.root); measureLegs(st); }
   }
   restore(st);
@@ -357,9 +357,11 @@ export function applyEnemyMotion(entry, ctx) {
     const want = st.speed > .25 ? 1 : 0;
     st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .12 : .22)));
     // Each skeleton starts at its own point in the stride, steps its own length and wanders a little, so a crowd never marches in step.
-    const P = st.gaitP ||= gaitProfile(st.traits.seed, skeletonKindIndex(data.id));
+    const P = st.gaitP ||= gaitProfile(st.traits.seed, gaitKind(visual, data));
     if (st.phase === undefined) st.phase = P.phase0;
-    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
+    // Sideways and backwards steps are shorter and quicker than a forward stride (span shrinks with the stride, so feet stay matched).
+    st.strideK = 1 - .45 * Math.abs(st.moveR ?? 0) - .2 * Math.max(0, -(st.moveF ?? 1));
+    const stride = (st.legLenRest || .78) * SKELETON_STRIDE * P.stride * st.strideK * (1 + P.drift * noise1(st.traits.seed, 77, t * .35));
     if (!teleport) st.phase = (st.phase + travel / stride) % 4096;
     if (st.walk < .5 && !teleport) { const target = Math.round(st.phase * 2) / 2; st.phase += (target - st.phase) * (1 - Math.exp(-dt / .18)); }
     // Guard: the shield comes up while winding up or recoiling, and when a Hero is close in front.
@@ -373,7 +375,17 @@ export function applyEnemyMotion(entry, ctx) {
     const emerging = tick - (data.emergeTick ?? -1e9) < EMERGE_TICKS;
     const guardWant = Math.max(threat * .85, age >= 0 && age < 40 ? .4 : 0, hurt >= 0 && hurt < 50 ? .8 : 0) * (data.missingParts?.includes('leftArm') || data.shieldBroken || emerging ? 0 : 1);
     st.guard = (st.guard || 0) + (guardWant - (st.guard || 0)) * (1 - Math.exp(-dt / (guardWant > (st.guard || 0) ? .14 : .55)));
+    // Notice: a Hero stepping up after a quiet spell startles it (once; a skeleton already squared up does not re-startle).
+    if (data.side === 'party') st.calm = 0; // Dawnhold's own troops are not startled by their Heroes
+    else if (threat < .08) st.calm = (st.calm || 0) + dt; else if (threat > .35 && (st.calm ?? 9) > 2.5 && !emerging && st.init) { st.noticeAt = t; st.calm = 0; } else st.calm = 0;
+    // Travel direction in actor space (x right, z forward), smoothed: steps follow it, so backing off and sidling step too.
+    if (travel > 1e-4 && !teleport) {
+      const dx = _v.x - st.prevX, dz = _v.z - st.prevZ, d = Math.hypot(dx, dz) || 1, r = (dx * aR.x + dz * aR.z) / d, f = (dx * aF.x + dz * aF.z) / d, k = 1 - Math.exp(-dt / .15);
+      st.moveR = (st.moveR ?? 0) + (r - (st.moveR ?? 0)) * k; st.moveF = (st.moveF ?? 1) + (f - (st.moveF ?? 1)) * k;
+      const n = Math.hypot(st.moveR, st.moveF); if (n > 1e-3) { st.moveR /= Math.max(n, .35); st.moveF /= Math.max(n, .35); }
+    }
   }
+  st.prevX = _v.x; st.prevZ = _v.z;
 
   if (data.hurtTick !== undefined && data.hurtTick !== st.lastHurt) {
     // Spawned already-hurt actors do not replay an old flinch.
@@ -391,6 +403,7 @@ export function applyEnemyMotion(entry, ctx) {
   attackEnvelope(tick - (data.attackTick ?? -1000), kind, envelope);
   sigIn.kind = kind; sigIn.tr = st.traits; sigIn.t = t; sigIn.moving = moving; sigIn.stride = st.stride; sigIn.walk = st.walk || 0; sigIn.gait = st.gait || 0;
   poseSignals(sigIn, sig);
+  secondaryMotion(st, kind, ctx, dt, teleport);
 
   visual.getWorldScale(_ws); const scale = _ws.y;
   if (kind === 'golem') applyGolem(st, ctx);
@@ -399,6 +412,39 @@ export function applyEnemyMotion(entry, ctx) {
   commit(st);
   st.init = true;
   return st;
+}
+
+// ---- Level 3 secondary motion: inertia and attention, shared by skeletons and golems.
+// A damped spring per channel (semi-implicit Euler, sub-stepped): the body lags a start, pitches on through a stop and
+// sways on a swerve; the head turns to keep a nearby Hero in view. Pure presentation, from the rendered root.
+function spring(s, target, dt, w, z) {
+  for (let n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n; n--;) { s.v += (w * w * (target - s.x) - 2 * z * w * s.v) * h; s.x += s.v * h; }
+  return s.x;
+}
+function secondaryMotion(st, kind, ctx, dt, teleport) {
+  const heavy = kind === 'golem', p = st.lastPos, dtc = Math.max(dt, 1e-3);
+  if (st.vpx === undefined || teleport) { st.vpx = p.x; st.vpz = p.z; st.vx = 0; st.vz = 0; }
+  const k = 1 - Math.exp(-dt / .06), ovx = st.vx, ovz = st.vz;
+  st.vx += ((p.x - st.vpx) / dtc - st.vx) * k; st.vz += ((p.z - st.vpz) / dtc - st.vz) * k; st.vpx = p.x; st.vpz = p.z;
+  const ax = (st.vx - ovx) / dtc, az = (st.vz - ovz) / dtc, aFwd = ax * aF.x + az * aF.z, aSide = ax * aR.x + az * aR.z;
+  // Inertial lean: minus the acceleration (a start rocks it back, a stop pitches it on), springy with a little overshoot.
+  const gain = heavy ? .012 : .022;
+  st.lagF = spring(st.lagFs ||= {x: 0, v: 0}, -clamp(aFwd, -14, 14) * gain, dt, heavy ? 6 : 10, heavy ? .5 : .32);
+  st.lagR = spring(st.lagRs ||= {x: 0, v: 0}, -clamp(aSide, -14, 14) * gain, dt, heavy ? 6 : 10, heavy ? .5 : .32);
+  // Attention: the nearest Hero within reach of its interest, held a little late and never past the neck's comfort.
+  let yaw = 0, pitch = 0, best = heavy ? 11 : 9;
+  for (const h of ctx.threats || []) {
+    const dx = h[0] - p.x, dz = h[2] - p.z, d = Math.hypot(dx, dz);
+    if (d < best && d > .3) { best = d; const f = dx * aF.x + dz * aF.z, r = dx * aR.x + dz * aR.z; yaw = -Math.atan2(r, f); pitch = Math.atan2((h[1] ?? p.y) + 1.5 - (p.y + (heavy ? 2.4 : 1.55)), d); }
+  }
+  const want = Math.abs(yaw) < 2.2 ? 1 : 0, lim = heavy ? .7 : 1.05;
+  st.lookYaw = spring(st.lookYs ||= {x: 0, v: 0}, clamp(yaw, -lim, lim) * want, dt, heavy ? 3.5 : 7, heavy ? .9 : .7);
+  st.lookPitch = spring(st.lookPs ||= {x: 0, v: 0}, clamp(pitch, -.45, .35) * want, dt, heavy ? 3.5 : 7, .8);
+  if (heavy) {
+    sig.bodyPitch += st.lagF * .55; sig.bodyRoll -= st.lagR * .35;
+    sig.armSwingL -= st.lagF * 1.1; sig.armSwingR -= st.lagF * 1.1;
+    sig.headYaw += st.lookYaw * (1 - envelope.coil); sig.headPitch += st.lookPitch * .6;
+  }
 }
 
 function applyHead(N) {
@@ -455,6 +501,9 @@ function golemEvents(st, data, tick) {
   st.telegraph = envelope.coil; st.recoil = Math.abs(recoilSig.value);
 }
 
+// Walk style: the warband archetype from the id, or the forgelings' own drill step.
+const gaitKind = (visual, data) => visual?.userData.forgeling ? FORGELING_GAIT : skeletonKindIndex(data.id);
+
 // Rest leg lengths and planted ankle height, measured once from the authored rig (procedural pose starts at rest).
 function measureLegs(st) {
   let len = 0;
@@ -470,9 +519,14 @@ const bodyEnv = {};
 function applySkeleton(st, ctx, scale, teleport, dt, tick, data) {
   const N = st.nodes;
   for (const leg of st.legs) leg.active = !missingSig[leg.part];
-  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t: tick / TICK_RATE, dt, teleport, aR, aU, aF, rootQ,
+  const P = st.gaitP, w = st.walk || 0, ph = st.phase || 0, sc = st.legScale || 1, t = tick / TICK_RATE;
+  const notice = Number.isFinite(st.noticeAt) && t - st.noticeAt < .9 && t >= st.noticeAt ? (t - st.noticeAt) / .9 : -1;
+  const both = !missingSig.leftLeg && !missingSig.rightLeg;
+  // Hops lift the whole body, feet and all: a Bloomcaller's skip on each stance, and the startle on noticing a Hero.
+  const hopLift = both ? (P?.hop || 0) * w * .05 * sc * Math.pow(.5 - .5 * Math.cos(ph * Math.PI * 4), 3) + (notice >= 0 && notice < .3 ? .09 * sc * Math.sin(Math.PI * notice / .3) : 0) : 0;
+  Object.assign(bodyEnv, {sig, attack: envelope, recoilValue: recoilSig.value, missing: missingSig, t, dt, teleport, aR, aU, aF, rootQ, notice, hopLift, lagF: st.lagF || 0, lagR: st.lagR || 0, lookYaw: st.lookYaw || 0, lookPitch: st.lookPitch || 0, moveR: st.moveR ?? 0, moveF: st.moveF ?? 1, strideK: st.strideK ?? 1,
     rootPos: st.lastPos, height: ctx.height, guard: st.guard || 0, shieldYaw: 0, walk: st.walk || 0, phase: st.phase || 0, traits: st.traits,
-    kind: skeletonKindIndex(data.id), shieldBroken: !!data.shieldBroken,
+    kind: gaitKind(st.visual, data) % FORGELING_GAIT, shieldBroken: !!data.shieldBroken,
     flinch: Number.isFinite(data.flinchTick) && tick >= data.flinchTick && tick - data.flinchTick < FLINCH_SHOW ? (tick - data.flinchTick) / FLINCH_SHOW : -1});
   poseSkeletonBody(st, bodyEnv, offsetWorld, solveLeg);
   if (!ctx.height || !N.root || !st.legs.length) return;

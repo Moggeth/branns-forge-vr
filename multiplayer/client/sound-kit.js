@@ -46,6 +46,12 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
     death_stone: {seconds: 1.4, range: 50, play(o, t) { noise(o, t, {type: 'highpass', f0: 3200, f1: 1400, peak: .12, release: .14}); thump(o, t, 90, 32, .3, .5); for (let i = 0; i < 6; i++) noise(o, t + .15 + i * .09 + Math.random() * .05, {f0: 500 + Math.random() * 500, q: 3, peak: .07, release: .09}); bell(o, t + .05, 1180, .02, .9); }},
     // Anything else: a soft "poof" of a body vanishing in a puff, with a falling note.
     death_soft: {trim: 3, seconds: .9, range: 36, play(o, t) { noise(o, t, {type: 'lowpass', f0: 1800, f1: 300, attack: .01, peak: .12, release: .35}); tone(o, t, {type: 'triangle', f0: 520, f1: 180, peak: .03, release: .4}); }},
+    // Skull shot: a big hollow "thunk" like a mallet on a coconut, a little bonk ring, then the bones hit the dirt.
+    skull_thunk: {seconds: 1, range: 46, play(o, t) { thump(o, t, 260, 85, .3, .16); noise(o, t, {f0: 950, f1: 600, q: 4, attack: .002, peak: .16, release: .07}); tone(o, t, {type: 'triangle', f0: 430, f1: 300, peak: .07, attack: .002, release: .13}); tone(o, t + .02, {f0: 780, f1: 640, peak: .025, release: .3}); rattle(o, t + .42, 6, {spread: .05, f: 1500, peak: .05}); }},
+    // War Hammer kill: the whole skeleton bursts. A crunch, a deep whump, and a long spray of rattling bones.
+    bone_shatter: {seconds: 1.5, range: 55, duck: [.18, .5], play(o, t) { noise(o, t, {type: 'highpass', f0: 2800, f1: 1100, peak: .2, release: .12}); thump(o, t, 120, 38, .34, .3); rattle(o, t + .03, 16, {spread: .028, f: 2100, peak: .08}); rattle(o, t + .45, 8, {spread: .06, f: 1500, peak: .045}); tone(o, t + .06, {type: 'triangle', f0: 560, f1: 170, attack: .02, peak: .02, release: .6}); }},
+    // A loose bone landing in the dirt: one dry clack.
+    bone_clack: {trim: 2.5, seconds: .2, range: 22, play(o, t, opts) { const w = clamp(opts.weight ?? 1, .3, 1.4); noise(o, t, {f0: 1500 + Math.random() * 900, q: 6, attack: .001, peak: .06 * w, release: .045}); tone(o, t, {f0: 560 + Math.random() * 160, f1: 360, peak: .025 * w, attack: .001, release: .05}); }},
     // Bone popped off (arm, skull): a cartoon "pok" with a wobble.
     detach: {trim: 3, seconds: .4, range: 32, play(o, t) { tone(o, t, {f0: 900, f1: 340, peak: .07, attack: .002, release: .09}); noise(o, t, {f0: 2400, q: 5, peak: .07, release: .04}); tone(o, t + .05, {type: 'triangle', f0: 300, f1: 420, peak: .02, release: .15}); }},
     // Ground shockwave: a whump you feel, with grit thrown up.

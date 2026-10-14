@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>Dragon lab</title><style>body{margin:0;background:#8fb6d6}canvas{display:block}</style>
 <script type="module">
 // Review page for the streak dragon (client/dragon-art.js). await lab.ready() for the Blender model, then
-// lab.view(name, t, opts) poses and renders one view; lab.rider(true) shows the rider's own dragon (see-through wings, no horns).
+// lab.view(name, t, opts) poses and renders one view; lab.rider('saddle'|'chase'|false) shows the rider's own dragon.
 import * as T from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {buildDragon,animateDragon,setRiderView,DRAGON_SCALE,DRAGON_SEAT,DRAGON_MOUTH} from '../client/dragon-art.js';
@@ -11,17 +11,21 @@ const scene=new T.Scene();const pmrem=new T.PMREMGenerator(renderer),room=new Ro
 scene.add(new T.HemisphereLight(0xe8f2ff,0x6a7a3a,1.3));const sun=new T.DirectionalLight(0xfff0d8,2.6);sun.position.set(-3,6,4);scene.add(sun);
 const cam=new T.PerspectiveCamera(40,W/H,.05,200);const dragon=buildDragon();scene.add(dragon);
 const mouth=new T.Mesh(new T.SphereGeometry(.12),new T.MeshBasicMaterial({color:0x00ff66}));mouth.position.fromArray(DRAGON_MOUTH).multiplyScalar(DRAGON_SCALE);mouth.visible=q.has('marks');dragon.add(mouth);
-const views={three:[[9,4,9],[0,.5,0]],side:[[13,1,0],[0,.5,0]],front:[[0,1.5,12],[0,1,0]],below:[[3,-9,4],[0,0,0]],top:[[0,14,-1],[0,0,0]],face:[[2.2,3.2,8.5],[0,2,4]],
-  saddle:[DRAGON_SEAT.map(n=>n*DRAGON_SCALE),[0,DRAGON_SEAT[1]*DRAGON_SCALE-2.6,DRAGON_SEAT[2]*DRAGON_SCALE+3.6]],saddleSide:[DRAGON_SEAT.map(n=>n*DRAGON_SCALE),[4,DRAGON_SEAT[1]*DRAGON_SCALE-2.8,DRAGON_SEAT[2]*DRAGON_SCALE+.5]]};
+const seatMark=new T.Mesh(new T.SphereGeometry(.12),new T.MeshBasicMaterial({color:0xff00ff}));seatMark.position.fromArray(DRAGON_SEAT).multiplyScalar(DRAGON_SCALE);seatMark.visible=q.has('marks');dragon.add(seatMark);
+// World units (metres): the model is ~10 m nose to tail with a ~23 m span. chase/chaseLevel copy dragon-ride.js's
+// chase camera (12.5 m back along the view, 4.6 m up) at its entry pitch (-.42) and level (lab.chase={back,up} tries other offsets); use fov 70 to match the game.
+const chaseAt=pitch=>{const {back=12.5,up=4.6}=window.lab?.chase||{},y=up-Math.sin(pitch)*back,z=-Math.cos(pitch)*back;return [[0,y,z],[0,y+Math.sin(pitch)*20,z+Math.cos(pitch)*20]];};
+const views={three:[[17,8,17],[0,.6,-.6]],side:[[27,1.5,-1],[0,.6,-1]],front:[[0,3,27],[0,1,0]],below:[[6,-16,8],[0,0,-1]],top:[[0,30,-1.2],[0,0,-1.2]],face:[[2.8,2.6,8.2],[0,1.4,3.8]],
+};
+// The saddle views start where the game does: at DRAGON_SEAT, pitched down .62 (SADDLE_PITCH in dragon-ride.js) unless lab.seatPitch is set.
+const seatView=(seat,side)=>{const p=seat.map(n=>n*DRAGON_SCALE);return [p,side?[p[0]+4,p[1]-2.8,p[2]+.5]:[p[0],p[1]-Math.sin(lab.seatPitch??.62)*5,p[2]+Math.cos(lab.seatPitch??.62)*5]];};
 window.lab={
   ready:()=>new Promise(r=>{const t=setInterval(()=>{if(dragon.userData.dragon?.model){clearInterval(t);r(true);}},50);}),
-  rider(on){setRiderView(dragon,on);},
+  rider(mode){setRiderView(dragon,mode);}, // 'saddle' | 'chase' | false (true = 'saddle')
   // Steps the animation from t0 to t in small increments (the lag filters integrate), then renders.
-  view(name='three',t=0,opts={},{fov=40,from=null}={}){const t0=from??Math.max(0,t-3);for(let s=t0;s<t;s+=1/30)animateDragon(dragon,s,opts);animateDragon(dragon,t,opts);
-    const [p,l]=views[name];cam.fov=fov;cam.updateProjectionMatrix();cam.position.set(...p);cam.lookAt(...l);renderer.render(scene,cam);},
-  mouthWorld(){dragon.updateMatrixWorld(true);const b=dragon.userData.dragon.bones,j=b.Jaw,h=b.Head,v=new T.Vector3();
-    // the tip of the upper lip and the tip of the lower jaw, averaged, in the dragon's unscaled local space
-    const up=new T.Vector3(0,1.19,4.9),lo=new T.Vector3(0,1.08,4.85);return {head:h.getWorldPosition(v).clone().divideScalar(DRAGON_SCALE).toArray(),jaw:j.getWorldPosition(new T.Vector3()).divideScalar(DRAGON_SCALE).toArray()};},
+  view(name='three',t=0,opts={},{fov=40,from=null}={}){const t0=from??Math.max(0,t-3);for(let s=t0;s<t;s+=1/30)animateDragon(dragon,s,opts);lab.power=animateDragon(dragon,t,opts);
+    const [p,l]=name==='chase'?chaseAt(-.42):name==='chaseLevel'?chaseAt(0):name.startsWith('saddle')?seatView(lab.seat||DRAGON_SEAT,name==='saddleSide'):views[name];cam.fov=fov;cam.updateProjectionMatrix();cam.position.set(...p);cam.lookAt(...l);renderer.render(scene,cam);},
+  animate:(t,opts={})=>(lab.power=animateDragon(dragon,t,opts)), // one animation step, no render
   dragon,
 };
 document.title='ready';
