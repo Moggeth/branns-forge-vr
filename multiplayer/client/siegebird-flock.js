@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
 import {createSiegebirdRune} from './siegebird-rune.js';
-import {SIEGEBIRD_RELOAD, siegebirdSide, siegebirdPlumage, easeInOut} from './siegebird-reload.js';
+import {SIEGEBIRD_RELOAD, siegebirdSide, siegebirdPlumage, siegebirdReliefPlumage, easeInOut} from './siegebird-reload.js';
 
 // Siegebird reload songbirds. Each reload a small bird flies in from off-frame (right, then left, alternating),
 // hovers beside the rail, lays the bolt in the channel and flies off across the far side. Pure presentation:
@@ -246,10 +246,11 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
 
   // A reload began: n is the shared reload index (side + plumage), golden may still be unknown (null).
   // quick: a perfect wind earned a fast reload, so the whole bird timeline plays at 1/SIEGEBIRD_RELOAD.quick.
-  function shot(visual, {n, golden = null, playerId = '', time, quick = false}) {
+  // relief: how many birds already gave up this reload on a weapon swap; the takeover bird wears a contrasting plumage.
+  function shot(visual, {n, golden = null, playerId = '', time, quick = false, relief = 0}) {
     const rig = rigFor(visual);
     rig.reloads = rig.reloads.filter(r => r.last < R.gone && r.n !== n).slice(-1);
-    rig.reloads.push({n, golden, playerId, start: time, rate: quick ? 1 / R.quick : 1, side: siegebirdSide(n), plumage: siegebirdPlumage(playerId, n), seated: false, last: -1});
+    rig.reloads.push({n, golden, playerId, start: time, rate: quick ? 1 / R.quick : 1, side: siegebirdSide(n), plumage: siegebirdReliefPlumage(siegebirdPlumage(playerId, n), relief), seated: false, last: -1});
     if (rig.boltGlow) rig.boltGlow.visible = false;
     rig.loadedGolden = false;
   }
@@ -331,7 +332,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     const v = rig.native.localToWorld(p1.clone()).sub(rig.native.localToWorld(p0.clone())).divideScalar(.02 / r.rate);
     if (roost.length >= ROOST.max) evict();
     if (roost.length >= ROOST.max) return false;
-    const w = {bird: pool.pop() || makeBird(null, world.group), key, h, golden: r.golden === true, plumage: r.plumage, scale: wtmp.s.x, pos: wtmp.a.clone(), vel: v, born: lastWorldTime, state: 'fly', path: null, perch: null};
+    const w = {bird: pool.pop() || makeBird(null, world.group), key, h, golden: r.golden === true && !carrying, plumage: r.plumage, scale: wtmp.s.x, pos: wtmp.a.clone(), vel: v, born: lastWorldTime, state: 'fly', path: null, perch: null};
     if (!w.bird.root.parent) world.group.add(w.bird.root);
     dress(w.bird, r.plumage, w.golden); w.bird.root.scale.setScalar(w.scale); if (w.bird.carry) w.bird.carry.visible = carrying;
     const heading = wtmp.b.set(v.x, 0, v.z);

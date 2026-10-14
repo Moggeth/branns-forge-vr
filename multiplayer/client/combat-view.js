@@ -12,6 +12,10 @@ import {attachEmberdew} from './emberdew-presentation.js';
 import {predictArrow, createPhoenixContrails} from './phoenix-flight.js';
 import {carryPose} from '../shared/phoenix-carry.js';
 import {createPhoenixFlareView, dressFlareArrow} from './phoenix-flare-view.js';
+import {createPhoenixIgniteView} from './phoenix-ignite-view.js';
+import {createPhoenixLight} from './phoenix-light.js';
+import {articulationChain, chainIndex, rigHinges, stepHinges} from './bone-articulation.js';
+import {createBoneShards} from './bone-shards.js';
 
 const PARTS = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
 const NAMES = {head: ['Head'], torso: ['Torso', 'BodyCore'], leftArm: ['LeftArm', 'ArmL'], rightArm: ['RightArm', 'ArmR'], leftLeg: ['LeftLeg', 'LegL'], rightLeg: ['RightLeg', 'LegR']};
@@ -202,18 +206,29 @@ export function faceToward(out, f, to, up) {
   _fb.makeBasis(_fx, _fu, f); _tb.makeBasis(_tx, _tu, to);
   return out.setFromRotationMatrix(_tb.multiply(_fb.transpose()));
 }
-export function snapshotDetachedPart(root, part) {
+// With {articulate: true} (skeleton bones) the elbow and wrist, knee and ankle, or jaw become hinged child groups
+// that flop under bone-articulation.js; embedded arrows and contacts follow whichever segment they are in.
+export function snapshotDetachedPart(root, part, {articulate = false} = {}) {
   root.updateWorldMatrix(true, true);
   const anchor = partAnchor(root, part);
   const detached = new THREE.Group(); detached.userData.detachedPart = part;
   detached.position.copy(anchor.getWorldPosition(new THREE.Vector3()));
   detached.quaternion.copy(anchor.getWorldQuaternion(new THREE.Quaternion()));
   const worldToDetached = new THREE.Matrix4().compose(detached.position, detached.quaternion, new THREE.Vector3(1, 1, 1)).invert();
+  // Segments share the root's orientation and sit at each joint, so a hinge only ever turns about its own pivot.
+  const chain = articulate ? articulationChain(root, part) : null, segments = [detached], toSegment = [worldToDetached];
+  if (chain) for (let i = 1; i < chain.length; i++) {
+    const at = chain[i].bone.getWorldPosition(new THREE.Vector3()), segment = new THREE.Group();
+    segment.name = `${chain[i].name}:hinge`; segment.userData.detachedPart = part;
+    segment.position.copy(at.clone().applyMatrix4(toSegment[i - 1])); segments[i - 1].add(segment); segments.push(segment);
+    toSegment.push(new THREE.Matrix4().compose(at, detached.quaternion, new THREE.Vector3(1, 1, 1)).invert());
+  }
   // Anchors preserve actual bone space, including actor scale, after freezing.
   root.traverse(node => {
     if (!node.isBone && node !== anchor) return;
-    const frozen = new THREE.Group(); frozen.name = node.name; frozen.matrix.copy(worldToDetached).multiply(node.matrixWorld);
-    frozen.matrix.decompose(frozen.position, frozen.quaternion, frozen.scale); detached.add(frozen);
+    const i = chain ? chainIndex(chain, node) : 0;
+    const frozen = new THREE.Group(); frozen.name = node.name; frozen.matrix.copy(toSegment[i]).multiply(node.matrixWorld);
+    frozen.matrix.decompose(frozen.position, frozen.quaternion, frozen.scale); segments[i].add(frozen);
   });
   const eyes = new THREE.Vector3(); let eyeCount = 0, centre = null;
   root.traverse(mesh => {
@@ -221,35 +236,41 @@ export function snapshotDetachedPart(root, part) {
     const record = recordGeometry(mesh), selected = record.triangles.filter(t => t.part === part);
     if (!selected.length) return;
     if (mesh.isSkinnedMesh) mesh.skeleton.update();
-    const geometry = new THREE.BufferGeometry(), positions = [], attributes = {};
-    for (const [name, attr] of Object.entries(record.original.attributes)) {
-      if (!['position', 'normal', 'skinIndex', 'skinWeight', 'tangent'].includes(name)) attributes[name] = {source: attr, values: []};
-    }
-    let offset = 0;
-    for (const triangle of selected) {
-      const glow = (Array.isArray(mesh.material) ? mesh.material[triangle.materialIndex] : mesh.material)?.name === 'EyeGlow';
-      for (const index of triangle.ids) {
-        const point = mesh.getVertexPosition(index, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(worldToDetached);
-        positions.push(...point.toArray());
-        if (glow) { eyes.add(point); eyeCount++; }
-        for (const attr of Object.values(attributes)) for (let c = 0; c < attr.source.itemSize; c++) attr.values.push(attr.source.getComponent(index, c));
+    const bySegment = segments.map(() => []);
+    for (const triangle of selected) bySegment[chain ? chainIndex(chain, triangleBone(mesh, triangle.ids) || mesh) : 0].push(triangle);
+    bySegment.forEach((triangles, i) => {
+      if (!triangles.length) return;
+      const geometry = new THREE.BufferGeometry(), positions = [], attributes = {};
+      for (const [name, attr] of Object.entries(record.original.attributes)) {
+        if (!['position', 'normal', 'skinIndex', 'skinWeight', 'tangent'].includes(name)) attributes[name] = {source: attr, values: []};
       }
-      appendMaterialGroup(geometry, offset, triangle.materialIndex); offset += 3;
-    }
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    for (const [name, attr] of Object.entries(attributes)) geometry.setAttribute(name, new THREE.Float32BufferAttribute(attr.values, attr.source.itemSize));
-    geometry.computeVertexNormals(); geometry.computeBoundingSphere();
-    const piece = new THREE.Mesh(geometry, mesh.material); piece.name = `${mesh.name}:detached`;
-    piece.userData.detachedPart = part;
-    if (contactSurface(mesh)) piece.userData.contactSurface = 'shield';
-    detached.add(piece);
-    if (piece.material?.name === 'Bone' || (Array.isArray(piece.material) && piece.material.some(m => m.name === 'Bone'))) centre = (centre || new THREE.Box3()).union(geometry.boundingBox || (geometry.computeBoundingBox(), geometry.boundingBox));
+      let offset = 0;
+      for (const triangle of triangles) {
+        const glow = (Array.isArray(mesh.material) ? mesh.material[triangle.materialIndex] : mesh.material)?.name === 'EyeGlow';
+        for (const index of triangle.ids) {
+          const point = mesh.getVertexPosition(index, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
+          if (glow) { eyes.add(point.clone().applyMatrix4(worldToDetached)); eyeCount++; }
+          positions.push(...point.applyMatrix4(toSegment[i]).toArray());
+          for (const attr of Object.values(attributes)) for (let c = 0; c < attr.source.itemSize; c++) attr.values.push(attr.source.getComponent(index, c));
+        }
+        appendMaterialGroup(geometry, offset, triangle.materialIndex); offset += 3;
+      }
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      for (const [name, attr] of Object.entries(attributes)) geometry.setAttribute(name, new THREE.Float32BufferAttribute(attr.values, attr.source.itemSize));
+      geometry.computeVertexNormals(); geometry.computeBoundingSphere();
+      const piece = new THREE.Mesh(geometry, mesh.material); piece.name = `${mesh.name}:detached`;
+      piece.userData.detachedPart = part;
+      if (contactSurface(mesh)) piece.userData.contactSurface = 'shield';
+      segments[i].add(piece);
+      if (i === 0 && (piece.material?.name === 'Bone' || (Array.isArray(piece.material) && piece.material.some(m => m.name === 'Bone')))) centre = (centre || new THREE.Box3()).union(geometry.boundingBox || (geometry.computeBoundingBox(), geometry.boundingBox));
+    });
   });
   // A skull remembers which way its face looks (towards its glowing eyes), so a hero holding it sees it grin back.
   if (eyeCount && centre) {
     const face = eyes.divideScalar(eyeCount).sub(centre.getCenter(new THREE.Vector3()));
     if (face.lengthSq() > 1e-8) detached.userData.faceLocal = face.normalize();
   }
+  if (chain) rigHinges(detached, segments, chain, part, root);
   return detached;
 }
 
@@ -276,6 +297,34 @@ export function maskMissingParts(root, missing = []) {
   });
 }
 
+const sameArray = (a, b) => a === b || (!!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]));
+// Loose bones are drawn every frame, not at snapshot rate: from the latest authoritative pose the bone carries on
+// along its own velocity and spin under the shared physics' gravity (15 m/s^2) until the next snapshot lands, and
+// whatever gap that leaves closes over 50 ms instead of popping. A held or resting bone just glides to its pose.
+const REMAINS_G = 15, REMAINS_AHEAD = .15, REMAINS_BLEND = .05;
+const _rp = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rq2 = new THREE.Quaternion(), _rqI = new THREE.Quaternion(), _rw = new THREE.Vector3();
+function remainsPose(node, data, old) {
+  const pose = old || {position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), velocity: new THREE.Vector3(), spin: new THREE.Vector3(), offset: new THREE.Vector3(), offsetQ: new THREE.Quaternion(), age: 0};
+  pose.position.fromArray(data.position); pose.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);
+  const free = !data.heldBy && !(data.rest >= 24);
+  pose.velocity.fromArray(free && data.velocity || [0, 0, 0]); pose.spin.fromArray(free && data.angularVelocity || [0, 0, 0]);
+  pose.age = 0; pose.data = {position: [...data.position], quaternion: [...(data.quaternion || [0, 0, 0, 1])], velocity: [...(data.velocity || [0, 0, 0])]};
+  // The new pose replaces the prediction; the visible difference is kept as an offset that fades away.
+  if (old) { pose.offset.copy(node.position).sub(pose.position); pose.offsetQ.copy(pose.quaternion).invert().premultiply(node.quaternion); }
+  if (!old || pose.offset.lengthSq() > 4) { pose.offset.set(0, 0, 0); pose.offsetQ.identity(); }
+  return pose;
+}
+function predictRemains(node, pose, dt, height) {
+  pose.age = Math.min(REMAINS_AHEAD, pose.age + dt); const t = pose.age;
+  _rp.copy(pose.position).addScaledVector(pose.velocity, t); _rp.y -= .5 * REMAINS_G * t * t * (pose.velocity.lengthSq() > 0 ? 1 : 0);
+  // Never predict a falling bone into the ground below where it was last seen.
+  if (pose.velocity.y < 0 || _rp.y < pose.position.y) { const floor = Math.min(pose.position.y, (height(_rp.x, _rp.z) ?? -Infinity) + .05); if (_rp.y < floor) _rp.y = floor; }
+  const blend = Math.min(1, t / REMAINS_BLEND);
+  node.position.copy(_rp).addScaledVector(pose.offset, 1 - blend);
+  const w = pose.spin.length();
+  if (w > 1e-4) _rq.setFromAxisAngle(_rw.copy(pose.spin).divideScalar(w), w * t).multiply(pose.quaternion); else _rq.copy(pose.quaternion);
+  node.quaternion.copy(_rq).premultiply(_rq2.copy(pose.offsetQ).slerp(_rqI, blend));
+}
 // Closest approach of segment from-to to a vertical capsule standing at base; null when it misses.
 function capsuleContact(from, to, base, height, radius) {
   const steps = 12; let best = null;
@@ -286,14 +335,28 @@ function capsuleContact(from, to, base, height, radius) {
   }
   return best;
 }
-export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party'}) {
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party', night = () => 0, onBoneLand = () => {}, quality = 'high'}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
+  // Splinters wear the skeleton's own bone material, so they are made when the first one is needed.
+  let shardSystem = null;
+  const shards = {
+    handle(event) {
+      if (!shardSystem) {
+        let material = null; templates.get?.('skeleton')?.scene?.traverse(n => { if (!material && n.isMesh) material = (Array.isArray(n.material) ? n.material : [n.material]).find(m => m?.name === 'Bone') || null; });
+        shardSystem = createBoneShards({scene, material, height, quality});
+      }
+      return shardSystem.handle(event);
+    },
+    update: dt => shardSystem?.update(dt), stats: () => shardSystem?.stats() || {bursts: 0, spawned: 0, recycled: 0, active: 0}, dispose: () => shardSystem?.dispose(),
+  };
   const creatures = createCreatureLifeDeath({scene, height});
   const fractures = createEmbedFractures({camera});
   const streaks = createProjectileStreaks();
   const contrails = createPhoenixContrails();
   const flares = createPhoenixFlareView({scene, templates, height});
+  const ignites = createPhoenixIgniteView({scene});
+  const phoenixLight = createPhoenixLight({scene, night, camera});
   scene.add(fractures.object, streaks.object, contrails.object);
   const flightPoint = new THREE.Vector3(), flightVelocity = new THREE.Vector3(), wingTip = new THREE.Vector3();
   let wingTips = null; // [left, right] wing-tip points in each wing node's own frame, measured once from the mesh
@@ -338,7 +401,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (let i = 0; i < 2; i++) { const w = u.wingNodes[i]; if (w) w.quaternion.copy(w.userData.rest).multiply(flapTurn.setFromAxisAngle(flapAxis, i ? flap : -flap)); }
     group.updateWorldMatrix(false, true);
     // Frantic wing tips would scribble at carrying speed; one soft ember wisp streams from the tail instead.
-    contrails.emit(`carry:${rig.group.id}`, u.arrow.localToWorld(wingTip.set(0, 0, .78)), .5 * (u.fade ?? 1));
+    contrails.emit(`carry:${rig.group.id}`, u.arrow.localToWorld(wingTip.set(0, 0, .78)), .9 * (u.fade ?? 1));
+    phoenixLight.offer(group.position, .7 * (u.fade ?? 1));
   }
   function updateCarries(dt, tick) {
     const live = new Set();
@@ -396,6 +460,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     node.updateWorldMatrix(false, true);
     for (let i = 0; i < 2; i++) if (nodes[i]) contrails.emit(`${data.id}:${i}`, nodes[i].localToWorld(wingTip.copy(wingTips[i])), fade);
+    phoenixLight.offer(node.position, fade);
   }
   const embedPoint = new THREE.Vector3(), embedTravel = new THREE.Vector3(), embedQuaternion = new THREE.Quaternion();
   const streakFallback = new THREE.Vector3();
@@ -437,13 +502,15 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
         let source = actorFor(data.sourceId)?.visual;
         if (!source && templates.has(data.kind)) { source = prepareAsset(templates.get(data.kind), data.kind).visual; if (data.kind === 'skeleton') dressSkeleton(source, data.sourceId); }
         if (!source || source.userData.placeholder) continue;
-        node = snapshotDetachedPart(source, data.part); detached.set(data.id, node); scene.add(node);
+        node = snapshotDetachedPart(source, data.part, {articulate: data.kind === 'skeleton'}); detached.set(data.id, node); scene.add(node);
         node.position.fromArray(data.position); node.quaternion.fromArray(data.quaternion || [0, 0, 0, 1]);
       }
-      const targetPosition = new THREE.Vector3().fromArray(data.position), targetQuaternion = new THREE.Quaternion().fromArray(data.quaternion || [0, 0, 0, 1]);
       const oldPose = node.userData.pose;
-      if (!oldPose || !oldPose.position.equals(targetPosition) || !oldPose.quaternion.equals(targetQuaternion)) {
-        node.userData.pose = {from: node.position.clone(), fromQuaternion: node.quaternion.clone(), position: targetPosition, quaternion: targetQuaternion, age: 0};
+      if (!oldPose || !sameArray(oldPose.data.position, data.position) || !sameArray(oldPose.data.quaternion, data.quaternion)) {
+        // A bone that was falling and has stopped (or bounced) just hit the ground: worth a clack.
+        const fell = oldPose?.data.velocity[1] ?? 0;
+        node.userData.pose = remainsPose(node, data, oldPose);
+        if (fell < -2.2 && (data.velocity?.[1] ?? 0) > fell * .35 && !data.heldBy && !data.carry) onBoneLand({position: data.position, part: data.part, id: data.id, weight: Math.min(1.4, -fell / 7)});
       }
       node.userData.targetId = data.id; node.userData.heldBy = data.heldBy; node.userData.carry = data.carry || null;
     }
@@ -578,11 +645,14 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const node of detached.values()) {
       if (node.userData.carry) continue; // drawn every frame from the shared flight path below
       const pose = node.userData.pose; if (!pose) continue;
-      pose.age = Math.min(.05, pose.age + dt); const alpha = pose.age / .05;
-      node.position.lerpVectors(pose.from, pose.position, alpha); node.quaternion.slerpQuaternions(pose.fromQuaternion, pose.quaternion, alpha);
+      predictRemains(node, pose, dt, height);
     }
     updateCarries(dt, renderTick);
+    for (const node of detached.values()) if (node.userData.hinges && node.visible) stepHinges(node, dt, height);
+    shards.update(dt);
     flares.update(dt);
+    ignites.update(dt);
+    phoenixLight.update(dt);
     contrails.update(dt, camera);
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
     if (camera) fractures.update(camera);
@@ -714,8 +784,9 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     disposed = true;
     damageNumbers.dispose();
     creatures.dispose();
+    shards.dispose();
     fractures.dispose();
-    streaks.dispose(); contrails.dispose(); flares.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
+    streaks.dispose(); contrails.dispose(); flares.dispose(); ignites.dispose(); phoenixLight.dispose(); for (const rig of carries.values()) rig.group.removeFromParent(); carries.clear();
     fractureAnchors.clear();
     for (const [id] of embeds) remove(embeds, id);
     for (const [id] of projectiles) remove(projectiles, id);
@@ -723,7 +794,8 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const actor of actors.values()) maskMissingParts(actor.visual, []);
   }
   return {sync, prepareActors, tick, fireSamples, segmentContacts, grabTarget, poseLocalHeld, forEachEmbedFracture, dispose, detached, embeds, projectiles,
-    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails, flares: flares.stats().flares}),
+    boneShardStats: () => shards.stats(),
+    rangedEffectStats: () => ({fracturesStored: fractures.embeds.size, fracturesVisible: fractures.object.count, streaksVisible: streaks.object.count, contrails: contrails.stats().trails, contrailMotes: contrails.stats().motes, flares: flares.stats().flares, ignites: ignites.stats().ignites, phoenixLight: phoenixLight.stats()}),
     beginCreatureFrame: () => creatures.beginFrame(),
     creatureStats: () => creatures.stats(),
     heldLimbRoot: holderId => {
@@ -736,7 +808,9 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
       const actor = event?.id === undefined ? null : actorFor(event.id);
       if ((event?.kind === 'hit' || event?.kind === 'headshot') && creatureActor(actor)) creatures.hit(actor, event);
       if (event?.kind === 'death' && (creatureActor(actor) || ['skeleton', 'golem'].includes(event.creature))) creatures.death(actor, event);
+      if ((event?.kind === 'death' && event.style) || (event?.kind === 'detach' && event.creature === 'skeleton' && !event.dying)) shards.handle(event);
       if (event?.kind === 'phoenix_flare' && Array.isArray(event.position)) flares.burst(event);
+      if (event?.kind === 'phoenix_ignite' && Array.isArray(event.position)) { ignites.burst(event); phoenixLight.flash(event.position); }
     },
     damageNumberStats: () => damageNumbers.stats()};
 }

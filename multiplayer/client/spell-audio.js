@@ -49,6 +49,9 @@ export function createSpellAudio(context) {
     spring: (o, t) => { for (let i = 0; i < 7; i++) tone(o, t + i * .11, {f0: 600 + ((i * 5) % 7) * 90, f1: 1400 + ((i * 3) % 5) * 120, attack: .005, peak: .022, release: .14}); noise(o, t, {type: 'bandpass', f0: 900, f1: 1600, q: .8, attack: .3, peak: .04, release: 1.2}); },
     blessing: (o, t) => { chord(o, t, [523, 659, 784, 1047], {attack: .35, peak: .018, release: 1.6, stagger: .1}); noise(o, t + .1, {type: 'highpass', f0: 4500, attack: .4, peak: .025, release: 1.2}); },
     rainfall: (o, t) => { noise(o, t, {type: 'lowpass', f0: 300, f1: 140, attack: .6, peak: .09, release: 2.4}); noise(o, t + .4, {type: 'bandpass', f0: 1800, f1: 2600, q: .6, attack: 1.2, peak: .06, release: 2.2}); chord(o, t + .3, [294, 370, 440, 587], {attack: .8, peak: .014, release: 2, stagger: .2}); },
+    // Waking the woods: a deep, friendly wooden yawn (a creaking groan rising) under a warm, green major chord.
+    awaken: (o, t) => { noise(o, t, {type: 'bandpass', f0: 180, f1: 340, q: 9, attack: .5, peak: .09, release: .9}); rumble(o, t, 40, 60, 1.4, .08); chord(o, t + .35, [262, 330, 392, 523], {type: 'triangle', attack: .3, peak: .016, release: 1.4, stagger: .12}); },
+    wildwake: (o, t) => { for (let i = 0; i < 3; i++) noise(o, t + i * .25, {type: 'bandpass', f0: 200 + i * 40, f1: 360 + i * 60, q: 8, attack: .3, peak: .07, release: .6}); rumble(o, t, 36, 64, 1.8, .1); chord(o, t + .4, [196, 294, 392, 494, 587], {type: 'triangle', attack: .3, peak: .016, release: 1.6, stagger: .1}); },
     quake: (o, t) => { rumble(o, t, 30, 24, 2.2, .2); for (let i = 0; i < 6; i++) noise(o, t + .2 + i * .17, {type: 'bandpass', f0: 380 + 60 * (i % 3), q: 2, attack: .01, peak: .05, release: .2}); },
   };
   const GIFTS = {

@@ -87,7 +87,8 @@ export function towerGeometry(seed, {r: radius = 1.6, h = 3.2, course = 0.4, per
 
 // Bronze fire basket on a tripod: a lathe-turned bowl, three splayed legs, four strap bars arching over the fire.
 // Origin at the tripod foot; the fire sits at y = BASKET.fire.
-export const BASKET = Object.freeze({height: 0.95, fire: 1.05, radius: 0.62});
+export const BASKET = Object.freeze({height: 0.95, fire: 1.05, radius: 0.62,
+  eyes: Object.freeze({x: 0.115, y: 1.0, z: 0.69})}); // the kit owl's crystal eyes, basket-local (three.js +Z faces the arch)
 export function basketGeometry() {
   const R = BASKET.radius, parts = [];
   const profile = [[0.08, 0], [0.32, 0.04], [0.56, 0.16], [R, 0.34], [R + 0.05, 0.38], [R - 0.02, 0.4], [0.5, 0.2], [0.26, 0.08], [0.06, 0.06]].map(([x, y]) => new THREE.Vector2(x, y));
