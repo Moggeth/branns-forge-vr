@@ -103,12 +103,13 @@ function damageEnemy(state, enemy, amount, events, ownerId, side) {
   return hitEnemyPart(state,enemy,'torso',amount,ownerId||side?{ownerId,side}:null,{nextId,terrainHeight},events);
 
 }
-function damageHero(state, hero, amount, events) {
+/** from: optional world position the blow came from; clients use it to point the hurt cue (client/hurt-feedback.js). */
+function damageHero(state, hero, amount, events, from) {
   if((hero.protectedUntil??0)>state.tick||hero.dragon)return; // a Hero on their dragon is out of reach
   if(tavernSafe(state,hero))return; // taverns are sanctuaries (shared/taverns.js)
   amount*=Math.max(0,1-itemBonus(hero,'armor')-aleArmor(state,hero)); // Shield-Charm and Hearty Ale
   hero.hp -= amount;
-  events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone'});
+  events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone',hero:true,damage:Math.round(amount*10)/10,...(Array.isArray(from)?{from:from.slice(0,3)}:{})});
   if (hero.hp <= 0) {
     if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);breakStreak(hero);
     events.push(event('death', hero.position, hero.id));
@@ -132,8 +133,8 @@ function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
 
 function instantiate(state) {
   let fireSampleProvider=null;
-  const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev)=>damageHero(s,hero,n,ev),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
+  const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events,from)=>{const start=events.length;damageHero(s,p,n,events,from);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
+  const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
   const dragonContext={...combatContext,hitEnemyPart,ignite:(s,at,radius)=>{addFuel(s,at,radius,.35,true);applyHeat(s,at,radius,1,fireContext);}};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
@@ -325,7 +326,7 @@ function instantiate(state) {
         if (supplied) {
           // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
           const rival=homeBattle(state)&&state.players.find(h=>h.id===message.targetId&&h.id!==p.id&&h.role==='hero'&&(h.side||'party')!==(p.side||'party'));
-          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
+          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events,p.position);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
           if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
@@ -446,7 +447,7 @@ function instantiate(state) {
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
         const at = [pending.x, terrainHeight(state, pending.x, pending.z), pending.z];
         for (const e of [...state.enemies]) if (enemyHostileTo(e,pending.side) && distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
-        for (const p of state.players) if (p.role === 'hero' && (!battleSkirmish(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
+        for (const p of state.players) if (p.role === 'hero' && (!battleSkirmish(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events, at);
         for(const base of state.battle.bases)if(distance(base.position,at)<=5)damageBattleBase(state,base.id,90,pending.side||'party',events);
         for(const b of state.inventions.structures)if(distance(b.position,at)<=5)damageInvention(state,b.id,90,null,events,pending.side||'party');
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});

@@ -18,7 +18,7 @@ const suite = [
   'emergence-polish','enemy-behaviour','enemy-shadow-budget','expedition-hud','expedition-integration',
   'expedition-presentation.test','fire','wyrmspout','wyrmspout-tank','weapon-inspect','emberdew','fire-authored-samples','fire-performance',
   'fire-spatial-phoenix','fire-warmup','forest-resource-integration','forge-protection','foundation-tiles',
-  'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hold-overlays',
+  'geode-emberdew-effects','geode-light','glb','hero-equipment','hero-view','hurt-feedback','hold-overlays',
   'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',
   'inventions-review','legacy-trees','lobby-ui.test','lumber-collection','lumber-session',
   'material-audio','material-economy','meteor-creature','mining-geometry',

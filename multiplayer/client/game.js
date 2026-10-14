@@ -140,6 +140,8 @@ import {createSoundKit} from './sound-kit.js';
 import {cueFor,pickupCue} from './event-sounds.js';
 import {onKeepGround} from '../shared/keep-sites.js';
 import {createStormreelView} from './stormreel-view.js';
+import {createHurtFeedback} from './hurt-feedback.js';
+import {heroMaxHp} from '../shared/hero-progress.js';
 import {createRadiantStaff, enhanceStaffTemplate} from './radiant-staff.js';
 import {createStormreelWeapon} from './stormreel-weapon.js';
 import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
@@ -464,6 +466,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const stormDarken=createStormDarken({camera,renderer,reduced:reducedWeaponMotion});
   // Camera jolt for a surge nearby and the tug when the cable runs out (presentation only, decays every frame).
   const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null};
+  // Getting hurt (client/hurt-feedback.js): edge bloom toward the blow, HP chip, view nudge, buzz, thump; low-health heartbeat.
+  const hurtEye=new THREE.Vector3(),hurtLook=new THREE.Vector3();
+  const hurtView={position:new THREE.Vector3(),yaw:0},hurtDir=new THREE.Vector3();
+  const hurtFeel=createHurtFeedback({camera,view:()=>{camera.getWorldPosition(hurtView.position);camera.getWorldDirection(hurtDir);hurtView.yaw=Math.atan2(-hurtDir.x,-hurtDir.z);return hurtView;},presenting:()=>renderer.xr.isPresenting,touch:()=>touchEnabled,reducedMotion:reducedWeaponMotion,audio:()=>audioContext,
+    haptic:(steps,hand)=>feedback.pattern?.(steps,hand),self:()=>role==='hero'?snapshot.players?.find(p=>p.id===playerId)||null:null,maxHp:p=>p?.maxHp||heroMaxHp(p||{})});
   function stormTug(){const t=performance.now()/1000;if(t<stormJolt.nextTug)return;stormJolt.nextTug=t+.65;stormJolt.tug=1;stormView.tug(playerId);stormWeapon.tug?.();
     if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.8,duration:60}]);else if(touchEnabled)try{navigator.vibrate?.([35]);}catch{}
     report(`The cable is at full stretch. Spike the crossbow (${touchEnabled?'Spike':'G'}) or walk back toward the tower.`);}
@@ -1122,12 +1129,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   }
   function stopFireAudio(){if(flameSource){flameSource.stop();flameSource.disconnect();flameGain.disconnect();flameSource=null;flameGain=null;}}
   function handleEvent(event){
+    if(event.kind==='hit'&&event.hero&&event.id===playerId&&role==='hero'){camera.getWorldPosition(hurtEye);camera.getWorldDirection(hurtLook);hurtFeel.hurt(event,{position:hurtEye,yaw:Math.atan2(-hurtLook.x,-hurtLook.z)});}
     if(event.kind==='respawn'&&event.id===playerId){clearInput();if(snapshot.battle?.v===2){yaw=Math.atan2(event.position[0],event.position[2]);pitch=0;}localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;initialized=true;}
     if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
     waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);dragonRide.event(event,playerId);
     feedback.handleEvent(event);
     if(appleSnack.event(event,playerId))return;
-    combat.handleEvent(event);
+    combat.handleEvent(event.hero&&event.id===playerId?{...event,damage:0}:event); // no number floating in your own face
     wyrmStream.handleEvent(event,{localId:playerId,resolveTarget:(id,part)=>{const a=actors.get(`e:${id}`);return a?.visual?partAnchor(a.visual,part):null;}});wyrmFeel.event(event,playerId,listenerPose());
     golemFx.handleEvent(event);
     entView.event(event);stumplingView.event(event);
@@ -1712,6 +1720,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? (b.style === 'gnashjaw' ? 2.75 : 1.9) : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
     stormJoltStep(dt);
+    hurtFeel.update(dt);
     dragonRide.setPointScale(renderer.domElement.height,camera.fov);dragonRide.aim(camera,now);
     if (touchEnabled && role === 'god' && active && !renderer.xr.isPresenting) updateTouchAim();
     weaponAnchor.visible = role === 'hero' && !renderer.xr.isPresenting && active && !manned && !dragonBlend;
