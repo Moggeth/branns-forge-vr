@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4}</style></head><body>
+<script type="module">
+// Review lab for keep siege damage (2026-10-09): the real home-base view with the Blender kit, a real new world's keeps,
+// and hit events like the host sends. The game renderer's tone mapping and lights; flat ground at keep height.
+//   lab.scenario(name)  healthy | chip | magic | cracked | crumbling | broken
+//   lab.frame(n)        advance n 60 Hz frames and render
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createHomeBaseView} from '../client/home-base-view.js';
+import {createSimulation} from '../shared/simulation.js';
+const W = innerWidth || 960, H = innerHeight || 540, renderer = new T.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(W, H); renderer.setPixelRatio(1); renderer.toneMapping = T.ACESFilmicToneMapping; renderer.outputColorSpace = T.SRGBColorSpace; document.body.appendChild(renderer.domElement);
+const scene = new T.Scene(); scene.background = new T.Color(0x9fc0dc); scene.fog = new T.Fog(0xb7cbe0, 40, 140);
+const pmrem = new T.PMREMGenerator(renderer), room = new RoomEnvironment(); scene.environment = pmrem.fromScene(room, .04).texture; scene.environmentIntensity = .55; room.dispose();
+scene.add(new T.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2)); const sun = new T.DirectionalLight(0xffe3ad, 2.2); sun.position.set(-22, 38, 15); scene.add(sun);
+const sim = createSimulation({seed: 9}); sim.addPlayer({id: 'host'}); const snap = sim.snapshot();
+const base = snap.battle.bases[1], pylon = base.parts.find(p => p.kind === 'pylon'), spire = base.parts.find(p => p.kind === 'spire');
+const ground = new T.Mesh(new T.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({color: 0x667b43, roughness: 1})); ground.position.y = pylon.position[1] - .05; scene.add(ground);
+const view = createHomeBaseView({scene}); view.sync(snap);
+view.installKit(await new GLTFLoader().loadAsync('/assets/bases_kit.glb')); view.sync(snap);
+const cam = new T.PerspectiveCamera(55, W / H, .05, 400); scene.add(cam);
+const P = pylon.position, out = [P[0] - base.position[0], P[2] - base.position[2]], ol = Math.hypot(...out), o = [out[0] / ol, out[1] / ol];
+const place = (d = 7.5) => { cam.position.set(P[0] + o[0] * d + o[1] * d / 3, P[1] + 2.2 + d * .1, P[2] + o[1] * d - o[0] * d / 3); cam.lookAt(P[0], P[1] + 3, P[2]); }; place();
+const face = (h = 2.4) => [P[0] + o[0] * .55, P[1] + h, P[2] + o[1] * .55];
+const hit = (blow, h) => view.event({kind: 'home_part_hit', id: pylon.id, part: 'pylon', side: 'rivals', hp: pylon.hp, position: [...P], at: face(h), blow});
+let tick = 0;
+window.lab = {
+  distance(d) { place(d); },
+  frame(n = 1) { for (let i = 0; i < n; i++) { tick++; snap.tick = tick; view.update(1 / 60, cam, tick); } renderer.render(scene, cam); },
+  scenario(name) {
+    if (name === 'healthy') pylon.hp = pylon.maxHp;
+    if (name === 'chip') { pylon.hp = pylon.maxHp - 12; hit('chip'); }
+    if (name === 'magic') { pylon.hp = Math.round(pylon.maxHp * .55); hit('magic', 3); }
+    if (name === 'cracked') { pylon.hp = Math.round(pylon.maxHp * .55); hit('hit'); }
+    if (name === 'crumbling') { pylon.hp = Math.round(pylon.maxHp * .2); hit('hit', 3.4); }
+    if (name === 'broken') { pylon.hp = 0; view.event({kind: 'home_part_broken', id: pylon.id, part: 'pylon', side: 'rivals', position: [...P]}); }
+    view.sync(snap);
+  },
+};
+document.title = 'ready';
+</script></body></html>
