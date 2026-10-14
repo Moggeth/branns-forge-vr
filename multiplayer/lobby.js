@@ -195,7 +195,10 @@ $('lobbyForm').addEventListener('submit', event => {
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
-$('create').addEventListener('click', () => quickPlay());
+// The local map editor's Play button opens /?solo on the dev server: Play then starts a solo world on this
+// computer, no room service needed. Builds ignore it (import.meta.env.DEV is false there).
+const devSolo = import.meta.env?.DEV && new URLSearchParams(location.search).has('solo');
+$('create').addEventListener('click', () => devSolo ? start({create: true, solo: true}) : quickPlay());
 
 // Quick play: join the fullest open world in your region, or start one if none has room.
 // A world that turns out full or gone is skipped; after three misses we just light a new one.

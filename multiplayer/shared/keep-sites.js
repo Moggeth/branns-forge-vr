@@ -1,3 +1,4 @@
+import {movedList, movedTable} from './map-layout.js';
 // Where the two keeps stand, and the ground carved for them out of the corner mountains: a round bowl for the
 // half-ring keep, a narrow pass straight back toward the corner, and a walled back town filling the corner itself,
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
@@ -55,7 +56,7 @@ export function beyondWorld(x, z, limit = 55) {
 // second cottage onto the inner cliff, the well stands in the yard, and lanterns light the pass.
 const C = (u, v) => Object.freeze([u, v]);
 const at = (where, face) => Object.freeze({at: where, face});
-export const BACK_TOWN = Object.freeze({
+export const BACK_TOWN = movedTable('town', {
   workshop: at(C(63.2, 63.2), C(50, 50)),
   stores: at(C(65.5, 56.5), C(53, 56.5)),
   cottage: at(C(56.5, 65.5), C(56.5, 53)),
@@ -63,7 +64,7 @@ export const BACK_TOWN = Object.freeze({
   well: at(C(60.6, 57.6), C(53, 53)),
 });
 // Lanterns up the pass and round the yard, [u, v] like the buildings.
-export const BACK_TOWN_LANTERNS = Object.freeze([C(51.7, 48.9), C(51.7, 54.5), C(53.8, 61.5), C(61.5, 53.8)]);
+export const BACK_TOWN_LANTERNS = movedList('town.lanterns', [C(51.7, 48.9), C(51.7, 54.5), C(53.8, 61.5), C(61.5, 53.8)]);
 /** World {x, z, yaw} of a back-town piece for one side ('party' or 'rivals'). */
 export function backTownPiece(side, name) {
   const g = side === 'rivals' ? 1 : -1, {at: [u, v], face: [fu, fv]} = BACK_TOWN[name];

@@ -21,7 +21,7 @@ const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
- const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
+ const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.type!=='stormspire'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
  const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
  const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e),yaw:e.yaw,side:e.side}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
