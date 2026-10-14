@@ -7,7 +7,9 @@ import {HOME_NAMES} from '../shared/home-bases.js';
 import {draughtCap} from '../shared/home-shop.js';
 import {TAVERN_NAMES} from '../shared/taverns.js';
 
-// Each item's little shelf picture and accent.
+// Each item's little shelf picture and accent. The pictures are Blender renders (assets/hero-items-20261009 ->
+// /assets/items/<id>.webp); the glyph shows until (or if) the picture fails to load.
+export const itemIcon = id => `/assets/items/${id}.webp`;
 export const ITEM_ART = Object.freeze({
   breastplate: {glyph: '🛡️', hue: 38}, boots: {glyph: '👢', hue: 28}, whetstone: {glyph: '🪨', hue: 210}, kettle: {glyph: '🫖', hue: 18},
   purse: {glyph: '👛', hue: 46}, belt: {glyph: '🧪', hue: 200}, charm: {glyph: '🧿', hue: 215}, leech: {glyph: '🪱', hue: 340},
@@ -23,6 +25,13 @@ const el = (tag, attrs = {}, children = []) => {
   for (const c of [].concat(children)) if (c) n.append(c);
   return n;
 };
+
+/** A rendered item picture; falls back to its glyph (or nothing) if the image cannot load. */
+function picture(id, cls, glyph = '') {
+  const img = el('img', {class: cls, src: itemIcon(id), alt: '', draggable: 'false', decoding: 'async'});
+  img.addEventListener('error', () => img.replaceWith(el('span', {class: `${cls} qm-glyph`, text: glyph})), {once: true});
+  return img;
+}
 
 /** Pure view model (also used by tests). */
 export function shopModel(player = {}) {
@@ -68,13 +77,16 @@ export function createQuartermasterUI({mount = document.body, hudSelf = null, on
   // HUD: Healing Draught chip (tap or V) and the tavern banner.
   const draughtNum = el('span', {class: 'qm-draught-num', text: '0'});
   const draught = el('button', {type: 'button', class: 'qm-draught', hidden: true, title: 'Drink a Healing Draught (V)', 'aria-keyshortcuts': 'V', onclick: () => onDrink()},
-    [el('span', {class: 'qm-draught-flask', 'aria-hidden': 'true'}), draughtNum, el('kbd', {class: 'qm-key', text: 'V'})]);
+    [picture('draught', 'qm-draught-flask'), draughtNum, el('kbd', {class: 'qm-key', text: 'V'})]);
   const tavernName = el('strong'), tavernNote = el('span');
-  const tavern = el('div', {class: 'qm-tavern', hidden: true, role: 'status', 'aria-live': 'polite'}, [el('span', {class: 'qm-tavern-mug', 'aria-hidden': 'true', text: '🍺'}), el('span', {class: 'qm-tavern-text'}, [tavernName, tavernNote])]);
+  const tavern = el('div', {class: 'qm-tavern', hidden: true, role: 'status', 'aria-live': 'polite'}, [picture('ale', 'qm-tavern-mug', '🍺'), el('span', {class: 'qm-tavern-text'}, [tavernName, tavernNote])]);
   (hudSelf || mount).append(draught); mount.append(tavern);
   let tavernAt = '', tavernTimer = 0;
 
-  const art = id => { const a = ITEM_ART[id] || {glyph: '✦', hue: 40}; return el('span', {class: 'qm-art', style: `--qm-hue:${a.hue}`, 'aria-hidden': 'true', text: a.glyph}); };
+  const art = id => {
+    const a = ITEM_ART[id] || {glyph: '✦', hue: 40}, box = el('span', {class: 'qm-art', style: `--qm-hue:${a.hue}`, 'aria-hidden': 'true'});
+    box.append(picture(id, 'qm-art-img', a.glyph)); return box;
+  };
   function renderSlots() {
     slots.replaceChildren(...model.slots.map((id, i) => id
       ? el('li', {class: 'qm-slot', 'data-filled': ''}, [art(id), el('span', {class: 'qm-slot-name', text: ITEMS[id].name}),

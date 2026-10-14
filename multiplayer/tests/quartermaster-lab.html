@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quartermaster lab</title>
+<link rel="stylesheet" href="../lobby.css"><link rel="stylesheet" href="../client/quartermaster.css">
+<style>body{margin:0;min-height:100vh;background:#3a4a2a url() center/cover}#hud{position:fixed;left:16px;bottom:16px;display:flex;gap:8px}</style>
+<div id="hud"></div>
+<script type="module">
+// Review page for the Quartermaster shop, the Healing Draught chip and the tavern banner with the item pictures
+// (assets/hero-items-20261009 -> /assets/items/<id>.webp). ?side=rivals for Grumblekeep, ?banner to show the tavern banner.
+import {createQuartermasterUI} from '../client/quartermaster-ui.js';
+const q = new URLSearchParams(location.search);
+const ui = createQuartermasterUI({hudSelf: document.getElementById('hud')});
+const self = {resources: {gold: 34}, items: ['hat', 'kettle', 'locket'], side: q.get('side') || 'party', draughts: 2, hp: 60, maxHp: 120};
+ui.update(self, {role: 'hero', tavern: q.has('banner') ? {id: 'tavern-neutral', side: 'neutral'} : null, tick: 0});
+if (!q.has('banner')) ui.show();
+window.qmReady = () => [...document.images].every(i => i.complete);
+</script>
