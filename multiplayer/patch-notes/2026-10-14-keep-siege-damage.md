@@ -1,5 +1,5 @@
 ---
-date: 2026-10-10
+date: 2026-10-14
 area: World
 title: Keep buildings show the damage you deal
 ---
