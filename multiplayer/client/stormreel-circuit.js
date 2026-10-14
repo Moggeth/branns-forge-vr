@@ -1,12 +1,16 @@
 // Stormreel circuit through a foe (presentation): a + bolt and a - bolt in the same body close the loop, and this is what
-// the player sees while the current runs. The closing SURGE: a white-hot flash, a ground shockwave, thick channels from
-// each bolt into the body, arcs leaping to the neighbours the soil current jolts. Then the COOK: the body lights up blue-white
-// from inside and shakes, current pours bolt -> body -> bolt as a branching red-to-blue channel with carriers riding it,
-// arcs crawl over the limbs and spit into the ground, smoke curls off the head. If it dies in the circuit it is left
-// charred, smoking, on a scorch mark. Reads authority events and snapshots; never writes gameplay state.
+// the player sees. The power is the Stormspire's, carried down the cable, so the kill reads as an industrial ARC FLASH,
+// not weather (Mitch, 2026-10-11: "an industrial electrical arc", "mechanically coherent"; 2026-10-10: "a big fuckin deal").
+// The SURGE: a fat violet-white plasma arc roars bolt -> body -> bolt, a fireball of plasma swells in the body, molten
+// spatter sprays and drips, the soil current spits at the neighbours, and the glare is so bright the world around it goes dark
+// (ctx.darken dips the exposure; every arc material is drawn untonemapped, so the arc itself stays white-hot). While the
+// circuit holds (half a second) the COOK keeps that arc writhing like a welder's, lights the body from inside and shakes it.
+// A foe that dies in it is left charred, smoking, on a scorch mark. Reads authority events and snapshots; never writes gameplay state.
 import * as THREE from 'three';
 import {POLE,MIXED_HUE,makeSprite,flicker} from './stormreel-look.js';
 
+// ARC tints the white-blue lightning ribbon toward the violet of a real electric arc.
+export const ARC = new THREE.Color(.6, .2, 1);
 const HOT = new THREE.Color(0xdff2ff), BODY = new THREE.Color(0x7cc4ff), RED_HOT = new THREE.Color(POLE.red.hot), BLUE_HOT = new THREE.Color(POLE.blue.hot);
 
 function smokeTexture() {
@@ -35,7 +39,7 @@ function scorchTexture() {
 /**
  * ctx: scene, lightning, height(x,z), beads (stormreel-look createBeads), tex {soft}, sound(name, ...args),
  *      bodyPoints(enemyId, outVectors) -> count, enemyVisual(enemyId) -> Object3D | null, enemyAt(enemyId, out) -> Vector3 | null,
- *      shake(amount, at) (camera, local only), flash(amount) (screen, local only)
+ *      shake(amount, at) (camera), flash(amount, at) (screen), darken(amount, at) (the world dims round the strike)
  */
 export function createCircuitFx(ctx) {
   const {scene, lightning} = ctx;
@@ -44,8 +48,8 @@ export function createCircuitFx(ctx) {
   const body = Array.from({length: 8}, () => new THREE.Vector3());
   // One permanent light for the circuit (never added or removed, so no shader rebuilds): the surge floods the
   // surroundings blue-white, then the cook flickers it while the current runs. Off (intensity 0) the rest of the time.
-  const light = new THREE.PointLight(0xbfe0ff, 0, 11, 2); light.castShadow = false; light.name = 'StormCircuitLight'; scene.add(light);
-  let flashK = 0, cookK = 0;
+  const light = new THREE.PointLight(0xd8ccff, 0, 11, 2); light.castShadow = false; light.name = 'StormCircuitLight'; scene.add(light);
+  let flashK = 0, cookK = 0, blastK = 0;
   // Lit-from-inside and charred variants of an enemy's own materials, shared by every foe wearing them.
   const lit = new Map(), char = new Map(), litMats = new Set();
   function variant(cache, m, make) { if (!m) return m; let x = cache.get(m.uuid); if (!x) { x = make(m); cache.set(m.uuid, x); } return x; }
@@ -62,7 +66,7 @@ export function createCircuitFx(ctx) {
   function victim(id) {
     let x = victims.get(id);
     if (!x) {
-      x = {id, since: 0, ground: 0, smoke: 0, zap: 0, age: 0, flare: makeSprite(scene, ctx.tex.soft, 0x9fd0ff, 14), core: makeSprite(scene, ctx.tex.soft, 0xffffff, 15), base: null, at: new THREE.Vector3()};
+      x = {id, since: 0, ground: 0, smoke: 0, zap: 0, age: 0, flare: makeSprite(scene, ctx.tex.soft, 0xa890ff, 14), core: makeSprite(scene, ctx.tex.soft, 0xffffff, 15), base: null, at: new THREE.Vector3()};
       victims.set(id, x); dress(x, 'lit');
     }
     return x;
@@ -86,19 +90,39 @@ export function createCircuitFx(ctx) {
     scorches.push({mesh, age: 0, life: 14});
   }
 
+  /** The crown of the arc between the two bolts: it jumps through the air outside the body (bowing out from the foe's
+   *  middle, `mid`) and hot plasma rises, so it lifts too. */
+  const bowOut = new THREE.Vector3();
+  function bow(pa, pb, mid, out) {
+    const d = pa.distanceTo(pb); out.lerpVectors(pa, pb, .5);
+    bowOut.set(out.x - mid.x, 0, out.z - mid.z); if (bowOut.lengthSq() < 1e-4) bowOut.set(pb.z - pa.z, 0, pa.x - pb.x); if (bowOut.lengthSq() < 1e-4) bowOut.set(1, 0, 0);
+    return out.addScaledVector(bowOut.normalize(), .75 + .3 * Math.min(2, d)).setY(out.y + .25 + .15 * Math.min(2, d));
+  }
+
   /** ev: storm_arc {enemy, red, blue, at, splash, wet}, plus where the bolts are drawn (pa, pb) and splash foe positions. */
   function surge(ev, pa, pb, splashAt = [], local = false) {
     const at = v.fromArray(ev.at || ev.red).clone(), x = victim(ev.enemy); x.age = 0; x.kick = 1;
     ctx.sound?.('surge', ev.at, !!ev.wet);
-    if (local) { ctx.flash?.(.55); ctx.shake?.(.7); } else ctx.shake?.(.35, at);
-    light.position.copy(at); flashK = 1;
+    ctx.darken?.(1, at); ctx.flash?.(local ? .9 : .7, at); ctx.shake?.(local ? 1 : .8, local ? undefined : at);
+    light.position.copy(at); light.position.y += 1.5; flashK = 1; blastK = 1;
     if (!lightning) return;
-    lightning.glow(at, {size: 5.5, life: .5, color: 0xffffff}); lightning.glow(at, {size: 3, life: .9, color: 0x9fd0ff});
-    lightning.ring(new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .04, at.z), {radius: 3.2, life: .6, color: 0xbfe2ff});
-    lightning.burst(at, {count: 60, speed: 6.5, life: .8}); lightning.burst(at, {count: 24, speed: 3, up: 1.5});
+    // The arc flash: a thick, ropey plasma channel bolt -> body -> bolt (no forks: a power arc is one writhing rope),
+    // with a thin white-hot core inside it. It holds for the circuit's half second; cook() keeps it writhing.
+    const floor0 = new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .05, at.z);
+    for (const [from, to] of [[pa, at], [at, pb]]) lightning.strike(from.clone(), to.clone(), {life: .5, width: .12, rough: .07, depth: 4, branches: 0, restrikes: 0, intensity: 3, hue: ARC});
+    // Outside the body the two bolts arc straight to each other like electrodes: a fat rope that bows up off the heat.
+    const top = bow(pa, pb, ctx.enemyAt?.(ev.enemy, v2)?.clone().setY(at.y) || at, new THREE.Vector3());
+    for (const [from, to] of [[pa, top], [top, pb]]) {
+      lightning.strike(from.clone(), to.clone(), {life: .6, width: .17, rough: .06, depth: 5, branches: 0, restrikes: 0, intensity: 3.5, hue: ARC});
+      lightning.strike(from.clone(), to.clone(), {life: .45, width: .045, rough: .04, depth: 5, branches: 0, restrikes: 2, intensity: 2});
+    }
+    // The plasma fireball swelling in the body, and the glare round it.
+    lightning.glow(at, {size: 1.6, life: .7, color: 0xffffff}); lightning.glow(at, {size: 3.2, life: .8, color: 0x9a7cff}); 
+    lightning.ring(floor0.clone(), {radius: 3.5, life: .45, color: 0xcdbfff});
+    // Molten spatter: a hard spray, then heavy drips that fall and cool orange.
+    lightning.burst(at, {count: 90, speed: 8, life: .9, molten: true}); lightning.burst(at, {count: 40, speed: 2.5, up: .9, life: 1.3, molten: true}); lightning.burst(at, {count: 30, speed: 6});
     for (const [p, pole] of [[pa, 'red'], [pb, 'blue']]) {
-      lightning.strike(p.clone(), at.clone(), {life: .35, width: .2, rough: .12, depth: 5, branches: 3, restrikes: 3, intensity: 1.8, hue: POLE[pole].hue});
-      lightning.glow(p, {size: 2.2, life: .4, color: POLE[pole].glow});
+      lightning.glow(p, {size: 2.6, life: .5, color: POLE[pole].glow}); lightning.burst(p, {count: 14, speed: 3, life: .8, molten: true});
     }
     // The soil current leaps to each neighbour and spits up out of the ground in a ring.
     const floor = new THREE.Vector3(at.x, ctx.height(at.x, at.z) + .05, at.z);
@@ -118,7 +142,7 @@ export function createCircuitFx(ctx) {
     x.kick = Math.max(0, (x.kick || 0) - dt * 2.5);
     // Shake: the whole body buzzes on its feet (restored when the circuit lets go).
     if (x.root) { x.base ||= x.root.position.clone(); const a = (.025 + .03 * x.kick) * (.6 + .4 * power); x.root.position.set(x.base.x + (Math.random() - .5) * a, x.base.y + Math.random() * a * .6, x.base.z + (Math.random() - .5) * a); }
-    x.flare.position.copy(centre); x.flare.scale.setScalar((1.3 + .9 * flicker(time, 1)) * (1 + x.kick)); x.flare.material.opacity = .3 + .25 * f;
+    x.flare.position.copy(centre); x.flare.scale.setScalar((.9 + .5 * flicker(time, 1)) * (1 + .4 * x.kick)); x.flare.material.opacity = .22 + .18 * f;
     x.core.position.copy(centre); x.core.scale.setScalar(.45 + .35 * flicker(time * 1.9, 7)); x.core.material.opacity = .5 + .4 * f;
     // Carriers: + -> body -> -.
     if (ctx.beads) for (let i = 0; i < 10; i++) {
@@ -128,10 +152,17 @@ export function createCircuitFx(ctx) {
     if (!lightning) return;
     x.since -= dt;
     if (x.since <= 0) {
-      x.since = .045 + Math.random() * .04;
-      // The main channel: from the + bolt into the body's core and out through the - bolt, red fading to blue.
-      lightning.strike(pa.clone(), centre.clone(), {life: .1 + Math.random() * .06, width: .11, rough: .14, depth: 4, branches: 2, restrikes: 1, intensity: 1.5, hue: POLE.red.hue});
-      lightning.strike(centre.clone(), pb.clone(), {life: .1 + Math.random() * .06, width: .11, rough: .14, depth: 4, branches: 2, restrikes: 1, intensity: 1.5, hue: POLE.blue.hue});
+      x.since = .05 + Math.random() * .03;
+      // The arc holds: a writhing violet rope from the + bolt through the body's core and out through the - bolt, the
+      // poles' own colours licking at each end, molten beads dripping off both bolts.
+      lightning.strike(pa.clone(), centre.clone(), {life: .1, width: .09, rough: .08, depth: 4, branches: 0, restrikes: 0, intensity: 3.5, hue: ARC});
+      lightning.strike(centre.clone(), pb.clone(), {life: .1, width: .09, rough: .08, depth: 4, branches: 0, restrikes: 0, intensity: 3.5, hue: ARC});
+      const top = bow(pa, pb, centre, v2).clone(); top.y += (Math.random() - .5) * .15;
+      lightning.strike(pa.clone(), top, {life: .1, width: .14, rough: .07, depth: 5, branches: 0, restrikes: 0, intensity: 4, hue: ARC});
+      lightning.strike(top.clone(), pb.clone(), {life: .1, width: .14, rough: .07, depth: 5, branches: 0, restrikes: 0, intensity: 4, hue: ARC});
+      lightning.strike(pa.clone(), centre.clone().lerp(pa, .6), {life: .08, width: .07, rough: .12, depth: 3, branches: 0, restrikes: 0, intensity: 1.2, hue: POLE.red.hue});
+      lightning.strike(pb.clone(), centre.clone().lerp(pb, .6), {life: .08, width: .07, rough: .12, depth: 3, branches: 0, restrikes: 0, intensity: 1.2, hue: POLE.blue.hue});
+      if (Math.random() < .5) lightning.burst(Math.random() < .5 ? pa : pb, {count: 3, speed: 1.4, up: .2, life: .9, molten: true});
       // Crawling over the limbs.
       if (n >= 2) for (let r = 0; r < 2; r++) {
         const i = Math.floor(Math.random() * n); let j = Math.floor(Math.random() * n); if (j === i) j = (j + 1) % n;
@@ -158,9 +189,10 @@ export function createCircuitFx(ctx) {
     release(x, cooked);
   }
   function update(dt, camPos) {
-    // Surge: a white-hot flash that falls off fast; cook: a cooler flicker held while a victim is lit.
-    light.intensity = 40 * flashK * flashK + 6 * cookK; light.color.setHex(flashK > .4 ? 0xeef6ff : 0x9fd0ff);
-    flashK = Math.max(0, flashK - dt * 3.2); cookK = Math.max(0, cookK - dt * 8);
+    // Surge: a white-hot flash that falls off fast; cook: a cooler violet flicker held while a victim is lit.
+    // The arc flash floods everything within 35 m with white light (the same one light: only its numbers change, never its shader).
+    light.intensity = 40 * flashK * flashK + 6 * cookK + 260 * blastK * blastK; light.distance = 9 + 16 * blastK; light.color.setHex(flashK > .4 ? 0xf1ecff : 0xb8a8ff);
+    flashK = Math.max(0, flashK - dt * 2.4); cookK = Math.max(0, cookK - dt * 8); blastK = Math.max(0, blastK - dt * 2.8);
     for (const x of [...victims.values()]) { if (!x.seen) end(x.id, false); x.seen = false; }
     for (let i = smokes.length - 1; i >= 0; i--) {
       const s = smokes[i]; s.age += dt; const t = s.age / s.life;

@@ -45,6 +45,7 @@ import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,valid
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {WORLD_EXTENT,clampToWorld} from './keep-sites.js';
 import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
+import {resolveMapExtras} from './map-extras.js';
 export const HZ = 60;
 
 const BOUND = 55, MAX_WORLD = 64;
@@ -83,7 +84,7 @@ function spawn(state, ignored = '') {
     const theta = i * 2.3999632297, radius = 2.8 * Math.sqrt(i);
     const candidate = [clamp(origin[0] + Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(origin[1] + Math.sin(theta) * radius, -BOUND, BOUND)];
     candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
-    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,candidate);
+    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,candidate);resolveMapExtras(candidate);
     if(candidate.some((v,k)=>k!==1&&Math.abs(v)>49.5))continue;
     const others = [...state.players.filter(p => p.role === 'hero' && p.id !== ignored), ...state.enemies];
     const hazards=state.fireCells.filter(c=>c.burning);
@@ -429,7 +430,7 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveMapExtras(p.position);resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -460,7 +461,7 @@ function instantiate(state) {
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveTerrainBoundary(position,radius);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveMapExtras(position,radius);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);

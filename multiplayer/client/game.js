@@ -132,6 +132,7 @@ import {flaskLaunch,forecastFlask,forecastCinder,createLandingMarkers} from './e
 import {worldTrees} from '../shared/world-content.js';
 import {createLightningFx} from './lightning-fx.js';
 import {createAudioMix} from './audio-mix.js';
+import {createStormDarken} from './storm-darken.js';
 import {createAmbienceAudio} from './ambience-audio.js';
 import {createSoundKit} from './sound-kit.js';
 import {cueFor,pickupCue} from './event-sounds.js';
@@ -453,7 +454,10 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     listener:()=>listenerPose(),spireEntry:id=>inventionVisual.spireEntry(id),spireArt:inventionVisual.spires,audio:()=>audioContext,
     enemyVisual:id=>actors.get(`e:${id}`)?.visual||null,
     shake:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;stormJolt.shake=Math.max(stormJolt.shake,k*Math.max(0,1-d/28));},
-    flash:k=>{stormJolt.flash=Math.max(stormJolt.flash,k);}});
+    flash:(k,at)=>{const d=at?Math.hypot(at.x-localPosition.x,at.z-localPosition.z):0;stormJolt.flash=Math.max(stormJolt.flash,k*Math.max(0,1-d/90)*(reducedWeaponMotion?.4:1));},
+    // A closed circuit is so bright the world around it goes dark (Mitch, 2026-10-10): the exposure dips while the lightning, drawn untonemapped, stays white-hot.
+    darken:(k,at)=>stormDarken.hit(k,at,localPosition)});
+  const stormDarken=createStormDarken({camera,renderer,reduced:reducedWeaponMotion});
   // Camera jolt for a surge nearby and the tug when the cable runs out (presentation only, decays every frame).
   const stormJolt={shake:0,flash:0,tug:0,nextTug:0,el:null};
   // Getting hurt (client/hurt-feedback.js): edge bloom toward the blow, HP chip, view nudge, buzz, thump; low-health heartbeat.
@@ -463,12 +467,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     haptic:(steps,hand)=>feedback.pattern?.(steps,hand),self:()=>role==='hero'?snapshot.players?.find(p=>p.id===playerId)||null:null,maxHp:p=>p?.maxHp||heroMaxHp(p||{})});
   function stormTug(){const t=performance.now()/1000;if(t<stormJolt.nextTug)return;stormJolt.nextTug=t+.65;stormJolt.tug=1;stormView.tug(playerId);stormWeapon.tug?.();
     if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.8,duration:60}]);else if(touchEnabled)try{navigator.vibrate?.([35]);}catch{}
-    report('The cable is at full stretch. Spike the crossbow (G) or walk back toward the tower.');}
+    report(`The cable is at full stretch. Spike the crossbow (${touchEnabled?'Spike':'G'}) or walk back toward the tower.`);}
   function stormJoltStep(dt){const j=stormJolt,t=performance.now();
     if(!renderer.xr.isPresenting&&(j.shake>.001||j.tug>.001)){camera.rotation.x+=j.shake*.03*Math.sin(t*.083)-j.tug*j.tug*.05;camera.rotation.y+=j.shake*.022*Math.sin(t*.067+1)+j.tug*.012*Math.sin(t*.05);}
     j.shake=Math.max(0,j.shake-dt*2.6);j.tug=Math.max(0,j.tug-dt*3.2);j.flash=Math.max(0,j.flash-dt*3.5);
     if(j.flash>.001&&!j.el&&globalThis.document){j.el=document.createElement('div');j.el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(circle,rgba(220,235,255,.9),rgba(140,180,255,.35));opacity:0';document.body.appendChild(j.el);}
-    if(j.el)j.el.style.opacity=String(Math.min(.6,j.flash));}
+    if(j.el)j.el.style.opacity=String(Math.min(.85,j.flash));
+    stormDarken.update(dt);}
   const stormWeapon=createStormreelWeapon({scene,lightning,send:(action,payload)=>{unlockAudio();onAction(action,payload);},aim:()=>weaponAim(),snapshot:()=>snapshot,playerId:()=>playerId,
     height:(x,z)=>heightAt(x,z,snapshot.edits),localPosition:()=>localPosition,audio:()=>audioContext,now:()=>performance.now()/1000,hud:globalThis.document?.body,severKey:()=>touchEnabled?'Special':'Q',sfx:stormView.sfx});
   // R beside the tower while wearing its pack drops in another Crystal (taking or hanging the pack does this too).
@@ -476,10 +481,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Q / Special: reel your bolt back in along its tether (shared/stormreel.js stormReel); it also breaks a live circuit.
   function reelStorm(){const b=wornTower(snapshot,selfPlayer());if(!b?.probes){report('No bolt out to reel in. Hold and release to fire one.');return;}unlockAudio();onAction('stormReel',{});}
   function stormFeel(event){
-    if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (negative)':'Red (positive)'} Stormreel shouldered. ${touchEnabled?'Hold Zap to charge, release to fire':'Hold click to charge, release to fire'}. Stick a red (+) bolt and a blue (−) bolt in the SAME foe to close the circuit. Solo? ${touchEnabled?'Drop':'G'} spikes this crossbow in the ground so you can fetch the other one. ${touchEnabled?'Special':'Q'} reels your bolt back in.`);
+    if(event.kind==='storm_pack_take'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (−)':'Red (+)'} Stormreel. ${touchEnabled?'Hold Zap':'Hold click'} to charge. A red and a blue bolt in one foe strikes it down. ${touchEnabled?'Spike':'G'} plants it, ${touchEnabled?'Reel':'Q'} winds a bolt back.`);
     if(event.kind==='storm_plant'&&event.by===playerId)report(`Crossbow spiked into the ground. Its bolt stays live. ${touchEnabled?'Use':'E'} beside it to pick it back up.`);
     if(event.kind==='storm_pickup'&&event.by===playerId)report(`${event.pack==='blue'?'Blue (−)':'Red (+)'} crossbow back in hand.`);
-    if(event.kind==='storm_arc'&&event.by===playerId)report('Circuit closed! Lightning is cooking your target.');
+    if(event.kind==='storm_arc'&&event.by===playerId)report(event.killed===false?'Circuit closed, but something shielded your target.':'Circuit closed! The arc burned your target down.');
+    if(event.kind==='storm_arc')audioMix?.duck(.3,1.8);
     if(event.kind==='storm_reel'&&event.by===playerId){if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.35,duration:30},{at:70,amplitude:.7,duration:50}]);else if(touchEnabled)try{navigator.vibrate?.([14,24,30]);}catch{}}
     if(event.kind==='storm_reel'&&event.by===playerId&&event.refund)report(`Bolt reeled in${event.refund?`, ${event.refund} charge returned to the tower`:''}.`);
     if(event.kind==='storm_arc'&&event.by===playerId&&touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([30,20,30,20,60]);}catch{}
@@ -1980,7 +1986,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Phones wind the manned Timberline by holding the Wind button (the Jump slot while seated).
     setCrank(down) { crankHeld = !!down && active && role === 'hero'; },
     projectWorld(point){camera.updateMatrixWorld();const p=new THREE.Vector3(...point).project(camera);if(p.z < -1||p.z>1)return null;const r=canvas.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2,viewportWidth:innerWidth,viewportHeight:innerHeight};},
-    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,mannedVerb:mannedVerb(),scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
+    fireSamples:id=>combat.fireSamples(id),strike, equip, primaryDown,primaryUp,collectAt,tapAt,collectTarget(id){if(active&&role==='hero'&&appleSnack.holding()){unlockAudio();appleSnack.bite();return;}if(active&&role==='hero'&&/:(red|blue)$/.test(id||'')&&nearPlantedPack()){unlockAudio();onAction('stormPickup');return;}if(active&&role==='hero'&&!useInvention(id))onAction('collectTarget',{targetId:id});},grab,release,special,specialPress,cancelSpecialAim:cancelWallAim,weaponState:()=>({tool,aiming,manned:!!manned,mannedVerb:mannedVerb(),scoping,ads:adsAmount,fov:camera.fov,zeroDistance:tool==='crossbow'?30:null,...weapons.state()}),
     useResource(kind){if(active&&role==='hero')onAction('useResource',{kind});},
     beginInventionPlacement,
     interact,
@@ -1990,7 +1996,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
