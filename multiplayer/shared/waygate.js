@@ -7,6 +7,7 @@
 // State lives in state.waygate = {lit:[tick, x8], openUntil, dest}; worlds saved before it load without it.
 import {heroMaxHp} from './hero-progress.js';
 import {STARTING_SITES} from './starting-world.js';
+import {siteShift} from './map-layout.js';
 import {STAR_SITES} from './adventure.js';
 
 export const WAYGATE = Object.freeze({litTicks: 25 * 60, openTicks: 60 * 60, reach: 3.4, restoreHp: 30, restoreMana: 40, ringRadius: 9, returnRadius: 0.85});
@@ -23,10 +24,12 @@ function destination(id, name, x, z, face) {
   const fx = face[0] - x, fz = face[1] - z, d = Math.hypot(fx, fz) || 1, out = [-fz / d * 1.8, fx / d * 1.8];
   return Object.freeze({id, name, x, z, out, yaw: Math.atan2(-(face[0] - x - out[0]), -(face[1] - z - out[1]))});
 }
+const shifted = (id, name, x, z, [fx, fz]) => { const [dx, dz] = siteShift(id); return destination(id, name, x + dx, z + dz, [fx + dx, fz + dz]); };
 export const DESTINATIONS = Object.freeze([
   destination('forge', 'the Forge', -7.4, 5.1, [0, 0]), // on the sanctuary path, clear of the yard's ore nodes
-  destination('outcrop', 'the Crystal Outcrop', 20.5, 12.5, [27, 14]),
-  destination('watcharch', 'the Ruined Watch-Arch', -4.5, -22, [-5, -28]),
+  // Landmark destinations follow their site when the map editor shifts it (shared/map-layout.js).
+  shifted('outcrop', 'the Crystal Outcrop', 20.5, 12.5, [27, 14]),
+  shifted('watcharch', 'the Ruined Watch-Arch', -4.5, -22, [-5, -28]),
 ]);
 const flat = (a, x, z) => Math.hypot(a[0] - x, a[2] - z);
 
