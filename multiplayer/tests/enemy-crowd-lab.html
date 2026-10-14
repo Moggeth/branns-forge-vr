@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Enemy crowd lab</title>
+<style>body{margin:0;background:#a9c0cc}canvas{display:block}#cap{position:fixed;left:12px;bottom:10px;font:600 18px system-ui;color:#fff;text-shadow:0 1px 3px #000}</style>
+<div id="cap"></div>
+<script type="module">
+// Crowd movement review on the shipped layers: the real shared enemy steering (stepEnemies at 60 Hz) chasing a Hero,
+// published as 20 Hz snapshots with arrival jitter like a browser host, then presented exactly like game.js does
+// (presentation clock, root smoothing, enemy-motion + skeleton-motion posing). A checker floor shows any foot skate.
+// Deterministic: window.studio.frame(i) renders frame i at 30 fps. Not shipped.
+// ?cam=wide|close|side  ?n=12 skeletons  ?golems=2  ?play
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {prepareAsset} from '../client/asset-pose.js';
+import {applyEnemyMotion} from '../client/enemy-motion.js';
+import {dressSkeleton} from '../client/skeleton-look.js';
+import {createPresentationClock} from '../client/presentation-clock.js';
+import {createEnemy} from '../shared/combat.js';
+import {stepEnemies} from '../shared/enemy-behaviour.js';
+const interp = await import('../client/enemy-interp.js').catch(() => null);
+const q=new URLSearchParams(location.search),W=innerWidth,H=innerHeight,camMode=q.get('cam')||'wide';
+const N=+(q.get('n')||12),NG=+(q.get('golems')??2),DT=1/30;
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.shadowMap.enabled=true;document.body.append(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0xa9c0cc);s.fog=new THREE.Fog(s.background,24,60);
+s.add(new THREE.HemisphereLight(0xc6e0ed,0x5e5139,1.2));
+const sun=new THREE.DirectionalLight(0xffe3ad,2.2);sun.position.set(6,12,4);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-14,right:14,top:14,bottom:-14});s.add(sun,sun.target);
+const cv=document.createElement('canvas');cv.width=cv.height=64;const cx=cv.getContext('2d');cx.fillStyle='#6f7d3d';cx.fillRect(0,0,64,64);cx.fillStyle='#64712f';cx.fillRect(0,0,32,32);cx.fillRect(32,32,32,32);
+const tex=new THREE.CanvasTexture(cv);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(40,40);tex.colorSpace=THREE.SRGBColorSpace;tex.magFilter=THREE.NearestFilter;tex.anisotropy=8;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.receiveShadow=true;s.add(ground);
+const heroMesh=new THREE.Mesh(new THREE.CapsuleGeometry(.3,1.1,4,12),new THREE.MeshStandardMaterial({color:0x3d7bd9}));heroMesh.castShadow=true;s.add(heroMesh);
+const cam=new THREE.PerspectiveCamera(40,W/H,.05,120),cap=document.getElementById('cap');
+// Shared state: one Hero walking a loop, then standing still so the crowd gathers round.
+const state={tick:0,players:[{id:'hero',role:'hero',position:[0,0,0],hp:100}],enemies:[],inventions:{defenders:[],structures:[]}};
+for(let i=0;i<N;i++){const a=i/N*Math.PI*2,R=9+(i%3)*1.4;state.enemies.push(createEnemy(`camp_${i+3}`,[Math.cos(a)*R,0,Math.sin(a)*R]));}
+for(let i=0;i<NG;i++){const a=(i+.5)/Math.max(1,NG)*Math.PI*2+.4;state.enemies.push(createEnemy(`golem_${i}`,[Math.cos(a)*12,0,Math.sin(a)*12],'golem'));}
+for(const e of state.enemies)e.attackTick=-1000;
+const heroAt=t=>{const u=Math.min(t,9);return u<9?[Math.sin(u*.42)*5,0,Math.sin(u*.84)*2.6]:[Math.sin(9*.42)*5,0,Math.sin(9*.84)*2.6];};
+const ctx={ground:()=>0,resolve:()=>{},damageHero:()=>{},damageStructure:()=>{},damageEnemy:()=>{},damageBase:()=>{},events:[]};
+// Network: a snapshot every 3 ticks, arriving 25..60 ms later (deterministic jitter).
+const clock=createPresentationClock(),inbox=[];let snapshot=null,nowMs=0;
+const jitter=k=>25+((Math.imul(k+1,0x9e3779b1)>>>0)%36);
+const actors=new Map();let templates={};
+function makeActor(d){
+ const root=new THREE.Group();root.position.fromArray(d.position);s.add(root);
+ const visual=prepareAsset(templates[d.kind],d.kind,d.kind==='golem'?undefined:1.7).visual;visual.traverse(n=>{if(n.isMesh)n.castShadow=true;});
+ if(d.kind==='skeleton')dressSkeleton(visual,d.id);root.add(visual);
+ return {enemy:true,root,visual,target:new THREE.Vector3(),data:d};}
+let renderTick=0;
+function frame(i){
+ const tMs=i*DT*1000;
+ // Simulation up to now, publishing snapshots.
+ while(state.tick<Math.floor(tMs/1000*60)){state.tick++;state.players[0].position=heroAt(state.tick/60);ctx.events=[];stepEnemies(state,ctx);
+  if(state.tick%3===0)inbox.push({at:state.tick/60*1000+jitter(state.tick),snap:{tick:state.tick,enemies:JSON.parse(JSON.stringify(state.enemies)),players:JSON.parse(JSON.stringify(state.players))}});}
+ while(inbox.length&&inbox[0].at<=tMs){const m=inbox.shift();snapshot=m.snap;clock.observe(snapshot.tick,m.at);
+  for(const d of snapshot.enemies){let e=actors.get(d.id);if(!e){e=makeActor(d);actors.set(d.id,e);}e.target.fromArray(d.position);e.data=d;interp?.noteEnemySnapshot?.(e,d,snapshot.tick);}}
+ if(!snapshot)return 0;
+ renderTick=clock.sample(tMs);
+ for(const e of actors.values()){
+  if(interp&&!q.has('legacy'))interp.presentEnemyRoot(e,renderTick,DT);
+  else{e.root.position.lerp(e.target,1-Math.exp(-DT*12));e.root.rotation.y=e.data.yaw||0;}
+  applyEnemyMotion(e,{tick:renderTick,dt:DT,height:()=>0,threats:[snapshot.players[0].position]});}
+ const hp=heroAt(renderTick/60);heroMesh.position.set(hp[0],.85,hp[2]);
+ const focus=[...actors.values()][+(q.get('focus')||0)];
+ if(camMode==='close'&&focus){const p=focus.root.position;cam.position.set(p.x+2.6,1.1,p.z+2.6);cam.lookAt(p.x,.55,p.z);}
+ else if(camMode==='side'){cam.position.set(0,2.2,15);cam.lookAt(0,.6,0);}
+ else{cam.position.set(hp[0]*.6+4.2,4.6,hp[2]*.6+7.2);cam.lookAt(hp[0]*.6,.4,hp[2]*.6);}
+ cap.textContent=(interp&&!q.has('legacy')?'After':'Before')+` · ${renderTick<9*60?'chasing a moving Hero':'gathering round a Hero who stopped'}`;
+ r.render(s,cam);return renderTick/60;}
+window.studio={frames:Math.round(14/DT),frame,ready:false};
+const loader=new GLTFLoader();
+Promise.all(['skeleton','golem'].map(n=>new Promise(res=>loader.load(`/assets/${n}.glb`,g=>{templates[n]=g;res();})))).then(()=>{
+ window.studio.ready=true;document.title='ready';
+ if(q.has('play')){let i=0;setInterval(()=>{frame(i++);if(i>=window.studio.frames){location.reload();}},1000/30);}});
+</script></html>

@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Ent studio</title>
+<style>body{margin:0;background:#a9c0cc}canvas{display:block}#cap{position:fixed;left:12px;bottom:10px;font:600 18px system-ui;color:#fff;text-shadow:0 1px 3px #000}</style>
+<div id="cap"></div>
+<script type="module">
+// Ent review on the shipped view (ent-view + ent-face). Deterministic: window.studio.frame(i) renders frame i at 30 fps.
+// ?scene=face   elder face close-up: wakes, looks at a Hero who walks past, blinks, scowls, winds up and slams
+// ?scene=walk   an elder and a sapling walking toward the camera (footfalls, beard springs, crown lag)
+// ?scene=lineup elder + sapling of every tree variant, standing.  ?play. Not shipped.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createEntView} from '../client/ent-view.js';
+const q=new URLSearchParams(location.search),W=innerWidth,H=innerHeight,scene=q.get('scene')||'face',DT=1/30;
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.shadowMap.enabled=true;document.body.append(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0xa9c0cc);s.fog=new THREE.Fog(s.background,25,60);
+s.add(new THREE.HemisphereLight(0xc6e0ed,0x5e5139,1.25));
+const sun=new THREE.DirectionalLight(0xffe3ad,2.4);sun.position.set(-4,9,-6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});s.add(sun,sun.target);
+const fill=new THREE.DirectionalLight(0xbfd8ff,.7);fill.position.set(3,4,-8);s.add(fill);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x6f7d3d,roughness:1}));ground.receiveShadow=true;s.add(ground);
+const cam=new THREE.PerspectiveCamera(40,W/H,.05,120),cap=document.getElementById('cap');
+const hero=new THREE.Mesh(new THREE.CapsuleGeometry(.3,1.1,4,12),new THREE.MeshStandardMaterial({color:0x3d7bd9}));hero.castShadow=true;s.add(hero);
+const templates=new Map(),actors=new Map();let view;
+function spawn(id,size,variant,x,z,yaw,wakeTick=-200){const root=new THREE.Group();root.position.set(x,0,z);root.rotation.y=yaw;s.add(root);
+ const data={id,kind:'ent',size,variant,wakeTick,treeHeight:size==='elder'?7:4,attackTick:-1000,missingParts:[],yaw};const visual=view.build(data);visual.traverse(n=>{if(n.isMesh)n.castShadow=true;});root.add(visual);
+ const e={enemy:true,root,visual,data};actors.set(id,e);return e;}
+const SC={
+ face:{dur:12,setup(){spawn('ent-elder',size(),0,0,0,Math.PI,24);},
+  step(t){const e=actors.get('ent-elder'),tick=t*60;const hx=Math.sin(t*.45)*3.2;hero.position.set(hx,.85,4.2);
+   if(t>8.2&&e.data.attackTick<0)e.data.attackTick=Math.round(tick);if(t>10.6&&!e.data.hurtTick)e.data.hurtTick=Math.round(tick);
+   view.update(actors,tick,DT,[[hx,0,4.2]]);view.tick(DT);
+   const H=e.data.size==='elder'?3.4:1.75;cam.position.set(.9,H*.6,3.1*H/3.4+1.2);cam.lookAt(0,H*.5,0);
+   return t<1.6?'Waking up':t<8.2?'Watching a Hero walk past':t<10.6?'Wind-up and slam':'Struck';}},
+ walk:{dur:8,setup(){spawn('ent-walker',size(),+(q.get('variant')||0),-1.2,-6,0);spawn('ent-sap','sapling',2,1.4,-6,0);},
+  step(t){const tick=t*60;for(const e of actors.values()){const sp=e.data.size==='elder'?1.15:2.7*.6;e.root.position.z=-6+t*sp*.9;e.root.rotation.y=Math.PI;}
+   view.update(actors,tick,DT,[[0,0,30]]);view.tick(DT);const zc=-6+t*1.1;cam.position.set(4.5,2.6,zc+6.5);cam.lookAt(0,1.4,zc);return 'Elder and sapling on the march';}},
+ lineup:{dur:4,setup(){let i=0;for(let v=0;v<3;v++)for(const sz of ['elder','sapling']){spawn(`ent-${v}-${sz}`,sz,v,(i-2.5)*2.4,0,Math.PI);i++;}},
+  step(t){view.update(actors,t*60,DT,[[0,0,9]]);view.tick(DT);cam.position.set(0,2.4,12);cam.lookAt(0,1.5,0);return 'Every variant, elder and sapling';}},
+};
+function size(){return q.get('size')||'elder';}
+window.studio={ready:false,frames:Math.round(SC[scene].dur/DT),frame(i){const t=i*DT;cap.textContent=SC[scene].step(t);r.render(s,cam);return t;}};
+const loader=new GLTFLoader(),names=['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_young_lod'];
+Promise.all(names.map(n=>new Promise(res=>loader.load(`/assets/${n}.glb`,g=>{templates.set(n,g);res();},undefined,()=>res())))).then(()=>{
+ view=createEntView({scene:s,templates,height:()=>0});SC[scene].setup();window.studio.ready=true;document.title='ready';
+ if(q.has('play')){let i=0;setInterval(()=>{window.studio.frame(i);i=(i+1)%window.studio.frames;},1000/30);}});
+</script></html>

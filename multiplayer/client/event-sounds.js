@@ -12,7 +12,8 @@ export function cueFor(event, {me = null} = {}) {
     case 'death':
       if (event.id === me) return {name: 'hero_down', opts: {mine: true}};
       if (!event.creature) return {name: 'death_soft'};
-      return {name: event.creature === 'skeleton' ? 'death_bone' : event.creature === 'golem' ? null : 'death_soft'};
+      if (event.creature === 'skeleton') return {name: event.style === 'shatter' ? 'bone_shatter' : event.style === 'headshot' ? 'skull_thunk' : 'death_bone'};
+      return {name: event.creature === 'golem' ? null : 'death_soft'};
     case 'respawn': return event.id === me ? {name: 'respawn', opts: {mine: true}} : null;
     case 'hit': return event.id === me && event.material === 'flesh' ? {name: 'hurt', opts: {mine: true, gap: .12}} : null;
     case 'detach': case 'joint_tear': return {name: 'detach', opts: {key: `detach:${event.id}`, gap: .05}};
