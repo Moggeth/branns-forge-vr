@@ -8,6 +8,7 @@ import {terrainHeight} from '../shared/terrain.js';
 import {buildKitBase, prepareHomeKit} from './home-base-art.js';
 import {homeBallistaYaw} from '../shared/home-ballista.js';
 import {createKeepBallistaView} from './keep-ballista-view.js';
+import {createSiegeDamageView} from './siege-damage-view.js';
 
 const STYLE = {
   party: {stone: 0xb9ad97, trim: 0xc49a52, glow: 0x5fb4ff, wood: 0x8a6440, roof: 0x3d4a5c, accent: 0x2f6fd0, dome: new THREE.Color(0x58b4ff)},
@@ -39,6 +40,14 @@ export function createHomeBaseView({scene}) {
   let snapshot = null, enabled = false, kit = null;
   // The gate ballistas: once their kit loads, each base's ballista parts are taken over by Sunlance / Gnashjaw rigs.
   const keep = createKeepBallistaView({root, height: (x, z) => terrainHeight(snapshot, x, z, false)});
+  // Siege hits: chips, sparks, cracks and a health bar over whatever was struck (client/siege-damage-view.js).
+  const damage = createSiegeDamageView({root, height: (x, z) => terrainHeight(snapshot, x, z, false), lookup: id => {
+    for (const b of bases.values()) {
+      if (b.id === id) return {object: b.heart.proxy || b.heart.group, side: b.side, kind: 'heart', data: b.data};
+      const p = b.parts.get(id); if (p) return {object: p.group, side: b.side, kind: p.kind, data: p.data, part: p};
+    }
+    return null;
+  }});
   const adoptKeep = b => { for (const p of b.parts.values()) if (p.kind === 'ballista') keep.adopt(p); };
   // Lights stay in the renderer even when the bases are hidden. Changing the
   // visible light count invalidates EVERY lit shader (including terrain/trees).
@@ -223,7 +232,7 @@ export function createHomeBaseView({scene}) {
 
   function installKit(gltf) {
     const k = prepareHomeKit(gltf); if (!k) return false;
-    kit = k; for (const b of bases.values()) disposeBase(b); bases.clear();
+    kit = k; damage.reset(); for (const b of bases.values()) disposeBase(b); bases.clear();
     if (snapshot) sync(snapshot);
     return true;
   }
@@ -231,6 +240,7 @@ export function createHomeBaseView({scene}) {
   function event(ev) {
     if (!enabled) return;
     keep.event(ev);
+    damage.event(ev);
     if (ev.kind === 'battle_wave') for (const b of bases.values()) b.bellSwing = 1;
     if (ev.kind === 'home_bell') { const b = bases.get(ev.side); if (b) b.bellSwing = 1.4; }
     // A drink lifts a ring of the fountain's own glow; a mend sparkles once up the mended piece.
@@ -253,6 +263,7 @@ export function createHomeBaseView({scene}) {
   function update(dt, camera, tick = snapshot?.tick) {
     if (!enabled || !snapshot) return;
     keep.update(dt, tick, camera);
+    if (camera) damage.update(dt, camera);
     const now = performance.now(), t = now / 1000, k = 1 - Math.exp(-dt * 6);
     for (const b of bases.values()) {
       const data = b.data, fallen = data.fallenUntil > snapshot.tick, pylonsUp = data.parts.some(p => p.kind === 'pylon' && p.hp > 0), shield = !fallen && pylonsUp;
@@ -312,6 +323,6 @@ export function createHomeBaseView({scene}) {
 
   const setLocalAim = (id, aim) => { keep.setLocalAim(id, aim); if (aim) localAim.set(id, aim); else localAim.delete(id); };
   function installKeepKit(gltf) { if (!keep.install(gltf)) return false; for (const b of bases.values()) adoptKeep(b); return true; }
-  return {sync, event, update, targets, installKit, installKeepKit, keep, setLocalAim, object: root, stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
-    dispose() { keep.dispose(); for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
+  return {sync, event, update, targets, installKit, installKeepKit, keep, setLocalAim, object: root, damageStats: () => damage.stats(), stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
+    dispose() { keep.dispose(); damage.dispose(); for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }
