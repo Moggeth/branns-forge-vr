@@ -3,10 +3,31 @@ import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunder
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {hasTalent} from './hero-progress.js';
+import {DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 // Geode Burst (pick talent): an ending crystal wall bursts into shards that wound and toss foes beside it.
 export const GEODE_BURST=Object.freeze({radius:2.6,damage:70});
 export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:80}); // cooldown: pick (see special-cooldowns.js)
 const fail=code=>({ok:false,code,events:[]});
+// Pick of Riches: each segment of a Stonewhisper ridge is a real mineral that the pick's resonance tears up out of the
+// ground, mined like any other seam. Mostly common stone and ore, and every cast surfaces at least one rich seam. Star
+// metal stays out (meteors and deep mountain veins keep it special). Weights are per segment; kinds are DEPOSIT_CATALOG
+// keys, so the reward, hits and label come from the catalog.
+export const RIDGE_MINERALS=Object.freeze({
+ common:Object.freeze({stone:46,iron:26,copper:14}),
+ rich:Object.freeze({crystal:7,gold:5,mithril:2})});
+export const RIDGE_KINDS=Object.freeze([...Object.keys(RIDGE_MINERALS.common),...Object.keys(RIDGE_MINERALS.rich)]);
+export const isRichMineral=kind=>Object.hasOwn(RIDGE_MINERALS.rich,kind);
+const ridgeUnit=(seed,key)=>{let h=2166136261^(seed>>>0);for(const c of String(key))h=Math.imul(h^c.charCodeAt(0),16777619);
+ h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0)/4294967296;};
+const ridgePick=(table,u)=>{const e=Object.entries(table),total=e.reduce((n,[,w])=>n+w,0);let r=u*total;for(const [k,w] of e){r-=w;if(r<0)return k;}return e[0][0];};
+/** Minerals for a cast's segments (caster end first). Deterministic in the world seed and cast id: no clock, no RNG.
+ * If no segment rolled rich, one in the taller far half becomes a rich seam. */
+export function ridgeMinerals(seed,castId,count){
+ const all={...RIDGE_MINERALS.common,...RIDGE_MINERALS.rich};
+ const kinds=Array.from({length:count},(_,i)=>ridgePick(all,ridgeUnit(seed,`${castId}:${i}`)));
+ if(count&&!kinds.some(isRichMineral)){const half=Math.floor(count/2),i=Math.min(count-1,half+Math.floor(ridgeUnit(seed,`${castId}:at`)*(count-half)));kinds[i]=ridgePick(RIDGE_MINERALS.rich,ridgeUnit(seed,`${castId}:rich`));}
+ return kinds;
+}
 /** Prepare the complete cast before allocating IDs, cooldown or damage. */
 export function terrainSpecial(state,p,ctx,hitEnemyPart,m={}) {
   if(p.tool==='axe')return axeCleave(state,p,ctx,hitEnemyPart); // the cleave owns its own cooldown; old axe_sunder edits/deposits still load
@@ -46,15 +67,16 @@ function crystalWall(state,p,ctx,m,hitEnemyPart) {
   for(const list of standing.slice(0,Math.max(0,standing.length-PICK_WALL.standing+1)))shatterWall(state,list,ctx,events,'replaced',hitEnemyPart);
   p.specialTick=state.tick;
   const castId=ctx.nextId(state,'w'),rupture=createSunderRupture(castId,plan.start,plan.end,state.tick,'pick_wall');
-  for(const q of plan.segments){
+  const minerals=ridgeMinerals(state.seed|0,castId,plan.segments.length);
+  for(const [i,q] of plan.segments.entries()){
     const id=ctx.nextId(state,'s'),oreId=ctx.nextId(state,'o');editIds.push(id);depositIds.push(oreId);
     state.edits.push({id,kind:'pick_wall',x:q.x,z:q.z,radius:q.radius,height:Math.max(q.h0,q.h1),rupture:{...rupture,start:[...rupture.start],end:[...rupture.end]},
       wall:{a:q.a,b:q.b,h0:q.h0,h1:q.h1,expireTick:state.tick+PICK_WALL.lifetimeTicks,owner:p.id}});
-    state.deposits.push({id:oreId,x:q.x,z:q.z,kind:'stone',hits:0,maxHits:3,depleted:false,special:'pick_wall',editId:id});
+    const kind=minerals[i];state.deposits.push({id:oreId,x:q.x,z:q.z,kind,hits:0,maxHits:DEPOSIT_CATALOG[kind].maxHits,depleted:false,special:'pick_wall',editId:id});
   }
   events.push({kind:'pick_burst',weapon:'pick',id:p.id,cast:castId,tick:state.tick,position,direction:[plan.direction[0],0,plan.direction[1]],
     start:plan.start,end:plan.end,durationTicks:rupture.durationTicks,expireTick:state.tick+PICK_WALL.lifetimeTicks,
-    path:plan.segments.map(q=>[q.x,terrainHeight(state,q.x,q.z),q.z]),editIds,depositIds});
+    path:plan.segments.map(q=>[q.x,terrainHeight(state,q.x,q.z),q.z]),editIds,depositIds,minerals});
   return {ok:true,events};
 }
 /** Begin the sink of every segment of one timed cast now; deposits/edits retire after its sinkTicks in stepCrystalWalls. */
@@ -65,7 +87,8 @@ export function shatterWall(state,list,ctx,events,reason,hitEnemyPart) {
   const drop=(k,e,amount=1)=>{if(state.pickups.length<256)state.pickups.push({id:ctx.nextId(state,'p'),kind:k,x:e.x,z:e.z,y:terrainHeight(state,e.x,e.z,false),amount});};
   // Shards: a small, bounded reward for a wall that stood its full minute (never for a replaced one). A closing chasm
   // leaves nothing new: its crystal seams were placed when it opened.
-  if(reason==='expired'&&kind==='pick_wall')for(const [i,e] of live.entries())if(i%3===1)drop('stone',e);
+  // A ridge segment crumbles into a shard of its own mineral.
+  if(reason==='expired'&&kind==='pick_wall')for(const [i,e] of live.entries())if(i%3===1)drop(depositReward(state.deposits.find(d=>d.editId===e.id)?.kind)?.kind??'stone',e);
   if(reason==='expired'&&kind==='wall')for(const [i,e] of live.entries()){if(i%2===0)drop('stone',e);if(i===live.length>>1)drop('gems',e);}
   const name=kind==='sunder'?'sunder_close':kind==='wall'?'raise_wall_shatter':'pick_wall_shatter';
   events.push({kind:name,cast:r.id,reason,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],editIds:live.map(e=>e.id)});

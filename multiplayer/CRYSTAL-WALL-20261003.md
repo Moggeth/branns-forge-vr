@@ -80,3 +80,21 @@ and lightly see-through. The low quality setting halves the spark and dust pools
 - No mastery or progression system exists yet. The hooks are the `PICK_WALL` table.
 - Allies are lifted with a vertical impulse, not carried on the crest.
 - The `pick_wall` sound is procedural. Authored samples could replace it later.
+
+## Pick of Riches (2026-10-12)
+
+Each ridge segment's deposit is now a real mineral (`ridgeMinerals` in `shared/weapon-specials.js`), not plain stone.
+
+- Weights per segment: stone 46, iron 26, copper 14 (common); crystal 7, gold 5, mithril 2 (rich). Star metal is
+  excluded. If no segment rolls rich, one segment in the far (taller) half becomes a rich seam, so every cast has one.
+- The roll hashes the world seed and the cast id: no clock or RNG, so peers, reloads and host migration agree.
+- Deposits take the catalog kind, hits and reward (`DEPOSIT_CATALOG`). Save validation allows these kinds only on
+  `pick_wall` deposits; Raise Wall and Sunder stay stone. Old saves with stone ridge segments still load.
+- An expired ridge drops shards of each segment's own resource (still one per three segments).
+- Presentation: crystal segments keep the glass crystals, 15% larger. Other minerals replace the flank crystals with
+  broken ore columns in one opaque instanced batch per wall (`client/ridge-minerals.js`, mineral in the instance colour's
+  green channel). The resonance rim, crust lining and blue druzes on the spine keep the magic visible. Rich seams bloom
+  with glints in their own colour and a three-note chime; ore chips use a small second shard pool.
+- Budget: one more draw per wall (4 to 6 total), plus one shared draw while ore chips fly.
+- Review: `tests/pick-riches-lab.html` (flat lab, `?view=side|close|end&minerals=...`) and
+  `tests/crystal-wall-review.html?minerals=...` (in game; `review.castAt(x,z)`, `review.place(x,z)`).

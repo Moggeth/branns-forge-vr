@@ -12,7 +12,7 @@ const axe=createAxeCleaveView({scene,height:()=>0});
 const before=[];scene.traverse(o=>{if(o.geometry)before.push([o,o.visible,{...o.geometry.drawRange},o.geometry.attributes.position.version]);});
 const stats=wall.stats(),events=wall.drainEvents(),warm=createAbilityWarmup(T,scene),crystal=wall.prepareWarmup();
 assert.ok(warm.stats.draws>=8,'guide, impact markers, footprint, particles and cleave are represented');
-assert.equal(crystal.group.children.length,5,'three colored crystal variants, crust, and ground strip');
+assert.equal(crystal.group.children.length,6,'three colored crystal variants, crust, ore, and ground strip');
 assert.equal(crystal.group.children[0].material,wall.materials.pale,'retain runtime program owner');
 assert.ok(crystal.group.children[0].instanceColor,'compile the actual instance-color variant');
 let disposedMaterials=0;scene.traverse(o=>{for(const m of [o.material].flat())m?.addEventListener('dispose',()=>disposedMaterials++);});

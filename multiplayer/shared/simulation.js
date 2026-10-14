@@ -14,7 +14,7 @@ export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
-import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS} from './weapon-specials.js';
+import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS,RIDGE_KINDS} from './weapon-specials.js';
 import {castEarthLine,earthLineEdits} from './earth-spells.js';
 export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
@@ -584,7 +584,7 @@ export function loadSimulation(saved) {
   const linkedWalls=new Set();
   for(const d of deposits) {
     if(d.special!==undefined&&!['axe_sunder',...WALL_DEPOSITS].includes(d.special))throw Error('Invalid special deposit');
-    if(d.special!==undefined&&d.kind!=='stone')throw Error('Invalid special material');
+    if(d.special!==undefined&&d.kind!=='stone'&&!(d.special==='pick_wall'&&RIDGE_KINDS.includes(d.kind)))throw Error('Invalid special material');
     if(WALL_DEPOSITS.includes(d.special)) {
       const edit=saved.edits.find(e=>e.id===d.editId);
       if(!validId(d.editId)||linkedWalls.has(d.editId)||(d.depleted?!!edit&&!(edit.wall&&edit.wall.expireTick<=saved.tick):!edit)||edit&&(edit.kind!==d.special||edit.x!==d.x||edit.z!==d.z)||d.special==='wall'&&edit&&!edit.wall)throw Error('Invalid wall linkage');
