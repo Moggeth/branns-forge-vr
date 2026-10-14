@@ -6,6 +6,7 @@ import {HOME_LAYOUT as L, HOME_SITES, TAVERN_SCALE, homePiece, homePoint, pieceW
 import {KEEP_CARVE, WORLD_EXTENT, backTownPiece, keepCarve, onKeepGround} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS, STORES, WORKSHOP, backTownSpot, resolveBackTowns} from '../shared/home-workshop.js';
 import {baseHeight, moveOnTerrain} from '../shared/terrain.js';
+import {coveCarve} from '../shared/larimar-cove.js';
 const liveState = {battle: {v: 2, status: 'running'}};
 
 let count = 0;
@@ -60,8 +61,12 @@ test('a narrow pass leads back from each keep into its back town, walled by clif
       assert.equal(keepCarve(g * u, g * v), 1, `town ground open at ${u},${v}`);
       assert.ok(Math.abs(baseHeight(g * u, g * v) - floor) < .5, `town floor level at ${u},${v}`);
     }
-    for (const [u, v] of [[(from + to) / 2, from - 4], [from - 4, (from + to) / 2], [(from + to) / 2, to + 2.5], [to + 2.5, (from + to) / 2]])
-      assert.ok(baseHeight(g * u, g * v) - floor > 8, `the town is walled in at ${u},${v}`);
+    // Larimar Cove (2026-10-10) opens off the town's inner side, so a wall point inside the cove is checked past the cove's far shore instead
+    for (const [u, v] of [[(from + to) / 2, from - 4], [from - 4, (from + to) / 2], [(from + to) / 2, to + 2.5], [to + 2.5, (from + to) / 2]]) {
+      const [wu, wv] = coveCarve(g * u, g * v) > 0 ? [u, from - 14] : [u, v];
+      assert.equal(coveCarve(g * wu, g * wv), 0, `wall point ${wu},${wv} lies outside the cove`);
+      assert.ok(baseHeight(g * wu, g * wv) - floor > 8, `the town is walled in at ${wu},${wv}`);
+    }
     assert.ok(Math.max(Math.abs(g * to), Math.abs(g * to)) < WORLD_EXTENT, 'the town stays inside the world');
   }
 });

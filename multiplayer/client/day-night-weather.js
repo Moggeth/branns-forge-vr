@@ -25,7 +25,7 @@ const KEYS = (SUNNY ? SUNNY_KEYS : [
 ]).map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
 const COLOR_FIELDS = ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'];
 const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .6; // a lower sun: long shadows and slanted shafts all day
-const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xd4dce4);
+const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xa9b9cf);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // URL preview for screenshots and quick looks: ?sky=night|dusk|dawn|noon|0..1 and ?weather=rain|storm|snow|fog|clear
@@ -60,13 +60,14 @@ function createSnow(count) {
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(seeds, 3));
   const material = new THREE.ShaderMaterial({
     uniforms: {uTime: {value: 0}, uCenter: {value: new THREE.Vector3()}, uBox: {value: new THREE.Vector3(24, 14, 24)}, uWind: {value: new THREE.Vector2(.5, .2)}, uSize: {value: 60}, uOpacity: {value: 0}, uColor: {value: new THREE.Color(1, 1, 1)}},
-    vertexShader: `uniform float uTime, uSize; uniform vec3 uCenter, uBox; uniform vec2 uWind; varying float vA;
+    vertexShader: `uniform float uTime, uSize; uniform vec3 uCenter, uBox; uniform vec2 uWind; varying float vA, vGlint;
       void main(){ vec3 o = uCenter - uBox * 0.5; float t = uTime;
         vec3 drift = vec3(uWind.x * t + sin(t * 0.7 + position.y * 40.0) * 0.6, -(0.9 + position.z * 0.6) * t, uWind.y * t + cos(t * 0.6 + position.x * 31.0) * 0.6);
         vec3 p = o + mod(position * uBox + drift - o, uBox); vec3 r = (p - uCenter) / uBox;
         vA = 1.0 - smoothstep(0.3, 0.5, max(abs(r.x), max(abs(r.y), abs(r.z))));
-        vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = clamp(uSize * (0.5 + position.x * 0.7) / -mv.z, 1.0, 14.0); }`,
-    fragmentShader: 'uniform vec3 uColor; uniform float uOpacity; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(uColor, uOpacity * vA * smoothstep(0.5, 0.1, d)); }',
+        vGlint = pow(max(0.0, sin(t * (2.0 + position.y * 3.0) + position.z * 60.0)), 24.0) * step(0.72, position.y); // a few flakes catch the light
+        vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = clamp(uSize * (0.5 + position.x * 0.7) * (1.0 + vGlint * 0.8) / -mv.z, 1.0, 16.0); }`,
+    fragmentShader: 'uniform vec3 uColor; uniform float uOpacity; varying float vA, vGlint; void main(){ float d = length(gl_PointCoord - 0.5); float core = smoothstep(0.5, 0.1, d); gl_FragColor = vec4(mix(uColor, vec3(0.75, 0.9, 1.6), vGlint) * (1.0 + vGlint * 2.0), uOpacity * vA * core * (1.0 + vGlint)); }',
     transparent: true, depthWrite: false, fog: false, toneMapped: false,
   });
   const mesh = new THREE.Points(geometry, material); mesh.name = 'weather-snow'; mesh.frustumCulled = false; mesh.raycast = () => {}; mesh.renderOrder = 20; mesh.visible = false;
@@ -78,14 +79,15 @@ function createMotes(count) {
   const seeds = new Float32Array(count * 3); for (let i = 0; i < seeds.length; i++) seeds[i] = Math.random();
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(seeds, 3));
   const material = new THREE.ShaderMaterial({
-    uniforms: {uTime: {value: 0}, uCenter: {value: new THREE.Vector3()}, uBox: {value: new THREE.Vector3(30, 4, 30)}, uGround: {value: 0}, uSize: {value: 80}, uOpacity: {value: 0}},
-    vertexShader: `uniform float uTime, uSize, uGround; uniform vec3 uCenter, uBox; varying float vA; varying vec3 vC;
+    uniforms: {uTime: {value: 0}, uCenter: {value: new THREE.Vector3()}, uBox: {value: new THREE.Vector3(30, 4, 30)}, uGround: {value: 0}, uSize: {value: 80}, uOpacity: {value: 0}, uDay: {value: 0}},
+    vertexShader: `uniform float uTime, uSize, uGround, uDay; uniform vec3 uCenter, uBox; varying float vA; varying vec3 vC;
       void main(){ vec3 o = uCenter - uBox * 0.5; float t = uTime, s = position.x * 17.0 + position.z * 29.0;
         vec3 drift = vec3(sin(t * 0.21 + s) * 1.6, 0.0, cos(t * 0.17 + s * 1.3) * 1.6);
         vec3 p = o + mod(position * uBox + drift - o, uBox); p.y = uGround + 0.35 + position.y * 2.6 + sin(t * 0.5 + s) * 0.35;
         vec3 r = (p - uCenter) / uBox; float edge = 1.0 - smoothstep(0.32, 0.5, max(abs(r.x), abs(r.z)));
         float pulse = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(t * (0.9 + position.y) + s * 3.0), 3.0);
         vA = edge * pulse; vC = position.y > 0.88 ? vec3(1.0, 0.72, 0.38) : mix(vec3(0.35, 0.85, 1.0), vec3(0.6, 0.55, 1.0), position.z);
+        vC = mix(vC, position.y > 0.55 ? vec3(1.0, 0.8, 0.42) : vec3(0.5, 1.0, 0.82), uDay); // by day: drifting gold and green fae lights
         vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = clamp(uSize * (0.6 + position.x * 0.6) / -mv.z, 1.5, 10.0); }`,
     fragmentShader: 'uniform float uOpacity; varying float vA; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); gl_FragColor = vec4(vC * (1.0 + 2.0 * smoothstep(0.2, 0.0, d)), uOpacity * vA * a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false,
@@ -163,7 +165,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     const fogTint = grey.copy(FOG_DAY).lerp(FOG_NIGHT, night); if (w.snow > .3) fogTint.lerp(SNOW_DAY.clone().lerp(FOG_NIGHT, night), .5);
     env.haze.lerp(fogTint, Math.min(1, overcast * .7 + w.fog * .5)); env.hill.lerp(env.haze, overcast * .35);
     env.hemiSky.lerp(grey, overcast * .4); env.envI *= 1 - overcast * .3; env.exposure *= 1 - overcast * .04;
-    env.fogScale = Math.max(.14, 1 - w.fog * .86 - w.rain * .42 - w.storm * .55 - w.snow * .5);
+    env.fogScale = Math.max(.14, 1 - w.fog * .86 - w.rain * .42 - w.storm * .55 - w.snow * .32);
     // Thick air: the sky near the horizon melts into the same haze so distant mountains never cut a hard silhouette.
     const melt = 1 - env.fogScale; env.horizon.lerp(env.haze, Math.min(1, melt * 1.1)); env.zenith.lerp(env.haze, melt * .55);
     if (rts) env.fogScale = .5 + env.fogScale * .5;
@@ -192,10 +194,13 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
       u.uOpacity.value = .85 - night * .25; u.uSize.value = (low ? 48 : 60) * (rts ? 1.6 : 1); u.uColor.value.setRGB(1 - night * .35, 1 - night * .28, 1 - night * .12);
       snow.mesh.geometry.setDrawRange(0, Math.ceil(snow.count * Math.min(1, snowW * 1.15)));
     }
-    const moteW = night * (1 - Math.min(1, rainW * .8 + w.fog * .3)) * (rts ? .6 : 1);
+    // Night resonance sparks, and by day a sparse drift of fae lights (fewer, softer) so the meadow always feels alive.
+    const dayMotes = (1 - night) * (1 - Math.min(1, rainW * 1.2 + w.storm)) * .5;
+    const moteW = (night * (1 - Math.min(1, rainW * .8 + w.fog * .3)) + dayMotes) * (rts ? .6 : 1);
     motes.mesh.visible = moteW > .02;
     if (motes.mesh.visible) {
-      const u = motes.mesh.material.uniforms; u.uTime.value = time; u.uCenter.value.copy(center); u.uGround.value = groundY; u.uOpacity.value = moteW * .9;
+      const u = motes.mesh.material.uniforms; u.uTime.value = time; u.uCenter.value.copy(center); u.uGround.value = groundY; u.uOpacity.value = moteW * .9; u.uDay.value = 1 - night;
+      motes.mesh.geometry.setDrawRange(0, Math.ceil(motes.count * (night > .5 ? 1 : .45)));
       u.uBox.value.set(30 * scale, 4, 30 * scale); u.uSize.value = (rts ? 160 : 80);
     }
     if (audio) {
@@ -213,11 +218,11 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     wet = first ? rainW : approach(wet, rainW, step, 14, 80);
     snowCover = first ? w.snow : approach(snowCover, w.snow, step, 40, 110);
     const A = ATMOSPHERE;
-    A.bfTime.value = time % 3600; A.bfWet.value = Math.min(1, wet * 1.1); A.bfSnow.value = Math.min(1, snowCover);
+    A.bfTime.value = time % 3600; A.bfSparkle.value = (1 - night * .5) * (1 - overcast * .45) + night * .35; A.bfWet.value = Math.min(1, wet * 1.1); A.bfSnow.value = Math.min(1, snowCover);
     mistBase = mistBase == null || first ? groundY : approach(mistBase, groundY, step, 6, 6);
     A.bfMistBase.value = Math.min(mistBase, 1.5) - .4;
     A.bfMistHeight.value = 2.2 + w.fog * 2.6 + rainW * 1.2 + (rts ? 1.5 : 0);
-    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .026) * (rts ? .55 : 1);
+    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1);
     A.bfWind.value.set(.35 + w.storm * 1.2, .12 + w.storm * .5);
     const sunSide = e >= 0;
     lightDir.copy(sunSide ? env.skySunDir : env.moonDir);
@@ -235,7 +240,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
       gain.setRGB(1 + .05 * lowSun * sunUp, 1, 1 - .05 * lowSun * sunUp + .03 * night);
       post.set({sun: lightDir, rays: (sunSide ? sunUp * (.7 + lowSun * .6) : moonUp * .25) * (1 - overcast * .8), rayColor,
         bloom: .3 + night * .22 + w.storm * .1, bloomThreshold: .95, vignette: .2 + night * .14 + w.fog * .06,
-        lift, gain, saturation: 1.06 - night * .14 - overcast * .1, contrast: 1.04 + lowSun * .03});
+        lift, gain, saturation: 1.06 - night * .14 - overcast * .1 + w.snow * .12, contrast: 1.04 + lowSun * .03 + w.snow * .1 + w.fog * .05});
     }
   }
   let camera_ = null;

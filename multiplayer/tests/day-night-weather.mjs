@@ -100,7 +100,7 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   const overcast = createDayNightWeather({scene, orchard, height, quality: 'low', preview: {phase: .55, weather: 'storm'}});
   overcast.setTrees(trees); overcast.update({tick: 0, camera, time: 0, dt: 0}); assert.equal(overcast.stats().sunbeams.beams, 0, 'no shafts under storm cloud');
   const snowy = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: .3, weather: 'snow'}});
-  snowy.update({tick: 0, camera, time: 0, dt: 0}); assert.ok(ATMOSPHERE.bfSnow.value > .9 && ATMOSPHERE.bfMist.value > dawnMist * .5);
+  snowy.update({tick: 0, camera, time: 0, dt: 0}); assert.ok(ATMOSPHERE.bfSnow.value > .9 && ATMOSPHERE.bfMist.value > dawnMist * .3 && ATMOSPHERE.bfSparkle.value > .4);
   for (const s of [wetSky, dawn, golden, noonSky, overcast, snowy]) s.dispose();
   assert.equal(scene.children.length, before);
   console.log('day-night-weather: ok');

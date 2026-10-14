@@ -9,9 +9,10 @@ import * as THREE from 'three';
 import {TERRAIN_GRID} from '../shared/terrain.js';
 
 const STEP = TERRAIN_GRID.step, HALF = TERRAIN_GRID.half;
-export const CORNER_GROUND = Object.freeze({inner: 48.75, outer: 76.5, crest: 71});
+export const CORNER_GROUND = Object.freeze({inner: 48.75, cove: 38.25, outer: 76.5, crest: 71});
 // Patches in corner coordinates [u0, u1, v0, v1] (distance from centre toward the corner along x and z).
-const PATCHES = [[HALF, CORNER_GROUND.outer, CORNER_GROUND.inner, CORNER_GROUND.outer], [CORNER_GROUND.inner, HALF, HALF, CORNER_GROUND.outer]];
+// The first patch reaches further along the outer edge to floor Larimar Cove (shared/larimar-cove.js), cut beside the town.
+const PATCHES = [[HALF, CORNER_GROUND.outer, CORNER_GROUND.cove, CORNER_GROUND.outer], [CORNER_GROUND.inner, HALF, HALF, CORNER_GROUND.outer]];
 
 export function createKeepCornerGround({scene, ground, height}) {
   const pos = [], index = [];
