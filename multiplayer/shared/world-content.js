@@ -4,17 +4,20 @@ import {keepCarve} from './keep-sites.js';
 const insideHome=(x,z,margin=0)=>keepCarve(x,z)>.02||Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin)||Math.hypot(x-NEUTRAL_TAVERN.at[0],z-NEUTRAL_TAVERN.at[1])<8+margin;
 import {clearLandmarkTrees,STARTING_SITES} from './starting-world.js';
 import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {MAP_EXTRAS, moved} from './map-layout.js';
 // Deterministic world presentation data.  This file deliberately has no clock or RNG.
 const hash = (seed, n) => { let x = (seed ^ Math.imul(n + 1, 0x9e3779b9)) >>> 0; x ^= x >>> 16; x = Math.imul(x, 0x85ebca6b); x ^= x >>> 13; return x >>> 0; };
+// Starting trees and ore can be moved by the local map editor (shared/map-layout.js), keyed by their ids.
 export const baseTrees = [
   [-2, 6, 5.8], [1.8, 6.5, 6.4], [-3.5, 9, 5.2], [3.7, 9.4, 6.1], [0, 11.5, 6.8],
   [-12, -9, 7], [14, -12, 6.5], [-17, 17, 7.2], [19, 18, 5.6], [-24, 4, 6.4], [25, 2, 6.8]
-];
+].map(([x, z, h], i) => [...moved(`tree${i + 1}`, [x, z]), h])
+  .concat(MAP_EXTRAS.filter(e => e.kind === 'tree').map(e => [e.x, e.z, e.height ?? 6.2]));
 export const initialDeposits = () => [
   [-5, 5, 'stone'], [5, 5, 'stone'], [-7, 10, 'stone'], [7, 10, 'stone'], [0, 14, 'stone'],
   [-8, 3, 'iron'], [8, 3, 'iron'], [9, -8, 'iron'], [-15, -10, 'iron'],
   [-28, -17, 'mithril'], [30, 14, 'mithril'], [18, -24, 'crystal'], [-19, 23, 'crystal']
-].map(([x,z,kind], i) => ({id: `ore${i + 1}`, x, z, kind, hits: 0, maxHits: DEPOSIT_CATALOG[kind].maxHits, depleted: false}));
+].map(([x,z,kind], i) => [...moved(`ore${i + 1}`, [x, z]), kind]).concat(MAP_EXTRAS.filter(e => DEPOSIT_CATALOG[e.kind]).map(e => [e.x, e.z, e.kind])).map(([x,z,kind], i) => ({id: `ore${i + 1}`, x, z, kind, hits: 0, maxHits: DEPOSIT_CATALOG[kind].maxHits, depleted: false}));
 
 /** A new visible seam rises every two minutes. Existing depleted rocks stay depleted.
  * Root calls once per simulation tick; deterministic time bucket/id prevents replay duplication.

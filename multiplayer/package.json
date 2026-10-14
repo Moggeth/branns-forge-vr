@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5178",
+    "map": "vite --host 127.0.0.1 --port 5178 --open /map-editor/",
+    "map:phone": "vite --host 0.0.0.0 --port 5178",
     "build": "vite build",
     "build:check": "vite build --config tests/vite.config.mjs",
     "start": "node gateway.mjs",

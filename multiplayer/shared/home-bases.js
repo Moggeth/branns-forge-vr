@@ -1,6 +1,7 @@
 import {heroMaxHp} from './hero-progress.js';
 import {restoreMill} from './home-mill.js';
 import {HOME_SITES} from './keep-sites.js';
+import {movedPlaced, movedTable} from './map-layout.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -44,7 +45,8 @@ const polar = (deg, r) => P(+(Math.sin(deg * Math.PI / 180) * r).toFixed(3), +(M
 // face: the base-local point a building's front (+Z of its model) looks toward.
 const piece = (at, face) => Object.freeze({at: Object.freeze(at), face: Object.freeze(face)});
 const HEART = P(0, 0);
-export const HOME_LAYOUT = Object.freeze({
+// Every entry can be moved by the local map editor (shared/map-layout.js); both keeps mirror the move.
+export const HOME_LAYOUT = movedTable('keep', {
   barracks: P(-14, .5), fountain: P(-6.5, 6.5),
   // Two pylons flank the gate; the third guards the mouth of the pass.
   pylons: Object.freeze([P(9, 13), P(-9, 13), P(0, -16)]),
@@ -58,9 +60,9 @@ export const HOME_LAYOUT = Object.freeze({
   tavern: piece(P(-10.6, -10.6), HEART),
   mill: piece(P(10.6, -10.6), HEART),
   quartermaster: piece(P(14, .5), HEART),
-});
+}, ['bellPost']);
 // The shared tavern ("The Muddled Mug") stands off the lane south of the Forge, its front toward the centre.
-export const NEUTRAL_TAVERN = Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)});
+export const NEUTRAL_TAVERN = movedPlaced('mug', Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)}));
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 const sideKey = side => side === 'rivals' ? 'rivals' : 'party';
