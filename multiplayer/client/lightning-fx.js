@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 
 export const LIGHTNING_CAPS = Object.freeze({quads: 1800, arcs: 40, sparks: 320, glows: 24, rings: 12});   // headroom for a live Stormreel circuit (arc channels, crawling fire on its victims)
-const BLUE = new THREE.Color(0x58c8ff), CORE = new THREE.Color(0xeefbff);
+const BLUE = new THREE.Color(0x58c8ff), CORE = new THREE.Color(0xeefbff), MOLTEN = new THREE.Color(0xff7a1a);   // molten: arc-weld spatter cools white -> orange
 
 function gradientTexture() {
   // Across the ribbon (v): transparent edge -> blue glow -> white core -> blue -> edge.
@@ -104,13 +104,13 @@ export function createLightningFx({scene, quality = 1} = {}) {
       arc.paths.push({pts: jagged(from, from.clone().addScaledVector(dir, len), {depth: Math.max(2, arc.depth - 2), rough: arc.rough * 1.3}), w: .45});
     }
   }
-  function burst(at, {count = 24, speed = 4, up = .6, normal = null, life = .5} = {}) {
+  function burst(at, {count = 24, speed = 4, up = .6, normal = null, life = .5, molten = false} = {}) {
     const n = normal ? (normal.isVector3 ? normal : tmp2.fromArray(normal)) : null;
     for (let i = 0; i < count; i++) {
       if (sparks.length >= C.sparks) sparks.shift();
       const v = new THREE.Vector3(Math.random() - .5, Math.random() - .5 + up, Math.random() - .5).normalize().multiplyScalar(speed * (.35 + Math.random() * .65));
       if (n && v.dot(n) < 0) v.addScaledVector(n, -2 * v.dot(n));
-      sparks.push({p: (at.isVector3 ? at : tmp.fromArray(at)).clone(), v, age: 0, life: life * (.5 + Math.random() * .7)});
+      sparks.push({p: (at.isVector3 ? at : tmp.fromArray(at)).clone(), v, age: 0, life: life * (.5 + Math.random() * .7), molten});
     }
   }
   function glow(at, {size = 1.6, life = .35, color = 0x9fdcff} = {}) {
@@ -161,7 +161,7 @@ export function createLightningFx({scene, quality = 1} = {}) {
       const s = sparks[i]; s.age += dt; if (s.age >= s.life) { sparks.splice(i, 1); continue; }
       s.v.y -= 9 * dt; s.v.multiplyScalar(Math.exp(-1.5 * dt)); s.p.addScaledVector(s.v, dt);
     }
-    for (const s of sparks) { const k = 1 - s.age / s.life; sparkPos.set([s.p.x, s.p.y, s.p.z], n * 3); c3.copy(CORE).lerp(BLUE, 1 - k).multiplyScalar(k * 1.4); sparkCol.set([c3.r, c3.g, c3.b], n * 3); n++; }
+    for (const s of sparks) { const k = 1 - s.age / s.life; sparkPos.set([s.p.x, s.p.y, s.p.z], n * 3); c3.copy(CORE).lerp(s.molten ? MOLTEN : BLUE, s.molten ? Math.sqrt(1 - k) : 1 - k).multiplyScalar(k * 1.4); sparkCol.set([c3.r, c3.g, c3.b], n * 3); n++; }
     sparkGeo.setDrawRange(0, n); if (n) { sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true; }
     sparkPoints.visible = n > 0;
     // glows face the camera

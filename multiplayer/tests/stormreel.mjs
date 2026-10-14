@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
-import {STRUCTURES} from '../shared/inventions.js';
-import {STORMREEL,terminalPoint,wornTower,cableLength,leash,nearestFreePack,hookPoint} from '../shared/stormreel.js';
+import {STRUCTURES,damageInvention} from '../shared/inventions.js';
+import {homePoint,homeSolids,pieceLocal,resolveHomeStructures} from '../shared/home-bases.js';
+import {STORMREEL,HOME_STORMSPIRE,terminalPoint,wornTower,cableLength,leash,nearestFreePack,hookPoint,cableWraps} from '../shared/stormreel.js';
 
 const foeHp=(s,id)=>s.checkpoint().enemies.find(e=>e.id===id)?.hp??0;
 
@@ -46,7 +47,7 @@ assert.ok(d<=STORMREEL.cable+1e-6&&d>STORMREEL.cable-.5,`held at the end of the 
  const me={id:'h',tool:'stormreel',position:[t[0]+2,0,t[2]+5]};b.wrapAt=[me.position[0],me.position[2]];
  const walk=(x,z)=>{for(let i=1;i<=30;i++){const pos=[me.position[0]+(x-me.position[0])/(31-i),0,me.position[2]+(z-me.position[2])/(31-i)];leash(st,me,pos);me.position=pos;}};
  walk(t[0]+2,t[2]+15);walk(t[0]-2,t[2]+15);
- assert.ok(b.wraps.some(w=>w.id==='peg-tree0'),'swinging behind the trunk wraps the cable round it');
+ assert.ok(b.wraps.some(w=>w.id==="peg-tree0"),'swinging behind the trunk wraps the cable round it');
  const around=cableLength(b,me.position);assert.ok(Math.abs(around-(10+Math.hypot(2,5)))<.05,`wrapped length counts the run to the tree (${around.toFixed(2)})`);
  walk(t[0]+2,t[2]+15);assert.ok(!b.wraps.some(w=>w.id==='peg-tree0'),'walking back round unwraps it');}
 
@@ -115,7 +116,35 @@ assert.ok(s.checkpoint().enemies[0].hp>=80,'bolt only');
 {const sim=createSimulation({room:'SOLO'});sim.adventureWorld();sim.step();const k=sim.checkpoint();
  for(const side of ['party','rivals']){const b=k.inventions.structures.find(b=>b.id===`home-stormspire-${side}`);assert.ok(b,`${side} base Stormspire`);assert.equal(b.side,side);assert.equal(b.charge,STORMREEL.maxCharge);
   const t=terminalPoint(b),base=k.battle.bases.find(x=>x.side===side);assert.ok(Math.hypot(t[0],t[2])<Math.hypot(b.position[0],b.position[2]),'terminal on the field side');void base;}
- const again=loadSimulation(JSON.parse(JSON.stringify(k)));again.step();assert.equal(again.checkpoint().inventions.structures.filter(b=>b.type==='stormspire').length,2,'never duplicated');}
+ const again=loadSimulation(JSON.parse(JSON.stringify(k)));again.step();assert.equal(again.checkpoint().inventions.structures.filter(b=>b.type==='stormspire').length,2,'never duplicated');
+ // It stands at the front of the keep, just inside the gate (Mitch, 2026-10-10), and an older save's tower behind the heart walks there.
+ for(const side of ['party','rivals']){const b=k.inventions.structures.find(b=>b.id===`home-stormspire-${side}`),[x,z]=homePoint(side,HOME_STORMSPIRE.at);
+  assert.ok(Math.hypot(b.position[0]-x,b.position[2]-z)<1e-6,`${side} tower at the front`);assert.ok(HOME_STORMSPIRE.at[1]>8,'out toward the gate, in front of the heart');}
+ const old=JSON.parse(JSON.stringify(k)),ob=old.inventions.structures.find(b=>b.id==='home-stormspire-party'),[ox,oz]=homePoint('party',[7.6,-5.2]);ob.position=[ox,ob.position[1],oz];ob.wraps=[{id:'t',x:0,z:0,s:1}];
+ const moved=loadSimulation(old);moved.step();const mb=moved.checkpoint().inventions.structures.find(b=>b.id==='home-stormspire-party'),[nx,nz]=homePoint('party',HOME_STORMSPIRE.at);
+ assert.ok(Math.hypot(mb.position[0]-nx,mb.position[2]-nz)<1e-6&&!mb.wraps,'an older save\'s tower moves to the front');}
+
+// The cable routes round everything it touches (Mitch, 2026-10-10), not just trees: walk a loop out of the keep, round a
+// gate ballista, a ward and the tower itself; no run of cable ever passes through a keep solid, and walking back unwinds it.
+{const sim=createSimulation({room:'SOLO'});const k=sim.adventureWorld();k.battle.status='running';k.tick=5;
+ const l=loadSimulation(k);l.step();const st=l.checkpoint(),b=st.inventions.structures.find(x=>x.id==='home-stormspire-party');
+ const me={id:'h',tool:'stormreel',position:[...hookPoint(b,'red')]};b.operator='h';b.wraps=[];b.wrapAt=[me.position[0],me.position[2]];st.players=[me];
+ const solids=homeSolids('party'),inside=(x,z)=>solids.some(q=>{if(q.r!==undefined)return Math.hypot(x-q.x,z-q.z)<q.r-.05;const [u,v]=pieceLocal(q,[x,z]);return Math.abs(u-q.at[0])<q.half[0]-.05&&Math.abs(v-q.at[1])<q.half[1]-.05;});
+ const clear=()=>{const t=terminalPoint(b,'red'),pts=[[t[0],t[2]],...cableWraps(b,'red').map(w=>[w.x,w.z]),[me.position[0],me.position[2]]];
+  for(let i=1;i<pts.length;i++)for(let j=1;j<40;j++)if(inside(pts[i-1][0]+(pts[i][0]-pts[i-1][0])*j/40,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*j/40))return false;return true;};
+ const walkTo=([lx,ly])=>{const [tx,tz]=homePoint('party',[lx,ly]);for(let i=0;i<3000;i++){const dx=tx-me.position[0],dz=tz-me.position[2],d=Math.hypot(dx,dz);if(d<.15)break;
+  const pos=[me.position[0]+dx/d*Math.min(.1,d),0,me.position[2]+dz/d*Math.min(.1,d)];resolveHomeStructures(st,pos);leash(st,me,pos);me.position=pos;}};
+ const route=[[8,15],[12,20],[16,14],[14,6],[10,2],[2,8],[-4,12]];
+ for(const at of route){walkTo(at);assert.ok(clear(),`the cable runs clear of the keep at ${at} (${cableWraps(b,'red').map(w=>w.id)})`);}
+ assert.ok(cableWraps(b,'red').some(w=>w.id.startsWith('home-party-'))&&cableWraps(b,'red').some(w=>w.id.startsWith('peg-home-stormspire-party')),'it bends round keep pieces and its own tower');
+ for(const at of [...route].reverse())walkTo(at);walkTo([6.9,12.7]);assert.equal(cableWraps(b,'red').length,0,'walking back the way you came unwinds it');}
+
+// Indestructible for now (Mitch, 2026-10-10: "it's too fun to kill"): no hammer, spell or foe can knock a Stormspire down,
+// foes stop picking it as a target, and a tower knocked down in an older save stands again.
+{s=fixture();const k=s.checkpoint();k.inventions.structures.find(b=>b.id==='spire1').hp=0;const l=loadSimulation(k);l.step();
+ assert.equal(l.checkpoint().inventions.structures.find(b=>b.id==='spire1').hp,240,'a fallen tower stands again');
+ const c=l.checkpoint();assert.equal(damageInvention(c,'spire1',200,null,[],'rivals'),false,'damage does nothing');assert.equal(c.inventions.structures.find(b=>b.id==='spire1').hp,240);}
+
 
 // The circuit (Mitch, 2026-10-07): a positive bolt and a negative bolt in the SAME foe. A solo Hero lodges the + bolt,
 // plants the red crossbow (the bolt stays wired to it), fetches the blue one and lodges the - bolt in the same body.
@@ -136,23 +165,20 @@ assert.ok(s.checkpoint().enemies[0].hp>=80,'bolt only');
  const other=act(s,{action:'storm',...aimAt(s,body('foe1')),charge:.3});assert.equal(other.events.find(e=>e.kind==='storm_bolt').targetId,'foe1');
  assert.ok(!other.events.some(e=>e.kind==='storm_arc')&&!tower(s).arc,'bolts in two foes do not close the circuit');assert.ok(foeHp(s,'foe1')>80);
  run(s,STORMREEL.cooldownTicks);
- const g0=foeHp(s,'foe0'),r2=act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.equal(r2.events.find(e=>e.kind==='storm_bolt').probe,'blue');
+ const r2=act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.equal(r2.events.find(e=>e.kind==='storm_bolt').probe,'blue');
  const arc=r2.events.find(e=>e.kind==='storm_arc');assert.ok(arc,'+ and - in the same foe close the circuit');assert.equal(arc.enemy,'foe0');
- assert.ok(g0-foeHp(s,'foe0')>=STORMREEL.surge*.4,'the closing surge is enormous, even through golem stone');assert.ok(foeHp(s,'foe1')<100&&arc.splash.includes('foe1'),'the neighbour is jolted through the soil');
- const before=tower(s).charge,hp1=foeHp(s,'foe0');assert.ok(hp1>0&&tower(s).arc,'a golem survives the surge, so the current keeps cooking it');
- run(s,20);assert.ok(foeHp(s,'foe0')<hp1,'pulses keep frying it');assert.ok(tower(s).charge<before,'the circuit drains the tower');
- // Reel (Q): the blue bolt winds back in along its tether, the circuit dies, the positive probe stays, charge comes back.
+ // Instant kill (Mitch, 2026-10-10): even an armoured golem dies in the closing surge, no continuous zapping.
+ assert.equal(foeHp(s,'foe0'),0,'the closing surge kills the golem outright');assert.equal(arc.killed,true);assert.equal(arc.creature,'golem');
+ assert.ok(r2.events.indexOf(arc)<r2.events.findIndex(e=>e.kind==='death'&&e.id==='foe0'),'the strike leads the death, so the flash lands with the kill');
+ assert.ok(foeHp(s,'foe1')<100&&arc.splash.includes('foe1'),'the neighbour is jolted through the soil');
+ run(s,2);assert.equal(tower(s).arc,undefined,'the circuit lets go once its foe is dead');
+ assert.ok(tower(s).probes.red.fell&&tower(s).probes.blue.fell&&!tower(s).probes.red.enemy,'both bolts fell out of the body');
+ // Reel (Q): your own bolt winds back in along its tether and returns part of its charge; the other one stays out.
  const charge0=tower(s).charge,rl=act(s,{action:'stormReel'});assert.equal(rl.ok,true,rl.code);
  assert.ok(rl.events.some(e=>e.kind==='storm_reel'&&e.pack==='blue'),'your own bolt is reeled in');
- assert.ok(rl.events.some(e=>e.kind==='storm_arc_end'&&e.why==='reeled'));
- assert.equal(tower(s).arc,undefined);assert.ok(tower(s).probes?.red&&!tower(s).probes.blue,'the other polarity stays lodged');
- assert.ok(tower(s).charge>charge0,'reeling returns part of the bolt\'s charge');
- // Lodge it again: the circuit kills the golem, both bolts drop out of the body and the circuit ends.
- run(s,STORMREEL.cooldownTicks);act(s,{action:'storm',...aimAt(s,body('foe0')),charge:1});assert.ok(tower(s).arc);
- run(s,60*STORMREEL.arcSeconds);assert.equal(foeHp(s,'foe0'),0,'cooked');assert.equal(tower(s).arc,undefined);
- assert.ok(tower(s).probes.red.fell&&tower(s).probes.blue.fell&&!tower(s).probes.red.enemy,'both bolts fell out of the body');
- // With only the planted red probe left, the blue wearer can still reel bolts in (so a circuit can always be cleared).
- assert.equal(act(s,{action:'stormReel'}).ok,true);assert.equal(act(s,{action:'stormReel'}).ok,true);assert.equal(tower(s).probes,undefined);
+ assert.ok(tower(s).probes?.red&&!tower(s).probes.blue,'the other polarity stays out');assert.ok(tower(s).charge>charge0,'reeling returns part of the bolt\'s charge');
+ // With only the planted red probe left, the blue wearer can still reel it in (so a circuit can always be cleared).
+ assert.equal(act(s,{action:'stormReel'}).ok,true);assert.equal(tower(s).probes,undefined);
  assert.equal(act(s,{action:'stormReel'}).code,'not_needed');
  // Nothing left on the hooks: Use at the tower winds the planted red crossbow home.
  {const c=s.checkpoint();c.players[0].position=[9.6,terrainHeight(c,9.6,20.5),20.5];s=loadSimulation(c);}
