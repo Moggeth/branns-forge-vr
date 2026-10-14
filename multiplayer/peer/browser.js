@@ -7,6 +7,9 @@ const encoder = new TextEncoder();
 const preparedOwner = new WeakMap();
 const emit = (target, type, detail) => target.dispatchEvent(new CustomEvent(type, { detail }));
 const open = channel => channel?.readyState === 'open';
+// Give same-network RTC a brief head start, then use the already-open room socket.
+// ICE can take many seconds across NATs; players should not wait for it to fail.
+const RELAY_HEAD_START_MS = 250;
 // Pre-welcome rejections that no automatic retry can fix.
 const TERMINAL_JOIN_ERRORS = new Set(['room_not_found', 'room_full', 'invalid_room', 'invalid_identity', 'server_full', 'rate_limited', 'client_update_required']);
 
@@ -86,7 +89,9 @@ export class PeerRoomConnection extends EventTarget {
         emit(this, 'welcome', { maxPeers:this.maxPeers, room: this.room, peerId: this.peerId, secret: this.secret, epoch: this.epoch, hostId: this.hostId, role: this.role, isHost: this.isHost, peers: [...this.roster.values()], relayConfigured: this.relayConfigured, resume });
         emit(this, 'roster', { maxPeers:this.maxPeers, peers: [...this.roster.values()], epoch: this.epoch });
         emit(this, 'status', { state: this.isHost ? 'hosting' : this.#playable() ? 'connected' : 'connecting_to_host', relayConfigured: this.relayConfigured });
-        if (!this.isHost && this.roster.get(this.hostId)?.online === false) emit(this, 'owner_lost', { epoch: this.epoch });
+        if (!this.isHost && this.roster.get(this.hostId)?.online === false) {
+          emit(this, 'owner_lost', { epoch: this.epoch }); this.retryWorld();
+        }
         if (this.isHost) for (const peer of this.roster.values()) if (peer.id !== this.peerId && peer.online) this.#connectPeer(peer.id, true);
         if (!this.isHost && this.checkpointRevision >= 0) this.#signal({ type: 'checkpoint_ready', revision: this.checkpointRevision });
         clearInterval(this.heartbeat);
@@ -165,6 +170,9 @@ export class PeerRoomConnection extends EventTarget {
       if (message.epoch !== this.epoch) return;
       if (!message.deliberate && this.#playable()) return;
       emit(this, 'owner_lost', { epoch: this.epoch }); emit(this, 'status', { state: 'owner_lost' });
+      // This also covers a join during departure, before any data edge was ready.
+      // The liveness timer only watches established edges and cannot rescue that join.
+      this.retryWorld();
     } else if (message.type === 'continue_world_offer') {
       // A signaling-only failure is not a failed game host. Never fork a healthy authority.
       if (!message.graceful && this.#playable()) return this.declineWorld();
@@ -201,7 +209,7 @@ export class PeerRoomConnection extends EventTarget {
     this.peers.set(id, peer);
     if (this.relayTransport === 'websocket') peer.relayTimer = setTimeout(() => {
       if (this.peers.get(id) === peer && !open(peer.channel) && !peer.relay) this.#signal({ type: 'relay_request', to: id, epoch: this.epoch });
-    }, 8000);
+    }, RELAY_HEAD_START_MS);
     connection.onicecandidate = event => {
       if (!event.candidate || peer.epoch !== this.epoch) return;
       if (!peer.offerSent) { peer.localIceQueue.push(event.candidate); return; }

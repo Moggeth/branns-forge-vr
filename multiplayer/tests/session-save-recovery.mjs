@@ -13,6 +13,20 @@ class Connection extends EventTarget {
   send(){return true;}
   setCheckpoint(){this.published++;}
 }
+
+test('host loss distinguishes an arriving world from a failed recovery write',()=>{
+  const connection=new Connection(),session=new WorldSession({connection,storage:{getItem:()=>null,setItem:()=>{throw Error('Storage full');}}}),losses=[];
+  session.addEventListener('owner_lost',e=>losses.push(e.detail));
+  try {
+    connection.dispatchEvent(new CustomEvent('owner_lost',{detail:{epoch:1}}));
+    assert.equal(losses[0].recoveryAvailable,false);
+    assert.equal(losses[0].recoverySaved,false);
+    session.latest=createSimulation({room:'12345678'}).checkpoint();
+    connection.dispatchEvent(new CustomEvent('owner_lost',{detail:{epoch:1}}));
+    assert.equal(losses[1].recoveryAvailable,true);
+    assert.equal(losses[1].recoverySaved,false,'real write failures must still be surfaced');
+  } finally {session.dispose();}
+});
 function fixture({full=true,stored=true}={}){
   const simulation=createSimulation({room:'12345678'});simulation.addPlayer({id:'old-owner',name:'Owner'});
   const state=simulation.adventureWorld();state.players[0].resources.mithril=75;state.players[0].heldOre='ironOre';

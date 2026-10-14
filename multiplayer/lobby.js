@@ -404,7 +404,7 @@ async function start(attempt) {
   // The next player takes the world over by themselves, so a host leaving shows nothing unless
   // the switch is unusually slow; then a quiet note explains the pause.
   next.addEventListener('owner_lost', mine(detail => {
-    if (!detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
+    if (detail.recoveryAvailable && !detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
   }));
   next.addEventListener('continue_world_offer', mine(() => { removeNotice('waiting'); }));
   next.addEventListener('continue_offer_expired', mine(() => removeNotice('continue')));

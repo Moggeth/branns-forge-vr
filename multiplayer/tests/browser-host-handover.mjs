@@ -35,7 +35,9 @@ async function carriesOn(old,label){
     offers:window.events.filter(e=>e.name==='continue_world_offer').length,errors:window.events.filter(e=>e.name==='error').map(e=>e.detail.code)}))})));
   for(const o of observers){
     assert.ok(o.edit,`${label}: ${o.name} lost the terrain edit`);
-    assert.ok(o.gapMs<15000,`${label}: ${o.name} waited ${o.gapMs} ms`);
+    // A crash still needs four seconds of missing traffic to avoid false migration.
+    // Graceful handoffs should resume within two seconds, including relay fallback.
+    assert.ok(o.gapMs<(label==='host-crashes'?6000:2000),`${label}: ${o.name} waited ${o.gapMs} ms`);
     assert.ok(o.rewindTicks<=60,`${label}: ${o.name} saw the world rewind ${o.rewindTicks} ticks`);
   }
   record(label,'pass',{newHost:next.name,tookMs,observers});
