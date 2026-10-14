@@ -1,0 +1,24 @@
+{
+  "triangles": 17408,
+  "vertices": 9170,
+  "materials": [
+    "TurtleShell",
+    "TurtleSkin",
+    "TurtleEye"
+  ],
+  "bones": 19,
+  "parts": {
+    "bezel": 2210,
+    "eye": 352,
+    "finB": 642,
+    "finF": 1226,
+    "head": 1280,
+    "lid": 608,
+    "neck": 352,
+    "plastron": 617,
+    "shell": 1793,
+    "tail": 90
+  },
+  "bytes": 728704,
+  "seconds": 9.1
+}

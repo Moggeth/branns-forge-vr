@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Larimar Cove in game</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// The real game renderer (client/game.js) on a real in-page simulation, with a Hero standing in the party's back town
+// looking down at Larimar Cove. window.lab drives review captures: lab.advance(ticks), lab.place([u,v], lookAt [u,v]),
+// lab.cove() (the cove view's diagnostics). ?touch for the phone layout, ?manual to freeze time between advances.
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+const params=new URLSearchParams(location.search),touch=params.has('touch'),manual=params.has('manual');
+const spot=(params.get('at')||'61.5,57.5').split(',').map(Number),look=(params.get('look')||'63.1,48.4').split(',').map(Number);
+let sim=createSimulation({room:'LAB',seed:41});sim.addPlayer({id:'me',name:'Lab',role:'hero'});
+let faceYaw=0;
+function place(at,to){const c=sim.checkpoint(),p=c.players[0],x=-at[0],z=-at[1];p.position=[x,terrainHeight(c,x,z),z];p.yaw=faceYaw=Math.atan2(-(-to[0]-x),-(-to[1]-z));if(params.has('tick'))c.tick=Number(params.get('tick'));sim=loadSimulation(c);}
+place(spot,look);
+let seq=1,pending=[],last=performance.now();
+const canvas=document.getElementById('c');
+const game=createGame({canvas,isHost:()=>true,onAction:(action,d={})=>{const r=sim.command('me',{type:'action',seq:seq++,action,...d});pending.push(...(r.events||[]));},
+  onInput:input=>sim.command('me',{type:'input',seq:seq++,...input}),onCast:()=>{},onStatus:m=>{window.lastStatus=m;}});
+game.setTouchEnabled(touch);
+function pump(){const now=performance.now();let n=Math.min(12,Math.round((now-last)/16.667));last+=n*16.667;for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+function advance(n){for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+if(!manual)setInterval(pump,50);advance(1);
+window.lab={game,advance,place,look:(y,p)=>game.setLook(y,p),sim:()=>sim,cove:()=>({...game.diagnostics().larimarCove,tick:sim.snapshot().tick,render:game.diagnostics().presentationTick}),controls:()=>game.controlsSnapshot()};
+game.setActive(true);
+const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r();}},100);});
+await wait();game.setActive(true);game.setLook(faceYaw+Number(params.get('turn')||0),Number(params.get('pitch')||-.25));document.title='ready';
+</script>

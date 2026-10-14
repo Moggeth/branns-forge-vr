@@ -1,6 +1,7 @@
 // One deterministic surface contract for authority, rendering and saved worlds.
 export const TERRAIN_LIMITS = Object.freeze({bound:55, mountainStart:46, mountainCrest:55, deformation:6, axeScar:.65, slope:1.15, rim:50});
 import {HOME_SITES,WORLD_EXTENT,keepCarve,onKeepGround} from './keep-sites.js';
+import {lakeBasin} from './larimar-cove.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 export const SUNDER_SETTLE_DISTANCE=1.1;
@@ -135,7 +136,7 @@ const rawBaseHeight=(x,z)=>{
   const carve=keepCarve(x,z),meadow=meadowHeight(x,z);
   if(!carve)return meadow+mountainHeight(x,z);
   const [sx,sz]=HOME_SITES[x+z<0?'party':'rivals'];
-  return meadow+(meadowHeight(sx,sz)-meadow)*carve+mountainHeight(x,z);
+  return meadow+(meadowHeight(sx,sz)-meadow)*carve+mountainHeight(x,z)-lakeBasin(x,z); // Larimar Cove's lake bed
 };
 // Match THREE.PlaneGeometry(120,120,160,160).rotateX(-PI/2), including
 // Float32 vertex storage and the diagonal xFraction+zFraction=1.
