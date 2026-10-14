@@ -5,6 +5,8 @@
 //           little arpeggio; tall segments ring lower and fuller,
 //   warn    a soft tremolo shimmer when a wall has 3 s left,
 //   break   a bright glass burst + low thump per shattering segment (capped).
+//   riches  (Pick of Riches) ore segments open with a stony crack under a softer bell; a rich seam (crystal, gold,
+//           mithril) adds a rising three-note treasure sparkle.
 // Spatialised with equal-power panners; bounded to MAX_VOICES concurrent sources; all gains ramp (no clicks).
 const MAX_VOICES=14,PENTA=[0,2,4,7,9,12,14,16,19,21];
 export function createCrystalWallAudio({context,master=.55}={}){
@@ -20,7 +22,7 @@ export function createCrystalWallAudio({context,master=.55}={}){
  function claim(){if(voices>=MAX_VOICES){stats.culled++;return false;}voices++;stats.played++;return true;}
  function release(node,at){node.onended=()=>{voices=Math.max(0,voices-1);};node.stop(at);}
  function env(gain,t,peak,attack,decay){gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(peak,t+attack);gain.gain.exponentialRampToValueAtTime(0.0001,t+attack+decay);}
- function bell(position,listener,freq,level,decay){if(!claim())return;const t=context.currentTime,dest=panner(position,listener),bus=context.createGain();bus.gain.value=level;bus.connect(dest);
+ function bell(position,listener,freq,level,decay,delay=0){if(!claim())return;const t=context.currentTime+delay,dest=panner(position,listener),bus=context.createGain();bus.gain.value=level;bus.connect(dest);
   // glass/bell partial ratios (slightly inharmonic) with faster decay on upper partials
   const partials=[[1,1],[2.01,.5],[2.76,.42],[5.4,.22],[8.93,.1]];let last=null;
   for(const [r,a] of partials){const o=context.createOscillator(),g=context.createGain();o.type='sine';o.frequency.value=freq*r;env(g,t,a,.004,decay/(1+r*.35));o.connect(g).connect(bus);o.start(t);last=o;o.stop(t+decay+.05);}
@@ -46,7 +48,9 @@ export function createCrystalWallAudio({context,master=.55}={}){
    for(const e of events.burst){const h=e.height||2.4,note=PENTA[Math.min(PENTA.length-1,e.segment)],freq=520*Math.pow(2,note/12)*(1.15-h/2.4*.25);
     // a chasm's lining rings a fifth lower and darker, under a little stone crack, as it splits open
     if(e.kind==='sunder'){bell(e.position,listener,freq*.67,.09+.04*h/2.4,1.4+h*.2);if(e.segment%2===0)crack(e.position,listener,.16);}
-    else bell(e.position,listener,freq,.11+.05*h/2.4,1.6+h*.25);}
+    else if(e.mineral&&e.mineral!=='crystal'){crack(e.position,listener,.14);bell(e.position,listener,freq*.75,.06+.03*h/2.4,1.1+h*.2);}
+    else bell(e.position,listener,freq,.11+.05*h/2.4,1.6+h*.25);
+    if(e.rich)for(const [i,r] of [2,2.52,3].entries())bell(e.position,listener,freq*r,.05,1.4,.09*(i+1));}
    let breaks=0;for(const e of events.shatter){if(breaks++<4)crack(e.position,listener,.28);bell(e.position,listener,1900+Math.random()*900,.05,.6);}
    const warned=new Set();for(const e of events.warn)if(!warned.has(e.wall)){warned.add(e.wall);shimmer(e.position,listener);}},
   stats:()=>({...stats,voices}),

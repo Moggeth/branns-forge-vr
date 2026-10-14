@@ -18,8 +18,11 @@ if(q.has('foes'))save.enemies=[[at[0]-4,at[1]+.2],[at[0]-6.5,at[1]-.3]].map(([x,
 sim=loadSimulation(save);
 window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
 const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
- onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
+ onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});if(r.ok&&action==='special')forceMinerals();for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
  onInput:input=>sim.command(role==='god'?'god':'hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
+// ?minerals=stone,iron,copper,crystal,gold,mithril pins the Pick of Riches roll (caster end first) for captures.
+function forceMinerals(){const list=q.get('minerals')?.split(',');if(!list)return;const s=sim.checkpoint(),walls=s.deposits.filter(d=>d.special==='pick_wall'&&!d.depleted&&s.edits.find(e=>e.id===d.editId)?.rupture.startTick===s.tick);
+ walls.forEach((d,i)=>{const kind=list[i%list.length];d.kind=kind;d.maxHits={stone:3,iron:4,copper:4,crystal:5,gold:5,mithril:5}[kind];});sim=loadSimulation(s);}
 function publish(){game.applySnapshot(sim.snapshot(),role);}
 function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
 publish();game.setRole('hero');game.setActive(true);
@@ -28,6 +31,8 @@ window.review={
  aim:()=>game.specialPress(true),cast:()=>game.specialPress(false),look:(x,y)=>game.lookByPixels(x,y),
  view(next){role=next;publish();game.setRole(next);if(next==='god')game.centerView();},
  skipToWarning(){const s=sim.checkpoint(),start=Math.min(...s.edits.filter(e=>e.wall).map(e=>e.rupture.startTick));s.tick=start+3600-180-2;sim=loadSimulation(s);publish();},
+ castAt(x,z){const r=sim.command('hero',{type:'action',seq:++seq,action:'special',point:[x,terrainHeight(sim.snapshot(),x,z),z]});if(r.ok)forceMinerals();for(const e of r.events||[])game.handleEvent(e);publish();return r.ok||r.code;},
+ place(x,z,who=0){const s=sim.checkpoint();s.players[who].position=[x,terrainHeight(s,x,z),z];sim=loadSimulation(s);publish();},
  equip:(tool='pick')=>game.equip(tool),tick:()=>sim.snapshot().tick,stats:()=>game.diagnostics(),snapshot:()=>sim.snapshot(),
 };
 $('aim').onclick=()=>review.aim();$('cast').onclick=()=>review.cast();$('run').onclick=()=>review.run(1);$('end').onclick=()=>review.skipToWarning();

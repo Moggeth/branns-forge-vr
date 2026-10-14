@@ -1,5 +1,7 @@
 import {applyCrystalMaterial} from './material-refinements.js';
 import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey,wallSpec} from '../shared/terrain.js';
+import {isRichMineral} from '../shared/weapon-specials.js';
+import {oreMaterial,oreChunkGeometry,oreColor,ORE_GLINT} from './ridge-minerals.js';
 // Stonewhisper crystal wall presentation, v2 "geode" (2026-10-03).
 // Authority (shared/weapon-specials.js) raises a chain of capsule segments behind a 10 m/s front, keeps them for
 // its lifetimeTicks, then sinks them. Everything here is a pure function of the snapshot tick, so every peer and
@@ -13,6 +15,9 @@ import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey,wallSpec} from '../shar
 // Crystals line the two flanks of the crest and leave a druzy channel along its spine, so the walkable ramp/crest reads
 // as walkable. Draw cost per wall: 3 crystal batches + 1 crust batch + 1 glow strip; shared shard/spark/dust pools add 3.
 // No lights, no transparency sorting on solids, no per-frame allocation in update().
+// Pick of Riches (2026-10-12): each crystal-wall segment is the mineral its deposit names. Crystal segments grow the
+// geode crystals, larger; every other mineral replaces the flank crystals with broken ore columns (client/ridge-minerals.js,
+// one more batch per wall) while small blue druzes keep marking the spine. Rich seams bloom with glints and a chime.
 // The God's Raise Wall (edit kind 'wall') is the same geode, grown to rampart size; the God's Sunder (kind 'sunder')
 // turns it inside out: the crust peels back off the chasm lips and crystal lines the chasm walls and floor.
 export const CRYSTALS_PER_SEGMENT=10,PLATES_PER_SEGMENT=6,GROW_TICKS=30,CRACK_TICKS=12;
@@ -24,7 +29,7 @@ export const WALL_VIEWS=Object.freeze({
  sunder:{flank:8,floor:5,plates:6,reach:1,strip:3.2,seam:1,layout:'chasm'},
 });
 const viewOf=kind=>WALL_VIEWS[kind];
-const SHARD_POOL=192,SPARK_POOL=320,DUST_POOL=96;
+const SHARD_POOL=192,ORE_SHARD_POOL=96,SPARK_POOL=320,DUST_POOL=96;
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
 const rng=seed=>()=>{seed=seed+0x6d2b79f5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=t=>t*t*(3-2*t);
@@ -138,13 +143,16 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   pale:new T.MeshStandardMaterial({color:0x3f7fe0,emissive:0x0b3aa8,emissiveIntensity:.85,roughness:.12,metalness:0,flatShading:true})};
  // Glassy: front faces only, depth-writing, lightly see-through (convex crystals need no sorting within a batch).
  for(const [kind,material] of Object.entries(mats)){applyCrystalMaterial(material,kind);addResonance(material);material.transparent=true;material.opacity=kind==='core'?.92:.84;material.depthWrite=true;}
- const crust=crustMaterial(T),strip=stripMaterial(T);
+ const crust=crustMaterial(T),strip=stripMaterial(T),ore=oreMaterial(T,wallTime),oreGeo=oreChunkGeometry(T,rng(53)),oreTint=new T.Color();
  const shapes=[0,1,2].map(v=>unitCrystal(T,6-(v&1),.26+v*.06,rng(91+v))),shapeMaterial=[mats.pale,mats.core,mats.pale];
  const plateGeo=plateGeometry(T,rng(7));
  // ---- shared pools: shards (instanced crystal fragments), sparks (additive points), dust (soft points) ----
  const shardMesh=new T.InstancedMesh(shapes[0],mats.pale,SHARD_POOL);shardMesh.name='CrystalWallShards';shardMesh.count=0;shardMesh.frustumCulled=false;
  shardMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);shardMesh.setColorAt(0,new T.Color(1,1,1));shardMesh.raycast=()=>{};shardMesh.userData.ignoreContact=true;root.add(shardMesh);
- const shards=Array.from({length:SHARD_POOL},()=>({life:0,age:0,p:new T.Vector3(),v:new T.Vector3(),q:new T.Quaternion(),spin:new T.Vector3(),s:.1}));
+ const oreShardMesh=new T.InstancedMesh(oreGeo,ore,ORE_SHARD_POOL);oreShardMesh.name='CrystalWallOreShards';oreShardMesh.count=0;oreShardMesh.frustumCulled=false;
+ oreShardMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);oreShardMesh.setColorAt(0,new T.Color(1,1,1));oreShardMesh.raycast=()=>{};oreShardMesh.userData.ignoreContact=true;root.add(oreShardMesh);
+ const shardOf=()=>({life:0,age:0,p:new T.Vector3(),v:new T.Vector3(),q:new T.Quaternion(),spin:new T.Vector3(),s:.1,mineral:null});
+ const shards=Array.from({length:SHARD_POOL},shardOf),oreShards=Array.from({length:ORE_SHARD_POOL},shardOf);
  function points(name,count,additive){
   const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(count*3),3).setUsage(T.DynamicDrawUsage));
   g.setAttribute('aColor',new T.BufferAttribute(new Float32Array(count*4),4).setUsage(T.DynamicDrawUsage));g.setAttribute('aSize',new T.BufferAttribute(new Float32Array(count),1).setUsage(T.DynamicDrawUsage));
@@ -157,7 +165,8 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
  const sparks=points('CrystalWallSparks',quality==='low'?SPARK_POOL/2:SPARK_POOL,true),dust=points('CrystalWallDust',quality==='low'?DUST_POOL/2:DUST_POOL,false);
  // grav: downward m/s^2 (negative = buoyant motes/dust)
  function emit(pool,x,y,z,vx,vy,vz,life,size,r,g,b,drag=0,grav=0){const p=pool.live[pool.next];pool.next=(pool.next+1)%pool.count;p.life=life;p.age=0;p.x=x;p.y=y;p.z=z;p.vx=vx;p.vy=vy;p.vz=vz;p.size=size;p.r=r;p.g=g;p.b=b;p.drag=drag;p.grav=grav;}
- function emitShard(x,y,z,vx,vy,vz,s,seed){let i=shards.findIndex(q=>q.age>=q.life);if(i<0)i=seed%SHARD_POOL;const q=shards[i];q.life=.75+(seed%7)*.05;q.age=0;q.p.set(x,y,z);q.v.set(vx,vy,vz);q.q.setFromAxisAngle(new T.Vector3(vx,1,vz).normalize(),seed%6);q.spin.set((seed%5)-2,(seed%3)*2-2,(seed%7)-3).multiplyScalar(2.2);q.s=s;}
+ // mineral: null = a glass crystal shard, else a chip of that ore
+ function emitShard(x,y,z,vx,vy,vz,s,seed,mineral=null){const pool=mineral?oreShards:shards;let i=pool.findIndex(q=>q.age>=q.life);if(i<0)i=seed%pool.length;const q=pool[i];q.mineral=mineral;q.life=.75+(seed%7)*.05;q.age=0;q.p.set(x,y,z);q.v.set(vx,vy,vz);q.q.setFromAxisAngle(new T.Vector3(vx,1,vz).normalize(),seed%6);q.spin.set((seed%5)-2,(seed%3)*2-2,(seed%7)-3).multiplyScalar(2.2);q.s=s;}
  const events={burst:[],shatter:[],warn:[]};// drained by game.js for audio/haptics (presentation-timed, late-join safe)
 
  const walls=new Map();let terrainKey=null,lastEdits=null,lastDeposits=null,lastTick=0,shownTick=0;
@@ -168,6 +177,8 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   const segCount=list.length,crystalCap=segCount*(view.flank*2+view.floor);
   const batches=shapes.map((geometry,k)=>{const mesh=new T.InstancedMesh(geometry,shapeMaterial[k],crystalCap);mesh.name='CrystalBatch_'+k;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
    mesh.setColorAt(0,new T.Color(1,1,1));mesh.instanceColor.setUsage(T.DynamicDrawUsage);mesh.userData.wallTargets=[];mesh.count=0;g.add(mesh);return mesh;});
+  const oreMesh=new T.InstancedMesh(oreGeo,ore,kind==='pick_wall'?crystalCap:1);oreMesh.name='CrystalOre';oreMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+  oreMesh.setColorAt(0,new T.Color(1,1,1));oreMesh.instanceColor.setUsage(T.DynamicDrawUsage);oreMesh.userData.wallTargets=[];oreMesh.count=0;oreMesh.visible=false;g.add(oreMesh);
   const crustMesh=new T.InstancedMesh(plateGeo,crust,segCount*view.plates);crustMesh.name='CrystalCrust';crustMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);crustMesh.userData.wallTargets=[];crustMesh.count=0;g.add(crustMesh);
   // strip: along -0.6..len+1.6, across -view.strip..view.strip, conformed to live terrain
   const nA=Math.max(8,Math.ceil((len+2.2)/.3)),nC=view.layout==='chasm'?13:9,positions=new Float32Array(nA*nC*3),wall=new Float32Array(nA*nC*2),index=[];
@@ -175,7 +186,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   const sg=new T.BufferGeometry();sg.setAttribute('position',new T.BufferAttribute(positions,3).setUsage(T.DynamicDrawUsage));sg.setAttribute('aWall',new T.BufferAttribute(wall,2));sg.setIndex(index);
   const sm=strip.clone();sm.uniforms.uTime=wallTime;sm.uniforms.uLength.value=len;sm.uniforms.uScale.value=view.strip/1.8;sm.uniforms.uSeam.value=view.seam;
   const stripMesh=new T.Mesh(sg,sm);stripMesh.name='CrystalWallGlow';stripMesh.frustumCulled=false;stripMesh.renderOrder=2;stripMesh.raycast=()=>{};stripMesh.userData.ignoreContact=true;g.add(stripMesh);
-  const w={id,kind,view,spec,group:g,batches,crustMesh,stripMesh,rupture:r0,len,t:[tx,tz],n:[nx,nz],segments:[],lastHeights:null,owner:list[0].wall.owner,quiet:false};
+  const w={id,kind,view,spec,group:g,batches,oreMesh,crustMesh,stripMesh,rupture:r0,len,t:[tx,tz],n:[nx,nz],segments:[],lastHeights:null,owner:list[0].wall.owner,quiet:false};
   const ordered=[...list].sort((a,b)=>((a.x-r0.start[0])*tx+(a.z-r0.start[1])*tz)-((b.x-r0.start[0])*tx+(b.z-r0.start[1])*tz));
   ordered.forEach((e,si)=>w.segments.push(segment(w,e,si,deposits.get(e.id))));
   walls.set(id,w);return w;
@@ -186,17 +197,21 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   // front reaches this segment's centre, then the soil finishes moving over the settle band
   const span=w.len+SUNDER_SETTLE_DISTANCE,d=w.rupture.durationTicks,front=w.rupture.startTick+d*along/span,risen=w.rupture.startTick+d*Math.min(1,(along+SUNDER_SETTLE_DISTANCE)/span);
   const crack=front+(risen-front)*.55;
-  const crystals=[],flank=view.flank*2,reach=view.reach,size=chasm?.7+.3*hMean:(.5+hMean*.3);
+  // Pick of Riches: a ridge segment shows the mineral its deposit names (legacy stone segments read as granite).
+  const mineral=w.kind==='pick_wall'&&deposit?deposit.kind:null,rich=isRichMineral(mineral),ores=!!mineral&&mineral!=='crystal';
+  const crystals=[],flank=view.flank*2,reach=view.reach,size=(chasm?.7+.3*hMean:(.5+hMean*.3))*(mineral==='crystal'?1.15:1);
   for(let k=0;k<flank+view.floor;k++){
    const druze=k>=flank,pair=k>>1,s=k%2?1:-1;
    // ridge: crystals crowd the crest edges, leaning out; chasm: they line both walls, leaning in toward the void
    const side=druze?(r()-.5)*(chasm?.5:.25)*reach:s*(chasm?spec.width*(.22+r()*.42):(.28+r()*.3)*reach);
    // the crystal wall keeps its even rhythm; the God's lines scatter crystals freely so long walls never read as a fence
    const u=druze?((k-flank+.5)/view.floor*2-1)*.8:w.kind==='pick_wall'?(pair/Math.max(1,view.flank-1)*2-1)*(.85+r()*.15):(r()*2-1)*.98;
-   const shape=druze?(chasm&&k%2?1:0):chasm?(k%3?1:k%2?2:0):k%4===1?1:k%3===2?2:0,core=shape===1,grand=!chasm&&reach>1&&(k%5===1);
-   const len=(druze?(chasm?(.35+r()*.35)*size:(.22+r()*.18)*scale):(core?1.55:1.0+r()*.45)*size*(chasm?.7:1))*(grand?1.35:1);
-   const rad=(druze?(chasm?.1+r()*.06:.07+r()*.04):(core?.21:.12+r()*.07)*(.75+scale*.35))*(reach>1?1.25:1);
-   const lean=druze?(r()-.5)*.4:Math.sign(side)*(chasm?-(.4+r()*.35):(.22+r()*.3)),tilt=(r()-.5)*.35,twist=r()*Math.PI*2;
+   const crystalShape=druze?(chasm&&k%2?1:0):chasm?(k%3?1:k%2?2:0):k%4===1?1:k%3===2?2:0,shape=ores&&!druze?3:crystalShape,core=crystalShape===1;
+   const grand=!chasm&&reach>1&&(k%5===1)||rich&&shape===3&&k===1;// a rich ore seam heaves up one tall prize column
+   let len=(druze?(chasm?(.35+r()*.35)*size:(.22+r()*.18)*scale):(core?1.55:1.0+r()*.45)*size*(chasm?.7:1))*(grand?1.35:1);
+   let rad=(druze?(chasm?.1+r()*.06:.07+r()*.04):(core?.21:.12+r()*.07)*(.75+scale*.35))*(reach>1?1.25:1);
+   if(shape===3){len*=.82;rad*=1.45;}// ore breaks off as stout columns rather than slender points
+   const lean=(druze?(r()-.5)*.4:Math.sign(side)*(chasm?-(.4+r()*.35):(.22+r()*.3)))*(shape===3?.7:1),tilt=(r()-.5)*.35,twist=r()*Math.PI*2;
    const q=new T.Quaternion().setFromAxisAngle(new T.Vector3(tx,0,tz),-lean).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(nx,0,nz),tilt)).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),twist));
    crystals.push({shape,ox:tx*u*half+nx*side,oz:tz*u*half+nz*side,depth:druze?.08:chasm?.3+r()*.15:.6+r()*.2,len,rad,q,
     delay:r()*8+(druze?6:0)+(core?2:0),order:(core?10:0)+(druze?20:0)+r()+(1-Math.abs(side))*.5,seed:hash(e.id+':'+k),glow:core||chasm&&druze?1.15:1});
@@ -212,14 +227,14 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
     h:chasm?(.55+r()*.4):rampart?hMean*(.62+r()*.36):(.42+r()*.22)*(.5+.5*scale),d:(.13+r()*.05)*(rampart?2.4:chasm?1.5:1),yaw:Math.atan2(nx*s,nz*s)+(r()-.5)*(rampart?.35:chasm?.6:.3),
     open:chasm?.85+r()*.45:rampart?-(.16+r()*.14):.45+r()*.35,sink:chasm?.05:rampart?.35:.22,seed:hash(e.id+'#'+k)});
   }
-  return {edit:e,spec,deposit,si,along,front,risen,crack,crystals,removalOrder,plates:platesOut,removed:0,hits:deposit?.hits||0,broken:false,bloomed:false,warned:false,expireTick:ws.expireTick,naturalEnd:w.rupture.startTick+spec.lifetimeTicks};
+  return {edit:e,spec,deposit,mineral,rich,si,along,front,risen,crack,crystals,removalOrder,plates:platesOut,removed:0,hits:deposit?.hits||0,broken:false,bloomed:false,warned:false,expireTick:ws.expireTick,naturalEnd:w.rupture.startTick+spec.lifetimeTicks};
  }
  // ---- per-frame pose ----
  const tmpE=new T.Euler(),axisY=new T.Vector3(0,1,0),tmpQ=new T.Quaternion(),tmpQ2=new T.Quaternion(),tmpV=new T.Vector3(),white=new T.Color();
  function pose(w,tick){
   const edits=lastEdits;let animating=false;
-  const counts=[0,0,0];let plateCount=0;
-  for(const b of w.batches)b.userData.wallTargets.length=0;w.crustMesh.userData.wallTargets.length=0;
+  const counts=[0,0,0];let plateCount=0,oreCount=0;
+  for(const b of w.batches)b.userData.wallTargets.length=0;w.crustMesh.userData.wallTargets.length=0;w.oreMesh.userData.wallTargets.length=0;
   for(const seg of w.segments){
    const e=seg.edit,cx=e.x,cz=e.z,ground=height(cx,cz,edits),sink=sinkOf(seg,tick);
    const grow=clamp((tick-seg.crack)/GROW_TICKS,0,1.6),open=clamp((tick-seg.crack+4)/CRACK_TICKS,0,1);
@@ -248,14 +263,15 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
     dummy.p.set(cx+c.ox,height(cx+c.ox,cz+c.oz,edits)-c.depth-lift,cz+c.oz);
     dummy.q.copy(c.q);if(u<1){tmpQ.setFromAxisAngle(tmpV.set(w.t[0],0,w.t[1]),(1-ee)*1.1);dummy.q.premultiply(tmpQ);}
     const wide=.55+.45*Math.min(1,ee);dummy.s.set(c.rad*wide,(c.len+c.depth)*Math.max(.05,ee),c.rad*wide);
-    dummy.m.compose(dummy.p,dummy.q,dummy.s);const b=w.batches[c.shape],i=counts[c.shape]++;b.setMatrixAt(i,dummy.m);b.userData.wallTargets.push(id);
+    dummy.m.compose(dummy.p,dummy.q,dummy.s);const isOre=c.shape===3,b=isOre?w.oreMesh:w.batches[c.shape],i=isOre?oreCount++:counts[c.shape]++;b.setMatrixAt(i,dummy.m);b.userData.wallTargets.push(id);
     // light: birth flash decays to rest; warning flicker in the final seconds
     const flash=Math.max(0,1-(tick-seg.crack-c.delay)/40)*2.6,flick=warn>0?(1+warn*.9*Math.sin(tick*(.9+warn*1.4)+c.seed%13)*((c.seed>>3)%2?1:-.6)):1;
-    white.setScalar(Math.max(.15,(c.glow+flash)*flick));b.setColorAt(i,white);
+    const light=Math.max(.15,(c.glow+flash)*flick);if(isOre)b.setColorAt(i,oreColor(oreTint,light,seg.mineral));else{white.setScalar(light);b.setColorAt(i,white);}
     if(warn>.25&&((tick|0)+c.seed)%97===0&&Math.random()<.5)emit(sparks,dummy.p.x,dummy.p.y+c.len*.8,dummy.p.z,(Math.random()-.5)*.6,.4,(Math.random()-.5)*.6,.9,.05,.4,.8,1,.4,-.4);
    }
   }
   for(let k=0;k<3;k++){const b=w.batches[k];b.count=counts[k];b.instanceMatrix.needsUpdate=true;if(b.instanceColor)b.instanceColor.needsUpdate=true;b.computeBoundingSphere();}
+  {const b=w.oreMesh;b.count=oreCount;b.visible=oreCount>0;b.instanceMatrix.needsUpdate=true;b.instanceColor.needsUpdate=true;if(oreCount)b.computeBoundingSphere();}
   w.crustMesh.count=plateCount;w.crustMesh.instanceMatrix.needsUpdate=true;w.crustMesh.computeBoundingSphere();
   // strip: front distance, bloom energy, fade as the wall sinks
   const u=w.stripMesh.material.uniforms,r=w.rupture,span=w.len+SUNDER_SETTLE_DISTANCE;
@@ -275,13 +291,16 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   const r=rng(seg.crystals[0].seed),[tx,tz]=w.t,e=seg.edit,many=quality==='low'?6:12;
   for(let i=0;i<many;i++){const a=r()*Math.PI*2,s=.6+r()*1.6;emit(sparks,e.x+(r()-.5)*.8,ground+.2+r()*.6,e.z+(r()-.5)*.8,Math.cos(a)*s*.6,1.2+r()*2.2,Math.sin(a)*s*.6,.7+r()*.6,.06+r()*.05,.35+r()*.3,.7+r()*.25,1,1.8,1.2);}
   for(let i=0;i<(quality==='low'?2:3);i++){const s=r()<.5?1:-1;emit(dust,e.x+w.n[0]*s*(.9+r()*.4)+tx*(r()-.5),ground-.6+r()*.3,e.z+w.n[1]*s*(.9+r()*.4)+tz*(r()-.5),w.n[0]*s*(.5+r()*.6),.3+r()*.4,w.n[1]*s*(.5+r()*.6),.9+r()*.4,.18+r()*.12,.62,.5,.36,2.6,-.15);}
-  events.burst.push({position:[e.x,ground,e.z],wall:w.id,kind:w.kind,segment:seg.si,height:(e.wall.h0+e.wall.h1)/2});
+  // a rich seam announces itself: a fountain of glints in its own colour
+  const glint=seg.rich&&ORE_GLINT[seg.mineral];
+  if(glint)for(let i=0;i<(quality==='low'?8:16);i++){const a=r()*Math.PI*2,s=.3+r()*.9;emit(sparks,e.x+(r()-.5)*.6,ground+.6+r()*1.4,e.z+(r()-.5)*.6,Math.cos(a)*s,1.6+r()*2.4,Math.sin(a)*s,1+r()*.8,.05+r()*.05,glint[0],glint[1],glint[2],1.4,1.6);}
+  events.burst.push({position:[e.x,ground,e.z],wall:w.id,kind:w.kind,segment:seg.si,height:(e.wall.h0+e.wall.h1)/2,...(seg.mineral?{mineral:seg.mineral}:{}),...(seg.rich?{rich:true}:{})});
  }
  function breakSegment(w,seg,ground,tick){
   const fresh=tick<seg.expireTick+10,e=seg.edit;
   if(fresh){
    for(let k=seg.removed;k<seg.removalOrder.length;k++){const c=seg.removalOrder[k],r=rng(c.seed);
-    for(let j=0;j<(c.shape===1?2:1);j++)emitShard(e.x+c.ox,ground+c.len*(.2+.6*r()),e.z+c.oz,(r()-.5)*2.4+w.n[0]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,1.4+r()*2.6,(r()-.5)*2.4+w.n[1]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,c.rad*(.45+r()*.3),c.seed+j);
+    for(let j=0;j<(c.shape===1?2:1);j++)emitShard(e.x+c.ox,ground+c.len*(.2+.6*r()),e.z+c.oz,(r()-.5)*2.4+w.n[0]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,1.4+r()*2.6,(r()-.5)*2.4+w.n[1]*Math.sign(c.ox*w.n[0]+c.oz*w.n[1]||1)*1.2,c.rad*(.45+r()*.3)*(c.shape===3?.6:1),c.seed+j,c.shape===3?seg.mineral:null);
     for(let j=0;j<2;j++)emit(sparks,e.x+c.ox,ground+c.len*r(),e.z+c.oz,(r()-.5)*3,1+r()*2.5,(r()-.5)*3,.55+r()*.4,.07,.5,.85,1,1.2,4);}
    for(let i=0;i<2;i++)emit(dust,e.x+(Math.random()-.5),ground-.3,e.z+(Math.random()-.5),(Math.random()-.5)*.8,.4,(Math.random()-.5)*.8,1.1,.22,.62,.5,.36,2.4,-.15);
    events.shatter.push({position:[e.x,ground,e.z],wall:w.id,kind:w.kind,segment:seg.si,crystals:seg.removalOrder.length-seg.removed});
@@ -296,7 +315,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   if(target<seg.removed){seg.removed=target;return;}// restored to an earlier checkpoint
   const ground=height(seg.edit.x,seg.edit.z,lastEdits);
   while(seg.removed<target){const c=seg.removalOrder[seg.removed++];if(!animate)continue;const r=rng(c.seed+hits);
-   for(let j=0;j<2;j++)emitShard(seg.edit.x+c.ox,ground+c.len*.5,seg.edit.z+c.oz,(r()-.5)*2,1.5+r()*1.5,(r()-.5)*2,c.rad*.5,c.seed+j);}
+   for(let j=0;j<2;j++)emitShard(seg.edit.x+c.ox,ground+c.len*.5,seg.edit.z+c.oz,(r()-.5)*2,1.5+r()*1.5,(r()-.5)*2,c.rad*(c.shape===3?.32:.5),c.seed+j,c.shape===3?seg.mineral:null);}
  }
  // ---- snapshot sync ----
  function sync(s){
@@ -317,7 +336,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   }
   legacy.sync(s);
  }
- function retire(id,w){w.group.removeFromParent();for(const b of w.batches)b.dispose();w.crustMesh.dispose();w.stripMesh.geometry.dispose();w.stripMesh.material.dispose();walls.delete(id);}
+ function retire(id,w){w.group.removeFromParent();for(const b of w.batches)b.dispose();w.oreMesh.dispose();w.crustMesh.dispose();w.stripMesh.geometry.dispose();w.stripMesh.material.dispose();walls.delete(id);}
  // ---- per frame ----
  function update(dt,simTick=lastTick){
   shownTick=simTick<shownTick-120?simTick:Math.max(shownTick,simTick);// never rewind for jitter; follow a real rewind
@@ -331,9 +350,13 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   stepPools(dt);legacy.update(dt);
  }
  function stepPools(dt){
-  let n=0;for(const q of shards){if(q.age>=q.life)continue;q.age+=dt;q.v.y-=9.8*dt;q.p.addScaledVector(q.v,dt);tmpQ.setFromEuler(tmpE.set(q.spin.x*dt,q.spin.y*dt,q.spin.z*dt));q.q.multiply(tmpQ);
-   const k=Math.max(0,1-q.age/q.life),s=q.s*Math.pow(k,.6);if(s<=.002)continue;dummy.s.set(s*.45,s*2.8,s*.45);dummy.m.compose(q.p,q.q,dummy.s);shardMesh.setMatrixAt(n,dummy.m);white.setScalar(.6+2.4*k);shardMesh.setColorAt(n,white);n++;}
-  shardMesh.count=n;shardMesh.instanceMatrix.needsUpdate=true;if(shardMesh.instanceColor)shardMesh.instanceColor.needsUpdate=true;
+  for(const [pool,mesh] of [[shards,shardMesh],[oreShards,oreShardMesh]]){let n=0;
+   for(const q of pool){if(q.age>=q.life)continue;q.age+=dt;q.v.y-=9.8*dt;q.p.addScaledVector(q.v,dt);tmpQ.setFromEuler(tmpE.set(q.spin.x*dt,q.spin.y*dt,q.spin.z*dt));q.q.multiply(tmpQ);
+    const k=Math.max(0,1-q.age/q.life),s=q.s*Math.pow(k,.6);if(s<=.002)continue;
+    // ore chips tumble as blocky chunks; glass shards as splinters
+    if(q.mineral)dummy.s.set(s*.9,s*1.3,s*.9);else dummy.s.set(s*.45,s*2.8,s*.45);dummy.m.compose(q.p,q.q,dummy.s);mesh.setMatrixAt(n,dummy.m);
+    if(q.mineral)mesh.setColorAt(n,oreColor(oreTint,.4+1.2*k,q.mineral));else{white.setScalar(.6+2.4*k);mesh.setColorAt(n,white);}n++;}
+   mesh.count=n;mesh.visible=n>0||mesh===shardMesh;mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
   for(const pool of [sparks,dust]){const pos=pool.mesh.geometry.attributes.position,col=pool.mesh.geometry.attributes.aColor,size=pool.mesh.geometry.attributes.aSize;let live=0;
    for(let i=0;i<pool.count;i++){const p=pool.live[i];if(p.age>=p.life){size.array[i]=0;continue;}live++;p.age+=dt;const drag=Math.exp(-p.drag*dt);p.vx*=drag;p.vz*=drag;p.vy=p.vy*drag-p.grav*dt;
     p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;const k=1-p.age/p.life,a=pool===dust?k*(1-k)*2:k*k;
@@ -343,22 +366,22 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
  // ---- raycast: instanced crystals/plates map instanceId -> deposit id ----
  function resolveTarget(hit){const ids=hit?.object?.userData?.wallTargets;if(!ids||hit.instanceId===undefined)return null;const id=ids[hit.instanceId];if(!id)return null;
   return {id,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:true};}
- function targets(){const out=[];for(const w of walls.values()){for(const b of w.batches)if(b.count)out.push(b);if(w.crustMesh.count)out.push(w.crustMesh);}return out.concat(legacy.targets());}
+ function targets(){const out=[];for(const w of walls.values()){for(const b of w.batches)if(b.count)out.push(b);if(w.oreMesh.count)out.push(w.oreMesh);if(w.crustMesh.count)out.push(w.crustMesh);}return out.concat(legacy.targets());}
  function drainEvents(){const out={burst:events.burst.splice(0),shatter:events.shatter.splice(0),warn:events.warn.splice(0)};return out;}
  function stats(){let crystals=0,plates=0,tris=0,draws=0,growing=0;
   for(const w of walls.values()){for(const s of w.segments){crystals+=s.removalOrder.length-s.removed;if(shownTick<s.crack+GROW_TICKS)growing++;}
-   for(const b of w.batches)if(b.count){draws++;tris+=triCount(b.geometry)*b.count;}plates+=w.crustMesh.count;if(w.crustMesh.count){draws++;tris+=triCount(plateGeo)*w.crustMesh.count;}if(w.stripMesh.material.uniforms.uLive.value>0){draws++;tris+=w.stripMesh.geometry.index.count/3;}}
+   for(const b of [...w.batches,w.oreMesh])if(b.count){draws++;tris+=triCount(b.geometry)*b.count;}plates+=w.crustMesh.count;if(w.crustMesh.count){draws++;tris+=triCount(plateGeo)*w.crustMesh.count;}if(w.stripMesh.material.uniforms.uLive.value>0){draws++;tris+=w.stripMesh.geometry.index.count/3;}}
   const l=legacy.stats();
-  return {walls:walls.size,segments:[...walls.values()].reduce((n,w)=>n+w.segments.length,0)+l.segments,crystals:crystals+l.crystals,plates,growing,triangles:tris+l.triangles,draws:draws+l.draws+(shardMesh.count?1:0)+(sparks.mesh.visible?1:0)+(dust.mesh.visible?1:0),
-   shards:shardMesh.count,sparks:sparks.liveCount||0,dust:dust.liveCount||0,debris:l.debris,sharedGeometries:shapes.length+1,sharedMaterials:Object.keys(mats).length+2};}
+  return {walls:walls.size,segments:[...walls.values()].reduce((n,w)=>n+w.segments.length,0)+l.segments,crystals:crystals+l.crystals,plates,growing,triangles:tris+l.triangles,draws:draws+l.draws+(shardMesh.count?1:0)+(oreShardMesh.count?1:0)+(sparks.mesh.visible?1:0)+(dust.mesh.visible?1:0),
+   shards:shardMesh.count+oreShardMesh.count,ores:[...walls.values()].reduce((n,w)=>n+w.oreMesh.count,0),sparks:sparks.liveCount||0,dust:dust.liveCount||0,debris:l.debris,sharedGeometries:shapes.length+2,sharedMaterials:Object.keys(mats).length+3};}
  // Retained runtime materials keep these shader programs alive after loading.
  // These variants do not exist in the scene until the first earth spell.
  function prepareWarmup(){
   const group=new T.Group(),instances=[];group.name='CrystalWallWarmup';
-  for(const [i,geometry] of [...shapes,plateGeo].entries()){
-   const mesh=new T.InstancedMesh(geometry,i<3?shapeMaterial[i]:crust,1);
+  for(const [i,geometry] of [...shapes,plateGeo,oreGeo].entries()){
+   const mesh=new T.InstancedMesh(geometry,i<3?shapeMaterial[i]:i===3?crust:ore,1);
    mesh.setMatrixAt(0,new T.Matrix4().makeTranslation(i-1,1,-3));
-   if(i<3)mesh.setColorAt(0,new T.Color(1,1,1));
+   if(i!==3)mesh.setColorAt(0,new T.Color(1,1,1));
    mesh.frustumCulled=false;group.add(mesh);instances.push(mesh);
   }
   const geometry=new T.BufferGeometry();
@@ -368,8 +391,8 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
   let disposed=false;
   return {group,dispose(){if(disposed)return;disposed=true;group.removeFromParent();geometry.dispose();for(const m of instances)m.dispose();group.clear();}};
  }
- function dispose(){for(const [id,w] of walls)retire(id,w);root.removeFromParent();legacy.dispose();shardMesh.dispose();for(const p of [sparks,dust]){p.mesh.geometry.dispose();p.mesh.material.dispose();}
-  for(const g of shapes)g.dispose();plateGeo.dispose();for(const m of Object.values(mats))m.dispose();crust.dispose();strip.dispose();}
+ function dispose(){for(const [id,w] of walls)retire(id,w);root.removeFromParent();legacy.dispose();shardMesh.dispose();oreShardMesh.dispose();for(const p of [sparks,dust]){p.mesh.geometry.dispose();p.mesh.material.dispose();}
+  for(const g of shapes)g.dispose();plateGeo.dispose();oreGeo.dispose();for(const m of Object.values(mats))m.dispose();crust.dispose();ore.dispose();strip.dispose();}
  const legacy=createLegacyWalls({T,scene:root,height,mats,shapes});
  return {sync,update,dispose,stats,targets,resolveTarget,drainEvents,prepareWarmup,root,materials:mats};
 }
