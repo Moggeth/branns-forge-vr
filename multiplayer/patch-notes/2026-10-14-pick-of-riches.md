@@ -1,5 +1,5 @@
 ---
-date: 2026-10-12 13:44
+date: 2026-10-14 22:58
 area: Weapons
 title: The Pick of Riches
 ---
