@@ -9,10 +9,11 @@ import {worldClock, solarAngle, nightAmount, DAYLIGHT_SHARE} from '../shared/wor
 import {ATMOSPHERE, adoptAtmosphere, atmosphereStats} from './atmosphere-materials.js';
 import {createAtmospherePost} from './atmosphere-post.js';
 import {createSunbeams} from './sunbeams.js';
+import {SUNNY, SUNNY_KEYS} from './palette-preview.js';
 
 const C = hex => new THREE.Color(hex);
 // Palette keyed on sun elevation (sin of the solar angle). Colours sRGB hex -> linear working space via THREE.Color.
-const KEYS = [
+const KEYS = (SUNNY ? SUNNY_KEYS : [
   {e: -1.0, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
   {e: -.32, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
   {e: -.12, sun: 0x96a4e6, hemiSky: 0x46558c, hemiGround: 0x211c18, hemiI: .55, zenith: 0x0d1838, horizon: 0x534a78, haze: 0x2b3152, hill: 0x181d33, exposure: 1.12, env: .09, cloud: 0x4a4466},
@@ -21,7 +22,7 @@ const KEYS = [
   {e: .36, sun: 0xffcf8f, hemiSky: 0xc7d6dc, hemiGround: 0x6d5a35, hemiI: .95, zenith: 0x5f8fc0, horizon: 0xf3d39c, haze: 0xe2cb9b, hill: 0x56684f, exposure: 1.02, env: .42, cloud: 0xfff4e2},
   {e: .75, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
   {e: 1.0, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
-].map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
+]).map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
 const COLOR_FIELDS = ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'];
 const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .6; // a lower sun: long shadows and slanted shafts all day
 const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xa9b9cf);

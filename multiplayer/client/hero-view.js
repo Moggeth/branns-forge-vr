@@ -18,7 +18,7 @@ export const HERO_LOD_DISTANCE = 16;
 // Remote equipment. Same canonical asset-pose contract as the local XR weapon (setWeaponGrip(visual, true, tool)),
 // re-expressed in the authored WeaponGrip socket frame. Bow is a left-hand weapon locally, so it is here too.
 // 'limb' (held bone) is presented by combat-view's detached part, so the grip stays empty.
-export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
+export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
 // Bounded VR body: the neck carries part of the head turn; the torso lags but never more than torsoLag behind.
 export const HERO_HEADLOOK = Object.freeze({yaw: 1.2, pitchUp: .6, pitchDown: .8, roll: .35, neckShare: .4, torsoLag: .75, torsoRate: 4, movingTorsoRate: 10});
 export const HERO_CROUCH = Object.freeze({deadband: .04, maxDrop: .45, lean: .28, rate: 10});
