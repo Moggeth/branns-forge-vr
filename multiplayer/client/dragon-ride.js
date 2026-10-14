@@ -7,16 +7,19 @@
 // impact ticks) and is drawn on the presentation clock. Fire lives in client/dragon-fire.js: pooled, capped and a
 // handful of draws, so a full barrage stays phone- and Quest-safe.
 import * as THREE from 'three';
-import {DRAGON,dragonPose} from '../shared/dragon-streak.js';
+import {DRAGON,dragonPose,breathGlob,globPosition} from '../shared/dragon-streak.js';
 import {buildDragon,animateDragon,setRiderView,DRAGON_SCALE,DRAGON_SEAT,DRAGON_MOUTH} from './dragon-art.js';
 import {createDragonAudio} from './dragon-audio.js';
 import {createDragonHud} from './dragon-hud.js';
 import {createDragonFire} from './dragon-fire.js';
 
+// The chase camera sits this far behind (along the view) and above the dragon, so it rides low in the frame and the
+// crosshair looks past it to the ground.
+const CHASE = Object.freeze({back: 16, up: 5.2, enterPitch: -.4}), SADDLE_PITCH = -.35, STEER = Object.freeze({dead: .22, full: .85, every: 150});
 const HZ = 60, BREATH_PULSE_MS = 104, RECOVER = 48;
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n)), smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 
-export function createDragonRide({scene, ray, send, report = () => {}, audio, listener, touch = () => false, xr = () => false}) {
+export function createDragonRide({scene, ray, height = () => undefined, send, report = () => {}, audio, listener, touch = () => false, xr = () => false}) {
   const group = new THREE.Group(); group.name = 'dragonStreak'; scene.add(group);
   const fx = createDragonFire(group, {lowQuality: touch});
   const sound = createDragonAudio(audio);
@@ -25,11 +28,11 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
   const aimRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({color: 0xffb347, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false}));
   const diveRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({color: 0xff6a2a, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false}));
   aimRing.renderOrder = diveRing.renderOrder = 20; aimRing.visible = diveRing.visible = false; group.add(aimRing, diveRing);
-  const dragons = new Map(), strikes = new Map(), booms = [];
-  const local = {id: null, ride: null, held: {breath: false}, pulseAt: 0, aim: new THREE.Vector3(), aimOk: false, wasRiding: false, shake: 0, breathShown: 0, startYaw: null};
+  const dragons = new Map(), strikes = new Map(), pulses = new Map(), booms = [], gp = [0, 0, 0], gv = new THREE.Vector3();
+  const local = {id: null, ride: null, held: {breath: false}, pulseAt: 0, aim: new THREE.Vector3(), aimOk: false, wasRiding: false, shake: 0, breathShown: 0, startYaw: null, camera: 'chase', steer: 0, steerAt: 0};
   const v = new THREE.Vector3(), w = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ'), seat = new THREE.Vector3(), mouth = new THREE.Vector3(), camDir = new THREE.Vector3();
   let snapshot = {players: []}, tick = 0, time = 0, hudModel = null, updates = 0;
-  const hud = createDragonHud({onCall: () => call(), onAttack: (kind, down) => press(kind, down)});
+  const hud = createDragonHud({onCall: () => call(), onAttack: (kind, down) => press(kind, down), onView: () => toggleCamera()});
 
   // --- Flight with the presentation-only dive swoop layered on top. -------------------------------------------------------
   function diveFor(ownerId, at) {
@@ -62,6 +65,7 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
   function boom(s, late = false) {
     s.boomed = true; if (late) return;
     const big = s.kind === 'dive';
+    if (big) { const d = dragons.get(s.owner); if (d) d.roar = time; }
     fx.impact(s.x, s.y, s.z, big, big ? DRAGON.dive.radius : DRAGON.fireball.radius);
     sound.boom([s.x, s.y, s.z], listener?.(), big);
     if (s.owner === local.id) local.shake = Math.max(local.shake, big ? 1 : .45);
@@ -89,17 +93,20 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
 
   function ensureDragon(id) {
     let d = dragons.get(id);
-    if (!d) { d = {root: buildDragon(), breath: 0, aim: new THREE.Vector3(), aimSet: false, seen: 0}; group.add(d.root); dragons.set(id, d); }
+    if (!d) { d = {root: buildDragon(), breath: 0, aim: new THREE.Vector3(), aimSet: false, seen: 0, roar: time + .9}; group.add(d.root); dragons.set(id, d); }
     return d;
   }
-  function update(dt, {snapshot: snap, tick: at, localId, now}) {
+  function update(dt, {snapshot: snap, tick: at, localId, now, view = {yaw: 0, pitch: 0}}) {
     snapshot = snap; tick = at; time += dt; local.id = localId; updates++;
     const me = snap.players?.find(p => p.id === localId);
     local.ride = me?.role === 'hero' && me.dragon ? me.dragon : null;
     const listenerPose = listener?.();
     // Remember pending strikes from the snapshot.
     const live = new Set();
-    for (const p of snap.players || []) if (p.dragon) { live.add(p.id); for (const s of p.dragon.strikes || []) remember(p.id, s); }
+    for (const p of snap.players || []) if (p.dragon) {
+      live.add(p.id); for (const s of p.dragon.strikes || []) remember(p.id, s);
+      for (const f of p.dragon.flames || []) { const k = `${p.id}:${f.launch}`; if (!pulses.has(k)) pulses.set(k, {...f, globs: f.at.map((_, i) => breathGlob(f, i)), shown: 0}); }
+    }
     // Dragons: arrive, fly, leave. A dragon whose ride ended keeps flying away out of view on the same curve for a moment.
     for (const [id, d] of dragons) {
       if (live.has(id)) continue;
@@ -124,11 +131,23 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
       if (isLocal && local.aimOk) d.aim.copy(local.aim); else if (ride.aim) { v.fromArray(ride.aim); if (!d.aimSet) d.aim.copy(v); else d.aim.lerp(v, 1 - Math.exp(-dt * 10)); }
       d.aimSet = true;
       // The rider's own dragon glides with shallower strokes so its wings stay at the edges of the view.
-      const riderView = isLocal && !xr(); if (d.riderView !== riderView) { d.riderView = riderView; setRiderView(d.root, riderView); }
-      animateDragon(d.root, time + (id.length % 7), {breath: d.breath, dive: pz.dive, beat: 1 + .6 * (1 - (pz.intro ?? 1)), amp: riderView ? .5 : 1});
+      // The rider's own dragon: from the saddle its horns hide and its wings go see-through and glide with shallower
+      // strokes, so they stay at the edges of the view; from the chase camera it is shown off whole.
+      const riderView = isLocal && !xr() ? local.camera : false; if (d.riderView !== riderView) { d.riderView = riderView; setRiderView(d.root, riderView); }
+      const raw = dragonPose(ride, Math.min(at, ride.end + 60));
+      const stroke = animateDragon(d.root, time + (id.length % 7), {breath: d.breath, dive: pz.dive, beat: 1 + .6 * (1 - (pz.intro ?? 1)), amp: riderView === 'saddle' ? .5 : 1, arrive: pz.intro ?? 1, leave: pz.outro ?? 0,
+        turn: raw.turn ?? 0, bank: raw.bank ?? 0, roar: d.roar ? Math.max(0, Math.sin(Math.PI * Math.min(1, (time - d.roar) / 1.3))) : 0});
+      // Each big downstroke pushes air: wisps stream off the wingtips, the rider's view buffets, and low over the ground
+      // (the swoop in, a dive) it kicks up a ring of dust and torn grass.
+      const power = typeof stroke === 'number' ? stroke : 0;
+      if (power > .55 && !d.stroking) {
+        d.stroking = true; d.root.updateMatrixWorld(true);
+        fx.gust(d.root.position, pz.quaternion, power, height(d.root.position.x, d.root.position.z));
+        if (isLocal) local.shake = Math.max(local.shake, .18 * power);
+      } else if (power < .3) d.stroking = false;
       if (d.breath > .05) {
         d.root.updateMatrixWorld(true); mouth.copy(local3(DRAGON_MOUTH)).applyMatrix4(d.root.matrixWorld);
-        fx.breath(id, mouth, d.aim, d.breath, dt, DRAGON.breath.radius);
+        fx.breath(id, mouth, d.aim, d.breath, dt);
         breathLevel = Math.max(breathLevel, isLocal ? d.breath : d.breath * .5);
       } else fx.breathEnd(id);
     }
@@ -146,16 +165,32 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
       v.copy(s.from).lerp(w.set(s.x, s.y, s.z), u); v.y += Math.sin(Math.PI * u) * 2.2;
       fx.fireball(v, s.launch * .618 + s.x, dt);
     }
+    // Breath globs on their arcs, sampled at the presentation tick, splashing where the host said they land.
+    for (const [k, f] of pulses) {
+      if (at > f.launch + DRAGON.breath.maxFlight + 30) { pulses.delete(k); continue; }
+      f.globs.forEach((g, i) => {
+        if (f.shown & (1 << i) || at < f.launch) return;
+        globPosition(f, g, Math.min(at, g.at), gp); v.fromArray(gp);
+        if (at >= g.at) { f.shown |= 1 << i; if (at < g.at + 20) fx.splash(v.x, v.y, v.z, i === 0 && f.launch % (DRAGON.breath.pulseTicks * 2) < DRAGON.breath.pulseTicks); return; }
+        const t = (at - f.launch) / HZ; gv.set(g.v[0], g.v[1] - DRAGON.breath.gravity * t, g.v[2]);
+        fx.glob(v, gv, f.launch * .37 + i, dt);
+      });
+      if (f.shown === (1 << f.globs.length) - 1) pulses.delete(k);
+    }
     fx.update(dt);
     local.shake = Math.max(0, local.shake - dt * 2.2);
-    // The rider's seat (camera) and the turn of the circle, so the view keeps facing the same ground while flying round it.
-    let seatOut = null, yawDrift = 0, enter = false;
+    // The rider's eye: in the saddle, or the chase camera behind and above along the view. On mounting it faces the way
+    // the dragon flies; after that the dragon steers towards wherever the rider looks (see aim), so the view never drifts.
+    let seatOut = null, enter = false;
     if (local.ride && !xr()) {
       const d = dragons.get(localId);
       if (d) {
-        d.root.updateMatrixWorld(true); seat.copy(local3(DRAGON_SEAT)).applyMatrix4(d.root.matrixWorld); seatOut = seat;
-        yawDrift = -local.ride.dir * 2 * Math.PI / DRAGON.lapSeconds * dt;
-        if (!local.wasRiding) { enter = true; const p = dragonPose(local.ride, at); local.startYaw = Math.atan2(-(local.ride.cx - p.position[0]), -(local.ride.cz - p.position[2])); }
+        if (local.camera === 'chase') {
+          const cp = Math.cos(view.pitch);
+          seat.copy(d.root.position).add(v.set(Math.sin(view.yaw) * cp * CHASE.back, CHASE.up - Math.sin(view.pitch) * CHASE.back, Math.cos(view.yaw) * cp * CHASE.back));
+        } else { d.root.updateMatrixWorld(true); seat.copy(local3(DRAGON_SEAT)).applyMatrix4(d.root.matrixWorld); }
+        seatOut = seat;
+        if (!local.wasRiding) { enter = true; const p = dragonPose(local.ride, at); local.startYaw = Math.atan2(-p.heading[0], -p.heading[2]); }
       }
     }
     if (local.wasRiding && !local.ride) { local.held.breath = false; aimRing.visible = diveRing.visible = false; }
@@ -165,14 +200,14 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
       left: Math.max(0, (local.ride.end - at) / HZ), total: DRAGON.rideTicks / HZ, open: attackOpen(),
       breath: charge('breath'), fireball: charge('fireball'), dive: charge('dive'), held: local.held} : null};
     hud.render(me?.role === 'hero' ? hudModel : {streak: 0, need: DRAGON.streak, ready: false, touch: touch(), riding: null});
-    return {seat: seatOut, yawDrift, enter, startYaw: local.startYaw, shake: local.shake};
+    return {seat: seatOut, yawDrift: 0, enter, startYaw: local.startYaw, startPitch: local.camera === 'chase' ? CHASE.enterPitch : SADDLE_PITCH, mode: local.camera, shake: local.shake};
   }
 
   /** After the camera is placed: aim from the screen centre, show the target, and pace breath pulses. */
   function aim(camera, nowMs) {
     if (!local.ride || xr()) { aimRing.visible = diveRing.visible = false; return; }
     camera.getWorldPosition(v); camera.getWorldDirection(camDir);
-    const far = DRAGON.reach - 5, hit = ray.segment(v.toArray(), [v.x + camDir.x * far, v.y + camDir.y * far, v.z + camDir.z * far]);
+    const far = DRAGON.reach - 5 + (local.camera === 'chase' ? CHASE.back : 0), hit = ray.segment(v.toArray(), [v.x + camDir.x * far, v.y + camDir.y * far, v.z + camDir.z * far]);
     local.aimOk = !!hit?.point;
     if (local.aimOk) local.aim.fromArray(hit.point);
     const open = attackOpen();
@@ -182,6 +217,16 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
       aimRing.position.copy(local.aim).y += .2; aimRing.scale.setScalar(DRAGON.breath.radius * pulse); aimRing.material.color.setHex(open ? 0xffb347 : 0x9fb7c9);
       diveRing.position.copy(aimRing.position); diveRing.scale.setScalar(DRAGON.dive.radius);
     }
+    // Steering: the dragon banks towards where the rider looks, in quarter steps, with a dead zone around its nose so
+    // small aiming moves don't turn it. Re-sent while the host's current leg disagrees (a steer inside the host's
+    // 6-tick window is dropped there).
+    if (open) {
+      const p = dragonPose(local.ride, tick), want = Math.atan2(camDir.x, camDir.z), diff = Math.atan2(Math.sin(want - p.yaw), Math.cos(want - p.yaw));
+      const mag = Math.max(0, Math.abs(diff) - STEER.dead) / STEER.full, q = Math.round(Math.sign(diff) * Math.min(1, mag) * 4) / 4;
+      const legs = local.ride.legs, have = legs?.length ? legs[legs.length - 1] : null;
+      const agreed = have && !have.forced && Math.abs(have.turn - q * DRAGON.maxTurn) < 1e-6;
+      if ((q !== local.steer || !agreed) && !have?.forced && nowMs - local.steerAt >= STEER.every) { local.steer = q; local.steerAt = nowMs; send({steer: q}); }
+    }
     if (local.held.breath && open && local.aimOk && nowMs - local.pulseAt >= BREATH_PULSE_MS && local.ride.breath >= DRAGON.breath.pulseTicks) { local.pulseAt = nowMs; send({attack: 'breath', point: local.aim.toArray()}); }
   }
 
@@ -189,7 +234,7 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
     const lp = listener?.();
     if (ev.kind === 'streak' && ev.id === localId) sound.chime(ev.count);
     if (ev.kind === 'dragon_ready' && ev.id === localId) { sound.fanfare(); report(touch() ? 'Five in a row! Slay Thee, Sun Birdy Above is ready. Tap it to take to the sky.' : 'Five in a row! Slay Thee, Sun Birdy Above is ready. Press H to call the dragon.'); }
-    if (ev.kind === 'dragon_summon') { sound.roar(ev.id === localId ? null : ev.centre, lp, {level: ev.id === localId ? .85 : .7}); if (ev.id === localId) report(touch() ? 'Slay Thee, Sun Birdy Above! Drag to aim. Hold Fire Breath, tap Fireballs and Comet Dive.' : 'Slay Thee, Sun Birdy Above! Aim with the mouse. Hold click to breathe fire, right-click for fireballs, Space to dive.'); }
+    if (ev.kind === 'dragon_summon') { sound.roar(ev.id === localId ? null : ev.centre, lp, {level: ev.id === localId ? .85 : .7}); if (ev.id === localId) report(touch() ? 'Slay Thee, Sun Birdy Above! Look where you want to fly. Hold Fire Breath, tap Fireballs and Comet Dive.' : 'Slay Thee, Sun Birdy Above! The dragon flies where you look. Hold click to breathe fire, right-click for fireballs, Space to dive, C to change view.'); }
     if (ev.kind === 'dragon_fireball') { for (const s of ev.shots || []) remember(ev.id, s); if (ev.id !== localId) sound.whoosh(ev.from, lp); }
     if (ev.kind === 'dragon_dive') { remember(ev.id, ev.strike); if (ev.id !== localId) sound.roar(ev.from, lp, {level: .8, pitch: 1.15}); }
     if (ev.kind === 'dragon_impact') {
@@ -205,9 +250,12 @@ export function createDragonRide({scene, ray, send, report = () => {}, audio, li
     if (code === 'Digit1') press('breath', down);
     else if (code === 'Digit2' || code === 'KeyF') press('fireball', down);
     else if (code === 'Digit3' || code === 'Space') press('dive', down);
+    else if (code === 'KeyC' && down) toggleCamera();
   }
+  /** Chase camera (behind and above) or the saddle; the eye glides between them through the game's camera blend. */
+  function toggleCamera() { local.camera = local.camera === 'chase' ? 'saddle' : 'chase'; const k = touch() ? 'Tap the camera' : 'Press C'; report(local.camera === 'chase' ? `Chase view. ${k} for the saddle.` : `Saddle view. ${k} to watch from behind.`); }
   return {
-    update, aim, event, key, press, call,
+    update, aim, event, key, press, call, toggleCamera, camera: () => local.camera,
     riding: () => !!local.ride && !xr(),
     ready: () => !!snapshot.players?.find(p => p.id === local.id)?.dragonReady,
     isRiding: p => !!p?.dragon,

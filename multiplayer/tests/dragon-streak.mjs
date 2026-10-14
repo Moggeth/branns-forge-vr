@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
-import {DRAGON,dragonPose,dragonRiding} from '../shared/dragon-streak.js';
+import {DRAGON,dragonPose,dragonRiding,breathGlob,globPosition} from '../shared/dragon-streak.js';
 
 // Fixture: one hero at (x,z) with skeletons `ahead` metres along -Z.
 function fixture({x=10,z=10,foes=[],ready=false,streak}={}) {
@@ -56,7 +56,12 @@ function withFoes(s,points){const c=s.checkpoint();c.enemies=points.map(([x,z],i
 s=withFoes(s,[[10,10],[10.5,10.5],[20,4],[0,0],[1,1],[1.5,-1]]);
 // Breath: pulses scorch around the aim point; too-fast pulses are quietly ignored.
 let hits=0;
-for(let i=0;i<20;i++){const res=act(s,{action:'dragon',attack:'breath',point:ground(s,10,10)});assert.equal(res.ok,true);hits+=res.events.filter(e=>e.kind==='hit'||e.kind==='death').length;run(s,DRAGON.breath.pulseTicks);}
+// Breath is physical: globs fly from the mouth on arcs and burn only where they land, a moment later.
+{const res=act(s,{action:'dragon',attack:'breath',point:ground(s,10,10)});assert.equal(res.ok,true);assert.equal(res.events.length,0,'nothing burns at the instant of breathing');
+ const f=hero(s).dragon.flames;assert.equal(f.length,1);assert.equal(f[0].at.length,DRAGON.breath.globs);assert.ok(f[0].at.every(t=>t>s.snapshot().tick),'globs are in flight');
+ const g=breathGlob(f[0],0),land=globPosition(f[0],g,f[0].at[0]);assert.ok(Math.hypot(land[0]-10,land[2]-10)<3.5,'globs land near the aim');}
+for(let i=0;i<20;i++){const res=act(s,{action:'dragon',attack:'breath',point:ground(s,10,10)});assert.equal(res.ok,true);hits+=run(s,DRAGON.breath.pulseTicks).filter(e=>e.kind==='hit'||e.kind==='death').length;}
+hits+=run(s,90).filter(e=>e.kind==='hit'||e.kind==='death').length;assert.equal(hero(s).dragon.flames.length,0,'every glob lands');
 assert.ok(hits>0,'breath hurts');
 assert.ok(!s.snapshot().enemies.some(e=>e.id==='sk0'),'sustained breath fells a skeleton');
 assert.ok(s.snapshot().fireCells.some(c=>c.burning),'breath lights the ground');
@@ -92,6 +97,29 @@ s=fixture({streak:4});
 {const c=s.checkpoint();c.players[0].hp=1;c.enemies=[createEnemy('biter',[10,terrainHeight(c,10,10.6),10.6])];s=loadSimulation(c);}
 run(s,240);
 assert.equal(hero(s).streak,undefined,'a fall resets the streak');
+
+// Steering: the rider's turn starts a new leg exactly where the dragon is, so the path never jumps; it then flies
+// straight or turns as asked, and turns itself back in at the edge of the map.
+{
+  let s=fixture({ready:true});act(s,{action:'dragon',call:true});run(s,DRAGON.arriveTicks+10);
+  assert.equal(act(s,{action:'dragon',steer:3}).code,'invalid_action');
+  const t0=s.snapshot().tick;assert.equal(act(s,{action:'dragon',steer:0}).ok,true);
+  let ride=hero(s).dragon;assert.equal(ride.legs.length,2,'steering starts a new leg');assert.equal(ride.legs[1].turn,0);
+  let last=null,maxStep=0,maxYaw=0,prevYaw=null;
+  for(let t=t0-8;t<=t0+30;t+=.25){const p=dragonPose(ride,t);if(last)maxStep=Math.max(maxStep,Math.hypot(p.position[0]-last[0],p.position[2]-last[2]));if(prevYaw!==null)maxYaw=Math.max(maxYaw,Math.abs(p.yaw-prevYaw));last=p.position;prevYaw=p.yaw;}
+  assert.ok(maxStep<.06&&maxYaw<.01,`steering is continuous (step ${maxStep.toFixed(3)} m, yaw ${maxYaw.toFixed(4)})`);
+  const a=dragonPose(ride,t0+60),b=dragonPose(ride,t0+120);assert.ok(Math.abs(a.yaw-b.yaw)<1e-9,'steer 0 flies straight');
+  assert.ok(Math.abs(Math.hypot(b.position[0]-a.position[0],b.position[2]-a.position[2])-DRAGON.speed)<.01,'at flying speed');
+  // Flying straight out, it reaches the edge and turns back in by itself, then hands control back.
+  let forced=false;for(let i=0;i<600&&s.snapshot().players[0].dragon;i++){run(s,1);const r=hero(s).dragon;if(r?.legs.some(l=>l.forced))forced=true;}
+  assert.ok(forced,'turns back at the edge');
+  {const r=hero(s).dragon;if(r){for(let t=r.start;t<s.snapshot().tick;t+=30){const [x,,z]=dragonPose(r,t).position;assert.ok(Math.hypot(x,z)<52,'stays over the map');}}}
+  // A save mid-steer carries the legs, and a ride saved before steering existed still loads and flies its orbit.
+  s=fixture({ready:true});act(s,{action:'dragon',call:true});run(s,DRAGON.arriveTicks+10);act(s,{action:'dragon',steer:-.5});
+  const c=JSON.parse(JSON.stringify(s.checkpoint()));assert.equal(loadSimulation(c).snapshot().players[0].dragon.legs.length,2);
+  delete c.players[0].dragon.legs;const old=loadSimulation(c);assert.ok(dragonPose(old.snapshot().players[0].dragon,old.snapshot().tick).position.every(Number.isFinite),'legless ride flies');
+  {const bad=JSON.parse(JSON.stringify(s.checkpoint()));bad.players[0].dragon.legs[1].turn=99;assert.throws(()=>loadSimulation(bad));}
+}
 
 // Bad saves are refused.
 {const c=fixture().checkpoint();c.players[0].streak=9;assert.throws(()=>loadSimulation(c));}

@@ -17,7 +17,7 @@ for (let i = 0; i < 14; i++) { const r = new THREE.Mesh(new THREE.IcosahedronGeo
 const camera = new THREE.PerspectiveCamera(70, 1, .1, 400), group = new THREE.Group(); scene.add(group);
 const params = new URLSearchParams(location.search), fx = createDragonFire(group, {lowQuality: () => params.has('low')});
 const mouth = new THREE.Vector3(-6, 20, -10), target = new THREE.Vector3(2, 0, 2);
-let breathOn = false, amount = 0, t = 0; const balls = [];
+let breathOn = false, amount = 0, t = 0, pulseT = 0, marks = 0; const balls = [], globs = [];
 const views = {ground: [[14, 2.2, 16], [0, 4, 0]], saddle: [[-6.5, 21.5, -11.5], [2, 0, 2]], close: [[7, 3, 9], [1, 1, 1]]};
 function view(name) { const [p, l] = views[name]; camera.position.fromArray(p); camera.lookAt(...l); }
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); fx.setPointScale(h * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))); }
@@ -25,7 +25,12 @@ addEventListener('resize', resize); resize(); view('ground');
 function frame(dt) {
   t += dt; amount += ((breathOn ? 1 : 0) - amount) * (1 - Math.exp(-dt * 14));
   if (breathOn) target.set(2 + 3 * Math.sin(t * .7), 0, 2 + 2 * Math.cos(t * .5));
-  if (amount > .05) fx.breath('lab', mouth, target, amount, dt, 3); else fx.breathEnd('lab');
+  if (amount > .05) fx.breath('lab', mouth, target, amount, dt); else fx.breathEnd('lab');
+  // Globs as the host throws them: three per pulse on ballistic arcs to the target, splashing where they land.
+  if (breathOn && (pulseT += dt) >= .1) { pulseT = 0; const d = mouth.distanceTo(target), T = Math.max(.25, d / 30);
+    for (let i = 0; i < 3; i++) globs.push({o: mouth.clone(), v: new THREE.Vector3((target.x - mouth.x) / T + (Math.random() - .5) * 3.2, (target.y - mouth.y) / T + 4.9 * T + (Math.random() - .5) * 1.6, (target.z - mouth.z) / T + (Math.random() - .5) * 3.2), t: 0, seed: Math.random(), mark: i === 0 && (marks++ % 2 === 0)}); }
+  for (let i = globs.length - 1; i >= 0; i--) { const g = globs[i]; g.t += dt; const p = g.o.clone().addScaledVector(g.v, g.t); p.y -= 4.9 * g.t * g.t;
+    if (p.y <= 0) { fx.splash(p.x, 0, p.z, g.mark); globs.splice(i, 1); continue; } fx.glob(p, new THREE.Vector3(g.v.x, g.v.y - 9.8 * g.t, g.v.z), g.seed, dt); }
   for (let i = balls.length - 1; i >= 0; i--) {
     const b = balls[i]; b.u += dt / .55;
     if (b.u >= 1) { fx.impact(b.to.x, 0, b.to.z, b.big, b.big ? 7.5 : 3.6); balls.splice(i, 1); continue; }

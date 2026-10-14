@@ -96,6 +96,7 @@ import {createAppleSnack} from './apple-snack.js';
 import {createDragonRide} from './dragon-ride.js';
 import {createWorldContent,createResourceArt,HELD_SCALE} from './world-content-view.js';
 import {updateEnemyMotion, noteEnemyHit} from './enemy-motion.js';
+import {noteEnemySnapshot, presentEnemyRoot} from './enemy-interp.js';
 import {dressSkeleton} from './skeleton-look.js';
 import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
@@ -301,7 +302,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
-  const beaconView=createBeaconView({scene,startingWorld,audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
+  const beaconView=createBeaconView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),night:()=>skyCycle.night(),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const feedback = createContactFeedback({sources: () => controllerSources.values(), playerId: () => playerId, tool: () => tool, weaponHand: () => weaponHand, presenting: () => renderer.xr.isPresenting});
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
@@ -387,20 +388,20 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null,localSide:()=>snapshot.players?.find(p=>p.id===playerId)?.side||'party', night:()=>skyCycle.night?.()??0, onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null,localSide:()=>snapshot.players?.find(p=>p.id===playerId)?.side||'party', night:()=>skyCycle.night?.()??0, quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high', onBoneLand:landing=>soundKit?.play('bone_clack',landing.position,listenerPose(),{weight:landing.weight,key:`clack:${landing.id}`,gap:.12}), onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   // Apple on a stick (client/apple-snack.js, shared/fruit.js): shot apples fall on their shaft; take one, then bite.
   const appleSnack=createAppleSnack({scene,camera,templates,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),reducedMotion:reducedWeaponMotion,send:(action,detail)=>onAction(action,detail),
     haptic:kind=>{if(renderer.xr.isPresenting)feedback.pattern?.(kind==='bite'?[{at:0,amplitude:.55,duration:28},{at:55,amplitude:.3,duration:18}]:[{at:0,amplitude:.25,duration:20}]);else if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[16,34,10]:[10]);}catch{}}});
   appleSnack.attachTrees(content.trees);
   // Dragon kill streak: every dragon in the sky, its fire, and the rider's seat, aim and attack buttons.
-  const dragonRide=createDragonRide({scene,ray:terrainRay,send:detail=>{unlockAudio();onAction('dragon',detail);},report,audio:()=>audioContext,listener:()=>listenerPose(),touch:()=>touchEnabled,xr:()=>renderer.xr.isPresenting});
+  const dragonRide=createDragonRide({scene,ray:terrainRay,height:(x,z)=>heightAt(x,z),send:detail=>{unlockAudio();onAction('dragon',detail);},report,audio:()=>audioContext,listener:()=>listenerPose(),touch:()=>touchEnabled,xr:()=>renderer.xr.isPresenting});
   let dragonBlend=null,dragonLastEye=null,dragonFrame={seat:null,yawDrift:0,enter:false,shake:0}; // smooth camera hand-over between the body and the saddle (presentation only)
   const dragonEyeAt=new THREE.Vector3(),dragonBodyEye=new THREE.Vector3();
   // Places the camera while on the dragon, and for the glide up to the saddle and back down to the body. False otherwise.
   function dragonEye(dt){
     if(renderer.xr.isPresenting||role!=='hero'){dragonBlend=null;dragonLastEye=null;return false;}
     const seat=dragonFrame.seat,body=dragonBodyEye.set(localPosition.x,localPosition.y+1.65,localPosition.z);
-    if(!!seat!==(dragonBlend?.to==='seat')){if(!seat&&!dragonLastEye){dragonBlend=null;return false;}dragonBlend={to:seat?'seat':'body',t:0,from:(dragonLastEye||body).clone()};}
+    if(!!seat!==(dragonBlend?.to==='seat')||seat&&dragonLastEye&&dragonBlend.mode!==dragonFrame.mode){if(!seat&&!dragonLastEye){dragonBlend=null;return false;}dragonBlend={to:seat?'seat':'body',mode:dragonFrame.mode,t:0,from:(dragonLastEye||body).clone()};} // also glides between the chase camera and the saddle
     if(!dragonBlend)return false;
     dragonBlend.t=Math.min(1,dragonBlend.t+dt/(seat?.9:.7));
     dragonEyeAt.copy(dragonBlend.from).lerp(seat||body,THREE.MathUtils.smootherstep(dragonBlend.t,0,1));
@@ -701,6 +702,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       }
       entry.target.fromArray(data.position);
       entry.data = data;
+      if (enemy) noteEnemySnapshot(entry, data, snapshot.tick); // interpolated per frame (enemy-interp.js), never stepped per packet
       upgradeActor(entry); upgradeHero(entry);
       if (!enemy && !entry.visual.userData.hero) {
         const { head, hands } = entry.visual.userData;
@@ -1686,8 +1688,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     }
     if (manned) updateManned(dt, now);
     crankNearby(now);
-    dragonFrame=dragonRide.update(dt,{snapshot,tick:renderTick,localId:playerId,now});
-    if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=-.62;}yaw+=dragonFrame.yawDrift;pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
+    dragonFrame=dragonRide.update(dt,{snapshot,tick:renderTick,localId:playerId,now,view:{yaw,pitch}});
+    if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=dragonFrame.startPitch;}pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
     if (role === 'god' && !renderer.xr.isPresenting) {
       pan.addScaledVector(move, dt * 18);
       pan.x = THREE.MathUtils.clamp(pan.x, -45, 45); pan.z = THREE.MathUtils.clamp(pan.z, -45, 45);
@@ -1789,9 +1791,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
           animation.motion = motion;
         }
       }
-      entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
-      if (entry.enemy || !entry.data.head) entry.root.rotation.y = entry.data.yaw || 0;
-      else entry.root.rotation.y = 0;
+      if (entry.enemy) presentEnemyRoot(entry, renderTick, dt);
+      else {
+        entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
+        entry.root.rotation.y = entry.data.head ? 0 : entry.data.yaw || 0;
+      }
       if (entry.visual.userData.hero) heroView.update(entry.visual, entry.data, entry.root, dt, (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldPosition(heroCamera));
       if (!entry.enemy && entry.data?.role) entry.root.visible = !entry.data.dragon; // a Hero on their dragon is up in the saddle
     }
@@ -1806,7 +1810,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     enemyThreats.length=0;for(const p of snapshot.players||[])if(p.role==='hero'&&p.position)enemyThreats.push(p.id===playerId?localPosition.toArray(threatPoint):p.position);
     updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround,threats:enemyThreats});
     golemFx.update(actors,renderTick,dt,now/1000);
-    entView.update(actors,renderTick,dt);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
+    entView.update(actors,renderTick,dt,enemyThreats);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
     goldenFlight.length=0;for(const q of snapshot.projectiles||[])if(q.golden){const node=combat.projectiles.get(q.id);if(node?.visible!==false)goldenFlight.push({id:q.id,position:node?node.position:new THREE.Vector3().fromArray(q.position)});}
     skeletonFx.update(dt,{camera,golden:goldenFlight,viewportHeight:renderer.domElement.height||800});
