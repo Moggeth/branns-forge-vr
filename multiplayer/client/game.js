@@ -155,7 +155,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const started = performance.now();
   let disposed = false, active = false, role = 'hero', spell = 'grove', playerId = null;
   let requestedActive=false;
-  const startup={construction,ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null};
+  const startup={construction,ready:false,phase:'assets',readyMs:null,textureCount:0,warmDrawMs:0,error:null,jobs:{}};
+  async function prepareStartup(name,run){const at=performance.now();try{return await run();}finally{startup.jobs[name]=performance.now()-at;}}
   // Non-authoritative lobby preview only: never stepped, published or saved.
   // Real room/save snapshots replace it through applySnapshot below.
   let snapshot = createSimulation({room:'PREVIEW',seed:41}).snapshot();
@@ -1900,7 +1901,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup,abilityWarmup,wallWarmup;
     try{
       assetQueue.start();
-      await Promise.all(assetInstalls);if(disposed)return;
+      await prepareStartup('assets',()=>Promise.all(assetInstalls));if(disposed)return;
       await yieldToBrowser();
       // Build the default render-only world before compiling, even in the empty
       // lobby. Do not initialize a player or step/publish this preview state.
@@ -1927,20 +1928,20 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       scene.add(representatives);scene.updateMatrixWorld(true);
       skyCycle.prepare(scene);
       startup.phase='shaders';report('Preparing world shaders and textures…');
-      await spellVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
-      await fireVisual.prepareShaders(renderer,camera,scene);if(disposed)return;
-      await expedition.prepare(renderer,camera,scene);if(disposed)return;
-      await renderer.compileAsync(scene,camera);if(disposed)return;
+      await prepareStartup('spells',()=>spellVisual.prepareShaders(renderer,camera,scene));if(disposed)return;
+      await prepareStartup('fire',()=>fireVisual.prepareShaders(renderer,camera,scene));if(disposed)return;
+      await prepareStartup('expedition',()=>expedition.prepare(renderer,camera,scene));if(disposed)return;
+      await prepareStartup('worldShaders',()=>renderer.compileAsync(scene,camera));if(disposed)return;
       const textures=new Set();scene.traverse(object=>{for(const material of [object.material,object.customDepthMaterial,object.customDistanceMaterial].flat())if(material)for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);});
       // Small upload batches let the loading interface update between them.
-      for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;await yieldToBrowser();}
+      await prepareStartup('textures',async()=>{for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;await yieldToBrowser();}});
       if(disposed)return;
-      await skyCycle.prepareRenderer(scene,camera);if(disposed)return;
+      await prepareStartup('atmosphere',()=>skyCycle.prepareRenderer(scene,camera));if(disposed)return;
       startup.phase='shadows';
       // compileAsync omits the shadow render pass. Warm both camera families once.
       const warmCamera=camera.clone();warmCamera.position.set(0,48,38);warmCamera.lookAt(0,0,0);
       const warmStarted=performance.now();startup.warmBatches=await warmRender({renderer,scene,camera:warmCamera,cancelled:()=>disposed});if(disposed)return;await yieldToBrowser();skyCycle.render(scene,camera);startup.warmDrawMs=performance.now()-warmStarted;
-      await renderer.compileAsync(scene,camera);if(disposed)return;
+      await prepareStartup('finalShaders',()=>renderer.compileAsync(scene,camera));if(disposed)return;
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
     finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
     if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
