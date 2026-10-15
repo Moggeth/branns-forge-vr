@@ -447,3 +447,26 @@ export function syncWeaponReadiness(current, {root, tool, reducedMotion = false}
   current?.dispose();
   return root && tool && BUILD[tool] ? createWeaponReadiness({root, tool, reducedMotion}) : null;
 }
+
+
+// Fixed local equipment keeps its prepared geometry/programs between swaps.
+// Held bones are transient world objects and must never accumulate in this cache.
+export function createWeaponReadinessCache(){
+  const entries=new Map();let current=null,disposed=false,constructed=0;
+  function prepare({root,tool,reducedMotion=false}={}){
+    if(disposed||!root||!BUILD[tool])return null;
+    let value=entries.get(root);
+    if(value&&value.tool!==tool){value.dispose();entries.delete(root);value=null;}
+    if(!value||value.disposed){value=createWeaponReadiness({root,tool,reducedMotion});constructed++;if(tool!=='limb')entries.set(root,value);}
+    value.setReducedMotion(reducedMotion);return value;
+  }
+  return {prepare,
+    select(options={}){
+      if(current&&!current.disposed&&current.root===options.root&&current.tool===options.tool){current.setReducedMotion(!!options.reducedMotion);return current;}
+      if(current&&!entries.has(current.root))current.dispose();
+      return current=prepare(options);
+    },
+    dispose(){if(disposed)return;disposed=true;if(current&&!entries.has(current.root))current.dispose();for(const value of entries.values())value.dispose();entries.clear();current=null;},
+    stats:()=>({prepared:entries.size,constructed,disposed}),
+  };
+}

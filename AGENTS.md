@@ -80,3 +80,7 @@ Read docs/PROGRESSIVE-START-20261015.md alongside the cold-start handoff before 
 ### WorkCodex review access observation (2026-10-15)
 
 The read-only progressive-loading review failed in 9 s before producing findings: Azure HTTP 401, principal lacks API/operation access. Do not repeat that review attempt unchanged; verify repaired access/configuration first. Local review and required tests remain available. See docs/PROGRESSIVE-START-20261015.md for the release evidence.
+
+### Fixed lighting and held effects (2026-10-15)
+
+Read docs/COLD-START-PICK-20261015.md before further startup/pick work. Prepare actual held readiness variants before publishing equipment and retain fixed effects across swaps; transient bones still release. Lighting is exact half-float CubeUV data with the original generator as fallback. Re-bake after fingerprint/parameter changes and verify both pixel hashes and rendered metallic/matte equality. Profile Vite routes by pathname and assert instrumentation exists. Use structured patches and separate execution/publishing commands rather than large grouped shell requests.

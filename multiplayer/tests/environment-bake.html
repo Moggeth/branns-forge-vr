@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Fixed environment bake</title>
+<script type="module">
+import * as T from 'three';
+import '../client/atmosphere-materials.js';
+import {loadEnvironmentPixels} from '../client/environment-delivery.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+window.bakeRoomEnvironment=async size=>{
+ const renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+ renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;
+ const room=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer),at=performance.now();
+ const target=pmrem.fromScene(room,.04,.1,100,{size});
+ const pixels=new Uint16Array(target.width*target.height*4);
+ try{
+  await renderer.readRenderTargetPixelsAsync(target,0,0,target.width,target.height,pixels);
+  const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
+  const bytes=new Uint8Array(pixels.buffer);let binary='';for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
+  return {size,width:target.width,height:target.height,type:target.texture.type,format:target.texture.format,mapping:target.texture.mapping,colorSpace:target.texture.colorSpace,minFilter:target.texture.minFilter,magFilter:target.texture.magFilter,bakeMs:performance.now()-at,gpu:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):'unknown',base64:btoa(binary)};
+ }finally{target.dispose();room.dispose();pmrem.dispose();renderer.dispose();}
+};
+window.compareBakedRoomEnvironment=async size=>{
+ const renderer=new T.WebGLRenderer({antialias:true,alpha:false});renderer.toneMapping=T.ACESFilmicToneMapping;renderer.outputColorSpace=T.SRGBColorSpace;
+ const room=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer),original=pmrem.fromScene(room,.04,.1,100,{size});
+ const data=await loadEnvironmentPixels(`/assets/lighting/room-${size}.bfenv.gz`),baked=new T.DataTexture(data.pixels,data.width,data.height,T.RGBAFormat,T.HalfFloatType);
+ baked.mapping=T.CubeUVReflectionMapping;baked.colorSpace=T.LinearSRGBColorSpace;baked.minFilter=baked.magFilter=T.LinearFilter;baked.generateMipmaps=false;baked.needsUpdate=true;
+ const scene=new T.Scene();scene.background=new T.Color(0xabc5c2);scene.environmentIntensity=.55;
+ const geometry=new T.SphereGeometry(.4,32,16),materials=[];
+ for(let i=0;i<8;i++){const material=new T.MeshStandardMaterial({color:0xc7ad82,metalness:i<4?1:0,roughness:[.02,.2,.5,1][i%4]});materials.push(material);const mesh=new T.Mesh(geometry,material);mesh.position.set((i%4-1.5),i<4?.55:-.55,0);scene.add(mesh);}
+ const camera=new T.PerspectiveCamera(45,1,.1,20);camera.position.set(0,0,5.5);camera.lookAt(0,0,0);
+ const target=new T.WebGLRenderTarget(256,256,{type:T.HalfFloatType}),buffers=[];
+ try{
+  renderer.setRenderTarget(target);
+  for(const texture of [original.texture,baked]){scene.environment=texture;renderer.render(scene,camera);const pixels=new Uint16Array(256*256*4);await renderer.readRenderTargetPixelsAsync(target,0,0,256,256,pixels);buffers.push(pixels);}
+  let different=0,maxAbsolute=0;for(let i=0;i<buffers[0].length;i++)if(buffers[0][i]!==buffers[1][i]){different++;maxAbsolute=Math.max(maxAbsolute,Math.abs(T.DataUtils.fromHalfFloat(buffers[0][i])-T.DataUtils.fromHalfFloat(buffers[1][i])));}
+  return {size,different,maxAbsolute,samples:buffers[0].length};
+ }finally{target.dispose();baked.dispose();original.dispose();room.dispose();pmrem.dispose();geometry.dispose();materials.forEach(m=>m.dispose());renderer.dispose();}
+};
+</script>

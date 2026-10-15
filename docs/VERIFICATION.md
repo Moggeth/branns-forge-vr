@@ -2348,3 +2348,8 @@ See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepa
 ### Progressive startup verification (2026-10-15)
 
 See [progressive startup verification](PROGRESSIVE-START-20261015.md) for the 39-model entry set, demand-prioritised equipment, incremental scenery fades, measured before/after timings and browser checks.
+
+
+### Faster cold opening and prepared pick (2026-10-15)
+
+See [measurements, exact lighting and first-pick verification](COLD-START-PICK-20261015.md) for the complete-world loading improvement, held-effect reuse, cache fallback and reproduction commands.
