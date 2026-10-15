@@ -1,5 +1,7 @@
 # Verification and recovery evidence — 2026-09-12
 
+2026-10-15: [Cold opening](COLD-START-20261015.md) records byte-exact model packing, render-target preparation, browser fallback/rotation acceptance, measured bounds and failed-strategy lessons.
+
 2026-10-15: [Faster world recovery](INSTANT-WORLD-RECOVERY-20261015.md) records delays, fixes, measured browser acceptance, and verified worktree/browser-cache recovery paths.
 
 ## Mutable enemy surface geometry — 2026-10-02
