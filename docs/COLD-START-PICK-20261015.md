@@ -104,3 +104,45 @@ logs/work-timing.csv; overlapping steps must not be summed as elapsed time.
   lines versus LF in Git: raw hashing would falsely reject Linux CI. Only source
   text normalizes; binary/pixel hashes remain exact. EOL normalization does not
   require a GPU re-bake because JavaScript evaluates the same template text.
+
+## Released and verified
+
+PR #105 merged as `81099fc4f0e50872ab7dc085db841fd71acc4877`. The tested corrected
+head was `857c9f7`; both trees were exactly
+`5d8de2a4d1f50e48ace554555b9b867a19250bec`. Required Linux CI run 38674669444 passed
+**215/215 suites in 355.2 s**, check job **398 s**. The superseded run was cancelled
+after the line-ending portability correction; it is not a verification result.
+Existing production workflow 38675417338 succeeded in **37 s** on the established
+project/domain. No service, account, credential or publishing target changed.
+
+The hosted page identified `81099fc`, reported baked lighting and a complete
+39-model entry set. A fresh browser measured **9.747 s** navigation to ready,
+renderer 7.033 s; reload measured **2.640 s**, renderer 2.369 s. Reload reused all
+39 models and the lighting from cache, with zero model/lighting transfer bytes.
+These hosted observations include network variance and are not the paired local
+comparison above; do not present them as proof of a universal cold-start gain.
+The environment's readyMs is an overlapping asynchronous duration, not an extra
+blocking stage to add to construction or total readiness.
+
+The deployed desktop lighting file returned HTTP 200, one-year immutable cache
+headers and exactly 339,214 compressed bytes. Decompression/decoding matched source
+pixel SHA-256 `618988bf92870cd877e6fbc89f7c4d546ae028664978c6c8d6c57fc11f207202`.
+Production browser checks passed healthy desktop/touch lighting and deliberately
+unavailable packed lighting; fallback reported generated lighting with null
+startup error. This also verifies the deployed dynamic fallback chunk.
+
+Hosted pick -> axe -> pick checks passed in desktop, touch and touch-HDR modes.
+The first desktop pick's maximum frame gap was **16.7 ms**; all other tested swap
+maxima were **8.5 ms**. Program counts stayed 254, 238 and 250 respectively, and
+effect construction counts did not increase. No first-use program was added in
+those tested modes. These results do not establish physical-device frame budgets.
+
+Evidence is ignored under logs/pick-cold-ci-pass.log, pick-cold-deploy.json,
+pick-cold-production.json, live-lighting.json, pick-cold-live-swaps.log and
+pick-cold-live-environment.log. All test browsers and owned local Vite/preview
+servers were stopped. The original diverged checkout and user files were preserved.
+
+GitHub checks may not exist yet while a new workflow is pending behind a cancelled
+run. Use the known run ID with gh run watch instead of repeatedly asking pr checks
+for a not-yet-registered job. Keep required checks intact and compare tested and
+merged trees before dispatching the existing production workflow.
