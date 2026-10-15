@@ -15,7 +15,7 @@ for(const mode of ['packed','unsupported','failed-packed']){
     assert.equal(startup.error,null,'warmup must complete, not merely recover from an exception');
     assert.ok(startup.shaderVariants.representatives<startup.shaderVariants.objects);
     if(mode==='unsupported'){
-      assert.equal(requests.some(path=>path.startsWith('/assets/packed/')),false);
+      assert.equal(requests.some(path=>path.startsWith('/assets/packed/')&&!path.endsWith('.webp')),false);
       assert.ok(requests.includes('/assets/axe.glb'));
     }else{
       assert.ok(requests.some(path=>/^\/assets\/packed\/axe\./.test(path)));

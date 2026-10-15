@@ -84,3 +84,7 @@ The read-only progressive-loading review failed in 9 s before producing findings
 ### Fixed lighting and held effects (2026-10-15)
 
 Read docs/COLD-START-PICK-20261015.md before further startup/pick work. Prepare actual held readiness variants before publishing equipment and retain fixed effects across swaps; transient bones still release. Lighting is exact half-float CubeUV data with the original generator as fallback. Re-bake after fingerprint/parameter changes and verify both pixel hashes and rendered metallic/matte equality. Profile Vite routes by pathname and assert instrumentation exists. Use structured patches and separate execution/publishing commands rather than large grouped shell requests.
+
+### Lossless download packaging (2026-10-15)
+
+Read docs/LOSSLESS-DOWNLOADS-20261015.md before changing model/texture delivery. Source art stays unchanged; optimized containers must preserve scene semantics, exact geometry bytes, texture dimensions and decoded RGBA including transparent RGB. Keep build-time pixel guards and actual-browser GPU equality checks. Preserve original GLB/PNG fallbacks, self-contained model loading and all 39 initial models. Keep unhashed inventories outside immutable cache routes. JPEG-to-lossless-WebP trials grew payloads; do not repeat or substitute lossy conversions without a different approved art contract.
