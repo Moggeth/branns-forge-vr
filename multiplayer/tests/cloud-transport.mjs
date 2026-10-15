@@ -13,12 +13,15 @@ try {
   await host.evaluate(url=>window.makeSession(url,{name:'Host',role:'hero',desktop:true}),endpoint);
   await host.waitForFunction(()=>window.s?.identity?.room);
   const room = await host.evaluate(()=>window.s.identity.room);
+  const joinStarted = performance.now();
   await guest.evaluate(({url,room})=>window.makeSession(url,{room,name:'God',role:'god',desktop:true}),{url:endpoint,room});
   await guest.waitForFunction(()=>window.s.latest?.players.length===2,null,{timeout:25000});
   const relay = await guest.evaluate(()=>[...window.s.connection.peers.values()].some(p=>p.relay)); assert.equal(relay,forcedRelay);
   await guest.evaluate(()=>window.s.command('cast',{spell:'raise',point:[10,0,10]}));
   await host.waitForFunction(()=>window.s.simulation.snapshot().edits.length>0);
-  record('two-real-sessions-and-replication','pass',{room,transport:relay?'cloud-relay':'direct-rtc'});
+  const joinMs = Math.round(performance.now()-joinStarted);
+  if (forcedRelay) assert.ok(joinMs < 2000, `stalled direct connection took ${joinMs}ms to deliver recovery state`);
+  record('two-real-sessions-and-replication','pass',{room,transport:relay?'cloud-relay':'direct-rtc',joinMs});
   for(const page of [host,guest]) {
     const d=await page.evaluate(()=>window.s.connection.diagnostics());
     assert.ok(d.edges>0 && d.ingress.length>0);assert.ok(d.ingress.every(edge=>edge.rejected===0));assert.equal(d.recovery.rejected,0);
