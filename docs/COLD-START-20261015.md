@@ -122,3 +122,45 @@ and `logs/work-timing.csv` (measured work steps). Original model sources remain 
   build (an earlier patch-note jargon failure otherwise left an old preview build).
 - Player notes reject developer terms such as "shader". Validate their final text
   before building; describe shorter loading in ordinary player language.
+
+
+## Released and checked on production
+
+PR #103 merged as `aea4f3c690749a1f28bbf66d46f2e67e60334ead`.
+Required CI passed **212/212 suites in 356.4 s**, check job 380 s. The existing
+nonblocking stale suite still reports 0/9; those historical failures were not changed.
+Production workflow `38664185286` passed in **38 s**. The merged tree matched the
+PR-tested tree exactly (`e2e08f4fda54423c0a0e480766ff645a7587d755`) before the existing
+manual production workflow was dispatched. All release gates remained enabled.
+
+The hosted root returned HTTP 200, identified build `aea4f3c`, and served the packed
+axe with `Cache-Control: public,max-age=31536000,immutable`. Its gzip payload was
+4,498,491 bytes with no HTTP Content-Encoding; the native decoder path worked with
+zero model fallbacks. Hosted bundle/header verification command: 5.724 s.
+
+A fresh Chromium browser, followed by a reload in the same context, without HTTP
+interception, measured:
+
+| Hosted visit | Navigation to ready | Renderer preparation | Model transfer | Model cache hits |
+| --- | ---: | ---: | ---: | ---: |
+| First | 4.707 s | 4.118 s | 31,248,592 bytes | 0 / 46 |
+| Reload | 2.312 s | 2.092 s | 0 bytes | 46 / 46 |
+
+Total transferred resource bytes were 40,965,649 on the first visit and 6,600 on
+reload. Both visits had null startup errors, zero delivery fallbacks and no browser
+errors. Harness command: 7.881 s. These are desktop measurements on one runner,
+with normal network variability; they do not establish physical phone performance
+or subsecond first-ever opening. Staying on the welcome screen created no public
+room. Raw evidence: ignored `logs/cold-start/production-repeat-visits.json` and
+`logs/cold-start/production-bundle.json`.
+
+Cache-testing lesson: Playwright HTTP request routing disables the browser cache.
+The first attempt reused the offline-room helper, reported zero cache hits and
+retransferred 31 MB of models despite correct headers. Remove HTTP routing for
+cache benchmarks. A welcome-only check needs no offline stubs because it never
+presses Play. Keep failure-injection routes in their separate cold/fallback tests.
+
+Gzip headers can differ between build platforms, so development and CI may emit
+different hashes for the same source model. URLs hash the actual emitted bytes;
+repeated production builds on the pinned environment remain cache safe, and
+byte-exact decompression—not cross-platform gzip-byte identity—is the art contract.

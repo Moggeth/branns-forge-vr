@@ -57,3 +57,16 @@ run appropriate checks before merging and releasing. Prefer a review PR and the
 existing CI/deployment workflow. Verify the actual live revision after release.
 The approval does not authorize unrelated projects, new publishing destinations,
 paid services, credential changes, or destructive actions.
+
+
+### Cold loading / browser cache verification (2026-10-15)
+
+Read docs/COLD-START-20261015.md before startup/performance work. Test packed assets
+against a production build; development intentionally loads original GLBs. Cache
+benchmarks must not use Playwright HTTP routes or stubUnavailableRooms, which
+disable caching. Stay on the welcome screen to avoid creating public rooms.
+Check startup.error is null as well as startup.ready; a caught preparation error
+can otherwise produce a misleading success and an expensive first draw. Preserve
+the actual HDR/direct render target and original object references during shader
+preparation; runtime userData may be circular. The handoff records exact fallback,
+variant, rotation, payload and cache checks plus measured limits.

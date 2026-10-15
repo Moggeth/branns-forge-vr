@@ -1,6 +1,6 @@
 Mobile startup and adaptive rendering: [implementation, measurements and real-device limits](docs/MOBILE-RESPONSIVENESS-20261008.md).
 
-Cold opening follow-up (2026-10-15): lossless model downloads are 39% smaller, initial transfers overlap setup, and desktop rendering avoids duplicate preparation. [Measurements, tests and recovery](docs/COLD-START-20261015.md).
+Cold opening release (2026-10-15): live code aea4f3c makes model downloads 39% smaller and avoids duplicate preparation. Hosted desktop check: 4.7 s cold, 2.3 s on reload; all 46 startup models reused from cache on reload. [Measurements, limits and recovery](docs/COLD-START-20261015.md).
 
 World recovery release (2026-10-15): live revision fb0ff46 reduces stalled-direct fallback from eight seconds to 250 ms and retries host departure immediately. [Measured checks, release evidence and handoff](docs/INSTANT-WORLD-RECOVERY-20261015.md). Routine fixes, merges and releases are authorized in AGENTS.md.
 
