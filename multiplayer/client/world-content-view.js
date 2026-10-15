@@ -1,3 +1,5 @@
+import {DECORATION_ASSETS} from './asset-catalog.js';
+import {createSoftReveal} from './soft-reveal.js';
 import {createResourceArt} from './forest-resource-art.js';
 export {createResourceArt,HELD_SCALE} from './forest-resource-art.js';
 import {DEPOSIT_CATALOG,materialLabel} from '../shared/material-catalog.js';
@@ -24,7 +26,7 @@ function bayPlate(kind,amount){if(typeof document==='undefined')return null;cons
   g.textAlign='center';g.textBaseline='middle';g.font='700 40px Georgia, serif';g.fillStyle=BAY_COLORS[kind]||'#ffe1a0';g.fillText(`${n} ${materialLabel(kind)}`,128,45);tex.needsUpdate=true;};
  const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sprite.scale.set(.66,.23,1);sprite.renderOrder=3;sprite.userData.ownMaterial=true;sprite.userData.draw=draw;sprite.userData.amount=amount;draw(amount);return sprite;}
 export function createWorldContent({scene,templates,instantiate,height,camera=null}) {
- const objects=new Map(),batches=[],formations=[];let terrainKey=null,foundationKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
+ const objects=new Map(),batches=[],formations=[],decorationGroups=new Map(),readyDecorations=new Set();let generation=0,alive=true;let terrainKey=null,foundationKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
  const resourceArt=createResourceArt();let miningWarmup=null;
  const resourceVariant=id=>{let h=2166136261;for(const ch of id)h=Math.imul(h^ch.charCodeAt(0),16777619);return (h>>>0)%3;};
  const treeView=createTreeView({scene,templates,height,camera});
@@ -66,7 +68,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
    }
   }
   for(const [id,e]of objects)if(!objectIds.has(id)){e.light?.dispose();e.fracture?.dispose();remove(e.root);if(e.root.isMesh)e.root.geometry.dispose();objects.delete(id);}
-  if(seed!==s.seed){for(const b of batches){scene.remove(b.mesh);b.mesh.dispose();}batches.length=0;for(const f of formations)f.mesh.removeFromParent();formations.length=0;seed=s.seed;scatter(s);terrainKey=null;}
+  if(seed!==s.seed){clearDecorations();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}batches.length=0;for(const f of formations)f.mesh.removeFromParent();formations.length=0;seed=s.seed;scatter(s);terrainKey=null;}
   const nextFoundationKey=foundationTerrainKey(s),nextTerrainKey=terrainFrameKey(s.edits,s.tick)+'|'+nextFoundationKey;if(nextTerrainKey!==terrainKey){
    const full=terrainKey===null||nextFoundationKey!==foundationKey,dirty=terrainDirtyEdits(previousTerrainEdits,s.edits,previousTerrainTick,s.tick),touched=p=>full||dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step);
    terrainKey=nextTerrainKey;foundationKey=nextFoundationKey;
@@ -85,14 +87,29 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
  function terrainMoved(dirty){if(!last||!dirty?.length)return;reground(p=>dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step),last.edits);}
  function scatter(s){
   for(const [name,x,z,size,angle]of [['bank',-18,-18,1.4,.8],['bank',-21,-16,1.1,1.2],['ridge',20,-22,3.1,-.5],['ridge',23,-24,2.4,.5],['roots',-13,-10,.65,1.2]]){const mesh=authored(name,size);if(mesh){mesh.position.set(x,height(x,z,s.edits)-.1,z);mesh.rotation.y=angle;scene.add(mesh);formations.push({mesh,x,z});}}
-  const names=['grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle'];
-  for(let n=0;n<names.length;n++){const template=templates.get(names[n]);if(!template)continue;template.scene.updateMatrixWorld(true);const points=[];
+  const group=scatterDecorations(s,DECORATION_ASSETS.filter(name=>readyDecorations.has(name)));scene.add(group);
+ }
+ function clearDecorations(){generation++;for(const entry of decorationGroups.values()){entry.reveal?.finish();entry.group.removeFromParent();}decorationGroups.clear();}
+ function scatterDecorations(s,names){
+  const group=new T.Group();
+  for(const name of names){const n=DECORATION_ASSETS.indexOf(name);if(decorationGroups.has(name))continue;const template=templates.get(name);if(!template)continue;decorationGroups.set(name,{group,reveal:null});template.scene.updateMatrixWorld(true);const points=[];
    for(let i=0;i<65;i++){const h=((Math.imul(i+1,73856093)^Math.imul(n+1,19349663)^s.seed)>>>0);const a=h*.000001,r=5+Math.sqrt((h%1000)/1000)*45,x=Math.sin(a)*r,z=Math.cos(a)*r;if(Math.abs(x)<1.5&&z>0&&z<16)continue;points.push({x,z,angle:a,scale:.7+(h%70)/100});}
-   template.scene.traverse(c=>{if(!c.isMesh)return;const mesh=new T.InstancedMesh(c.geometry,c.material,points.length);scene.add(mesh);batches.push({mesh,points,local:c.matrixWorld.clone()});});
+   template.scene.traverse(c=>{if(!c.isMesh)return;const mesh=new T.InstancedMesh(c.geometry,c.material,points.length);group.add(mesh);batches.push({mesh,points,local:c.matrixWorld.clone()});});
   }
+  return group;
+ }
+ async function installDecoration(name,prepare){
+  if(!alive||!last||decorationGroups.has(name))return;const version=generation;
+  const group=scatterDecorations(last,[name]);if(!group.children.length)return;
+  reground(()=>true,last.edits);group.updateMatrixWorld(true);
+  // Prepare both final and fading instanced variants before showing any detail.
+  await prepare(group);if(!alive)return;if(generation!==version)return installDecoration(name,prepare);
+  const reveal=createSoftReveal(group);
+  await prepare(group);if(!alive||generation!==version){reveal.finish();if(alive)return installDecoration(name,prepare);return;}
+  readyDecorations.add(name);decorationGroups.get(name).reveal=reveal;scene.add(group);
  }
  // simTick may be fractional (interpolated render tick); tree falls are pure functions of it so every client agrees.
- function tick(now,simTick=last?.tick??0){resourceArt.update(now/1000);treeView.tick(now,simTick);const dt=previousTickTime===null?0:Math.max(0,Math.min(.1,(now-previousTickTime)/1000));previousTickTime=now;crystalWall.update(dt,simTick);for(const e of objects.values())e.fracture?.update(dt);
+ function tick(now,simTick=last?.tick??0){resourceArt.update(now/1000);treeView.tick(now,simTick);const dt=previousTickTime===null?0:Math.max(0,Math.min(.1,(now-previousTickTime)/1000));previousTickTime=now;for(const entry of decorationGroups.values())entry.reveal?.update(dt);crystalWall.update(dt,simTick);for(const e of objects.values())e.fracture?.update(dt);
   setGeodeLightTime(now/1000);lightCandidates.length=0;if(camera)camera.getWorldPosition(cameraPosition);else cameraPosition.set(0,0,0);
   for(const e of objects.values())if(e.light){e.lightDistance=e.root.position.distanceToSquared(cameraPosition);e.lightRank=Infinity;if(e.lightDistance<=GEODE_LIGHT_DISTANCE**2)lightCandidates.push(e);}
   lightCandidates.sort((a,b)=>a.lightDistance-b.lightDistance);for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].lightRank=i;
@@ -100,11 +117,11 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   for(const e of objects.values())if(e.light&&e.lightRank>=GEODE_LIGHT_BUDGET)e.light.update(dt,camera,false);
   for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].light.update(dt,camera);
   for(const e of objects.values())if(e.data.type==='pickup'&&!e.bay){e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007;}}
- return {prepareMiningWarmup,prepareMiningWarmupAsync,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
+ return {installDecoration,prepareMiningWarmup,prepareMiningWarmupAsync,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
   // Raycast hit -> {id, point, normal (world), instanced}: instanced tree batches map instanceId to the tree id; deposits/entities use userData.targetId.
   resolveTarget(hit){const t=treeView.resolveTarget(hit)||crystalWall.resolveTarget(hit);if(t)return t;let n=hit?.object;while(n&&!n.userData.targetId)n=n.parent;if(!n)return null;
    return {id:n.userData.targetId,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:false};},
   crystalWall,grabTarget:(origin,direction,max)=>treeView.grabTarget(origin,direction,Math.min(max??2.5,2.5))?.id||null,surfaceVisible:treeView.surfaceVisible,trees:treeView,
-  reload(){seed=null;for(const [id,e]of objects)if(e.data.type==='pickup'&&e.root.isMesh&&templates.has(PICKUP_ASSETS[e.data.kind])){remove(e.root);e.root.geometry.dispose();objects.delete(id);}if(last)sync(last);},dispose(){miningWarmup?.dispose();miningWarmup=null;treeView.dispose();crystalWall.dispose();for(const e of objects.values()){e.light?.dispose();e.fracture?.dispose();remove(e.root);}for(const f of formations)f.mesh.removeFromParent();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}resourceArt.dispose();},
-  stats:()=>({...treeView.stats(),resourceArt:resourceArt.stats(),resourceModels:[...objects.values()].map(e=>({id:e.data.id,kind:e.data.kind,type:e.data.type,art:e.root.userData.resourceArt||(e.data.type==='deposit'?(e.data.kind==='meteor'?'meteor':'boulder'):PICKUP_ASSETS[e.data.kind]||e.data.kind)})),props:batches.reduce((n,b)=>n+b.points.length,0),deposits:objects.size,crystalWalls:crystalWall.stats(),geodeLights:{...geodeLightGlobalStats(),geodes:[...objects.values()].filter(e=>e.light).map(e=>e.light.stats())},fractures:[...objects.values()].filter(e=>e.fracture).map(e=>e.fracture.stats())})};
+  reload(){seed=null;for(const [id,e]of objects)if(e.data.type==='pickup'&&e.root.isMesh&&templates.has(PICKUP_ASSETS[e.data.kind])){remove(e.root);e.root.geometry.dispose();objects.delete(id);}if(last)sync(last);},dispose(){alive=false;clearDecorations();miningWarmup?.dispose();miningWarmup=null;treeView.dispose();crystalWall.dispose();for(const e of objects.values()){e.light?.dispose();e.fracture?.dispose();remove(e.root);}for(const f of formations)f.mesh.removeFromParent();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}resourceArt.dispose();},
+  stats:()=>({...treeView.stats(),resourceArt:resourceArt.stats(),resourceModels:[...objects.values()].map(e=>({id:e.data.id,kind:e.data.kind,type:e.data.type,art:e.root.userData.resourceArt||(e.data.type==='deposit'?(e.data.kind==='meteor'?'meteor':'boulder'):PICKUP_ASSETS[e.data.kind]||e.data.kind)})),decorations:{groups:decorationGroups.size,fading:[...decorationGroups.values()].filter(e=>e.reveal&&!e.reveal.done).length},props:batches.reduce((n,b)=>n+b.points.length,0),deposits:objects.size,crystalWalls:crystalWall.stats(),geodeLights:{...geodeLightGlobalStats(),geodes:[...objects.values()].filter(e=>e.light).map(e=>e.light.stats())},fractures:[...objects.values()].filter(e=>e.fracture).map(e=>e.fracture.stats())})};
 }

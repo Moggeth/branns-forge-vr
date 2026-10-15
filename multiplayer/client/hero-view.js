@@ -142,7 +142,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const want = HERO_WEAPONS.tools.includes(tool) ? tool : null;
     if (want === u.weaponTool && (u.weapon || !want)) return;
     const visual = want ? weaponFor(u, want) : null;
-    if (want && !visual && want === u.weaponTool) return;
+    if (want && !visual) return; // Keep the current authored item until the replacement is prepared.
     u.weapon?.removeFromParent(); u.weapon = null; u.weaponTool = want; u.recoil = 0;
     if (!visual) return;
     const socket = u.sockets[HERO_WEAPONS.leftHand.includes(want) ? 'L' : 'R'] || u.sockets.R;

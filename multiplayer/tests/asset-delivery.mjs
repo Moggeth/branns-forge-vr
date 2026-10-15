@@ -54,7 +54,7 @@ test('installation failure reports once and never starts a second installation',
 });
 
 test('early transfers are bounded, low priority and omit optional assets',async()=>{
-  assert.ok(STARTUP_ASSETS.length>=40);assert.ok(STARTUP_ASSETS.every(name=>!SECONDARY_ASSETS.has(name)));
+  assert.equal(STARTUP_ASSETS.length,39);assert.ok(['axe','tree','bases_kit','skeleton','forge'].every(name=>STARTUP_ASSETS.includes(name)));assert.ok(!STARTUP_ASSETS.includes('crossbow'));assert.ok(STARTUP_ASSETS.every(name=>!SECONDARY_ASSETS.has(name)));
   const store=new Map(),requests=[],release=[];
   const fetchImpl=(url,options)=>new Promise(resolve=>{requests.push({url,priority:options.priority});release.push(()=>resolve(new Response(new Uint8Array([103,108,84,70]))));});
   prefetchAssets({'/assets/a.glb':'/a','/assets/b.glb':'/b','/assets/c.glb':'/c'},['a','b','c'],{fetchImpl,store,concurrency:2});

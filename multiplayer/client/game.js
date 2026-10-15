@@ -1,10 +1,10 @@
 import {warmRender} from './warm-render.js';
 import {batchRigidWeapon} from './rigid-weapon-batch.js';
 import {createRenderBudget,renderSize} from './render-budget.js';
-import {yieldToBrowser,createAssetQueue,prepareAssetTextures} from './startup-work.js';
+import {yieldToBrowser,afterPaint,createAssetQueue,prepareAssetTextures} from './startup-work.js';
 import {createAssetDelivery} from './asset-delivery.js';
 import {PACKED_ASSETS} from './asset-delivery-manifest.js';
-import {SECONDARY_ASSETS,WORLD_TEMPLATE_ASSETS} from './asset-catalog.js';
+import {SECONDARY_ASSETS,STREAMED_WEAPONS,DECORATION_ASSETS,WORLD_TEMPLATE_ASSETS} from './asset-catalog.js';
 import {compileWorld} from './compile-world.js';
 import './atmosphere-materials.js'; // installs the shared mist/wet/snow material layer before anything compiles
 import {mergeCreatureSkins} from './merge-creature-skins.js';
@@ -661,7 +661,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Remote Hero equipment: a canonical clone of an already-loaded template (shared geometry/materials); hero-view poses it
   // in the WeaponGrip socket with the local XR contract. null while loading; hero-view retries and never disposes templates.
   function remoteWeapon(name) {
-    if (!templates.has(name)) return null;
+    if (!templates.has(name)||STREAMED_WEAPONS.has(name)&&!weaponModels.has(name)){if(STREAMED_WEAPONS.has(name))assetQueue.prioritize(name);return null;}
     let visual;
     if(['axe','pick','hammer'].includes(name)){
       let batch=remoteBatches.get(name);if(!batch){batch=batchRigidWeapon(templates.get(name));remoteBatches.set(name,batch);}
@@ -807,7 +807,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       scene.remove(warning.group); disposeResources(warning.group); warnings.delete(id);
     }
   }
-  const loader = new GLTFLoader(),assetInstalls=[],secondaryInstalls=[];
+  const loader = new GLTFLoader(),assetInstalls=[],secondaryInstalls=[],assetPromises=new Map();
+  let equipRequest=0;
+  async function prepareStreamed(root){
+    await compileWorld(renderer,root,camera,{}, {batchSize:16,yieldTask:afterPaint,compile:(stage,eye)=>skyCycle.compileAsset(stage,eye,scene)});
+    await prepareAssetTextures(root,{renderer,yieldTask:afterPaint,cancelled:()=>disposed});
+  }
   const assetQueue=createAssetQueue({concurrency:mobileBudget?2:4});
   // Decorative ground cover, the optional launcher and VR pouch
   // must not hold the playable world hostage to their download/decoding time.
@@ -823,8 +828,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         if(disposed){disposeResources(gltf.scene);return;}
         await install(gltf);
       }catch(error){startup.error=String(error.message||error);report(`Asset preparation: ${startup.error}`);}finally{resolve();}
-    },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}})),essential);
-    (essential?assetInstalls:secondaryInstalls).push(pending);return pending;
+    },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}})),essential,name);
+    assetPromises.set(name,pending);(essential?assetInstalls:secondaryInstalls).push(pending);return pending;
   };
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}
@@ -881,7 +886,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
-  for (const name of WORLD_TEMPLATE_ASSETS) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of WORLD_TEMPLATE_ASSETS) loader.load(`/assets/${name}.glb`, async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'forgeling') prepareForgelingTemplate(gltf.scene);
     if (name === 'skeleton' || name === 'forgeling') mergeCreatureSkins(gltf);
@@ -902,9 +907,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if (name === 'skeleton'||name==='golem'||name==='forgeling'||name.startsWith('tree')) for (const entry of actors.values()) upgradeActor(entry);
     if(name==='stormreel')stormView.installCrossbow(gltf);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout','stormreel','staff'].includes(name)) {
-      const model = instantiate(name, WEAPON_HEIGHTS[name]);weaponModels.set(name,model);
+      const model = instantiate(name, WEAPON_HEIGHTS[name]);
+      if(startup.ready){updateWeaponPresentation(model,name,{draw:0,recoil:0,time:0,templates});await prepareStreamed(model);if(disposed)return;}
+      weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
-    } else if (name !== 'siegebird_songbird'&&startup.ready) content.reload();
+    } else if (DECORATION_ASSETS.includes(name)&&startup.ready) await content.installDecoration(name,prepareStreamed);
+    else if (name !== 'siegebird_songbird'&&startup.ready) content.reload();
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
 
   function pointerHit(event) {
@@ -1210,7 +1218,16 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     stormWeapon.setModel(tool==='stormreel'?axeModel:null);
     if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});resumeSiegebird();}
   }
-  function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;inspect.cancel();weapons.cancel();cinderAim=false;cancelWallAim();specialSwing=null;presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});aiming=false;
+  async function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;
+    const request=++equipRequest;
+    if(STREAMED_WEAPONS.has(next)&&!weaponModels.has(next)){
+      startup.pendingTool=next;assetQueue.prioritize(next);report(`Preparing ${next}... You can keep moving.`);
+      await assetPromises.get(next);
+      if(disposed||request!==equipRequest)return;startup.pendingTool=null;
+      if(!weaponModels.has(next)){report(`Could not prepare ${next}. Check your connection and reload to retry.`);return;}
+      if(!active||role!=='hero')return;
+    }else startup.pendingTool=null;
+    inspect.cancel();weapons.cancel();cinderAim=false;cancelWallAim();specialSwing=null;presses.invalidate();swingAt=-Infinity;swingContact=true;onAction('equip',{tool:next});aiming=false;
     // First person: stash the old item, then draw the new one (weapon-swap.js). VR hands and held limbs swap at once.
     if(renderer.xr.isPresenting||!weaponAnchor.visible||next==='limb'||tool==='limb'){const pending=weaponSwap.cancel();if(pending&&pending!==next)equipVisual(pending);equipVisual(next);}else weaponSwap.request(next,tool);}
   // VR aim comes from the controller that actually holds the weapon (or that made this grab/throw press), never an
@@ -1331,8 +1348,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   let inspectFit=null,inspectFitModel=null,inspectBlocked=null;
   function wyrmIndicators(){const r=weaponReadiness(snapshot.players.find(p=>p.id===playerId),'wyrmspout',snapshot.tick||0);return {charge:r.specialReady,locked:r.overheated};}
   function startInspect(){const st=weapons.state();inspectBlocked=!active?'inactive':role!=='hero'?'role':renderer.xr.isPresenting?'xr':manned?'manned':tool==='limb'?'limb':!weaponAnchor.visible?'hidden':!axeModel?'loading':weaponSwap.busy?'swapping':st.firing?'firing':st.drawing?'drawing':null;if(inspectBlocked)return;unlockAudio();inspect.press();if(Number.isFinite(inspectPinAt))inspect.pin(inspectPinAt);}
-  function primaryDown(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){mannedPress();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(tool==='stormreel'){stormWeapon.begin();return;}if(tool==='staff'){staffFx.press();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
-  function special(){if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='stormreel'){reelStorm();return;}if(tool==='staff'){staffFx.nova(performance.now()/1000);return;}if(tool==='flask'&&!touchEnabled&&!renderer.xr.isPresenting){cinderAim=true;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
+  function primaryDown(){if(startup.restoringTool)return;if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('breath',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();unlockAudio();if(manned){mannedPress();return;}if(appleSnack.holding()){appleSnack.bite();return;}if(tool==='stormreel'){stormWeapon.begin();return;}if(tool==='staff'){staffFx.press();return;}if(!weapons.begin()){if(renderer.xr.isPresenting)weapons.special();else strike();}else if(tool==='bow'&&aiming&&!renderer.xr.isPresenting)weapons.special();}
+  function special(){if(startup.restoringTool)return;if(active&&role==='hero'&&dragonRide.riding()){dragonRide.press('fireball',true);return;}if(!active||role!=='hero'||inventionPlacement||weaponSwap.busy)return;inspect.cancel();if(manned){scoping=!scoping;return;}if(tool==='stormreel'){reelStorm();return;}if(tool==='staff'){staffFx.nova(performance.now()/1000);return;}if(tool==='flask'&&!touchEnabled&&!renderer.xr.isPresenting){cinderAim=true;return;}if(tool==='crossbow'&&!renderer.xr.isPresenting)aiming=!aiming;else if(tool==='bow')bowSpecial();else weapons.special();}
   // Emberwing's Special: on desktop Q is always Phoenix Flare (right click owns the phoenix aim). Touch and VR have no
   // right click, so their Special latches the phoenix while drawn and looses a flare otherwise.
   function bowSpecial(){if(!touchEnabled&&!renderer.xr.isPresenting||!weapons.state().drawing)phoenixFlare();else weapons.special();}
@@ -1913,7 +1930,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       content.reload();content.sync(snapshot);syncWorldSignals();syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
       // Lobby startup has no roster. Prepare the actual clone/rig variants now,
       // so the first remote players and bot wave don't move compilation to join.
-      for(const [i,name] of ['axe','pick','hammer','crossbow','bow','wyrmspout','flask'].entries()){
+      for(const [i,name] of ['axe','flask'].entries()){
         const data={id:`warm-hero-${i}`,role:'hero',tool:name,hp:100},visual=heroView.create(data,{variant:i%2?'mosswarden':'emberwright'});
         if(visual){const root=new THREE.Group();root.position.set(i*2-6,0,0);root.add(visual);representatives.add(root);heroView.update(visual,data,root,1/60,camera.position);warmHeroes.push(visual);}
         await yieldToBrowser();if(disposed)return;
@@ -1957,7 +1974,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       await prepareStartup('firstWorldFrame',()=>skyCycle.render(scene,camera));
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
     finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
-    if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
+    if(disposed)return;startup.initialModels=assetInstalls.length;startup.streamedModels=secondaryInstalls.length;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
     report(`World renderer ready (${Math.round(startup.readyMs)} ms).`);
     assetQueue.background();
     void Promise.all(secondaryInstalls).then(()=>{startup.secondaryReady=true;startup.completeMs=performance.now()-started;});
@@ -1978,7 +1995,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       const self = snapshot.players.find(player => player.id === playerId);
       if(previousSelf && self?.castTick>previousSelf.castTick && pendingCastPreview){spellVisual.commitTarget(pendingCastPreview);pendingCastPreview=null;}
       if (self) {
-        if(self.tool && self.tool!==tool&&!weaponSwap.busy)equipVisual(self.tool);
+        if(!STREAMED_WEAPONS.has(self.tool)||weaponModels.has(self.tool))startup.restoringTool=null;
+        if(self.tool && self.tool!==tool&&!weaponSwap.busy){
+          if(STREAMED_WEAPONS.has(self.tool)&&!weaponModels.has(self.tool)){
+            if(startup.restoringTool!==self.tool){const wanted=self.tool;startup.restoringTool=wanted;assetQueue.prioritize(wanted);
+              void assetPromises.get(wanted)?.then(()=>{if(disposed||snapshot.players.find(p=>p.id===playerId)?.tool!==wanted)return;startup.restoringTool=null;if(weaponModels.has(wanted))equipVisual(wanted);});}
+          }else {startup.restoringTool=null;equipVisual(self.tool);}
+        }
         const authoritative = new THREE.Vector3().fromArray(self.position);
         if (!initialized || authoritative.distanceTo(localPosition) > 4) {
           if(!initialized&&snapshot.battle?.v===2){yaw=Math.atan2(self.position[0],self.position[2]);pitch=0;}
