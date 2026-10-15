@@ -118,12 +118,13 @@ export function createAtmospherePost({renderer, tier = postTierFromUrl()}) {
   }
   // Compile the scene against the SAME HDR target used during play. Compiling
   // only against the default framebuffer misses the no-tone-mapping variants.
-  async function prepare(scene,camera) {
+  async function prepare(scene,camera,prepareWorld) {
     const prior=renderer.getRenderTarget();
     const geometry=new THREE.PlaneGeometry(2,2),quad=new THREE.Mesh(geometry,final),stage=new THREE.Scene();stage.add(quad);
     const eye=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
     try {
-      renderer.setRenderTarget(sceneRT);await renderer.compileAsync(scene,camera);
+      renderer.setRenderTarget(sceneRT);
+      if(prepareWorld)await prepareWorld();else await renderer.compileAsync(scene,camera);
       for(const material of [highPass,...bloom.separableBlurMaterials,bloom.compositeMaterial,bloom.materialCopy,rays]) {
         if(!material)continue;quad.material=material;await renderer.compileAsync(stage,eye);
       }

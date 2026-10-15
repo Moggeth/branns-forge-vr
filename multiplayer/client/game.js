@@ -2,6 +2,10 @@ import {warmRender} from './warm-render.js';
 import {batchRigidWeapon} from './rigid-weapon-batch.js';
 import {createRenderBudget,renderSize} from './render-budget.js';
 import {yieldToBrowser,createAssetQueue,prepareAssetTextures} from './startup-work.js';
+import {createAssetDelivery} from './asset-delivery.js';
+import {PACKED_ASSETS} from './asset-delivery-manifest.js';
+import {SECONDARY_ASSETS,WORLD_TEMPLATE_ASSETS} from './asset-catalog.js';
+import {compileWorld} from './compile-world.js';
 import './atmosphere-materials.js'; // installs the shared mist/wet/snow material layer before anything compiles
 import {mergeCreatureSkins} from './merge-creature-skins.js';
 import {dressForgeling,dressForgelingModel,prepareForgelingTemplate} from './forgeling-look.js';
@@ -807,11 +811,10 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const assetQueue=createAssetQueue({concurrency:mobileBudget?2:4});
   // Decorative ground cover, the optional launcher and VR pouch
   // must not hold the playable world hostage to their download/decoding time.
-  const secondaryAssets=new Set(['heavy_launcher','waist_pouch','grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']);
-  const loadAsset=loader.load.bind(loader);
+  const loadAsset=createAssetDelivery(loader,{packed:PACKED_ASSETS,onFallback:()=>{startup.deliveryFallbacks=(startup.deliveryFallbacks||0)+1;}});
   // Include async installation, not only downloads: clones add material variants.
   loader.load=(url,install,progress,failed)=>{
-    const name=url.split('/').pop().replace('.glb',''),essential=!secondaryAssets.has(name);
+    const name=url.split('/').pop().replace('.glb',''),essential=!SECONDARY_ASSETS.has(name);
     const pending=assetQueue.add(()=>disposed?Promise.resolve():new Promise(resolve=>loadAsset(url,async gltf=>{
       try{
         if(disposed){disposeResources(gltf.scene);return;}
@@ -825,7 +828,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   };
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}
-    try{await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Timberline material preparation failed: ${error.message}`);}
+    try{if(startup.ready)await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Timberline material preparation failed: ${error.message}`);}
     if(disposed){disposeResources(gltf.scene);return;}
     inventionVisual.installTimberline(name,gltf);
   },undefined,()=>report(`Could not load ${name}; reload to restore Timberline visuals.`));
@@ -865,7 +868,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   loader.load('/assets/hero.glb', async gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     orchard.enableShadowCasting(gltf.scene);
-    try { await renderer.compileAsync(gltf.scene, camera, scene); }
+    try { if(startup.ready)await renderer.compileAsync(gltf.scene, camera, scene); }
     catch (error) { disposeResources(gltf.scene); report(`Hero material preparation failed (${error.message || error}).`); return; }
     if (disposed) { disposeResources(gltf.scene); return; }
     heroView.install(gltf);
@@ -878,7 +881,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     shrineBarBack.position.y=3.3;shrineBar.position.y=3.3;
     syncWorldSignals();
   },undefined,()=>report('Could not load the forge; reload to retry.'));
-  for (const name of ['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'star_gem', 'stone_chunk', 'orchard_apple', 'skeleton', 'forgeling', 'axe', 'pick', 'hammer','crossbow','bow','wyrmspout','stormreel','staff','arrow','wings','siegebird_songbird','golem', 'boulder', 'meteor', 'bank', 'ridge', 'roots', 'log', 'endcap', 'cut1', 'cut2', 'chip', 'bridge', 'grass_tuft','meadow_flowers','fern_delicate','leaf_litter','pebble_scatter','mushroom_cluster','fallen_branch','broadleaf_plant','river_stones','root_tangle']) loader.load(`/assets/${name}.glb`, gltf => {
+  for (const name of WORLD_TEMPLATE_ASSETS) loader.load(`/assets/${name}.glb`, gltf => {
     if (disposed) { disposeResources(gltf.scene); return; }
     if (name === 'forgeling') prepareForgelingTemplate(gltf.scene);
     if (name === 'skeleton' || name === 'forgeling') mergeCreatureSkins(gltf);
@@ -895,13 +898,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if (name === 'meteor') renderer.compileAsync(gltf.scene, camera, scene).catch(error => {
       if (!disposed) report(`Meteor shader preparation: ${error.message}`);
     });
-    if (name === 'tree') { syncTrees(); }
+    if (name === 'tree'&&startup.ready) { syncTrees(); }
     if (name === 'skeleton'||name==='golem'||name==='forgeling'||name.startsWith('tree')) for (const entry of actors.values()) upgradeActor(entry);
     if(name==='stormreel')stormView.installCrossbow(gltf);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout','stormreel','staff'].includes(name)) {
       const model = instantiate(name, WEAPON_HEIGHTS[name]);weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
-    } else if (name !== 'siegebird_songbird') content.reload();
+    } else if (name !== 'siegebird_songbird'&&startup.ready) content.reload();
   }, undefined, () => report(`Could not load ${name} model; reconnect or reload to retry.`));
 
   function pointerHit(event) {
@@ -1905,7 +1908,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       await yieldToBrowser();
       // Build the default render-only world before compiling, even in the empty
       // lobby. Do not initialize a player or step/publish this preview state.
-      content.sync(snapshot);syncWorldSignals();syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
+      // All initial templates are now installed. Rebuild content once instead
+      // of rebuilding trees/deposits after each of dozens of arriving models.
+      content.reload();content.sync(snapshot);syncWorldSignals();syncOrchardContent();meadow.sync(snapshot);oreGlint.sync(snapshot);settlementVisual.sync(snapshot);inventionVisual.sync(snapshot);
       // Lobby startup has no roster. Prepare the actual clone/rig variants now,
       // so the first remote players and bot wave don't move compilation to join.
       for(const [i,name] of ['axe','pick','hammer','crossbow','bow','wyrmspout','flask'].entries()){
@@ -1928,20 +1933,28 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       scene.add(representatives);scene.updateMatrixWorld(true);
       skyCycle.prepare(scene);
       startup.phase='shaders';report('Preparing world shaders and textures…');
+      // Prepare and draw only the variants the actual play target needs. Desktop
+      // uses HDR; compiling/drawing the default framebuffer first doubled world work.
+      await prepareStartup('atmosphere',()=>skyCycle.prepareRenderer(scene,camera,async()=>{
       await prepareStartup('spells',()=>spellVisual.prepareShaders(renderer,camera,scene));if(disposed)return;
       await prepareStartup('fire',()=>fireVisual.prepareShaders(renderer,camera,scene));if(disposed)return;
       await prepareStartup('expedition',()=>expedition.prepare(renderer,camera,scene));if(disposed)return;
-      await prepareStartup('worldShaders',()=>renderer.compileAsync(scene,camera));if(disposed)return;
+      startup.shaderVariants={};
+      await prepareStartup('worldShaders',()=>compileWorld(renderer,scene,camera,startup.shaderVariants));if(disposed)return;
       const textures=new Set();scene.traverse(object=>{for(const material of [object.material,object.customDepthMaterial,object.customDistanceMaterial].flat())if(material)for(const value of Object.values(material))if(value?.isTexture&&!value.isRenderTargetTexture)textures.add(value);});
       // Small upload batches let the loading interface update between them.
       await prepareStartup('textures',async()=>{for(const texture of textures){if(disposed)return;renderer.initTexture(texture);startup.textureCount++;await yieldToBrowser();}});
       if(disposed)return;
-      await prepareStartup('atmosphere',()=>skyCycle.prepareRenderer(scene,camera));if(disposed)return;
       startup.phase='shadows';
       // compileAsync omits the shadow render pass. Warm both camera families once.
       const warmCamera=camera.clone();warmCamera.position.set(0,48,38);warmCamera.lookAt(0,0,0);
-      const warmStarted=performance.now();startup.warmBatches=await warmRender({renderer,scene,camera:warmCamera,cancelled:()=>disposed});if(disposed)return;await yieldToBrowser();skyCycle.render(scene,camera);startup.warmDrawMs=performance.now()-warmStarted;
+      const warmStarted=performance.now();startup.warmBatches=await warmRender({renderer,scene,camera:warmCamera,cancelled:()=>disposed});if(disposed)return;await yieldToBrowser();startup.warmDrawMs=performance.now()-warmStarted;
       await prepareStartup('finalShaders',()=>renderer.compileAsync(scene,camera));if(disposed)return;
+      }));
+      // The post pass must output to the restored framebuffer, never read and
+      // write its own HDR scene texture during the preparation callback.
+      if(disposed)return;
+      await prepareStartup('firstWorldFrame',()=>skyCycle.render(scene,camera));
     }catch(error){startup.error=String(error.message||error);report(`Shader preparation incomplete: ${startup.error}. Reload if visuals are missing.`);}
     finally{abilityWarmup?.dispose();wallWarmup?.dispose();treeWarmup?.dispose();miningWarmup?.finish();for(const visual of warmHeroes)heroView.release(visual);representatives.traverse(n=>n.skeleton?.dispose());representatives.removeFromParent();}
     if(disposed)return;startup.ready=true;startup.phase='ready';startup.readyMs=performance.now()-started;previous=performance.now();api.setActive(requestedActive);
