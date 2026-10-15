@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import {createAssetQueue} from '../client/startup-work.js';
+import {createSoftReveal} from '../client/soft-reveal.js';
+import {compileWorld} from '../client/compile-world.js';
+import {createHeroView} from '../client/hero-view.js';
+import {loadGLB} from './glb.mjs';
+import {fileURLToPath} from 'node:url';
+import {createWorldContent} from '../client/world-content-view.js';
+const turn=()=>new Promise(r=>setImmediate(r));
+const queue=createAssetQueue({concurrency:2,yieldTask:()=>Promise.resolve()}),started=[],release={};
+const job=name=>()=>new Promise(r=>{started.push(name);release[name]=r;});
+const first=queue.add(job('clutter'),false,'clutter'),next=queue.add(job('pick'),false,'pick'),last=queue.add(job('bow'),false,'bow');
+queue.start();queue.background();await turn();assert.deepEqual(started,['clutter']);
+queue.prioritize('bow');await turn();assert.deepEqual(started,['clutter','bow']);
+release.bow();await last;assert.equal(started.includes('pick'),false);
+release.clutter();await first;await turn();release.pick();await next;
+const material=new T.MeshStandardMaterial({opacity:.8}),geometry=new T.BoxGeometry(),root=new T.Group();
+const a=new T.Mesh(geometry,material),b=new T.Mesh(geometry,material);root.add(a,b);
+let originalDisposed=0;material.addEventListener('dispose',()=>originalDisposed++);
+const reveal=createSoftReveal(root);assert.equal(a.material,b.material);assert.notEqual(a.material,material);assert.equal(a.material.opacity,0);assert.equal(a.material.alphaHash,true);
+reveal.update(.6);assert.ok(Math.abs(a.material.opacity-.4)<.0001);reveal.update(.6);assert.equal(reveal.done,true);assert.equal(a.material,material);assert.equal(originalDisposed,0);reveal.finish();
+const stage=new T.Scene();for(let i=0;i<5;i++)stage.add(new T.Mesh(new T.BoxGeometry(),material));
+let slices=0,yields=0;
+await compileWorld({},stage,new T.Camera(),{}, {batchSize:2,yieldTask:async()=>{yields++;},compile:async view=>{let count=0;view.traverse(n=>{if(n.isMesh){count++;assert.equal(n.parent,stage);}});assert.ok(count<=2);slices++;}});
+assert.equal(slices,3);assert.equal(yields,2);
+const world=new T.Scene(),templates=new Map(),content=createWorldContent({scene:world,templates,instantiate:()=>null,height:()=>0});
+const snapshot={seed:41,tick:1,edits:[],groves:[],pickups:[],deposits:[]};content.sync(snapshot);
+const template=()=>({scene:new T.Group().add(new T.Mesh(geometry,material))});let preparations=0;
+templates.set('grass_tuft',template());await content.installDecoration('grass_tuft',async()=>{preparations++;});
+const firstMesh=world.children.flatMap(n=>n.children).find(n=>n.isInstancedMesh&&n.material.alphaHash);assert.ok(firstMesh);content.tick(0);content.tick(50);
+assert.ok(firstMesh.material.opacity>0&&firstMesh.material.opacity<.8);
+templates.set('meadow_flowers',template());await content.installDecoration('meadow_flowers',async()=>{preparations++;});
+assert.equal(world.children.flatMap(n=>n.children).includes(firstMesh),true);assert.equal(content.stats().decorations.groups,2);assert.equal(preparations,4);
+await content.installDecoration('grass_tuft',async()=>{throw Error('duplicate');});
+templates.set('leaf_litter',template());let resume;
+let held=false;const pending=content.installDecoration('leaf_litter',async()=>{if(!held){held=true;await new Promise(r=>{resume=r;});}});content.sync({...snapshot,seed:42});resume();await pending;
+assert.equal(content.stats().decorations.groups,3);
+content.dispose();assert.equal(originalDisposed,0);geometry.dispose();material.dispose();
+console.log('progressive-assets: demand bypass, bounded compilation, shared fade ownership and incremental scenery passed');
+
+
+// Remote tool updates keep the previous complete model while the new one streams.
+const available=new Set(['axe']),view=createHeroView({resolveWeapon:name=>available.has(name)?new T.Group():null});
+const hero=loadGLB(fileURLToPath(new URL('../public/assets/hero.glb',import.meta.url)));hero.animations=[];view.install(hero);
+const data={id:'remote',role:'hero',tool:'axe',hp:100,position:[0,0,0]},body=view.create(data),holder=new T.Group().add(body),eye=new T.Vector3(0,1,4);
+view.update(body,data,holder,1/60,eye);const old=body.userData.weapon;assert.ok(old);
+view.update(body,{...data,tool:'pick'},holder,1/60,eye);assert.equal(body.userData.weapon,old);
+available.add('pick');view.update(body,{...data,tool:'pick'},holder,1/60,eye);assert.notEqual(body.userData.weapon,old);assert.equal(body.userData.weaponTool,'pick');view.release(body);view.dispose();
+
+// Preloaded fixtures retain complete scenery immediately; transforms follow terrain.
+const readyScene=new T.Scene(),readyContent=createWorldContent({scene:readyScene,templates:new Map([['grass_tuft',template()]]),height:()=>3});
+readyContent.sync(snapshot);const readyGrass=readyScene.getObjectByName('GroundDetail:grass_tuft');assert.ok(readyGrass?.isInstancedMesh);assert.equal(readyGrass.material,material);const transform=new T.Matrix4();readyGrass.getMatrixAt(0,transform);assert.equal(transform.elements[13],3);readyContent.dispose();

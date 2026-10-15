@@ -141,7 +141,12 @@ export function createAtmospherePost({renderer, tier = postTierFromUrl()}) {
     if (saturation !== undefined) u.saturation.value = saturation; if (contrast !== undefined) u.contrast.value = contrast;
   }
   return {
-    render, set, prepare, stats: () => ({...stats}),
+    render, set, prepare, compileAsset(root,camera,world) {
+      if(renderer.xr.isPresenting)return renderer.compileAsync(root,camera,world);
+      const prior=renderer.getRenderTarget();
+      try{renderer.setRenderTarget(sceneRT);return renderer.compileAsync(root,camera,world);}
+      finally{renderer.setRenderTarget(prior);}
+    }, stats: () => ({...stats}),
     dispose() { sceneRT.dispose(); raysRT.dispose(); depth.dispose(); bloom.dispose(); rays.dispose(); final.dispose(); raysQuad.dispose(); finalQuad.dispose(); },
   };
 }

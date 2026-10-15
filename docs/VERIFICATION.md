@@ -2343,3 +2343,8 @@ A queued RAF can predate async warm-up completion. Clamp frame dt on both sides 
 ### Mobile startup and sustained rendering (2026-10-08)
 
 See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.
+
+
+### Progressive startup verification (2026-10-15)
+
+See [progressive startup verification](PROGRESSIVE-START-20261015.md) for the 39-model entry set, demand-prioritised equipment, incremental scenery fades, measured before/after timings and browser checks.

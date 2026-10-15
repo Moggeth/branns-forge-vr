@@ -253,6 +253,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
   return {
     update, render, prepare,
     night() { return last?.night ?? 0; }, // 0 day .. 1 deep night, for faked light (beacon glow)
+    compileAsset(root,camera,world) { return post?.compileAsset ? post.compileAsset(root,camera,world) : renderer.compileAsync(root,camera,world); },
     async prepareRenderer(scene_,camera,prepareWorld) {
       prepare(scene_);
       if(post?.prepare)await post.prepare(scene_,camera,prepareWorld);

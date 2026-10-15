@@ -10,6 +10,7 @@ for(const mode of ['packed','unsupported','failed-packed']){
     await stubUnavailableRooms(page);
     await page.goto(BASE+'/?acceptanceProbe',{waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>document.querySelector('#world')?.brannDiagnostics?.()?.startup.ready,null,{timeout:120000});
+    if(mode==='failed-packed')await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics().startup.secondaryReady,null,{timeout:120000});
     const startup=await page.evaluate(()=>document.querySelector('#world').brannDiagnostics().startup);
     assert.equal(startup.error,null,'warmup must complete, not merely recover from an exception');
     assert.ok(startup.shaderVariants.representatives<startup.shaderVariants.objects);

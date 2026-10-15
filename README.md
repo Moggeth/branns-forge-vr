@@ -1289,3 +1289,8 @@ Ability performance diagnosis and repeatable checks: [2026-10-05 pass](docs/ABIL
 Loading/crowd/host profiling and regression commands: [2026-10-05 performance pass](docs/WORLD-PERFORMANCE-20261005.md).
 
 Mobile crowd rendering and shader-transition performance (2026-10-06): see [measured results and reproduction](docs/MOBILE-PERFORMANCE-20261006.md).
+
+
+### Progressive opening (2026-10-15)
+
+See [progressive opening](docs/PROGRESSIVE-START-20261015.md) for the 39-model entry set, demand-prioritised equipment, incremental scenery fades, measured before/after timings and browser checks.

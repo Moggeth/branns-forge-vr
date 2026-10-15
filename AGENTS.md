@@ -70,3 +70,8 @@ can otherwise produce a misleading success and an expensive first draw. Preserve
 the actual HDR/direct render target and original object references during shader
 preparation; runtime userData may be circular. The handoff records exact fallback,
 variant, rotation, payload and cache checks plus measured limits.
+
+
+### Progressive startup (2026-10-15)
+
+Read docs/PROGRESSIVE-START-20261015.md alongside the cold-start handoff before loading changes. Keep initial world geometry complete; promote selected/restored/remote equipment without sending equip early. Background renderer target state must restore synchronously before awaiting. Never rebuild all scenery for one arriving decoration; prepare final and fading instanced variants before attaching. Use bounded observed-request waits in delayed-asset tests, not fixed 150 ms assumptions. Write JavaScript explicitly as UTF-8 on Windows.

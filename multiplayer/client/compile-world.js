@@ -4,7 +4,7 @@ import {Group} from 'three';
 // Compile each exact combination once, preserving skinning, morphs, instancing
 // and all hidden first-use representatives. The real scene supplies its lights,
 // fog and environment; no live node is reparented or hidden.
-export async function compileWorld(renderer,scene,camera,stats={}){
+export async function compileWorld(renderer,scene,camera,stats={}, {batchSize=Infinity,yieldTask=()=>Promise.resolve(),compile=(root,eye,world)=>renderer.compileAsync(root,eye,world)}={}){
   const stage=new Group(),seen=new Set(),representatives=[];let objects=0;
   scene.traverse(object=>{
     if(!(object.isMesh||object.isPoints||object.isLine||object.isSprite))return;
@@ -18,5 +18,6 @@ export async function compileWorld(renderer,scene,camera,stats={}){
   stage.traverse=callback=>{callback(stage);for(const object of representatives)callback(object);};
   stage.traverseVisible=()=>{};
   stats.objects=objects;stats.representatives=representatives.length;
-  try{await renderer.compileAsync(stage,camera,scene);}finally{representatives.length=0;}
+  const all=representatives.slice();
+  try{for(let i=0;i<all.length;i+=batchSize){representatives.splice(0,representatives.length,...all.slice(i,i+batchSize));await compile(stage,camera,scene);if(i+batchSize<all.length)await yieldTask();}}finally{representatives.length=0;}
 }
