@@ -85,3 +85,63 @@ Final benchmark and release results are appended after verification.
 
 Primary references used for implementation: [Sharp lossless WebP options](https://sharp.pixelplumbing.com/api-output/#webp)
 and [Khronos EXT_texture_webp](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_texture_webp/README.md).
+
+## Released measurements
+
+PR [#106](https://github.com/Moggeth/branns-forge-vr/pull/106), source commit
+`2a5abb73b932bb4331e61825ab1be5f7935a5e6b`, merged as
+`0fd49af96bf20f63de1fe5f23fa027782b86c025`. Required CI run `38694294970`
+passed **216/216 suites in 389.0 s**, job duration 416 s. The historical nonblocking
+stale suite remained unchanged. The tested and merged trees were identical:
+`7181de6706b06a1c8fe282b00c6438570eb03228`.
+
+Production workflow `38695131287` passed in **79 s**, including the existing cloud
+room health check, pixel-guarded production build and staged asset-integrity check.
+The build adds a pinned native image encoder on CI/developer machines only; it
+does not add a browser image-compression library or new runtime image requests.
+
+Paired local navigation-to-ready results (one controlled run per case, fresh
+contexts, 40 ms latency for limited links, no HTTP interception):
+
+| Connection / visit | Before | Smaller textures |
+| --- | ---: | ---: |
+| Unrestricted, first | 6.112 s | 4.381 s |
+| Unrestricted, cached | 2.679 s | 2.795 s |
+| 12 Mbps, first | 28.044 s | 25.007 s |
+| 6 Mbps, first | 52.261 s | 45.371 s |
+
+First-visit resource transfer fell from **36,510,537 to 31,656,275 bytes**:
+**4,854,262 bytes / 13.3% smaller**. Initial models were 26,164,909 -> 23,038,709
+encoded bytes; the eight initial world textures were 8,140,696 -> 6,412,314 bytes.
+Across all 63 models, gzip delivery fell 32,728,498 -> 29,170,891 bytes. Fast-link
+CPU/driver variation affects the unrestricted figures; the link-limited gains
+align with the smaller payload. These measurements do not establish physical
+phone acceptance, universal timings, or instant startup on slow connections.
+
+Local acceptance passed: lossless browser pixels/fallbacks 13.105 s, packed/raw/
+failed-model cold paths 27.632 s, progressive desktop/touch priority/cancellation/
+decoration fades 25.804 s, and nine pick swaps across desktop/touch/touch HDR
+45.394 s. The actual committed production build passed in 19.340 s. Paired load
+benchmarks took 180.281 s; dependency installation took 1.736 s.
+
+Actual hosted revision `0fd49af` then passed:
+
+- Fresh visit: 9.066 s navigation-to-ready, 39 initial models, eight smaller world
+  textures, zero delivery fallbacks, baked lighting and null startup error. Total
+  resource transfer 31,379,711 bytes. Live network results are unpaired and must
+  not be compared directly with prior release timings as a performance proof.
+- Cached reload: 2.667 s; **39/39 models and 8/8 world textures transferred zero
+  bytes**, total resource transfer 4,200 bytes. Healthy visit/reload/header check
+  took 24.287 s. Model/image URLs returned one-year immutable cache headers.
+- Browser/GPU equality: **58 delivered images, 152,436,736 channel values, zero
+  differences**, covering both colour-conversion settings. Deliberate external
+  HTTP 503 and undecodable-image cases recovered the authored ground PNG. Hosted
+  pixel and fallback harness took 26.449 s.
+- Nine hosted pick/axe swaps passed in 60.876 s: maximum observed frame gap
+  **16.8 ms**, no new readiness effects and no rendering-program count increase.
+  Includes desktop, touch and touch HDR; this is desktop Chromium touch emulation.
+
+Evidence is ignored under `logs/download-*.json`, `logs/download-*.log`, browser
+captures and `logs/work-timing.csv`. Both owned preview servers were stopped and
+each browser closed in its finally block. No public room was created, no voice
+was invoked, and the original diverged/user checkout was preserved.
