@@ -6,6 +6,7 @@
 // focus only after it moves, cells rebuilt lazily after terrain/structure changes. One small texture (the daisy heads,
 // cut from Mitch's walk photo: assets/trees-canopy-20261004/photo_textures.py); no lights or shadow casters.
 import * as THREE from 'three';
+import {loadDeliveredTexture} from './texture-delivery.js';
 import {ORCHARD_LAYOUT, valueNoise, hash2, dryness, disturbanceAt} from './orchard-presentation.js';
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
 import {STRUCTURES} from '../shared/inventions.js';
@@ -325,7 +326,7 @@ export function createMeadowCover({scene, height, quality = 'high', renderer = n
   daisies.visible = false; let daisyTex = daisyTexture || null, disposed = false;
   const useDaisyTex = tex => { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = Math.min(4, renderer?.capabilities?.getMaxAnisotropy?.() || 1); daisyMat.map = tex; daisyMat.needsUpdate = true; daisies.visible = true; };
   if (daisyTex) useDaisyTex(daisyTex);
-  else if (typeof document !== 'undefined') new THREE.TextureLoader().load(assetBase + DAISY_SHEET.url, tex => { if (disposed) { tex.dispose(); return; } daisyTex = tex; useDaisyTex(tex); }, undefined, () => {}); // decorative: the meadow reads fine without them
+  else if (typeof document !== 'undefined') loadDeliveredTexture(new THREE.TextureLoader(), assetBase + DAISY_SHEET.url, tex => { if (disposed) { tex.dispose(); return; } daisyTex = tex; useDaisyTex(tex); }, undefined, () => {}); // decorative: the meadow reads fine without them
   const motes = cfg.motes ? createMotes(cfg.motes, U) : null; if (motes) scene.add(motes);
 
   // Lazy per-cell state: static candidates (deterministic) + dynamic visibility/heights (terrain, structures).

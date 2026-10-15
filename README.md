@@ -1299,3 +1299,6 @@ See [progressive opening](docs/PROGRESSIVE-START-20261015.md) for the 39-model e
 ### Faster cold opening and prepared pick (2026-10-15)
 
 See [measurements, exact lighting and first-pick verification](docs/COLD-START-PICK-20261015.md) for the complete-world loading improvement, held-effect reuse, cache fallback and reproduction commands.
+
+
+Lossless texture delivery (2026-10-15): see docs/LOSSLESS-DOWNLOADS-20261015.md for smaller first downloads, exact geometry/pixel checks, original-file fallbacks, browser acceptance, timings and release evidence.

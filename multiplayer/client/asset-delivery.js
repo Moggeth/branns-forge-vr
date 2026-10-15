@@ -1,4 +1,4 @@
-// Native streaming decompression preserves every authored model byte. The
+// Native streaming decompression preserves every packaged model byte. The
 // content hash gives repeated visits an immutable URL without stale art after updates.
 const prefetched=new Map();
 const consumedByStore=new WeakMap();

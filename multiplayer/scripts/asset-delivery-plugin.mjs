@@ -3,6 +3,7 @@ import {gzip} from 'node:zlib';
 import {promisify} from 'node:util';
 import {createHash} from 'node:crypto';
 import {fingerprintSource} from './lighting-fingerprint.mjs';
+import {createLosslessImageOptimizer,optimizeModel} from './lossless-textures.mjs';
 const compress=promisify(gzip);
 const root=new URL('../public/assets/',import.meta.url);
 export async function packAsset(bytes){
@@ -16,15 +17,25 @@ export function assetDelivery(){
     async transform(code,id){
       if(!id.replaceAll('\\','/').endsWith('/client/asset-delivery-manifest.js'))return null;
       manifestPromise??=(async()=>{
-        const entries=[];let raw=0,packed=0;
+        const entries=[],textures={},report={models:[],textures:[]},optimizeImage=createLosslessImageOptimizer();let raw=0,packed=0;
         for(const name of (await readdir(root)).filter(n=>n.endsWith('.glb')).sort()){
-          const input=await readFile(new URL(name,root)),output=await packAsset(input);
+          const input=await readFile(new URL(name,root)),original=await packAsset(input),optimized=await packAsset(await optimizeModel(input,optimizeImage));
+          const output=optimized.bytes.length<original.bytes.length?optimized:original;
           if(output.bytes.length>=input.length)continue;
           const fileName=`assets/packed/${name.slice(0,-4)}.${output.hash}.glb.gz`;
           this.emitFile({type:'asset',fileName,source:output.bytes});
           entries.push([`/assets/${name}`,`/${fileName}`]);raw+=input.length;packed+=output.bytes.length;
+          report.models.push({name,url:`/${fileName}`,before:original.bytes.length,after:output.bytes.length});
         }
-        console.log(`asset-delivery: ${entries.length} exact GLBs, ${raw} -> ${packed} bytes (${Math.round((1-packed/raw)*100)}% smaller)`);
+        for(const name of (await readdir(root)).filter(n=>n.endsWith('.png')).sort()){
+          const input=await readFile(new URL(name,root)),output=await optimizeImage(input);
+          if(output.equals(input))continue;
+          const hash=createHash('sha256').update(output).digest('hex').slice(0,16),fileName=`assets/packed/${name.slice(0,-4)}.${hash}.webp`;
+          this.emitFile({type:'asset',fileName,source:output});textures[`/assets/${name}`]=`/${fileName}`;
+          report.textures.push({name,url:`/${fileName}`,before:input.length,after:output.length});
+        }
+        this.emitFile({type:'asset',fileName:'assets/download-report.json',source:JSON.stringify(report,null,2)});
+        console.log(`asset-delivery: ${entries.length} lossless models, ${raw} -> ${packed} bytes (${Math.round((1-packed/raw)*100)}% smaller)`);
         const environments={},lighting=new URL('lighting/',root),metadata=JSON.parse(await readFile(new URL('room-environment.json',lighting),'utf8'));
         const threeVersion=JSON.parse(await readFile(new URL('../node_modules/three/package.json',import.meta.url),'utf8')).version;
         const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -35,10 +46,10 @@ export function assetDelivery(){
           const fileName=`assets/packed/room-${variant.size}.${hash.slice(0,16)}.bfenv.gz`;
           this.emitFile({type:'asset',fileName,source:bytes});environments[variant.size]=`/${fileName}`;
         }
-        return {models:Object.fromEntries(entries),environments};
+        return {models:Object.fromEntries(entries),textures,environments};
       })();
       const manifest=await manifestPromise;
-      return {code:`export const PACKED_ASSETS=${JSON.stringify(manifest.models)};export const BAKED_ENVIRONMENTS=${JSON.stringify(manifest.environments)};`,map:null};
+      return {code:`export const PACKED_ASSETS=${JSON.stringify(manifest.models)};export const PACKED_TEXTURES=${JSON.stringify(manifest.textures)};export const BAKED_ENVIRONMENTS=${JSON.stringify(manifest.environments)};`,map:null};
     },
   };
 }
