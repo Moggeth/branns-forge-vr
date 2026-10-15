@@ -92,3 +92,56 @@ Timing evidence: `logs/work-timing.csv`, including unsuccessful strategies.
   and the terrain test searched only direct scene children. Preserve preloaded
   readiness and locate the named GroundDetail instance through the group. The
   terrain placement assertions remain intact; none was moved to the stale suite.
+
+
+## Released and checked on production
+
+PR #104 merged as `830cc7e`; its tree exactly matched tested PR head `e3062aa`
+(`25bf8bacf76acfd793dc074cad000edb9fc3e2b2`). Corrected required CI run
+38667225181 passed **213/213 suites in 360.9 s**; the check job took 391 s.
+The first run found the preloaded-fixture issue above (253 s job, 223.7 s suites).
+Production deployment 38667852674 succeeded in **42 s** on the existing project
+and domain. No room service, credentials or public destination was changed.
+
+The hosted HTML identified `830cc7e - 10-15 01:51Z`. HTTP was 200 and packed
+models retained the immutable one-year cache header. Fresh hosted Chromium
+navigation to ready measured **7.234 s**, including **6.181 s** renderer time;
+39 packed models transferred 26,176,609 bytes including resource overhead.
+Reload measured **2.448 s**, renderer 2.232 s, **39/39 model cache hits** and zero
+model transfer bytes. All transferred resources on reload totalled 6,600 bytes.
+These live timings differ from the paired local comparison and do not establish
+an instant first visit. No HTTP routes were used in the cache benchmark.
+
+Separate hosted acceptance held streamed weapon responses and exercised actual
+solo entry, demand priority, cancellation, swaps and all ten scenery groups on
+desktop and touch landscape. Both passed with null startup errors and no browser
+errors. Those tests use offline room stubs and do not create public rooms.
+Evidence: `logs/progressive-production-controls.log` and
+`logs/progressive-production-repeat-visits.json`.
+
+A further local first-swap probe found a remaining first-pick frame spike:
+158.2 ms before and 191.7 ms with progressive delivery in one paired run; p95 was
+8.4 ms in both. First crossbow max was 16.7 versus 25.0 ms (p95 ~16.7 ms).
+These single observations do not prove a regression or stall-free first use.
+Compilation and texture preparation do not guarantee every first draw is free
+of driver/buffer-upload cost. Treat bounded GPU first-draw preparation as a next
+performance investigation, and keep it against the real rendering target.
+Raw evidence: `logs/compare-progressive-swaps.log`. Do not claim this release
+makes every first action seamless or physical phones consistently 60 FPS.
+
+The optional read-only WorkCodex review failed before producing findings:
+Azure returned HTTP 401, principal lacks API/operation access. Wrapper metadata
+recorded **9 s** with its internal reconnects. Do not repeat that strategy until
+access changes; the release used local code review, focused checks, real browser
+acceptance and full required CI instead.
+
+PowerShell revision expressions containing braces must be quoted, for example
+`git rev-parse 'HEAD^{tree}'`; an unquoted expression was interpreted as a
+script block during release preparation. The quoted tree comparison succeeded.
+For future startup work, include `node tests/progressive-sunder.mjs` in the quick
+pre-push set, since it checks preloaded scatter transforms as well as terrain.
+
+Measured elapsed time through hosted verification: 1737.1 s.
+Detailed timing rows include overlapping review/CI/browser work and must not be
+summed as sequential elapsed time. Owned local preview servers and test browsers
+were stopped; the original diverged checkout and its user files were preserved.
