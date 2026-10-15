@@ -26,7 +26,7 @@ function bayPlate(kind,amount){if(typeof document==='undefined')return null;cons
   g.textAlign='center';g.textBaseline='middle';g.font='700 40px Georgia, serif';g.fillStyle=BAY_COLORS[kind]||'#ffe1a0';g.fillText(`${n} ${materialLabel(kind)}`,128,45);tex.needsUpdate=true;};
  const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sprite.scale.set(.66,.23,1);sprite.renderOrder=3;sprite.userData.ownMaterial=true;sprite.userData.draw=draw;sprite.userData.amount=amount;draw(amount);return sprite;}
 export function createWorldContent({scene,templates,instantiate,height,camera=null}) {
- const objects=new Map(),batches=[],formations=[],decorationGroups=new Map(),readyDecorations=new Set();let generation=0,alive=true;let terrainKey=null,foundationKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
+ const objects=new Map(),batches=[],formations=[],decorationGroups=new Map(),readyDecorations=new Set(DECORATION_ASSETS.filter(name=>templates.has(name)));let generation=0,alive=true;let terrainKey=null,foundationKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
  const resourceArt=createResourceArt();let miningWarmup=null;
  const resourceVariant=id=>{let h=2166136261;for(const ch of id)h=Math.imul(h^ch.charCodeAt(0),16777619);return (h>>>0)%3;};
  const treeView=createTreeView({scene,templates,height,camera});
@@ -94,7 +94,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   const group=new T.Group();
   for(const name of names){const n=DECORATION_ASSETS.indexOf(name);if(decorationGroups.has(name))continue;const template=templates.get(name);if(!template)continue;decorationGroups.set(name,{group,reveal:null});template.scene.updateMatrixWorld(true);const points=[];
    for(let i=0;i<65;i++){const h=((Math.imul(i+1,73856093)^Math.imul(n+1,19349663)^s.seed)>>>0);const a=h*.000001,r=5+Math.sqrt((h%1000)/1000)*45,x=Math.sin(a)*r,z=Math.cos(a)*r;if(Math.abs(x)<1.5&&z>0&&z<16)continue;points.push({x,z,angle:a,scale:.7+(h%70)/100});}
-   template.scene.traverse(c=>{if(!c.isMesh)return;const mesh=new T.InstancedMesh(c.geometry,c.material,points.length);group.add(mesh);batches.push({mesh,points,local:c.matrixWorld.clone()});});
+   template.scene.traverse(c=>{if(!c.isMesh)return;const mesh=new T.InstancedMesh(c.geometry,c.material,points.length);mesh.name=`GroundDetail:${name}`;group.add(mesh);batches.push({mesh,points,local:c.matrixWorld.clone()});});
   }
   return group;
  }

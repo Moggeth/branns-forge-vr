@@ -47,3 +47,7 @@ const data={id:'remote',role:'hero',tool:'axe',hp:100,position:[0,0,0]},body=vie
 view.update(body,data,holder,1/60,eye);const old=body.userData.weapon;assert.ok(old);
 view.update(body,{...data,tool:'pick'},holder,1/60,eye);assert.equal(body.userData.weapon,old);
 available.add('pick');view.update(body,{...data,tool:'pick'},holder,1/60,eye);assert.notEqual(body.userData.weapon,old);assert.equal(body.userData.weaponTool,'pick');view.release(body);view.dispose();
+
+// Preloaded fixtures retain complete scenery immediately; transforms follow terrain.
+const readyScene=new T.Scene(),readyContent=createWorldContent({scene:readyScene,templates:new Map([['grass_tuft',template()]]),height:()=>3});
+readyContent.sync(snapshot);const readyGrass=readyScene.getObjectByName('GroundDetail:grass_tuft');assert.ok(readyGrass?.isInstancedMesh);assert.equal(readyGrass.material,material);const transform=new T.Matrix4();readyGrass.getMatrixAt(0,transform);assert.equal(transform.elements[13],3);readyContent.dispose();

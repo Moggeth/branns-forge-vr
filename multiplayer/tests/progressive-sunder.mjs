@@ -77,7 +77,7 @@ assert.ok(maxError<1e-6);geometry.dispose();mesh.material.dispose();
  const scene=new T.Scene(),template=new T.Group();template.add(new T.Mesh(new T.BoxGeometry(1,1,1).translate(0,.5,0),new T.MeshBasicMaterial()));
  const templates=new Map([['boulder',{scene:template}],['bank',{scene:template}],['grass_tuft',{scene:template}]]);
  const content=createWorldContent({scene,templates,height:(x,z)=>terrainHeight(current,x,z,false)});
- const blank={...middle,tick:0,edits:[]};current=blank;content.sync(blank);const scatter=scene.children.find(n=>n.isInstancedMesh&&n.count>0);assert.ok(scatter);const matrix=new T.Matrix4();scatter.getMatrixAt(0,matrix);assert.ok(Math.hypot(matrix.elements[12],matrix.elements[14])>1,'fresh empty-edits scatter receives its transforms');
+ const blank={...middle,tick:0,edits:[]};current=blank;content.sync(blank);const scatter=scene.getObjectByName('GroundDetail:grass_tuft');assert.ok(scatter);const matrix=new T.Matrix4();scatter.getMatrixAt(0,matrix);assert.ok(Math.hypot(matrix.elements[12],matrix.elements[14])>1,'fresh empty-edits scatter receives its transforms');
  current={...middle,tick:0,deposits:[{id:'ore',kind:'stone',x:13,z:10,hits:0,maxHits:3,depleted:false}]};content.sync(current);
  const target=content.targets().find(x=>x.userData.targetId==='ore');assert.ok(target);const before=target.position.y;
  current={...current,tick:36};content.sync(current);assert.equal(content.targets().find(x=>x.userData.targetId==='ore'),target);assert.ok(target.position.y<before-.5);assert.equal(target.position.y,terrainHeight(current,13,10,false));content.dispose();template.children[0].geometry.dispose();template.children[0].material.dispose();

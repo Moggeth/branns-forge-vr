@@ -86,3 +86,9 @@ frontend if packed assets are absent; no room Worker change is required.
   clips must explicitly provide an empty animations array.
 
 Timing evidence: `logs/work-timing.csv`, including unsuccessful strategies.
+
+- First required CI run caught a preloaded-fixture regression (212/213 passed in
+  223.7 s): constructor-supplied decoration templates were treated as unprepared,
+  and the terrain test searched only direct scene children. Preserve preloaded
+  readiness and locate the named GroundDetail instance through the group. The
+  terrain placement assertions remain intact; none was moved to the stale suite.
