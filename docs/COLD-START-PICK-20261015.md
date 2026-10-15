@@ -100,3 +100,7 @@ logs/work-timing.csv; overlapping steps must not be summed as elapsed time.
 - Use absolute log paths when mixing repo-root and multiplayer tools. Locate
   installed Three sources with rg --files rather than guessing package paths.
 - WorkCodex's known Azure 401 was not retried without an access change.
+- Source fingerprints normalize line endings. Review caught 178 Windows CRLF
+  lines versus LF in Git: raw hashing would falsely reject Linux CI. Only source
+  text normalizes; binary/pixel hashes remain exact. EOL normalization does not
+  require a GPU re-bake because JavaScript evaluates the same template text.

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {gunzipSync,gzipSync} from 'node:zlib';import {createHash} from 'node:crypto';
 import {encodeEnvironment,decodeEnvironment} from '../client/environment-codec.js';
 import {loadEnvironmentPixels,prefetchEnvironment} from '../client/environment-delivery.js';
+import {fingerprintSource} from '../scripts/lighting-fingerprint.mjs';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 for(const grey of [false,true]){
  const pixels=Uint16Array.from({length:96},(_,i)=>(i*63131)&65535);
@@ -11,6 +12,9 @@ for(const grey of [false,true]){
  for(const broken of [encoded.slice(0,8),encoded.slice(0,-1),new Uint8Array(encoded).fill(0,8,10)])assert.throws(()=>decodeEnvironment(broken));
 }
 const metadata=JSON.parse(readFileSync(new URL('../public/assets/lighting/room-environment.json',import.meta.url)));
+assert.equal(fingerprintSource('a\r\nb\r'),fingerprintSource('a\nb\n'),'Windows and Linux source text agree');
+assert.equal(metadata.source,fingerprintSource(readFileSync(new URL('../node_modules/three/examples/jsm/environments/RoomEnvironment.js',import.meta.url))));
+assert.equal(metadata.atmosphere,fingerprintSource(readFileSync(new URL('../client/atmosphere-materials.js',import.meta.url))));
 assert.deepEqual(metadata.variants.map(v=>v.size),[128,256]);
 for(const variant of metadata.variants){
  const packed=readFileSync(new URL('../public/assets/lighting/'+variant.file,import.meta.url));assert.equal(hash(packed),variant.encodedSha256);

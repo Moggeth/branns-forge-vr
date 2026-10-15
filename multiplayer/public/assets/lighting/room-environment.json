@@ -1,7 +1,7 @@
 {
   "three": "0.186.1",
   "source": "55f466192cc84298755a424c5e040345006b2ee1455589b3b54126c2ea4123f4",
-  "atmosphere": "37d5bdc4f7050585ef078b951f5bbeba10ac7b043ee676e2029408b317e30051",
+  "atmosphere": "c545672816536754632b1dc244222268b8b82cdc5a93bbf8ba40b321fba7ceea",
   "sigma": 0.04,
   "near": 0.1,
   "far": 100,
