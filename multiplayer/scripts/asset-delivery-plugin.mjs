@@ -2,6 +2,7 @@ import {readdir,readFile} from 'node:fs/promises';
 import {gzip} from 'node:zlib';
 import {promisify} from 'node:util';
 import {createHash} from 'node:crypto';
+import {fingerprintSource} from './lighting-fingerprint.mjs';
 const compress=promisify(gzip);
 const root=new URL('../public/assets/',import.meta.url);
 export async function packAsset(bytes){
@@ -24,9 +25,20 @@ export function assetDelivery(){
           entries.push([`/assets/${name}`,`/${fileName}`]);raw+=input.length;packed+=output.bytes.length;
         }
         console.log(`asset-delivery: ${entries.length} exact GLBs, ${raw} -> ${packed} bytes (${Math.round((1-packed/raw)*100)}% smaller)`);
-        return Object.fromEntries(entries);
+        const environments={},lighting=new URL('lighting/',root),metadata=JSON.parse(await readFile(new URL('room-environment.json',lighting),'utf8'));
+        const threeVersion=JSON.parse(await readFile(new URL('../node_modules/three/package.json',import.meta.url),'utf8')).version;
+        const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+        if(metadata.sigma!==.04||metadata.near!==.1||metadata.far!==100||metadata.variants.map(v=>v.size).join(',')!=='128,256'||metadata.three!==threeVersion||metadata.source!==fingerprintSource(await readFile(new URL('../node_modules/three/examples/jsm/environments/RoomEnvironment.js',import.meta.url)))||metadata.atmosphere!==fingerprintSource(await readFile(new URL('../client/atmosphere-materials.js',import.meta.url))))throw Error('Fixed lighting bake is stale; regenerate with scripts/bake-room-environment.mjs');
+        for(const variant of metadata.variants){
+          const bytes=await readFile(new URL(variant.file,lighting)),hash=digest(bytes);
+          if(hash!==variant.encodedSha256)throw Error('Fixed lighting bake hash mismatch');
+          const fileName=`assets/packed/room-${variant.size}.${hash.slice(0,16)}.bfenv.gz`;
+          this.emitFile({type:'asset',fileName,source:bytes});environments[variant.size]=`/${fileName}`;
+        }
+        return {models:Object.fromEntries(entries),environments};
       })();
-      return {code:`export const PACKED_ASSETS=${JSON.stringify(await manifestPromise)};`,map:null};
+      const manifest=await manifestPromise;
+      return {code:`export const PACKED_ASSETS=${JSON.stringify(manifest.models)};export const BAKED_ENVIRONMENTS=${JSON.stringify(manifest.environments)};`,map:null};
     },
   };
 }

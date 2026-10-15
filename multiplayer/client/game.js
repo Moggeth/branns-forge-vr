@@ -43,7 +43,7 @@ import {createEnemyShadowBudget} from './enemy-shadow-budget.js';
 import {createMeteorCreaturePresentation} from './meteor-creature.js';
 import {SPELLS,settleCastPoint} from '../shared/spells.js';
 import {createSettlementView} from './settlement-view.js';
-import {syncWeaponReadiness} from './weapon-readiness.js';
+import {createWeaponReadinessCache} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {enhanceWyrmspoutTemplate} from './wyrmspout-look.js';
 import {enhancePickTemplate} from './pick-luminance.js';
@@ -106,7 +106,7 @@ import {createForgeView} from './forge-view.js';
 import {createFirePresentation,createEmberdewModel} from './fire-presentation.js';
 import {forgeFloor,resolveForge} from '../shared/forge-collision.js';
 import {terrainHeight as simulationHeight,createSimulation} from '../shared/simulation.js';
-import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createRoomEnvironment} from './room-environment.js';
 import {createVRAdventurePanel} from './vr-adventure-panel.js';
 import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} from './vr-input-policy.js';
 import {createExpeditionPresentation} from './expedition-presentation.js';
@@ -191,6 +191,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const remoteBatches=new Map();
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
   let axeModel = null, touchEnabled = false, fixedAim = null;
+  const readinessCache=createWeaponReadinessCache();
   let heldReadiness = null, failedReadinessRoot = null;
   const reducedWeaponMotion=!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const touchAxes = {left: {x: 0, y: 0}, right: {x: 0, y: 0}};
@@ -223,12 +224,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   renderer.toneMappingExposure = 1.0;
   renderer.localClippingEnabled = true;
   yield;
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const roomEnvironment = new RoomEnvironment();
-  const environment = pmrem.fromScene(roomEnvironment, .04, .1, 100, {size:mobileBudget?128:256});
-  scene.environment = environment.texture;
+  startup.environment={};
+  const environment=createRoomEnvironment({renderer,scene,size:mobileBudget?128:256,stats:startup.environment,cancelled:()=>disposed});
   scene.environmentIntensity = .55;
-  roomEnvironment.dispose(); pmrem.dispose();
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 180);
@@ -908,7 +906,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(name==='stormreel')stormView.installCrossbow(gltf);
     if (['axe','pick','hammer','crossbow','bow','wyrmspout','stormreel','staff'].includes(name)) {
       const model = instantiate(name, WEAPON_HEIGHTS[name]);
-      if(startup.ready){updateWeaponPresentation(model,name,{draw:0,recoil:0,time:0,templates});await prepareStreamed(model);if(disposed)return;}
+      const readinessAt=performance.now();readinessCache.prepare({root:model,tool:name,reducedMotion:reducedWeaponMotion});
+      (startup.weaponPreparation??={})[name]={readinessMs:performance.now()-readinessAt};
+      if(startup.ready||startup.phase!=='assets'){updateWeaponPresentation(model,name,{draw:0,recoil:0,time:0,templates});await prepareStreamed(model);if(disposed)return;}
       weaponModels.set(name,model);
       if (name === tool) equipVisual(tool);
     } else if (DECORATION_ASSETS.includes(name)&&startup.ready) await content.installDecoration(name,prepareStreamed);
@@ -1857,7 +1857,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(tool==='limb'&&!renderer.xr.isPresenting&&role==='hero')combat.poseLocalHeld?.(playerId,weaponAnchor);
     tickPhysicalMelee(now,dt);
     const heldRoot=tool==='limb'?combat.heldLimbRoot(playerId):axeModel;
-    if(!heldRoot||heldRoot!==failedReadinessRoot){try{heldReadiness=syncWeaponReadiness(heldReadiness,{root:heldRoot,tool,reducedMotion:reducedWeaponMotion});}catch(error){failedReadinessRoot=heldRoot;heldReadiness=null;report(`Weapon readiness: ${error.message}`);}}
+    if(!heldRoot||heldRoot!==failedReadinessRoot){try{heldReadiness=readinessCache.select({root:heldRoot,tool,reducedMotion:reducedWeaponMotion});}catch(error){failedReadinessRoot=heldRoot;heldReadiness=null;report(`Weapon readiness: ${error.message}`);}}
     const readiness=weaponReadiness(snapshot.players.find(p=>p.id===playerId),tool,snapshot.tick);
     heldReadiness?.update({...readiness,time:now/1000,focus:tool==='pick'?pickWallMotion.pose(performance.now()/1000)?.focus||0:0});
     axeReadyCue.update(role==='hero'&&heldReadiness?tool:null,readiness.specialReady);
@@ -1921,7 +1921,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const representatives=new THREE.Group(),warmHeroes=[];let treeWarmup,miningWarmup,abilityWarmup,wallWarmup;
     try{
       assetQueue.start();
-      await prepareStartup('assets',()=>Promise.all(assetInstalls));if(disposed)return;
+      await prepareStartup('assets',()=>Promise.all([...assetInstalls,environment.ready]));if(disposed)return;
       await yieldToBrowser();
       // Build the default render-only world before compiling, even in the empty
       // lobby. Do not initialize a player or step/publish this preview state.
@@ -2059,7 +2059,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),readiness:readinessCache.stats(),programs:renderer.info.programs.length,startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -2083,7 +2083,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     dispose() {
       voiceBadges.dispose(); setVoiceZoneResolver('home-taverns', null);
       if (disposed) return;
-      clearInput(); active = false; disposed = true;dragonRide.dispose();heldReadiness?.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();cornerGround.dispose();
+      clearInput(); active = false; disposed = true;dragonRide.dispose();readinessCache.dispose();pickupHighlight.dispose();mountainArena.dispose();alpineForest.dispose();cornerGround.dispose();
       clearTimeout(zeroInputTimer);
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
