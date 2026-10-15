@@ -81,3 +81,40 @@ Stop only the owned Vite/Wrangler diagnostics. Refresh after an approved release
 - Legacy README/VERIFICATION contain non-UTF-8 bytes; `apply_patch` rejected the
   multi-file documentation patch before writes. Preserve their bytes and insert
   ASCII link text with byte-based editing, rather than silently recoding old history.
+
+
+## Released and verified
+
+PR #102 was squash-merged to main as `fb0ff46929a5dc4e2c56b4c6d222cb5ea77bf93a`.
+Standing approval was authored in `d85d9d7` and is included in that merge.
+Required PR CI passed **210/210 suites in 337.4 s** (check job 384 s).
+The separate known-stale job reports 0/9, as expected by its existing nonblocking
+configuration; this release does not claim those historical checks were repaired.
+
+Production workflow run `38661228635` passed in **35 s** and published that exact
+revision. Before dispatch, the PR head and merged main tree hashes were identical
+(`e9fabdbab6285995c3acc8eae37f40ab225998ce`), so the existing manual production
+workflow could release the tested files while main's duplicate CI continued.
+The workflow retained its newest-main, service-readiness and asset-staging gates.
+
+The production root returned HTTP 200 and its served lobby identified itself as
+`fb0ff46` with a 250 ms relay timer and the recovery-availability fix. Bundle check:
+1.696 s. Hosted desktop and phone-width browser checks then passed, including real
+rendering, entering solo, controls activation, no browser errors, and screenshots.
+The two-browser harness took 26.758 s. Asset/render startup measured 11.687 s desktop
+and 5.685 s phone emulation on this runner: these are separate from connection
+recovery, so they must not be described as instant initial cold loading.
+Evidence is in ignored `logs/production-recovery-results.json` and
+`logs/production-recovery-browser/`. The solo checks intercepted room traffic and
+created no public test room. Physical devices and separate-network timings remain
+unverified.
+
+Release verification fast path: run `multiplayer/scripts/check-room-service.mjs`
+with `PEER_URL=wss://branns-forge-rooms.fauxgrady.workers.dev/peer/cloud` (or the
+existing `VITE_PEER_WS_URL`); omitting it correctly rejects publication. A Python
+urllib health probe on this machine failed certificate validation with an expired
+certificate; the Node release gate and Chromium verified the live service using
+normal certificate checks. Use that maintained gate instead of disabling TLS
+verification. The root cause of the Python-specific certificate failure was not
+established. Do not retry it as an availability test or weaken the application's
+TLS settings.
