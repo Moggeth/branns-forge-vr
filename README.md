@@ -1,6 +1,6 @@
 Mobile startup and adaptive rendering: [implementation, measurements and real-device limits](docs/MOBILE-RESPONSIVENESS-20261008.md).
 
-World recovery follow-up (2026-10-15): prepared fix reduces stalled-direct fallback from eight seconds to 250 ms and retries host departure immediately. [Measured checks and handoff](docs/INSTANT-WORLD-RECOVERY-20261015.md). Publication awaits approval. These are local results.
+World recovery follow-up (2026-10-15): prepared fix reduces stalled-direct fallback from eight seconds to 250 ms and retries host departure immediately. [Measured checks and handoff](docs/INSTANT-WORLD-RECOVERY-20261015.md). Publishing is authorized under the project standing approval. Measurements below are from local verification.
 
 Camera black-flash containment: [GPU findings and regression](docs/CAMERA-BLACK-FLASH-20261007.md).
 

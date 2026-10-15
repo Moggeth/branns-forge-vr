@@ -4,7 +4,8 @@ Prepared from remote main `8de545f` in isolated branch `codex/instant-recovery`.
 The original main checkout is three commits ahead and 149 behind origin/main;
 its asset-browser changes and untracked native files remain untouched.
 GitHub reports `Moggeth/branns-forge-vr` is public, despite older private-repository
-notes. Publishing this branch and deploying it await user approval.
+notes. The user approved routine public pushes, merges and releases on 2026-10-15;
+this standing approval is now recorded in AGENTS.md.
 
 ## Avoidable delays
 

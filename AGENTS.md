@@ -1,7 +1,7 @@
 # Brann's Forge VR — working agreements
 The active shipped game is multiplayer/ (Three.js, Vite, shared JavaScript simulation and WebXR). Start with docs/CLAUDE-HANDOFF-20261003.md. godot/ is the preserved native predecessor (Godot 4.7.2 + SteamVR OpenXR), not the browser runtime. service/ is its isolated Node forge/voice/bounty bridge. native/ preserves an unbuilt Unity draft; it is not the runnable project and is not on the critical path. Unity 6000.0.33f1 failed licensing on this machine. Do not retry Unity builds until that external state changes.
 
-Preserve C:/Users/mog/OneDrive/Documents/BomberWLAN unchanged. This child project is its own Git repository, with private `Moggeth/branns-forge-vr` as `origin`; follow the user's current Git/auth/publishing instructions and never push the unrelated BomberWLAN checkout. Global agreements from the task apply, including measured timings, small scoped commits, account/visibility checks before remote work, durable logging and README handoff.
+Preserve C:/Users/mog/OneDrive/Documents/BomberWLAN unchanged. This child project is its own Git repository, with `Moggeth/branns-forge-vr` as `origin`; follow the user's current Git/auth/publishing instructions and never push the unrelated BomberWLAN checkout. Global agreements from the task apply, including measured timings, small scoped commits, account/visibility checks before remote work, durable logging and README handoff.
 
 **Patch notes:** every PR that changes the browser game adds one player-facing entry file in multiplayer/patch-notes/ (see its README for format and tone; CI enforces it on pull requests).
 
@@ -39,3 +39,21 @@ WorkCodex: wrapper fails in a new non-Git directory without --skip-git-repo-chec
 Player-facing art and interaction rule (2026-10-03): Do not leave visible placeholder spheres, cubes, capsules or default primitives where a real object, creature, pickup, structure or magical entity is intended. Commission explicit Claude Opus 5.5 through the verified personal subscription for these replacements and visual/UI design. Primitives may be modelling building blocks inside finished authored assets; debug proxies belong only in developer modes. Frequent gameplay actions need direct world interactions, hotkeys or a compact quick-access tray; do not require nested menus for known build/equip/cast actions.
 
 Every player-facing failure must explain why and how to recover. Prefer authoritative structured reason/recourse and matching preview validation over generic Invalid placement or Failed messages.
+
+
+## Standing approval for fixes and releases (2026-10-15)
+
+The user authorizes routine fixes and improvements in this project to be pushed,
+merged and deployed as work is completed, without asking for approval each time.
+This approval explicitly includes the public `Moggeth/branns-forge-vr` repository
+and the existing production site `https://branns-forge-multiplayer.vercel.app`.
+Do not change repository visibility as a prerequisite. This project-specific
+approval overrides the global requirement to ask before publishing to a public
+repository for this project.
+
+Continue to verify the project-appropriate GitHub identity, preserve unrelated
+local work, create scoped commits, report commit hashes and pushed branches, and
+run appropriate checks before merging and releasing. Prefer a review PR and the
+existing CI/deployment workflow. Verify the actual live revision after release.
+The approval does not authorize unrelated projects, new publishing destinations,
+paid services, credential changes, or destructive actions.
