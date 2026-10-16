@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Underways in game</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// The real game renderer (client/game.js) on a real in-page simulation with a Hero who walks into the arena's
+// Underway entrance. window.lab drives review captures: lab.advance(ticks), lab.enter(), lab.room(beat, {at, look}),
+// lab.spot(x, z, lookX, lookZ) in dungeon-local metres, lab.surface(x, z, lookX, lookZ) on the map, lab.info().
+// ?touch for the phone layout, ?manual to freeze time between advances.
+import * as THREE from 'three';
+import {createGame} from '../client/game.js';
+let labScene=null;{const add=THREE.Scene.prototype.add;THREE.Scene.prototype.add=function(...o){labScene=labScene||this;return add.apply(this,o);};}
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {ARENA_UNDERWAYS} from '../shared/underways/sites.js';
+import {slotOrigin} from '../shared/underways/space.js';
+import {generateUnderway,roomCenter} from '../shared/underways/gen.js';
+const params=new URLSearchParams(location.search),touch=params.has('touch'),manual=params.has('manual');
+let sim=createSimulation({room:'LAB',seed:Number(params.get('seed')||41)});sim.addPlayer({id:'me',name:'Lab',role:'hero'});
+const S=()=>sim.adventureWorld(),me=()=>S().players[0];
+let seq=1,pending=[],last=performance.now(),faceYaw=0;
+const canvas=document.getElementById('c');
+const game=createGame({canvas,isHost:()=>true,onAction:(action,d={})=>{const r=sim.command('me',{type:'action',seq:seq++,action,...d});pending.push(...(r.events||[]));},
+  onInput:input=>sim.command('me',{type:'input',seq:seq++,...input}),onCast:()=>{},onStatus:m=>{window.lastStatus=m;}});
+game.setTouchEnabled(touch);
+function flush(){game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+function pump(){const now=performance.now();let n=Math.min(12,Math.round((now-last)/16.667));last+=n*16.667;for(let i=0;i<n;i++)pending.push(...sim.step());flush();}
+function advance(n){for(let i=0;i<n;i++)pending.push(...sim.step());flush();}
+function teleport(x,z,lx,lz,ev){const p=me();p.position=[x,terrainHeight(S(),x,z),z];p.vy=0;p.yaw=faceYaw=Math.atan2(-(lx-x),-(lz-z));p.protectedUntil=S().tick+1e6;pending.push({kind:ev||'underway_enter',id:'me',position:[...p.position],yaw:p.yaw});flush();game.setLook(faceYaw,Number(params.get('pitch')||-.05));}
+const run=()=>S().underways.runs[0],dungeon=()=>{const r=run();return r&&generateUnderway(r.seed,{style:r.style,depth:r.depth});};
+function enter(){const s=ARENA_UNDERWAYS[0];const p=me();p.position=[s.mouth[0],terrainHeight(S(),s.mouth[0],s.mouth[1]),s.mouth[1]];advance(2);faceYaw=me().yaw;game.setLook(faceYaw,-.05);return {run:run(),name:dungeon()?.name};}
+function spot(x,z,lx,lz){const [ox,oz]=slotOrigin(run().slot);teleport(x+ox,z+oz,lx+ox,lz+oz);}
+function room(beat,{wake=true,back=0}={}){const d=dungeon(),q=d.rooms.find(r=>r.beat===beat),[cx,cz]=roomCenter(q),[ix,iz]=q.path[0],[tx,tz]=q.path[2];
+  const t=back?.15:.35,x=ix+(cx-ix)*t,z=iz+(cz-iz)*t;spot(x,z,back?cx:tx,back?cz:tz);if(wake)advance(2);return q;}
+window.lab={game,advance,enter,spot,room,dungeon,run,sim:()=>sim,S,me,surface:(x,z,lx,lz)=>teleport(x,z,lx,lz,'underway_leave'),
+  info:()=>({...game.diagnostics().underways,tick:S().tick}),scene:()=>labScene,hide:(...names)=>{for(const n of names)labScene.getObjectByName(n)&&(labScene.getObjectByName(n).visible=false);}};
+if(!manual)setInterval(pump,50);advance(1);
+game.setActive(true);
+const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r();}},100);});
+await wait();game.setActive(true);document.title='ready';
+</script>

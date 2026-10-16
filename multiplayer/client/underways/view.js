@@ -1,0 +1,256 @@
+// The Underways in the game: every open dungeon run drawn at its slot (shell, props, hazards, chests, key and gate,
+// shrine, guardian's hoard and the ways out), the surface entrances, and the change of light as you go down.
+// Presentation only: all rules are shared/underways/rules.js; everything visible here is derived from the snapshot and
+// the render tick (estimated, fractional), so hazards and gates move every frame, never in 20 Hz steps.
+//
+// Light: inside, the sun, sky light and reflections give way to the dungeon's own baked fire- and crystal-light; one
+// pooled point light rides with the viewer as their lantern (always in the scene, zero outside: no shader recompiles).
+import * as THREE from 'three';
+import {generateUnderway, GRID, TILE, floorHeight, ceilingAt} from '../../shared/underways/gen.js';
+import {inUnderway, slotOf, slotOrigin, GATE_RISE} from '../../shared/underways/space.js';
+import {UNDERWAYS, hazardPhase} from '../../shared/underways/rules.js';
+import {ARENA_UNDERWAYS} from '../../shared/underways/sites.js';
+import {buildUnderwayShell, bakeAt, UNDERWAY_LOOK} from './build.js';
+import {shellMaterial, lookUniforms} from './look.js';
+import {underwayKit, crystalType, propMaterial, propTime} from './props.js';
+import {createUnderwayPortal} from './portal.js';
+import {createUnderwayCards} from './cards.js';
+import {ITEMS} from '../../shared/hero-items.js';
+
+const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+export const UNDERWAY_VIEW = Object.freeze({
+  lantern: Object.freeze({color: 0xffc58a, intensity: 7, distance: 12, decay: 1.5}),
+  dim: Object.freeze({sun: 1, hemi: .93, env: .85}),
+});
+
+function instanced(geo, mat, list, lightOf, name) {
+  if (!list.length) return null;
+  const mesh = new THREE.InstancedMesh(geo, mat, list.length), m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const light = new Float32Array(list.length * 3);
+  list.forEach((it, i) => {
+    p.set(it.x, it.y, it.z); q.setFromAxisAngle(up, it.yaw || 0); s.set(...(Array.isArray(it.scale) ? it.scale : [it.scale || 1, it.scale || 1, it.scale || 1]));
+    mesh.setMatrixAt(i, m.compose(p, q, s));
+    light.set(lightOf(it), i * 3);
+  });
+  geo = mesh.geometry; // shared kit geometry: the per-instance light rides on the mesh's own attribute copy
+  mesh.geometry = geo.clone();
+  mesh.geometry.setAttribute('aPropLight', new THREE.InstancedBufferAttribute(light, 3));
+  mesh.instanceMatrix.needsUpdate = true; mesh.computeBoundingSphere();
+  mesh.name = name; mesh.raycast = () => {}; mesh.castShadow = false; mesh.receiveShadow = false; mesh.userData.presentationOnly = true;
+  return mesh;
+}
+// A single prop mesh with its own baked light (dynamic ones: chests, key, gate, hoard).
+function single(geo, mat, light) {
+  const g = geo.clone(), n = g.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) a.set(light, i * 3);
+  g.setAttribute('aPropLight', new THREE.BufferAttribute(a, 3));
+  const mesh = new THREE.Mesh(g, mat); mesh.raycast = () => {}; mesh.userData.presentationOnly = true;
+  return mesh;
+}
+
+function buildRun(run, {quality, propMat}) {
+  const d = generateUnderway(run.seed, {style: run.style, depth: run.depth}), low = quality === 'low', t0 = performance.now();
+  const [ox, oz] = slotOrigin(run.slot), group = new THREE.Group(); group.name = `Underway_${run.id}`; group.position.set(ox, 0, oz);
+  const shell = buildUnderwayShell(d, {quality});
+  const meshes = [];
+  for (const [key, surface] of [['floor', 'floor'], ['walls', 'wall'], ['roof', 'roof']]) {
+    const mesh = new THREE.Mesh(shell[key], shellMaterial(d.style, surface, {low}));
+    mesh.name = `Underway_${run.id}_${key}`; mesh.raycast = () => {}; mesh.matrixAutoUpdate = false; mesh.userData.presentationOnly = true; mesh.frustumCulled = false;
+    group.add(mesh); meshes.push(mesh);
+  }
+  const kit = underwayKit(), lit = it => bakeAt(d, it.x, it.y + .8, it.z), Y = (x, z) => floorHeight(d, x, z);
+  // Static props, instanced per type.
+  const byType = new Map(), add = (type, it) => { if (!kit[type]) return; if (!byType.has(type)) byType.set(type, []); byType.get(type).push(it); };
+  for (const p of d.props) {
+    const type = p.type === 'crystal' ? crystalType(p.color) : p.type;
+    add(type, {x: p.x, y: Y(p.x, p.z), z: p.z, yaw: p.yaw, scale: p.scale});
+  }
+  // Mine corridors: timber sets every 2.5 m, rails down the spine.
+  if (d.style === 'mine') for (const c of d.corridors) {
+    const w = (c.axis === 'z' ? c.x1 - c.x0 + 1 : c.y1 - c.y0 + 1) * TILE, mid = c.axis === 'z' ? ((c.x0 + c.x1 + 1) / 2 - GRID / 2) * TILE : ((c.y0 + c.y1 + 1) / 2 - GRID / 2) * TILE;
+    const lo = c.axis === 'z' ? (c.y0 - GRID / 2) * TILE : (c.x0 - GRID / 2) * TILE, hi = c.axis === 'z' ? (c.y1 + 1 - GRID / 2) * TILE : (c.x1 + 1 - GRID / 2) * TILE;
+    const yaw = c.axis === 'z' ? 0 : Math.PI / 2;
+    for (let s = lo + .4; s <= hi - .3; s += 2.5) {
+      const [x, z] = c.axis === 'z' ? [mid, s] : [s, mid], y = Y(x, z), h = ceilingAt(d, x, z);
+      add('timber', {x, y, z, yaw, scale: [w - .15, h, 1]});
+    }
+    const spine = d.rooms[c.a].spine && d.rooms[c.b].spine;
+    if (spine) for (let s = lo + 1; s <= hi - .9; s += 2) { const [x, z] = c.axis === 'z' ? [mid, s] : [s, mid]; add('rails', {x, y: Y(x, z), z, yaw}); }
+  }
+  for (const v of d.vignettes) add(v.kind.endsWith('-sign') ? 'sign' : `tale-${v.kind}`, {x: v.x, y: Y(v.x, v.z), z: v.z, yaw: v.yaw});
+  add('returnCircle', {x: d.entry.x, y: Y(d.entry.x, d.entry.z), z: d.entry.z, yaw: 0});
+  // Hazard furniture (vents and loose roof patches); their motion is animated below.
+  const hazards = [];
+  for (const h of d.hazards) {
+    const y = Y(h.x, h.z);
+    if (h.type === 'flame') add('vent', {x: h.x, y, z: h.z, yaw: 0});
+    if (h.type === 'rockfall') add('crackedRoof', {x: h.x, y: y + ceilingAt(d, h.x, h.z) + (UNDERWAY_LOOK[d.style].roofBulge ? .35 : 0), z: h.z, yaw: h.x * 1.7});
+    hazards.push({h, y, roof: y + ceilingAt(d, h.x, h.z)});
+  }
+  for (const [type, list] of byType) { const mesh = instanced(kit[type], propMat, list, lit, `Underway_${run.id}_${type}`); if (mesh) group.add(mesh); }
+
+  // Dynamic pieces.
+  const chests = d.chests.map(c => {
+    const y = Y(c.x, c.z), L = bakeAt(d, c.x, y + .8, c.z), g = new THREE.Group(); g.position.set(c.x, y, c.z); g.rotation.y = c.yaw;
+    if (c.tier) { const base = single(kit.chestBase, propMat, L), lid = single(kit.chestLid, propMat, L); lid.position.set(0, .5, .32); g.add(base, lid); g.userData.lid = lid; }
+    else { const urn = single(kit.urn, propMat, L); g.add(urn); g.scale.setScalar(.9 + (c.x * 7.1 % 1 + 1) % 1 * .3); }
+    group.add(g);
+    return {c, g, opened: run.opened.includes(c.id) ? -1e9 : null};
+  });
+  const keyLight = bakeAt(d, d.key.x, Y(d.key.x, d.key.z) + 1, d.key.z), plinth = single(kit.plinth, propMat, keyLight), key = single(kit.key, propMat, keyLight);
+  plinth.position.set(d.key.x, Y(d.key.x, d.key.z), d.key.z); key.position.set(d.key.x, Y(d.key.x, d.key.z) + 1.45, d.key.z); group.add(plinth, key);
+  const g0 = d.gate, gateY = Y(g0.x, g0.z), gateMesh = single(kit.gate, propMat, bakeAt(d, g0.x, gateY + 1.5, g0.z));
+  gateMesh.position.set(g0.x, gateY, g0.z); gateMesh.rotation.y = g0.axis === 'z' ? 0 : Math.PI / 2; gateMesh.scale.set(g0.width, Math.min(1, ceilingAt(d, g0.x, g0.z) / 3.4), 1); group.add(gateMesh);
+  const shrineMesh = single(kit.shrine, propMat, bakeAt(d, d.shrine.x, Y(d.shrine.x, d.shrine.z) + 1, d.shrine.z));
+  shrineMesh.position.set(d.shrine.x, Y(d.shrine.x, d.shrine.z), d.shrine.z); shrineMesh.rotation.y = Math.atan2(-(d.rooms[d.shrine.room].path[0][0] - d.shrine.x), -(d.rooms[d.shrine.room].path[0][1] - d.shrine.z)) + Math.PI; group.add(shrineMesh);
+  const hy = Y(d.hoard.x, d.hoard.z), hoardLight = bakeAt(d, d.hoard.x, hy + 1, d.hoard.z);
+  const hoardPile = single(kit.hoard, propMat, hoardLight); hoardPile.position.set(d.hoard.x, hy, d.hoard.z); group.add(hoardPile);
+  const hoardChest = new THREE.Group(); hoardChest.position.set(d.hoard.x, hy + .35, d.hoard.z); hoardChest.rotation.y = d.hoard.yaw; hoardChest.scale.setScalar(1.6);
+  const hb = single(kit.chestBase, propMat, hoardLight), hl = single(kit.chestLid, propMat, hoardLight); hl.position.set(0, .5, .32); hoardChest.add(hb, hl); group.add(hoardChest);
+  const exit = single(kit.exit, propMat, [0, 0, 0]); exit.position.set(d.exit.x, Y(d.exit.x, d.exit.z), d.exit.z); exit.rotation.y = d.hoard.yaw; exit.visible = false; group.add(exit);
+  // Flames for vents (shared additive material), and rocks for rockfalls.
+  const flameMat = new THREE.MeshBasicMaterial({vertexColors: true, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false});
+  const warnMat = new THREE.MeshBasicMaterial({color: 0xff8a3a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false});
+  for (const hz of hazards) {
+    if (hz.h.type === 'flame') { const f = new THREE.Mesh(kit.flame, flameMat); f.position.set(hz.h.x, hz.y + .12, hz.h.z); f.visible = false; f.raycast = () => {}; group.add(f); hz.flame = f; }
+    if (hz.h.type === 'rockfall') {
+      hz.rocks = [0, 1, 2, 3].map(k => { const r = single(k % 2 ? kit.rock1 : kit.rock0, propMat, bakeAt(d, hz.h.x, hz.y + 1, hz.h.z)); r.visible = false; group.add(r); return {mesh: r, ox: Math.cos(k * 1.9 + hz.h.x) * .7 * (k ? 1 : .2), oz: Math.sin(k * 1.9 + hz.h.z) * .7 * (k ? 1 : .2), s: .7 + k * .18}; });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(hz.h.radius - .15, hz.h.radius, 32).rotateX(-Math.PI / 2), warnMat.clone()); ring.position.set(hz.h.x, hz.y + .04, hz.h.z); ring.raycast = () => {}; group.add(ring); hz.ring = ring;
+    }
+  }
+  return {run, d, group, meshes, chests, key, plinth, gateMesh, gateY, shrineMesh, hoardChest, hoardLid: hl, hoardPile, exit, hazards, flameMat, buildMs: performance.now() - t0, triangles: shell.triangles, shards: []};
+}
+
+export function createUnderwayView({scene, quality = 'high', sound = () => {}, kick = () => {}, mount = null, height = null} = {}) {
+  const propMat = propMaterial(), built = new Map(), root = new THREE.Group(); root.name = 'Underways'; scene.add(root);
+  const L = UNDERWAY_VIEW.lantern, lantern = new THREE.PointLight(L.color, 0, L.distance, L.decay); lantern.name = 'UnderwayLantern'; lantern.castShadow = false; lantern.userData.ignoreContact = true; scene.add(lantern);
+  const portals = createUnderwayPortal({scene, sites: ARENA_UNDERWAYS, height, propMat});
+  const cards = createUnderwayCards({mount});
+  const eye = new THREE.Vector3(), look = new THREE.Vector3(), fogDeep = new THREE.Color();
+  let depth = 0, time = 0, primed = false, current = null, lastBuild = 0;
+  const stat = {runs: 0, buildMs: 0, triangles: 0, depth: 0, lantern: 0, inside: false};
+
+  function sync(snapshot) {
+    const runs = snapshot?.underways?.runs || [];
+    for (const [id, b] of built) if (!runs.some(r => r.id === id && r.seed === b.run.seed && r.slot === b.run.slot)) { root.remove(b.group); disposeRun(b); built.delete(id); }
+    for (const run of runs) {
+      let b = built.get(run.id);
+      if (!b) { b = buildRun(run, {quality, propMat}); built.set(run.id, b); root.add(b.group); lastBuild = b.buildMs; }
+      b.run = run;
+    }
+    stat.runs = built.size; stat.buildMs = lastBuild; stat.triangles = [...built.values()].reduce((n, b) => n + b.triangles, 0);
+  }
+  function disposeRun(b) { for (const m of b.meshes) m.geometry.dispose(); b.group.traverse(o => { if (o.isMesh && !b.meshes.includes(o) && o.geometry !== underwayKit().flame) o.geometry.dispose?.(); }); b.flameMat.dispose(); }
+
+  function animate(b, tick, dt) {
+    const {run, d} = b;
+    for (const hz of b.hazards) {
+      const h = hz.h, active = run.woke.includes(h.room), ph = active ? (hazardPhase(h, Math.floor(tick)) + (tick % 1)) : -1;
+      if (h.type === 'flame' && hz.flame) {
+        const on = active && ph < h.on, pre = active && ph > h.period - 24, k = on ? Math.min(1, ph / 8) * (1 - smooth((ph - h.on + 14) / 14)) : 0;
+        hz.flame.visible = on || pre;
+        const flick = 1 + .12 * Math.sin(time * 31 + h.x) + .08 * Math.sin(time * 47 + h.z);
+        if (on) hz.flame.scale.set(.9 + .25 * k, (.3 + 2.6 * k) * flick, .9 + .25 * k);
+        else if (pre) { const w = (ph - (h.period - 24)) / 24; hz.flame.scale.set(.5 * w, .25 * w * flick, .5 * w); }
+      }
+      if (h.type === 'rockfall' && hz.rocks) {
+        const fallStart = h.warn - 22, warnK = active && ph < h.warn ? smooth(ph / h.warn) : 0;
+        hz.ring.material.opacity = active && ph < h.warn ? .15 + .55 * warnK * (.75 + .25 * Math.sin(time * 12)) : 0;
+        for (const r of hz.rocks) {
+          if (!active || ph < fallStart || ph > h.warn + 160) { r.mesh.visible = false; continue; }
+          r.mesh.visible = true;
+          const t = clamp((ph - fallStart) / 22), y = ph < h.warn ? lerp(hz.roof - .2, hz.y + .2 * r.s, t * t) : hz.y + .2 * r.s, sink = ph > h.warn + 100 ? (ph - h.warn - 100) / 60 : 0;
+          r.mesh.position.set(h.x + r.ox, y - sink * .45, h.z + r.oz); r.mesh.scale.setScalar(r.s * (1 - sink * .6)); r.mesh.rotation.set(t * 3 + r.s, t * 2, 0);
+        }
+      }
+    }
+    // Chests and urns: a lid swings open; an urn bursts into shards.
+    for (const c of b.chests) {
+      const opened = run.opened.includes(c.c.id);
+      if (opened && c.opened === null) { c.opened = time; if (!c.c.tier) burstShards(b, c); }
+      if (c.c.tier && c.g.userData.lid) c.g.userData.lid.rotation.x = c.opened === null ? 0 : -1.9 * smooth((time - c.opened) / .45);
+      if (!c.c.tier) c.g.visible = !opened;
+    }
+    // The key floats and turns until taken; the gate rises once opened.
+    b.key.visible = !run.key; b.key.position.y = floorHeight(d, d.key.x, d.key.z) + 1.45 + Math.sin(time * 2) * .08; b.key.rotation.y = time * 1.4;
+    const rise = run.gateTick >= 0 ? smooth((tick - run.gateTick) / GATE_RISE) : 0;
+    b.gateMesh.position.y = b.gateY + rise * (ceilingAt(d, d.gate.x, d.gate.z) - .2); b.gateMesh.position.x = d.gate.x + (rise > 0 && rise < 1 ? Math.sin(time * 40) * .02 : 0);
+    // The hoard rumbles when its guardian falls, bursts, and the way out rises from the floor.
+    const since = run.bossDown >= 0 ? tick - run.bossDown : -1, burst = run.hoardTick >= 0 ? tick - run.hoardTick : -1;
+    const shake = since >= 0 && burst < 0 ? smooth(since / UNDERWAYS.hoardDelay) : 0;
+    b.hoardChest.position.x = d.hoard.x + Math.sin(time * 37) * .05 * shake; b.hoardChest.position.z = d.hoard.z + Math.cos(time * 29) * .05 * shake;
+    b.hoardLid.rotation.x = burst >= 0 ? -2.1 * smooth(burst / 12) : -.12 * shake * (.5 + .5 * Math.sin(time * 23));
+    const exitK = burst >= 0 ? smooth((burst - UNDERWAYS.exitDelay * .4) / (UNDERWAYS.exitDelay * .6)) : 0;
+    b.exit.visible = exitK > 0; if (b.exit.visible) { b.exit.position.y = floorHeight(d, d.exit.x, d.exit.z) - 2.6 * (1 - exitK); b.exit.rotation.z = time * .6; }
+    // Shards and coins in flight.
+    for (let i = b.shards.length - 1; i >= 0; i--) {
+      const s = b.shards[i]; s.t += dt; s.v[1] -= 9.8 * dt; s.mesh.position.x += s.v[0] * dt; s.mesh.position.y += s.v[1] * dt; s.mesh.position.z += s.v[2] * dt; s.mesh.rotation.x += s.spin * dt;
+      const floor = floorHeight(d, s.mesh.position.x, s.mesh.position.z) + .03; if (s.mesh.position.y < floor) { s.mesh.position.y = floor; s.v[0] *= .5; s.v[2] *= .5; s.v[1] = Math.abs(s.v[1]) * .25; s.spin *= .5; }
+      if (s.t > s.life) { b.group.remove(s.mesh); s.mesh.geometry.dispose(); b.shards.splice(i, 1); } else if (s.t > s.life - .6) s.mesh.scale.setScalar(Math.max(.01, (s.life - s.t) / .6) * s.size);
+    }
+  }
+  const shardGeo = new THREE.TetrahedronGeometry(.08, 0), coinGeo = new THREE.CylinderGeometry(.06, .06, .015, 8);
+  function burstShards(b, c, {coins = 0} = {}) {
+    const L = bakeAt(b.d, c.c.x, floorHeight(b.d, c.c.x, c.c.z) + .5, c.c.z);
+    for (let k = 0; k < (coins || 9); k++) {
+      const geo = coins ? coinGeo : shardGeo, color = coins ? [.95, .72, .28] : [.66, .38, .24];
+      const g = geo.clone(), n = g.attributes.position.count, col = new Float32Array(n * 3), gl = new Float32Array(n), pl = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { col.set(color, i * 3); gl[i] = coins ? .35 : 0; pl.set(L, i * 3); }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aGlow', new THREE.BufferAttribute(gl, 1)); g.setAttribute('aPropLight', new THREE.BufferAttribute(pl, 3));
+      const mesh = new THREE.Mesh(g, propMat), a = k * 2.4 + c.c.x, sp = coins ? 2 + (k % 5) * .7 : 1.5 + (k % 3) * .8;
+      mesh.position.set(c.c.x, floorHeight(b.d, c.c.x, c.c.z) + (coins ? 1.2 : .35), c.c.z); mesh.raycast = () => {}; b.group.add(mesh);
+      b.shards.push({mesh, v: [Math.cos(a) * sp * .6, coins ? 5 + (k % 4) : 2.5 + (k % 3), Math.sin(a) * sp * .6], spin: 6 + k, t: 0, life: coins ? 3.2 : 2.2, size: 1});
+    }
+  }
+
+  return {
+    group: root, depth: () => depth,
+    /** Call once per frame after the sky has set the day's light. */
+    update(dt, {camera, sun, hemisphere, fog, snapshot, tick = 0} = {}) {
+      time += dt; lookUniforms.uUwTime.value = time; propTime(time);
+      sync(snapshot);
+      camera.getWorldPosition(eye);
+      const inside = inUnderway(eye.x, eye.z), target = inside ? 1 : 0;
+      // Snap on arrival (a teleport), ease only for small changes.
+      if (!primed || Math.abs(target - depth) > .5) depth = target; else depth += (target - depth) * Math.min(1, dt * 3);
+      primed = true; stat.inside = inside; stat.depth = depth;
+      current = inside ? [...built.values()].find(b => b.run.slot === slotOf(eye.x, eye.z)) || null : null;
+      const k = smooth(depth), D = UNDERWAY_VIEW.dim;
+      if (k > 0) {
+        if (sun) sun.intensity *= 1 - D.sun * k;
+        if (hemisphere) hemisphere.intensity *= 1 - D.hemi * k;
+        scene.environmentIntensity = (scene.environmentIntensity ?? 1) * (1 - D.env * k);
+        if (fog && current) { fogDeep.set(UNDERWAY_LOOK[current.d.style].fog); fog.color.lerp(fogDeep, k); if (fog.isFog) { fog.near = lerp(fog.near, 9, k); fog.far = lerp(fog.far, 46, k); } else if (fog.isFogExp2) fog.density = lerp(fog.density, .028, k); }
+      }
+      camera.getWorldDirection(look);
+      lantern.position.copy(eye).addScaledVector(look, .5); lantern.position.y += .2;
+      lantern.intensity = L.intensity * k; stat.lantern = lantern.intensity;
+      for (const b of built.values()) { b.group.visible = b === current; if (b.group.visible) animate(b, tick, dt); }
+      portals.update(dt, {tick, camera, snapshot, inside});
+      cards.update(dt);
+    },
+    /** Sim events: wakes, keys, gates, chests, the hoard. Sounds and the story cards. */
+    event(e, {me} = {}) {
+      const b = e.run ? built.get(e.run) : null;
+      if (e.kind === 'underway_enter' && e.id === me) cards.title(e.name, {mine: 'An old mine, dug too deep', crypt: 'A crypt that never quite settled', keep: 'A keep the earth swallowed whole'}[e.style] || '');
+      if (e.kind === 'underway_room' && e.id === me && e.lore) cards.lore(e.lore);
+      if (e.kind === 'underway_key') { sound('reward', e.position, {tone: 'key'}); if (e.id === me) cards.lore('You take the gate key. Somewhere behind you, a lock clicks hopefully.'); }
+      if (e.kind === 'underway_gate') { sound('stone_hit', e.position, {weight: 1.6}); kick(.6); }
+      if (e.kind === 'underway_open' && b) { sound(e.tier ? 'reward' : 'stone_hit', e.position, {weight: e.tier ? 1 : .6}); }
+      if (e.kind === 'underway_wave') { kick(.5); cards.lore(e.wave === 1 ? 'The guardian bellows. More of them are coming!' : 'The guardian staggers and calls for everyone left!'); }
+      if (e.kind === 'underway_boss_down') { kick(1); cards.lore('The guardian falls. The hoard begins to rumble…'); }
+      if (e.kind === 'underway_hoard' && b) {
+        kick(1.2); sound('reward', e.position, {tone: 'hoard'});
+        burstShards(b, {c: {x: b.d.hoard.x, z: b.d.hoard.z, tier: 1}}, {coins: 28});
+        const mine = e.granted?.find(g => g.id === me);
+        cards.title('Hoard claimed!', mine ? `You found the ${ITEMS[mine.item]?.name || 'treasure'} in the hoard! The way out is opening.` : 'The way out is opening.');
+      }
+      if (e.kind === 'underway_leave' && e.id === me && e.reason === 'victory') cards.lore('Back in the daylight. The mine shifts and settles behind you: next time it will be somewhere new.');
+    },
+    stats: () => ({...stat, portals: portals.stats()}),
+    current: () => current,
+    dispose() { for (const b of built.values()) disposeRun(b); scene.remove(root); scene.remove(lantern); portals.dispose(); cards.dispose(); propMat.dispose(); },
+  };
+}
