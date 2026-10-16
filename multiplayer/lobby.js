@@ -20,6 +20,8 @@ import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
 import './client/quick-build.css';
+import {createRunHud,createRunLauncher} from './client/run-panel.js';
+import './client/run-panel.css';
 import {inventionView} from './shared/inventions.js';
 import './client/invention-panel.css';
 import './client/spellbook.css';
@@ -125,6 +127,8 @@ let mobile = null, xrActive = false;
 let quietHud=null;
 let fieldOverlays=null,holdOverlays=null,fieldKind=null,fieldPinned=false,restoreFieldLock=false,fieldKeyupTrusted=false;
 let resourceBar=null,forgePanel=null,forgeOpen=false,spellbook=null,quickBuild=null,quickBuildOpen=false;
+// Expedition Roguelite (client/run-panel.js): the run strip and stage dialogs, and the welcome-screen launcher.
+let runModal=false;
 let voice = null;
 const voiceControls = createVoiceControls({card:document.querySelector('#menu .menu-card'), getVoice:() => voice, openMenu});
 let game = null, session = null, rendererReady = false, rendererFailed = false;
@@ -229,7 +233,7 @@ function quickFallback() {
   return true;
 }
 $('solo').addEventListener('click',()=>start({create:true,solo:true}));
-$('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save}));
+$('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save,run:lastAttempt?.run}));
 
 function joinFromForm() {
   const code = roomInput.value.trim();
@@ -339,8 +343,8 @@ function setPhase(next) {
 function syncActive() {
   $('hud').inert=menuOpen||!!fieldKind||forgeOpen||quickBuildOpen;
   if (phase !== 'game' || !connected || menuOpen || fieldKind || quickBuildOpen || xrActive || currentRole !== 'hero') interactionCue?.reset();
-  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen);
-  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen,role:currentRole,xr:xrActive});
+  game?.setActive(phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen && !runModal);
+  mobile?.update({active:phase === 'game' && connected && !menuOpen && !patchNotesOpen && !talentsOpen && !shopOpen && !fieldKind && !forgeOpen && !quickBuildOpen && !runModal,role:currentRole,xr:xrActive});
   if(fieldOverlays)fieldOverlays.entry.hidden=phase!=='game'||menuOpen||!!fieldKind||xrActive;
   updateLookHint();
 }
@@ -357,6 +361,7 @@ function teardown() {
   try { old?.dispose(); } catch (error) { console.warn('Session cleanup failed', error); }
   connected = false; playerId = null; appliedRole = null; lastSnapshot = null;
   expeditionBanner?.destroy(); expeditionBanner = null; game?.setExpedition(null);
+  runHud.update(null, null); runModal = false;
   interactionCue?.reset();
   clearNotices();
 }
@@ -391,7 +396,7 @@ async function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); runHud.handleEvent(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(detail => {
@@ -434,7 +439,7 @@ async function start(attempt) {
   }, JOIN_TIMEOUT_MS);
 
   try {
-    next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role,
+    next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role, ...(attempt.create && attempt.run && !attempt.save ? {run: attempt.run} : {}),
       // Any device can carry the world on when the host leaves (phones and headsets host new worlds already).
       desktop: true});
   } catch (error) {
@@ -568,7 +573,8 @@ function onSnapshot(snapshot) {
     applyRoleUi(self.role);
   }
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
-  if (snapshot.adventure) try {
+  if (snapshot.run && expeditionBanner) { expeditionBanner.destroy(); expeditionBanner = null; } // the run strip replaces the quest card
+  if (snapshot.adventure && !snapshot.run) try {
     const view = battleQuestView(snapshot,playerId)||adventureView(snapshot.adventure, snapshot, playerId);
     if (!expeditionBanner) expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction});
     expeditionBanner.update(view, {held: self?.resources, mana: self?.mana});
@@ -590,6 +596,7 @@ function onSnapshot(snapshot) {
     quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
+  runHud.update(snapshot, playerId);
   if (snapshots % 15 === 0) refreshHostControls();
   if (menuOpen && $('techDetails').open && snapshots % 10 === 0) renderTech();
   refreshFieldModel();
@@ -680,6 +687,15 @@ function giftToast(e) {
 let callouts=null;
 const calloutLane=()=>callouts??=createCallouts({mount:$('hud'),info:$('toast')});
 function toast(text) { calloutLane().info(text); }
+const runHud = createRunHud({parent: body,
+  command: (action, payload) => session?.command('run', {action, ...payload}),
+  isHost: () => isHost(),
+  newRun: run => { try { session?.startRun(run); } catch (error) { toast(error.message); } },
+  leave: () => $('leave').click(),
+  toast: text => toast(text),
+  onModal: open => { runModal = open; if (open) { game?.clearControls(); if (document.pointerLockElement) document.exitPointerLock?.(); } syncActive(); }});
+const runLauncher = createRunLauncher({parent: body, openHall: () => runHud.openHall(), onStart: run => start({create: true, run, ...(devSolo ? {solo: true} : {})})});
+$('runLaunch')?.addEventListener('click', () => runLauncher.open());
 // Failures: short red standalone text that fades on its own (the recovery hint sits small beneath).
 function fail(text) { if (text) calloutLane().error(text); }
 
@@ -970,6 +986,8 @@ const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySele
   onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{shopOpen=false;syncActive();}});
 if(/acceptanceProbe/.test(location.search))window.__qaUI={quartermaster,heroProgress,patchNotes:null};
+// Dev-only run probe for the Expedition Roguelite capture script (tests/browser-expedition-run.mjs).
+if(import.meta.env?.DEV&&/acceptanceProbe/.test(location.search))window.__qaRun={session:()=>session,snapshot:()=>lastSnapshot,playerId:()=>playerId};
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));

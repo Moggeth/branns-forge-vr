@@ -112,6 +112,8 @@ import {createRoomEnvironment} from './room-environment.js';
 import {createVRAdventurePanel} from './vr-adventure-panel.js';
 import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} from './vr-input-policy.js';
 import {createExpeditionPresentation} from './expedition-presentation.js';
+import {createRunPresentation,dressBoss} from './run-presentation.js';
+import {BOSS} from '../shared/run-boss.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
 import {createLarimarCoveView} from './larimar-cove-view.js';
@@ -438,6 +440,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     stumpOf:treeId=>{const cut=(snapshot.harvestedTrees||[]).find(h=>h.id===treeId),tree=cut&&worldTrees(snapshot).find(t=>t.id===treeId);return tree?{height:cutLocalHeight(tree,cut,heightAt(tree.x,tree.z,snapshot.edits))}:null;}});
   yield;
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
+  const runView=createRunPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)}); // Expedition Roguelite beacons and rings
   const wyrmStream=createWyrmspoutStream({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   // Wyrmspout rumble: controller pulses in VR, short buzzes on phones (phone may be null for a pulse phones skip).
   const wyrmFeel=createWyrmspoutFeel({audio:()=>audioContext,haptic:(steps,phone)=>{if(role!=='hero')return;if(renderer.xr.isPresenting)feedback.pattern?.(steps);else if(touchEnabled&&phone)try{navigator.vibrate?.(phone);}catch{}}});
@@ -675,8 +678,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
     const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
-    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
+    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8*(entry.data.boss?BOSS.scale:1):1.7,entry.data.id);
     if (!model) return;
+    if (entry.data.boss && entry.data.kind === 'golem') dressBoss(model); // the Expedition Heart guardian
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
     entry.visual = model;
@@ -1859,7 +1863,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       guideTiming.lastMs=performance.now()-guideStart;guideTiming.maxMs=Math.max(guideTiming.maxMs,guideTiming.lastMs);guideTiming.updates++;
     }else{trajectoryGuide.hide();nextGuideAt=0;guideHitTick=null;}
     updateFlaskGuide(now);
-    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);wyrmStream.update(dt,camera);expedition.update(now,dt,camera);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());ambience?.update({dt,ear:listenerPose,sky:()=>skyCycle.stats(),state:()=>snapshot,altitude:()=>{const p=listenerPose().position;return p[1]-heightAt(p[0],p[2],snapshot.edits);}});
+    {const t=terrainShownTick();content.tick(now,Number.isFinite(t)?t:snapshot.tick||0);}impacts.update(dt);rewards.update(dt);fireVisual.update(now,dt);wyrmStream.update(dt,camera);expedition.update(now,dt,camera);runView.setRun(snapshot.run);runView.update(now,dt);woodAudio?.tick(listenerPose());materialAudio?.tick(listenerPose());ambience?.update({dt,ear:listenerPose,sky:()=>skyCycle.stats(),state:()=>snapshot,altitude:()=>{const p=listenerPose().position;return p[1]-heightAt(p[0],p[2],snapshot.edits);}});
     updateWallPreview();{const wallEvents=content.crystalWall.drainEvents();if(wallAudio&&(wallEvents.burst.length||wallEvents.shatter.length||wallEvents.warn.length))wallAudio.play(wallEvents,listenerPose());}
     if(now-cueAt>=100){cueAt=now;nearestPickup=active&&role==='hero'?findCollectible():null;pickupHighlight.update(nearestPickup,now,(x,z)=>heightAt(x,z,snapshot.edits));const xr=renderer.xr.isPresenting,live=active&&role==='hero'&&!xr&&initialized;onAimProbe?.(live?aimProbe():null,{active,role,xr,mode:touchEnabled?'touch':'desktop',position:localPosition.toArray(),yaw});}
     for (const entry of actors.values()) {
