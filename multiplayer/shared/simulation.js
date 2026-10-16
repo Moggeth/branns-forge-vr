@@ -58,6 +58,7 @@ const depositCap = state => state?.world ? 192 : 80;
 import {createRun,stepRun,runAction,restoreRun} from './expedition-run.js';
 import {validBoonList} from './run-boons.js';
 import {arenaOpenGround,arenaCamp} from './run-sites.js';
+import './expedition-world.js'; // registers the 'expedition' world mode
 export const HZ = 60;
 
 const MAX_WORLD = 64;

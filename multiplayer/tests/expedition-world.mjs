@@ -1,6 +1,9 @@
 // Expedition runs on a generated world: sites come from world.findSites (+ real Underways entrances), deterministic.
 import assert from 'node:assert/strict';
-import {runSitesFromWorld, runSeedFor, expeditionWorldMode, RUN_WORLD} from '../shared/expedition-world.js';
+import {runSitesFromWorld, runSeedFor, EXPEDITION_MODE, RUN_WORLD} from '../shared/expedition-world.js';
+import {worldMode} from '../shared/world-modes.js';
+import {createSimulation, loadSimulation} from '../shared/simulation.js';
+import {worldDescriptor} from '../shared/worldgen/registry.js';
 import {createRun, restoreRun} from '../shared/expedition-run.js';
 
 // A stand-in world: findSites scatters seeded points in the requested ring, like worldgen's findSites.
@@ -15,21 +18,66 @@ const fakeWorld = {
 };
 const a = runSitesFromWorld(fakeWorld, 31337), b = runSitesFromWorld(fakeWorld, 31337);
 assert.deepEqual(a, b, 'same world + seed gives the same sites');
-assert.deepEqual(a.camp, [3, -4]);
+assert.deepEqual(a.camp, [0, 0]);
 assert.equal(a.sites.filter(s => s.kind === 'underways').length, 2, 'in-range entrances become Underways sites');
 assert.ok(!a.sites.some(s => s.id === 'xr_ent-far'), 'far entrances are skipped');
 assert.ok(a.sites.every(s => s.id.startsWith('xr_')), 'site ids are prefixed');
-assert.ok(a.bound <= RUN_WORLD.far + 80);
+assert.equal(a.bound, 1024, 'bound follows the world (walk bounds or extent)');
 const run = createRun({seed: 31337, ...a});
 assert.equal(run.nodes.length, 10);
 assert.deepEqual(restoreRun(JSON.parse(JSON.stringify(run))), run, 'world runs round-trip through restore');
 
-// Hooks: newState builds a run from the world, snapshot/restore carry it, actions route to the run.
-const hooks = expeditionWorldMode({grantXp() {}, heroMaxHp: () => 100, makeBoss() {}}, () => fakeWorld);
-const state = {world: {seed: 'mossy-heron-417'}, players: [], enemies: [], deposits: []};
-hooks.newState(state, fakeWorld);
+// The registered mode only builds the run; the core simulation steps, saves and snapshots it.
+assert.equal(worldMode('expedition').newState, EXPEDITION_MODE.newState);
+assert.equal(EXPEDITION_MODE.step, undefined, 'no second director step');
+const state = {world: {seed: 'mossy-heron-417'}};
+EXPEDITION_MODE.newState(state, fakeWorld);
 assert.equal(state.run.seed, runSeedFor('mossy-heron-417'));
-const out = {}; hooks.snapshot(state, out); assert.equal(out.run, state.run);
-const copy = {}; hooks.restore(JSON.parse(JSON.stringify(out)), copy); assert.deepEqual(copy.run, state.run);
-assert.equal(hooks.action(state, {id: 'p1'}, {type: 'mode'}, {}), null, 'messages for other modes are not ours');
+const st2 = {world: {seed: 'x'}}; EXPEDITION_MODE.newState(st2, fakeWorld, {seed: 31337, format: 'daily', daily: '2026-10-17'});
+assert.equal(st2.run.seed, 31337); assert.equal(st2.run.format, 'daily');
+
+// The real thing: a generated expedition world with a run, stepped, saved and reloaded.
+const descriptor = worldDescriptor({kind: 'expedition', seed: 'mossy-heron-417', preset: 'continent', size: 2048});
+const sim = createSimulation({room: 'XR', seed: 5, world: descriptor, run: {seed: 31337}});
+sim.addPlayer({id: 'p1', name: 'Mitch', role: 'hero'});
+for (let i = 0; i < 120; i++) sim.step();
+const snap = sim.snapshot();
+assert.ok(snap.run && snap.world, 'snapshot carries the run and the world');
+assert.equal(snap.run.seed, 31337);
+assert.ok(snap.run.nodes.every(n => Math.hypot(n.x, n.z) <= RUN_WORLD.far + 1), 'destinations within the run ring');
+const again = createSimulation({room: 'XR', seed: 5, world: descriptor, run: {seed: 31337}}).snapshot().run;
+assert.deepEqual(again.nodes, snap.run.nodes, 'same world + seed = same route');
+const loaded = loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint())));
+assert.deepEqual(loaded.snapshot().run, snap.run, 'world runs survive save and reload');
+
+// A full solo run to victory across the generated world: foes, shards and the colossus spawn on its terrain.
+{
+  let run = loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))), seq = 1;
+  const cmd = m => run.command('p1', {...m, type: 'run', seq: seq++});
+  const steps = n => { for (let i = 0; i < n; i++) run.step(); };
+  const edit = fn => { const st = run.checkpoint(); fn(st); run = loadSimulation(st); };
+  const teleport = (x, z) => edit(st => { const p = st.players[0]; p.position = [x, p.position[1], z]; });
+  assert.ok(cmd({action: 'kit', kit: 'skirmisher'}).ok); assert.ok(cmd({action: 'begin'}).ok);
+  let spawned = 0;
+  for (let guard = 0; guard < 400 && !['won', 'returned', 'fallen'].includes(run.snapshot().run.stage); guard++) {
+    const s = run.snapshot(), r = s.run;
+    if (r.stage === 'route') { assert.ok(cmd({action: 'route', node: r.at ? r.nodes.find(n => n.id === r.at).next[0] : r.nodes[0].id}).ok); steps(2); continue; }
+    if (r.stage === 'reward') { assert.ok(cmd({action: 'boon', boon: r.offers.p1[0]}).ok); steps(2); continue; }
+    if (r.stage === 'decide') { assert.ok(cmd({action: 'decide', choice: 'push'}).ok); steps(2); continue; }
+    const n = r.nodes.find(q => q.id === r.target);
+    if (r.stage === 'travel') { teleport(n.x, n.z); steps(3); continue; }
+    // fight
+    for (const f of s.enemies.filter(e => r.foes.some(q => q.id === e.id))) {
+      spawned++;
+      assert.ok(f.position.every(Number.isFinite));
+      assert.ok(Math.hypot(f.position[0] - n.x, f.position[2] - n.z) < 30, 'foes gather at their destination');
+    }
+    edit(st => { const ids = new Set(st.run.foes.map(f => f.id)); st.enemies = st.enemies.filter(e => !ids.has(e.id)); for (const d of st.deposits) if (st.run.shards.includes(d.id)) { d.depleted = true; d.hits = d.maxHits; } });
+    teleport(n.x, n.z); steps(n.kind === 'hold' ? 400 : 5);
+  }
+  const end = run.snapshot().run;
+  assert.equal(end.stage, 'won', 'the world run reaches the Heart and wins');
+  assert.ok(spawned > 5, 'encounters spawned on the generated terrain');
+  const heart = end.nodes.find(n => n.kind === 'heart'); assert.ok(Math.hypot(heart.x, heart.z) > 150, 'the Heart sits far out in the world');
+}
 console.log('expedition-world: ok');
