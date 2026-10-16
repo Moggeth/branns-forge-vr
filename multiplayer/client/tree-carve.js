@@ -61,12 +61,19 @@ export function buildNotch(trunk, notch, uvMap) {
  const r = notch.radius, upper = sectionFace(bark, fU, nU, p => fL(p) <= 1e-5, uvMap, r, t), lower = sectionFace(bark, fL, nL, p => s(p) >= notch.hinge - 1e-5, uvMap, r, t);
  return {bark, wood: [...upper, ...lower], upper, lower};
 }
-/** Third cut: split the notched trunk at the exact hinge height into rooted stump and falling section, with two end caps. */
-export function buildFelled(trunk, notch, uvMap) {
- const n = buildNotch(trunk, notch, uvMap), h = notch.height, above = p => p[1] - h, below = p => h - p[1], {s} = notchPlanes(notch), t = [-notch.normal[2], 0, notch.normal[0]];
+/** Several open notches on one trunk (each its own spot): carved in order, earlier wood faces trimmed by later wedges. */
+export function carveNotches(trunk, notches, uvMap) {
+ let bark = trunk, wood = []; for (const notch of notches) { const res = buildNotch(bark, notch, uvMap); wood = [...carveWedge(wood, notch), ...res.wood]; bark = res.bark; }
+ return {bark, wood};
+}
+/** Third cut: split the notched trunk at the exact hinge height into rooted stump and falling section, with two end caps.
+ *  extra: the tree's other open notches; they stay carved on whichever side of the split they sit. */
+export function buildFelled(trunk, notch, uvMap, extra = []) {
+ const pre = extra.length ? carveNotches(trunk, extra, uvMap) : {bark: trunk, wood: []}, extraWood = carveWedge(pre.wood, notch);
+ const n = buildNotch(pre.bark, notch, uvMap), h = notch.height, above = p => p[1] - h, below = p => h - p[1], {s} = notchPlanes(notch), t = [-notch.normal[2], 0, notch.normal[0]];
  const stumpBark = clipTriangles(n.bark, below), topBark = clipTriangles(n.bark, above), behind = p => s(p) <= notch.hinge + 1e-5;
  const stumpCap = sectionFace(stumpBark, above, [0, 1, 0], behind, uvMap, notch.radius, t), topCap = sectionFace(topBark, above, [0, -1, 0], behind, uvMap, notch.radius, t);
- return {stump: {bark: stumpBark, wood: [...n.lower, ...stumpCap]}, top: {bark: topBark, wood: [...n.upper, ...topCap]}, caps: {stump: stumpCap, top: topCap}};
+ return {stump: {bark: stumpBark, wood: [...n.lower, ...stumpCap, ...clipTriangles(extraWood, below)]}, top: {bark: topBark, wood: [...n.upper, ...topCap, ...clipTriangles(extraWood, above)]}, caps: {stump: stumpCap, top: topCap}};
 }
 /** Split the actual felled bark into a contiguous log; retain original UVs and add end-grain only at the seams. */
 export function buildTimberSection(top, low, high, uvMap, radius) {
