@@ -33,6 +33,7 @@ export const RESOURCES = [
   ['starMetal', 'Star metal', 'Rarest alloy for master inventions', 'star'],
   ['copper', 'Copper', 'Wiring, bells and warm fittings for coming inventions', 'ingot'],
   ['gold', 'Gold', 'Inlay and enchanting foci for coming inventions', 'ingot'],
+  ['amber', 'Amber', 'Glowing resin from felled trees, for coming inventions', 'crystal'],
 ];
 export const ORES = [
   ['ironOre', 'Iron ore', 'iron', 'Refine at the forge into Iron'],

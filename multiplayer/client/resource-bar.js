@@ -4,7 +4,7 @@ import {MATERIAL_CATALOG,materialLabel} from '../shared/material-catalog.js';
 
 // Basics, then ores, then refined metals. Each ore sits in the same column order as the metal it smelts into.
 export const RESOURCE_BAR_GROUPS = Object.freeze([
-  Object.freeze(['wood', 'stone', 'gems']),
+  Object.freeze(['wood', 'stone', 'gems', 'amber']),
   Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'copperOre', 'goldOre']),
   Object.freeze(['iron', 'mithril', 'starMetal', 'copper', 'gold']),
 ]);
@@ -27,6 +27,8 @@ export function resourceIcon(key) {
     <path d="M11 6l1.2 5.6L5.5 10.5M12.2 11.6l7.8 1.9M12.2 11.6l-2.6 7.2" fill="none" stroke="${lo}" stroke-width=".9"/><path d="M11 6l6.5 1.5-5.3 4.1z" fill="${hi}" opacity=".85"/>`;
   else if (key === 'gems') body = `<path d="M12 2l4.5 6-4.5 14-4.5-14z" fill="${mid}" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/><path d="M12 2l-4.5 6h9z" fill="${hi}"/><path d="M12 8v14" stroke="${lo}" stroke-width=".8"/>
     <path d="M17.5 10l2.5 3-2.5 7-2.2-6.5z" fill="${lo}" stroke="${ink}" stroke-width=".8" stroke-linejoin="round"/><path d="M6.5 11l-2.5 3 2.5 6 2-6z" fill="${lo}" stroke="${ink}" stroke-width=".8" stroke-linejoin="round"/>`;
+  else if (key === 'amber') body = `<path d="M12 3.5c4.6 0 7.5 3.6 7.5 8.3 0 4.4-3.3 8.7-7.5 8.7s-7.5-4.3-7.5-8.7C4.5 7.1 7.4 3.5 12 3.5z" fill="${mid}" stroke="${ink}" stroke-width="1"/>
+    <path d="M12 3.5l3.6 4.2-3.6 2.6-3.6-2.6z" fill="${hi}"/><path d="M8.4 7.7l3.6 2.6v10.2M15.6 7.7L12 10.3" fill="none" stroke="${lo}" stroke-width=".8"/><circle cx="9.6" cy="14.2" r="1.3" fill="#fff1c8" opacity=".75"/>`;
   else if (ORE_OF[key]) {
     const m = MATERIAL_CATALOG[ORE_OF[key]].color, mh = shade(m, .35), ml = shade(m, -.2);
     body = `<path d="M3.5 17l2.5-7.5 5-4 6.5 1.5 3 6-2.5 5.5-9 .5z" fill="#6f6a63" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/><path d="M11 5.5l6.5 1.5-5 4z" fill="#8d877e"/>
