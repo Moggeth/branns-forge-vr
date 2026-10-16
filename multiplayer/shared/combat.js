@@ -1,4 +1,5 @@
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
+import {BOSS_HP} from './underways/constants.js';
 import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -75,7 +76,7 @@ function embedDepth(kind,part,measured,targetId){
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
 // Save/restore ceilings shared by every creature kind (ents carry their size class).
-export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
+export const enemyMaxHp=e=>e?.boss?BOSS_HP:e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
 export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120:part==='torso'?100:55;
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
 export function applyEnemyScorch(enemy,part,amount){

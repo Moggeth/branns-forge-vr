@@ -6,6 +6,7 @@ import {entSpec,entWaking,entRooting} from './ents.js';
 import {STUMPLING,stepStumplingMotion} from './stumplings.js';
 import {clampToWorld} from './keep-sites.js';
 import {skeletonKindIndex} from './skeleton-kinds.js';
+import {sameSpace} from './underways/space.js';
 export const ENEMY_STRIKE_TICK=18;
 // A skeleton whose shield splinters reels for this long (no steering, no new swing, a swing in progress misses).
 export const FLINCH_TICKS=45;
@@ -37,8 +38,10 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}
-  const foes=battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets;
+  // Bodies in the Underways and on the surface never chase each other across the gap (shared/underways/space.js).
+  const foes=(battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets).filter(h=>sameSpace(h.position,e.position));
   let target=null,best=Infinity;for(const h of foes){const d=flat(e.position,h.position);if(d<best){best=d;target=h;}}
+  if(e.uw!==undefined&&best>16)target=null; // dungeon foes hold their room until a Hero comes close (they cannot path round corners from afar)
   let patrol=false;
   if(battleBot(e)&&(!target||best>BATTLE.aggroRange)){target=battleWaypoint(state,e,ground);best=flat(e.position,target.position);patrol=!!target.battleLane;}
   if(e.id.startsWith('camp_')&&best>14){const n=Number(e.id.replace(/\D/g,''))||0,a=state.tick/360+n;target={id:'patrol',position:[(n%2?-37:37)+Math.sin(a)*2,e.position[1],30+Math.cos(a)*2]};best=flat(e.position,target.position);patrol=true;}

@@ -48,6 +48,8 @@ import {WORLD_EXTENT,clampToWorld} from './keep-sites.js';
 import {resolveCoveLakes} from './larimar-cove.js';
 import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
 import {resolveMapExtras} from './map-extras.js';
+import {inUnderway,resolveUnderway} from './underways/space.js';
+import {stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
 export const HZ = 60;
 
 const BOUND = 55, MAX_WORLD = 64;
@@ -59,12 +61,14 @@ const fail = code => ({ok: false, code, events: []});
 const ok = (events = []) => ({ok: true, events});
 const safeSeq = n => Number.isSafeInteger(n) && n > 0;
 const cleanName = value => (typeof value === 'string' ? value : 'Guest').trim().replace(/[\r\n\t]/g, ' ').slice(0, 24) || 'Guest';
-const validPoint = p => Array.isArray(p) && p.length === 3 && p.every(finite) && Math.abs(p[0]) <= WORLD_EXTENT && Math.abs(p[2]) <= WORLD_EXTENT && Math.abs(p[1]) <= 1000;
+// The Underways' pocket dungeons sit in a reserved band far off the map (shared/underways/space.js).
+const onMap = (x, z) => Math.abs(x) <= WORLD_EXTENT && Math.abs(z) <= WORLD_EXTENT || inUnderway(x, z);
+const validPoint = p => Array.isArray(p) && p.length === 3 && p.every(finite) && onMap(p[0], p[2]) && Math.abs(p[1]) <= 1000;
 const castPoint = p => validPoint(p) && Math.abs(p[0]) <= BOUND && Math.abs(p[2]) <= BOUND; // god spells stay on the open map
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 const validPosition = p => Array.isArray(p) && p.length === 3 && p.every(finite) &&
-  Math.abs(p[0]) <= WORLD_EXTENT && Math.abs(p[2]) <= WORLD_EXTENT && Math.abs(p[1]) <= 200; // keep back towns reach past ±55
+  onMap(p[0], p[2]) && Math.abs(p[1]) <= 200; // keep back towns reach past ±55
 const validTick = (n, current, minimum = -1000, future = 0) => Number.isSafeInteger(n) && n >= minimum && n <= current + future;
 
 function pose(value) {
@@ -129,6 +133,7 @@ function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], fruit: createFruit(), heroLedger: {}, shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
   // New worlds open with the always-on home bases; legacyBattle keeps the old host-started skirmish for its tests.
   if (!legacyBattle) state.battle = createHomeBattle(state, terrainHeight);
+  state.underways = emptyUnderways(); // the Underways' open dungeons (shared/underways/rules.js)
   return state;
 }
 
@@ -305,6 +310,8 @@ function instantiate(state) {
         if (geode) return ok(geode);
         const beacon = supplied ? strikeBeacon(state, p, message, events) : null;
         if (beacon) return ok(beacon);
+        // The Underways: a swing near an urn or chest breaks it open, unless a foe is in reach first.
+        if (inUnderway(p.position[0], p.position[2]) && !state.enemies.some(e => enemyHostileTo(e,p.side) && inReach(e) < Infinity)) { const delve = strikeUnderway(state, p, events, {addPickup}); if (delve) return ok(delve); }
         const tree = worldTrees(state).find(t => t.id === message.targetId);
         const ore = state.deposits.find(d => d.id === message.targetId);
         if (supplied && tree) {
@@ -432,7 +439,8 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,p.position,.28,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveCoveLakes(p.position);resolveMapExtras(p.position);resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'&&inUnderway(p.position[0],p.position[2]))resolveUnderway(state,p.position,.28);
+        else if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,p.position,.28,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveCoveLakes(p.position);resolveMapExtras(p.position);resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -463,11 +471,12 @@ function instantiate(state) {
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);resolveTerrainBoundary(position,radius);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{if(inUnderway(position[0],position[2]))return resolveUnderway(state,position,radius);resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
       for(const e of state.enemies)if(e.hp>0)resolveTaverns(state,e.position,.5); // monsters are shooed out of every tavern
+      stepUnderways(state,{createEnemy,terrainHeight,damageHero,damageEnemy,addPickup,grantXp,heroMaxHp,release:p=>{releaseHeld(state,p,[0,0,0]);releaseLog(state,p);releaseSnack(state,p);}},events); // the Underways (shared/underways/rules.js)
       stepTaverns(state);stepMills(state,events);stepWorkshops(state,{terrainHeight},events);
       if(state.tick%30===0)for(const p of state.players)if(p.role==='hero'&&p.hp>0&&itemBonus(p,'regen')>0)p.hp=Math.min(heroMaxHp(p),p.hp+itemBonus(p,'regen')/2); // Pocket Kettle
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
@@ -497,7 +506,7 @@ function instantiate(state) {
         players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,streak,dragonReady,dragon}) =>
           ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items}), xp:xp||0, talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
-        edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
+        edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),...(state.underways?.runs.length||Object.keys(state.underways?.delves||{}).length?{underways:state.underways}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
         awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
@@ -526,7 +535,7 @@ export function loadSimulation(saved) {
     throw Error('Invalid simulation checkpoint');
   const ids = new Set();
   const unique = id => { if (!validId(id) || id === 'shrine' || ids.has(id)) return false; ids.add(id); return true; };
-  const validXZ = item => finite(item.x) && finite(item.z) && Math.abs(item.x) <= WORLD_EXTENT && Math.abs(item.z) <= WORLD_EXTENT;
+  const validXZ = item => finite(item.x) && finite(item.z) && onMap(item.x, item.z);
   const harvested = saved.harvestedTrees === undefined ? [] : saved.harvestedTrees;
   const deposits = saved.deposits === undefined ? initialDeposits() : saved.deposits;
   const pickups = saved.pickups === undefined ? [] : saved.pickups;
@@ -557,10 +566,11 @@ export function loadSimulation(saved) {
       throw Error('Invalid simulation player');
   }
   const entTrees = restoreEntTrees(saved), entAwake = new Set(entTrees.awakenedTrees.map(t => t.id));
+  const underways = restoreUnderways(saved);
   for (const e of saved.enemies) {
     if(e?.emergeTick!==undefined&&!validTick(e.emergeTick,saved.tick,0))throw Error('Invalid enemy emergence');
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
+        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || !validUnderwayEnemy(e,underways.runs) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
@@ -620,7 +630,7 @@ export function loadSimulation(saved) {
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...restoreTownFields(p),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home,uw,room,boss}) => ({id, position, yaw, hp, attackTick,...underwayEnemyFields({uw,room,boss}),...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
   state.edits = saved.edits.map(restoreTerrainEdit); const bake = restoreTerrainBake(saved.terrainBake); if (bake) state.terrainBake = bake; state.groves = copy(saved.groves);
@@ -638,6 +648,7 @@ export function loadSimulation(saved) {
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
   if(saved.landmarks!==undefined&&typeof saved.landmarks!=='boolean')throw Error('Invalid landmark version');
   state.landmarks=saved.landmarks===true;
+  state.underways=underways;
   const waygate=restoreWaygate(saved);if(waygate)state.waygate=waygate;const geodes=restoreGeodes(saved);if(geodes)state.geodes=geodes;const beacon=restoreBeacon(saved);if(beacon)state.beacon=beacon;
   state.heroLedger = restoreLedger(saved);
   state.shrine = copy(saved.shrine); // Includes break/restore timer.
