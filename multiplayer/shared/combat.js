@@ -1,5 +1,6 @@
 import {posLimit} from './world-extent.js';
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
+import {BOSS,bossScale} from './run-boss.js';
 import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -76,8 +77,9 @@ function embedDepth(kind,part,measured,targetId){
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
 // Save/restore ceilings shared by every creature kind (ents carry their size class).
-export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
-export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120:part==='torso'?100:55;
+export function makeBoss(e,id){e.boss=id;e.hp=enemyMaxHp(e);e.parts=Object.fromEntries(PARTS.map(p=>[p,enemyPartMax(e,p)]));e.armor=BOSS.armor;return e;}
+export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320*(e.boss?BOSS.hp:1):100;
+export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120*(e.boss?BOSS.parts:1):part==='torso'?100:55;
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
 export function applyEnemyScorch(enemy,part,amount){
   if(!enemy||!PARTS.includes(part)||!Number.isFinite(amount)||amount<=0)return false;
@@ -87,12 +89,12 @@ export function applyEnemyScorch(enemy,part,amount){
 }
 export function createEnemy(id,position,kind='skeleton') {return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
 const centers={head:[0,1.75,0],torso:[0,1.15,0],leftArm:[.48,1.12,0],rightArm:[-.48,1.12,0],leftLeg:[.2,.48,0],rightLeg:[-.2,.48,0]};
-export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45:1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
+export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45*bossScale(enemy):1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
 export function validPartHit(enemy,part,point) {
   if(!PARTS.includes(part)||enemy.missingParts?.includes(part)||!vec(point))return false;
   if(enemy.kind==='ent')return dist(point,entPartPosition(enemy,part))<=entPartReach(enemy,part);
   if(enemy.kind==='stumpling')return dist(point,partPosition(enemy,part))<=.85; // one rigid body: roots and all
-  const s=enemy.kind==='golem'?1.45:1,center=partPosition(enemy,part);
+  const s=enemy.kind==='golem'?1.45*bossScale(enemy):1,center=partPosition(enemy,part);
   // The shipped 1.7m skeleton skull spans y=1.259..1.724. The historical
   // 1.75m fallback pivot rejected real jaw/face triangles. This is only the
   // authority sanity envelope: rendered triangles still determine every hit.

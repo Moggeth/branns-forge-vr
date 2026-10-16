@@ -25,6 +25,9 @@ const pickupTotals = simulation => {
 const sequenceFloor = () => Math.min(SEQ_MAX, Math.max(0, Math.floor(Date.now())));
 
 // One owner for simulation scheduling, peer authority and recovery. No UI dependency.
+const runWorldName = run => `${run.format === 'daily' ? 'Daily Expedition' : 'Expedition'} ${run.seed}`;
+// A run may carry a generated-world descriptor (run.world); the simulation takes it as its own option.
+const runSimOptions=(room,run)=>{if(!run)return {room,seed:41};const {world,...options}=run;return {room,seed:41,run:options,...(world?{world}:{})};};
 export class WorldSession extends EventTarget {
   constructor({url, connection, storage} = {}) {
     super();
@@ -101,6 +104,9 @@ export class WorldSession extends EventTarget {
     // A new generated world (world-creation menu): only the descriptor travels; every peer regenerates the land.
     this.newWorld = options.save ? null : restoreWorldDescriptor(options.world) || null;
     this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || (this.newWorld ? worldTitle(this.newWorld) : this.connection.local?'Solo Orchard':'Little Orchard');
+    // Expedition Roguelite (shared/expedition-run.js): a new world created with run options starts as a run.
+    this.runOptions = !options.save && options.run ? {...options.run} : null;
+    if (this.runOptions) this.name = runWorldName(this.runOptions);
     if (this.initialCheckpoint) loadSimulation(this.initialCheckpoint); // Reject corrupt saves before joining.
     this.running = true; this.last = performance.now(); this.accumulator = 0;
     this.timer = setInterval(() => this.tick(), 8);
@@ -174,7 +180,7 @@ export class WorldSession extends EventTarget {
     if (!this.identity) return;
     try {
       this.codec = new SnapshotDeltaEncoder(); // New stream id; guests re-announce after one legacy snapshot.
-      this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation({room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})});
+      this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation(this.runOptions ? runSimOptions(this.identity.room,this.runOptions) : {room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})});
       this.reconcile(); this.last = performance.now(); this.accumulator = 0;
       let recovery;
       if (restoringSave && [...this.parked.values()].some(({record}) => record.heldOre || PACK.some(k => record.resources?.[k] > 0))) {
@@ -371,6 +377,15 @@ export class WorldSession extends EventTarget {
     this.saves.put(this.exportSave());
     this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
     this.simulation = createSimulation({room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})}); this.codec.reset();
+    this.reconcile(); this.publish(true);
+  }
+  /** Host only: replace this world with a fresh Expedition Roguelite run (a run world needs no sandbox backup). */
+  startRun(run) {
+    if (!this.simulation) throw new Error('Only the current host can start a new run.');
+    const fresh = createSimulation(runSimOptions(this.identity.room,run));
+    this.runOptions = {...run}; this.name = runWorldName(run);
+    this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
+    this.simulation = fresh; this.codec.reset();
     this.reconcile(); this.publish(true);
   }
   stop() { if (this.running && this.simulation) try { this.publish(true); } catch { /* closing */ }
