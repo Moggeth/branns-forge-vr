@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Critter studio</title>
+<style>body{margin:0;background:#a9c0cc}canvas{display:block}#cap{position:fixed;left:12px;bottom:10px;font:600 18px system-ui;color:#fff;text-shadow:0 1px 3px #000}</style>
+<div id="cap"></div>
+<script type="module">
+// Rabble critter review: the shipped client/critter-view.js on a scripted timeline per critter (?kind=kettlebelly|
+// bramblehog|kegtoter, ?cam=three|front|side, ?dusk). Fixed-step: window.studio.frame(i) advances to frame i at 30 fps
+// and must be called for every frame in order (studio.skip(i) does the same without rendering). Not shipped.
+import * as THREE from 'three';
+import {createCritterView} from '../client/critter-view.js';
+import {CRITTER} from '../shared/critters.js';
+const q=new URLSearchParams(location.search),W=innerWidth,H=innerHeight,dusk=q.has('dusk'),KIND=q.get('kind')||'kettlebelly';
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.shadowMap.enabled=true;document.body.append(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(dusk?0x27324a:0xa9c0cc);s.fog=new THREE.Fog(s.background,18,44);
+s.add(new THREE.HemisphereLight(dusk?0x5a6a90:0xc6e0ed,0x5e5139,dusk?.45:1.2));
+const sun=new THREE.DirectionalLight(dusk?0x9fb0ff:0xffe3ad,dusk?.5:2.2);sun.position.set(6,10,4);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});s.add(sun);s.add(sun.target);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,40).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:dusk?0x2c3a22:0x6f7d3d,roughness:1}));ground.receiveShadow=true;s.add(ground);
+for(let i=0;i<40;i++){const t=new THREE.Mesh(new THREE.BoxGeometry(.3,.02,.3),new THREE.MeshStandardMaterial({color:0x5d6a33}));t.position.set(-20+i*1.6,.01,(i%3-1)*1.4);s.add(t);} // ground marks so travel reads
+const cam=new THREE.PerspectiveCamera(40,W/H,.05,90);
+const view=createCritterView({scene:s,height:()=>0,quality:q.get('q')||'high'});
+const hero=new THREE.Mesh(new THREE.CapsuleGeometry(.3,1.1,4,8),new THREE.MeshStandardMaterial({color:0x4a7fd0,roughness:.6}));hero.castShadow=true;s.add(hero);
+const house=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.2,2.4),new THREE.MeshStandardMaterial({color:0x9b7b5b,roughness:.9}));house.position.set(99,1.1,0);house.castShadow=true;s.add(house);
+const DT=1/30,entry={enemy:true,root:new THREE.Group(),visual:null,data:{id:'studio_'+KIND,kind:KIND,hp:CRITTER[KIND].hp,attackTick:-1000,missingParts:[]}};
+s.add(entry.root);const actors=new Map([['e:studio',entry]]);
+// Each script: segments for the caption, and step(t, tick, d) that sets the root and saved ticks the sim would publish.
+const T=x=>Math.round(x*60);
+const SCRIPTS={
+ kettlebelly:{end:12,seg:[[0,'Idle: puffing, lid rattling'],[1.5,'Waddles on its pistons'],[4,'Builds pressure: gauge to red'],[4.6,'Vents a cone of steam'],[5.6,'Clang! (hit)'],[6.2,'Waddles on'],[7.6,'Punctured: jets about on its own leak'],[10.1,'Bursts']],
+  step(t,d){let x=-3;x+=clamp(t-1.5,0,2.5)*1.35;x+=clamp(t-6.2,0,1.2)*1.35;let z=0,yaw=-Math.PI/2;
+   d.emergeTick=T(0)-200;d.ventTick=t>=4?T(4):undefined;d.hurtTick=t>=5.6?T(5.6):undefined;
+   if(t>=7.6){d.leakTick=T(7.6);d.leakSpin=1;const a=Math.min(t,10.1)-7.6;let yy=yaw,px=x,pz=0;for(let k=0;k<T(a);k++){const u=k/150;yy+=.085*(1+u);px+=-Math.sin(yy+1.9)*4.2/60*.55;pz+=-Math.cos(yy+1.9)*4.2/60*.55;}x=px;z=pz;yaw=yy;}
+   hero.position.set(x+3.4,.85,0);return {x,z,yaw,events:[[4,'kettle_build'],[4.6,'kettle_vent'],[7.6,'kettle_leak'],[10.1,'critter_blast','kettle']],release:10.1};}},
+ bramblehog:{end:11.5,seg:[[0,'Snuffles about'],[1.5,'Trots toward a Hero'],[3.6,'Curls up and revs'],[4.1,'Rolls!'],[5.6,'Crashes: dizzy'],[8.3,'Nips'],[9.3,'Ouch (hit)'],[10,'Flops over']],
+  step(t,d){let x=-6;x+=clamp(t-1.5,0,2)*2;x+=clamp(t-4.1,0,1.5)*7.5*.8;
+   d.curlTick=t>=3.6?T(3.6):undefined;d.dizzyTick=t>=5.6?T(5.6):undefined;d.attackTick=t>=8.3?T(8.3):-1000;d.hurtTick=t>=9.3?T(9.3):undefined;
+   hero.position.set(t<4.1?x+7:-6+4+1.5*7.5*.8+1.3,.85,0);return {x,z:0,yaw:-Math.PI/2,events:[[3.6,'bramble_curl'],[5.6,'bramble_stop',null,true],[8.3,'bramble_nip']],release:10};}},
+ kegtoter:{end:10.6,seg:[[0,'Totters under a lit keg'],[1,'Hurries toward a house'],[4.2,'Plants the keg, covers its ears'],[6.7,'BOOM'],[6.8,'Blown backwards: a backflip'],[7.3,'Cheers'],[8.2,'Digs away']],
+  step(t,d){let x=-4;x+=clamp(t-1,0,3.1)*1.6*.85;const kx=x+.55;
+   d.plantTick=t>=4.2?T(4.2):undefined;d.kegAt=t>=4.2&&t<6.7?[kx,0,0]:undefined;d.blastTick=t>=6.7?T(6.7):undefined;if(t>=6.7)x-=Math.min(1,(t-6.7)/.12)*1.2;
+   house.position.set(-4+3.1*1.6*.85+.55+1.6+1.2,1.1,0);hero.position.set(-30,0,0);return {x,z:0,yaw:-Math.PI/2,events:[[4.2,'keg_plant'],[6.7,'critter_blast','keg']],release:9.45,burrow:true,kegX:kx};}},
+};
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+const S=SCRIPTS[KIND];let done=-1,released=false,fired=new Set(),lastT=0;
+function advance(i,quiet){
+ for(let k=done+1;k<=i;k++){const t=k*DT,w=S.step(t,entry.data);entry.root.position.set(w.x,0,w.z);entry.root.rotation.y=w.yaw;entry.root.updateMatrixWorld();
+  for(const [at,kind,style,crash] of w.events)if(t>=at&&!fired.has(kind)){fired.add(kind);const p=kind==='critter_blast'&&style==='keg'?[w.kegX,0,0]:[w.x,0,w.z];view.event({kind,id:entry.data.id,position:p,style,radius:style==='keg'?4:3.2,crash,tick:T(at)});}
+  if(!released&&t>=w.release){released=true;view.release(entry,{tick:T(t)+(w.burrow?200:0)});}
+  if(!released)view.update(actors,t*60,DT);view.tick(DT);lastT=t;
+  const fw=new THREE.Vector3(0,0,-1).applyQuaternion(entry.root.quaternion),rt=new THREE.Vector3(1,0,0).applyQuaternion(entry.root.quaternion),gx=released?cam.userData.gx:w.x,gz=released?cam.userData.gz:w.z;cam.userData.gx=gx;cam.userData.gz=gz;
+  const vw=q.get('cam')||'three',dist=KIND==='kettlebelly'?3.3:2.7;
+  if(vw==='front')cam.position.set(gx+fw.x*dist,1.1,gz+fw.z*dist);else if(vw==='side')cam.position.set(gx+rt.x*dist,1.1,gz+rt.z*dist);else cam.position.set(gx+dist*.62,1.9,gz+dist*.95);
+  cam.lookAt(gx,.55,gz);sun.position.set(gx+6,10,4);sun.target.position.set(gx,0,0);
+  document.getElementById('cap').textContent=S.seg.filter(([a])=>t>=a).at(-1)[1];}
+ done=Math.max(done,i);if(!quiet)r.render(s,cam);return lastT;}
+entry.visual=view.build(entry.data);entry.root.add(entry.visual);
+window.studio={ready:true,frames:Math.round(S.end/DT),frame:i=>advance(i,false),skip:i=>advance(i,true)};document.title='ready';
+if(q.has('play')){let i=0;setInterval(()=>{advance(i++,false);if(i>=window.studio.frames)location.reload();},1000/30);}
+</script></html>

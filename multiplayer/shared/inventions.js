@@ -9,6 +9,7 @@ import {foundationAt,FOUNDATION_HALF} from './terrain.js';
 import {STARTING_SITES} from './starting-world.js';
 import {useStormspire} from './stormreel.js';
 import {atHomeStores} from './home-workshop.js';
+import {CRITTER_KINDS} from './critters.js'; // a camp's fourth returner is one of the rabble, in turn
 const def=(name,description,cost,hp,radius,use)=>Object.freeze({name,description,cost,hp,radius,use});
 export const STRUCTURES=Object.freeze({
  forge:def('Central Forge','Permanent hearth. Drop ore in the hopper or refine from Stores. Outputs arrive in the tray.',{},100,3,'Refine'),
@@ -181,7 +182,7 @@ export function stepInventions(s,c,events){const i=state(s);if(!s.players.length
  stepStuck(s);
  if(i.fells.length){const trees=worldTrees(s);for(let n=i.fells.length-1;n>=0;n--){const f=i.fells[n];if(s.tick<f.atTick)continue;const t=trees.find(t=>t.id===f.treeId);if(t){const floor=ground(s,t.x,t.z,c),height=clamp(f.height-floor,.45,1.5)+floor;for(let cut=0;cut<3;cut++){const r=c.chopTree(s,t,[t.x+.2,height,t.z],[1,0,0],{terrainHeight:(x,z)=>ground(s,x,z,c)});events.push(...(r.events||[]).map(e=>({...e,by:f.owner})));}}i.fells.splice(n,1);}}
  // Two distant camps replenish visibly, at most four opponents every three minutes.
- if(s.battle?.status!=='running'&&s.players.length&&s.tick%10800===600&&!s.enemies.some(e=>e.id.startsWith('camp_'))&&s.enemies.length<=60){for(let n=0;n<4;n++){const x=(n<2?-1:1)*(36+n%2*3),z=28+n%2*3;const e=c.createEnemy(c.nextId(s,'camp_'),[x,ground(s,x,z,c),z]);e.emergeTick=s.tick;s.enemies.push(e);events.push({kind:'camp_return',id:e.id,position:[...e.position]});}}
+ if(s.battle?.status!=='running'&&s.players.length&&s.tick%10800===600&&!s.enemies.some(e=>e.id.startsWith('camp_'))&&s.enemies.length<=60){for(let n=0;n<4;n++){const x=(n<2?-1:1)*(36+n%2*3),z=28+n%2*3;const e=c.createEnemy(c.nextId(s,'camp_'),[x,ground(s,x,z,c),z],n===3?CRITTER_KINDS[Math.floor(s.tick/10800)%CRITTER_KINDS.length]:undefined);e.emergeTick=s.tick;s.enemies.push(e);events.push({kind:'camp_return',id:e.id,position:[...e.position]});}}
  for(const b of i.structures){if(b.type!=='timberline')continue;if(b.operator&&(b.hp<=0||!operatorOf(s,b)))b.operator=null;
   // Winding: the machine winds itself; the operator holding R doubles it, a second Hero cranking quadruples it.
   if(s.tick<b.readyTick&&s.tick-b.fireTick>=MANNED.fireTicks){const boost=(b.helpUntil||0)>s.tick?MANNED.helperBoost:(b.crankUntil||0)>s.tick?MANNED.operatorBoost:1;if(boost>1)b.readyTick=Math.max(s.tick+1,b.readyTick-(boost-1));}}

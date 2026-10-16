@@ -3,6 +3,7 @@ import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELE
 import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
 import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
 import {GOLEM_CYCLE, golemSignals, applyGolemPose, golemRigInfo, NOTICE_SECONDS, NOTICE_BEATS, golemFidget} from './golem-motion.js';
+import {isCritter} from '../shared/critters.js';
 export {GOLEM_CYCLE} from './golem-motion.js';
 const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
 
@@ -290,7 +291,7 @@ export function noteEnemyHit(entry, event, fallbackTick) {
 // entry: {root, visual, data}; ctx: {tick: float interpolated sim tick, height(x,z), dt}
 export function applyEnemyMotion(entry, ctx) {
   const visual = entry.visual, data = entry.data;
-  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || data.kind === 'stumpling' || visual.userData.stumpling || visual.userData.released) return null; // ents pose in ent-view
+  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || data.kind === 'stumpling' || visual.userData.stumpling || visual.userData.critter || isCritter(data.kind) || visual.userData.released) return null; // ents pose in ent-view
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) {

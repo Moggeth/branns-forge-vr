@@ -132,7 +132,8 @@ function blast(state, at, radius, hero, foe, building, source, ownerId, ctx, eve
     if (other === source || other.hp <= 0 || !state.enemies.includes(other)) continue;
     const d = flat(other.position, at); if (d >= radius) continue;
     const normal = d > 1e-3 ? [(other.position[0] - at[0]) / d, 0, (other.position[2] - at[2]) / d] : [0, 1, 0];
-    ctx.hitEnemyPart?.(state, other, 'torso', foe * fall(d), {...(ownerId ? {ownerId} : {}), point: [other.position[0], other.position[1] + 1, other.position[2]], normal, energy: 1.8, blast: true}, ctx, events);
+    const keg = other.kind === 'kegtoter' && other.blastTick === undefined; // another keg in the blast goes up too
+    ctx.hitEnemyPart?.(state, other, 'torso', keg ? other.hp + 1 : foe * fall(d), {...(ownerId ? {ownerId} : {}), point: [other.position[0], other.position[1] + 1, other.position[2]], normal, energy: 1.8, blast: true}, ctx, events);
     if (state.enemies.includes(other) && other.kind !== 'ent' && other.launchTick === undefined && d < radius * .7 && !isCritter(other.kind)) other.launchTick = state.tick; // tossed
   }
   if (building) for (const b of state.inventions?.structures || []) if (b.hp > 0 && b.type !== 'forge' && flat(b.position, at) < radius + 1.5) ctx.damageStructure?.(state, b.id, building, events);
