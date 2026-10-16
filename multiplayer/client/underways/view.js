@@ -9,7 +9,8 @@ import * as THREE from 'three';
 import {generateUnderway, GRID, TILE, floorHeight, ceilingAt} from '../../shared/underways/gen.js';
 import {inUnderway, slotOf, slotOrigin, GATE_RISE} from '../../shared/underways/space.js';
 import {UNDERWAYS, hazardPhase} from '../../shared/underways/rules.js';
-import {ARENA_UNDERWAYS} from '../../shared/underways/sites.js';
+import {underwaySites} from '../../shared/underways/sites.js';
+import '../../shared/underways/world.js'; // generated worlds list their caves as dungeon sites
 import {buildUnderwayShell, bakeAt, UNDERWAY_LOOK} from './build.js';
 import {shellMaterial, lookUniforms} from './look.js';
 import {underwayKit, crystalType, propMaterial, propTime} from './props.js';
@@ -151,9 +152,16 @@ function buildRun(run, {quality, propMat}) {
 export function createUnderwayView({scene, quality = 'high', sound = () => {}, kick = () => {}, mount = null, height = null} = {}) {
   const propMat = propMaterial(), built = new Map(), root = new THREE.Group(); root.name = 'Underways'; scene.add(root);
   const L = UNDERWAY_VIEW.lantern, lantern = new THREE.PointLight(L.color, 0, L.distance, L.decay); lantern.name = 'UnderwayLantern'; lantern.castShadow = false; lantern.userData.ignoreContact = true; scene.add(lantern);
-  const portals = createUnderwayPortal({scene, sites: ARENA_UNDERWAYS, height, propMat});
+  // Surface portals follow the world in the snapshot: the arena's own mine, or every cave a generated world placed.
+  let portals = null, portalKey = '';
+  function syncPortals(snapshot) {
+    const sites = underwaySites(snapshot?.world ? snapshot : null), key = (snapshot?.world ? JSON.stringify(snapshot.world) : 'arena') + sites.length;
+    if (portals && key === portalKey) return; portals?.dispose(); portalKey = key; portals = createUnderwayPortal({scene, sites, height, propMat});
+  }
+  syncPortals(null);
   const cards = createUnderwayCards({mount});
-  const eye = new THREE.Vector3(), look = new THREE.Vector3(), fogDeep = new THREE.Color();
+  const eye = new THREE.Vector3(), look = new THREE.Vector3(), fogDeep = new THREE.Color(), skyKeep = new THREE.Color();
+  let skyOwn = null; // the scene's background colour while we darken it underground (restored on the way out)
   let depth = 0, time = 0, primed = false, current = null, lastBuild = 0;
   const stat = {runs: 0, buildMs: 0, triangles: 0, depth: 0, lantern: 0, inside: false};
 
@@ -240,7 +248,7 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
     /** Call once per frame after the sky has set the day's light. */
     update(dt, {camera, sun, hemisphere, fog, snapshot, tick = 0} = {}) {
       time += dt; lookUniforms.uUwTime.value = time; propTime(time);
-      sync(snapshot);
+      sync(snapshot); syncPortals(snapshot);
       camera.getWorldPosition(eye);
       const inside = inUnderway(eye.x, eye.z), target = inside ? 1 : 0;
       // Snap on arrival (a teleport), ease only for small changes.
@@ -252,13 +260,16 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
         if (sun) sun.intensity *= 1 - D.sun * k;
         if (hemisphere) hemisphere.intensity *= 1 - D.hemi * k;
         scene.environmentIntensity = (scene.environmentIntensity ?? 1) * (1 - D.env * k);
+        // Underground there is no sky: any seam the rock leaves shows the dungeon's own dark, never daylight.
+        if (scene.background?.isColor && scene.background !== fog?.color) { if (skyOwn !== scene.background) { skyOwn = scene.background; skyKeep.copy(skyOwn); } skyOwn.copy(skyKeep).lerp(fogDeep.set(UNDERWAY_LOOK[current?.d.style || 'mine'].fog), k); }
         if (fog && current) { fogDeep.set(UNDERWAY_LOOK[current.d.style].fog); fog.color.lerp(fogDeep, k); if (fog.isFog) { fog.near = lerp(fog.near, 9, k); fog.far = lerp(fog.far, 46, k); } else if (fog.isFogExp2) fog.density = lerp(fog.density, .028, k); }
       }
+      else if (skyOwn) { skyOwn.copy(skyKeep); skyOwn = null; }
       camera.getWorldDirection(look);
       lantern.position.copy(eye).addScaledVector(look, -.35); lantern.position.y += .55; // above and behind the head: lights the way, not the held weapon
       lantern.intensity = L.intensity * k; stat.lantern = lantern.intensity;
       for (const b of built.values()) { b.group.visible = b === current; if (b.group.visible) animate(b, tick, dt); }
-      portals.update(dt, {tick, camera, snapshot, inside});
+      portals?.update(dt, {tick, camera, snapshot, inside});
       cards.update(dt);
     },
     /** Sim events: wakes, keys, gates, chests, the hoard. Sounds and the story cards. */
@@ -279,8 +290,20 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
       }
       if (e.kind === 'underway_leave' && e.id === me && e.reason === 'victory') cards.lore('Back in the daylight. The mine shifts and settles behind you: next time it will be somewhere new.');
     },
-    stats: () => ({...stat, portals: portals.stats()}),
+    stats: () => ({...stat, portals: portals?.stats()}),
+    /** Crown a guardian golem's model (its head bone, or the top of the model when it has none). */
+    dressGuardian(model) {
+      if (!model || model.userData.uwCrown) return;
+      let head = null; model.traverse(o => { if (!head && (o.isBone || o.type === 'Object3D') && /head/i.test(o.name)) head = o; });
+      const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+      const crown = single(underwayKit().crown, propMat, [.9, .75, .6]); crown.name = 'UnderwayCrown';
+      const width = size.x * .2; // about the head's span on the golem
+      model.updateWorldMatrix(true, true);
+      if (head) { const ws = head.getWorldScale(new THREE.Vector3()), wp = head.getWorldPosition(new THREE.Vector3()); crown.scale.setScalar(width / ws.x); head.add(crown); crown.position.set(0, (box.max.y - wp.y) * .55 / ws.y, 0); }
+      else { const ms = model.getWorldScale(new THREE.Vector3()).x; crown.scale.setScalar(width / ms); crown.position.set(0, (box.max.y - model.getWorldPosition(new THREE.Vector3()).y) / ms - .05, 0); model.add(crown); }
+      model.userData.uwCrown = crown;
+    },
     current: () => current,
-    dispose() { for (const b of built.values()) disposeRun(b); scene.remove(root); scene.remove(lantern); portals.dispose(); cards.dispose(); propMat.dispose(); },
+    dispose() { for (const b of built.values()) disposeRun(b); scene.remove(root); scene.remove(lantern); portals?.dispose(); cards.dispose(); propMat.dispose(); },
   };
 }

@@ -1,5 +1,6 @@
+import {posLimit} from './world-extent.js';
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
-import {BOSS_HP} from './underways/constants.js';
+import {BOSS_HP,BOSS_SCALE} from './underways/constants.js';
 import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -26,7 +27,7 @@ import {beyondWorld} from './keep-sites.js';
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel','staff']);
 export const PARTS = Object.freeze(['head','torso','leftArm','rightArm','leftLeg','rightLeg']);
 export const COMBAT_LIMITS = Object.freeze({projectiles:96, embeds:192, detachedParts:96});
-const vec = (v,limit=200) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
+const vec = (v,limit=posLimit()) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
 const quat = q => Array.isArray(q)&&q.length===4&&q.every(Number.isFinite)&&Math.abs(Math.hypot(...q)-1)<.02;
 const dist = (a,b) => Math.hypot(...a.map((n,i)=>n-b[i]));
 const unit = v => vec(v,1.01)&&Math.abs(Math.hypot(...v)-1)<.02;
@@ -87,12 +88,12 @@ export function applyEnemyScorch(enemy,part,amount){
 }
 export function createEnemy(id,position,kind='skeleton') {return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
 const centers={head:[0,1.75,0],torso:[0,1.15,0],leftArm:[.48,1.12,0],rightArm:[-.48,1.12,0],leftLeg:[.2,.48,0],rightLeg:[-.2,.48,0]};
-export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45:1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
+export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45*(enemy.boss?BOSS_SCALE:1):1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
 export function validPartHit(enemy,part,point) {
   if(!PARTS.includes(part)||enemy.missingParts?.includes(part)||!vec(point))return false;
   if(enemy.kind==='ent')return dist(point,entPartPosition(enemy,part))<=entPartReach(enemy,part);
   if(enemy.kind==='stumpling')return dist(point,partPosition(enemy,part))<=.85; // one rigid body: roots and all
-  const s=enemy.kind==='golem'?1.45:1,center=partPosition(enemy,part);
+  const s=enemy.kind==='golem'?1.45*(enemy.boss?BOSS_SCALE:1):1,center=partPosition(enemy,part);
   // The shipped 1.7m skeleton skull spans y=1.259..1.724. The historical
   // 1.75m fallback pivot rejected real jaw/face triangles. This is only the
   // authority sanity envelope: rendered triangles still determine every hit.

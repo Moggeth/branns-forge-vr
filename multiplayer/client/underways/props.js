@@ -34,8 +34,21 @@ const lathe = (pts, s = 12) => new THREE.LatheGeometry(pts.map(([x, y]) => new T
 const beam = (w, h, d, color, opts) => [part(box(w, h, d), color, {...opts, jitter: .12}), part(box(w * .86, h * 1.004, d * .86), C.timberDark, opts)];
 const rng = seed => { let s = seed >>> 0 || 1; return () => (s = Math.imul(s ^ s >>> 15, 0x2c1b3c6d) + 0x6d2b79f5 >>> 0, (s >>> 8) / 16777216); };
 
+// The guardian's crown: a dented miner's-gold band with five crystal points, the brightest set front and centre.
+// Sized for a 1 m wide head; the view scales it to the golem it sits on.
+function crown() {
+  const parts = [part(cyl(.5, .46, .26, 14), C.gold, {at: [0, .13, 0], jitter: .12}), part(cyl(.53, .53, .06, 14), C.brass, {at: [0, .02, 0]}),
+    part(cyl(.53, .53, .05, 14), C.brass, {at: [0, .25, 0]})];
+  for (let k = 0; k < 5; k++) {
+    const a = k / 5 * Math.PI * 2, h = k === 0 ? .62 : .38 + (k % 2) * .08, x = Math.sin(a) * .48, z = Math.cos(a) * .48;
+    parts.push(part(cyl(0, .1, .22, 4), C.gold, {at: [x, .36, z], rot: [0, a, 0]}));
+    parts.push(part(new THREE.OctahedronGeometry(.11, 0), k === 0 ? [1, .78, .36] : [.5, .85, 1], {at: [x * 1.02, .28 + h * .5, z * 1.02], scale: [1, h * 2.4, 1], glow: k === 0 ? .55 : .35}));
+  }
+  return merge(parts);
+}
+
 function crystalCluster(color, seed) {
-  const r = rng(seed), parts = [], heart = color.map(v => Math.min(1, v * 1.15));
+  const r = rng(seed), parts = [], heart = color.map(v => Math.min(1, v * 1.1)), deep = color.map(v => v * .55);
   const count = 5 + Math.floor(r() * 3);
   for (let i = 0; i < count; i++) {
     const h = .35 + r() * .9 * (i === 0 ? 1.4 : 1), w = .07 + r() * .08, a = r() * 6.283, tilt = i === 0 ? r() * .2 : .25 + r() * .55;
@@ -43,7 +56,7 @@ function crystalCluster(color, seed) {
     const shaft = new THREE.CylinderGeometry(w, w * 1.15, h, 6, 1); shaft.translate(0, h * .5, 0);
     const g = mergeGeometries([geo.toNonIndexed(), shaft.toNonIndexed()]);
     const ox = Math.cos(a) * (i ? .08 + r() * .18 : 0), oz = Math.sin(a) * (i ? .08 + r() * .18 : 0);
-    parts.push(part(g, i % 2 ? color : heart, {at: [ox, -.04, oz], rot: [Math.sin(a) * tilt, a, Math.cos(a) * tilt], glow: .55 + r() * .35, jitter: .25, seed: seed + i}));
+    parts.push(part(g, i % 2 ? deep : heart, {at: [ox, -.04, oz], rot: [Math.sin(a) * tilt, a, Math.cos(a) * tilt], glow: i % 2 ? .12 + r() * .1 : .3 + r() * .15, jitter: .25, seed: seed + i}));
   }
   parts.push(part(new THREE.DodecahedronGeometry(.22, 0), C.rockDark, {at: [0, .02, 0], scale: [1.3, .45, 1.1], jitter: .2}));
   return merge(parts);
@@ -330,7 +343,7 @@ export function underwayKit() {
     rock0: fallenRock(1), rock1: fallenRock(4), sign: sign(), 'tale-mine-0': camp(), 'tale-mine-1': pickRack(),
     'pillar-crypt': pillar('crypt'), 'pillar-keep': pillar('keep'), torch: torch(), brazier: brazier(), sarcophagus: sarcophagus(), candles: candles(), bones: bones(), urnpile: urnPile(),
     roots: roots(), masonry: masonry(), 'banner-crypt': banner([.42, .16, .4]), 'banner-keep': banner([.2, .36, .62]), spikePlate: spikePlate(), spikes: spikes(), portcullis: portcullis(),
-    'tale-crypt-0': tableFeast(), 'tale-crypt-1': candles(12), 'tale-keep-0': pudding(), 'tale-keep-1': helmRack(),
+    'tale-crypt-0': tableFeast(), 'tale-crypt-1': candles(12), 'tale-keep-0': pudding(), 'tale-keep-1': helmRack(), crown: crown(),
   };
   return kit;
 }

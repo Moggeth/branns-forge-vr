@@ -7,6 +7,8 @@ import {inUnderway, slotOrigin, resolveUnderway, gateClosed, GATE_RISE} from '..
 import {UNDERWAYS, BOSS_HP, hazardPhase} from '../shared/underways/rules.js';
 import {ARENA_UNDERWAYS} from '../shared/underways/sites.js';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
+import {worldDescriptor} from '../shared/worldgen/registry.js';
+import {underwaySites} from '../shared/underways/sites.js';
 import {terrainHeight} from '../shared/terrain.js';
 
 const t0 = performance.now();
@@ -159,4 +161,24 @@ assert.deepEqual(JSON.stringify(a), JSON.stringify(b), 'two hosts agree tick for
   put(game, 'h1', 0, 6); steps(game, UNDERWAYS.emptyClose + 2);
   assert.equal(S(game).underways.runs.length, 0); assert.equal(S(game).underways.delves[site.id] ?? 0, 0, 'abandoning does not reroll');
 }
-console.log(`underways: ${UNDERWAY_STYLES.length * 80} dungeons valid (worst ${worst.toFixed(1)} ms), full delve deterministic, ${(performance.now() - t0).toFixed(0)} ms`);
+
+// In a generated world every cave the world generator placed is a dungeon: walk into the first one (a mine near the
+// start village), go down, save and load inside, and come back out at the cave mouth.
+{
+  const game = createSimulation({room: 'WILDS', seed: 5, world: worldDescriptor({seed: 'brann'})});
+  game.addPlayer({id: 'h1', name: 'Brann', role: 'hero'}); steps(game, 200);
+  const sites = underwaySites(S(game)), first = sites[0];
+  assert.ok(sites.length >= 4 && first.id === 'u0' && first.style === 'mine', 'world caves become dungeon sites');
+  put(game, 'h1', first.mouth[0], first.mouth[1]);
+  const ev = steps(game, 2); assert.ok(ev.some(e => e.kind === 'underway_enter'), 'a world cave goes down');
+  const run = S(game).underways.runs[0]; assert.equal(run.site, 'u0');
+  assert.ok(inUnderway(hero(game, 'h1').position[0], hero(game, 'h1').position[2]));
+  steps(game, 30);
+  const again = loadSimulation(JSON.parse(JSON.stringify(game.checkpoint())));
+  assert.deepEqual(again.adventureWorld().underways, S(game).underways, 'a world save keeps the delve');
+  const d = generateUnderway(run.seed, {style: run.style, depth: run.depth}), [ox, oz] = slotOrigin(run.slot);
+  put(game, 'h1', d.entry.x + ox, d.entry.z + oz); const out = steps(game, 3);
+  assert.ok(out.some(e => e.kind === 'underway_leave'), 'back out of the world cave');
+  const p = hero(game, 'h1'); assert.ok(Math.hypot(p.position[0] - first.back[0], p.position[2] - first.back[1]) < .5, 'at the cave mouth');
+}
+console.log(`underways: ${UNDERWAY_STYLES.length * 80} dungeons valid (worst ${worst.toFixed(1)} ms), full delve deterministic, world caves delve, ${(performance.now() - t0).toFixed(0)} ms`);

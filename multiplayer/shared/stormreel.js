@@ -16,6 +16,7 @@
 // stays lodged (tethered to its tower terminal by cable) after you drop the pack that fired it. Q reels your bolt back in.
 // The cable is the range limit: its path (terminal, round anything it wraps, to the wearer) never exceeds `cable` metres.
 // It routes round everything solid it touches (Mitch, 2026-10-10): trees, keep buildings, rocks, structures and the tower.
+import {posLimit} from './world-extent.js';
 import {partPosition,validPartHit,PARTS} from './combat.js';
 import {enemyHostileTo} from './battle-mode.js';
 import {raining} from './weather-spell.js';
@@ -458,7 +459,7 @@ export function rayGround(height, origin, dir, range) {
 export function stormShot(state, p, m, ctx) {
   const fail = code => ({ok: false, code, events: []});
   const b = wornTower(state, p); if (!b) return fail('no_pack');
-  const vec = v => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= 200);
+  const vec = v => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= posLimit());
   if (!vec(m.origin) || Math.hypot(...m.origin.map((v, i) => v - p.position[i])) > 2.7 || !vec(m.direction) || Math.abs(Math.hypot(...m.direction) - 1) > .02) return fail('invalid_action');
   if (!Number.isFinite(m.charge) || m.charge < 0 || m.charge > 1) return fail('invalid_action');
   if (state.tick - (p.attackTick ?? -1000) < STORMREEL.cooldownTicks) return fail('cooldown');

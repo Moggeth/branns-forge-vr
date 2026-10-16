@@ -18,7 +18,7 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // Pace personality per warband archetype (shared/skeleton-kinds.js order): Thornhood scurry, Old Bones dawdle.
 const SKELETON_PACE=[1,.96,1.08,.88,1.04,1];
 const AVOID_AHEAD=1.7,TURN_RATE=.15;
-const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
+const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?(e.boss?.65:.5):.32;
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){

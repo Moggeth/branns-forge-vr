@@ -38,6 +38,7 @@ import {installHeartstoneKit} from './heartstone-art.js';
 import {createWaygateView} from './waygate-view.js';
 import {createUnderwayView} from './underways/view.js';
 import {inUnderway,underwayFloor} from '../shared/underways/space.js';
+import {BOSS_SCALE} from '../shared/underways/constants.js';
 import {createGeodeView} from './geode-view.js';
 import {createBeaconView} from './beacon-view.js';
 import {resolveStartingWorld} from '../shared/starting-world.js';
@@ -679,12 +680,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
     const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
-    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
+    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8*(entry.data.boss?BOSS_SCALE:1):1.7,entry.data.id);
     if (!model) return;
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
     entry.visual = model;
     entry.root.add(model);
+    if (entry.data.boss) underways.dressGuardian(model); // the Underways' crowned guardian
     if (forgeling) dressForgelingModel(model, entry.data.id);
     else if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }
