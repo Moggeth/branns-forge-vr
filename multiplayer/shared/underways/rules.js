@@ -170,7 +170,7 @@ function burstHoard(state, run, d, heroes, ctx, events) {
     const pool = HOARD_ITEMS.filter(id => !items.includes(id)), pick = pool[hashSeed(run.seed, p.id, n) % Math.max(1, pool.length)];
     if (pick && items.length < 6) { items.push(pick); granted.push({id: p.id, item: pick}); }
   });
-  events.push({kind: 'underway_hoard', run: run.id, position: [hx, y, hz], drops, granted, name: d.name});
+  events.push({kind: 'underway_hoard', run: run.id, ...(run.tag ? {tag: run.tag} : {}), position: [hx, y, hz], drops, granted, name: d.name});
 }
 
 /** Hazard phase for a tick (shared by rules and renderer). */
