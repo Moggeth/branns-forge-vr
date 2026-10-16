@@ -2,6 +2,11 @@
 export const TERRAIN_LIMITS = Object.freeze({bound:55, mountainStart:46, mountainCrest:55, deformation:6, axeScar:.65, slope:1.15, rim:50});
 import {HOME_SITES,WORLD_EXTENT,keepCarve,onKeepGround} from './keep-sites.js';
 import {lakeBasin} from './larimar-cove.js';
+import {worldFor} from './worldgen/registry.js';
+import {modeTerrainAt} from './world-modes.js';
+import {activeWorld, thingLimit} from './world-extent.js';
+/** Undeformed ground of a generated world at sim (x, z): a mode's own floor (dungeon interiors) or the overworld. */
+export function worldBaseHeight(world, x, z) {const own = modeTerrainAt(x, z); return own ? own.heightAt(x, z) : world.heightAt(x, z);}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 export const SUNDER_SETTLE_DISTANCE=1.1;
@@ -93,7 +98,7 @@ export function terrainDirtyEdits(previous=[],next=[],previousTick=Infinity,tick
 }
 export function validateTerrainRupture(edit,tick) {
   const r=edit.rupture;if(r===undefined)return true;
-  const pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
+  const pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=thingLimit());
   if(!Object.hasOwn(RUPTURE_DURATION,edit.kind)||!r||typeof r!=='object'||Array.isArray(r)||typeof r.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(r.id)||!pair(r.start)||!pair(r.end)||!Number.isSafeInteger(r.startTick)||r.startTick<0||r.startTick>tick)return false;
   const dx=r.end[0]-r.start[0],dz=r.end[1]-r.start[1],length=Math.hypot(dx,dz);
   if(length<.5||length>18.000001||r.durationTicks!==RUPTURE_DURATION[edit.kind](length))return false;
@@ -113,7 +118,7 @@ export const wallSegmentRadius=(kind,half)=>{const spec=wallSpec(kind);return ha
 /** Timed segment (crystal wall, Raise Wall or Sunder chasm): exact capsule on its cast's rupture line, bounded heights,
  * lifetime from the cast tick. A chasm stores positive depths in h0/h1 and a negative edit.height. */
 export function validateWallSegment(e,tick) {
-  const w=e.wall,r=e.rupture,spec=WALL_SPECS[e.kind],pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=55);
+  const w=e.wall,r=e.rupture,spec=WALL_SPECS[e.kind],pair=p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&Math.abs(n)<=thingLimit());
   if(!spec||!w||typeof w!=='object'||Array.isArray(w)||!r||!pair(w.a)||!pair(w.b)||typeof w.owner!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(w.owner))return false;
   const half=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])/2,top=spec.peak??spec.depth,chasm=e.kind==='sunder';
   if(![w.h0,w.h1].every(h=>Number.isFinite(h)&&h>0&&h<=top)||e.height!==(chasm?-1:1)*Math.max(w.h0,w.h1)||half<.05||half>spec.segment)return false;
@@ -170,7 +175,8 @@ function foundationHeight(state,x,z,y) {
 }
 export function rawTerrainHeight(state,x,z) {
   let earth=0,scar=0,wall=0,low=0,high=0;
-  if(state.terrainBake&&sampleBake(state.terrainBake,x,z)){earth=BAKED[0];scar=BAKED[1];}
+  const world=state.world?worldFor(state):null;
+  if(state.terrainBake&&(world?sampleWorldBake(state.terrainBake,x,z):sampleBake(state.terrainBake,x,z))){earth=BAKED[0];scar=BAKED[1];}
   for(const edit of state.edits||[]) {
     const dx=x-edit.x,dz=z-edit.z;
     // Most kernels do not cover this vertex. Reject before the costly hypot,
@@ -192,8 +198,9 @@ export function rawTerrainHeight(state,x,z) {
   // Permanent forge: its work apron never moves. Blend over three metres so
   // excavation outside remains continuous rather than making an invisible cliff.
   const forgeProtection=smooth(clamp((Math.hypot(x,z)-4)/3,0,1));
-  const protection=(1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1)))*forgeProtection;
-  return foundationHeight(state,x,z,rawBaseHeight(x,z)+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall+low+high,-6,6)*protection);
+  // A generated world has no colosseum rim: earth can be shaped anywhere except the forge apron.
+  const protection=world?forgeProtection:(1-smooth(clamp((Math.max(Math.abs(x),Math.abs(z))-46)/4,0,1)))*forgeProtection;
+  return foundationHeight(state,x,z,(world?worldBaseHeight(world,x,z):rawBaseHeight(x,z))+clamp(clamp(earth,-6,6)+clamp(scar,-.65,.65)+wall+low+high,-6,6)*protection);
 }
 // Soil rendering is recessed beneath masonry; authoritative walking/support stay on y=top.
 // Tile edges align to the .75m ground lattice, so interpolation cannot poke soil through tiles.
@@ -222,12 +229,13 @@ export function terrainHeight(state,x,z,includeBridges=true) {
  * Looking ahead by a body radius avoids frame-sized steps bypassing a tall wall.
  * Airborne actors can clear low obstacles when their feet already exceed the rise. */
 export function moveOnTerrain(state,position,dx,dz,radius=.28) {
-  const origin=[...position];
+  const origin=[...position],world=state.world?worldFor(state):null;
   for(const [axis,delta] of [[0,dx],[2,dz]]) {
     if(!delta)continue;
     const next=[...position];next[axis]+=delta;
+    if(world){const b=walkArea(world,position[0],position[2]);next[0]=clamp(next[0],b.minX+radius,b.maxX-radius);next[2]=clamp(next[2],b.minZ+radius,b.maxZ-radius);}
     // The open meadow stops at ±50; a keep's carved bowl, pass and back town run on out toward the corners.
-    if(!walkable(next[0],next[2],radius)){if(Math.max(Math.abs(position[0]),Math.abs(position[2]))>50-radius)continue;next[axis]=clamp(next[axis],-50+radius,50-radius);} // out on keep ground: stop at its edge
+    else if(!walkable(next[0],next[2],radius)){if(Math.max(Math.abs(position[0]),Math.abs(position[2]))>50-radius)continue;next[axis]=clamp(next[axis],-50+radius,50-radius);} // out on keep ground: stop at its edge
     const ground=terrainHeight(state,position[0],position[2]),dest=terrainHeight(state,next[0],next[2]);
     const probe=[...next];probe[axis]+=Math.sign(delta)*radius;
     const ahead=terrainHeight(state,probe[0],probe[2]);
@@ -238,7 +246,14 @@ export function moveOnTerrain(state,position,dx,dz,radius=.28) {
   return Math.hypot(position[0]-origin[0],position[2]-origin[2]);
 }
 const walkable=(x,z,radius)=>Math.max(Math.abs(x),Math.abs(z))<=50-radius||onKeepGround(x,z)&&Math.max(Math.abs(x),Math.abs(z))<=WORLD_EXTENT-radius;
-export function resolveTerrainBoundary(position,radius=.28) {
+// Generated worlds: walkers stay inside the overworld's walk square, or inside the dungeon cell they stand in.
+function walkArea(world,x,z) {
+  if(x<=world.bounds.maxX)return world.walkBounds;
+  const own=modeTerrainAt(x,z);return own?.bounds?.(x,z)||world.walkBounds;
+}
+export function resolveTerrainBoundary(position,radius=.28,state=null) {
+  const world=state?.world?worldFor(state):activeWorld();
+  if(world){const b=walkArea(world,position[0],position[2]);position[0]=clamp(position[0],b.minX+radius,b.maxX-radius);position[2]=clamp(position[2],b.minZ+radius,b.maxZ-radius);return position;}
   if(walkable(position[0],position[2],radius))return position;
   position[0]=clamp(position[0],-50+radius,50-radius);
   position[2]=clamp(position[2],-50+radius,50-radius);
@@ -286,6 +301,38 @@ function sampleBake(bake,x,z) {
   for(let c=0;c<2;c++){const a=g[CHANNELS[c]];BAKED[c]=(u+v<=1?a[i]*(1-u-v)+a[i+1]*u+a[i+SIDE]*v:a[i+SIDE+1]*(u+v-1)+a[i+1]*(1-v)+a[i+SIDE]*(1-u))/1000;}
   return true;
 }
+// Generated worlds bake into the same 16 x 16 vertex tiles on an unbounded lattice anchored at the origin
+// (tile keys may be negative), so settled earthworks persist anywhere in a world at a constant reading cost.
+const WORLD_TILE_KEY=/^-?\d{1,4},-?\d{1,4}$/;
+function sampleWorldBake(bake,x,z) {
+  const step=TERRAIN_GRID.step,fx=x/step,fz=z/step,ix=Math.floor(fx),iz=Math.floor(fz),u=fx-ix,v=fz-iz;
+  const at=(ch,i,k)=>{const t=bake[ch]?.[`${Math.floor(i/TILE)},${Math.floor(k/TILE)}`];if(!t)return 0;const a=decodeTile(t);return a[(k-Math.floor(k/TILE)*TILE)*TILE+(i-Math.floor(i/TILE)*TILE)];};
+  let any=false;
+  for(let c=0;c<2;c++){const ch=CHANNELS[c],a00=at(ch,ix,iz),a10=at(ch,ix+1,iz),a01=at(ch,ix,iz+1),a11=at(ch,ix+1,iz+1);
+    if(a00||a10||a01||a11)any=true;BAKED[c]=(u+v<=1?a00*(1-u-v)+a10*u+a01*v:a11*(u+v-1)+a10*(1-v)+a01*(1-u))/1000;}
+  return any;
+}
+function makeWorldTerrainRoom(state,chosen) {
+  const old=state.terrainBake,step=TERRAIN_GRID.step,work={earth:new Map(),scar:new Map()},touched=new Set();
+  const tileOf=(ch,key)=>{let a=work[ch].get(key);if(!a){const t=old?.[ch]?.[key];a=Float64Array.from(t?decodeTile(t):new Int16Array(TILE_CELLS),v=>v/1000);work[ch].set(key,a);}return a;};
+  for(const e of chosen){
+    const ch=e.kind==='axe_sunder'?'scar':'earth';
+    for(let iz=Math.ceil((e.z-e.radius)/step);iz<=Math.floor((e.z+e.radius)/step);iz++)for(let ix=Math.ceil((e.x-e.radius)/step);ix<=Math.floor((e.x+e.radius)/step);ix++){
+      const x=ix*step,z=iz*step,dx=x-e.x,dz=z-e.z;if(Math.abs(dx)>=e.radius||Math.abs(dz)>=e.radius)continue;
+      const t=clamp(1-Math.hypot(dx,dz)/e.radius,0,1);if(t<=0)continue;
+      const ti=Math.floor(ix/TILE),tj=Math.floor(iz/TILE),key=`${ti},${tj}`;touched.add(key);
+      tileOf(ch,key)[(iz-tj*TILE)*TILE+(ix-ti*TILE)]+=e.height*smooth(t)*terrainEditScale(e,state.tick??Infinity,x,z);
+    }
+  }
+  const next={rev:(old?.rev||0)+1,earth:{...(old?.earth||{})},scar:{...(old?.scar||{})}},lim=TERRAIN_BAKE.limitMm;
+  for(const key of touched)for(const ch of CHANNELS){
+    const a=work[ch].get(key)||tileOf(ch,key),tile=new Int16Array(TILE_CELLS);let any=false;
+    for(let i=0;i<TILE_CELLS;i++){const mm=clamp(Math.round(a[i]*1000),-lim,lim);tile[i]=mm;if(mm)any=true;}
+    if(any)next[ch][key]=encodeTile(tile);else delete next[ch][key];
+  }
+  const gone=new Set(chosen);state.edits=state.edits.filter(e=>!gone.has(e));state.terrainBake=next;
+  return chosen.length;
+}
 export const terrainEditBakeable=(e,tick)=>e.kind!=='pick_wall'&&!e.wall&&(!e.rupture||tick>=e.rupture.startTick+e.rupture.durationTicks);
 /** Pure: which edits makeTerrainRoom would fold so `needed` more fit under the live limit. */
 export function planTerrainBake(edits=[],tick=0,needed=1) {
@@ -297,6 +344,7 @@ export function planTerrainBake(edits=[],tick=0,needed=1) {
 /** Authority: fold the oldest settled edits into the baked grid. Returns the number folded. */
 export function makeTerrainRoom(state,needed=1) {
   const chosen=planTerrainBake(state.edits,state.tick??0,needed);if(!chosen.length)return 0;
+  if(state.world)return makeWorldTerrainRoom(state,chosen);
   const old=state.terrainBake,g=old?bakedGrid(old):null,work={},touched=new Set(),{half,step}=TERRAIN_GRID;
   for(const ch of CHANNELS){work[ch]=new Float64Array(SIDE*SIDE);if(g)for(let i=0;i<SIDE*SIDE;i++)work[ch][i]=g[ch][i]/1000;}
   for(const e of chosen){
@@ -323,14 +371,14 @@ export function makeTerrainRoom(state,needed=1) {
   const gone=new Set(chosen);state.edits=state.edits.filter(e=>!gone.has(e));state.terrainBake=next;
   return chosen.length;
 }
-export function restoreTerrainBake(bake) {
+export function restoreTerrainBake(bake,world=false) {
   if(bake===undefined)return undefined;
   if(!bake||typeof bake!=='object'||Array.isArray(bake)||!Number.isSafeInteger(bake.rev)||bake.rev<1||Object.keys(bake).some(k=>!['rev',...CHANNELS].includes(k)))throw Error('Invalid baked terrain');
   const out={rev:bake.rev,earth:{},scar:{}};
   for(const ch of CHANNELS){
     const tiles=bake[ch]??{};if(!tiles||typeof tiles!=='object'||Array.isArray(tiles))throw Error('Invalid baked terrain');
     for(const [key,text] of Object.entries(tiles)){
-      if(!TILE_KEY.test(key)||typeof text!=='string'||text.length!==Math.ceil(TILE_CELLS*2/3)*4||!/^[A-Za-z0-9+/]+=*$/.test(text))throw Error('Invalid baked tile');
+      if(!(world?WORLD_TILE_KEY:TILE_KEY).test(key)||typeof text!=='string'||text.length!==Math.ceil(TILE_CELLS*2/3)*4||!/^[A-Za-z0-9+/]+=*$/.test(text))throw Error('Invalid baked tile');
       const a=decodeTile(text);if(a.some(v=>Math.abs(v)>TERRAIN_BAKE.limitMm))throw Error('Invalid baked tile');
       out[ch][key]=text;
     }

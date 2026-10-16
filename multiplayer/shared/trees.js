@@ -1,6 +1,7 @@
 // Shared, deterministic tree rules: chopping, tick-driven felling, physical logs, collision and strict save.
 // No clock, no RNG, no Three.js. Every client and late joiner derives identical poses from (state, tick).
-import {worldTrees} from './world-content.js';
+import {posLimit, thingLimit, activeWorld} from './world-extent.js';
+import {worldTrees, treeIdSet, wildsTreeKey} from './world-content.js';
 import {WORLD_EXTENT} from './keep-sites.js';
 
 export const TREE_LIMITS = {logs: 48, logsPerTree: 3, logLength: 1.1, logRadius: .16, reach: 2.5, settleTicks: 36,
@@ -17,7 +18,8 @@ export const VARIANTS = ['tree', 'tree_b', 'tree_young'];
 export const NOTCH = {upper: Math.tan(50*Math.PI/180), lower: Math.tan(12*Math.PI/180), depth: [0, .34, .62]};
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-const vec = (v, b = 200) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= b);
+const logHalf = () => activeWorld() ? thingLimit() : TREE_LIMITS.worldHalf;
+const vec = (v, b = posLimit()) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= b);
 const distance = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
 export const variantName = tree => VARIANTS[tree.variant] || 'tree';
 export const treeProfile = tree => TREE_PROFILES[variantName(tree)];
@@ -27,6 +29,8 @@ export const isFelled = cut => cut?.cuts === 3 && cut.felledTick > 0;
 // A harvest record's own cutHeight/fallYaw/cuts is the lead notch (the spot cut most recently, and the one that fells).
 // Other open spots live in record.notches [{cutHeight, fallYaw, cuts 1-2}]; each spot counts its own cuts toward three.
 export const MAX_EXTRA_NOTCHES = 6;
+// Generated worlds keep more open wounds (old stumps compact into state.wilds.felled, see shared/wilds.js).
+export const harvestCap = state => state?.world ? 640 : 256;
 export const treeNotches = cut => cut ? [cut, ...(cut.notches || [])] : [];
 const yawGap = (a, b) => Math.abs(((a - b) % (2*Math.PI) + 3*Math.PI) % (2*Math.PI) - Math.PI);
 /** The wound a chop at world height y on trunk side yaw lands in (nearest in height within notchTolerance, on the same face
@@ -106,7 +110,7 @@ export function chopTree(state, tree, point, normal, ctx) {
  const glance = {kind: 'wood_hit', position: [...point], id: tree.id, material: 'wood', normal: [...normal], glance: true};
  if (!inRange) return {events: [glance]};                                          // limbs/roots: feedback only, no wound
  const yaw = d > .001 ? Math.atan2(dx, dz) : 0;
- if (!h) { if (state.harvestedTrees.length >= 256) return {code: 'world_limit'}; h = {id: tree.id, cuts: 0, cutHeight: point[1], felledTick: 0, fallYaw: yaw, landed: false}; state.harvestedTrees.push(h); }
+ if (!h) { if (state.harvestedTrees.length >= harvestCap(state)) return {code: 'world_limit'}; h = {id: tree.id, cuts: 0, cutHeight: point[1], felledTick: 0, fallYaw: yaw, landed: false}; state.harvestedTrees.push(h); }
  else { // every wound persists; the spot being cut becomes the lead so its third cut fells the tree there
   const spot = notchAt(h, point[1], yaw), lead = {cutHeight: h.cutHeight, fallYaw: h.fallYaw, cuts: h.cuts}, notches = h.notches ? [...h.notches] : [];
   if (spot && spot !== h) { notches[notches.indexOf(spot)] = lead; Object.assign(h, {cutHeight: spot.cutHeight, fallYaw: spot.fallYaw, cuts: spot.cuts}); }
@@ -127,7 +131,7 @@ export function createTreeIndex(cell = TREE_LIMITS.cell) {
  let key = '', trees = [], grid = new Map(), byId = new Map();
  const k = (i, j) => `${i},${j}`;
  return {
-  update(state) { const next = `${state.seed}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${waitingTrees(state)}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}|${JSON.stringify(state.treeRoots || [])}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
+  update(state) { const next = `${state.seed}|${wildsTreeKey(state)}|${!!state.landmarks}|${JSON.stringify(state.groves || [])}|${waitingTrees(state)}|${(state.awakenedTrees || []).map(t => t.id).join()}|${(state.wildTrees || []).map(t => t.id).join()}|${JSON.stringify(state.treeRoots || [])}`; if (next === key) return false; key = next; trees = worldTrees(state); grid = new Map(); byId = new Map(trees.map(t => [t.id, t]));
    for (const t of trees) { const c = k(Math.floor(t.x/cell), Math.floor(t.z/cell)); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t); } return true; },
   all: () => trees, get: id => byId.get(id),
   near(x, z, out = []) { out.length = 0; const ci = Math.floor(x/cell), cj = Math.floor(z/cell); for (let i = ci-1; i <= ci+1; i++) for (let j = cj-1; j <= cj+1; j++) { const g = grid.get(k(i, j)); if (g) for (const t of g) out.push(t); } return out; }
@@ -248,7 +252,7 @@ export function stepTrees(state, ctx, index, events) {
   if (log.sleeping || log.bornTick===state.tick) continue;
   awake.push(log); const dt = 1/TREE_LIMITS.hz;
   log.velocity[1] -= TREE_LIMITS.gravity*dt;
-  for (let i = 0; i < 3; i++) log.position[i] = clamp(log.position[i] + log.velocity[i]*dt, i === 1 ? -150 : -TREE_LIMITS.worldHalf, i === 1 ? 150 : TREE_LIMITS.worldHalf);
+  for (let i = 0; i < 3; i++) log.position[i] = clamp(log.position[i] + log.velocity[i]*dt, i === 1 ? -posLimit() : -logHalf(), i === 1 ? posLimit() : logHalf());
   const [x, y, z, w] = log.quaternion, [a, b, c] = log.angularVelocity, q = [x+(a*w+b*z-c*y)*dt/2, y+(b*w+c*x-a*z)*dt/2, z+(c*w+a*y-b*x)*dt/2, w-(a*x+b*y+c*z)*dt/2], len = Math.hypot(...q); log.quaternion = q.map(n => n/len);
   const support = logSupport(log, ground);
   if (log.position[1] <= support) { const speed = -log.velocity[1]; log.position[1] = support; log.velocity[1] = speed > 1 ? speed*.22 : 0; log.velocity[0] *= .82; log.velocity[2] *= .82; log.angularVelocity = log.angularVelocity.map(n => n*.8);
@@ -267,10 +271,10 @@ export function stepTrees(state, ctx, index, events) {
 // ---- Strict save/restore.
 export function restoreHarvested(saved, treeIds) {
  const out = [], seen = new Set(), list = saved.harvestedTrees ?? [];
- if (!Array.isArray(list) || list.length > 256) throw Error('Invalid harvested trees');
+ if (!Array.isArray(list) || list.length > harvestCap(saved)) throw Error('Invalid harvested trees');
  for (const h of list) {
-  if (!h || typeof h !== 'object' || typeof h.id !== 'string' || seen.has(h.id) || !treeIds.has(h.id) || !Number.isInteger(h.cuts) || h.cuts < 1 || h.cuts > 3 || !Number.isFinite(h.cutHeight) || Math.abs(h.cutHeight) > 200 || !Number.isInteger(h.felledTick) || h.felledTick < 0 || h.felledTick > saved.tick || (h.cuts === 3) !== (h.felledTick > 0) || !Number.isFinite(h.fallYaw) || Math.abs(h.fallYaw) > Math.PI + 1e-6 || (h.landed !== undefined && typeof h.landed !== 'boolean') || (h.landed && h.cuts !== 3)) throw Error('Invalid harvested tree');
-  if (h.notches !== undefined && (!Array.isArray(h.notches) || !h.notches.length || h.notches.length > MAX_EXTRA_NOTCHES || h.notches.some(n => !n || typeof n !== 'object' || !Number.isInteger(n.cuts) || n.cuts < 1 || n.cuts > 2 || !Number.isFinite(n.cutHeight) || Math.abs(n.cutHeight) > 200 || !Number.isFinite(n.fallYaw) || Math.abs(n.fallYaw) > Math.PI + 1e-6))) throw Error('Invalid harvested tree notches');
+  if (!h || typeof h !== 'object' || typeof h.id !== 'string' || seen.has(h.id) || !treeIds.has(h.id) || !Number.isInteger(h.cuts) || h.cuts < 1 || h.cuts > 3 || !Number.isFinite(h.cutHeight) || Math.abs(h.cutHeight) > posLimit() || !Number.isInteger(h.felledTick) || h.felledTick < 0 || h.felledTick > saved.tick || (h.cuts === 3) !== (h.felledTick > 0) || !Number.isFinite(h.fallYaw) || Math.abs(h.fallYaw) > Math.PI + 1e-6 || (h.landed !== undefined && typeof h.landed !== 'boolean') || (h.landed && h.cuts !== 3)) throw Error('Invalid harvested tree');
+  if (h.notches !== undefined && (!Array.isArray(h.notches) || !h.notches.length || h.notches.length > MAX_EXTRA_NOTCHES || h.notches.some(n => !n || typeof n !== 'object' || !Number.isInteger(n.cuts) || n.cuts < 1 || n.cuts > 2 || !Number.isFinite(n.cutHeight) || Math.abs(n.cutHeight) > posLimit() || !Number.isFinite(n.fallYaw) || Math.abs(n.fallYaw) > Math.PI + 1e-6))) throw Error('Invalid harvested tree notches');
   seen.add(h.id);
   // Pre-log saves already awarded the 3-wood pickup at the final chop: treat them as landed so timber is never duplicated.
   out.push({id: h.id, cuts: h.cuts, cutHeight: h.cutHeight, felledTick: h.felledTick, fallYaw: h.fallYaw, landed: h.cuts === 3 ? (h.landed ?? true) : false,
@@ -280,10 +284,10 @@ export function restoreHarvested(saved, treeIds) {
 }
 export function restoreLogs(saved, ids) {
  if (saved.looseLogs !== undefined && (!Array.isArray(saved.looseLogs) || saved.looseLogs.length > TREE_LIMITS.logs)) throw Error('Invalid log limit');
- const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), trees = new Set([...worldTrees(saved), ...(saved.awakenedTrees || [])].map(t => t.id)); // ent timber names its awakened tree
+ const holders = new Set((saved.detachedParts || []).filter(d => d.heldBy).map(d => d.heldBy)), known = treeIdSet(saved), awake = new Set((saved.awakenedTrees || []).map(t => t.id)), trees = {has: id => known.has(id) || awake.has(id)}; // ent timber names its awakened tree
  const KEYS = ['id', 'sourceId', 'position', 'quaternion', 'velocity', 'angularVelocity', 'heldBy', 'bornTick', 'sleeping', 'section', 'length', 'radius'];
  return (saved.looseLogs || []).map(log => {
-  if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > WORLD_EXTENT || Math.abs(log.position[2]) > WORLD_EXTENT || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
+  if (!log || typeof log !== 'object' || Object.keys(log).some(k => !KEYS.includes(k)) || typeof log.id !== 'string' || !/^log[0-9]+$/.test(log.id) || ids.has(log.id) || !trees.has(log.sourceId) || !vec(log.position) || Math.abs(log.position[0]) > (activeWorld() ? thingLimit() : WORLD_EXTENT) || Math.abs(log.position[2]) > (activeWorld() ? thingLimit() : WORLD_EXTENT) || !vec(log.velocity, 100) || !vec(log.angularVelocity, 30) || !Array.isArray(log.quaternion) || log.quaternion.length !== 4 || !log.quaternion.every(Number.isFinite) || Math.abs(Math.hypot(...log.quaternion) - 1) > .01 || !Number.isInteger(log.bornTick) || log.bornTick < 0 || log.bornTick > saved.tick || typeof log.sleeping !== 'boolean' || (log.heldBy !== null && (typeof log.heldBy !== 'string' || !saved.players?.some(p => p.id === log.heldBy && p.role === 'hero') || holders.has(log.heldBy)))) throw Error('Invalid physical log');
   if(log.section!==undefined && (!Array.isArray(log.section)||log.section.length!==2||!log.section.every(n=>Number.isFinite(n)&&n>=0&&n<=4)||log.section[1]<=log.section[0]||!Number.isFinite(log.length)||log.length<=0||log.length>4||!Number.isFinite(log.radius)||log.radius<=0||log.radius>1.5))throw Error('Invalid timber section');
   if(log.section===undefined&&(log.length!==undefined||log.radius!==undefined))throw Error('Invalid legacy log dimensions');
   ids.add(log.id); if (log.heldBy) holders.add(log.heldBy); return Object.fromEntries(KEYS.filter(k=>log[k]!==undefined).map(k => [k, structuredClone(log[k])]));

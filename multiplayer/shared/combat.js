@@ -1,3 +1,4 @@
+import {posLimit} from './world-extent.js';
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
 import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
@@ -25,7 +26,7 @@ import {beyondWorld} from './keep-sites.js';
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel','staff']);
 export const PARTS = Object.freeze(['head','torso','leftArm','rightArm','leftLeg','rightLeg']);
 export const COMBAT_LIMITS = Object.freeze({projectiles:96, embeds:192, detachedParts:96});
-const vec = (v,limit=200) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
+const vec = (v,limit=posLimit()) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
 const quat = q => Array.isArray(q)&&q.length===4&&q.every(Number.isFinite)&&Math.abs(Math.hypot(...q)-1)<.02;
 const dist = (a,b) => Math.hypot(...a.map((n,i)=>n-b[i]));
 const unit = v => vec(v,1.01)&&Math.abs(Math.hypot(...v)-1)<.02;
