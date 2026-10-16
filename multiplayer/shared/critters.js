@@ -13,6 +13,8 @@
 import {clampToWorld} from './keep-sites.js';
 
 export const CRITTER_KINDS = Object.freeze(['kettlebelly', 'bramblehog', 'kegtoter']);
+/** The God's Rabble summon: which critter answers is fixed by the cast id, so every peer agrees. */
+export const rabbleKind = id => CRITTER_KINDS[Math.min(CRITTER_KINDS.length - 1, Math.floor(hash(id, 'rabble') * CRITTER_KINDS.length))];
 export const isCritter = kind => CRITTER_KINDS.includes(kind);
 
 export const CRITTER = Object.freeze({

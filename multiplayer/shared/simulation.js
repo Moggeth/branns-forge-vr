@@ -41,7 +41,7 @@ import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boon
 import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs,TREE_LIMITS} from './trees.js';
 import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.js';
-import {CRITTER_KINDS,CRITTER_FIELDS,isCritter} from './critters.js';
+import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind} from './critters.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
@@ -356,7 +356,7 @@ function instantiate(state) {
       if(spell==='crystal'||spell==='starfall'||spell==='wall')reclaimDepletedDeposits(state); // a wall reclaims room for its quarry stone
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
-      if ((['skeleton','squad','golem'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
+      if ((['skeleton','squad','golem','rabble'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
@@ -379,6 +379,7 @@ function instantiate(state) {
       const earth=line?castEarthLine(state,p,spell,idNew,start,end,{nextId},events):null;
       events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start,end,rupture:earth.rupture,expireTick:earth.expireTick,by:p.id}:{})});
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
+      if(spell==='rabble')state.enemies.push({...createEnemy(idNew,at,rabbleKind(idNew)),emergeTick:state.tick});
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-BOUND,BOUND),sz=clamp(z+(i<2?-1:1)*1.4,-BOUND,BOUND);state.enemies.push({...createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]),emergeTick:state.tick});}
       if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'crystal',hits:0,maxHits:5,depleted:false});
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
