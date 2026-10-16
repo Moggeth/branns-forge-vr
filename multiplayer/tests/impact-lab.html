@@ -1,0 +1,15 @@
+<!doctype html><html><meta charset="utf-8"><title>Impact lab</title><style>body{margin:0;background:#8aa}canvas{display:block}</style>
+<canvas id="c" width="854" height="480"></canvas>
+<script type="module">
+// Impact artist alone at first-person range: ?m=wood|stone|earth|crystal|bone&steel=1. Not shipped.
+import * as THREE from 'three';
+import {createImpactPresentation} from '../client/impact-presentation.js';
+const q=new URLSearchParams(location.search),r=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9fb8b0);const cam=new THREE.PerspectiveCamera(70,854/480,.05,100);cam.position.set(0,1.65,1.6);cam.lookAt(0,1.05,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x556644,1.4));const sun=new THREE.DirectionalLight(0xfff0d0,2.2);sun.position.set(3,5,4);scene.add(sun);
+const wall=new THREE.Mesh(new THREE.BoxGeometry(1,2,.4),new THREE.MeshStandardMaterial({color:q.get('m')==='wood'?0xe8e4da:0x6b6460}));wall.position.set(0,1,-.2);scene.add(wall);
+const fx=createImpactPresentation({scene,camera:cam});
+window.shoot=()=>fx.emit({material:q.get('m')||'stone',position:[0,1.05,0],normal:[0,0,1],steel:q.get('steel')!=='0',direction:[-1,0,0],kind:q.get('k')||'rebound',energy:1.15,seed:7});
+window.step=(dt)=>{fx.update(dt);r.render(scene,cam);return r.domElement.toDataURL('image/jpeg',.9);};
+window.ready=true;
+</script></html>

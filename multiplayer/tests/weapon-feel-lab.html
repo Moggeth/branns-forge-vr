@@ -24,11 +24,11 @@ else goal=(q.get('at')||'-14,-20').split(',').map(Number);
 const side=Number(q.get('side')||0),approach=Math.atan2(goal[0]-(-29),goal[1]-(-29))+side; // come from the spawn side
 const at=[goal[0]-Math.sin(approach)*dist,goal[1]-Math.cos(approach)*dist],yaw=Math.atan2(-(goal[0]-at[0]),-(goal[1]-at[1]));
 save.players[0].position=[at[0],terrainHeight(save,at[0],at[1]),at[1]];save.players[0].yaw=yaw;save.players[0].tool=tool;
-if(target==='foe'||target==='golem'){const e=Object.assign(createEnemy('foe0',[goal[0],terrainHeight(save,goal[0],goal[1]),goal[1]],target==='golem'?'golem':undefined),{yaw:yaw+Math.PI,hp:9999,maxHp:9999});if(target==='golem')e.kind='golem';save.enemies=[e];}
+if(target==='foe'||target==='golem'){const e=Object.assign(createEnemy('foe0',[goal[0],terrainHeight(save,goal[0],goal[1]),goal[1]],target==='golem'?'golem':undefined),{yaw:Math.atan2(Math.sin(yaw+Math.PI),Math.cos(yaw+Math.PI))});save.enemies=[e];}
 sim=loadSimulation(save);
 window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
 const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
- onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
+ onAction:(action,extra)=>{const r=action==='projectileHit'?sim.projectileContact(extra):sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
  onInput:input=>sim.command('hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
 function publish(){game.applySnapshot(sim.snapshot(),'hero');}
 function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
@@ -36,7 +36,7 @@ function face(){const eye=terrainHeight(save,at[0],at[1])+1.65,ground=terrainHei
 publish();game.setRole('hero');game.setActive(true);game.equip(tool);face();
 window.review={
  step,swing:()=>game.strike(),fire:(down=true)=>down?game.primaryDown():game.primaryUp(),equip:t=>game.equip(t),face,look:(x,y)=>game.lookByPixels(x,y),setLook:(y,p)=>game.setLook(y,p),
- stats:()=>game.diagnostics(),snapshot:()=>sim.snapshot(),yaw,at,goal,
+ stats:()=>game.diagnostics(),event:e=>game.handleEvent(e),ground:(x,z)=>terrainHeight(save,x,z),snapshot:()=>sim.snapshot(),yaw,at,goal,
  canvas:()=>$('world'),
 };
 for(const b of document.querySelectorAll('[data-t]'))b.onclick=()=>review.equip(b.dataset.t);$('swing').onclick=()=>review.swing();

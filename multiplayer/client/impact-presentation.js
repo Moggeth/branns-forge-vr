@@ -253,7 +253,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
     const farBoost = 1 + (1 - lod) * 0.6; // keep distant chips legible
     const eCount = (0.4 + 0.6 * e) * lod;
     const eSpeed = 0.75 + 0.25 * e;
-    const eSize = (0.8 + 0.2 * e) * farBoost;
+    const eSize = (0.8 + 0.2 * e) * farBoost * 1.5; // read at arm's length in first person (2026-10-16)
 
     // tangent basis (allocation-free)
     let hx = 0, hy = 0, hz = 0;
@@ -290,8 +290,8 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
     if (glint && lod > 0.25) {
       const i = slot(flashes);
       flashes.p[i * 3] = px + n0x * 0.02; flashes.p[i * 3 + 1] = py + n0y * 0.02; flashes.p[i * 3 + 2] = pz + n0z * 0.02;
-      flashes.life[i] = 0.075 + 0.03 * e;
-      flashes.size[i] = (ev.material === 'bone' ? 0.07 : 0.11) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1);
+      flashes.life[i] = 0.1 + 0.04 * e;
+      flashes.size[i] = (ev.material === 'bone' ? 0.13 : 0.24) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1);
       flashTint.array[i * 4] = glint[0]; flashTint.array[i * 4 + 1] = glint[1]; flashTint.array[i * 4 + 2] = glint[2];
       flashTint.array[i * 4 + 3] = 0;
     }
@@ -326,7 +326,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       const sp = (prof.speed[0] + rnd() * (prof.speed[1] - prof.speed[0])) * eSpeed;
       sparks.v[i * 3] = vA.x * sp; sparks.v[i * 3 + 1] = vA.y * sp; sparks.v[i * 3 + 2] = vA.z * sp;
       sparks.life[i] = (0.16 + rnd() * 0.22) * (0.8 + 0.2 * e);
-      sparks.size[i] = (0.0018 + rnd() * 0.0016) * (0.8 + 0.2 * e) * farBoost; // half-width
+      sparks.size[i] = (0.0042 + rnd() * 0.0036) * (0.8 + 0.2 * e) * farBoost; // half-width: a few pixels at arm's length
       sparks.bounce[i] = 0;
       const hot = prof.sparkRgb[0], base = prof.sparkRgb[1], inten = 0.55 + rnd() * 0.3;
       for (let a = 0; a < 3; a++) { sparks.hot[i * 3 + a] = hot[a] * inten; sparks.base[i * 3 + a] = base[a] * inten; }
@@ -431,7 +431,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       P.p[i3] = x; P.p[i3 + 1] = y; P.p[i3 + 2] = z;
       P.v[i3] = vx; P.v[i3 + 1] = vy; P.v[i3 + 2] = vz;
       const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      const len = clamp(sp * 0.011, 0.008, 0.05) * (1 - t * 0.6);
+      const len = clamp(sp * 0.02, 0.014, 0.09) * (1 - t * 0.6);
       const wd = P.size[i] * (1 - t * 0.5);
       if (sp > 1e-4) { vA.set(vx / sp, vy / sp, vz / sp); qA.setFromUnitVectors(UP, vA); } else qA.identity();
       vP.set(x, y, z); vS.set(wd * 2, len, wd * 2);

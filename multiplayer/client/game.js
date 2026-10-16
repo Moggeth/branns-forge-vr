@@ -1401,7 +1401,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(['crossbow','bow','wyrmspout','flask','stormreel'].includes(tool)){primaryDown();return;}
     const profile=SWING_PROFILES[tool]||SWING_PROFILES.axe;
     if (!active || role !== 'hero' || specialSwing || weaponSwap.busy || performance.now() - swingAt < profile.cooldown*1000) return;
-    swingAt = performance.now();strikeClock.begin(swingAt/1000,profile.duration);swingContact=false;soundKit?.play('swing',null,null,{tool,gap:.05});swingTarget=contactRay();swingReach=THREE.MathUtils.clamp(swingTarget?.distance||2.5,.6,2.8);
+    swingAt = performance.now();strikeClock.begin(swingAt/1000,profile.duration);swingContact=false;soundKit?.play('swing',null,null,{tool,gap:.05});swingTarget=contactRay();{const aim=weaponAim(),earth=swingTarget?null:terrainRay.segment(aim.origin,aim.origin.map((v,i)=>v+aim.direction[i]*2.6));swingReach=THREE.MathUtils.clamp(swingTarget?.distance??earth?.distance??1.5,.6,2.8);} // a blow into the dirt or open air stays at arm's length
     swingRest={position:new THREE.Vector3(...FPS_WEAPON_POSE.position),quaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(...FPS_WEAPON_POSE.rotation))};
     swingRest.position.x=.33*Math.min(1,camera.aspect/.9);
     unlockAudio();
