@@ -21,6 +21,7 @@ import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
 import './client/quick-build.css';
 import {createRunHud,createRunLauncher} from './client/run-panel.js';
+import {runWristView,runVrAction} from './client/run-vr.js';
 import './client/run-panel.css';
 import {inventionView} from './shared/inventions.js';
 import './client/invention-panel.css';
@@ -524,6 +525,12 @@ let expeditionBanner = null;
 let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
 function expeditionAction(action,detail={}) {
   if((action.startsWith('forge')||action.startsWith('invention'))){command('action',{action,...detail});return;}
+  const runCmd = runVrAction(action);
+  if (runCmd) {
+    if (runCmd.local === 'leave') return void $('leave').click();
+    if (runCmd.local === 'again') { try { session?.startRun({format: 'expedition', seed: (crypto.getRandomValues(new Uint32Array(1))[0] % 900000) + 100000}); } catch (error) { toast(error.message); } return; }
+    return void command('run', {action: runCmd.action, ...runCmd.payload});
+  }
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
   if (!session || !adv || !self) return;
   const send = payload => command('adventure', payload);
@@ -581,6 +588,7 @@ function onSnapshot(snapshot) {
     // DOM is invisible in WebXR: the same view drives the in-world wrist panel (it repaints only when its model changes).
     if (xrActive) game.setExpedition(view, snapshot, playerId);
   } catch (error) { recordProblem(error); }
+  else if (xrActive && snapshot.run) try { game.setExpedition(runWristView(snapshot, playerId, {isHost: isHost()}), snapshot, playerId); } catch (error) { recordProblem(error); }
   else if (xrActive) game.setExpedition(null);
 
   const count = session?.connection.local?'This device':`${snapshot.players.length} of ${session?.connection.maxPeers ?? snapshot.maxPlayers ?? 32} here`;
