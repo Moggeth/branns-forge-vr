@@ -25,9 +25,10 @@ export function underwaySites(state) {
   return Array.isArray(extra) ? extra : ARENA_UNDERWAYS;
 }
 
-// A generated overworld's entrances ({id, x, z, yaw facing OUT of the cliff, tier 1..5, seed, name, biome}) as sites.
+// A generated overworld's entrances ({id, x, z, cliffDir [dx, dz] into the cliff, or yaw facing OUT of it, tier 1..5,
+// seed, name, biome}) as sites. cliffDir wins when present, so the portal faces the rock whatever the yaw convention.
 // Style follows the biome (mountain/rock: mine, marsh/forest: crypt, ruins/grass: keep); tier sets depth (1..4).
 const STYLE_FOR = b => /mount|rock|cliff|tundra|snow|alpine/.test(b || '') ? 'mine' : /marsh|swamp|wet|forest|wood|bog/.test(b || '') ? 'crypt' : 'keep';
 export function sitesFromEntrances(entrances, height) {
-  return entrances.map(e => site(e.id, e.name || 'the Underways', e.style || STYLE_FOR(e.biome), Math.max(1, Math.min(4, Math.ceil((e.tier || 1) * .8))), [e.x, e.z], e.yaw + Math.PI, e.seed ?? null, height));
+  return entrances.map(e => site(e.id, e.name || 'the Underways', e.style || STYLE_FOR(e.biome), Math.max(1, Math.min(4, Math.ceil((e.tier || 1) * .8))), [e.x, e.z], e.cliffDir ? Math.atan2(-e.cliffDir[0], -e.cliffDir[1]) : e.yaw + Math.PI, e.seed ?? null, height));
 }
