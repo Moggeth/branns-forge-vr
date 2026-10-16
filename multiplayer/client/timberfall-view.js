@@ -18,7 +18,7 @@ import {TIMBERFALL, timberfallLane} from '../shared/timberfall.js';
 const AMBER = new THREE.Color(1.0, .38, .03), HOT = new THREE.Color(1.0, .72, .3), DIM = new THREE.Color(.62, .44, .26);
 export const HEART_COLOURS = Object.freeze({amber: [1.0, .52, .1], gold: [1.0, .82, .32], gems: [.72, .5, 1.0]});
 const POOL = 3, HEART_POOL = 6, ALONG = 48, SPARKS = 72, GLINTS = 28, RING_MARKS = TIMBERFALL.trees;
-export const TIMBERFALL_VIEW = Object.freeze({fade: 1.3, bladeHeight: 3.4, bladeHalf: 1.7, bulge: 1.1, heartLife: 1.7});
+export const TIMBERFALL_VIEW = Object.freeze({fade: 1.3, bladeHeight: 2.6, bladeHalf: 2.4, bulge: 1.2, heartLife: 1.7});
 
 const finish = `
   #include <tonemapping_fragment>
@@ -46,14 +46,17 @@ uniform vec3 uGlow, uHot;
 varying vec2 vBlade;
 void main() {
   float crest = sqrt(max(0., 1. - vBlade.x * vBlade.x));
-  float edge = exp(-(1. - vBlade.y) * 22.);            // the burning cutting line along the crest
+  float edge = exp(-(1. - vBlade.y) * 12.);            // the burning cutting line along the crest
   float halo = exp(-(1. - vBlade.y) * 5.) * .22;       // its glow just beneath
   float streak = pow(.5 + .5 * sin(vBlade.x * 31. + uFlicker * 23.), 6.) * (1. - vBlade.y) * .35; // rising shreds of light
   float foot = exp(-vBlade.y * 12.) * .5;              // where it tears the ground
   float sides = smoothstep(1., .55, abs(vBlade.x)) * (.35 + .65 * crest);
   float a = (edge * 1.7 + halo * 1.6 + streak * 1.4 + foot * 1.5) * sides * uFade;
   vec3 c = mix(uGlow, uHot, clamp(edge * .7 + foot * .3, 0., 1.));
-  gl_FragColor = vec4(c * a, 1.);${finish}
+  // Normal blending with a saturated colour (not additive), so the blade still reads as amber fire against a bright,
+  // hazy sky where an additive glow would wash out to nothing.
+  gl_FragColor = vec4(c * (1. + edge * .25), clamp(a, 0., .92));
+  #include <colorspace_fragment>
 }`;
 
 // ---------------------------------------------------------------- the scored seam behind it
@@ -75,7 +78,7 @@ void main() {
   float line = exp(-pow((vSeam.y - jag) * 7., 2.));       // the cut itself, a ragged glowing seam
   float scorch = exp(-vSeam.y * vSeam.y * 2.4) * .32;      // light spilling either side of it
   float lead = exp(-behind * 1.4);                         // brightest right behind the blade
-  float a = (line * (.55 + .9 * heat) + scorch * heat + lead * .8 * exp(-vSeam.y * vSeam.y * 4.)) * uFade;
+  float a = (line * (.9 + 1.4 * heat) + scorch * heat * 1.6 + lead * 1.4 * exp(-vSeam.y * vSeam.y * 3.)) * uFade;
   vec3 c = mix(uGlow * .8, uHot, clamp(heat * line + lead * .5, 0., 1.));
   gl_FragColor = vec4(c * a, 1.);${finish}
 }`;
@@ -222,7 +225,7 @@ export function createTimberfallView({scene, height = () => 0, reducedMotion = f
     bladeGeometry.setAttribute('aBlade', new THREE.Float32BufferAttribute(bladeData, 2)); bladeGeometry.setIndex(bladeIndex);
     bladeGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1.4, 0), 4);
     const blade = new THREE.Mesh(bladeGeometry, additive({uHalf: {value: TIMBERFALL_VIEW.bladeHalf}, uHeight: {value: TIMBERFALL_VIEW.bladeHeight},
-      uBulge: {value: TIMBERFALL_VIEW.bulge}, uLean: {value: .18}, uFade: {value: 0}, uFlicker: {value: 0}, ...colours()}, BLADE_VERTEX, BLADE_FRAGMENT));
+      uBulge: {value: TIMBERFALL_VIEW.bulge}, uLean: {value: .18}, uFade: {value: 0}, uFlicker: {value: 0}, ...colours()}, BLADE_VERTEX, BLADE_FRAGMENT, {blending: THREE.NormalBlending, toneMapped: false}));
     // Seam: ALONG x 3 strip, heights baked at cast time from the live terrain.
     const seamPositions = new Float32Array(ALONG * 3 * 3), seamData = new Float32Array(ALONG * 3 * 2), seamIndex = [];
     for (let i = 0; i < ALONG - 1; i++) for (let j = 0; j < 2; j++) { const k = i * 3 + j; seamIndex.push(k, k + 3, k + 1, k + 1, k + 3, k + 4); }
@@ -236,7 +239,7 @@ export function createTimberfallView({scene, height = () => 0, reducedMotion = f
     sparkGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(Math.max(1, sparkCount) * 3), 3));
     sparkGeometry.setAttribute('aSpark', new THREE.BufferAttribute(sparkSpec, 4)); sparkGeometry.setAttribute('aGround', new THREE.BufferAttribute(sparkGround, 1));
     sparkGeometry.setDrawRange(0, sparkCount);
-    const sparks = new THREE.Points(sparkGeometry, additive({uFront: {value: 0}, uSpeed: {value: TIMBERFALL.speed}, uScale: {value: 34},
+    const sparks = new THREE.Points(sparkGeometry, additive({uFront: {value: 0}, uSpeed: {value: TIMBERFALL.speed}, uScale: {value: 52},
       uStart: {value: new THREE.Vector3()}, uDir: {value: new THREE.Vector3(0, 0, -1)}, ...colours()}, SPARK_VERTEX, SPARK_FRAGMENT));
     const ring = new THREE.Mesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), additive({uAge: {value: 0}, uFade: {value: 0}, ...colours()}, RING_VERTEX, RING_FRAGMENT));
     for (const [m, name, order] of [[blade, 'timberfall-blade', 5], [seam, 'timberfall-seam', 4], [sparks, 'timberfall-sparks', 6], [ring, 'timberfall-ring', 4]]) {
@@ -258,7 +261,7 @@ export function createTimberfallView({scene, height = () => 0, reducedMotion = f
     const w = waves[nextWave]; nextWave = (nextWave + 1) % POOL;
     w.at = now; w.length = Math.max(0, Number(tf.length) || 0); w.speed = Number(tf.speed) || TIMBERFALL.speed; w.live = true;
     w.start.set(tf.start[0], tf.start[1], tf.start[2]); w.dir.set(tf.direction[0], 0, tf.direction[2]).normalize();
-    const nx = -w.dir.z, nz = w.dir.x, half = TIMBERFALL.treeWidth * .9, span = w.length + 1, pos = w.seam.geometry.attributes.position, data = w.seam.geometry.attributes.aSeam;
+    const nx = -w.dir.z, nz = w.dir.x, half = TIMBERFALL.treeWidth * 1.2, span = w.length + 1, pos = w.seam.geometry.attributes.position, data = w.seam.geometry.attributes.aSeam;
     for (let i = 0; i < ALONG; i++) {
       const a = span * i / (ALONG - 1), cx = w.start.x + w.dir.x * a, cz = w.start.z + w.dir.z * a;
       w.ground[i] = groundAt(cx, cz, w.start.y);
