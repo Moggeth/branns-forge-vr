@@ -2,6 +2,7 @@
 export const TERRAIN_LIMITS = Object.freeze({bound:55, mountainStart:46, mountainCrest:55, deformation:6, axeScar:.65, slope:1.15, rim:50});
 import {HOME_SITES,WORLD_EXTENT,keepCarve,onKeepGround} from './keep-sites.js';
 import {lakeBasin} from './larimar-cove.js';
+import {inUnderway,underwayFloor,moveUnderway} from './underways/space.js';
 import {worldFor} from './worldgen/registry.js';
 import {modeTerrainAt} from './world-modes.js';
 import {activeWorld, thingLimit} from './world-extent.js';
@@ -218,6 +219,7 @@ export function terrainRenderVertex(state,x,z,includeBridges=false,y=terrainHeig
  return y-FOUNDATION_SOIL_RECESS*cover;
 }
 export function terrainHeight(state,x,z,includeBridges=true) {
+  if(inUnderway(x,z))return underwayFloor(state,x,z); // the Underways: pocket dungeons far from the map (shared/underways/space.js)
   let y=triangleHeight((a,b)=>rawTerrainHeight(state,a,b),x,z);
   for(const b of includeBridges?(state.bridges||[]):[]) {
     const dx=x-b.x,dz=z-b.z,f=-Math.sin(b.yaw)*dx-Math.cos(b.yaw)*dz,s=Math.cos(b.yaw)*dx-Math.sin(b.yaw)*dz;
@@ -229,6 +231,7 @@ export function terrainHeight(state,x,z,includeBridges=true) {
  * Looking ahead by a body radius avoids frame-sized steps bypassing a tall wall.
  * Airborne actors can clear low obstacles when their feet already exceed the rise. */
 export function moveOnTerrain(state,position,dx,dz,radius=.28) {
+  if(inUnderway(position[0],position[2])){const o=[...position];moveUnderway(state,position,dx,dz,radius);return Math.hypot(position[0]-o[0],position[2]-o[2]);}
   const origin=[...position],world=state.world?worldFor(state):null;
   for(const [axis,delta] of [[0,dx],[2,dz]]) {
     if(!delta)continue;
@@ -245,13 +248,14 @@ export function moveOnTerrain(state,position,dx,dz,radius=.28) {
   }
   return Math.hypot(position[0]-origin[0],position[2]-origin[2]);
 }
-const walkable=(x,z,radius)=>Math.max(Math.abs(x),Math.abs(z))<=50-radius||onKeepGround(x,z)&&Math.max(Math.abs(x),Math.abs(z))<=WORLD_EXTENT-radius;
+const walkable=(x,z,radius)=>inUnderway(x,z)||Math.max(Math.abs(x),Math.abs(z))<=50-radius||onKeepGround(x,z)&&Math.max(Math.abs(x),Math.abs(z))<=WORLD_EXTENT-radius;
 // Generated worlds: walkers stay inside the overworld's walk square, or inside the dungeon cell they stand in.
 function walkArea(world,x,z) {
   if(x<=world.bounds.maxX)return world.walkBounds;
   const own=modeTerrainAt(x,z);return own?.bounds?.(x,z)||world.walkBounds;
 }
 export function resolveTerrainBoundary(position,radius=.28,state=null) {
+  if(inUnderway(position[0],position[2]))return position; // dungeon walls hold walkers there (shared/underways/space.js)
   const world=state?.world?worldFor(state):activeWorld();
   if(world){const b=walkArea(world,position[0],position[2]);position[0]=clamp(position[0],b.minX+radius,b.maxX-radius);position[2]=clamp(position[2],b.minZ+radius,b.maxZ-radius);return position;}
   if(walkable(position[0],position[2],radius))return position;

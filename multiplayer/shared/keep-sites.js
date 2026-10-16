@@ -1,4 +1,5 @@
 import {movedList, movedTable} from './map-layout.js';
+import {inUnderway} from './underways/space.js';
 // Where the two keeps stand, and the ground carved for them out of the corner mountains: a round bowl for the
 // half-ring keep, a narrow pass straight back toward the corner, and a walled back town filling the corner itself,
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
@@ -71,6 +72,7 @@ export function onKeepGround(x, z) {
 }
 /** Clamp a ground point to the world: inside ±limit on the open map, or anywhere on a keep's carved floor. */
 export function clampToWorld(x, z, limit = 55) {
+  if (inUnderway(x, z)) return [x, z]; // dungeon walls hold walkers there (shared/underways/space.js)
   const w = activeWorld();
   if (w) { if (inUnderwayBand(x, z)) return [x, z]; const b = w.bounds; return [clamp(x, b.minX, b.maxX), clamp(z, b.minZ, b.maxZ)]; }
   if ((Math.abs(x) <= limit && Math.abs(z) <= limit) || onKeepGround(x, z)) return [x, z];
