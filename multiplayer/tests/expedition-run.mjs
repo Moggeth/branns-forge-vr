@@ -43,14 +43,22 @@ function clear(sim, id) {
   if (n.kind === 'shrine') { assert.equal(s.run.stage, 'reward'); return sim; }
   assert.equal(s.run.stage, 'fight', `arriving starts the ${n.kind}`);
   if (n.kind === 'heart') {
-    const boss = s.enemies.find(e => e.boss);
+    const boss = s.enemies.find(e => typeof e.boss === 'string');
     assert.ok(boss, 'the Heart has its guardian');
     assert.equal(boss.hp, enemyMaxHp(boss)); assert.ok(boss.hp >= 1500, 'the guardian is a real boss');
     const head = partPosition(boss, 'head'); assert.ok(head[1] - boss.position[1] > 4, 'the crowned colossus towers');
     assert.ok(validPartHit(boss, 'head', head), 'hits land on its scaled body');
+    const reloaded = loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))).snapshot().enemies.find(e => typeof e.boss === 'string');
+    assert.deepEqual({hp: reloaded.hp, armor: reloaded.armor, boss: reloaded.boss}, {hp: boss.hp, armor: boss.armor, boss: boss.boss}, 'a live guardian survives saves and host handover');
   }
   for (let i = 0; i < 80 && sim.snapshot().run.stage === 'fight'; i++) {
     if (n.kind === 'treasure') sim = mineShards(sim);
+    if (n.kind === 'underways' && sim.snapshot().run.delve) {
+      // The party went down into a real dungeon (tests/underways.mjs plays those through): call the hoard won and walk out.
+      const st = sim.checkpoint(); assert.ok(st.underways.runs.some(r => r.id === st.run.delve && r.tag === `xr:${n.id}`), 'a tagged dungeon opened');
+      assert.ok(st.players[0].position[0] > 1000, 'the Hero is down in the Underways');
+      st.run.objective.have = 1; sim = loadSimulation(st);
+    }
     sim = killAll(sim); sim = teleport(sim, id, n.x, n.z); steps(sim, n.kind === 'hold' ? 400 : 5);
   }
   assert.equal(sim.snapshot().run.stage, 'reward', `${n.kind} clears`);
@@ -140,4 +148,42 @@ function clear(sim, id) {
 assert.ok(Math.abs(itemBonus({runBoons: ['keen', 'fury']}, 'damage') - .45) < 1e-9);
 assert.equal(heroMaxHp({xp: 0, runBoons: ['glass']}), 70);
 assert.equal(itemBonus({runBoons: ['wellspring'], items: []}, 'mana'), .5);
+// The Underways destination with a dungeon module present (ctx.underways mirrors shared/underways/rules.js:
+// openUnderway, enterUnderway, an in-dungeon test). Clear the mouth, go down, win the hoard, come back up.
+{
+  const camp0 = arenaCamp(), route = buildRoute(4242, camp0, ground), uwNode = route.find(n => n.kind === 'underways') || route.find(n => n.tier === 1);
+  const state = {tick: 0, players: [{id: 'h1', name: 'Mitch', role: 'hero', hp: 100, mana: 0, xp: 0, position: [uwNode.x, 0, uwNode.z], resources: {}, runBoons: []}], enemies: [], deposits: []};
+  state.run = {...(await import('../shared/expedition-run.js')).createRun({seed: 4242, camp: camp0, sites: ground}), stage: 'travel', target: uwNode.id};
+  state.run.nodes.find(n => n.id === uwNode.id).kind = 'underways';
+  const opened = [], entered = [];
+  const underways = {
+    open(st, o) { const r = {id: `uw${opened.length + 1}`, tag: o.tag, style: o.style, depth: o.depth, back: o.back, cleared: false}; (st.underways ||= {runs: []}).runs.push(r); opened.push(o); return r; },
+    enter(st, p, r, ev) { p.position = [9100, 0, 9100]; entered.push(p.id); ev.push({kind: 'underway_enter', id: p.id, run: r.id}); },
+    inside: p => p.position[0] >= 9000,
+  };
+  const ctx = {createEnemy, terrainHeight: () => 0, grantXp, heroMaxHp, makeBoss, underways};
+  const tick = (events = []) => { state.tick++; return stepRun(state, events, ctx).events; };
+  tick(); assert.equal(state.run.stage, 'fight', 'arriving at the mouth starts the guard fight');
+  assert.ok(state.run.foes.length > 0, 'guardians wait at the mouth');
+  state.enemies = []; tick();
+  assert.equal(opened.length, 1, 'a cleared mouth opens a dungeon');
+  assert.equal(opened[0].tag, `xr:${uwNode.id}`); assert.ok(['mine', 'crypt', 'keep'].includes(opened[0].style) && opened[0].depth >= 1);
+  assert.deepEqual(entered, ['h1'], 'the party goes down'); assert.equal(state.run.delve, 'uw1');
+  for (let i = 0; i < 30; i++) tick(); assert.equal(state.run.stage, 'fight', 'the destination waits on the delve');
+  // Abandoned delve: the dungeon closes; walking back to the mouth opens a fresh one.
+  state.underways.runs = []; state.players[0].position = [uwNode.x, 0, uwNode.z]; tick();
+  assert.equal(opened.length, 2, 'returning to the mouth reopens the Underways'); assert.equal(state.run.delve, 'uw2');
+  const restored = restoreRun(JSON.parse(JSON.stringify(state.run))); assert.equal(restored.delve, 'uw2', 'an open delve survives a save');
+  tick([{kind: 'underway_hoard', run: 'uw2', tag: `xr:${uwNode.id}`, drops: [], granted: []}]);
+  assert.equal(state.run.objective.have, 1, 'the guardian’s hoard wins the delve');
+  tick(); assert.equal(state.run.stage, 'fight', 'still below: wait for the way out');
+  state.players[0].position = [uwNode.x, 0, uwNode.z + 3]; tick();
+  assert.equal(state.run.stage, 'reward', 'back on the surface the Underways count as cleared');
+  // No dungeon module (or every slot busy): the mouth fight alone clears it.
+  const legacy = {...ctx, underways: undefined}; delete legacy.underways;
+  const st2 = {tick: 0, players: [{...state.players[0], position: [uwNode.x, 0, uwNode.z]}], enemies: [], deposits: []};
+  st2.run = {...restoreRun(JSON.parse(JSON.stringify({...state.run, stage: 'travel', target: uwNode.id, at: '', path: [], delve: '', objective: {have: 0, need: 0}, foes: []})))};
+  stepRun(st2, [], legacy); st2.enemies = []; stepRun(st2, [], legacy); assert.equal(st2.run.stage, 'reward');
+  const { delve, ...old } = st2.run; assert.equal(restoreRun(old).delve, '', 'runs saved before delves still load');
+}
 console.log('expedition run: ok');

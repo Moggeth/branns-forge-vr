@@ -68,7 +68,10 @@ async function play(page, prefix, {phone = false} = {}) {
   await shot(page, `${prefix}04-travel-beacon`);
   await approach(page, target, 2); r = await until(page, r => r.stage === 'fight' || r.stage === 'reward', 'fight');
   await sleep(target.kind === 'skirmish' || target.kind === 'elite' ? 4500 : 2500);
-  await approach(page, target, 9); await sleep(800);
+  // Frame the fight: stand 9 m back from the foes (toward camp), facing them.
+  const foes = await page.evaluate(() => { const s = window.__qaRun.snapshot(), ids = new Set(s.run.foes.map(f => f.id)); return s.enemies.filter(e => ids.has(e.id)).map(e => [e.position[0], e.position[2]]); });
+  const mid = foes.length ? {x: foes.reduce((a, f) => a + f[0], 0) / foes.length, z: foes.reduce((a, f) => a + f[1], 0) / foes.length} : target;
+  await approach(page, mid, 9); await sleep(800);
   await shot(page, `${prefix}05-fight`);
   await clearFoes(page); await approach(page, target, 1);
   r = await until(page, r => r.stage === 'reward', 'reward');
@@ -91,7 +94,7 @@ async function play(page, prefix, {phone = false} = {}) {
         await sleep(7000); // the colossus unfurls from its meteor
         await approach(page, n, 13); await sleep(1200);
         await shot(page, `${prefix}08-heart-guardian`);
-        await host(page, function () { const b = st.enemies.find(e => e.boss); if (b) b.hp = Math.round(b.hp * .4); });
+        await host(page, function () { const b = st.enemies.find(e => typeof e.boss === 'string'); if (b) b.hp = Math.round(b.hp * .4); });
         await sleep(600); await shot(page, `${prefix}09-heart-strip`);
       } else { await approach(page, n, 2); await until(page, r => r.stage !== 'travel', 'arrive'); }
       continue;
