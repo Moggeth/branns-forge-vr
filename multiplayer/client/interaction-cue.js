@@ -13,7 +13,7 @@ import {MILL, millAt} from '../shared/home-mill.js';
 import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
-import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, rotateVector, logLength, logRadius} from '../shared/trees.js';
+import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, notchAt, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
 const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
 const titleCase = t => String(t).replace(/\b\w/g, ch => ch.toUpperCase());
@@ -281,15 +281,13 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     const cut = (snapshot.harvestedTrees || []).find(h => h.id === id);
     if (isFelled(cut)) return null; // felled trunks leave targets(); their logs are cued instead
     const floor = ctx.height ? ctx.height(tree.x, tree.z) : 0, local = pt[1] - floor, s = treeScale(tree);
-    const progress = cut ? {done: cut.cuts, total: 3} : null;
+    const spot = cut && notchAt(cut, pt[1], Math.atan2(pt[0] - tree.x, pt[2] - tree.z)), progress = cut ? {done: spot?.cuts || 0, total: 3} : null; // each wound counts its own cuts
     if (tool !== 'axe') return make('tree', 'tool', id, 'Tree', 'Needs the Axe', keys.axe, '', progress);
     if (!reachable(tree.x, tree.z, floor)) return make('tree', 'far', id, 'Tree', 'Move closer', '', '', progress);
     if (boneHeld) return make('tree', 'busy', id, 'Tree', 'Drop the bone first', keys.drop);
-    // chopTree: hits off the trunk produce nothing; outside CUT_RANGE or away from the notch only glance.
+    // chopTree: hits off the trunk produce nothing; outside CUT_RANGE only glance. A new height starts a fresh notch.
     if (Math.hypot(pt[0] - tree.x, pt[2] - tree.z) > trunkRadius(tree, clamp(local, 0, tree.height)) + TREE_LIMITS.chopSlack + .2)
       return make('tree', 'aim', id, 'Tree', 'Aim at the trunk', '', '', progress);
-    if (cut && Math.abs(cut.cutHeight - pt[1]) > TREE_LIMITS.notchTolerance)
-      return make('tree', 'aim', id, 'Tree', cut.cutHeight < pt[1] ? 'Aim lower, at the notch' : 'Aim higher, at the notch', '', '', progress);
     if (local < CUT_RANGE[0]*s - .15) return make('tree', 'aim', id, 'Tree', 'Aim higher on the trunk', '', '', progress);
     if (local > CUT_RANGE[1]*s + .15) return make('tree', 'aim', id, 'Tree', 'Aim lower on the trunk', '', '', progress);
     return make('tree', 'ready', id, 'Tree', 'Chop', keys.strike, '', progress);

@@ -19,8 +19,8 @@ let sim = heroAt([tree.x, floor, tree.z + 1.2], 0);
 const strike = (y = floor + 1) => act(sim, {action: 'strike', targetId: tree.id, point: [tree.x, y, tree.z + r], normal: [0, 0, 1]});
 steps(sim, 30);
 const first = strike(); assert.equal(first.ok, true); assert.equal(sim.snapshot().harvestedTrees[0].cuts, 1);
-steps(sim, 28); const wild = strike(floor + 1.9); assert.equal(wild.events[0]?.glance, true, 'off-notch swing glances');
-assert.equal(sim.snapshot().harvestedTrees[0].cuts, 1, 'persisted wound is not reset by a stray swing');
+steps(sim, 28); const wild = strike(floor + 1.9); assert.equal(wild.events[0]?.cuts, 1, 'a swing elsewhere starts its own notch');
+assert.deepEqual(sim.snapshot().harvestedTrees[0].notches.map(n => n.cuts), [1], 'the first wound persists with its cut');
 steps(sim, 28); strike(); steps(sim, 28);
 // Save while wounded survives exactly.
 assert.deepEqual(loadSimulation(JSON.parse(JSON.stringify(sim.checkpoint()))).snapshot().harvestedTrees, sim.snapshot().harvestedTrees);

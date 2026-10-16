@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import * as T from 'three';
 import * as R from '../shared/trees.js';
 import {worldTrees} from '../shared/world-content.js';
-import {bakeTriangles, buildNotch, buildFelled, audit, fitEndcapUV} from '../client/tree-carve.js';
+import {bakeTriangles, buildNotch, buildFelled, carveNotches, audit, fitEndcapUV} from '../client/tree-carve.js';
 import {createTreeView} from '../client/tree-view.js';
 import {loadGLB} from './glb.mjs';
 
@@ -25,6 +25,23 @@ test('chops: side from impact, wound persists, 3rd fells, glance off-range', () 
  r = R.chopTree(s, t, hitPoint(t, .1, [1, 0]), [1, 0, 0], c); assert.ok(r.events[0].glance, 'root flare is out of the authored cut range');
  R.chopTree(s, t, hitPoint(t, 1.1, [1, 0]), [1, 0, 0], c); r = R.chopTree(s, t, hitPoint(t, 1, [1, 0]), [1, 0, 0], c); assert.equal(h.cuts, 3); assert.equal(h.felledTick, 100); assert.equal(r.events[1].kind, 'tree_fell');
  assert.deepEqual(R.chopTree(s, t, hitPoint(t, 1), [0, 0, 1], c).events, []); assert.equal(R.chopTree(s, t, [t.x + 3, 1, t.z], [1, 0, 0], c).events.length, 0); });
+test('multiple spots: each wound counts its own cuts, three in one spot fells there', () => { const s = fresh(), t = tree1(s), c = {terrainHeight: () => 0};
+ const chop = (y, side) => R.chopTree(s, t, hitPoint(t, y, side), [side[0], 0, side[1]], c);
+ chop(1, [1, 0]); const h = s.harvestedTrees[0];
+ let r = chop(.55, [0, 1]); assert.ok(!r.events[0].glance, 'a second spot is not invulnerable'); assert.equal(r.events[0].cuts, 1);
+ assert.deepEqual([h.cutHeight, h.cuts], [.55, 1]); assert.equal(h.notches.length, 1); assert.deepEqual(h.notches[0], {cutHeight: 1, fallYaw: Math.PI/2, cuts: 1}, 'the first wound persists');
+ r = chop(1.05, [1, 0]); assert.equal(r.events[0].cuts, 2, 'back in the first notch: its count carries on'); assert.equal(h.cutHeight, 1); assert.ok(Math.abs(h.fallYaw - Math.PI/2) < 1e-9);
+ chop(.6, [0, 1]); assert.equal(h.cuts, 2); assert.equal(h.felledTick, 0, 'four cuts across two spots never fell'); assert.equal(h.notches.length, 1);
+ r = chop(.95, [1, 0]); assert.equal(h.cuts, 3); assert.equal(r.events[1].kind, 'tree_fell'); assert.equal(h.cutHeight, 1, 'falls at the spot that took three'); assert.ok(Math.abs(h.fallYaw - Math.PI/2) < 1e-9);
+ assert.deepEqual(h.notches, [{cutHeight: .55, fallYaw: 0, cuts: 2}]);
+ const o = {...fresh(), harvestedTrees: []}, opp = (y, side) => R.chopTree(o, t, hitPoint(t, y, side), [side[0], 0, side[1]], c);
+ opp(1, [1, 0]); opp(1, [-1, 0]); opp(1, [1, 0]); r = opp(1, [-1, 0]); assert.equal(o.harvestedTrees[0].felledTick, 0, 'opposite faces at the same height are separate spots'); assert.deepEqual([o.harvestedTrees[0].cuts, o.harvestedTrees[0].notches[0].cuts], [2, 2]);
+ opp(1, [.9, .44]); assert.equal(o.harvestedTrees[0].cuts, 3, 'a slightly different angle on the same face is the same notch');
+ const restored = R.restoreHarvested(structuredClone(s), new Set(worldTrees(s).map(t => t.id)))[0]; assert.deepEqual(restored.notches, h.notches, 'save keeps every wound');
+ for (const notches of [[], [{cutHeight: .5, fallYaw: 0, cuts: 3}], [{cutHeight: .5, fallYaw: 9, cuts: 1}], Array(R.MAX_EXTRA_NOTCHES + 1).fill({cutHeight: .5, fallYaw: 0, cuts: 1})]) assert.throws(() => R.restoreHarvested({...s, harvestedTrees: [{...structuredClone(h), notches}]}, new Set(worldTrees(s).map(t => t.id))));
+ const big = {id: 'tree1', x: t.x, z: t.z, height: 14, variant: 0}, b = {...fresh(), harvestedTrees: []};
+ for (let y = .9; y < 3.75; y += .4) { const q = R.chopTree(b, big, hitPoint(big, y, [1, 0]), [1, 0, 0], c); assert.ok(!q.events[0].glance, `fresh spot at ${y.toFixed(1)} bites`); }
+ assert.equal(b.harvestedTrees[0].notches.length, R.MAX_EXTRA_NOTCHES, 'oldest wounds heal past the cap, so the tree is never invulnerable'); });
 test('notch depth: second chop deeper, at impact height', () => { const s = fresh(), t = tree1(s); R.chopTree(s, t, hitPoint(t, 1.2), [0, 0, 1], {terrainHeight: () => 0}); const h = s.harvestedTrees[0];
  const n1 = R.notchFor(t, h, 0); h.cuts = 2; const n2 = R.notchFor(t, h, 0); assert.ok(n2.depth > n1.depth*1.5); assert.ok(Math.abs(n1.height - 1.2) < 1e-9); });
 test('fall: deterministic, monotonic, terrain contact, settle', () => { const s = fresh(), t = tree1(s), h = fell(s, t); let prev = -1, landed = null;
@@ -73,6 +90,13 @@ for (const v of ['tree', 'tree_b', 'tree_young']) {
   assert.ok(res.upper.length > 3 && res.lower.length > 3); const inner = Math.min(...res.bark.flat().filter(x => Math.abs(x.p[1] - n.height) < .02).map(x => x.p[0]*n.normal[0] + x.p[2]*n.normal[2]).filter(sv => sv > -1)); assert.ok(inner < n.radius, 'surface moved inward');
   const remaining = all.flat().filter(x => Math.abs(x.p[1] - n.height) < 1e-4).map(x => x.p[0]*n.normal[0] + x.p[2]*n.normal[2]); assert.ok(Math.max(...remaining) <= n.hinge + 1e-4, 'nothing remains in front of the hinge at the notch height');
   if (cuts === 2 && yaw === .7 && y === 1) geomReport.push(`${v} notch2: bark ${res.bark.length} tris (from ${tris.length}), wood ${res.wood.length} tris`); });
+ test(`${v}: two notches at different spots watertight; felling keeps the other wound`, () => {
+  const a = R.notchFor(tree, {cuts: 2, cutHeight: .55, fallYaw: -2.4}, 0), b = R.notchFor(tree, {cuts: 1, cutHeight: 1.2, fallYaw: .7}, 0), res = carveNotches(tris, [a, b], uvMap), au = audit([...res.bark, ...res.wood]);
+  assert.ok(Math.abs(au.openLength - base.openLength) < 1e-6 && au.openMaxY < -.09, `two notches stay closed: ${au.openLength} vs ${base.openLength}`); assert.equal(au.flipped, base.flipped); assert.equal(au.missingUV + au.badNormal, 0);
+  assert.ok(res.bark.length > buildNotch(tris, b, uvMap).bark.length, 'both wedges carved');
+  const fell = R.notchFor(tree, {cuts: 2, cutHeight: 1.2, fallYaw: .7}, 0), f = buildFelled(tris, fell, uvMap, [a]), st = audit([...f.stump.bark, ...f.stump.wood]), top = audit([...f.top.bark, ...f.top.wood]);
+  assert.equal(top.open.length, 0, 'falling section closed'); assert.ok(Math.abs(st.openLength - base.openLength) < 1e-6 && st.openMaxY < -.09, 'stump with the lower wound still closed');
+  assert.ok(f.stump.wood.length > buildFelled(tris, fell, uvMap).stump.wood.length, 'lower wound shows on the stump'); });
  test(`${v}: felled split exact height, 2 caps radius-correct, closed`, () => { const n = R.notchFor(tree, {cuts: 2, cutHeight: 1.0, fallYaw: .3}, 0), f = buildFelled(tris, n, uvMap);
   const st = audit([...f.stump.bark, ...f.stump.wood]), top = audit([...f.top.bark, ...f.top.wood]); assert.equal(st.flipped + top.flipped, 2*base.flipped); assert.equal(st.missingUV + top.missingUV + st.badNormal + top.badNormal, 0);
   assert.equal(top.open.length, 0, 'falling section is closed'); assert.ok(Math.abs(st.openLength - base.openLength) < 1e-6 && st.openMaxY < -.09, 'stump open only at the buried bottom');
@@ -80,6 +104,17 @@ for (const v of ['tree', 'tree_b', 'tree_young']) {
   assert.ok(Math.max(...f.stump.bark.flat().map(x => x.p[1])) <= n.height + 1e-6 && Math.min(...f.top.bark.flat().map(x => x.p[1])) >= n.height - 1e-6); });
 }
 
+test('headless view: a second spot carves its own visible notch and gets hit feedback', () => {
+ const templates = new Map(Object.entries(kits)), scene = new T.Scene(), view = createTreeView({scene, templates, height: () => 0}), s = fresh(), t = tree1(s), c = {terrainHeight: () => 0};
+ view.sync(s); view.tick(0, s.tick); R.chopTree(s, t, hitPoint(t, 1, [1, 0]), [1, 0, 0], c); view.sync(s); view.tick(10, s.tick);
+ const e = view.entity('tree1'), trunk = e.full.byPart.Trunk[0], one = trunk.geometry.attributes.position.count;
+ R.chopTree(s, t, hitPoint(t, .55, [0, 1]), [0, 0, 1], c); view.sync(s); view.tick(20, s.tick);
+ assert.ok(trunk.geometry.attributes.position.count > one, 'both notches carved into the bark'); assert.equal(view.stats().wounded, 1);
+ assert.ok(Math.abs(e.recoil.axis.x - 1) < 1e-9 && Math.abs(e.recoil.axis.z) < 1e-9, 'recoil comes from the new spot');
+ scene.updateMatrixWorld(true);
+ for (const [y, from, dir, side] of [[1, [t.x + 3, 1, t.z], [-1, 0, 0], 'x'], [.55, [t.x, .55, t.z + 3], [0, 0, -1], 'z']]) {
+  const hit = new T.Raycaster(new T.Vector3(...from), new T.Vector3(...dir)).intersectObjects(view.targets(), false)[0];
+  assert.ok(hit && (side === 'x' ? hit.point.x - t.x : hit.point.z - t.z) < R.trunkRadius(t, y) - .02, `ray enters the notch at ${y}`); } });
 test('headless view: placement by root origin, notch swap, fall pose, logs, LOD, targets, stats', () => {
  const templates = new Map(Object.entries(kits)), scene = new T.Scene(), camera = new T.PerspectiveCamera(); camera.position.set(-2, 1.7, 9); scene.add(camera); camera.updateMatrixWorld(true);
  const view = createTreeView({scene, templates, height: () => 0, camera}), s = fresh(); view.sync(s); view.tick(0, s.tick); let st = view.stats();
