@@ -81,6 +81,8 @@ function wrap(gen) {
     moistureAt: (x, z) => gen.moistureAt(x + ox, z + oz),
     temperatureAt: (x, z) => gen.temperatureAt(x + ox, z + oz),
     slopeAt: (x, z) => gen.slopeAt(x + ox, z + oz),
+    hillAt: (x, z) => gen.hillAt(x + ox, z + oz),
+    scarpAt: (x, z) => gen.scarpAt(x + ox, z + oz),
     roadAt: (x, z) => gen.roadAt(x + ox, z + oz),
     dangerAt: (x, z) => gen.dangerAt(x + ox, z + oz),
     regionAt: (x, z) => { const r = gen.regionAt(x + ox, z + oz); return r && toSim(r); },

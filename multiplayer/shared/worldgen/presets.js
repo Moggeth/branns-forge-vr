@@ -80,7 +80,7 @@ export const PRESETS = Object.freeze({
   }),
   riverlands: Object.freeze({
     id: 'riverlands', name: 'Greenwater Basin', blurb: 'A broad green basin ringed by hills; one mighty river, marshes and a delta.',
-    size: 4096, warmth: .6, wetness: 1.3, seaRatio: .2,
+    size: 4096, warmth: .6, wetness: 1.3, seaRatio: .2, relief: .6, dales: 0, // rounded hills, no dales: the basin stays one great river's country
     setup(r) { return {coast: r.int(0, 3), warp: [r.range(0, 99), r.range(0, 99)]}; },
     elevation(nx, nz, n, s) {
       // Rotate so the sea is on the seeded side ("down" = +v).

@@ -8,6 +8,7 @@
 // in, nudged off roads and out of water.
 import {hashInts, hash01} from './random.js';
 import {sinQ, cosQ, atanQ2} from './generate.js';
+import {resolveCrags} from './content.js';
 const sq = v => v * v;
 
 // Collision radius per piece (metres); 0 = walk through.
@@ -78,7 +79,7 @@ export function placesFor(world) {
   return out;
 }
 const grids = new WeakMap();
-/** Push a walker out of every solid piece it overlaps (a cylinder per piece). */
+/** Push a walker out of every solid piece it overlaps (a cylinder per piece), then out of the crags. */
 export function resolvePlaces(world, position, radius = .28) {
   if (!world) return position;
   const grid = grids.get(placesFor(world)), gx = Math.floor(position[0] / 32), gz = Math.floor(position[2] / 32);
@@ -87,7 +88,7 @@ export function resolvePlaces(world, position, radius = .28) {
     if (d2 >= min * min) continue;
     const d = Math.sqrt(d2) || 1e-6; position[0] = p.x + dx / d * min; position[2] = p.z + dz / d * min;
   }
-  return position;
+  return resolveCrags(world, position, radius); // and the land's own rock (tors, outcrops, boulders, spires)
 }
 /** Pieces within `radius` of (x, z) (renderer streaming). */
 export function placesNear(world, x, z, radius) { const r2 = radius * radius; return placesFor(world).filter(p => sq(p.x - x) + sq(p.z - z) <= r2); }

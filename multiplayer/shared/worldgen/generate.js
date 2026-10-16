@@ -60,6 +60,7 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
   const N = SIZE / CELL, HALF = SIZE / 2, NN = N * N;
   const rand = createRandom(hashInts(seedHash, 1));
   const noise = createNoise(hashInts(seedHash, 2)), detailNoise = createNoise(hashInts(seedHash, 3));
+  const reliefNoise = createNoise(hashInts(seedHash, 5));
   const setup = P.setup(rand);
   const timing = {}, tStart = now();
   let t0 = tStart;
@@ -67,10 +68,20 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
   const cellX = i => (i + .5) * CELL - HALF, cellZ = j => (j + .5) * CELL - HALF;
 
   // ---------- 1. landform ----------
-  const elev = new Float64Array(NN);
+  const elev = new Float64Array(NN), hilly = new Float64Array(NN), relief = new Float64Array(NN);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const nx = ((i + .5) / N) * 2 - 1, nz = ((j + .5) / N) * 2 - 1;
     let h = P.elevation(nx, nz, noise, setup);
+    // Hill country, gathered in patches so open plains remain between: rolling downs and knolls, with long dales
+    // (inverted ridges) running through them. Added after erosion (which would plane them away) but before drainage,
+    // so rivers, lakes and biomes still follow the new shape.
+    const hill = (.25 + .75 * smooth(-.3, .3, reliefNoise.fbm(nx * 2.1 + 31, nz * 2.1 - 17, 3))) * (P.relief ?? 1);
+    hilly[idx(i, j)] = hill;
+    if (hill > 0) {
+      const roll = reliefNoise.fbm(nx * 8.5 + 5, nz * 8.5 - 2, 4), knoll = reliefNoise.fbm(nx * 22 - 9, nz * 22 + 4, 3);
+      const dale = reliefNoise.ridged(nx * 4.6 - 8, nz * 4.6 + 3, 3);
+      relief[idx(i, j)] = P.dales === 0 ? hill * Math.max(0, 40 * roll + 12 * knoll + 6) : hill * (46 * roll + 14 * knoll + 34 - 70 * dale * dale); // a basin gets rounded hills only (dales would pond)
+    }
     const edge = Math.max(Math.abs(nx), Math.abs(nz));
     if (edge > .94) h = Math.min(h, -8 - (edge - .94) * 600); // every world is wrapped in sea
     elev[idx(i, j)] = h;
@@ -79,6 +90,7 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
 
   // ---------- 2. erosion (droplets on the coarse grid) ----------
   if (!globalThis.__NOERODE) erode(elev, N, createRandom(hashInts(seedHash, 4)), Math.floor(NN * .8));
+  for (let c = 0; c < NN; c++) if (relief[c]) elev[c] += relief[c] * smooth(-3, 8, elev[c]); // hills stop at the shore
   timing.erosion = lap();
 
   // ---------- 3. sea, drainage and lakes ----------
@@ -464,6 +476,10 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
   // Roughness by place: crags in the mountains, soft roll on meadows, almost none near water.
   const rough = new Float64Array(NN);
   for (let c = 0; c < NN; c++) rough[c] = ocean[c] ? .6 : lakeId[c] >= 0 ? .3 : clamp(.7 + slope[c] * 10 + Math.max(0, elev[c] - 120) / 50, .5, 9) * smooth(0, 3, riverNear[c] + .5);
+  // Ledges: in hill country the slopes break into terraces with short steep risers (the scarps and shelves that make
+  // a hillside read as rock and grass), kept off water, flat floors and the lowland plains.
+  const scarp = new Float64Array(NN);
+  for (let c = 0; c < NN; c++) scarp[c] = ocean[c] || lakeId[c] >= 0 ? 0 : hilly[c] * smooth(.05, .2, slope[c]) * smooth(2, 5, riverNear[c]) * smooth(2, 5, lakeNear[c]) * smooth(2, 5, coastNear[c]);
   const SEGS = seg.freeze();
   const QUERY = {d: 0, t: 0, k: -1};
 
@@ -472,6 +488,13 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
     let h = cubic(elev, x, z);
     const r = bilinear(rough, x, z);
     h += r * (detailNoise.fbm(x * .018, z * .018, 4) * .9 + detailNoise.ridged(x * .006 + 3, z * .006, 3) * r * .12 - r * .05);
+    const hl = bilinear(hilly, x, z);
+    if (hl > .02) h += hl * (4.5 * detailNoise.fbm(x * .011 + 7, z * .011 - 3, 3) + 2.2 * detailNoise.fbm(x * .03 - 5, z * .03 + 8, 2)); // knolls and hummocks
+    const sc = bilinear(scarp, x, z);
+    if (sc > .03) { // terrace: hold each 7 m band flat, then step up over its last 30% (a smooth riser, never a vertical wall)
+      const step = 7, t = h / step + detailNoise.fbm(x * .02 + 2, z * .02 + 6, 2) * .35, f = t - Math.floor(t), q = smooth(.62, .92, f);
+      h += ((Math.floor(t) + q) * step - t * step) * Math.min(1, sc * 1.6);
+    }
     // Roads: flatten toward their smoothed bed.
     let rd = Infinity, ry = 0;
     SEGS.forEachNear(x, z, 1, (k, d, t) => { if (d < rd) { rd = d; ry = SEGS.lerpY(k, t); } });
@@ -566,7 +589,7 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
     version: WORLDGEN_VERSION, seed: seedText, seedHash, preset: P.id, presetName: P.name, size: SIZE, half: HALF, cell: CELL, n: N,
     contentChunk: CONTENT_CHUNK, windDir: ['west', 'east', 'north', 'south'][windDir], riverThreshold,
     heightAt, waterAt, biomeAt, dangerAt, regionAt, riverNear: riverNearPoint, isWater, findSites,
-    moistureAt: sampleField(moist), temperatureAt: sampleField(temp), forestAt: (x, z) => bilinear(forest, x, z), slopeAt: sampleField(slope),
+    moistureAt: sampleField(moist), temperatureAt: sampleField(temp), forestAt: (x, z) => bilinear(forest, x, z), slopeAt: sampleField(slope), hillAt: sampleField(hilly), scarpAt: sampleField(scarp),
     roadAt: (x, z) => { let rd = Infinity; SEGS.forEachNear(x, z, 1, (k, d) => { if (d < rd) rd = d; }); return rd; },
     settlements, roads, rivers, lakes, regions, landmarks, discoveries, entrances, spawn, start: {x: startX, z: startZ, settlement: startSettlement.id},
     grids: {elev, biome, forest, moist, temp, ocean, lakeId, riverOf, regionOf, roadCells, slope},

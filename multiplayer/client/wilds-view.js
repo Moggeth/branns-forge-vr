@@ -13,8 +13,8 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {rawTerrainHeight, terrainRenderVertex, FOUNDATION_HALF} from '../shared/terrain.js';
-import {chunkContent, activeChunks, CHUNK} from '../shared/worldgen/content.js';
-import {BIOME} from '../shared/worldgen/generate.js';
+import {chunkContent, activeChunks, CHUNK, CRAG_KINDS} from '../shared/worldgen/content.js';
+import {BIOME, BIOME_NAMES} from '../shared/worldgen/generate.js';
 import {hash01} from '../shared/worldgen/random.js';
 import {loadDeliveredTexture} from './texture-delivery.js';
 
@@ -301,6 +301,50 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
       mesh.count = n; mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; treeCount += n;
     }
   }
+  // ---------- crags (tors, outcrops, boulders, spires) ----------
+  // Solid landforms from the same chunk content the simulation collides with. Drawn everywhere within reach, live
+  // window included (nothing else draws them). Tall ones (tors, spires) carry further so ridgelines keep their teeth.
+  const CRAG_VARIANTS = 2, cragMaterial = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .95, metalness: 0, flatShading: true});
+  const cragMeshes = CRAG_KINDS.map(kind => Array.from({length: CRAG_VARIANTS}, (_, v) => {
+    const m = new THREE.InstancedMesh(makeCragGeometry(kind, v), cragMaterial, Math.ceil(Q.cap * (kind === 'boulder' ? .12 : .08)));
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(m.count * 3), 3);
+    m.count = 0; m.frustumCulled = false; m.castShadow = true; m.receiveShadow = true; m.name = `wilds-crag-${kind}-${v}`; m.userData.ignoreContact = true; group.add(m); return m;
+  }));
+  const CRAG_TINT = {rock: [1, .97, .93], snow: [.95, .97, 1.03], tundra: [.93, .95, .98], pine: [.9, .93, .95], steppe: [1.08, 1, .86], beach: [1.1, 1.04, .9], meadow: [1.04, 1, .92], forest: [.94, .96, .9], marsh: [.88, .92, .86]};
+  let cragJob = null, cragAt = [NaN, NaN], cragCount = 0;
+  function* buildCrags(fx, fz) {
+    const near = Q.mid * 1.1, far = Q.mid * 2.2, r = Math.ceil(far / CHUNK), ccx = Math.floor(fx / CHUNK), ccz = Math.floor(fz / CHUNK);
+    const lists = cragMeshes.map(row => row.map(() => [])), seed = world.gen.seedHash;
+    for (let cz = ccz - r; cz <= ccz + r; cz++) {
+      for (let cx = ccx - r; cx <= ccx + r; cx++) {
+        const mx = (cx + .5) * CHUNK - fx, mz = (cz + .5) * CHUNK - fz, d2 = mx * mx + mz * mz; if (d2 > far * far) continue;
+        for (const g of chunkContent(world, cx, cz).crags) {
+          if (d2 > near * near && g.kind !== 'tor' && g.kind !== 'spire') continue;
+          const k = CRAG_KINDS.indexOf(g.kind), v = g.v % CRAG_VARIANTS, L = lists[k][v]; if (L.length >= cragMeshes[k][v].instanceMatrix.count) continue;
+          L.push(g);
+        }
+        yield;
+      }
+    }
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    cragCount = 0;
+    for (const [k, row] of lists.entries()) for (const [v, L] of row.entries()) {
+      const mesh = cragMeshes[k][v];
+      L.forEach((g, n) => {
+        // Seat it on the lowest ground under its footprint so no edge floats on a slope.
+        const rr = g.r * .8, y = Math.min(world.heightAt(g.x, g.z), world.heightAt(g.x + rr, g.z), world.heightAt(g.x - rr, g.z), world.heightAt(g.x, g.z + rr), world.heightAt(g.x, g.z - rr));
+        const lean = g.kind === 'outcrop' ? .32 : g.kind === 'spire' ? (hash01(seed, 97, n, k) - .5) * .14 : 0;
+        e.set(lean, g.yaw, (hash01(seed, 98, g.x * 10 | 0, g.z * 10 | 0) - .5) * (g.kind === 'boulder' ? .5 : .1), 'YXZ'); q.setFromEuler(e);
+        p.set(g.x, y - g.s * (g.kind === 'boulder' ? .22 : .12), g.z); sc.setScalar(g.s);
+        mesh.setMatrixAt(n, m4.compose(p, q, sc));
+        const t = CRAG_TINT[BIOME_NAMES[world.biomeAt(g.x, g.z)]] || [1, 1, 1], shade = .88 + hash01(seed, 99, g.x * 10 | 0, g.z * 10 | 0) * .22;
+        mesh.instanceColor.setXYZ(n, t[0] * shade, t[1] * shade, t[2] * shade);
+        if ((n & 127) === 127) return;
+      });
+      mesh.count = L.length; mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; cragCount += L.length;
+      yield;
+    }
+  }
   // ---------- per frame ----------
   let time = 0;
   function setWorld(next, nextDescriptor) {
@@ -308,6 +352,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     world = next; descriptor = nextDescriptor || null; tiles = new Map(); job = null; treeJob = null; treeKey = '';
     for (const L of levels) { L.built = false; L.cx = L.cz = L.wantX = L.wantZ = NaN; L.innerKey = ''; L.mesh.visible = false; }
     for (const m of treeMeshes) m.count = 0;
+    for (const row of cragMeshes) for (const m of row) m.count = 0; cragJob = null; cragAt = [NaN, NaN];
     group.visible = !!world;
     if (world) { baseState.world = descriptor; buildWater(); }
   }
@@ -317,6 +362,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     while (performance.now() - t0 < budget) {
       if (job) { if (job.next().done) job = null; continue; }
       if (treeJob) { if (treeJob.next().done) treeJob = null; continue; }
+      if (cragJob) { if (cragJob.next().done) cragJob = null; continue; }
       break;
     }
   }
@@ -337,17 +383,19 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
         treeJob = buildTrees(focus.x, focus.z, skip, new Set(felled.map(f => f[0]).concat((snapshot.harvestedTrees || []).map(h => h.id))));
       }
     }
+    if (!cragJob && (!Number.isFinite(cragAt[0]) || Math.hypot(focus.x - cragAt[0], focus.z - cragAt[1]) > 30)) { cragAt = [focus.x, focus.z]; cragJob = buildCrags(focus.x, focus.z); }
     pump(budget);
     if (sea && camera) { sea.position.set(Math.round(camera.position.x / 64) * 64, 0, Math.round(camera.position.z / 64) * 64); }
   }
   /** Synchronous first build (loading screen): every level and the forests. */
-  function prime({focus, snapshot}) { update({focus, camera: null, snapshot, budget: 0}); while (job || treeJob) pump(50); }
+  function prime({focus, snapshot}) { update({focus, camera: null, snapshot, budget: 0}); while (job || treeJob || cragJob) pump(50); }
   function dispose() {
     scene.remove(group);
     for (const L of levels) L.mesh.geometry.dispose();
     for (const m of [sea, lakes, rivers]) m?.geometry.dispose();
     for (const m of treeMeshes) { m.geometry.dispose(); m.dispose?.(); }
-    terrainMaterial.dispose(); waterMaterial.dispose(); treeMaterial.dispose();
+    for (const row of cragMeshes) for (const m of row) { m.geometry.dispose(); m.dispose?.(); }
+    terrainMaterial.dispose(); waterMaterial.dispose(); treeMaterial.dispose(); cragMaterial.dispose();
   }
   return {group, setWorld, update, prime, terrainChanged, fog: {near: Q.fogNear, far: Q.fogFar}, active: () => !!world,
     nearMesh: () => levels[0].mesh, building: () => !!job || !!treeJob,
@@ -445,5 +493,55 @@ function makeTreeGeometry(variant) {
   }
   const merged = mergeGeometries(parts.map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'color'].includes(k)) g.deleteAttribute(k); return g; }));
   merged.computeVertexNormals();
+  return merged;
+}
+
+// Faceted crags at unit size, coloured per vertex: warm weathered stone, darker in the cracks and at the foot, a
+// lichen-and-moss cap on the upward faces. kind: tor (stacked blocks), outcrop (a leaning slab breaking from the
+// ground), boulder (rounded stone), spire (tapering needle). Two shape variants each, fixed per variant (no shimmer).
+function makeCragGeometry(kind, variant) {
+  let seed = 9173 + variant * 7919 + kind.length * 31;
+  const rnd = () => (seed = Math.imul(seed ^ seed >>> 15, 0x2c1b3c6d) + 0x6d2b79f5 >>> 0, (seed >>> 8) / 16777216);
+  const stone = new THREE.Color(0xa49a8c), stoneDark = new THREE.Color(0x6f675e), lichen = new THREE.Color(0x8fae5a), moss = new THREE.Color(0x6e9444);
+  const parts = [];
+  const block = (geo, x, y, z, sx, sy, sz, yaw = 0, jitter = .12) => {
+    const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position;
+    // Jitter shared corners together (same position, same nudge) so the faceted block stays closed.
+    const nudge = new Map();
+    for (let i = 0; i < p.count; i++) {
+      const key = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
+      if (!nudge.has(key)) nudge.set(key, [1 + (rnd() - .5) * jitter * 2, 1 + (rnd() - .5) * jitter * 2, 1 + (rnd() - .5) * jitter * 2]);
+      const [a, b, c] = nudge.get(key); p.setXYZ(i, p.getX(i) * a, p.getY(i) * b, p.getZ(i) * c);
+    }
+    g.scale(sx, sy, sz); g.rotateY(yaw); g.translate(x, y, z); parts.push(g);
+  };
+  if (kind === 'tor') {
+    let y = 0; const n = 3 + variant;
+    for (let k = 0; k < n; k++) { const w = .62 - k * .1 + rnd() * .08, h = .22 + rnd() * .1; block(new THREE.DodecahedronGeometry(1, 0), (rnd() - .5) * .14, y + h * .5, (rnd() - .5) * .14, w, h * .62, w * (.8 + rnd() * .25), rnd() * 3); y += h * .82; }
+    block(new THREE.DodecahedronGeometry(1, 0), .5, .12, .22, .22, .16, .2, rnd() * 3); block(new THREE.DodecahedronGeometry(1, 0), -.42, .1, -.3, .18, .13, .17, rnd() * 3);
+  } else if (kind === 'outcrop') {
+    block(new THREE.BoxGeometry(1, 1, 1, 2, 2, 2), 0, .32, 0, .5, .72, .9 + variant * .2, 0, .14);
+    block(new THREE.BoxGeometry(1, 1, 1, 1, 2, 1), .3, .2, -.32, .3, .44, .4, .4, .16);
+    block(new THREE.DodecahedronGeometry(1, 0), -.32, .06, .4, .2, .12, .2, rnd() * 3);
+  } else if (kind === 'boulder') {
+    block(new THREE.IcosahedronGeometry(1, 1), 0, .34, 0, .52, .4 + variant * .06, .48, 0, .16);
+  } else {
+    let y = 0; const n = 4 + variant;
+    for (let k = 0; k < n; k++) { const w = .34 * (1 - k / (n + .6)), h = 2.4 / n; block(new THREE.CylinderGeometry(w * .82, w, h, 6, 1), (rnd() - .5) * .05, y + h * .5, (rnd() - .5) * .05, 1, 1, 1, rnd() * 3, .1); y += h * .96; }
+    block(new THREE.DodecahedronGeometry(1, 0), .26, .12, .1, .2, .16, .2, rnd() * 3);
+  }
+  const merged = mergeGeometries(parts.map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); return g; }));
+  merged.computeVertexNormals();
+  // Colour by facing and height: moss on the tops, darker in the low crevices, a little speckle per face.
+  const p = merged.attributes.position, nrm = merged.attributes.normal, col = new Float32Array(p.count * 3), c = new THREE.Color();
+  let top = 0; for (let i = 0; i < p.count; i++) top = Math.max(top, p.getY(i));
+  for (let i = 0; i < p.count; i += 3) {
+    const ny = (nrm.getY(i) + nrm.getY(i + 1) + nrm.getY(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, speck = .92 + rnd() * .16;
+    c.copy(stoneDark).lerp(stone, Math.min(1, .35 + y / Math.max(.01, top) * .9));
+    if (ny > .55) c.lerp(rnd() < .5 ? lichen : moss, Math.min(.85, (ny - .55) * 2.4));
+    c.multiplyScalar(speck);
+    for (let k = 0; k < 3; k++) { col[(i + k) * 3] = c.r; col[(i + k) * 3 + 1] = c.g; col[(i + k) * 3 + 2] = c.b; }
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return merged;
 }
