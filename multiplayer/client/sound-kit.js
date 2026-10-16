@@ -76,6 +76,27 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
       noise(o, t + dur * .2, {type: 'highpass', f0: 3800, attack: dur * .4, peak: peak * .25, release: dur * .3});
       if (body) tone(o, t + dur * .3, {f0: 120, f1: 80, attack: dur * .3, peak: .03 * body, release: dur * .5});
     }},
+    // Steel bounced off stone in your hands: the haft rings. A bright, slightly sour two-partial ring that dies fast, a
+    // hammer's lower and longer. Plays on top of the stone/metal contact sound itself.
+    strike_ring: {trim: 1.6, seconds: .7, range: 0, play(o, t, {tool = 'axe'} = {}) {
+      const f = {hammer: 610, pick: 1180}[tool] || 880, decay = tool === 'hammer' ? .5 : .32;
+      tone(o, t, {type: 'triangle', f0: f, f1: f * .985, peak: .03, attack: .002, release: decay});
+      tone(o, t, {f0: f * 2.71, f1: f * 2.69, peak: .012, attack: .002, release: decay * .6});
+      noise(o, t, {type: 'highpass', f0: 5200, peak: .02, attack: .001, release: .05});
+    }},
+    // An axe wrenched back out of a cut: a short, dry wooden creak and squeak.
+    strike_wrench: {trim: 1.4, seconds: .4, range: 0, play(o, t, {delay = .08} = {}) {
+      const at = t + delay;
+      noise(o, at, {f0: 650, f1: 1300, q: 7, attack: .02, peak: .045, release: .07, rate: .7});
+      tone(o, at + .015, {type: 'sawtooth', f0: 210, f1: 330, peak: .008, attack: .01, release: .06});
+    }},
+    // Steel bitten into the dirt: a soft, heavy chunk and a hiss of thrown grit.
+    strike_earth: {trim: 2, seconds: .45, range: 26, play(o, t, {weight = 1} = {}) {
+      const w = clamp(weight, .6, 1.6);
+      thump(o, t, 140, 55, .16 * w, .12);
+      noise(o, t, {type: 'lowpass', f0: 1100, f1: 260, peak: .09 * w, release: .14});
+      noise(o, t + .03, {f0: 2600, f1: 1400, q: 1.1, peak: .025, release: .18});
+    }},
     // Your Hero knocked out: a dull thump, the world pulls away (a falling, muffled chord). Then the respawn chime.
     hero_down: {seconds: 2, range: 30, duck: [.45, 1.6], play(o, t) { thump(o, t, 110, 38, .3, .5); noise(o, t, {type: 'lowpass', f0: 900, f1: 120, peak: .14, release: .9}); [7, 3, 0].forEach((n, i) => tone(o, t + .15 + i * .18, {type: 'triangle', f0: semis(392, n), f1: semis(392, n) * .97, peak: .035, release: .7})); }},
     respawn: {seconds: 1.6, range: 30, play(o, t) { noise(o, t, {type: 'highpass', f0: 2500, f1: 6000, attack: .35, peak: .05, release: .6}); [0, 7, 12, 16].forEach((n, i) => bell(o, t + .2 + i * .09, semis(523, n), .03, 1)); }},

@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weapon feel lab</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:13px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:6px 10px}button{padding:8px;margin:2px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}body.clean header{display:none}</style>
+<header>Weapon feel — actual game renderer, local authority.
+<button data-t="axe">Axe</button><button data-t="pick">Pick</button><button data-t="hammer">Hammer</button><button data-t="crossbow">Siegebird</button><button data-t="bow">Emberwing</button><button id="swing">Swing / fire</button>
+<span id="status"></span><div id="error"></div></header><canvas id="world" aria-label="Weapon feel review world"></canvas>
+<script type="module">
+// Weapon feel review (strike-feel.js): the real createGame renderer and a local shared simulation. The hero stands
+// ?dist metres from ?target (tree | ore | foe | golem | ground; ?id picks a specific tree or ore) with ?tool in hand,
+// looking at it at ?height metres up. ?clean hides the toolbar, ?auto runs the authority at 60 Hz. review.step(n)
+// advances the authority by hand for frame-stepped captures. Not shipped.
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
+import {worldTrees} from '../shared/world-content.js';
+const $=id=>document.getElementById(id),q=new URLSearchParams(location.search);if(q.has('clean'))document.body.classList.add('clean');
+const target=q.get('target')||'tree',dist=Number(q.get('dist')||1.6),tool=q.get('tool')||(target==='ore'?'pick':'axe'),aimHeight=Number(q.get('height')??(target==='ground'?0:1.05));
+let sim=createSimulation({room:'FEEL_REVIEW'}),seq=0,auto=q.has('auto');
+sim.addPlayer({id:'hero',name:'Reviewer'});
+let save=sim.checkpoint();
+let goal;
+if(target==='tree'){const t=worldTrees(save).find(t=>t.id===(q.get('id')||'tree6'));goal=[t.x,t.z];}
+else if(target==='ore'){const o=save.deposits.find(d=>d.id===(q.get('id')||'ore1'));goal=[o.x,o.z];}
+else goal=(q.get('at')||'-14,-20').split(',').map(Number);
+const side=Number(q.get('side')||0),approach=Math.atan2(goal[0]-(-29),goal[1]-(-29))+side; // come from the spawn side
+const at=[goal[0]-Math.sin(approach)*dist,goal[1]-Math.cos(approach)*dist],yaw=Math.atan2(-(goal[0]-at[0]),-(goal[1]-at[1]));
+save.players[0].position=[at[0],terrainHeight(save,at[0],at[1]),at[1]];save.players[0].yaw=yaw;save.players[0].tool=tool;
+if(target==='foe'||target==='golem'){const e=Object.assign(createEnemy('foe0',[goal[0],terrainHeight(save,goal[0],goal[1]),goal[1]],target==='golem'?'golem':undefined),{yaw:Math.atan2(Math.sin(yaw+Math.PI),Math.cos(yaw+Math.PI))});save.enemies=[e];}
+sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
+ onAction:(action,extra)=>{const r=action==='projectileHit'?sim.projectileContact(extra):sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
+ onInput:input=>sim.command('hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
+function publish(){game.applySnapshot(sim.snapshot(),'hero');}
+function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
+function face(){const eye=terrainHeight(save,at[0],at[1])+1.65,ground=terrainHeight(save,goal[0],goal[1]);game.setLook(yaw,Math.atan2(ground+aimHeight-eye,dist));}
+publish();game.setRole('hero');game.setActive(true);game.equip(tool);face();
+window.review={
+ step,swing:()=>game.strike(),fire:(down=true)=>down?game.primaryDown():game.primaryUp(),equip:t=>game.equip(t),face,look:(x,y)=>game.lookByPixels(x,y),setLook:(y,p)=>game.setLook(y,p),
+ stats:()=>game.diagnostics(),event:e=>game.handleEvent(e),ground:(x,z)=>terrainHeight(save,x,z),snapshot:()=>sim.snapshot(),yaw,at,goal,
+ canvas:()=>$('world'),
+};
+for(const b of document.querySelectorAll('[data-t]'))b.onclick=()=>review.equip(b.dataset.t);$('swing').onclick=()=>review.swing();
+if(auto)setInterval(()=>step(1),1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>
