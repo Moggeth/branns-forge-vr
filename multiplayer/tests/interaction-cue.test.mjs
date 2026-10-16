@@ -58,11 +58,12 @@ test('canopy/limb hit off the trunk asks for the trunk', () => {
   const c = decideCue(view(), hero(), snap(), aimAt([1.2, 2.2, -2.4], 't1', [0, 1.65, -.5]), ctx());
   assert.equal(c.action, 'Aim at the trunk');
 });
-test('existing notch: progress and notch tolerance', () => {
+test('existing notch: progress per spot, a new spot starts fresh', () => {
   const s = snap({harvestedTrees: [{id: 't1', cuts: 1, cutHeight: .9, felledTick: 0, fallYaw: 0, landed: false}]});
   const ok = decideCue(view(), hero(), s, aimAt(trunk(1), 't1'), ctx());
   assert.deepEqual([ok.action, ok.progress], ['Chop', {done: 1, total: 3}]);
-  assert.equal(decideCue(view(), hero(), s, aimAt(trunk(1.5), 't1'), ctx()).action, 'Aim lower, at the notch');
+  const fresh = decideCue(view(), hero(), s, aimAt(trunk(1.5), 't1'), ctx());
+  assert.deepEqual([fresh.action, fresh.progress], ['Chop', {done: 0, total: 3}], 'chopping elsewhere is allowed and starts its own notch');
 });
 test('felled tree gives no tree cue', () => {
   const s = snap({harvestedTrees: [{id: 't1', cuts: 3, cutHeight: .9, felledTick: 5, fallYaw: 0, landed: true}]});

@@ -10,8 +10,8 @@ import {createTreeMaterials} from './tree-materials.js';
 import {tagAppleSlots} from './tree-fruit-mask.js';
 import {APPLE_VARIANT} from '../shared/fruit.js';
 import {worldTrees} from '../shared/world-content.js';
-import {VARIANTS, treeScale, notchFor, treeFall, isFelled, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
-import {bakeTriangles, buildNotch, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
+import {VARIANTS, treeScale, notchFor, treeFall, isFelled, treeNotches, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
+import {bakeTriangles, carveNotches, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
 import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} from './tree-growth.js';
 import {createTreeHarvestWarmup} from './tree-harvest-warmup.js';
 
@@ -69,13 +69,14 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
  function destroy(e) { clearWound(e); if (e.felled) for (const m of e.felled.meshes) release(m.geometry); e.root.removeFromParent(); }
  function authoredNotch(e, cut) { const s = treeScale(e.tree), n = notchFor(e.tree, cut, e.floor); return {...n, height: n.height/s, radius: n.radius/s, depth: n.depth/s, hinge: n.hinge/s}; }
  function applyWound(e, cut) { // cuts 1-2: replace the Trunk geometry with the carved shell and add the exposed wood faces
-  clearWound(e); const kit = e.kit, notch = authoredNotch(e, cut), res = buildNotch(kit.trunk, notch, uvMap), trunk = e.full.byPart.Trunk[0], original = trunk.geometry;
+  clearWound(e); const kit = e.kit, notch = authoredNotch(e, cut), res = carveNotches(kit.trunk, [...extraNotches(e, cut), notch], uvMap), trunk = e.full.byPart.Trunk[0], original = trunk.geometry;
   trunk.geometry = owned(res.bark, kit.trunkColor); const wood = new T.Mesh(owned(res.wood, true), woodMaterial); wood.userData.targetId = e.tree.id; e.full.g.add(wood);
   e.wound = {meshes: [wood], notch, restore: () => { release(trunk.geometry); trunk.geometry = original; }};
  }
+ const extraNotches = (e, cut) => (cut.notches || []).map(n => authoredNotch(e, n));
  function applyFelled(e, cut) {
   clearWound(e); e.full.g.removeFromParent(); e.lodGroup?.g.removeFromParent();
-  const kit = e.kit, notch = authoredNotch(e, {...cut, cuts: 2}), res = buildFelled(kit.trunk, notch, uvMap), meshes = [];
+  const kit = e.kit, notch = authoredNotch(e, {...cut, cuts: 2}), res = buildFelled(kit.trunk, notch, uvMap, extraNotches(e, cut)), meshes = [];
   const stump = new T.Group(); place(stump, kit.parts.Roots, e.tree.id); const sb = new T.Mesh(owned(res.stump.bark, kit.trunkColor), kit.trunkMaterial), sw = new T.Mesh(owned(res.stump.wood, true), woodMaterial); stump.add(sb, sw); meshes.push(sb, sw);
   const fall = treeFall(e.tree, cut, cut.felledTick, e.floor, ground), s = treeScale(e.tree), pivot = new T.Group(), body = new T.Group();
   pivot.position.set(fall.hinge[0]/s, fall.hinge[1]/s, fall.hinge[2]/s); body.position.copy(pivot.position).negate(); pivot.add(body);
@@ -124,11 +125,11 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
     if (r) { batches.remove(t.id); intact.delete(t.id); growing.delete(t.id); }
    }
    e.tree = t; e.floor = floor; e.root.position.set(t.x, e.floor, t.z); e.scale = sc; // Tree root origin = trunk axis at ground: never recentre by bounds
-   const key = `${cut.cuts}|${cut.cutHeight}|${cut.fallYaw}|${cut.felledTick}|${e.floor}`;
+   const total = treeNotches(cut).reduce((n, w) => n + w.cuts, 0), key = `${cut.cuts}|${cut.cutHeight}|${cut.fallYaw}|${cut.felledTick}|${e.floor}|${(cut.notches || []).map(n => `${n.cuts},${n.cutHeight},${n.fallYaw}`).join(';')}`;
    if (key !== e.key) {
-    if (e.synced && cut.cuts > e.cuts && !(isFelled(cut) && e.felled)) hitFeedback(e, cut, now); // never replayed for late joiners
+    if (e.synced && total > e.cuts && !(isFelled(cut) && e.felled)) hitFeedback(e, cut, now); // the lead is the spot just cut; never replayed for late joiners
     if (isFelled(cut)) { if (!e.felled) applyFelled(e, cut); } else applyWound(e, cut);
-    e.key = key; e.cuts = cut?.cuts || 0;
+    e.key = key; e.cuts = total;
    }
    if (e.felled) {
     const f=e.felled; f.stump.visible = !walking.has(t.id);
@@ -150,7 +151,7 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   for(const l of s.looseLogs||[]) {
    if(!l.section)continue;const e=trees.get(l.sourceId);if(!e?.felled)continue;liveLogs.add(l.id);
    let entry=logEntities.get(l.id);
-   if(!entry){const notch=authoredNotch(e,{...e.felled.cut,cuts:2}),top=buildFelled(e.kit.trunk,notch,uvMap).top;
+   if(!entry){const notch=authoredNotch(e,{...e.felled.cut,cuts:2}),top=buildFelled(e.kit.trunk,notch,uvMap,extraNotches(e,e.felled.cut)).top;
     const piece=buildTimberSection(top,l.section[0],l.section[1],uvMap,l.radius/e.scale),root=new T.Group(),center=(l.section[0]+l.section[1])/2;
     for(const [tris,material,color] of [[piece.bark,e.kit.trunkMaterial,e.kit.trunkColor],[piece.wood,woodMaterial,true]]) {
      const geometry=owned(tris,color);geometry.translate(0,-center,0);const mesh=new T.Mesh(geometry,material);mesh.userData.logId=l.id;root.add(mesh);

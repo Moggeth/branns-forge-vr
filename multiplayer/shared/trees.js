@@ -24,6 +24,12 @@ export const treeProfile = tree => TREE_PROFILES[variantName(tree)];
 export const treeScale = tree => tree.height / treeProfile(tree).height;
 const widestRing = new Map(Object.values(TREE_PROFILES).map(p=>[p,Math.max(...p.rings.map(r=>r[1]))]));
 export const isFelled = cut => cut?.cuts === 3 && cut.felledTick > 0;
+// A harvest record's own cutHeight/fallYaw/cuts is the lead notch (the spot cut most recently, and the one that fells).
+// Other open spots live in record.notches [{cutHeight, fallYaw, cuts 1-2}]; each spot counts its own cuts toward three.
+export const MAX_EXTRA_NOTCHES = 6;
+export const treeNotches = cut => cut ? [cut, ...(cut.notches || [])] : [];
+/** The wound a chop at world height y lands in (nearest within notchTolerance), or null for fresh bark. */
+export function notchAt(cut, y) { let best = null, gap = TREE_LIMITS.notchTolerance; for (const n of treeNotches(cut)) { const d = Math.abs(n.cutHeight - y); if (d <= gap) { gap = d; best = n; } } return best; }
 export function rotateVector(v, q) { const [x,y,z,w] = q, [a,b,c] = v, tx = 2*(y*c-z*b), ty = 2*(z*a-x*c), tz = 2*(x*b-y*a); return [a+w*tx+y*tz-z*ty, b+w*ty+z*tx-x*tz, c+w*tz+x*ty-y*tx]; }
 
 /** World-space trunk radius at a local height above the tree's ground (scaled authored contract). */
@@ -97,8 +103,14 @@ export function chopTree(state, tree, point, normal, ctx) {
  const s = treeScale(tree), inRange = local >= CUT_RANGE[0]*s - .15 && local <= CUT_RANGE[1]*s + .15;
  const glance = {kind: 'wood_hit', position: [...point], id: tree.id, material: 'wood', normal: [...normal], glance: true};
  if (!inRange) return {events: [glance]};                                          // limbs/roots: feedback only, no wound
- if (!h) { if (state.harvestedTrees.length >= 256) return {code: 'world_limit'}; h = {id: tree.id, cuts: 0, cutHeight: point[1], felledTick: 0, fallYaw: d > .001 ? Math.atan2(dx, dz) : 0, landed: false}; state.harvestedTrees.push(h); }
- else if (Math.abs(h.cutHeight - point[1]) > TREE_LIMITS.notchTolerance) return {events: [glance]}; // the persisted wound stays
+ const yaw = d > .001 ? Math.atan2(dx, dz) : 0;
+ if (!h) { if (state.harvestedTrees.length >= 256) return {code: 'world_limit'}; h = {id: tree.id, cuts: 0, cutHeight: point[1], felledTick: 0, fallYaw: yaw, landed: false}; state.harvestedTrees.push(h); }
+ else { // every wound persists; the spot being cut becomes the lead so its third cut fells the tree there
+  const spot = notchAt(h, point[1]), lead = {cutHeight: h.cutHeight, fallYaw: h.fallYaw, cuts: h.cuts}, notches = h.notches ? [...h.notches] : [];
+  if (spot && spot !== h) { notches[notches.indexOf(spot)] = lead; Object.assign(h, {cutHeight: spot.cutHeight, fallYaw: spot.fallYaw, cuts: spot.cuts}); }
+  else if (!spot) { notches.push(lead); if (notches.length > MAX_EXTRA_NOTCHES) notches.shift(); Object.assign(h, {cutHeight: point[1], fallYaw: yaw, cuts: 0}); }
+  if (notches.length) h.notches = notches;
+ }
  h.cuts++;
  const events = [{kind: 'wood_hit', position: [...point], id: tree.id, material: 'wood', normal: [...normal], cuts: h.cuts}];
  if (h.cuts >= 3) { h.cuts = 3; h.felledTick = Math.max(1, state.tick); h.landed = false; events.push({kind: 'tree_fell', position: [tree.x, floor, tree.z], id: tree.id, yaw: h.fallYaw,
@@ -256,9 +268,11 @@ export function restoreHarvested(saved, treeIds) {
  if (!Array.isArray(list) || list.length > 256) throw Error('Invalid harvested trees');
  for (const h of list) {
   if (!h || typeof h !== 'object' || typeof h.id !== 'string' || seen.has(h.id) || !treeIds.has(h.id) || !Number.isInteger(h.cuts) || h.cuts < 1 || h.cuts > 3 || !Number.isFinite(h.cutHeight) || Math.abs(h.cutHeight) > 200 || !Number.isInteger(h.felledTick) || h.felledTick < 0 || h.felledTick > saved.tick || (h.cuts === 3) !== (h.felledTick > 0) || !Number.isFinite(h.fallYaw) || Math.abs(h.fallYaw) > Math.PI + 1e-6 || (h.landed !== undefined && typeof h.landed !== 'boolean') || (h.landed && h.cuts !== 3)) throw Error('Invalid harvested tree');
+  if (h.notches !== undefined && (!Array.isArray(h.notches) || !h.notches.length || h.notches.length > MAX_EXTRA_NOTCHES || h.notches.some(n => !n || typeof n !== 'object' || !Number.isInteger(n.cuts) || n.cuts < 1 || n.cuts > 2 || !Number.isFinite(n.cutHeight) || Math.abs(n.cutHeight) > 200 || !Number.isFinite(n.fallYaw) || Math.abs(n.fallYaw) > Math.PI + 1e-6))) throw Error('Invalid harvested tree notches');
   seen.add(h.id);
   // Pre-log saves already awarded the 3-wood pickup at the final chop: treat them as landed so timber is never duplicated.
-  out.push({id: h.id, cuts: h.cuts, cutHeight: h.cutHeight, felledTick: h.felledTick, fallYaw: h.fallYaw, landed: h.cuts === 3 ? (h.landed ?? true) : false});
+  out.push({id: h.id, cuts: h.cuts, cutHeight: h.cutHeight, felledTick: h.felledTick, fallYaw: h.fallYaw, landed: h.cuts === 3 ? (h.landed ?? true) : false,
+   ...(h.notches ? {notches: h.notches.map(n => ({cutHeight: n.cutHeight, fallYaw: n.fallYaw, cuts: n.cuts}))} : {})});
  }
  return out;
 }
