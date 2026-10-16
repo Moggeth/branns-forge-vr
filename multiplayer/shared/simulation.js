@@ -41,7 +41,7 @@ import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boon
 import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
 import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,restoreHarvested,restoreLogs,TREE_LIMITS} from './trees.js';
 import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.js';
-import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind} from './critters.js';
+import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind,setCritterWorld} from './critters.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
@@ -99,6 +99,7 @@ function spawn(state, ignored = '') {
   return best;
 }
 
+setCritterWorld({damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),damageStructure:(s,id,n,ev)=>damageInvention(s,id,n,null,ev)}); // blasts on every kill path (shared/critters.js)
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 
 function damageEnemy(state, enemy, amount, events, ownerId, side) {

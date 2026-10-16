@@ -30,6 +30,12 @@ export const CRITTER = Object.freeze({
     cheerTicks: 90, burrowTicks: 75, fleeSpeed: 2.6, loot: [['copper', 1]]}),
 });
 export const critterSpec = e => CRITTER[e?.kind] || null;
+/** A summoned critter climbs out of the ground for this long before it acts (client/critter-view.js plays the rise). */
+export const CRITTER_EMERGE_TICKS = 45;
+// Blast effects need the authority's own Hero and building damage (armour, taverns, dragons). Every kill path reaches
+// critterDeath, and not all of them carry those callbacks, so shared/simulation.js registers them here once.
+let worldHooks = {};
+export function setCritterWorld(hooks) { worldHooks = {...hooks}; }
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -126,7 +132,7 @@ function blast(state, at, radius, hero, foe, building, source, ownerId, ctx, eve
   for (const p of state.players) {
     if (p.role !== 'hero' || p.hp <= 0) continue;
     const d = Math.hypot(p.position[0] - at[0], p.position[1] + .9 - at[1] - .5, p.position[2] - at[2]);
-    if (d < radius) ctx.damageHero?.(state, p, hero * fall(d), events, center);
+    if (d < radius) (ctx.damageHero || worldHooks.damageHero)?.(state, p, hero * fall(d), events, center);
   }
   for (const other of [...state.enemies]) {
     if (other === source || other.hp <= 0 || !state.enemies.includes(other)) continue;
@@ -136,7 +142,7 @@ function blast(state, at, radius, hero, foe, building, source, ownerId, ctx, eve
     ctx.hitEnemyPart?.(state, other, 'torso', keg ? other.hp + 1 : foe * fall(d), {...(ownerId ? {ownerId} : {}), point: [other.position[0], other.position[1] + 1, other.position[2]], normal, energy: 1.8, blast: true}, ctx, events);
     if (state.enemies.includes(other) && other.kind !== 'ent' && other.launchTick === undefined && d < radius * .7 && !isCritter(other.kind)) other.launchTick = state.tick; // tossed
   }
-  if (building) for (const b of state.inventions?.structures || []) if (b.hp > 0 && b.type !== 'forge' && flat(b.position, at) < radius + 1.5) ctx.damageStructure?.(state, b.id, building, events);
+  if (building) for (const b of state.inventions?.structures || []) if (b.hp > 0 && b.type !== 'forge' && flat(b.position, at) < radius + 1.5) (ctx.damageStructure || worldHooks.damageStructure)?.(state, b.id, building, events);
 }
 
 // ---- movement helpers ----
@@ -173,6 +179,7 @@ function nearest(e, list) { let best = null, d = Infinity; for (const t of list)
  */
 export function stepCritter(state, e, ctx) {
   e.lastTick = state.tick;
+  if (state.tick - (e.emergeTick ?? -1e9) < CRITTER_EMERGE_TICKS) { settle(e, ctx, CRITTER[e.kind]); return; } // still climbing out
   if (e.kind === 'kettlebelly') return stepKettle(state, e, ctx);
   if (e.kind === 'bramblehog') return stepBramble(state, e, ctx);
   if (e.kind === 'kegtoter') return stepKeg(state, e, ctx);
@@ -282,7 +289,7 @@ function stepKeg(state, e, ctx) {
   }
   // Carry: buildings first (it is a sapper), then the nearest Hero.
   const [b, bd] = nearest(e, ctx.buildings), [h, hd] = quarry(e, ctx.heroes);
-  const target = b && bd < 26 ? b : h, d = target === b ? bd : hd, reach = target === b ? s.plantBuilding : s.plantRange;
+  const target = b && bd < (e.id.startsWith('camp_') ? 14 : 26) ? b : h, d = target === b ? bd : hd, reach = target === b ? s.plantBuilding : s.plantRange;
   if (!target) { idle(state, e, ctx, s); return; }
   const dx = target.position[0] - e.position[0], dz = target.position[2] - e.position[2];
   if (d > reach) steer(e, dx, dz, s.speed * (1 - .25 * Math.abs(Math.sin(t / 23))), ctx, s, .12); // the keg sways its pace
@@ -304,6 +311,12 @@ export function validCritter(e, tick) {
   if (e.rollYaw !== undefined && !Number.isFinite(e.rollYaw)) return false;
   if (e.rollHits !== undefined && (!Array.isArray(e.rollHits) || e.rollHits.length > 16 || !e.rollHits.every(q => typeof q === 'string' && q.length <= 64))) return false;
   if (e.kegAt !== undefined && (!Array.isArray(e.kegAt) || e.kegAt.length !== 3 || !e.kegAt.every(Number.isFinite))) return false;
+  // Phase companions: a lit fuse has its keg on the ground (and only then); a curl or roll has its heading.
+  if ((e.plantTick !== undefined && e.blastTick === undefined) !== (e.kegAt !== undefined)) return false;
+  if (e.curlTick !== undefined && e.rollYaw === undefined) return false;
+  if (e.kind !== 'kettlebelly' && [e.ventTick, e.leakTick, e.leakSpin].some(v => v !== undefined)) return false;
+  if (e.kind !== 'bramblehog' && [e.curlTick, e.rollYaw, e.dizzyTick, e.rollHits].some(v => v !== undefined)) return false;
+  if (e.kind !== 'kegtoter' && [e.plantTick, e.kegAt, e.blastTick].some(v => v !== undefined)) return false;
   return true;
 }
 export const CRITTER_FIELDS = Object.freeze(['ventTick', 'leakTick', 'leakSpin', 'leakBy', 'curlTick', 'rollYaw', 'dizzyTick', 'rollHits', 'plantTick', 'kegAt', 'blastTick', 'lastTick']);

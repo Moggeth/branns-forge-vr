@@ -8,7 +8,7 @@
 // Draws per critter: one rigid-skinned body (client/critter-geometry.js) and one glow; a Kegtoter adds its keg, fuse and
 // spark. Geometry and the lit materials are shared per kind. No lights: glows are unlit emissive meshes and particles.
 import * as THREE from 'three';
-import {CRITTER, isCritter} from '../shared/critters.js';
+import {CRITTER, CRITTER_EMERGE_TICKS, isCritter} from '../shared/critters.js';
 import {KETTLE, BRAMBLE, KEG, kettleGeometry, kettleGlow, brambleGeometry, dizzyLeaves, moleGeometry, kegGeometry, fuseGeometry, bake, M} from './critter-geometry.js';
 import {softTexture} from './ent-view.js';
 
@@ -115,8 +115,8 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
       r: color[0] * (.8 + Math.random() * .4), g: color[1] * (.8 + Math.random() * .4), b: color[2] * (.8 + Math.random() * .4)}); } }
   function puff(x, y, z, vx, vy, vz, {size = .14, grow = 2.2, life = .9, alpha = .7, drag = 1.6, grav = .6, tint = .94} = {}) { steam.emit({x, y, z, vx, vy, vz, size, grow, life, alpha, drag, grav, r: tint, g: tint + .02, b: tint + .04}); }
   function emerge(entry, c, st, tick) { // risen from the earth by the God's Rabble call
-    const a = age(tick, entry.data.emergeTick); if (!(a >= 0 && a < .9)) return 0;
-    const u = smooth(a / .7); if (!st.rose) { st.rose = true; entry.root.getWorldPosition(v1); dirt(v1.x, height(v1.x, v1.z) + .05, v1.z, n(24), 1.4, 2.4); }
+    const a = age(tick, entry.data.emergeTick), rise = CRITTER_EMERGE_TICKS / 60; if (!(a >= 0 && a < rise + .2)) return 0;
+    const u = smooth(a / rise); if (!st.rose) { st.rose = true; entry.root.getWorldPosition(v1); dirt(v1.x, height(v1.x, v1.z) + .05, v1.z, n(24), 1.4, 2.4); }
     return -(1 - u) * (PIVOT[c.kind] * 2 + .1);
   }
   function stride(entry, c, dt, per) {

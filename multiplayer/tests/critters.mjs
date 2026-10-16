@@ -79,6 +79,16 @@ const X = 20, Z = -20; // open ground, clear of the forge apron and the camp
   assert.ok(!s.enemies.includes(b));
 }
 
+{ // Review fixes: blasts hurt Heroes on every kill path; summons wait out their rise; inconsistent saves are refused.
+  const sim = world(), s = S(sim), m = place(s, 'kegtoter', X, Z, 'k_bare'), h = hero(s); h.position = at(s, X + 1, Z); const hp0 = h.hp;
+  hitEnemyPart(s, m, 'torso', 999, null, {nextId: (st, p) => `${p}${++st.idCounter}`, terrainHeight}, []); // a bare context, like a Quake or a trap
+  assert.ok(h.hp < hp0, 'the keg still hurts the Hero');
+  const b = place(s, 'bramblehog', X - 6, Z, 'b_rise'); b.emergeTick = s.tick; const p0 = [...b.position]; h.position = at(s, X - 6, Z - 1.2); h.hp = 100;
+  step(sim, 30); assert.ok(Math.hypot(b.position[0] - p0[0], b.position[2] - p0[2]) < 1e-6 && h.hp === 100, 'no moving or nipping while it climbs out');
+  const k = place(s, 'kegtoter', X + 8, Z, 'k_bad'); k.plantTick = s.tick; const bad = JSON.parse(JSON.stringify(sim.checkpoint()));
+  assert.throws(() => loadSimulation(bad), /enemy/i, 'a lit fuse needs its keg');
+}
+
 { // Long mixed run: no NaN, nothing escapes the world, and every checkpoint loads.
   const sim = world(), s = S(sim), h = hero(s); h.position = at(s, X, Z - 3);
   for (let i = 0; i < 6; i++) place(s, CRITTER_KINDS[i % 3], X + (i % 3) * 3 - 3, Z + 4 + Math.floor(i / 3) * 3, `mix${i}`);
