@@ -26,7 +26,7 @@ export const NODE_KINDS = Object.freeze({
   treasure: Object.freeze({name: 'Star Shards', text: 'Stars are falling here. Crack the shards before the ambush closes in.', haul: 35}),
   hold: Object.freeze({name: 'Hold the Ward', text: 'Stand in the ward circle while waves come.', haul: 30}),
   shrine: Object.freeze({name: 'Shrine', text: 'A quiet shrine: heal up and take a rare upgrade. No fight.', haul: 6}),
-  underways: Object.freeze({name: 'Underways', text: 'A way down into the Underways. Its guardians wait at the mouth.', haul: 50}),
+  underways: Object.freeze({name: 'Underways', text: 'A way down into the Underways. Beat the guardians at the mouth, then delve for the hoard.', haul: 50}),
   heart: Object.freeze({name: 'The Heart', text: 'The region’s heart and its guardian. Beat it to win the run.', haul: 120}),
 });
 export const RUN_TUNING = Object.freeze({
@@ -115,7 +115,7 @@ export function createRun({format = 'expedition', seed = 1, daily = '', camp = [
     boss: Object.hasOwn(BOSSES, boss) ? boss : bosses[mix(seed, 'boss') % bosses.length],
     lives: T.livesBase, maxLives: T.livesBase, mult: 1, haul: 0, kills: 0, deaths: 0, pushes: 0,
     foes: [], shards: [], objective: {have: 0, need: 0}, wave: 0, nextWave: 0,
-    votes: {}, firstVote: 0, offers: {}, picks: {}, rerolls: {}, kits: {}, hall: {}, applied: {}, notice: 'Gather at camp and choose a starting kit.', result: null, seq: 0};
+    votes: {}, firstVote: 0, offers: {}, picks: {}, rerolls: {}, kits: {}, hall: {}, applied: {}, notice: 'Gather at camp and choose a starting kit.', result: null, seq: 0, delve: ''};
 }
 export const runActive = run => !!run && !RUN_ENDED.includes(run.stage);
 export const runEnded = run => !!run && RUN_ENDED.includes(run.stage);
@@ -247,7 +247,39 @@ function stepFight(state, run, n, heroes, ctx, out) {
     }
     return run.objective.have >= run.objective.need && !run.foes.length;
   }
+  if (n.kind === 'underways' && ctx.underways) return stepDelve(state, run, n, heroes, ctx, out);
   return !run.foes.length;
+}
+// The Underways (shared/underways/rules.js, through ctx.underways = {open, enter, inside}): once the mouth is clear the
+// party goes down into a real dungeon, tagged with this destination; its guardian's hoard clears the destination and
+// the way out brings everyone back up. A delve abandoned before the hoard reopens when the party returns to the mouth.
+const DELVE_STYLES = ['mine', 'crypt', 'keep'];
+export const delveTag = (run, n) => `xr:${n.id}`;
+function stepDelve(state, run, n, heroes, ctx, out) {
+  if (run.foes.length) return false;
+  const U = ctx.underways, tag = delveTag(run, n), open = run.delve ? state.underways?.runs?.find(r => r.id === run.delve) : null;
+  if (run.delve && !open) run.delve = ''; // it closed (cleared, or abandoned and emptied)
+  if (run.objective.have >= 1) return !heroes.some(p => U.inside(p)); // hoard won: done once everyone is back up
+  if (!run.delve) {
+    const near = heroes.filter(p => p.hp > 0 && !U.inside(p) && flat(xz(p.position), [n.x, n.z]) <= T.arrive);
+    if (!near.length) return false;
+    const y = ctx.terrainHeight(state, n.x, n.z + 3);
+    const delve = U.open(state, {seed: (mix(run.seed, n.id, 'delve') % 2147483646) + 1, style: DELVE_STYLES[Math.min(n.tier, 2)], depth: clamp(n.tier + 1 + run.pushes, 1, 4), tag, back: [n.x, y, n.z + 3, 0]});
+    if (!delve) { notice(run, 'The Underways are crowded. The hoard waits for another day.'); return true; } // every slot busy: clear as a fight
+    run.delve = delve.id; run.objective = {have: 0, need: 1};
+    for (const p of near) U.enter(state, p, delve, out.events);
+    out.events.push({kind: 'run_delve', node: n.id, delve: delve.id, style: delve.style, depth: delve.depth});
+    notice(run, 'Down into the Underways! Find the guardian and win its hoard.');
+  }
+  return false;
+}
+/** Dungeon events for the open delve (called from stepRun with this tick's events). */
+function watchDelve(run, events) {
+  if (run.stage !== 'fight' || !run.delve) return;
+  const n = node(run, run.target), tag = n && delveTag(run, n);
+  for (const e of events) if (e?.kind === 'underway_hoard' && (e.tag === tag || e.run === run.delve || e.run?.tag === tag)) {
+    run.objective.have = 1; notice(run, 'The hoard is yours! Take the way out.');
+  }
 }
 function despawn(state, run) {
   const ids = new Set(run.foes.map(f => f.id));
@@ -285,6 +317,7 @@ export function stepRun(state, events, ctx) {
     if (run.lives > 0) { run.lives--; out.events.push({kind: 'run_life', lives: run.lives, id: e.id}); }
     else { finish(state, run, 'fallen', out); return out; }
   }
+  watchDelve(run, events);
   // Late joiners get their kit and Hall unlocks as soon as they arrive.
   if (run.stage !== 'camp') for (const p of players) if (!run.applied[p.id]) applyKit(state, run, p, ctx, out);
   if (run.stage === 'route') {
@@ -389,15 +422,16 @@ export function runAction(state, p, m, ctx) {
 }
 
 // ---- Save validation --------------------------------------------------------------------------------------
+const OPTIONAL = ['delve'];
 const KEYS = ['v', 'format', 'seed', 'daily', 'stage', 'elapsed', 'clock', 'camp', 'bound', 'nodes', 'at', 'path', 'target', 'boss', 'lives', 'maxLives',
-  'mult', 'haul', 'kills', 'deaths', 'pushes', 'foes', 'shards', 'objective', 'wave', 'nextWave', 'votes', 'firstVote', 'offers', 'picks', 'rerolls', 'kits', 'hall', 'applied', 'notice', 'result', 'seq'];
+  'mult', 'haul', 'kills', 'deaths', 'pushes', 'foes', 'shards', 'objective', 'wave', 'nextWave', 'votes', 'firstVote', 'offers', 'picks', 'rerolls', 'kits', 'hall', 'applied', 'notice', 'result', 'seq', 'delve'];
 function idMap(o, ok, max = 64) { if (!record(o) || Object.keys(o).length > max) return false; return Object.entries(o).every(([k, v]) => /^[a-z0-9 _'.-]{1,64}$/i.test(k) && k !== '__proto__' && ok(v)); }
 /** Strict whitelist validation of a saved run. Returns a clean copy or throws. */
 export function restoreRun(saved) {
   const r = saved, bad = code => { throw Error(`Invalid run: ${code}`); };
   if (!record(r) || r.v !== RUN_VERSION) bad('version');
   for (const k of Object.keys(r)) if (!KEYS.includes(k)) bad(`key_${k}`.slice(0, 40));
-  for (const k of KEYS) if (!Object.hasOwn(r, k)) bad(`missing_${k}`);
+  for (const k of KEYS) if (!Object.hasOwn(r, k) && !OPTIONAL.includes(k)) bad(`missing_${k}`);
   if (!Object.hasOwn(RUN_FORMATS, r.format) || !int(r.seed, 0, 2 ** 31) || typeof r.daily !== 'string' || r.daily.length > 10 || !RUN_STAGES.includes(r.stage)) bad('header');
   if (!int(r.elapsed, 0, 1e9) || !int(r.clock, 0, 1e9) || !Array.isArray(r.camp) || r.camp.length !== 2 || !r.camp.every(v => num(v, -4000, 4000)) || !num(r.bound, 20, 4000)) bad('clock');
   if (!Array.isArray(r.nodes) || r.nodes.length < 2 || r.nodes.length > 40) bad('nodes');
@@ -418,6 +452,7 @@ export function restoreRun(saved) {
   if (!idMap(r.offers, v => validBoonList(v) && v.length <= 4) || !idMap(r.picks, v => Object.hasOwn(BOONS, v)) || !idMap(r.rerolls, v => int(v, 0, 9))) bad('offers');
   if (!idMap(r.kits, v => Object.hasOwn(KITS, v)) || !idMap(r.applied, v => v === true) || !idMap(r.hall, v => record(v) && Object.entries(v).every(([k, n]) => HALL_IDS.includes(k) && int(n, 1, HALL[k].max)))) bad('players');
   if (typeof r.notice !== 'string' || r.notice.length > 120) bad('notice');
+  if (r.delve !== undefined && !(r.delve === '' || validId(r.delve))) bad('delve');
   if (r.result !== null && !(record(r.result) && RUN_ENDED.includes(r.result.outcome) && int(r.result.banked, 0, 1e8) && int(r.result.haul, 0, 1e7) && int(r.result.kills, 0, 1e9) && int(r.result.deaths, 0, 1e9) && int(r.result.time, 0, 1e8) && int(r.result.tier, 0, 12) && Array.isArray(r.result.path) && r.result.path.length <= 12 && r.result.path.every(k => Object.hasOwn(NODE_KINDS, k)) && Object.keys(r.result).length === 7)) bad('result');
-  return structuredClone(r);
+  const clean = structuredClone(r); clean.delve ??= ''; return clean;
 }

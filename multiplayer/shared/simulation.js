@@ -51,7 +51,7 @@ import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
 import {resolveMapExtras} from './map-extras.js';
 import {inUnderway,resolveUnderway} from './underways/space.js';
 import './underways/world.js';
-import {stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
+import {openUnderway,enterUnderway,stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
 import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
 import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
@@ -188,7 +188,10 @@ function instantiate(state) {
     p.resources[kind] -= n; slot++; } } };
   // Optional Forge Expedition (shared/adventure.js): command results since the last step feed its deed tracking.
   const adventureEvents = [], adventureContext = {createEnemy, terrainHeight};
-  const runContext = {createEnemy, terrainHeight, grantXp, heroMaxHp, makeBoss};
+  // Underways destinations delve into real dungeons (shared/underways/rules.js); carried logs and snacks stay up top.
+  const releaseForDelve = p => { releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p); };
+  const runContext = {createEnemy, terrainHeight, grantXp, heroMaxHp, makeBoss,
+    underways: {open: openUnderway, enter: (st, p, r, ev) => enterUnderway(st, p, r, ev, {release: releaseForDelve}), inside: p => inUnderway(p.position[0], p.position[2])}};
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
       if (!validId(id) || player(id)) return fail('invalid_player');

@@ -62,6 +62,13 @@ export function nextRunOptions(snapshot, {seed, same = false} = {}) {
   return {...base, world: same ? world : worldDescriptor({kind: 'expedition', seed: friendlySeed(seed), preset: world.preset, size: world.size})};
 }
 
+/** The world a new run plays on: the menu's world, except the Daily Expedition, whose world comes from the date's seed
+ * so every player gets the same world and route that day. */
+export function runWorldFor(run, world) {
+  if (!world) return null;
+  return run.format === 'daily' ? worldDescriptor({kind: 'expedition', seed: friendlySeed(run.seed), preset: 'continent', size: world.size}) : world;
+}
+
 /** Pure model of the strip, so tests and the VR panel can share it. */
 export function runStripModel(run, viewerId = '', enemies = []) {
   if (!run) return null;
@@ -73,10 +80,11 @@ export function runStripModel(run, viewerId = '', enemies = []) {
     if (n.kind === 'hold') { objective = 'Hold the ward circle'; progress = run.objective.need ? run.objective.have / run.objective.need : 0; }
     else if (n.kind === 'treasure') { objective = `Crack the star shards ${run.objective.have}/${run.objective.need}`; progress = run.objective.need ? run.objective.have / run.objective.need : 0; }
     else if (n.kind === 'heart') {
-      const boss = enemies.find(e => e.boss), max = boss ? enemyMaxHp(boss) : 1;
+      const boss = enemies.find(e => typeof e.boss === 'string'), max = boss ? enemyMaxHp(boss) : 1;
       objective = boss ? `${BOSSES[boss.boss]?.name || 'Guardian'} · ${run.foes.length - 1} guard${run.foes.length === 2 ? '' : 's'}` : `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`;
       progress = boss ? Math.max(0, boss.hp) / max : null;
-    } else objective = `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`;
+    } else if (n.kind === 'underways' && run.delve) objective = run.objective.have ? 'Hoard won! Take the way out' : 'Delve: find the guardian and its hoard';
+    else objective = `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`;
   } else objective = STAGE_TITLE[run.stage] || '';
   return {format: RUN_FORMATS[run.format]?.name || 'Expedition', seed: run.seed, stage: run.stage, title: STAGE_TITLE[run.stage], objective, progress,
     lives: run.lives, maxLives: run.maxLives, haul: run.haul, mult: run.mult, tier: run.path.length, tiers: RUN_TUNING.tiers, notice: run.notice, kind: n?.kind || 'camp', ended: RUN_ENDED.includes(run.stage)};

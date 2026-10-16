@@ -82,7 +82,11 @@ assert.deepEqual(loaded.snapshot().run, snap.run, 'world runs survive save and r
 }
 // The next run: a fresh world of the same preset, or the very same world and route.
 {
-  const {nextRunOptions} = await import('../client/run-panel.js');
+  const {nextRunOptions, runWorldFor} = await import('../client/run-panel.js');
+  const menu = worldDescriptor({kind: 'expedition', seed: 'amber-otter-212', preset: 'highlands', size: 2048});
+  assert.equal(runWorldFor({format: 'expedition', seed: 9}, menu), menu, 'a run plays on the world picked in the menu');
+  assert.deepEqual(runWorldFor({format: 'daily', seed: 77}, menu), runWorldFor({format: 'daily', seed: 77}, worldDescriptor({kind: 'expedition', seed: 'other-seed-1', preset: 'archipelago', size: 2048})), 'the daily world is the same for everyone');
+  assert.equal(runWorldFor({format: 'daily', seed: 77}, null), null);
   const s = sim.snapshot(), fresh = nextRunOptions(s, {seed: 4242}), same = nextRunOptions(s, {same: true});
   assert.equal(fresh.seed, 4242); assert.equal(fresh.world.preset, 'continent'); assert.notEqual(fresh.world.seed, s.world.seed);
   assert.deepEqual(same.world, s.world); assert.equal(same.seed, 31337);
