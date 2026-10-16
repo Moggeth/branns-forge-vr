@@ -35,7 +35,7 @@ import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js'
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
 import {stormShot,stormReel,leash,releasePack,plantPack,stormPickup,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
-import {TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
+import {makeBoss,TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
 import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
@@ -55,6 +55,9 @@ import {worldMode} from './world-modes.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
 const depositCap = state => state?.world ? 192 : 80;
+import {createRun,stepRun,runAction,restoreRun} from './expedition-run.js';
+import {validBoonList} from './run-boons.js';
+import {arenaOpenGround,arenaCamp} from './run-sites.js';
 export const HZ = 60;
 
 const MAX_WORLD = 64;
@@ -129,20 +132,23 @@ function damageHero(state, hero, amount, events, from) {
   }
 }
 
-function newState({room = 'LOCAL', seed = 41, legacyBattle = false, world = undefined} = {}) {
+function newState({room = 'LOCAL', seed = 41, legacyBattle = false, world = undefined, run = null} = {}) {
   if (typeof room !== 'string' || !room || room.length > 64 || !Number.isSafeInteger(seed)) throw Error('Invalid room or seed');
-  if (world) { const descriptor = restoreWorldDescriptor(world); return withWorld(worldFor(descriptor), () => newWorldState({room, seed, descriptor})); }
+  if (world) { const descriptor = restoreWorldDescriptor(world); return withWorld(worldFor(descriptor), () => newWorldState({room, seed, descriptor, run})); }
   const state = {version: 1, contentVersion: 3, landmarks:true, room, seed, tick: 0, idCounter: 0, players: [], enemies: [], edits: [], groves: [], harvestedTrees: [], deposits: initialDeposits().concat([{id:'landmarkOre1',x:-19.2,z:13,kind:'stone',hits:0,maxHits:3,depleted:false},{id:'landmarkOre2',x:19,z:-11.5,kind:'meteor',hits:0,maxHits:5,depleted:false},{id:'landmarkOre3',x:28,z:-12.5,kind:'meteor',hits:0,maxHits:5,depleted:false}]), pickups: [
     {id:'watchCache',kind:'gems',x:-6,z:-22,y:baseHeight(-6,-22),amount:3},{id:'sanctuaryCache',kind:'stone',x:-25,z:11,y:baseHeight(-25,11),amount:4},
     {id:'apple1',kind:'apple',x:-2,z:6,y:baseHeight(-2,6),amount:1},{id:'apple2',kind:'apple',x:2,z:6.5,y:baseHeight(2,6.5),amount:1}], bridges: [],
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], fruit: createFruit(), heroLedger: {}, shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
   // New worlds open with the always-on home bases; legacyBattle keeps the old host-started skirmish for its tests.
   if (!legacyBattle) state.battle = createHomeBattle(state, terrainHeight);
+  // Expedition Roguelite (shared/expedition-run.js): a generated world passes its own camp and sites; today's map
+  // uses the open ground found by shared/run-sites.js.
+  if (run) state.run = createRun({format: run.format, seed: run.seed, daily: run.daily, boss: run.boss, camp: run.camp || arenaCamp(), sites: run.sites || arenaOpenGround(), bound: run.bound || thingLimit()});
   return state;
 }
 // A generated world (The Great Wilds, Expedition, Underways): the same state shape, but no arena landmarks, keeps or
 // home battle. The village forge stands at the origin; its yard is the plaza the generator flattened there.
-function newWorldState({room, seed, descriptor}) {
+function newWorldState({room, seed, descriptor, run = null}) {
   const state = newState({room, seed, legacyBattle: true});
   state.world = descriptor;
   state.landmarks = false;
@@ -151,7 +157,7 @@ function newWorldState({room, seed, descriptor}) {
   state.pickups = [];
   state.shrine.position = [0, terrainHeight(state, 0, 0), 0];
   newWildsState(state, worldFor(state), terrainHeight);
-  worldMode(descriptor.kind)?.newState?.(state, worldFor(state));
+  worldMode(descriptor.kind)?.newState?.(state, worldFor(state), run || {});
   return state;
 }
 
@@ -174,6 +180,7 @@ function instantiate(state) {
     p.resources[kind] -= n; slot++; } } };
   // Optional Forge Expedition (shared/adventure.js): command results since the last step feed its deed tracking.
   const adventureEvents = [], adventureContext = {createEnemy, terrainHeight};
+  const runContext = {createEnemy, terrainHeight, grantXp, heroMaxHp, makeBoss};
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
       if (!validId(id) || player(id)) return fail('invalid_player');
@@ -199,7 +206,13 @@ function instantiate(state) {
         if (message.seq <= p.seq) return fail('duplicate_sequence');
         p.seq=message.seq;return battleAction(state,p,message,{createEnemy,terrainHeight});
       }
+      if (p && message?.type === 'run') {
+        if (!safeSeq(message.seq)) return fail('invalid_sequence');
+        if (message.seq <= p.seq) return fail('duplicate_sequence');
+        p.seq = message.seq; return runAction(state, p, message, runContext);
+      }
       if (p && message?.type === 'adventure') {
+        if (state.run) return fail('run_active');
         if (state.battle.status!=='off' && state.battle.v!==2 && ['start','retry'].includes(message.action)) return fail('battle_active');
         if (!safeSeq(message.seq)) return fail('invalid_sequence');
         if (message.seq <= p.seq) return fail('duplicate_sequence');
@@ -447,7 +460,7 @@ function instantiate(state) {
       treeIndex.update(state); const treeCuts=treeCutMap(state);
       for (const p of state.players) {
         const previousPosition=[...p.position];
-        p.mana = Math.min(100, p.mana + (3+(p.role==='god'?Math.min(2,state.groves.filter(g=>!state.harvestedTrees.some(t=>t.id.startsWith(g.id)&&t.cuts>=3)).length*.15):0)) / HZ);
+        p.mana = Math.min(100, p.mana + (3+(p.role==='god'?Math.min(2,state.groves.filter(g=>!state.harvestedTrees.some(t=>t.id.startsWith(g.id)&&t.cuts>=3)).length*.15):0)) * (1+itemBonus(p,'mana')) / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
           const pace=5*swiftFactor(state,p)*(1+itemBonus(p,'speed'))/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
@@ -508,9 +521,11 @@ function instantiate(state) {
       },events,adventureEvents);
       stepInventions(state,inventionContext,events);stepHeartstones(state);
       if(state.world){stepWilds(state,{nextId,terrainHeight,createEnemy,grantXp},events);worldMode(state.world.kind)?.step?.(state,{nextId,terrainHeight,createEnemy,addPickup,damageHero,hitEnemyPart,world:worldFor(state)},events);}
-      const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
+      const recent = adventureEvents.concat(events); adventureEvents.length = 0;
+      const expedition = stepAdventure(state.adventure, state, recent);
       if (expedition.intents.length) applyAdventureIntents(state, expedition.intents, adventureContext);
       events.push(...expedition.events);
+      if (state.run) events.push(...stepRun(state, recent, runContext).events);
       state.shrine.hp=100;state.shrine.disabledUntil=0;
       return events;
     },
@@ -518,13 +533,13 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,streak,dragonReady,dragon}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items}), xp:xp||0, talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,streak,dragonReady,dragon,runBoons}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items,runBoons}), xp:xp||0,...(runBoons?.length?{runBoons:[...runBoons]}:{}), talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
-        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...modeSnapshot(state)});
+        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.run?{run:state.run}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...modeSnapshot(state)});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -583,7 +598,7 @@ function loadState(saved, descriptor) {
         (p.stats!==undefined&&(!record(p.stats)||!['kills','deaths','harvested','contribution'].every(k=>finite(p.stats[k])&&p.stats[k]>=0&&p.stats[k]<=1e9&&(k==='contribution'||Number.isInteger(p.stats[k]))))) ||
         (p.protectedUntil !== undefined && !validTick(p.protectedUntil,saved.tick,0,180)) ||
         (p.specialTick !== undefined && !validTick(p.specialTick,saved.tick)) ||
-        (p.siegebird !== undefined && !validSiegebird(p.siegebird)) || !validBoons(p, saved.tick) ||
+        (p.siegebird !== undefined && !validSiegebird(p.siegebird)) || !validBoons(p, saved.tick) || (p.runBoons !== undefined && !validBoonList(p.runBoons)) ||
         (p.heldOre!==undefined&&!['ironOre','mithrilOre','starOre'].includes(p.heldOre)) ||
         (p.rally!==undefined&&!validId(p.rally)) ||
         (p.side!==undefined&&!['party','rivals'].includes(p.side)) || !validTownFields(p,saved.tick) ||
@@ -596,7 +611,7 @@ function loadState(saved, descriptor) {
   for (const e of saved.enemies) {
     if(e?.emergeTick!==undefined&&!validTick(e.emergeTick,saved.tick,0))throw Error('Invalid enemy emergence');
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
+        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.boss!==undefined && (e.kind!=='golem' || !/^[a-z]{1,16}$/.test(e.boss))) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
@@ -653,10 +668,10 @@ function loadState(saved, descriptor) {
   state.players = copy(saved.players).map(p => ({id: p.id, name: p.name, role: p.role, position: p.position,
     stats:Object.fromEntries(['kills','deaths','harvested','contribution'].map(k=>[k,p.stats?.[k]||0])),
     yaw: p.yaw, hp: p.hp, mana: p.mana, move: p.move, vy: p.vy,velocity:p.velocity||[0,0,0], inputTick: p.inputTick,
-    attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
+    attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p),...(p.runBoons?.length?{runBoons:[...p.runBoons]}:{}), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...restoreTownFields(p),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home,boss}) => ({id, position, yaw, hp, attackTick,...(boss&&kind==='golem'?{boss}:{}),...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
   state.edits = saved.edits.map(restoreTerrainEdit); const bake = restoreTerrainBake(saved.terrainBake, !!descriptor); if (bake) state.terrainBake = bake; state.groves = copy(saved.groves);
@@ -664,6 +679,7 @@ function loadState(saved, descriptor) {
   state.treeRoots = treeRoots; state.harvestedTrees = harvestedTrees; state.looseLogs = looseLogs; Object.assign(state, entTrees);
   if (saved.adventure !== undefined) { const restored = restoreAdventure(saved.adventure); if (!restored.ok) throw Error('Invalid expedition: ' + restored.code); state.adventure = restored.adventure; }
   state.battle=restoreBattle(saved);
+  if (saved.run !== undefined) state.run = restoreRun(saved.run);
   state.settlement=restoreSettlement(saved.settlement,saved.tick,contentIds,new Set(saved.enemies.map(e=>e.id)));
   state.inventions=restoreInventions(saved.inventions,saved.tick);
   state.fruit=restoreFruit(saved,contentIds,saved.players);
