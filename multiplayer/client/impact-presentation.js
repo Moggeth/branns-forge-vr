@@ -120,7 +120,7 @@ void main() {
   vec2 a = abs(vUv);
   float core = exp(-dot(vUv, vUv) * 9.0);
   float rays = max(0.0, 1.0 - a.x * 9.0) * max(0.0, 1.0 - a.y) + max(0.0, 1.0 - a.y * 9.0) * max(0.0, 1.0 - a.x);
-  float v = (core + rays * 0.55) * vTint.a;
+  float v = (core * 2.2 + rays * 0.9) * vTint.a;
   if (v < 0.004) discard;
   gl_FragColor = vec4(vTint.rgb * v, v);
 }`;
@@ -283,7 +283,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
     };
 
     const hard = ev.material === 'stone' || ev.material === 'metal' || ev.material === 'crystal';
-    const sparkBase = ev.steel === false ? 0 : ev.steel === true && hard ? Math.max(4, prof.sparks * 1.6) : prof.sparks;
+    const sparkBase = ev.steel === false ? 0 : ev.steel === true && hard ? Math.max(8, prof.sparks * 2.5) : prof.sparks;
     const chipBase = prof.chips * (ev.kind === 'bite' ? 1.3 : ev.kind === 'rebound' ? 0.7 : 1);
     const nChips = count(chipBase), nSparks = count(sparkBase), nDust = lod < 0.3 ? 0 : count(prof.dust);
     const glint = FLASH_RGB[ev.material] && (ev.material === 'bone' || ev.steel !== false) ? FLASH_RGB[ev.material] : null;
@@ -291,7 +291,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       const i = slot(flashes);
       flashes.p[i * 3] = px + n0x * 0.02; flashes.p[i * 3 + 1] = py + n0y * 0.02; flashes.p[i * 3 + 2] = pz + n0z * 0.02;
       flashes.life[i] = 0.1 + 0.04 * e;
-      flashes.size[i] = (ev.material === 'bone' ? 0.13 : 0.24) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1);
+      flashes.size[i] = (ev.material === 'bone' ? 0.16 : 0.32) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1);
       flashTint.array[i * 4] = glint[0]; flashTint.array[i * 4 + 1] = glint[1]; flashTint.array[i * 4 + 2] = glint[2];
       flashTint.array[i * 4 + 3] = 0;
     }
@@ -328,7 +328,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       sparks.life[i] = (0.16 + rnd() * 0.22) * (0.8 + 0.2 * e);
       sparks.size[i] = (0.0042 + rnd() * 0.0036) * (0.8 + 0.2 * e) * farBoost; // half-width: a few pixels at arm's length
       sparks.bounce[i] = 0;
-      const hot = prof.sparkRgb[0], base = prof.sparkRgb[1], inten = 0.55 + rnd() * 0.3;
+      const hot = prof.sparkRgb[0], base = prof.sparkRgb[1], inten = (0.55 + rnd() * 0.3) * (ev.steel === true ? 1.8 : 1); // steel sparks read against a bright day
       for (let a = 0; a < 3; a++) { sparks.hot[i * 3 + a] = hot[a] * inten; sparks.base[i * 3 + a] = base[a] * inten; }
     }
 
