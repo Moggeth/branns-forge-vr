@@ -2,12 +2,12 @@
 // same view shape the Forge Expedition wrist panel already draws (client/vr-adventure-panel.js), with up to three
 // trigger buttons for whatever the stage needs: a kit, a route choice, an upgrade, return or push on.
 // Pure (no DOM, no Three): button ids are 'run:<action>:<value>' and runVrAction() turns one into a run command.
-import {NODE_KINDS, RUN_TUNING, routeChoices, nodeHaul, RUN_ENDED} from '../shared/expedition-run.js';
+import {NODE_KINDS, RUN_TUNING, OMENS, routeChoices, nodeHaul, tradePrice, RUN_ENDED} from '../shared/expedition-run.js';
 import {BOONS, KITS, KIT_IDS} from '../shared/run-boons.js';
 import {runStripModel} from './run-panel.js';
 
 const TONE = {camp: '#e0a64a', route: '#e0a64a', travel: '#ffb35a', fight: '#ff7a4a', reward: '#9fc8ff', decide: '#ffd36b', won: '#ffd36b', returned: '#c9b48a', fallen: '#9a8f86'};
-const KIND_ICON = {skirmish: 'skull', elite: 'skull', treasure: 'gem', hold: 'star', shrine: 'flame', underways: 'stone', heart: 'flame'};
+const KIND_ICON = {skirmish: 'skull', elite: 'skull', treasure: 'gem', hold: 'star', shrine: 'flame', underways: 'stone', heart: 'flame', trader: 'gem'};
 const short = (text, n = 16) => text.length > n ? `${text.slice(0, n - 1)}…` : text;
 
 /** Wrist-panel view for the run, or null outside a run. */
@@ -24,19 +24,28 @@ export function runWristView(snapshot, playerId, {isHost = false} = {}) {
       info('timber', kit ? `Kit: ${KITS[kit].name}. ${KITS[kit].text}` : 'Choose a starting kit, then set out');
       buttons.push({id: `run:kit:${nextKit}`, label: kit ? `Kit: ${short(KITS[nextKit].name, 12)}` : `Kit: ${KITS[KIT_IDS[0]].name}`});
     } else info('star', 'Gods pick God upgrades after each destination');
+    if (run.omen && run.omen !== 'calm') info('star', `Omen: ${OMENS[run.omen]?.name}. ${OMENS[run.omen]?.text}`);
     buttons.push({id: 'run:begin:', label: 'Set out'});
     next = 'Pick a kit, then set out';
   } else if (run.stage === 'route') {
     for (const id of routeChoices(run)) {
       const n = run.nodes.find(q => q.id === id), k = NODE_KINDS[n.kind], mine = run.votes[playerId] === id;
       buttons.push({id: `run:route:${id}`, label: `${mine ? '✓ ' : ''}${short(k.name, 14)}`});
-      info(KIND_ICON[n.kind] || 'star', `${k.name}: ◆ ${nodeHaul(run, n)}`);
+      info(KIND_ICON[n.kind] || 'star', n.kind === 'trader' ? `${k.name}: spend your haul` : `${k.name}: ◆ ${nodeHaul(run, n)}`);
     }
     next = 'Vote for the next destination';
   } else if (run.stage === 'reward') {
-    const offer = run.offers[playerId] || [], picked = run.picks[playerId];
-    for (const id of offer) { const b = BOONS[id]; info('star', `${b.name}: ${b.text}`); if (!picked) buttons.push({id: `run:boon:${id}`, label: short(b.name, 14)}); }
-    next = picked ? `Chose ${BOONS[picked]?.name}. Waiting for the party` : 'Choose one upgrade for this run';
+    const offer = run.offers[playerId] || [], picked = run.picks[playerId], at = run.nodes.find(q => q.id === run.at);
+    if (at?.kind === 'trader') {
+      // The smith: the two upgrades the party can afford (cheapest first) and a button to keep the Embers.
+      const wares = offer.map(id => ({id, price: tradePrice(run, at, id)})).sort((a, b) => a.price - b.price);
+      for (const {id, price} of wares) info('gem', `${BOONS[id].name} ◆ ${price}: ${BOONS[id].text}`);
+      if (!picked) { for (const {id, price} of wares.filter(w => w.price <= run.haul).slice(0, 2)) buttons.push({id: `run:boon:${id}`, label: `${short(BOONS[id].name, 10)} ◆${price}`}); buttons.push({id: 'run:skip:', label: 'Keep Embers'}); }
+      next = picked === 'skip' ? 'Kept your Embers. Waiting for the party' : picked ? `Bought ${BOONS[picked]?.name}. Waiting for the party` : `The Wandering Smith · haul ◆ ${run.haul}`;
+    } else {
+      for (const id of offer) { const b = BOONS[id]; info('star', `${b.name}: ${b.text}`); if (!picked) buttons.push({id: `run:boon:${id}`, label: short(b.name, 14)}); }
+      next = picked ? `Chose ${BOONS[picked]?.name}. Waiting for the party` : 'Choose one upgrade for this run';
+    }
   } else if (run.stage === 'decide') {
     info('path', `Haul ◆ ${run.haul} · ${run.lives} spare li${run.lives === 1 ? 'fe' : 'ves'}`);
     info('skull', `Push on: ×${(run.mult + RUN_TUNING.pushMult).toFixed(2)} haul, more danger`);
@@ -63,7 +72,7 @@ export function runVrAction(id) {
   if (ns !== 'run') return null;
   if (action === 'again' || action === 'leave') return {local: action};
   if (action === 'kit') return {action, payload: {kit: value}};
-  if (action === 'begin') return {action, payload: {}};
+  if (action === 'begin' || action === 'skip') return {action, payload: {}};
   if (action === 'route') return {action, payload: {node: value}};
   if (action === 'boon') return {action, payload: {boon: value}};
   if (action === 'decide') return {action, payload: {choice: value}};

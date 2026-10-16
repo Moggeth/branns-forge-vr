@@ -3,7 +3,7 @@
 // DOM only, phone-first (large tap targets, one column under 520 px). Reads the authoritative run from snapshots
 // (shared/expedition-run.js) and sends {type:'run'} commands; it never decides anything itself.
 // Panels re-render only when their content signature changes, so votes and timers never steal a tap mid-press.
-import {NODE_KINDS, RUN_FORMATS, RUN_TUNING, BOSSES, routeChoices, nodeHaul, RUN_ENDED, dailySeed} from '../shared/expedition-run.js';
+import {NODE_KINDS, RUN_FORMATS, RUN_TUNING, BOSSES, OMENS, omenFor, routeChoices, nodeHaul, tradePrice, RUN_ENDED, dailySeed} from '../shared/expedition-run.js';
 import {BOONS, KITS, KIT_IDS, HALL, HALL_IDS} from '../shared/run-boons.js';
 import {enemyMaxHp} from '../shared/combat.js';
 import {worldDescriptor} from '../shared/worldgen/registry.js';
@@ -22,6 +22,8 @@ export const RUN_ICONS = Object.freeze({
   heart: 'M3 8l4 3 5-7 5 7 4-3-2 12H5zm3.6 10h10.8l.9-5.6-2.3 1.7L12 8.6 8 14.1l-2.3-1.7z',
   ember: 'M12 2c1.2 3.6 5.5 5.4 5.5 10.6A5.5 5.5 0 0 1 6.5 12.6c0-2.6 1.6-4.3 2.6-5.2.1 1.8.9 2.7 1.8 2.7 0-3.4-.6-5.4 1.1-8.1z',
   camp: 'M12 3 2 20h20zm0 5 5.5 10h-3L12 13l-2.5 5h-3z',
+  trader: 'M3 6h13c0 2 2 3.2 5 3.2v2.3c-3 0-5 1.1-6 2.9v1.9h2V20H7v-3.7h2v-1.9C8 12.6 6 11.5 3 11.5z',
+  omen: 'M14.5 2.5A9.5 9.5 0 1 0 21.5 17 7.5 7.5 0 0 1 14.5 2.5zM18 3l.8 1.9 1.9.8-1.9.8L18 8.4l-.8-1.9-1.9-.8 1.9-.8z',
   hp: 'M12 21 3.5 12.7A5 5 0 0 1 12 6a5 5 0 0 1 8.5 6.7z',
   damage: 'M14 3h7v7l-9.5 9.5-2 2L8 20l-3 3-2-2 3-3-1.5-1.5 2-2zm1.5 2-8 8 3.5 3.5 8-8V5z',
   speed: 'M5 5h8l-2 4h6L8 21l2-8H5z',
@@ -36,7 +38,7 @@ export const RUN_ICONS = Object.freeze({
   pick: 'M3 7c5-4 13-4 18 0l-1 1.5c-2-1.3-4-2-6-2.4L5 21l-2-1 8.6-14.4C9 5.9 6.6 6.7 4.5 8z',
   crossbow: 'M3 11h18v2H3zm8-8h2v18h-2zM5 5l2-2 12 12-2 2zM5 19 17 7l2 2L7 21z',
 });
-const BOON_ICON = b => b.lives ? 'lives' : b.mana ? 'mana' : b.xp ? 'xp' : b.lifesteal ? 'hp' : b.damage ? 'damage' : b.hp ? 'hp' : b.speed ? 'speed' : b.regen ? 'regen' : b.armor ? 'armor' : b.goldPerKill ? 'gold' : b.draughts ? 'flask' : 'ember';
+const BOON_ICON = b => b.lives ? 'lives' : b.mana ? 'mana' : b.lifesteal ? 'hp' : b.damage ? 'damage' : b.armor ? 'armor' : b.hp ? 'hp' : b.speed ? 'speed' : b.regen ? 'regen' : b.goldPerKill ? 'gold' : b.xp ? 'xp' : b.draughts ? 'flask' : 'ember';
 const STAGE_TITLE = {camp: 'Camp', route: 'Choose the route', travel: 'Travel', fight: 'Fight', reward: 'Choose an upgrade', decide: 'Return or push on', won: 'Victory', returned: 'Home safe', fallen: 'The party fell'};
 const OUTCOME = {won: ['The Heart is won!', 'Your whole haul is banked twice over.'], returned: ['Home safe', 'You turned back in time and banked the whole haul.'], fallen: ['The party fell', 'A quarter of the haul made it home.']};
 
@@ -81,12 +83,17 @@ export function runStripModel(run, viewerId = '', enemies = []) {
     else if (n.kind === 'treasure') { objective = `Crack the star shards ${run.objective.have}/${run.objective.need}`; progress = run.objective.need ? run.objective.have / run.objective.need : 0; }
     else if (n.kind === 'heart') {
       const boss = enemies.find(e => typeof e.boss === 'string'), max = boss ? enemyMaxHp(boss) : 1;
-      objective = boss ? `${BOSSES[boss.boss]?.name || 'Guardian'} · ${run.foes.length - 1} guard${run.foes.length === 2 ? '' : 's'}` : `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`;
+      const name = BOSSES[boss?.boss]?.name || 'Guardian', guards = `${run.foes.length - 1} guard${run.foes.length === 2 ? '' : 's'}`;
+      const stones = run.objective.need - run.objective.have;
+      objective = !boss ? `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`
+        : boss.boss === 'warden' ? `${name} raises the dead · ${guards}`
+        : boss.boss === 'shardback' && stones > 0 ? `${name} mends · crack ${stones} heartstone${stones === 1 ? '' : 's'}`
+        : `${name} · ${guards}`;
       progress = boss ? Math.max(0, boss.hp) / max : null;
     } else if (n.kind === 'underways' && run.delve) objective = run.objective.have ? 'Hoard won! Take the way out' : 'Delve: find the guardian and its hoard';
     else objective = `${run.foes.length} foe${run.foes.length === 1 ? '' : 's'} left`;
   } else objective = STAGE_TITLE[run.stage] || '';
-  return {format: RUN_FORMATS[run.format]?.name || 'Expedition', seed: run.seed, stage: run.stage, title: STAGE_TITLE[run.stage], objective, progress,
+  return {format: RUN_FORMATS[run.format]?.name || 'Expedition', seed: run.seed, omen: run.omen && run.omen !== 'calm' ? OMENS[run.omen]?.name || '' : '', stage: run.stage, title: STAGE_TITLE[run.stage], objective, progress,
     lives: run.lives, maxLives: run.maxLives, haul: run.haul, mult: run.mult, tier: run.path.length, tiers: RUN_TUNING.tiers, notice: run.notice, kind: n?.kind || 'camp', ended: RUN_ENDED.includes(run.stage)};
 }
 
@@ -129,10 +136,16 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
   }
 
   // ---- camp: starting kits ----
+  function omenCard(id) {
+    const o = OMENS[id] || OMENS.calm, card = el('div', `rx-omen rx-omen-${id || 'calm'}`), top = el('div', 'rx-detail-top');
+    top.append(icon('omen', 22), el('strong', '', `Omen: ${o.name}`)); card.append(top, el('p', '', o.text));
+    return card;
+  }
   function campView(run, me, players) {
     const box = el('div', 'rx-body');
     box.append(header('Expedition camp', `Seed ${run.seed}${run.daily ? ` · Daily ${run.daily}` : ''}. Choose a starting kit, then set out. Reach and defeat the Heart, or turn back in time to bank your haul.`, 'camp'));
     const scroll = el('div', 'rx-scroll');
+    scroll.append(omenCard(run.omen));
     if (me?.role === 'hero') {
       scroll.append(el('h3', 'rx-sub', 'Your starting kit'));
       const grid = el('div', 'rx-cards');
@@ -190,7 +203,7 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
       const card = el('div', `rx-detail rx-k-${focus.kind}`), top = el('div', 'rx-detail-top');
       top.append(icon(focus.kind, 26), el('strong', '', NODE_KINDS[focus.kind].name), el('span', 'rx-tier', focus.kind === 'heart' ? 'Final' : `Tier ${focus.tier + 1}`));
       card.append(top, el('p', '', focus.kind === 'heart' ? `${NODE_KINDS.heart.text} Guardian: ${BOSSES[run.boss].name}. ${BOSSES[run.boss].text}` : NODE_KINDS[focus.kind].text));
-      card.append(el('p', 'rx-reward', `Haul: about ${nodeHaul(run, focus)} Embers${focus.kind === 'heart' ? ', and the whole haul doubles' : ''}`));
+      card.append(el('p', 'rx-reward', focus.kind === 'trader' ? `Spend your haul (${run.haul} Embers) on upgrades, or keep it.` : `Haul: about ${nodeHaul(run, focus)} Embers${focus.kind === 'heart' ? ', and the whole haul doubles' : ''}`));
       const open = choices.includes(focus.id);
       if (open) card.append(button('btn-primary rx-go', run.votes[viewer] === focus.id ? 'Your vote is in' : players.length > 1 ? 'Vote for this route' : 'Go here', () => send('route', {node: focus.id}), {disabled: run.votes[viewer] === focus.id}));
       else card.append(el('p', 'rx-note', run.path.includes(focus.id) ? 'Already cleared.' : 'Not reachable from here.'));
@@ -204,21 +217,24 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
   // ---- upgrade cards ----
   function rewardView(run, me) {
     const box = el('div', 'rx-body'), offer = run.offers[viewer] || [], picked = run.picks[viewer];
-    const n = run.nodes.find(q => q.id === run.at);
-    box.append(header(picked ? 'Upgrade chosen' : 'Choose an upgrade', n ? `${NODE_KINDS[n.kind].name} cleared. Upgrades last until the run ends.` : '', 'xp'));
+    const n = run.nodes.find(q => q.id === run.at), shop = n?.kind === 'trader';
+    if (shop) box.append(header(picked === 'skip' ? 'You kept your Embers' : picked ? 'Bought!' : 'The Wandering Smith', `The haul holds ${run.haul} Embers, shared by the party. Whatever you spend will not be banked.`, 'trader'));
+    else box.append(header(picked ? 'Upgrade chosen' : 'Choose an upgrade', n ? `${NODE_KINDS[n.kind].name} cleared. Upgrades last until the run ends.` : '', 'xp'));
     const scroll = el('div', 'rx-scroll'), grid = el('div', 'rx-cards');
     for (const id of offer) {
-      const b = BOONS[id], chosen = picked === id;
-      const card = el('button', `rx-card rx-boon rx-t-${b.tier}${chosen ? ' rx-picked' : ''}`); card.type = 'button'; card.disabled = !!picked && !chosen;
+      const b = BOONS[id], chosen = picked === id, price = shop ? tradePrice(run, n, id) : 0, poor = price > run.haul;
+      const card = el('button', `rx-card rx-boon rx-t-${b.tier}${chosen ? ' rx-picked' : ''}${shop && poor && !chosen ? ' rx-poor' : ''}`); card.type = 'button'; card.disabled = (!!picked && !chosen) || (shop && poor && !chosen);
       const top = el('span', 'rx-card-top'); top.append(icon(BOON_ICON(b), 30), el('span', 'rx-card-name', b.name));
       card.append(el('span', 'rx-tierflag', b.tier), top, el('span', 'rx-card-text', b.text));
+      if (shop) card.append(el('span', 'rx-price', chosen ? 'Bought' : poor ? `◆ ${price} · not enough` : `◆ ${price}`));
       card.addEventListener('click', () => { if (!picked) send('boon', {boon: id}); });
       grid.append(card);
     }
     scroll.append(grid);
+    if (shop && !picked) scroll.append(button('btn rx-skip', 'Keep my Embers', () => send('skip')));
     if (!picked && run.rerolls[viewer] > 0) scroll.append(button('btn-quiet rx-reroll', `Reroll (${run.rerolls[viewer]} left)`, () => send('reroll')));
     if (me?.runBoons?.length) { const have = el('p', 'rx-note'); have.textContent = `Your upgrades: ${me.runBoons.map(id => BOONS[id]?.name).filter(Boolean).join(', ')}`; scroll.append(have); }
-    scroll.append(timerNote(run, RUN_TUNING.pick, picked ? 'Waiting for the party ·' : 'Picked for you in'));
+    scroll.append(timerNote(run, RUN_TUNING.pick, picked ? 'Waiting for the party ·' : shop ? 'The smith packs up in' : 'Picked for you in'));
     box.append(scroll);
     return box;
   }
@@ -295,7 +311,7 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
     const live = players.map(p => p.id).join();
     if (run.stage === 'camp') return `camp|${JSON.stringify(run.kits)}|${live}|${me?.role}`;
     if (run.stage === 'route') return `route|${run.at}|${JSON.stringify(run.votes)}|${live}|${routeFocus}|${run.mult}`;
-    if (run.stage === 'reward') return `reward|${run.at}|${JSON.stringify(run.offers[viewer])}|${run.picks[viewer] || ''}|${run.rerolls[viewer] || 0}|${(me?.runBoons || []).length}`;
+    if (run.stage === 'reward') return `reward|${run.at}|${run.haul}|${JSON.stringify(run.offers[viewer])}|${run.picks[viewer] || ''}|${run.rerolls[viewer] || 0}|${(me?.runBoons || []).length}`;
     if (run.stage === 'decide') return `decide|${run.at}|${JSON.stringify(run.votes)}|${run.lives}|${live}`;
     if (RUN_ENDED.includes(run.stage)) return `end|${run.stage}|${creditNote}|${isHost()}`;
     return '';
@@ -306,7 +322,7 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
     // Strip
     const m = runStripModel(run, viewer, lastSnap?.enemies || []);
     strip.hidden = false; strip.dataset.stage = run.stage;
-    setText(sLeft, `${m.format} · ${m.seed}`);
+    setText(sLeft, `${m.format} · ${m.seed}${m.omen ? ` · ${m.omen}` : ''}`);
     sKind.replaceChildren(icon(m.kind === 'camp' ? 'camp' : m.kind, 16));
     setText(sObj, m.objective);
     sBar.hidden = m.progress === null; sFill.style.transform = `scaleX(${m.progress ?? 0})`;
@@ -359,6 +375,9 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
       if (e.kind === 'run_life') toast(e.lives > 0 ? `An Ember gutters out. ${e.lives} spare li${e.lives === 1 ? 'fe' : 'ves'} left.` : 'Last Ember! One more fall ends the run.');
       else if (e.kind === 'run_cleared') toast(`Destination cleared: +${e.haul} Embers to the haul.`);
       else if (e.kind === 'run_spawn' && e.boss) toast(`${BOSSES[e.boss]?.name || 'The guardian'} awakens!`);
+      else if (e.kind === 'run_heartstone') toast(e.left ? `A heartstone shatters! ${e.left} left.` : 'The last heartstone shatters. The Shardback can no longer mend!');
+      else if (e.kind === 'run_raise') toast(`The Bone Warden raises ${e.count} more from the ground!`);
+      else if (e.kind === 'run_trade') { const who = lastSnap?.players?.find(p => p.id === e.id); toast(`${e.id === viewer ? 'You' : who?.name || 'A hero'} bought ${BOONS[e.boon]?.name || 'an upgrade'} for ${e.price} Embers.`); }
     },
     openHall, closeHall,
     get modal() { return !backdrop.hidden || !hallBack.hidden; },
@@ -392,6 +411,13 @@ export function createRunLauncher({parent, onStart, openHall}) {
     const seedRow = el('label', 'rx-seed'); seedRow.append(el('span', '', 'Seed (optional)'));
     const input = el('input'); input.type = 'text'; input.inputMode = 'numeric'; input.placeholder = format === 'daily' ? String(dailySeed(today)) : 'Random'; input.disabled = format === 'daily'; input.maxLength = 9;
     seedRow.append(input); scroll.append(seedRow);
+    const omenNote = el('p', 'rx-note rx-omen-note');
+    const showOmen = () => {
+      const typed = parseInt(input.value.replace(/\D/g, ''), 10), seed = format === 'daily' ? dailySeed(today) : Number.isSafeInteger(typed) && typed > 0 ? typed % 2 ** 31 : 0;
+      const o = seed ? OMENS[omenFor(seed, format)] : null;
+      omenNote.replaceChildren(icon('omen', 16), el('span', '', o ? ` Omen: ${o.name}. ${o.text}` : ' Every seed brings an omen that bends the run.'));
+    };
+    input.addEventListener('input', showOmen); showOmen(); scroll.append(omenNote);
     scroll.append(el('p', 'rx-note', `${meta.embers} Embers banked. Each run resets the world, your level, upgrades and pack; banked Embers and Hall unlocks stay.`));
     const foot = el('footer', 'rx-foot');
     foot.append(button('btn-quiet', 'Hall of Embers', () => openHall()));

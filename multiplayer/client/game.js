@@ -715,12 +715,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
     const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8*bossScale(entry.data):1.7,entry.data.id);
     if (!model) return;
-    if (entry.data.boss && entry.data.kind === 'golem') dressBoss(model); // the Expedition Heart guardian
+    if (typeof entry.data.boss === 'string' && entry.data.kind === 'golem') dressBoss(model, entry.data.boss); // the Expedition Heart guardian
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
     entry.visual = model;
     entry.root.add(model);
-    if (entry.data.boss) underways.dressGuardian(model, 2.8 * BOSS_SCALE); // the Underways' crowned guardian
+    if (entry.data.boss === true) underways.dressGuardian(model, 2.8 * BOSS_SCALE); // the Underways' crowned guardian
     if (forgeling) dressForgelingModel(model, entry.data.id);
     else if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }

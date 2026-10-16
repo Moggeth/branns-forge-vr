@@ -2,7 +2,8 @@
    transition/animation. Phone-first: one column under 520px, 48px tap targets, safe-area aware. */
 :root {
   --rx-ember: #ff9a4a; --rx-ember-hot: #ffd27a; --rx-common: #b9c9a6; --rx-rare: #8fc4ff; --rx-epic: #e5a2ff;
-  --rx-k-skirmish: #e9b46a; --rx-k-elite: #ff7d5e; --rx-k-treasure: #9fd3ff; --rx-k-hold: #93d08a; --rx-k-shrine: #ffd27a; --rx-k-underways: #c7a6ff; --rx-k-heart: #ff5d73;
+  --rx-k-skirmish: #e9b46a; --rx-k-elite: #ff7d5e; --rx-k-treasure: #9fd3ff; --rx-k-hold: #93d08a; --rx-k-shrine: #ffd27a; --rx-k-underways: #c7a6ff; --rx-k-heart: #ff5d73; --rx-k-trader: #7fe0c6;
+  --rx-o-calm: #b9c9a6; --rx-o-bloodmoon: #ff5d5d; --rx-o-gilded: #ffd27a; --rx-o-longroad: #9fc8ff; --rx-o-starfall: #c7a6ff;
 }
 
 /* ---------- run strip ---------- */
@@ -88,6 +89,10 @@
 .rx-boon:nth-child(2) { animation-delay: .06s; } .rx-boon:nth-child(3) { animation-delay: .12s; } .rx-boon:nth-child(4) { animation-delay: .18s; }
 @keyframes rx-deal { from { transform: translateY(18px) rotate(-2deg); opacity: 0; } }
 .rx-reroll { justify-self: start; min-height: 44px; }
+.rx-skip { justify-self: start; min-height: 48px; }
+.rx-price { justify-self: start; margin-top: 2px; padding: 3px 10px; border-radius: 999px; font: 800 .82rem/1.2 var(--sans, system-ui); color: #2a1606; background: var(--rx-ember-hot); }
+.rx-poor .rx-price { color: var(--muted, #b9aa8e); background: rgba(255, 255, 255, .08); }
+.rx-card.rx-poor { opacity: .55; }
 .rx-party { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .rx-party li { display: flex; align-items: center; gap: 8px; color: var(--rx-ember-hot); }
 .rx-party span { color: var(--text, #efe5d1); flex: 1; }
@@ -118,7 +123,7 @@
 .rx-k-heart.rx-node { width: 60px; height: 60px; }
 .rx-votes { position: absolute; top: -6px; right: -8px; min-width: 20px; padding: 2px 5px; border-radius: 999px; font: 800 .7rem/1.1 var(--sans, system-ui); color: #2a1606; background: var(--rx-ember-hot); }
 .rx-k-skirmish { --k: var(--rx-k-skirmish); } .rx-k-elite { --k: var(--rx-k-elite); } .rx-k-treasure { --k: var(--rx-k-treasure); } .rx-k-hold { --k: var(--rx-k-hold); }
-.rx-k-shrine { --k: var(--rx-k-shrine); } .rx-k-underways { --k: var(--rx-k-underways); } .rx-k-heart { --k: var(--rx-k-heart); }
+.rx-k-shrine { --k: var(--rx-k-shrine); } .rx-k-underways { --k: var(--rx-k-underways); } .rx-k-heart { --k: var(--rx-k-heart); } .rx-k-trader { --k: var(--rx-k-trader); }
 .rx-detail { --k: var(--rx-k-skirmish); display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--k) 40%, transparent); background: color-mix(in srgb, var(--k) 8%, rgba(0, 0, 0, .2)); }
 .rx-detail p { margin: 0; font-size: .9rem; }
 .rx-detail-top { display: flex; align-items: center; gap: 8px; color: var(--k); }
@@ -126,6 +131,13 @@
 .rx-tier { margin-left: auto; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted, #b9aa8e); }
 .rx-reward { color: var(--rx-ember-hot) !important; }
 .rx-detail .rx-go { justify-self: start; }
+
+/* ---------- omens ---------- */
+.rx-omen { --k: var(--rx-o-calm); display: grid; gap: 4px; padding: 10px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--k) 45%, transparent);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--k) 16%, rgba(0, 0, 0, .25)), rgba(0, 0, 0, .15)); }
+.rx-omen p { margin: 0; font-size: .9rem; }
+.rx-omen-bloodmoon { --k: var(--rx-o-bloodmoon); } .rx-omen-gilded { --k: var(--rx-o-gilded); } .rx-omen-longroad { --k: var(--rx-o-longroad); } .rx-omen-starfall { --k: var(--rx-o-starfall); }
+.rx-omen-note { display: flex; align-items: center; gap: 4px; color: var(--rx-ember-hot); }
 
 /* ---------- decide ---------- */
 .rx-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

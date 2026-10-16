@@ -26,4 +26,14 @@ sim.addPlayer({id: 'a', name: 'A', role: 'hero'});
 const m = runStripModel(sim.snapshot().run, 'a');
 assert.equal(m.stage, 'camp'); assert.equal(m.lives, 3); assert.equal(m.seed, 5); assert.equal(m.ended, false);
 assert.equal(runStripModel(null), null);
+{ // Heart guardians name their mechanic on the run bar; omens show by name.
+  const r = structuredClone(sim.snapshot().run), heart = r.nodes.find(n => n.kind === 'heart');
+  Object.assign(r, {stage: 'fight', target: heart.id, at: heart.id, foes: [{id: 'b', tag: 'boss'}, {id: 'g', tag: 'r'}], objective: {have: 1, need: 3}, omen: 'bloodmoon'});
+  const boss = b => [{id: 'b', kind: 'golem', boss: b, hp: 100, maxHp: 200}];
+  assert.match(runStripModel(r, 'a', boss('warden')).objective, /Bone Warden raises the dead/);
+  assert.match(runStripModel(r, 'a', boss('shardback')).objective, /crack 2 heartstones/);
+  assert.match(runStripModel(r, 'a', boss('colossus')).objective, /Meteor Colossus · 1 guard$/);
+  assert.equal(runStripModel(r, 'a').omen, 'Blood Moon');
+  assert.equal(runStripModel({...r, omen: 'calm'}, 'a').omen, '');
+}
 console.log('run meta: ok');
