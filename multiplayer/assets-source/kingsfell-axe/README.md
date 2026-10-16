@@ -23,9 +23,11 @@ Conventions:
   (heartstone), and the `CuttingEdge_Top/Mid/Bottom` and `Heartstone` empties used to fit the edge arc.
 - Every textured material has albedo, metal/rough and normal maps (numpy relief). Ambient occlusion is baked in Cycles
   into the vertex colours (COLOR_0) and multiplied into base colour (`--no-ao` skips the bake for quick iterations).
-  Textures ship as WebP (`EXT_texture_webp`): the noisy relief maps are about 4x smaller than PNG.
+  Textures are PNG source art; the delivery build converts them losslessly (never lossy: AGENTS.md). To keep that
+  small, data maps are authored at 6 bits and colour at 7, the edge map is flat outside the bevel band and the haft
+  relief is half resolution.
 - Blender gotcha: set a data image's colorspace to Non-Color *before* writing its pixels, or they come out blank.
 - The heartstone's depth (ember, trapped leaf, sap specks) is a parallax effect in the runtime shader, not geometry.
-- Budget: about 8.4k triangles, 1.6 MB. Glow is emissive only (no lights); the readiness adds one ribbon draw.
+- Budget: about 8.4k triangles, 5.5 MB source GLB, about 2.7 MB delivered. Glow is emissive only (no lights); the readiness adds one ribbon draw.
 
 Checks: `node tests/kingsfell-luminance.mjs`; the in-game Timberfall lab is `tests/timberfall-lab.html`.

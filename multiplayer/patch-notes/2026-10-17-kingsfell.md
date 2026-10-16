@@ -10,5 +10,5 @@ title: Kingsfell, the new axe
 - **Sapdrinker:** every axe blow that bites a tree or a foe brings Timberfall back half a second sooner.
 - Timberfall recharges in 7 seconds (was 6). With the Whirlwind talent it cuts in a full circle around you with 30% more reach and recharges in 5 seconds (was 4).
 - Kingsfell got a full finishing pass, and the forge left its story all over it. Its steel carries the growth rings of the king-oak it was forged from, a single oak leaf is still sealed deep in the amber heartstone above a glowing ember, and specks of sap twinkle inside. A gold crown and a vine-wrapped socket mark it as royal work, the smith's crowned-tree stamp sits on the poll, tally marks for every giant it has felled are inlaid on the haft, and an amber acorn hangs from the pommel on a braided cord.
-- The axe is about 70% smaller to download.
+- The axe is about 20% smaller to download, even with all the new detail.
 > Pick of Riches turned rock into treasure. Kingsfell does the same for the forest.
