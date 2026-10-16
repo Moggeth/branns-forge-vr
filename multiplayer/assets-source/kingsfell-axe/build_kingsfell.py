@@ -90,6 +90,10 @@ def image(name, rgb, alpha=None, colour=True):
     img = bpy.data.images.new(name, w, h, alpha=False, is_data=not colour)
     if not colour: img.colorspace_settings.name = 'Non-Color'   # before the pixels: changing it afterwards drops them
     px = np.ones((h, w, 4), np.float32); px[..., :3] = np.clip(rgb, 0, 1)
+    # Data maps are authored at 6 bits, colour at 7 (steps of 4/255): invisible on relief and roughness, and it lets the PNGs (and
+    # the lossless WebP the delivery build makes from them) compress about 2x. Nothing is lossily re-encoded later.
+    if not colour: px[..., :3] = np.round(px[..., :3] * 255 / 4) * 4 / 255
+    else: px[..., :3] = np.round(px[..., :3] * 255 / 2) * 2 / 255      # colour at 7 bits: still finer than the noise in it
     img.pixels.foreach_set(px.ravel())    # row 0 = v 0 (Blender rows run bottom-up, like UV v)
     img.pack(); return img
 def srgb(c): return np.asarray(c, np.float32)
@@ -139,6 +143,9 @@ def edge_textures(n=512):
     mr = np.stack([np.zeros_like(rough), rough, np.ones_like(rough)], -1)
     # hone scratches run along the edge (tangential), finer toward the apex
     hgt = np.sin(rad * 5200 + fbm(ang * 30, rad * 40, 2, 22) * 3) * .5 * (1 - apex) + grind * .2
+    # only the bevel band is ever sampled: leave the rest flat so it costs nothing to download
+    band = (rad > EDGE_R - .07)[..., None]
+    alb = np.where(band, alb, srgb((.46, .48, .51))); mr = np.where(band, mr, np.array([0, .26, 1])); hgt = np.where(band[..., 0], hgt, 0)
     return image('KF_Edge_Albedo', alb), image('KF_Edge_MR', mr, colour=False), normal_map('KF_Edge_Normal', hgt, 1.2)
 def forged_textures(n=512):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
@@ -208,8 +215,8 @@ def wood_textures(w=256, h=1024):
     rough = np.clip(.62 - .12 * t + .04 * fine, .3, .85)
     mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
     # open-pored ash: the soft earlywood sinks between the hard grain lines; years of hands polish the ridges
-    hgt = t * .8 + fine * .2
-    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False), normal_map('KF_Wood_Normal', hgt, 4)
+    hgt = t
+    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False), normal_map('KF_Wood_Normal', hgt[::2, ::2], 2)   # half-res relief is plenty on a 3 cm haft
 def leather_textures(n=256):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     pebble = fbm(u * 30, v * 30, 3, 51); crease = np.abs(fbm(u * 7, v * 7, 3, 53))
@@ -669,7 +676,7 @@ os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
 bpy.ops.object.select_all(action='DESELECT')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_yup=True, export_apply=True,
                           export_materials='EXPORT', export_normals=True, export_texcoords=True, export_extras=False,
-                          export_image_format='WEBP', export_image_quality=90)  # WebP (EXT_texture_webp): ~4x smaller than PNG for noisy relief maps
+                          export_image_format='AUTO')  # PNG source art: the delivery build converts it losslessly (AGENTS.md)
 REPORT['bytes'] = os.path.getsize(OUT); REPORT['seconds'] = round(time.time() - T0, 2)
 os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
 with open(os.path.join(HERE, 'out', 'build_report.json'), 'w') as fh: json.dump(REPORT, fh, indent=2)
