@@ -260,8 +260,6 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
       else await prepareWorld?.();
     },
     setTrees(list) { beams?.setTrees(list); },
-    // How dark it is now (0 day .. 1 deep night), cheap enough to read every frame.
-    night: () => last?.night ?? 0,
     // Call once the AudioContext exists (after a user gesture); safe to call repeatedly.
     attachAudio(context) { if (!audio && context) { try { audio = createWeatherAudio(context); } catch { audio = null; } } },
     stats() { const w = last?.weather; return {frames, phase: last ? +last.phase.toFixed(4) : null, hour: last ? +last.hour?.toFixed(2) : null, night: last ? +last.night.toFixed(3) : null, weather: w?.kind ?? null, weights: w ? Object.fromEntries(Object.entries(w.weights).map(([k, v]) => [k, +v.toFixed(3)])) : null,
