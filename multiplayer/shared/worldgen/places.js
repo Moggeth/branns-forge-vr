@@ -37,7 +37,7 @@ const DISCOVERY = {
 };
 const cache = new WeakMap();
 
-/** Every placed piece in sim coordinates: [{id, kit, node, x, z, yaw, radius, owner}] (cached per world). */
+/** Every placed piece in sim coordinates: [{id, kit, node, x, z, yaw, radius, owner, hidden?}] (cached per world; hidden = collider only). */
 export function placesFor(world) {
   let out = cache.get(world); if (out) return out;
   out = []; const seed = world.gen.seedHash;
@@ -62,14 +62,14 @@ export function placesFor(world) {
     compose(s.id, s.x, s.z, recipe, s.start ? 17 : Math.max(8, s.radius * .3), s.start ? 27 : Math.max(13, s.radius * .42), hashInts(seed, 300, i));
   });
   world.discoveries.forEach((d, i) => compose(d.id, d.x, d.z, DISCOVERY[d.kind] || DISCOVERY.ruin, 3.2, 5, hashInts(seed, 310, i)));
-  // Cave mouths: two posts and a lintel framing the way in, rubble at the feet.
+  // Cave mouths: the Underways draw a timbered portal there (client/underways/portal.js); its two posts stand 1.45 m
+  // either side of the mouth (.8 m out from the entrance point, set .25 m back into the hill). Invisible colliders
+  // sit on those posts so a Hero bumps the timber they see.
   for (const e of world.entrances) {
     const [dx, dz] = e.cliffDir || [0, 1], len = Math.sqrt(dx * dx + dz * dz) || 1, fx = dx / len, fz = dz / len, sx = -fz, sz = fx;
-    const yaw = atanQ2(-fx, -fz);
-    out.push({id: `${e.id}pL`, kit: 'landmarks', node: 'Post_A', x: e.x + sx * 1.7, z: e.z + sz * 1.7, yaw, radius: .45, owner: e.id});
-    out.push({id: `${e.id}pR`, kit: 'landmarks', node: 'Post_B', x: e.x - sx * 1.7, z: e.z - sz * 1.7, yaw, radius: .45, owner: e.id});
-    out.push({id: `${e.id}pT`, kit: 'landmarks', node: 'Lintel', x: e.x, z: e.z, yaw, radius: 0, owner: e.id, lift: 2.9});
-    out.push({id: `${e.id}pR1`, kit: 'landmarks', node: 'Rubble_B', x: e.x + sx * 3 - fx * 1.2, z: e.z + sz * 3 - fz * 1.2, yaw: yaw + 1, radius: .6, owner: e.id});
+    const mx = e.x - fx * .55, mz = e.z - fz * .55, yaw = atanQ2(-fx, -fz);
+    out.push({id: `${e.id}pL`, kit: 'landmarks', node: 'Post_A', x: mx + sx * 1.45, z: mz + sz * 1.45, yaw, radius: .3, owner: e.id, hidden: true});
+    out.push({id: `${e.id}pR`, kit: 'landmarks', node: 'Post_B', x: mx - sx * 1.45, z: mz - sz * 1.45, yaw, radius: .3, owner: e.id, hidden: true});
   }
   out = Object.freeze(out.map(Object.freeze)); cache.set(world, out);
   const grid = new Map();

@@ -255,7 +255,7 @@ function wildsBanner(e, me) {
 }
 // World creation menu: the classic valley or a generated world (Great Wilds, plus the experimental modes as they land).
 const worldMenu = createWorldMenu({
-  available: kind => kind === 'arena' || kind === 'wilds' || kind === 'expedition' ? true : 'Arriving in a coming update. This mode is still being built.',
+  available: kind => ['arena', 'wilds', 'expedition', 'underways'].includes(kind) ? true : 'Arriving in a coming update. This mode is still being built.',
   onStart: async choice => {
     if (choice.kind === 'expedition') { runLauncher.open(); return; } // the run launcher picks format, seed and kit
     if (!game && !rendererFailed) { const revision = ++startRevision; showLobbyStatus('Preparing the world…', {busy: true, cancel: true}); await rendererPromise; if (revision !== startRevision) return; }

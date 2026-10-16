@@ -12,6 +12,7 @@ import {worldFor} from './worldgen/registry.js';
 import {activeChunks, chunkContent, depositFor, isGeneratedRockId, isGeneratedTreeId, generatedRock, CHUNK} from './worldgen/content.js';
 import {DEPOSIT_CATALOG, MATERIAL_KEYS} from './material-catalog.js';
 import {registerWorldMode} from './world-modes.js';
+import {sitesFromEntrances} from './underways/sites.js';
 
 export const WILDS = Object.freeze({
   syncTicks: 20,                 // how often the live window of rocks is refreshed
@@ -41,6 +42,18 @@ const REWARDS = {
   grove: () => [['apple', 4], ['wood', 3]],
 };
 
+/** Where Heroes first arrive: the village forge, or for an Underways start, outside the first cave (u0, the
+ *  newcomer's tier-1 mine), a few steps back from its portal. */
+const origins = new WeakMap();
+export function wildsOrigin(state, world = worldFor(state)) {
+  if (state.world?.kind !== 'underways' || !world) return [0, 0];
+  let o = origins.get(world); if (o) return o;
+  const e = world.entrances.find(x => x.id === 'u0') || world.entrances[0];
+  if (!e) o = [0, 0];
+  else { const s = sitesFromEntrances([e], (x, z) => world.heightAt(x, z))[0], fx = s.back[0] - s.mouth[0], fz = s.back[1] - s.mouth[1], k = 7 / (Math.sqrt(fx * fx + fz * fz) || 1); o = [s.mouth[0] + fx * k, s.mouth[1] + fz * k]; }
+  origins.set(world, o); return o;
+}
+
 export function createWilds() { return {v: 1, felled: [], spent: [], found: [], cleared: [], guards: {}, felledRev: 0}; }
 
 /** Fill a fresh wilds state: spawn plaza supplies at the village forge. */
@@ -49,8 +62,8 @@ export function newWildsState(state, world, terrainHeight) {
   state.landmarks = false;
   state.deposits = [];
   // Starting resources at the forge yard: enough for a first tool upgrade and a campfire, never a whole base.
-  const supplies = [['wood', 6, -3.2, 4.2], ['stone', 4, 3.4, 4.4], ['apple', 3, -1.4, 6.2], ['ironOre', 2, 2.2, -4.6]];
-  state.pickups = supplies.map(([kind, amount, x, z], i) => ({id: `wstart${i}`, kind, x, z, y: terrainHeight(state, x, z), amount}));
+  const supplies = [['wood', 6, -3.2, 4.2], ['stone', 4, 3.4, 4.4], ['apple', 3, -1.4, 6.2], ['ironOre', 2, 2.2, -4.6]], [ox, oz] = wildsOrigin(state, world);
+  state.pickups = supplies.map(([kind, amount, x, z], i) => ({id: `wstart${i}`, kind, x: x + ox, z: z + oz, y: terrainHeight(state, x + ox, z + oz), amount}));
   syncWildsContent(state, world);
   return state;
 }
@@ -193,3 +206,4 @@ export const wildsDepositKnown = id => isGeneratedRockId(id);
 export {DEPOSIT_CATALOG};
 
 registerWorldMode('wilds', {});
+registerWorldMode('underways', {}); // the same overworld, entered at a cave (shared/underways/world.js lists its caves)

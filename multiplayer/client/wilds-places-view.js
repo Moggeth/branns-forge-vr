@@ -19,6 +19,7 @@ export function createWildsPlacesView({scene, height}) {
     kits[name] = nodes; kitRev++;
   }
   function make(p) {
+    if (p.hidden) return null; // a collider for something another view draws (the Underways' cave portals)
     const nodes = kits[p.kit]; if (!nodes) return null;
     const src = nodes.get(p.node); if (!src) return null;
     const g = new THREE.Group(), body = src.clone(true);

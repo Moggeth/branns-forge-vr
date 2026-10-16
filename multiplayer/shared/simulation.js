@@ -54,7 +54,7 @@ import './underways/world.js';
 import {stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
 import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
-import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown} from './wilds.js';
+import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin} from './wilds.js';
 import {worldMode} from './world-modes.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
@@ -96,7 +96,7 @@ function pose(value) {
 
 
 function spawn(state, ignored = '') {
-  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=homeBattle(state)?homePoint(team,[0,7]):base?[base.position[0]+sign*4,base.position[2]]:[0,8];
+  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=homeBattle(state)?homePoint(team,[0,7]):base?[base.position[0]+sign*4,base.position[2]]:state.world?.kind==='underways'?wildsOrigin(state):[0,8];
   let best = [origin[0], 0, origin[1]], clearance = -1;
   const trees=createTreeIndex();trees.update(state);const cuts=treeCutMap(state),forgeY=terrainHeight(state,0,0,false);
   for (let i = 0; i < 128; i++) {
@@ -657,8 +657,8 @@ function loadState(saved, descriptor) {
     } else if(d.editId!==undefined)throw Error('Invalid wall linkage');
   }
   if(saved.edits.some(e=>e.kind==='pick_wall'&&!linkedWalls.has(e.id)))throw Error('Unmineable wall'); // Raise Wall quarry stone is optional
-  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || (q.side!==undefined&&!['party','rivals'].includes(q.side)) || !finite(q.y) || Math.abs(q.y)>200 || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > (/^ingot/.test(q.id) ? 999 : 10)) throw Error('Invalid pickup'); else contentIds.add(q.id);
-  for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>200 || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
+  for (const q of pickups) if (!record(q) || !validId(q.id) || contentIds.has(q.id) || ![...MATERIAL_KEYS,'apple'].includes(q.kind) || !validXZ(q) || (q.side!==undefined&&!['party','rivals'].includes(q.side)) || !finite(q.y) || Math.abs(q.y)>posLimit() || !Number.isInteger(q.amount) || q.amount < 1 || q.amount > (/^ingot/.test(q.id) ? 999 : 10)) throw Error('Invalid pickup'); else contentIds.add(q.id);
+  for (const b of bridges) if (!record(b) || !validId(b.id) || contentIds.has(b.id) || !validXZ(b) || !finite(b.y) || Math.abs(b.y)>posLimit() || !finite(b.yaw) || Math.abs(b.yaw)>Math.PI+.000001) throw Error('Invalid bridge'); else contentIds.add(b.id);
   const meteorRewards=saved.meteorRewards??[];
   if(!Array.isArray(meteorRewards)||meteorRewards.length>64)throw Error('Invalid meteor rewards');
   for(const r of meteorRewards)if(!record(r)||!validId(r.id)||contentIds.has(r.id)||!validXZ(r)||r.amount!==6)throw Error('Invalid meteor reward');else contentIds.add(r.id);
