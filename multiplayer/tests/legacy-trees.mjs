@@ -34,6 +34,9 @@ test('multiple spots: each wound counts its own cuts, three in one spot fells th
  chop(.6, [0, 1]); assert.equal(h.cuts, 2); assert.equal(h.felledTick, 0, 'four cuts across two spots never fell'); assert.equal(h.notches.length, 1);
  r = chop(.95, [1, 0]); assert.equal(h.cuts, 3); assert.equal(r.events[1].kind, 'tree_fell'); assert.equal(h.cutHeight, 1, 'falls at the spot that took three'); assert.ok(Math.abs(h.fallYaw - Math.PI/2) < 1e-9);
  assert.deepEqual(h.notches, [{cutHeight: .55, fallYaw: 0, cuts: 2}]);
+ const o = {...fresh(), harvestedTrees: []}, opp = (y, side) => R.chopTree(o, t, hitPoint(t, y, side), [side[0], 0, side[1]], c);
+ opp(1, [1, 0]); opp(1, [-1, 0]); opp(1, [1, 0]); r = opp(1, [-1, 0]); assert.equal(o.harvestedTrees[0].felledTick, 0, 'opposite faces at the same height are separate spots'); assert.deepEqual([o.harvestedTrees[0].cuts, o.harvestedTrees[0].notches[0].cuts], [2, 2]);
+ opp(1, [.9, .44]); assert.equal(o.harvestedTrees[0].cuts, 3, 'a slightly different angle on the same face is the same notch');
  const restored = R.restoreHarvested(structuredClone(s), new Set(worldTrees(s).map(t => t.id)))[0]; assert.deepEqual(restored.notches, h.notches, 'save keeps every wound');
  for (const notches of [[], [{cutHeight: .5, fallYaw: 0, cuts: 3}], [{cutHeight: .5, fallYaw: 9, cuts: 1}], Array(R.MAX_EXTRA_NOTCHES + 1).fill({cutHeight: .5, fallYaw: 0, cuts: 1})]) assert.throws(() => R.restoreHarvested({...s, harvestedTrees: [{...structuredClone(h), notches}]}, new Set(worldTrees(s).map(t => t.id))));
  const big = {id: 'tree1', x: t.x, z: t.z, height: 14, variant: 0}, b = {...fresh(), harvestedTrees: []};

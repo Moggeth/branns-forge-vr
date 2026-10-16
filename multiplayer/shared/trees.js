@@ -4,7 +4,7 @@ import {worldTrees} from './world-content.js';
 import {WORLD_EXTENT} from './keep-sites.js';
 
 export const TREE_LIMITS = {logs: 48, logsPerTree: 3, logLength: 1.1, logRadius: .16, reach: 2.5, settleTicks: 36,
- notchTolerance: .35, chopSlack: .25, hz: 60, gravity: 15, maxFallTicks: 240, cell: 4, worldHalf: 54.5};
+ notchTolerance: .35, notchArc: Math.PI/3, chopSlack: .25, hz: 60, gravity: 15, maxFallTicks: 240, cell: 4, worldHalf: 54.5};
 // Authored trunk contract (art/tree_contract.json, metres at the authored scale). Rings are regular 12-gons, axis x=z=0 below 2 m.
 // [authored height (bbox max y), first limb y, [y, mean radius]...]. Radius is linear between rings, so interpolation is exact.
 export const TREE_PROFILES = {
@@ -28,8 +28,10 @@ export const isFelled = cut => cut?.cuts === 3 && cut.felledTick > 0;
 // Other open spots live in record.notches [{cutHeight, fallYaw, cuts 1-2}]; each spot counts its own cuts toward three.
 export const MAX_EXTRA_NOTCHES = 6;
 export const treeNotches = cut => cut ? [cut, ...(cut.notches || [])] : [];
-/** The wound a chop at world height y lands in (nearest within notchTolerance), or null for fresh bark. */
-export function notchAt(cut, y) { let best = null, gap = TREE_LIMITS.notchTolerance; for (const n of treeNotches(cut)) { const d = Math.abs(n.cutHeight - y); if (d <= gap) { gap = d; best = n; } } return best; }
+const yawGap = (a, b) => Math.abs(((a - b) % (2*Math.PI) + 3*Math.PI) % (2*Math.PI) - Math.PI);
+/** The wound a chop at world height y on trunk side yaw lands in (nearest in height within notchTolerance, on the same face
+ *  within notchArc), or null for fresh bark. The other face of the trunk at the same height is a different spot. */
+export function notchAt(cut, y, yaw) { let best = null, gap = TREE_LIMITS.notchTolerance; for (const n of treeNotches(cut)) { const d = Math.abs(n.cutHeight - y); if (d <= gap && yawGap(n.fallYaw, yaw) <= TREE_LIMITS.notchArc) { gap = d; best = n; } } return best; }
 export function rotateVector(v, q) { const [x,y,z,w] = q, [a,b,c] = v, tx = 2*(y*c-z*b), ty = 2*(z*a-x*c), tz = 2*(x*b-y*a); return [a+w*tx+y*tz-z*ty, b+w*ty+z*tx-x*tz, c+w*tz+x*ty-y*tx]; }
 
 /** World-space trunk radius at a local height above the tree's ground (scaled authored contract). */
@@ -106,7 +108,7 @@ export function chopTree(state, tree, point, normal, ctx) {
  const yaw = d > .001 ? Math.atan2(dx, dz) : 0;
  if (!h) { if (state.harvestedTrees.length >= 256) return {code: 'world_limit'}; h = {id: tree.id, cuts: 0, cutHeight: point[1], felledTick: 0, fallYaw: yaw, landed: false}; state.harvestedTrees.push(h); }
  else { // every wound persists; the spot being cut becomes the lead so its third cut fells the tree there
-  const spot = notchAt(h, point[1]), lead = {cutHeight: h.cutHeight, fallYaw: h.fallYaw, cuts: h.cuts}, notches = h.notches ? [...h.notches] : [];
+  const spot = notchAt(h, point[1], yaw), lead = {cutHeight: h.cutHeight, fallYaw: h.fallYaw, cuts: h.cuts}, notches = h.notches ? [...h.notches] : [];
   if (spot && spot !== h) { notches[notches.indexOf(spot)] = lead; Object.assign(h, {cutHeight: spot.cutHeight, fallYaw: spot.fallYaw, cuts: spot.cuts}); }
   else if (!spot) { notches.push(lead); if (notches.length > MAX_EXTRA_NOTCHES) notches.shift(); Object.assign(h, {cutHeight: point[1], fallYaw: yaw, cuts: 0}); }
   if (notches.length) h.notches = notches;

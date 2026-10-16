@@ -281,7 +281,7 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     const cut = (snapshot.harvestedTrees || []).find(h => h.id === id);
     if (isFelled(cut)) return null; // felled trunks leave targets(); their logs are cued instead
     const floor = ctx.height ? ctx.height(tree.x, tree.z) : 0, local = pt[1] - floor, s = treeScale(tree);
-    const spot = cut && notchAt(cut, pt[1]), progress = cut ? {done: spot?.cuts || 0, total: 3} : null; // each wound counts its own cuts
+    const spot = cut && notchAt(cut, pt[1], Math.atan2(pt[0] - tree.x, pt[2] - tree.z)), progress = cut ? {done: spot?.cuts || 0, total: 3} : null; // each wound counts its own cuts
     if (tool !== 'axe') return make('tree', 'tool', id, 'Tree', 'Needs the Axe', keys.axe, '', progress);
     if (!reachable(tree.x, tree.z, floor)) return make('tree', 'far', id, 'Tree', 'Move closer', '', '', progress);
     if (boneHeld) return make('tree', 'busy', id, 'Tree', 'Drop the bone first', keys.drop);
