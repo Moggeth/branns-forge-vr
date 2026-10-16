@@ -12,6 +12,8 @@ export function setActiveWorld(world) { const previous = active; active = world 
 export const activeWorld = () => active;
 /** Largest |x| or |z| any thing may have (validators). */
 export const thingLimit = () => active ? Math.max(active.extent, UNDERWAY_MAX) : ARENA_LIMITS.things;
+/** How far the God may pan and aim: the valley's historic limit, or a generated world's own square. */
+export const godReach = (arena = ARENA_LIMITS.things) => active ? active.extent : arena;
 /** Largest |x| or |z| any position may have, including the arena's keep corners. */
 export const extentLimit = () => active ? Math.max(active.extent, UNDERWAY_MAX) : ARENA_LIMITS.extent;
 /** True inside the active limit on both axes. */

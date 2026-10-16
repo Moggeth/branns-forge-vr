@@ -48,3 +48,13 @@ console.log(`PASS guide: "${view.title}" · ${view.line} · found ${view.found}/
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), dx = u0.x - p.position[0], dz = u0.z - p.position[2], d = Math.hypot(dx, dz);
   assert.ok((fx * dx + fz * dz) / d > .99, 'a new Hero faces the cave'); }
 console.log('PASS spawn faces the cave');
+// A God can follow Heroes out into the Wilds: groves land where aimed, not pinned to the valley's ±51 m wall.
+{ const s3 = createSimulation({room: 'D', seed: 41, world: worldDescriptor({kind: 'wilds', seed: 'ci-delve', preset: 'continent', size: 2048})});
+  s3.addPlayer({id: 'g', role: 'god'}); const st3 = s3.adventureWorld(), w3 = worldFor(st3.world);
+  let spot = null; for (let a = 0; a < 64 && !spot; a++) { const x = Math.cos(a * .7) * 300, z = Math.sin(a * .7) * 300; if (!w3.isWater(x, z) && w3.forestAt(x, z) < .3 && w3.slopeAt(x, z) < .3) spot = {x, z}; }
+  assert.ok(spot, 'found open ground 300 m out');
+  st3.bloom = 999; st3.players[0].mana = 100;
+  const before = st3.groves.length, r = s3.command('g', {type: 'cast', seq: 1, spell: 'grove', point: [spot.x, terrainHeight(st3, spot.x, spot.z), spot.z]});
+  assert.ok(r.ok, `grove cast ok (${r.code})`); for (let i = 0; i < 3; i++) s3.step();
+  const g = st3.groves.slice(before)[0]; assert.ok(g && Math.hypot((g.x ?? g.position?.[0]) - spot.x, (g.z ?? g.position?.[2]) - spot.z) < 12, 'grove grows where the God aimed'); }
+console.log('PASS God reaches the far Wilds');

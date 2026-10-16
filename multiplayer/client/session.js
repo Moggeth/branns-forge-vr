@@ -376,7 +376,9 @@ export class WorldSession extends EventTarget {
     // A failed recovery write must abort reset; the confirmation promises a backup.
     this.saves.put(this.exportSave());
     this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
-    this.simulation = createSimulation({room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})}); this.codec.reset();
+    // Reset keeps the world type: the one this room was created with, else the loaded save's or the predecessor's own.
+    const current = this.simulation.snapshot().world, world = this.newWorld || (current && current.kind !== 'expedition' ? current : null);
+    this.simulation = createSimulation({room:this.identity.room,seed:41,...(world?{world}:{})}); this.codec.reset();
     this.reconcile(); this.publish(true);
   }
   /** Host only: replace this world with a fresh Expedition Roguelite run (a run world needs no sandbox backup). */

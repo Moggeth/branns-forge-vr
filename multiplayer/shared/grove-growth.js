@@ -2,7 +2,7 @@
 // nearest open ground within reach: crowns never swallow each other, trunks stay off rocks, buildings, landmarks
 // and Heroes. A cast is refused only when not one tree fits. Pure and deterministic: the aimed preview and the
 // authority run the same plan on the same world, so the preview shows exactly the trees that will grow.
-import {thingLimit} from './world-extent.js';
+import {thingLimit, godReach} from './world-extent.js';
 import {worldTrees} from './world-content.js';
 import {STARTING_SITES} from './starting-world.js';
 import {VARIANTS, TREE_PROFILES} from './trees.js';
@@ -72,7 +72,7 @@ function occupancy(state, heroes) {
     add,
     free(t) {
       const {x, z} = t;
-      if (Math.abs(x) > GROVE_EDGE || Math.abs(z) > GROVE_EDGE || Math.hypot(x, z) < FORGE_APRON) return false;
+      const edge = godReach(GROVE_EDGE); if (Math.abs(x) > edge || Math.abs(z) > edge || Math.hypot(x, z) < FORGE_APRON) return false;
       if (state.landmarks && STARTING_SITES.some(s => Math.hypot(x - s.x, z - s.z) < s.radius + c.landmark)) return false;
       if (deposits.some(d => Math.hypot(d.x - x, d.z - z) < c.deposit)) return false;
       if (structures.some(b => Math.hypot(b.position[0] - x, b.position[2] - z) < c.structure)) return false;

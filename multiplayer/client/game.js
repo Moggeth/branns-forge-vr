@@ -160,7 +160,7 @@ import {createWildsView} from './wilds-view.js';
 import {createWildsPlacesView} from './wilds-places-view.js';
 import {worldFor} from '../shared/worldgen/registry.js';
 import {resolvePlaces} from '../shared/worldgen/places.js';
-import {setActiveWorld} from '../shared/world-extent.js';
+import {setActiveWorld,godReach} from '../shared/world-extent.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
 // Presentation helpers pass only edits; the baked ground (old settled earthworks) comes from the latest snapshot.
@@ -993,7 +993,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function cancelCast() { castStart = null; quickKey = null; castRevision++; }
   function castAt(point,finish=false) {
     if (!active || role !== 'god' || inventionPlacement) return;
-    const x = THREE.MathUtils.clamp(point.x, -55, 55), z = THREE.MathUtils.clamp(point.z, -55, 55);
+    const reach=godReach(55),x = THREE.MathUtils.clamp(point.x, -reach, reach), z = THREE.MathUtils.clamp(point.z, -reach, reach);
     let at=isLineSpell()?[x,heightAt(x,z,snapshot.edits),z]:settledPoint(spell,x,z);
     if(isLineSpell()&&!castStart&&!finish){castStart=new THREE.Vector3(...at);report('Choose the end of the line, then release / Cast again.');return;}
     let extra={};
@@ -1803,7 +1803,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(dragonFrame.seat&&active&&role==='hero'){if(dragonFrame.enter){yaw=dragonFrame.startYaw;pitch=dragonFrame.startPitch;}pitch=THREE.MathUtils.clamp(pitch,-1.45,.25);}
     if (role === 'god' && !renderer.xr.isPresenting) {
       pan.addScaledVector(move, dt * 18);
-      pan.x = THREE.MathUtils.clamp(pan.x, -45, 45); pan.z = THREE.MathUtils.clamp(pan.z, -45, 45);
+      {const reach=godReach(45);pan.x = THREE.MathUtils.clamp(pan.x, -reach, reach); pan.z = THREE.MathUtils.clamp(pan.z, -reach, reach);} // the valley's ±45, or a generated world's own edge
       rig.position.set(0, 0, 0);
       camera.position.set(pan.x + Math.sin(orbitYaw) * orbitRadius * Math.cos(orbitTilt), heightAt(pan.x, pan.z, snapshot.edits) + orbitRadius * Math.sin(orbitTilt) + 3, pan.z + Math.cos(orbitYaw) * orbitRadius * Math.cos(orbitTilt));
       camera.lookAt(pan.x, heightAt(pan.x, pan.z, snapshot.edits), pan.z);
