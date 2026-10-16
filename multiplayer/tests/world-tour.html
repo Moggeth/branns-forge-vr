@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>World tour</title>
+<style>html,body{margin:0;height:100%;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script type="module">
+// The real game renderer (client/game.js) on an in-page simulation, for review captures anywhere on the map in Hero or
+// God view. window.lab.place([x, z], [lookX, lookZ]) stands the Hero at a world point facing another; lab.god(zoom)
+// lifts to the God camera over the same spot. ?touch for the phone layout, ?seed= for the world seed, ?live to let
+// the world clock run between captures (otherwise time holds still).
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+const params=new URLSearchParams(location.search),touch=params.has('touch'),still=!params.has('live');
+let sim=createSimulation({room:'LAB',seed:Number(params.get('seed')||3)});sim.addPlayer({id:'me',name:'Lab',role:'hero'});
+let faceYaw=0;
+// Captures hold one clear morning (the first weather front) with no foes about; side picks whose turrets stay friendly.
+function place(at,to,{side='party',tick=6000}={}){const c=sim.checkpoint(),p=c.players[0],[x,z]=at;p.position=[x,terrainHeight(c,x,z),z];p.yaw=faceYaw=Math.atan2(-(to[0]-x),-(to[1]-z));
+ p.side=side;c.tick=Math.max(c.tick,tick);c.enemies=[];if(c.battle)c.battle.nextWaveTick=c.tick+3600;sim=loadSimulation(c);advance(2);game.setLook(faceYaw,Number(params.get('pitch')||-.12));}
+let seq=1,pending=[],last=performance.now();
+const canvas=document.getElementById('c');
+const game=createGame({canvas,isHost:()=>true,onAction:(action,d={})=>{const r=sim.command('me',{type:'action',seq:seq++,action,...d});pending.push(...(r.events||[]));},
+  onInput:input=>sim.command('me',{type:'input',seq:seq++,...input}),onCast:()=>{},onStatus:m=>{window.lastStatus=m;}});
+game.setTouchEnabled(touch);
+function advance(n){for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+function pump(){const now=performance.now();let n=still?0:Math.min(12,Math.round((now-last)/16.667));last+=n*16.667;for(let i=0;i<n;i++)pending.push(...sim.step());game.applySnapshot(sim.snapshot(),'me');for(const e of pending)game.handleEvent(e);pending=[];}
+setInterval(pump,50);advance(1);
+window.lab={game,advance,place,look:(y,p)=>game.setLook(y,p),sim:()=>sim,hero:()=>game.setRole('hero'),god:(zoom=0)=>{game.setRole('god');if(zoom)game.zoomBy(zoom);},controls:()=>game.controlsSnapshot()};
+game.setActive(true);
+const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r();}},100);});
+await wait();game.setActive(true);document.title='ready';
+</script>
