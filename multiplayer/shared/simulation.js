@@ -46,6 +46,7 @@ import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,valid
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {WORLD_EXTENT,clampToWorld} from './keep-sites.js';
 import {resolveCoveLakes} from './larimar-cove.js';
+import {stepSaltMines,noteSaltStrike,restoreMines,validateMineDeposit,validSaltback,emptyMines} from './salt-mine-rules.js';
 import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
 import {resolveMapExtras} from './map-extras.js';
 export const HZ = 60;
@@ -129,6 +130,7 @@ function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
     meteorRewards: [], projectiles: [], embeds: [], detachedParts: [], fireCells:[],fireSurfaces:[], looseLogs: [], adventure: createAdventure({seed}), battle:createBattle(), settlement:createSettlement(), inventions:createInventions(), pendingStarfalls: [], bloom: 0, springs: [], awakenedTrees: [], wildTrees: [], fruit: createFruit(), heroLedger: {}, shrine: {position: [0, baseHeight(0, 0), 0], hp: 100, maxHp: 100, disabledUntil: 0}};
   // New worlds open with the always-on home bases; legacyBattle keeps the old host-started skirmish for its tests.
   if (!legacyBattle) state.battle = createHomeBattle(state, terrainHeight);
+  state.mines = emptyMines(); // the Brinedeep salt mines (shared/salt-mine-rules.js)
   return state;
 }
 
@@ -321,7 +323,7 @@ function instantiate(state) {
           if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:reachY}) || (face ? Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > RAISE_WALL.width+.5 : Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5) || message.point[1]>oreFloor+2 || message.point[1]<oreFloor-face-2) return ok();
           const motherlode=hasTalent(p,'pick','motherlode');
           if(ore.hits+oreStep(p,ore)>=ore.maxHits&&state.pickups.length>=256)return fail('world_limit');
-          ore.hits=Math.min(ore.maxHits,ore.hits+oreStep(p,ore)); events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
+          ore.hits=Math.min(ore.maxHits,ore.hits+oreStep(p,ore)); events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]}); noteSaltStrike(state,ore,p,events);
           if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,Math.min(10,reward.amount*(motherlode?2:1)));if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,motherlode?4:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
@@ -472,6 +474,7 @@ function instantiate(state) {
       if(state.tick%30===0)for(const p of state.players)if(p.role==='hero'&&p.hp>0&&itemBonus(p,'regen')>0)p.hp=Math.min(heroMaxHp(p),p.hp+itemBonus(p,'regen')/2); // Pocket Kettle
       stepEntRooting(state,treeIndex.all(),{terrainHeight,nextId,logLimit:TREE_LIMITS.logs,makePickup:addPickup,blocked:(x,z)=>state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<3)||(state.landmarks&&STARTING_SITES.some(q=>Math.hypot(x-q.x,z-q.z)<q.radius+1))},events);
       stepStumplings(state,{trees:treeIndex,terrainHeight,nextId},events);
+      stepSaltMines(state,{terrainHeight,nextId,damageHero,damageEnemy:(s,e,n,ev,ownerId)=>hitEnemyPart(s,e,'torso',n,ownerId?{ownerId}:{},{nextId,terrainHeight},ev),retained:d=>retainedDepositPredicate(state)(d)},events);
       flushMeteorRewards(state,terrainHeight);
       renewGeology(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)},events);
       stepVeins(state,{terrainHeight,canPlace:(x,z)=>!state.inventions.structures.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<5)&&!(homeBattle(state)&&state.battle.bases.some(b=>Math.hypot(b.position[0]-x,b.position[2]-z)<HOME.domeRadius+1.5)),retained:d=>retainedDepositPredicate(state)(d)},events);
@@ -500,7 +503,7 @@ function instantiate(state) {
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
-        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
+        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.mines?{mines:state.mines}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -560,7 +563,7 @@ export function loadSimulation(saved) {
   for (const e of saved.enemies) {
     if(e?.emergeTick!==undefined&&!validTick(e.emergeTick,saved.tick,0))throw Error('Invalid enemy emergence');
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
-        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
+        (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || !validSaltback(e,saved) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
       throw Error('Invalid simulation enemy');
   }
   for (const e of saved.edits) {
@@ -582,6 +585,7 @@ export function loadSimulation(saved) {
   const contentIds = new Set([...ids, 'shrine', ...treeIds, ...entAwake, ...saved.pendingStarfalls.map(p=>p.id)]);
   for (const d of deposits) if (!record(d) || !validId(d.id) || contentIds.has(d.id) || !validXZ(d) || !Object.hasOwn(DEPOSIT_CATALOG,d.kind) || !Number.isInteger(d.hits) || d.hits < 0 || d.hits > DEPOSIT_CATALOG[d.kind].maxHits || d.maxHits !== DEPOSIT_CATALOG[d.kind].maxHits || typeof d.depleted !== 'boolean' || (d.depleted !== (d.hits >= d.maxHits))) throw Error('Invalid deposit'); else contentIds.add(d.id);
   const veinSlots=new Set();for(const d of deposits)validateVein(d,saved.tick,veinSlots);
+  const seamSlots=new Set();for(const d of deposits)validateMineDeposit(d,saved.tick,seamSlots);
   const linkedWalls=new Set();
   for(const d of deposits) {
     if(d.special!==undefined&&!['axe_sunder',...WALL_DEPOSITS].includes(d.special))throw Error('Invalid special deposit');
@@ -620,7 +624,7 @@ export function loadSimulation(saved) {
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...restoreTownFields(p),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home,diveTick,seenTick,crown}) => ({id, position, yaw, hp, attackTick,...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(kind==='saltback'?{wakeTick,home,...(crown?{crown:true}:{}),...(diveTick!==undefined?{diveTick}:{}),...(seenTick!==undefined?{seenTick}:{})}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');
   state.edits = saved.edits.map(restoreTerrainEdit); const bake = restoreTerrainBake(saved.terrainBake); if (bake) state.terrainBake = bake; state.groves = copy(saved.groves);
@@ -632,12 +636,13 @@ export function loadSimulation(saved) {
   state.inventions=restoreInventions(saved.inventions,saved.tick);
   state.fruit=restoreFruit(saved,contentIds,saved.players);
   for(const b of state.inventions.structures){if(contentIds.has(b.id))throw Error('Duplicate structure');contentIds.add(b.id);}
-  state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted,special,editId,vein,respawnTick})=>({id,x,z,kind,hits,maxHits,depleted,...(special?{special}:{}),...(editId?{editId}:{}),...(vein!==undefined?{vein}:{}),...(respawnTick!==undefined?{respawnTick}:{})}));
+  state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted,special,editId,vein,respawnTick,mine,seam})=>({id,x,z,kind,hits,maxHits,depleted,...(special?{special}:{}),...(editId?{editId}:{}),...(vein!==undefined?{vein}:{}),...(mine!==undefined?{mine}:{}),...(seam!==undefined?{seam}:{}),...(respawnTick!==undefined?{respawnTick}:{})}));
   state.meteorRewards=copy(meteorRewards);
   state.pickups = pickups.map(({id,kind,x,z,y,amount,side})=>({id,kind,x,z,y,amount,...(side?{side}:{})}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
   if(saved.landmarks!==undefined&&typeof saved.landmarks!=='boolean')throw Error('Invalid landmark version');
   state.landmarks=saved.landmarks===true;
+  state.mines=restoreMines(saved);
   const waygate=restoreWaygate(saved);if(waygate)state.waygate=waygate;const geodes=restoreGeodes(saved);if(geodes)state.geodes=geodes;const beacon=restoreBeacon(saved);if(beacon)state.beacon=beacon;
   state.heroLedger = restoreLedger(saved);
   state.shrine = copy(saved.shrine); // Includes break/restore timer.

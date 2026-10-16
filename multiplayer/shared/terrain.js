@@ -2,6 +2,7 @@
 export const TERRAIN_LIMITS = Object.freeze({bound:55, mountainStart:46, mountainCrest:55, deformation:6, axeScar:.65, slope:1.15, rim:50});
 import {HOME_SITES,WORLD_EXTENT,keepCarve,onKeepGround} from './keep-sites.js';
 import {lakeBasin} from './larimar-cove.js';
+import {mineCarve,mineFloor} from './salt-mines.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 export const SUNDER_SETTLE_DISTANCE=1.1;
@@ -133,11 +134,21 @@ export const TERRAIN_GRID=Object.freeze({half:60,segments:160,step:.75});
 const meadowHeight=(x,z)=>.45*Math.sin(x*.09)*Math.cos(z*.07);
 // Inside a keep's carve the meadow's roll levels out to the heart's own height, so plazas and buildings sit flush.
 const rawBaseHeight=(x,z)=>{
-  const carve=keepCarve(x,z),meadow=meadowHeight(x,z);
-  if(!carve)return meadow+mountainHeight(x,z);
+  const carve=keepCarve(x,z,false),meadow=meadowHeight(x,z);
+  if(!carve){
+    // A salt mine's floor (shared/salt-mines.js): the cutting, the sloping tunnel and the hall, sunk into the rock.
+    const mine=mineCarve(x,z);
+    return mine?meadow+(mineFloor(x,z)-meadow)*mine+mountainHeight(x,z):meadow+mountainHeight(x,z);
+  }
   const [sx,sz]=HOME_SITES[x+z<0?'party':'rivals'];
   return meadow+(meadowHeight(sx,sz)-meadow)*carve+mountainHeight(x,z)-lakeBasin(x,z); // Larimar Cove's lake bed
 };
+/** The mountains as if no mine were cut into them: the rock over a mine's tunnel and hall, for the presentation's
+ * mountain shell and the cap over the tunnel (client/salt-mine-view.js). */
+export function unminedHeight(x,z) {
+  const meadow=meadowHeight(x,z),t=clamp((Math.max(Math.abs(x),Math.abs(z))-46)/9,0,1);
+  return meadow+(t?smooth(t)*(14+2*Math.sin(x*.31+z*.17)+Math.cos(z*.43-x*.11))*(1-keepCarve(x,z,false)):0);
+}
 // Match THREE.PlaneGeometry(120,120,160,160).rotateX(-PI/2), including
 // Float32 vertex storage and the diagonal xFraction+zFraction=1.
 export function triangleHeight(sample,x,z) {

@@ -54,6 +54,26 @@ function patchCrystal(m, time, rim) {
  };
  m.customProgramCacheKey = () => 'fr-crystal'; return m;
 }
+// Rock salt (halite): milky, frosted body that glows warm from within like a salt lamp. Cloudy parallax veils drift
+// under the faces, thin grazing edges glow brighter, and the whole crystal breathes slowly. Glow colour is the
+// material's emissive tinted by the cube's own vertex colour, so white cubes glow pale and rose cubes glow deep.
+function patchSalt(m, time) {
+ m.onBeforeCompile = s => { s.uniforms.uFrTime = time;
+  s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFrObj;').replace('#include <begin_vertex>', '#include <begin_vertex>\n vFrObj = position;');
+  s.fragmentShader = s.fragmentShader.replace('#include <common>', `#include <common>\n${NOISE_GLSL}\nvarying vec3 vFrObj; uniform float uFrTime;`)
+   .replace('#include <color_fragment>', `#include <color_fragment>
+ { float milk=frN(vFrObj*15.0+2.0); float sat=1.0-min(vColor.g,vColor.b)/max(vColor.r,1e-3); diffuseColor.rgb=mix(diffuseColor.rgb,vec3(1.0,.95,.94),.28*(1.0-sat)*smoothstep(.45,.85,milk)); }`)
+   .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+ { vec3 vd=normalize(vViewPosition); float ndv=clamp(abs(dot(normal,vd)),0.0,1.0);
+   float lum=max(vColor.r,max(vColor.g,vColor.b)); vec3 q=vFrObj*8.0+vd*.55;
+   float cloud=frN(q)*.6+frN(q*2.7+5.0)*.4; float rimF=pow(1.0-ndv,2.0);
+   float breathe=.88+.12*sin(uFrTime*.9+vFrObj.y*3.0+vFrObj.x*2.0);
+   vec3 glow=emissive*(.4+.6*vColor.rgb); float sat=1.0-min(vColor.g,vColor.b)/max(vColor.r,1e-3);
+   glow=mix(glow,vec3(max(glow.r,max(glow.g,glow.b)))*vec3(1.0,.8,.74),(1.0-sat)*.6); // milky cubes glow peach-white, rose cubes deep rose
+   totalEmissiveRadiance = glow*lum*lum*(.3+.65*cloud+.55*rimF)*breathe; }`);
+ };
+ m.customProgramCacheKey = () => 'fr-salt'; return m;
+}
 
 // ---------- geometry builders ----------
 // Faceted rock lump: displaced icosphere + planar fractures + undercut strata ledges + flattened bed. Non-indexed => flat
@@ -86,6 +106,29 @@ function prism({base, dir, len, rad, sides = 6, seed = 1, broken = false, tint =
   for (let i = 0; i < sides; i++) tri(r1[i], r1[(i + 1) % sides], tip, .8, .8, 1); }
  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
  g.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2)); g.computeVertexNormals(); return g;
+}
+// Halite cube: rock salt grows as cubes. A box (half extents h) in the frame up/spin/tilt, with stepped "hopper"
+// funnels sunk into the crown face (hopper = steps) and, when sides is set, into the side faces too. Colour encodes the
+// inner glow like prism(): a deeper base and a bright crown. Non-indexed => crisp flat faces.
+const CUBE_FACES = [[[0, 1, 0], [0, 0, 1], [1, 0, 0]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]], [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+ [[-1, 0, 0], [0, 0, 1], [0, 1, 0]], [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [0, 1, 0], [1, 0, 0]]]; // [N, U, V] with U x V = N
+function haliteCube({c, h, up = new T.Vector3(0, 1, 0), spin = 0, tilt = 0, hopper = 0, sides = 0, tint = [1, 1, 1], base = .55}) {
+ const Y = up.clone().normalize(), X = new T.Vector3().crossVectors(Y, Math.abs(Y.y) < .9 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0)).normalize().applyAxisAngle(Y, spin), Z = new T.Vector3().crossVectors(X, Y);
+ const M = new T.Matrix4().makeBasis(X, Y, Z); if (tilt) M.multiply(new T.Matrix4().makeRotationAxis(new T.Vector3(1, 0, 1).normalize(), tilt)); M.setPosition(c);
+ const pos = [], col = [], hmin = Math.min(h[0], h[1], h[2]);
+ const put = (x, y, z, glow) => { pos.push(x, y, z); const k = Math.min(1, (base + (1 - base) * (y / h[1] * .5 + .5)) * glow); col.push(tint[0] * k, tint[1] * k, tint[2] * k); };
+ for (const [fi, [N, U, V]] of CUBE_FACES.entries()) { const steps = fi === 0 ? hopper : fi > 1 && sides ? sides : 0;
+  const ext = A => Math.abs(A[0] * h[0] + A[1] * h[1] + A[2] * h[2]), hn = ext(N), hu = ext(U), hv = ext(V);
+  const at = (a, b, fr, dep) => [0, 1, 2].map(k => N[k] * (hn - dep * hmin) + U[k] * a * fr * hu + V[k] * b * fr * hv);
+  const ring = (fr, dep) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => at(a, b, fr, dep));
+  const quad = (A, B, C, D, g) => { for (const p of [A, B, C, A, C, D]) put(p[0], p[1], p[2], g); };
+  let fr = 1, dep = 0;
+  for (let s = 0; s < steps; s++) { const fr2 = fr - (s ? .19 : .15), dep2 = dep + .075, o = ring(fr, dep), i = ring(fr2, dep), b = ring(fr2, dep2), g = 1.05 + s * .1;
+   for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; quad(o[k], o[j], i[j], i[k], g); quad(i[k], i[j], b[j], b[k], g * .72); } // bright terraces, shadowed risers
+   fr = fr2; dep = dep2; }
+  const q = ring(fr, dep); quad(q[0], q[1], q[2], q[3], 1.1 + steps * .15); }
+ const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+ g.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2)); g.applyMatrix4(M); g.computeVertexNormals(); return g;
 }
 // Cast ingot: rounded-trapezoid section extruded with end bevels, top face carries a sunk maker's stamp (diamond + bar).
 function ingotGeo(len = .2, w = .085, h = .052) {
@@ -145,12 +188,29 @@ const DEPOSIT = {
  star: {style: 'geode', shape: [.7, .58, .62, 0], bands: [[.14, .12, .13], [.22, .19, .19], [.1, .09, .1], [.18, .15, .14]], rust: [.5, .3, .12], ore: 0xf2b95c, oreMetal: 1, oreRough: .24, crystal: [1, .58, .16], emissive: 0xff8a12, bounce: 0x7a3a06}
 };
 for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
-const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
+// Brinedeep rock salt (shared/salt-mines.js). Pink-grey halite rock with a white salt bloom on its upper faces, and
+// clusters of glowing halite cubes. cubes = milky white, pale pink, rose; core = the heart's deep-rose jackpot cubes.
+const SALT_CUBES = [[1, .88, .86], [1, .56, .63], [1, .32, .44]]; // linear vertex colour: milky white, pale pink, rose
+Object.assign(DEPOSIT, {
+ salt: {style: 'halite', height: 1.2, bands: [[.3, .15, .17], [.38, .2, .21], [.22, .11, .13], [.45, .26, .26]], crust: [.96, .9, .89], cubes: SALT_CUBES, emissive: 0xff8fa8, glow: 1.7, bounce: 0x8a2640},
+ saltHeart: {style: 'heart', height: 1.5, bands: [[.3, .13, .17], [.38, .18, .22], [.21, .1, .13], [.45, .23, .27]], crust: [.98, .92, .92], cubes: SALT_CUBES, core: [.9, .1, .24], emissive: 0xff5a8c, glow: 2.8, bounce: 0xc02a58},
+ saltRubble: {style: 'rubble', height: .5, bands: [[.3, .19, .2], [.42, .29, .29], [.2, .16, .17], [.62, .46, .45]], crust: [.95, .9, .89], cubes: SALT_CUBES, emissive: 0xff8fa8, glow: 1.5, bounce: 0x6a2032}
+});
+const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star',
+ salt: 'salt', salt_seam: 'salt', saltHeart: 'saltHeart', salt_heart: 'saltHeart', saltRubble: 'saltRubble', salt_rubble: 'saltRubble'};
 export const BAR_STACK_MAX = 24;
-export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold']);
-export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star']);
+export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold', 'salt']);
+export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star', 'salt', 'saltHeart', 'saltRubble']);
 export const HELD_SCALE = .5; // hero/held ore: same asset at half scale
 
+// The Great Salt Shaker is drawn by the mine's curios (client/salt-mine-props.js), always on its plinth: its deposit
+// is only an unseen body for picks to knock.
+let shakerShape = null;
+function shakerProxy() {
+  shakerShape ??= {geometry: new T.CylinderGeometry(.5, .62, 1.85, 10).translate(0, .93, 0), material: new T.MeshBasicMaterial({visible: false})};
+  const root = new T.Group(), body = new T.Mesh(shakerShape.geometry, shakerShape.material); body.name = 'SaltShakerBody'; root.add(body);
+  root.name = 'Deposit:saltShaker'; root.userData.authoredDeposit = true; root.userData.resourceArt = 'saltShaker'; root.userData.proxy = true; return root;
+}
 export function createResourceArt() {
  const time = {value: 0}, geos = new Set(), mats = new Map(), pickups = new Map(), deposits = new Map();
  const own = g => (geos.add(g), g.computeBoundingBox(), g.computeBoundingSphere(), g);
@@ -234,21 +294,68 @@ export function createResourceArt() {
   const rock = mergeFlat(lumps), crys = mergeFlat(crystals), oreG = mergeFlat(ore);
   paint(oreG, (p, n, i, out) => { const k = .7 + .3 * Math.max(0, n.y); out[0] = out[1] = out[2] = k; });
   // baked crystal bounce into uv.y (fake nearby glow; no lights)
-  const rp = rock.attributes.position, uv = rock.attributes.uv; for (let i = 0; i < rp.count; i++) { _v.fromBufferAttribute(rp, i); let gl = 0; for (const R of roots) gl += Math.exp(-_v.distanceToSquared(R) / .045); uv.setY(i, Math.min(1, gl * .6)); uv.setX(i, 0); }
+  const rp = rock.attributes.position, uv = rock.attributes.uv; for (let i = 0; i < rp.count; i++) { _v.fromBufferAttribute(rp, i); let gl = 0; for (const R of roots) gl += Math.exp(-_v.distanceToSquared(R) / .045); uv.setY(i, Math.min(st === 'heart' ? .8 : 1, gl * .6)); uv.setX(i, 0); }
   sitOnFloorGroup([rock, crys, oreG], 1.2); for (const g of [rock, crys, oreG]) g.translate(0, -.05, 0); // bed sinks 5 cm into terrain
   return [[own(rock), stoneMat('deposit:' + kind, d.bounce), 'Rock'], [own(oreG), metalMat('ore:' + kind, d.ore, d.oreMetal, d.oreRough, .18), 'Ore'], [own(crys), crystalMat('deposit:' + kind, d.emissive, [.9, .95, 1]), 'Crystal']];
+ }
+ // ---------- Brinedeep rock salt ----------
+ const saltMat = (key, emissive, glow) => mat('salt:' + key, () => patchSalt(new T.MeshStandardMaterial({color: 0xffffff, vertexColors: true, metalness: 0, roughness: .36, emissive, emissiveIntensity: glow}), time));
+ const saltRockPaint = d => { const base = strataPaint(d.bands, {freq: 7}); return (p, n, i, out, cav) => { base(p, n, i, out, cav); // white salt bloom on the upper faces
+  const bloom = clamp01((n.y - .45) * 1.8 + (fbm(p.x * 7, p.y * 7, p.z * 7) - .5) * 1.6) * (1 - cav * .7), c = mixc(out, d.crust, bloom * .42); out[0] = c[0]; out[1] = c[1]; out[2] = c[2]; }; };
+ const spread = (g, count, seed, minD, filter) => { const out = []; for (const pn of surfacePoints(g, count * 10, seed, filter)) { if (out.every(([Q]) => Q.distanceTo(pn[0]) > minD)) out.push(pn); if (out.length >= count) break; } return out; };
+ // One intergrown cluster: a lead cube (hopper-stepped crown) with smaller cubes leaning off it, some stood on a corner.
+ function saltCluster(list, roots, r, P, N, s, tints, n, {hopper = 2, lead = null, leadTilt = 0, sink = .2} = {}) {
+  const up = N.clone().lerp(new T.Vector3(0, 1, 0), .5).normalize(), A = new T.Vector3().crossVectors(up, new T.Vector3(.3, .1, .9)).normalize(), B = new T.Vector3().crossVectors(up, A);
+  for (let i = 0; i < n; i++) { const big = i === 0, k = big ? 1 : .34 + r() * .4, hh = s * k, a = r() * Math.PI * 2, dd = big ? 0 : s * (.8 + r() * .7);
+   const c = P.clone().addScaledVector(A, Math.cos(a) * dd).addScaledVector(B, Math.sin(a) * dd).addScaledVector(up, hh * (.2 + r() * .4) - dd * sink);
+   const dir = up.clone().add(new T.Vector3(r() - .5, r() * .3, r() - .5).multiplyScalar(big ? .35 : .8)).normalize();
+   list.push(haliteCube({c, h: [hh * (.88 + r() * .24), hh * (.92 + r() * .3), hh * (.88 + r() * .24)], up: dir, spin: r() * 6, tilt: big ? leadTilt : r() < .4 ? .55 + r() * .35 : 0,
+    hopper: big ? hopper : r() < .3 ? 1 : 0, tint: big && lead ? lead : tints[Math.floor(r() * tints.length)]}));
+   roots.push(c); } }
+ function saltKit(kind, variant) { const d = DEPOSIT[kind], st = d.style, seed = 5000 + kind.length * 131 + variant * 7919, r = rng(seed), lumps = [], cubes = [], roots = [];
+  if (st === 'rubble') { // fallen roof rock: a low heap of broken chunks, a few loose cubes still glowing in it
+   const mound = rockLump({detail: 2, sx: .55, sy: .2, sz: .45, seed, cuts: 5, strata: .07, rough: .45, bed: -.3}); mound.translate(0, .06, 0); lumps.push(mound);
+   for (let i = 0; i < 10; i++) { const a = i * 2.4 + r() * .6, rad = .12 + Math.sqrt(r()) * .5, s = .08 + r() * .1 * (1.2 - rad);
+    const g = rockLump({detail: 1, sx: s * (1 + r() * .7), sy: s * (.55 + r() * .4), sz: s * (1 + r() * .5), seed: seed + 13 * i, cuts: 4, strata: .06, rough: .35, bed: -.5});
+    g.rotateY(r() * 6); g.rotateZ((r() - .5) * .9); g.translate(Math.cos(a) * rad, Math.max(0, (.6 - rad) * .3) + s * .25, Math.sin(a) * rad * .85); lumps.push(g); }
+   spread(mound, 4, seed + 5, .26, (P, N) => N.y > .5).forEach(([P, N], i) => saltCluster(cubes, roots, r, P, N, .085 + r() * .03, d.cubes, 2 + (i === 0) * 2, {hopper: 2}));
+  } else { const heart = st === 'heart';
+   const main = rockLump({detail: 3, sx: heart ? .8 : .74, sy: heart ? .56 : .62, sz: heart ? .7 : .58, seed, cuts: 5, strata: .14, rough: .32, bed: -.62}); main.translate(0, .32, 0); lumps.push(main);
+   const side = rockLump({detail: 2, sx: .42, sy: .3, sz: .36, seed: seed + 1, cuts: 4, strata: .12, rough: .35}); side.rotateY(r() * 6); side.translate(.52 + r() * .15, .1, -.25 + r() * .2); lumps.push(side);
+   const shelf = rockLump({detail: 2, sx: .32, sy: .24, sz: .4, seed: seed + 2, cuts: 4, strata: .1, rough: .35}); shelf.translate(-.5, .06, .3 - r() * .2); lumps.push(shelf);
+   const sites = spread(main, heart ? 4 : 6, seed + 5, heart ? .42 : .32, (P, N) => N.y > (heart ? -.1 : .15) && P.y > .15);
+   sites.forEach(([P, N], i) => saltCluster(cubes, roots, r, P.clone().addScaledVector(N, -.04), N, (heart ? .09 : .165) * (i === 0 ? 1.25 : .72 + r() * .35), d.cubes, 4 + Math.floor(r() * 3), {hopper: i < 2 ? 3 : 2, lead: heart ? SALT_CUBES[2] : null}));
+   if (heart) { // the jackpot: a deep-rose hopper core bursting from the crown, ringed by milky white cubes
+    const p = main.attributes.position; let top = 0; for (let i = 1; i < p.count; i++) if (p.getY(i) > p.getY(top)) top = i;
+    const T0 = new T.Vector3().fromBufferAttribute(p, top).multiply(new T.Vector3(.8, 1, .8)).add(new T.Vector3(0, -.12, 0)), up = new T.Vector3(.12, 1, .18).normalize();
+    saltCluster(cubes, roots, r, T0.clone().add(new T.Vector3(0, -.08, 0)), up, .27, [SALT_CUBES[0], SALT_CUBES[0], SALT_CUBES[1], d.core], 9, {hopper: 3, lead: d.core, leadTilt: .32, sink: .04});
+    const twin = T0.clone().add(new T.Vector3(.2, -.04, .14)); cubes.push(haliteCube({c: twin, h: [.15, .17, .15], up: new T.Vector3(.5, 1, .3), spin: 1.1, hopper: 2, tint: d.core})); roots.push(twin);
+    const twin2 = T0.clone().add(new T.Vector3(-.18, -.08, .1)); cubes.push(haliteCube({c: twin2, h: [.11, .12, .11], up: new T.Vector3(-.6, 1, .2), spin: .4, tilt: .7, hopper: 1, tint: SALT_CUBES[2]})); roots.push(twin2);
+   }
+  }
+  for (const g of lumps) paint(g, saltRockPaint(d));
+  const rock = mergeFlat(lumps), crys = mergeFlat(cubes), reach = st === 'heart' ? .12 : .08;
+  const rp = rock.attributes.position, uv = rock.attributes.uv; for (let i = 0; i < rp.count; i++) { _v.fromBufferAttribute(rp, i); let gl = 0; for (const R of roots) gl += Math.exp(-_v.distanceToSquared(R) / reach); uv.setY(i, Math.min(st === 'heart' ? .8 : 1, gl * .6)); uv.setX(i, 0); }
+  sitOnFloorGroup([rock, crys], d.height); for (const g of [rock, crys]) g.translate(0, st === 'rubble' ? -.02 : -.05, 0);
+  return [[own(rock), stoneMat('deposit:' + kind, d.bounce), 'Rock'], [own(crys), saltMat('deposit:' + kind, d.emissive, d.glow), 'Crystal']];
+ }
+ function saltPickup() { const r = rng(777), list = [], tints = [...SALT_CUBES, [1, .4, .5]];
+  [[0, .085, 0, .095, 2], [.13, .05, .05, .06, 0], [-.11, .045, .07, .055, 1], [.03, .04, -.12, .05, 0], [-.08, .035, -.08, .042, 0], [.09, .03, .12, .036, 0], [-.01, .19, .015, .045, 0]].forEach(([x, y, z, s, hop], i) =>
+   list.push(haliteCube({c: new T.Vector3(x, y, z), h: [s, s * (.9 + r() * .2), s], up: new T.Vector3((r() - .5) * .6, 1, (r() - .5) * .6), spin: r() * 6, tilt: i > 3 && i < 6 ? .62 : 0, hopper: hop, tint: tints[i % tints.length], base: .7})));
+  const g = mergeFlat(list); sitOnFloorGroup([g], .2);
+  return {parts: [[own(g), saltMat('pickup', 0xff8fa8, 1.4)]]};
  }
  function build(parts, name) { const root = new T.Group(); root.name = name; const host = new T.Group(); host.name = name + 'Art'; root.add(host);
   for (const [g, m, n] of parts) { const mesh = new T.Mesh(g, m); mesh.name = n || m.name; mesh.castShadow = mesh.receiveShadow = true; host.add(mesh); } return root; }
  return {
   pickup(kind) { if (!PICKUP_KINDS.includes(kind)) return null; let kit = pickups.get(kind);
-   if (!kit) { kit = kind.endsWith('Ore') ? orePickup(kind) : kind === 'crystal' ? crystalPickup() : ingotPickup(kind); pickups.set(kind, kit); }
+   if (!kit) { kit = kind.endsWith('Ore') ? orePickup(kind) : kind === 'salt' ? saltPickup() : kind === 'crystal' ? crystalPickup() : ingotPickup(kind); pickups.set(kind, kit); }
    const g = build(kit.parts, 'Pickup:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; return g; },
   barStack(kind, count) { if (!METAL[kind]) return null; const n = Math.max(1, Math.min(BAR_STACK_MAX, count | 0)), k = 'stack:' + kind + ':' + n; let kit = pickups.get(k);
    if (!kit) { kit = barStackKit(kind, n); pickups.set(k, kit); }
    const g = build(kit.parts, 'BarStack:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; g.userData.barStack = n; return g; },
-  deposit(kind, {variant = 0} = {}) { const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
-   if (!kit) { kit = depositKit(k, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Deposit:' + k); g.userData.authoredDeposit = true; g.userData.resourceArt = k; return g; },
+  deposit(kind, {variant = 0} = {}) { if (kind === 'saltShaker') return shakerProxy(); const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
+   if (!kit) { kit = DEPOSIT[k].cubes ? saltKit(k, variant % 3) : depositKit(k, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Deposit:' + k); g.userData.authoredDeposit = true; g.userData.resourceArt = k; return g; },
   update(seconds) { if (Number.isFinite(seconds)) time.value = seconds; },
   stats() { let tris = 0; for (const g of geos) tris += g.attributes.position.count / 3; return {geometries: geos.size, materials: mats.size, triangles: tris}; },
   dispose() { for (const g of geos) g.dispose(); for (const m of mats.values()) m.dispose(); geos.clear(); mats.clear(); pickups.clear(); deposits.clear(); }

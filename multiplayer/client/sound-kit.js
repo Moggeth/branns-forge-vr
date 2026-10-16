@@ -119,6 +119,23 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
     // Adventure beats: a rising warning before a big attack lands, then the hit; a cheerful sting for each stage.
     telegraph: {seconds: 1.2, range: 60, play(o, t) { tone(o, t, {type: 'triangle', f0: 330, f1: 660, attack: .7, peak: .04, release: .2}); noise(o, t, {f0: 600, f1: 2400, attack: .7, peak: .04, release: .2}); }},
     star_impact: {seconds: 1.4, range: 60, duck: [.3, .9], play(o, t) { thump(o, t, 90, 30, .3, .6); noise(o, t, {type: 'lowpass', f0: 1400, f1: 140, peak: .16, release: .8}); bell(o, t + .03, 880, .04, 1.2); bell(o, t + .07, 1320, .03, 1); }},
+    // Brinedeep salt mines (client/salt-mine-view.js). A roof about to give: timber groans, grit patters down.
+    mine_creak: {seconds: 1.6, range: 30, play(o, t) { tone(o, t, {type: 'sawtooth', f0: 92, f1: 70, attack: .25, hold: .35, peak: .018, release: .5, detune: 8}); tone(o, t + .1, {type: 'triangle', f0: 180, f1: 150, attack: .3, peak: .012, release: .6}); for (let i = 0; i < 9; i++) noise(o, t + .3 + i * .1 + Math.random() * .06, {f0: 3000 + Math.random() * 2500, q: 6, peak: .03, release: .04}); }},
+    // The roof comes down: a deep crump, a slide of rock and a rattle of salt bouncing after.
+    mine_fall: {seconds: 1.8, range: 45, duck: [.25, .7], play(o, t) { thump(o, t, 70, 26, .38, .7); noise(o, t, {type: 'lowpass', f0: 1100, f1: 160, peak: .2, release: .9}); for (let i = 0; i < 10; i++) noise(o, t + .12 + i * .07 + Math.random() * .05, {f0: 700 + Math.random() * 900, q: 2.5, peak: .06, release: .08}); rattle(o, t + .6, 8, {spread: .07, f: 2600, peak: .035}); }},
+    // Firedamp: a soft whump of gas taking light, then the roar and a ringing echo off the salt.
+    firedamp_boom: {seconds: 2.4, range: 70, duck: [.4, 1.2], play(o, t) { noise(o, t, {type: 'lowpass', f0: 300, f1: 900, attack: .05, peak: .1, release: .1}); thump(o, t + .08, 60, 22, .45, 1); noise(o, t + .08, {type: 'lowpass', f0: 2400, f1: 120, peak: .26, release: 1.4}); noise(o, t + .1, {f0: 1500, f1: 500, q: .8, peak: .08, release: .8}); bell(o, t + .2, 523, .025, 1.6); bell(o, t + .24, 784, .018, 1.4); }},
+    // The Great Salt Shaker knocked empty: a brassy ring and a long glittering pour of salt. Full again: a soft chime.
+    shaker_shower: {seconds: 2.4, range: 30, play(o, t) { bell(o, t, 659, .05, 1.4); bell(o, t + .02, 988, .035, 1.2); for (let i = 0; i < 26; i++) noise(o, t + .08 + i * .06 + Math.random() * .04, {f0: 5200 + Math.random() * 3000, q: 9, peak: .028 * (1 - i / 30), release: .05}); noise(o, t + .1, {f0: 6000, f1: 3000, q: 1.2, attack: .1, hold: 1, peak: .02, release: .6}); }},
+    shaker_full: {seconds: 1.4, range: 18, play(o, t) { bell(o, t, 1319, .018, 1); bell(o, t + .12, 1760, .014, .9); bell(o, t + .24, 2093, .012, .8); }},
+    // The mine canary: a bright little two-note trill.
+    canary_chirp: {seconds: .5, range: 12, play(o, t) { for (let i = 0; i < 3; i++) tone(o, t + i * .09, {type: 'sine', f0: 2600 + i * 300, f1: 3600 + i * 200, attack: .005, peak: .02, release: .06}); }},
+    // King Pinchy surfaces: a tiny, pompous fanfare.
+    king_fanfare: {seconds: 1.4, range: 30, play(o, t) { for (const [i, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) tone(o, t + i * .13, {type: 'square', f0: f, f1: f, attack: .01, hold: i === 3 ? .35 : .06, peak: .02, release: .12}); }},
+    // Saltback crabs: a dry little click-clack, a snap of the big claw, and a gritty burrow.
+    saltback_click: {seconds: .4, range: 18, play(o, t) { for (let i = 0; i < 3; i++) noise(o, t + i * .06 + Math.random() * .02, {f0: 3400 + Math.random() * 1200, q: 9, attack: .001, peak: .05, release: .03}); }},
+    saltback_pinch: {seconds: .5, range: 22, play(o, t) { noise(o, t, {f0: 2600, q: 5, attack: .001, peak: .12, release: .05}); tone(o, t, {type: 'square', f0: 900, f1: 500, peak: .015, release: .07}); thump(o, t + .02, 260, 120, .08, .08); }},
+    saltback_burrow: {seconds: 1.1, range: 22, play(o, t) { noise(o, t, {type: 'bandpass', f0: 900, f1: 500, q: 1.4, attack: .1, hold: .3, peak: .07, release: .4}); rattle(o, t + .1, 6, {spread: .09, f: 2200, peak: .03}); }},
     stage: {seconds: 1.6, range: 0, play(o, t) { horn(o, t, [262, 392, 523], .04, .14); }},
     support: {seconds: 1, range: 40, play(o, t) { [0, 4, 7].forEach((n, i) => bell(o, t + i * .07, semis(659, n), .03, .8)); }},
     // Battle beats: a warm horn rising (start), a triumphant fanfare (victory), a lower pair (stop/lost).

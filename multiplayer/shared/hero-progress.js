@@ -14,7 +14,7 @@ export const xpForLevel = level => START[Math.max(1, Math.min(HERO_LEVEL.max, le
 export const XP_MAX = xpForLevel(HERO_LEVEL.max);
 
 // What a hero earns. Kills are credited to whoever landed the killing blow; harvest to whoever swung.
-export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpling: 8, tree: 10, ore: 6, meteor: 15});
+export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpling: 8, saltback: 12, tree: 10, ore: 6, meteor: 15});
 
 // Two specialties per weapon (the hammer is not in yet). `ready: false` lists a specialty without letting anyone buy
 // it yet (its weapon's thread turns it on when the effect ships).

@@ -5,7 +5,7 @@ import {createEnemy,hitEnemyPart,mineGolemRemains} from '../shared/combat.js';
 
 assert.equal(materialLabel('gems'),'Crystal');assert.equal(materialLabel('crystal'),'Crystal');
 assert.equal(materialLabel('wood'),'Wood');assert.equal(materialLabel('starMetal'),'Star metal');
-for(const key of MATERIAL_KEYS){assert.ok(MATERIAL_CATALOG[key].use.length>12);assert.ok(MATERIAL_CATALOG[key].source.length>12);assert.ok(MATERIAL_CATALOG[key].recipes.length||MATERIAL_CATALOG[key].groundwork,`${key} needs a recipe or an explicit groundwork flag`);}
+for(const key of MATERIAL_KEYS){assert.ok(MATERIAL_CATALOG[key].use.length>12);assert.ok(MATERIAL_CATALOG[key].source.length>12);assert.ok(MATERIAL_CATALOG[key].recipes.length||MATERIAL_CATALOG[key].groundwork||MATERIAL_CATALOG[key].trade,`${key} needs a recipe or an explicit groundwork or trade flag`);}
 assert.deepEqual(restoreMaterials({wood:2,stone:3,gems:4}),{...emptyMaterials(),wood:2,stone:3,gems:4});
 assert.equal(restoreMaterials({crystal:5}).gems,5);
 for(const invalid of [NaN,Infinity,-1,1000,1.5,'2',null,undefined])assert.throws(()=>restoreMaterials({iron:invalid}));

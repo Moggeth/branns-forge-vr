@@ -13,9 +13,9 @@ export const QUICK_BUILDS = [
   ['bridge', 'Bridge', 'bridge'],
 ];
 const RES_NAME = {wood: 'Wood', stone: 'Stone', iron: 'Iron', mithril: 'Mithril', crystal: 'Crystal', starMetal: 'Star metal',
-  ironOre: 'Iron ore', mithrilOre: 'Mithril ore', starOre: 'Star ore', copper: 'Copper', gold: 'Gold', copperOre: 'Copper ore', goldOre: 'Gold ore'};
+  ironOre: 'Iron ore', mithrilOre: 'Mithril ore', starOre: 'Star ore', copper: 'Copper', gold: 'Gold', copperOre: 'Copper ore', goldOre: 'Gold ore', salt: 'Salt'};
 const ALIAS = {star_metal: 'starMetal', starmetal: 'starMetal', stars: 'starMetal', gems: 'crystal', iron_ore: 'ironOre',
-  mithril_ore: 'mithrilOre', star_ore: 'starOre', logging_yard: 'loggingYard', loggingyard: 'loggingYard'};
+  mithril_ore: 'mithrilOre', star_ore: 'starOre', copper_ore: 'copperOre', gold_ore: 'goldOre', rock_salt: 'salt', logging_yard: 'loggingYard', loggingyard: 'loggingYard'};
 const canon = k => ALIAS[k] || k;
 const has = v => v !== undefined && v !== null && v !== '';
 const num = v => (Number.isFinite(+v) ? +v : 0);

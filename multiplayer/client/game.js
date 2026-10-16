@@ -32,7 +32,10 @@ import {applyMountainGroundTreatment} from './mountain-ground-treatment.js';
 import {createPickupHighlight} from './pickup-highlight.js';
 import {nearestCollectible} from '../shared/collection-target.js';
 import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} from '../shared/trees.js';
-import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,hasActiveTerrain} from '../shared/terrain.js';
+import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,hasActiveTerrain,unminedHeight} from '../shared/terrain.js';
+import {mineCarve} from '../shared/salt-mines.js';
+import {createSaltMineView} from './salt-mine-view.js';
+import {KIT_URL as SALT_MINE_KIT_URL,CURIOS_URL as SALT_MINE_CURIOS_URL} from './salt-mine-props.js';
 import {createStartingWorld} from './starting-world.js';
 import {installHeartstoneKit} from './heartstone-art.js';
 import {createWaygateView} from './waygate-view.js';
@@ -78,6 +81,7 @@ import {createWyrmspoutFeel} from './wyrmspout-feel.js';
 import {WYRMSPOUT,sprayTuning,tankFill} from '../shared/wyrmspout.js';
 import {createEntView} from './ent-view.js';
 import {createStumplingView} from './stumpling-view.js';
+import {createSaltbackView} from './saltback-view.js';
 import {ENT_SPELLS, entTargets} from '../shared/ents.js';
 import {GROWTH, growthPlan, waveLine} from '../shared/grove-growth.js';
 const GROWTH_SPELLS=['grove','ring','wave'];
@@ -241,7 +245,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const colliderDebug=colliderMode!==null?createColliderDebug({scene,terrainHeight:(st,x,z)=>terrainHeight(x,z,st.edits,st.tick??Infinity),legacy:colliderMode==='legacy',structureRadius:type=>STRUCTURES[type]?.radius||1.5}):null;
   const timberlineSight=createTimberlineSight({scene}),timberlineAmmoHud=createTimberlineAmmoHud();
   let scoping=false,scopeAmount=0;const scopeEye=new THREE.Vector3(),sightEye=new THREE.Vector3();
-  scene.add(new THREE.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2));
+  const hemisphere=new THREE.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2);scene.add(hemisphere);
   const sun = new THREE.DirectionalLight(0xffe3ad, 2.2);
   sun.position.set(-22, 38, 15);
   scene.add(sun);
@@ -267,6 +271,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Larimar Cove: a little lake beside each back town, home to Shellbright the larimar turtle (presentation only).
   const coveHeroes=[], coveSky=new THREE.Color(), coveSun=new THREE.Vector3();
   const larimarCove = createLarimarCoveView({scene, height: (x, z) => heightAt(x, z, []), sound: (name, position, opts) => soundKit?.play(name, position, listenerPose(), opts)});
+  // The Brinedeep salt mines in the two open corners: the cave, its kit, its glow and the viewer's lantern (presentation only).
+  const saltMines = createSaltMineView({scene, ground, height: (x, z) => heightAt(x, z, []), unmined: unminedHeight, quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', sound: (name, position, opts) => soundKit?.play(name, position, listenerPose(), opts), kick: k => { if (k > .01 && !renderer.xr.isPresenting) viewPunch.kick([.028, .004, .012], k); }});
   let orchardContentKey = '', stepDistance = 0, stepSound = false;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
@@ -321,7 +327,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // The axe's edge re-arms: a quiet shing and one light tick (controller rumble in VR, a short buzz on touch devices).
   const axeReadyCue = createAxeReadyCue({audio: () => audioContext, haptic: () => { if (renderer.xr.isPresenting) feedback.pattern?.([{at: 0, amplitude: .3, duration: 22}]); else if (touchEnabled) navigator.vibrate?.(14); }});
   function contactMaterial(id) {
-    const enemy = [...(snapshot.enemies || []),...(snapshot.detachedParts||[])].find(e => e.id === id); if (enemy) return enemy.kind === 'golem' ? 'stone' : enemy.kind === 'ent' || enemy.kind === 'stumpling' ? 'wood' : 'bone';
+    const enemy = [...(snapshot.enemies || []),...(snapshot.detachedParts||[])].find(e => e.id === id); if (enemy) return enemy.kind === 'golem' || enemy.kind === 'saltback' ? 'stone' : enemy.kind === 'ent' || enemy.kind === 'stumpling' ? 'wood' : 'bone';
     if ((snapshot.deposits || []).some(d => d.id === id)) return 'stone';
     if (id === 'shrine') return 'metal';
     return worldTrees(snapshot).some(t => t.id === id) ? 'wood' : 'earth';
@@ -395,7 +401,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const pickupHighlight=createPickupHighlight({scene});
   applyMountainGroundTreatment(orchard.material);
   yield;
-  const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
+  const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>mineCarve(x,z)>0?unminedHeight(x,z):heightAt(x,z,snapshot.edits)}); // the rock stands whole over the salt mines
   const alpineForest=createAlpineForest({scene,arena:mountainArena,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high'});
   const cornerGround=createKeepCornerGround({scene,ground,height:(x,z)=>heightAt(x,z,snapshot.edits)}); // the keeps' back towns past the old map edge
   let nearestPickup=null;
@@ -436,6 +442,14 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const stumplingView=createStumplingView({scene,templates,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
     onSound:event=>{if(event.kind==='stump_chirp'||event.kind==='stump_squeak')stumpChirp(event);else woodAudio?.play(event,listenerPose());},
     stumpOf:treeId=>{const cut=(snapshot.harvestedTrees||[]).find(h=>h.id===treeId),tree=cut&&worldTrees(snapshot).find(t=>t.id===treeId);return tree?{height:cutLocalHeight(tree,cut,heightAt(tree.x,tree.z,snapshot.edits))}:null;}});
+  // Saltback crabs (assets-source/saltback-crab): the model streams in when the first crab surfaces; placeholders until then.
+  const saltbackView=createSaltbackView({scene,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',crown:()=>saltMines.props.crown(),
+    sound:(name,position,opts)=>soundKit?.play(name,position,listenerPose(),opts),
+    load:()=>loader.load('/assets/saltback-crab.glb',async gltf=>{
+      if(disposed||!saltbackView.install(gltf)){disposeResources(gltf.scene);if(!disposed){report('Saltback crab model is incomplete; crabs stay as stand-ins.');saltbackView.failed();}return;}
+      try{await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Saltback material preparation: ${error.message}`);}
+      if(!disposed)for(const entry of actors.values())upgradeActor(entry);
+    },undefined,()=>{report('Saltback crab model unavailable; crabs stay as stand-ins.');saltbackView.failed();})});
   yield;
   const expedition=createExpeditionPresentation({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
   const wyrmStream=createWyrmspoutStream({scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
@@ -675,7 +689,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
     const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
-    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
+    const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):entry.data.kind==='saltback'?saltbackView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8:1.7,entry.data.id);
     if (!model) return;
     entry.root.remove(entry.visual);
     disposePlaceholder(entry.visual);
@@ -743,7 +757,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       }
     }
     for (const [key, entry] of actors) if (!present.has(key)) {
-      if(entry.enemy){entView.release(entry,snapshot);stumplingView.release(entry,snapshot);} // felled/rooted ents and stumplings keep a short corpse; the actor frees an empty stand-in
+      if(entry.enemy){entView.release(entry,snapshot);stumplingView.release(entry,snapshot);saltbackView.release(entry,snapshot);} // felled/rooted ents and stumplings keep a short corpse; the actor frees an empty stand-in
       meteorCreatures.remove(entry);scene.remove(entry.root);
       if (entry.visual.userData.mixer) {
         const mixer = entry.visual.userData.mixer;
@@ -833,6 +847,10 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     },progress,error=>{startup.error=`Asset unavailable: ${url}`;try{failed?.(error);}finally{resolve();}})),essential,name);
     assetPromises.set(name,pending);(essential?assetInstalls:secondaryInstalls).push(pending);return pending;
   };
+  // The Brinedeep salt mines' kit and its crabs are part of the world at entry (asset-catalog: creatures and buildings never swap in late).
+  loader.load(SALT_MINE_KIT_URL,async gltf=>{if(disposed||!await saltMines.props.install(gltf,prepareStreamed))report(`Salt mine kit: ${saltMines.props.stats().failed||'not installed'}`);gltf.scene.traverse(o=>o.geometry?.dispose());/* the kit keeps its own geometry copies and the shared materials and textures */},undefined,()=>{saltMines.props.failed();report('Salt mine kit unavailable; the mines stand without their timbers.');});
+  loader.load(SALT_MINE_CURIOS_URL,async gltf=>{if(disposed||!await saltMines.props.installCurios(gltf,prepareStreamed))report(`Salt mine curios: ${saltMines.props.stats().failed||'not installed'}`);gltf.scene.traverse(o=>o.geometry?.dispose());},undefined,()=>report('Salt mine curios unavailable; the mines stand without their odds and ends.'));
+  saltbackView.preload();
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}
     try{if(startup.ready)await renderer.compileAsync(gltf.scene,camera,scene);}catch(error){report(`Timberline material preparation failed: ${error.message}`);}
@@ -1155,7 +1173,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     combat.handleEvent(event.hero&&event.id===playerId?{...event,damage:0}:event); // no number floating in your own face
     wyrmStream.handleEvent(event,{localId:playerId,resolveTarget:(id,part)=>{const a=actors.get(`e:${id}`);return a?.visual?partAnchor(a.visual,part):null;}});wyrmFeel.event(event,playerId,listenerPose());
     golemFx.handleEvent(event);
-    entView.event(event);stumplingView.event(event);
+    entView.event(event);stumplingView.event(event);saltbackView.event(event);saltMines.event(event);
     settlementVisual.event(event);inventionVisual.event(event);stormView.event(event);stormFeel(event);
     // Home base hands-on pieces: a deep bell, a bright drink chord, a hammer's chime as a part knits back together.
     if(event.kind==='home_bell'){homeSound.chord(event.position,[-12,-5,0],.16,180,4.5);if(event.id===playerId)report(`The bell rings out: ${event.count} troops march from the barracks.`);}
@@ -1892,7 +1910,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     enemyThreats.length=0;for(const p of snapshot.players||[])if(p.role==='hero'&&p.position)enemyThreats.push(p.id===playerId?localPosition.toArray(threatPoint):p.position);
     updateEnemyMotion(actors,{tick:renderTick,dt,height:enemyGround,threats:enemyThreats});
     golemFx.update(actors,renderTick,dt,now/1000);
-    entView.update(actors,renderTick,dt,enemyThreats);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);
+    entView.update(actors,renderTick,dt,enemyThreats);entView.tick(dt);stumplingView.update(actors,renderTick,dt);stumplingView.tick(dt);saltbackView.update(actors,renderTick,dt,enemyThreats);saltbackView.tick(dt);
     combat.tick(dt,isHost(),now/1000,renderTick);
     goldenFlight.length=0;for(const q of snapshot.projectiles||[])if(q.golden){const node=combat.projectiles.get(q.id);if(node?.visible!==false)goldenFlight.push({id:q.id,position:node?node.position:new THREE.Vector3().fromArray(q.position)});}
     skeletonFx.update(dt,{camera,golden:goldenFlight,viewportHeight:renderer.domElement.height||800});
@@ -1922,12 +1940,13 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     for (const p of snapshot.players || []) { if (meadowPushers.length >= 4) break; if (p.id !== playerId && p.role === 'hero' && p.position) meadowPushers.push([p.position[0], p.position[1], p.position[2], .8]); }
     meadow.update(dt, camera, {pushers: meadowPushers}); oreGlint.update(dt, camera);
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
-    skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});inventionVisual.setNight(skyCycle.night());
+    skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting,shelter:saltMines.depth()});inventionVisual.setNight(skyCycle.night());
     orchard.update(dt, camera); skyline.update(camera);
     coveHeroes.length=0;if(role==='hero'&&initialized)coveHeroes.push({id:playerId,x:localPosition.x,y:localPosition.y,z:localPosition.z});
     for(const p of snapshot.players||[]){if(p.id===playerId||p.role!=='hero')continue;const at=actors.get('p:'+p.id)?.root.position;if(at)coveHeroes.push({id:p.id,x:at.x,y:at.y,z:at.z});}
     if(scene.fog?.color)coveSky.copy(scene.fog.color);coveSun.copy(sun.position).sub(sun.target.position);
     larimarCove.update(dt,{tick:renderTick,camera:viewCamera,heroes:coveHeroes,night:skyCycle.night?.()??0,sky:coveSky,sunDir:coveSun,detail:touchEnabled?.6:1});
+    saltMines.update(dt,{camera:viewCamera,sun,hemisphere,fog:scene.fog,renderer,snapshot,tick:renderTick});
     voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvas.clientHeight);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
@@ -2105,7 +2124,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),readiness:readinessCache.stats(),programs:renderer.info.programs.length,startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),townLife:inventionVisual.townLifeStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),strike:{kind:strikeClock.kind,trail:swingTrail.stats(),punch:[...viewPunch.value],predicted:impactLedger.size},expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),readiness:readinessCache.stats(),programs:renderer.info.programs.length,startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),townLife:inventionVisual.townLifeStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),strike:{kind:strikeClock.kind,trail:swingTrail.stats(),punch:[...viewPunch.value],predicted:impactLedger.size},expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),saltbacks:saltbackView.stats(),saltMines:saltMines.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
@@ -2135,7 +2154,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();stormWeapon.dispose();stormView.dispose();stormJolt.el?.remove();lightning.dispose();heroView.dispose();
-      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();swingTrail.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();emberdewFx.dispose();flaskGuide.dispose();cinderMarkers.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();larimarCove.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      heldResourceArt.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();swingTrail.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();emberdewFx.dispose();flaskGuide.dispose();cinderMarkers.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();saltbackView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();larimarCove.dispose();saltMines.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);

@@ -133,7 +133,8 @@ test('the back town is only solid while the keep battle runs', () => {
 });
 
 test('the open meadow away from the keeps is untouched by the carve', () => {
-  assert.equal(keepCarve(0, 0), 0); assert.equal(keepCarve(-34, 34), 0); assert.equal(keepCarve(50, -50), 0);
+  assert.equal(keepCarve(0, 0), 0); assert.equal(keepCarve(-34, 34), 0); assert.equal(keepCarve(50, -50, false), 0); // the open corners hold the salt mines
+  assert.equal(keepCarve(40, -50), 0); assert.equal(keepCarve(-50, 40), 0);
 });
 
 console.log(`keep-ring: ${count} checks passed`);

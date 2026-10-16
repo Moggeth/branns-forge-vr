@@ -61,7 +61,7 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
     else continue; // Wait for the authored asset; never show a temporary primitive pickup.
     if(!root)continue;if(c.type==='deposit'&&!root.userData.authoredDeposit&&!['stone','meteor'].includes(c.kind)){root.traverse(n=>{if(n.isMesh){n.material=n.material.clone();n.material.color.lerp(new T.Color(DEPOSIT_CATALOG[c.kind]?.color||0xffffff),.65);n.userData.ownMaterial=true;}});}scene.add(root);tag(root,c.id);e={root,data:c,bay:!!root.userData.barStack};if(e.bay){e.plate=bayPlate(c.kind,c.amount);if(e.plate){e.plate.position.y=Math.ceil(root.userData.barStack/3)*.073+.32;root.add(e.plate);}}objects.set(c.id,e);
    }if(e.plate&&e.plate.userData.amount!==c.amount){e.plate.userData.amount=c.amount;e.plate.userData.draw(c.amount);}e.data=c;const floor=height(c.x,c.z,s.edits);e.root.position.set(c.x,c.type==='bridge'?c.y:floor+(c.type==='pickup'?pickupLift(e):0),c.z);if(c.type==='bridge')e.root.rotation.y=c.yaw;
-   if(c.type==='deposit'&&c.hits>0){
+   if(c.type==='deposit'&&c.hits>0&&!e.root.userData.proxy){
     if(!e.fracture){e.fracture=attachFracture(T,e.root,c.id);if(c.kind==='meteor'&&e.fracture)e.light=createGeodeLight({root:e.root,id:c.id,fracture:e.fracture});}
     // Capture the fracture shells before saved damage removes them without chips.
     e.fracture?.setDamage(c.hits,c.maxHits,{animate:!newlyCreated});e.light?.damage(c.hits/Math.max(1,c.maxHits));

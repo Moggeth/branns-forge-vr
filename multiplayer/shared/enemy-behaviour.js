@@ -4,6 +4,7 @@ import {BATTLE,battleBot,battleObjectives,battleWaypoint} from './battle-mode.js
 import {PICK_WALL} from './terrain.js';
 import {entSpec,entWaking,entRooting} from './ents.js';
 import {STUMPLING,stepStumplingMotion} from './stumplings.js';
+import {SALT,stepSaltbackMotion} from './salt-mine-rules.js';
 import {clampToWorld} from './keep-sites.js';
 import {skeletonKindIndex} from './skeleton-kinds.js';
 export const ENEMY_STRIKE_TICK=18;
@@ -17,7 +18,7 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // Pace personality per warband archetype (shared/skeleton-kinds.js order): Thornhood scurry, Old Bones dawdle.
 const SKELETON_PACE=[1,.96,1.08,.88,1.04,1];
 const AVOID_AHEAD=1.7,TURN_RATE=.15;
-const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
+const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='saltback'?SALT.crab.radius:e.kind==='golem'?.5:.32;
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
@@ -34,6 +35,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   if(e.kind==='ent'&&(entWaking(e,state.tick)||entRooting(e,state.tick)))continue;
   // Root critters never fight: they wander, flee and burrow (shared/stumplings.js).
   if(e.kind==='stumpling'){stepStumplingMotion(state,e,{heroes,ground,resolve});continue;}
+  // Saltback crabs keep to their salt mine: scuttle sideways at Heroes and pinch (shared/salt-mine-rules.js).
+  if(e.kind==='saltback'){stepSaltbackMotion(state,e,{heroes,ground,resolve,damageHero,events});continue;}
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}

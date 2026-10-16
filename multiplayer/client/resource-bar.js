@@ -2,11 +2,13 @@
 // side's stores hold some). Presentation only: it reads the snapshot and never changes state.
 import {MATERIAL_CATALOG,materialLabel} from '../shared/material-catalog.js';
 
-// Basics, then ores, then refined metals. Each ore sits in the same column order as the metal it smelts into.
+// Basics, then ores, then refined metals, then trade goods. Each ore sits in the same column order as the metal it
+// smelts into. Brinedeep salt is never smelted: it is sold at the Gold mill, so it gets its own group.
 export const RESOURCE_BAR_GROUPS = Object.freeze([
   Object.freeze(['wood', 'stone', 'gems']),
   Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'copperOre', 'goldOre']),
   Object.freeze(['iron', 'mithril', 'starMetal', 'copper', 'gold']),
+  Object.freeze(['salt']),
 ]);
 export const RESOURCE_BAR_KEYS = Object.freeze(RESOURCE_BAR_GROUPS.flat());
 /** Always shown on small touch screens even at zero; other materials appear there once you have some. */
@@ -16,7 +18,7 @@ const rgb = n => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 const shade = (n, f) => '#' + rgb(n).map(c => Math.round(f >= 0 ? c + (255 - c) * f : c * (1 + f)).toString(16).padStart(2, '0')).join('');
 const ORE_OF = {ironOre: 'iron', mithrilOre: 'mithril', starOre: 'starMetal', copperOre: 'copper', goldOre: 'gold'};
 
-/** Inline SVG for one material: logs, stone, crystal, ore (rock with metal flecks) and cast bars. */
+/** Inline SVG for one material: logs, stone, crystal, ore (rock with metal flecks), cast bars and rock-salt cubes. */
 export function resourceIcon(key) {
   const c = MATERIAL_CATALOG[key]?.color ?? 0x999999;
   const hi = shade(c, .45), mid = shade(c, 0), lo = shade(c, -.38), ink = '#1a120b';
@@ -27,7 +29,14 @@ export function resourceIcon(key) {
     <path d="M11 6l1.2 5.6L5.5 10.5M12.2 11.6l7.8 1.9M12.2 11.6l-2.6 7.2" fill="none" stroke="${lo}" stroke-width=".9"/><path d="M11 6l6.5 1.5-5.3 4.1z" fill="${hi}" opacity=".85"/>`;
   else if (key === 'gems') body = `<path d="M12 2l4.5 6-4.5 14-4.5-14z" fill="${mid}" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/><path d="M12 2l-4.5 6h9z" fill="${hi}"/><path d="M12 8v14" stroke="${lo}" stroke-width=".8"/>
     <path d="M17.5 10l2.5 3-2.5 7-2.2-6.5z" fill="${lo}" stroke="${ink}" stroke-width=".8" stroke-linejoin="round"/><path d="M6.5 11l-2.5 3 2.5 6 2-6z" fill="${lo}" stroke="${ink}" stroke-width=".8" stroke-linejoin="round"/>`;
-  else if (ORE_OF[key]) {
+  else if (key === 'salt') { // three halite cubes (one stepped hopper crown) with a warm glow spark
+    const cube = (x, y, s, top) => `<path d="M${x} ${y - s}l${s * 1.1} ${s * .6}-${s * 1.1} ${s * .6}-${s * 1.1}-${s * .6}z" fill="${top}" stroke="${ink}" stroke-width=".9" stroke-linejoin="round"/>`
+      + `<path d="M${x - s * 1.1} ${y - s * .4}l${s * 1.1} ${s * .6}v${s * 1.25}l-${s * 1.1}-${s * .6}z" fill="${mid}" stroke="${ink}" stroke-width=".9" stroke-linejoin="round"/>`
+      + `<path d="M${x} ${y + s * .2}l${s * 1.1}-${s * .6}v${s * 1.25}l-${s * 1.1} ${s * .6}z" fill="${lo}" stroke="${ink}" stroke-width=".9" stroke-linejoin="round"/>`;
+    body = cube(12, 8.6, 4.8, hi) + `<path d="M12 5.4l2.8 1.6-2.8 1.6-2.8-1.6z" fill="none" stroke="${mid}" stroke-width=".8"/>`
+      + cube(7, 15.6, 3.2, '#fff3f0') + cube(17.2, 16, 2.9, hi)
+      + '<path d="M19.6 2.6l.45 1.2 1.2.45-1.2.45-.45 1.2-.45-1.2-1.2-.45 1.2-.45z" fill="#ffe9d6"/>';
+  } else if (ORE_OF[key]) {
     const m = MATERIAL_CATALOG[ORE_OF[key]].color, mh = shade(m, .35), ml = shade(m, -.2);
     body = `<path d="M3.5 17l2.5-7.5 5-4 6.5 1.5 3 6-2.5 5.5-9 .5z" fill="#6f6a63" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/><path d="M11 5.5l6.5 1.5-5 4z" fill="#8d877e"/>
       <path d="M8 11.5l2.2-1 1.2 2-1.8 1.6z" fill="${mh}" stroke="${ml}" stroke-width=".6"/><path d="M13.5 13.5l2.4-.6.6 2.2-2.2.9z" fill="${mh}" stroke="${ml}" stroke-width=".6"/><path d="M10.5 16l1.6-.3.3 1.5-1.6.4z" fill="${mh}"/>

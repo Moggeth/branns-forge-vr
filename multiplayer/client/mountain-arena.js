@@ -115,7 +115,7 @@ export function createMountainArena({THREE, scene, height, seed = 7, columnsPerS
         // reads as spurs and amphitheatre bowls instead of four flat walls. The inner seam (s <= crest) stays exact.
         const w = sstep(ARENA.crest, ARENA.crest + 3, s), sr = s + w * 2.6 * sstep(.3, .8, R0.bay);
         const pn = Math.pow(Math.pow(Math.abs(dx), 6) + Math.pow(Math.abs(dz), 6), 1 / 6), k = sr * (1 + (1 / pn - 1) * w * sstep(ARENA.crest, ARENA.outer, s));
-        const kk = Math.min(k, ARENA.outer), x = dx * kk, z = dz * kk, carve = keepCarve(x, z);
+        const kk = Math.min(k, ARENA.outer), x = dx * kk, z = dz * kk, carve = keepCarve(x, z, false); // whole over the salt mines
         // Where a keep has cut its pass and back town out of the corner the rock steps aside: the shell sinks under
         // the carved floor and the real cliffs (ground mesh + keep-corner-ground.js) show instead.
         const y = height(x, z) + lift * (1 - carve) - 2.5 * carve; // never beyond Chebyshev 65
