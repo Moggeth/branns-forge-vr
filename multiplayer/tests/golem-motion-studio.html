@@ -19,26 +19,36 @@ const sun=new THREE.DirectionalLight(dusk?0x9fb0ff:0xffe3ad,dusk?.5:2.2);sun.pos
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:dusk?0x2c3a22:0x6f7d3d,roughness:1}));ground.receiveShadow=true;s.add(ground);
 const cam=new THREE.PerspectiveCamera(42,W/H,.05,80);cam.position.set(5.2,2.6,6.4);cam.lookAt(-.4,1.3,0);
 const cap=document.getElementById('cap'),fx=createGolemPresentation({scene:s,height:()=>0});
-const DT=1/30,ENTRY={enemy:true,root:new THREE.Group(),visual:null,data:{id:'studio',kind:'golem',hp:320,armor:3,attackTick:-1000,missingParts:[]}};
+import {golemFidget} from '../client/golem-motion.js';
+// Pick an id whose seeded idle schedule knocks on its own head inside the opening idle (review only).
+let ID='studio';for(let n=0;n<400;n++){const f={};let hit=false;for(let t=.8;t<3.6;t+=.1){golemFidget(((h=>{for(const c of 'g'+n)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;})(0x811c9dc5)),t,f);if(f.type==='knock'&&f.u>.3&&f.u<.7){hit=true;break;}}if(hit){ID='g'+n;break;}}
+const DT=1/30,ENTRY={enemy:true,root:new THREE.Group(),visual:null,data:{id:ID,kind:'golem',hp:320,armor:3,attackTick:-1000,missingParts:[]}};
 s.add(ENTRY.root);const actors=new Map([['e:studio',ENTRY]]);
-// Timeline (seconds): what the simulation would publish, sampled per frame.
-const SEG=[[0,'Idle'],[2.2,'Walk'],[5.6,'Slam'],[7.4,'Hit react'],[9.2,'Arm broken off'],[10.6,'Leg broken off: limping'],[13.8,'Both legs gone: crawling']];
+// Timeline (seconds): what the simulation would publish, sampled per frame. ?before shows the shipped motion's segments.
+const SEG=[[0,'Idle: knocks on its own head'],[4.4,'Notices a Hero: chest beat'],[6.2,'Walk'],[9.4,'Turns on the spot'],[10.8,'Slam'],[12.6,'Hit react'],[14.4,'Arm broken off'],[15.8,'Leg broken off: limping'],[19,'Both legs gone: crawling']];
+const hero=new THREE.Mesh(new THREE.CapsuleGeometry(.3,1.1,4,8),new THREE.MeshStandardMaterial({color:0x4a7fd0,roughness:.6}));hero.castShadow=true;hero.visible=false;s.add(hero);
 function state(t){
- const d=ENTRY.data,walking=(t>=2.2&&t<5.4)||(t>=10.6&&t<16.5);
- let x=-3.2;x+=Math.min(Math.max(t-2.2,0),3.2)*1.25;if(t>10.6)x+=Math.min(t-10.6,3.2)*1.25*.55;if(t>13.8)x+=Math.min(t-13.8,2.7)*1.25*.2;
- ENTRY.root.position.set(x,0,0);ENTRY.root.rotation.y=-Math.PI/2; // walks along +X (actor forward is -Z)
- d.attackTick=t>=5.6?Math.round(5.6*60):-1000;
- const hits=[7.4,8.2].filter(h=>t>=h);d.hurtTick=hits.length?Math.round(hits.at(-1)*60):undefined;
- d.missingParts=[...(t>=9.2?['rightArm']:[]),...(t>=10.6?['leftLeg']:[]),...(t>=13.8?['rightLeg']:[])];
- d.armor=t>=9.2?1:3;d.hp=t>=9.2?120:320;return walking;}
+ const d=ENTRY.data,walking=(t>=6.2&&t<9.2)||(t>=15.8&&t<21.5);
+ let x=-3.2;x+=Math.min(Math.max(t-6.2,0),3)*1.25;if(t>15.8)x+=Math.min(t-15.8,3.2)*1.25*.55;if(t>19)x+=Math.min(t-19,2.5)*1.25*.2;
+ ENTRY.root.position.set(x,0,0);
+ // walks along +X (actor forward is -Z); turns a full 90 degrees on the spot, then back
+ const turn=t<9.4?0:t<10.1?((t-9.4)/.7):t<10.8?1-((t-10.1)/.7):0;
+ ENTRY.root.rotation.y=-Math.PI/2+Math.sin(Math.PI/2*Math.min(1,turn))*1.2;
+ d.attackTick=t>=10.8?Math.round(10.8*60):-1000;
+ const hits=[12.6,13.4].filter(h=>t>=h);d.hurtTick=hits.length?Math.round(hits.at(-1)*60):undefined;
+ d.missingParts=[...(t>=14.4?['rightArm']:[]),...(t>=15.8?['leftLeg']:[]),...(t>=19?['rightLeg']:[])];
+ d.armor=t>=14.4?1:3;d.hp=t>=14.4?120:320;
+ const seen=t>=4.4;hero.visible=seen;hero.position.set(x+(t<6.2?8:t<9.4?5.5:3.2),.85,0);
+ return {walking,threats:seen?[[hero.position.x,0,0]]:[]};}
 let lastHurt;
-window.studio={ready:false,frames:Math.round(17*30),frame(i){
- const t=i*DT;state(t);const d=ENTRY.data;
- if(d.hurtTick!==lastHurt&&d.hurtTick!==undefined){noteEnemyHit(ENTRY,{part:t<8?'torso':'leftArm',normal:[-.3,0,.9]});lastHurt=d.hurtTick;}
+window.studio={ready:false,probe(names){const out={},inv=ENTRY.root.matrixWorld.clone().invert();ENTRY.root.updateWorldMatrix(true,true);for(const n of names){const fist=/^Fist/.test(n),o=ENTRY.visual.getObjectByName(fist?'Elbow'+n.slice(4):n);if(!o)continue;const v=(fist?o.localToWorld(new THREE.Vector3(0,-.6,.1)):o.children.length||o.isMesh?new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()):o.getWorldPosition(new THREE.Vector3())).applyMatrix4(inv);out[n]=[+v.x.toFixed(2),+v.y.toFixed(2),+(-v.z).toFixed(2)];}return out;},frames:Math.round(21.7*30),skip(i){return this.frame(i,true);},frame(i,quiet){
+ const t=i*DT,w=state(t);const d=ENTRY.data;
+ if(d.hurtTick!==lastHurt&&d.hurtTick!==undefined){noteEnemyHit(ENTRY,{part:t<13.4?'torso':'head',normal:[.9,0,-.3]});lastHurt=d.hurtTick;}
  updateGolemArmor(ENTRY.visual,d.armor);maskMissingParts(ENTRY.visual,d.missingParts);
- applyEnemyMotion(ENTRY,{tick:t*60,dt:DT,height:()=>0});fx.update(actors,t*60,DT,t);
- const gx=ENTRY.root.position.x;cam.position.set(gx+3.6,2.3,4.6);cam.lookAt(gx-.2,1.25,0);sun.position.set(gx+6,10,4);sun.target.position.set(gx,0,0);sun.target.updateMatrixWorld();
- cap.textContent=SEG.filter(([a])=>t>=a).at(-1)[1];r.render(s,cam);return t;}};
+ applyEnemyMotion(ENTRY,{tick:t*60,dt:DT,height:()=>0,threats:w.threats});fx.update(actors,t*60,DT,t);
+ const gx=ENTRY.root.position.x,view=q.get('cam')||'three',fw=new THREE.Vector3(0,0,-1).applyQuaternion(ENTRY.root.quaternion),rt=new THREE.Vector3(1,0,0).applyQuaternion(ENTRY.root.quaternion);
+ if(view==='front')cam.position.set(gx+fw.x*5.5,1.8,fw.z*5.5);else if(view==='side')cam.position.set(gx+rt.x*5.5,1.8,rt.z*5.5);else cam.position.set(gx+3.6,2.3,4.6);cam.lookAt(gx-(view==='three'?.2:0),1.25,0);sun.position.set(gx+6,10,4);sun.target.position.set(gx,0,0);sun.target.updateMatrixWorld();
+ cap.textContent=SEG.filter(([a])=>t>=a).at(-1)[1];if(!quiet)r.render(s,cam);return t;}};
 new GLTFLoader().load('/assets/golem.glb',gltf=>{
  gltf.scene.traverse(n=>{if(n.isMesh)n.castShadow=true;for(const m of [n.material].flat())if(m&&/^crystal/i.test(m.name))m.emissive.setRGB(.3,.62,1);});
  ENTRY.visual=prepareAsset(gltf,'golem',2.8).visual;ENTRY.root.add(ENTRY.visual);

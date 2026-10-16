@@ -120,6 +120,13 @@ export function createGolemPresentation({scene, height = () => 0, audio = () => 
     thump(v, big ? 80 : 110, 36, big ? .8 : .45, big ? .6 : .3); grit(v, 260, big ? .5 : .3, big ? 1.1 : .5, .6, rnd());
     v.done(v.t + (big ? 1.7 : 1));
   }
+  // A fist on its own stone: a hollow knock (chest beats are deep and boomy, head knocks short and woody).
+  function soundKnock(pos, chest) {
+    const v = voice(pos); if (!v) return;
+    thump(v, chest ? 120 : 260, chest ? 55 : 150, chest ? .7 : .35, chest ? .28 : .12); grit(v, chest ? 700 : 1600, chest ? .3 : .18, chest ? .16 : .07, 1.1, rnd());
+    if (chest) bell(v, 392, .05, .6);
+    v.done(v.t + (chest ? .7 : .3));
+  }
   function rumble(pos, near, amplitude, ms) {
     const l = listener(); if (!haptic || !l) return;
     const d = Math.hypot(pos.x - l.position[0], pos.z - l.position[2]); if (d > near) return;
@@ -167,6 +174,11 @@ export function createGolemPresentation({scene, height = () => 0, audio = () => 
           ground(leg, _p); stats.steps++;
           for (let i = 0; i < 3; i++) puff(_p.x, _p.y, _p.z, .55, .6, .32 * e.strength);
           soundStep(_p, e.strength); rumble(_p, 7, .22, 30);
+        } else if (e.type === 'thump' || e.type === 'knock') {
+          const chest = e.type === 'thump', node = entry.visual.getObjectByName(chest ? 'BodyCore' : 'Head'); if (!node) continue;
+          node.getWorldPosition(_p); stats.knocks = (stats.knocks || 0) + 1; rec.flash = Math.max(rec.flash, chest ? .45 : .15);
+          for (let i = 0; i < (chest ? 4 : 2); i++) puff(_p.x, _p.y - .2, _p.z, chest ? .35 : .2, .5, chest ? .22 : .12);
+          soundKnock(_p, chest); if (chest) rumble(_p, 9, .25, 40);
         } else if (e.type === 'telegraph') {
           entry.root.getWorldPosition(_p); stats.telegraphs++; soundTelegraph(_p);
         } else if (e.type === 'slam') {

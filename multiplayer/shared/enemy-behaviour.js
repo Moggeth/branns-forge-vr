@@ -6,6 +6,7 @@ import {entSpec,entWaking,entRooting} from './ents.js';
 import {STUMPLING,stepStumplingMotion} from './stumplings.js';
 import {clampToWorld} from './keep-sites.js';
 import {skeletonKindIndex} from './skeleton-kinds.js';
+import {CRITTER,isCritter,stepCritter} from './critters.js';
 export const ENEMY_STRIKE_TICK=18;
 // A skeleton whose shield splinters reels for this long (no steering, no new swing, a swing in progress misses).
 export const FLINCH_TICKS=45;
@@ -17,7 +18,7 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // Pace personality per warband archetype (shared/skeleton-kinds.js order): Thornhood scurry, Old Bones dawdle.
 const SKELETON_PACE=[1,.96,1.08,.88,1.04,1];
 const AVOID_AHEAD=1.7,TURN_RATE=.15;
-const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
+const radius=e=>isCritter(e.kind)?CRITTER[e.kind].radius:e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
@@ -37,6 +38,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}
+  // Kettlebellies, Bramblehogs and Kegtoters run their own rules (shared/critters.js); they never join battle lanes.
+  if(isCritter(e.kind)){stepCritter(state,e,{heroes,foes:state.enemies,buildings,ground,resolve,damageHero,damageEnemy:(f,n,ev,side,ownerId)=>damageEnemy?.(f,n,ev,side,ownerId),damageStructure:(id,n,ev)=>damageStructure?.(id,n,ev),events});continue;}
   const foes=battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets;
   let target=null,best=Infinity;for(const h of foes){const d=flat(e.position,h.position);if(d<best){best=d;target=h;}}
   let patrol=false;

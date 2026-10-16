@@ -5,7 +5,7 @@ import {RAISE_WALL,SUNDER} from './terrain.js';
 export const SPELL_SCHOOLS = Object.freeze([
   {id:'grow',label:'Grow',job:'Make the world alive and feed the Heroes',spells:['grove','ring','wave','heal','spring','blessing']},
   {id:'shape',label:'Shape',job:'Move the land: paths, cover and ore',spells:['raise','lower','wall','sunder','crystal','quake']},
-  {id:'summon',label:'Summon',job:'Call creatures: foes that drop loot, and allies',spells:['skeleton','squad','golem','awaken','wildwake']},
+  {id:'summon',label:'Summon',job:'Call creatures: foes that drop loot, and allies',spells:['skeleton','squad','golem','awaken','wildwake','rabble']},
   {id:'sky',label:'Sky',job:'Instant strikes and weather',spells:['lightning','frost','starfall','rainfall']},
 ].map(s=>Object.freeze({...s,spells:Object.freeze(s.spells)})));
 const SCHOOL_OF = Object.fromEntries(SPELL_SCHOOLS.flatMap(s=>s.spells.map(id=>[id,s.id])));
@@ -13,6 +13,7 @@ export const SPELLS = Object.freeze([
   {id:'skeleton',label:'Skeleton',cost:15,target:'point',icon:'☠'},
   {id:'squad',label:'Skeleton Squad',cost:38,target:'point',icon:'☠'},
   {id:'golem',label:'Stone Golem',cost:45,target:'point',icon:'◆'},
+  {id:'rabble',label:'Rabble',cost:30,target:'point',icon:'✺'}, // one of the shared/critters.js rabble, picked by the cast id
   {id:'raise',label:'Raise Earth',cost:12,target:'point',icon:'▲'},
   {id:'lower',label:'Lower Earth',cost:12,target:'point',icon:'▼'},
   {id:'sunder',label:'Sunder',cost:14,target:'line',icon:'ϟ'},
@@ -48,7 +49,7 @@ export const WEAPONS = Object.freeze([
 // Creatures, trees and crystal stay off the forge apron (wider during an
 // expedition for creatures), and trees keep room inside the mountain wall.
 export const FORGE_APRON = 7, EXPEDITION_KEEP_OUT = 12, GROVE_EDGE = 51;
-const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem'], SUMMONS = ['skeleton','squad','golem'];
+const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem','rabble'], SUMMONS = ['skeleton','squad','golem','rabble'];
 export function settleCastPoint(spell, point, {expedition = false} = {}) {
   let [x, y, z] = point;
   if (spell === 'grove' || spell === 'ring') { x = Math.max(-GROVE_EDGE, Math.min(GROVE_EDGE, x)); z = Math.max(-GROVE_EDGE, Math.min(GROVE_EDGE, z)); }
@@ -59,7 +60,7 @@ export function settleCastPoint(spell, point, {expedition = false} = {}) {
 
 // Spatial preview dimensions mirror authoritative spell effects and world-content tree sites.
 export const SPELL_TARGET_SHAPES = Object.freeze({
-  skeleton: { r: 2 }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 },
+  skeleton: { r: 2 }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 }, rabble: { r: 2.2 },
   raise: { r: 6, h: 2 }, lower: { r: 6, h: -2 },
   // Earth lines: kr is the trench lip / wall foot half-width, kh the full depth/height, bank the chasm's outer spoil edge.
   sunder: { line: true, kr: SUNDER.width, kh: -SUNDER.depth, bank: SUNDER.bankOut }, wall: { line: true, kr: RAISE_WALL.width, kh: RAISE_WALL.peak },
