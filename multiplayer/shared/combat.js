@@ -6,7 +6,7 @@ import {queueMeteorReward} from './resources.js';
 import {ENT_SIZES,entSpec,entPartPosition,entPartReach,severEntLimb,dropEntTimber} from './ents.js';
 import {TREE_LIMITS} from './trees.js';
 import {STUMPLING,stumplingParts,dropStumplingLoot} from './stumplings.js';
-import {SALT,saltbackParts,dropSaltbackLoot} from './salt-mine-rules.js';
+import {SALT,saltbackParts,dropSaltbackLoot,saltbackMaxHp} from './salt-mine-rules.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
 import {WYRMSPOUT,sprayTuning,spendGlob,clingSplash} from './wyrmspout.js';
@@ -76,7 +76,7 @@ function embedDepth(kind,part,measured,targetId){
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();if(kind==='saltback')return saltbackParts();return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
 // Save/restore ceilings shared by every creature kind (ents carry their size class).
-export const enemyMaxHp=e=>e?.kind==='saltback'?SALT.crab.hp:e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
+export const enemyMaxHp=e=>e?.kind==='saltback'?saltbackMaxHp(e):e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
 export const enemyPartMax=(e,part)=>e?.kind==='saltback'?SALT.crab.part:e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120:part==='torso'?100:55;
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
 export function applyEnemyScorch(enemy,part,amount){

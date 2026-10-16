@@ -11,27 +11,35 @@
 //   a salt heart out of the rock. The vent then seeps full again over a couple of minutes.
 // - Saltback crabs: hermit crabs in salt-crystal shells. While Heroes are in a mine they climb out of its brine pools
 //   (a few at a time), scuttle sideways at the nearest Hero and pinch. Hurt badly, they bolt for the pool and dive;
-//   left alone, they wander home and dive anyway. Felled, they drop the salt off their shells.
+//   left alone, they wander home and dive anyway. Felled, they drop the salt off their shells. Now and then the one
+//   climbing out of the Brine Deep's lake wears a tiny gold crown: King Pinchy, tougher, grumpier and much richer.
+// - The Great Salt Shaker: in the grotto past the squeeze, a golden idol on a salt plinth. Give it a good knock and
+//   it showers salt; it fills up again after a while.
 import {MINE, MINE_SIDES, mineCeiling, mineDepth, mineField, mineInside, minePoint, mineSideAt, mineWalkable, portalAlong} from './salt-mines.js';
 import {DEPOSIT_CATALOG} from './material-catalog.js';
 
 export const SALT = Object.freeze({
   check: 30,                      // ticks between seam checks
-  seamsPerMine: 5,
+  seamsPerMine: 7,
   respawn: Object.freeze([5400, 9000]), // 1.5-2.5 minutes at 60 Hz
   heroClear: 5,                   // a seam never glows out within this distance of a Hero
   heart: .14,                     // chance a fresh seam deep in the hall is a salt heart
-  strain: Object.freeze({salt: 9, saltHeart: 14, saltRubble: 3, blast: 45, limit: 100, early: 55, earlyChance: .22, release: 60, decayTicks: 75}),
+  richHeart: .32,                 // ... in the Brine Deep, where the salt grows richest
+  strain: Object.freeze({salt: 9, saltHeart: 14, saltRubble: 3, saltShaker: 0, blast: 45, limit: 100, early: 55, earlyChance: .22, release: 60, decayTicks: 75}),
   fall: Object.freeze({warnTicks: 105, radius: 1.65, damage: 30, crab: 70, near: Object.freeze([.35, 1.45]), cap: 6, rubbleCap: 3}),
   damp: Object.freeze({refill: 7800, reach: 1.5, height: 2.4, radius: 4.4, damage: 46, crab: 110, burst: 6, falls: 2}),
   crab: Object.freeze({
     maxPerMine: 3, worldCap: 58, spawnCheck: 240, emergeTicks: 72, diveTicks: 54, idleTicks: 1500,
     hp: 60, part: 60, radius: .36, height: .55, aggro: 8.5, reach: 1.25, windup: 21, cooldown: 90, damage: 9,
     scuttle: 2.55, wander: .9, flee: 3.1, fleeBelow: .3, loot: 2,
+    king: Object.freeze({chance: .2, hp: 150, damage: 15, loot: 10}), // King Pinchy, only ever from the lake
   }),
+  shaker: Object.freeze({refill: 21600, firstTick: 600, shower: 6}), // fills up again in six minutes; knocked empty, it rains loose salt
 });
-// Firedamp vents, in corner space (the same in both mines).
-export const DAMP_VENTS = Object.freeze([Object.freeze([56.3, 59.7]), Object.freeze([62.7, 55.7])]);
+// Firedamp vents, in corner space (the same in both mines): two in the hall and one by the Brine Deep's squeeze.
+export const DAMP_VENTS = Object.freeze([Object.freeze([56.9, 58.7]), Object.freeze([62.7, 55.7]), Object.freeze([63.6, 45.3])]);
+// The Great Salt Shaker's plinth, at the back of the grotto.
+export const SHAKER_SPOT = Object.freeze([58.75, 42.35]);
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -44,20 +52,23 @@ function mix(...parts) {
   return h >>> 0;
 }
 const unit = (...p) => mix(...p) / 4294967296;
-export const SALT_KINDS = Object.freeze(['salt', 'saltHeart', 'saltRubble']);
+export const SALT_KINDS = Object.freeze(['salt', 'saltHeart', 'saltRubble', 'saltShaker']);
 export const isSaltDeposit = d => SALT_KINDS.includes(d?.kind);
 export const isSeam = d => Number.isInteger(d?.seam);
 export const isSaltback = e => e?.kind === 'saltback';
+export const isShaker = d => d?.kind === 'saltShaker';
+export const saltbackMaxHp = e => e?.crown ? SALT.crab.king.hp : SALT.crab.hp;
 
 // ---- Fixed spots, found once from the mine's shape (pure maths, the same on every peer), in corner space.
 // Seam spots hug the walls a little inside the walking line, so a Hero can stand in front and swing.
 function findSpots() {
   const spots = [], target = MINE.walk + .5;
-  const keep = (u, v, deep) => {
+  const keep = (u, v, deep, rich = false) => {
     if (spots.some(s => Math.hypot(s.u - u, s.v - v) < 1.75)) return;
     if (MINE.pools.some(p => Math.hypot(p[0] - u, p[1] - v) < p[2] + 1)) return;
     if (DAMP_VENTS.some(p => Math.hypot(p[0] - u, p[1] - v) < 1.9)) return;
-    spots.push(Object.freeze({u: +u.toFixed(3), v: +v.toFixed(3), deep}));
+    if (MINE.drifts.some(q => q.name !== 'deep' && Math.hypot(q.points[0][0] - u, q.points[0][1] - v) < 2.2)) return; // keep the drifts' mouths clear
+    spots.push(Object.freeze({u: +u.toFixed(3), v: +v.toFixed(3), deep, ...(rich ? {rich} : {})}));
   };
   const toWall = (pu, pv, du, dv, hi) => {
     let lo = 0;
@@ -65,16 +76,27 @@ function findSpots() {
     const u = pu + du * lo, v = pv + dv * lo, [x, z] = minePoint('east', [u, v]);
     return Math.abs(mineInside(x, z) - target) < .08 ? [u, v] : null;
   };
-  for (const h of MINE.halls) for (let k = 0; k < 40; k++) {
-    const a = k / 40 * Math.PI * 2, at = toWall(h[0], h[1], Math.cos(a), Math.sin(a), 9);
-    if (at && mineField(at[0], at[1]).along > portalAlong() + 6.5) keep(at[0], at[1], true);
-  }
+  // The hall and the Brine Deep (the chapel keeps its carvings and the grotto its idol: no seams there).
+  MINE.halls.forEach((h, i) => {
+    if (i === MINE.chapel || i === MINE.grotto) return;
+    for (let k = 0; k < 40; k++) {
+      const a = k / 40 * Math.PI * 2, at = toWall(h[0], h[1], Math.cos(a), Math.sin(a), 9);
+      if (at && mineField(at[0], at[1]).along > portalAlong() + 6.5 && mineField(at[0], at[1]).room === i) keep(at[0], at[1], true, i === MINE.deep);
+    }
+  });
   for (let i = 2; i < MINE.path.length - 1; i++) {
     const a = MINE.path[i], b = MINE.path[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     for (const f of [.2, .5, .8]) for (const side of [-1, 1]) {
       const at = toWall(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, -(b[1] - a[1]) / len * side, (b[0] - a[0]) / len * side, 4);
       if (at) keep(at[0], at[1], false);
     }
+  }
+  // The drift down to the Brine Deep.
+  const d = MINE.drifts.find(q => q.name === 'deep').points;
+  for (let i = 0; i < d.length - 1; i++) for (const side of [-1, 1]) {
+    const a = d[i], b = d[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const at = toWall((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, -(b[1] - a[1]) / len * side, (b[0] - a[0]) / len * side, 4);
+    if (at) keep(at[0], at[1], true);
   }
   return Object.freeze(spots);
 }
@@ -86,7 +108,7 @@ export const poolPoint = (side, i) => minePoint(side, [MINE.pools[i][0], MINE.po
 const mineOf = d => d.mine === 'east' || d.mine === 'west' ? d.mine : mineSideAt(d.x, d.z);
 
 /** Fresh mine bookkeeping: roof strain and firedamp vents per mine, and falls on their way down. */
-export const emptyMines = () => ({east: {strain: 0, damp: [0, 0]}, west: {strain: 0, damp: [0, 0]}, falls: []});
+export const emptyMines = () => ({east: {strain: 0, damp: DAMP_VENTS.map(() => 0)}, west: {strain: 0, damp: DAMP_VENTS.map(() => 0)}, falls: []});
 const heroesIn = (state, side) => (state.players || []).filter(p => p.role === 'hero' && p.hp > 0 && mineDepth(p.position[0], p.position[2]) > .3 && mineSideAt(p.position[0], p.position[2]) === side);
 
 // ---- Seams
@@ -97,7 +119,7 @@ function placeSeam(state, side, slot, previous) {
     if (previous && Math.hypot(previous.x - x, previous.z - z) < 2) continue;
     if (live.some(d => Math.hypot(d.x - x, d.z - z) < 2)) continue;
     if (!previous?.initial && (state.players || []).some(p => p.role === 'hero' && Math.hypot(p.position[0] - x, p.position[2] - z) < SALT.heroClear)) continue;
-    const heart = s.deep && !live.some(d => d.kind === 'saltHeart') && unit(seed, side, slot, tick, 'heart') < SALT.heart;
+    const heart = s.deep && !live.some(d => d.kind === 'saltHeart') && unit(seed, side, slot, tick, 'heart') < (s.rich ? SALT.richHeart : SALT.heart);
     return {x: +x.toFixed(3), z: +z.toFixed(3), kind: heart ? 'saltHeart' : 'salt'};
   }
   return null;
@@ -121,6 +143,35 @@ function stepSeams(state, ctx, events) {
     const id = `salt${slot}t${state.tick}`, c = DEPOSIT_CATALOG[spot.kind], y = ctx.terrainHeight(state, spot.x, spot.z);
     state.deposits.push({id, x: spot.x, z: spot.z, kind: spot.kind, hits: 0, maxHits: c.maxHits, depleted: false, mine: side, seam: slot});
     events.push({kind: 'geology_emerge', id, material: 'salt', position: [spot.x, y, spot.z], tick: state.tick, salt: spot.kind});
+  }
+}
+
+// ---- The Great Salt Shaker: one per mine, always on its plinth; knocked empty, it fills again after a while.
+export const shakerId = side => `shaker${side[0]}`;
+export const shakerPoint = side => minePoint(side, SHAKER_SPOT);
+function stepShakers(state, ctx, events) {
+  if (!Array.isArray(state.deposits) || state.tick < SALT.shaker.firstTick) return;
+  for (const side of MINE_SIDES) {
+    const id = shakerId(side), old = state.deposits.find(d => d.id === id);
+    if (old && !old.depleted) continue;
+    if (old && old.respawnTick === undefined) {
+      old.respawnTick = state.tick + SALT.shaker.refill;
+      // Salt pours from its cap and rains all round the plinth, on top of the heap it gives itself.
+      for (let k = 0; k < SALT.shaker.shower && state.pickups.length < 256; k++) {
+        const a = (k + unit(state.seed | 0, side, state.tick, k, 'shower')) / SALT.shaker.shower * Math.PI * 2;
+        let px = old.x + Math.cos(a) * 1.05, pz = old.z + Math.sin(a) * 1.05;
+        if (!mineWalkable(px, pz)) { px = old.x + Math.cos(a) * .7; pz = old.z + Math.sin(a) * .7; }
+        state.pickups.push({id: ctx.nextId(state, 'p'), kind: 'salt', x: +px.toFixed(3), z: +pz.toFixed(3), y: ctx.terrainHeight(state, px, pz), amount: 1});
+      }
+      events.push({kind: 'shaker_shower', side, position: [old.x, ctx.terrainHeight(state, old.x, old.z), old.z]});
+      continue;
+    }
+    if (old && state.tick < old.respawnTick) continue;
+    if (!old && state.deposits.length + (state.pendingStarfalls?.length || 0) >= 80) continue;
+    const [x, z] = shakerPoint(side), c = DEPOSIT_CATALOG.saltShaker;
+    if (old) state.deposits.splice(state.deposits.indexOf(old), 1);
+    state.deposits.push({id, x: +x.toFixed(3), z: +z.toFixed(3), kind: 'saltShaker', hits: 0, maxHits: c.maxHits, depleted: false, mine: side});
+    events.push({kind: 'shaker_full', side, id, position: [x, ctx.terrainHeight(state, x, z), z]});
   }
 }
 
@@ -224,9 +275,9 @@ function stepDamp(state, ctx, events) {
 
 // ---- Saltback crabs
 export const saltbackParts = () => ({head: SALT.crab.part, torso: SALT.crab.part, leftArm: SALT.crab.part, rightArm: SALT.crab.part, leftLeg: SALT.crab.part, rightLeg: SALT.crab.part});
-export function createSaltback(id, side, pool, tick, seed, y) {
+export function createSaltback(id, side, pool, tick, seed, y, crown = false) {
   const [x, z] = poolPoint(side, pool);
-  return {id, kind: 'saltback', position: [x, y, z], yaw: wrap(unit(seed, id, 'yaw') * Math.PI * 2), hp: SALT.crab.hp, parts: saltbackParts(), missingParts: [], attackTick: -1000, wakeTick: tick, home: [+x.toFixed(3), +z.toFixed(3)]};
+  return {id, kind: 'saltback', position: [x, y, z], yaw: wrap(unit(seed, id, 'yaw') * Math.PI * 2), hp: crown ? SALT.crab.king.hp : SALT.crab.hp, parts: saltbackParts(), missingParts: [], attackTick: -1000, wakeTick: tick, home: [+x.toFixed(3), +z.toFixed(3)], ...(crown ? {crown: true} : {})};
 }
 export const saltbackEmerging = (e, tick) => tick - e.wakeTick < SALT.crab.emergeTicks;
 export const saltbackDiving = (e, tick) => e.diveTick !== undefined && tick >= e.diveTick;
@@ -246,9 +297,10 @@ function stepCrabs(state, ctx, events) {
     if (crabs.length && unit(state.seed | 0, side, state.tick, 'crab') < .5) continue;
     const pool = Math.floor(unit(state.seed | 0, side, state.tick, 'pool') * MINE.pools.length), [x, z] = poolPoint(side, pool);
     if (here.some(p => Math.hypot(p.position[0] - x, p.position[2] - z) < 1.6)) continue; // not under a Hero's boots
-    const crab = createSaltback(ctx.nextId(state, 'crab'), side, pool, state.tick, state.seed | 0, ctx.terrainHeight(state, x, z));
+    const king = pool === MINE.lake && !crabs.some(e => e.crown) && unit(state.seed | 0, side, state.tick, 'king') < C.king.chance;
+    const crab = createSaltback(ctx.nextId(state, 'crab'), side, pool, state.tick, state.seed | 0, ctx.terrainHeight(state, x, z), king);
     state.enemies.push(crab);
-    events.push({kind: 'saltback_emerge', id: crab.id, side, position: [...crab.position], tick: state.tick, material: 'salt'});
+    events.push({kind: 'saltback_emerge', id: crab.id, side, position: [...crab.position], tick: state.tick, material: 'salt', ...(king ? {crown: true} : {})});
   }
 }
 /**
@@ -265,7 +317,7 @@ export function stepSaltbackMotion(state, e, {heroes, ground, resolve, damageHer
     const d = flat(e.position, h.position); if (d < best && Math.abs(h.position[1] - e.position[1]) < 2) { best = d; target = h; }
   }
   if (target) e.seenTick = tick;
-  const hurt = e.hp <= C.hp * C.fleeBelow, home = [e.home[0], e.position[1], e.home[1]], toHome = flat(e.position, home);
+  const hurt = e.hp <= saltbackMaxHp(e) * C.fleeBelow, home = [e.home[0], e.position[1], e.home[1]], toHome = flat(e.position, home);
   // Bolting home hurt, or bored with no Hero about: dive back into the brine once there.
   const bored = !target && tick - Math.max(e.wakeTick, e.seenTick ?? e.wakeTick) > C.idleTicks;
   if ((hurt || bored) && toHome < .6) { e.diveTick = tick; events?.push({kind: 'saltback_dive', id: e.id, position: [...e.position]}); return; }
@@ -276,7 +328,7 @@ export function stepSaltbackMotion(state, e, {heroes, ground, resolve, damageHer
       const victim = heroes.find(h => h.id === e.attackTarget);
       if (victim && victim.hp > 0) {
         const d = flat(e.position, victim.position), dot = (-Math.sin(e.yaw) * (victim.position[0] - e.position[0]) - Math.cos(e.yaw) * (victim.position[2] - e.position[2])) / Math.max(d, .001);
-        if (d < C.reach + .35 && dot > .5 && Math.abs(victim.position[1] - e.position[1]) < 1.6 && (e.hurtTick ?? -1e9) < e.attackTick) damageHero(state, victim, C.damage, events, e.position);
+        if (d < C.reach + .35 && dot > .5 && Math.abs(victim.position[1] - e.position[1]) < 1.6 && (e.hurtTick ?? -1e9) < e.attackTick) damageHero(state, victim, e.crown ? C.king.damage : C.damage, events, e.position);
       }
     }
     return;
@@ -321,9 +373,9 @@ export function stepSaltbackMotion(state, e, {heroes, ground, resolve, damageHer
 /** Loot from a felled crab: the salt off its shell, where it fell. ctx: {nextId, terrainHeight}. */
 export function dropSaltbackLoot(state, e, ctx, events) {
   if (state.pickups.length >= 256) return;
-  const [x, , z] = e.position;
-  state.pickups.push({id: ctx.nextId(state, 'p'), kind: 'salt', x: +x.toFixed(3), z: +z.toFixed(3), y: ctx.terrainHeight(state, x, z), amount: SALT.crab.loot});
-  events.push({kind: 'saltback_loot', id: e.id, position: [...e.position], salt: SALT.crab.loot});
+  const [x, , z] = e.position, amount = e.crown ? SALT.crab.king.loot : SALT.crab.loot;
+  state.pickups.push({id: ctx.nextId(state, 'p'), kind: 'salt', x: +x.toFixed(3), z: +z.toFixed(3), y: ctx.terrainHeight(state, x, z), amount});
+  events.push({kind: 'saltback_loot', id: e.id, position: [...e.position], salt: amount, ...(e.crown ? {crown: true} : {})});
 }
 
 /** Root calls once per simulation tick (after enemy movement). ctx: {terrainHeight(state,x,z), nextId(state,prefix),
@@ -336,7 +388,7 @@ export function stepSaltMines(state, ctx, events = []) {
   landFalls(state, ctx, events);
   stepDamp(state, ctx, events);
   stepCrabs(state, ctx, events);
-  if (state.tick % SALT.check === 0 || state.tick === 1) stepSeams(state, ctx, events);
+  if (state.tick % SALT.check === 0 || state.tick === 1) { stepSeams(state, ctx, events); stepShakers(state, ctx, events); }
 }
 
 // ---- Strict save validation.
@@ -366,6 +418,12 @@ export function restoreMines(saved) {
 export function validateMineDeposit(d, tick, slots) {
   if (d.mine === undefined) { if (d.seam !== undefined || isSaltDeposit(d)) throw Error('Invalid salt deposit'); return; }
   if (!MINE_SIDES.includes(d.mine) || !isSaltDeposit(d) || mineInside(d.x, d.z) < 0) throw Error('Invalid salt deposit');
+  if (isShaker(d)) {
+    const [x, z] = shakerPoint(d.mine);
+    if (d.id !== shakerId(d.mine) || d.seam !== undefined || Math.abs(d.x - x) > .01 || Math.abs(d.z - z) > .01) throw Error('Invalid salt deposit');
+    if (d.respawnTick !== undefined && (!d.depleted || !Number.isSafeInteger(d.respawnTick) || d.respawnTick < 0 || d.respawnTick > tick + SALT.shaker.refill)) throw Error('Invalid salt deposit');
+    return;
+  }
   if (d.seam === undefined) { if (d.respawnTick !== undefined && d.vein === undefined) throw Error('Invalid salt deposit'); return; }
   if (!Number.isInteger(d.seam) || d.seam < 0 || d.seam >= SALT.seamsPerMine * 2 || slots.has(d.seam) || slotSide(d.seam) !== d.mine || d.vein !== undefined) throw Error('Invalid salt deposit');
   if (d.respawnTick !== undefined && (!d.depleted || !Number.isSafeInteger(d.respawnTick) || d.respawnTick < 0 || d.respawnTick > tick + SALT.respawn[1])) throw Error('Invalid salt deposit');
@@ -373,10 +431,11 @@ export function validateMineDeposit(d, tick, slots) {
 }
 /** A saved crab must be a whole, plausible crab living in one of the mines. */
 export function validSaltback(e, saved) {
-  if (!isSaltback(e)) return e.diveTick === undefined && e.seenTick === undefined;
+  if (!isSaltback(e)) return e.diveTick === undefined && e.seenTick === undefined && e.crown === undefined;
+  if (e.crown !== undefined && (e.crown !== true || !MINE_SIDES.some(side => { const [x, z] = poolPoint(side, MINE.lake); return Math.abs(x - e.home[0]) < .01 && Math.abs(z - e.home[1]) < .01; }))) return false;
   const C = SALT.crab;
   return Number.isSafeInteger(e.wakeTick) && e.wakeTick >= 0 && e.wakeTick <= saved.tick && Array.isArray(e.home) && e.home.length === 2 && e.home.every(finite) &&
     MINE.pools.some((p, i) => MINE_SIDES.some(side => { const [x, z] = poolPoint(side, i); return Math.abs(x - e.home[0]) < .01 && Math.abs(z - e.home[1]) < .01; })) &&
     (e.diveTick === undefined || (validTick(e.diveTick, saved.tick) && saved.tick < e.diveTick + C.diveTicks)) && (e.seenTick === undefined || validTick(e.seenTick, saved.tick)) &&
-    e.hp <= C.hp && mineInside(e.position[0], e.position[2]) > 0;
+    e.hp <= saltbackMaxHp(e) && mineInside(e.position[0], e.position[2]) > 0;
 }

@@ -35,7 +35,7 @@ import {waistPouchPosition,POUCH_RULES,capsuleDistance,isFelled,cutLocalHeight} 
 import {terrainHeight as sharedTerrainHeight,moveOnTerrain,terrainFrameKey,terrainDirtyEdits,foundationTerrainKey,terrainRenderVertex,hasActiveTerrain,unminedHeight} from '../shared/terrain.js';
 import {mineCarve} from '../shared/salt-mines.js';
 import {createSaltMineView} from './salt-mine-view.js';
-import {KIT_URL as SALT_MINE_KIT_URL} from './salt-mine-props.js';
+import {KIT_URL as SALT_MINE_KIT_URL,CURIOS_URL as SALT_MINE_CURIOS_URL} from './salt-mine-props.js';
 import {createStartingWorld} from './starting-world.js';
 import {installHeartstoneKit} from './heartstone-art.js';
 import {createWaygateView} from './waygate-view.js';
@@ -443,7 +443,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     onSound:event=>{if(event.kind==='stump_chirp'||event.kind==='stump_squeak')stumpChirp(event);else woodAudio?.play(event,listenerPose());},
     stumpOf:treeId=>{const cut=(snapshot.harvestedTrees||[]).find(h=>h.id===treeId),tree=cut&&worldTrees(snapshot).find(t=>t.id===treeId);return tree?{height:cutLocalHeight(tree,cut,heightAt(tree.x,tree.z,snapshot.edits))}:null;}});
   // Saltback crabs (assets-source/saltback-crab): the model streams in when the first crab surfaces; placeholders until then.
-  const saltbackView=createSaltbackView({scene,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',
+  const saltbackView=createSaltbackView({scene,height:enemyGround,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high',crown:()=>saltMines.props.crown(),
     sound:(name,position,opts)=>soundKit?.play(name,position,listenerPose(),opts),
     load:()=>loader.load('/assets/saltback-crab.glb',async gltf=>{
       if(disposed||!saltbackView.install(gltf)){disposeResources(gltf.scene);if(!disposed){report('Saltback crab model is incomplete; crabs stay as stand-ins.');saltbackView.failed();}return;}
@@ -849,6 +849,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   };
   // The Brinedeep salt mines' kit and its crabs are part of the world at entry (asset-catalog: creatures and buildings never swap in late).
   loader.load(SALT_MINE_KIT_URL,async gltf=>{if(disposed||!await saltMines.props.install(gltf,prepareStreamed))report(`Salt mine kit: ${saltMines.props.stats().failed||'not installed'}`);gltf.scene.traverse(o=>o.geometry?.dispose());/* the kit keeps its own geometry copies and the shared materials and textures */},undefined,()=>{saltMines.props.failed();report('Salt mine kit unavailable; the mines stand without their timbers.');});
+  loader.load(SALT_MINE_CURIOS_URL,async gltf=>{if(disposed||!await saltMines.props.installCurios(gltf,prepareStreamed))report(`Salt mine curios: ${saltMines.props.stats().failed||'not installed'}`);gltf.scene.traverse(o=>o.geometry?.dispose());},undefined,()=>report('Salt mine curios unavailable; the mines stand without their odds and ends.'));
   saltbackView.preload();
   for(const name of ['timberline_ballista','timberline_bolts'])loader.load(`/assets/${name}.glb`,async gltf=>{
     if(disposed){disposeResources(gltf.scene);return;}

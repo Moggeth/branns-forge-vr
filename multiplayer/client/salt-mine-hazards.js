@@ -126,6 +126,20 @@ export function createSaltMineHazards({scene, height, rockMaterial, quality = 'h
     }
   }
 
+  // The Great Salt Shaker knocked empty: salt pours from its cap in a glittering fountain, gold and pink.
+  function shower(position) {
+    const [x, y, z] = position;
+    for (let k = 0; k < (low ? 60 : 120); k++) {
+      const a = rnd() * Math.PI * 2, sp = .6 + rnd() * 1.8;
+      sparks.spawn(x + Math.cos(a) * .15, y + 1.85, z + Math.sin(a) * .15, Math.cos(a) * sp, 2.4 + rnd() * 2.2, Math.sin(a) * sp, {life: 1 + rnd() * 1.1, size: .05 + rnd() * .08, color: rnd() < .45 ? [1, .86, .45] : [1, .62, .74], drag: .7, gravity: 6.5});
+    }
+    for (let k = 0; k < (low ? 10 : 20); k++) { const a = rnd() * Math.PI * 2, sp = .5 + rnd(); dust.spawn(x, y + .4, z, Math.cos(a) * sp, .3 + rnd() * .4, Math.sin(a) * sp, {life: 1.2 + rnd(), size: .25 + rnd() * .2, color: [.95, .86, .86], drag: 1.6}); }
+  }
+  function twinkle(position) {
+    const [x, y, z] = position;
+    for (let k = 0; k < (low ? 14 : 28); k++) { const a = rnd() * Math.PI * 2, r = .3 + rnd() * .5; sparks.spawn(x + Math.cos(a) * r, y + .3 + rnd() * 1.6, z + Math.sin(a) * r, 0, .25 + rnd() * .3, 0, {life: .8 + rnd() * .8, size: .04 + rnd() * .05, color: [1, .9, .6], drag: 2}); }
+  }
+
   return {
     group,
     event(event, viewer) {
@@ -134,6 +148,9 @@ export function createSaltMineHazards({scene, height, rockMaterial, quality = 'h
       if (event.kind === 'mine_creak') { sound('mine_creak', event.position); grit = Math.max(grit, 1); }
       else if (event.kind === 'mine_fall') { fall(event.position, event.roof); stat.falls++; sound('mine_fall', event.position); kick(clamp(1.2 - dist / 14) * .9); }
       else if (event.kind === 'firedamp_blast') { blast(event.position); stat.blasts++; sound('firedamp_boom', event.position); kick(clamp(1.4 - dist / 22) * 1.6); }
+      else if (event.kind === 'shaker_shower') { shower(event.position); sound('shaker_shower', event.position); kick(clamp(1 - dist / 8) * .35); }
+      else if (event.kind === 'shaker_full') { if (dist < 30) { twinkle(event.position); sound('shaker_full', event.position); } }
+      else if (event.kind === 'saltback_emerge' && event.crown) { twinkle(event.position); sound('king_fanfare', event.position); }
     },
     /** snapshot: the latest sim snapshot (falls on their way and the vents' fill); tick: the presentation tick. */
     update(dt, {snapshot, tick, camera} = {}) {

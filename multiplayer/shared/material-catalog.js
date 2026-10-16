@@ -44,7 +44,8 @@ export const DEPOSIT_CATALOG=Object.freeze({
  // Brinedeep salt mine deposits (shared/salt-mine-rules.js).
  salt:Object.freeze({label:'Rock salt seam',maxHits:4,resource:'salt',amount:3,color:0xf2a9bd}),
  saltHeart:Object.freeze({label:'Salt heart',maxHits:6,resource:'salt',amount:10,color:0xff7fa3}),
- saltRubble:Object.freeze({label:'Salt rubble',maxHits:2,resource:'salt',amount:2,color:0xd9b7b9})
+ saltRubble:Object.freeze({label:'Salt rubble',maxHits:2,resource:'salt',amount:2,color:0xd9b7b9}),
+ saltShaker:Object.freeze({label:'The Great Salt Shaker',maxHits:5,resource:'salt',amount:10,color:0xf4c95d})
 });
 export const depositReward=kind=>{const d=Object.hasOwn(DEPOSIT_CATALOG,kind)?DEPOSIT_CATALOG[kind]:null;return d?{kind:d.resource,amount:d.amount}:null;};
 export const emptyMaterials=()=>Object.fromEntries(MATERIAL_KEYS.map(key=>[key,0]));

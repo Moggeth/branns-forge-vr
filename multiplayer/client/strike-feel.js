@@ -57,7 +57,7 @@ export function strikeMaterial(targetId, snapshot = {}, {trees = [], structureMa
   if (enemy) return enemy.kind === 'golem' || enemy.kind === 'saltback' ? 'stone' : enemy.kind === 'ent' || enemy.kind === 'stumpling' ? 'wood' : 'bone';
   if (snapshot.players?.some(p => p.id === targetId)) return 'flesh';
   const ore = snapshot.deposits?.find(d => d.id === targetId);
-  if (ore) return ore.kind === 'crystal' || ore.special === 'crystal' ? 'crystal' : 'stone';
+  if (ore) return ore.kind === 'crystal' || ore.special === 'crystal' ? 'crystal' : ore.kind === 'saltShaker' ? 'metal' : 'stone';
   if (trees.some(t => t.id === targetId)) return 'wood';
   const building = snapshot.inventions?.structures?.find(b => b.id === targetId);
   if (building) return structureMaterial(building.type);

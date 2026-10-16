@@ -5,7 +5,7 @@ import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
 import {isVein} from './ore-veins.js';
-import {isSeam} from './salt-mine-rules.js';
+import {isSeam,isShaker} from './salt-mine-rules.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
 import {worldTrees} from './world-content.js';
@@ -115,7 +115,7 @@ export function retainedDepositPredicate(state){
  ]);
  const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
  const liveEdits=new Set((state.edits||[]).map(e=>e.id));
- return d=>!d.depleted||isVein(d)||isSeam(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
+ return d=>!d.depleted||isVein(d)||isSeam(d)||isShaker(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
 }
 // Preview the exact post-reclamation budget without changing world state. Pending
 // meteors reserve their eventual deposit slots, just as the authority does.

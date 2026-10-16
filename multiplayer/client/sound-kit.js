@@ -125,6 +125,13 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
     mine_fall: {seconds: 1.8, range: 45, duck: [.25, .7], play(o, t) { thump(o, t, 70, 26, .38, .7); noise(o, t, {type: 'lowpass', f0: 1100, f1: 160, peak: .2, release: .9}); for (let i = 0; i < 10; i++) noise(o, t + .12 + i * .07 + Math.random() * .05, {f0: 700 + Math.random() * 900, q: 2.5, peak: .06, release: .08}); rattle(o, t + .6, 8, {spread: .07, f: 2600, peak: .035}); }},
     // Firedamp: a soft whump of gas taking light, then the roar and a ringing echo off the salt.
     firedamp_boom: {seconds: 2.4, range: 70, duck: [.4, 1.2], play(o, t) { noise(o, t, {type: 'lowpass', f0: 300, f1: 900, attack: .05, peak: .1, release: .1}); thump(o, t + .08, 60, 22, .45, 1); noise(o, t + .08, {type: 'lowpass', f0: 2400, f1: 120, peak: .26, release: 1.4}); noise(o, t + .1, {f0: 1500, f1: 500, q: .8, peak: .08, release: .8}); bell(o, t + .2, 523, .025, 1.6); bell(o, t + .24, 784, .018, 1.4); }},
+    // The Great Salt Shaker knocked empty: a brassy ring and a long glittering pour of salt. Full again: a soft chime.
+    shaker_shower: {seconds: 2.4, range: 30, play(o, t) { bell(o, t, 659, .05, 1.4); bell(o, t + .02, 988, .035, 1.2); for (let i = 0; i < 26; i++) noise(o, t + .08 + i * .06 + Math.random() * .04, {f0: 5200 + Math.random() * 3000, q: 9, peak: .028 * (1 - i / 30), release: .05}); noise(o, t + .1, {f0: 6000, f1: 3000, q: 1.2, attack: .1, hold: 1, peak: .02, release: .6}); }},
+    shaker_full: {seconds: 1.4, range: 18, play(o, t) { bell(o, t, 1319, .018, 1); bell(o, t + .12, 1760, .014, .9); bell(o, t + .24, 2093, .012, .8); }},
+    // The mine canary: a bright little two-note trill.
+    canary_chirp: {seconds: .5, range: 12, play(o, t) { for (let i = 0; i < 3; i++) tone(o, t + i * .09, {type: 'sine', f0: 2600 + i * 300, f1: 3600 + i * 200, attack: .005, peak: .02, release: .06}); }},
+    // King Pinchy surfaces: a tiny, pompous fanfare.
+    king_fanfare: {seconds: 1.4, range: 30, play(o, t) { for (const [i, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) tone(o, t + i * .13, {type: 'square', f0: f, f1: f, attack: .01, hold: i === 3 ? .35 : .06, peak: .02, release: .12}); }},
     // Saltback crabs: a dry little click-clack, a snap of the big claw, and a gritty burrow.
     saltback_click: {seconds: .4, range: 18, play(o, t) { for (let i = 0; i < 3; i++) noise(o, t + i * .06 + Math.random() * .02, {f0: 3400 + Math.random() * 1200, q: 9, attack: .001, peak: .05, release: .03}); }},
     saltback_pinch: {seconds: .5, range: 22, play(o, t) { noise(o, t, {f0: 2600, q: 5, attack: .001, peak: .12, release: .05}); tone(o, t, {type: 'square', f0: 900, f1: 500, peak: .015, release: .07}); thump(o, t + .02, 260, 120, .08, .08); }},

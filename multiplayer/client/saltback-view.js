@@ -40,7 +40,10 @@ const GLOW = new THREE.Color(1, .5, .6), SALT_PINK = [.98, .72, .8], SALT_WHITE 
  *   event(event)              emerge/dive/pinch/loot/hit bursts and cues
  *   tick(dt)                  particles, corpses and the shared glow pulse
  */
-export function createSaltbackView({scene, load = () => {}, height = () => 0, quality = 'high', sound = () => {}} = {}) {
+// King Pinchy (a crowned crab from the Brine Deep's lake): a size up, and the curios' gold crown set jauntily on top
+// of the shell (crown() hands over a fresh crown group, or null until the curios have arrived).
+const KING_SCALE = 1.32, CROWN_AT = Object.freeze([0, .43, -.03]), CROWN_TILT = .22;
+export function createSaltbackView({scene, load = () => {}, height = () => 0, quality = 'high', sound = () => {}, crown = () => null} = {}) {
  const low = quality === 'low', tex = softTexture(), chips = createParticles(scene, low ? 90 : 180, false, tex);
  const glow = {value: 1}, corpses = [], states = new WeakMap(), crabIds = new Set();
  let template = null, clips = null, requested = false, clock = 0, materials = [];
@@ -87,11 +90,18 @@ export function createSaltbackView({scene, load = () => {}, height = () => 0, qu
   model.traverse(n => { if (n.isBone) bones[n.name] = n; if (n.isMesh) n.userData.saltback = true; });
   const mixer = new THREE.AnimationMixer(model), actions = {};
   for (const name of CLIPS) { const a = mixer.clipAction(clips[name]); a.setLoop(THREE.LoopRepeat, Infinity); a.play(); a.setEffectiveWeight(0); actions[name] = a; }
-  const body = new THREE.Group(); body.name = 'SaltbackBody'; body.rotation.y = Math.PI; body.scale.setScalar(SCALE); body.add(model); // built facing +Z; the sim faces -Z
+  const body = new THREE.Group(); body.name = 'SaltbackBody'; body.rotation.y = Math.PI; body.scale.setScalar(SCALE * (data.crown ? KING_SCALE : 1)); body.add(model); // built facing +Z; the sim faces -Z
   const visual = new THREE.Group(); visual.name = 'Saltback'; visual.add(body);
   const seed = hash(data.id);
-  visual.userData.saltback = {mixer, actions, body, model, bones, seed, eyeRest: {EyeL: new THREE.Quaternion(), EyeR: new THREE.Quaternion()}};
+  visual.userData.saltback = {mixer, actions, body, model, bones, seed, eyeRest: {EyeL: new THREE.Quaternion(), EyeR: new THREE.Quaternion()}, king: !!data.crown, crowned: false};
+  crownOn(visual.userData.saltback);
   return visual;
+ }
+ function crownOn(rig) {
+  if (!rig.king || rig.crowned || !rig.bones.Body) return;
+  const c = crown(); if (!c) return;
+  c.position.fromArray(CROWN_AT); c.rotation.set(0, .3, CROWN_TILT); c.traverse(n => { if (n.isMesh) n.userData.saltback = true; });
+  rig.bones.Body.add(c); rig.crowned = true;
  }
  const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), q1 = new THREE.Quaternion(), e1 = new THREE.Euler(), weights = {};
  function apply(rig, times, w) {
@@ -103,6 +113,7 @@ export function createSaltbackView({scene, load = () => {}, height = () => 0, qu
  }
  function pose(entry, tick, dt, threats) {
   const visual = entry.visual, rig = visual.userData.saltback, d = entry.data; if (!rig || !d) return;
+  if (rig.king && !rig.crowned) crownOn(rig);
   entry.root.getWorldPosition(v1); crabIds.add(d.id);
   let st = states.get(visual);
   if (!st) { st = {last: v1.clone(), vx: 0, move: 0, idle: (rig.seed % 997) / 997 * 2, scuttle: 0, look: 0, yaw: 0, pitch: 0, clickAt: clock + 1.5 + (rig.seed % 7) * .5, snapped: d.attackTick, hurt: d.hurtTick}; states.set(visual, st); }

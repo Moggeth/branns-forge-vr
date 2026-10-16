@@ -105,7 +105,7 @@ export function stepVeins(state, ctx, events = []) {
 
 /** Save validation for the optional vein fields. Throws on malformed values. */
 export function validateVein(d, tick, slots) {
-  if (d.vein === undefined) { if (d.respawnTick !== undefined && d.seam === undefined) throw Error('Invalid vein'); return; } // salt seams keep their own timer
+  if (d.vein === undefined) { if (d.respawnTick !== undefined && d.seam === undefined && d.kind !== 'saltShaker') throw Error('Invalid vein'); return; } // salt seams and the Great Salt Shaker keep their own timers
   if (!Number.isInteger(d.vein) || d.vein < 0 || d.vein >= VEIN_RULES.slots || slots.has(d.vein) || !Object.hasOwn(DEPOSIT_CATALOG, d.kind)) throw Error('Invalid vein');
   if (d.respawnTick !== undefined && (!d.depleted || !Number.isSafeInteger(d.respawnTick) || d.respawnTick < 0 || d.respawnTick > tick + VEIN_RULES.respawn[1])) throw Error('Invalid vein');
   slots.add(d.vein);

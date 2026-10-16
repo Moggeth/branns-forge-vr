@@ -1,7 +1,7 @@
 {
   "file": "salt-mine-kit.glb",
-  "bytes": 1027616,
-  "triangles": 17970,
+  "bytes": 2494760,
+  "triangles": 69678,
   "materials": [
     "Timber",
     "Iron",
@@ -18,8 +18,8 @@
   ],
   "pieces": {
     "MinePortal": {
-      "triangles": 5016,
-      "vertices": 9384,
+      "triangles": 6138,
+      "vertices": 12237,
       "materials": [
         "Timber",
         "Iron",
@@ -27,24 +27,24 @@
         "SaltCrystal"
       ],
       "bbox_min": [
-        -4.038,
-        -0.299,
+        -4.28,
+        -0.273,
         -1.5
       ],
       "bbox_max": [
-        4.117,
-        5.652,
+        4.289,
+        5.175,
         0.707
       ],
       "colour_range": [
-        0.0028,
+        0.0024,
         1.0
       ],
       "glow_mask_max": 1.0
     },
     "TimberSet": {
-      "triangles": 716,
-      "vertices": 1283,
+      "triangles": 1076,
+      "vertices": 1926,
       "materials": [
         "Timber",
         "Iron",
@@ -62,21 +62,21 @@
         0.317
       ],
       "colour_range": [
-        0.0034,
-        0.9686
+        0.0031,
+        0.9529
       ],
       "glow_mask_max": 0.55
     },
     "RailStraight": {
-      "triangles": 240,
-      "vertices": 328,
+      "triangles": 640,
+      "vertices": 956,
       "materials": [
         "Timber",
         "Iron"
       ],
       "bbox_min": [
         -0.486,
-        -0.01,
+        -0.012,
         -1.0
       ],
       "bbox_max": [
@@ -85,17 +85,18 @@
         1.0
       ],
       "colour_range": [
-        0.0151,
-        0.23
+        0.0154,
+        0.7083
       ],
       "glow_mask_max": 0.0
     },
     "MineCart": {
-      "triangles": 3508,
-      "vertices": 4768,
+      "triangles": 4996,
+      "vertices": 6968,
       "materials": [
         "Timber",
         "Iron",
+        "Brass",
         "SaltRock",
         "SaltCrystal"
       ],
@@ -106,14 +107,14 @@
       ],
       "bbox_max": [
         0.55,
-        1.434,
+        1.491,
         0.961
       ],
       "colour_range": [
-        0.0024,
+        0.0021,
         1.0
       ],
-      "glow_mask_max": 0.62
+      "glow_mask_max": 1.0
     },
     "Lantern": {
       "triangles": 1110,
@@ -140,14 +141,14 @@
       "glow_mask_max": 0.0
     },
     "SaltCluster": {
-      "triangles": 1754,
-      "vertices": 3892,
+      "triangles": 3138,
+      "vertices": 6944,
       "materials": [
         "SaltRock",
         "SaltCrystal"
       ],
       "bbox_min": [
-        -0.762,
+        -0.799,
         -0.144,
         -0.795
       ],
@@ -163,8 +164,8 @@
       "glow_mask_max": 1.0
     },
     "SaltClusterSmall": {
-      "triangles": 326,
-      "vertices": 742,
+      "triangles": 558,
+      "vertices": 1206,
       "materials": [
         "SaltRock",
         "SaltCrystal"
@@ -180,7 +181,7 @@
         0.26
       ],
       "colour_range": [
-        0.0431,
+        0.0353,
         1.0
       ],
       "glow_mask_max": 1.0
@@ -209,10 +210,11 @@
       "glow_mask_max": 0.45
     },
     "RubblePile": {
-      "triangles": 1156,
-      "vertices": 2848,
+      "triangles": 1302,
+      "vertices": 3051,
       "materials": [
         "Timber",
+        "Iron",
         "SaltRock"
       ],
       "bbox_min": [
@@ -222,19 +224,20 @@
       ],
       "bbox_max": [
         0.733,
-        0.666,
+        1.239,
         0.881
       ],
       "colour_range": [
-        0.0045,
+        0.0034,
         0.9686
       ],
       "glow_mask_max": 0.62
     },
     "BrineRim": {
-      "triangles": 2780,
-      "vertices": 3813,
+      "triangles": 2824,
+      "vertices": 3913,
       "materials": [
+        "Timber",
         "SaltRock",
         "SaltCrystal"
       ],
@@ -245,14 +248,224 @@
       ],
       "bbox_max": [
         1.125,
-        0.191,
+        0.33,
         1.105
       ],
       "colour_range": [
-        0.1608,
+        0.0031,
         1.0
       ],
       "glow_mask_max": 0.6
+    },
+    "StatueBrann": {
+      "triangles": 8172,
+      "vertices": 6131,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -1.065,
+        0.0,
+        -0.749
+      ],
+      "bbox_max": [
+        0.971,
+        2.713,
+        0.738
+      ],
+      "colour_range": [
+        0.0392,
+        1.0
+      ],
+      "glow_mask_max": 0.866
+    },
+    "StatueCrab": {
+      "triangles": 7072,
+      "vertices": 4889,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.71,
+        0.0,
+        -0.46
+      ],
+      "bbox_max": [
+        0.71,
+        1.217,
+        0.46
+      ],
+      "colour_range": [
+        0.0392,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "StatueGoat": {
+      "triangles": 7392,
+      "vertices": 4311,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.92,
+        0.0,
+        -0.4
+      ],
+      "bbox_max": [
+        1.007,
+        1.346,
+        0.407
+      ],
+      "colour_range": [
+        0.1098,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "SaltChandelier": {
+      "triangles": 7346,
+      "vertices": 11442,
+      "materials": [
+        "Iron",
+        "Brass",
+        "SaltCrystal",
+        "LanternGlow"
+      ],
+      "bbox_min": [
+        -0.917,
+        -1.954,
+        -0.917
+      ],
+      "bbox_max": [
+        0.917,
+        0.007,
+        0.917
+      ],
+      "colour_range": [
+        0.0086,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "ChapelRelief": {
+      "triangles": 5600,
+      "vertices": 4597,
+      "materials": [
+        "SaltRock"
+      ],
+      "bbox_min": [
+        -1.3,
+        -0.0,
+        0.0
+      ],
+      "bbox_max": [
+        1.301,
+        1.697,
+        0.25
+      ],
+      "colour_range": [
+        0.0706,
+        1.0
+      ],
+      "glow_mask_max": 0.86
+    },
+    "CarversBench": {
+      "triangles": 2880,
+      "vertices": 3560,
+      "materials": [
+        "Timber",
+        "Iron",
+        "Brass",
+        "SaltRock",
+        "SaltCrystal",
+        "LanternGlow"
+      ],
+      "bbox_min": [
+        -0.9,
+        0.0,
+        -0.37
+      ],
+      "bbox_max": [
+        0.9,
+        1.205,
+        0.37
+      ],
+      "colour_range": [
+        0.0032,
+        1.0
+      ],
+      "glow_mask_max": 0.85
+    },
+    "SaltSpire": {
+      "triangles": 2520,
+      "vertices": 1666,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.444,
+        -0.065,
+        -0.394
+      ],
+      "bbox_max": [
+        0.411,
+        1.54,
+        0.495
+      ],
+      "colour_range": [
+        0.098,
+        1.0
+      ],
+      "glow_mask_max": 0.8
+    },
+    "Stalactites": {
+      "triangles": 2600,
+      "vertices": 1355,
+      "materials": [
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.376,
+        -1.228,
+        -0.294
+      ],
+      "bbox_max": [
+        0.365,
+        -0.0,
+        0.32
+      ],
+      "colour_range": [
+        0.2157,
+        0.9804
+      ],
+      "glow_mask_max": 0.95
+    },
+    "SaltDrapery": {
+      "triangles": 2950,
+      "vertices": 1801,
+      "materials": [
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.994,
+        -1.612,
+        -0.22
+      ],
+      "bbox_max": [
+        1.001,
+        0.02,
+        0.222
+      ],
+      "colour_range": [
+        0.2588,
+        0.9882
+      ],
+      "glow_mask_max": 0.95
     }
   },
   "anchors": {
@@ -262,6 +475,64 @@
         2.4943,
         0.664
       ]
+    },
+    "SaltChandelier": {
+      "flames": [
+        [
+          0.821,
+          -0.855,
+          0.22
+        ],
+        [
+          0.22,
+          -0.855,
+          0.821
+        ],
+        [
+          -0.601,
+          -0.855,
+          0.601
+        ],
+        [
+          -0.821,
+          -0.855,
+          -0.22
+        ],
+        [
+          -0.22,
+          -0.855,
+          -0.821
+        ],
+        [
+          0.601,
+          -0.855,
+          -0.601
+        ]
+      ]
+    },
+    "CarversBench": {
+      "flames": [
+        [
+          -0.74,
+          1.11,
+          -0.2
+        ],
+        [
+          -0.6,
+          1.05,
+          -0.24
+        ],
+        [
+          0.72,
+          1.15,
+          -0.22
+        ],
+        [
+          0.58,
+          1.03,
+          -0.18
+        ]
+      ]
     }
   },
   "rail": {
@@ -270,5 +541,5 @@
     "length": 2.0
   },
   "glow_mask": "TEXCOORD_1.x (0..1) on SaltCrystal and SaltRock; 0 elsewhere",
-  "seconds": 3.7
+  "seconds": 54.7
 }

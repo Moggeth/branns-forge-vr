@@ -203,6 +203,14 @@ export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', '
 export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star', 'salt', 'saltHeart', 'saltRubble']);
 export const HELD_SCALE = .5; // hero/held ore: same asset at half scale
 
+// The Great Salt Shaker is drawn by the mine's curios (client/salt-mine-props.js), always on its plinth: its deposit
+// is only an unseen body for picks to knock.
+let shakerShape = null;
+function shakerProxy() {
+  shakerShape ??= {geometry: new T.CylinderGeometry(.5, .62, 1.85, 10).translate(0, .93, 0), material: new T.MeshBasicMaterial({visible: false})};
+  const root = new T.Group(), body = new T.Mesh(shakerShape.geometry, shakerShape.material); body.name = 'SaltShakerBody'; root.add(body);
+  root.name = 'Deposit:saltShaker'; root.userData.authoredDeposit = true; root.userData.resourceArt = 'saltShaker'; root.userData.proxy = true; return root;
+}
 export function createResourceArt() {
  const time = {value: 0}, geos = new Set(), mats = new Map(), pickups = new Map(), deposits = new Map();
  const own = g => (geos.add(g), g.computeBoundingBox(), g.computeBoundingSphere(), g);
@@ -346,7 +354,7 @@ export function createResourceArt() {
   barStack(kind, count) { if (!METAL[kind]) return null; const n = Math.max(1, Math.min(BAR_STACK_MAX, count | 0)), k = 'stack:' + kind + ':' + n; let kit = pickups.get(k);
    if (!kit) { kit = barStackKit(kind, n); pickups.set(k, kit); }
    const g = build(kit.parts, 'BarStack:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; g.userData.barStack = n; return g; },
-  deposit(kind, {variant = 0} = {}) { const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
+  deposit(kind, {variant = 0} = {}) { if (kind === 'saltShaker') return shakerProxy(); const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
    if (!kit) { kit = DEPOSIT[k].cubes ? saltKit(k, variant % 3) : depositKit(k, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Deposit:' + k); g.userData.authoredDeposit = true; g.userData.resourceArt = k; return g; },
   update(seconds) { if (Number.isFinite(seconds)) time.value = seconds; },
   stats() { let tris = 0; for (const g of geos) tris += g.attributes.position.count / 3; return {geometries: geos.size, materials: mats.size, triangles: tris}; },
