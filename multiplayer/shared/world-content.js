@@ -17,7 +17,7 @@ export const baseTrees = [
 // road and the keep fronts like everything else (tests/map-clearance.mjs). `size` is the drawn height in metres and
 // `r` the footprint radius that height gives the model. Movable in the map editor as formation<n>.
 export const TERRAIN_FORMATIONS = Object.freeze([
-  ['bank', -10.5, -21, 1.4, 2.3, 1.9], ['bank', -21, -10.5, 1.1, -.85, 1.5], ['ridge', 20, -22, 3.1, -.5, 1.4], ['ridge', 23, -24, 2.4, .5, 1.1],
+  ['bank', -9.5, -19.8, 1.4, 2.3, 1.9], ['bank', -21, -10.5, 1.1, -.85, 1.5], ['ridge', 20, -22, 3.1, -.5, 1.4], ['ridge', 23, -24, 2.4, .5, 1.1],
   ['roots', -13.6, -6.6, .65, 1.2, .75]
 ].map(([asset, x, z, size, angle, r], i) => { const [mx, mz] = moved(`formation${i + 1}`, [x, z]); return Object.freeze({id: `formation${i + 1}`, asset, x: mx, z: mz, size, angle, r}); }));
 export const initialDeposits = () => [

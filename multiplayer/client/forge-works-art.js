@@ -15,19 +15,25 @@ function hash(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x 
 
 // Coursed stone: every triangle takes the colour of the block its centroid falls in, mortar where it nears a joint.
 function paintCourses(geo, {course = .17, blocks = 11, base = [.5, .45, .39], spread = .12, mortar = .55, soot = 0} = {}) {
-  const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position, col = new Float32Array(p.count * 3);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  // Smooth normals come from the shared-vertex mesh; lathe and box quads are consecutive triangle pairs, so each
+  // block is picked from the quad's centre and both halves share a colour (no saw-tooth across a face).
+  if (geo.index) geo.computeVertexNormals();
+  const smooth = !!geo.index, g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position, col = new Float32Array(p.count * 3);
+  const a = new THREE.Vector3(), q = new THREE.Vector3();
   for (let i = 0; i < p.count; i += 3) {
-    a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
-    const m = a.add(b).add(c).multiplyScalar(1 / 3), row = Math.floor(m.y / course), fy = m.y / course - row;
+    const pair = i - (i % 6); q.set(0, 0, 0);
+    for (let v = pair; v < Math.min(p.count, pair + 6); v++) q.add(a.fromBufferAttribute(p, v));
+    const m = q.multiplyScalar(1 / (Math.min(p.count, pair + 6) - pair)), row = Math.floor(m.y / course), fy = m.y / course - row;
     const ang = (Math.atan2(m.z, m.x) / (Math.PI * 2) + 1) * blocks + row * .5, cell = Math.floor(ang), fx = ang - cell;
     const joint = fy < .1 || fx < .05 || fx > .95, h = hash(row * 31 + cell), t = (h - .5) * spread;
     let k = joint ? mortar : 1;
     const dark = soot ? Math.max(0, 1 - Math.hypot(m.x, m.z + .6) / .7) * soot * (m.y < 1 ? 1 : .3) : 0;
     k *= 1 - dark;
-    for (let v = 0; v < 3; v++) { col[(i + v) * 3] = (base[0] + t) * k; col[(i + v) * 3 + 1] = (base[1] + t * .9) * k; col[(i + v) * 3 + 2] = (base[2] + t * .8) * k; }
+    // base/spread are display (sRGB) values; vertex colours are linear, so convert or the stone washes out to white.
+    const lin = v => Math.pow(Math.max(0, v), 2.2);
+    for (let v = 0; v < 3; v++) { col[(i + v) * 3] = lin(base[0] + t) * k; col[(i + v) * 3 + 1] = lin(base[1] + t * .9) * k; col[(i + v) * 3 + 2] = lin(base[2] + t * .8) * k; }
   }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); if (!smooth) g.computeVertexNormals(); return g;
 }
 
 function signTexture(lines, accent) {

@@ -1,33 +1,55 @@
-// Laid stone roads: the main road from gate to gate (shared/keep-sites.js MAIN_ROAD) and the three footpaths out from
-// the Forge to the landmarks (shared/starting-world.js STARTING_PATHS) are paved with hand-cut flagstones bedded in the
+// Laid stone roads: the main road from gate to gate (shared/keep-sites.js MAIN_ROAD), the three footpaths out from
+// the Forge to the landmarks (shared/starting-world.js STARTING_PATHS), each keep's gate road, square and pass, and the
+// footpaths to The Muddled Mug are paved with hand-cut flagstones bedded in the
 // worn dirt the ground shader already draws, with a kerb of smaller setts along each edge. The dirt shows through the
 // joints and through a few stones lost to wear, so the road reads as old and walked, not as a fresh decal.
 // - Presentation only: no collision, raycast targets, lights or shadow casters. Stones stand 4 cm proud of the ground.
 // - Every stone sits on the caller's height(x, z) and tilts to the local slope; update() re-seats them after terrain
 //   changes (craters, raised ground), so they ride the same surface the Hero walks on.
 // - Deterministic from the route data alone: every peer and reload lays the same stones.
-// - Budget: four instanced draws (three flagstone shapes and the kerb sett), ~1k stones, ~35k triangles.
+// - Budget: four instanced draws (three flagstone shapes and the kerb sett), ~1.8k stones, ~46k triangles.
 import * as THREE from 'three';
-import {MAIN_ROAD} from '../shared/keep-sites.js';
-import {homePoint} from '../shared/home-bases.js';
+import {MAIN_ROAD, backTownPoint} from '../shared/keep-sites.js';
+import {homePoint, NEUTRAL_TAVERN} from '../shared/home-bases.js';
 import {STARTING_PATHS} from '../shared/starting-world.js';
 
-export const ROAD_PAVING_VERSION = 1;
+export const ROAD_PAVING_VERSION = 2;
+const mugPaths = () => { const [mx, mz] = NEUTRAL_TAVERN.at, door = [mx + Math.sin(NEUTRAL_TAVERN.yaw) * 4.6, mz + Math.cos(NEUTRAL_TAVERN.yaw) * 4.6];
+  return [[[-15, -15], [-12, -22.5], [-4, -23.6], door], [[.5, -5.5], [2.6, -12], [4.2, -18.5], door]]; };
 // [points, half width, wear]: wear is the share of stones a long life of boots has worn away (more on footpaths).
 export function pavedRoutes() {
   return [
     {id: 'main', points: [homePoint('party', [0, 17.5]), ...MAIN_ROAD.points, homePoint('rivals', [0, 17.5])], half: 1.25, wear: .05, kerb: true},
     {id: 'forge-lane', points: [[6, -6], [2.6, -2.4]], half: .85, wear: .08, kerb: false},
     ...STARTING_PATHS.map(p => ({id: p.id, points: p.points, half: p.width / 2, wear: .14, kerb: false})),
+    // Inside each keep: the gate road into the square, the square round the heart and the lane up the pass to the back
+    // town's yard; and the two footpaths to The Muddled Mug (the same lines the ground shader wears, orchard-presentation.js).
+    ...['party', 'rivals'].flatMap(side => {
+      const L = pts => pts.map(p => homePoint(side, p));
+      return [
+        {id: `${side}-gate`, points: L([[0, 17.5], [0, 12.5], [0, 7.9]]), half: 1.05, wear: .06, kerb: false},
+        {id: `${side}-square`, points: L(Array.from({length: 25}, (_, i) => [Math.sin(i / 24 * Math.PI * 2) * 7.5, Math.cos(i / 24 * Math.PI * 2) * 7.5])), half: .75, wear: .08, kerb: false},
+        {id: `${side}-pass`, points: [...L([[0, -7.9], [0, -13.5], [1.9, -16], [0, -18.5], [0, -29], [0, -35]]), backTownPoint(side, [58.5, 58.5])], half: .85, wear: .1, kerb: false},
+      ];
+    }),
+    ...mugPaths().map((points, i) => ({id: `mug-${i}`, points, half: .8, wear: .12, kerb: false})),
   ];
 }
 
-/** How far (x, z) is outside the nearest laid route's edge (negative = on the stones). Ground scatter uses it. */
-export function pavingClearance(x, z) {
-  let best = Infinity;
-  for (const {points: P, half} of pavedRoutes()) for (let i = 1; i < P.length; i++) {
-    const [ax, az] = P[i - 1], [bx, bz] = P[i], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
-    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t) - half);
+// Every laid segment once, flat: ax, az, bx, bz, half, then its box grown by the half width (for a cheap reject).
+let segCache = null;
+const segments = () => segCache ||= Float64Array.from(pavedRoutes().flatMap(({points: P, half}) => P.slice(1).flatMap(([bx, bz], i) => {
+  const [ax, az] = P[i]; return [ax, az, bx, bz, half, Math.min(ax, bx) - half, Math.max(ax, bx) + half, Math.min(az, bz) - half, Math.max(az, bz) + half];
+})));
+/** How far (x, z) is outside the nearest laid route's edge (negative = on the stones), up to `reach` (segments whose
+ *  box is further than that are skipped, so far points report `reach`). Ground scatter and grass use it. */
+export function pavingClearance(x, z, reach = Infinity) {
+  const S = segments();
+  let best = reach;
+  for (let k = 0; k < S.length; k += 9) {
+    if (x < S[k + 5] - best || x > S[k + 6] + best || z < S[k + 7] - best || z > S[k + 8] + best) continue;
+    const ax = S[k], az = S[k + 1], dx = S[k + 2] - ax, dz = S[k + 3] - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t) - S[k + 4]);
   }
   return best;
 }
@@ -36,7 +58,7 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6d2b79f5) >>>
 // One hand-cut flagstone: an irregular convex outline (unit square before scaling), a flat dished top, a
 // chamfer and short sides that sink into the bedding. Separate rings per band so the chamfer catches light crisply.
 // Vertex colour carries a baked occlusion: bright face, darker chamfer, near-black foot.
-export function flagstoneGeometry(seed, {corners = 4, height = .1, chamfer = .045, sink = .08} = {}) {
+export function flagstoneGeometry(seed, {corners = 4, height = .1, chamfer = .045, sink = .08, sides = true} = {}) {
   // A dressed block: a unit square (scaled to the stone's footprint) with its edges a touch out of true and `corners`
   // of its corners knocked off, so neighbours butt up with thin joints instead of leaving hex-shaped dirt gaps.
   const r = rng(seed), outline = [], hx = .5 - r() * .02, hz = .5 - r() * .02;
@@ -61,8 +83,8 @@ export function flagstoneGeometry(seed, {corners = 4, height = .1, chamfer = .04
   for (let i = 0; i < corners; i++) idx.push(centre, top + (i + 1) % corners, top + i);
   const bevelTop = ring(1 - chamfer * 1.6, height, .86), bevelFoot = ring(1, height - chamfer, .7, .012);
   band(bevelTop, bevelFoot);
-  const sideTop = ring(1, height - chamfer, .7, .012), sideFoot = ring(1.04, -sink, .32, .012);
-  band(sideTop, sideFoot);
+  // Sides below the chamfer foot only show where a stone stands proud (the kerb); flagstones bed flush and skip them.
+  if (sides) { const sideTop = ring(1, height - chamfer, .7, .012), sideFoot = ring(1.04, -sink, .32, .012); band(sideTop, sideFoot); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -111,7 +133,7 @@ export function createRoadPaving({scene, height, quality = 'high'}) {
   const group = new THREE.Group(); group.name = 'RoadPaving';
   scene.add(group);
   const routes = pavedRoutes(), laid = routes.map((route, i) => ({route, stones: layRoute(route, 901 + i * 37)}));
-  const shapes = [flagstoneGeometry(11, {corners: 4}), flagstoneGeometry(23, {corners: 3}), flagstoneGeometry(37, {corners: 2}), flagstoneGeometry(53, {corners: 4, height: .13, chamfer: .05, sink: .12})];
+  const shapes = [flagstoneGeometry(11, {corners: 4, sides: false}), flagstoneGeometry(23, {corners: 3, sides: false}), flagstoneGeometry(37, {corners: 2, sides: false}), flagstoneGeometry(53, {corners: 4, height: .13, chamfer: .05, sink: .12})];
   const material = new THREE.MeshStandardMaterial({name: 'RoadStone', vertexColors: true, roughness: .88, metalness: 0});
   // Grain and pitting from world position: each stone's face differs, no texture fetch, cheap on phones.
   material.onBeforeCompile = s => {

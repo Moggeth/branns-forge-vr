@@ -12,6 +12,7 @@ import {baseTrees, TERRAIN_FORMATIONS} from '../shared/world-content.js';
 import {createSimulation} from '../shared/simulation.js';
 import {baseHeight} from '../shared/terrain.js';
 import {townLifeLayout} from '../client/town-life.js';
+import {pavingClearance} from '../client/road-paving.js';
 
 const LIST = process.argv.includes('--list');
 const items = [];
@@ -79,6 +80,12 @@ for (const it of items) {
   if (it.folk) continue;
   const gap = it.box ? Math.min(...roadSamples.map(([x, z]) => boxCircle(it, x, z, 0))) : mainRoadDistance(it.x, it.z) - it.r;
   if (gap < MAIN_ROAD.half - .05) overlaps.push(`main road x ${it.group}/${it.name}: ${(MAIN_ROAD.half - gap).toFixed(2)} m onto the road at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
+}
+// Nothing solid stands on the laid stones of any road or footpath either (lanterns and townsfolk may).
+for (const it of items) {
+  if (it.folk || it.decor || it.group.startsWith('keep-') || it.group.startsWith('site-') || it.group === 'mug') continue;
+  const gap = pavingClearance(it.x, it.z) - it.r;
+  if (gap < -.05) overlaps.push(`paving x ${it.group}/${it.name}: ${(-gap).toFixed(2)} m onto the stones at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
 }
 // Props inside the buildings they dress are fine only when they sit outside every solid of another building.
 const steep = [];

@@ -228,6 +228,7 @@ export function createHomeBaseView({scene}) {
     b.group.removeFromParent(); b.dome.material.dispose();
     for (const m of b.baked || []) m.geometry.dispose();
     if (b.heart.proxy) { b.heart.proxy.geometry.dispose(); b.heart.proxy.material.dispose(); }
+    b.heart.hearth?.dispose();
   }
 
   function installKit(gltf) {
@@ -272,6 +273,7 @@ export function createHomeBaseView({scene}) {
       if (b.flashStart) { u.uFlash.value = Math.min(1, (now - b.flashStart) / 700); if (u.uFlash.value >= 1) b.flashStart = 0; }
       const heartUp = fallen ? 0 : 1; b.heartAlive += (heartUp - b.heartAlive) * k;
       const h = b.heart; h.heart.position.y = (h.heartY ?? 4.6) + Math.sin(t * 1.3) * .18; h.core.rotation.y = t * .6;
+      if (h.hearth) h.hearth.uniforms.uTime.value = t;
       if (h.kit) { h.rings[0].rotation.set(.55, t * .8, 0); h.rings[1].rotation.set(-.42 + Math.sin(t * .4) * .1, -t * .55, .3); }
       else { h.rings[0].rotation.z = t * .7; h.rings[1].rotation.x = -t * .5; }
       if (b.bell) { b.bellSwing = Math.max(0, b.bellSwing - dt * .25); b.bell.rotation.x = Math.sin(t * 6.5) * .55 * b.bellSwing + Math.sin(t * .9) * .03; }
