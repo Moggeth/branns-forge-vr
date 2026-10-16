@@ -2096,7 +2096,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         }
         const authoritative = new THREE.Vector3().fromArray(self.position);
         if (!initialized || authoritative.distanceTo(localPosition) > 4) {
-          if(!initialized&&snapshot.battle?.v===2){yaw=Math.atan2(self.position[0],self.position[2]);pitch=0;}
+          if(!initialized&&snapshot.battle?.v===2){yaw=Math.atan2(self.position[0],self.position[2]);pitch=0;}else if(!initialized&&snapshot.world&&Number.isFinite(self.yaw)){yaw=self.yaw;pitch=0;} // a generated world can face you at something (the Underways' first cave)
           localPosition.copy(authoritative); correction.set(0, 0, 0); initialized = true;
           verticalSpeed = 0; grounded = authoritative.y <= forgeFloor(authoritative.x,authoritative.z,heightAt(0,0,snapshot.edits),simulationHeight(snapshot,authoritative.x,authoritative.z)) + 0.05;
         }

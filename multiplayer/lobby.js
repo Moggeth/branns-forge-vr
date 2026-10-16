@@ -35,6 +35,8 @@ import './client/mobile-ui.css';
 import {afterPaint} from './client/startup-work.js';
 import {LocalRoomConnection} from './client/local-room.js';
 import { WorldSession } from './client/session.js';
+import { createWildsGuide, wildsGuideView } from './client/wilds-guide.js';
+import './client/wilds-guide.css';
 import { WorldSaves, parseSave } from './client/world-saves.js';
 import { createSavedWorldsChooser, downloadSave } from './saved-worlds-chooser.js';
 import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindObjectiveActions, bindControlsCard, bindConnectivity, releaseFocusAfterPointer } from './lobby-ui.js';
@@ -389,7 +391,7 @@ function teardown() {
   const old = session; session = null;
   try { old?.dispose(); } catch (error) { console.warn('Session cleanup failed', error); }
   connected = false; playerId = null; appliedRole = null; lastSnapshot = null;
-  expeditionBanner?.destroy(); expeditionBanner = null; game?.setExpedition(null);
+  expeditionBanner?.destroy(); expeditionBanner = null; game?.setExpedition(null); wildsGuide?.destroy(); wildsGuide = null;
   runHud.update(null, null); runModal = false;
   interactionCue?.reset();
   clearNotices();
@@ -550,7 +552,7 @@ function recordProblem(problem) {
 }
 
 // ---------------------------------------------------------------- Forge Expedition (optional co-op run, shared/adventure.js)
-let expeditionBanner = null;
+let expeditionBanner = null, wildsGuide = null;
 let interactionCue = null; // contextual harvesting cue (client/interaction-cue*.js); hidden in menus, God view and XR
 function expeditionAction(action,detail={}) {
   if((action.startsWith('forge')||action.startsWith('invention'))){command('action',{action,...detail});return;}
@@ -610,7 +612,10 @@ function onSnapshot(snapshot) {
   }
   try { game.applySnapshot(snapshot, playerId); } catch (error) { recordProblem(error); }
   if (snapshot.run && expeditionBanner) { expeditionBanner.destroy(); expeditionBanner = null; } // the run strip replaces the quest card
-  if (snapshot.adventure && !snapshot.run) try {
+  if (snapshot.world && expeditionBanner) { expeditionBanner.destroy(); expeditionBanner = null; } // generated worlds have their own discoveries, not the valley's forge quest
+  if (snapshot.world && !snapshot.run) try { (wildsGuide ||= createWildsGuide($('hud'))).update(wildsGuideView(snapshot, playerId)); } catch (error) { recordProblem(error); }
+  else if (wildsGuide) { wildsGuide.destroy(); wildsGuide = null; }
+  if (snapshot.adventure && !snapshot.run && !snapshot.world) try {
     const view = battleQuestView(snapshot,playerId)||adventureView(snapshot.adventure, snapshot, playerId);
     if (!expeditionBanner) expeditionBanner = createAdventureBanner($('hud'), {onAction: expeditionAction});
     expeditionBanner.update(view, {held: self?.resources, mana: self?.mana});

@@ -35,3 +35,16 @@ assert.ok(inUnderway(...[back.snapshot().players[0].position[0], back.snapshot()
 const wilds = createSimulation({room: 'W', seed: 41, world: worldDescriptor({kind: 'wilds', seed: 'ci-delve', preset: 'continent', size: 2048})}); wilds.addPlayer({id: 'h', role: 'hero'});
 const wp = wilds.snapshot().players[0].position; assert.ok(Math.hypot(wp[0], wp[2]) < 30);
 console.log(`PASS underways start: arrive ${d0.toFixed(1)} m from ${u0.id} (${u0.style}), delve opens, peers agree, save keeps the run`);
+// The guide card points a new Hero at the nearest unfound place, in plain words.
+const {wildsGuideView, compassWord} = await import('../client/wilds-guide.js');
+assert.equal(compassWord(0, -5), 'north'); assert.equal(compassWord(5, 0), 'east'); assert.equal(compassWord(-3, 3), 'south-west');
+const fresh = createSimulation({room: 'G', seed: 41, world: worldDescriptor({kind: 'wilds', seed: 'ci-delve', preset: 'continent', size: 2048})}); fresh.addPlayer({id: 'h', role: 'hero'});
+for (let i = 0; i < 20; i++) fresh.step();
+const view = wildsGuideView(fresh.snapshot(), 'h');
+assert.ok(view && view.title && view.next && view.total > 10 && /^Next: .+, \d.* (north|south|east|west)/.test(view.line), view?.line);
+assert.equal(wildsGuideView(sim.snapshot(), 'h1'), null, 'hidden below ground');
+console.log(`PASS guide: "${view.title}" · ${view.line} · found ${view.found}/${view.total}`);
+{ const s2 = createSimulation({room: 'F', seed: 41, world}); s2.addPlayer({id: 'h', role: 'hero'}); const p = s2.snapshot().players[0];
+  const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), dx = u0.x - p.position[0], dz = u0.z - p.position[2], d = Math.hypot(dx, dz);
+  assert.ok((fx * dx + fz * dz) / d > .99, 'a new Hero faces the cave'); }
+console.log('PASS spawn faces the cave');

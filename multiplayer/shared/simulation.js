@@ -54,7 +54,7 @@ import './underways/world.js';
 import {stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
 import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
-import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin} from './wilds.js';
+import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
 import {worldMode} from './world-modes.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
@@ -195,7 +195,7 @@ function instantiate(state) {
       if (!['hero', 'god'].includes(role)) return fail('invalid_role');
       if (state.players.length >= MAX_PLAYERS) return fail('room_full');
       const position = spawn(state);
-      state.players.push({id, name: cleanName(name), role, position, yaw: 0, hp: 100, mana: 100,
+      state.players.push({id, name: cleanName(name), role, position, yaw: state.world?wildsFacing(state,position):0, hp: 100, mana: 100,
         move: [0, 0], vy: 0,velocity:[0,0,0], inputTick: -1000, attackTick: -1000, castTick: -1000,
         roleTick: -1000, seq: 0, stats:{kills:0,deaths:0,harvested:0,contribution:0}, tool: 'axe', side:'party', resources: emptyMaterials()});
       const joined = state.players[state.players.length - 1]; adoptProgress(state, joined); joined.hp = heroMaxHp(joined);
@@ -221,6 +221,7 @@ function instantiate(state) {
       }
       if (p && message?.type === 'adventure') {
         if (state.run) return fail('run_active');
+        if (state.world) return fail('not_in_this_world'); // the forge quest is laid out on the classic valley
         if (state.battle.status!=='off' && state.battle.v!==2 && ['start','retry'].includes(message.action)) return fail('battle_active');
         if (!safeSeq(message.seq)) return fail('invalid_sequence');
         if (message.seq <= p.seq) return fail('duplicate_sequence');

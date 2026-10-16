@@ -54,6 +54,13 @@ export function wildsOrigin(state, world = worldFor(state)) {
   origins.set(world, o); return o;
 }
 
+/** Which way a new Hero faces: toward the cave in an Underways start (three.js yaw, 0 faces -z), else north. */
+export function wildsFacing(state, position, world = worldFor(state)) {
+  if (state.world?.kind !== 'underways' || !world) return 0;
+  const e = world.entrances.find(x => x.id === 'u0') || world.entrances[0]; if (!e) return 0;
+  return Math.atan2(-(e.x - position[0]), -(e.z - position[2]));
+}
+
 export function createWilds() { return {v: 1, felled: [], spent: [], found: [], cleared: [], guards: {}, felledRev: 0}; }
 
 /** Fill a fresh wilds state: spawn plaza supplies at the village forge. */
@@ -117,7 +124,8 @@ function compactHarvest(state, w) {
 }
 const near = (pos, h, r) => { const m = /^wt(-?\d+)_(-?\d+)_/.exec(h.id); if (!m) return true; const cx = (+m[1] + .5) * CHUNK, cz = (+m[2] + .5) * CHUNK; return Math.hypot(pos[0] - cx, pos[2] - cz) < r + CHUNK; };
 
-function sitesOf(world) {
+/** Every findable place in a world (settlements, landmarks, discoveries, caves), for discovery and the guide card. */
+export function sitesOf(world) {
   return [
     ...world.settlements.map(s => ({id: s.id, x: s.x, z: s.z, kind: 'settlement', name: s.name, sub: s.kind})),
     ...world.landmarks.map(l => ({id: l.id, x: l.x, z: l.z, kind: 'landmark', name: l.name, sub: l.kind})),
