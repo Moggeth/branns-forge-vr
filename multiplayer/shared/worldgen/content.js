@@ -100,7 +100,7 @@ export function chunkContent(world, cx, cz) {
 //   tor      stacked weathered blocks crowning a hill crest
 //   outcrop  a tilted slab breaking out of a ledge or steep slope, leaning downhill
 //   boulder  a rounded stone, in loose fields across hill country
-//   spire    a tall needle among the high rock
+//   spire    a weathered rock stack among the high rock
 // Each record: {x, z, kind, yaw, s (size, metres), r (collision radius), h (height above ground)}.
 export const CRAG_KINDS = Object.freeze(['tor', 'outcrop', 'boulder', 'spire']);
 const CRAG_TRIES = 10;
@@ -108,7 +108,7 @@ function craggery(world, cx, cz) {
   if (!world.hillAt) return [];
   const seed = world.gen.seedHash, x0 = cx * CHUNK, z0 = cz * CHUNK, out = [];
   const put = (kind, x, z, s, yaw, k) => {
-    const r = kind === 'tor' ? s * .62 : kind === 'outcrop' ? s * .5 : kind === 'spire' ? s * .22 : s * .5, h = kind === 'tor' ? s * .9 : kind === 'outcrop' ? s * .7 : kind === 'spire' ? s * 2.4 : s * .7;
+    const r = kind === 'tor' ? s * .62 : kind === 'outcrop' ? s * .5 : kind === 'spire' ? s * .34 : s * .5, h = kind === 'tor' ? s * .9 : kind === 'outcrop' ? s * .7 : kind === 'spire' ? s * 1.8 : s * .7;
     if (blocked(world, x, z, r + 1) || out.some(g => (g.x - x) * (g.x - x) + (g.z - z) * (g.z - z) < (g.r + r + .8) * (g.r + r + .8))) return;
     out.push({x: +x.toFixed(3), z: +z.toFixed(3), kind, yaw: +(yaw).toFixed(3), s: +s.toFixed(2), r: +r.toFixed(2), h: +h.toFixed(2), v: k % 4});
   };
@@ -117,7 +117,7 @@ function craggery(world, cx, cz) {
     const hill = world.hillAt(x, z), sc = world.scarpAt(x, z), slope = world.slopeAt(x, z), biome = BIOME_NAMES[world.biomeAt(x, z)];
     const size = hash01(seed, 44, cx, cz, k), yaw = hash01(seed, 45, cx, cz, k) * 6.2831853;
     if ((biome === 'rock' || biome === 'tundra' || biome === 'snow') && slope > .18 && roll < .32) { put('spire', x, z, 2.4 + 2 * size, yaw, k); continue; }
-    if (sc > .22 && roll < .55 * sc + .1) { // a slab out of the ledge, leaning downhill
+    if (sc > .1 && roll < .7 * sc + .15) { // a slab out of the ledge, leaning downhill
       const e = .8, gx = world.heightAt(x + e, z) - world.heightAt(x - e, z), gz = world.heightAt(x, z + e) - world.heightAt(x, z - e);
       put('outcrop', x, z, 2.2 + 2.4 * size, atanQ2(-gx, -gz), k); continue;
     }

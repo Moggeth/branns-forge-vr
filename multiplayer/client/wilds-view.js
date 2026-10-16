@@ -527,8 +527,11 @@ function makeCragGeometry(kind, variant) {
     block(new THREE.IcosahedronGeometry(1, 1), 0, .34, 0, .52, .4 + variant * .06, .48, 0, .16);
   } else {
     let y = 0; const n = 4 + variant;
-    for (let k = 0; k < n; k++) { const w = .34 * (1 - k / (n + .6)), h = 2.4 / n; block(new THREE.CylinderGeometry(w * .82, w, h, 6, 1), (rnd() - .5) * .05, y + h * .5, (rnd() - .5) * .05, 1, 1, 1, rnd() * 3, .1); y += h * .96; }
-    block(new THREE.DodecahedronGeometry(1, 0), .26, .12, .1, .2, .16, .2, rnd() * 3);
+    // A weathered rock stack: broad footing, chunky leaning blocks, a blunt cap (not a needle).
+    let lean = 0;
+    for (let k = 0; k < n; k++) { const w = .5 * (1 - k / (n + 1.4)), h = 1.8 / n; block(new THREE.CylinderGeometry(w * .8, w, h, 5 + (k & 1), 1), lean + (rnd() - .5) * .08, y + h * .5, (rnd() - .5) * .08, 1, 1, 1, rnd() * 3, .18); y += h * .94; lean += .03; }
+    block(new THREE.DodecahedronGeometry(1, 0), lean, y, 0, .2, .14, .18, rnd() * 3);
+    block(new THREE.DodecahedronGeometry(1, 0), .42, .14, .12, .26, .2, .24, rnd() * 3); block(new THREE.DodecahedronGeometry(1, 0), -.36, .1, -.28, .2, .14, .2, rnd() * 3);
   }
   const merged = mergeGeometries(parts.map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); return g; }));
   merged.computeVertexNormals();

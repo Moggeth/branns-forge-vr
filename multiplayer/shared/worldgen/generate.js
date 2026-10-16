@@ -479,7 +479,9 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
   // Ledges: in hill country the slopes break into terraces with short steep risers (the scarps and shelves that make
   // a hillside read as rock and grass), kept off water, flat floors and the lowland plains.
   const scarp = new Float64Array(NN);
-  for (let c = 0; c < NN; c++) scarp[c] = ocean[c] || lakeId[c] >= 0 ? 0 : hilly[c] * smooth(.05, .2, slope[c]) * smooth(2, 5, riverNear[c]) * smooth(2, 5, lakeNear[c]) * smooth(2, 5, coastNear[c]);
+  // Only in patches (a few hillsides, not every slope), and never on mountain faces, where 7 m steps read as sawteeth.
+  for (let c = 0; c < NN; c++) { const i = c % N, j = (c - i) / N; scarp[c] = ocean[c] || lakeId[c] >= 0 ? 0 : hilly[c] * smooth(.05, .2, slope[c]) * (1 - smooth(.28, .5, slope[c])) * (1 - smooth(140, 210, elev[c]))
+    * smooth(.05, .3, reliefNoise.fbm(i * .045 + 11, j * .045 - 7, 2)) * smooth(2, 5, riverNear[c]) * smooth(2, 5, lakeNear[c]) * smooth(2, 5, coastNear[c]); }
   const SEGS = seg.freeze();
   const QUERY = {d: 0, t: 0, k: -1};
 
@@ -493,7 +495,7 @@ export function generateWorld({seed = 'brann', preset = 'continent', size} = {})
     const sc = bilinear(scarp, x, z);
     if (sc > .03) { // terrace: hold each 7 m band flat, then step up over its last 30% (a smooth riser, never a vertical wall)
       const step = 7, t = h / step + detailNoise.fbm(x * .02 + 2, z * .02 + 6, 2) * .35, f = t - Math.floor(t), q = smooth(.62, .92, f);
-      h += ((Math.floor(t) + q) * step - t * step) * Math.min(1, sc * 1.6);
+      h += ((Math.floor(t) + q) * step - t * step) * Math.min(.85, sc * 1.3);
     }
     // Roads: flatten toward their smoothed bed.
     let rd = Infinity, ry = 0;
