@@ -23,7 +23,7 @@ export function createUnderwayCards({mount = null} = {}) {
   root.append(title, lore); host.append(root);
   let titleLeft = 0, loreLeft = 0, last = null;
   return {
-    title(name, sub = '') { tb.textContent = name; ti.textContent = sub; ti.style.display = sub ? '' : 'none'; title.classList.add('show'); titleLeft = 4.2; last = {title: name, sub}; },
+    title(name, sub = '') { tb.textContent = name; ti.textContent = sub; ti.style.display = sub ? '' : 'none'; title.classList.add('show'); titleLeft = 4.2; lore.classList.remove('show'); loreLeft = 0; last = {title: name, sub}; },
     lore(text) { lore.textContent = text; lore.classList.add('show'); loreLeft = Math.min(10, 3.5 + text.length / 22); last = {lore: text}; },
     update(dt) {
       if (titleLeft > 0 && (titleLeft -= dt) <= 0) title.classList.remove('show');

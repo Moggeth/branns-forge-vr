@@ -311,7 +311,7 @@ function banner(color) {
   const cloth = new THREE.PlaneGeometry(.8, 1.6, 1, 4); const p = cloth.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, Math.sin((y + .8) * 2) * .04); if (y < -.75) p.setY(i, y - Math.abs(p.getX(i)) * .3); }
   return merge([part(cyl(.025, .025, 1, 6), C.iron, {at: [0, 3.1, -.06], rot: [0, 0, Math.PI / 2]}), part(cloth, color, {at: [0, 2.3, -.07], jitter: .1}), part(new THREE.CircleGeometry(.18, 12), C.gold, {at: [0, 2.45, -.085], rot: [0, Math.PI, 0], glow: .15})]);
 }
-function spikePlate() { const parts = [part(box(1.8, .06, 1.8), C.ironWarm, {at: [0, .03, 0]})]; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) parts.push(part(box(.08, .07, .08), C.iron, {at: [-.6 + i * .4, .06, -.6 + j * .4]})); return merge(parts); }
+function spikePlate() { const parts = [part(box(1.7, .05, 1.7), C.iron, {at: [0, .025, 0], jitter: .15}), part(box(1.82, .03, 1.82), C.ironWarm, {at: [0, .015, 0]})]; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) parts.push(part(cyl(.07, .07, .012, 6), [.05, .045, .045], {at: [-.6 + i * .4, .052, -.6 + j * .4]})); return merge(parts); }
 function spikes() { const parts = []; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) parts.push(part(new THREE.ConeGeometry(.07, .7, 5), [.75, .74, .72], {at: [-.6 + i * .4, .35, -.6 + j * .4]})); return merge(parts); }
 function portcullis() {
   const parts = []; for (let k = 0; k < 7; k++) parts.push(part(box(.07, 3.4, .07), C.iron, {at: [-.43 + k * .143, 1.7, 0]}));

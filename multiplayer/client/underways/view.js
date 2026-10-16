@@ -23,7 +23,7 @@ const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 export const UNDERWAY_VIEW = Object.freeze({
   lantern: Object.freeze({color: 0xffc58a, intensity: 3.2, distance: 11, decay: 1.4}),
-  dim: Object.freeze({sun: 1, hemi: .93, env: .85}),
+  dim: Object.freeze({sun: 1, hemi: .84, env: .8}), // a little sky light stays so foes read against the dark
 });
 
 function instanced(geo, mat, list, lightOf, name) {
@@ -61,6 +61,9 @@ function buildRun(run, {quality, propMat}) {
     mesh.name = `Underway_${run.id}_${key}`; mesh.raycast = () => {}; mesh.matrixAutoUpdate = false; mesh.userData.presentationOnly = true; mesh.frustumCulled = false;
     group.add(mesh); meshes.push(mesh);
   }
+  // A dark backstop round the whole dungeon: any hairline seam in the rock shows the deep, never the daylit sky.
+  const back = new THREE.Mesh(new THREE.BoxGeometry(GRID * TILE + 8, 60, GRID * TILE + 8), new THREE.MeshBasicMaterial({color: UNDERWAY_LOOK[d.style].fog, side: THREE.BackSide, fog: false}));
+  back.name = `Underway_${run.id}_backstop`; back.raycast = () => {}; back.userData.presentationOnly = true; back.position.y = 2; group.add(back); meshes.push(back);
   const kit = underwayKit(), lit = it => bakeAt(d, it.x, it.y + .8, it.z), Y = (x, z) => floorHeight(d, x, z);
   // Static props, instanced per type.
   const byType = new Map(), add = (type, it) => { if (!kit[type]) return; if (!byType.has(type)) byType.set(type, []); byType.get(type).push(it); };
@@ -294,13 +297,15 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
     /** Crown a guardian golem's model (its head bone, or the top of the model when it has none). */
     dressGuardian(model) {
       if (!model || model.userData.uwCrown) return;
-      let head = null; model.traverse(o => { if (!head && (o.isBone || o.type === 'Object3D') && /head/i.test(o.name)) head = o; });
+      let head = null; model.traverse(o => { if (!head && o.isBone && /head/i.test(o.name)) head = o; });
       const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
       const crown = single(underwayKit().crown, propMat, [.9, .75, .6]); crown.name = 'UnderwayCrown';
       const width = size.x * .2; // about the head's span on the golem
       model.updateWorldMatrix(true, true);
-      if (head) { const ws = head.getWorldScale(new THREE.Vector3()), wp = head.getWorldPosition(new THREE.Vector3()); crown.scale.setScalar(width / ws.x); head.add(crown); crown.position.set(0, (box.max.y - wp.y) * .55 / ws.y, 0); }
-      else { const ms = model.getWorldScale(new THREE.Vector3()).x; crown.scale.setScalar(width / ms); crown.position.set(0, (box.max.y - model.getWorldPosition(new THREE.Vector3()).y) / ms - .05, 0); model.add(crown); }
+      // On the model root (bone axes differ between rigs): just above the head, at the top of the body's bounds.
+      const ms = model.getWorldScale(new THREE.Vector3()).x, base = model.getWorldPosition(new THREE.Vector3());
+      const hx = head ? head.getWorldPosition(new THREE.Vector3()).sub(base) : new THREE.Vector3();
+      crown.scale.setScalar(width / ms); crown.position.set(0, (box.max.y - base.y) / ms - width * .25 / ms, 0); crown.position.x = 0; crown.position.z = head ? hx.z / ms * .5 : 0; model.add(crown);
       model.userData.uwCrown = crown;
     },
     current: () => current,
