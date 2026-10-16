@@ -36,11 +36,15 @@ async function clearFoes(page) { await host(page, function () { const ids = new 
 async function play(page, prefix, {phone = false} = {}) {
   page.setDefaultTimeout(120000); // software WebGL on CI-like runners is slow to present frames
   await page.goto(`${BASE}/?solo&acceptanceProbe`, {waitUntil: 'domcontentloaded'});
-  await page.waitForSelector('#runLaunch', {state: 'visible', timeout: 60000});
+  await page.waitForSelector('#newWorld', {state: 'visible', timeout: 60000});
   // The first-visit "What's new" panel opens a moment after load.
   if (await page.waitForSelector('.pn-backdrop', {state: 'visible', timeout: 20000}).catch(() => null)) { await page.click('.pn-backdrop button:has-text("Got it")'); await page.waitForSelector('.pn-backdrop', {state: 'hidden'}).catch(() => {}); }
   await page.fill('#name', 'Mitch').catch(() => {});
-  await page.click('#runLaunch');
+  // New world menu -> Expedition Roguelite -> the run launcher (the run plays on the menu's generated world).
+  await page.click('#newWorld');
+  await page.click('.wm-mode[data-mode="expedition"]');
+  await sleep(600); await shot(page, `${prefix}00a-new-world-menu`);
+  await page.click('.wm-go');
   await page.waitForSelector('.rx-launch .rx-go', {state: 'visible'});
   await sleep(1200);
   await shot(page, `${prefix}00-launcher`);

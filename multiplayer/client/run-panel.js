@@ -62,6 +62,13 @@ export function nextRunOptions(snapshot, {seed, same = false} = {}) {
   return {...base, world: same ? world : worldDescriptor({kind: 'expedition', seed: friendlySeed(seed), preset: world.preset, size: world.size})};
 }
 
+/** The world a new run plays on: the menu's world, except the Daily Expedition, whose world comes from the date's seed
+ * so every player gets the same world and route that day. */
+export function runWorldFor(run, world) {
+  if (!world) return null;
+  return run.format === 'daily' ? worldDescriptor({kind: 'expedition', seed: friendlySeed(run.seed), preset: 'continent', size: world.size}) : world;
+}
+
 /** Pure model of the strip, so tests and the VR panel can share it. */
 export function runStripModel(run, viewerId = '', enemies = []) {
   if (!run) return null;

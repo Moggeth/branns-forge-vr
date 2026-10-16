@@ -20,7 +20,7 @@ import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
 import './client/quick-build.css';
-import {createRunHud,createRunLauncher,nextRunOptions} from './client/run-panel.js';
+import {createRunHud,createRunLauncher,nextRunOptions,runWorldFor} from './client/run-panel.js';
 import {runWristView,runVrAction} from './client/run-vr.js';
 import './client/run-panel.css';
 import {inventionView} from './shared/inventions.js';
@@ -257,7 +257,7 @@ function wildsBanner(e, me) {
 const worldMenu = createWorldMenu({
   available: kind => ['arena', 'wilds', 'expedition', 'underways'].includes(kind) ? true : 'Arriving in a coming update. This mode is still being built.',
   onStart: async choice => {
-    if (choice.kind === 'expedition') { runLauncher.open(); return; } // the run launcher picks format, seed and kit
+    if (choice.kind === 'expedition') { runWorld = choice.world || null; runLauncher.open(); return; } // the run launcher picks format and seed; the run plays on the menu's generated world
     if (!game && !rendererFailed) { const revision = ++startRevision; showLobbyStatus('Preparing the world…', {busy: true, cancel: true}); await rendererPromise; if (revision !== startRevision) return; }
     start({create: true, solo: devSolo, ...(choice.world ? {world: choice.world} : {})});
   }});
@@ -731,8 +731,9 @@ const runHud = createRunHud({parent: body,
   leave: () => $('leave').click(),
   toast: text => toast(text),
   onModal: open => { runModal = open; if (open) { game?.clearControls(); if (document.pointerLockElement) document.exitPointerLock?.(); } syncActive(); }});
-const runLauncher = createRunLauncher({parent: body, openHall: () => runHud.openHall(), onStart: run => start({create: true, run, ...(devSolo ? {solo: true} : {})})});
-$('runLaunch')?.addEventListener('click', () => runLauncher.open());
+let runWorld = null; // the generated world chosen in the New world menu (null: today's valley)
+const runLauncher = createRunLauncher({parent: body, openHall: () => runHud.openHall(), onStart: run => start({create: true, run: runWorld ? {...run, world: runWorldFor(run, runWorld)} : run, ...(devSolo ? {solo: true} : {})})});
+$('runLaunch')?.addEventListener('click', () => { runWorld = null; runLauncher.open(); });
 // Failures: short red standalone text that fades on its own (the recovery hint sits small beneath).
 function fail(text) { if (text) calloutLane().error(text); }
 
