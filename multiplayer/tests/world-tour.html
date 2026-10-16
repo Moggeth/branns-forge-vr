@@ -24,6 +24,6 @@ function pump(){const now=performance.now();let n=still?0:Math.min(12,Math.round
 setInterval(pump,50);advance(1);
 window.lab={game,advance,place,look:(y,p)=>game.setLook(y,p),sim:()=>sim,hero:()=>game.setRole('hero'),god:(zoom=0)=>{game.setRole('god');if(zoom)game.zoomBy(zoom);},controls:()=>game.controlsSnapshot()};
 game.setActive(true);
-const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r();}},100);});
-await wait();game.setActive(true);document.title='ready';
+const wait=()=>new Promise(r=>{const t=setInterval(()=>{if(game.diagnostics().startup.ready){clearInterval(t);r(game.diagnostics().startup.error);}},100);});
+const failed=await wait();game.setActive(true);document.title=failed?'failed: '+failed:'ready'; // a failed startup never passes as ready
 </script>

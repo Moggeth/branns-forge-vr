@@ -635,7 +635,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;
     terrainGeometry.update((x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)),dirty);
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
-    if(live){orchard.terrainTick?.(tick);content.terrainMoved(dirty);for(const e of dirty||[])meadowPending.set(e.id,e);return;}
+    if(live){orchard.terrainTick?.(tick);content.terrainMoved(dirty);roadPaving.terrainMoved(dirty);for(const e of dirty||[])meadowPending.set(e.id,e);return;}
     const meadowDirty=dirty&&dirty.concat([...meadowPending.values()]);meadowPending.clear();mountainArena.sync(snapshot);alpineForest.sync();cornerGround.sync();
     meadow.terrainChanged({edits: snapshot.edits, terrainTick: tick, dirty: foundationChanged ? null : meadowDirty});
     orchard.groundChanged({edits: snapshot.edits,terrainTick:tick,foundationChanged}); // edit-only rebake of the disturbed-earth channel; slope soil/stone follows the new normals

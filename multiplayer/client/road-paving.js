@@ -141,10 +141,13 @@ float roadNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0
   const all = laid.flatMap(l => l.stones.map(s => ({...s, route: l.route.id})));
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3(), p = new THREE.Vector3(), sc = new THREE.Vector3(), colour = new THREE.Color();
   const visibleRoutes = new Set(routes.map(r => r.id));
-  function update() {
+  // dirty: optional [{x, z, radius}] terrain edits morphing this frame; only stones near them re-seat (slots stay put
+  // because the visible set is unchanged between full updates).
+  function update(dirty = null) {
     const used = [0, 0, 0, 0];
     for (const s of all) {
       if (!visibleRoutes.has(s.route)) continue;
+      if (dirty && !dirty.some(d => Math.hypot(s.x - d.x, s.z - d.z) <= d.radius + 1)) { used[s.kind]++; continue; }
       const e = .35, h = height(s.x, s.z), hx = height(s.x + e, s.z) - height(s.x - e, s.z), hz = height(s.x, s.z + e) - height(s.x, s.z - e);
       n.set(-hx, 2 * e, -hz).normalize();
       q.setFromUnitVectors(up, n); qy.setFromAxisAngle(up, s.yaw); q.multiply(qy);
@@ -154,15 +157,16 @@ float roadNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0
       const mesh = meshes[s.kind], i = used[s.kind]++;
       mesh.setMatrixAt(i, m4);
       const t = TINTS[Math.floor(s.tint * TINTS.length)], v = .92 + (s.tint * 7.31 % 1) * .16;
-      mesh.setColorAt(i, colour.setRGB(t[0] * v, t[1] * v, t[2] * v));
+      if (!dirty) mesh.setColorAt(i, colour.setRGB(t[0] * v, t[1] * v, t[2] * v));
     }
-    meshes.forEach((mesh, k) => { mesh.count = used[k]; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; });
+    meshes.forEach((mesh, k) => { mesh.count = used[k]; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor && !dirty) mesh.instanceColor.needsUpdate = true; });
   }
   update();
   return {
     group, update,
     // Landmark footpaths only exist in worlds that have the landmarks.
     setLandmarks(on) { const want = !!on, had = visibleRoutes.has(STARTING_PATHS[0]?.id); if (want === had) return; for (const p of STARTING_PATHS) want ? visibleRoutes.add(p.id) : visibleRoutes.delete(p.id); update(); },
+    terrainMoved(dirty) { if (dirty?.length) update(dirty); },
     stats: () => ({stones: meshes.reduce((n, m) => n + m.count, 0), draws: meshes.length, triangles: meshes.reduce((n, m) => n + m.count * m.geometry.index.count / 3, 0)}),
     dispose() { group.removeFromParent(); for (const g of shapes) g.dispose(); material.dispose(); for (const m of meshes) m.dispose?.(); },
   };

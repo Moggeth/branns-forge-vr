@@ -20,6 +20,13 @@ mesh.getMatrixAt(0, m); p.setFromMatrixPosition(m);
 assert.ok(Math.abs(p.y - (h(p.x, p.z) - .06)) <= .0100001, 'stones sit on the ground (within their centimetre of lift)');
 h = (x, z) => 3; paving.update(); mesh.getMatrixAt(0, m); p.setFromMatrixPosition(m);
 assert.ok(Math.abs(p.y - 2.94) <= .0100001, 'stones re-seat after the terrain changes');
+{ // a live terrain morph re-seats only the stones near it
+  const far = new THREE.Matrix4(), farP = new THREE.Vector3(); mesh.getMatrixAt(mesh.count - 1, far); farP.setFromMatrixPosition(far);
+  h = (x, z) => 5; paving.terrainMoved([{x: p.x, z: p.z, radius: 1}]); mesh.getMatrixAt(0, m); p.setFromMatrixPosition(m);
+  assert.ok(Math.abs(p.y - 4.94) <= .0100001, 'stones under a live edit follow it');
+  mesh.getMatrixAt(mesh.count - 1, far); assert.ok(Math.abs(new THREE.Vector3().setFromMatrixPosition(far).y - farP.y) < 1e-9, 'stones away from it stay put');
+  h = (x, z) => 3; paving.update();
+}
 paving.setLandmarks(false); const without = paving.stats().stones; paving.setLandmarks(true);
 assert.ok(paving.stats().stones > without, 'landmark footpaths come and go with the landmarks');
 const hits = new THREE.Raycaster(new THREE.Vector3(0, 10, -12), new THREE.Vector3(0, -1, 0)).intersectObject(paving.group, true);
