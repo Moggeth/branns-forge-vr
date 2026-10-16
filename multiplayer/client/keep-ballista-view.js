@@ -349,7 +349,7 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
     setLocalDraw(id, startMs) { if (startMs === null || startMs === undefined) localDraw.delete(id); else localDraw.set(id, startMs); },
     localDraw: (id, now = performance.now()) => { const s = localDraw.get(id); return s === undefined ? null : sunDraw(0, (now - s) / 1000 * 60); },
     stats: () => ({rigs: parts.size, timberlines: [...parts.values()].filter(b => b.keep.style === 'timberline').map(b => ({id: b.data.id, phase: b.keep.machine.state, aim: b.keep.machine.aim, lod: b.keep.machine.lod})), flights: flights.size, stuck: stuck.length, links: links.count, fx: fx.length}),
-    dispose() { group.removeFromParent(); linkGeo.dispose(); linkMat.dispose(); flashGeo.dispose(); glowTex.dispose(); ringGeo.dispose(); arcGeo.dispose(); arcMat.dispose(); for (const m of Object.values(trailMats)) m.dispose(); }};
+    dispose() { for (const built of [...parts.values()]) release(built); group.removeFromParent(); linkGeo.dispose(); linkMat.dispose(); flashGeo.dispose(); glowTex.dispose(); ringGeo.dispose(); arcGeo.dispose(); arcMat.dispose(); for (const m of Object.values(trailMats)) m.dispose(); }};
 }
 
 /** A soft round glow (white, alpha falls off smoothly) so flashes read as light, not a solid ball. */

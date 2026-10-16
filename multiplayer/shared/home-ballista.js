@@ -101,7 +101,7 @@ function launchTimberline(state, part, by) {
   const hat = !!by && hasItem(state.players.find(q => q.id === by), 'hat');
   const q = launchKeepTimberline(state, mannedShot(keepTimberlineFrame(part), {yaw: part.aimYaw || 0, pitch: part.aimPitch || 0}), {structureId: part.id, side: part.side, owner: by ?? null});
   if (!q) return null;
-  q.heroDamage = KEEP_BALLISTA.timberline.hero;
+  q.heroDamage = KEEP_BALLISTA.timberline.hero; if (hat) q.power = 1.5;
   const reload = by ? MANNED.reloadTicks : KEEP_BALLISTA.timberline.unmannedReload;
   part.readyTick = state.tick + (hat ? reload / 2 : reload); part.fireTick = state.tick;
   return {kind: 'timberline_fire', id: part.id, structureId: part.id, part: part.id, side: part.side, position: [...part.position], origin: [...q.origin], target: [...q.target],

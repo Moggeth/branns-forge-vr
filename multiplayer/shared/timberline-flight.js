@@ -79,9 +79,9 @@ function stepLong(s,q,c,events,structureDefs){
  hits.sort((x,y)=>x.u-y.u||(x.part<y.part?-1:1));
  for(const h of hits){if(h.kind!=='ground'&&h.kind!=='block'&&q.hitIds.includes(h.obj.id))continue;
   if(h.kind==='battle-base'){damageBattleBase(s,h.obj.id,110,q.side,events);events.push({kind:'timberline_stop',id:q.id,structureId:q.structureId,position:h.point,material:'stone'});return true;}
-  if(h.kind==='hero'){q.hitIds.push(h.obj.id);c.damageHero(s,h.obj,q.heroDamage,events,q.origin);continue;}
+  if(h.kind==='hero'){q.hitIds.push(h.obj.id);c.damageHero(s,h.obj,Math.round(q.heroDamage*(q.power||1)),events,q.origin);continue;}
   if(h.kind==='tree'){q.hitIds.push(h.obj.id);const f=timberlineLaunch(q).forward,flatF=[f[0],0,f[2]].map(v=>v/Math.max(1e-6,Math.hypot(f[0],f[2])));for(let cut=0;cut<3;cut++){const r=c.chopTree(s,h.obj,h.point,flatF,{terrainHeight:(x,z)=>c.terrainHeight(s,x,z,false)});events.push(...(r.events||[]).map(e=>({...e,by:q.owner})));}events.push({kind:'timberline_shear',id:q.id,structureId:q.structureId,position:h.point,material:'wood'});continue;}
-  if(h.kind==='enemy'){q.hitIds.push(h.obj.id);if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,270,{ownerId:q.owner,side:q.side,tool:'axe'},c,events);else c.damageEnemy(s,h.obj,250,events,q.owner,q.side);
+  if(h.kind==='enemy'){q.hitIds.push(h.obj.id);const power=q.power||1;if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,Math.round(270*power),{ownerId:q.owner,side:q.side,tool:'axe'},c,events);else c.damageEnemy(s,h.obj,Math.round(250*power),events,q.owner,q.side);
    if(!(h.obj.hp>0&&s.enemies.includes(h.obj)))continue;}
   stick(s,q,h,t0+(t1-t0)*h.u,events);return true;
  }
