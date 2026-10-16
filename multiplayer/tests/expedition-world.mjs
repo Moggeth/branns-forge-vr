@@ -80,4 +80,14 @@ assert.deepEqual(loaded.snapshot().run, snap.run, 'world runs survive save and r
   assert.ok(spawned > 5, 'encounters spawned on the generated terrain');
   const heart = end.nodes.find(n => n.kind === 'heart'); assert.ok(Math.hypot(heart.x, heart.z) > 150, 'the Heart sits far out in the world');
 }
+// The next run: a fresh world of the same preset, or the very same world and route.
+{
+  const {nextRunOptions} = await import('../client/run-panel.js');
+  const s = sim.snapshot(), fresh = nextRunOptions(s, {seed: 4242}), same = nextRunOptions(s, {same: true});
+  assert.equal(fresh.seed, 4242); assert.equal(fresh.world.preset, 'continent'); assert.notEqual(fresh.world.seed, s.world.seed);
+  assert.deepEqual(same.world, s.world); assert.equal(same.seed, 31337);
+  assert.deepEqual(nextRunOptions({run: s.run}, {seed: 7}), {format: 'expedition', seed: 7}, 'arena runs stay on the arena');
+  const next = createSimulation({room: 'XR', seed: 41, run: (({world, ...o}) => o)(fresh), world: fresh.world}).snapshot();
+  assert.equal(next.world.seed, fresh.world.seed); assert.equal(next.run.seed, 4242);
+}
 console.log('expedition-world: ok');

@@ -6,6 +6,8 @@
 import {NODE_KINDS, RUN_FORMATS, RUN_TUNING, BOSSES, routeChoices, nodeHaul, RUN_ENDED, dailySeed} from '../shared/expedition-run.js';
 import {BOONS, KITS, KIT_IDS, HALL, HALL_IDS} from '../shared/run-boons.js';
 import {enemyMaxHp} from '../shared/combat.js';
+import {worldDescriptor} from '../shared/worldgen/registry.js';
+import {friendlySeed} from '../shared/worldgen/random.js';
 import {loadRunMeta, saveRunMeta, buyHall, hallCost, creditRun, runKey, todayUtc} from './run-meta.js';
 
 const HZ = 60;
@@ -48,6 +50,17 @@ function icon(name, size = 20) {
 const button = (cls, text, onClick, {disabled = false, title = ''} = {}) => { const b = el('button', `btn ${cls}`, text); b.type = 'button'; b.disabled = disabled; if (title) b.title = title; b.addEventListener('click', onClick); return b; };
 const clock = secs => `${Math.floor(secs / 60)}:${String(Math.max(0, Math.floor(secs % 60))).padStart(2, '0')}`;
 const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+
+/**
+ * Options for the next run from this one. On a generated world a new run gets a fresh world of the same preset and
+ * size (the world resets with the run); "same seed again" replays the same world and route exactly.
+ */
+export function nextRunOptions(snapshot, {seed, same = false} = {}) {
+  const run = snapshot?.run, world = snapshot?.world;
+  const base = same && run ? {format: run.format, seed: run.seed, daily: run.daily} : {format: 'expedition', seed};
+  if (!world) return base;
+  return {...base, world: same ? world : worldDescriptor({kind: 'expedition', seed: friendlySeed(seed), preset: world.preset, size: world.size})};
+}
 
 /** Pure model of the strip, so tests and the VR panel can share it. */
 export function runStripModel(run, viewerId = '', enemies = []) {
@@ -239,8 +252,8 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
     scroll.append(path);
     const foot = el('footer', 'rx-foot rx-foot-wrap');
     if (isHost()) {
-      foot.append(button('btn-primary', 'New expedition', () => newRun({format: 'expedition', seed: randomSeed()})));
-      foot.append(button('btn', 'Same seed again', () => newRun({format: run.format, seed: run.seed, daily: run.daily})));
+      foot.append(button('btn-primary', 'New expedition', () => newRun(nextRunOptions(lastSnap, {seed: randomSeed()}))));
+      foot.append(button('btn', 'Same seed again', () => newRun(nextRunOptions(lastSnap, {same: true}))));
     } else foot.append(el('p', 'rx-note', 'The host can start the next run.'));
     foot.append(button('btn-quiet', 'Hall of Embers', openHall), button('btn-quiet', 'Leave', leave));
     box.append(scroll, foot);

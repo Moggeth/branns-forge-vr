@@ -20,7 +20,7 @@ import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
 import './client/quick-build.css';
-import {createRunHud,createRunLauncher} from './client/run-panel.js';
+import {createRunHud,createRunLauncher,nextRunOptions} from './client/run-panel.js';
 import {runWristView,runVrAction} from './client/run-vr.js';
 import './client/run-panel.css';
 import {inventionView} from './shared/inventions.js';
@@ -528,7 +528,7 @@ function expeditionAction(action,detail={}) {
   const runCmd = runVrAction(action);
   if (runCmd) {
     if (runCmd.local === 'leave') return void $('leave').click();
-    if (runCmd.local === 'again') { try { session?.startRun({format: 'expedition', seed: (crypto.getRandomValues(new Uint32Array(1))[0] % 900000) + 100000}); } catch (error) { toast(error.message); } return; }
+    if (runCmd.local === 'again') { try { session?.startRun(nextRunOptions(lastSnapshot, {seed: (crypto.getRandomValues(new Uint32Array(1))[0] % 900000) + 100000})); } catch (error) { toast(error.message); } return; }
     return void command('run', {action: runCmd.action, ...runCmd.payload});
   }
   const snap = lastSnapshot, adv = snap?.adventure, self = snap?.players.find(p => p.id === playerId);
