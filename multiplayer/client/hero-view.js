@@ -182,6 +182,8 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     u.attackAt = u.clock;
     a.reset().setEffectiveWeight(1).fadeIn(special ? .06 : .03).play();
     if (strike) a.time = HERO_ATTACK_EVIDENCE.strikeFrame;                  // the event is post-contact: show strike + recovery, not a late wind-up
+    // The blow catches for a moment on what it hit (strike-feel.js does the same in first person): longest in wood.
+    u.attackHold = strike ? (ev.kind === 'wood_hit' ? .08 : .05) : 0;
     return special ? 'special' : 'strike';
   }
 
@@ -316,6 +318,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     else { u.torsoYaw = null; u.crouch = 0; u.look = null; if (u.model.rotation.y || u.model.position.x || u.model.position.z) { u.model.rotation.y = 0; u.model.position.set(0, 0, 0); } }
     locomotion(u, u.model, dt);
     if (u.posed) { for (const [b, p, q] of u.rest) { b.position.copy(p); b.quaternion.copy(q); } u.posed = false; }
+    { const a = u.heroActions.Attack; if (a) a.timeScale = u.clock - u.attackAt < (u.attackHold || 0) ? .06 : 1; }
     u.heroMixer.update(dt);
     if (data.head) { u.model.updateMatrixWorld(true); u.posed = true;
       crouch(u);                                                                 // feet pinned, hips lowered: before the arms
