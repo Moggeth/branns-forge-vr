@@ -30,7 +30,7 @@ const heroesIn = (state, run) => state.players.filter(p => p.role === 'hero' && 
 
 /** The seed a site's next delve uses: the world seed, the site, and how many times it has been cleared. */
 export function siteSeed(state, site) {
-  return hashSeed(state.seed, site.id, state0(state).delves[site.id] || 0);
+  return hashSeed(site.seed ?? state.seed, site.id, state0(state).delves[site.id] || 0);
 }
 
 /** Open a dungeon run (the entrance rules and the roguelite both call this). Returns the run or null when full. */

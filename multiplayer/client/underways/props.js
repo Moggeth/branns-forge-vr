@@ -112,6 +112,16 @@ function timberSet() {
     part(box(.12, .32, .14), C.timberDark, {at: [-.4, .86, 0], rot: [0, 0, -.8]}), part(box(.12, .32, .14), C.timberDark, {at: [.4, .86, 0], rot: [0, 0, .8]}),
   ]);
 }
+// A pit prop against a cave wall: a post (unit height, scaled to the roof), a cap block and a raking brace.
+function pitProp() {
+  return merge([...beam(.22, 1, .22, C.timber, {at: [0, .5, 0]}), part(box(.5, .08, .4), C.timberDark, {at: [0, .97, -.05]}), part(box(.1, .45, .12), C.timberPale, {at: [0, .78, -.16], rot: [.6, 0, 0]})]);
+}
+// The ladder you came down: two rails and rungs, unit height (scaled to the roof), leaning on the wall behind.
+function ladder() {
+  const parts = [part(box(.08, 1, .08), C.timberPale, {at: [-.28, .5, 0], jitter: .1}), part(box(.08, 1, .08), C.timberPale, {at: [.28, .5, 0], jitter: .1})];
+  for (let k = 0; k < 10; k++) parts.push(part(box(.56, .035, .05), C.timber, {at: [0, .06 + k * .1, 0]}));
+  return merge(parts);
+}
 // Mine rails: a 2 m length (sleepers and two rails) along -z.
 function rails() {
   const parts = [part(box(.06, .06, 2), C.iron, {at: [-.36, .07, 0]}), part(box(.06, .06, 2), C.iron, {at: [.36, .07, 0]})];
@@ -234,6 +244,79 @@ function pickRack() {
   return merge(parts);
 }
 
+
+// ---- Crypt and sunken keep pieces.
+function pillar(style) {
+  // Unit height (scaled to the roof): plinth, shaft and capital. The crypt's is fluted grey stone; the keep's is warm
+  // ashlar drums with an ivy collar.
+  const st = style === 'keep' ? [.6, .55, .45] : C.stone, dk = style === 'keep' ? [.48, .44, .36] : C.stoneDark, parts = [];
+  parts.push(part(box(1.1, .1, 1.1), dk, {at: [0, .05, 0]}), part(cyl(.42, .5, .06, 12), st, {at: [0, .12, 0]}));
+  if (style === 'keep') for (let k = 0; k < 6; k++) parts.push(part(cyl(.4, .4, .14, 12), k % 2 ? st : dk, {at: [0, .2 + k * .135, 0], jitter: .15, seed: k}));
+  else parts.push(part(cyl(.36, .4, .8, 12), st, {at: [0, .55, 0], jitter: .08}));
+  parts.push(part(cyl(.5, .4, .06, 12), st, {at: [0, .97, 0]}), part(box(1.05, .06, 1.05), dk, {at: [0, 1.0, 0]}));
+  if (style === 'keep') parts.push(part(new THREE.TorusGeometry(.42, .07, 6, 14), C.moss, {at: [0, .35, 0], rot: [Math.PI / 2, 0, 0], jitter: .3}));
+  return merge(parts);
+}
+function torch() {
+  return merge([part(box(.14, .3, .06), C.iron, {at: [0, 2.0, .04]}), part(box(.05, .05, .32), C.iron, {at: [0, 2.06, -.12], rot: [-.5, 0, 0]}),
+    part(cyl(.05, .03, .5, 6), C.timber, {at: [0, 2.2, -.26], rot: [-.25, 0, 0]}), part(cyl(.08, .05, .1, 8), C.iron, {at: [0, 2.43, -.31]}),
+    part(new THREE.ConeGeometry(.09, .32, 7), C.flame, {at: [0, 2.62, -.33], glow: 1}), part(new THREE.ConeGeometry(.05, .2, 6), [1, .9, .55], {at: [0, 2.56, -.33], glow: 1})]);
+}
+function brazier() {
+  const parts = [part(lathe([[0, 0], [.3, 0], [.12, .1], [.08, .7], [.18, .78], [.42, .92], [.45, 1.0], [0, .96]], 12), C.ironWarm)];
+  for (let k = 0; k < 6; k++) parts.push(part(new THREE.DodecahedronGeometry(.1, 0), [.3, .12, .06], {at: [Math.cos(k) * .2, 1.0, Math.sin(k) * .2], glow: .6}));
+  parts.push(part(new THREE.ConeGeometry(.28, .6, 8), C.flame, {at: [0, 1.32, 0], glow: 1}), part(new THREE.ConeGeometry(.15, .4, 7), [1, .9, .55], {at: [0, 1.22, 0], glow: 1}));
+  return merge(parts);
+}
+function sarcophagus() {
+  return merge([part(box(.95, .7, 2.1), C.stone, {at: [0, .35, 0], jitter: .08}), part(box(1.05, .12, 2.2), C.stoneDark, {at: [0, .76, 0]}),
+    part(box(.6, .14, 1.4), C.stone, {at: [0, .89, .05]}), part(new THREE.SphereGeometry(.2, 10, 8), C.stone, {at: [0, .95, -.7], scale: [1, .7, 1]}),
+    part(box(.2, .1, .6), C.stone, {at: [-.15, .97, .1], rot: [0, .2, 0]}), part(box(.2, .1, .6), C.stone, {at: [.15, .97, .1], rot: [0, -.2, 0]}),
+    part(box(.98, .05, .05), C.gold, {at: [0, .5, -1.06]})]);
+}
+function candles(seed = 4) {
+  const r = rng(seed), parts = [];
+  for (let k = 0; k < 6; k++) { const a = r() * 6.283, d = r() * .25, h = .08 + r() * .25, x = Math.cos(a) * d, z = Math.sin(a) * d; parts.push(part(cyl(.03, .035, h, 6), C.paper, {at: [x, h / 2, z]}), part(new THREE.ConeGeometry(.02, .06, 5), C.flame, {at: [x, h + .035, z], glow: 1})); }
+  parts.push(part(cyl(.18, .2, .03, 10), [.85, .8, .62], {at: [0, .015, 0]}));
+  return merge(parts);
+}
+function bones(seed = 6) {
+  const r = rng(seed), bone = [.88, .84, .72], parts = [part(new THREE.SphereGeometry(.12, 10, 8), bone, {at: [.1, .1, 0], scale: [1, .9, 1.15]})];
+  for (let k = 0; k < 5; k++) parts.push(part(cyl(.025, .025, .4 + r() * .2, 5), bone, {at: [(r() - .5) * .6, .04, (r() - .5) * .6], rot: [Math.PI / 2, r() * 3, 0]}));
+  return merge(parts);
+}
+function urnPile() { const a = pot(3), b = pot(5); b.scale(.7, .7, .7); b.translate(.38, 0, .12); const c = pot(7); c.scale(.8, .55, .8); c.rotateZ(1.4); c.translate(-.3, .17, .2); return merge([a, b, c]); }
+function roots(seed = 8) {
+  // Roots hanging from the roof, unit height (the view scales them to the room): a few long tapering strands.
+  const r = rng(seed), parts = [];
+  for (let k = 0; k < 6; k++) { const len = .25 + r() * .45, x = (r() - .5) * .9, z = (r() - .5) * .9; parts.push(part(cyl(.05 * (1 - k * .05), .012, len, 5), k % 2 ? [.36, .26, .16] : [.3, .22, .14], {at: [x, 1 - len / 2, z], rot: [(r() - .5) * .3, 0, (r() - .5) * .3]})); }
+  parts.push(part(new THREE.SphereGeometry(.12, 8, 6), C.moss, {at: [0, .98, 0], scale: [3, .5, 3], jitter: .3}));
+  return merge(parts);
+}
+function masonry(seed = 9) { const r = rng(seed), parts = []; for (let k = 0; k < 4; k++) parts.push(part(box(.5 + r() * .3, .3, .35), r() > .5 ? [.6, .55, .45] : [.5, .46, .38], {at: [(r() - .5) * .7, .15 + (k > 2 ? .3 : 0), (r() - .5) * .5], rot: [0, r() * 3, (r() - .5) * .3], jitter: .15, seed: k})); return merge(parts); }
+function banner(color) {
+  const cloth = new THREE.PlaneGeometry(.8, 1.6, 1, 4); const p = cloth.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, Math.sin((y + .8) * 2) * .04); if (y < -.75) p.setY(i, y - Math.abs(p.getX(i)) * .3); }
+  return merge([part(cyl(.025, .025, 1, 6), C.iron, {at: [0, 3.1, -.06], rot: [0, 0, Math.PI / 2]}), part(cloth, color, {at: [0, 2.3, -.07], jitter: .1}), part(new THREE.CircleGeometry(.18, 12), C.gold, {at: [0, 2.45, -.085], rot: [0, Math.PI, 0], glow: .15})]);
+}
+function spikePlate() { const parts = [part(box(1.8, .06, 1.8), C.ironWarm, {at: [0, .03, 0]})]; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) parts.push(part(box(.08, .07, .08), C.iron, {at: [-.6 + i * .4, .06, -.6 + j * .4]})); return merge(parts); }
+function spikes() { const parts = []; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) parts.push(part(new THREE.ConeGeometry(.07, .7, 5), [.75, .74, .72], {at: [-.6 + i * .4, .35, -.6 + j * .4]})); return merge(parts); }
+function portcullis() {
+  const parts = []; for (let k = 0; k < 7; k++) parts.push(part(box(.07, 3.4, .07), C.iron, {at: [-.43 + k * .143, 1.7, 0]}));
+  for (const y of [.5, 1.4, 2.3, 3.2]) parts.push(part(box(1.0, .07, .09), C.iron, {at: [0, y, 0]}));
+  for (let k = 0; k < 7; k++) parts.push(part(new THREE.ConeGeometry(.06, .18, 4), C.iron, {at: [-.43 + k * .143, -.08, 0], rot: [Math.PI, 0, 0]}));
+  parts.push(part(box(.36, .34, .14), C.brass, {at: [0, 1.5, -.12]}), part(box(.05, .1, .02), [.5, .9, 1], {at: [0, 1.48, -.195], glow: 1}));
+  return merge(parts);
+}
+function tableFeast() {
+  const parts = [part(box(2.6, .1, 1.0), C.timber, {at: [0, .78, 0], jitter: .1}), ...[[-1.1, -.38], [1.1, -.38], [-1.1, .38], [1.1, .38]].map(([x, z]) => part(box(.1, .76, .1), C.timberDark, {at: [x, .38, z]}))];
+  for (let k = 0; k < 5; k++) parts.push(part(lathe([[0, 0], [.05, 0], [.06, .14], [0, .14]], 8), C.brass, {at: [-1 + k * .5, .83, (k % 2 - .5) * .5]}));
+  parts.push(part(new THREE.SphereGeometry(.22, 10, 8), [.55, .32, .16], {at: [0, .95, 0], scale: [1.4, .8, 1]}), part(cyl(.3, .3, .03, 12), C.paper, {at: [0, .845, 0]}));
+  for (let k = 0; k < 4; k++) { const x = -.9 + k * .6; parts.push(part(box(.4, .45, .4), C.timberPale, {at: [x, .23, k % 2 ? .75 : -.75]})); parts.push(part(new THREE.SphereGeometry(.13, 10, 8), [.88, .84, .72], {at: [x, 1.25, k % 2 ? .75 : -.75], scale: [1, .95, 1.1]}), part(cyl(.12, .1, .45, 8), [.88, .84, .72], {at: [x, .9, k % 2 ? .75 : -.75]})); }
+  return merge(parts);
+}
+function pudding() { return merge([part(lathe([[0, 0], [1.1, 0], [1.2, .3], [1.0, .9], [.5, 1.2], [0, 1.25]], 16), [.52, .3, .16], {jitter: .1}), part(new THREE.SphereGeometry(.7, 14, 6, 0, 6.283, 0, 1.0), [.95, .92, .82], {at: [0, .75, 0], scale: [1.5, .5, 1.5]}), part(new THREE.SphereGeometry(.12, 8, 6), [.85, .1, .12], {at: [0, 1.3, 0], glow: .1}), part(cyl(1.4, 1.4, .05, 16), C.brass, {at: [0, .02, 0]})]); }
+function helmRack() { const parts = [...beam(2.4, .12, .1, C.timber, {at: [0, 1.5, 0]})]; for (let k = 0; k < 6; k++) parts.push(part(new THREE.SphereGeometry(.16, 10, 8, 0, 6.283, 0, 1.6), C.iron, {at: [-1 + k * .4, 1.45, -.12]}), part(box(.04, .12, .04), C.brass, {at: [-1 + k * .4, 1.5, -.29]})); return merge(parts); }
+
 let kit = null;
 /** The shared kit: geometry per prop type (built once, on first use). */
 export function underwayKit() {
@@ -242,9 +325,12 @@ export function underwayKit() {
   kit = {
     lantern: lantern(), cart: cart(), barrel: barrel(), crate: crate(), rubble: rubble(), mushroom: mushrooms(),
     'crystal-0': crystalCluster([.5, .85, 1], 3), 'crystal-1': crystalCluster([.75, .55, 1], 5), 'crystal-2': crystalCluster([.5, 1, .82], 9),
-    timber: timberSet(), rails: rails(), urn: pot(), chestBase: chestBase(), chestLid: chestLid(), plinth, key, shrine: shrine(), hoard: hoardPile(),
+    timber: timberSet(), pitProp: pitProp(), ladder: ladder(), rails: rails(), urn: pot(), chestBase: chestBase(), chestLid: chestLid(), plinth, key, shrine: shrine(), hoard: hoardPile(),
     gate: gateMine(), exit: exitRing(), returnCircle: returnCircle(), vent: vent(), flame: flameColumn(), crackedRoof: crackedRoof(),
     rock0: fallenRock(1), rock1: fallenRock(4), sign: sign(), 'tale-mine-0': camp(), 'tale-mine-1': pickRack(),
+    'pillar-crypt': pillar('crypt'), 'pillar-keep': pillar('keep'), torch: torch(), brazier: brazier(), sarcophagus: sarcophagus(), candles: candles(), bones: bones(), urnpile: urnPile(),
+    roots: roots(), masonry: masonry(), 'banner-crypt': banner([.42, .16, .4]), 'banner-keep': banner([.2, .36, .62]), spikePlate: spikePlate(), spikes: spikes(), portcullis: portcullis(),
+    'tale-crypt-0': tableFeast(), 'tale-crypt-1': candles(12), 'tale-keep-0': pudding(), 'tale-keep-1': helmRack(),
   };
   return kit;
 }

@@ -21,7 +21,7 @@ const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
 const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 export const UNDERWAY_VIEW = Object.freeze({
-  lantern: Object.freeze({color: 0xffc58a, intensity: 7, distance: 12, decay: 1.5}),
+  lantern: Object.freeze({color: 0xffc58a, intensity: 3.2, distance: 11, decay: 1.4}),
   dim: Object.freeze({sun: 1, hemi: .93, env: .85}),
 });
 
@@ -64,7 +64,10 @@ function buildRun(run, {quality, propMat}) {
   // Static props, instanced per type.
   const byType = new Map(), add = (type, it) => { if (!kit[type]) return; if (!byType.has(type)) byType.set(type, []); byType.get(type).push(it); };
   for (const p of d.props) {
-    const type = p.type === 'crystal' ? crystalType(p.color) : p.type;
+    const type = p.type === 'crystal' ? crystalType(p.color) : p.type === 'pillar' || p.type === 'banner' ? `${p.type}-${d.style === 'keep' ? 'keep' : 'crypt'}` : p.type;
+    if (p.type === 'pillar') { add(type, {x: p.x, y: Y(p.x, p.z), z: p.z, yaw: 0, scale: [1, ceilingAt(d, p.x, p.z) + .05, 1]}); continue; }
+    if (p.type === 'roots') { const h = ceilingAt(d, p.x, p.z) * .55; add(type, {x: p.x, y: Y(p.x, p.z) + ceilingAt(d, p.x, p.z) - h, z: p.z, yaw: p.yaw, scale: [p.scale, h, p.scale]}); continue; }
+    if (p.type === 'skyshaft') continue;
     add(type, {x: p.x, y: Y(p.x, p.z), z: p.z, yaw: p.yaw, scale: p.scale});
   }
   // Mine corridors: timber sets every 2.5 m, rails down the spine.
@@ -79,13 +82,29 @@ function buildRun(run, {quality, propMat}) {
     const spine = d.rooms[c.a].spine && d.rooms[c.b].spine;
     if (spine) for (let s = lo + 1; s <= hi - .9; s += 2) { const [x, z] = c.axis === 'z' ? [mid, s] : [s, mid]; add('rails', {x, y: Y(x, z), z, yaw}); }
   }
+  // Mine rooms: pit props shore up the cave walls every few metres (presentation only; they stand in the wall's lee).
+  if (d.style === 'mine') for (let j = 1; j < GRID - 1; j++) for (let i = 1; i < GRID - 1; i++) {
+    const ro = d.roomOf[j * GRID + i]; if (ro < 0 || (i * 7 + j * 3) % 4) continue;
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (d.tiles[(j + dj) * GRID + i + di]) continue;
+      const x = ((i - GRID / 2 + .5) + di * .5) * TILE - di * .28, z = ((j - GRID / 2 + .5) + dj * .5) * TILE - dj * .28;
+      if (d.hazards.some(h => Math.hypot(h.x - x, h.z - z) < 1.6) || d.props.some(p => Math.hypot(p.x - x, p.z - z) < 1.2)) break;
+      add('pitProp', {x, y: Y(x - di * .3, z - dj * .3), z, yaw: Math.atan2(di, dj), scale: [1, ceilingAt(d, x - di * .5, z - dj * .5) + .3, 1]});
+      break;
+    }
+  }
   for (const v of d.vignettes) add(v.kind.endsWith('-sign') ? 'sign' : `tale-${v.kind}`, {x: v.x, y: Y(v.x, v.z), z: v.z, yaw: v.yaw});
   add('returnCircle', {x: d.entry.x, y: Y(d.entry.x, d.entry.z), z: d.entry.z, yaw: 0});
+  { // the way you came down: a ladder up the shaft over the return circle, in a shaft of daylight
+    const q0 = d.rooms[0], wallZ = (q0.y1 + 1 - GRID / 2) * TILE, h = ceilingAt(d, d.entry.x, d.entry.z);
+    add('ladder', {x: d.entry.x, y: Y(d.entry.x, d.entry.z), z: wallZ - .15, yaw: 0, scale: [1, h + .4, 1]});
+  }
   // Hazard furniture (vents and loose roof patches); their motion is animated below.
   const hazards = [];
   for (const h of d.hazards) {
     const y = Y(h.x, h.z);
     if (h.type === 'flame') add('vent', {x: h.x, y, z: h.z, yaw: 0});
+    if (h.type === 'spikes') add('spikePlate', {x: h.x, y, z: h.z, yaw: 0, scale: [h.half, 1, h.half]});
     if (h.type === 'rockfall') add('crackedRoof', {x: h.x, y: y + ceilingAt(d, h.x, h.z) + (UNDERWAY_LOOK[d.style].roofBulge ? .35 : 0), z: h.z, yaw: h.x * 1.7});
     hazards.push({h, y, roof: y + ceilingAt(d, h.x, h.z)});
   }
@@ -101,7 +120,7 @@ function buildRun(run, {quality, propMat}) {
   });
   const keyLight = bakeAt(d, d.key.x, Y(d.key.x, d.key.z) + 1, d.key.z), plinth = single(kit.plinth, propMat, keyLight), key = single(kit.key, propMat, keyLight);
   plinth.position.set(d.key.x, Y(d.key.x, d.key.z), d.key.z); key.position.set(d.key.x, Y(d.key.x, d.key.z) + 1.45, d.key.z); group.add(plinth, key);
-  const g0 = d.gate, gateY = Y(g0.x, g0.z), gateMesh = single(kit.gate, propMat, bakeAt(d, g0.x, gateY + 1.5, g0.z));
+  const g0 = d.gate, gateY = Y(g0.x, g0.z), gateMesh = single(d.style === 'mine' ? kit.gate : kit.portcullis, propMat, bakeAt(d, g0.x, gateY + 1.5, g0.z));
   gateMesh.position.set(g0.x, gateY, g0.z); gateMesh.rotation.y = g0.axis === 'z' ? 0 : Math.PI / 2; gateMesh.scale.set(g0.width, Math.min(1, ceilingAt(d, g0.x, g0.z) / 3.4), 1); group.add(gateMesh);
   const shrineMesh = single(kit.shrine, propMat, bakeAt(d, d.shrine.x, Y(d.shrine.x, d.shrine.z) + 1, d.shrine.z));
   shrineMesh.position.set(d.shrine.x, Y(d.shrine.x, d.shrine.z), d.shrine.z); shrineMesh.rotation.y = Math.atan2(-(d.rooms[d.shrine.room].path[0][0] - d.shrine.x), -(d.rooms[d.shrine.room].path[0][1] - d.shrine.z)) + Math.PI; group.add(shrineMesh);
@@ -109,12 +128,18 @@ function buildRun(run, {quality, propMat}) {
   const hoardPile = single(kit.hoard, propMat, hoardLight); hoardPile.position.set(d.hoard.x, hy, d.hoard.z); group.add(hoardPile);
   const hoardChest = new THREE.Group(); hoardChest.position.set(d.hoard.x, hy + .35, d.hoard.z); hoardChest.rotation.y = d.hoard.yaw; hoardChest.scale.setScalar(1.6);
   const hb = single(kit.chestBase, propMat, hoardLight), hl = single(kit.chestLid, propMat, hoardLight); hl.position.set(0, .5, .32); hoardChest.add(hb, hl); group.add(hoardChest);
+  const shaftMat = new THREE.ShaderMaterial({transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: {uTime: lookUniforms.uUwTime},
+    vertexShader: 'varying vec2 vUv; void main(){vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'varying vec2 vUv; uniform float uTime; void main(){ float edge=sin(vUv.x*3.14159); float a=pow(edge,2.0)*smoothstep(0.0,.35,vUv.y)*(.85+.15*sin(uTime*.7+vUv.x*9.0)); gl_FragColor=vec4(vec3(1.0,.93,.75)*a*.22,1.0); }'});
+  const shaftH = ceilingAt(d, d.entry.x, d.entry.z) + 1, shaft = new THREE.Mesh(new THREE.CylinderGeometry(.9, 1.3, shaftH, 20, 1, true), shaftMat);
+  shaft.position.set(d.entry.x, Y(d.entry.x, d.entry.z) + shaftH / 2, d.entry.z + .4); shaft.raycast = () => {}; shaft.renderOrder = 2; group.add(shaft);
   const exit = single(kit.exit, propMat, [0, 0, 0]); exit.position.set(d.exit.x, Y(d.exit.x, d.exit.z), d.exit.z); exit.rotation.y = d.hoard.yaw; exit.visible = false; group.add(exit);
   // Flames for vents (shared additive material), and rocks for rockfalls.
   const flameMat = new THREE.MeshBasicMaterial({vertexColors: true, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false});
   const warnMat = new THREE.MeshBasicMaterial({color: 0xff8a3a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false});
   for (const hz of hazards) {
     if (hz.h.type === 'flame') { const f = new THREE.Mesh(kit.flame, flameMat); f.position.set(hz.h.x, hz.y + .12, hz.h.z); f.visible = false; f.raycast = () => {}; group.add(f); hz.flame = f; }
+    if (hz.h.type === 'spikes') { const sp = single(kit.spikes, propMat, bakeAt(d, hz.h.x, hz.y + .5, hz.h.z)); sp.position.set(hz.h.x, hz.y - .7, hz.h.z); sp.scale.set(hz.h.half, 1, hz.h.half); group.add(sp); hz.spikes = sp; }
     if (hz.h.type === 'rockfall') {
       hz.rocks = [0, 1, 2, 3].map(k => { const r = single(k % 2 ? kit.rock1 : kit.rock0, propMat, bakeAt(d, hz.h.x, hz.y + 1, hz.h.z)); r.visible = false; group.add(r); return {mesh: r, ox: Math.cos(k * 1.9 + hz.h.x) * .7 * (k ? 1 : .2), oz: Math.sin(k * 1.9 + hz.h.z) * .7 * (k ? 1 : .2), s: .7 + k * .18}; });
       const ring = new THREE.Mesh(new THREE.RingGeometry(hz.h.radius - .15, hz.h.radius, 32).rotateX(-Math.PI / 2), warnMat.clone()); ring.position.set(hz.h.x, hz.y + .04, hz.h.z); ring.raycast = () => {}; group.add(ring); hz.ring = ring;
@@ -154,6 +179,11 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
         const flick = 1 + .12 * Math.sin(time * 31 + h.x) + .08 * Math.sin(time * 47 + h.z);
         if (on) hz.flame.scale.set(.9 + .25 * k, (.3 + 2.6 * k) * flick, .9 + .25 * k);
         else if (pre) { const w = (ph - (h.period - 24)) / 24; hz.flame.scale.set(.5 * w, .25 * w * flick, .5 * w); }
+      }
+      if (h.type === 'spikes' && hz.spikes) {
+        // A short tremble, the snap up, a hold, then a slow sink: readable timing on every device.
+        const up = !active ? 0 : ph < 4 ? ph / 4 : ph < h.on ? 1 : ph < h.on + 20 ? 1 - (ph - h.on) / 20 : ph > h.period - 18 ? .06 * Math.abs(Math.sin(time * 60)) : 0;
+        hz.spikes.position.y = hz.y - .7 + .72 * up;
       }
       if (h.type === 'rockfall' && hz.rocks) {
         const fallStart = h.warn - 22, warnK = active && ph < h.warn ? smooth(ph / h.warn) : 0;
@@ -225,7 +255,7 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
         if (fog && current) { fogDeep.set(UNDERWAY_LOOK[current.d.style].fog); fog.color.lerp(fogDeep, k); if (fog.isFog) { fog.near = lerp(fog.near, 9, k); fog.far = lerp(fog.far, 46, k); } else if (fog.isFogExp2) fog.density = lerp(fog.density, .028, k); }
       }
       camera.getWorldDirection(look);
-      lantern.position.copy(eye).addScaledVector(look, .5); lantern.position.y += .2;
+      lantern.position.copy(eye).addScaledVector(look, -.35); lantern.position.y += .55; // above and behind the head: lights the way, not the held weapon
       lantern.intensity = L.intensity * k; stat.lantern = lantern.intensity;
       for (const b of built.values()) { b.group.visible = b === current; if (b.group.visible) animate(b, tick, dt); }
       portals.update(dt, {tick, camera, snapshot, inside});
