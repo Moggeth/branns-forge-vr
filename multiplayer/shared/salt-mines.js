@@ -145,7 +145,7 @@ export function mineDepth(x, z) {
   if (outside(u, v)) return 0;
   const f = mineField(u, v);
   if (f.d > MINE.wall + .6) return 0;
-  return smooth((f.along - portalAlong() + .4) / 6.2) * (1 - smooth((f.d - MINE.wall) / .6));
+  return smooth((f.along - portalAlong() + .3) / 3.6) * (1 - smooth((f.d - MINE.wall) / .6));
 }
 /** World {x, z, yaw} of the portal for one mine, facing out of the mountain along the path (three.js yaw: +Z faces
  * the meadow). Width is the opening the frame must span. */

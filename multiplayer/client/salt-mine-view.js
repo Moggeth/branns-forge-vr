@@ -16,11 +16,11 @@
 // - Hazards: dust trickling where the roof is about to fall and a growing shadow under it; the fall itself (rocks and
 //   a dust burst); the firedamp's yellow-green seep over full vents and the blast.
 import * as THREE from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createSaltMineProps} from './salt-mine-props.js';
+import {createSaltMineHazards} from './salt-mine-hazards.js';
 import {MINE, MINE_SIDES, mineArch, mineDepth, mineField, mineInside, minePoint, mineSideAt, minePortal, portalAlong, pathLength} from '../shared/salt-mines.js';
 import {DAMP_VENTS, SALT, SEAM_SPOTS, spotPoint} from '../shared/salt-mine-rules.js';
 
-const KIT_URL = '/assets/salt-mine-kit.glb';
 const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
 const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -36,7 +36,7 @@ const fbm = (x, y, z) => .55 * vnoise(x, y, z) + .3 * vnoise(x * 2.1 + 7, y * 2.
 export const MINE_LOOK = Object.freeze({
   // Rock-salt strata: blush, rose, milk-white and a warm iron-stained band (linear-ish sRGB, multiplied by AO).
   bands: Object.freeze([[.82, .55, .56], [.7, .36, .42], [.88, .8, .76], [.62, .44, .38], [.8, .5, .53]]),
-  floor: Object.freeze([.86, .76, .74]),
+  floor: Object.freeze([.8, .64, .57]),
   glow: 0xff7f95, amber: 0xffb070,
   fog: 0x1d0e13,                  // the rose dusk deep inside
   lantern: Object.freeze({color: 0xffc07a, intensity: 9, distance: 13, decay: 1.6}),
@@ -62,13 +62,14 @@ export function patchSaltRock(material, {veins = 1, grain = 1, key = 'salt-rock'
         float mineGrain = mn(vMineWorld * 6.0)${low ? '' : ' * .6 + mn(vMineWorld * 17.0) * .4'};
         diffuseColor.rgb *= ${(1 - .22 * grain).toFixed(3)} + ${(.44 * grain).toFixed(3)} * mineGrain;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        // Salt-lamp veins: a slow warm pulse through bands of glowing crystal in the rock.
-        // Contours of a strata-stretched noise: thin veins that run with the bedding, branching here and there.
-        float mineV = mn(vMineWorld * vec3(.45, 2.6, .45) + vec3(0.0, uMineTime * .02, 0.0))${low ? '' : ' * .75 + mn(vMineWorld * 1.7) * .25'};
-        float mineVein = smoothstep(.6, .655, mineV) * (1.0 - smoothstep(.69, .75, mineV)) + smoothstep(.83, .9, mineV) * .6;
-        float minePulse = .8 + .2 * sin(uMineTime * .7 + vMineWorld.x * .8 + vMineWorld.z * .6);
+        // Salt-lamp light from inside the rock: a soft warm glow that swells through the rosy strata (the vertex colour's
+        // blush), breathing slowly in broad patches, and pin-point glints where crystal faces catch it.
+        float mineBlush = clamp((vColor.r - vColor.b) * 2.6, 0.0, 1.0);
+        float mineSwell = smoothstep(.35, .85, mn(vMineWorld * vec3(.32, .8, .32) + vec3(0.0, uMineTime * .015, 0.0)));
+        float minePulse = .82 + .18 * sin(uMineTime * .6 + vMineWorld.x * .5 + vMineWorld.z * .4);
+        float mineGlint = ${low ? '0.0' : 'smoothstep(.93, .985, mn(vMineWorld * 23.0)) * .9'};
         vec3 mineGlow = mix(uMineGlowColor, uMineAmber, mn(vMineWorld * .35));
-        totalEmissiveRadiance += mineGlow * (mineVein * ${(.85 * veins).toFixed(3)} * minePulse + ${(.05 * veins).toFixed(3)}) * uMineGlow * vColor.rgb;`);
+        totalEmissiveRadiance += mineGlow * ((.05 + .3 * mineBlush * mineSwell) * ${veins.toFixed(3)} * minePulse + mineGlint * ${(.6 * veins).toFixed(3)}) * uMineGlow * vColor.rgb;`);
   };
   material.customProgramCacheKey = () => key + (low ? '-low' : '');
   return material;
@@ -223,6 +224,9 @@ function mergeShell(a, b) {
   return g;
 }
 
+// The headwall stands this far into the mountain behind the portal plane, so the kit's rock-salt collar round the
+// timber frame shows in front of it.
+const HEAD_BACK = 1.25;
 // ---- Outside: the cap of mountain over the tunnel and the headwall round the portal (the ground's material).
 function buildCapAndHeadwall(side, height, unmined) {
   const pos = [], idx = [], step = .5;
@@ -242,7 +246,7 @@ function buildCapAndHeadwall(side, height, unmined) {
   // up to the mountain's surface.
   const lat = [-PORTAL_DIR[1], PORTAL_DIR[0]], rows = 6, cols = 26, half = 4.6, base = pos.length / 3;
   for (let c = 0; c <= cols; c++) {
-    const t = -half + 2 * half * c / cols, u = P1[0] + lat[0] * t, v = P1[1] + lat[1] * t, [x, z] = minePoint(side, [u, v]);
+    const t = -half + 2 * half * c / cols, u = P1[0] + lat[0] * t + PORTAL_DIR[0] * HEAD_BACK, v = P1[1] + lat[1] * t + PORTAL_DIR[1] * HEAD_BACK, [x, z] = minePoint(side, [u, v]);
     const f = mineField(u, v), insideCave = MINE.wall - f.d > 0, floor = height(x, z);
     const bottom = insideCave ? floor + mineArch(u + PORTAL_DIR[0] * .02, v + PORTAL_DIR[1] * .02).height - .05 : floor - .3, top = Math.max(bottom + .3, unmined(x, z) + .05);
     for (let r = 0; r <= rows; r++) {
@@ -253,7 +257,9 @@ function buildCapAndHeadwall(side, height, unmined) {
   }
   for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) { const a = base + c * (rows + 1) + r, b = a + rows + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2));
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); // the ground's own UVs (PlaneGeometry(120, 120) laid flat) so its textures and mask line up with the mountain round it
+  const uv = new Float32Array(pos.length / 3 * 2); for (let i = 0; i < pos.length / 3; i++) { uv[i * 2] = (pos[i * 3] + 60) / 120; uv[i * 2 + 1] = (60 - pos[i * 3 + 2]) / 120; }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   // the headwall must face out of the mountain toward the meadow
   g.computeVertexNormals();
@@ -263,7 +269,7 @@ function buildCapAndHeadwall(side, height, unmined) {
   return g;
 }
 
-export function createSaltMineView({scene, ground, height, unmined, quality = 'high', sound = () => {}} = {}) {
+export function createSaltMineView({scene, ground, height, unmined, quality = 'high', sound = () => {}, kick = () => {}} = {}) {
   const low = quality === 'low', group = new THREE.Group(); group.name = 'SaltMines'; scene.add(group);
   const rockMat = patchSaltRock(new THREE.MeshStandardMaterial({vertexColors: true, roughness: .82, metalness: 0, emissive: 0x000000, envMapIntensity: .5, side: THREE.DoubleSide}), {low});
   const floorMat = patchSaltRock(new THREE.MeshStandardMaterial({vertexColors: true, roughness: .9, metalness: 0, envMapIntensity: .4, side: THREE.DoubleSide}), {veins: .35, grain: .7, key: 'salt-floor', low});
@@ -286,6 +292,8 @@ export function createSaltMineView({scene, ground, height, unmined, quality = 'h
   // The viewer's lantern: one pooled light, always present.
   const L = MINE_LOOK.lantern, lantern = new THREE.PointLight(L.color, 0, L.distance, L.decay);
   lantern.name = 'MineLantern'; lantern.castShadow = false; lantern.userData.ignoreContact = true; scene.add(lantern);
+  const props = createSaltMineProps({scene, height, quality});
+  const hazards = createSaltMineHazards({scene, height, rockMaterial: rockMat, quality, kick, sound, lantern});
   const eye = new THREE.Vector3(), look = new THREE.Vector3(), fogDeep = new THREE.Color(MINE_LOOK.fog), tmpC = new THREE.Color();
   let depth = 0, time = 0, primed = false; const lastEye = new THREE.Vector3();
 
@@ -294,7 +302,7 @@ export function createSaltMineView({scene, ground, height, unmined, quality = 'h
     /** How deep the viewer is in a mine (0..1), eased: the client uses it to hush weather and ambience. */
     depth: () => depth,
     /** After the sky, weather and orchard have set the day's light for this frame: dim it by the viewer's depth. */
-    update(dt, {camera, sun, hemisphere, fog, renderer, kitReady} = {}) {
+    update(dt, {camera, sun, hemisphere, fog, renderer, snapshot, tick = 0} = {}) {
       time += dt; mineUniforms.uMineTime.value = time;
       camera.getWorldPosition(eye);
       const target = mineDepth(eye.x, eye.z) * (eye.y < height(eye.x, eye.z) + 4.5 ? 1 : 0);
@@ -314,11 +322,16 @@ export function createSaltMineView({scene, ground, height, unmined, quality = 'h
       lantern.intensity = L.intensity * k; stat.lantern = lantern.intensity; stat.depth = depth;
       // The salt glows a touch brighter as your eyes adjust deep inside.
       mineUniforms.uMineGlow.value = .75 + .35 * k;
-      void tmpC; void kitReady; void sound;
+      props.update(dt, .8 + .4 * k);
+      hazards.update(dt, {snapshot, tick, camera});
+      void tmpC;
     },
-    stats: () => ({...stat, draws: group.children.length}),
+    /** Sim events: creaks, falls and firedamp blasts. */
+    event(event) { hazards.event(event, eye); },
+    props, hazards,
+    stats: () => ({...stat, draws: group.children.length, kit: props.stats(), hazards: hazards.stats()}),
     dispose() {
-      scene.remove(group); scene.remove(lantern);
+      scene.remove(group); scene.remove(lantern); props.dispose(); hazards.dispose();
       for (const g of geos) g.dispose(); rockMat.dispose(); floorMat.dispose();
     },
   };

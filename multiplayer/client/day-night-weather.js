@@ -224,7 +224,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     mistBase = mistBase == null || first ? groundY : approach(mistBase, groundY, step, 6, 6);
     A.bfMistBase.value = Math.min(mistBase, 1.5) - .4;
     A.bfMistHeight.value = 2.2 + w.fog * 2.6 + rainW * 1.2 + (rts ? 1.5 : 0);
-    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1) * open;
+    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1) * Math.max(0, 1 - 4 * (1 - open)); // gone a few steps in
     A.bfWind.value.set(.35 + w.storm * 1.2, .12 + w.storm * .5);
     const sunSide = e >= 0;
     lightDir.copy(sunSide ? env.skySunDir : env.moonDir);

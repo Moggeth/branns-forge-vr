@@ -18,9 +18,9 @@ export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  copperOre:{label:'Copper ore',use:'Forge feedstock: one ore makes one Copper.',source:'Mine the glinting green lodes along the mountain foot.',recipes:['refineCopper'],color:0x4f9a7c},
  goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a},
  // Brinedeep rock salt (shared/salt-mines.js): sold, not smelted. The Gold mill pays more for it than for gold ore.
- salt:{label:'Salt',use:'Prized in every kitchen and tavern: the Gold mill pays handsomely for it.',source:'Mine the glowing rock-salt seams deep in the Brinedeep salt mines, or crack it off Saltback crabs.',recipes:[],color:0xf2a9bd}
+ salt:{label:'Salt',use:'Prized in every kitchen and tavern: the Gold mill pays handsomely for it.',source:'Mine the glowing rock-salt seams deep in the Brinedeep salt mines, or crack it off Saltback crabs.',recipes:[],trade:true,color:0xf2a9bd}
 }).map(([key,value])=>[key,Object.freeze({...value,recipes:Object.freeze(value.recipes)})])));
-// groundwork: a mined and refined metal whose first recipes are still to be designed.
+// groundwork: a mined and refined metal whose first recipes are still to be designed. trade: a good sold, not built with.
 export const materialKey=key=>key==='crystal'?'gems':key;
 export const materialInfo=key=>Object.hasOwn(MATERIAL_CATALOG,materialKey(key))?MATERIAL_CATALOG[materialKey(key)]:null;
 export const materialLabel=key=>materialInfo(key)?.label??String(key);
