@@ -4,7 +4,7 @@ import {movedList, movedTable} from './map-layout.js';
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
 // (shared/home-bases.js). Pure data and maths. Larimar Cove (shared/larimar-cove.js) opens off each back town's yard.
 import {coveCarve} from './larimar-cove.js';
-import {activeWorld, UNDERWAY_BAND} from './world-extent.js';
+import {activeWorld, inUnderwayBand} from './world-extent.js';
 export const HOME_SITES = Object.freeze({party: Object.freeze([-34, -34]), rivals: Object.freeze([34, 34])});
 export const KEEP_CARVE = Object.freeze({
   bowl: 20, bowlBlend: 3,          // flat to 20 m from the heart, cliffs rise over the next 3 m
@@ -72,7 +72,7 @@ export function onKeepGround(x, z) {
 /** Clamp a ground point to the world: inside ±limit on the open map, or anywhere on a keep's carved floor. */
 export function clampToWorld(x, z, limit = 55) {
   const w = activeWorld();
-  if (w) { const b = w.bounds, east = b.maxX + UNDERWAY_BAND; return [clamp(x, b.minX, east), clamp(z, b.minZ, x > b.maxX ? b.minZ + UNDERWAY_BAND : b.maxZ)]; }
+  if (w) { if (inUnderwayBand(x, z)) return [x, z]; const b = w.bounds; return [clamp(x, b.minX, b.maxX), clamp(z, b.minZ, b.maxZ)]; }
   if ((Math.abs(x) <= limit && Math.abs(z) <= limit) || onKeepGround(x, z)) return [x, z];
   return [clamp(x, -limit, limit), clamp(z, -limit, limit)];
 }
