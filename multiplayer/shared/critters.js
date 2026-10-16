@@ -157,6 +157,14 @@ function steer(e, dx, dz, speed, {ground, resolve}, s, turn = .14) {
 }
 function settle(e, {ground, resolve}, s) { resolve(e.position, s.radius, s.height); e.position[1] = ground(e.position[0], e.position[2]); }
 function facingTo(e, p) { const d = flat(e.position, p) || 1; return (-Math.sin(e.yaw) * (p[0] - e.position[0]) - Math.cos(e.yaw) * (p[2] - e.position[2])) / d; }
+/** The Hero a critter is after: camp critters only leave their camp for one within 14 m (like the camp skeletons); others see 24 m. */
+function quarry(e, heroes) { const [h, d] = nearest(e, heroes); return h && d <= (e.id.startsWith('camp_') ? 14 : 24) ? [h, d] : [null, Infinity]; }
+/** Nobody in sight: a camp critter ambles round its camp; anything else stands its ground. */
+function idle(state, e, ctx, s) {
+  if (e.id.startsWith('camp_')) { const n = Number(e.id.replace(/\D/g, '')) || 0, a = state.tick / 360 + n, px = (n % 2 ? -37 : 37) + Math.sin(a) * 2, pz = 30 + Math.cos(a) * 2;
+    if (Math.hypot(px - e.position[0], pz - e.position[2]) > .6) steer(e, px - e.position[0], pz - e.position[2], s.speed * .6, ctx, s, .1); }
+  settle(e, ctx, s);
+}
 function nearest(e, list) { let best = null, d = Infinity; for (const t of list) { const q = flat(e.position, t.position); if (q < d) { d = q; best = t; } } return [best, d]; }
 
 /**
@@ -184,7 +192,7 @@ function stepKettle(state, e, ctx) {
     if (a % 30 === 0) for (const h of ctx.heroes) if (flat(h.position, e.position) < s.radius + .55) ctx.damageHero(state, h, s.leakTouch, events, e.position);
     return;
   }
-  const [target, d] = nearest(e, ctx.heroes), age = t - (e.ventTick ?? -1e9);
+  const [target, d] = quarry(e, ctx.heroes), age = t - (e.ventTick ?? -1e9);
   if (age >= 0 && age < s.ventTicks) {
     if (age === s.ventStrike) { // the cone of steam
       events.push({kind: 'kettle_vent', id: e.id, position: [...e.position], yaw: e.yaw, tick: t});
@@ -195,7 +203,7 @@ function stepKettle(state, e, ctx) {
     }
     settle(e, ctx, s); return;
   }
-  if (!target) { settle(e, ctx, s); return; }
+  if (!target) { idle(state, e, ctx, s); return; }
   if (d > s.ventRange * .8) steer(e, target.position[0] - e.position[0], target.position[2] - e.position[2], s.speed, ctx, s, .09);
   else steer(e, target.position[0] - e.position[0], target.position[2] - e.position[2], 0.0001, ctx, s, .09);
   settle(e, ctx, s);
@@ -232,8 +240,8 @@ function stepBramble(state, e, ctx) {
     return;
   }
   // Trot: snuffle toward the nearest Hero; nip when close; curl and roll from a run-up distance.
-  const [target, d] = nearest(e, ctx.heroes);
-  if (!target) { settle(e, ctx, s); return; }
+  const [target, d] = quarry(e, ctx.heroes);
+  if (!target) { idle(state, e, ctx, s); return; }
   const dx = target.position[0] - e.position[0], dz = target.position[2] - e.position[2];
   if (d > 1.3) steer(e, dx, dz, s.speed, ctx, s, .16);
   else steer(e, dx, dz, .0001, ctx, s, .16);
@@ -273,9 +281,9 @@ function stepKeg(state, e, ctx) {
     return;
   }
   // Carry: buildings first (it is a sapper), then the nearest Hero.
-  const [b, bd] = nearest(e, ctx.buildings), [h, hd] = nearest(e, ctx.heroes);
+  const [b, bd] = nearest(e, ctx.buildings), [h, hd] = quarry(e, ctx.heroes);
   const target = b && bd < 26 ? b : h, d = target === b ? bd : hd, reach = target === b ? s.plantBuilding : s.plantRange;
-  if (!target) { settle(e, ctx, s); return; }
+  if (!target) { idle(state, e, ctx, s); return; }
   const dx = target.position[0] - e.position[0], dz = target.position[2] - e.position[2];
   if (d > reach) steer(e, dx, dz, s.speed * (1 - .25 * Math.abs(Math.sin(t / 23))), ctx, s, .12); // the keg sways its pace
   settle(e, ctx, s);
