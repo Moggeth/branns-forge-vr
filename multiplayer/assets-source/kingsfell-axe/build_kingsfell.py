@@ -64,7 +64,12 @@ def chamfer(t):
     return 0.5 + 0.5 * min(1.0, k)
 def cheek_thickness(s, t):
     base = 0.0215 + (0.0062 - 0.0215) * (s / SB) ** 0.8
-    return base * chamfer(t) * (1 + .14 * math.sin(math.pi * t) * (1 - s))
+    th = base * chamfer(t) * (1 + .14 * math.sin(math.pi * t) * (1 - s))
+    # the heartstone sits on a low forged boss, and a shallow hollow grind runs just inside the bevel: both catch light
+    x, z = blade(s, t); d = math.hypot(x - HEART[0], (z - HEART[1]) * 1.12)
+    boss = .0032 * math.exp(-(d / .058) ** 2)
+    hollow = -.0011 * math.exp(-((s - .79) / .055) ** 2) * math.sin(math.pi * t) ** .5
+    return th + boss + hollow
 def half_thickness(s, t):
     if s <= SB: return cheek_thickness(s, t)
     f = ((s - SB) / (1 - SB)) ** 0.9            # the honed bevel starts exactly where the cheek ends
@@ -82,12 +87,17 @@ def fbm(x, y, octaves=5, seed=0):
     return out
 def image(name, rgb, alpha=None, colour=True):
     h, w = rgb.shape[:2]
-    img = bpy.data.images.new(name, w, h, alpha=False)
+    img = bpy.data.images.new(name, w, h, alpha=False, is_data=not colour)
+    if not colour: img.colorspace_settings.name = 'Non-Color'   # before the pixels: changing it afterwards drops them
     px = np.ones((h, w, 4), np.float32); px[..., :3] = np.clip(rgb, 0, 1)
     img.pixels.foreach_set(px.ravel())    # row 0 = v 0 (Blender rows run bottom-up, like UV v)
-    if not colour: img.colorspace_settings.name = 'Non-Color'
     img.pack(); return img
 def srgb(c): return np.asarray(c, np.float32)
+def normal_map(name, hgt, strength):
+    """Tangent-space normal map from a height field (rows = v, cols = u)."""
+    gy_, gx_ = np.gradient(hgt.astype(np.float64))
+    n = np.stack([-gx_ * strength, -gy_ * strength, np.ones_like(hgt)], -1); n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    return image(name, n * .5 + .5, colour=False)
 
 # Cheek UV: planar over the head, u = x / 0.52, v = (z - 0.36) / 0.56.
 def cheek_uv(x, z): return x / 0.52, (z - 0.36) / 0.56
@@ -97,13 +107,13 @@ def ring_textures(n=1024):
     dx, dz = x - HEART[0], (z - HEART[1]) * 1.12
     r = np.hypot(dx, dz)
     warp = fbm(x * 9, z * 9, 5, 3) * .012 + fbm(x * 31, z * 31, 3, 4) * .003
-    phase = (r + warp) * 26.0                                   # ~3.8 mm growth rings in steel
+    phase = (r + warp) * 34.0                                   # ~2.9 mm growth rings in steel
     ring_id = np.floor(phase); f = phase - ring_id
     late = np.exp(-((f - .78) / .07) ** 2)                      # thin bright 'latewood' line in each ring
     vary = 0.75 + 0.25 * np.sin(ring_id * 12.9898) ** 2
     layer = np.clip(late * vary + 0.18 * (1 - f), 0, 1)
     knots = np.clip(fbm(x * 14, z * 14, 3, 9) * 1.6, 0, 1)
-    dark, light = srgb((.070, .074, .084)), srgb((.36, .37, .39))
+    dark, light = srgb((.15, .155, .17)), srgb((.54, .55, .58))   # etched-dark and bright layers of polished steel
     alb = dark + (light - dark) * layer[..., None] * (0.82 + 0.18 * knots[..., None])
     # a cool blued temper toward the bevel and a faint warm bloom round the heartstone
     edge_d = EDGE_R - np.hypot(x - EDGE_C[0], z - EDGE_C[1])
@@ -113,7 +123,10 @@ def ring_textures(n=1024):
     alb = alb + srgb((.10, .045, .01)) * warm[..., None] * .6
     rough = 0.50 - 0.20 * layer + 0.05 * fbm(x * 60, z * 60, 2, 11)
     mr = np.stack([np.zeros_like(rough), np.clip(rough, .12, .9), np.ones_like(rough)], -1)
-    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False)
+    # relief: each latewood line stands a hair proud (acid-etched damascus), knots swell, so the rings catch the light
+    folds = np.exp(-((((phase * 3) % 1) - .5) / .12) ** 2) * .18          # the fold lines inside each ring
+    hgt = late * vary * .6 + folds + knots * .08
+    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False), normal_map('KF_Ring_Normal', hgt, 2.4)
 def edge_textures(n=512):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     x, z = u * 0.52, v * 0.56 + 0.36
@@ -124,11 +137,18 @@ def edge_textures(n=512):
     alb = alb * (1 - apex[..., None] * .0) + srgb((.92, .93, .95)) * apex[..., None] * .25
     rough = np.clip(0.26 - 0.12 * apex + 0.08 * (grind - .5), .06, .5)
     mr = np.stack([np.zeros_like(rough), rough, np.ones_like(rough)], -1)
-    return image('KF_Edge_Albedo', alb), image('KF_Edge_MR', mr, colour=False)
+    # hone scratches run along the edge (tangential), finer toward the apex
+    hgt = np.sin(rad * 5200 + fbm(ang * 30, rad * 40, 2, 22) * 3) * .5 * (1 - apex) + grind * .2
+    return image('KF_Edge_Albedo', alb), image('KF_Edge_MR', mr, colour=False), normal_map('KF_Edge_Normal', hgt, 1.2)
 def forged_textures(n=512):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
+    alb, rough, hgt = forged_parts(u, v)
+    mr = np.stack([np.zeros_like(rough), rough, np.ones_like(rough)], -1)
+    return image('KF_Forged_Albedo', alb), image('KF_Forged_MR', mr, colour=False), normal_map('KF_Forged_Normal', hgt, 7)
+def forged_parts(u, v):
+    """Blackened hammer-forged steel: (albedo, roughness, height)."""
     # hammer dimples: soft cells from a jittered grid
-    cells = 18; gx, gy = u * cells, v * cells
+    cells = 28; gx, gy = u * cells, v * cells
     best = np.full(u.shape, 9.0); h = np.zeros_like(u)
     jit = rng.uniform(0, 1, (cells + 2, cells + 2, 2))
     for oy in (-1, 0, 1):
@@ -139,13 +159,45 @@ def forged_textures(n=512):
             best = np.minimum(best, d)
     dimple = np.clip(best, 0, .75) / .75                         # 0 in a dimple's centre .. 1 at the ridge
     noise = fbm(u * 8, v * 8, 4, 31)
-    alb = srgb((.15, .135, .125)) * (0.80 + 0.30 * dimple[..., None] + 0.12 * noise[..., None])
-    rough = np.clip(.66 - .16 * dimple + .06 * noise, .35, .85)
-    mr = np.stack([np.zeros_like(rough), rough, np.ones_like(rough)], -1)
-    hgt = (dimple ** 2) * 1.0
-    gy_, gx_ = np.gradient(hgt)
-    nrm = np.stack([-gx_ * 18, -gy_ * 18, np.ones_like(hgt)], -1); nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
-    return image('KF_Forged_Albedo', alb), image('KF_Forged_MR', mr, colour=False), image('KF_Forged_Normal', nrm * .5 + .5, colour=False)
+    # blackened, with the high spots rubbed back to bright steel by use
+    alb = srgb((.12, .108, .10)) * (0.80 + 0.30 * dimple[..., None] + 0.12 * noise[..., None])
+    rub = np.clip((dimple - .72) / .28, 0, 1) ** 2 * np.clip(noise * 2 + .6, 0, 1)
+    alb = alb + (srgb((.42, .42, .43)) - alb) * rub[..., None] * .55
+    rough = np.clip(.62 - .16 * dimple + .06 * noise - .25 * rub, .25, .85)
+    return alb, rough, dimple ** 2
+def socket_textures(n=512):
+    """Blackened forged steel with a gold-inlaid interlace: two vines braided round the eye, an oak leaf at each crossing."""
+    v, u = np.mgrid[0:n, 0:n] / (n - 1)
+    fa, fm_, fn = forged_parts(u, v)
+    a = v - .5 - .26 * np.sin(TAU * u); b = v - .5 + .26 * np.sin(TAU * u)
+    over = np.sin(TAU * u) > 0                                    # which vine passes over at each crossing
+    ga = np.exp(-(a / .032) ** 6); gb = np.exp(-(b / .032) ** 6)
+    gb = gb * np.clip(1 - (~over) * np.exp(-(a / .10) ** 2) * 1.0, 0, 1); ga = ga * np.clip(1 - over * np.exp(-(b / .10) ** 2), 0, 1)
+    # leaves: a little almond at each peak/trough
+    lx = ((u * 2 + .25) % 1) - .5; ly = np.where(np.sin(TAU * u) > 0, v - .5 - .26, v - .5 + .26)
+    leaf = (np.clip(1 - ((lx / .13) ** 2 + (ly / .065) ** 2), 0, 1) > 0) * 1.0 * (np.abs(np.sin(TAU * u)) > .85)
+    gold = np.clip(np.maximum(np.maximum(ga, gb), leaf), 0, 1)
+    goldc = srgb((.78, .52, .19)) * (0.85 + .15 * fbm(u * 40, v * 40, 2, 61)[..., None])
+    alb = fa * (1 - gold[..., None]) + goldc * gold[..., None]
+    rough = fm_ * (1 - gold) + .24 * gold; metal = gold * 1.0 + (1 - gold) * 0.0
+    mr = np.stack([np.zeros_like(rough), rough, metal], -1)
+    hgt = fn - gold * .35 + np.clip(gold * 1.2, 0, 1) * .0                          # inlay sits just below the steel
+    return image('KF_Socket_Albedo', alb), image('KF_Socket_MR', mr, colour=False), normal_map('KF_Socket_Normal', hgt, 7)
+def stamp_textures(n=256):
+    """The smith's mark punched into the poll: a crowned tree in a ring."""
+    v, u = np.mgrid[0:n, 0:n] / (n - 1)
+    fa, fm_, fn = forged_parts(u * 2.2, v * 2.2)
+    x, y = u - .5, v - .5; r = np.hypot(x, y)
+    ring = np.exp(-((r - .36) / .022) ** 2)
+    trunk = (np.abs(x) < .028) & (y > -.24) & (y < .02)
+    tiers = np.zeros_like(r, bool)
+    for cy, w in ((-.02, .19), (.07, .15), (.15, .10)):
+        tiers |= (y > cy) & (y < cy + .11) & (np.abs(x) < w * (1 - (y - cy) / .11))
+    crown = (y > .24) & (y < .30) & (np.abs(x) < .12) & ((np.abs(x) % .06) < .035)
+    mark = np.clip(ring + trunk + tiers + crown, 0, 1)
+    alb = fa * (1 - .55 * mark[..., None])
+    rough = np.clip(fm_ + .15 * mark, .3, .9); mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
+    return image('KF_Stamp_Albedo', alb), image('KF_Stamp_MR', mr, colour=False), normal_map('KF_Stamp_Normal', fn * .5 - mark * .9, 8)
 def wood_textures(w=256, h=1024):
     v, u = np.mgrid[0:h, 0:w].astype(np.float64); v /= h - 1; u /= w - 1
     grain = np.sin((u * 26 + fbm(u * 3, v * 2, 4, 41) * 1.8 + fbm(u * 20, v * 40, 2, 43) * .15) * TAU)
@@ -155,14 +207,17 @@ def wood_textures(w=256, h=1024):
     alb *= (0.92 + 0.08 * fine[..., None])
     rough = np.clip(.62 - .12 * t + .04 * fine, .3, .85)
     mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
-    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False)
+    # open-pored ash: the soft earlywood sinks between the hard grain lines; years of hands polish the ridges
+    hgt = t * .8 + fine * .2
+    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False), normal_map('KF_Wood_Normal', hgt, 4)
 def leather_textures(n=256):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     pebble = fbm(u * 30, v * 30, 3, 51); crease = np.abs(fbm(u * 7, v * 7, 3, 53))
     alb = srgb((.205, .062, .045)) * (0.85 + 0.12 * pebble[..., None] - 0.18 * crease[..., None])
     rough = np.clip(.66 + .12 * pebble, .4, .9)
     mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
-    return image('KF_Leather_Albedo', alb), image('KF_Leather_MR', mr, colour=False)
+    hgt = pebble * .5 - crease * .8
+    return image('KF_Leather_Albedo', alb), image('KF_Leather_MR', mr, colour=False), normal_map('KF_Leather_Normal', hgt, 6)
 
 # ------------------------------------------------------------------ materials
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -184,15 +239,19 @@ def pbr(name, albedo=None, mr=None, normal=None, colour=(1, 1, 1), metal=0.0, ro
     if emit:
         b.inputs['Emission Color'].default_value = (*emit, 1); b.inputs['Emission Strength'].default_value = strength
     return m
-ring_a, ring_mr = ring_textures(); edge_a, edge_mr = edge_textures(); forged_a, forged_mr, forged_n = forged_textures()
-wood_a, wood_mr = wood_textures(); leather_a, leather_mr = leather_textures()
+ring_a, ring_mr, ring_n = ring_textures(); edge_a, edge_mr, edge_n = edge_textures(); forged_a, forged_mr, forged_n = forged_textures()
+wood_a, wood_mr, wood_n = wood_textures(); leather_a, leather_mr, leather_n = leather_textures()
+sock_a, sock_mr, sock_n = socket_textures(); stamp_a, stamp_mr, stamp_n = stamp_textures()
 MATS = {
-    'KF_Steel_Ring': pbr('KF_Steel_Ring', ring_a, ring_mr),
-    'KF_Steel_Edge': pbr('KF_Steel_Edge', edge_a, edge_mr),
+    'KF_Steel_Ring': pbr('KF_Steel_Ring', ring_a, ring_mr, ring_n),
+    'KF_Steel_Edge': pbr('KF_Steel_Edge', edge_a, edge_mr, edge_n),
     'KF_Steel_Forged': pbr('KF_Steel_Forged', forged_a, forged_mr, forged_n),
-    'KF_Wood_Haft': pbr('KF_Wood_Haft', wood_a, wood_mr),
-    'KF_Leather': pbr('KF_Leather', leather_a, leather_mr),
+    'KF_Steel_Socket': pbr('KF_Steel_Socket', sock_a, sock_mr, sock_n),
+    'KF_Steel_Stamp': pbr('KF_Steel_Stamp', stamp_a, stamp_mr, stamp_n),
+    'KF_Wood_Haft': pbr('KF_Wood_Haft', wood_a, wood_mr, wood_n),
+    'KF_Leather': pbr('KF_Leather', leather_a, leather_mr, leather_n),
     'KF_Gold': pbr('KF_Gold', colour=(.93, .62, .22), metal=1.0, rough=.26),
+    'KF_Cord': pbr('KF_Cord', colour=(.30, .16, .08), metal=0.0, rough=.8),
     'KF_Amber': pbr('KF_Amber', colour=(.85, .30, .02), metal=0.0, rough=.06, emit=(1.0, .34, .02), strength=.8),
     'KF_Vein': pbr('KF_Vein', colour=(.95, .66, .24), metal=1.0, rough=.22, emit=(1.0, .42, .05), strength=0.6),
 }
@@ -240,9 +299,9 @@ def lathe(name, mat, profile, sides, center=(0.0, 0.0), squash=1.0, phase=None, 
     return mesh_obj(name, bm, mat, smooth, flat)
 
 # ------------------------------------------------------------------ the blade (cheek + honed bevel)
-S_CHEEK = [0, .03, .07, .12, .18, .25, .33, .41, .49, .57, .65, .72, .77, SB]
+S_CHEEK = [0, .03, .07, .10, .13, .16, .19, .22, .25, .29, .33, .37, .41, .45, .49, .53, .57, .61, .65, .69, .72, .75, .78, .81, .84, SB]
 S_BEVEL = [SB, SB + .02, SB + .045, SB + .07, SB + .09, 1.0]
-T_ROWS = sorted(set([0, .025, .055, .945, .975, 1] + [round(.055 + .89 * k / 22, 4) for k in range(23)]))
+T_ROWS = sorted(set([0, .025, .055, .945, .975, 1] + [round(.055 + .89 * k / 34, 4) for k in range(35)]))
 def blade_mesh(name, s_rows, mat, smooth=26):
     bm = bmesh.new(); front, back = [], []
     for s in s_rows:
@@ -358,9 +417,35 @@ def oct_profile_obj(name, mat, profile, rx_scale=1.0, cx=0.0, flat=False, smooth
     if uvbox: set_uvs(bm, lambda l: ((l.vert.co.x + l.vert.co.y) * 4.0, l.vert.co.z * 4.0))
     return mesh_obj(name, bm, mat, smooth, flat)
 # the eye: an octagonal collar, flared top and bottom
-oct_profile_obj('Head_Socket', 'KF_Steel_Forged', [
+sock = oct_profile_obj('Head_Socket', 'KF_Steel_Socket', [
     (EYE[0], .030, .030), (EYE[0] + .010, .036, .033), (EYE[0] + .020, .033, .0305),
-    (EYE[1] - .022, .033, .0305), (EYE[1] - .010, .037, .034), (EYE[1], .031, .031)], cx=.004)
+    (EYE[1] - .022, .033, .0305), (EYE[1] - .010, .037, .034), (EYE[1], .031, .031)], cx=.004, uvbox=False)
+def socket_uv():
+    me = sock.data; uvl = me.uv_layers.new(name='UVMap')
+    for poly in me.polygons:
+        a0 = None
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            a = math.atan2(co.y, co.x - .004) / TAU + .5
+            if a0 is None: a0 = a
+            if a - a0 > .5: a -= 1
+            if a0 - a > .5: a += 1
+            uvl.data[li].uv = (a * 2, (co.z - EYE[0]) / (EYE[1] - EYE[0]) * .9 + .05)
+socket_uv()
+# the crown: eight gold points rising from the top band of the eye (Kingsfell, the forester-king's axe)
+def crown():
+    bm = bmesh.new(); z0 = EYE[1] + .0075
+    for k in range(8):
+        a = math.pi / 8 + TAU * k / 8; a1 = a - TAU / 16 * .62; a2 = a + TAU / 16 * .62
+        r = .0285
+        p1 = bm.verts.new((.003 + math.cos(a1) * r, math.sin(a1) * r, z0)); p2 = bm.verts.new((.003 + math.cos(a2) * r, math.sin(a2) * r, z0))
+        tip = bm.verts.new((.003 + math.cos(a) * (r - .003), math.sin(a) * (r - .003), z0 + .016))
+        q1 = bm.verts.new((.003 + math.cos(a1) * (r - .004), math.sin(a1) * (r - .004), z0)); q2 = bm.verts.new((.003 + math.cos(a2) * (r - .004), math.sin(a2) * (r - .004), z0))
+        bm.faces.new((p1, p2, tip)); bm.faces.new((q2, q1, tip)); bm.faces.new((p1, tip, q1)); bm.faces.new((p2, q2, tip))
+        bead = bm.verts.new((.003 + math.cos(a) * (r - .003), math.sin(a) * (r - .003), z0 + .0185))
+        bm.faces.new((tip, bead, p2))
+    return mesh_obj('Crown_Gold', bm, 'KF_Gold', smooth_angle=20)
+crown()
 # the poll: a stout octagonal hammer face behind the eye
 def poll():
     bm = bmesh.new(); rings = []
@@ -371,8 +456,12 @@ def poll():
             ring.append(bm.verts.new((x, math.sin(a) * hy, POLL_Z + math.cos(a) * hz)))
         rings.append(ring)
     loft(bm, rings, True, True)
-    set_uvs(bm, lambda l: (l.vert.co.x * 4.0, (l.vert.co.z + l.vert.co.y) * 4.0))
-    return mesh_obj('Head_Poll', bm, 'KF_Steel_Forged', smooth_angle=30)
+    def uv(l):
+        n = l.face.normal; co = l.vert.co
+        if abs(n.y) > .5: return ((co.x + .055) / .085 + .5, (co.z - POLL_Z) / .085 + .5)    # the stamp, both flats
+        return (co.x * 4.0 + .3, (co.z + co.y) * 4.0)
+    set_uvs(bm, uv)
+    return mesh_obj('Head_Poll', bm, 'KF_Steel_Stamp', smooth_angle=30)
 poll()
 # gold poll cap band and eye bands
 def band(name, z, r, ry, h, cx=0.0, mat='KF_Gold', sides=8):
@@ -472,6 +561,49 @@ def pommel_pip():
     set_uvs(bm, lambda l: (.5, .5))
     return mesh_obj('Pommel_Amber', bm, 'KF_Amber', flat=True)
 pommel_pip()
+# tally: every great tree Kingsfell has felled is a gold-filled notch on the haft, four strokes and a slash, twice
+def tally():
+    bm = bmesh.new()
+    def bar(side, x0, z0, x1, z1, w=.0011):
+        dx, dz = x1 - x0, z1 - z0; L = math.hypot(dx, dz); nx, nz = -dz / L * w, dx / L * w
+        y = side * (.0196 * math.cos(math.pi / 8) + .0003)   # on the haft's flat
+        q = [bm.verts.new((x0 + nx, y, z0 + nz)), bm.verts.new((x1 + nx, y, z1 + nz)), bm.verts.new((x1 - nx, y, z1 - nz)), bm.verts.new((x0 - nx, y, z0 - nz))]
+        bm.faces.new(q if side < 0 else list(reversed(q)))
+    for side in (-1, 1):
+        for g, z in enumerate((.272, .306)):
+            for k in range(4): bar(side, -.0060 + k * .0040, z, -.0060 + k * .0040, z + .016)
+            bar(side, -.0080, z + .0025, .0075, z + .0135)
+    return mesh_obj('Tally_Gold', bm, 'KF_Gold', flat=True)
+tally()
+# a charm on a short braided cord from the pommel: an amber acorn, the seed the heartstone came from
+def charm():
+    cord = bmesh.new(); z0 = HAFT[0] - .012
+    pts = [Vector((.029, 0, z0)), Vector((.034, 0, z0 - .012)), Vector((.036, 0, z0 - .026)), Vector((.036, 0, z0 - .040))]
+    rings = []
+    for k, p in enumerate(pts):
+        rings.append([cord.verts.new((p.x + math.cos(a) * .0019, p.y + math.sin(a) * .0019, p.z)) for a in np.linspace(0, TAU, 7)[:-1] + k * .5])
+    loft(cord, rings, True, True)
+    set_uvs(cord, lambda l: (.5, .5))
+    mesh_obj('Charm_Cord', cord, 'KF_Cord', smooth_angle=80)
+    ring = bmesh.new()   # a little gold eyelet on the pommel collar
+    c = Vector((.029, 0, z0)); rr = []
+    for a in np.linspace(0, TAU, 9)[:-1]:
+        rr.append([ring.verts.new((c.x + math.cos(a) * (.0042 + math.cos(b) * .0012), math.sin(b) * .0012, c.z + math.sin(a) * (.0042 + math.cos(b) * .0012))) for b in np.linspace(0, TAU, 5)[:-1]])
+    for i in range(8):
+        for j in range(4):
+            ring.faces.new((rr[i][j], rr[(i + 1) % 8][j], rr[(i + 1) % 8][(j + 1) % 4], rr[i][(j + 1) % 4]))
+    mesh_obj('Charm_Eyelet', ring, 'KF_Gold', smooth_angle=60)
+    # acorn: amber nut under a gold cup with a tiny stalk
+    zc = z0 - .040; nut = []
+    for z, r in ((zc - .001, .0050), (zc - .006, .0066), (zc - .012, .0062), (zc - .017, .0044), (zc - .0205, .0018)):
+        nut.append((z, r))
+    a_bm = bmesh.new(); rings = [ring_section(a_bm, (.036, 0, z), r, r, 10) for z, r in nut]
+    loft(a_bm, rings, True, False); tip = a_bm.verts.new((.036, 0, zc - .0225))
+    for k in range(10): a_bm.faces.new((rings[-1][k], rings[-1][(k + 1) % 10], tip))
+    set_uvs(a_bm, lambda l: (.5, .5))
+    mesh_obj('Charm_Acorn', a_bm, 'KF_Amber', smooth_angle=70)
+    lathe('Charm_Cup', 'KF_Gold', [(zc - .004, .0071), (zc - .0005, .0074), (zc + .0025, .0058), (zc + .004, .0026), (zc + .0065, .0012)], 10, center=(.036, 0), smooth=40)
+charm()
 
 # ------------------------------------------------------------------ sockets
 empty('Grip_Center', (0.0075, 0, 0.120))
@@ -480,6 +612,38 @@ for name, t in (('CuttingEdge_Bottom', .08), ('CuttingEdge_Mid', .5), ('CuttingE
 empty('Head_Center', (0.205, 0, 0.650))
 empty('Poll_Face', (-0.104, 0, POLL_Z))
 empty('Heartstone', (HEART[0], 0, HEART[1]))
+
+# ------------------------------------------------------------------ baked contact shading
+# Ambient occlusion baked into a colour attribute on every mesh (Cycles, short distance, so it darkens joints and
+# crevices - the crown in its band, the eye's flares, the veins' grooves - not whole faces). Materials multiply it
+# into the base colour; glTF carries it as COLOR_0.
+def bake_ao(samples=96, distance=.035):
+    SC.render.engine = 'CYCLES'; SC.cycles.device = 'CPU'; SC.cycles.samples = samples
+    SC.world = SC.world or bpy.data.worlds.new('bake'); SC.world.light_settings.distance = distance
+    meshes = [o for o in SC.objects if o.type == 'MESH']
+    for o in meshes:
+        if 'AO' not in o.data.color_attributes: o.data.color_attributes.new('AO', 'BYTE_COLOR', 'CORNER')
+        o.data.color_attributes.active_color = o.data.color_attributes['AO']
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in meshes: o.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.bake(type='AO', target='VERTEX_COLORS')
+    # soften: keep the contact darkening, never crush a whole part (parts that sit inside others see a lot of occluder)
+    for o in meshes:
+        a = o.data.color_attributes['AO']; d = np.zeros(len(a.data) * 4); a.data.foreach_get('color', d); d = d.reshape(-1, 4)
+        d[:, :3] = np.clip(1 - (1 - d[:, :3]) * .62, .42, 1); d[:, 3] = 1; a.data.foreach_set('color', d.ravel())
+    for m in bpy.data.materials:
+        if not m.use_nodes or not m.name.startswith('KF_'): continue
+        nt = m.node_tree; b = nt.nodes['Principled BSDF']; inp = b.inputs['Base Color']
+        ca = nt.nodes.new('ShaderNodeVertexColor'); ca.layer_name = 'AO'
+        mix = nt.nodes.new('ShaderNodeMix'); mix.data_type = 'RGBA'; mix.blend_type = 'MULTIPLY'
+        sock = lambda socks, ident: next(x for x in socks if x.identifier == ident)
+        a_in, b_in, out = sock(mix.inputs, 'A_Color'), sock(mix.inputs, 'B_Color'), sock(mix.outputs, 'Result_Color')
+        sock(mix.inputs, 'Factor_Float').default_value = 1.0
+        if inp.is_linked: nt.links.new(inp.links[0].from_socket, a_in)
+        else: a_in.default_value = inp.default_value
+        nt.links.new(ca.outputs['Color'], b_in); nt.links.new(out, inp)
+if '--no-ao' not in ARGS: bake_ao()
 
 # ------------------------------------------------------------------ checks + export
 def tri_count():
@@ -496,7 +660,7 @@ lo, hi = bounds()
 REPORT = {'triangles': tri_count(), 'meshes': sum(1 for o in SC.objects if o.type == 'MESH'), 'nodes': len(SC.objects),
           'bounds_min': [round(v, 4) for v in lo], 'bounds_max': [round(v, 4) for v in hi],
           'edge': {'center': EDGE_C, 'radius': EDGE_R, 'span': EDGE_SPAN}, 'heart': HEART}
-assert REPORT['triangles'] < 8000, REPORT
+assert REPORT['triangles'] < 12000, REPORT
 for name in ('Grip_Center', 'CuttingEdge_Mid', 'CuttingEdge_Top', 'CuttingEdge_Bottom', 'Head_Center', 'Poll_Face', 'Heartstone',
              'Head_Blade', 'Head_CuttingEdge', 'Heart_Amber', 'Veins_Gold'):
     assert name in bpy.data.objects, name
@@ -505,7 +669,7 @@ os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
 bpy.ops.object.select_all(action='DESELECT')
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_yup=True, export_apply=True,
                           export_materials='EXPORT', export_normals=True, export_texcoords=True, export_extras=False,
-                          export_image_format='AUTO')
+                          export_image_format='WEBP', export_image_quality=90)  # WebP (EXT_texture_webp): ~4x smaller than PNG for noisy relief maps
 REPORT['bytes'] = os.path.getsize(OUT); REPORT['seconds'] = round(time.time() - T0, 2)
 os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
 with open(os.path.join(HERE, 'out', 'build_report.json'), 'w') as fh: json.dump(REPORT, fh, indent=2)
@@ -536,7 +700,8 @@ if RENDER:
     views = {'full': ((.15, -1.55, .40), (.17, 0, .39), 42), 'three-quarter': ((1.1, -1.5, .9), (.14, 0, .42), 45),
              'head': ((.24, -.75, .66), (.22, 0, .64), 50), 'edge-on': ((1.3, -.05, .66), (.2, 0, .64), 60),
              'heart': ((.17, -.32, .70), (.17, 0, .67), 55), 'back': ((-.9, 1.6, .7), (.12, 0, .45), 45),
-             'first-person': ((-.30, -.36, .30), (.15, .05, .66), 30)}
+             'first-person': ((-.30, -.36, .30), (.15, .05, .66), 30),
+             'socket': ((-.05, -.42, .80), (-.01, 0, .72), 55), 'pommel': ((.10, -.32, -.02), (.02, 0, -.08), 55)}
     only = arg('--views'); views = {k: v for k, v in views.items() if not only or k in only.split(',')}
     for name, (loc, at, lens) in views.items():
         cam.lens = lens; co.location = loc; co.rotation_euler = (Vector(at) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()

@@ -57,7 +57,19 @@ export function kingsfellFrame(scene) {
     const r = Math.hypot(v.x - cx, v.y - cy); apex = Math.max(apex, r); bevel = Math.min(bevel, r);
     span = Math.max(span, Math.abs(Math.atan2(v.y - cy, v.x - cx)));
   }
-  return {space, center: new THREE.Vector2(cx, cy), apex, bevel, span, heart: new THREE.Vector2(heart.x, heart.y)};
+  // the heartstone gem: how deep the cheek surface sits under it (|z| of its rim) and its radius
+  const gem = new THREE.Vector2(.008, .03), amber = meshesByMaterial(scene, 'KF_Amber');
+  let rim = Infinity, radius = 0;
+  for (const mesh of amber) {
+    const gp = mesh.geometry.attributes.position, gm = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld);
+    for (let i = 0; i < gp.count; i++) {
+      v.fromBufferAttribute(gp, i).applyMatrix4(gm);
+      const d = Math.hypot(v.x - heart.x, v.y - heart.y);
+      if (d < .06) { rim = Math.min(rim, Math.abs(v.z)); radius = Math.max(radius, d); }
+    }
+  }
+  if (Number.isFinite(rim) && radius > 0) gem.set(rim, radius);
+  return {space, center: new THREE.Vector2(cx, cy), apex, bevel, span, heart: new THREE.Vector2(heart.x, heart.y), gem};
 }
 
 // ---------------------------------------------------------------- shaders
@@ -67,6 +79,7 @@ uniform vec4 uKfEdge;       // arc centre xy, apex radius, bevel radius (edge-fr
 uniform vec4 uKfSchedule;   // edge start, edge length, angular span, heart radius of glow
 uniform vec4 uKfVein;       // vein start, vein length, heart start, heart length
 uniform vec2 uKfHeart;      // heartstone centre xy
+uniform vec2 uKfGem;        // heartstone: cheek surface depth under the gem, gem radius
 uniform vec3 uKfAmber, uKfDormant, uKfHot;
 varying vec3 vKfPos;
 float kfSmooth(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
@@ -118,25 +131,53 @@ const VEIN_FRAGMENT = /* glsl */`
   float lit = kfVeinLit(u), ignite = kfIgnite(uKfVein.x + uKfVein.y * u);
   float flow = uKfCharge >= .999 ? pow(max(0., sin((u * 7. - uKfTime * uKfMotion * .9) * 6.2831)), 6.) * (1. - u * .4) : 0.;
   float core = exp(-across * across * 3.5);
-  diffuseColor.rgb *= mix(1., .45, lit);
-  vec3 glow = mix(uKfDormant, uKfAmber, lit) * lit * (.55 + .9 * core) * (1. + uKfBeat * .25 * (1. - u));
-  totalEmissiveRadiance += glow + uKfHot * core * (ignite * 1.3 + flow * .55 + uKfFlare * .45 + uKfDrain * .8);
+  diffuseColor.rgb *= mix(1., .6, lit);
+  vec3 glow = mix(uKfDormant, uKfAmber, lit) * lit * (.12 + .55 * core * core) * (1. + uKfBeat * .25 * (1. - u));
+  totalEmissiveRadiance += glow + uKfHot * core * core * (ignite * 1.3 + flow * .45 + uKfFlare * .45 + uKfDrain * .8);
 }
 `;
-// Heartstone: amber lit from within. Facets facing you glow hottest (looking into the gem), the rim stays deep orange.
+// Heartstone: amber lit from within, with depth. The gem is a shallow dome, so its inside is faked by parallax: each
+// pixel follows the view ray (object space) down into a virtual interior. Deepest, at the blade's midplane, sits the
+// ember the light comes from; above it, sealed in the amber, a single oak leaf from the tree it was cut from, a dark
+// silhouette backlit through its veins; between them, specks of trapped sap catch the ember and twinkle. Facets facing
+// you glow hottest, the rim stays deep orange. The pommel pip and the charm's acorn get the plain glow.
 const HEART_FRAGMENT = /* glsl */`
 {
   vec3 V = normalize(vViewPosition);
   float facing = clamp(abs(dot(normal, V)), 0., 1.);
   float heart = kfHeart() * (1. + uKfBeat * .7) + uKfFlare * 1.2 + uKfDrain * 2.;
   float grain = .82 + .18 * kfNoise(vKfPos * 420.);
-  diffuseColor.rgb *= .55;
-  totalEmissiveRadiance = mix(uKfDormant * 1.6, uKfAmber, clamp(heart, 0., 1.)) * heart * (.32 + .5 * facing * facing) * grain
-    + uKfHot * pow(facing, 6.) * heart * .28;
+  vec3 amber = mix(uKfDormant * 1.6, uKfAmber, clamp(heart, 0., 1.));
+  diffuseColor.rgb *= vec3(.5, .32, .12);
+  vec3 glow = amber * heart * (.16 + .26 * facing * facing) * grain + uKfHot * pow(facing, 6.) * heart * .1;
+  vec2 rel = vKfPos.xy - uKfHeart;
+  float inGem = 1. - smoothstep(uKfGem.y * .82, uKfGem.y * 1.02, length(rel));
+  if (inGem > 0.) {
+    vec3 rd = normalize(vKfPos - vKfEye);
+    float side = vKfPos.z < 0. ? -1. : 1., top = abs(vKfPos.z), down = max(-rd.z * side, .3) / .7; // .7: amber bends the ray in
+    // the ember, at the midplane under the gem
+    float toEmber = top / down; vec2 emberAt = rel + rd.xy * toEmber;
+    float de = length(emberAt), ember = exp(-de * de / (uKfGem.y * uKfGem.y * .03)) * 1.1 + exp(-de * de / (uKfGem.y * uKfGem.y * .22)) * .3;
+    // the leaf, just under the cheek's surface: an oak leaf, a little askew, stalk toward the haft
+    vec2 q = rel + rd.xy * max(top - uKfGem.x * .62, 0.) / down;
+    q = mat2(.80, -.60, .60, .80) * q / uKfGem.y;
+    float t = (q.x + .72) / 1.3, w = .30 * pow(max(sin(3.14159 * clamp(t, 0., 1.)), 0.), .7) * (.72 + .28 * abs(sin(t * 3.14159 * 4.5)));
+    float leaf = (1. - smoothstep(w - .035, w, abs(q.y))) * step(0., t) * step(t, 1.);
+    leaf = max(leaf, (1. - smoothstep(.012, .03, abs(q.y))) * step(-.95, q.x) * step(q.x, -.7));
+    float rib = exp(-q.y * q.y / .0006), ribs = pow(abs(sin((q.x - abs(q.y) * 1.1) * 26.)), 14.) * smoothstep(.02, .06, abs(q.y));
+    float veins = leaf * clamp(rib + ribs * .7, 0., 1.);
+    // specks of sap between leaf and ember
+    vec2 sp = (rel + rd.xy * max(top - uKfGem.x * .35, 0.) / down) * 640.;
+    vec2 cell = floor(sp), f = fract(sp) - .5; float h = kfHash(vec3(cell, side * 7.));
+    float speck = step(.9, h) * exp(-dot(f, f) * 30.) * (.6 + .4 * sin(uKfTime * uKfMotion * 2.4 + h * 60.));
+    vec3 inside = uKfHot * ember * heart * (1. - leaf * .82) + amber * speck * heart * .9;
+    glow = mix(glow, glow * (1. - leaf * .75) + vec3(.5, .13, .015) * veins * heart * .4, inGem) + inside * inGem * (.4 + .6 * facing);
+  }
+  totalEmissiveRadiance = glow;
 }
 `;
 const ROLES = {
-  edge: {fragment: EDGE_FRAGMENT}, cheek: {fragment: CHEEK_FRAGMENT}, vein: {fragment: VEIN_FRAGMENT, uv: true}, heart: {fragment: HEART_FRAGMENT},
+  edge: {fragment: EDGE_FRAGMENT, reflect: 1.4}, cheek: {fragment: CHEEK_FRAGMENT, reflect: 1.8}, vein: {fragment: VEIN_FRAGMENT, uv: true}, heart: {fragment: HEART_FRAGMENT, eye: true},
 };
 
 function patchMaterial(material, role, uniforms) {
@@ -144,13 +185,16 @@ function patchMaterial(material, role, uniforms) {
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vKfPos;${r.uv ? '\nvarying vec2 vKfUv;' : ''}`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvKfPos = position;${r.uv ? '\nvKfUv = uv;' : ''}`);
+      .replace('#include <common>', `#include <common>\nvarying vec3 vKfPos;${r.uv ? '\nvarying vec2 vKfUv;' : ''}${r.eye ? '\nvarying vec3 vKfEye;' : ''}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvKfPos = position;${r.uv ? '\nvKfUv = uv;' : ''}${r.eye ? '\nvKfEye = (inverse(modelViewMatrix) * vec4(0., 0., 0., 1.)).xyz;' : ''}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${COMMON}${r.uv ? '\nvarying vec2 vKfUv;' : ''}`)
+      .replace('#include <common>', `#include <common>\n${COMMON}${r.uv ? '\nvarying vec2 vKfUv;' : ''}${r.eye ? '\nvarying vec3 vKfEye;' : ''}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${r.fragment}`);
+    // Polished steel is mostly reflection: lift the environment's specular on the cheek and edge so the shaded side
+    // (the face a first-person player sees most) still reads as metal, not a black cut-out.
+    if (r.reflect) shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>\nradiance *= ${r.reflect.toFixed(2)};`);
   };
-  material.customProgramCacheKey = () => `brann-kingsfell-${role}-v1`;
+  material.customProgramCacheKey = () => `brann-kingsfell-${role}-v2`;
   material.needsUpdate = true;
   return material;
 }
@@ -162,7 +206,7 @@ function kingsfellUniforms(frame) {
     uKfEdge: {value: new THREE.Vector4(frame.center.x, frame.center.y, frame.apex, frame.bevel)},
     uKfSchedule: {value: new THREE.Vector4(S.edge[0], S.edge[1], frame.span, .055)},
     uKfVein: {value: new THREE.Vector4(S.vein[0], S.vein[1], S.heart[0], S.heart[1])},
-    uKfHeart: {value: frame.heart.clone()},
+    uKfHeart: {value: frame.heart.clone()}, uKfGem: {value: frame.gem.clone()},
     uKfAmber: {value: AMBER.clone()}, uKfDormant: {value: DORMANT.clone()}, uKfHot: {value: HOT.clone()},
   };
 }
