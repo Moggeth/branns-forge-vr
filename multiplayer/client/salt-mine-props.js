@@ -5,7 +5,6 @@
 // material, so the whole kit for both mines is a handful of draws. The salt glows from inside like a salt lamp, from
 // the kit's glow mask (TEXCOORD_1.x) as emissive only: no lights.
 import * as THREE from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MINE, MINE_SIDES, mineArch, mineField, minePoint, mineDirection, minePortal, portalAlong, pathLength} from '../shared/salt-mines.js';
 import {DAMP_VENTS, SEAM_SPOTS} from '../shared/salt-mine-rules.js';
 
@@ -108,9 +107,10 @@ function patchKitGlow(material, strength) {
   return material;
 }
 
-/** Load the kit and place it in both mines. Resolves to {group, stats(), update(dt, glowLevel), dispose()}. */
-export function createSaltMineProps({scene, height, quality = 'high', url = KIT_URL} = {}) {
-  const low = quality === 'low', group = new THREE.Group(); group.name = 'SaltMineKit'; scene.add(group);
+/** Place the kit in both mines once the game's asset pipeline delivers it: install(gltf, prepare) builds the instanced
+ * pieces off-scene, awaits prepare(group) (texture upload and shader compile) and only then adds them to the scene. */
+export function createSaltMineProps({scene, height, quality = 'high'} = {}) {
+  const low = quality === 'low', group = new THREE.Group(); group.name = 'SaltMineKit';
   const stat = {ready: false, failed: false, draws: 0, instances: 0, triangles: 0};
   const disposables = new Set();
   const layout = kitLayout();
@@ -122,7 +122,7 @@ export function createSaltMineProps({scene, height, quality = 'high', url = KIT_
     if (m.name === 'SaltCrystal') patchKitGlow(m, low ? 1.6 : 1.9);
     else if (m.name === 'SaltRock') patchKitGlow(m, .9);
     else if (m.name === 'LanternGlow') { m.emissive = new THREE.Color(1, .62, .28); m.emissiveIntensity = 2.6; m.toneMapped = true; }
-    materials.set(m.name, m); disposables.add(m); return m;
+    materials.set(m.name, m); disposables.add(m); if (m.map) disposables.add(m.map); return m;
   }
   function harvest(gltf) {
     for (const name of KIT_NODES) {
@@ -200,13 +200,15 @@ export function createSaltMineProps({scene, height, quality = 'high', url = KIT_
     group.updateMatrixWorld(true);
   }
   let disposed = false;
-  const ready = new GLTFLoader().loadAsync(url).then(gltf => {
-    if (disposed) return;
-    harvest(gltf); place(); stat.ready = true;
-    gltf.scene.traverse(o => { if (o.isMesh) { o.geometry.dispose(); } });
-  }).catch(err => { stat.failed = String(err?.message || err); });
+  async function install(gltf, prepare = async () => {}) {
+    if (disposed || stat.ready) return false;
+    try { harvest(gltf); place(); await prepare(group); }
+    catch (err) { stat.failed = String(err?.message || err); return false; }
+    if (disposed) return false;
+    scene.add(group); stat.ready = true; return true;
+  }
   return {
-    group, layout, ready,
+    group, layout, install, failed(reason) { stat.failed = String(reason || 'unavailable'); },
     update(dt, level = 1) { glow.uSaltKitTime.value += dt; glow.uSaltKitGlow.value = level; },
     stats: () => ({...stat}),
     dispose() { disposed = true; scene.remove(group); for (const d of disposables) d.dispose?.(); },

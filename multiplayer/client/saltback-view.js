@@ -34,7 +34,7 @@ const GLOW = new THREE.Color(1, .5, .6), SALT_PINK = [.98, .72, .8], SALT_WHITE 
 /**
  * createSaltbackView({scene, load(), height(x,z), quality, sound(name, position, opts)})
  *   install(gltf)             share the crab template (rename Root, set up materials); returns false if incomplete
- *   build(data) -> visual      null until installed (the first request calls load() once)
+ *   build(data) -> visual      a placeholder stand-in until installed (the first request calls load(); failed() re-arms it)
  *   update(actors, tick, dt, threats)  pose every crab (after enemy motion, before combat contacts)
  *   release(entry, snapshot)  a crab that died keeps a corpse that rolls over and sinks; one that dived just goes
  *   event(event)              emerge/dive/pinch/loot/hit bursts and cues
@@ -66,9 +66,23 @@ export function createSaltbackView({scene, load = () => {}, height = () => 0, qu
   mesh.castShadow = !low; mesh.receiveShadow = true; mesh.frustumCulled = false; // skinned bounds lag the clips (Emerge, Death)
   template = gltf.scene; clips = byName; return true;
  }
+ // Until the model arrives (or if it never does) a crab is still seen: a little salt-crusted dome on orange legs-in-a-
+ // lump. Its own geometry and materials, as the game disposes a placeholder when the real model replaces it.
+ function standIn() {
+  const g = new THREE.Group(), head = new THREE.Object3D(), hands = [new THREE.Object3D(), new THREE.Object3D()];
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.3, 10, 6), new THREE.MeshStandardMaterial({color: 0xe0642c, roughness: .7}));
+  body.scale.set(1.15, .45, .9); body.position.y = .2;
+  const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(.24, 0), new THREE.MeshStandardMaterial({color: 0xf6c4cf, emissive: 0xff7f95, emissiveIntensity: .5, roughness: .4, flatShading: true}));
+  shell.position.y = .38; shell.scale.set(1, .8, 1);
+  g.add(body, shell, head, ...hands); head.position.y = .45;
+  g.userData = {head, hands, placeholder: true, saltbackStandIn: true};
+  return g;
+ }
+ /** The model failed to arrive: let the next crab that needs it ask again (after a pause, not every frame). */
+ function failed() { setTimeout(() => { requested = false; }, 15000); }
  function build(data) {
   if (data?.kind !== 'saltback') return null;
-  if (!template) { if (!requested) { requested = true; load(); } return null; }
+  if (!template) { if (!requested) { requested = true; load(); } return standIn(); }
   const model = cloneSkinnedAsset(template), bones = {};
   model.traverse(n => { if (n.isBone) bones[n.name] = n; if (n.isMesh) n.userData.saltback = true; });
   const mixer = new THREE.AnimationMixer(model), actions = {};
@@ -185,5 +199,6 @@ export function createSaltbackView({scene, load = () => {}, height = () => 0, qu
   for (const c of corpses) endCorpse(c); corpses.length = 0; chips.dispose(); tex.dispose();
   if (template) { template.traverse(n => n.geometry?.dispose()); for (const m of materials) m.dispose(); template = null; }
  }
- return {install, build, update, release, event, tick, stats, dispose, ready: () => !!template};
+ function preload() { if (!template && !requested) { requested = true; load(); } }
+ return {install, build, update, release, event, tick, stats, dispose, failed, preload, ready: () => !!template};
 }
