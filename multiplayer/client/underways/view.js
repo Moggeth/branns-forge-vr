@@ -299,8 +299,8 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
       if (!model || model.userData.uwCrown) return;
       // On the model root (bone axes and skinned bounds differ between rigs): just above the head, from the known height.
       const crown = single(underwayKit().crown, propMat, [.9, .75, .6]); crown.name = 'UnderwayCrown';
-      model.updateWorldMatrix(true, false); const ms = model.getWorldScale(new THREE.Vector3()).x || 1, width = height * .2;
-      crown.scale.setScalar(width / ms); crown.position.set(0, height * .86 / ms, 0); model.add(crown);
+      model.updateWorldMatrix(true, false); const ms = model.getWorldScale(new THREE.Vector3()).x || 1, width = height * .27;
+      crown.scale.setScalar(width / ms); crown.position.set(0, height * .9 / ms, 0); model.add(crown);
       model.userData.uwCrown = crown;
     },
     current: () => current,

@@ -142,13 +142,21 @@ export function buildUnderwayShell(d, {quality = 'high'} = {}) {
         grid.push(col);
       }
       const nrm = [-di, 0, -dj]; // faces the floor tile
+      // Each vertex's own normal from its neighbours, so baked light and occlusion follow the rock's lumps.
+      for (let s = 0; s <= wallSeg; s++) for (let r = 0; r <= wallRows; r++) {
+        const a = grid[Math.max(0, s - 1)][r], b = grid[Math.min(wallSeg, s + 1)][r], c = grid[s][Math.max(0, r - 1)], e = grid[s][Math.min(wallRows, r + 1)];
+        const t1 = [b.x - a.x, b.y - a.y, b.z - a.z], t2 = [e.x - c.x, e.y - c.y, e.z - c.z];
+        let n = [t1[1] * t2[2] - t1[2] * t2[1], t1[2] * t2[0] - t1[0] * t2[2], t1[0] * t2[1] - t1[1] * t2[0]];
+        if (n[0] * nrm[0] + n[2] * nrm[2] < 0) n = n.map(v => -v);
+        const l = Math.hypot(...n) || 1; grid[s][r].n = n.map(v => v / l);
+      }
       for (let s = 0; s < wallSeg; s++) for (let r = 0; r < wallRows; r++) {
         const quad = [grid[s][r], grid[s + 1][r], grid[s + 1][r + 1], grid[s][r + 1]];
         // winding so the front face looks at the floor tile
         const order = (di + dj > 0) === (di !== 0) ? [[0, 2, 1], [0, 3, 2]] : [[0, 1, 2], [0, 2, 3]];
         for (const tri of order) for (const k of tri) {
           const v = quad[k], hk = clamp((v.y - grid[0][0].y) / Math.max(.1, grid[0][wallRows].y - grid[0][0].y)), ao = .5 + .5 * smoothstep(0, .35, hk) * (1 - .35 * smoothstep(.8, 1, hk));
-          push(W, v.x, v.y, v.z, ...nrm, v.u, v.v, albedo(L.rock, v.x, v.y, v.z, 0), bake(v.x - di * .1, v.y, v.z - dj * .1, ...nrm, ao));
+          push(W, v.x, v.y, v.z, ...v.n, v.u, v.v, albedo(L.rock, v.x, v.y, v.z, 0), bake(v.x - di * .1, v.y, v.z - dj * .1, ...v.n, ao * (.82 + .18 * Math.max(0, v.n[1] + .4))));
         }
       }
     }
