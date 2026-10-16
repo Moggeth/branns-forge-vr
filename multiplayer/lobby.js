@@ -38,6 +38,9 @@ import { knownErrorText, detectControlScheme, describeVr, renderObjective, bindO
 import { adventureView } from './shared/adventure.js';
 import {battlePanelModel,battleQuestView} from './client/battle-model.js';
 import {createRoomDirectory} from './client/public-room-directory.js';
+import {worldDescriptor} from './shared/worldgen/registry.js';
+import {createWorldMenu} from './client/world-menu.js';
+import {friendlySeed} from './shared/worldgen/random.js';
 import {findWorlds} from './client/quick-play.js';
 import {createPublicRoomBrowser} from './client/public-rooms.js';
 import {createBattlePanel} from './client/battle-panel.js';
@@ -198,7 +201,10 @@ $('lobbyForm').addEventListener('submit', event => {
 // The local map editor's Play button opens /?solo on the dev server: Play then starts a solo world on this
 // computer, no room service needed. Builds ignore it (import.meta.env.DEV is false there).
 const devSolo = import.meta.env?.DEV && new URLSearchParams(location.search).has('solo');
-$('create').addEventListener('click', () => devSolo ? start({create: true, solo: true}) : quickPlay());
+// A shared world link (?world=wilds&seed=mossy-heron-417&preset=continent) starts that generated world when you create one.
+const linkedWorld = (() => { const q = new URLSearchParams(location.search), kind = q.get('world'); if (!kind) return null;
+  try { return worldDescriptor({kind, seed: q.get('seed') || friendlySeed(Date.now() % 100000), preset: q.get('preset') || 'continent'}); } catch { return null; } })();
+$('create').addEventListener('click', () => devSolo ? start({create: true, solo: true}) : linkedWorld ? start({create: true}) : quickPlay());
 
 // Quick play: join the fullest open world in your region, or start one if none has room.
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
@@ -229,6 +235,14 @@ function quickFallback() {
   return true;
 }
 $('solo').addEventListener('click',()=>start({create:true,solo:true}));
+// World creation menu: the classic valley or a generated world (Great Wilds, plus the experimental modes as they land).
+const worldMenu = createWorldMenu({
+  available: kind => kind === 'arena' || kind === 'wilds' ? true : 'Arriving in a coming update. This mode is still being built.',
+  onStart: async choice => {
+    if (!game && !rendererFailed) { const revision = ++startRevision; showLobbyStatus('Preparing the world…', {busy: true, cancel: true}); await rendererPromise; if (revision !== startRevision) return; }
+    start({create: true, solo: devSolo, ...(choice.world ? {world: choice.world} : {})});
+  }});
+$('newWorld').addEventListener('click', () => worldMenu.open());
 $('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save}));
 
 function joinFromForm() {
@@ -435,6 +449,7 @@ async function start(attempt) {
 
   try {
     next.connect({save: attempt.save || null, room: attempt.create ? '' : attempt.room, name, role,
+      ...(attempt.create && !attempt.save && (attempt.world || linkedWorld) ? {world: attempt.world || linkedWorld} : {}),
       // Any device can carry the world on when the host leaves (phones and headsets host new worlds already).
       desktop: true});
   } catch (error) {

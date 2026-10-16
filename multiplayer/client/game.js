@@ -151,11 +151,14 @@ import {heroMaxHp} from '../shared/hero-progress.js';
 import {createRadiantStaff, enhanceStaffTemplate} from './radiant-staff.js';
 import {createStormreelWeapon} from './stormreel-weapon.js';
 import {leash as stormLeash,wornTower,STORMREEL} from '../shared/stormreel.js';
+import {createWildsView} from './wilds-view.js';
+import {worldFor} from '../shared/worldgen/registry.js';
+import {setActiveWorld} from '../shared/world-extent.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
 // Presentation helpers pass only edits; the baked ground (old settled earthworks) comes from the latest snapshot.
-let currentTerrainBake;
-export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake},x,z,false);}
+let currentTerrainBake,currentWorld;
+export function terrainHeight(x,z,edits=[],tick=Infinity) {return sharedTerrainHeight({edits,tick,terrainBake:currentTerrainBake,...(currentWorld?{world:currentWorld}:{})},x,z,false);}
 
 function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = () => {}, onStatus = () => {}, onXRChange = () => {}, onMenu = () => {}, isHost = () => true, onSelection = () => {}, onExpeditionAction = () => {}, onAimProbe = null, onVoicePose = null, voiceActivity = null, onNotice = () => {}, construction = [] }) {
   const started = performance.now();
@@ -257,16 +260,36 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     baseHeight: (x,z) => heightAt(x,z,[]), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high', edits: snapshot.edits});
   // Living meadow (grass, wildflowers, pollen) over the same authoritative surface; presentation only.
   yield;
-  const meadow = createMeadowCover({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
+  // Views that only belong to the hand-built arena (hidden in generated worlds).
+  const arenaOnly=[];function arenaView(make){const before=new Set(scene.children),view=make();for(const c of scene.children)if(!before.has(c))arenaOnly.push(c);return view;}
+  const meadow = arenaView(()=>createMeadowCover({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'}));
   // Mountain-foot ore veins glint so they can be spotted from across the Orchard (shared/ore-veins.js).
-  const oreGlint = createOreGlint({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits)});
+  const oreGlint = arenaView(()=>createOreGlint({scene, renderer, height: (x, z) => heightAt(x, z, snapshot.edits)}));
   // Layered distant alpine ranges replace the low orchard silhouette backdrop.
-  const skyline = createAlpineSkyline({scene, sky: orchard.objects.sky}); orchard.objects.backdrop.visible = false;
+  const skyline = arenaView(()=>createAlpineSkyline({scene, sky: orchard.objects.sky})); orchard.objects.backdrop.visible = false;
   yield;
   const skyCycle = createDayNightWeather({scene, orchard, renderer, height: (x, z) => heightAt(x, z, snapshot.edits), quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
+  // Generated worlds (The Great Wilds and friends): land to the horizon, water and far forests. Arena views hide meanwhile.
+  const wildsView = createWildsView({scene, renderer, quality: globalThis.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high'});
+  const groundHit = () => wildsView.active() ? wildsView.nearMesh() : ground;
+  let wildsKey = '';
+  const shotProbe = new URLSearchParams(globalThis.location?.search || '').has('acceptanceProbe');
+  function syncWorld() {
+    const key = snapshot.world ? JSON.stringify(snapshot.world) : '';
+    if (key === wildsKey) return; wildsKey = key;
+    currentWorld = snapshot.world || undefined;
+    const world = currentWorld ? worldFor(snapshot) : null;
+    setActiveWorld(world); wildsView.setWorld(world, currentWorld);
+    const arena = !world;
+    for (const view of [ground, orchard.objects.skirt, ...arenaOnly]) view.visible = arena;
+    camera.far = arena ? 180 : (mobileBudget ? 1700 : 2600); camera.updateProjectionMatrix();
+    if (world) { const me = snapshot.players.find(p => p.id === playerId) || snapshot.players.find(p => p.role === 'hero'); const at = me?.position || [0, 0, 0];
+      const started = performance.now(); wildsView.prime({focus: {x: at[0], z: at[2]}, snapshot: {...snapshot}}); frameMetrics.record('wildsPrime', performance.now() - started); }
+    terrainSignature = null;
+  }
   // Larimar Cove: a little lake beside each back town, home to Shellbright the larimar turtle (presentation only).
   const coveHeroes=[], coveSky=new THREE.Color(), coveSun=new THREE.Vector3();
-  const larimarCove = createLarimarCoveView({scene, height: (x, z) => heightAt(x, z, []), sound: (name, position, opts) => soundKit?.play(name, position, listenerPose(), opts)});
+  const larimarCove = arenaView(()=>createLarimarCoveView({scene, height: (x, z) => heightAt(x, z, []), sound: (name, position, opts) => soundKit?.play(name, position, listenerPose(), opts)}));
   let orchardContentKey = '', stepDistance = 0, stepSound = false;
   const cursor = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 48), new THREE.MeshBasicMaterial({ color: 0xf2c779, side: THREE.DoubleSide, depthWrite: false }));
   cursor.rotation.x = -Math.PI / 2;
@@ -368,7 +391,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         controllers[i].getWorldPosition(raycaster.ray.origin);
         controllers[i].getWorldQuaternion(poseQuaternion);
         raycaster.ray.direction.set(0, 0, -1).applyQuaternion(poseQuaternion);
-        const hit = raycaster.intersectObject(ground)[0];
+        const hit = raycaster.intersectObject(groundHit())[0];
         if (hit) castAt(hit.point);
       }
     });
@@ -395,9 +418,9 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const pickupHighlight=createPickupHighlight({scene});
   applyMountainGroundTreatment(orchard.material);
   yield;
-  const mountainArena=createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});
-  const alpineForest=createAlpineForest({scene,arena:mountainArena,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high'});
-  const cornerGround=createKeepCornerGround({scene,ground,height:(x,z)=>heightAt(x,z,snapshot.edits)}); // the keeps' back towns past the old map edge
+  const mountainArena=arenaView(()=>createMountainArena({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)}));
+  const alpineForest=arenaView(()=>createAlpineForest({scene,arena:mountainArena,quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high'}));
+  const cornerGround=arenaView(()=>createKeepCornerGround({scene,ground,height:(x,z)=>heightAt(x,z,snapshot.edits)})); // the keeps' back towns past the old map edge
   let nearestPickup=null;
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
@@ -631,6 +654,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     terrainPreviousEdits=snapshot.edits;terrainPreviousTick=tick;
     terrainSignature = signature;terrainFoundationKey=foundations;
     fireVisual.invalidateTerrain();terrainRay.invalidateTerrain();worldMatricesAt=-1;
+    if(wildsView.active()){wildsView.terrainChanged(dirty);frameMetrics.record('terrainCpu',performance.now()-terrainStarted);if(live)content.terrainMoved(dirty);return;}
     terrainGeometry.update((x,z)=>terrainRenderVertex(snapshot,x,z,false,heightAt(x,z,snapshot.edits)),dirty);
     frameMetrics.record('terrainCpu',performance.now()-terrainStarted);
     if(live){orchard.terrainTick?.(tick);content.terrainMoved(dirty);for(const e of dirty||[])meadowPending.set(e.id,e);return;}
@@ -923,7 +947,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const rect = canvas.getBoundingClientRect();
     pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObject(ground)[0];
+    const hit = raycaster.intersectObject(groundHit())[0];
     if (hit) hitPoint.copy(hit.point);
     return hit;
   }
@@ -978,7 +1002,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       if (aimTerrain === terrainSignature && aimCamera.equals(camera.matrixWorld)) return cursor.visible;
       aimTerrain = terrainSignature; aimCamera.copy(camera.matrixWorld);
       raycaster.setFromCamera(pointer.set(0, 0), camera);
-      const hit = raycaster.intersectObject(ground)[0];
+      const hit = raycaster.intersectObject(groundHit())[0];
       cursor.visible = !!hit; if (hit) hitPoint.copy(hit.point);
     }
     if (cursor.visible) cursor.position.copy(hitPoint).addScaledVector(THREE.Object3D.DEFAULT_UP, 0.08);
@@ -1285,7 +1309,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function contactRay(){
     const aim=weaponAim(),from=new THREE.Vector3(...aim.origin),direction=new THREE.Vector3(...aim.direction),to=from.clone().addScaledVector(direction,3.2);
     const enemies=combat.segmentContacts(from.toArray(),to.toArray())||[];
-    raycaster.set(from,direction);raycaster.far=3.2;const targets=content.targets().concat(inventionVisual.targets(),[shrine,ground,startingWorld.group]);for(const t of targets)t.updateMatrixWorld(true);
+    raycaster.set(from,direction);raycaster.far=3.2;const targets=content.targets().concat(inventionVisual.targets(),[shrine,groundHit(),startingWorld.group]);for(const t of targets)t.updateMatrixWorld(true);
     const hits=raycaster.intersectObjects(targets,true).filter(h=>surfaceVisible(h.object));raycaster.far=Infinity;
     const enemy=enemies[0],world=hits[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
     if(enemyDistance<(world?.distance??Infinity))return {...enemy,distance:enemyDistance};
@@ -1330,7 +1354,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const rect=canvas.getBoundingClientRect();pointer.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);camera.updateMatrixWorld();raycaster.setFromCamera(pointer,camera);
     const from=raycaster.ray.origin.clone(),to=from.clone().addScaledVector(raycaster.ray.direction,3.2);
     const enemy=combat.segmentContacts(from.toArray(),to.toArray(),{includePartPoses:false})[0];
-    raycaster.far=3.2;const targets=content.targets().concat(inventionVisual.targets(),[ground,shrine,startingWorld.group]);for(const t of targets)t.updateWorldMatrix(true,true);const h=raycaster.intersectObjects(targets,true).find(h=>surfaceVisible(h.object));raycaster.far=Infinity;
+    raycaster.far=3.2;const targets=content.targets().concat(inventionVisual.targets(),[groundHit(),shrine,startingWorld.group]);for(const t of targets)t.updateWorldMatrix(true,true);const h=raycaster.intersectObjects(targets,true).find(h=>surfaceVisible(h.object));raycaster.far=Infinity;
     const eDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
     let point=null;
     if(enemy&&eDistance<(h?.distance??Infinity)){
@@ -1921,9 +1945,15 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     meadowPushers.length = 0; if (role === 'hero') meadowPushers.push([localPosition.x, localPosition.y, localPosition.z, .8]);
     for (const p of snapshot.players || []) { if (meadowPushers.length >= 4) break; if (p.id !== playerId && p.role === 'hero' && p.position) meadowPushers.push([p.position[0], p.position[1], p.position[2], .8]); }
     meadow.update(dt, camera, {pushers: meadowPushers}); oreGlint.update(dt, camera);
+    // Browser QA captures only (?acceptanceProbe): a fixed vantage [x,y,z,yaw,pitch] set by the harness.
+    if(shotProbe&&globalThis.__brannShotCam){const c=globalThis.__brannShotCam;rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(c[0],c[1],c[2]);camera.rotation.set(c[4]||0,c[3]||0,0);camera.updateMatrixWorld(true);}
     const viewCamera=renderer.xr.isPresenting?renderer.xr.getCamera():camera;viewCamera.getWorldPosition(heroCamera);
     skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});inventionVisual.setNight(skyCycle.night());
     orchard.update(dt, camera); skyline.update(camera);
+    if(wildsView.active()){ // a whole landscape to see: push the haze out, keeping the sky cycle's colour and weather scale
+      scene.fog.near*=wildsView.fog.near;scene.fog.far*=wildsView.fog.far;
+      wildsView.update({focus:role==='god'&&!renderer.xr.isPresenting?pan:heroCamera,camera:viewCamera,snapshot:{...snapshot,tick:terrainShownTick()},dt});
+    }
     coveHeroes.length=0;if(role==='hero'&&initialized)coveHeroes.push({id:playerId,x:localPosition.x,y:localPosition.y,z:localPosition.z});
     for(const p of snapshot.players||[]){if(p.id===playerId||p.role!=='hero')continue;const at=actors.get('p:'+p.id)?.root.position;if(at)coveHeroes.push({id:p.id,x:at.x,y:at.y,z:at.z});}
     if(scene.fog?.color)coveSky.copy(scene.fog.color);coveSun.copy(sun.position).sub(sun.target.position);
@@ -2034,7 +2064,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       worldMatricesAt=-1;
       const previousSelf=snapshot.players.find(p=>p.id===id), previousRoom=snapshot.room;
       snapshot = { ...next, players: next.players || [], enemies: next.enemies || [], edits: next.edits || [], groves: next.groves || [], pendingStarfalls: next.pendingStarfalls || [] };
-      currentTerrainBake=snapshot.terrainBake;terrainSampler.setState({...snapshot,tick:terrainShownTick()});
+      currentTerrainBake=snapshot.terrainBake;syncWorld();terrainSampler.setState({...snapshot,tick:terrainShownTick()});
       if (id !== playerId) feedback.reset();
       playerId = id; snapshotAt = performance.now(); feedback.sync(snapshot, id);
       presentationClock.observe(snapshot.tick||0,snapshotAt,{reset:previousRoom!==snapshot.room});
@@ -2105,7 +2135,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     handleEvent,
     setDamageNumbers(enabled){combat.setDamageNumbers(!!enabled);},
     setGraphicsMode(value){const ok=renderBudget.mode(value);if(ok)try{localStorage.setItem('branns-forge.graphics',value);}catch{}return ok;},
-    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),readiness:readinessCache.stats(),programs:renderer.info.programs.length,startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),townLife:inventionVisual.townLifeStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),strike:{kind:strikeClock.kind,trail:swingTrail.stats(),punch:[...viewPunch.value],predicted:impactLedger.size},expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
+    diagnostics(){return {remoteBatches:[...remoteBatches].map(([name,b])=>({name,savedDraws:b.savedDraws})),graphics:{...renderBudget.stats(),bufferWidth:canvas.width,bufferHeight:canvas.height},assetQueue:assetQueue.stats(),readiness:readinessCache.stats(),programs:renderer.info.programs.length,startup:{...startup},stormreel:{...stormView.stats(),...stormWeapon.stats(),lightning:lightning.stats(),spires:inventionVisual.spires.stats()},dragon:dragonRide.stats(),inspect:{mode:inspect.mode(),active:inspect.active(),blocked:inspectBlocked},wyrmspout:wyrmStream.stats(),staff:{...staffFx.stats(),holding:staffFx.holding()},cpuTimings:frameMetrics.stats(),rewards:rewards.stats(),presentationTick:renderTick,creatures:combat.creatureStats(),bottle:bottleFx.stats(),emberdew:{guide:flaskGuide.object.visible,contact:flaskGuide.object.children[1].visible,landings:cinderMarkers.object.visible?cinderMarkers.object.count:0,cinderAim,aiming,forecast:{...flaskForecast},hand:emberdewHand.state(),fx:emberdewFx.stats()},trajectory:trajectoryGuide.object.visible,guideTiming:{...guideTiming},rangedEffects:combat.rangedEffectStats(),terrainGeometry:terrainGeometry.stats(),terrainRay:terrainRay.stats(),terrainSampler:terrainSampler.stats(),mountains:mountainArena.stats(),cornerGround:cornerGround.stats(),backTown:inventionVisual.backTownStats(),townLife:inventionVisual.townLifeStats(),mapExtras:inventionVisual.mapExtrasStats(),alpineForest:alpineForest.stats(),collection:pickupHighlight.stats(),landmarks:startingWorld.stats(),enemyShadows:enemyShadows.stats(),meteorCreatures:meteorCreatures.records.size,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,world:content.stats(),heroes:heroView.stats(),forge:forge.stats(),inventions:inventionVisual.stats(),fire:fireVisual.stats(),effects:spellVisual.stats(),impacts:impacts.stats(),strike:{kind:strikeClock.kind,trail:swingTrail.stats(),punch:[...viewPunch.value],predicted:impactLedger.size},expedition:expedition.stats(),expeditionPanel:(({shown,redraws})=>({shown,redraws}))(adventurePanel.state()),orchard:orchard.stats(),wilds:wildsView.active()?{...wildsView.stats(),far:camera.far,fog:[scene.fog.near,scene.fog.far]}:null,sky:skyCycle.stats(),ents:entView.stats(),stumplings:stumplingView.stats(),meadow:meadow.stats(),oreGlint:oreGlint.stats(),skyline:skyline.stats(),larimarCove:larimarCove.stats(),audio:{contextState:audioContext?.state??null,sampleRate:audioContext?.sampleRate??null,wood:woodAudio?.stats()??null,material:materialAudio?.stats()??null,mix:audioMix?.stats()??null,kit:soundKit?.stats()??null,ambience:ambience?.stats()??null}};},
     clearControls: clearInput,
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },

@@ -1,4 +1,7 @@
 import {createSimulation, loadSimulation, HZ, MAX_PLAYERS} from '../shared/simulation.js';
+import {restoreWorldDescriptor} from '../shared/worldgen/registry.js';
+import {PRESETS} from '../shared/worldgen/presets.js';
+const worldTitle = w => `${{wilds:'The Great Wilds',expedition:'Expedition',underways:'The Underways'}[w.kind]} · ${PRESETS[w.preset]?.name || ''} · ${w.seed}`.slice(0, 60);
 import {MATERIAL_KEYS, emptyMaterials} from '../shared/material-catalog.js';
 import {PeerRoomConnection} from '../peer/browser.js';
 import {makeSave, parseSave, WorldSaves} from './world-saves.js';
@@ -95,7 +98,9 @@ export class WorldSession extends EventTarget {
     this.stop(); this.identity = null; this.latest = null; this.sequence = 0; this.parked.clear();
     this.lastSave = 0; this.lastCheckpoint = 0;
     this.initialCheckpoint = options.save?.checkpoint || null;
-    this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || (this.connection.local?'Solo Orchard':'Little Orchard');
+    // A new generated world (world-creation menu): only the descriptor travels; every peer regenerates the land.
+    this.newWorld = options.save ? null : restoreWorldDescriptor(options.world) || null;
+    this.worldId = options.save?.id || crypto.randomUUID(); this.name = options.save?.name || (this.newWorld ? worldTitle(this.newWorld) : this.connection.local?'Solo Orchard':'Little Orchard');
     if (this.initialCheckpoint) loadSimulation(this.initialCheckpoint); // Reject corrupt saves before joining.
     this.running = true; this.last = performance.now(); this.accumulator = 0;
     this.timer = setInterval(() => this.tick(), 8);
@@ -169,7 +174,7 @@ export class WorldSession extends EventTarget {
     if (!this.identity) return;
     try {
       this.codec = new SnapshotDeltaEncoder(); // New stream id; guests re-announce after one legacy snapshot.
-      this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation({room:this.identity.room,seed:41});
+      this.simulation = checkpoint ? loadSimulation({...checkpoint,room:this.identity.room}) : createSimulation({room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})});
       this.reconcile(); this.last = performance.now(); this.accumulator = 0;
       let recovery;
       if (restoringSave && [...this.parked.values()].some(({record}) => record.heldOre || PACK.some(k => record.resources?.[k] > 0))) {
@@ -365,7 +370,7 @@ export class WorldSession extends EventTarget {
     // A failed recovery write must abort reset; the confirmation promises a backup.
     this.saves.put(this.exportSave());
     this.worldId = crypto.randomUUID(); this.latest = null; this.lastSave = 0; this.parked.clear();
-    this.simulation = createSimulation({room:this.identity.room,seed:41}); this.codec.reset();
+    this.simulation = createSimulation({room:this.identity.room,seed:41,...(this.newWorld?{world:this.newWorld}:{})}); this.codec.reset();
     this.reconcile(); this.publish(true);
   }
   stop() { if (this.running && this.simulation) try { this.publish(true); } catch { /* closing */ }
