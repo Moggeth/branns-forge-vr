@@ -28,7 +28,7 @@ function frameGeometry() {
 }
 function rockCollar(seed) {
   // Boulders and slabs piled round the frame so the portal sits in the hill (the terrain carries on behind them).
-  const r = rng(seed), parts = [], rock = [[.46, .4, .34], [.38, .33, .29], [.52, .46, .39]];
+  const r = rng(seed), parts = [], rock = [[.3, .26, .22], [.25, .22, .2], [.34, .29, .24]];
   const place = (x, y, z, s, sy = .8) => { const g = new THREE.DodecahedronGeometry(s, 1); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const n = 1 + (r() - .5) * .22; p.setXYZ(i, p.getX(i) * n, p.getY(i) * n * sy, p.getZ(i) * n); } g.rotateY(r() * 6); g.translate(x, y, z); parts.push(colored(g, rock[Math.floor(r() * 3)], 0, .22, Math.floor(x * 10 + y))); };
   for (const side of [-1, 1]) {
     place(side * 2.35, .55, -.25, .95, .9); place(side * 2.15, 1.75, -.5, .8); place(side * 2.6, 2.7, -.9, .95); place(side * 3.3, .7, -.8, .9, .75); place(side * 2.0, 3.45, -.6, .75);
