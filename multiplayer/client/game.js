@@ -48,7 +48,7 @@ import {createWeaponReadinessCache} from './weapon-readiness.js';
 import {weaponReadiness} from './ability-readiness.js';
 import {enhanceWyrmspoutTemplate} from './wyrmspout-look.js';
 import {enhancePickTemplate} from './pick-luminance.js';
-import {enhanceAxeTemplate} from './axe-luminance.js';
+import {enhanceKingsfellTemplate} from './kingsfell-luminance.js';
 import {createAxeReadyCue} from './axe-ready-cue.js';
 import {createAxeCleaveView,playCleaveSound} from './axe-cleave-view.js';
 import {spellUnavailable} from './spell-availability.js';
@@ -895,7 +895,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if (name === 'skeleton' || name === 'golem' || name === 'forgeling') orchard.enableShadowCasting(gltf.scene); // bounded casters: actors + forge only, never ground props
     if (name === 'golem') gltf.scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^crystal/i.test(m.name)) m.emissive.setRGB(.3, .62, 1); }); // resonance blue; also the assembly binding colour
     if (name === 'pick') enhancePickTemplate(gltf.scene); // shared gem/metal look before any clone renders
-    if (name === 'axe') enhanceAxeTemplate(gltf.scene); // shared edge/inlay/metal look before any clone renders
+    if (name === 'axe') enhanceKingsfellTemplate(gltf.scene); // shared heart/vein/edge light before any clone renders
     if (name === 'wyrmspout') enhanceWyrmspoutTemplate(gltf.scene); // scales, hammered brass, glass and the sloshing liquid
     if (name === 'staff') enhanceStaffTemplate(gltf.scene); // breathing glows and the pearl enamel, shared by every copy
     templates.set(name, gltf);
