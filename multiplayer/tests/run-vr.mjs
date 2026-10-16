@@ -30,6 +30,14 @@ run.stage = 'reward'; run.at = 'n00'; run.offers.p1 = ['ironhide', 'keen', 'flee
 v = check(runWristView(snap, 'p1'), 'reward');
 assert.deepEqual(runVrAction(v.buttons[2].id), {action: 'boon', payload: {boon: 'fleet'}});
 run.picks.p1 = 'keen'; assert.equal(runWristView(snap, 'p1').buttons.length, 0, 'no buttons once picked');
+// The Wandering Smith: affordable wares (cheapest first) plus Keep Embers, and nothing once bought or skipped.
+run.picks = {}; run.nodes.find(n => n.id === 'n00').kind = 'trader'; run.haul = 40; run.offers.p1 = ['ironhide', 'keen', 'fleet'];
+v = check(runWristView(snap, 'p1'), 'reward');
+assert.equal(v.buttons.at(-1).id, 'run:skip:'); assert.deepEqual(runVrAction('run:skip:'), {action: 'skip', payload: {}});
+assert.ok(v.buttons.length >= 1 && v.buttons.length <= 3);
+run.haul = 0; assert.deepEqual(runWristView(snap, 'p1').buttons.map(b => b.id), ['run:skip:'], 'nothing affordable: only Keep Embers');
+run.picks.p1 = 'skip'; assert.equal(runWristView(snap, 'p1').buttons.length, 0); assert.match(runWristView(snap, 'p1').nextStep, /Kept your Embers/);
+run.nodes.find(n => n.id === 'n00').kind = 'skirmish';
 run.stage = 'decide'; v = check(runWristView(snap, 'p1'), 'decide');
 assert.deepEqual(v.buttons.map(b => runVrAction(b.id).payload.choice), ['return', 'push']);
 run.stage = 'won'; run.result = {outcome: 'won', banked: 400, kills: 30, path: ['n00', 'n10', 'n20', 'heart']};

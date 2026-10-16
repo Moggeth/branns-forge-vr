@@ -17,11 +17,16 @@ export const BOONS = Object.freeze(Object.fromEntries(Object.entries({
   leech: {name: 'Thirsty Blade', tier: 'rare', role: 'hero', text: 'Heal for 6% of the damage you deal.', lifesteal: .06},
   heartwood: {name: 'Heartwood', tier: 'rare', role: 'hero', text: '+60 max health and heal 1 health every second.', hp: 60, regen: 1},
   fury: {name: 'Forge Fury', tier: 'rare', role: 'hero', text: 'Your weapons hit 30% harder.', damage: .3},
+  scavenger: {name: 'Scavenger', tier: 'common', role: 'hero', text: '+3 Gold for every foe you fell, and 30 experience now.', goldPerKill: 3, xp: 30},
+  bulwark: {name: 'Bulwark', tier: 'rare', role: 'hero', text: 'Take 20% less damage, but run 8% slower.', armor: .2, speed: -.08},
+  windrunner: {name: 'Windrunner', tier: 'rare', role: 'hero', text: 'Run 20% faster and heal half a health every second.', speed: .2, regen: .5},
+  secondwind: {name: 'Second Wind', tier: 'rare', role: 'hero', text: 'The party gains a spare life, but you lose 20 max health.', lives: 1, hp: -20},
   glass: {name: 'Glass Heart', tier: 'epic', role: 'hero', text: 'Hit 45% harder, but lose 30 max health.', damage: .45, hp: -30, unlock: true},
   phoenix: {name: 'Phoenix Feather', tier: 'epic', role: 'any', text: 'The party gains a spare life.', lives: 1, unlock: true},
   // God boons
   wellspring: {name: 'Wellspring', tier: 'common', role: 'god', text: 'Your mana refills 50% faster.', mana: .5},
   deepwell: {name: 'Deep Well', tier: 'rare', role: 'god', text: 'Your mana refills twice as fast.', mana: 1},
+  starwell: {name: 'Starwell', tier: 'common', role: 'god', text: 'Your mana refills 30% faster, and the party’s haul grows by 15 Embers.', mana: .3, haul: 15},
   ember: {name: 'Kindled Ember', tier: 'rare', role: 'god', text: 'The party gains a spare life.', lives: 1},
 }).map(([id, spec]) => [id, Object.freeze({id, ...spec})])));
 export const BOON_IDS = Object.freeze(Object.keys(BOONS));

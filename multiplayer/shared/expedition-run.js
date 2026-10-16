@@ -26,6 +26,7 @@ export const NODE_KINDS = Object.freeze({
   treasure: Object.freeze({name: 'Star Shards', text: 'Stars are falling here. Crack the shards before the ambush closes in.', haul: 35}),
   hold: Object.freeze({name: 'Hold the Ward', text: 'Stand in the ward circle while waves come.', haul: 30}),
   shrine: Object.freeze({name: 'Shrine', text: 'A quiet shrine: heal up and take a rare upgrade. No fight.', haul: 6}),
+  trader: Object.freeze({name: 'Wandering Smith', text: 'A travelling smith sells upgrades for Embers from your haul. No fight.', haul: 0}),
   underways: Object.freeze({name: 'Underways', text: 'A way down into the Underways. Beat the guardians at the mouth, then delve for the hoard.', haul: 50}),
   heart: Object.freeze({name: 'The Heart', text: 'The region’s heart and its guardian. Beat it to win the run.', haul: 120}),
 });
@@ -36,10 +37,29 @@ export const RUN_TUNING = Object.freeze({
   boss: Object.freeze({hpScale: 5, scale: 1.75}),
 });
 const T = RUN_TUNING;
-const TIER_KINDS = [['skirmish', 'treasure', 'shrine', 'skirmish'], ['skirmish', 'elite', 'hold', 'treasure', 'underways'], ['elite', 'hold', 'underways', 'shrine', 'treasure']];
+const TIER_KINDS = [['skirmish', 'treasure', 'shrine', 'skirmish'], ['skirmish', 'elite', 'hold', 'treasure', 'underways', 'trader'], ['elite', 'hold', 'underways', 'shrine', 'treasure', 'trader']];
+// Heart guardians rotate with the seed. All three are crowned meteor golems at boss scale; each fights differently.
 export const BOSSES = Object.freeze({
-  colossus: Object.freeze({name: 'Meteor Colossus', kind: 'golem', text: 'A mountain of star-iron, crowned in fire.'}),
+  colossus: Object.freeze({name: 'Meteor Colossus', kind: 'golem', text: 'A mountain of star-iron, crowned in fire. It hits like a landslide.'}),
+  warden: Object.freeze({name: 'Bone Warden', kind: 'golem', text: 'Antlered in bone. While it stands, the dead keep climbing out of the ground.', raise: s(9)}),
+  shardback: Object.freeze({name: 'Shardback', kind: 'golem', text: 'Crystal-backed. Three heartstones mend it until you crack them.', stones: 3, mend: .012}),
 });
+// Omens: one per run, from the seed (the Daily Expedition always has one). Each bends the rules for the whole run.
+export const OMENS = Object.freeze({
+  calm: Object.freeze({name: 'Clear Skies', text: 'No omen. A fair road.'}),
+  bloodmoon: Object.freeze({name: 'Blood Moon', text: 'More foes at every fight, and 30% more haul from each destination.', foes: 2, haulMult: 1.3}),
+  gilded: Object.freeze({name: 'Gilded Road', text: 'Every foe felled adds 3 more Embers, and smiths sell at 40% off.', killHaul: 3, discount: .4}),
+  longroad: Object.freeze({name: 'The Long Road', text: 'One fewer spare life, but every destination heals you fully and offers one more card.', lives: -1, cards: 1, fullHeal: true}),
+  starfall: Object.freeze({name: 'Starfall', text: 'Star Shards destinations pay double and hold one more shard.', treasure: 2, shards: 1}),
+});
+export const OMEN_IDS = Object.freeze(Object.keys(OMENS));
+/** The omen a seed brings: calm about a third of the time, never calm for the Daily Expedition. */
+export function omenFor(seed, format = 'expedition') {
+  const dark = OMEN_IDS.filter(id => id !== 'calm'), roll = mix(seed, 'omen');
+  if (format !== 'daily' && roll % 3 === 0) return 'calm';
+  return dark[(roll >>> 4) % dark.length];
+}
+const omenOf = run => OMENS[run.omen] || OMENS.calm;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -112,7 +132,7 @@ export function createRun({format = 'expedition', seed = 1, daily = '', camp = [
   const bosses = Object.keys(BOSSES);
   return {v: RUN_VERSION, format, seed, daily: typeof daily === 'string' ? daily.slice(0, 10) : '', stage: 'camp', elapsed: 0, clock: 0,
     camp: [Math.round(camp[0] * 10) / 10, Math.round(camp[1] * 10) / 10], bound: clamp(bound, 20, 4000), nodes, at: '', path: [], target: '',
-    boss: Object.hasOwn(BOSSES, boss) ? boss : bosses[mix(seed, 'boss') % bosses.length],
+    boss: Object.hasOwn(BOSSES, boss) ? boss : bosses[mix(seed, 'boss') % bosses.length], omen: omenFor(seed, format),
     lives: T.livesBase, maxLives: T.livesBase, mult: 1, haul: 0, kills: 0, deaths: 0, pushes: 0,
     foes: [], shards: [], objective: {have: 0, need: 0}, wave: 0, nextWave: 0,
     votes: {}, firstVote: 0, offers: {}, picks: {}, rerolls: {}, kits: {}, hall: {}, applied: {}, notice: 'Gather at camp and choose a starting kit.', result: null, seq: 0, delve: ''};
@@ -126,7 +146,9 @@ export function routeChoices(run) {
   if (!run.at) return run.nodes.filter(n => n.tier === 0).map(n => n.id);
   return node(run, run.at)?.next.slice() || [];
 }
-export const nodeHaul = (run, n) => Math.round(NODE_KINDS[n.kind].haul * (1 + .35 * n.tier) * run.mult);
+export const nodeHaul = (run, n) => { const o = omenOf(run); return Math.round(NODE_KINDS[n.kind].haul * (1 + .35 * n.tier) * run.mult * (o.haulMult || 1) * (n.kind === 'treasure' ? o.treasure || 1 : 1)); };
+/** What the Wandering Smith asks for an upgrade at this destination. */
+export const tradePrice = (run, n, id) => Math.max(1, Math.round(({common: 15, rare: 30, epic: 50}[BOONS[id]?.tier] || 20) * (1 + .35 * (n?.tier || 0)) * (1 - (omenOf(run).discount || 0))));
 
 function present(world) {
   const players = Array.isArray(world?.players) ? world.players : [];
@@ -145,6 +167,7 @@ function grantBoon(state, run, p, id, ctx, out) {
   if (p.runBoons.length >= BOON_LIMIT) return false;
   p.runBoons.push(id);
   if (b.lives) { run.lives = Math.min(T.livesMax + 3, run.lives + b.lives); run.maxLives = Math.max(run.maxLives, run.lives); }
+  if (b.haul) run.haul = Math.min(1e7, run.haul + b.haul);
   if (b.xp && p.role === 'hero') ctx.grantXp?.(state, p, b.xp, out.events, p.position);
   if (b.hp > 0 && p.role === 'hero') p.hp = Math.min(ctx.heroMaxHp(p), p.hp + b.hp);
   if (p.role === 'hero') p.hp = Math.min(p.hp, ctx.heroMaxHp(p));
@@ -172,7 +195,7 @@ function poolFor(run, p) {
   return BOON_IDS.filter(id => { const b = BOONS[id]; return (b.role === 'any' || b.role === p.role) && (!b.unlock || hall[id]); });
 }
 function makeOffer(run, p, salt, rare = false) {
-  const pool = poolFor(run, p), hall = run.hall[nameKey(p.name)] || {}, n = Math.min(pool.length, 3 + (hall.choice ? 1 : 0));
+  const pool = poolFor(run, p), hall = run.hall[nameKey(p.name)] || {}, n = Math.min(pool.length, 3 + (hall.choice ? 1 : 0) + (omenOf(run).cards || 0));
   const weight = id => BOONS[id].tier === 'common' ? (rare ? 1 : 6) : BOONS[id].tier === 'rare' ? (rare ? 5 : 2) : (rare ? 3 : 1);
   const offer = [], left = [...pool];
   for (let i = 0; i < n && left.length; i++) {
@@ -203,15 +226,17 @@ function spawn(state, run, out, kind, at, radius, tag, ctx, extra = {}) {
 function startFight(state, run, n, heroes, ctx, out) {
   const at = [n.x, n.z], h = clamp(heroes, 1, 6), tier = n.tier, push = run.pushes;
   run.objective = {have: 0, need: 0}; run.wave = 0; run.nextWave = 0; run.shards = [];
-  if (n.kind === 'skirmish') for (let i = 0; i < 2 + tier + h + push; i++) spawn(state, run, out, 'skeleton', at, 5, 'w', ctx);
+  const extra = omenOf(run).foes || 0;
+  if (n.kind === 'skirmish') for (let i = 0; i < 2 + tier + h + push + extra; i++) spawn(state, run, out, 'skeleton', at, 5, 'w', ctx);
   else if (n.kind === 'elite' || n.kind === 'underways') {
     const golems = 1 + (tier >= 2 ? 1 : 0) + (h >= 3 ? 1 : 0) + (n.kind === 'underways' ? 1 : 0);
     for (let i = 0; i < golems; i++) spawn(state, run, out, 'golem', at, 4, 'g', ctx);
-    for (let i = 0; i < 1 + h + push; i++) spawn(state, run, out, 'skeleton', at, 6, 'w', ctx);
+    for (let i = 0; i < 1 + h + push + extra; i++) spawn(state, run, out, 'skeleton', at, 6, 'w', ctx);
   } else if (n.kind === 'treasure') {
-    run.objective = {have: 0, need: T.shards};
-    for (let i = 0; i < T.shards; i++) {
-      const id = `rx${run.seed % 100000}s${run.seq++}`, a = i * 2.0944 + (mix(run.seed, n.id) % 100) / 50;
+    const shards = T.shards + (omenOf(run).shards || 0);
+    run.objective = {have: 0, need: shards};
+    for (let i = 0; i < shards; i++) {
+      const id = `rx${run.seed % 100000}s${run.seq++}`, a = i * Math.PI * 2 / shards + (mix(run.seed, n.id) % 100) / 50;
       const x = n.x + Math.cos(a) * 2.2, z = n.z + Math.sin(a) * 2.2;
       if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80) break;
       state.deposits.push({id, x, z, kind: 'meteor', hits: 0, maxHits: 5, depleted: false});
@@ -226,7 +251,19 @@ function startFight(state, run, n, heroes, ctx, out) {
   } else if (n.kind === 'heart') {
     const boss = BOSSES[run.boss];
     spawn(state, run, out, boss.kind, at, .5, 'boss', ctx, {boss: run.boss});
-    for (let i = 0; i < 2 + h; i++) spawn(state, run, out, 'skeleton', at, 7, 'w', ctx);
+    for (let i = 0; i < 2 + h + extra; i++) spawn(state, run, out, 'skeleton', at, 7, 'w', ctx);
+    if (boss.raise) run.nextWave = boss.raise;
+    if (boss.stones) {
+      // The Shardback's heartstones: crystal pillars round the arena that mend it while any still stands.
+      for (let i = 0; i < boss.stones; i++) {
+        const id = `rx${run.seed % 100000}s${run.seq++}`, a = i * Math.PI * 2 / boss.stones + (mix(run.seed, 'stones') % 100) / 50;
+        if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80) break;
+        state.deposits.push({id, x: n.x + Math.cos(a) * 8, z: n.z + Math.sin(a) * 8, kind: 'crystal', hits: 0, maxHits: 5, depleted: false});
+        run.shards.push(id);
+      }
+      run.objective = {have: 0, need: run.shards.length};
+      out.events.push({kind: 'run_shards', position: [n.x, ctx.terrainHeight(state, n.x, n.z), n.z], ids: [...run.shards], heartstones: true});
+    }
   }
   notice(run, NODE_KINDS[n.kind].text);
 }
@@ -248,7 +285,25 @@ function stepFight(state, run, n, heroes, ctx, out) {
     return run.objective.have >= run.objective.need && !run.foes.length;
   }
   if (n.kind === 'underways' && ctx.underways) return stepDelve(state, run, n, heroes, ctx, out);
+  if (n.kind === 'heart') stepGuardian(state, run, n, ctx, out);
   return !run.foes.length;
+}
+// Heart guardian behaviours: the Bone Warden keeps raising the dead; the Shardback mends while its heartstones stand.
+function stepGuardian(state, run, n, ctx, out) {
+  const spec = BOSSES[run.boss], bossFoe = run.foes.find(f => f.tag === 'boss'), boss = bossFoe && state.enemies.find(e => e.id === bossFoe.id);
+  if (!boss) return;
+  if (spec.raise && run.elapsed >= run.nextWave) {
+    run.nextWave = run.elapsed + spec.raise; run.wave++;
+    const count = Math.min(2 + run.pushes, T.maxFoes - run.foes.length);
+    for (let i = 0; i < count; i++) spawn(state, run, out, 'skeleton', xz(boss.position), 5, 'r', ctx);
+    if (count > 0) out.events.push({kind: 'run_raise', id: boss.id, count, position: [...boss.position]});
+  }
+  if (spec.stones) {
+    const left = run.shards.filter(id => state.deposits.some(d => d.id === id && !d.depleted));
+    const before = run.objective.have; run.objective.have = run.objective.need - left.length;
+    if (run.objective.have > before) { out.events.push({kind: 'run_heartstone', left: left.length, position: [...boss.position]}); notice(run, left.length ? `A heartstone shatters! ${left.length} left.` : 'The last heartstone shatters. The Shardback can no longer mend!'); }
+    if (left.length && run.elapsed % HZ === 0) { const max = ctx.enemyMaxHp?.(boss) || boss.hp; boss.hp = Math.min(max, boss.hp + Math.ceil(max * spec.mend)); }
+  }
 }
 // The Underways (shared/underways/rules.js, through ctx.underways = {open, enter, inside}): once the mouth is clear the
 // party goes down into a real dungeon, tagged with this destination; its guardian's hoard clears the destination and
@@ -295,7 +350,7 @@ function finish(state, run, outcome, out) {
 }
 function offerAll(state, run, players, n, out) {
   run.offers = {}; run.picks = {};
-  for (const p of players) run.offers[p.id] = makeOffer(run, p, `${n.id}:${run.pushes}`, n.kind === 'shrine' || n.kind === 'heart' || n.kind === 'underways');
+  for (const p of players) run.offers[p.id] = makeOffer(run, p, `${n.id}:${run.pushes}`, ['shrine', 'heart', 'underways', 'trader'].includes(n.kind));
   out.events.push({kind: 'run_offers', node: n.id});
 }
 
@@ -311,7 +366,7 @@ export function stepRun(state, events, ctx) {
   const ids = new Set(state.enemies.map(e => e.id)), pids = new Set(players.map(p => p.id));
   const before = run.foes.length;
   run.foes = run.foes.filter(f => ids.has(f.id));
-  if (run.foes.length < before && run.stage === 'fight') { const n = before - run.foes.length; run.kills += n; run.haul += n * T.killHaul; }
+  if (run.foes.length < before && run.stage === 'fight') { const n = before - run.foes.length; run.kills += n; run.haul += n * (T.killHaul + (omenOf(run).killHaul || 0)); }
   if (run.stage !== 'camp') for (const e of events) if (e?.kind === 'death' && pids.has(e.id)) {
     run.deaths++;
     if (run.lives > 0) { run.lives--; out.events.push({kind: 'run_life', lives: run.lives, id: e.id}); }
@@ -328,7 +383,7 @@ export function stepRun(state, events, ctx) {
   } else if (run.stage === 'travel') {
     const n = node(run, run.target);
     if (heroes.some(p => p.hp > 0 && flat(xz(p.position), [n.x, n.z]) <= T.arrive) || !heroes.length && run.elapsed > s(8)) {
-      if (n.kind === 'shrine') { arrive(state, run, n, players, ctx, out); }
+      if (n.kind === 'shrine' || n.kind === 'trader') { arrive(state, run, n, players, ctx, out); }
       else { enter(run, 'fight', out, {node: n.id}); startFight(state, run, n, heroes.length, ctx, out); }
     }
   } else if (run.stage === 'fight') {
@@ -337,7 +392,8 @@ export function stepRun(state, events, ctx) {
   } else if (run.stage === 'reward') {
     const waiting = players.filter(p => run.offers[p.id]?.length && !run.picks[p.id]);
     if (!waiting.length || run.elapsed >= T.pick) {
-      for (const p of waiting) { run.picks[p.id] = run.offers[p.id][0]; grantBoon(state, run, p, run.offers[p.id][0], ctx, out); }
+      const trading = node(run, run.at)?.kind === 'trader';
+      for (const p of waiting) { if (trading) { run.picks[p.id] = 'skip'; continue; } run.picks[p.id] = run.offers[p.id][0]; grantBoon(state, run, p, run.offers[p.id][0], ctx, out); }
       if (run.at === 'heart') finish(state, run, 'won', out);
       else { enter(run, 'decide', out); notice(run, `Return and bank ${run.haul} Embers, or push on for a bigger haul (x${(run.mult + T.pushMult).toFixed(2)}).`); }
     }
@@ -362,14 +418,15 @@ function choose(state, run, id, out) {
 }
 function arrive(state, run, n, players, ctx, out) {
   const gain = nodeHaul(run, n);
-  run.haul = Math.min(1e7, run.haul + gain); run.at = n.id; run.path.push(n.id); run.target = '';
+  run.haul = Math.min(1e7, run.haul + gain); run.at = n.id; run.path.push(n.id); run.target = ''; run.delve = '';
   despawn(state, run);
   // Each cleared destination tops the party up a little (a shrine all the way).
-  for (const p of players) { if (p.role === 'hero') p.hp = Math.min(ctx.heroMaxHp(p), n.kind === 'shrine' ? ctx.heroMaxHp(p) : p.hp + 30); p.mana = Math.min(100, p.mana + 30); }
+  const full = n.kind === 'shrine' || omenOf(run).fullHeal;
+  for (const p of players) { if (p.role === 'hero') p.hp = Math.min(ctx.heroMaxHp(p), full ? ctx.heroMaxHp(p) : p.hp + 30); p.mana = Math.min(100, p.mana + 30); }
   out.events.push({kind: 'run_cleared', node: n.id, haul: gain, position: [n.x, ctx.terrainHeight(state, n.x, n.z), n.z]});
   enter(run, 'reward', out, {node: n.id});
   offerAll(state, run, players, n, out);
-  notice(run, `${NODE_KINDS[n.kind].name} cleared: +${gain} Embers. Choose an upgrade.`);
+  notice(run, n.kind === 'trader' ? `The Wandering Smith has wares. You carry ${run.haul} Embers.` : `${NODE_KINDS[n.kind].name} cleared: +${gain} Embers. Choose an upgrade.`);
 }
 
 // ---- Commands ---------------------------------------------------------------------------------------------
@@ -395,7 +452,7 @@ export function runAction(state, p, m, ctx) {
     if (run.stage !== 'camp') return fail('already_begun');
     const hallBest = k => Math.max(0, ...players.map(q => run.hall[nameKey(q.name)]?.[k] || 0));
     const heroes = players.filter(q => q.role === 'hero').length;
-    run.lives = run.maxLives = clamp(T.livesBase + Math.max(0, heroes - 1) + hallBest('spark'), 1, T.livesMax);
+    run.lives = run.maxLives = clamp(T.livesBase + Math.max(0, heroes - 1) + hallBest('spark') + (omenOf(run).lives || 0), 1, T.livesMax);
     for (const q of players) applyKit(state, run, q, ctx, out);
     enter(run, 'route', out); notice(run, 'Choose your first destination.');
     return ok(out.events);
@@ -407,7 +464,17 @@ export function runAction(state, p, m, ctx) {
   }
   if (m.action === 'boon') {
     if (run.stage !== 'reward' || run.picks[p.id] || !run.offers[p.id]?.includes(m.boon)) return fail('invalid_boon');
+    const at = node(run, run.at);
+    if (at?.kind === 'trader') {
+      const price = tradePrice(run, at, m.boon);
+      if (run.haul < price) return fail('cant_afford');
+      run.haul -= price; out.events.push({kind: 'run_trade', id: p.id, boon: m.boon, price});
+    }
     run.picks[p.id] = m.boon; grantBoon(state, run, p, m.boon, ctx, out); return ok(out.events);
+  }
+  if (m.action === 'skip') {
+    if (run.stage !== 'reward' || run.picks[p.id] || node(run, run.at)?.kind !== 'trader') return fail('invalid_skip');
+    run.picks[p.id] = 'skip'; return ok();
   }
   if (m.action === 'reroll') {
     if (run.stage !== 'reward' || run.picks[p.id] || !run.offers[p.id] || !(run.rerolls[p.id] > 0)) return fail('no_reroll');
@@ -422,9 +489,9 @@ export function runAction(state, p, m, ctx) {
 }
 
 // ---- Save validation --------------------------------------------------------------------------------------
-const OPTIONAL = ['delve'];
+const OPTIONAL = ['delve', 'omen'];
 const KEYS = ['v', 'format', 'seed', 'daily', 'stage', 'elapsed', 'clock', 'camp', 'bound', 'nodes', 'at', 'path', 'target', 'boss', 'lives', 'maxLives',
-  'mult', 'haul', 'kills', 'deaths', 'pushes', 'foes', 'shards', 'objective', 'wave', 'nextWave', 'votes', 'firstVote', 'offers', 'picks', 'rerolls', 'kits', 'hall', 'applied', 'notice', 'result', 'seq', 'delve'];
+  'mult', 'haul', 'kills', 'deaths', 'pushes', 'foes', 'shards', 'objective', 'wave', 'nextWave', 'votes', 'firstVote', 'offers', 'picks', 'rerolls', 'kits', 'hall', 'applied', 'notice', 'result', 'seq', 'delve', 'omen'];
 function idMap(o, ok, max = 64) { if (!record(o) || Object.keys(o).length > max) return false; return Object.entries(o).every(([k, v]) => /^[a-z0-9 _'.-]{1,64}$/i.test(k) && k !== '__proto__' && ok(v)); }
 /** Strict whitelist validation of a saved run. Returns a clean copy or throws. */
 export function restoreRun(saved) {
@@ -449,10 +516,11 @@ export function restoreRun(saved) {
   if (!record(r.objective) || Object.keys(r.objective).length !== 2 || !int(r.objective.have, 0, 1e7) || !int(r.objective.need, 0, 1e7)) bad('objective');
   if (!int(r.wave, 0, 1e6) || !int(r.nextWave, 0, 1e9) || !int(r.firstVote, 0, 1e9) || !int(r.seq, 0, 1e9)) bad('waves');
   if (!idMap(r.votes, v => typeof v === 'string' && (nodeIds.has(v) || v === 'return' || v === 'push'))) bad('votes');
-  if (!idMap(r.offers, v => validBoonList(v) && v.length <= 4) || !idMap(r.picks, v => Object.hasOwn(BOONS, v)) || !idMap(r.rerolls, v => int(v, 0, 9))) bad('offers');
+  if (!idMap(r.offers, v => validBoonList(v) && v.length <= 4) || !idMap(r.picks, v => Object.hasOwn(BOONS, v) || v === 'skip') || !idMap(r.rerolls, v => int(v, 0, 9))) bad('offers');
   if (!idMap(r.kits, v => Object.hasOwn(KITS, v)) || !idMap(r.applied, v => v === true) || !idMap(r.hall, v => record(v) && Object.entries(v).every(([k, n]) => HALL_IDS.includes(k) && int(n, 1, HALL[k].max)))) bad('players');
   if (typeof r.notice !== 'string' || r.notice.length > 120) bad('notice');
   if (r.delve !== undefined && !(r.delve === '' || validId(r.delve))) bad('delve');
+  if (r.omen !== undefined && !Object.hasOwn(OMENS, r.omen)) bad('omen');
   if (r.result !== null && !(record(r.result) && RUN_ENDED.includes(r.result.outcome) && int(r.result.banked, 0, 1e8) && int(r.result.haul, 0, 1e7) && int(r.result.kills, 0, 1e9) && int(r.result.deaths, 0, 1e9) && int(r.result.time, 0, 1e8) && int(r.result.tier, 0, 12) && Array.isArray(r.result.path) && r.result.path.length <= 12 && r.result.path.every(k => Object.hasOwn(NODE_KINDS, k)) && Object.keys(r.result).length === 7)) bad('result');
-  const clean = structuredClone(r); clean.delve ??= ''; return clean;
+  const clean = structuredClone(r); clean.delve ??= ''; clean.omen ??= 'calm'; return clean;
 }

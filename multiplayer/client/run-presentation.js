@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import {NODE_KINDS, RUN_TUNING, routeChoices} from '../shared/expedition-run.js';
 
-export const RUN_KIND_COLOR = Object.freeze({skirmish: 0xffb35a, elite: 0xff6a4a, treasure: 0x8fd0ff, hold: 0x8fe08a, shrine: 0xffe08a, underways: 0xb98cff, heart: 0xff4f6d});
+export const RUN_KIND_COLOR = Object.freeze({skirmish: 0xffb35a, elite: 0xff6a4a, treasure: 0x8fd0ff, hold: 0x8fe08a, shrine: 0xffe08a, underways: 0xb98cff, heart: 0xff4f6d, trader: 0x7fe0c6});
 const BEAM_VS = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
 const BEAM_FS = `uniform vec3 uColor; uniform float uT; uniform float uAlpha; varying vec2 vUv;
 void main(){ float edge=pow(1.0-abs(vUv.x*2.0-1.0),1.6); float fall=pow(1.0-vUv.y,1.4);
@@ -94,10 +94,82 @@ function mergeSimple(list) {
   for (const g of geos) if (!list.includes(g)) g.dispose();
   return out;
 }
-/** Crowns a golem model (the Meteor Colossus): a star-iron crown and a glowing gem riding its Head node. */
-export function dressBoss(model) {
+// ---- Bone Warden antlers and Shardback crystal spines ----
+// Built once in a unit space (head or body width 1, +Z behind), then fitted per model (the golem faces model +Z) and
+// parented to the Head / BodyCore node so they ride the golem's animation. One mesh each, no lights.
+const boneMat = new THREE.MeshStandardMaterial({color: 0xeadfc4, roughness: .72, flatShading: true});
+const soulMat = new THREE.MeshStandardMaterial({color: 0x8dffb0, emissive: 0x2aff6a, emissiveIntensity: 2.4, roughness: .2, flatShading: true});
+const spineMat = new THREE.MeshStandardMaterial({color: 0x9ff2ff, emissive: 0x2ab8ff, emissiveIntensity: 1.5, metalness: .1, roughness: .15, flatShading: true});
+const decorGeo = {};
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function limb(from, to, r0, r1, sides = 5) {
+  _a.fromArray(from); _b.fromArray(to); const dir = _b.clone().sub(_a), len = dir.length();
+  const g = new THREE.CylinderGeometry(r1, r0, len, sides).translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(_up, dir.normalize())); return g.translate(..._a.toArray());
+}
+function antlerGeometry() {
+  if (decorGeo.antlers) return decorGeo.antlers;
+  // Two branching antlers rising from the brow, sweeping out and back, with three tines each.
+  const parts = [];
+  for (const s of [-1, 1]) {
+    const base = [s * .28, -.05, .05], knee = [s * .62, .42, .2], tip = [s * .78, .95, .36];
+    parts.push(limb(base, knee, .11, .08), limb(knee, tip, .08, .025));
+    parts.push(limb([s * .45, .18, .12], [s * .62, .5, -.12], .065, .015), limb(knee, [s * .98, .72, .12], .06, .012), limb([s * .7, .68, .28], [s * .58, 1.05, .1], .05, .01));
+  }
+  decorGeo.antlers = mergeSimple(parts); for (const g of parts) g.dispose();
+  return decorGeo.antlers;
+}
+function spineGeometry() {
+  if (decorGeo.spines) return decorGeo.spines;
+  // Crystal spines in two staggered rows down the back (+Z is behind), leaning up and out like a geode split open.
+  const parts = [], sites = [[0, .32, .62], [-.26, .18, .5], [.26, .18, .5], [0, .0, .48], [-.22, -.18, .38], [.22, -.18, .38], [0, -.32, .3]];
+  sites.forEach(([x, y, len], i) => {
+    const g = new THREE.OctahedronGeometry(1, 0).scale(.09 + len * .08, len * .55, .09 + len * .08).translate(0, len * .45, 0);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(_up, new THREE.Vector3(x * 1.4, .7 + (i % 2) * .15, 1).normalize()));
+    parts.push(g.translate(x, y, 0));
+  });
+  decorGeo.spines = mergeSimple(parts); for (const g of parts) g.dispose();
+  return decorGeo.spines;
+}
+/** Parents `obj` to `node`, placed at a model-space position and scale (works before the model joins the scene). */
+const BEHIND = new THREE.Quaternion().setFromAxisAngle(_up, Math.PI); // unit +Z (behind) -> the golem's back, model -Z
+function attachInModelSpace(model, node, obj, at, scale) {
+  model.updateMatrixWorld(true);
+  const nodeInModel = new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(node.matrixWorld);
+  const local = nodeInModel.invert().multiply(new THREE.Matrix4().compose(at, BEHIND, new THREE.Vector3().setScalar(scale)));
+  local.decompose(obj.position, obj.quaternion, obj.scale);
+  obj.userData.ignoreContact = true; obj.traverse(o => { o.userData.ignoreContact = true; o.castShadow = false; o.raycast = () => {}; });
+  node.add(obj);
+}
+function modelBox(model, node) {
+  model.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(node).applyMatrix4(new THREE.Matrix4().copy(model.matrixWorld).invert());
+}
+function dressWarden(model) {
+  const head = model.getObjectByName('Head'); if (!head) return false;
+  const box = modelBox(model, model.getObjectByName('HeadMesh') || head), size = box.getSize(new THREE.Vector3()), w = Math.max(size.x, size.z);
+  const g = new THREE.Group(); g.name = 'WardenAntlers';
+  const soul = new THREE.Mesh(decorGeo.soul ??= new THREE.OctahedronGeometry(.15, 0).scale(1, 1.4, .7), soulMat); soul.position.set(0, -.18, -.52);
+  g.add(new THREE.Mesh(antlerGeometry(), boneMat), soul);
+  attachInModelSpace(model, head, g, new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * .1, (box.min.z + box.max.z) / 2), w * 1.15);
+  model.userData.bossCrown = g; return true;
+}
+function dressShardback(model) {
+  const core = model.getObjectByName('BodyCore'); if (!core) return false;
+  const box = modelBox(model, model.getObjectByName('BodyCoreMesh') || core), size = box.getSize(new THREE.Vector3());
+  const spines = new THREE.Mesh(spineGeometry(), spineMat); spines.name = 'ShardbackSpines';
+  attachInModelSpace(model, core, spines, new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y + size.y * .6, box.min.z + size.z * .12), Math.max(size.x, size.y) * .9);
+  model.userData.bossCrown = spines; return true;
+}
+
+/** Dresses a run's Heart guardian by boss id: the Meteor Colossus is crowned, the Bone Warden antlered with a soul gem,
+ * the Shardback spined in crystal. */
+export function dressBoss(model, id = 'colossus') {
+  if (model.userData.bossCrown) return false;
+  if (id === 'warden') return dressWarden(model);
+  if (id === 'shardback') return dressShardback(model);
   const head = model.getObjectByName('Head'), mesh = model.getObjectByName('HeadMesh');
-  if (!head || model.userData.bossCrown) return false;
+  if (!head) return false;
   const crown = new THREE.Group(); crown.name = 'BossCrown';
   const band = new THREE.Mesh(crownGeometry(), crownMat), gem = new THREE.Mesh(gemGeo, gemMat);
   gem.position.set(0, .2, .55); band.castShadow = false; for (const m of [band, gem]) m.userData.ignoreContact = true;

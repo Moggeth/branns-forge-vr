@@ -190,7 +190,7 @@ function instantiate(state) {
   const adventureEvents = [], adventureContext = {createEnemy, terrainHeight};
   // Underways destinations delve into real dungeons (shared/underways/rules.js); carried logs and snacks stay up top.
   const releaseForDelve = p => { releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p); };
-  const runContext = {createEnemy, terrainHeight, grantXp, heroMaxHp, makeBoss,
+  const runContext = {createEnemy, terrainHeight, grantXp, heroMaxHp, makeBoss, enemyMaxHp,
     underways: {open: openUnderway, enter: (st, p, r, ev) => enterUnderway(st, p, r, ev, {release: releaseForDelve}), inside: p => inUnderway(p.position[0], p.position[2])}};
   const api = {
     addPlayer({id, name = 'Guest', role = 'hero'} = {}) {
