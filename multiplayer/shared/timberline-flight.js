@@ -72,10 +72,14 @@ function stepLong(s,q,c,events,structureDefs){
   if(v.kind!=='block'&&q.hitIds.includes(v.obj.id))continue;
   const h=sweptHit(a,b,v);if(h)hits.push({kind:v.kind,obj:v.obj,...h});}
 
+ // A keep Timberline's pair (shared/home-ballista.js) also cuts rival Heroes in its path; the wire passes on through them.
+ if(q.heroDamage&&c.damageHero)for(const p of s.players){if(p.role!=='hero'||!(p.hp>0)||(p.side||'party')===q.side||(p.protectedUntil??0)>s.tick||p.dragon||q.hitIds.includes(p.id))continue;
+  const h=sweptHit(a,b,{shape:'frustum',at:p.position,base:.45,top:.45,height:1.85});if(h)hits.push({kind:'hero',obj:p,...h});}
  for(const tag of ['L','R']){const h=boltInGround(s,c,tag==='L'?a.left:a.right,tag==='L'?b.left:b.right);if(h)hits.push({kind:'ground',obj:{id:'ground'},u:h.u,point:h.point,part:tag==='L'?'bolt_L':'bolt_R'});}
  hits.sort((x,y)=>x.u-y.u||(x.part<y.part?-1:1));
  for(const h of hits){if(h.kind!=='ground'&&h.kind!=='block'&&q.hitIds.includes(h.obj.id))continue;
   if(h.kind==='battle-base'){damageBattleBase(s,h.obj.id,110,q.side,events);events.push({kind:'timberline_stop',id:q.id,structureId:q.structureId,position:h.point,material:'stone'});return true;}
+  if(h.kind==='hero'){q.hitIds.push(h.obj.id);c.damageHero(s,h.obj,q.heroDamage,events,q.origin);continue;}
   if(h.kind==='tree'){q.hitIds.push(h.obj.id);const f=timberlineLaunch(q).forward,flatF=[f[0],0,f[2]].map(v=>v/Math.max(1e-6,Math.hypot(f[0],f[2])));for(let cut=0;cut<3;cut++){const r=c.chopTree(s,h.obj,h.point,flatF,{terrainHeight:(x,z)=>c.terrainHeight(s,x,z,false)});events.push(...(r.events||[]).map(e=>({...e,by:q.owner})));}events.push({kind:'timberline_shear',id:q.id,structureId:q.structureId,position:h.point,material:'wood'});continue;}
   if(h.kind==='enemy'){q.hitIds.push(h.obj.id);if(h.obj.kind==='golem')for(const part of ['leftArm','rightArm'])c.hitEnemyPart(s,h.obj,part,270,{ownerId:q.owner,side:q.side,tool:'axe'},c,events);else c.damageEnemy(s,h.obj,250,events,q.owner,q.side);
    if(!(h.obj.hp>0&&s.enemies.includes(h.obj)))continue;}

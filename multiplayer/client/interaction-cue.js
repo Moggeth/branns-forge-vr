@@ -187,11 +187,11 @@ function homeCue(self, snapshot, keys, make) {
   }
   if (at(backTownSpot(base.side, 'stores', STORES.door), STORES.reach)) return make('home', 'ready', 'stores', 'Stores', 'Bank it all', keys.collect, 'everything in your pack into your side\'s stores');
   for (const part of base.parts) if (part.kind === 'ballista' && part.hp > 0 && at([part.position[0], part.position[2]], HOME_MANNED.reach)) {
-    const sun = part.side !== 'rivals', name = sun ? 'Sunlance' : 'Gnashjaw', wind = keys.crank || keys.wind || 'crank';
+    const timber = part.side !== 'rivals', name = timber ? 'Timberline' : 'Gnashjaw', wind = keys.crank || keys.wind || 'crank';
     if (part.operator === self.id) return make('home', 'manned', part.id, name, 'Step off', keys.collect);
     const other = part.operator && part.operator !== self.id;
     if (other) return tick < part.readyTick || part.hook ? make('home', 'busy', part.id, name, part.hook ? 'Help reel' : 'Help wind', wind, part.hook ? 'reels the catch in faster' : 'winds it faster') : make('home', 'busy', part.id, name, 'Manned', '');
-    return make('home', 'ready', part.id, name, 'Man it', keys.collect, sun ? `then aim, hold ${keys.strike.toLowerCase()} to draw, let go on the golden flash` : `then aim, ${keys.strike.toLowerCase()} spits the harpoon, ${wind} reels it in`);
+    return make('home', 'ready', part.id, name, 'Man it', keys.collect, timber ? `then aim, ${keys.strike.toLowerCase()} fires the pair, ${wind} winds it faster` : `then aim, ${keys.strike.toLowerCase()} spits the harpoon, ${wind} reels it in`);
   }
   if (at(homePoint(base.side, HOME_LAYOUT.fountain), HOME.drink.reach)) {
     const ready = (self.drinkTick ?? -1e9) + HOME.drink.cooldown;

@@ -1,7 +1,10 @@
 // Keep ballistas (battle v2). Each home base has two gate ballistas in its own style:
-//  - Dawnhold's Sunlance: hold to draw, release to loose a crystal lance. The longer the draw, the faster, flatter and
-//    harder it flies; letting go in the golden beat just after a full draw looses a Dawnbreak lance that pierces a line
-//    of foes and bursts where it lands.
+//  - Dawnhold's Timberlines: the Hero's twin-bolt Timberline, mounted at the gate. Manned it is exactly the built one
+//    (click fires the long wired pair, R winds, the brass ladder sights) but needs no Wood or Iron; the pair is a real
+//    inventions shot (shared/inventions.js launchKeepTimberline), so it shears trees, sticks and tethers like any other,
+//    and here it also cuts rival Heroes. Unmanned it tracks and fires on its own, winding more slowly.
+//  - The Sunlance (hold to draw, release on the golden beat for a Dawnbreak) is Dawnhold's former pair; its rules stay
+//    here so the style can come back by changing KEEP_STYLES.
 //  - Grumblekeep's Gnashjaw: a big skull spits a chained harpoon. A hooked foe is held and slowed; winding the crank
 //    reels them in, a click yanks them, and anything dragged up to the jaw gets chomped.
 // A Hero of the base's own side mans one with Use. The wire actions are the Timberline ones (inventionMount / Steer /
@@ -11,6 +14,9 @@
 import {HOME, HOME_MANNED, baseFallen, damageHome, findHomeTarget, homeBattle, homeFrame, shieldUp} from './home-bases.js';
 import {worldColliders, insideVolume} from './colliders.js';
 import {hasItem} from './hero-items.js';
+import {MANNED, mannedShot, launchKeepTimberline} from './inventions.js';
+import {timberlineLaunch} from './timberline-flight.js';
+import {TIMBERLINE_FLIGHT} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-flight.js';
 export {HOME_MANNED};
 
 export const KEEP_BALLISTA = Object.freeze({
@@ -22,8 +28,14 @@ export const KEEP_BALLISTA = Object.freeze({
   gnashjaw: Object.freeze({speed: 54, damage: 40, hero: 18, chain: 36, hookTicks: 9 * 60, reel: 6.5, reelAuto: 3.2, reelGolem: 1.8,
     yank: 2.4, yankEvery: 24, yankDamage: 8, chomp: 3.6, chompDamage: 120, chompHero: 50, retractTicks: 60,
     trunnion: 1.46, ahead: 1.9, above: -.16}),
+  // Reload and crank numbers are the built Timberline's (inventions.js MANNED); unmanned it winds half again slower.
+  timberline: Object.freeze({unmannedReload: 360, hero: 45}),
 });
-export const keepStyle = side => side === 'rivals' ? 'gnashjaw' : 'sunlance';
+export const KEEP_STYLES = Object.freeze({party: 'timberline', rivals: 'gnashjaw'});
+export const keepStyle = side => KEEP_STYLES[side === 'rivals' ? 'rivals' : 'party'];
+const isTimberline = part => keepStyle(part.side) === 'timberline';
+// Crew numbers (seat, reload, winding boosts): a keep Timberline handles exactly like a built one.
+const crewOf = part => isTimberline(part) ? MANNED : HOME_MANNED;
 const spec = part => KEEP_BALLISTA[keepStyle(part.side)];
 
 const ID = /^battle-base-(party|rivals)-ballista-[01]$/;
@@ -40,17 +52,21 @@ const ok = (events = []) => ({ok: true, events});
 export function homeBallistaYaw(side) { const f = homeFrame(side).forward; return Math.atan2(-f[0], -f[1]); }
 /** Where the operator stands: behind the grips, swinging round with the aim. */
 export function homeBallistaSeat(part, aimYaw = part.aimYaw || 0) {
-  const y = homeBallistaYaw(part.side) + aimYaw;
-  return [part.position[0] + Math.sin(y) * HOME_MANNED.seat, part.position[1], part.position[2] + Math.cos(y) * HOME_MANNED.seat];
+  const y = homeBallistaYaw(part.side) + aimYaw, seat = crewOf(part).seat;
+  return [part.position[0] + Math.sin(y) * seat, part.position[1], part.position[2] + Math.cos(y) * seat];
 }
+/** A keep Timberline's frame as a built one ({position, yaw}), so mannedShot() and the brass-ladder sight read it unchanged. */
+export const keepTimberlineFrame = part => ({id: part.id, position: part.position, yaw: homeBallistaYaw(part.side)});
 /** The muzzle (where shots leave) and unit forward for a ballista at this aim. Shared by authority and view. */
 export function keepMuzzle(part, aimYaw = part.aimYaw || 0, aimPitch = part.aimPitch || 0) {
+  if (isTimberline(part)) { const l = timberlineLaunch(mannedShot(keepTimberlineFrame(part), {yaw: aimYaw, pitch: aimPitch})); return {at: l.origin, forward: l.forward}; }
   const s = spec(part), y = homeBallistaYaw(part.side) + aimYaw, cp = Math.cos(aimPitch), sp = Math.sin(aimPitch);
   const f = [-Math.sin(y) * cp, sp, -Math.cos(y) * cp], u = [Math.sin(y) * sp, cp, Math.cos(y) * sp];
   return {at: [0, 1, 2].map(k => part.position[k] + (k === 1 ? s.trunnion : 0) + f[k] * s.ahead + u[k] * s.above), forward: f};
 }
 /** Launch speed for a Sunlance draw (0..1) or the Gnashjaw harpoon. */
 export function keepSpeed(part, charge = 0, perfect = false) {
+  if (isTimberline(part)) return TIMBERLINE_FLIGHT.speed;
   const s = spec(part);
   return keepStyle(part.side) === 'gnashjaw' ? s.speed : perfect ? s.speed[1] * 1.08 : lerp(s.speed[0], s.speed[1], clamp(charge, 0, 1));
 }
@@ -69,7 +85,8 @@ export function sunDraw(drawTick, tick) {
 const seated = (part, p) => flat(p.position, homeBallistaSeat(part)) <= 1.5;
 const operatorOf = (state, part) => part.operator ? state.players.find(p => p.id === part.operator && p.role === 'hero' && p.hp > 0 && (p.side || 'party') === part.side && seated(part, p)) : null;
 const shotsOf = state => state.battle.keepShots || [];
-const flying = (state, part) => shotsOf(state).some(s => s.part === part.id);
+// A keep Timberline's pair can fly on for seconds after a miss; only the harpoon on its chain holds the next shot.
+const flying = (state, part) => !isTimberline(part) && shotsOf(state).some(s => s.part === part.id);
 
 function setAim(state, p, part, aim, c) {
   if (!aim || !Number.isFinite(aim.yaw) || !Number.isFinite(aim.pitch)) return fail('invalid_target');
@@ -79,7 +96,20 @@ function setAim(state, p, part, aim, c) {
   return ok();
 }
 
+// The keep Timberline's pair joins the inventions shots: same flight, cuts, sticking and tethers as a built Timberline.
+function launchTimberline(state, part, by) {
+  const hat = !!by && hasItem(state.players.find(q => q.id === by), 'hat');
+  const q = launchKeepTimberline(state, mannedShot(keepTimberlineFrame(part), {yaw: part.aimYaw || 0, pitch: part.aimPitch || 0}), {structureId: part.id, side: part.side, owner: by ?? null});
+  if (!q) return null;
+  q.heroDamage = KEEP_BALLISTA.timberline.hero;
+  const reload = by ? MANNED.reloadTicks : KEEP_BALLISTA.timberline.unmannedReload;
+  part.readyTick = state.tick + (hat ? reload / 2 : reload); part.fireTick = state.tick;
+  return {kind: 'timberline_fire', id: part.id, structureId: part.id, part: part.id, side: part.side, position: [...part.position], origin: [...q.origin], target: [...q.target],
+    material: 'wood', sourceMaterial: by ? 'weapon' : 'bone', by: by ?? null, manned: !!by, keep: true};
+}
+
 function launch(state, part, by, {charge = 0, perfect = false} = {}) {
+  if (isTimberline(part)) return launchTimberline(state, part, by);
   const {at, forward} = keepMuzzle(part), speed = keepSpeed(part, charge, perfect), style = keepStyle(part.side);
   const shot = {id: `${part.id}:${state.tick}`, part: part.id, side: part.side, style, o: at.map(round), v: forward.map(v => round(v * speed)), tick: state.tick,
     by: by ?? null, charge: round(charge), perfect: !!perfect, hits: []};
@@ -101,6 +131,7 @@ function fire(state, p, part, aim, c) {
     return ok([launch(state, part, p.id)]);
   }
   if (state.tick < part.readyTick) { delete part.drawTick; return fail('machine_loading'); }
+  if (isTimberline(part)) { const ev = launch(state, part, p.id); return ev ? ok([ev]) : fail('machine_limit'); }
   return ok([launch(state, part, p.id, sunDraw(part.drawTick, state.tick))]);
 }
 
@@ -135,8 +166,8 @@ export function homeBallistaAction(state, p, m, c) {
   if (action === 'inventionUse') return part.operator === p.id ? fire(state, p, part, m.aim, c) : fail('not_operator');
   if (action === 'inventionCrank') {
     if (!part.hook && state.tick >= part.readyTick) return fail('not_needed');
-    if (part.operator === p.id) part.crankUntil = state.tick + HOME_MANNED.crankHold;
-    else if (flat(p.position, part.position) <= HOME_MANNED.reach) part.helpUntil = state.tick + HOME_MANNED.crankHold;
+    if (part.operator === p.id) part.crankUntil = state.tick + crewOf(part).crankHold;
+    else if (flat(p.position, part.position) <= HOME_MANNED.reach) part.helpUntil = state.tick + crewOf(part).crankHold;
     else return fail('too_far');
     return ok();
   }
@@ -298,8 +329,8 @@ function stepHook(state, part, ctx, events) {
 
 // --- Unmanned tracking ----------------------------------------------------------------------------------------
 // Elevation that lands a shot of speed v at flat distance d and height h (the flatter of the two arcs), or null.
-export function keepPitchFor(d, h, v) {
-  const g = KEEP_BALLISTA.gravity, root = v ** 4 - g * (g * d * d + 2 * h * v * v);
+export function keepPitchFor(d, h, v, g = KEEP_BALLISTA.gravity) {
+  const root = v ** 4 - g * (g * d * d + 2 * h * v * v);
   return root < 0 ? null : Math.atan2(v * v - Math.sqrt(root), g * d);
 }
 const tracks = new WeakMap();
@@ -320,21 +351,22 @@ function stepAuto(state, part, events) {
   const charge = keepStyle(part.side) === 'sunlance' ? KEEP_BALLISTA.sunlance.autoCharge : 0, v = keepSpeed(part, charge);
   const muzzle = keepMuzzle(part).at, d0 = flat(target.position, muzzle), lead = d0 / v;
   const aim = [target.position[0] + tr.vx * lead, target.position[1] + 1, target.position[2] + tr.vz * lead];
-  const d = Math.hypot(aim[0] - muzzle[0], aim[2] - muzzle[2]), pitch = keepPitchFor(d, aim[1] - muzzle[1], v);
+  const d = Math.hypot(aim[0] - muzzle[0], aim[2] - muzzle[2]), pitch = keepPitchFor(d, aim[1] - muzzle[1], v, isTimberline(part) ? TIMBERLINE_FLIGHT.gravity : KEEP_BALLISTA.gravity);
   if (pitch === null) return;
   const yaw = wrap(Math.atan2(-(aim[0] - part.position[0]), -(aim[2] - part.position[2])) - homeBallistaYaw(part.side));
   const step = KEEP_BALLISTA.turn / 60, dy = wrap(yaw - (part.aimYaw || 0)), dp = clamp(pitch, HOME_MANNED.pitchMin, HOME_MANNED.pitchMax) - (part.aimPitch || 0);
   part.aimYaw = wrap((part.aimYaw || 0) + clamp(dy, -step, step)); part.aimPitch = (part.aimPitch || 0) + clamp(dp, -step, step);
   if (state.tick < part.readyTick || flying(state, part) || Math.abs(dy) > .035 || Math.abs(dp) > .035) return;
-  events.push(launch(state, part, null, {charge}));
+  const ev = launch(state, part, null, {charge}); if (ev) events.push(ev);
 }
 
 /** Per tick, before the bases step: drop operators who left, wind reloads, reel hooks and fire unmanned ballistas. True while manned. */
 export function stepHomeBallista(state, part, ctx, events = []) {
   if (part.operator && (part.hp <= 0 || !operatorOf(state, part))) { part.operator = null; delete part.drawTick; }
   if (part.drawTick !== undefined && (!part.operator || state.tick - part.drawTick > 20 * 60)) delete part.drawTick;
-  if (state.tick < part.readyTick && !part.hook && state.tick - (part.fireTick ?? -1e9) >= HOME_MANNED.fireTicks) {
-    const boost = (part.helpUntil || 0) > state.tick ? HOME_MANNED.helperBoost : (part.crankUntil || 0) > state.tick ? HOME_MANNED.operatorBoost : 1;
+  const crew = crewOf(part);
+  if (state.tick < part.readyTick && !part.hook && state.tick - (part.fireTick ?? -1e9) >= crew.fireTicks) {
+    const boost = (part.helpUntil || 0) > state.tick ? crew.helperBoost : (part.crankUntil || 0) > state.tick ? crew.operatorBoost : 1;
     if (boost > 1) part.readyTick = Math.max(state.tick + 1, part.readyTick - (boost - 1));
   }
   if (!ctx) return !!part.operator;

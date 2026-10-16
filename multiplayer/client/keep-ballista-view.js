@@ -1,10 +1,15 @@
-// Keep ballista presentation: the Sunlance and Gnashjaw rigs at each gate, their shots, chains, stuck lances, impact
+// Keep ballista presentation: Dawnhold's gate Timberlines and Grumblekeep's Gnashjaw rigs (and the retired Sunlance), their shots, chains, stuck lances, impact
 // flashes and the operator's sighting arc. Everything moves on the frame clock: shots follow the shared ballistic curve
 // from their launch event (shared/home-ballista.js keepShotAt) at the presentation tick, aims ease toward the replicated
-// aim (or follow the operator's own aim at once), and pose changes spring rather than snap.
+// aim (or follow the operator's own aim at once), and pose changes spring rather than snap. A keep Timberline is the
+// built Timberline's own model and clips (its pair, stuck bolts and tracers draw with every other Timberline shot in
+// invention-view.js), standing on a Dawnhold dais.
 import * as THREE from 'three';
 import {HOME_MANNED, KEEP_BALLISTA, homeBallistaYaw, keepMuzzle, keepShotAt, keepSpeed, keepStyle, sunDraw} from '../shared/home-ballista.js';
+import {machineCycleAge} from '../shared/inventions.js';
 import {buildKeepRig, poseKeepRig, prepareKeepKit, rigMuzzle} from './keep-ballista-art.js';
+import {createTimberlineBallista} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
+import {addLadderPlates} from './timberline-ladder-plates.js';
 
 const TIP = {sunlance: 1.8, gnashjaw: 2.56}; // bolt length from its nock (the mesh origin) to its tip
 const STUCK_CAP = 20, STUCK_LIFE = 22, LINK = .13, LINKS = 300;
@@ -12,7 +17,21 @@ const COLOR = {sunlance: new THREE.Color(0x7cc4ff), dawn: new THREE.Color(0xffc6
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const v3 = a => new THREE.Vector3(a[0], a[1], a[2]);
 
-export function createKeepBallistaView({root, height = () => 0}) {
+// The dais under a gate Timberline: Dawnhold sandstone, a brass rim and a blue enamel inlay that wakes while it is loaded.
+const DAIS = Object.freeze({radius: 1.32, top: .04, depth: .45, stone: 0xb9ad97, brass: 0xc49a52, glow: 0x5fb4ff});
+function buildDais() {
+  const g = new THREE.Group(); g.name = 'keep-timberline-dais';
+  const stone = new THREE.MeshStandardMaterial({color: DAIS.stone, roughness: .86, flatShading: true});
+  const brass = new THREE.MeshStandardMaterial({color: DAIS.brass, metalness: .8, roughness: .35, flatShading: true});
+  const inlay = new THREE.MeshStandardMaterial({color: DAIS.glow, emissive: DAIS.glow, emissiveIntensity: .9, roughness: .3});
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(DAIS.radius, DAIS.radius + .08, DAIS.depth, 8), stone); pad.position.y = DAIS.top - DAIS.depth / 2; pad.rotation.y = Math.PI / 8;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(DAIS.radius + .01, .035, 4, 8).rotateX(Math.PI / 2), brass); rim.position.y = DAIS.top; rim.rotation.y = Math.PI / 8;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(DAIS.radius * .7, .022, 3, 32).rotateX(Math.PI / 2), inlay); ring.position.y = DAIS.top + .004;
+  g.add(pad, rim, ring);
+  return {group: g, inlay, dispose() { for (const m of [pad, rim, ring]) m.geometry.dispose(); stone.dispose(); brass.dispose(); inlay.dispose(); }};
+}
+
+export function createKeepBallistaView({root, height = () => 0, timberline = () => null}) {
   const group = new THREE.Group(); group.name = 'keep-ballistas'; root.add(group);
   let kit = null, snapshot = null, tick = 0;
   const parts = new Map(), flights = new Map(), stuck = [], fx = [], fxPool = [], localAim = new Map(), localDraw = new Map(), retracts = new Map();
@@ -37,8 +56,11 @@ export function createKeepBallistaView({root, height = () => 0}) {
 
   /** Take over a home-base ballista part (built by home-base-view) with a keep rig. */
   function adopt(built) {
-    if (!kit || built.keep) return !!built.keep;
-    const style = keepStyle(built.data.side), rig = buildKeepRig(kit, style);
+    if (built.keep) return true;
+    const style = keepStyle(built.data.side);
+    if (style === 'timberline') return adoptTimberline(built);
+    if (!kit) return false;
+    const rig = buildKeepRig(kit, style);
     for (const c of [...built.group.children]) built.group.remove(c);
     rig.group.rotation.y = -built.group.rotation.y; // world-aligned inside the placed part
     rig.group.traverse(n => { if (n.isMesh) n.userData.targetId = built.data.id; });
@@ -48,7 +70,22 @@ export function createKeepBallistaView({root, height = () => 0}) {
     parts.set(built.data.id, built);
     return true;
   }
-  const release = built => { if (built?.keep) { parts.delete(built.data.id); built.keep = null; } };
+  // Dawnhold's gate Timberline: the built Timberline's model, facing out of the gate on its dais.
+  function adoptTimberline(built) {
+    const gltf = timberline(); if (!gltf) return false;
+    const machine = createTimberlineBallista(gltf, {castShadow: false}), dais = buildDais();
+    addLadderPlates(machine.nodes);
+    for (const c of [...built.group.children]) built.group.remove(c);
+    const holder = new THREE.Group(); holder.name = 'keep-timberline';
+    holder.rotation.y = homeBallistaYaw(built.data.side) - built.group.rotation.y; // the machine's rest heading, world-aligned
+    holder.add(dais.group, machine.object); built.group.add(holder);
+    holder.traverse(n => { if (n.isMesh) n.userData.targetId = built.data.id; });
+    built.head = null; built.bow = null; built.bolt = null;
+    built.keep = {style: 'timberline', machine, dais, holder, yaw: built.data.aimYaw || 0, pitch: built.data.aimPitch || 0};
+    parts.set(built.data.id, built);
+    return true;
+  }
+  const release = built => { if (built?.keep) { if (built.keep.machine) { built.keep.machine.dispose(); built.keep.dais.dispose(); } parts.delete(built.data.id); built.keep = null; } };
 
   function sync(s) { snapshot = s; }
 
@@ -192,6 +229,21 @@ export function createKeepBallistaView({root, height = () => 0}) {
   }
 
   // --- Per frame ------------------------------------------------------------------------------------------
+  function poseTimberline(built, dt, camera) {
+    const k = built.keep, data = built.data, alive = data.hp > 0;
+    // The operator's own predicted aim drives it at once; everyone else eases toward the replicated aim every frame.
+    const mine = localAim.get(data.id), want = mine || {yaw: data.aimYaw || 0, pitch: data.aimPitch || 0}, ease = mine ? 1 : 1 - Math.exp(-dt * 7);
+    k.yaw += wrap(want.yaw - k.yaw) * ease; k.pitch += (want.pitch - k.pitch) * ease;
+    k.machine.aimImmediate(k.yaw, k.pitch);
+    const age = machineCycleAge({fireTick: data.fireTick ?? -1e4, readyTick: data.readyTick ?? 0}, tick);
+    k.machine.seekCycle(alive ? age : 99, camera, viewport, {ammo: alive});
+    // The inlay glows while a pair sits on the rails and dims through the wind.
+    const ready = tick >= (data.readyTick ?? 0);
+    k.dais.inlay.emissiveIntensity += ((alive ? (ready ? 1.1 : .35) : 0) - k.dais.inlay.emissiveIntensity) * (1 - Math.exp(-dt * 6));
+    k.holder.visible = built.alive > .2 || alive;
+    return k;
+  }
+
   function poseFor(built, dt, now) {
     const k = built.keep, data = built.data, alive = data.hp > 0;
     const mine = localAim.get(data.id), aim = mine || (data.operator || data.aimYaw !== undefined ? {yaw: data.aimYaw || 0, pitch: data.aimPitch || 0} : null);
@@ -224,11 +276,12 @@ export function createKeepBallistaView({root, height = () => 0}) {
     return k;
   }
 
-  function update(dt, renderTick, camera) {
-    if (!kit) return;
-    tick = renderTick ?? tick;
+  let viewport = 1080;
+  function update(dt, renderTick, camera, viewportHeight = viewport) {
+    tick = renderTick ?? tick; viewport = viewportHeight;
+    if (!kit) { for (const built of parts.values()) if (built.keep.style === 'timberline') poseTimberline(built, dt, camera); return; }
     const now = performance.now();
-    for (const built of parts.values()) poseFor(built, dt, now);
+    for (const built of parts.values()) if (built.keep.style === 'timberline') poseTimberline(built, dt, camera); else poseFor(built, dt, now);
     stepFlights(dt, camera);
     // Chains: from each Gnashjaw's mouth to its harpoon in flight, its hooked catch, or the harpoon winding home.
     linkCount = 0;
@@ -284,12 +337,18 @@ export function createKeepBallistaView({root, height = () => 0}) {
     }
   }
 
-  return {install, adopt, release, sync, event, update, sight, ready: () => !!kit, sightState,
+  /** World position of a gate Timberline's sighting eye (the brass ladder's peep), or null. */
+  function scopeEye(id, out = new THREE.Vector3()) {
+    const built = parts.get(id); if (built?.keep?.style !== 'timberline') return null;
+    built.group.updateWorldMatrix(true, true); return built.keep.machine.nodes.Socket_ScopeEye?.getWorldPosition(out) || null;
+  }
+
+  return {install, adopt, release, sync, event, update, sight, scopeEye, ready: () => !!kit, sightState,
     setLocalAim(id, aim) { if (aim) localAim.set(id, aim); else localAim.delete(id); },
     /** The operator's own Sunlance draw: a frame time it started at, or null when released or cancelled. */
     setLocalDraw(id, startMs) { if (startMs === null || startMs === undefined) localDraw.delete(id); else localDraw.set(id, startMs); },
     localDraw: (id, now = performance.now()) => { const s = localDraw.get(id); return s === undefined ? null : sunDraw(0, (now - s) / 1000 * 60); },
-    stats: () => ({rigs: parts.size, flights: flights.size, stuck: stuck.length, links: links.count, fx: fx.length}),
+    stats: () => ({rigs: parts.size, timberlines: [...parts.values()].filter(b => b.keep.style === 'timberline').map(b => ({id: b.data.id, phase: b.keep.machine.state, aim: b.keep.machine.aim, lod: b.keep.machine.lod})), flights: flights.size, stuck: stuck.length, links: links.count, fx: fx.length}),
     dispose() { group.removeFromParent(); linkGeo.dispose(); linkMat.dispose(); flashGeo.dispose(); glowTex.dispose(); ringGeo.dispose(); arcGeo.dispose(); arcMat.dispose(); for (const m of Object.values(trailMats)) m.dispose(); }};
 }
 
