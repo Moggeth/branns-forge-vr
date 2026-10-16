@@ -13,6 +13,7 @@ import {MILL, millAt} from '../shared/home-mill.js';
 import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
+import {MOUNT, mountOf, mountNear} from '../shared/mounts.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, notchAt, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
 const METAL_BARS = new Set(['iron', 'mithril', 'starMetal', 'copper', 'gold']);
@@ -110,7 +111,13 @@ export function decideCue(view, self, snapshot, aim, ctx) {
   const stackCue = c => { const metal = METAL_BARS.has(c.kind), ore = /Ore$/.test(c.kind); if (!metal && !ore) return null; const n = c.amount | 0, label = titleCase(materialLabel(c.kind)), noun = metal ? `${label} Bar${n === 1 ? '' : 's'}` : label;
     return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, materialInfo(c.kind)?.use || ''); };
   const pickupCue = c => c.type==='snack'?snackCue(c):(c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Pick up':'Collect',keys.collect,c.kind==='apple'?'A treat: +50 health in three bites':materialInfo(c.kind)?.use||''));
+  // Mounts (shared/mounts.js): a wild tiger takes the apple in your hand before you would bite it yourself.
+  const riding = mountOf(snapshot, self), nearMount = !riding && mountNear(snapshot, self);
+  if (nearMount && !nearMount.tamed && (snapshot.fruit?.drops || []).some(d => d.heldBy === self.id)) return make('mount', 'ready', nearMount.id, 'Wild tiger', 'Offer the apple', keys.collect, 'a friend for life, and a ride');
   if(selected&&!selected.full&&!selected.unnecessary)return pickupCue(selected);
+  if (nearMount) { const name = MOUNT.kinds[nearMount.kind].name;
+    return nearMount.tamed ? make('mount', 'ready', nearMount.id, name, 'Ride', keys.collect, nearMount.kind === 'tiger' ? 'quick on its feet, leaps high' : 'twice as fast as running')
+      : make('mount', 'full', nearMount.id, 'Wild tiger', 'Bring an apple', '', 'pick one up and offer it from your hand'); }
 
   // 2. Aimed target. Occluders: the nearest visible content surface and analytic terrain.
   if (aim && finite3(aim.origin) && finite3(aim.direction)) {
@@ -153,6 +160,8 @@ export function decideCue(view, self, snapshot, aim, ctx) {
   const forge = snapshot.inventions?.structures.find(b => b.type === 'forge' && b.hp > 0);
   const forgeCue = forge && structureCue(forge, self, snapshot, keys, make);
   if (forgeCue) return forgeCue;
+
+  if (riding) return make('mount', 'manned', riding.id, MOUNT.kinds[riding.kind].name, 'Hop off', keys.collect);
 
   // 4. Forge delivery: only inside DEPOSIT_RANGE while the expedition offers Deliver and the Hero carries an accepted kind.
   const deliver = ctx.deliver;

@@ -64,6 +64,20 @@ export function poseRemoteWeapon(visual, tool) {
  * updateWeaponPresentation itself allocates per visual (the bowstring line).
  */
 // siegebird: () => the shared songbird flock (siegebird-flock.js) or null while its assets load.
+// Astride a mount: thighs forward and apart round the saddle, shins hanging back toward the stirrups. Applied on top of
+// the animated pose each frame (the rest pose is restored the next frame, like the VR body layers).
+const _seatQ = new THREE.Quaternion(), _seatE = new THREE.Euler();
+export const SEAT_POSE = Object.freeze({thigh: .85, spread: .95, knee: -1.25, foot: .2});
+export function seatPose(bones, pose = SEAT_POSE) {
+  for (const side of ['L', 'R']) {
+    const k = side === 'L' ? 1 : -1, bone = n => bones[`${n}${side}`] || bones[`${n}.${side}`]; // the loader drops the dot from node names
+    const up = bone('UpperLeg'), low = bone('LowerLeg'), foot = bone('Foot');
+    if (up) up.quaternion.multiply(_seatQ.setFromEuler(_seatE.set(pose.thigh, 0, pose.spread * k)));
+    if (low) low.quaternion.multiply(_seatQ.setFromEuler(_seatE.set(pose.knee, 0, 0)));
+    if (foot) foot.quaternion.multiply(_seatQ.setFromEuler(_seatE.set(pose.foot, 0, 0)));
+  }
+}
+
 export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null} = {}) {
   let template = null, clips = null, eyeHeight = 1.645;
   const materials = new Map(), live = new Set(), warned = new Set();
@@ -193,7 +207,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     if (u.last) { const d = Math.hypot(p.x - u.last.x, p.z - u.last.z) / Math.max(dt, 1e-3);
       u.speed += (Math.min(d, 9) - u.speed) * (1 - Math.exp(-dt * HERO_LOCOMOTION.smoothing)); }
     (u.last ||= new THREE.Vector3()).copy(p);
-    const L = HERO_LOCOMOTION, a = u.heroActions, s = u.speed;
+    const L = HERO_LOCOMOTION, a = u.heroActions, s = u.seated ? 0 : u.speed; // a rider's legs stay in the stirrups
     const move = THREE.MathUtils.smoothstep(s, L.moveThreshold * .6, L.moveThreshold * 1.6);
     const run = THREE.MathUtils.smoothstep(s, L.runBlendStart, L.runBlendEnd);
     a.Idle?.setEffectiveWeight(1 - move); a.Walk?.setEffectiveWeight(move * (1 - run)); a.Run?.setEffectiveWeight(move * run);
@@ -320,6 +334,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     if (u.posed) { for (const [b, p, q] of u.rest) { b.position.copy(p); b.quaternion.copy(q); } u.posed = false; }
     { const a = u.heroActions.Attack; if (a) a.timeScale = u.clock - u.attackAt < (u.attackHold || 0) ? .06 : 1; }
     u.heroMixer.update(dt);
+    if (u.seated) { seatPose(u.bones); u.posed = true; }                         // astride a horse or tiger (client/mount-view.js)
     if (data.head) { u.model.updateMatrixWorld(true); u.posed = true;
       crouch(u);                                                                 // feet pinned, hips lowered: before the arms
       if (data.hands?.[0]) reach(u, 'L', data.hands[0], root);                    // hands[0] = left, hands[1] = right (game.js order)

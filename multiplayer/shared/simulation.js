@@ -20,6 +20,7 @@ export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
 import {resolveStartingWorld,STARTING_SITES} from './starting-world.js';
 import {resolvePlaces} from './worldgen/places.js';
+import {mountAction,mountJump,mountSpeed,riderRadius,spawnWorldMounts,stepMounts,restoreMounts} from './mounts.js';
 import {resolveDeposits} from './colliders.js';
 import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
@@ -165,6 +166,8 @@ function newWorldState({room, seed, descriptor, run = null}) {
   state.pickups = [];
   state.shrine.position = [0, terrainHeight(state, 0, 0), 0];
   newWildsState(state, worldFor(state), terrainHeight);
+  // Horses at the start and a wild tiger nearby (shared/mounts.js); an Expedition run travels on foot.
+  if (descriptor.kind !== 'expedition') state.mounts = spawnWorldMounts(state, worldFor(state), terrainHeight, wildsOrigin(state, worldFor(state)));
   worldMode(descriptor.kind)?.newState?.(state, worldFor(state), run || {});
   return state;
 }
@@ -275,7 +278,7 @@ function instantiate(state) {
         p.move = p.role === 'hero' && !p.dragon ? [x, z] : [0, 0];
         p.yaw = ((message.yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
         p.inputTick = state.tick;
-        if (message.jump === true && p.role === 'hero' && !p.dragon && p.vy === 0) p.vy = 5.5;
+        if (message.jump === true && p.role === 'hero' && !p.dragon && p.vy === 0) p.vy = mountJump(state,p);
         if (message.head !== undefined) p.head = pose(message.head);
         if (message.hands !== undefined) p.hands = message.hands.map(pose);
         return ok();
@@ -293,6 +296,7 @@ function instantiate(state) {
         if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (message.action === 'talent') return talentAction(state,p,message);
         if (p.role !== 'hero') return fail('invalid_action');
+        if (message.action === 'mount' || message.action === 'dismount') return mountAction(state,p,message,{takeApple:h=>{const f=state.fruit,i=f?.drops?.findIndex(d=>d.heldBy===h.id)??-1;if(i<0)return false;f.drops.splice(i,1);return true;}});
         if (message.action === 'dragon') return dragonAction(state,p,message,dragonContext);
         if (p.dragon && message.action !== 'equip') return fail('dragon_riding');
         if (message.action === 'equip') {
@@ -477,13 +481,13 @@ function instantiate(state) {
         p.mana = Math.min(100, p.mana + (3+(p.role==='god'?Math.min(2,state.groves.filter(g=>!state.harvestedTrees.some(t=>t.id.startsWith(g.id)&&t.cuts>=3)).length*.15):0)) * (1+itemBonus(p,'mana')) / HZ);
         if (state.tick - p.inputTick > 18) p.move = [0, 0];
         if (p.role === 'hero') {
-          const pace=5*swiftFactor(state,p)*(1+itemBonus(p,'speed'))/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
+          const pace=5*swiftFactor(state,p)*(1+itemBonus(p,'speed'))*mountSpeed(state,p)/HZ;moveOnTerrain(state,p.position,p.move[0]*pace,p.move[1]*pace);
           leash(state,p,p.position);
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
         if(p.role==='hero'&&inUnderway(p.position[0],p.position[2]))resolveUnderway(state,p.position,.28);
-        else if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,p.position,.28,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);if(state.world)resolvePlaces(worldFor(state),p.position);else{resolveBackTowns(state,p.position);resolveCoveLakes(p.position);resolveMapExtras(p.position);}resolveTerrainBoundary(p.position);}
+        else if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));const rr=riderRadius(state,p);resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),rr);resolveDeposits(state,p.position,rr,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);if(state.world)resolvePlaces(worldFor(state),p.position,rr);else{resolveBackTowns(state,p.position);resolveCoveLakes(p.position);resolveMapExtras(p.position);}resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -492,6 +496,7 @@ function instantiate(state) {
         const speed=Math.hypot(vx,vz);if(speed>5){vx*=5/speed;vz*=5/speed;}
         p.velocity=p.role==='hero'?[vx,p.vy,vz]:[0,0,0];
       }
+      stepMounts(state,{terrainHeight,world:state.world?worldFor(state):null},events);
       stepStormspires(state, events, (x,z)=>terrainHeight(state,x,z,false), {...combatContext,hitEnemyPart});
       stepBoons(state); stepBloom(state, events); stepRain(state, events); stepWaygate(state, {terrainHeight}, events); stepGeodes(state, events); stepBeacon(state, events);
       for (const pending of [...state.pendingStarfalls]) {
@@ -555,7 +560,7 @@ function instantiate(state) {
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),...(state.underways?.runs.length||Object.keys(state.underways?.delves||{}).length?{underways:state.underways}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
-        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.run?{run:state.run}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...modeSnapshot(state)});
+        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.run?{run:state.run}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...(state.mounts?.length?{mounts:state.mounts}:{}),...modeSnapshot(state)});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -711,6 +716,7 @@ function loadState(saved, descriptor) {
   const waygate=restoreWaygate(saved);if(waygate)state.waygate=waygate;const geodes=restoreGeodes(saved);if(geodes)state.geodes=geodes;const beacon=restoreBeacon(saved);if(beacon)state.beacon=beacon;
   state.heroLedger = restoreLedger(saved);
   state.shrine = copy(saved.shrine); // Includes break/restore timer.
+  state.mounts = restoreMounts(saved, state.players, validPosition);
   if (descriptor) { state.wilds = restoreWilds(saved); worldMode(descriptor.kind)?.restore?.(saved, state); }
   return instantiate(state);
 }
